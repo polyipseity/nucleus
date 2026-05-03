@@ -59,7 +59,6 @@ in
       NSToolbarTitleViewRolloverDelay = 0.0;         # instant toolbar title appearance on hover
       # Text substitution dictionary: maps `replace` → `with` in all apps.
       # Entries here suppress autocorrect for technical terms and provide one
-      # shortcut ("omw" → Chinese phrase).
       NSUserDictionaryReplacementItems = [
         { replace = "contravariance"; "with" = "contravariance"; }
         { replace = "contravariant"; "with" = "contravariant"; }
@@ -71,7 +70,6 @@ in
         { replace = "Google"; "with" = "Google"; }
         { replace = "IME"; "with" = "IME"; }
         { replace = "Microsoft"; "with" = "Microsoft"; }
-        { replace = "omw"; "with" = "在路上了！"; }
         { replace = "OneDrive"; "with" = "OneDrive"; }
         { replace = "pullback"; "with" = "pullback"; }
         { replace = "pushforward"; "with" = "pushforward"; }
