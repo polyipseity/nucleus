@@ -66,7 +66,7 @@ case "$(uname -s)" in
     # nix-darwin manages both the system layer and the user Home Manager
     # profile.  darwin-rebuild invokes sudo internally for system activation.
     start_sudo_keepalive
-    nix --extra-experimental-features "$NIX_EXTRA_FEATURES" run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
+    sudo nix --extra-experimental-features "$NIX_EXTRA_FEATURES" run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
     ;;
   Linux)
     if [ -f /etc/NIXOS ]; then
@@ -86,5 +86,4 @@ case "$(uname -s)" in
     printf '%s\n' "error: unsupported OS '$(uname -s)'" >&2
     exit 1
     ;;
-esac
 esac

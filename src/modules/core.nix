@@ -272,14 +272,17 @@ in
   };
 
   # Probe the module option tree at evaluation time to decide which option to
-  # populate. Both branches may match simultaneously (e.g. nix-darwin with
-  # Home Manager), so mkMerge is used to merge both results safely.
+  # populate. optionalAttrs is used (instead of mkIf) for environment/home
+  # branches so unknown option paths are omitted entirely on module stacks
+  # where they do not exist (for example: home.* in pure system evaluations).
+  # Both branches may match simultaneously (e.g. nix-darwin with Home Manager),
+  # so mkMerge is used to merge both results safely.
   config = lib.mkMerge [
-    (lib.mkIf (options ? environment && options.environment ? systemPackages) {
+    (lib.optionalAttrs (options ? environment && options.environment ? systemPackages) {
       environment.systemPackages = sharedPackages;
     })
 
-    (lib.mkIf (options ? home && options.home ? packages) {
+    (lib.optionalAttrs (options ? home && options.home ? packages) {
       home.packages = sharedPackages;
     })
 
