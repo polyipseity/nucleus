@@ -81,6 +81,6 @@
 - `.editorconfig`, `.gitattributes`, `.markdownlint.jsonc`,
   `.agents/.markdownlint.jsonc` — formatting and line-ending rules
 - `src/flake.nix` — Nix flake entrypoint (hosts + home-manager outputs)
-- `src/hosts/` — per-machine configurations (macbook, workstation, surface)
+- `src/hosts/` — per-machine configurations (macbook, nixos, windows)
 - `src/modules/` — shared Nix modules (core packages, home, shell, editors)
 - `scripts/bootstrap.sh`, `scripts/bootstrap.ps1` — one-command setup wrappers

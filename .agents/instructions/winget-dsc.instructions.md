@@ -1,15 +1,15 @@
 ---
-description: "Use when authoring or editing WinGet DSC configuration files under src/hosts/surface/. Covers DSC v3 YAML structure, resource ordering, sorting, and safe authoring patterns for this repository."
+description: "Use when authoring or editing WinGet DSC configuration files under src/hosts/windows/. Covers DSC v3 YAML structure, resource ordering, sorting, and safe authoring patterns for this repository."
 name: "WinGet DSC Authoring"
-applyTo: "src/hosts/surface/**/*.yaml, src/hosts/surface/**/*.yml"
+applyTo: "src/hosts/windows/**/*.yaml, src/hosts/windows/**/*.yml"
 ---
 
 # WinGet DSC Authoring
 
 ## File location and purpose
 
-- `src/hosts/surface/configuration.dsc.yaml` is the single WinGet DSC v3
-  manifest for the Surface (Windows) host.
+- `src/hosts/windows/configuration.dsc.yaml` is the single WinGet DSC v3
+  manifest for the Windows host.
 - It is applied with `winget configure` (see `README.md` and
   `scripts/bootstrap.ps1` for the exact invocation).
 
@@ -61,7 +61,7 @@ packages) or `settings.valueName` / `settings.name` (for other resources).
 
 - Test the manifest dry-run on the target machine with:
   ```powershell
-  winget configure --what-if .\src\hosts\surface\configuration.dsc.yaml
+  winget configure --what-if .\src\hosts\windows\configuration.dsc.yaml
   ```
 - Full application requires an elevated PowerShell session and
   `--accept-configuration-agreements`.

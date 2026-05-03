@@ -16,9 +16,9 @@ nucleus/
 │   ├── hosts/
 │   │   ├── macbook/
 │   │   │   └── default.nix
-│   │   ├── workstation/
+│   │   ├── nixos/
 │   │   │   └── configuration.nix
-│   │   └── surface/
+│   │   └── windows/
 │   │       └── configuration.dsc.yaml
 │   └── modules/
 │       ├── core.nix
@@ -36,8 +36,8 @@ nucleus/
 
 - `src/modules/core.nix`: shared CLI tools (`git`, `rustup`, `ripgrep`, `fd`, `bottom`, `eza`, `zoxide`)
 - `src/hosts/macbook/default.nix`: macOS defaults (keyboard repeat, dock behavior)
-- `src/hosts/workstation/configuration.nix`: Linux host/system defaults and hardware baseline
-- `src/hosts/surface/configuration.dsc.yaml`: Windows packages/settings/environment via WinGet DSC
+- `src/hosts/nixos/configuration.nix`: Linux host/system defaults and hardware baseline
+- `src/hosts/windows/configuration.dsc.yaml`: Windows packages/settings/environment via WinGet DSC
 - `src/modules/home.nix`: home-level shell/editor/dotfile composition across platforms
 
 ## One-liner apply commands
@@ -51,13 +51,13 @@ nix run nix-darwin -- switch --flake ./src#macbook
 ### Linux (NixOS)
 
 ```bash
-sudo nixos-rebuild switch --flake ./src#workstation
+sudo nixos-rebuild switch --flake ./src#nixos
 ```
 
 ### Windows (Admin PowerShell)
 
 ```powershell
-winget configure .\src\hosts\surface\configuration.dsc.yaml
+winget configure .\src\hosts\windows\configuration.dsc.yaml
 ```
 
 ## Bootstrap scripts

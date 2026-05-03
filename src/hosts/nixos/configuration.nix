@@ -2,7 +2,7 @@
 {
   imports = [ ../../modules/core.nix ];
 
-  networking.hostName = "workstation";
+  networking.hostName = "nixos";
   networking.networkmanager.enable = true;
 
   nix.settings.experimental-features = [ "flakes" "nix-command" ];

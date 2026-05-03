@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
   [Parameter()]
-  [string]$ConfigPath = (Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\surface\configuration.dsc.yaml")
+  [string]$ConfigPath = (Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\windows\configuration.dsc.yaml")
 )
 
 $ErrorActionPreference = "Stop"

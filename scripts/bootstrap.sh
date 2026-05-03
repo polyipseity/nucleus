@@ -18,8 +18,8 @@ case "$OS_NAME" in
     ;;
   Linux)
     if command -v nixos-rebuild >/dev/null 2>&1; then
-      printf '%s\n' "Applying NixOS configuration: workstation"
-      sudo nixos-rebuild switch --flake "$REPO_ROOT/src#workstation"
+      printf '%s\n' "Applying NixOS configuration: nixos"
+      sudo nixos-rebuild switch --flake "$REPO_ROOT/src#nixos"
     else
       if ! command -v home-manager >/dev/null 2>&1; then
         printf '%s\n' "error: home-manager not found (required for non-NixOS Linux)" >&2

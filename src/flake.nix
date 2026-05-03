@@ -41,10 +41,10 @@
       };
 
       # Linux (NixOS)
-      nixosConfigurations.workstation = nixpkgs.lib.nixosSystem {
+      nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
         system = systems.linux;
         modules = [
-          ./hosts/workstation/configuration.nix
+          ./hosts/nixos/configuration.nix
           home-manager.nixosModules.home-manager
           {
             home-manager.useGlobalPkgs = true;
