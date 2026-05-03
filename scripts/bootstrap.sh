@@ -191,7 +191,7 @@ load_bootstrap_versions
 ensure_macos_nix_mount
 bootstrap_nix_if_missing
 
-if ! nix --extra-experimental-features "nix-command flakes" profile list | grep -q "bootstrap-deps"; then
+if ! nix --extra-experimental-features "nix-command flakes" profile list 2>/dev/null | grep -q "bootstrap-deps"; then
   printf '%s\n' "Installing bootstrap-managed dependencies..."
   nix --extra-experimental-features "nix-command flakes" profile add "$REPO_ROOT/src#bootstrap-deps"
 else

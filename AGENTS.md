@@ -41,6 +41,9 @@
 - For Nix profile operations, prefer `nix profile add` over the deprecated
   `nix profile install` alias, and use presence checks (`nix profile list`)
   in bootstrap scripts to keep reruns idempotent and warning-free.
+- When piping `nix profile list` to `grep -q` (or similar early-exit filters),
+  redirect stderr to `/dev/null` (`2>/dev/null`) to suppress the SIGPIPE
+  "Broken pipe" warning that occurs when `grep` closes the stream early.
 - When a language, framework, task runner, or test system is clearly present,
   add or refine focused instruction files for it rather than stuffing detailed
   rules into `AGENTS.md`.
