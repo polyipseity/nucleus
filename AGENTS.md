@@ -91,6 +91,24 @@
   or semantically significant (e.g. `boot.initrd.availableKernelModules`,
   module import lists where one module must precede another).
 
+## Package Management Strategy
+
+### Package Selection Policy (macOS)
+
+When a package exists in both nixpkgs and Homebrew, agents must apply the
+following logic:
+
+1. **CLI Tools**: Must use `nixpkgs`. Never install CLI tools via Homebrew
+  unless the Nix version is broken on Darwin.
+2. **GUI Apps**: Must use `homebrew.casks`. Nix-installed GUI apps are
+  discouraged due to Spotlight and permission issues (unless mac-app-util is
+  explicitly configured).
+3. **Hardware/Drivers**: Use Homebrew. Any tool requiring kernel extensions or
+  deep system integration (for example `bclm`) should be managed via Homebrew.
+4. **Symmetry**: When adding a package, check whether a Windows equivalent
+  exists in `src/hosts/windows/system.dsc.yml` to maintain cross-platform
+  parity.
+
 ## Refactoring Guardrails
 
 - **Pre-flight check rule**: before proposing or executing edits, verify target

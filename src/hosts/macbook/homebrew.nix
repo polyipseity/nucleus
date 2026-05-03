@@ -3,26 +3,33 @@
 # nix-darwin's homebrew module is the declarative bridge: on every activation
 # it runs `brew bundle` from a generated Brewfile, then removes any formula/cask
 # not listed here (cleanup = "zap" also removes app data).
-{ pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
+  # Package overlap decisions are centralized in modules/core.nix.
+  coreManagedBrews = config.nucleus.macos.generatedHomebrew.brews;
+  coreManagedCasks = config.nucleus.macos.generatedHomebrew.casks;
+
   # CLI formulae managed via Homebrew.
   # These are tools unavailable in nixpkgs or where the Homebrew build is
   # preferred (e.g. tightly coupled to macOS internals).
-  managedBrews = [
+  staticManagedBrews = [
     "displayplacer"              # CLI display arrangement tool
     "smudge/smudge/nightlight"   # Night Shift schedule & temperature control
     "zackelia/formulae/bclm"     # Battery charge limit management
   ];
 
+  managedBrews = builtins.sort (a: b: a < b) (lib.unique (staticManagedBrews ++ coreManagedBrews));
+
   # GUI applications managed via Homebrew Cask.
-  managedCasks = [
+  # Dual-source casks (for example Google Chrome, VS Code, VLC) are selected
+  # from core.nix and merged below so backend switches stay centralized.
+  staticManagedCasks = [
     "alt-tab"                    # Windows-style alt-tab switcher
     "appcleaner"                 # Thorough app uninstaller
     "betterdisplay"              # Advanced display management and virtual screens
     "chrome-remote-desktop-host" # Headless remote-desktop receiver
     "coolterm"                   # Serial terminal
     "discord@canary"             # Discord pre-release client
-    "google-chrome"              # Primary browser
     "google-chrome@canary"       # Chrome dev channel for web testing
     "iterm2"                     # Terminal emulator
     "lulu"                       # Outbound network firewall
@@ -34,11 +41,11 @@ let
     "stats"                      # Menu bar system stats
     "telegram-desktop@beta"      # Telegram pre-release client
     "utm"                        # QEMU-based VM manager
-    "visual-studio-code"         # VS Code stable
     "visual-studio-code@insiders" # VS Code Insiders (pre-release)
-    "vlc"                        # Media player
     "whatsapp@beta"              # WhatsApp pre-release client
   ];
+
+  managedCasks = builtins.sort (a: b: a < b) (lib.unique (staticManagedCasks ++ coreManagedCasks));
 
   # Nix-managed packages that must be in the system environment (not just the
   # user profile) because they need to be reachable from non-login shells or
