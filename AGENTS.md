@@ -4,16 +4,16 @@
 
 - Root `AGENTS.md` is the workspace-wide source of truth. Do not add
   `.github/copilot-instructions.md`.
-- Treat this repository as a template skeleton, not as a fully initialized app.
-  Language-specific manifests, task-runner files, dependency metadata, and
-  test configs may be introduced later by setup flows and are not guaranteed to
-  exist yet.
+- `src/` contains the Nix-based declarative configuration: `flake.nix`,
+  `hosts/` (per-machine configs), and `modules/` (shared logic).
+- `scripts/` contains bootstrap automation: `bootstrap.sh` (Unix) and
+  `bootstrap.ps1` (Windows).
+- `tests/` is still a placeholder; test infrastructure has not been added yet.
 - Keep this file short and durable. Put file-type and workflow-specific rules
   in `.agents/instructions/*.instructions.md`, reusable workflows in
   `.agents/prompts/*.prompt.md`, and skill assets in `.agents/skills/<skill>/`.
-- `src/`, `tests/`, and `scripts/` currently exist as template directories and
-  may contain only `.gitkeep` placeholders. Inspect the on-disk tree before you
-  assume source files, tests, or runnable commands already exist.
+- Inspect the on-disk tree before assuming source files, tests, or runnable
+  commands exist in a given location.
 
 ## Architecture
 
@@ -61,6 +61,12 @@
   `.opencode/commands/` when both copies exist.
 - Respect the repository newline policy: Markdown and shell scripts use LF;
   PowerShell and batch scripts use CRLF.
+- **Sorting**: always sort items in any list (package lists, import lists,
+  shell alias lists, shell completions, environment variable blocks) and any
+  configuration block that lacks a natural semantic order. Alphabetical
+  ascending order is the default. Do not sort items whose order is load-order
+  or semantically significant (e.g. `boot.initrd.availableKernelModules`,
+  module import lists where one module must precede another).
 
 ## Key References
 
@@ -74,3 +80,7 @@
   automation and policy
 - `.editorconfig`, `.gitattributes`, `.markdownlint.jsonc`,
   `.agents/.markdownlint.jsonc` — formatting and line-ending rules
+- `src/flake.nix` — Nix flake entrypoint (hosts + home-manager outputs)
+- `src/hosts/` — per-machine configurations (macbook, workstation, surface)
+- `src/modules/` — shared Nix modules (core packages, home, shell, editors)
+- `scripts/bootstrap.sh`, `scripts/bootstrap.ps1` — one-command setup wrappers

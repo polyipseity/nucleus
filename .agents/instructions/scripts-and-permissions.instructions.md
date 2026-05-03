@@ -3,6 +3,7 @@ description: "Use when adding or editing files under scripts/. Covers script pla
 name: "Scripts and Executable Permissions"
 applyTo: "scripts/**"
 ---
+
 # Scripts and Executable Permissions
 
 ## Scope and template state
@@ -33,10 +34,19 @@ applyTo: "scripts/**"
   - `*.ps1` uses CRLF
   - `*.bat` uses CRLF
   - additional script types should get explicit policy before widespread use
-- On non-Windows platforms, shell scripts intended for direct execution should
-  have executable bits tracked correctly in Git.
+- Every `.sh` script in `scripts/` must have its executable bit tracked in Git.
+  Set it with `git update-index --chmod=+x scripts/<name>.sh` when adding or
+  renaming a shell script. Verify the stored mode with
+  `git ls-files --stage scripts/` (mode `100755` is correct; `100644` is not).
 - If you add a new script extension or change placement conventions, update the
   related config and any tests in the same change.
+
+## Sorting
+
+- Sort `case` branch labels, environment variable blocks, and any other
+  unordered list-like constructs alphabetically.
+- Do not sort `case` branches whose matching order is semantically significant
+  (e.g. a catch-all `*` branch must remain last).
 
 ## Portability and safety
 
