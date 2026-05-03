@@ -75,27 +75,29 @@ nucleus/
 - `src/modules/shell.nix`: declarative shell aliases and environment tooling integration
 - `src/modules/wallpapers.nix`: declarative wallpaper materialization to `~/Pictures/wallpapers`
 - `src/modules/windows/common.ps1`: Windows helper module for executable resolution, SOPS decryption helpers, and WinGet DSC invocation
-- `src/modules/windows/secrets.ps1`: Windows helper module for secrets/key materialization
+- `src/modules/windows/secrets.ps1`: Windows helper module for batch and JIT secrets/key materialization entrypoints
 - `src/modules/windows/wallpapers.ps1`: Windows helper module for wallpaper materialization
-- `src/scripts/apply.sh`: Unix apply orchestrator with a 4-stage lifecycle (pre-flight checks -> secret materialization -> primary apply -> post-apply triggers)
-- `src/hosts/windows/apply.ps1`: Windows apply orchestrator with the same 4-stage lifecycle (pre-flight checks -> secret materialization -> primary apply -> post-apply triggers)
+- `src/scripts/apply.sh`: thin Unix apply wrapper that loads environment context and executes the Nix engine (`nix` rebuild/switch)
+- `src/hosts/windows/apply.ps1`: thin Windows apply wrapper that loads shared module context and executes the WinGet DSC engine (`winget configure`)
 - `src/assets/wallpapers/*.sops`: encrypted wallpaper blobs materialized to `~/Pictures/wallpapers`
 - `.sops.yaml`: key policy for repo secrets (global GPG + per-machine age recipients)
 - `src/secrets/*.yml`: SOPS-managed encrypted secret files (GPG keys, SSH keys); one file per identity
 
-### Symmetrical apply lifecycle
+### Engine-first apply pattern
 
 Both primary apply entrypoints (`src/scripts/apply.sh` and
-`src/hosts/windows/apply.ps1`) follow the same 4-stage lifecycle:
+`src/hosts/windows/apply.ps1`) use the same minimal orchestration pattern:
 
-1. **Pre-flight checks**: verify required tooling and resolve targeted files.
-2. **Secret materialization**: decrypt SOPS-managed secrets (and encrypted
-    wallpaper assets) to host paths.
-3. **Primary apply**: run the platform declarative engine (`nix` rebuild/switch
-    on Unix, `winget configure` on Windows).
-4. **Post-apply triggers**: run lightweight refresh actions (for example
-    wallpaper or session refresh) without moving desired state out of
-    declarative definitions.
+1. **Load environment/module context**.
+2. **Execute declarative engine** (`nix` or `winget configure`).
+
+Pre-flight checks, secret materialization, and refresh behavior live in
+declarative layers:
+
+- Unix/macOS: Home Manager activation hooks in `src/modules/secrets.nix` and
+    `src/modules/wallpapers.nix`.
+- Windows: WinGet DSC resources in `src/hosts/windows/*.dsc.yml`, with module
+    helpers providing JIT secret materialization entrypoints when needed.
 
 ## One-liner apply commands
 
@@ -211,8 +213,8 @@ sops --encrypt --input-type binary --output src/assets/wallpapers/aurora.jpg.sop
 
 Apply-time materialization:
 
-- Unix/macOS: Home Manager activation (`src/modules/wallpapers.nix`) decrypts all `*.sops` blobs to `$HOME/Pictures/wallpapers/<name>.<ext>`
-- Windows apply (`src/hosts/windows/apply.ps1`) decrypts all `*.sops` blobs to `%USERPROFILE%\Pictures\wallpapers\<name>.<ext>`, then applies user DSC with the active wallpaper path
+- Unix/macOS: Home Manager activation (`src/modules/wallpapers.nix`) decrypts all `*.sops` blobs to `$HOME/Pictures/wallpapers/<name>.<ext>` and runs desktop refresh hooks.
+- Windows: user-state application is declarative through WinGet DSC (`src/hosts/windows/user.dsc.yml`), with refresh ordering expressed through DSC `dependsOn` and module-based JIT secret materialization available for resource-level consumers.
 
 Git handling:
 

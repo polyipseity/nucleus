@@ -2,8 +2,23 @@
 let
   hostSshKeyPath = "/etc/ssh/ssh_host_ed25519_key";
   secretsDir = ../../secrets;
+  secretEntries =
+    if builtins.pathExists secretsDir then builtins.attrNames (builtins.readDir secretsDir)
+    else [ ];
+  hasEncryptedSecretFiles = lib.any (name: lib.hasSuffix ".yml" name) secretEntries;
 in
 {
+  assertions = [
+    {
+      assertion = builtins.pathExists secretsDir;
+      message = "nucleus: required secrets directory is missing at ${toString secretsDir}.";
+    }
+    {
+      assertion = hasEncryptedSecretFiles;
+      message = "nucleus: no encrypted secret files (*.yml) found under ${toString secretsDir}.";
+    }
+  ];
+
   home.activation.nucleusKeyProvision = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     export GNUPGHOME="${config.home.homeDirectory}/.gnupg"
     export HOME="${config.home.homeDirectory}"
@@ -22,10 +37,8 @@ in
       ${pkgs.sops}/bin/sops --decrypt --output-format json "$1" > "$2"
     }
 
-    found=0
     for secrets_file in "${secretsDir}"/*.yml; do
       [ -e "$secrets_file" ] || continue
-      found=1
 
       tmp_json="$(mktemp)"
       if nucleus_decrypt "$secrets_file" "$tmp_json"; then
@@ -52,9 +65,5 @@ in
 
       rm -f "$tmp_json"
     done
-
-    if [ "$found" -eq 0 ]; then
-      echo "nucleus: no .yml secret files found in ${secretsDir}; skipping secret provisioning."
-    fi
   '';
 }

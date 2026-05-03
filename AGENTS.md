@@ -72,6 +72,12 @@
 - **Declarative enforcement**: if a WinGet DSC resource can represent desired
   Windows state, prefer adding it to `system.dsc.yml` or `user.dsc.yml` rather
   than introducing new imperative commands in `bootstrap.ps1` or `apply.ps1`.
+- **Declarative first**: imperative code in `src/scripts/apply.sh` and
+  `src/hosts/windows/apply.ps1` is treated as a bug. If desired state can be
+  represented in Nix modules or WinGet DSC resources, move it there.
+- **JIT secrets**: do not materialize secrets globally in orchestration
+  wrappers. Materialize secrets only in the module/resource that requires them
+  (for example Home Manager activation hooks or targeted Windows module calls).
 - **Sorting**: always sort items in any list (package lists, import lists,
   shell alias lists, shell completions, environment variable blocks) and any
   configuration block that lacks a natural semantic order. Alphabetical

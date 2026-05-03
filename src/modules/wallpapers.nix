@@ -4,11 +4,19 @@ let
   wallpapersDir = ../../assets/wallpapers;
 in
 {
+  assertions = [
+    {
+      assertion = builtins.pathExists wallpapersDir;
+      message = "nucleus: required wallpapers directory is missing at ${toString wallpapersDir}.";
+    }
+  ];
+
   home.activation.nucleusWallpaperProvision = lib.hm.dag.entryAfter [ "nucleusKeyProvision" ] ''
     export GNUPGHOME="${config.home.homeDirectory}/.gnupg"
     export HOME="${config.home.homeDirectory}"
 
     picturesDir="$HOME/Pictures/wallpapers"
+    activeWallpaperPath=""
 
     mkdir -p "$GNUPGHOME"
     chmod 700 "$GNUPGHOME"
@@ -44,6 +52,10 @@ in
           else
             rm -f "$tmpTarget"
           fi
+
+          if [ -z "$activeWallpaperPath" ]; then
+            activeWallpaperPath="$targetFile"
+          fi
         else
           rm -f "$tmpTarget"
           echo "nucleus: failed to decrypt wallpaper $(basename "$wallpaper_blob"); skipping." >&2
@@ -53,6 +65,21 @@ in
 
     if [ "$found" -eq 0 ]; then
       echo "nucleus: no wallpaper blobs (*.sops) found in ${wallpapersDir}; skipping wallpaper provisioning."
+    fi
+
+    if [ -n "$activeWallpaperPath" ]; then
+      if command -v osascript >/dev/null 2>&1; then
+        osascript <<EOF >/dev/null 2>&1 || true
+tell application "System Events"
+  repeat with desktopRef in desktops
+    set picture of desktopRef to POSIX file "$activeWallpaperPath"
+  end repeat
+end tell
+EOF
+      elif command -v gsettings >/dev/null 2>&1; then
+        gsettings set org.gnome.desktop.background picture-uri "file://$activeWallpaperPath" >/dev/null 2>&1 || true
+        gsettings set org.gnome.desktop.background picture-uri-dark "file://$activeWallpaperPath" >/dev/null 2>&1 || true
+      fi
     fi
   '';
 }
