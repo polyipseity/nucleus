@@ -8,7 +8,7 @@
 
 .PARAMETER ConfigPath
   Path to the WinGet DSC YAML file.
-  Defaults to src/hosts/windows/configuration.dsc.yaml.
+  Defaults to src/hosts/windows/configuration.dsc.yml.
 
 .PARAMETER Help
   Show this help message and exit.
@@ -28,7 +28,7 @@
 [CmdletBinding()]
 param(
   [Parameter()]
-  [string]$ConfigPath = (Join-Path -Path $PSScriptRoot -ChildPath "configuration.dsc.yaml"),
+  [string]$ConfigPath = (Join-Path -Path $PSScriptRoot -ChildPath "configuration.dsc.yml"),
 
   [Alias("h")]
   [Parameter()]

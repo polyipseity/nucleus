@@ -1,14 +1,14 @@
 ---
 description: "Use when authoring or editing WinGet DSC configuration files under src/hosts/windows/. Covers DSC v3 YAML structure, resource ordering, sorting, and safe authoring patterns for this repository."
 name: "WinGet DSC Authoring"
-applyTo: "src/hosts/windows/**/*.yaml, src/hosts/windows/**/*.yml"
+applyTo: "src/hosts/windows/**/*.yml"
 ---
 
 # WinGet DSC Authoring
 
 ## File location and purpose
 
-- `src/hosts/windows/configuration.dsc.yaml` is the single WinGet DSC v3
+- `src/hosts/windows/configuration.dsc.yml` is the single WinGet DSC v3
   manifest for the Windows host.
 - It is applied with `winget configure` (see `README.md` and
   `scripts/bootstrap.ps1` for the exact invocation).
@@ -46,6 +46,8 @@ packages) or `settings.valueName` / `settings.name` (for other resources).
 
 ## Authoring rules
 
+- Always use `.yml` extension for WinGet DSC manifests; do not create
+  long-extension YAML filenames in `src/hosts/windows/`.
 - Always specify `source: winget` for `Microsoft.WinGet.Client/Package`
   entries; do not omit it even if it is technically the default.
 - Use the canonical WinGet package identifier (verified via `winget search`)
@@ -61,7 +63,7 @@ packages) or `settings.valueName` / `settings.name` (for other resources).
 
 - Test the manifest dry-run on the target machine with:
   ```powershell
-  winget configure --what-if .\src\hosts\windows\configuration.dsc.yaml
+  winget configure --what-if .\src\hosts\windows\configuration.dsc.yml
   ```
 - Full application requires an elevated PowerShell session and
   `--accept-configuration-agreements`.

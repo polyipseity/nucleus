@@ -2,8 +2,8 @@
 # Pre-commit-style configuration for common checks and Python formatting.
 # Mirrors the project's conventions: enable the recommended hooks from pre-commit-hooks and use Ruff
 # for Python formatting and linting. Adjust or opt-out of any hooks as needed per team preference.
-# This file replaces `.pre-commit-config.yaml`; that file has been removed to avoid duplication.
-# Note: `prek` can read `.pre-commit-config.yaml` for compatibility, but `prek.toml` is preferred.
+# This file replaces `.pre-commit-config.yml`; that file has been removed to avoid duplication.
+# Note: `prek` can read `.pre-commit-config.yml` for compatibility, but `prek.toml` is preferred.
 
 default_install_hook_types = ["commit-msg", "pre-commit", "pre-push"]
 default_stages = ["pre-commit"]

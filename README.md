@@ -20,7 +20,7 @@ nucleus/
 │   │   ├── nixos/
 │   │   │   └── configuration.nix
 │   │   └── windows/
-│   │       └── configuration.dsc.yaml
+│   │       └── configuration.dsc.yml
 │   └── modules/
 │       ├── core.nix
 │       ├── home.nix
@@ -46,7 +46,7 @@ nucleus/
 - `src/modules/core.nix`: shared CLI tools (`git`, `rustup`, `ripgrep`, `fd`, `bottom`, `eza`, `zoxide`)
 - `src/hosts/macbook/default.nix`: macOS defaults (keyboard repeat, dock behavior)
 - `src/hosts/nixos/configuration.nix`: Linux host/system defaults and hardware baseline
-- `src/hosts/windows/configuration.dsc.yaml`: Windows packages/settings/environment via WinGet DSC
+- `src/hosts/windows/configuration.dsc.yml`: Windows packages/settings/environment via WinGet DSC
 - `src/modules/home.nix`: home-level shell/editor/dotfile composition across platforms
 - `src/modules/secrets/default.nix`: decrypt/provision activation logic (SSH + GPG imports)
 - `src/scripts/apply.sh`: Unix apply script (secrets preflight + OS config); exposed as `nix run ./src#apply`
@@ -71,7 +71,7 @@ sudo nixos-rebuild switch --flake ./src#nixos
 ### Windows (Admin PowerShell)
 
 ```powershell
-winget configure .\src\hosts\windows\configuration.dsc.yaml
+winget configure .\src\hosts\windows\configuration.dsc.yml
 ```
 
 ## Bootstrap scripts

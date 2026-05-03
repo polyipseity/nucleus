@@ -61,6 +61,9 @@
   `.opencode/commands/` when both copies exist.
 - Respect the repository newline policy: Markdown and shell scripts use LF;
   PowerShell and batch scripts use CRLF.
+- **YAML extension policy**: use `.yml` for repository YAML files. Do not add
+  long-extension YAML filenames. Exception: `.sops.yaml` is required by SOPS
+  config discovery and must keep that exact name.
 - **Sorting**: always sort items in any list (package lists, import lists,
   shell alias lists, shell completions, environment variable blocks) and any
   configuration block that lacks a natural semantic order. Alphabetical
