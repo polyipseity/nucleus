@@ -11,27 +11,37 @@ let
 in
 {
   # ---------------------------------------------------------------------------
+  # Declarative power-management settings handled by nix-darwin's power module.
+  # These translate to systemsetup / pmset calls at activation time.
+  #   computer = "never" — idle sleep disabled            (was: pmset -a sleep 0)
+  #   display  = "never" — displays never sleep           (was: pmset -a displaysleep 0)
+  #   harddisk = "never" — disk sleep disabled            (was: pmset -a disksleep 0)
+  #   restartAfterPowerFailure — recover from power loss  (was: pmset -c autorestart 1)
+  # ---------------------------------------------------------------------------
+  power.sleep.computer = "never";
+  power.sleep.display = "never";
+  power.sleep.harddisk = "never";
+  power.restartAfterPowerFailure = true;
+
+  # ---------------------------------------------------------------------------
   # configureBatteryPolicy
-  # Configures power-management settings via pmset to keep the MacBook always
-  # awake and ready for remote-desktop sessions:
+  # Imperative pmset settings that have no nix-darwin declarative equivalent:
   #   disablesleep 1   — prevent the system from ever sleeping
   #   lidwake 0        — do not wake on lid open (headless remote use)
-  #   displaysleep 0   — displays never sleep
-  #   sleep 0          — idle sleep disabled
-  #   disksleep 0      — disk sleep disabled
   #   womp 1           — wake on network access (Wake on LAN)
   #   powernap 1       — allow background fetches during Power Nap
-  #   autorestart 1    — auto-restart after power failure (AC-only setting)
   #   highpowermode 1  — use maximum CPU/GPU performance on AC
   #   lowpowermode 0   — disable Low Power Mode explicitly
+  # sleep / displaysleep / disksleep / autorestart are handled declaratively
+  # above via the power.sleep.* and power.restartAfterPowerFailure options.
   # The -x flag check is present because pmset might be absent in certain VM
   # or CI environments where this config could theoretically be evaluated.
   # ---------------------------------------------------------------------------
   system.activationScripts.configureBatteryPolicy.text = ''
     if [ -x /usr/bin/pmset ]; then
-      /usr/bin/pmset -a disablesleep 1 lidwake 0 displaysleep 0 sleep 0 disksleep 0
+      /usr/bin/pmset -a disablesleep 1 lidwake 0
       /usr/bin/pmset -a womp 1 powernap 1
-      /usr/bin/pmset -c autorestart 1 highpowermode 1 lowpowermode 0
+      /usr/bin/pmset -c highpowermode 1 lowpowermode 0
     fi
   '';
 
@@ -47,33 +57,6 @@ in
       /opt/homebrew/bin/bclm write 100 || echo "[ERROR] bclm write failed" >&2
       /opt/homebrew/bin/bclm persist || echo "[ERROR] bclm persist failed" >&2
     fi
-  '';
-
-  # ---------------------------------------------------------------------------
-  # configureDiagnostics
-  # Enables automatic crash-report and diagnostic submission to Apple so that
-  # system crashes are logged in the Feedback Assistant and forwarded upstream.
-  # ---------------------------------------------------------------------------
-  system.activationScripts.configureDiagnostics.text = ''
-    /usr/bin/defaults write /Library/Preferences/com.apple.SubmitDiagInfo SubmitDiagInfo -bool true
-  '';
-
-  # ---------------------------------------------------------------------------
-  # configureKeyboardBrightness
-  # Sets the ambient-light-sensor error threshold that drives keyboard backlight
-  # brightness.  An int of 25 maps to roughly half brightness in subdued
-  # lighting conditions.  The `|| true` suppresses errors on non-backlit keyboards.
-  # ---------------------------------------------------------------------------
-  system.activationScripts.configureKeyboardBrightness.text = ''
-    /usr/bin/defaults write /Library/Preferences/com.apple.iokit.AmbientLightSensor "Keyboard Backlight Error Condition" -int 25 || true
-  '';
-
-  # ---------------------------------------------------------------------------
-  # configureLockScreenMessage
-  # Writes the lock-screen banner text shown on the login window.
-  # ---------------------------------------------------------------------------
-  system.activationScripts.configureLockScreenMessage.text = ''
-    /usr/bin/defaults write /Library/Preferences/com.apple.loginwindow LoginwindowText "✨"
   '';
 
   # ---------------------------------------------------------------------------

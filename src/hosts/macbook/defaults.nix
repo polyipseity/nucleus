@@ -91,6 +91,12 @@ in
     # first-class nix-darwin options.  Written with `defaults write <domain>`.
     # -------------------------------------------------------------------------
     CustomUserPreferences = {
+      # NSGlobalDomain: global preferences that don't fit nix-darwin typed options.
+      "NSGlobalDomain" = {
+        # Treat Caps Lock as a per-app input-source switch (e.g. EN ↔ Cangjie).
+        TISCapslockLanguageSwitch = true;
+      };
+
       # Activity Monitor: show CPU usage in the Dock icon; refresh every second.
       "com.apple.ActivityMonitor" = {
         IconType = 5;         # CPU history graph in Dock icon
@@ -118,9 +124,11 @@ in
         kDimTime = 5;   # dim after 5 seconds
       };
 
-      # Input sources: set the full ordered list of enabled input methods and
-      # select the first one (US keyboard) as the active source.
+      # Input sources: set the full ordered list of enabled input methods,
+      # select the first one (US keyboard) as the active source, and configure
+      # dictation and keyboard behaviour.
       "com.apple.HIToolbox" = {
+        AppleDictationAutoEnable = true;    # auto-enable dictation system-wide
         AppleEnabledInputSources = inputMethods;
         AppleSelectedInputSources = [ (builtins.head inputMethods) ];
       };
@@ -165,6 +173,9 @@ in
         RichText = false;
       };
 
+      # Keyboard: Fn key acts as standard function keys (F1–F12) by default.
+      "com.apple.TextInput.Kybd".FnKeyUsage = 1;
+
       # Show the Input Menu (language switcher) in the menu bar.
       "com.apple.TextInputMenu".visible = true;
 
@@ -200,6 +211,14 @@ in
       "com.apple.desktopservices" = {
         DSDontWriteNetworkStores = true;
         DSDontWriteUSBStores = true;
+      };
+
+      # Dock: disable Stage Manager / Widget corner zones (value 0 = no-op).
+      "com.apple.dock" = {
+        wdev-bl = 0;
+        wdev-br = 0;
+        wdev-tl = 0;
+        wdev-tr = 0;
       };
 
       # Finder: allow text selection in Quick Look previews.
@@ -345,6 +364,24 @@ in
       ShowStatusBar = true;                  # show item count / available space bar
       WarnOnEmptyTrash = true;               # confirm before permanently deleting
     };
+
+    # -------------------------------------------------------------------------
+    # CustomSystemPreferences — arbitrary system-level defaults not exposed as
+    # first-class nix-darwin options.  Written with `sudo defaults write`.
+    # -------------------------------------------------------------------------
+    CustomSystemPreferences = {
+      # Enable automatic crash-report and diagnostic submission to Apple.
+      "com.apple.SubmitDiagInfo".SubmitDiagInfo = true;
+
+      # Ambient-light-sensor threshold that drives keyboard backlight brightness.
+      # 25 maps to roughly half brightness in subdued lighting conditions.
+      "com.apple.iokit.AmbientLightSensor"."Keyboard Backlight Error Condition" = 25;
+    };
+
+    # -------------------------------------------------------------------------
+    # loginwindow — login-screen presentation settings.
+    # -------------------------------------------------------------------------
+    loginwindow.LoginwindowText = "✨";
 
     # -------------------------------------------------------------------------
     # Screenshot settings

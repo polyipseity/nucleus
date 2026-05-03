@@ -5,8 +5,7 @@
 #
 # Activation order (Home Manager DAG):
 #   writeBoundary / linkGeneration
-#     → clearDesktop, configureInputAndSiri, configureITerm2Settings,
-#       configureSystemHardening
+#     → clearDesktop, configureInputAndSiri, configureSystemHardening
 #     → configureLaunchServices, configureNightlight
 #       → ensureHeadlessDisplay
 #         → configureDisplayResolutions
@@ -185,38 +184,32 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # configureInputAndSiri
-    # Writes input-method and keyboard shortcut defaults that cannot be expressed
-    # in the nix-darwin system.defaults tree because they use the private
-    # symbolichotkeys domain or require a running input method daemon reload.
+    # Writes input-method defaults that cannot be expressed in the nix-darwin
+    # system.defaults tree because they require a running input method daemon
+    # reload to take effect at session time.
     #
     #   hotkey 176 disabled  — disable the built-in "Move focus to next window"
-    #                          shortcut that conflicts with custom window managers
-    #   TISCapslockLanguageSwitch  — make Caps Lock switch input source
-    #   AppleDictationAutoEnable   — enable dictation in all apps automatically
-    #   FnKeyUsage = 1             — Fn key shows Character Viewer (not Emoji)
-    #   activateSettings -u        — flush keyboard/input settings immediately
-    #   killall TISwitcher         — restart the input-source switcher daemon
+    #                          shortcut that conflicts with custom window managers.
+    #                          Uses -dict-add (merge), which cannot be expressed
+    #                          as a plain defaults write in CustomUserPreferences.
+    #   activateSettings -u  — flush keyboard/input settings into the running session
+    #   killall TISwitcher   — restart the input-source switcher daemon so changes
+    #                          to TISCapslockLanguageSwitch / FnKeyUsage take effect
+    #
+    # TISCapslockLanguageSwitch, AppleDictationAutoEnable, and FnKeyUsage are
+    # now handled declaratively in defaults.nix via CustomUserPreferences.
     # -------------------------------------------------------------------------
     configureInputAndSiri = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 176 "<dict><key>enabled</key><false/></dict>" || true
-      /usr/bin/defaults write -g TISCapslockLanguageSwitch -bool true || true
-      /usr/bin/defaults write com.apple.HIToolbox AppleDictationAutoEnable -bool true || true
-      /usr/bin/defaults write com.apple.TextInput.Kybd FnKeyUsage -int 1 || true
       /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u 2>/dev/null || true
       /usr/bin/killall -HUP TISwitcher 2>/dev/null || true
     '';
 
     # -------------------------------------------------------------------------
-    # configureITerm2Settings
-    # Enables the iTerm2 bootstrap daemon.  The daemon allows shell integration
-    # scripts to communicate with iTerm2 even when the app is not the foreground
-    # window, enabling features like automatic profile switching on SSH.
-    # Written here (rather than in defaults.nix) because it must be idempotent
-    # and the app must already be installed before this runs.
+    # configureITerm2Settings was removed: `BootstrapDaemon = true` is now
+    # handled declaratively in defaults.nix via
+    # system.defaults.CustomUserPreferences."com.googlecode.iterm2".
     # -------------------------------------------------------------------------
-    configureITerm2Settings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      /usr/bin/defaults write com.googlecode.iterm2 BootstrapDaemon -bool true || true
-    '';
 
     # -------------------------------------------------------------------------
     # configureLaunchServices
@@ -269,31 +262,27 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # configureSystemHardening
-    # Applies security and performance hardening measures that require a running
-    # user session (not available to system-level activationScripts):
+    # Applies Spotlight indexing suppression for build artifact directories;
+    # requires a running user session (not available to system-level scripts).
     #
-    #   Dock hot corners disabled (wdev-tl/tr/bl/br = 0): prevents accidental
-    #   screen sleep or Mission Control triggers from corner hover.
+    #   .metadata_never_index files: tells Spotlight not to index well-known
+    #   build artifact directories under ~/dev (node_modules, target, build,
+    #   dist, etc.), reducing indexing CPU/disk overhead and avoiding Spotlight
+    #   surfacing compiled binaries or cache files.
     #
-    #   .metadata_never_index files: tells Spotlight not to index known build
-    #   artifact directories under ~/dev (node_modules, target, build, dist,
-    #   etc.), which dramatically reduces indexing CPU/disk overhead and avoids
-    #   Spotlight surfacing compiled binaries or cache files.
+    #   Dock restart: applies any pending Dock pref changes (e.g. hot corners
+    #   written declaratively via CustomUserPreferences."com.apple.dock") without
+    #   requiring a full logout.
     #
-    #   Dock restart: applies the hot-corner changes without a full logout.
+    # Dock hot-corner disable (wdev-tl/tr/bl/br = 0) is now handled declaratively
+    # in defaults.nix via system.defaults.CustomUserPreferences."com.apple.dock".
     # -------------------------------------------------------------------------
     configureSystemHardening = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      # Disable all four Dock hot corners (0 = no action).
-      /usr/bin/defaults write com.apple.dock wdev-tl -int 0
-      /usr/bin/defaults write com.apple.dock wdev-tr -int 0
-      /usr/bin/defaults write com.apple.dock wdev-bl -int 0
-      /usr/bin/defaults write com.apple.dock wdev-br -int 0
-
       DEV_ROOT="$HOME/dev"
       if [ -d "$DEV_ROOT" ]; then
         # Place a .metadata_never_index sentinel inside every well-known build
         # artifact directory found under ~/dev so Spotlight skips them.
-        for dir_name in "node_modules" "target" "incremental" "build" "bin" "obj" "venv" ".venv" "__pycache__" "vendor" ".gradle" ".next" ".turbo" "dist"; do
+        for dir_name in ".gradle" ".next" ".turbo" ".venv" "__pycache__" "bin" "build" "dist" "incremental" "node_modules" "obj" "target" "venv" "vendor"; do
           /usr/bin/find "$DEV_ROOT" -name "$dir_name" -type d -prune -exec touch "{}/.metadata_never_index" \; 2>/dev/null || true
         done
       else
