@@ -140,12 +140,21 @@ let
     };
   };
 
+  # Shorthand alias into the module option values set by the host config.
   packageSelection = config.nucleus.macos.packageSelection;
+  # Sorted list of all overlap package names; iterated in the selection pipeline below.
   overlapPackageNames = builtins.attrNames overlappingPackages;
 
+  # Policy function: maps a package category to its default backend.
+  # CLI tools default to nixpkgs; GUI/hardware-integrated apps default to
+  # Homebrew, following the AGENTS.md package selection policy.
   defaultBackendFor = category:
     if category == "cli" then "nixpkgs" else "homebrew";
 
+  # Per-package backend resolver — applies in priority order:
+  #   1. Explicit per-package override (packageSelection.overrides).
+  #   2. Policy function (defaultBackendFor) when overlapBackend == "policy".
+  #   3. Global backend setting ("homebrew" or "nixpkgs") otherwise.
   resolveBackend = packageName:
     if builtins.hasAttr packageName packageSelection.overrides then
       builtins.getAttr packageName packageSelection.overrides
@@ -154,6 +163,8 @@ let
     else
       packageSelection.overlapBackend;
 
+  # Resolved backend attrset for every overlap package:
+  #   { "<package-name>" = "nixpkgs" | "homebrew"; }
   selectedOverlapBackends = builtins.listToAttrs (map
     (packageName: {
       name = packageName;
@@ -161,12 +172,17 @@ let
     })
     overlapPackageNames);
 
+  # Validation list: overlap packages routed to nixpkgs but absent from the
+  # current pkgs attrset (e.g. a package unavailable on this platform).
+  # Non-empty causes an `assertions` failure at eval time via the config block.
   missingNixAttrs = lib.optionals pkgs.stdenv.isDarwin (builtins.filter
     (packageName:
       selectedOverlapBackends.${packageName} == "nixpkgs"
       && !(builtins.hasAttr overlappingPackages.${packageName}.nixpkgsAttr pkgs))
     overlapPackageNames);
 
+  # Nix derivations for overlap packages resolved to the nixpkgs backend.
+  # Empty list on non-Darwin hosts because the overlap policy is macOS-only.
   overlapNixPackages = lib.optionals pkgs.stdenv.isDarwin (lib.concatMap
     (packageName:
       let
@@ -178,6 +194,9 @@ let
         [ ])
     overlapPackageNames);
 
+  # Homebrew formula names (kind = "brew") for overlap packages on the homebrew
+  # backend.  Passed to homebrew.nix via the generated module option so the
+  # host does not need to list them manually.
   overlapHomebrewBrews = lib.optionals pkgs.stdenv.isDarwin (builtins.filter
     (name: name != null)
     (map
@@ -191,6 +210,9 @@ let
           null)
       overlapPackageNames));
 
+  # Homebrew cask names (kind = "cask") for overlap packages on the homebrew
+  # backend.  Passed to homebrew.nix via the generated module option so the
+  # host does not need to list them manually.
   overlapHomebrewCasks = lib.optionals pkgs.stdenv.isDarwin (builtins.filter
     (name: name != null)
     (map
@@ -204,6 +226,8 @@ let
           null)
       overlapPackageNames));
 
+  # Final merged package list installed on every host: shared base + Darwin
+  # extras + any overlap packages resolved to the nixpkgs backend on Darwin.
   sharedPackages = baseSharedPackages ++ darwinSharedPackages ++ overlapNixPackages;
 in
 {

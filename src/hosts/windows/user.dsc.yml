@@ -39,7 +39,7 @@ properties:
     - resource: Microsoft.Windows.Environment/Variable
       id: homeEnvVar
       directives:
-        description: Set user-level HOME for CLI parity
+        description: Set HOME to %USERPROFILE% so Unix-heritage tools (git, ssh, curl) find the expected home directory path on Windows
       settings:
         name: HOME
         value: "%USERPROFILE%"
@@ -48,7 +48,7 @@ properties:
     - resource: Microsoft.Windows.Environment/Variable
       id: nixPathEnvVar
       directives:
-        description: Set user-level NIX_PATH
+        description: Register nixpkgs in NIX_PATH so <nixpkgs> references in Nix expressions resolve via the flake registry without a channels configuration
       settings:
         name: NIX_PATH
         value: nixpkgs=flake:nixpkgs
