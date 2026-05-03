@@ -1,0 +1,58 @@
+{ config, lib, pkgs, ... }:
+let
+  hostSshKeyPath = "/etc/ssh/ssh_host_ed25519_key";
+  wallpapersDir = ../../assets/wallpapers;
+in
+{
+  home.activation.nucleusWallpaperProvision = lib.hm.dag.entryAfter [ "nucleusKeyProvision" ] ''
+    export GNUPGHOME="${config.home.homeDirectory}/.gnupg"
+    export HOME="${config.home.homeDirectory}"
+
+    picturesDir="$HOME/Pictures/wallpapers"
+
+    mkdir -p "$GNUPGHOME"
+    chmod 700 "$GNUPGHOME"
+    mkdir -p "$picturesDir"
+
+    nucleus_decrypt_wallpaper() {
+      if [ -f "${hostSshKeyPath}" ]; then
+        SOPS_AGE_SSH_PRIVATE_KEY_FILE="${hostSshKeyPath}" \
+          ${pkgs.sops}/bin/sops --decrypt --output "$2" "$1" 2>/dev/null \
+          && return 0
+      fi
+
+      if ! ${pkgs.gnupg}/bin/gpg --list-secret-keys --with-colons 2>/dev/null | ${pkgs.gnugrep}/bin/grep -Eq '^(sec|ssb):'; then
+        return 1
+      fi
+
+      ${pkgs.sops}/bin/sops --decrypt --output "$2" "$1"
+    }
+
+    found=0
+    if [ -d "${wallpapersDir}" ]; then
+      for wallpaper_blob in "${wallpapersDir}"/*.sops; do
+        [ -e "$wallpaper_blob" ] || continue
+        found=1
+
+        targetFile="$picturesDir/$(basename "${wallpaper_blob%.sops}")"
+        tmpTarget="$(mktemp)"
+
+        if nucleus_decrypt_wallpaper "$wallpaper_blob" "$tmpTarget"; then
+          if [ ! -f "$targetFile" ] || ! ${pkgs.diffutils}/bin/cmp -s "$tmpTarget" "$targetFile"; then
+            mv "$tmpTarget" "$targetFile"
+            chmod 644 "$targetFile"
+          else
+            rm -f "$tmpTarget"
+          fi
+        else
+          rm -f "$tmpTarget"
+          echo "nucleus: failed to decrypt wallpaper $(basename "$wallpaper_blob"); skipping." >&2
+        fi
+      done
+    fi
+
+    if [ "$found" -eq 0 ]; then
+      echo "nucleus: no wallpaper blobs (*.sops) found in ${wallpapersDir}; skipping wallpaper provisioning."
+    fi
+  '';
+}

@@ -1,0 +1,7 @@
+# self {
+*
+!*/
+!.gitattributes
+!.gitignore
+!*.sops
+# }

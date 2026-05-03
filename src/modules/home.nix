@@ -13,6 +13,7 @@ in
     ./editors/default.nix
     ./secrets/default.nix
     ./shell/default.nix
+    ./wallpapers/default.nix
   ];
 
   home = {

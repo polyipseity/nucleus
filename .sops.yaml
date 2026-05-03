@@ -5,6 +5,14 @@ keys:
   - &primary_gpg F45098829935F40E47717018FBA5C89B3E700B7339A67CD0E1AD1361C25E7CFD
 
 creation_rules:
+  - path_regex: src[/\\]assets[/\\]wallpapers[/\\].*\.(gif|jpeg|jpg|png|sops|webp)$
+    key_groups:
+      - age:
+          # - *host_macbook
+          # - *host_nixos
+          # - *host_windows
+        pgp:
+          - *primary_gpg
   - path_regex: src[/\\]secrets[/\\].*\.yml$
     key_groups:
       - age:
