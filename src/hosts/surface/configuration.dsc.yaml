@@ -1,0 +1,76 @@
+# WinGet Configuration (DSC v3) for the Surface host
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Visual Studio Code is installed
+      settings:
+        id: Microsoft.VisualStudioCode
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Git is installed
+      settings:
+        id: Git.Git
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Chrome is installed
+      settings:
+        id: Google.Chrome
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Discord is installed
+      settings:
+        id: Discord.Discord
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Spotify is installed
+      settings:
+        id: Spotify.Spotify
+        source: winget
+
+    - resource: Microsoft.Windows.Settings/DeveloperMode
+      directives:
+        description: Enable Developer Mode
+      settings:
+        Enabled: true
+
+    - resource: Microsoft.Windows.Settings/Taskbar
+      directives:
+        description: Keep a compact centered taskbar
+      settings:
+        Alignment: Center
+        Size: Small
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: Enable long path support in the registry
+      settings:
+        keyPath: HKLM\System\CurrentControlSet\Control\FileSystem
+        valueName: LongPathsEnabled
+        valueData: 1
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Environment/Variable
+      directives:
+        description: Set user-level NIX_PATH
+      settings:
+        name: NIX_PATH
+        value: nixpkgs=flake:nixpkgs
+        scope: User
+
+    - resource: Microsoft.Windows.Environment/Variable
+      directives:
+        description: Set user-level HOME for CLI parity
+      settings:
+        name: HOME
+        value: "%USERPROFILE%"
+        scope: User
