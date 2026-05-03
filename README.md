@@ -21,7 +21,8 @@ nucleus/
 │   │   │   └── configuration.nix
 │   │   └── windows/
 │   │       ├── apply.ps1
-│   │       ├── configuration.dsc.yml
+│   │       ├── system.dsc.yml
+│   │       ├── user.dsc.yml
 │   │       └── lib/
 │   │           ├── Nucleus.Common.ps1
 │   │           ├── Nucleus.Secrets.ps1
@@ -56,7 +57,8 @@ nucleus/
 - `src/modules/core.nix`: shared CLI tools (`git`, `rustup`, `ripgrep`, `fd`, `bottom`, `eza`, `zoxide`)
 - `src/hosts/macbook/default.nix`: macOS defaults (keyboard repeat, dock behavior)
 - `src/hosts/nixos/configuration.nix`: Linux host/system defaults and hardware baseline
-- `src/hosts/windows/configuration.dsc.yml`: Windows packages/settings/environment via WinGet DSC
+- `src/hosts/windows/system.dsc.yml`: Windows pre-provision baseline via WinGet DSC (packages + machine settings)
+- `src/hosts/windows/user.dsc.yml`: Windows post-provision baseline via WinGet DSC (folders + user settings)
 - `src/modules/home.nix`: home-level shell/editor/dotfile composition across platforms
 - `src/modules/secrets/default.nix`: declarative secret provisioning activation logic (SSH + GPG imports)
 - `src/modules/wallpapers/default.nix`: declarative wallpaper materialization to `~/Pictures/wallpapers`
@@ -83,7 +85,8 @@ sudo nixos-rebuild switch --flake ./src#nixos
 ### Windows (Admin PowerShell)
 
 ```powershell
-winget configure .\src\hosts\windows\configuration.dsc.yml
+winget configure .\src\hosts\windows\system.dsc.yml
+winget configure .\src\hosts\windows\user.dsc.yml
 ```
 
 ## Bootstrap scripts
@@ -180,7 +183,7 @@ sops --encrypt --input-type binary --output src/assets/wallpapers/aurora.jpg.sop
 Apply-time materialization:
 
 - Unix/macOS: Home Manager activation (`src/modules/wallpapers/default.nix`) decrypts all `*.sops` blobs to `$HOME/Pictures/wallpapers/<name>.<ext>`
-- Windows apply (`src/hosts/windows/apply.ps1`) decrypts all `*.sops` blobs to `%USERPROFILE%\Pictures\wallpapers\<name>.<ext>`
+- Windows apply (`src/hosts/windows/apply.ps1`) decrypts all `*.sops` blobs to `%USERPROFILE%\Pictures\wallpapers\<name>.<ext>`, then applies user DSC with the active wallpaper path
 
 Git handling:
 

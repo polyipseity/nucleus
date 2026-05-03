@@ -10,12 +10,20 @@
   Path to the directory containing encrypted wallpaper blobs (*.sops).
   Defaults to src/assets/wallpapers.
 
-.PARAMETER ConfigPath
-  Path to the WinGet DSC YAML file.
-  Defaults to src/hosts/windows/configuration.dsc.yml.
+.PARAMETER ConfigDir
+  Directory containing modular WinGet DSC YAML files.
+  Defaults to src/hosts/windows.
 
 .PARAMETER Help
   Show this help message and exit.
+
+.PARAMETER PostProvisionConfigFiles
+  Ordered list of WinGet DSC files applied after secrets/wallpapers are materialized.
+  Defaults to user.dsc.yml.
+
+.PARAMETER PreProvisionConfigFiles
+  Ordered list of WinGet DSC files applied before secrets/wallpapers are materialized.
+  Defaults to system.dsc.yml.
 
 .PARAMETER SecretsDir
   Path to the directory containing SOPS-encrypted .yml secret files.
@@ -35,11 +43,17 @@ param(
   [string]$AssetsDir = (Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wallpapers"),
 
   [Parameter()]
-  [string]$ConfigPath = (Join-Path -Path $PSScriptRoot -ChildPath "configuration.dsc.yml"),
+  [string]$ConfigDir = $PSScriptRoot,
 
   [Alias("h")]
   [Parameter()]
   [switch]$Help,
+
+  [Parameter()]
+  [string[]]$PostProvisionConfigFiles = @("user.dsc.yml"),
+
+  [Parameter()]
+  [string[]]$PreProvisionConfigFiles = @("system.dsc.yml"),
 
   [Parameter()]
   [string]$SecretsDir = (Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets")
@@ -57,10 +71,12 @@ $libDir = Join-Path -Path $PSScriptRoot -ChildPath "lib"
 . (Join-Path -Path $libDir -ChildPath "Nucleus.Secrets.ps1")
 . (Join-Path -Path $libDir -ChildPath "Nucleus.Wallpapers.ps1")
 
-$resolvedConfig = Resolve-Path -Path $ConfigPath
+$resolvedConfigDir = (Resolve-Path -Path $ConfigDir).Path
 
-Write-Host "Applying WinGet DSC: $resolvedConfig" -ForegroundColor Cyan
-winget configure --accept-configuration-agreements --disable-interactivity "$resolvedConfig"
+foreach ($configFile in $PreProvisionConfigFiles) {
+  $configPath = Join-Path -Path $resolvedConfigDir -ChildPath $configFile
+  Invoke-NucleusWingetConfiguration -ConfigPath $configPath
+}
 
 $gpgExe = Resolve-NucleusExecutable -Name "gpg" -CandidatePaths @(
   (Join-Path -Path ${env:ProgramFiles(x86)} -ChildPath "GnuPG\bin\gpg.exe"),
@@ -76,4 +92,9 @@ $sopsExe = Resolve-NucleusExecutable -Name "sops" -CandidatePaths @(
 $hostKeyPath = Join-Path -Path $env:PROGRAMDATA -ChildPath "ssh\ssh_host_ed25519_key"
 
 Sync-NucleusSecrets -SecretsDir $SecretsDir -GpgExe $gpgExe -HostKeyPath $hostKeyPath -SopsExe $sopsExe
-Sync-NucleusWallpapers -AssetsDir $AssetsDir -GpgExe $gpgExe -HostKeyPath $hostKeyPath -OutputDir (Join-Path -Path $HOME -ChildPath "Pictures\wallpapers") -SopsExe $sopsExe
+$activeWallpaperPath = Sync-NucleusWallpapers -AssetsDir $AssetsDir -GpgExe $gpgExe -HostKeyPath $hostKeyPath -OutputDir (Join-Path -Path $HOME -ChildPath "Pictures\wallpapers") -SopsExe $sopsExe
+
+foreach ($configFile in $PostProvisionConfigFiles) {
+  $configPath = Join-Path -Path $resolvedConfigDir -ChildPath $configFile
+  Invoke-NucleusWingetConfiguration -ConfigPath $configPath -WallpaperPath $activeWallpaperPath
+}

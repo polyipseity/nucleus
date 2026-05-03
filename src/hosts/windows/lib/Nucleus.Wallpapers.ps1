@@ -18,18 +18,20 @@ function Sync-NucleusWallpapers {
 
   if (-not (Test-Path -Path $AssetsDir)) {
     Write-Host "No wallpaper assets directory found at $AssetsDir; skipping wallpaper sync." -ForegroundColor Yellow
-    return
+    return $null
   }
 
   $wallpaperFiles = @(Get-ChildItem -Path $AssetsDir -Filter "*.sops" | Sort-Object Name)
   if ($wallpaperFiles.Count -eq 0) {
     Write-Host "No wallpaper blobs (*.sops) found in $AssetsDir; skipping wallpaper sync." -ForegroundColor Yellow
-    return
+    return $null
   }
 
   if (-not (Test-Path -Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
   }
+
+  $activeWallpaperPath = $null
 
   foreach ($wallpaperFile in $wallpaperFiles) {
     $outputName = [System.IO.Path]::GetFileNameWithoutExtension($wallpaperFile.Name)
@@ -37,7 +39,12 @@ function Sync-NucleusWallpapers {
 
     Write-Host "Materializing wallpaper: $outputName" -ForegroundColor Cyan
     Get-NucleusDecryptedBlob -FilePath $wallpaperFile.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -OutputPath $outputPath -SopsExe $SopsExe
+
+    if (-not $activeWallpaperPath) {
+      $activeWallpaperPath = $outputPath
+    }
   }
 
   Write-Host "Wallpaper sync complete." -ForegroundColor Green
+  return $activeWallpaperPath
 }

@@ -16,6 +16,59 @@ function Resolve-NucleusExecutable {
   throw "Unable to resolve managed executable path for '$Name'."
 }
 
+function Invoke-NucleusWingetConfiguration {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ConfigPath,
+
+    [Parameter()]
+    [string]$WallpaperPath
+  )
+
+  if (-not (Test-Path -Path $ConfigPath)) {
+    throw "WinGet DSC configuration not found: $ConfigPath"
+  }
+
+  $resolvedConfigPath = (Resolve-Path -Path $ConfigPath).Path
+  $tempConfigPath = $null
+
+  try {
+    $configContent = Get-Content -Path $resolvedConfigPath -Raw
+
+    if ($configContent.Contains("__NUCLEUS_ACTIVE_WALLPAPER__")) {
+      $effectiveWallpaperPath = $WallpaperPath
+
+      if ([string]::IsNullOrWhiteSpace($effectiveWallpaperPath)) {
+        $existingWallpaperPath = (Get-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name Wallpaper -ErrorAction SilentlyContinue).Wallpaper
+        if (-not [string]::IsNullOrWhiteSpace($existingWallpaperPath)) {
+          $effectiveWallpaperPath = $existingWallpaperPath
+        }
+      }
+
+      if ([string]::IsNullOrWhiteSpace($effectiveWallpaperPath)) {
+        $effectiveWallpaperPath = (Join-Path -Path $HOME -ChildPath "Pictures\wallpapers")
+      }
+
+      $configContent = $configContent.Replace("__NUCLEUS_ACTIVE_WALLPAPER__", $effectiveWallpaperPath)
+      $tempConfigPath = Join-Path -Path $env:TEMP -ChildPath ("nucleus-winget-config-" + [System.Guid]::NewGuid().ToString() + ".yml")
+      $configContent | Out-File -FilePath $tempConfigPath -Encoding utf8 -NoNewline
+      $resolvedConfigPath = $tempConfigPath
+    }
+
+    Write-Host "Applying WinGet DSC: $resolvedConfigPath" -ForegroundColor Cyan
+    winget configure --accept-configuration-agreements --disable-interactivity "$resolvedConfigPath"
+
+    if ($LASTEXITCODE -ne 0) {
+      throw "winget configure failed for '$ConfigPath' with exit code $LASTEXITCODE."
+    }
+  }
+  finally {
+    if ($tempConfigPath -and (Test-Path -Path $tempConfigPath)) {
+      Remove-Item -Path $tempConfigPath -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
 function Get-NucleusSecrets {
   param(
     [Parameter(Mandatory = $true)]

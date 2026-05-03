@@ -8,10 +8,11 @@ applyTo: "src/hosts/windows/**/*.yml"
 
 ## File location and purpose
 
-- `src/hosts/windows/configuration.dsc.yml` is the single WinGet DSC v3
-  manifest for the Windows host.
-- It is applied with `winget configure` (see `README.md` and
-  `scripts/bootstrap.ps1` for the exact invocation).
+- `src/hosts/windows/system.dsc.yml` contains pre-provision system baseline
+  resources (packages, machine settings, machine registry).
+- `src/hosts/windows/user.dsc.yml` contains post-provision user baseline
+  resources (folder layout, user registry, user environment variables).
+- They are applied in-order by `src/hosts/windows/apply.ps1`.
 
 ## DSC v3 document structure
 
@@ -26,7 +27,8 @@ applyTo: "src/hosts/windows/**/*.yml"
 
 ## Resource groups and ordering
 
-Organize resources into these logical groups, in this order:
+Organize resources into these logical groups, in this order (within each DSC
+file):
 
 1. Package installations (`Microsoft.WinGet.Client/Package`)
 2. System settings (`Microsoft.Windows.Settings/*`)
@@ -63,7 +65,8 @@ packages) or `settings.valueName` / `settings.name` (for other resources).
 
 - Test the manifest dry-run on the target machine with:
   ```powershell
-  winget configure --what-if .\src\hosts\windows\configuration.dsc.yml
+  winget configure --what-if .\src\hosts\windows\system.dsc.yml
+  winget configure --what-if .\src\hosts\windows\user.dsc.yml
   ```
 - Full application requires an elevated PowerShell session and
   `--accept-configuration-agreements`.

@@ -1,4 +1,4 @@
-# WinGet Configuration (DSC v3) for the Windows host
+# WinGet DSC v3 - system-level baseline for Windows host
 properties:
   configurationVersion: 0.2.0
   resources:
@@ -72,19 +72,3 @@ properties:
         valueName: LongPathsEnabled
         valueData: 1
         valueType: DWord
-
-    - resource: Microsoft.Windows.Environment/Variable
-      directives:
-        description: Set user-level HOME for CLI parity
-      settings:
-        name: HOME
-        value: "%USERPROFILE%"
-        scope: User
-
-    - resource: Microsoft.Windows.Environment/Variable
-      directives:
-        description: Set user-level NIX_PATH
-      settings:
-        name: NIX_PATH
-        value: nixpkgs=flake:nixpkgs
-        scope: User

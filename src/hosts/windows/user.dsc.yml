@@ -1,0 +1,35 @@
+# WinGet DSC v3 - user-level baseline for Windows host
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.Windows.Storage/Folder
+      directives:
+        description: Ensure wallpaper output directory exists
+      settings:
+        Path: "%USERPROFILE%\\Pictures\\wallpapers"
+        Ensure: Present
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: Ensure desktop wallpaper points at declaratively materialized asset
+      settings:
+        keyPath: HKCU\Control Panel\Desktop
+        valueName: Wallpaper
+        valueData: "__NUCLEUS_ACTIVE_WALLPAPER__"
+        valueType: String
+
+    - resource: Microsoft.Windows.Environment/Variable
+      directives:
+        description: Set user-level HOME for CLI parity
+      settings:
+        name: HOME
+        value: "%USERPROFILE%"
+        scope: User
+
+    - resource: Microsoft.Windows.Environment/Variable
+      directives:
+        description: Set user-level NIX_PATH
+      settings:
+        name: NIX_PATH
+        value: nixpkgs=flake:nixpkgs
+        scope: User
