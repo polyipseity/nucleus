@@ -37,31 +37,29 @@ in
     }
 
     found=0
-    if [ -d "${wallpapersDir}" ]; then
-      for wallpaper_blob in "${wallpapersDir}"/*.sops; do
-        [ -e "$wallpaper_blob" ] || continue
-        found=1
+    for wallpaper_blob in "${wallpapersDir}"/*.sops; do
+      [ -e "$wallpaper_blob" ] || continue
+      found=1
 
-        targetFile="$picturesDir/$(basename "${wallpaper_blob%.sops}")"
-        tmpTarget="$(mktemp)"
+      targetFile="$picturesDir/$(basename "${wallpaper_blob%.sops}")"
+      tmpTarget="$(mktemp)"
 
-        if nucleus_decrypt_wallpaper "$wallpaper_blob" "$tmpTarget"; then
-          if [ ! -f "$targetFile" ] || ! ${pkgs.diffutils}/bin/cmp -s "$tmpTarget" "$targetFile"; then
-            mv "$tmpTarget" "$targetFile"
-            chmod 644 "$targetFile"
-          else
-            rm -f "$tmpTarget"
-          fi
-
-          if [ -z "$activeWallpaperPath" ]; then
-            activeWallpaperPath="$targetFile"
-          fi
+      if nucleus_decrypt_wallpaper "$wallpaper_blob" "$tmpTarget"; then
+        if [ ! -f "$targetFile" ] || ! ${pkgs.diffutils}/bin/cmp -s "$tmpTarget" "$targetFile"; then
+          mv "$tmpTarget" "$targetFile"
+          chmod 644 "$targetFile"
         else
           rm -f "$tmpTarget"
-          echo "nucleus: failed to decrypt wallpaper $(basename "$wallpaper_blob"); skipping." >&2
         fi
-      done
-    fi
+
+        if [ -z "$activeWallpaperPath" ]; then
+          activeWallpaperPath="$targetFile"
+        fi
+      else
+        rm -f "$tmpTarget"
+        echo "nucleus: failed to decrypt wallpaper $(basename "$wallpaper_blob"); skipping." >&2
+      fi
+    done
 
     if [ "$found" -eq 0 ]; then
       echo "nucleus: no wallpaper blobs (*.sops) found in ${wallpapersDir}; skipping wallpaper provisioning."
