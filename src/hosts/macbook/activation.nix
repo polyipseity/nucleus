@@ -4,11 +4,6 @@
 # system.activationScripts is a nix-darwin-only option they are guaranteed to
 # execute on macOS; no OS check inside the shell body is needed.
 { ... }:
-let
-  # When true, Arduino IDE 1.8 is downloaded and installed to /Applications.
-  # Set to false to have the activation script remove it instead.
-  enableArduinoIDE = true;
-in
 {
   # ---------------------------------------------------------------------------
   # Declarative power-management settings handled by nix-darwin's power module.
@@ -67,41 +62,5 @@ in
   # ---------------------------------------------------------------------------
   system.activationScripts.configureMonitorColorProfile.text = ''
     /usr/bin/defaults delete /Library/Preferences/com.apple.ColorSync.DeviceCache || true
-  '';
-
-  # ---------------------------------------------------------------------------
-  # configurePostActivation
-  # Runs final one-time setup tasks that require the rest of the system to be
-  # fully activated first:
-  #
-  #   Rosetta 2: installs the x86_64 translation layer if oahd (the Rosetta
-  #   daemon) is not already running.  Required for x86_64-only binaries.
-  #
-  #   Arduino IDE: conditionally installs or removes Arduino IDE 1.8.19.
-  #   Controlled by the `enableArduinoIDE` Nix boolean above; the branch is
-  #   resolved at eval time so only the relevant shell block is embedded.
-  # ---------------------------------------------------------------------------
-  system.activationScripts.configurePostActivation.text = ''
-    if ! /usr/bin/pgrep -q oahd; then
-      /usr/sbin/softwareupdate --install-rosetta --agree-to-license || true
-    fi
-
-    ARDUINO_APP="/Applications/Arduino.app"
-    ${if enableArduinoIDE then ''
-    if [ ! -d "$ARDUINO_APP" ]; then
-      TMP_DIR=$(/usr/bin/mktemp -d)
-      URL="https://downloads.arduino.cc/arduino-1.8.19-macosx.zip"
-      if /usr/bin/curl -fsSL -o "$TMP_DIR/arduino.zip" "$URL"; then
-        /usr/bin/unzip -q "$TMP_DIR/arduino.zip" -d "$TMP_DIR"
-        if [ -d "$TMP_DIR/Arduino.app" ]; then
-          /bin/rm -rf "$ARDUINO_APP"
-          /bin/mv "$TMP_DIR/Arduino.app" "$ARDUINO_APP"
-        fi
-      fi
-      /bin/rm -rf "$TMP_DIR"
-    fi
-    '' else ''
-    [ -d "$ARDUINO_APP" ] && /bin/rm -rf "$ARDUINO_APP"
-    ''}
   '';
 }

@@ -8,6 +8,7 @@
     ./base.nix
     ./defaults.nix
     ./homebrew.nix
+    ./manual-installations.nix
     ./networking.nix
     ./security.nix
     ./sops.nix
