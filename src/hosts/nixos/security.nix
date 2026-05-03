@@ -1,9 +1,13 @@
 # nixos/security.nix — Privilege-escalation hardening for the NixOS host.
 { ... }:
 {
-  # Shorten the sudo credential cache to 5 minutes to reduce the window in
-  # which an unattended terminal can perform privileged operations.
-  security.sudo.extraConfig = ''
-    Defaults timestamp_timeout=5
-  '';
+  # Keep SSH remote access available while using key-based auth only.
+  services.openssh = {
+    enable = true;
+    openFirewall = true;
+    settings = {
+      KbdInteractiveAuthentication = false;
+      PasswordAuthentication = false;
+    };
+  };
 }

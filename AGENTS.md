@@ -81,6 +81,11 @@
 - **Declarative first**: imperative code in `src/scripts/apply.sh` and
   `src/hosts/windows/apply.ps1` is treated as a bug. If desired state can be
   represented in Nix modules or WinGet DSC resources, move it there.
+- **POSIX shared config**: any setting duplicated between
+  `src/hosts/macbook/` and `src/hosts/nixos/` (for example Nix experimental
+  features, system Zsh enablement, sudo timeout policy, or shared SOPS key
+  sources) should be centralized in `src/modules/*.nix` and imported by both
+  hosts.
 - **JIT secrets**: do not materialize secrets globally in orchestration
   wrappers. Materialize secrets only in the module/resource that requires them
   (for example Home Manager activation hooks or targeted Windows module calls).

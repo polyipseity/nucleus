@@ -4,6 +4,10 @@
 {
   imports = [
     ../../modules/core.nix
+    ../../modules/posix-base.nix
+    ../../modules/posix-security.nix
+    ../../modules/posix-sops.nix
+    ../../modules/posix-user-shell.nix
     ./activation.nix
     ./base.nix
     ./defaults.nix

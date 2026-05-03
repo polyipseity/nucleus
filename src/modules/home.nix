@@ -21,6 +21,7 @@ in
   imports = [
     ./core.nix
     ./editors.nix
+    ./linux.nix
     ./macos.nix
     ./secrets.nix
     ./shell.nix
