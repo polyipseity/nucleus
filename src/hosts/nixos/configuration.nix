@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, username, ... }:
 {
   imports = [ ../../modules/core.nix ];
 
@@ -12,7 +12,14 @@
 
   programs.zsh.enable = true;
 
-  users.users.user = {
+  sops = {
+    age = {
+      sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+    };
+    gnupg.home = "/home/${username}/.gnupg";
+  };
+
+  users.users.${username} = {
     isNormalUser = true;
     extraGroups = [ "networkmanager" "wheel" ];
     shell = pkgs.zsh;

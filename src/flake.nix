@@ -11,55 +11,133 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    sops-nix = {
+      url = "github:Mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { darwin, home-manager, nixpkgs, ... }:
+  outputs = { darwin, home-manager, nixpkgs, sops-nix, ... }:
     let
-      username = "user"; # TODO: Change this to your local username.
+      username = "polyipseity";
       systems = {
-        mac = "aarch64-darwin";
         linux = "x86_64-linux";
+        mac = "aarch64-darwin";
       };
       mkPkgs = system: import nixpkgs {
         inherit system;
         config.allowUnfree = true;
       };
+      pkgsLinux = mkPkgs systems.linux;
+      pkgsMac = mkPkgs systems.mac;
     in {
+      apps = {
+        "${systems.mac}" = {
+          darwin-rebuild = {
+            type = "app";
+            program = "${darwin.packages.${systems.mac}.darwin-rebuild}/bin/darwin-rebuild";
+          };
+        };
+        "${systems.linux}" = {
+          home-manager = {
+            type = "app";
+            program = "${home-manager.packages.${systems.linux}.home-manager}/bin/home-manager";
+          };
+          nixos-rebuild = {
+            type = "app";
+            program = "${pkgsLinux.nixos-rebuild}/bin/nixos-rebuild";
+          };
+        };
+      };
+
       # macOS (nix-darwin)
       darwinConfigurations.macbook = darwin.lib.darwinSystem {
+        specialArgs = { inherit username; };
         system = systems.mac;
         modules = [
           ./hosts/macbook/default.nix
+          sops-nix.darwinModules.sops
           home-manager.darwinModules.home-manager
           {
+            home-manager.extraSpecialArgs = { inherit username; };
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
-            home-manager.extraSpecialArgs = { inherit username; };
-            home-manager.users.${username} = import ./modules/home.nix;
+            home-manager.users.${username} = {
+              imports = [
+                sops-nix.homeManagerModules.sops
+                ./modules/home.nix
+              ];
+            };
           }
         ];
       };
 
       # Linux (NixOS)
       nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
+        specialArgs = { inherit username; };
         system = systems.linux;
         modules = [
           ./hosts/nixos/configuration.nix
+          sops-nix.nixosModules.sops
           home-manager.nixosModules.home-manager
           {
+            home-manager.extraSpecialArgs = { inherit username; };
+
+        packages = {
+          "${systems.mac}".bootstrap-deps = pkgsMac.symlinkJoin {
+            name = "bootstrap-deps";
+            paths = [
+              pkgsMac.gnupg
+              pkgsMac.jq
+              pkgsMac.sops
+            ];
+          };
+          "${systems.linux}".bootstrap-deps = pkgsLinux.symlinkJoin {
+            name = "bootstrap-deps";
+            paths = [
+              pkgsLinux.gnupg
+              pkgsLinux.jq
+              pkgsLinux.sops
+            ];
+          };
+        };
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
-            home-manager.extraSpecialArgs = { inherit username; };
-            home-manager.users.${username} = import ./modules/home.nix;
+            home-manager.users.${username} = {
+              imports = [
+                sops-nix.homeManagerModules.sops
+                ./modules/home.nix
+              ];
+            };
           }
         ];
       };
 
+      devShells = {
+        "${systems.mac}".bootstrap = pkgsMac.mkShell {
+          packages = [
+            pkgsMac.gnupg
+            pkgsMac.jq
+            pkgsMac.sops
+          ];
+        };
+        "${systems.linux}".bootstrap = pkgsLinux.mkShell {
+          packages = [
+            pkgsLinux.gnupg
+            pkgsLinux.jq
+            pkgsLinux.sops
+          ];
+        };
+      };
+
       # Generic CLI profile (works for Linux and WSL; can also drive cross-platform dotfiles)
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
-        pkgs = mkPkgs systems.linux;
         extraSpecialArgs = { inherit username; };
-        modules = [ ./modules/home.nix ];
+        modules = [
+          sops-nix.homeManagerModules.sops
+          ./modules/home.nix
+        ];
+        pkgs = pkgsLinux;
       };
     };
 }

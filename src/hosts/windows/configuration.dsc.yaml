@@ -1,4 +1,4 @@
-# WinGet Configuration (DSC v3) for the Surface host
+# WinGet Configuration (DSC v3) for the Windows host
 properties:
   configurationVersion: 0.2.0
   resources:
@@ -18,6 +18,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Gpg4win is installed
+      settings:
+        id: GnuPG.Gpg4win
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Chrome is installed
       settings:
         id: Google.Chrome
@@ -28,6 +35,13 @@ properties:
         description: Ensure Visual Studio Code is installed
       settings:
         id: Microsoft.VisualStudioCode
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure SOPS is installed
+      settings:
+        id: SecretsOPerationS.SOPS
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package

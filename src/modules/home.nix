@@ -10,8 +10,9 @@ in
 {
   imports = [
     ./core.nix
-    ./shell/default.nix
     ./editors/default.nix
+    ./secrets/default.nix
+    ./shell/default.nix
   ];
 
   home = {

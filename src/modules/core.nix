@@ -5,8 +5,11 @@ let
     eza
     fd
     git
+    gnupg
+    jq
     ripgrep
     rustup
+    sops
     zoxide
   ];
 in

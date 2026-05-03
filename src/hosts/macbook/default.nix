@@ -1,10 +1,17 @@
-{ ... }:
+{ username, ... }:
 {
   imports = [ ../../modules/core.nix ];
 
   networking.hostName = "macbook";
 
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings.experimental-features = [ "flakes" "nix-command" ];
+
+  sops = {
+    age = {
+      sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+    };
+    gnupg.home = "/Users/${username}/.gnupg";
+  };
 
   system.defaults = {
     NSGlobalDomain = {
