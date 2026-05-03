@@ -3,7 +3,7 @@
   Install bootstrap dependencies for the nucleus environment on Windows.
 
 .DESCRIPTION
-  Installs Git, GnuPG, and SOPS via winget using pinned versions from
+  Installs GnuPG and SOPS via winget using pinned versions from
   scripts/bootstrap-versions.env.
   Use -Apply to run the Windows apply script after dependency installation.
 
@@ -67,7 +67,7 @@ function Get-RequiredVersionSetting {
     Import-BootstrapVersions.
 
   .PARAMETER Key
-    The settings key to look up (e.g. 'NUCLEUS_GIT_VERSION').
+    The settings key to look up (e.g. 'NUCLEUS_GPG4WIN_VERSION').
 
   .OUTPUTS
     [string]  The non-empty value associated with $Key.
@@ -225,7 +225,6 @@ if (-not (Get-Command -Name winget -ErrorAction SilentlyContinue)) {
 $BootstrapVersions = Import-BootstrapVersions -FilePath $VersionsFilePath
 
 $BootstrapPackageVersions = [ordered]@{
-  "Git.Git" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_GIT_VERSION"
   "GnuPG.Gpg4win" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_GPG4WIN_VERSION"
   "SecretsOPerationS.SOPS" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_SOPS_VERSION"
 }

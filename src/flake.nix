@@ -50,14 +50,13 @@
       pkgsMac   = mkPkgs systems.mac;
 
       # Build the `nix run .#apply` app for a given package set.
-      # Wraps scripts/apply.sh in a shell application that has git, gnupg, jq,
-      # and sops on PATH, so the script needs no external dependencies at
-      # runtime beyond a working Nix installation.
+      # Wraps scripts/apply.sh in a shell application that has git on PATH,
+      # which is sufficient for repository-root resolution in apply.sh.
       mkApplyApp = pkgs: {
         type = "app";
         program = "${pkgs.writeShellApplication {
           name = "nucleus-apply";
-          runtimeInputs = [ pkgs.git pkgs.gnupg pkgs.jq pkgs.sops ];
+          runtimeInputs = [ pkgs.git ];
           text = builtins.readFile ./scripts/apply.sh;
         }}/bin/nucleus-apply";
       };
@@ -146,15 +145,14 @@
 
       # -----------------------------------------------------------------------
       # packages — installable via `nix profile add .#bootstrap-deps`.
-      # bootstrap-deps is a symlink-joined set of the tools that bootstrap.sh
-      # needs before the full configuration has been applied (gnupg, jq, sops).
+      # bootstrap-deps is a symlink-joined set of the tools used for manual
+      # secret lifecycle tasks during bootstrap (gnupg, sops).
       # -----------------------------------------------------------------------
       packages = {
         "${systems.mac}".bootstrap-deps = pkgsMac.symlinkJoin {
           name = "bootstrap-deps";
           paths = [
             pkgsMac.gnupg
-            pkgsMac.jq
             pkgsMac.sops
           ];
         };
@@ -162,7 +160,6 @@
           name = "bootstrap-deps";
           paths = [
             pkgsLinux.gnupg
-            pkgsLinux.jq
             pkgsLinux.sops
           ];
         };
@@ -177,14 +174,12 @@
         "${systems.mac}".bootstrap = pkgsMac.mkShell {
           packages = [
             pkgsMac.gnupg
-            pkgsMac.jq
             pkgsMac.sops
           ];
         };
         "${systems.linux}".bootstrap = pkgsLinux.mkShell {
           packages = [
             pkgsLinux.gnupg
-            pkgsLinux.jq
             pkgsLinux.sops
           ];
         };

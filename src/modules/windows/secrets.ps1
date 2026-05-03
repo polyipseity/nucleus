@@ -1,3 +1,42 @@
+function Test-NucleusPrimaryUser {
+  <#
+  .SYNOPSIS
+    Returns whether the current Windows user is the configured primary user.
+
+  .DESCRIPTION
+    Compares the current interactive username against $PrimaryUsername.
+    Secret materialization must only run for this primary user; non-primary
+    users are always skipped.
+
+  .PARAMETER PrimaryUsername
+    Canonical primary username (for example: 'polyipseity').
+
+  .PARAMETER Quiet
+    Suppress the skip warning when the username does not match.
+
+  .OUTPUTS
+    [bool]  True when current user matches $PrimaryUsername.
+  #>
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$PrimaryUsername,
+
+    [Parameter()]
+    [switch]$Quiet
+  )
+
+  $currentUsername = [System.Environment]::UserName
+  if ($currentUsername -eq $PrimaryUsername) {
+    return $true
+  }
+
+  if (-not $Quiet) {
+    Write-Host "Skipping secret materialization for non-primary user '$currentUsername'. Expected '$PrimaryUsername'." -ForegroundColor Yellow
+  }
+
+  return $false
+}
+
 function Sync-NucleusSecretFile {
   <#
   .SYNOPSIS
@@ -5,18 +44,16 @@ function Sync-NucleusSecretFile {
 
   .DESCRIPTION
     Calls Get-NucleusSecrets to decrypt $FilePath, then processes two
-    optional payload fields:
+    username-scoped flat keys:
 
-    ssh_keys   — An array of {name, value} objects.  Each is written to
-                 $HOME\.ssh\<name> using ASCII encoding (no BOM, no trailing
-                 newline).  Files are only overwritten when the content has
-                 actually changed to avoid unnecessary disk writes and
-                 fingerprint updates.
+    ssh_personal_${username}
+      Written to $HOME\.ssh\ssh_personal_${username} using ASCII encoding
+      (no BOM, no trailing newline). The file is only overwritten when content
+      changes.
 
-    gpg_imports — An array of {name, value} objects.  Each value (an armored
-                  GPG key block) is written to a temp file, imported with
-                  `gpg --batch --import`, and the temp file is deleted.  Import
-                  output is suppressed; errors surface as exceptions.
+    gpg_personal_${username}
+      Imported into the current GPG keyring via stdin (`gpg --batch --import -`).
+      No temporary plaintext files are created.
 
     $HOME\.ssh is created if it does not already exist.
 
@@ -32,9 +69,13 @@ function Sync-NucleusSecretFile {
   .PARAMETER SopsExe
     Absolute path to the sops executable.
 
+  .PARAMETER PrimaryUsername
+    Canonical primary username allowed to materialize/import secrets.
+
   .EXAMPLE
-    Sync-NucleusSecretFile -FilePath '.\personal.yml' -GpgExe 'gpg.exe' `
-        -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' -SopsExe 'sops.exe'
+    Sync-NucleusSecretFile -FilePath '.\ssh-personal.yml' -GpgExe 'gpg.exe' `
+      -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' -SopsExe 'sops.exe' `
+      -PrimaryUsername 'polyipseity'
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -47,11 +88,21 @@ function Sync-NucleusSecretFile {
     [string]$HostKeyPath,
 
     [Parameter(Mandatory = $true)]
-    [string]$SopsExe
+    [string]$SopsExe,
+
+    [Parameter(Mandatory = $true)]
+    [string]$PrimaryUsername
   )
 
+  if (-not (Test-NucleusPrimaryUser -PrimaryUsername $PrimaryUsername -Quiet)) {
+    return
+  }
+
   $secretFileInfo = Get-Item -Path $FilePath
+  $gpgSecretName = "gpg_personal_$PrimaryUsername"
   $sshDir = Join-Path -Path $HOME -ChildPath ".ssh"
+  $sshSecretName = "ssh_personal_$PrimaryUsername"
+
   if (-not (Test-Path -Path $sshDir)) {
     New-Item -ItemType Directory -Path $sshDir -Force | Out-Null
   }
@@ -59,35 +110,31 @@ function Sync-NucleusSecretFile {
   Write-Host "Processing secrets from: $($secretFileInfo.Name)" -ForegroundColor Cyan
   $jsonSecrets = Get-NucleusSecrets -FilePath $secretFileInfo.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -SopsExe $SopsExe
 
-  if ($jsonSecrets.PSObject.Properties['ssh_keys']) {
-    foreach ($key in @($jsonSecrets.ssh_keys | Sort-Object name)) {
-      $keyPath = Join-Path -Path $sshDir -ChildPath $key.name
-      $existingValue = if (Test-Path -Path $keyPath) {
-        Get-Content -Path $keyPath -Raw
-      }
-      else {
-        ""
-      }
+  if ($null -ne $jsonSecrets.PSObject.Properties[$sshSecretName]) {
+    $sshKeyPath = Join-Path -Path $sshDir -ChildPath $sshSecretName
+    $sshKeyValue = [string]$jsonSecrets.$sshSecretName
+    $existingValue = if (Test-Path -Path $sshKeyPath) {
+      Get-Content -Path $sshKeyPath -Raw
+    }
+    else {
+      ""
+    }
 
-      if ($existingValue -ne $key.value) {
-        $key.value | Out-File -FilePath $keyPath -Encoding ascii -NoNewline
-        Write-Host "  Updated SSH key: $($key.name)" -ForegroundColor Cyan
-      }
+    if ($existingValue -ne $sshKeyValue) {
+      $sshKeyValue | Out-File -FilePath $sshKeyPath -Encoding ascii -NoNewline
+      Write-Host "  Updated SSH key: $sshSecretName" -ForegroundColor Cyan
     }
   }
 
-  if ($jsonSecrets.PSObject.Properties['gpg_imports']) {
-    foreach ($gpgKey in @($jsonSecrets.gpg_imports | Sort-Object name)) {
-      $tempPath = [System.IO.Path]::GetTempFileName()
+  if ($null -ne $jsonSecrets.PSObject.Properties[$gpgSecretName]) {
+    $gpgKeyValue = [string]$jsonSecrets.$gpgSecretName
+    if (-not [string]::IsNullOrWhiteSpace($gpgKeyValue)) {
+      $gpgKeyValue | & $GpgExe --batch --import - | Out-Null
+      if ($LASTEXITCODE -ne 0) {
+        throw "Failed to import GPG material '$gpgSecretName'. Exit code: $LASTEXITCODE"
+      }
 
-      try {
-        $gpgKey.value | Out-File -FilePath $tempPath -Encoding ascii -NoNewline
-        & $GpgExe --batch --import "$tempPath" | Out-Null
-        Write-Host "  Imported GPG material: $($gpgKey.name)" -ForegroundColor Cyan
-      }
-      finally {
-        Remove-Item -Path $tempPath -Force -ErrorAction SilentlyContinue
-      }
+      Write-Host "  Imported GPG material: $gpgSecretName" -ForegroundColor Cyan
     }
   }
 }
@@ -120,10 +167,14 @@ function Invoke-NucleusJitSecretMaterialization {
   .PARAMETER SopsExe
     Absolute path to the sops executable.
 
+  .PARAMETER PrimaryUsername
+    Canonical primary username allowed to materialize/import secrets.
+
   .EXAMPLE
     Invoke-NucleusJitSecretMaterialization -SecretsDir '.\secrets' `
-        -SecretNames @('personal', 'work') `
-        -GpgExe 'gpg.exe' -HostKeyPath '...\ssh_host_ed25519_key' -SopsExe 'sops.exe'
+      -SecretNames @('gpg-personal', 'ssh-personal') `
+      -GpgExe 'gpg.exe' -HostKeyPath '...\ssh_host_ed25519_key' -SopsExe 'sops.exe' `
+      -PrimaryUsername 'polyipseity'
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -139,8 +190,15 @@ function Invoke-NucleusJitSecretMaterialization {
     [string]$HostKeyPath,
 
     [Parameter(Mandatory = $true)]
-    [string]$SopsExe
+    [string]$SopsExe,
+
+    [Parameter(Mandatory = $true)]
+    [string]$PrimaryUsername
   )
+
+  if (-not (Test-NucleusPrimaryUser -PrimaryUsername $PrimaryUsername)) {
+    return
+  }
 
   foreach ($secretName in $SecretNames) {
     $normalizedSecretFile = if ($secretName.EndsWith(".yml")) { $secretName } else { "$secretName.yml" }
@@ -150,23 +208,23 @@ function Invoke-NucleusJitSecretMaterialization {
       throw "Requested JIT secret file was not found: $secretPath"
     }
 
-    Sync-NucleusSecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -SopsExe $SopsExe
+    Sync-NucleusSecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
   }
 }
 
 function Sync-NucleusSecrets {
   <#
   .SYNOPSIS
-    Batch-syncs all SOPS-encrypted secret files found in $SecretsDir.
+    Materializes primary-user personal SSH/GPG secrets from fixed secret files.
 
   .DESCRIPTION
-    Enumerates all *.yml files in $SecretsDir (sorted alphabetically) and calls
-    Sync-NucleusSecretFile for each one.  This is the top-level entry point
-    used by apply.ps1 for a full secrets pass.
+    Resolves exactly two secret files from $SecretsDir (sorted):
+      - gpg-personal.yml
+      - ssh-personal.yml
 
-    No-op (with a warning) when $SecretsDir does not exist or contains no .yml
-    files, so the function is safe to call even on machines where secrets have
-    not been provisioned yet.
+    Each file is passed to Sync-NucleusSecretFile, which extracts only
+    `gpg_personal_${username}` and `ssh_personal_${username}` for the primary
+    user and ignores all other keys.
 
   .PARAMETER SecretsDir
     Absolute path to the directory containing SOPS-encrypted YAML files.
@@ -180,9 +238,13 @@ function Sync-NucleusSecrets {
   .PARAMETER SopsExe
     Absolute path to the sops executable.
 
+  .PARAMETER PrimaryUsername
+    Canonical primary username allowed to materialize/import secrets.
+
   .EXAMPLE
     Sync-NucleusSecrets -SecretsDir '.\secrets' -GpgExe 'gpg.exe' `
-        -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' -SopsExe 'sops.exe'
+      -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' -SopsExe 'sops.exe' `
+      -PrimaryUsername 'polyipseity'
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -195,22 +257,28 @@ function Sync-NucleusSecrets {
     [string]$HostKeyPath,
 
     [Parameter(Mandatory = $true)]
-    [string]$SopsExe
+    [string]$SopsExe,
+
+    [Parameter(Mandatory = $true)]
+    [string]$PrimaryUsername
   )
 
-  $secretFiles = @()
+  if (-not (Test-NucleusPrimaryUser -PrimaryUsername $PrimaryUsername)) {
+    return
+  }
+
   if (-not (Test-Path -Path $SecretsDir)) {
     Write-Host "No secrets directory found at $SecretsDir; skipping key provisioning." -ForegroundColor Yellow
     return
   }
 
-  $secretFiles = @(Get-ChildItem -Path $SecretsDir -Filter "*.yml" | Sort-Object Name)
-  if ($secretFiles.Count -eq 0) {
-    Write-Host "No .yml secret files found in $SecretsDir; skipping key provisioning." -ForegroundColor Yellow
-    return
-  }
+  foreach ($secretFileName in @("gpg-personal.yml", "ssh-personal.yml")) {
+    $secretPath = Join-Path -Path $SecretsDir -ChildPath $secretFileName
+    if (-not (Test-Path -Path $secretPath)) {
+      Write-Host "Required secret file was not found: $secretPath" -ForegroundColor Yellow
+      continue
+    }
 
-  foreach ($secretFile in $secretFiles) {
-    Sync-NucleusSecretFile -FilePath $secretFile.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -SopsExe $SopsExe
+    Sync-NucleusSecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
   }
 }

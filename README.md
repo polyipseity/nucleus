@@ -52,8 +52,8 @@ nucleus/
 │   └── wallpapers/
 │       └── *.sops
 ├── src/secrets/
-│   ├── personal-gpg.yml
-│   └── personal-ssh.yml
+│   ├── gpg-personal.yml
+│   └── ssh-personal.yml
 ├── src/scripts/
 │   └── apply.sh
 └── scripts/
@@ -126,7 +126,7 @@ The bootstrap scripts are intentionally minimal: they only install the
 dependencies needed to run the rest of the toolchain.
 
 - Unix-like: `scripts/bootstrap.sh` - installs Nix (if absent) and Nix-managed bootstrap tools, with macOS `/nix` preflight handling
-- Windows: `scripts/bootstrap.ps1` - installs Git, GnuPG, and SOPS via winget
+- Windows: `scripts/bootstrap.ps1` - installs GnuPG and SOPS via winget
 
 When you explicitly request apply, bootstrap can delegate to the apply scripts
 after installing dependencies.
@@ -155,7 +155,7 @@ sh scripts/bootstrap.sh apply
 **Windows (Admin PowerShell):**
 
 ```powershell
-# Step 1: install Git, GnuPG, SOPS via winget
+# Step 1: install GnuPG and SOPS via winget
 .\scripts\bootstrap.ps1
 
 # Step 2: apply configuration (WinGet DSC + secrets provisioning)
@@ -190,11 +190,11 @@ This gives a one-time secure unlock path and then low-friction autonomous update
 2. Set your fingerprint in `.sops.yaml` (`*primary_gpg`).
 3. Add host age recipients in `.sops.yaml` for `macbook`, `nixos`, and `windows`.
 4. Edit secrets with SOPS (one file per identity):
-    - `sops src/secrets/personal-gpg.yml`
-    - `sops src/secrets/personal-ssh.yml`
+    - `sops src/secrets/gpg-personal.yml`
+    - `sops src/secrets/ssh-personal.yml`
 5. Re-encrypt after key policy updates:
-    - `sops updatekeys src/secrets/personal-gpg.yml`
-    - `sops updatekeys src/secrets/personal-ssh.yml`
+    - `sops updatekeys src/secrets/gpg-personal.yml`
+    - `sops updatekeys src/secrets/ssh-personal.yml`
 
 ## Binary wallpaper workflow (large collections)
 
@@ -229,8 +229,8 @@ Git handling:
    - Unix: `ssh-to-age < /etc/ssh/ssh_host_ed25519.pub`
    - Windows: `ssh-to-age < $env:PROGRAMDATA\ssh\ssh_host_ed25519.pub`
 4. Add that age recipient to `.sops.yaml`, then run for each secret file:
-   - `sops updatekeys src/secrets/personal-gpg.yml`
-   - `sops updatekeys src/secrets/personal-ssh.yml`
+    - `sops updatekeys src/secrets/gpg-personal.yml`
+    - `sops updatekeys src/secrets/ssh-personal.yml`
 5. Commit and push. Future decryptions can use host key automation.
 
 ## First-run checklist
