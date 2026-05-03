@@ -109,6 +109,14 @@ following logic:
   exists in `src/hosts/windows/system.dsc.yml` to maintain cross-platform
   parity.
 
+### Security Invariants (macOS)
+
+- **Security Invariant: Instant Lock** — always maintain
+  `com.apple.screensaver.askForPasswordDelay = 0` and
+  `com.apple.screensaver.askForPassword = true` in the macOS host
+  configuration. Any attempt to increase this delay or disable password
+  requirement is a security regression.
+
 ## Refactoring Guardrails
 
 - **Pre-flight check rule**: before proposing or executing edits, verify target
