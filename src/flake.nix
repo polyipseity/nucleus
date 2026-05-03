@@ -87,7 +87,7 @@
         specialArgs = { inherit username; };
         system = systems.linux;
         modules = [
-          ./hosts/nixos/configuration.nix
+          ./hosts/nixos/default.nix
           sops-nix.nixosModules.sops
           home-manager.nixosModules.home-manager
           {

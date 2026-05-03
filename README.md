@@ -26,7 +26,7 @@ nucleus/
 │   │   │   └── sops.nix
 │   │   ├── nixos/
 │   │   │   ├── base.nix
-│   │   │   ├── configuration.nix
+│   │   │   ├── default.nix
 │   │   │   ├── hardware.nix
 │   │   │   ├── networking.nix
 │   │   │   ├── security.nix
@@ -66,7 +66,7 @@ nucleus/
 
 - `src/modules/core.nix`: shared CLI tools (`bat`, `bottom`, `direnv`, `eza`, `fd`, `fzf`, `git`, `gnupg`, `jq`, `ripgrep`, `rustup`, `sops`, `uv`, `zoxide`) plus macOS-only desktop helpers
 - `src/hosts/macbook/default.nix`: macOS host entrypoint importing focused host modules (`activation.nix`, `homebrew.nix`, `defaults.nix`, etc.) for easier future extension
-- `src/hosts/nixos/configuration.nix`: NixOS host entrypoint importing focused host modules (`hardware.nix`, `users.nix`, `security.nix`, etc.) for easier future extension
+- `src/hosts/nixos/default.nix`: NixOS host entrypoint importing focused host modules (`hardware.nix`, `users.nix`, `security.nix`, etc.) for easier future extension
 - `src/hosts/windows/system.dsc.yml`: Windows pre-provision baseline via WinGet DSC (packages + machine settings)
 - `src/hosts/windows/user.dsc.yml`: Windows post-provision baseline via WinGet DSC (folders + user settings)
 - `src/modules/home.nix`: home-level shell/editor/dotfile composition across platforms

@@ -12,7 +12,7 @@ applyTo: "src/**/*.nix"
   `src/flake.lock`.
 - `src/hosts/<name>/` — machine-specific configuration; one directory per host.
   - `macbook/default.nix` — nix-darwin system config.
-  - `nixos/configuration.nix` — NixOS system config.
+  - `nixos/default.nix` — NixOS system config.
   - `windows/` — Windows; managed by WinGet DSC, not Nix (no `.nix` files here).
 - `src/modules/` — shared logic imported by hosts and home profiles.
   - `core.nix` — universal CLI packages.
