@@ -2,7 +2,6 @@
   description = "Nucleus - Unified Declarative System Configuration";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     darwin = {
       url = "github:lnl7/nix-darwin";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -11,9 +10,10 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   };
 
-  outputs = { nixpkgs, darwin, home-manager, ... }:
+  outputs = { darwin, home-manager, nixpkgs, ... }:
     let
       username = "user"; # TODO: Change this to your local username.
       systems = {

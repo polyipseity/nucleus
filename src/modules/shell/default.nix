@@ -6,22 +6,22 @@
     autosuggestion.enable = true;
     syntaxHighlighting.enable = true;
     shellAliases = {
-      ll = "eza -la";
       gs = "git status -sb";
+      ll = "eza -la";
     };
   };
 
   programs.fish = {
     enable = true;
     shellAliases = {
-      ll = "eza -la";
       gs = "git status -sb";
+      ll = "eza -la";
     };
   };
 
   programs.zoxide = {
     enable = true;
-    enableZshIntegration = true;
     enableFishIntegration = true;
+    enableZshIntegration = true;
   };
 }

@@ -1,12 +1,12 @@
 { lib, pkgs, options, ... }:
 let
   sharedPackages = with pkgs; [
-    git
-    rustup
-    ripgrep
-    fd
     bottom
     eza
+    fd
+    git
+    ripgrep
+    rustup
     zoxide
   ];
 in

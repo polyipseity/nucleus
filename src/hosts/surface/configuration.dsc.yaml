@@ -4,9 +4,9 @@ properties:
   resources:
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Visual Studio Code is installed
+        description: Ensure Discord is installed
       settings:
-        id: Microsoft.VisualStudioCode
+        id: Discord.Discord
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -25,9 +25,9 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Discord is installed
+        description: Ensure Visual Studio Code is installed
       settings:
-        id: Discord.Discord
+        id: Microsoft.VisualStudioCode
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -61,16 +61,16 @@ properties:
 
     - resource: Microsoft.Windows.Environment/Variable
       directives:
-        description: Set user-level NIX_PATH
-      settings:
-        name: NIX_PATH
-        value: nixpkgs=flake:nixpkgs
-        scope: User
-
-    - resource: Microsoft.Windows.Environment/Variable
-      directives:
         description: Set user-level HOME for CLI parity
       settings:
         name: HOME
         value: "%USERPROFILE%"
+        scope: User
+
+    - resource: Microsoft.Windows.Environment/Variable
+      directives:
+        description: Set user-level NIX_PATH
+      settings:
+        name: NIX_PATH
+        value: nixpkgs=flake:nixpkgs
         scope: User

@@ -5,7 +5,7 @@
   networking.hostName = "workstation";
   networking.networkmanager.enable = true;
 
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.settings.experimental-features = [ "flakes" "nix-command" ];
 
   boot.initrd.availableKernelModules = [ "xhci_pci" "nvme" "usbhid" "sd_mod" ];
   services.xserver.videoDrivers = [ "modesetting" ];
@@ -14,7 +14,7 @@
 
   users.users.user = {
     isNormalUser = true;
-    extraGroups = [ "wheel" "networkmanager" ];
+    extraGroups = [ "networkmanager" "wheel" ];
     shell = pkgs.zsh;
   };
 
