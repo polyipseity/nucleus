@@ -112,10 +112,15 @@ function Ensure-WingetPackage {
     [string]$Version
   )
 
+  # winget returns this code when the package is already installed and no newer
+  # version is available from configured sources.
+  $NoApplicableUpgradeExitCode = -1978335189
+
   $installArgs = @(
     "install"
     "--accept-package-agreements"
     "--accept-source-agreements"
+    "--disable-interactivity"
     "--exact"
     "--id"
     $Id
@@ -130,14 +135,26 @@ function Ensure-WingetPackage {
       return
     }
 
+    if ($LASTEXITCODE -eq $NoApplicableUpgradeExitCode) {
+      Write-Host "Package '$Id' is already installed at the requested version (or newer available version is not applicable)." -ForegroundColor Green
+      return
+    }
+
     Write-Host "Requested version '$Version' for '$Id' not available. Falling back to latest." -ForegroundColor Yellow
   }
 
   & winget @installArgs
 
-  if ($LASTEXITCODE -ne 0) {
-    throw "Failed to install package '$Id' with winget."
+  if ($LASTEXITCODE -eq 0) {
+    return
   }
+
+  if ($LASTEXITCODE -eq $NoApplicableUpgradeExitCode) {
+    Write-Host "Package '$Id' is already installed and up to date." -ForegroundColor Green
+    return
+  }
+
+  throw "Failed to install package '$Id' with winget. Exit code: $LASTEXITCODE"
 }
 
 if (-not (Get-Command -Name winget -ErrorAction SilentlyContinue)) {
