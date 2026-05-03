@@ -1,17 +1,30 @@
+# macbook/defaults.nix — Declarative macOS system.defaults for the MacBook.
+#
+# All settings are applied by nix-darwin via the `defaults write` mechanism
+# during `darwin-rebuild switch`.  They are grouped below by subsystem.
 { ... }:
 let
+  # ---------------------------------------------------------------------------
+  # Input method definitions
+  # The HIToolbox AppleEnabledInputSources list must be a complete ordered set;
+  # the first entry is used as the default source at login.
+  # ---------------------------------------------------------------------------
+
+  # Traditional Cangjie input method (part of the macOS TCIM bundle).
   cangjieInputMethod = {
     "Bundle ID" = "com.apple.inputmethod.TCIM";
     InputSourceKind = "Input Method";
     "Input Method Identifier" = "com.apple.inputmethod.TCIM.Cangjie";
   };
 
+  # Standard US QWERTY keyboard layout.
   usKeyboard = {
     InputSourceKind = "Keyboard Layout";
     "Keyboard Layout ID" = 0;
     "Keyboard Layout Name" = "U.S.";
   };
 
+  # Ordered list: US keyboard first (default at login), Cangjie second.
   inputMethods = [
     usKeyboard
     cangjieInputMethod
@@ -19,27 +32,34 @@ let
 in
 {
   system.defaults = {
+    # -------------------------------------------------------------------------
+    # NSGlobalDomain — system-wide defaults written to the global preferences
+    # domain, affecting most applications unless they override the value.
+    # -------------------------------------------------------------------------
     NSGlobalDomain = {
-      AppleFontSmoothing = 0;
-      AppleICUForce24HourTime = true;
-      AppleInterfaceStyleSwitchesAutomatically = true;
-      AppleKeyboardUIMode = 2;
-      ApplePressAndHoldEnabled = false;
-      AppleScrollerPagingBehavior = true;
-      AppleShowScrollBars = "Always";
-      InitialKeyRepeat = 15;
-      KeyRepeat = 2;
+      AppleFontSmoothing = 0;                        # disable subpixel anti-aliasing (better on Retina)
+      AppleICUForce24HourTime = true;                # 24-hour clock regardless of locale
+      AppleInterfaceStyleSwitchesAutomatically = true; # auto Dark/Light based on time of day
+      AppleKeyboardUIMode = 2;                       # full keyboard access: Tab navigates all controls
+      ApplePressAndHoldEnabled = false;              # disable character accent popup; enables key repeat
+      AppleScrollerPagingBehavior = true;            # clicking scroll track jumps to clicked position
+      AppleShowScrollBars = "Always";                # always show scroll bars (not just on scroll)
+      InitialKeyRepeat = 15;                         # delay before key repeat starts (lower = faster)
+      KeyRepeat = 2;                                 # key repeat rate (lower = faster)
       NSAutomaticCapitalizationEnabled = false;
-      NSAutomaticDashSubstitutionEnabled = false;
-      NSAutomaticPeriodSubstitutionEnabled = false;
-      NSAutomaticQuoteSubstitutionEnabled = false;
+      NSAutomaticDashSubstitutionEnabled = false;    # disable -- → em-dash substitution
+      NSAutomaticPeriodSubstitutionEnabled = false;  # disable double-space → period substitution
+      NSAutomaticQuoteSubstitutionEnabled = false;   # disable "smart" quote substitution
       NSAutomaticSpellingCorrectionEnabled = false;
-      NSAutomaticWindowAnimationsEnabled = false;
-      NSNavPanelExpandedStateForSaveMode = true;
+      NSAutomaticWindowAnimationsEnabled = false;    # disable new-window zoom animation
+      NSNavPanelExpandedStateForSaveMode = true;     # open save dialogs in expanded mode by default
       NSNavPanelExpandedStateForSaveMode2 = true;
-      NSServicesMinimumItemCountForContextSubmenu = 9999;
-      NSTableViewDefaultSizeMode = 3;
-      NSToolbarTitleViewRolloverDelay = 0.0;
+      NSServicesMinimumItemCountForContextSubmenu = 9999; # effectively hide Services from context menus
+      NSTableViewDefaultSizeMode = 3;                # medium row height in table views
+      NSToolbarTitleViewRolloverDelay = 0.0;         # instant toolbar title appearance on hover
+      # Text substitution dictionary: maps `replace` → `with` in all apps.
+      # Entries here suppress autocorrect for technical terms and provide one
+      # shortcut ("omw" → Chinese phrase).
       NSUserDictionaryReplacementItems = [
         { replace = "contravariance"; "with" = "contravariance"; }
         { replace = "contravariant"; "with" = "contravariant"; }
@@ -57,108 +77,137 @@ in
         { replace = "pushforward"; "with" = "pushforward"; }
         { replace = "SynthID"; "with" = "SynthID"; }
       ];
-      PMPrintingExpandedStateForPrint = true;
+      PMPrintingExpandedStateForPrint = true;        # open print dialogs in expanded mode
       PMPrintingExpandedStateForPrint2 = true;
-      "com.apple.keyboard.fnState" = true;
-      "com.apple.mouse.tapBehavior" = 1;
-      "com.apple.springing.delay" = 0.0;
-      "com.apple.swipescrolldirection" = true;
-      "com.apple.trackpad.scaling" = 3.0;
+      "com.apple.keyboard.fnState" = true;           # Fn keys act as standard F1–F12 by default
+      "com.apple.mouse.tapBehavior" = 1;             # tap-to-click on trackpad/mouse
+      "com.apple.springing.delay" = 0.0;             # spring-loaded folders open instantly
+      "com.apple.swipescrolldirection" = true;       # natural (reversed) scroll direction
+      "com.apple.trackpad.scaling" = 3.0;            # maximum trackpad tracking speed
     };
 
+    # -------------------------------------------------------------------------
+    # CustomUserPreferences — arbitrary per-app defaults not exposed as
+    # first-class nix-darwin options.  Written with `defaults write <domain>`.
+    # -------------------------------------------------------------------------
     CustomUserPreferences = {
+      # Activity Monitor: show CPU usage in the Dock icon; refresh every second.
       "com.apple.ActivityMonitor" = {
-        IconType = 5;
-        UpdatePeriod = 1;
+        IconType = 5;         # CPU history graph in Dock icon
+        UpdatePeriod = 1;     # refresh interval in seconds
       };
 
+      # Opt out of Apple personalised advertising.
       "com.apple.AdLib" = {
         allowApplePersonalizedAdvertising = false;
       };
 
+      # Trackpad: silent click (ActuationStrength 0), lightest click threshold,
+      # force-touch feedback enabled, three-finger drag instead of Mission Control.
       "com.apple.AppleMultitouchTrackpad" = {
-        ActuationStrength = 0;
-        FirstClickThreshold = 0;
-        ForceSuppressed = false;
-        TrackpadThreeFingerDrag = true;
+        ActuationStrength = 0;        # silent (haptic-only) click feedback
+        FirstClickThreshold = 0;      # lightest click force required
+        ForceSuppressed = false;      # keep Force Touch / Haptic Feedback enabled
+        TrackpadThreeFingerDrag = true; # drag windows with three fingers
       };
 
+      # Keyboard backlight: auto-adjust brightness; dim after 5 s of inactivity.
       "com.apple.BezelServices" = {
-        dAuto = true;
-        kDim = true;
-        kDimTime = 5;
+        dAuto = true;   # auto-adjust keyboard backlight to ambient light
+        kDim = true;    # dim keyboard backlight when idle
+        kDimTime = 5;   # dim after 5 seconds
       };
 
+      # Input sources: set the full ordered list of enabled input methods and
+      # select the first one (US keyboard) as the active source.
       "com.apple.HIToolbox" = {
         AppleEnabledInputSources = inputMethods;
         AppleSelectedInputSources = [ (builtins.head inputMethods) ];
       };
 
+      # Disable the Gatekeeper quarantine flag that shows "Downloaded from the
+      # Internet" dialogs for files opened from other machines / archives.
       "com.apple.LaunchServices" = {
         LSQuarantine = false;
       };
 
+      # iCloud Photos: enable library sync and automatic import.
       "com.apple.Photos" = {
         CloudPhotosEnabled = 1;
         ImportToCloudEnabled = 1;
       };
 
+      # Safari: disable password auto-fill, show Develop menu and internal debug menu.
       "com.apple.Safari" = {
         AutoFillPasswords = false;
         IncludeDevelopMenu = true;
         IncludeInternalDebugMenu = true;
       };
 
+      # Siri: enable keyboard shortcut (Option+Space = 1), hide menu-bar icon,
+      # enable Type to Siri (type instead of speak).
       "com.apple.Siri" = {
-        KeyboardShortcut = 1;
-        StatusMenuVisible = false;
-        TypeToSiriEnabled = true;
+        KeyboardShortcut = 1;      # Option+Space invokes Siri
+        StatusMenuVisible = false; # hide Siri from the menu bar
+        TypeToSiriEnabled = true;  # type queries instead of speaking them
       };
 
+      # Software Update: check for and download updates automatically; install
+      # critical (security) updates without prompting.
       "com.apple.SoftwareUpdate" = {
         AutomaticCheckEnabled = true;
         AutomaticDownload = true;
         CriticalUpdateInstall = true;
       };
 
+      # TextEdit: default to plain text mode instead of RTF.
       "com.apple.TextEdit" = {
         RichText = false;
       };
 
+      # Show the Input Menu (language switcher) in the menu bar.
       "com.apple.TextInputMenu".visible = true;
 
+      # Window Manager: enable click-to-show-desktop, hide Stage Manager widgets
+      # by default, enable window tiling (macOS 15+).
       "com.apple.WindowManager" = {
         EnableStandardClickToShowDesktop = true;
-        StandardHideWidgets = true;
-        WindowTilingEnabled = true;
+        StandardHideWidgets = true;   # hide Stage Manager widget strip by default
+        WindowTilingEnabled = true;   # enable drag-to-edge window tiling (Sequoia)
       };
 
+      # Siri / dictation backend preferences.
       "com.apple.assistant.support" = {
         "Assistant Enabled" = true;
-        "Auto Punctuation Enabled" = true;
+        "Auto Punctuation Enabled" = true;   # insert punctuation during dictation
         "Dictation Enabled" = true;
-        "Siri Data Sharing Opt-In Status" = 1;
+        "Siri Data Sharing Opt-In Status" = 1; # opt in to Siri improvement program
       };
 
+      # App Store: enable automatic app updates.
       "com.apple.commerce" = {
         AutoUpdate = true;
       };
 
+      # Control Centre: show battery percentage; tighten status-item spacing.
       "com.apple.controlcenter" = {
         BatteryShowPercentage = true;
-        NSStatusItemSelectionPadding = 6;
-        NSStatusItemSpacing = 6;
+        NSStatusItemSelectionPadding = 6; # pixels of padding around selected item
+        NSStatusItemSpacing = 6;          # pixels between status items
       };
 
+      # Prevent macOS from writing .DS_Store files on network volumes and USB drives.
       "com.apple.desktopservices" = {
         DSDontWriteNetworkStores = true;
         DSDontWriteUSBStores = true;
       };
 
+      # Finder: allow text selection in Quick Look previews.
       "com.apple.finder" = {
         QLEnableTextSelection = true;
       };
 
+      # Menu bar clock: full date + time with seconds.
       "com.apple.menuextra.clock" = {
         DateFormat = "EEE y-MM-dd HH:mm:ss";
         ShowDate = 1;
@@ -166,122 +215,153 @@ in
         ShowSeconds = true;
       };
 
+      # Screensaver: require password immediately after the screensaver engages.
       "com.apple.screensaver" = {
         askForPassword = true;
-        askForPasswordDelay = 0;
+        askForPasswordDelay = 0; # seconds before password is required (0 = immediately)
       };
 
+      # Sidebar: show iCloud Drive entries in Finder sidebar.
       "com.apple.sidebarlists" = {
         showicloud = true;
       };
 
+      # Dictation shortcut: double-press Right Command key (value 2).
       "com.apple.speech.recognition.AppleSpeechRecognition.prefs" = {
         DictationShortcut = 2;
       };
 
+      # Mission Control: do not span desktops across multiple displays; each
+      # monitor has its own independent Space set.
       "com.apple.spaces" = {
         "spans-displays" = false;
       };
 
+      # Spotlight: ordered search result categories.  MENU_SUGGESTIONS and
+      # MENU_WEBSEARCH are disabled to prevent Spotlight from sending queries
+      # to Apple/Bing.
       "com.apple.spotlight" = {
         orderedItems = [
-          { enabled = true; name = "APPLICATIONS"; }
-          { enabled = true; name = "SYSTEM_SETTINGS"; }
-          { enabled = true; name = "DIRECTORIES"; }
-          { enabled = true; name = "PDF"; }
-          { enabled = true; name = "FONTS"; }
-          { enabled = true; name = "DOCUMENTS"; }
-          { enabled = true; name = "MESSAGES"; }
-          { enabled = true; name = "CONTACTS"; }
-          { enabled = true; name = "EVENT_TODO"; }
-          { enabled = true; name = "IMAGES"; }
-          { enabled = true; name = "BOOKMARKS"; }
-          { enabled = true; name = "MUSIC"; }
-          { enabled = true; name = "MOVIES"; }
-          { enabled = true; name = "PRESENTATIONS"; }
-          { enabled = true; name = "SPREADSHEETS"; }
-          { enabled = true; name = "SOURCE"; }
-          { enabled = false; name = "MENU_SUGGESTIONS"; }
-          { enabled = false; name = "MENU_WEBSEARCH"; }
+          { enabled = true;  name = "APPLICATIONS"; }
+          { enabled = true;  name = "SYSTEM_SETTINGS"; }
+          { enabled = true;  name = "DIRECTORIES"; }
+          { enabled = true;  name = "PDF"; }
+          { enabled = true;  name = "FONTS"; }
+          { enabled = true;  name = "DOCUMENTS"; }
+          { enabled = true;  name = "MESSAGES"; }
+          { enabled = true;  name = "CONTACTS"; }
+          { enabled = true;  name = "EVENT_TODO"; }
+          { enabled = true;  name = "IMAGES"; }
+          { enabled = true;  name = "BOOKMARKS"; }
+          { enabled = true;  name = "MUSIC"; }
+          { enabled = true;  name = "MOVIES"; }
+          { enabled = true;  name = "PRESENTATIONS"; }
+          { enabled = true;  name = "SPREADSHEETS"; }
+          { enabled = true;  name = "SOURCE"; }
+          { enabled = false; name = "MENU_SUGGESTIONS"; } # disabled: prevents cloud lookups
+          { enabled = false; name = "MENU_WEBSEARCH"; }   # disabled: prevents web searches
         ];
       };
 
+      # Terminal: focus follows mouse pointer (hover to focus without clicking).
       "com.apple.terminal" = {
         FocusFollowsMouse = "YES";
       };
 
+      # Accessibility: larger cursor, AX1 font size category (standard),
+      # show window titlebar icons, keep motion and transparency effects on.
       "com.apple.universalaccess" = {
-        FontSizeCategory = "AX1";
-        cursorSize = 1.33;
+        FontSizeCategory = "AX1";         # standard font size category
+        cursorSize = 1.33;                # slightly enlarged cursor
         reduceMotion = false;
         reduceTransparency = false;
-        showWindowTitlebarIcons = true;
+        showWindowTitlebarIcons = true;   # show proxy icons in titlebars
       };
 
+      # Universal Control: automatically connect to nearby Mac/iPad.
       "com.apple.universalcontrol" = {
         autoConnect = true;
       };
 
+      # BetterDisplay: launch at login, show resolutions as a flat list, use
+      # maximum native resolution by default.
       "com.betterdisplay" = {
         LaunchAtLogin = true;
         ShowResolutionsAsList = true;
         UseMaximumResolution = true;
       };
 
+      # iTerm2: allow clipboard access from terminal applications, enable the
+      # bootstrap daemon (supports shell integration without requiring a full
+      # app launch), tip of the day on, subscribe to the nightly testing feed,
+      # enable Secure Keyboard Entry.
       "com.googlecode.iterm2" = {
         "AllowClipboardAccess" = true;
         "BootstrapDaemon" = true;
         "NoSyncTipOfTheDay" = false;
         "SUCheckAtStartup" = true;
         "SUEnableAutomaticChecks" = true;
-        "SUFeedURL" = "https://iterm2.com/appcasts/testing_modern.xml";
-        "Secure Input" = true;
+        "SUFeedURL" = "https://iterm2.com/appcasts/testing_modern.xml"; # nightly testing feed
+        "Secure Input" = true;  # blocks other processes from reading keystrokes
       };
     };
 
+    # -------------------------------------------------------------------------
+    # Dock settings
+    # -------------------------------------------------------------------------
     dock = {
-      autohide = true;
-      expose-group-by-app = true;
-      largesize = 128;
-      launchanim = true;
-      magnification = true;
-      mineffect = "scale";
-      minimize-to-application = true;
-      mru-spaces = false;
-      orientation = "bottom";
-      show-recents = false;
-      static-only = true;
-      tilesize = 128;
+      autohide = true;               # auto-hide Dock; shown only on cursor hover
+      expose-group-by-app = true;    # Mission Control groups windows by application
+      largesize = 128;               # magnified icon size when hovering
+      launchanim = true;             # animate app icons on launch
+      magnification = true;          # magnify icons under the cursor
+      mineffect = "scale";           # window minimize animation: scale (no genie)
+      minimize-to-application = true; # minimized windows collapse into app icon
+      mru-spaces = false;            # do not reorder Spaces by recent use
+      orientation = "bottom";        # Dock position
+      show-recents = false;          # hide recently opened apps section
+      static-only = true;            # show only running apps; hide pinned placeholders
+      tilesize = 128;                # base icon size
     };
 
+    # -------------------------------------------------------------------------
+    # Finder settings
+    # -------------------------------------------------------------------------
     finder = {
-      _FXShowPosixPathInTitle = true;
-      AppleShowAllExtensions = true;
-      CreateDesktop = true;
-      FXDefaultSearchScope = "SCcf";
-      FXEnableExtensionChangeWarning = false;
-      FXICloudDriveDesktop = true;
-      FXICloudDriveDocuments = true;
-      FXPreferredViewStyle = "clmv";
-      FXRemoveOldTrashItems = true;
+      _FXShowPosixPathInTitle = true;        # show full POSIX path in title bar
+      AppleShowAllExtensions = true;         # always show file extensions
+      CreateDesktop = true;                  # allow files/icons on the Desktop
+      FXDefaultSearchScope = "SCcf";         # default search scope: current folder
+      FXEnableExtensionChangeWarning = false; # suppress warning when changing extension
+      FXICloudDriveDesktop = true;           # sync Desktop to iCloud Drive
+      FXICloudDriveDocuments = true;         # sync Documents to iCloud Drive
+      FXPreferredViewStyle = "clmv";         # default view: column view
+      FXRemoveOldTrashItems = true;          # auto-delete Trash items after 30 days
       ShowExternalHardDrivesOnDesktop = true;
       ShowHardDrivesOnDesktop = true;
       ShowMountedServersOnDesktop = true;
-      ShowPathbar = true;
+      ShowPathbar = true;                    # show path breadcrumb bar at bottom
       ShowRemovableMediaOnDesktop = true;
-      ShowStatusBar = true;
-      WarnOnEmptyTrash = true;
+      ShowStatusBar = true;                  # show item count / available space bar
+      WarnOnEmptyTrash = true;               # confirm before permanently deleting
     };
 
+    # -------------------------------------------------------------------------
+    # Screenshot settings
+    # -------------------------------------------------------------------------
     screencapture = {
-      disable-shadow = true;
-      location = "~/Desktop";
-      type = "png";
+      disable-shadow = true;    # omit window drop-shadow from screenshots
+      location = "~/Desktop";   # default save location
+      type = "png";             # default file format
     };
 
+    # -------------------------------------------------------------------------
+    # Trackpad settings (system-level; fine-grained per-app settings are in
+    # CustomUserPreferences.com.apple.AppleMultitouchTrackpad above)
+    # -------------------------------------------------------------------------
     trackpad = {
-      Clicking = true;
-      TrackpadThreeFingerDrag = true;
+      Clicking = true;              # tap to click
+      TrackpadThreeFingerDrag = true; # drag windows with three fingers
     };
   };
 }

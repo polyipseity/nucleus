@@ -1,3 +1,5 @@
+# macbook/default.nix — nix-darwin entrypoint for the MacBook host.
+# Aggregates all host-specific module fragments; no settings live here directly.
 { ... }:
 {
   imports = [

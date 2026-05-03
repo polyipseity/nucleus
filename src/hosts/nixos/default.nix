@@ -1,3 +1,5 @@
+# nixos/default.nix — NixOS entrypoint for the generic Linux host.
+# Aggregates all host-specific module fragments; no settings live here directly.
 { ... }:
 {
   imports = [

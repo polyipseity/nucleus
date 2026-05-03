@@ -1,4 +1,30 @@
 function Resolve-NucleusExecutable {
+  <#
+  .SYNOPSIS
+    Returns the first candidate path that exists on disk.
+
+  .DESCRIPTION
+    Iterates $CandidatePaths in order and returns the first path that resolves
+    via Test-Path.  Used to locate managed executables (sops, age, gpg) that
+    may be installed in different locations depending on how WinGet, Scoop, or a
+    manual bootstrap placed them.
+
+  .PARAMETER CandidatePaths
+    Ordered list of absolute or relative paths to test.
+
+  .PARAMETER Name
+    Display name of the executable, used in the error message when none of the
+    candidates are found.
+
+  .OUTPUTS
+    [string]  Absolute path of the first candidate that exists.
+
+  .EXAMPLE
+    Resolve-NucleusExecutable -Name 'sops' -CandidatePaths @(
+      (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\sops\sops.exe'),
+      'C:\ProgramData\scoop\shims\sops.exe'
+    )
+  #>
   param(
     [Parameter(Mandatory = $true)]
     [string[]]$CandidatePaths,
@@ -17,6 +43,36 @@ function Resolve-NucleusExecutable {
 }
 
 function Invoke-NucleusWingetConfiguration {
+  <#
+  .SYNOPSIS
+    Applies a WinGet DSC v3 configuration file, substituting the wallpaper path
+    token when present.
+
+  .DESCRIPTION
+    Reads the YAML at $ConfigPath and replaces the literal token
+    __NUCLEUS_ACTIVE_WALLPAPER__ with the effective wallpaper path before
+    passing the file to `winget configure`.  Token substitution is performed in
+    a temporary file so the source DSC file is never modified on disk.
+
+    Wallpaper path resolution order:
+      1. $WallpaperPath parameter (if provided and non-empty)
+      2. Current value of HKCU:\Control Panel\Desktop\Wallpaper registry key
+      3. $HOME\Pictures\wallpapers (last-resort fallback)
+
+    The temporary file is deleted in a `finally` block whether the run
+    succeeds or fails.
+
+  .PARAMETER ConfigPath
+    Path to the WinGet DSC YAML file to apply.
+
+  .PARAMETER WallpaperPath
+    Optional.  If the DSC file contains the __NUCLEUS_ACTIVE_WALLPAPER__ token,
+    this path is substituted in.  When omitted or empty the current registry
+    wallpaper or a fallback path is used instead.
+
+  .EXAMPLE
+    Invoke-NucleusWingetConfiguration -ConfigPath '.\user.dsc.yml' -WallpaperPath 'C:\Users\me\Pictures\bg.png'
+  #>
   param(
     [Parameter(Mandatory = $true)]
     [string]$ConfigPath,
@@ -70,6 +126,45 @@ function Invoke-NucleusWingetConfiguration {
 }
 
 function Get-NucleusSecrets {
+  <#
+  .SYNOPSIS
+    Decrypts a SOPS-encrypted YAML file and returns its contents as a
+    PSCustomObject.
+
+  .DESCRIPTION
+    Attempts decryption in priority order:
+      1. Host SSH key (age recipient derived from the machine's SSH host key).
+         The key path is passed via the SOPS_AGE_SSH_PRIVATE_KEY_FILE env var
+         and cleared in a `finally` block so it is never left in the environment.
+      2. GPG keyring (used when the host SSH key is absent, e.g. first-run or
+         ephemeral environments).  Fails early with a clear message if no GPG
+         secret keys are imported.
+
+    The decrypted payload is parsed from JSON and returned as a PowerShell
+    object so callers can access named fields with dot notation.
+
+  .PARAMETER FilePath
+    Absolute path to the SOPS-encrypted YAML file to decrypt.
+
+  .PARAMETER GpgExe
+    Absolute path to the gpg executable (used for both GPG-path decryption
+    and pre-flight key detection).
+
+  .PARAMETER HostKeyPath
+    Path to the SSH host private key that backs the age recipient.  When the
+    file does not exist, host-key decryption is skipped and GPG is tried.
+
+  .PARAMETER SopsExe
+    Absolute path to the sops executable.
+
+  .OUTPUTS
+    [PSCustomObject]  Decrypted secret data as a structured object.
+
+  .EXAMPLE
+    $secrets = Get-NucleusSecrets -FilePath '.\secrets.yml' -GpgExe 'gpg.exe' `
+        -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' -SopsExe 'sops.exe'
+    $secrets.ssh_keys
+  #>
   param(
     [Parameter(Mandatory = $true)]
     [string]$FilePath,
@@ -111,6 +206,37 @@ function Get-NucleusSecrets {
 }
 
 function Get-NucleusDecryptedBlob {
+  <#
+  .SYNOPSIS
+    Decrypts a SOPS-encrypted binary blob and writes the plaintext to
+    $OutputPath.
+
+  .DESCRIPTION
+    Similar key-priority logic to Get-NucleusSecrets (host SSH key first, GPG
+    keyring fallback), but uses `sops --output` to write the raw decrypted
+    bytes directly to $OutputPath instead of capturing stdout.  Used for binary
+    assets such as wallpaper images that cannot be embedded in JSON.
+
+  .PARAMETER FilePath
+    Absolute path to the SOPS-encrypted blob file (typically *.sops).
+
+  .PARAMETER GpgExe
+    Absolute path to the gpg executable.
+
+  .PARAMETER HostKeyPath
+    Path to the SSH host private key that backs the age recipient.
+
+  .PARAMETER OutputPath
+    Destination path where the decrypted bytes will be written.
+
+  .PARAMETER SopsExe
+    Absolute path to the sops executable.
+
+  .EXAMPLE
+    Get-NucleusDecryptedBlob -FilePath '.\wallpaper.jpg.sops' -GpgExe 'gpg.exe' `
+        -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
+        -OutputPath 'C:\Users\me\Pictures\wallpaper.jpg' -SopsExe 'sops.exe'
+  #>
   param(
     [Parameter(Mandatory = $true)]
     [string]$FilePath,

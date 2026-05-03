@@ -31,6 +31,17 @@ if [ "$COMMAND" != "apply" ] && [ "$COMMAND" != "install-deps" ]; then
 fi
 
 load_bootstrap_versions() {
+  # Dot-sources bootstrap-versions.env into the current shell with `set -a`
+  # (auto-export) so every variable defined in the file is exported and
+  # available to child processes such as the Nix installer.
+  #
+  # Validates that the two mandatory variables NUCLEUS_NIX_INSTALLER_SHA256
+  # and NUCLEUS_NIX_INSTALLER_URL are both present and non-empty; exits 1 with
+  # a descriptive error if either is missing.
+  #
+  # Outputs (exported shell variables):
+  #   NIX_INSTALLER_SHA256  — expected SHA-256 hex digest of the installer
+  #   NIX_INSTALLER_URL     — download URL for the Nix installer script
   if [ ! -f "$VERSIONS_FILE" ]; then
     printf '%s\n' "error: expected bootstrap versions file at $VERSIONS_FILE" >&2
     exit 1
@@ -56,6 +67,20 @@ load_bootstrap_versions() {
 }
 
 bootstrap_nix_if_missing() {
+  # Installs Nix via the official installer script when `nix` is not already
+  # present in PATH.  No-op if Nix is already installed.
+  #
+  # Steps:
+  #   1. Download the installer from NIX_INSTALLER_URL to a temp file.
+  #   2. Verify the SHA-256 digest against NIX_INSTALLER_SHA256 (unless the
+  #      placeholder value is set, in which case a warning is printed and
+  #      verification is skipped — intended only for development).
+  #   3. Run the installer with --yes --no-daemon (single-user install).
+  #   4. Source the Nix profile script so the `nix` command is immediately
+  #      available in the current session without reopening a shell.
+  #   5. Verify that `nix` is now in PATH using require_command.
+  #
+  # Requires: curl, sha256sum or shasum or openssl (for checksum verification)
   if command -v nix >/dev/null 2>&1; then
     return
   fi
@@ -92,6 +117,20 @@ bootstrap_nix_if_missing() {
 }
 
 ensure_macos_nix_mount() {
+  # Ensures the /nix synthetic mount point exists on macOS before any Nix
+  # installation is attempted.
+  #
+  # macOS does not allow creating top-level directories on the root filesystem
+  # (APFS volume seal).  Nix requires /nix, so it must be declared in
+  # /etc/synthetic.conf and materialised by the apfs.util launch daemon during
+  # boot.
+  #
+  # Behaviour:
+  #   - No-op on non-macOS platforms.
+  #   - No-op if /nix already exists (e.g. after reboot or prior install).
+  #   - Appends 'nix' to /etc/synthetic.conf via sudo if not already present.
+  #   - Prints a reboot reminder and exits 1; the user must reboot and then
+  #     re-run bootstrap.sh to complete installation.
   if [ "$(uname -s)" != "Darwin" ]; then
     return
   fi
@@ -117,6 +156,9 @@ ensure_macos_nix_mount() {
 }
 
 require_command() {
+  # Asserts that a command is available in PATH.
+  # Prints an error to stderr and exits 1 if the command is missing.
+  # Args: $1 — name of the command to check
   if ! command -v "$1" >/dev/null 2>&1; then
     printf '%s\n' "error: $1 is required but was not found in PATH" >&2
     exit 1
@@ -124,6 +166,11 @@ require_command() {
 }
 
 sha256_of_file() {
+  # Computes the SHA-256 hex digest of a file and prints it to stdout.
+  # Tries sha256sum (Linux coreutils), then shasum -a 256 (macOS BSD tools),
+  # then openssl dgst -sha256 as a last resort.
+  # Calls require_command to abort with a clear error if none are available.
+  # Args: $1 — path to the file to hash
   file_path="$1"
 
   if command -v sha256sum >/dev/null 2>&1; then

@@ -1,4 +1,41 @@
 function Sync-NucleusSecretFile {
+  <#
+  .SYNOPSIS
+    Decrypts one SOPS secret file and materializes its payloads on disk.
+
+  .DESCRIPTION
+    Calls Get-NucleusSecrets to decrypt $FilePath, then processes two
+    optional payload fields:
+
+    ssh_keys   — An array of {name, value} objects.  Each is written to
+                 $HOME\.ssh\<name> using ASCII encoding (no BOM, no trailing
+                 newline).  Files are only overwritten when the content has
+                 actually changed to avoid unnecessary disk writes and
+                 fingerprint updates.
+
+    gpg_imports — An array of {name, value} objects.  Each value (an armored
+                  GPG key block) is written to a temp file, imported with
+                  `gpg --batch --import`, and the temp file is deleted.  Import
+                  output is suppressed; errors surface as exceptions.
+
+    $HOME\.ssh is created if it does not already exist.
+
+  .PARAMETER FilePath
+    Absolute path to the SOPS-encrypted YAML file.
+
+  .PARAMETER GpgExe
+    Absolute path to the gpg executable.
+
+  .PARAMETER HostKeyPath
+    Path to the SSH host private key used as the age decryption key.
+
+  .PARAMETER SopsExe
+    Absolute path to the sops executable.
+
+  .EXAMPLE
+    Sync-NucleusSecretFile -FilePath '.\personal.yml' -GpgExe 'gpg.exe' `
+        -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' -SopsExe 'sops.exe'
+  #>
   param(
     [Parameter(Mandatory = $true)]
     [string]$FilePath,
@@ -56,6 +93,38 @@ function Sync-NucleusSecretFile {
 }
 
 function Invoke-NucleusJitSecretMaterialization {
+  <#
+  .SYNOPSIS
+    Materializes a specific subset of named secret files on demand (JIT).
+
+  .DESCRIPTION
+    Designed for modules that need exactly one or two secrets rather than the
+    full batch sync.  For each name in $SecretNames, the function resolves the
+    corresponding .yml file under $SecretsDir (appending .yml if omitted) and
+    calls Sync-NucleusSecretFile.  Throws immediately if a requested secret
+    file does not exist.
+
+  .PARAMETER SecretsDir
+    Absolute path to the directory containing SOPS-encrypted YAML files.
+
+  .PARAMETER SecretNames
+    Names of the secret files to materialize.  The .yml extension is optional;
+    it is appended automatically if not present.
+
+  .PARAMETER GpgExe
+    Absolute path to the gpg executable.
+
+  .PARAMETER HostKeyPath
+    Path to the SSH host private key used as the age decryption key.
+
+  .PARAMETER SopsExe
+    Absolute path to the sops executable.
+
+  .EXAMPLE
+    Invoke-NucleusJitSecretMaterialization -SecretsDir '.\secrets' `
+        -SecretNames @('personal', 'work') `
+        -GpgExe 'gpg.exe' -HostKeyPath '...\ssh_host_ed25519_key' -SopsExe 'sops.exe'
+  #>
   param(
     [Parameter(Mandatory = $true)]
     [string]$SecretsDir,
@@ -86,6 +155,35 @@ function Invoke-NucleusJitSecretMaterialization {
 }
 
 function Sync-NucleusSecrets {
+  <#
+  .SYNOPSIS
+    Batch-syncs all SOPS-encrypted secret files found in $SecretsDir.
+
+  .DESCRIPTION
+    Enumerates all *.yml files in $SecretsDir (sorted alphabetically) and calls
+    Sync-NucleusSecretFile for each one.  This is the top-level entry point
+    used by apply.ps1 for a full secrets pass.
+
+    No-op (with a warning) when $SecretsDir does not exist or contains no .yml
+    files, so the function is safe to call even on machines where secrets have
+    not been provisioned yet.
+
+  .PARAMETER SecretsDir
+    Absolute path to the directory containing SOPS-encrypted YAML files.
+
+  .PARAMETER GpgExe
+    Absolute path to the gpg executable.
+
+  .PARAMETER HostKeyPath
+    Path to the SSH host private key used as the age decryption key.
+
+  .PARAMETER SopsExe
+    Absolute path to the sops executable.
+
+  .EXAMPLE
+    Sync-NucleusSecrets -SecretsDir '.\secrets' -GpgExe 'gpg.exe' `
+        -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' -SopsExe 'sops.exe'
+  #>
   param(
     [Parameter(Mandatory = $true)]
     [string]$SecretsDir,

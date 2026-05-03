@@ -1,4 +1,53 @@
 function Sync-NucleusWallpapers {
+  <#
+  .SYNOPSIS
+    Decrypts all SOPS-encrypted wallpaper blobs and returns the path of the
+    first decrypted file (the active wallpaper).
+
+  .DESCRIPTION
+    Enumerates all *.sops files in $AssetsDir (sorted alphabetically) and
+    decrypts each one to $OutputDir using Get-NucleusDecryptedBlob.  The output
+    filename is the blob's base name with the .sops extension stripped.
+
+    The function returns the path of the first successfully decrypted wallpaper
+    so the caller can pass it to Invoke-NucleusWingetConfiguration as the
+    __NUCLEUS_ACTIVE_WALLPAPER__ token value.
+
+    No-op (returns $null with a warning) when:
+      - $AssetsDir does not exist, or
+      - $AssetsDir contains no *.sops files.
+
+    $OutputDir is created automatically if it does not exist.
+
+  .PARAMETER AssetsDir
+    Absolute path to the directory containing SOPS-encrypted wallpaper blobs
+    (*.sops files).
+
+  .PARAMETER GpgExe
+    Absolute path to the gpg executable.
+
+  .PARAMETER HostKeyPath
+    Path to the SSH host private key used as the age decryption key.
+
+  .PARAMETER OutputDir
+    Directory where decrypted wallpaper files will be written.
+
+  .PARAMETER SopsExe
+    Absolute path to the sops executable.
+
+  .OUTPUTS
+    [string]  Absolute path to the first decrypted wallpaper file, or $null
+              when no wallpapers were found.
+
+  .EXAMPLE
+    $wallpaper = Sync-NucleusWallpapers `
+        -AssetsDir '.\assets\wallpapers' `
+        -GpgExe 'gpg.exe' `
+        -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
+        -OutputDir "$HOME\Pictures\wallpapers" `
+        -SopsExe 'sops.exe'
+    # $wallpaper is now the path to the active wallpaper, or $null.
+  #>
   param(
     [Parameter(Mandatory = $true)]
     [string]$AssetsDir,
