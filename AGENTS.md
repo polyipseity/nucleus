@@ -117,6 +117,15 @@ following logic:
   configuration. Any attempt to increase this delay or disable password
   requirement is a security regression.
 
+### Shell Strategy (POSIX Hosts)
+
+- For macOS and NixOS hosts, keep **Zsh** as the default interactive and login
+  shell. Do not introduce Fish or Nushell as defaults in shared modules.
+- Keep `programs.zsh.enable = true` at the system layer for both hosts and keep
+  managed user login shells on `pkgs.zsh`.
+- Keep `programs.direnv` with `nix-direnv` enabled in shared shell config so
+  Flake/devShell environments auto-load consistently in Zsh sessions.
+
 ## Refactoring Guardrails
 
 - **Pre-flight check rule**: before proposing or executing edits, verify target
