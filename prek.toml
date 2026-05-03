@@ -17,7 +17,7 @@ rev = "3e8a8703264a2f4a69428a0aa4dcb512790b2c8c"
 # - Keep hook repositories pinned (set `rev`) to an explicit release to ensure reproducible behaviour.
 hooks = [
   { id = "check-case-conflict" },
-  { id = "check-executables-have-shebangs", exclude = "^scripts/.*\\.bat$" },
+  { id = "check-executables-have-shebangs", exclude = "^scripts/.*\\.(bat|ps1)$" },
   { id = "check-illegal-windows-names" },
   { id = "check-merge-conflict" },
   { id = "check-shebang-scripts-are-executable" },
