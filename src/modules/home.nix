@@ -10,11 +10,11 @@ in
 {
   imports = [
     ./core.nix
-    ./editors/default.nix
-    ./macos/default.nix
-    ./secrets/default.nix
-    ./shell/default.nix
-    ./wallpapers/default.nix
+    ./editors.nix
+    ./macos.nix
+    ./secrets.nix
+    ./shell.nix
+    ./wallpapers.nix
   ];
 
   home = {

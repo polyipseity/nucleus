@@ -16,9 +16,12 @@ applyTo: "src/**/*.nix"
   - `windows/` — Windows; managed by WinGet DSC, not Nix (no `.nix` files here).
 - `src/modules/` — shared logic imported by hosts and home profiles.
   - `core.nix` — universal CLI packages.
-  - `home.nix` — home-manager root; imports shell and editor sub-modules.
-  - `shell/default.nix` — shell programs and aliases.
-  - `editors/default.nix` — editor programs.
+  - `home.nix` — home-manager root; imports shell, editor, and platform
+    sub-modules.
+  - `shell.nix` — shell programs and aliases.
+  - `editors.nix` — editor programs.
+  - `macos.nix`, `secrets.nix`, `wallpapers.nix` — platform/user activation
+    modules.
 
 ## Flake conventions
 

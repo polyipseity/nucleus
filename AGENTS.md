@@ -6,6 +6,8 @@
   `.github/copilot-instructions.md`.
 - `src/` contains the Nix-based declarative configuration: `flake.nix`,
   `hosts/` (per-machine configs), and `modules/` (shared logic).
+- Prefer single-file modules in `src/modules/*.nix` unless a module truly needs
+  nested sub-components.
 - `scripts/` contains bootstrap automation: `bootstrap.sh` (Unix) and
   `bootstrap.ps1` (Windows).
 - `tests/` is still a placeholder; test infrastructure has not been added yet.
@@ -64,6 +66,12 @@
 - **YAML extension policy**: use `.yml` for repository YAML files. Do not add
   long-extension YAML filenames. Exception: `.sops.yaml` is required by SOPS
   config discovery and must keep that exact name.
+- **Windows module path**: keep reusable PowerShell functions under
+  `src/modules/windows/*.ps1` using lowercase filenames; keep
+  `src/hosts/windows/apply.ps1` as a thin trigger/orchestrator.
+- **Declarative enforcement**: if a WinGet DSC resource can represent desired
+  Windows state, prefer adding it to `system.dsc.yml` or `user.dsc.yml` rather
+  than introducing new imperative commands in `bootstrap.ps1` or `apply.ps1`.
 - **Sorting**: always sort items in any list (package lists, import lists,
   shell alias lists, shell completions, environment variable blocks) and any
   configuration block that lacks a natural semantic order. Alphabetical
@@ -85,5 +93,6 @@
   `.agents/.markdownlint.jsonc` — formatting and line-ending rules
 - `src/flake.nix` — Nix flake entrypoint (hosts + home-manager outputs)
 - `src/hosts/` — per-machine configurations (macbook, nixos, windows)
-- `src/modules/` — shared Nix modules (core packages, home, shell, editors)
+- `src/modules/` — shared Nix modules (`*.nix`) and Windows helper modules
+  (`windows/*.ps1`)
 - `scripts/bootstrap.sh`, `scripts/bootstrap.ps1` — one-command setup wrappers

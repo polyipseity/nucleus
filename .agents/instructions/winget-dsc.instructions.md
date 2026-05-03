@@ -13,6 +13,8 @@ applyTo: "src/hosts/windows/**/*.yml"
 - `src/hosts/windows/user.dsc.yml` contains post-provision user baseline
   resources (folder layout, user registry, user environment variables).
 - They are applied in-order by `src/hosts/windows/apply.ps1`.
+- Reusable Windows helper logic is loaded from `src/modules/windows/*.ps1`; DSC
+  files should remain state declarations rather than script logic.
 
 ## DSC v3 document structure
 

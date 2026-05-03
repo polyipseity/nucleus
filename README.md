@@ -22,24 +22,19 @@ nucleus/
 │   │   └── windows/
 │   │       ├── apply.ps1
 │   │       ├── system.dsc.yml
-│   │       ├── user.dsc.yml
-│   │       └── lib/
-│   │           ├── Nucleus.Common.ps1
-│   │           ├── Nucleus.Secrets.ps1
-│   │           └── Nucleus.Wallpapers.ps1
+│   │       └── user.dsc.yml
 │   └── modules/
 │       ├── core.nix
+│       ├── editors.nix
 │       ├── home.nix
-│       ├── macos/
-│       │   └── default.nix
-│       ├── shell/
-│       │   └── default.nix
-│       ├── secrets/
-│       │   └── default.nix
-│       ├── wallpapers/
-│       │   └── default.nix
-│       └── editors/
-│           └── default.nix
+│       ├── macos.nix
+│       ├── secrets.nix
+│       ├── shell.nix
+│       ├── wallpapers.nix
+│       └── windows/
+│           ├── common.ps1
+│           ├── secrets.ps1
+│           └── wallpapers.ps1
 ├── src/assets/
 │   └── wallpapers/
 │       └── *.sops
@@ -62,11 +57,13 @@ nucleus/
 - `src/hosts/windows/system.dsc.yml`: Windows pre-provision baseline via WinGet DSC (packages + machine settings)
 - `src/hosts/windows/user.dsc.yml`: Windows post-provision baseline via WinGet DSC (folders + user settings)
 - `src/modules/home.nix`: home-level shell/editor/dotfile composition across platforms
-- `src/modules/macos/default.nix`: macOS Home Manager activation workflows (display/session tuning, launch-services app handlers, and user-session hardening)
-- `src/modules/secrets/default.nix`: declarative secret provisioning activation logic (SSH + GPG imports)
-- `src/modules/wallpapers/default.nix`: declarative wallpaper materialization to `~/Pictures/wallpapers`
+- `src/modules/macos.nix`: macOS Home Manager activation workflows (display/session tuning, launch-services app handlers, and user-session hardening)
+- `src/modules/secrets.nix`: declarative secret provisioning activation logic (SSH + GPG imports)
+- `src/modules/shell.nix`: declarative shell aliases and environment tooling integration
+- `src/modules/wallpapers.nix`: declarative wallpaper materialization to `~/Pictures/wallpapers`
+- `src/modules/windows/*.ps1`: Windows helper modules for executable discovery, secrets materialization, and wallpaper materialization
 - `src/scripts/apply.sh`: thin Unix apply wrapper; declarative SOPS operations run through Nix/Home Manager modules
-- `src/hosts/windows/apply.ps1`: thin Windows apply orchestrator; delegates to `src/hosts/windows/lib/*.ps1`
+- `src/hosts/windows/apply.ps1`: thin Windows apply orchestrator; loads `src/modules/windows/*.ps1` and runs pre-DSC -> materialization -> post-DSC
 - `src/assets/wallpapers/*.sops`: encrypted wallpaper blobs materialized to `~/Pictures/wallpapers`
 - `.sops.yaml`: key policy for repo secrets (global GPG + per-machine age recipients)
 - `src/secrets/*.yml`: SOPS-managed encrypted secret files (GPG keys, SSH keys); one file per identity
@@ -185,7 +182,7 @@ sops --encrypt --input-type binary --output src/assets/wallpapers/aurora.jpg.sop
 
 Apply-time materialization:
 
-- Unix/macOS: Home Manager activation (`src/modules/wallpapers/default.nix`) decrypts all `*.sops` blobs to `$HOME/Pictures/wallpapers/<name>.<ext>`
+- Unix/macOS: Home Manager activation (`src/modules/wallpapers.nix`) decrypts all `*.sops` blobs to `$HOME/Pictures/wallpapers/<name>.<ext>`
 - Windows apply (`src/hosts/windows/apply.ps1`) decrypts all `*.sops` blobs to `%USERPROFILE%\Pictures\wallpapers\<name>.<ext>`, then applies user DSC with the active wallpaper path
 
 Git handling:
