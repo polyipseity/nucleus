@@ -29,19 +29,12 @@ let
     "betterdisplay"              # Advanced display management and virtual screens
     "chrome-remote-desktop-host" # Headless remote-desktop receiver
     "coolterm"                   # Serial terminal
-    "discord@canary"             # Discord pre-release client
     "google-chrome@canary"       # Chrome dev channel for web testing
-    "iterm2"                     # Terminal emulator
     "lulu"                       # Outbound network firewall
-    "obsidian"                   # Note-taking / knowledge base
     "orbstack"                   # Docker/Linux VM runtime (faster than Docker Desktop)
     "parsec"                     # Low-latency remote gaming / desktop streaming
     "raycast"                    # Spotlight replacement and launcher
-    "rectangle"                  # Window snapping
-    "stats"                      # Menu bar system stats
-    "telegram-desktop@beta"      # Telegram pre-release client
-    "utm"                        # QEMU-based VM manager
-    "visual-studio-code@insiders" # VS Code Insiders (pre-release)
+    "telegram-desktop@beta"      # Telegram beta channel; kept static (no exact nixpkgs beta mapping)
     "whatsapp@beta"              # WhatsApp pre-release client
   ];
 

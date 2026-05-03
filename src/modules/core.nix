@@ -58,6 +58,14 @@ let
   #   CLI → nixpkgs
   #   GUI/hardware-integrated apps → Homebrew
   overlappingPackages = {
+    "discord@canary" = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "discord@canary";
+      };
+      nixpkgsAttr = "discord-canary";
+    };
     google-chrome = {
       category = "gui";
       homebrew = {
@@ -66,6 +74,46 @@ let
       };
       nixpkgsAttr = "google-chrome";
     };
+    iterm2 = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "iterm2";
+      };
+      nixpkgsAttr = "iterm2";
+    };
+    obsidian = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "obsidian";
+      };
+      nixpkgsAttr = "obsidian";
+    };
+    rectangle = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "rectangle";
+      };
+      nixpkgsAttr = "rectangle";
+    };
+    stats = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "stats";
+      };
+      nixpkgsAttr = "stats";
+    };
+    utm = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "utm";
+      };
+      nixpkgsAttr = "utm";
+    };
     visual-studio-code = {
       category = "gui";
       homebrew = {
@@ -73,6 +121,14 @@ let
         name = "visual-studio-code";
       };
       nixpkgsAttr = "vscode";
+    };
+    "visual-studio-code@insiders" = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "visual-studio-code@insiders";
+      };
+      nixpkgsAttr = "vscode-insiders";
     };
     vlc = {
       category = "gui";
