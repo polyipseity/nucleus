@@ -43,3 +43,23 @@ updates:
           - "*"
     cooldown:
       default-days: 5
+
+  # Nix (flake.nix)
+  - package-ecosystem: "nix"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "build"
+      prefix-development: "chore"
+      include: "scope"
+    groups:
+      nix:
+        patterns:
+          - "*"
+      nix-security:
+        applies-to: "security-updates"
+        patterns:
+          - "*"
+    cooldown:
+      default-days: 5
