@@ -79,6 +79,19 @@
   or semantically significant (e.g. `boot.initrd.availableKernelModules`,
   module import lists where one module must precede another).
 
+## Refactoring Guardrails
+
+- **Pre-flight check rule**: before proposing or executing edits, verify target
+  paths on disk and list all files that will be changed.
+- **Cross-platform symmetry rule**: when adding a capability that exists on
+  both Unix and Windows (for example secrets, fonts, or wallpapers), add or
+  update both implementations in the same change:
+  - Unix side under `src/modules/*.nix`
+  - Windows side under `src/modules/windows/*.ps1`
+- **Windows module enforcement**: all reusable PowerShell functions must live
+  under `src/modules/windows/*.ps1` with lowercase filenames; keep
+  `src/hosts/windows/apply.ps1` orchestration-only.
+
 ## Key References
 
 - `AGENTS.md` — workspace-wide defaults

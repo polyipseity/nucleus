@@ -74,12 +74,28 @@ nucleus/
 - `src/modules/secrets.nix`: declarative secret provisioning activation logic (SSH + GPG imports)
 - `src/modules/shell.nix`: declarative shell aliases and environment tooling integration
 - `src/modules/wallpapers.nix`: declarative wallpaper materialization to `~/Pictures/wallpapers`
-- `src/modules/windows/*.ps1`: Windows helper modules for executable discovery, secrets materialization, and wallpaper materialization
-- `src/scripts/apply.sh`: thin Unix apply wrapper; declarative SOPS operations run through Nix/Home Manager modules
-- `src/hosts/windows/apply.ps1`: thin Windows apply orchestrator; loads `src/modules/windows/*.ps1` and runs pre-DSC -> materialization -> post-DSC
+- `src/modules/windows/common.ps1`: Windows helper module for executable resolution, SOPS decryption helpers, and WinGet DSC invocation
+- `src/modules/windows/secrets.ps1`: Windows helper module for secrets/key materialization
+- `src/modules/windows/wallpapers.ps1`: Windows helper module for wallpaper materialization
+- `src/scripts/apply.sh`: Unix apply orchestrator with a 4-stage lifecycle (pre-flight checks -> secret materialization -> primary apply -> post-apply triggers)
+- `src/hosts/windows/apply.ps1`: Windows apply orchestrator with the same 4-stage lifecycle (pre-flight checks -> secret materialization -> primary apply -> post-apply triggers)
 - `src/assets/wallpapers/*.sops`: encrypted wallpaper blobs materialized to `~/Pictures/wallpapers`
 - `.sops.yaml`: key policy for repo secrets (global GPG + per-machine age recipients)
 - `src/secrets/*.yml`: SOPS-managed encrypted secret files (GPG keys, SSH keys); one file per identity
+
+### Symmetrical apply lifecycle
+
+Both primary apply entrypoints (`src/scripts/apply.sh` and
+`src/hosts/windows/apply.ps1`) follow the same 4-stage lifecycle:
+
+1. **Pre-flight checks**: verify required tooling and resolve targeted files.
+2. **Secret materialization**: decrypt SOPS-managed secrets (and encrypted
+    wallpaper assets) to host paths.
+3. **Primary apply**: run the platform declarative engine (`nix` rebuild/switch
+    on Unix, `winget configure` on Windows).
+4. **Post-apply triggers**: run lightweight refresh actions (for example
+    wallpaper or session refresh) without moving desired state out of
+    declarative definitions.
 
 ## One-liner apply commands
 
