@@ -30,15 +30,25 @@
       };
       pkgsLinux = mkPkgs systems.linux;
       pkgsMac = mkPkgs systems.mac;
+      mkApplyApp = pkgs: {
+        type = "app";
+        program = "${pkgs.writeShellApplication {
+          name = "nucleus-apply";
+          runtimeInputs = [ pkgs.git pkgs.gnupg pkgs.jq pkgs.sops ];
+          text = builtins.readFile ./scripts/apply.sh;
+        }}/bin/nucleus-apply";
+      };
     in {
       apps = {
         "${systems.mac}" = {
+          apply = mkApplyApp pkgsMac;
           darwin-rebuild = {
             type = "app";
             program = "${darwin.packages.${systems.mac}.darwin-rebuild}/bin/darwin-rebuild";
           };
         };
         "${systems.linux}" = {
+          apply = mkApplyApp pkgsLinux;
           home-manager = {
             type = "app";
             program = "${home-manager.packages.${systems.linux}.home-manager}/bin/home-manager";
@@ -82,25 +92,6 @@
           home-manager.nixosModules.home-manager
           {
             home-manager.extraSpecialArgs = { inherit username; };
-
-        packages = {
-          "${systems.mac}".bootstrap-deps = pkgsMac.symlinkJoin {
-            name = "bootstrap-deps";
-            paths = [
-              pkgsMac.gnupg
-              pkgsMac.jq
-              pkgsMac.sops
-            ];
-          };
-          "${systems.linux}".bootstrap-deps = pkgsLinux.symlinkJoin {
-            name = "bootstrap-deps";
-            paths = [
-              pkgsLinux.gnupg
-              pkgsLinux.jq
-              pkgsLinux.sops
-            ];
-          };
-        };
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.users.${username} = {
@@ -111,6 +102,25 @@
             };
           }
         ];
+      };
+
+      packages = {
+        "${systems.mac}".bootstrap-deps = pkgsMac.symlinkJoin {
+          name = "bootstrap-deps";
+          paths = [
+            pkgsMac.gnupg
+            pkgsMac.jq
+            pkgsMac.sops
+          ];
+        };
+        "${systems.linux}".bootstrap-deps = pkgsLinux.symlinkJoin {
+          name = "bootstrap-deps";
+          paths = [
+            pkgsLinux.gnupg
+            pkgsLinux.jq
+            pkgsLinux.sops
+          ];
+        };
       };
 
       devShells = {

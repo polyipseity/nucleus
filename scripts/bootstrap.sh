@@ -1,22 +1,33 @@
 #!/usr/bin/env sh
+# Install Nix (if absent) and the Nix-managed bootstrap dependencies.
+# After running this script, apply the configuration with: nix run ./src#apply
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 VERSIONS_FILE="$SCRIPT_DIR/bootstrap-versions.env"
-
-COMMAND="${1:-apply}"
+COMMAND="${1:-install-deps}"
 
 if [ "$COMMAND" = "-h" ] || [ "$COMMAND" = "--help" ] || [ "$COMMAND" = "help" ]; then
   cat <<'EOF'
-Usage: bootstrap.sh [command]
+Usage: bootstrap.sh [install-deps|apply]
+
+Installs Nix (if absent) and the Nix-managed bootstrap dependencies
+(gnupg, jq, sops) for this host.
 
 Commands:
-  apply         Apply the full configuration for this host (default)
-  install-deps  Install Nix-managed bootstrap dependencies only
+  install-deps  Install bootstrap dependencies only (default)
+  apply         Install bootstrap dependencies, then run src apply flow
+
+Options:
   -h, --help    Show this help message
 EOF
   exit 0
+fi
+
+if [ "$COMMAND" != "apply" ] && [ "$COMMAND" != "install-deps" ]; then
+  printf '%s\n' "error: unsupported command '$COMMAND' (supported: apply, install-deps)" >&2
+  exit 1
 fi
 
 load_bootstrap_versions() {
@@ -42,37 +53,6 @@ load_bootstrap_versions() {
 
   NIX_INSTALLER_SHA256="$NUCLEUS_NIX_INSTALLER_SHA256"
   NIX_INSTALLER_URL="$NUCLEUS_NIX_INSTALLER_URL"
-}
-
-install_bootstrap_deps_only() {
-  printf '%s\n' "Installing bootstrap-managed dependencies only..."
-  nix --extra-experimental-features "nix-command flakes" profile install "$REPO_ROOT/src#bootstrap-deps"
-  printf '%s\n' "Bootstrap dependencies installed. Skipping OS configuration."
-}
-
-apply_configuration() {
-  os_name="$1"
-
-  case "$os_name" in
-    Darwin)
-      printf '%s\n' "Applying nix-darwin configuration: macbook"
-      nix --extra-experimental-features "nix-command flakes" run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
-      ;;
-    Linux)
-      if [ -f /etc/NIXOS ]; then
-        printf '%s\n' "Applying NixOS configuration: nixos"
-        sudo nix --extra-experimental-features "nix-command flakes" run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
-      else
-        target_username="${NUCLEUS_USERNAME:-$(id -un)}"
-        printf '%s\n' "Applying Home Manager profile: $target_username"
-        nix --extra-experimental-features "nix-command flakes" run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
-      fi
-      ;;
-    *)
-      printf '%s\n' "error: unsupported OS '$os_name'" >&2
-      exit 1
-      ;;
-  esac
 }
 
 bootstrap_nix_if_missing() {
@@ -118,10 +98,6 @@ require_command() {
   fi
 }
 
-run_with_bootstrap_tools() {
-  nix --extra-experimental-features "nix-command flakes" develop "$REPO_ROOT/src#bootstrap" --command "$@"
-}
-
 sha256_of_file() {
   file_path="$1"
 
@@ -139,60 +115,16 @@ sha256_of_file() {
   openssl dgst -sha256 "$file_path" | awk '{ print $2 }'
 }
 
-verify_secrets_access() {
-  secrets_dir="$REPO_ROOT/src/secrets"
-  host_ssh_key="/etc/ssh/ssh_host_ed25519_key"
-  found=0
-
-  if [ ! -d "$secrets_dir" ]; then
-    printf '%s\n' "No secrets directory found at $secrets_dir; skipping decryption preflight."
-    return 0
-  fi
-
-  if [ -f "$host_ssh_key" ]; then
-    export SOPS_AGE_SSH_PRIVATE_KEY_FILE="$host_ssh_key"
-  else
-    if ! run_with_bootstrap_tools gpg --list-secret-keys --with-colons 2>/dev/null | grep -Eq '^(sec|ssb):'; then
-      printf '%s\n' "error: no GPG secret keys found; import your encryption subkey first." >&2
-      return 1
-    fi
-  fi
-
-  for secrets_file in "$secrets_dir"/*.yml; do
-    [ -e "$secrets_file" ] || continue
-    found=1
-    printf '%s\n' "Verifying: $(basename "$secrets_file")"
-    if ! run_with_bootstrap_tools sops --decrypt --output-format json "$secrets_file" >/dev/null 2>&1; then
-      unset SOPS_AGE_SSH_PRIVATE_KEY_FILE
-      printf '%s\n' "error: unable to decrypt $(basename "$secrets_file") with host SSH key or GPG." >&2
-      return 1
-    fi
-  done
-
-  unset SOPS_AGE_SSH_PRIVATE_KEY_FILE
-
-  if [ "$found" -eq 0 ]; then
-    printf '%s\n' "No .yml secret files found in $secrets_dir; skipping."
-    return 0
-  fi
-
-  printf '%s\n' "Verified secrets access."
-}
-
 load_bootstrap_versions
 bootstrap_nix_if_missing
 
-case "$COMMAND" in
-  apply)
-    verify_secrets_access
-    OS_NAME=$(uname -s)
-    apply_configuration "$OS_NAME"
-    ;;
-  install-deps)
-    install_bootstrap_deps_only
-    ;;
-  *)
-    printf '%s\n' "error: unsupported command '$COMMAND' (supported: apply, help, install-deps)" >&2
-    exit 1
-    ;;
-esac
+printf '%s\n' "Installing bootstrap-managed dependencies..."
+nix --extra-experimental-features "nix-command flakes" profile install "$REPO_ROOT/src#bootstrap-deps"
+
+if [ "$COMMAND" = "apply" ]; then
+  printf '%s\n' "Running apply flow via src#apply..."
+  nix --extra-experimental-features "nix-command flakes" run "$REPO_ROOT/src#apply"
+  exit 0
+fi
+
+printf '%s\n' "Bootstrap complete. Run 'nix run ./src#apply' to configure this host."

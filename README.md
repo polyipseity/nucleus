@@ -33,6 +33,8 @@ nucleus/
 ├── src/secrets/
 │   ├── personal-gpg.yml
 │   └── personal-ssh.yml
+├── src/scripts/
+│   └── apply.sh
 └── scripts/
     ├── bootstrap-versions.env
     ├── bootstrap.sh
@@ -47,6 +49,8 @@ nucleus/
 - `src/hosts/windows/configuration.dsc.yaml`: Windows packages/settings/environment via WinGet DSC
 - `src/modules/home.nix`: home-level shell/editor/dotfile composition across platforms
 - `src/modules/secrets/default.nix`: decrypt/provision activation logic (SSH + GPG imports)
+- `src/scripts/apply.sh`: Unix apply script (secrets preflight + OS config); exposed as `nix run ./src#apply`
+- `src/hosts/windows/apply.ps1`: Windows apply script (WinGet DSC + secrets provisioning)
 - `.sops.yaml`: key policy for repo secrets (global GPG + per-machine age recipients)
 - `src/secrets/*.yml`: SOPS-managed encrypted secret files (GPG keys, SSH keys); one file per identity
 
@@ -72,10 +76,14 @@ winget configure .\src\hosts\windows\configuration.dsc.yaml
 
 ## Bootstrap scripts
 
-- Unix-like systems: `scripts/bootstrap.sh`
-- Windows: `scripts/bootstrap.ps1`
+The bootstrap scripts are intentionally minimal: they only install the
+dependencies needed to run the rest of the toolchain.
 
-These wrappers call the same platform-native commands and keep setup repeatable.
+- Unix-like: `scripts/bootstrap.sh` - installs Nix (if absent) and Nix-managed bootstrap tools
+- Windows: `scripts/bootstrap.ps1` - installs Git, GnuPG, and SOPS via winget
+
+When you explicitly request apply, bootstrap can delegate to the apply scripts
+after installing dependencies.
 
 ### Bootstrap version pins
 
@@ -83,14 +91,39 @@ These wrappers call the same platform-native commands and keep setup repeatable.
     `scripts/bootstrap-versions.env`.
 - Update version/hash values there when bumping bootstrap dependencies.
 
-### Bootstrap commands
+### Workflow
 
-- Full bootstrap (Unix): `scripts/bootstrap.sh`
-- Full bootstrap (Windows): `scripts/bootstrap.ps1`
-- Dependencies only (Unix, no OS configuration): `scripts/bootstrap.sh install-deps`
-- Dependencies only (Windows, no OS configuration): `scripts/bootstrap.ps1 -InstallDepsOnly`
-- Show help (Unix): `scripts/bootstrap.sh --help`
-- Show help (Windows): `scripts/bootstrap.ps1 -Help` or `scripts/bootstrap.ps1 -h`
+**Unix:**
+
+```bash
+# Step 1: install Nix + bootstrap tools
+sh scripts/bootstrap.sh
+
+# Step 2: apply configuration (verifies secrets, then runs darwin-rebuild / nixos-rebuild / home-manager)
+nix run ./src#apply
+
+# Or do both in one command
+sh scripts/bootstrap.sh apply
+```
+
+**Windows (Admin PowerShell):**
+
+```powershell
+# Step 1: install Git, GnuPG, SOPS via winget
+.\scripts\bootstrap.ps1
+
+# Step 2: apply configuration (WinGet DSC + secrets provisioning)
+.\src\hosts\windows\apply.ps1
+
+# Or do both in one command
+.\scripts\bootstrap.ps1 -Apply
+```
+
+### Help
+
+- Unix: `scripts/bootstrap.sh --help`
+- Windows: `scripts/bootstrap.ps1 -Help` or `scripts/bootstrap.ps1 -h`
+- Windows apply: `src\hosts\windows\apply.ps1 -Help`
 
 ## Security model: unlock and promote
 
