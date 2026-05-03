@@ -131,6 +131,27 @@ following logic:
 - Keep `programs.direnv` with `nix-direnv` enabled in shared shell config so
   Flake/devShell environments auto-load consistently in Zsh sessions.
 
+### Wallpaper Gallery Policy
+
+The `src/modules/wallpapers.nix` activation hook manages desktop wallpapers as
+a rotating gallery, never as a single static file.
+
+1. **Direct file application ban**: agents must never call `osascript` or
+   `gsettings` targeting a single `.jpg` or `.png` path. All desktop background
+   commands must target either the gallery folder (macOS) or the generated XML
+   file (GNOME).
+2. **macOS**: `set picture of aDesktop` must point to the decrypted-wallpapers
+   **folder** (`~/Pictures/wallpapers`), with `picture rotation` set to `1`,
+   `change interval` set to `600.0` (10 minutes), and `random order` set to
+   `true`.
+3. **GNOME**: the activation hook must regenerate `nucleus-gallery.xml` on
+   every run, listing every image in `~/Pictures/wallpapers/` with alternating
+   `<static>` (595 s) and `<transition type="overlay">` (5 s) elements that
+   loop back to the first image. `picture-uri` must point to this XML file.
+4. **Stale cleanup**: before applying the gallery, delete any file in
+   `~/Pictures/wallpapers/` (excluding `*.xml`) that has no corresponding
+   `assets/wallpapers/$name.sops` source in the repository.
+
 ## Refactoring Guardrails
 
 - **Pre-flight check rule**: before proposing or executing edits, verify target

@@ -1,10 +1,14 @@
 # modules/wallpapers.nix — Home Manager activation hook that decrypts SOPS-
-# encrypted wallpaper blobs and sets the active desktop background.
+# encrypted wallpaper blobs and configures a slideshow / gallery desktop.
 #
 # Asset layout: assets/wallpapers/*.sops — each file is a binary image
 # encrypted with SOPS (age via host SSH key or GPG fallback).  On activation
-# the blobs are decrypted into ~/Pictures/wallpapers/ and the first one is
-# applied as the desktop wallpaper on both macOS (osascript) and GNOME (gsettings).
+# the blobs are decrypted into ~/Pictures/wallpapers/ and applied as a
+# rotating gallery (10-minute interval) on both macOS (osascript folder mode)
+# and GNOME (dynamically generated nucleus-gallery.xml).
+#
+# Stale cleanup: any file in ~/Pictures/wallpapers/ that no longer has a
+# matching *.sops source is removed so the gallery stays current.
 #
 # This activation runs after nucleusKeyProvision so that the GPG keyring and
 # SSH keys are already in place before decryption is attempted.
@@ -29,9 +33,6 @@ in
     export HOME="${config.home.homeDirectory}"
 
     picturesDir="$HOME/Pictures/wallpapers"
-    # Tracks the first successfully decrypted wallpaper path; used for the
-    # desktop background update at the end of the loop.
-    activeWallpaperPath=""
 
     mkdir -p "$GNUPGHOME"
     chmod 700 "$GNUPGHOME"
@@ -77,10 +78,6 @@ in
           rm -f "$tmpTarget"
         fi
 
-        # Record the first wallpaper path; used below to set the background.
-        if [ -z "$activeWallpaperPath" ]; then
-          activeWallpaperPath="$targetFile"
-        fi
       else
         rm -f "$tmpTarget"
         echo "nucleus: failed to decrypt wallpaper $(basename "$wallpaper_blob"); skipping." >&2
@@ -91,22 +88,73 @@ in
       echo "nucleus: no wallpaper blobs (*.sops) found in ${wallpapersDir}; skipping wallpaper provisioning."
     fi
 
-    # Apply the first decrypted wallpaper as the desktop background.
-    # osascript path: macOS (applies to every Space / desktop).
-    # gsettings path: GNOME on Linux.
-    if [ -n "$activeWallpaperPath" ]; then
-      if command -v osascript >/dev/null 2>&1; then
-        osascript <<EOF >/dev/null 2>&1 || true
+    # Stale cleanup: remove decrypted files that no longer have a matching
+    # .sops source so the gallery does not show deleted assets.
+    for decryptedFile in "$picturesDir"/*; do
+      [ -e "$decryptedFile" ] || continue
+      case "$decryptedFile" in *.xml) continue;; esac
+      baseName="$(basename "$decryptedFile")"
+      if [ ! -e "${wallpapersDir}/$baseName.sops" ]; then
+        rm -f "$decryptedFile"
+        echo "nucleus: removed stale wallpaper $baseName (no matching .sops source)."
+      fi
+    done
+
+    # Apply gallery / slideshow mode.
+    # macOS: point System Events at the wallpapers folder and enable rotation
+    #        (picture rotation=1, 10-minute interval, random order).
+    # GNOME: generate nucleus-gallery.xml listing all decrypted images, then
+    #        point picture-uri at the XML file.  Each image displays for 595 s
+    #        with a 5 s overlay transition (600 s / 10 min total per slide).
+    if command -v osascript >/dev/null 2>&1; then
+      osascript <<EOF >/dev/null 2>&1 || true
 tell application "System Events"
-  repeat with desktopRef in desktops
-    set picture of desktopRef to POSIX file "$activeWallpaperPath"
-  end repeat
+    set theDesktops to desktops
+    repeat with aDesktop in theDesktops
+        set picture rotation of aDesktop to 1
+        set change interval of aDesktop to 600.0
+        set random order of aDesktop to true
+        set picture of aDesktop to POSIX file "$picturesDir"
+    end repeat
 end tell
 EOF
-      elif command -v gsettings >/dev/null 2>&1; then
-        gsettings set org.gnome.desktop.background picture-uri "file://$activeWallpaperPath" >/dev/null 2>&1 || true
-        gsettings set org.gnome.desktop.background picture-uri-dark "file://$activeWallpaperPath" >/dev/null 2>&1 || true
+    elif command -v gsettings >/dev/null 2>&1; then
+      xmlFile="$picturesDir/nucleus-gallery.xml"
+      tmpXml="$(mktemp)"
+      firstImg=""
+      prevImg=""
+
+      for img in "$picturesDir"/*; do
+        [ -e "$img" ] || continue
+        case "$img" in *.xml) continue;; esac
+
+        if [ -z "$firstImg" ]; then
+          firstImg="$img"
+        fi
+
+        if [ -n "$prevImg" ]; then
+          printf '  <transition type="overlay">\n    <duration>5.0</duration>\n    <from>%s</from>\n    <to>%s</to>\n  </transition>\n' \
+            "$prevImg" "$img" >> "$tmpXml"
+        fi
+
+        printf '  <static>\n    <duration>595.0</duration>\n    <file>%s</file>\n  </static>\n' \
+          "$img" >> "$tmpXml"
+        prevImg="$img"
+      done
+
+      if [ -n "$firstImg" ]; then
+        {
+          printf '<?xml version="1.0" encoding="UTF-8"?>\n'
+          printf '<background>\n'
+          cat "$tmpXml"
+          printf '  <transition type="overlay">\n    <duration>5.0</duration>\n    <from>%s</from>\n    <to>%s</to>\n  </transition>\n' \
+            "$prevImg" "$firstImg"
+          printf '</background>\n'
+        } > "$xmlFile"
+        gsettings set org.gnome.desktop.background picture-uri "file://$xmlFile" >/dev/null 2>&1 || true
+        gsettings set org.gnome.desktop.background picture-uri-dark "file://$xmlFile" >/dev/null 2>&1 || true
       fi
+      rm -f "$tmpXml"
     fi
   '';
 }
