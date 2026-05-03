@@ -91,6 +91,31 @@ bootstrap_nix_if_missing() {
   require_command nix
 }
 
+ensure_macos_nix_mount() {
+  if [ "$(uname -s)" != "Darwin" ]; then
+    return
+  fi
+
+  if [ -e /nix ]; then
+    return
+  fi
+
+  printf '%s\n' "macOS requires /nix before Nix installation can proceed."
+
+  if [ ! -f /etc/synthetic.conf ] || ! grep -Eq '^nix$' /etc/synthetic.conf; then
+    if command -v sudo >/dev/null 2>&1; then
+      printf '%s\n' "Adding 'nix' to /etc/synthetic.conf (sudo may prompt)."
+      printf 'nix\n' | sudo tee -a /etc/synthetic.conf >/dev/null
+    else
+      printf '%s\n' "error: sudo is required to write /etc/synthetic.conf on macOS" >&2
+      exit 1
+    fi
+  fi
+
+  printf '%s\n' "Reboot once to materialize /nix, then re-run bootstrap.sh."
+  exit 1
+}
+
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     printf '%s\n' "error: $1 is required but was not found in PATH" >&2
@@ -116,6 +141,7 @@ sha256_of_file() {
 }
 
 load_bootstrap_versions
+ensure_macos_nix_mount
 bootstrap_nix_if_missing
 
 printf '%s\n' "Installing bootstrap-managed dependencies..."

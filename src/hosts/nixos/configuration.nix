@@ -2,6 +2,7 @@
 {
   imports = [ ../../modules/core.nix ];
 
+  networking.firewall.enable = true;
   networking.hostName = "nixos";
   networking.networkmanager.enable = true;
 
@@ -24,6 +25,10 @@
     extraGroups = [ "networkmanager" "wheel" ];
     shell = pkgs.zsh;
   };
+
+  security.sudo.extraConfig = ''
+    Defaults timestamp_timeout=5
+  '';
 
   system.stateVersion = "24.11";
 }

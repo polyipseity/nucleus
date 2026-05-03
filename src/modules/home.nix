@@ -11,6 +11,7 @@ in
   imports = [
     ./core.nix
     ./editors/default.nix
+    ./macos/default.nix
     ./secrets/default.nix
     ./shell/default.nix
     ./wallpapers/default.nix

@@ -30,6 +30,8 @@ nucleus/
 │   └── modules/
 │       ├── core.nix
 │       ├── home.nix
+│       ├── macos/
+│       │   └── default.nix
 │       ├── shell/
 │       │   └── default.nix
 │       ├── secrets/
@@ -54,12 +56,13 @@ nucleus/
 
 ## What each layer does
 
-- `src/modules/core.nix`: shared CLI tools (`git`, `rustup`, `ripgrep`, `fd`, `bottom`, `eza`, `zoxide`)
-- `src/hosts/macbook/default.nix`: macOS defaults (keyboard repeat, dock behavior)
-- `src/hosts/nixos/configuration.nix`: Linux host/system defaults and hardware baseline
+- `src/modules/core.nix`: shared CLI tools (`bat`, `bottom`, `direnv`, `eza`, `fd`, `fzf`, `git`, `gnupg`, `jq`, `ripgrep`, `rustup`, `sops`, `uv`, `zoxide`) plus macOS-only desktop helpers
+- `src/hosts/macbook/default.nix`: macOS host baseline (security defaults, Homebrew packages/casks, keyboard/input behavior, dock/finder preferences, and system-level activation hardening)
+- `src/hosts/nixos/configuration.nix`: Linux host/system defaults and hardware baseline with firewall + sudo timeout hardening
 - `src/hosts/windows/system.dsc.yml`: Windows pre-provision baseline via WinGet DSC (packages + machine settings)
 - `src/hosts/windows/user.dsc.yml`: Windows post-provision baseline via WinGet DSC (folders + user settings)
 - `src/modules/home.nix`: home-level shell/editor/dotfile composition across platforms
+- `src/modules/macos/default.nix`: macOS Home Manager activation workflows (display/session tuning, launch-services app handlers, and user-session hardening)
 - `src/modules/secrets/default.nix`: declarative secret provisioning activation logic (SSH + GPG imports)
 - `src/modules/wallpapers/default.nix`: declarative wallpaper materialization to `~/Pictures/wallpapers`
 - `src/scripts/apply.sh`: thin Unix apply wrapper; declarative SOPS operations run through Nix/Home Manager modules
@@ -94,7 +97,7 @@ winget configure .\src\hosts\windows\user.dsc.yml
 The bootstrap scripts are intentionally minimal: they only install the
 dependencies needed to run the rest of the toolchain.
 
-- Unix-like: `scripts/bootstrap.sh` - installs Nix (if absent) and Nix-managed bootstrap tools
+- Unix-like: `scripts/bootstrap.sh` - installs Nix (if absent) and Nix-managed bootstrap tools, with macOS `/nix` preflight handling
 - Windows: `scripts/bootstrap.ps1` - installs Git, GnuPG, and SOPS via winget
 
 When you explicitly request apply, bootstrap can delegate to the apply scripts
@@ -208,7 +211,7 @@ Git handling:
 2. Generate `flake.lock` after Nix is available:
    - run `nix flake lock` from inside `src/`
 3. Fill placeholders in `.sops.yaml` and encrypt each secret file with `sops --encrypt --in-place`.
-4. (Optional) add a `dotfiles/` directory for Home Manager to symlink into `$HOME`.
+4. (Optional) add `src/dotfiles/.config` and/or `src/dotfiles/.gitconfig` for Home Manager-managed symlinks.
 
 ## Notes
 
