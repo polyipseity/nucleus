@@ -145,7 +145,7 @@
       };
 
       # -----------------------------------------------------------------------
-      # packages — installable via `nix profile install .#bootstrap-deps`.
+      # packages — installable via `nix profile add .#bootstrap-deps`.
       # bootstrap-deps is a symlink-joined set of the tools that bootstrap.sh
       # needs before the full configuration has been applied (gnupg, jq, sops).
       # -----------------------------------------------------------------------

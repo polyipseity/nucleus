@@ -38,6 +38,9 @@
   exist before you run or document toolchain commands.
 - Detect install, build, test, lint, format, type-check, and release commands
   from actual repository files instead of assuming a default stack.
+- For Nix profile operations, prefer `nix profile add` over the deprecated
+  `nix profile install` alias, and use presence checks (`nix profile list`)
+  in bootstrap scripts to keep reruns idempotent and warning-free.
 - When a language, framework, task runner, or test system is clearly present,
   add or refine focused instruction files for it rather than stuffing detailed
   rules into `AGENTS.md`.
