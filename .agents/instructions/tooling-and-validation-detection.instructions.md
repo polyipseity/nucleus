@@ -1,7 +1,7 @@
 ---
 description: "Use when creating or updating instructions for repository tooling, build commands, tests, CI, editor automation, or validation workflows. Detect the real setup from config files before documenting or prescribing commands."
 name: "Tooling and Validation Detection"
-applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.json, .vscode/settings.json, .github/workflows/**/*.yml, .github/dependabot.yml, .editorconfig, .gitattributes"
+applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/settings.json, .github/workflows/**/*.yml, .github/dependabot.yml, .editorconfig, .gitattributes"
 ---
 
 # Tooling and Validation Detection

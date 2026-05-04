@@ -20,7 +20,7 @@
 ## Architecture
 
 - Agent customization is file-driven:
-  - `opencode.json` registers `.agents/instructions/**/*.md` and
+  - `opencode.jsonc` registers `.agents/instructions/**/*.md` and
     `.agents/skills/`
   - `.opencode/commands/` mirrors prompt workflows for OpenCode consumers
   - `.vscode/settings.json` defines terminal auto-approve patterns and editor
@@ -142,15 +142,10 @@ For Visual Studio Code, keep one declarative source of truth in
    - Maintain a Home Manager activation entry that symlinks those paths to the
      Nix-managed extension directory in the store.
 
-Before concluding VS Code changes, verify:
-
-- `visual-studio-code` and `visual-studio-code@insiders` remain backend-
-  selectable via `src/modules/core.nix` package-selection options.
-- No hard-coded VS Code casks are introduced in
-  `src/hosts/macbook/homebrew.nix` `staticManagedCasks`.
-- Stable and insiders `settings.json` are both managed from the same shared
-  settings source.
-- Darwin bridge symlinks are applied only for channels resolved to Homebrew.
+Before concluding VS Code changes, verify: both channels remain backend-selectable
+via `core.nix` package-selection options; no VS Code casks are hard-coded into
+`staticManagedCasks`; stable and insiders `settings.json` share the same source;
+Darwin bridge symlinks only apply when the backend resolves to Homebrew.
 
 ### Security Invariants (macOS)
 
@@ -214,7 +209,7 @@ a rotating gallery, never as a single static file.
 - `.agents/instructions/*.instructions.md` — focused authoring rules by file type
 - `.agents/prompts/commit-staged.prompt.md` and
   `.opencode/commands/commit-staged.prompt.md` — mirrored commit workflow prompt
-- `opencode.json` — instruction and skill discovery
+- `opencode.jsonc` — instruction and skill discovery
 - `.vscode/settings.json` — terminal auto-approve and editor behavior
 - `.github/workflows/ci.yml`, `.github/dependabot.yml`, `.commitlintrc.mjs` —
   automation and policy

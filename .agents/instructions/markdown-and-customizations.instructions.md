@@ -3,6 +3,7 @@ description: "Use when editing markdown docs, AGENTS.md, prompt files, or agent 
 name: "Markdown and Customization Authoring"
 applyTo: "AGENTS.md, README.md, .agents/**/*.md, .opencode/**/*.md, .github/**/*.md"
 ---
+
 # Markdown and Customization Authoring
 
 ## Scope and intent
@@ -33,7 +34,7 @@ applyTo: "AGENTS.md, README.md, .agents/**/*.md, .opencode/**/*.md, .github/**/*
 - Prefer short sections, bullets, and explicit file references wrapped in
   backticks.
 - Use "link, don't embed": point to canonical files such as
-  `.github/workflows/ci.yml`, `.commitlintrc.mjs`, `opencode.json`, or
+  `.github/workflows/ci.yml`, `.commitlintrc.mjs`, `opencode.jsonc`, or
   `.vscode/settings.json` instead of duplicating long policy blocks.
 - When documenting commands, reflect the commands that actually exist in the
   repo. If the template has not been initialized yet, say so plainly.

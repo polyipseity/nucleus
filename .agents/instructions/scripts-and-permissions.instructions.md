@@ -6,10 +6,10 @@ applyTo: "scripts/**"
 
 # Scripts and Executable Permissions
 
-## Scope and template state
+## Scope
 
-- Keep repo-level helper scripts in `scripts/`; the directory may currently
-  contain only `.gitkeep` until a downstream setup adds real scripts.
+- Keep repo-level helper scripts in `scripts/`. Current contents: `bootstrap.sh`
+  (Unix), `bootstrap.ps1` (Windows), and `bootstrap-versions.env` (version pins).
 - Do not scatter contributor-facing or CI-facing automation across random
   folders when `scripts/` is the intended home.
 
@@ -23,9 +23,9 @@ applyTo: "scripts/**"
   into the appropriate source tree instead of leaving it in `scripts/`.
 - Detect a script's runtime from its extension, shebang, adjacent config files,
   and the commands it invokes before adding stack-specific script guidance.
-- If a new runtime appears in `scripts/`, add or update a focused instruction
-  file for that runtime only after confirming it is part of the repo's real
-  setup.
+- `src/scripts/apply.sh` (the Nix apply dispatcher) lives under `src/` because
+  it is embedded in the flake as `apps.apply`; it follows the same doc and
+  line-ending rules as `scripts/` shell scripts.
 
 ## Line endings and permissions
 

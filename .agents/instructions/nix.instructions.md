@@ -9,19 +9,33 @@ applyTo: "src/**/*.nix"
 ## Repository layout
 
 - `src/flake.nix` — entrypoint; defines all flake outputs and pins inputs via
-  `src/flake.lock`.
+  `src/flake.lock`. Exposes `apps.apply` (`nix run .#apply`), engine binaries
+  (`darwin-rebuild`, `nixos-rebuild`, `home-manager`), `packages.bootstrap-deps`,
+  and `devShells.bootstrap` for each supported system.
+- `src/scripts/apply.sh` — the apply script wrapped by `apps.apply`; detects
+  OS and dispatches the correct engine command.
 - `src/hosts/<name>/` — machine-specific configuration; one directory per host.
-  - `macbook/default.nix` — nix-darwin system config.
-  - `nixos/default.nix` — NixOS system config.
-  - `windows/` — Windows; managed by WinGet DSC, not Nix (no `.nix` files here).
+  - `macbook/default.nix` — nix-darwin entrypoint; imports host fragments and
+    the shared posix/gnupg modules. Includes `manual-installations.nix` for
+    software not handled by nixpkgs or Homebrew.
+  - `nixos/default.nix` — NixOS entrypoint; imports host fragments and the
+    shared posix/gnupg modules.
+  - `windows/` — managed by WinGet DSC, not Nix (no `.nix` files here).
 - `src/modules/` — shared logic imported by hosts and home profiles.
-  - `core.nix` — universal CLI packages.
-  - `home.nix` — home-manager root; imports shell, editor, and platform
-    sub-modules.
-  - `shell.nix` — shell programs and aliases.
-  - `editors.nix` — editor programs.
-  - `macos.nix`, `secrets.nix`, `wallpapers.nix` — platform/user activation
-    modules.
+  - `core.nix` — universal CLI packages and macOS `overlappingPackages` table.
+  - `gnupg.nix` — nix-darwin GnuPG agent (guarded by option presence check).
+  - `home.nix` — Home Manager entrypoint; imports all shared feature modules.
+  - `editors.nix` — VS Code settings and extension management.
+  - `linux.nix` — GNOME/dconf parity settings for Linux Home Manager sessions.
+  - `macos.nix` — macOS Home Manager activation hooks and user-session hardening.
+  - `posix-base.nix` — shared system-layer defaults (flakes, zsh) for both
+    nix-darwin and NixOS.
+  - `posix-security.nix` — shared sudo timeout hardening for both POSIX hosts.
+  - `posix-sops.nix` — shared SOPS key sources (SSH host key + GPG fallback).
+  - `posix-user-shell.nix` — shared user account defaults (home dir, login shell).
+  - `secrets.nix` — declarative SSH/GPG secret provisioning activation logic.
+  - `shell.nix` — zsh, direnv, zoxide, and shell aliases.
+  - `wallpapers.nix` — decrypts wallpaper blobs and applies the rotating gallery.
 
 ## Flake conventions
 
@@ -36,8 +50,11 @@ applyTo: "src/**/*.nix"
 
 ## Host conventions
 
-- Every host module must `import ../../modules/core.nix` so the shared package
+- Every host module must import `../../modules/core.nix` so the shared package
   set is consistently applied.
+- Both POSIX hosts must import `posix-base.nix`, `posix-security.nix`,
+  `posix-sops.nix`, `posix-user-shell.nix`, and `gnupg.nix` — these replace
+  duplicated system-layer options that previously lived in each host directly.
 - System-specific options (drivers, hardware modules, kernel args) belong in the
   host file, not in shared modules.
 - Set `system.stateVersion` (NixOS) or `system.stateVersion` (nix-darwin) to

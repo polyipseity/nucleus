@@ -1,6 +1,7 @@
 # nucleus
 
-`nucleus` is a cross-platform, declarative environment repository designed to be a **single source of truth** for:
+`nucleus` is a cross-platform, declarative environment repository — a single
+source of truth for:
 
 - Linux system state (NixOS)
 - macOS system state (`nix-darwin`)
@@ -14,24 +15,16 @@ nucleus/
 ├── .sops.yaml
 ├── src/
 │   ├── flake.nix
+│   ├── scripts/
+│   │   └── apply.sh
+│   ├── assets/
+│   │   └── wallpapers/  *.sops
+│   ├── secrets/
+│   │   ├── gpg-personal.yml
+│   │   └── ssh-personal.yml
 │   ├── hosts/
-│   │   ├── macbook/
-│   │   │   ├── activation.nix
-│   │   │   ├── base.nix
-│   │   │   ├── default.nix
-│   │   │   ├── defaults.nix
-│   │   │   ├── homebrew.nix
-│   │   │   ├── networking.nix
-│   │   │   ├── security.nix
-│   │   │   └── sops.nix
-│   │   ├── nixos/
-│   │   │   ├── base.nix
-│   │   │   ├── default.nix
-│   │   │   ├── hardware.nix
-│   │   │   ├── networking.nix
-│   │   │   ├── security.nix
-│   │   │   ├── sops.nix
-│   │   │   └── users.nix
+│   │   ├── macbook/   (activation, base, defaults, homebrew, manual-installations, networking, security, sops)
+│   │   ├── nixos/     (base, hardware, networking, security, sops, users)
 │   │   └── windows/
 │   │       ├── apply.ps1
 │   │       ├── system.dsc.yml
@@ -39,8 +32,14 @@ nucleus/
 │   └── modules/
 │       ├── core.nix
 │       ├── editors.nix
+│       ├── gnupg.nix
 │       ├── home.nix
+│       ├── linux.nix
 │       ├── macos.nix
+│       ├── posix-base.nix
+│       ├── posix-security.nix
+│       ├── posix-sops.nix
+│       ├── posix-user-shell.nix
 │       ├── secrets.nix
 │       ├── shell.nix
 │       ├── wallpapers.nix
@@ -48,14 +47,6 @@ nucleus/
 │           ├── common.ps1
 │           ├── secrets.ps1
 │           └── wallpapers.ps1
-├── src/assets/
-│   └── wallpapers/
-│       └── *.sops
-├── src/secrets/
-│   ├── gpg-personal.yml
-│   └── ssh-personal.yml
-├── src/scripts/
-│   └── apply.sh
 └── scripts/
     ├── bootstrap-versions.env
     ├── bootstrap.sh
@@ -64,148 +55,92 @@ nucleus/
 
 ## What each layer does
 
-- `src/modules/core.nix`: shared CLI tools (`bat`, `bottom`, `direnv`, `eza`, `fd`, `fzf`, `git`, `gnupg`, `jq`, `ripgrep`, `rustup`, `sops`, `uv`, `zoxide`) plus macOS-only desktop helpers
-- `src/hosts/macbook/default.nix`: macOS host entrypoint importing focused host modules (`activation.nix`, `homebrew.nix`, `defaults.nix`, etc.) for easier future extension
-- `src/hosts/nixos/default.nix`: NixOS host entrypoint importing focused host modules (`hardware.nix`, `users.nix`, `security.nix`, etc.) for easier future extension
-- `src/hosts/windows/system.dsc.yml`: Windows pre-provision baseline via WinGet DSC (packages + machine settings)
-- `src/hosts/windows/user.dsc.yml`: Windows post-provision baseline via WinGet DSC (folders + user settings)
-- `src/modules/home.nix`: home-level shell/editor/dotfile composition across platforms
-- `src/modules/macos.nix`: macOS Home Manager activation workflows (display/session tuning, launch-services app handlers, and user-session hardening)
-- `src/modules/secrets.nix`: declarative secret provisioning activation logic (SSH + GPG imports)
-- `src/modules/shell.nix`: declarative shell aliases and environment tooling integration
-- `src/modules/wallpapers.nix`: declarative wallpaper materialization to `~/Pictures/wallpapers`
-- `src/modules/windows/common.ps1`: Windows helper module for executable resolution, SOPS decryption helpers, and WinGet DSC invocation
-- `src/modules/windows/secrets.ps1`: Windows helper module for batch and JIT secrets/key materialization entrypoints
-- `src/modules/windows/wallpapers.ps1`: Windows helper module for wallpaper materialization
-- `src/scripts/apply.sh`: thin Unix apply wrapper that loads environment context and executes the Nix engine (`nix` rebuild/switch)
-- `src/hosts/windows/apply.ps1`: thin Windows apply wrapper that loads shared module context and executes the WinGet DSC engine (`winget configure`)
-- `src/assets/wallpapers/*.sops`: encrypted wallpaper blobs materialized to `~/Pictures/wallpapers`
-- `.sops.yaml`: key policy for repo secrets (global GPG + per-machine age recipients)
-- `src/secrets/*.yml`: SOPS-managed encrypted secret files (GPG keys, SSH keys); one file per identity
+| File / module | Purpose |
+|---|---|
+| `src/modules/core.nix` | Shared CLI packages (`bat`, `bottom`, `direnv`, `eza`, `fd`, `fzf`, `git`, `gnupg`, `jq`, `opencode`, `ripgrep`, `rustup`, `sops`, `uv`, `zoxide`) plus the macOS `overlappingPackages` table |
+| `src/modules/gnupg.nix` | nix-darwin GnuPG agent (option-presence-guarded; imported by both POSIX hosts) |
+| `src/modules/home.nix` | Home Manager entrypoint; imports all feature modules |
+| `src/modules/editors.nix` | VS Code settings and extension management across platforms |
+| `src/modules/linux.nix` | GNOME/dconf parity settings for NixOS Home Manager sessions |
+| `src/modules/macos.nix` | macOS activation hooks, display/session tuning, launch-services handlers, user-session hardening |
+| `src/modules/posix-base.nix` | Shared system-layer defaults (flakes experimental feature, system zsh) for both POSIX hosts |
+| `src/modules/posix-security.nix` | Shared sudo timeout hardening (`timestamp_timeout=5`) |
+| `src/modules/posix-sops.nix` | Shared SOPS key sources: SSH host key age recipient + GnuPG home fallback |
+| `src/modules/posix-user-shell.nix` | Shared user account defaults (platform-correct home dir, zsh login shell) |
+| `src/modules/secrets.nix` | Declarative SSH/GPG secret provisioning via Home Manager activation |
+| `src/modules/shell.nix` | Zsh with plugins, direnv + nix-direnv, zoxide, shell aliases |
+| `src/modules/wallpapers.nix` | Decrypts wallpaper blobs to `~/Pictures/wallpapers`; applies rotating gallery |
+| `src/modules/windows/common.ps1` | Executable resolution, SOPS decryption helpers, WinGet DSC invocation |
+| `src/modules/windows/secrets.ps1` | Batch and JIT secret/key materialization |
+| `src/modules/windows/wallpapers.ps1` | Wallpaper materialization on Windows |
+| `src/hosts/macbook/default.nix` | nix-darwin entrypoint; imports all macbook fragments + shared posix modules |
+| `src/hosts/macbook/manual-installations.nix` | Imperative installers for software not in nixpkgs or Homebrew |
+| `src/hosts/nixos/default.nix` | NixOS entrypoint; imports all nixos fragments + shared posix modules |
+| `src/hosts/windows/system.dsc.yml` | Pre-provision Windows baseline: packages + machine settings |
+| `src/hosts/windows/user.dsc.yml` | Post-provision Windows baseline: folders + user settings |
+| `src/scripts/apply.sh` | OS-detecting apply dispatcher (wrapped as `nix run .#apply`) |
+| `src/hosts/windows/apply.ps1` | Thin Windows apply wrapper; invokes WinGet DSC |
+| `src/assets/wallpapers/*.sops` | Encrypted wallpaper blobs |
+| `.sops.yaml` | Key policy: global GPG + per-machine age recipients |
+| `src/secrets/*.yml` | SOPS-encrypted identities (GPG keys, SSH keys) |
 
-### Engine-first apply pattern
-
-Both primary apply entrypoints (`src/scripts/apply.sh` and
-`src/hosts/windows/apply.ps1`) use the same minimal orchestration pattern:
-
-1. **Load environment/module context**.
-2. **Execute declarative engine** (`nix` or `winget configure`).
-
-Pre-flight checks, secret materialization, and refresh behavior live in
-declarative layers:
-
-- Unix/macOS: Home Manager activation hooks in `src/modules/secrets.nix` and
-    `src/modules/wallpapers.nix`.
-- Windows: WinGet DSC resources in `src/hosts/windows/*.dsc.yml`, with module
-    helpers providing JIT secret materialization entrypoints when needed.
-
-## One-liner apply commands
+## Apply commands
 
 ### macOS
 
 ```bash
-nix run nix-darwin -- switch --flake ./src#macbook
+nix run ./src#apply
+# or directly:
+darwin-rebuild switch --flake ./src#macbook
 ```
 
 ### Linux (NixOS)
 
 ```bash
+nix run ./src#apply
+# or directly:
 sudo nixos-rebuild switch --flake ./src#nixos
 ```
 
 ### Windows (Admin PowerShell)
 
 ```powershell
+.\src\hosts\windows\apply.ps1
+# or directly:
 winget configure .\src\hosts\windows\system.dsc.yml
 winget configure .\src\hosts\windows\user.dsc.yml
 ```
 
-## Bootstrap scripts
+## Engine-first apply pattern
 
-The bootstrap scripts are intentionally minimal: they only install the
-dependencies needed to run the rest of the toolchain.
+Both apply entrypoints (`src/scripts/apply.sh` and `src/hosts/windows/apply.ps1`)
+follow the same minimal orchestration:
 
-- Unix-like: `scripts/bootstrap.sh` - installs Nix (if absent) and Nix-managed bootstrap tools, with macOS `/nix` preflight handling
-- Windows: `scripts/bootstrap.ps1` - installs GnuPG and SOPS via winget
+1. Load environment/module context.
+2. Execute the declarative engine (`nix` or `winget configure`).
 
-When you explicitly request apply, bootstrap can delegate to the apply scripts
-after installing dependencies.
+Pre-flight checks, secret materialization, and gallery refresh live in the
+declarative layers — not in the orchestration scripts:
 
-### Bootstrap version pins
+- Unix/macOS: Home Manager activation hooks in `secrets.nix` and `wallpapers.nix`.
+- Windows: WinGet DSC resources in `src/hosts/windows/*.dsc.yml`; PowerShell
+  module helpers provide JIT secret materialization when needed.
 
-- All bootstrap-managed tool versions and the Nix installer pin live in
-    `scripts/bootstrap-versions.env`.
-- Update version/hash values there when bumping bootstrap dependencies.
-
-### Workflow
-
-**Unix:**
-
-```bash
-# Step 1: install Nix + bootstrap tools
-sh scripts/bootstrap.sh
-
-# Step 2: apply configuration (declarative secret/wallpaper provisioning runs via Home Manager activation)
-nix run ./src#apply
-
-# Or do both in one command
-sh scripts/bootstrap.sh apply
-```
-
-**Windows (Admin PowerShell):**
-
-```powershell
-# Step 1: install GnuPG and SOPS via winget
-.\scripts\bootstrap.ps1
-
-# Step 2: apply configuration (WinGet DSC + secrets provisioning)
-.\src\hosts\windows\apply.ps1
-
-# Or do both in one command
-.\scripts\bootstrap.ps1 -Apply
-```
-
-### Help
-
-- Unix: `scripts/bootstrap.sh --help`
-- Windows: `scripts/bootstrap.ps1 -Help` or `scripts/bootstrap.ps1 -h`
-- Windows apply: `src\hosts\windows\apply.ps1 -Help`
-
-## Security model: unlock and promote
+## Security model
 
 - **Global admin identity**: your GPG encryption subkey can always decrypt repo secrets.
-- **Machine automation identity**: each machine can decrypt with its host SSH key
-    converted to age recipient form.
-- **Order of preference**: host SSH key decryption, then GPG keyring fallback.
+- **Machine automation identity**: each host decrypts with its SSH host key
+  converted to an age recipient.
+- **Precedence**: host SSH key first, then GPG keyring fallback.
 
-Global automation identity is intentionally disabled for now. Add it back later
-only if a clear operational need appears.
+Global automation identity is intentionally disabled. Re-enable only if a clear
+operational need arises.
 
-This gives a one-time secure unlock path and then low-friction autonomous updates.
+## Wallpaper workflow
 
-## Initial key setup
+Encrypted images live under `src/assets/wallpapers/` as individual `.sops` blobs.
 
-1. Identify your encryption-capable GPG subkey fingerprint:
-    - `gpg --list-keys --with-colons`
-2. Set your fingerprint in `.sops.yaml` (`*primary_gpg`).
-3. Add host age recipients in `.sops.yaml` for `macbook`, `nixos`, and `windows`.
-4. Edit secrets with SOPS (one file per identity):
-    - `sops src/secrets/gpg-personal.yml`
-    - `sops src/secrets/ssh-personal.yml`
-5. Re-encrypt after key policy updates:
-    - `sops updatekeys src/secrets/gpg-personal.yml`
-    - `sops updatekeys src/secrets/ssh-personal.yml`
-
-## Binary wallpaper workflow (large collections)
-
-For large wallpaper sets (10+ files), store each encrypted image as an
-individual `.sops` blob under `src/assets/wallpapers/`.
-
-- Recommended naming: `<original-name>.<ext>.sops` (for example: `aurora.jpg.sops`)
-- Keep plaintext images out of the repository after encryption
-- Avoid frequent re-encryption churn; each blob change stores a full binary in Git history
-
-Encrypt a wallpaper file:
+Encrypt an image:
 
 ```bash
 sops --encrypt --input-type binary --output src/assets/wallpapers/aurora.jpg.sops /path/to/aurora.jpg
@@ -213,35 +148,39 @@ sops --encrypt --input-type binary --output src/assets/wallpapers/aurora.jpg.sop
 
 Apply-time materialization:
 
-- Unix/macOS: Home Manager activation (`src/modules/wallpapers.nix`) decrypts all `*.sops` blobs to `$HOME/Pictures/wallpapers/<name>.<ext>` and runs desktop refresh hooks.
-- Windows: user-state application is declarative through WinGet DSC (`src/hosts/windows/user.dsc.yml`), with refresh ordering expressed through DSC `dependsOn` and module-based JIT secret materialization available for resource-level consumers.
+- **Unix/macOS**: Home Manager activation (`wallpapers.nix`) decrypts all blobs
+  to `~/Pictures/wallpapers/`, deletes stale files with no matching `.sops`
+  source, then applies the rotating gallery (folder on macOS; XML on GNOME).
+- **Windows**: JIT decryption via `src/modules/windows/wallpapers.ps1`.
 
-Git handling:
+Naming: `<original-name>.<ext>.sops` (e.g. `aurora.jpg.sops`). Keep plaintext
+images out of the repository after encryption.
 
-- `src/assets/wallpapers/*.sops` is marked as `binary` in `.gitattributes`
-- This prevents line-ending transforms and text diff heuristics on encrypted blobs
+`src/assets/wallpapers/*.sops` is marked `binary` in `.gitattributes` to
+prevent line-ending transforms and text diff heuristics.
 
-## Onboarding a new physical machine
+## Adding a new machine
 
-1. Import your GPG subkey once on the new machine.
-2. Run bootstrap (`scripts/bootstrap.sh` or `scripts/bootstrap.ps1`).
-3. Extract the machine age recipient from host SSH public key:
+1. Import your GPG subkey on the new machine.
+2. Run bootstrap if Nix / WinGet prerequisites are not yet installed:
+   - Unix: `sh scripts/bootstrap.sh`
+   - Windows (Admin): `.\scripts\bootstrap.ps1`
+3. Extract the machine's age recipient from its SSH host public key:
    - Unix: `ssh-to-age < /etc/ssh/ssh_host_ed25519.pub`
    - Windows: `ssh-to-age < $env:PROGRAMDATA\ssh\ssh_host_ed25519.pub`
-4. Add that age recipient to `.sops.yaml`, then run for each secret file:
-    - `sops updatekeys src/secrets/gpg-personal.yml`
-    - `sops updatekeys src/secrets/ssh-personal.yml`
-5. Commit and push. Future decryptions can use host key automation.
-
-## First-run checklist
-
-1. Update the username in `flake.nix` (`username = "user"`).
-2. Generate `flake.lock` after Nix is available:
-   - run `nix flake lock` from inside `src/`
-3. Fill placeholders in `.sops.yaml` and encrypt each secret file with `sops --encrypt --in-place`.
-4. (Optional) add `src/dotfiles/.config` and/or `src/dotfiles/.gitconfig` for Home Manager-managed symlinks.
+4. Add that recipient to `.sops.yaml`, then re-encrypt each secret file:
+   ```bash
+   sops updatekeys src/secrets/gpg-personal.yml
+   sops updatekeys src/secrets/ssh-personal.yml
+   ```
+5. Commit and push. Future decryptions use the host key automatically.
 
 ## Notes
 
-- This repo is intentionally modular: add a new machine by adding a folder under `hosts/` and wiring it in `flake.nix`.
-- Keep shared logic in `modules/` and reserve host-specific details for `hosts/<name>/`.
+- Add a new POSIX host by creating a directory under `src/hosts/` and wiring it
+  in `src/flake.nix`.
+- Keep shared logic in `src/modules/` and reserve host-specific details for
+  `src/hosts/<name>/`.
+- `scripts/bootstrap-versions.env` pins all bootstrap tool versions. Update it
+  when bumping bootstrap dependencies.
+- `tests/` is a placeholder; test infrastructure has not been added yet.
