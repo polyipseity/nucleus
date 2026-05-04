@@ -114,6 +114,41 @@ following logic:
   exists in `src/hosts/windows/system.dsc.yml` to maintain cross-platform
   parity.
 
+### VS Code Symmetry Protocol
+
+For Visual Studio Code, keep one declarative source of truth in
+`src/modules/editors.nix` while letting the installation backend pivot by OS.
+
+1. **Conditional backend**:
+   - Non-Darwin hosts use nixpkgs binaries (`pkgs.vscode`,
+     `pkgs.vscode-insiders`).
+   - Darwin hosts keep VS Code/Insiders in `src/modules/core.nix`
+     `overlappingPackages` and resolve backend through
+     `nucleus.macos.packageSelection` (global backend + per-package overrides).
+   - Do not hard-code VS Code casks into `staticManagedCasks`; when backend
+     resolves to Homebrew they must flow through
+     `config.nucleus.macos.generatedHomebrew.casks`.
+2. **Shared declarative settings**:
+   - Define one shared settings attrset in `src/modules/editors.nix`.
+   - Write identical JSON to both stable and insiders user-settings paths on
+     Linux (`~/.config/Code...`) and macOS
+     (`~/Library/Application Support/Code...`).
+3. **Darwin extension bridge**:
+   - Homebrew app bundles read extensions from `~/.vscode/extensions` and
+     `~/.vscode-insiders/extensions`.
+   - Maintain a Home Manager activation entry that symlinks those paths to the
+     Nix-managed extension directory in the store.
+
+Before concluding VS Code changes, verify:
+
+- `visual-studio-code` and `visual-studio-code@insiders` remain backend-
+  selectable via `src/modules/core.nix` package-selection options.
+- No hard-coded VS Code casks are introduced in
+  `src/hosts/macbook/homebrew.nix` `staticManagedCasks`.
+- Stable and insiders `settings.json` are both managed from the same shared
+  settings source.
+- Darwin bridge symlinks are applied only for channels resolved to Homebrew.
+
 ### Security Invariants (macOS)
 
 - **Security Invariant: Instant Lock** — always maintain
