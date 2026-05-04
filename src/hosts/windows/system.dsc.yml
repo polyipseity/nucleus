@@ -98,6 +98,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure prek is installed for cross-host pre-commit hook manager parity with macOS and NixOS
+      settings:
+        id: j178.Prek
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure jq is installed for cross-host JSON tooling parity with macOS and NixOS
       settings:
         id: jqlang.jq

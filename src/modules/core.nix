@@ -18,6 +18,7 @@ let
   #   gnupg      — GPG for secret management and signing
   #   jq         — JSON processor used by activation scripts
   #   opencode   — AI-native coding agent and assistant
+  #   prek       — pre-commit hook manager used by prek.toml
   #   ripgrep    — fast grep replacement
   #   rustup     — Rust toolchain manager
   #   sops       — secret encryption/decryption tool
@@ -34,6 +35,7 @@ let
     pkgs.gnupg
     pkgs.jq
     pkgs.opencode
+    pkgs.prek
     pkgs.ripgrep
     pkgs.rustup
     pkgs.sops
