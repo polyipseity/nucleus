@@ -78,6 +78,24 @@ packages) or `settings.valueName` / `settings.name` (for other resources).
 - Follow `.agents/instructions/cross-host-feature-parity.instructions.md`
   for parity-first scope decisions.
 
+## Imperative fallback safety (Windows modules)
+
+When a capability cannot be represented in WinGet DSC and must be implemented
+in `src/modules/windows/*.ps1` + `apply.ps1`, enforce all of the following:
+
+- **Managed-scope only**: modify only declaratively managed files/blocks/keys.
+  Do not overwrite or delete unrelated user content.
+- **Bounded edits**: use explicit markers (or equivalent precise selectors) for
+  file edits so cleanup can remove only managed content.
+- **Fail-fast on unsafe state**: if a required precondition is ambiguous or a
+  target looks externally managed, stop with an error instead of guessing.
+- **Idempotent configuration**: re-running apply must converge to the same
+  state without duplicating blocks or repeatedly mutating equivalent values.
+- **Idempotent deconfiguration**: disabling a feature must safely remove only
+  managed state and be no-op when already absent.
+- **Explicit toggle**: every imperative parity feature must expose an enable/
+  disable toggle in `src/hosts/windows/apply.ps1` and wire cleanup when false.
+
 ## Validation
 
 - Test the manifest dry-run on the target machine with:

@@ -81,6 +81,9 @@
 - **Declarative first**: imperative code in `src/scripts/apply.sh` and
   `src/hosts/windows/apply.ps1` is treated as a bug. If desired state can be
   represented in Nix modules or WinGet DSC resources, move it there.
+- **Windows imperative safety**: when imperative Windows logic is unavoidable,
+  keep all edits strictly managed-scope, fail fast on unsafe state, and enforce
+  idempotency for both configuration and deconfiguration paths.
 - **POSIX shared config**: any setting duplicated between
   `src/hosts/macbook/` and `src/hosts/nixos/` (for example Nix experimental
   features, system Zsh enablement, sudo timeout policy, or shared SOPS key
@@ -91,6 +94,9 @@
   practical in the same change. For platform-specific exceptions, add a short
   WHY comment in code. See
   `.agents/instructions/cross-host-feature-parity.instructions.md`.
+- **Feature-by-feature parity review**: when reducing parity debt, review
+  existing capabilities one-by-one and record each decision as implement now,
+  already in parity, or not practical yet (with a short WHY in code).
 - **JIT secrets**: do not materialize secrets globally in orchestration
   wrappers. Materialize secrets only in the module/resource that requires them
   (for example Home Manager activation hooks or targeted Windows module calls).
