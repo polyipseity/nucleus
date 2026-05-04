@@ -116,6 +116,14 @@ let
   managedPreferencesPurgeScript = pkgs.writeShellScriptBin "purge-managed-user-preferences" ''
     set -eu
 
+    # Verify Nix store integrity before running destructive preference cleanup.
+    # If verification fails we skip purge so an unrelated store issue cannot be
+    # compounded by deleting user preference state in the same maintenance run.
+    if ! ${pkgs.nix}/bin/nix-store --verify --check-contents >/dev/null 2>&1; then
+      echo "nucleus: store integrity check failed; skipping managed preference purge for safety." >&2
+      exit 0
+    fi
+
     prefs_root="$HOME/Library/Preferences"
     byhost_root="$prefs_root/ByHost"
 
