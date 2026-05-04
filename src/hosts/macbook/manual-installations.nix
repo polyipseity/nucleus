@@ -19,7 +19,9 @@ in
   # ---------------------------------------------------------------------------
   system.activationScripts.configureRosetta.text = ''
     if ! /usr/sbin/pkgutil --pkg-info com.apple.pkg.RosettaUpdateAuto > /dev/null 2>&1; then
-      /usr/sbin/softwareupdate --install-rosetta --agree-to-license || true
+      if ! /usr/sbin/softwareupdate --install-rosetta --agree-to-license; then
+        echo "nucleus: Rosetta installation command failed." >&2
+      fi
     fi
   '';
 

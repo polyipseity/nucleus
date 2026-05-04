@@ -44,6 +44,37 @@
       mkPkgs = system: import nixpkgs {
         inherit system;
         config.allowUnfree = true;
+
+        overlays = [
+          (_final: prev:
+            let
+              # Pin GnuPG to 2.5.x so PQC/Kyber subkeys can be decrypted.
+              # The nixpkgs 2.4.x patch stack is intentionally dropped here,
+              # because those patches target the 2.4 branch only.
+              gnupg25 = prev.callPackage "${nixpkgs}/pkgs/tools/security/gnupg/24.nix" {
+                enableMinimal = false;
+                guiSupport = prev.stdenv.hostPlatform.isDarwin;
+                pinentry = if prev.stdenv.hostPlatform.isDarwin then prev.pinentry_mac else prev.pinentry-gtk2;
+                withPcsc = true;
+                withTpm2Tss = !prev.stdenv.hostPlatform.isDarwin;
+              };
+
+              gnupg25_pinned = gnupg25.overrideAttrs (_old: rec {
+                version = "2.5.19";
+                src = prev.fetchurl {
+                  url = "mirror://gnupg/gnupg/gnupg-${version}.tar.bz2";
+                  hash = "sha256-ciqopCbdm0Tg0ZS3O/7jo+YX1lZ0zU0dBi5t8p8XiMY=";
+                };
+
+                patches = [ ];
+                postPatch = "";
+                env.NIX_CFLAGS_COMPILE = prev.lib.optionalString prev.stdenv.hostPlatform.isDarwin "-Wno-implicit-function-declaration -D_DARWIN_C_SOURCE";
+              });
+            in {
+              gnupg = gnupg25_pinned;
+              gnupg24 = gnupg25_pinned;
+            })
+        ];
       };
 
       pkgsLinux = mkPkgs systems.linux;

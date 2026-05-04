@@ -86,19 +86,26 @@ lib.mkIf isPrimaryUser {
 
   # --------------------------------------------------------------------------
   # GPG import — the only remaining imperative activation step.
-  # Runs after sops-nix (setupSecrets) has written the decrypted key to
-  # config.sops.secrets.${gpgSecretName}.path.
-  # gpg --import is idempotent; non-zero exit for already-present keys is
-  # suppressed.
+  # Runs after sops-nix has materialized decrypted secret files.
+  # gpg --import is idempotent, so repeated activations are safe.
+  #
+  # NOTE: GnuPG 2.5 + Kyber private key import currently fails with
+  # `--batch` (`IPC parameter error`) on this key format. We intentionally use
+  # a non-batch import invocation to ensure a successful secret-key import.
   # --------------------------------------------------------------------------
-  home.activation.nucleusGpgImport = lib.hm.dag.entryAfter [ "writeBoundary" "setupSecrets" ] ''
+  home.activation.nucleusGpgImport = lib.hm.dag.entryAfter [ "sops-nix" ] ''
     export GNUPGHOME="${config.home.homeDirectory}/.gnupg"
     mkdir -p "$GNUPGHOME"
     chmod 700 "$GNUPGHOME"
 
-    if [ -f "${config.sops.secrets.${gpgSecretName}.path}" ]; then
-      ${pkgs.gnupg}/bin/gpg --batch --import "${config.sops.secrets.${gpgSecretName}.path}" \
-        >/dev/null 2>&1 || true
+    if [ ! -f "${config.sops.secrets.${gpgSecretName}.path}" ]; then
+      echo "nucleus: missing decrypted GPG secret at ${config.sops.secrets.${gpgSecretName}.path}; cannot import key material." >&2
+      exit 1
+    fi
+
+    if ! ${pkgs.gnupg}/bin/gpg --import "${config.sops.secrets.${gpgSecretName}.path}"; then
+      echo "nucleus: gpg import failed for ${gpgSecretName}." >&2
+      exit 1
     fi
   '';
 }

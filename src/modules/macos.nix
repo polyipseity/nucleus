@@ -6,6 +6,8 @@
 # Activation order (Home Manager DAG):
 #   writeBoundary / linkGeneration
 #     → clearDesktop, configureInputAndSiri, configureSystemHardening
+#     → preflightPrivacyPermissions
+#       → configureSafariDefaults, configureUniversalAccessDefaults
 #     → configureLaunchServices, configureNightlight
 #       → ensureHeadlessDisplay
 #         → configureDisplayResolutions
@@ -69,9 +71,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #   SystemUIServer — menu-bar icons (clock, input source, etc.)
     # -------------------------------------------------------------------------
     clearDesktop = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      /usr/bin/killall Finder 2>/dev/null || true
-      /usr/bin/killall WindowManager 2>/dev/null || true
-      /usr/bin/killall SystemUIServer 2>/dev/null || true
+      for proc in Finder SystemUIServer WindowManager; do
+        if ! /usr/bin/killall "$proc"; then
+          echo "nucleus: $proc was not running (or could not be restarted)." >&2
+        fi
+      done
     '';
 
     # -------------------------------------------------------------------------
@@ -134,7 +138,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
         # Apply the target mode on the primary display and refresh the list.
         if [ -n "$MODE4_STR" ]; then
-          "$DP_BIN" "id:$PRIMARY_ID $MODE4_STR" || true
+          if ! "$DP_BIN" "id:$PRIMARY_ID $MODE4_STR"; then
+            echo "nucleus: failed to apply primary display mode with displayplacer." >&2
+          fi
           /bin/sleep 1
           FULL_LIST=$("$DP_BIN" list)
         fi
@@ -176,7 +182,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
           BEST_MODE=$(echo "$MODES" | /usr/bin/awk -v tw="$T_W" -v th="$T_H" '{ w=substr($0,index($0,"res:")+4); gsub(/[^0-9].*/,"",w); h=substr($0,index($0,"x")+1); gsub(/[^0-9].*/,"",h); if (w+0>=tw+0 && h+0<=th+0 && h+0>0) print w+0, h+0, $0 }' | /usr/bin/sort -n | /usr/bin/head -n 1 | /usr/bin/cut -d' ' -f3- | /usr/bin/sed 's/ <-- current mode$//')
 
           if [ -n "$BEST_MODE" ]; then
-            "$DP_BIN" "id:$ID $BEST_MODE" || true
+            if ! "$DP_BIN" "id:$ID $BEST_MODE"; then
+              echo "nucleus: failed to apply mode '$BEST_MODE' to display id $ID." >&2
+            fi
           fi
         done
       fi
@@ -200,9 +208,17 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # now handled declaratively in defaults.nix via CustomUserPreferences.
     # -------------------------------------------------------------------------
     configureInputAndSiri = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 176 "<dict><key>enabled</key><false/></dict>" || true
-      /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u 2>/dev/null || true
-      /usr/bin/killall -HUP TISwitcher 2>/dev/null || true
+      if ! /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 176 "<dict><key>enabled</key><false/></dict>"; then
+        echo "nucleus: failed to update symbolic hotkey 176." >&2
+      fi
+
+      if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
+        echo "nucleus: activateSettings -u failed; input settings may apply on next login." >&2
+      fi
+
+      if ! /usr/bin/killall -HUP TISwitcher; then
+        echo "nucleus: TISwitcher was not running (or could not be signaled)." >&2
+      fi
     '';
 
     # -------------------------------------------------------------------------
@@ -229,7 +245,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
         shift
 
         for uti in "$@"; do
-          "${dutiBin}" -s "$handler" "$uti" all || true
+          if ! "${dutiBin}" -s "$handler" "$uti" all; then
+            echo "nucleus: failed to register LaunchServices handler $handler for UTI $uti." >&2
+          fi
         done
       }
 
@@ -249,13 +267,62 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     configureNightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       if [ -x "/opt/homebrew/bin/nightlight" ]; then
-        /opt/homebrew/bin/nightlight schedule start || true
-        /opt/homebrew/bin/nightlight temp 50 || true
+        if ! /opt/homebrew/bin/nightlight schedule start; then
+          echo "nucleus: failed to configure Nightlight schedule." >&2
+        fi
+
+        if ! /opt/homebrew/bin/nightlight temp 50; then
+          echo "nucleus: failed to set Nightlight temperature." >&2
+        fi
+
         current_hour=$(date +%H)
         if [ "$current_hour" -ge 18 ] || [ "$current_hour" -lt 6 ]; then
-          /opt/homebrew/bin/nightlight on || true
+          if ! /opt/homebrew/bin/nightlight on; then
+            echo "nucleus: failed to enable Nightlight." >&2
+          fi
         else
-          /opt/homebrew/bin/nightlight off || true
+          if ! /opt/homebrew/bin/nightlight off; then
+            echo "nucleus: failed to disable Nightlight." >&2
+          fi
+        fi
+      fi
+    '';
+
+    # -------------------------------------------------------------------------
+    # preflightPrivacyPermissions
+    # Detects privacy-gated preference access problems early and emits an
+    # explicit Full Disk Access remediation block so activation logs explain why
+    # subsequent defaults writes may fail.
+    #
+    # Probe strategy:
+    #   1. Read the Safari defaults domain (containerized and commonly privacy-
+    #      gated from non-authorized terminals).
+    #   2. If read fails with permission text, print a highlighted FDA guide.
+    #   3. Otherwise log a neutral "domain unavailable" message (for example on
+    #      fresh profiles where Safari has not been launched yet).
+    # -------------------------------------------------------------------------
+    preflightPrivacyPermissions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      echo "nucleus: checking macOS privacy permissions before defaults writes..." >&2
+
+      print_fda_warning() {
+        bold="$(printf '\033[1m')"
+        red="$(printf '\033[31m')"
+        reset="$(printf '\033[0m')"
+        yellow="$(printf '\033[33m')"
+
+        printf '%s%sERROR: Full Disk Access Required%s\n' "$red" "$bold" "$reset" >&2
+        printf '%sNucleus detected that this terminal session lacks permission to modify protected user preferences.%s\n' "$yellow" "$reset" >&2
+        printf '%s\n' "To fix this:" >&2
+        printf '  1. Open %sSystem Settings > Privacy & Security > Full Disk Access%s\n' "$bold" "$reset" >&2
+        printf '  2. Toggle %sOn%s for your terminal emulator\n' "$bold" "$reset" >&2
+        printf '  3. Restart the terminal and run activation again\n' >&2
+      }
+
+      if ! safari_read_err="$({ /usr/bin/defaults read com.apple.Safari >/dev/null; } 2>&1)"; then
+        if printf '%s' "$safari_read_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
+          print_fda_warning
+        else
+          echo "nucleus: Safari preference domain is not readable in this session; continuing with best-effort defaults writes." >&2
         fi
       fi
     '';
@@ -267,13 +334,23 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # activation. Apply these settings from user activation instead so Safari
     # hardening remains declarative without breaking `darwin-rebuild switch`.
     # -------------------------------------------------------------------------
-    configureSafariDefaults = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    configureSafariDefaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
       # Skip writes when Safari's containerized preference domain is not yet
       # readable in this session (common on fresh profiles before Safari launch).
-      if /usr/bin/defaults read com.apple.Safari >/dev/null 2>&1; then
-        /usr/bin/defaults write com.apple.Safari AutoFillPasswords -bool false >/dev/null 2>&1 || true
-        /usr/bin/defaults write com.apple.Safari IncludeDevelopMenu -bool true >/dev/null 2>&1 || true
-        /usr/bin/defaults write com.apple.Safari IncludeInternalDebugMenu -bool true >/dev/null 2>&1 || true
+      if /usr/bin/defaults read com.apple.Safari >/dev/null; then
+        if ! /usr/bin/defaults write com.apple.Safari AutoFillPasswords -bool false; then
+          echo "nucleus: failed to set Safari AutoFillPasswords." >&2
+        fi
+
+        if ! /usr/bin/defaults write com.apple.Safari IncludeDevelopMenu -bool true; then
+          echo "nucleus: failed to enable Safari Develop menu." >&2
+        fi
+
+        if ! /usr/bin/defaults write com.apple.Safari IncludeInternalDebugMenu -bool true; then
+          echo "nucleus: failed to enable Safari internal debug menu." >&2
+        fi
+      else
+        echo "nucleus: Safari preference domain is not readable in this session; skipping Safari defaults." >&2
       fi
     '';
 
@@ -283,16 +360,36 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # system-level defaults writes during `darwin-rebuild`. Apply them from the
     # user activation phase to keep accessibility intent without system errors.
     # -------------------------------------------------------------------------
-    configureUniversalAccessDefaults = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    configureUniversalAccessDefaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
+      set_default() {
+        domain="$1"
+        key="$2"
+        value="$3"
+        value_type="$4"
+        yellow="$(printf '\033[33m')"
+        bold="$(printf '\033[1m')"
+        reset="$(printf '\033[0m')"
+
+        if ! write_err="$({ /usr/bin/defaults write "$domain" "$key" "-$value_type" "$value"; } 2>&1)"; then
+          if printf '%s' "$write_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
+            printf '%s![Permission Denied]%s Failed to set %s%s %s%s. Ensure Full Disk Access and Accessibility permissions are granted.\n' "$yellow" "$reset" "$bold" "$domain" "$key" "$reset" >&2
+          else
+            echo "nucleus: failed to set $domain $key ($write_err)." >&2
+          fi
+        fi
+      }
+
       # Some managed/macOS-hardened environments prevent direct writes to this
       # domain from non-interactive sessions. Only write when the domain is
       # readable to avoid noisy activation failures.
-      if /usr/bin/defaults read com.apple.universalaccess >/dev/null 2>&1; then
-        /usr/bin/defaults write com.apple.universalaccess FontSizeCategory -string "AX1" >/dev/null 2>&1 || true
-        /usr/bin/defaults write com.apple.universalaccess cursorSize -float 1.33 >/dev/null 2>&1 || true
-        /usr/bin/defaults write com.apple.universalaccess reduceMotion -bool false >/dev/null 2>&1 || true
-        /usr/bin/defaults write com.apple.universalaccess reduceTransparency -bool false >/dev/null 2>&1 || true
-        /usr/bin/defaults write com.apple.universalaccess showWindowTitlebarIcons -bool true >/dev/null 2>&1 || true
+      if /usr/bin/defaults read com.apple.universalaccess >/dev/null; then
+        set_default "com.apple.universalaccess" "FontSizeCategory" "AX1" "string"
+        set_default "com.apple.universalaccess" "cursorSize" "1.33" "float"
+        set_default "com.apple.universalaccess" "reduceMotion" "false" "bool"
+        set_default "com.apple.universalaccess" "reduceTransparency" "false" "bool"
+        set_default "com.apple.universalaccess" "showWindowTitlebarIcons" "true" "bool"
+      else
+        echo "nucleus: universalaccess preference domain is not readable in this session; skipping accessibility defaults." >&2
       fi
     '';
 
@@ -319,13 +416,17 @@ lib.mkIf pkgs.stdenv.isDarwin {
         # Place a .metadata_never_index sentinel inside every well-known build
         # artifact directory found under ~/dev so Spotlight skips them.
         for dir_name in ".gradle" ".next" ".turbo" ".venv" "__pycache__" "bin" "build" "dist" "incremental" "node_modules" "obj" "target" "venv" "vendor"; do
-          /usr/bin/find "$DEV_ROOT" -name "$dir_name" -type d -prune -exec touch "{}/.metadata_never_index" \; 2>/dev/null || true
+          if ! /usr/bin/find "$DEV_ROOT" -name "$dir_name" -type d -prune -exec touch "{}/.metadata_never_index" \;; then
+            echo "nucleus: failed to mark one or more '$dir_name' directories as metadata_never_index." >&2
+          fi
         done
       else
         mkdir -p "$DEV_ROOT"
       fi
 
-      /usr/bin/killall Dock 2>/dev/null || true
+      if ! /usr/bin/killall Dock; then
+        echo "nucleus: Dock was not running (or could not be restarted)." >&2
+      fi
     '';
 
     # -------------------------------------------------------------------------
@@ -340,7 +441,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #                   and granting Screen Recording + Accessibility to the
     #                   ChromeRemoteDesktopHost process.
     # -------------------------------------------------------------------------
-    displayManualInstructions = lib.hm.dag.entryAfter [ "configureDisplayResolutions" ] ''
+    displayManualInstructions = lib.hm.dag.entryAfter [
+      "installPackages"
+      "nucleusGpgImport"
+      "nucleusWallpaperProvision"
+      "onFilesChange"
+      "setupLaunchAgents"
+      "vscodeProfiles"
+    ] ''
       echo "--- MANUAL SETUP (one-time, required) ---" >&2
       echo "BetterDisplay: Grant Accessibility + Screen Recording in System Settings > Privacy & Security." >&2
       echo "CRD: Visit https://remotedesktop.google.com/access to name Mac and set PIN." >&2
@@ -375,11 +483,15 @@ lib.mkIf pkgs.stdenv.isDarwin {
         fi
 
         if ! /usr/sbin/system_profiler SPDisplaysDataType | /usr/bin/grep -q "$DISPLAY_NAME"; then
-          "$BD_BIN" create -devicetype=virtualscreen -virtualscreenname="$DISPLAY_NAME" -width=2560 -height=1600 || true
+          if ! "$BD_BIN" create -devicetype=virtualscreen -virtualscreenname="$DISPLAY_NAME" -width=2560 -height=1600; then
+            echo "nucleus: failed to create BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
+          fi
           /bin/sleep 3  # wait for the virtual display to be registered
         fi
 
-        "$BD_BIN" set -namelike="$DISPLAY_NAME" -connected=on || true
+        if ! "$BD_BIN" set -namelike="$DISPLAY_NAME" -connected=on; then
+          echo "nucleus: failed to set BetterDisplay virtual screen '$DISPLAY_NAME' connected=on." >&2
+        fi
       fi
     '';
   };

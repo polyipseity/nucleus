@@ -66,14 +66,17 @@ case "$(uname -s)" in
     # nix-darwin manages both the system layer and the user Home Manager
     # profile.  darwin-rebuild invokes sudo internally for system activation.
     start_sudo_keepalive
-    sudo nix --extra-experimental-features "$NIX_EXTRA_FEATURES" run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
+    # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
+    # while running as root (which otherwise produces ownership warnings).
+    sudo -H nix --extra-experimental-features "$NIX_EXTRA_FEATURES" run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
     ;;
   Linux)
     if [ -f /etc/NIXOS ]; then
       # NixOS: use nixos-rebuild so the system layer and the embedded
       # home-manager module are applied in a single atomic activation.
       start_sudo_keepalive
-      sudo nix --extra-experimental-features "$NIX_EXTRA_FEATURES" run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
+      # Keep root invocations on root-owned HOME for consistent Nix behavior.
+      sudo -H nix --extra-experimental-features "$NIX_EXTRA_FEATURES" run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
     else
       # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
       # no sudo required — keepalive is not started.

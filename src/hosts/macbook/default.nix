@@ -4,6 +4,7 @@
 {
   imports = [
     ../../modules/core.nix
+    ../../modules/gnupg.nix
     ../../modules/posix-base.nix
     ../../modules/posix-security.nix
     ../../modules/posix-sops.nix

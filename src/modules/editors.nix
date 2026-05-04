@@ -6,6 +6,10 @@
   programs.neovim = {
     enable = true;
     defaultEditor = true; # sets $EDITOR and $VISUAL to nvim
+    # Pin explicit values to avoid version-gated default warnings and to adopt
+    # the new Home Manager defaults intentionally.
+    withPython3 = false;
+    withRuby = false;
   };
 
   programs.vscode = {

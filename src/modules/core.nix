@@ -17,6 +17,7 @@ let
   #   git        — version control
   #   gnupg      — GPG for secret management and signing
   #   jq         — JSON processor used by activation scripts
+  #   opencode   — AI-native coding agent and assistant
   #   ripgrep    — fast grep replacement
   #   rustup     — Rust toolchain manager
   #   sops       — secret encryption/decryption tool
@@ -32,6 +33,7 @@ let
     pkgs.git
     pkgs.gnupg
     pkgs.jq
+    pkgs.opencode
     pkgs.ripgrep
     pkgs.rustup
     pkgs.sops

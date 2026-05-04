@@ -261,10 +261,10 @@ in
         DictationShortcut = 2;
       };
 
-      # Mission Control: do not span desktops across multiple displays; each
-      # monitor has its own independent Space set.
+      # Mission Control: span desktops across multiple displays so every monitor
+      # follows the same active Space when switching desktops.
       "com.apple.spaces" = {
-        "spans-displays" = false;
+        "spans-displays" = true;
       };
 
       # Spotlight: ordered search result categories.  MENU_SUGGESTIONS and
