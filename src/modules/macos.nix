@@ -4,16 +4,67 @@
 # on Linux hosts even though home.nix imports it unconditionally.
 #
 # Activation order (Home Manager DAG):
-#   writeBoundary / linkGeneration
-#     → clearDesktop, configureInputAndSiri, configureSystemHardening
+#   purgeManagedUserPreferenceOverrides
+#     → writeBoundary / linkGeneration
+#       → clearDesktop, configureInputAndSiri, configureSystemHardening
 #     → preflightPrivacyPermissions
 #       → configureSafariDefaults, configureUniversalAccessDefaults
+#       → reloadUserPreferenceState
 #     → configureLaunchServices, configureNightlight
 #       → ensureHeadlessDisplay
 #         → configureDisplayResolutions
 #           → displayManualInstructions
 { lib, pkgs, ... }:
 let
+  # Domains intentionally reset before each Home Manager write pass so stale
+  # manual overrides do not survive forever in ~/Library/Preferences.
+  #
+  # This list mirrors domains explicitly managed by this repository across:
+  #   - system.defaults typed options (dock/finder/screencapture/trackpad/...)
+  #   - system.defaults.CustomUserPreferences payloads
+  #   - user activation defaults hooks (Safari/universalaccess/symbolichotkeys)
+  #
+  # Keep this list alphabetically sorted for easy drift reviews.
+  resetUserPreferenceDomains = [
+    "NSGlobalDomain"
+    "com.apple.ActivityMonitor"
+    "com.apple.AdLib"
+    "com.apple.AppleMultitouchTrackpad"
+    "com.apple.BezelServices"
+    "com.apple.HIToolbox"
+    "com.apple.LaunchServices"
+    "com.apple.Photos"
+    "com.apple.Safari"
+    "com.apple.Siri"
+    "com.apple.SoftwareUpdate"
+    "com.apple.SubmitDiagInfo"
+    "com.apple.TextEdit"
+    "com.apple.TextInput.Kybd"
+    "com.apple.TextInputMenu"
+    "com.apple.WindowManager"
+    "com.apple.assistant.support"
+    "com.apple.commerce"
+    "com.apple.controlcenter"
+    "com.apple.desktopservices"
+    "com.apple.dock"
+    "com.apple.finder"
+    "com.apple.iokit.AmbientLightSensor"
+    "com.apple.loginwindow"
+    "com.apple.menuextra.clock"
+    "com.apple.screencapture"
+    "com.apple.screensaver"
+    "com.apple.sidebarlists"
+    "com.apple.speech.recognition.AppleSpeechRecognition.prefs"
+    "com.apple.spaces"
+    "com.apple.spotlight"
+    "com.apple.symbolichotkeys"
+    "com.apple.terminal"
+    "com.apple.universalaccess"
+    "com.apple.universalcontrol"
+    "com.betterdisplay"
+    "com.googlecode.iterm2"
+  ];
+
   # UTI list for Chrome: set as the default handler for HTML and XHTML documents.
   chromeUTIs = [ "public.html" "public.xhtml" ];
 
@@ -61,6 +112,55 @@ let
 in
 lib.mkIf pkgs.stdenv.isDarwin {
   home.activation = {
+    # -------------------------------------------------------------------------
+    # purgeManagedUserPreferenceOverrides
+    # Deletes selected user-level plist domains before Home Manager writes the
+    # declarative defaults payload.  This removes stale manual overrides that
+    # can persist indefinitely in ~/Library/Preferences and shadow desired
+    # state, especially for Dock/Finder.
+    #
+    # Scope intentionally limited to resetUserPreferenceDomains so we only wipe
+    # domains this repository explicitly manages.
+    #
+    # NSGlobalDomain is stored on disk as .GlobalPreferences.plist, so that
+    # alias is purged as well.
+    # -------------------------------------------------------------------------
+    purgeManagedUserPreferenceOverrides = lib.hm.dag.entryBefore [ "writeBoundary" ] ''
+      prefs_root="$HOME/Library/Preferences"
+      byhost_root="$prefs_root/ByHost"
+
+      purge_domain_variants() {
+        domain="$1"
+        domain_variants="$domain"
+
+        if [ "$domain" = "NSGlobalDomain" ]; then
+          domain_variants="$domain .GlobalPreferences"
+        fi
+
+        for variant in $domain_variants; do
+          # Clear in-memory preference registration for this domain first.
+          /usr/bin/defaults delete "$variant" >/dev/null 2>&1 || true
+
+          # Then remove on-disk plist payloads (regular + ByHost variants).
+          if [ -d "$prefs_root" ]; then
+            /usr/bin/find "$prefs_root" -maxdepth 1 -type f -name "$variant.plist" -delete
+          fi
+
+          if [ -d "$byhost_root" ]; then
+            /usr/bin/find "$byhost_root" -maxdepth 1 -type f -name "$variant.*.plist" -delete
+          fi
+        done
+      }
+
+      for domain in ${builtins.concatStringsSep " " resetUserPreferenceDomains}; do
+        purge_domain_variants "$domain"
+      done
+
+      # Flush cfprefsd caches so subsequent writeBoundary defaults writes use
+      # the clean domain state immediately.
+      /usr/bin/killall cfprefsd >/dev/null 2>&1 || true
+    '';
+
     # -------------------------------------------------------------------------
     # clearDesktop
     # Restarts the three system UI processes that cache defaults values so that
@@ -218,6 +318,22 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       if ! /usr/bin/killall -HUP TISwitcher; then
         echo "nucleus: TISwitcher was not running (or could not be signaled)." >&2
+      fi
+    '';
+
+    # -------------------------------------------------------------------------
+    # reloadUserPreferenceState
+    # Forces macOS to flush/reload user defaults after all managed defaults
+    # writes and domain-specific hooks.  This minimizes "ghost" values staying
+    # in memory until logout/login after a rebuild.
+    # -------------------------------------------------------------------------
+    reloadUserPreferenceState = lib.hm.dag.entryAfter [
+      "configureInputAndSiri"
+      "configureSafariDefaults"
+      "configureUniversalAccessDefaults"
+    ] ''
+      if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
+        echo "nucleus: activateSettings -u failed; some preference updates may require relogin." >&2
       fi
     '';
 

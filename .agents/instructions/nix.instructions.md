@@ -58,6 +58,20 @@ applyTo: "src/**/*.nix"
 - Home Manager `home.file` entries should use `lib.optionalAttrs` with a
   `builtins.pathExists` guard so missing dotfile sources don't break evaluation.
 
+## macOS defaults domain synchronization
+
+- When adding a new managed macOS defaults domain in either:
+  - `src/hosts/macbook/defaults.nix` (`system.defaults.*` or
+    `system.defaults.CustomUserPreferences.<domain>`), or
+  - `src/modules/macos.nix` (user activation `defaults write` hooks),
+    you must update `resetUserPreferenceDomains` in
+    `src/modules/macos.nix` in the same change.
+- Keep `resetUserPreferenceDomains` alphabetically sorted.
+- If the managed domain is `NSGlobalDomain`, also account for the on-disk
+  `.GlobalPreferences` alias used by macOS preference plist storage.
+- Do not add a new managed domain without updating the purge list; that creates
+  preference drift where manual user overrides can survive declarative rebuilds.
+
 ## Sorting
 
 - Package lists (e.g. `sharedPackages`, `environment.systemPackages`,
