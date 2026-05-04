@@ -1,12 +1,64 @@
 # WinGet DSC v3 - system-level baseline for Windows host
+# Package ID policy: prefer human-readable named IDs (for example
+# `Microsoft.PowerToys`) over opaque Microsoft Store-generated IDs. Use
+# generated IDs only when the Store package has no stable named identifier.
 properties:
   configurationVersion: 0.2.0
   resources:
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Discord is installed
+        description: Ensure WhatsApp Beta is installed to mirror the macOS beta-channel application baseline; Microsoft Store currently exposes only generated ID `9NBDXK71NK08` (no stable named alias)
       settings:
-        id: Discord.Discord
+        id: 9NBDXK71NK08
+        source: msstore
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure zoxide is installed for cross-host shell navigation parity with macOS and NixOS
+      settings:
+        id: ajeetdsouza.zoxide
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure uv is installed for cross-host Python workflow parity with macOS and NixOS
+      settings:
+        id: astral-sh.uv
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure ripgrep is installed for cross-host search tooling parity with macOS and NixOS
+      settings:
+        id: BurntSushi.ripgrep
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure bottom is installed for cross-host terminal monitoring parity with macOS and NixOS
+      settings:
+        id: Clement.bottom
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure direnv is installed for cross-host per-directory environment parity with macOS and NixOS
+      settings:
+        id: direnv.direnv
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Discord Canary is installed to match the macOS canary-channel declaration
+      settings:
+        id: Discord.Discord.Canary
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure eza is installed for cross-host shell listing parity with macOS and NixOS
+      settings:
+        id: eza-community.eza
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -32,9 +84,72 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Chrome Canary is installed to mirror the macOS canary-channel browser declaration
+      settings:
+        id: Google.Chrome.Canary
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Chrome Remote Desktop Host is installed to mirror the macOS remote-access host declaration
+      settings:
+        id: Google.ChromeRemoteDesktopHost
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure jq is installed for cross-host JSON tooling parity with macOS and NixOS
+      settings:
+        id: jqlang.jq
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure fzf is installed for cross-host fuzzy finder parity with macOS and NixOS
+      settings:
+        id: junegunn.fzf
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Visual Studio Code is installed
       settings:
         id: Microsoft.VisualStudioCode
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Visual Studio Code Insiders is installed to match the dual-channel editor baseline declared for macOS and NixOS
+      settings:
+        id: Microsoft.VisualStudioCode.Insiders
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Microsoft PowerToys is installed for Windows productivity tooling; Raycast (`9PFXXSHC64H3`) is intentionally not used on Windows and Rectangle is macOS-specific
+      settings:
+        id: Microsoft.PowerToys
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Obsidian is installed to mirror the macOS GUI package declaration
+      settings:
+        id: Obsidian.Obsidian
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Parsec is installed to mirror the macOS low-latency remote-desktop package declaration
+      settings:
+        id: Parsec.Parsec
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure rustup is installed for cross-host Rust toolchain parity with macOS and NixOS
+      settings:
+        id: Rustlang.Rustup
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -46,9 +161,37 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Spotify is installed
+        description: Ensure bat is installed for cross-host shell utility parity with macOS and NixOS
       settings:
-        id: Spotify.Spotify
+        id: sharkdp.bat
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure fd is installed for cross-host file search parity with macOS and NixOS
+      settings:
+        id: sharkdp.fd
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure opencode is installed for cross-host agent tooling parity with macOS and NixOS
+      settings:
+        id: SST.opencode
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Telegram Desktop Beta is installed to mirror the macOS beta-channel messaging baseline
+      settings:
+        id: Telegram.TelegramDesktop.Beta
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure VLC media player is installed to mirror the macOS GUI package declaration
+      settings:
+        id: VideoLAN.VLC
         source: winget
 
     - resource: Microsoft.Windows.Settings/DeveloperMode
@@ -59,10 +202,10 @@ properties:
 
     - resource: Microsoft.Windows.Settings/Taskbar
       directives:
-        description: Keep a compact centered taskbar
+        description: Keep a centered large taskbar for improved visibility
       settings:
         Alignment: Center
-        Size: Small
+        Size: Large
 
     - resource: Microsoft.Windows.Registry/RegistryValue
       directives:

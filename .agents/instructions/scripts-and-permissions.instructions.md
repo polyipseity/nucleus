@@ -13,6 +13,18 @@ applyTo: "scripts/**"
 - Do not scatter contributor-facing or CI-facing automation across random
   folders when `scripts/` is the intended home.
 
+## Cross-platform coordination
+
+- Treat `scripts/bootstrap.sh` and `scripts/bootstrap.ps1` as paired entry
+  points for the same bootstrap intent; keep capability parity as close as
+  platform constraints allow.
+- When adding a bootstrap dependency or behavior on one platform, evaluate and
+  update the other platform in the same change when practical.
+- Keep shared version pins in `scripts/bootstrap-versions.env` as the source of
+  truth whenever both scripts depend on the same tool versions.
+- Follow `.agents/instructions/cross-host-feature-parity.instructions.md`
+  for parity-first scope decisions.
+
 ## Placement and naming
 
 - Name scripts for the task they perform (`bootstrap`, `check`, `release`,

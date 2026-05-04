@@ -86,6 +86,11 @@
   features, system Zsh enablement, sudo timeout policy, or shared SOPS key
   sources) should be centralized in `src/modules/*.nix` and imported by both
   hosts.
+- **Parity-first feature scope**: when adding or changing a capability, audit
+  macOS, NixOS, and Windows first, then implement parity on as many hosts as
+  practical in the same change. For platform-specific exceptions, add a short
+  WHY comment in code. See
+  `.agents/instructions/cross-host-feature-parity.instructions.md`.
 - **JIT secrets**: do not materialize secrets globally in orchestration
   wrappers. Materialize secrets only in the module/resource that requires them
   (for example Home Manager activation hooks or targeted Windows module calls).
@@ -164,6 +169,19 @@ Darwin bridge symlinks only apply when the backend resolves to Homebrew.
   `src/modules/macos.nix` `resetUserPreferenceDomains`) as a user-invoked
   command, not an automatic activation step.
 
+### Security Invariants (Windows)
+
+- **Long Path Invariant** — always keep
+  `HKLM\System\CurrentControlSet\Control\FileSystem\LongPathsEnabled = 1`
+  in `src/hosts/windows/system.dsc.yml`. This prevents Nix/Git path failures
+  on deep directory trees.
+- **Primary User Secrets Invariant** — keep Windows secret materialization
+  scoped to the primary user via `Sync-NucleusSecrets` and
+  `Test-NucleusPrimaryUser`; do not broaden secret writes to all users.
+- **Managed Wallpaper Source Invariant** — keep wallpaper paths sourced from
+  declaratively materialized files in `%USERPROFILE%\Pictures\wallpapers`
+  (via `Sync-NucleusWallpapers`), not arbitrary unmanaged file paths.
+
 ### Shell Strategy (POSIX Hosts)
 
 - For macOS and NixOS hosts, keep **Zsh** as the default interactive and login
@@ -190,9 +208,15 @@ a rotating gallery, never as a single static file.
    every run, listing every image in `~/Pictures/wallpapers/` with alternating
    `<static>` (595 s) and `<transition type="overlay">` (5 s) elements that
    loop back to the first image. `picture-uri` must point to this XML file.
-4. **Stale cleanup**: before applying the gallery, delete any file in
+4. **Windows**: user wallpaper registry state must point to a path generated
+  from declaratively managed wallpaper assets (`assets/wallpapers/*.sops`
+  materialized to `%USERPROFILE%\Pictures\wallpapers`). Keep the
+  `__NUCLEUS_ACTIVE_WALLPAPER__` replacement flow in the Windows apply path so
+  DSC always receives a managed file path.
+5. **Stale cleanup**: before applying the gallery, delete any file in
    `~/Pictures/wallpapers/` (excluding `*.xml`) that has no corresponding
-   `assets/wallpapers/$name.sops` source in the repository.
+  `assets/wallpapers/$name.sops` source in the repository (Windows equivalent:
+  `Remove-NucleusStaleWallpapers`).
 
 ## Refactoring Guardrails
 

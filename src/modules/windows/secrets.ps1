@@ -1,3 +1,9 @@
+# modules/windows/secrets.ps1 — JIT secret materialization helpers for Windows.
+#
+# Functions in this module decrypt SOPS-managed secret files and materialize
+# primary-user SSH/GPG content on demand. Keep reusable secret logic here so
+# host apply scripts stay orchestration-only.
+
 function Test-NucleusPrimaryUser {
   <#
   .SYNOPSIS

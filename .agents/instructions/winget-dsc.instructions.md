@@ -56,12 +56,27 @@ packages) or `settings.valueName` / `settings.name` (for other resources).
   entries; do not omit it even if it is technically the default.
 - Use the canonical WinGet package identifier (verified via `winget search`)
   rather than a display name or URL.
+- Prefer human-readable named package IDs over opaque Microsoft Store-generated
+  IDs whenever a named ID exists.
+- When a Microsoft Store package only exposes a generated ID, keep using that
+  ID and document the rationale in `directives.description:`.
 - For registry values, always include `valueType` (`DWord`, `String`, etc.)
   to prevent ambiguous interpretation.
 - Environment variable scope must be `User` or `Machine`; prefer `User` unless
   the setting must be machine-wide.
 - Use `%USERPROFILE%` rather than a hard-coded path for the user's home
   directory in `value` strings.
+
+## Cross-host equivalence checks
+
+- Before adding a Windows package, check whether the capability should be
+  mirrored in `src/modules/core.nix` for macOS/NixOS parity.
+- Before adding a new cross-host CLI tool in `core.nix`, check whether Windows
+  should receive the same capability through `system.dsc.yml`.
+- Prefer implementing parity in the same change when practical; if not,
+  document the platform-specific rationale.
+- Follow `.agents/instructions/cross-host-feature-parity.instructions.md`
+  for parity-first scope decisions.
 
 ## Validation
 
@@ -76,8 +91,10 @@ packages) or `settings.valueName` / `settings.name` (for other resources).
 
 ## What to avoid
 
-- Do not add entries for tools also managed by Nix (e.g. `git`, `ripgrep`,
-  `fd`) on the same machine; keep each layer responsible for its own packages.
+- Do not add duplicate entries for tools already managed by another Windows
+  declarative layer. In this repository, `system.dsc.yml` is the canonical
+  Windows package baseline and should be kept intentionally in parity with
+  shared host policy.
 - Do not hard-code version strings in `settings.id` unless pinning to a
   specific release is intentional; WinGet resolves the latest by default.
 - Do not leave commented-out resources in the file; remove them or track
