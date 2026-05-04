@@ -159,6 +159,10 @@ Darwin bridge symlinks only apply when the backend resolves to Homebrew.
   the final activation step. It must depend on every other macOS/Home Manager
   activation entry in that module, and any newly added activation step must be
   added to its dependency list in the same change.
+- **Drift Reset Invariant: Manual Only** — keep macOS preference-domain purge
+  logic (`purge-managed-user-preferences`, driven by
+  `src/modules/macos.nix` `resetUserPreferenceDomains`) as a user-invoked
+  command, not an automatic activation step.
 
 ### Shell Strategy (POSIX Hosts)
 

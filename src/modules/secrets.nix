@@ -47,6 +47,16 @@ let
   isPrimaryUser = config.home.username == primaryUsername;
   gpgSecretName = "gpg_personal_${primaryUsername}";
   sshSecretName = "ssh_personal_${primaryUsername}";
+  sshPrivateKeyPath = "${config.home.homeDirectory}/.ssh/${sshSecretName}";
+  sshPublicKeyPath = "${sshPrivateKeyPath}.pub";
+  sshIdentityFile = "~/.ssh/${sshSecretName}";
+  sshExtraOptions =
+    {
+      AddKeysToAgent = "yes";
+    }
+    // lib.optionalAttrs pkgs.stdenv.isDarwin {
+      UseKeychain = "yes";
+    };
 in
 lib.mkIf isPrimaryUser {
   # Register both decryption backends for the HM sops-nix module.
@@ -60,7 +70,7 @@ lib.mkIf isPrimaryUser {
   # --------------------------------------------------------------------------
   sops.secrets."${sshSecretName}" = {
     sopsFile = ../secrets/ssh-personal.yml;
-    path = "${config.home.homeDirectory}/.ssh/${sshSecretName}";
+    path = sshPrivateKeyPath;
     mode = "0600";
   };
 
@@ -74,15 +84,75 @@ lib.mkIf isPrimaryUser {
     # on Linux, or ~/Library/… on macOS; both are outside persistent storage).
   };
 
-  # Static SSH IdentityFile config snippet.
-  # Activate with: Include ~/.ssh/config.d/* in ~/.ssh/config
-  home.file.".ssh/config.d/nucleus" = {
-    text = ''
-      # Managed by nucleus — do not edit manually.
-      Host *
-        IdentityFile ~/.ssh/${sshSecretName}
-    '';
+  programs.ssh = {
+    enable = true;
+    enableDefaultConfig = false;
+    matchBlocks = {
+      "*" = {
+        identityFile = sshIdentityFile;
+        extraOptions = sshExtraOptions;
+      };
+
+      "github.com" = {
+        hostname = "github.com";
+        identityFile = sshIdentityFile;
+        extraOptions = sshExtraOptions;
+      };
+    };
   };
+
+  # --------------------------------------------------------------------------
+  # SSH public key derivation — keep the public key synchronized with
+  # the declaratively managed private key so GitHub SSH auth works without any
+  # manual key-export steps after activation.
+  #
+  # Uses a non-interactive ssh-keygen invocation (`-P ""`) so activation never
+  # blocks on a passphrase prompt. If the private key is passphrase-protected,
+  # public-key derivation is treated as best-effort and emits a warning instead
+  # of failing the whole activation.
+  # --------------------------------------------------------------------------
+  home.activation.sshPublicKeyFromPrivate = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+    key_source=""
+    if [ -f "${sshPrivateKeyPath}" ]; then
+      key_source="${sshPrivateKeyPath}"
+    elif [ -f "${config.sops.secrets.${sshSecretName}.path}" ]; then
+      # During early activation ordering, the stable ~/.ssh symlink may not be
+      # present yet even though sops-nix has already materialized the secret.
+      key_source="${config.sops.secrets.${sshSecretName}.path}"
+    fi
+
+    if [ -z "$key_source" ]; then
+      echo "nucleus: missing SSH private key at ${sshPrivateKeyPath} (and sops path ${config.sops.secrets.${sshSecretName}.path}); cannot derive public key." >&2
+      exit 1
+    fi
+
+    tmpPublicKey="$(mktemp)"
+    tmpErr="$(mktemp)"
+    if ! ${pkgs.openssh}/bin/ssh-keygen -y -P "" -f "$key_source" > "$tmpPublicKey" 2> "$tmpErr"; then
+      if /usr/bin/grep -Eqi 'incorrect passphrase|passphrase' "$tmpErr"; then
+        if [ -f "${sshPublicKeyPath}" ]; then
+          echo "nucleus: SSH key is passphrase-protected; keeping existing public key at ${sshPublicKeyPath}." >&2
+        else
+          echo "nucleus: SSH key is passphrase-protected; could not derive ${sshPublicKeyPath} non-interactively. Load the key in your agent or remove passphrase, then re-run activation." >&2
+        fi
+        rm -f "$tmpPublicKey" "$tmpErr"
+        exit 0
+      fi
+
+      rm -f "$tmpPublicKey"
+      rm -f "$tmpErr"
+      echo "nucleus: failed to derive SSH public key from $key_source." >&2
+      exit 1
+    fi
+
+    rm -f "$tmpErr"
+    chmod 644 "$tmpPublicKey"
+    if [ -f "${sshPublicKeyPath}" ] && /usr/bin/cmp -s "$tmpPublicKey" "${sshPublicKeyPath}"; then
+      rm -f "$tmpPublicKey"
+    else
+      mv "$tmpPublicKey" "${sshPublicKeyPath}"
+    fi
+  '';
 
   # --------------------------------------------------------------------------
   # GPG import — the only remaining imperative activation step.

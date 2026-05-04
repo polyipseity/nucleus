@@ -4,9 +4,8 @@
 # on Linux hosts even though home.nix imports it unconditionally.
 #
 # Activation order (Home Manager DAG):
-#   purgeManagedUserPreferenceOverrides
-#     → writeBoundary / linkGeneration
-#       → clearDesktop, configureInputAndSiri, configureSystemHardening
+#   writeBoundary / linkGeneration
+#     → clearDesktop, configureInputAndSiri, configureSystemHardening
 #     → preflightPrivacyPermissions
 #       → configureSafariDefaults, configureUniversalAccessDefaults
 #       → reloadUserPreferenceState
@@ -110,6 +109,48 @@ let
   # Absolute path to the duti binary supplied by nixpkgs.
   dutiBin = "${pkgs.duti}/bin/duti";
 
+  # Manual drift-reset helper for managed macOS preference domains.
+  # This is intentionally a user-invoked command instead of an automatic
+  # activation phase so destructive purge operations cannot race with
+  # writeBoundary defaults application.
+  managedPreferencesPurgeScript = pkgs.writeShellScriptBin "purge-managed-user-preferences" ''
+    set -eu
+
+    prefs_root="$HOME/Library/Preferences"
+    byhost_root="$prefs_root/ByHost"
+
+    purge_domain_variants() {
+      domain="$1"
+      domain_variants="$domain"
+
+      if [ "$domain" = "NSGlobalDomain" ]; then
+        domain_variants="$domain .GlobalPreferences"
+      fi
+
+      for variant in $domain_variants; do
+        # Clear in-memory registration first, then remove persisted payloads.
+        /usr/bin/defaults delete "$variant" >/dev/null 2>&1 || true
+
+        if [ -d "$prefs_root" ]; then
+          /usr/bin/find "$prefs_root" -maxdepth 1 -type f -name "$variant.plist" -delete
+        fi
+
+        if [ -d "$byhost_root" ]; then
+          /usr/bin/find "$byhost_root" -maxdepth 1 -type f -name "$variant.*.plist" -delete
+        fi
+      done
+    }
+
+    for domain in ${builtins.concatStringsSep " " resetUserPreferenceDomains}; do
+      purge_domain_variants "$domain"
+    done
+
+    /usr/bin/killall cfprefsd >/dev/null 2>&1 || true
+    /bin/sleep 2
+
+    echo "Managed preference domains purged. Run your apply flow to re-assert declarative defaults."
+  '';
+
   # Keep displayManualInstructions as the final user-visible activation step.
   # Any new activation entry added to this module should be appended here so
   # manual instructions remain the last script to run.
@@ -130,10 +171,10 @@ let
     "gpgImport"
     "onFilesChange"
     "preflightPrivacyPermissions"
-    "purgeManagedUserPreferenceOverrides"
     "reloadUserPreferenceState"
     "sops-nix"
     "setupLaunchAgents"
+    "sshPublicKeyFromPrivate"
     "wallpaperProvision"
     "vscodeDarwinExtensionBridge"
     "vscodeProfiles"
@@ -141,56 +182,9 @@ let
   ];
 in
 lib.mkIf pkgs.stdenv.isDarwin {
+  home.packages = [ managedPreferencesPurgeScript ];
+
   home.activation = {
-    # -------------------------------------------------------------------------
-    # purgeManagedUserPreferenceOverrides
-    # Deletes selected user-level plist domains before Home Manager writes the
-    # declarative defaults payload.  This removes stale manual overrides that
-    # can persist indefinitely in ~/Library/Preferences and shadow desired
-    # state, especially for Dock/Finder.
-    #
-    # Scope intentionally limited to resetUserPreferenceDomains so we only wipe
-    # domains this repository explicitly manages.
-    #
-    # NSGlobalDomain is stored on disk as .GlobalPreferences.plist, so that
-    # alias is purged as well.
-    # -------------------------------------------------------------------------
-    purgeManagedUserPreferenceOverrides = lib.hm.dag.entryBefore [ "writeBoundary" ] ''
-      prefs_root="$HOME/Library/Preferences"
-      byhost_root="$prefs_root/ByHost"
-
-      purge_domain_variants() {
-        domain="$1"
-        domain_variants="$domain"
-
-        if [ "$domain" = "NSGlobalDomain" ]; then
-          domain_variants="$domain .GlobalPreferences"
-        fi
-
-        for variant in $domain_variants; do
-          # Clear in-memory preference registration for this domain first.
-          /usr/bin/defaults delete "$variant" >/dev/null 2>&1 || true
-
-          # Then remove on-disk plist payloads (regular + ByHost variants).
-          if [ -d "$prefs_root" ]; then
-            /usr/bin/find "$prefs_root" -maxdepth 1 -type f -name "$variant.plist" -delete
-          fi
-
-          if [ -d "$byhost_root" ]; then
-            /usr/bin/find "$byhost_root" -maxdepth 1 -type f -name "$variant.*.plist" -delete
-          fi
-        done
-      }
-
-      for domain in ${builtins.concatStringsSep " " resetUserPreferenceDomains}; do
-        purge_domain_variants "$domain"
-      done
-
-      # Flush cfprefsd caches so subsequent writeBoundary defaults writes use
-      # the clean domain state immediately.
-      /usr/bin/killall cfprefsd >/dev/null 2>&1 || true
-    '';
-
     # -------------------------------------------------------------------------
     # clearDesktop
     # Restarts the three system UI processes that cache defaults values so that
@@ -441,11 +435,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # subsequent defaults writes may fail.
     #
     # Probe strategy:
-    #   1. Read the Safari defaults domain (containerized and commonly privacy-
-    #      gated from non-authorized terminals).
-    #   2. If read fails with permission text, print a highlighted FDA guide.
-    #   3. Otherwise log a neutral "domain unavailable" message (for example on
-    #      fresh profiles where Safari has not been launched yet).
+    #   1. Attempt a write/delete probe on a privacy-gated domain.
+    #   2. If the probe fails with permission text, print a highlighted FDA
+    #      guide so later defaults-write failures are actionable.
+    #   3. Continue activation either way so non-privacy-gated settings still
+    #      converge in the same run.
     # -------------------------------------------------------------------------
     preflightPrivacyPermissions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       echo "nucleus: checking macOS privacy permissions before defaults writes..." >&2
@@ -464,11 +458,16 @@ lib.mkIf pkgs.stdenv.isDarwin {
         printf '  3. Restart the terminal and run activation again\n' >&2
       }
 
-      if ! safari_read_err="$({ /usr/bin/defaults read com.apple.Safari >/dev/null; } 2>&1)"; then
-        if printf '%s' "$safari_read_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
+      probe_domain="com.apple.universalaccess"
+      probe_key="NucleusActivationProbe"
+      if ! probe_err="$({
+        /usr/bin/defaults write "$probe_domain" "$probe_key" -bool false
+        /usr/bin/defaults delete "$probe_domain" "$probe_key"
+      } 2>&1)"; then
+        if printf '%s' "$probe_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
           print_fda_warning
         else
-          echo "nucleus: Safari preference domain is not readable in this session; continuing with best-effort defaults writes." >&2
+          echo "nucleus: privacy preflight probe failed unexpectedly ($probe_err); continuing with best-effort defaults writes." >&2
         fi
       fi
     '';
@@ -481,23 +480,46 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # hardening remains declarative without breaking `darwin-rebuild switch`.
     # -------------------------------------------------------------------------
     configureSafariDefaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
-      # Skip writes when Safari's containerized preference domain is not yet
-      # readable in this session (common on fresh profiles before Safari launch).
-      if /usr/bin/defaults read com.apple.Safari >/dev/null; then
-        if ! /usr/bin/defaults write com.apple.Safari AutoFillPasswords -bool false; then
-          echo "nucleus: failed to set Safari AutoFillPasswords." >&2
+      fda_warning_emitted=0
+
+      print_fda_warning() {
+        if [ "$fda_warning_emitted" -eq 1 ]; then
+          return
         fi
 
-        if ! /usr/bin/defaults write com.apple.Safari IncludeDevelopMenu -bool true; then
-          echo "nucleus: failed to enable Safari Develop menu." >&2
-        fi
+        bold="$(printf '\033[1m')"
+        red="$(printf '\033[31m')"
+        reset="$(printf '\033[0m')"
+        yellow="$(printf '\033[33m')"
 
-        if ! /usr/bin/defaults write com.apple.Safari IncludeInternalDebugMenu -bool true; then
-          echo "nucleus: failed to enable Safari internal debug menu." >&2
+        printf '%s%sERROR: Full Disk Access Required%s\n' "$red" "$bold" "$reset" >&2
+        printf '%sNucleus cannot write protected Safari preferences from this terminal session.%s\n' "$yellow" "$reset" >&2
+        printf '%s\n' "To fix this:" >&2
+        printf '  1. Open %sSystem Settings > Privacy & Security > Full Disk Access%s\n' "$bold" "$reset" >&2
+        printf '  2. Toggle %sOn%s for your terminal emulator\n' "$bold" "$reset" >&2
+        printf '  3. If already enabled, remove and re-add it, then restart the terminal\n' >&2
+
+        fda_warning_emitted=1
+      }
+
+      set_safari_default() {
+        key="$1"
+        value="$2"
+        value_type="$3"
+
+        if ! write_err="$({ /usr/bin/defaults write com.apple.Safari "$key" "-$value_type" "$value"; } 2>&1)"; then
+          if printf '%s' "$write_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
+            print_fda_warning
+            echo "nucleus: failed to set Safari key $key due to missing privacy authorization." >&2
+          else
+            echo "nucleus: failed to set Safari key $key ($write_err)." >&2
+          fi
         fi
-      else
-        echo "nucleus: Safari preference domain is not readable in this session; skipping Safari defaults." >&2
-      fi
+      }
+
+      set_safari_default "AutoFillPasswords" "false" "bool"
+      set_safari_default "IncludeDevelopMenu" "true" "bool"
+      set_safari_default "IncludeInternalDebugMenu" "true" "bool"
     '';
 
     # -------------------------------------------------------------------------
@@ -507,6 +529,28 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # user activation phase to keep accessibility intent without system errors.
     # -------------------------------------------------------------------------
     configureUniversalAccessDefaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
+      fda_warning_emitted=0
+
+      print_fda_warning() {
+        if [ "$fda_warning_emitted" -eq 1 ]; then
+          return
+        fi
+
+        bold="$(printf '\033[1m')"
+        red="$(printf '\033[31m')"
+        reset="$(printf '\033[0m')"
+        yellow="$(printf '\033[33m')"
+
+        printf '%s%sERROR: Full Disk Access Required%s\n' "$red" "$bold" "$reset" >&2
+        printf '%sNucleus cannot write Accessibility preferences from this terminal session.%s\n' "$yellow" "$reset" >&2
+        printf '%s\n' "To fix this:" >&2
+        printf '  1. Open %sSystem Settings > Privacy & Security > Full Disk Access%s\n' "$bold" "$reset" >&2
+        printf '  2. Toggle %sOn%s for your terminal emulator\n' "$bold" "$reset" >&2
+        printf '  3. If already enabled, remove and re-add it, then restart the terminal\n' >&2
+
+        fda_warning_emitted=1
+      }
+
       set_default() {
         domain="$1"
         key="$2"
@@ -518,6 +562,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
         if ! write_err="$({ /usr/bin/defaults write "$domain" "$key" "-$value_type" "$value"; } 2>&1)"; then
           if printf '%s' "$write_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
+            print_fda_warning
             printf '%s![Permission Denied]%s Failed to set %s%s %s%s. Ensure Full Disk Access and Accessibility permissions are granted.\n' "$yellow" "$reset" "$bold" "$domain" "$key" "$reset" >&2
           else
             echo "nucleus: failed to set $domain $key ($write_err)." >&2
@@ -525,18 +570,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
         fi
       }
 
-      # Some managed/macOS-hardened environments prevent direct writes to this
-      # domain from non-interactive sessions. Only write when the domain is
-      # readable to avoid noisy activation failures.
-      if /usr/bin/defaults read com.apple.universalaccess >/dev/null; then
-        set_default "com.apple.universalaccess" "FontSizeCategory" "AX1" "string"
-        set_default "com.apple.universalaccess" "cursorSize" "1.33" "float"
-        set_default "com.apple.universalaccess" "reduceMotion" "false" "bool"
-        set_default "com.apple.universalaccess" "reduceTransparency" "false" "bool"
-        set_default "com.apple.universalaccess" "showWindowTitlebarIcons" "true" "bool"
-      else
-        echo "nucleus: universalaccess preference domain is not readable in this session; skipping accessibility defaults." >&2
-      fi
+      set_default "com.apple.universalaccess" "FontSizeCategory" "AX1" "string"
+      set_default "com.apple.universalaccess" "cursorSize" "1.33" "float"
+      set_default "com.apple.universalaccess" "reduceMotion" "false" "bool"
+      set_default "com.apple.universalaccess" "reduceTransparency" "false" "bool"
+      set_default "com.apple.universalaccess" "showWindowTitlebarIcons" "true" "bool"
     '';
 
     # -------------------------------------------------------------------------

@@ -88,6 +88,9 @@ applyTo: "src/**/*.nix"
   `.GlobalPreferences` alias used by macOS preference plist storage.
 - Do not add a new managed domain without updating the purge list; that creates
   preference drift where manual user overrides can survive declarative rebuilds.
+- `resetUserPreferenceDomains` drives the manual drift-reset command
+  `purge-managed-user-preferences` and must not be wired into automatic
+  `home.activation.*` execution.
 
 ## macOS activation ordering invariant
 
