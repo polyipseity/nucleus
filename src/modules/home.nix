@@ -5,7 +5,7 @@
 #   • resolving the platform-appropriate home directory path
 #   • importing all shared feature modules
 #   • symlinking dotfiles from the repo's dotfiles/ tree into the home directory
-{ lib, pkgs, username, ... }:
+{ config, lib, pkgs, username, ... }:
 let
   # Derive the home directory from platform conventions. Keeping this local to
   # the module avoids relying on ad-hoc `_module.args` plumbed through every
@@ -48,6 +48,11 @@ in
     })
     (lib.optionalAttrs (builtins.pathExists (dotfilesRoot + "/.gitconfig")) {
       ".gitconfig".source = dotfilesRoot + "/.gitconfig";
+    })
+    (lib.optionalAttrs pkgs.stdenv.isDarwin {
+      # Keep iCloud Drive reachable from a short, stable path for all managed
+      # macOS users so scripts and shell workflows avoid long spaced paths.
+      "iCloud".source = config.lib.file.mkOutOfStoreSymlink "${resolvedHomeDirectory}/Library/Mobile Documents/com~apple~CloudDocs";
     })
   ];
 }

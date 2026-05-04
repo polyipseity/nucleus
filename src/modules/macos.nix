@@ -109,6 +109,36 @@ let
 
   # Absolute path to the duti binary supplied by nixpkgs.
   dutiBin = "${pkgs.duti}/bin/duti";
+
+  # Keep displayManualInstructions as the final user-visible activation step.
+  # Any new activation entry added to this module should be appended here so
+  # manual instructions remain the last script to run.
+  displayManualInstructionDeps = [
+    "checkFilesChanged"
+    "checkLinkTargets"
+    "clearDesktop"
+    "configureDisplayResolutions"
+    "configureInputAndSiri"
+    "configureLaunchServices"
+    "configureNightlight"
+    "configureSafariDefaults"
+    "configureSystemHardening"
+    "configureUniversalAccessDefaults"
+    "ensureHeadlessDisplay"
+    "installPackages"
+    "linkGeneration"
+    "gpgImport"
+    "onFilesChange"
+    "preflightPrivacyPermissions"
+    "purgeManagedUserPreferenceOverrides"
+    "reloadUserPreferenceState"
+    "sops-nix"
+    "setupLaunchAgents"
+    "wallpaperProvision"
+    "vscodeDarwinExtensionBridge"
+    "vscodeProfiles"
+    "writeBoundary"
+  ];
 in
 lib.mkIf pkgs.stdenv.isDarwin {
   home.activation = {
@@ -556,15 +586,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #   Chrome Remote Desktop (CRD) — requires naming the Mac in the web UI
     #                   and granting Screen Recording + Accessibility to the
     #                   ChromeRemoteDesktopHost process.
+    #
+    # Ordering invariant:
+    #   displayManualInstructions must remain the terminal activation node so
+    #   users always see one final, consolidated instruction block after every
+    #   automated step has finished.
     # -------------------------------------------------------------------------
-    displayManualInstructions = lib.hm.dag.entryAfter [
-      "installPackages"
-      "nucleusGpgImport"
-      "nucleusWallpaperProvision"
-      "onFilesChange"
-      "setupLaunchAgents"
-      "vscodeProfiles"
-    ] ''
+    displayManualInstructions = lib.hm.dag.entryAfter displayManualInstructionDeps ''
       echo "--- MANUAL SETUP (one-time, required) ---" >&2
       echo "BetterDisplay: Grant Accessibility + Screen Recording in System Settings > Privacy & Security." >&2
       echo "CRD: Visit https://remotedesktop.google.com/access to name Mac and set PIN." >&2

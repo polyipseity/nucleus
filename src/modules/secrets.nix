@@ -93,7 +93,7 @@ lib.mkIf isPrimaryUser {
   # `--batch` (`IPC parameter error`) on this key format. We intentionally use
   # a non-batch import invocation to ensure a successful secret-key import.
   # --------------------------------------------------------------------------
-  home.activation.nucleusGpgImport = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+  home.activation.gpgImport = lib.hm.dag.entryAfter [ "sops-nix" ] ''
     export GNUPGHOME="${config.home.homeDirectory}/.gnupg"
     mkdir -p "$GNUPGHOME"
     chmod 700 "$GNUPGHOME"

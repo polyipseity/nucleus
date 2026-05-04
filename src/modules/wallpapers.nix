@@ -10,7 +10,7 @@
 # Stale cleanup: any file in ~/Pictures/wallpapers/ that no longer has a
 # matching *.sops source is removed so the gallery stays current.
 #
-# This activation runs after nucleusGpgImport so the keyring import has already
+# This activation runs after gpgImport so the keyring import has already
 # happened before wallpaper decryption attempts.
 { config, lib, pkgs, username ? null, ... }:
 let
@@ -80,7 +80,7 @@ lib.mkIf isPrimaryUser {
   # same decryption flow as other secrets.
   sops.secrets = wallpaperSecrets;
 
-  home.activation.nucleusWallpaperProvision = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+  home.activation.wallpaperProvision = lib.hm.dag.entryAfter [ "sops-nix" ] ''
     export HOME="${config.home.homeDirectory}"
 
     picturesDir="$HOME/Pictures/wallpapers"

@@ -95,6 +95,9 @@
   ascending order is the default. Do not sort items whose order is load-order
   or semantically significant (e.g. `boot.initrd.availableKernelModules`,
   module import lists where one module must precede another).
+- **Naming style**: avoid `nucleus` branding prefixes in new identifiers
+  (activation names, helper names, options, scripts) unless a prefix is needed
+  for external integration or collision avoidance.
 
 ## Package Management Strategy
 
@@ -156,6 +159,11 @@ Before concluding VS Code changes, verify:
   `com.apple.screensaver.askForPassword = true` in the macOS host
   configuration. Any attempt to increase this delay or disable password
   requirement is a security regression.
+- **Activation Invariant: Manual Instructions Last** —
+  `src/modules/macos.nix` `home.activation.displayManualInstructions` must stay
+  the final activation step. It must depend on every other macOS/Home Manager
+  activation entry in that module, and any newly added activation step must be
+  added to its dependency list in the same change.
 
 ### Shell Strategy (POSIX Hosts)
 

@@ -72,6 +72,17 @@ applyTo: "src/**/*.nix"
 - Do not add a new managed domain without updating the purge list; that creates
   preference drift where manual user overrides can survive declarative rebuilds.
 
+## macOS activation ordering invariant
+
+- `src/modules/macos.nix` `home.activation.displayManualInstructions` must stay
+  the final activation step in that module.
+- It must depend on every other activation entry defined in
+  `src/modules/macos.nix` plus the required Home Manager/framework activation
+  boundaries (`writeBoundary`, `linkGeneration`, and any existing helper steps
+  already used in the dependency list).
+- When adding a new `home.activation.*` entry to `src/modules/macos.nix`, update
+  `displayManualInstructions` dependencies in the same change.
+
 ## Sorting
 
 - Package lists (e.g. `sharedPackages`, `environment.systemPackages`,
@@ -82,6 +93,12 @@ applyTo: "src/**/*.nix"
 - Do not sort items whose order is semantically significant:
   `boot.initrd.availableKernelModules`, ordered `imports` lists where one
   module precedes another by design.
+
+## Naming
+
+- Avoid repository-brand prefixes (for example `nucleus*`) in new Nix
+  identifiers unless the prefix is required for cross-module disambiguation or
+  external integration points.
 
 ## Validation
 

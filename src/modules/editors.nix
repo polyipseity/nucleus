@@ -88,7 +88,7 @@ in
     # home.file + darwin bridge logic instead.
     enable = !isDarwin || !stableUsesHomebrew;
     package = pkgs.vscode;
-    extensions = sharedExtensions;
+    profiles.default.extensions = sharedExtensions;
   };
 
   # Write identical settings payloads for both Code channels using the
