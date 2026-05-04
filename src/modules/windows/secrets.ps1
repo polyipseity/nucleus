@@ -49,11 +49,16 @@ function Sync-NucleusSecretFile {
     Decrypts one SOPS secret file and materializes its payloads on disk.
 
   .DESCRIPTION
-    Calls Get-NucleusSecrets to decrypt $FilePath, then processes two
+    Calls Get-NucleusSecrets to decrypt $FilePath, then processes three
     username-scoped flat keys:
 
     ssh_personal_${username}
       Written to $HOME\.ssh\ssh_personal_${username} using ASCII encoding
+      (no BOM, no trailing newline). The file is only overwritten when content
+      changes.
+
+    ssh_personal_${username}_pub
+      Written to $HOME\.ssh\ssh_personal_${username}.pub using ASCII encoding
       (no BOM, no trailing newline). The file is only overwritten when content
       changes.
 
@@ -107,6 +112,7 @@ function Sync-NucleusSecretFile {
   $secretFileInfo = Get-Item -Path $FilePath
   $gpgSecretName = "gpg_personal_$PrimaryUsername"
   $sshDir = Join-Path -Path $HOME -ChildPath ".ssh"
+  $sshPublicSecretName = "ssh_personal_${PrimaryUsername}_pub"
   $sshSecretName = "ssh_personal_$PrimaryUsername"
 
   if (-not (Test-Path -Path $sshDir)) {
@@ -132,12 +138,52 @@ function Sync-NucleusSecretFile {
     }
   }
 
+  if ($null -ne $jsonSecrets.PSObject.Properties[$sshPublicSecretName]) {
+    $sshPublicKeyPath = Join-Path -Path $sshDir -ChildPath "${sshSecretName}.pub"
+    $sshPublicKeyValue = [string]$jsonSecrets.$sshPublicSecretName
+    $existingPublicValue = if (Test-Path -Path $sshPublicKeyPath) {
+      Get-Content -Path $sshPublicKeyPath -Raw
+    }
+    else {
+      ""
+    }
+
+    if ($existingPublicValue -ne $sshPublicKeyValue) {
+      $sshPublicKeyValue | Out-File -FilePath $sshPublicKeyPath -Encoding ascii -NoNewline
+      Write-Host "  Updated SSH public key: $sshPublicSecretName" -ForegroundColor Cyan
+    }
+  }
+
   if ($null -ne $jsonSecrets.PSObject.Properties[$gpgSecretName]) {
     $gpgKeyValue = [string]$jsonSecrets.$gpgSecretName
     if (-not [string]::IsNullOrWhiteSpace($gpgKeyValue)) {
+      $secretKeyCountBefore = @(& $GpgExe --list-secret-keys --with-colons 2>$null | Where-Object { $_ -like "sec:*" }).Count
+      $firstFingerprint = $null
+      $showOnlyOutput = $gpgKeyValue | & $GpgExe --batch --import-options show-only --dry-run --with-colons --import - 2>$null
+      foreach ($line in $showOnlyOutput) {
+        if ($line -like "fpr:*") {
+          $parts = $line -split ":"
+          if ($parts.Length -ge 10 -and -not [string]::IsNullOrWhiteSpace($parts[9])) {
+            $firstFingerprint = $parts[9]
+            break
+          }
+        }
+      }
+
       $gpgKeyValue | & $GpgExe --batch --import - | Out-Null
       if ($LASTEXITCODE -ne 0) {
         throw "Failed to import GPG material '$gpgSecretName'. Exit code: $LASTEXITCODE"
+      }
+
+      if ($secretKeyCountBefore -eq 0) {
+        if ([string]::IsNullOrWhiteSpace($firstFingerprint)) {
+          throw "Imported first GPG key material but no fingerprint was detected for ownertrust bootstrap."
+        }
+
+        "${firstFingerprint}:6:" | & $GpgExe --import-ownertrust | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+          throw "Failed to assign ultimate ownertrust to '$firstFingerprint'. Exit code: $LASTEXITCODE"
+        }
       }
 
       Write-Host "  Imported GPG material: $gpgSecretName" -ForegroundColor Cyan
@@ -286,5 +332,46 @@ function Sync-NucleusSecrets {
     }
 
     Sync-NucleusSecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
+  }
+}
+
+function Remove-NucleusManagedSecrets {
+  <#
+  .SYNOPSIS
+    Removes managed SSH key material for the primary user.
+
+  .DESCRIPTION
+    Cleanup companion for secret parity toggles. Removes only files managed by
+    this repository (`ssh_personal_<user>` and corresponding `.pub`) from the
+    primary user's `~/.ssh` directory.
+
+    GPG keyring cleanup is intentionally out of scope because selective private
+    key deletion is not reliably reversible without a canonical key inventory.
+
+  .PARAMETER PrimaryUsername
+    Canonical primary username allowed to receive managed secret cleanup.
+
+  .EXAMPLE
+    Remove-NucleusManagedSecrets -PrimaryUsername 'polyipseity'
+  #>
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$PrimaryUsername
+  )
+
+  if (-not (Test-NucleusPrimaryUser -PrimaryUsername $PrimaryUsername)) {
+    return
+  }
+
+  $sshDir = Join-Path -Path $HOME -ChildPath '.ssh'
+  $sshSecretName = "ssh_personal_$PrimaryUsername"
+
+  foreach ($managedPath in @(
+      (Join-Path -Path $sshDir -ChildPath $sshSecretName),
+      (Join-Path -Path $sshDir -ChildPath "${sshSecretName}.pub")
+    )) {
+    if (Test-Path -Path $managedPath) {
+      Remove-Item -Path $managedPath -Force -ErrorAction SilentlyContinue
+    }
   }
 }

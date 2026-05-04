@@ -22,6 +22,36 @@ properties:
         valueData: "__NUCLEUS_ACTIVE_WALLPAPER__"
         valueType: String
 
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: screenSaveActive
+      directives:
+        description: Enable screen saver so Windows enforces an automatic lock path similar to macOS and GNOME session-idle behavior
+      settings:
+        keyPath: HKCU\Control Panel\Desktop
+        valueName: ScreenSaveActive
+        valueData: "1"
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: screenSaverSecure
+      directives:
+        description: Require password on screen saver resume so unattended sessions are protected with the same intent as immediate-lock policies on macOS and NixOS
+      settings:
+        keyPath: HKCU\Control Panel\Desktop
+        valueName: ScreenSaverIsSecure
+        valueData: "1"
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: screenSaveTimeout
+      directives:
+        description: Set a 60-second idle timeout before launching the screen saver to keep lock enforcement aggressive and parity-aligned with strict POSIX lock posture
+      settings:
+        keyPath: HKCU\Control Panel\Desktop
+        valueName: ScreenSaveTimeOut
+        valueData: "60"
+        valueType: String
+
     - resource: PSDscResources/Script
       id: wallpaperRefresh
       dependsOn:
@@ -35,6 +65,15 @@ properties:
           return $false
         SetScript: |
           & "$env:SystemRoot\System32\rundll32.exe" "user32.dll,UpdatePerUserSystemParameters"
+
+    - resource: Microsoft.Windows.Environment/Variable
+      id: editorEnvVar
+      directives:
+        description: Set EDITOR to nvim to mirror the default editor behavior declared for macOS and NixOS
+      settings:
+        name: EDITOR
+        value: nvim
+        scope: User
 
     - resource: Microsoft.Windows.Environment/Variable
       id: homeEnvVar
@@ -52,4 +91,13 @@ properties:
       settings:
         name: NIX_PATH
         value: nixpkgs=flake:nixpkgs
+        scope: User
+
+    - resource: Microsoft.Windows.Environment/Variable
+      id: visualEnvVar
+      directives:
+        description: Set VISUAL to nvim so terminal tooling follows the same preferred editor as POSIX hosts
+      settings:
+        name: VISUAL
+        value: nvim
         scope: User

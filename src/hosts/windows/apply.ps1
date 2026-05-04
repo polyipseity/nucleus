@@ -4,13 +4,16 @@
 
 .DESCRIPTION
   Orchestrates the Windows configuration lifecycle in a single script:
-    1. Load helper functions from $ModuleDir (common, secrets, wallpapers).
+    1. Load helper functions from $ModuleDir (common, secrets, wallpapers,
+       editors, git-ssh, power, shell, remote-access).
     2. Materialize primary-user secrets from src/secrets via SOPS.
     3. Materialize wallpaper blobs and remove stale decrypted files.
     4. Resolve each DSC config file relative to $ConfigDir.
     5. Pass each file to Invoke-NucleusWingetConfiguration, which substitutes
        the __NUCLEUS_ACTIVE_WALLPAPER__ token (when present) and runs
        `winget configure`.
+    6. Converge user-level shell/editor/Git/SSH parity state.
+    7. Converge remote-access and power posture parity state.
   The script is idempotent: re-running it re-applies all DSC resources and
   converges any drift from the desired state.
 
@@ -31,6 +34,27 @@
   Username allowed to materialize user-scoped secrets. Defaults to the
   current interactive user.
 
+.PARAMETER EnableSecretsParity
+  Enable managed secret materialization and managed SSH key cleanup fallback.
+
+.PARAMETER EnableGitSshParity
+  Enable managed user-level Git/SSH parity convergence and block cleanup logic.
+
+.PARAMETER EnablePowerParity
+  Enable managed Windows power policy parity convergence and cleanup fallback.
+
+.PARAMETER EnableRemoteAccessParity
+  Enable managed OpenSSH remote-access convergence and cleanup fallback.
+
+.PARAMETER EnableShellParity
+  Enable managed PowerShell profile parity block and cleanup fallback.
+
+.PARAMETER EnableVsCodeExtensionsParity
+  Enable managed VS Code extension parity convergence and cleanup fallback.
+
+.PARAMETER EnableVsCodeSettingsParity
+  Enable managed VS Code settings parity convergence and managed-key cleanup.
+
 .PARAMETER Help
   When present, prints this help text and exits without applying anything.
 
@@ -45,6 +69,14 @@
 .EXAMPLE
   # Apply while explicitly scoping secret materialization to one user:
   .\apply.ps1 -PrimaryUsername 'polyipseity'
+
+.EXAMPLE
+  # Apply while disabling managed VS Code settings parity (cleanup only):
+  .\apply.ps1 -EnableVsCodeSettingsParity:$false
+
+.EXAMPLE
+  # Apply while disabling managed remote-access parity (cleanup only):
+  .\apply.ps1 -EnableRemoteAccessParity:$false
 #>
 [CmdletBinding()]
 param(
@@ -52,7 +84,14 @@ param(
   [string[]]$ConfigFiles = @("system.dsc.yml", "user.dsc.yml"),
   [switch]$Help,
   [string]$ModuleDir = (Join-Path -Path $PSScriptRoot -ChildPath "..\..\modules\windows"),
-  [string]$PrimaryUsername = [System.Environment]::UserName
+  [string]$PrimaryUsername = [System.Environment]::UserName,
+  [bool]$EnableSecretsParity = $true,
+  [bool]$EnableGitSshParity = $true,
+  [bool]$EnablePowerParity = $true,
+  [bool]$EnableRemoteAccessParity = $true,
+  [bool]$EnableShellParity = $true,
+  [bool]$EnableVsCodeExtensionsParity = $true,
+  [bool]$EnableVsCodeSettingsParity = $true
 )
 
 $ErrorActionPreference = "Stop"
@@ -60,7 +99,12 @@ if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "common.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "editors.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "git-ssh.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "power.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "remote-access.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "secrets.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "shell.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers.ps1")
 
 $resolvedConfigDir = (Resolve-Path -Path $ConfigDir).Path
@@ -91,7 +135,12 @@ $gpgExe = Resolve-NucleusExecutable -Name "gpg" -CandidatePaths $gpgCandidates
 
 # Materialize user-scoped secrets once before DSC resources run.
 $secretsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets"
-Sync-NucleusSecrets -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $hostKeyPath -PrimaryUsername $PrimaryUsername -SopsExe $sopsExe
+if ($EnableSecretsParity) {
+  Sync-NucleusSecrets -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $hostKeyPath -PrimaryUsername $PrimaryUsername -SopsExe $sopsExe
+}
+else {
+  Remove-NucleusManagedSecrets -PrimaryUsername $PrimaryUsername
+}
 
 # Materialize decrypted wallpapers ahead of DSC so user.dsc.yml can resolve an
 # explicit active wallpaper path deterministically.
@@ -103,3 +152,10 @@ Remove-NucleusStaleWallpapers -AssetsDir $wallpaperAssetsDir -OutputDir $wallpap
 foreach ($configFile in $ConfigFiles) {
   Invoke-NucleusWingetConfiguration -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath $configFile) -WallpaperPath $activeWallpaperPath
 }
+
+Sync-NucleusVsCodeSettings -Enabled:$EnableVsCodeSettingsParity
+Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
+Sync-NucleusGitAndSshConfig -Enabled:$EnableGitSshParity -PrimaryUsername $PrimaryUsername
+Sync-NucleusShellProfile -Enabled:$EnableShellParity
+Sync-NucleusOpenSshServer -Enabled:$EnableRemoteAccessParity
+Sync-NucleusPowerPolicy -Enabled:$EnablePowerParity
