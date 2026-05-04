@@ -11,6 +11,8 @@
 #       -----BEGIN NOT OPENSSH PRIVATE KEY-----
 #       ...
 #       -----END NOT OPENSSH PRIVATE KEY-----
+#     ssh_personal_<username>_pub: |
+#       ssh-ed25519 AAAA... user@host
 #
 #   gpg-personal.yml:
 #     gpg_personal_<username>: |
@@ -47,6 +49,7 @@ let
   isPrimaryUser = config.home.username == primaryUsername;
   gpgSecretName = "gpg_personal_${primaryUsername}";
   sshSecretName = "ssh_personal_${primaryUsername}";
+  sshPublicSecretName = "${sshSecretName}_pub";
   sshPrivateKeyPath = "${config.home.homeDirectory}/.ssh/${sshSecretName}";
   sshPublicKeyPath = "${sshPrivateKeyPath}.pub";
   sshIdentityFile = "~/.ssh/${sshSecretName}";
@@ -75,6 +78,16 @@ lib.mkIf isPrimaryUser {
   };
 
   # --------------------------------------------------------------------------
+  # SSH public key — declaratively sourced from SOPS to avoid activation-time
+  # key derivation and passphrase handling edge cases.
+  # --------------------------------------------------------------------------
+  sops.secrets."${sshPublicSecretName}" = {
+    sopsFile = ../secrets/ssh-personal.yml;
+    path = sshPublicKeyPath;
+    mode = "0644";
+  };
+
+  # --------------------------------------------------------------------------
   # GPG key material — sops-nix decrypts to its managed path (tmpfs on Linux).
   # The activation hook below imports it into the keyring.
   # --------------------------------------------------------------------------
@@ -100,59 +113,6 @@ lib.mkIf isPrimaryUser {
       };
     };
   };
-
-  # --------------------------------------------------------------------------
-  # SSH public key derivation — keep the public key synchronized with
-  # the declaratively managed private key so GitHub SSH auth works without any
-  # manual key-export steps after activation.
-  #
-  # Uses a non-interactive ssh-keygen invocation (`-P ""`) so activation never
-  # blocks on a passphrase prompt. If the private key is passphrase-protected,
-  # public-key derivation is treated as best-effort and emits a warning instead
-  # of failing the whole activation.
-  # --------------------------------------------------------------------------
-  home.activation.sshPublicKeyFromPrivate = lib.hm.dag.entryAfter [ "sops-nix" ] ''
-    key_source=""
-    if [ -f "${sshPrivateKeyPath}" ]; then
-      key_source="${sshPrivateKeyPath}"
-    elif [ -f "${config.sops.secrets.${sshSecretName}.path}" ]; then
-      # During early activation ordering, the stable ~/.ssh symlink may not be
-      # present yet even though sops-nix has already materialized the secret.
-      key_source="${config.sops.secrets.${sshSecretName}.path}"
-    fi
-
-    if [ -z "$key_source" ]; then
-      echo "nucleus: missing SSH private key at ${sshPrivateKeyPath} (and sops path ${config.sops.secrets.${sshSecretName}.path}); cannot derive public key." >&2
-      exit 1
-    fi
-
-    tmpPublicKey="$(mktemp)"
-    tmpErr="$(mktemp)"
-    if ! ${pkgs.openssh}/bin/ssh-keygen -y -P "" -f "$key_source" > "$tmpPublicKey" 2> "$tmpErr"; then
-      if /usr/bin/grep -Eqi 'incorrect passphrase|passphrase' "$tmpErr"; then
-        if [ -f "${sshPublicKeyPath}" ]; then
-          echo "nucleus: SSH key is passphrase-protected; keeping existing public key at ${sshPublicKeyPath}." >&2
-        else
-          echo "nucleus: SSH key is passphrase-protected; could not derive ${sshPublicKeyPath} non-interactively. Load the key in your agent or remove passphrase, then re-run activation." >&2
-        fi
-        rm -f "$tmpPublicKey" "$tmpErr"
-        exit 0
-      fi
-
-      rm -f "$tmpPublicKey"
-      rm -f "$tmpErr"
-      echo "nucleus: failed to derive SSH public key from $key_source." >&2
-      exit 1
-    fi
-
-    rm -f "$tmpErr"
-    chmod 644 "$tmpPublicKey"
-    if [ -f "${sshPublicKeyPath}" ] && /usr/bin/cmp -s "$tmpPublicKey" "${sshPublicKeyPath}"; then
-      rm -f "$tmpPublicKey"
-    else
-      mv "$tmpPublicKey" "${sshPublicKeyPath}"
-    fi
-  '';
 
   # --------------------------------------------------------------------------
   # GPG import — the only remaining imperative activation step.

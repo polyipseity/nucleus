@@ -174,7 +174,6 @@ let
     "reloadUserPreferenceState"
     "sops-nix"
     "setupLaunchAgents"
-    "sshPublicKeyFromPrivate"
     "wallpaperProvision"
     "vscodeDarwinExtensionBridge"
     "vscodeProfiles"
