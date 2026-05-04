@@ -11,12 +11,14 @@
   #   computer = "never" — idle sleep disabled            (was: pmset -a sleep 0)
   #   display  = 1       — display sleeps after 1 minute to save power
   #   harddisk = "never" — disk sleep disabled            (was: pmset -a disksleep 0)
-  #   restartAfterPowerFailure — recover from power loss  (was: pmset -c autorestart 1)
+  #   restartAfterPowerFailure is intentionally omitted because this machine
+  #   model/firmware does not support it; setting it at all causes activation
+  #   failure on this hardware.
   # ---------------------------------------------------------------------------
   power.sleep.computer = "never";
   power.sleep.display = 1;
   power.sleep.harddisk = "never";
-  power.restartAfterPowerFailure = true;
+  # power.restartAfterPowerFailure = true;  # Keep the comment and keep it disabled.
 
   # ---------------------------------------------------------------------------
   # configureBatteryPolicy
@@ -24,8 +26,9 @@
   #   -a: shared behavior for all power sources (wake/network/background)
   #   -c: charger profile (max performance, no forced sleep)
   #   -b: battery profile (balanced mobile behavior)
-  # sleep/displaysleep/disksleep/autorestart continue to be handled declaratively
-  # above via power.sleep.* and power.restartAfterPowerFailure.
+  # sleep/displaysleep/disksleep continue to be handled declaratively above via
+  # power.sleep.*. `autorestart` is intentionally unmanaged because this host
+  # cannot safely apply restart-after-power-failure.
   # The -x flag check is present because pmset might be absent in certain VM
   # or CI environments where this config could theoretically be evaluated.
   # ---------------------------------------------------------------------------

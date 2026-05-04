@@ -3,7 +3,9 @@
 # exist (clock, lock behavior, touchpad/keyboard ergonomics, privacy, and power).
 { config, lib, pkgs, ... }:
 lib.mkIf pkgs.stdenv.isLinux {
-  programs.dconf.enable = true;
+  # Home Manager exposes GNOME settings via `dconf.*` (not `programs.dconf`).
+  # Enabling this keeps `dconf.settings` declarative and idempotent.
+  dconf.enable = true;
 
   dconf.settings = {
     # Input source baseline parity:

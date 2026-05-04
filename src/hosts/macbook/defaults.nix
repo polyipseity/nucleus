@@ -54,27 +54,7 @@ in
       NSAutomaticWindowAnimationsEnabled = false;    # disable new-window zoom animation
       NSNavPanelExpandedStateForSaveMode = true;     # open save dialogs in expanded mode by default
       NSNavPanelExpandedStateForSaveMode2 = true;
-      NSServicesMinimumItemCountForContextSubmenu = 9999; # effectively hide Services from context menus
       NSTableViewDefaultSizeMode = 3;                # medium row height in table views
-      NSToolbarTitleViewRolloverDelay = 0.0;         # instant toolbar title appearance on hover
-      # Text substitution dictionary: maps `replace` → `with` in all apps.
-      # Entries here suppress autocorrect for technical terms and provide one
-      NSUserDictionaryReplacementItems = [
-        { replace = "contravariance"; "with" = "contravariance"; }
-        { replace = "contravariant"; "with" = "contravariant"; }
-        { replace = "covariance"; "with" = "covariance"; }
-        { replace = "covector"; "with" = "covector"; }
-        { replace = "covectors"; "with" = "covectors"; }
-        { replace = "flashcard"; "with" = "flashcard"; }
-        { replace = "flashcards"; "with" = "flashcards"; }
-        { replace = "Google"; "with" = "Google"; }
-        { replace = "IME"; "with" = "IME"; }
-        { replace = "Microsoft"; "with" = "Microsoft"; }
-        { replace = "OneDrive"; "with" = "OneDrive"; }
-        { replace = "pullback"; "with" = "pullback"; }
-        { replace = "pushforward"; "with" = "pushforward"; }
-        { replace = "SynthID"; "with" = "SynthID"; }
-      ];
       PMPrintingExpandedStateForPrint = true;        # open print dialogs in expanded mode
       PMPrintingExpandedStateForPrint2 = true;
       "com.apple.keyboard.fnState" = true;           # Fn keys act as standard F1–F12 by default
@@ -91,6 +71,36 @@ in
     CustomUserPreferences = {
       # NSGlobalDomain: global preferences that don't fit nix-darwin typed options.
       "NSGlobalDomain" = {
+        # Keep Services out of context menus. This key is not exposed by
+        # nix-darwin's typed `system.defaults.NSGlobalDomain` options, so it
+        # must be applied through CustomUserPreferences.
+        NSServicesMinimumItemCountForContextSubmenu = 9999;
+
+        # Make toolbar title rollover hints appear instantly. This key is
+        # currently outside nix-darwin's typed NSGlobalDomain option set.
+        NSToolbarTitleViewRolloverDelay = 0.0;
+
+        # Text substitution dictionary that suppresses autocorrect for
+        # technical terms and product names used frequently in this setup.
+        # This key is not available as a typed nix-darwin NSGlobalDomain
+        # option, so it is declared as a custom preference payload.
+        NSUserDictionaryReplacementItems = [
+          { replace = "contravariance"; "with" = "contravariance"; }
+          { replace = "contravariant"; "with" = "contravariant"; }
+          { replace = "covariance"; "with" = "covariance"; }
+          { replace = "covector"; "with" = "covector"; }
+          { replace = "covectors"; "with" = "covectors"; }
+          { replace = "flashcard"; "with" = "flashcard"; }
+          { replace = "flashcards"; "with" = "flashcards"; }
+          { replace = "Google"; "with" = "Google"; }
+          { replace = "IME"; "with" = "IME"; }
+          { replace = "Microsoft"; "with" = "Microsoft"; }
+          { replace = "OneDrive"; "with" = "OneDrive"; }
+          { replace = "pullback"; "with" = "pullback"; }
+          { replace = "pushforward"; "with" = "pushforward"; }
+          { replace = "SynthID"; "with" = "SynthID"; }
+        ];
+
         # Treat Caps Lock as a per-app input-source switch (e.g. EN ↔ Cangjie).
         TISCapslockLanguageSwitch = true;
       };
@@ -141,13 +151,6 @@ in
       "com.apple.Photos" = {
         CloudPhotosEnabled = 1;
         ImportToCloudEnabled = 1;
-      };
-
-      # Safari: disable password auto-fill, show Develop menu and internal debug menu.
-      "com.apple.Safari" = {
-        AutoFillPasswords = false;
-        IncludeDevelopMenu = true;
-        IncludeInternalDebugMenu = true;
       };
 
       # Siri: enable keyboard shortcut (Option+Space = 1), hide menu-bar icon,
@@ -221,6 +224,16 @@ in
 
       # Finder: allow text selection in Quick Look previews.
       "com.apple.finder" = {
+        # Keep Desktop and Documents in iCloud Drive. These knobs are not
+        # currently part of nix-darwin's typed `system.defaults.finder` set,
+        # so they are expressed as custom domain values.
+        FXICloudDriveDesktop = true;
+        FXICloudDriveDocuments = true;
+
+        # Keep the empty-trash confirmation prompt enabled. This key is not a
+        # typed nix-darwin finder option, so we set it as a custom default.
+        WarnOnEmptyTrash = true;
+
         QLEnableTextSelection = true;
       };
 
@@ -285,16 +298,6 @@ in
         FocusFollowsMouse = "YES";
       };
 
-      # Accessibility: larger cursor, AX1 font size category (standard),
-      # show window titlebar icons, keep motion and transparency effects on.
-      "com.apple.universalaccess" = {
-        FontSizeCategory = "AX1";         # standard font size category
-        cursorSize = 1.33;                # slightly enlarged cursor
-        reduceMotion = false;
-        reduceTransparency = false;
-        showWindowTitlebarIcons = true;   # show proxy icons in titlebars
-      };
-
       # Universal Control: automatically connect to nearby Mac/iPad.
       "com.apple.universalcontrol" = {
         autoConnect = true;
@@ -328,7 +331,7 @@ in
     # -------------------------------------------------------------------------
     dock = {
       autohide = true;               # auto-hide Dock; shown only on cursor hover
-      expose-group-by-app = true;    # Mission Control groups windows by application
+      expose-group-apps = true;      # Mission Control groups windows by application
       largesize = 128;               # magnified icon size when hovering
       launchanim = true;             # animate app icons on launch
       magnification = true;          # magnify icons under the cursor
@@ -350,8 +353,6 @@ in
       CreateDesktop = true;                  # allow files/icons on the Desktop
       FXDefaultSearchScope = "SCcf";         # default search scope: current folder
       FXEnableExtensionChangeWarning = false; # suppress warning when changing extension
-      FXICloudDriveDesktop = true;           # sync Desktop to iCloud Drive
-      FXICloudDriveDocuments = true;         # sync Documents to iCloud Drive
       FXPreferredViewStyle = "clmv";         # default view: column view
       FXRemoveOldTrashItems = true;          # auto-delete Trash items after 30 days
       ShowExternalHardDrivesOnDesktop = true;
@@ -360,7 +361,6 @@ in
       ShowPathbar = true;                    # show path breadcrumb bar at bottom
       ShowRemovableMediaOnDesktop = true;
       ShowStatusBar = true;                  # show item count / available space bar
-      WarnOnEmptyTrash = true;               # confirm before permanently deleting
     };
 
     # -------------------------------------------------------------------------

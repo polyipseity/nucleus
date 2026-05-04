@@ -261,6 +261,42 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
+    # configureSafariDefaults
+    # Safari is sandboxed and stores preferences in a containerized domain that
+    # `system.defaults.CustomUserPreferences` cannot always write during system
+    # activation. Apply these settings from user activation instead so Safari
+    # hardening remains declarative without breaking `darwin-rebuild switch`.
+    # -------------------------------------------------------------------------
+    configureSafariDefaults = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      # Skip writes when Safari's containerized preference domain is not yet
+      # readable in this session (common on fresh profiles before Safari launch).
+      if /usr/bin/defaults read com.apple.Safari >/dev/null 2>&1; then
+        /usr/bin/defaults write com.apple.Safari AutoFillPasswords -bool false >/dev/null 2>&1 || true
+        /usr/bin/defaults write com.apple.Safari IncludeDevelopMenu -bool true >/dev/null 2>&1 || true
+        /usr/bin/defaults write com.apple.Safari IncludeInternalDebugMenu -bool true >/dev/null 2>&1 || true
+      fi
+    '';
+
+    # -------------------------------------------------------------------------
+    # configureUniversalAccessDefaults
+    # Accessibility defaults are user/session scoped and may be protected from
+    # system-level defaults writes during `darwin-rebuild`. Apply them from the
+    # user activation phase to keep accessibility intent without system errors.
+    # -------------------------------------------------------------------------
+    configureUniversalAccessDefaults = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      # Some managed/macOS-hardened environments prevent direct writes to this
+      # domain from non-interactive sessions. Only write when the domain is
+      # readable to avoid noisy activation failures.
+      if /usr/bin/defaults read com.apple.universalaccess >/dev/null 2>&1; then
+        /usr/bin/defaults write com.apple.universalaccess FontSizeCategory -string "AX1" >/dev/null 2>&1 || true
+        /usr/bin/defaults write com.apple.universalaccess cursorSize -float 1.33 >/dev/null 2>&1 || true
+        /usr/bin/defaults write com.apple.universalaccess reduceMotion -bool false >/dev/null 2>&1 || true
+        /usr/bin/defaults write com.apple.universalaccess reduceTransparency -bool false >/dev/null 2>&1 || true
+        /usr/bin/defaults write com.apple.universalaccess showWindowTitlebarIcons -bool true >/dev/null 2>&1 || true
+      fi
+    '';
+
+    # -------------------------------------------------------------------------
     # configureSystemHardening
     # Applies Spotlight indexing suppression for build artifact directories;
     # requires a running user session (not available to system-level scripts).

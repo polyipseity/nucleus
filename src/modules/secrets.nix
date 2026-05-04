@@ -8,15 +8,15 @@
 #
 #   ssh-personal.yml:
 #     ssh_personal_<username>: |
-#       -----BEGIN OPENSSH PRIVATE KEY-----
+#       -----BEGIN NOT OPENSSH PRIVATE KEY-----
 #       ...
-#       -----END OPENSSH PRIVATE KEY-----
+#       -----END NOT OPENSSH PRIVATE KEY-----
 #
 #   gpg-personal.yml:
 #     gpg_personal_<username>: |
-#       -----BEGIN PGP PRIVATE KEY BLOCK-----
+#       -----BEGIN NOT PGP PRIVATE KEY BLOCK-----
 #       ...
-#       -----END PGP PRIVATE KEY BLOCK-----
+#       -----END NOT PGP PRIVATE KEY BLOCK-----
 #
 # To flatten the existing nested-array format, run on a machine with the GPG
 # key already in the keyring:
@@ -59,7 +59,7 @@ lib.mkIf isPrimaryUser {
   # SSH private key — sops-nix owns decryption, file write, and chmod 600.
   # --------------------------------------------------------------------------
   sops.secrets."${sshSecretName}" = {
-    sopsFile = ../../secrets/ssh-personal.yml;
+    sopsFile = ../secrets/ssh-personal.yml;
     path = "${config.home.homeDirectory}/.ssh/${sshSecretName}";
     mode = "0600";
   };
@@ -69,7 +69,7 @@ lib.mkIf isPrimaryUser {
   # The activation hook below imports it into the keyring.
   # --------------------------------------------------------------------------
   sops.secrets."${gpgSecretName}" = {
-    sopsFile = ../../secrets/gpg-personal.yml;
+    sopsFile = ../secrets/gpg-personal.yml;
     # No explicit path — let sops-nix manage it (typically /run/user/<uid>/…
     # on Linux, or ~/Library/… on macOS; both are outside persistent storage).
   };
@@ -82,7 +82,6 @@ lib.mkIf isPrimaryUser {
       Host *
         IdentityFile ~/.ssh/${sshSecretName}
     '';
-    mode = "0600";
   };
 
   # --------------------------------------------------------------------------

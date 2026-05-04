@@ -5,13 +5,13 @@
 #   • resolving the platform-appropriate home directory path
 #   • importing all shared feature modules
 #   • symlinking dotfiles from the repo's dotfiles/ tree into the home directory
-{ lib, pkgs, username ? "user", homeDirectory ? null, ... }:
+{ lib, pkgs, username, ... }:
 let
-  # Derive the home directory from the passed-in argument when provided,
-  # otherwise fall back to the platform convention.
+  # Derive the home directory from platform conventions. Keeping this local to
+  # the module avoids relying on ad-hoc `_module.args` plumbed through every
+  # call site.
   resolvedHomeDirectory =
-    if homeDirectory != null then homeDirectory
-    else if pkgs.stdenv.isDarwin then "/Users/${username}"
+    if pkgs.stdenv.isDarwin then "/Users/${username}"
     else "/home/${username}";
 
   # Path to the checked-out dotfiles/ directory at the root of this repo.

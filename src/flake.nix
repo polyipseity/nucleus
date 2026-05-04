@@ -96,6 +96,9 @@
       # `darwin-rebuild switch` command activates both system and user config.
       # -----------------------------------------------------------------------
       darwinConfigurations.macbook = darwin.lib.darwinSystem {
+        # Reuse the shared package set so allowUnfree policy from mkPkgs is
+        # applied consistently to both system and embedded Home Manager evals.
+        pkgs = pkgsMac;
         specialArgs = { inherit username; };
         system = systems.mac;
         modules = [
@@ -103,6 +106,10 @@
           sops-nix.darwinModules.sops
           home-manager.darwinModules.home-manager
           {
+            # Preserve pre-existing dotfiles on first activation instead of
+            # aborting when Home Manager would overwrite them.
+            home-manager.backupFileExtension = "hm-backup";
+
             # Share the system nixpkgs instance to avoid a duplicate evaluation.
             home-manager.useGlobalPkgs = true;
             # Install user packages into the user profile rather than /etc.
@@ -123,6 +130,9 @@
       # Same Home Manager embedding pattern as the Darwin host.
       # -----------------------------------------------------------------------
       nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
+        # Keep NixOS evaluation aligned with the same pinned package set and
+        # unfree policy used by the rest of the flake outputs.
+        pkgs = pkgsLinux;
         specialArgs = { inherit username; };
         system = systems.linux;
         modules = [
@@ -130,6 +140,10 @@
           sops-nix.nixosModules.sops
           home-manager.nixosModules.home-manager
           {
+            # Mirror the Darwin behavior so first switch is non-destructive when
+            # user-owned files already exist at Home Manager target paths.
+            home-manager.backupFileExtension = "hm-backup";
+
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = { inherit username; };

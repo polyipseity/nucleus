@@ -17,7 +17,7 @@ let
   # Path to the ed25519 host key used as the SOPS age recipient.
   hostSshKeyPath = "/etc/ssh/ssh_host_ed25519_key";
   # Nix store path to the wallpaper blob directory (evaluated at build time).
-  wallpapersDir = ../../assets/wallpapers;
+  wallpapersDir = ../assets/wallpapers;
 in
 {
   # Fail fast at eval time if the expected asset directory is absent from the repo.
@@ -53,6 +53,8 @@ in
 
       # Abort early when no GPG secret key is available to avoid a confusing
       # SOPS error message.
+      # Modern GnuPG stores public keys in pubring.kbx; requiring legacy
+      # pubring.gpg causes false negatives on clean machines.
       if ! ${pkgs.gnupg}/bin/gpg --list-secret-keys --with-colons 2>/dev/null | ${pkgs.gnugrep}/bin/grep -Eq '^(sec|ssb):'; then
         return 1
       fi
@@ -65,7 +67,7 @@ in
       [ -e "$wallpaper_blob" ] || continue
       found=1
 
-      targetFile="$picturesDir/$(basename "${wallpaper_blob%.sops}")"
+      targetFile="$picturesDir/$(basename "''${wallpaper_blob%.sops}")"
       tmpTarget="$(mktemp)"
 
       if nucleus_decrypt_wallpaper "$wallpaper_blob" "$tmpTarget"; then
