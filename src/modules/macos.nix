@@ -647,16 +647,20 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # ensureHeadlessDisplay
-    # Creates a BetterDisplay virtual screen named "HeadlessDisplay" (2560×1600)
-    # and connects it.  This provides a persistent logical display for remote-
-    # desktop sessions when no physical monitor is attached; without it, macOS
-    # disables hardware-accelerated rendering and limits resolution to 1024×768.
+    # Maintains exactly one BetterDisplay virtual screen named "HeadlessDisplay"
+    # and keeps it connected for clamshell remote-desktop fallback.
+    #
+    # BetterDisplay free-tier constraint:
+    #   Runtime `set -connected=on` can fail without Pro on some builds, even
+    #   for virtual screens. To avoid paid-feature dependencies, this script
+    #   repairs state by recreating the virtual screen with `-connected=on`
+    #   instead of relying on connection toggles.
     #
     # Steps:
     #   1. Launch BetterDisplay in the background if it is not already running.
-    #   2. Create the virtual screen if it does not already appear in
-    #      system_profiler SPDisplaysDataType output.
-    #   3. Ensure the virtual screen is marked as connected.
+    #   2. Query BetterDisplay identifiers for `HeadlessDisplay`.
+    #   3. If there are zero/multiple instances, rebuild to one clean instance.
+    #   4. If the single instance exists but is disconnected, rebuild it.
     #
     # No-op if BetterDisplay is not installed.
     # -------------------------------------------------------------------------
@@ -665,20 +669,70 @@ lib.mkIf pkgs.stdenv.isDarwin {
       BD_APP="/Applications/BetterDisplay.app"
       DISPLAY_NAME="HeadlessDisplay"
 
+      create_headless_display() {
+        # Use documented virtual-screen parameters and force connected state at
+        # creation time so fallback remains available with the lid closed.
+        "$BD_BIN" create \
+          -type=VirtualScreen \
+          -virtualScreenName="$DISPLAY_NAME" \
+          -aspectWidth=16 \
+          -aspectHeight=10 \
+          -multiplierStep=160 \
+          -virtualScreenHiDPI=on \
+          -connected=on
+      }
+
+      discard_headless_displays() {
+        # Discard by BetterDisplay tag IDs so we only touch managed virtual
+        # screens and avoid affecting physical monitors.
+        for tag_id in $1; do
+          if ! "$BD_BIN" discard -tagID="$tag_id"; then
+            echo "nucleus: failed to discard duplicate BetterDisplay virtual screen tagID=$tag_id." >&2
+          fi
+        done
+      }
+
       if [ -f "$BD_BIN" ]; then
         if ! /usr/bin/pgrep -x "BetterDisplay" > /dev/null; then
           /usr/bin/open -g -a "$BD_APP"
           /bin/sleep 5  # wait for the app to initialise before issuing CLI commands
         fi
 
-        if ! /usr/sbin/system_profiler SPDisplaysDataType | /usr/bin/grep -q "$DISPLAY_NAME"; then
-          if ! "$BD_BIN" create -devicetype=virtualscreen -virtualscreenname="$DISPLAY_NAME" -width=2560 -height=1600; then
+        identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME" 2>/dev/null || true)"
+        tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
+        tag_count="$(printf '%s\n' "$tag_ids" | /usr/bin/awk 'NF { count += 1 } END { print count + 0 }')"
+
+        if [ "$tag_count" -ne 1 ]; then
+          if [ "$tag_count" -gt 0 ]; then
+            discard_headless_displays "$tag_ids"
+          fi
+
+          if ! create_headless_display; then
             echo "nucleus: failed to create BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
           fi
           /bin/sleep 3  # wait for the virtual display to be registered
+          identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME" 2>/dev/null || true)"
+          tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
+        else
+          tag_id="$(printf '%s\n' "$tag_ids" | /usr/bin/awk 'NF { print; exit }')"
+          connected_state="$($BD_BIN get -tagID="$tag_id" -connected 2>/dev/null || true)"
+
+          if [ "$connected_state" != "on" ]; then
+            if ! "$BD_BIN" discard -tagID="$tag_id"; then
+              echo "nucleus: failed to discard disconnected BetterDisplay virtual screen '$DISPLAY_NAME' (tagID=$tag_id)." >&2
+            fi
+
+            if ! create_headless_display; then
+              echo "nucleus: failed to recreate BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
+            fi
+            /bin/sleep 3  # wait for the virtual display to be registered
+            identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME" 2>/dev/null || true)"
+            tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
+          fi
         fi
 
-        if ! "$BD_BIN" set -namelike="$DISPLAY_NAME" -connected=on; then
+        connected_after="$($BD_BIN get -name="$DISPLAY_NAME" -connected 2>/dev/null || true)"
+        if [ "$connected_after" != "on" ]; then
           echo "nucleus: failed to set BetterDisplay virtual screen '$DISPLAY_NAME' connected=on." >&2
         fi
       fi

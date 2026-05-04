@@ -168,6 +168,10 @@ Darwin bridge symlinks only apply when the backend resolves to Homebrew.
   logic (`purge-managed-user-preferences`, driven by
   `src/modules/macos.nix` `resetUserPreferenceDomains`) as a user-invoked
   command, not an automatic activation step.
+- **BetterDisplay Free-Tier Invariant** — macOS display automation must avoid
+  BetterDisplay Pro-only operations. Do not rely on features that require Pro
+  (for example connection toggles for non-virtual displays or other gated
+  controls); prefer free-tier-compatible virtual-screen workflows.
 
 ### Security Invariants (Windows)
 
