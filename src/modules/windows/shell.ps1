@@ -15,7 +15,8 @@ function Sync-NucleusShellProfile {
 
     Managed content intentionally mirrors key POSIX shell workflow behavior:
       - direnv integration (if direnv is present)
-      - common aliases (`gs`, `ll`)
+      - common aliases (`g`, `ga`, `gc`, `gca`, `gco`, `gd`, `gl`, `gp`,
+        `gpl`, `gs`, `gst`, `la`, `ll`, `v`)
 
     Cleanup behavior when disabled removes only the managed block.
 
@@ -41,8 +42,20 @@ function Sync-NucleusShellProfile {
     'if (Get-Command direnv -ErrorAction SilentlyContinue) {'
     '  (& direnv hook pwsh) | Out-String | Invoke-Expression'
     '}'
-    'Set-Alias -Name gs -Value git -Option AllScope'
-    'Set-Alias -Name ll -Value Get-ChildItem -Option AllScope'
+    'function g { & git @Args }'
+    'function ga { & git add @Args }'
+    'function gc { & git commit @Args }'
+    'function gca { & git commit --amend @Args }'
+    'function gco { & git checkout @Args }'
+    'function gd { & git diff @Args }'
+    'function gl { & git log --oneline --decorate --graph @Args }'
+    'function gp { & git push @Args }'
+    'function gpl { & git pull @Args }'
+    'function gs { & git status -sb @Args }'
+    'function gst { & git status @Args }'
+    'function la { Get-ChildItem -Force @Args }'
+    'function ll { Get-ChildItem -Force @Args }'
+    'function v { & nvim @Args }'
     $managedBlockEnd
   )
 
