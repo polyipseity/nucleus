@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AMIsApplet</key>
+	<false/>
+	<key>AMStayOpen</key>
+	<false/>
+	<key>AMWorkflowVersion</key>
+	<string>1.6.1</string>
+	<key>actions</key>
+	<array>
+		<dict>
+			<key>AMAccepts</key>
+			<dict>
+				<key>Container</key>
+				<string>List</string>
+				<key>Optional</key>
+				<true/>
+				<key>Types</key>
+				<array/>
+			</dict>
+			<key>AMAction</key>
+			<dict>
+				<key>AMAccepts</key>
+				<dict>
+					<key>Container</key>
+					<string>List</string>
+					<key>Optional</key>
+					<true/>
+					<key>Types</key>
+					<array/>
+				</dict>
+				<key>AMActionVersion</key>
+				<string>2.2.4</string>
+				<key>AMApplication</key>
+				<array>
+					<string>System Events</string>
+				</array>
+				<key>AMParameterProperties</key>
+				<dict>
+					<key>source</key>
+					<dict/>
+				</dict>
+				<key>AMProvides</key>
+				<dict>
+					<key>Container</key>
+					<string>List</string>
+					<key>Types</key>
+					<array>
+						<string>com.apple.applescript.object</string>
+					</array>
+				</dict>
+				<key>ActionBundlePath</key>
+				<string>/System/Library/Automator/Run AppleScript.action</string>
+				<key>ActionName</key>
+				<string>Run AppleScript</string>
+				<key>ActionParameters</key>
+				<dict>
+					<key>source</key>
+					<string>on run {input}
+	-- Get the frontmost Finder window, or use Desktop as fallback
+	set targetFolder to missing value
+	try
+		tell application "System Events"
+			tell process "Finder"
+				set targetFolder to value of attribute "AXFocusedWindow"
+			end tell
+		end tell
+	end try
+
+	-- If no focused window, try another method
+	if targetFolder is missing value then
+		try
+			tell application "Finder"
+				set targetFolder to (target of Finder window 1) as alias
+			end tell
+		end try
+	end if
+
+	-- Last resort: use Desktop
+	if targetFolder is missing value then
+		set targetFolder to (path to desktop) as alias
+	end if
+
+	-- Ensure we have an alias (for path conversion)
+	try
+		set targetFolder to targetFolder as alias
+	end try
+
+	-- Convert to POSIX path
+	set targetPath to POSIX path of targetFolder
+
+	-- Generate unique filename
+	set baseName to "Untitled"
+	set fileExtension to ".txt"
+	set counter to 1
+	set fileName to baseName &amp; space &amp; counter &amp; fileExtension
+	set filePath to targetPath &amp; fileName
+
+	-- Loop to find a unique filename
+	repeat while (fileExists(filePath))
+		set counter to counter + 1
+		set fileName to baseName &amp; space &amp; counter &amp; fileExtension
+		set filePath to targetPath &amp; fileName
+	end repeat
+
+	-- Create the file
+	do shell script "touch " &amp; quoted form of filePath
+
+	-- Reveal it in Finder
+	tell application "Finder"
+		activate
+		delay 0.5
+		reveal (POSIX file filePath as alias)
+	end tell
+
+	return input
+end run
+
+-- Helper: Check if file exists
+on fileExists(filePath)
+	try
+		set dummy to POSIX file filePath as alias
+		return true
+	on error
+		return false
+	end try
+end fileExists</string>
+				</dict>
+			</dict>
+			<key>AMControlPanel</key>
+			<dict/>
+			<key>AMDescription</key>
+			<dict>
+				<key>AMDDescription</key>
+				<string>Create a new text file in the current Finder location</string>
+				<key>AMDInput</key>
+				<string>None</string>
+				<key>AMDNote</key>
+				<string></string>
+				<key>AMDOutput</key>
+				<string>None</string>
+			</dict>
+			<key>AMHighlight</key>
+			<false/>
+			<key>AMKeyModifier</key>
+			<integer>0</integer>
+			<key>AMLocation</key>
+			<string>428.000000:341.000000</string>
+			<key>AMNotarisationState</key>
+			<string>NotNotarised</string>
+			<key>AMShowWhenRun</key>
+			<true/>
+			<key>AMSource</key>
+			<string>on run {input}
+	-- Get the frontmost Finder window, or use Desktop as fallback
+	set targetFolder to missing value
+	try
+		tell application "System Events"
+			tell process "Finder"
+				set targetFolder to value of attribute "AXFocusedWindow"
+			end tell
+		end tell
+	end try
+
+	-- If no focused window, try another method
+	if targetFolder is missing value then
+		try
+			tell application "Finder"
+				set targetFolder to (target of Finder window 1) as alias
+			end tell
+		end try
+	end if
+
+	-- Last resort: use Desktop
+	if targetFolder is missing value then
+		set targetFolder to (path to desktop) as alias
+	end if
+
+	-- Ensure we have an alias (for path conversion)
+	try
+		set targetFolder to targetFolder as alias
+	end try
+
+	-- Convert to POSIX path
+	set targetPath to POSIX path of targetFolder
+
+	-- Generate unique filename
+	set baseName to "Untitled"
+	set fileExtension to ".txt"
+	set counter to 1
+	set fileName to baseName &amp; space &amp; counter &amp; fileExtension
+	set filePath to targetPath &amp; fileName
+
+	-- Loop to find a unique filename
+	repeat while (fileExists(filePath))
+		set counter to counter + 1
+		set fileName to baseName &amp; space &amp; counter &amp; fileExtension
+		set filePath to targetPath &amp; fileName
+	end repeat
+
+	-- Create the file
+	do shell script "touch " &amp; quoted form of filePath
+
+	-- Reveal it in Finder
+	tell application "Finder"
+		activate
+		delay 0.5
+		reveal (POSIX file filePath as alias)
+	end tell
+
+	return input
+end run
+
+-- Helper: Check if file exists
+on fileExists(filePath)
+	try
+		set dummy to POSIX file filePath as alias
+		return true
+	on error
+		return false
+	end try
+end fileExists</string>
+			<key>ActionBundlePath</key>
+			<string>/System/Library/Automator/Run AppleScript.action</string>
+			<key>ActionName</key>
+			<string>Run AppleScript</string>
+		</dict>
+	</array>
+	<key>kind</key>
+	<string>Finder</string>
+	<key>organizer</key>
+	<dict/>
+</dict>
+</plist>

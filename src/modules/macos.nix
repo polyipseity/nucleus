@@ -827,16 +827,20 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # Symlink Automator Quick Actions (Services) to ~/Library/Services so they
   # appear in Finder context menus. Each .workflow bundle must be defined as a
   # set of home.file entries that collectively preserve the bundle structure.
+  # macOS Services require document.wflow to be in Contents/Resources/, not
+  # directly in Contents/, to be properly recognized by LaunchServices.
   home.file = let
     # Base path to stored workflow bundles
     servicesPath = ../assets/macos/services;
   in {
     # "New File" Quick Action: creates Untitled.txt in the current Finder location.
     # Appears in Finder context menus (files, folders, and empty space) after
-    # refreshFinderServices restarts Finder and launchctl reloads services.
+    # refreshFinderServices restarts Finder and lsregister reloads services.
     "Library/Services/New File.workflow/Contents/Info.plist".source =
       "${servicesPath}/New File.workflow/Contents/Info.plist";
-    "Library/Services/New File.workflow/Contents/document.wflow".source =
-      "${servicesPath}/New File.workflow/Contents/document.wflow";
+    "Library/Services/New File.workflow/Contents/version.plist".source =
+      "${servicesPath}/New File.workflow/Contents/version.plist";
+    "Library/Services/New File.workflow/Contents/Resources/document.wflow".source =
+      "${servicesPath}/New File.workflow/Contents/Resources/document.wflow";
   };
 }
