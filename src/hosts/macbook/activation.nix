@@ -54,17 +54,20 @@
 
     if [ -x /usr/bin/pmset ]; then
       apply_pmset -a powernap 1 lidwake 1
-      apply_pmset -c womp 1 displaysleep 1 sleep 0 disksleep 0
-      apply_pmset -b womp 1 displaysleep 1 sleep 1 disksleep 10
-
-      if pmset_supports lessbright; then
-        apply_pmset -a lessbright 0
-        apply_pmset -b lessbright 1
-      fi
 
       if pmset_supports lowpowermode; then
         apply_pmset -c lowpowermode 0
         apply_pmset -b lowpowermode 1
+      fi
+
+      # Apply explicit per-source timers and wake policy after lowpowermode so
+      # platform presets cannot silently revert these managed values.
+      apply_pmset -c womp 1 displaysleep 1 sleep 0 disksleep 0
+      apply_pmset -b womp 1 displaysleep 1 sleep 1 disksleep 10
+
+      if pmset_supports lessbright; then
+        apply_pmset -c lessbright 0
+        apply_pmset -b lessbright 1
       fi
     fi
   '';
@@ -85,8 +88,16 @@
     console_user="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     macos_major="$(/usr/bin/sw_vers -productVersion 2>/dev/null | /usr/bin/awk -F. '{print $1}')"
 
-    if [ -x /usr/local/bin/battery ] && [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
-      if ! /usr/bin/sudo -u "$console_user" /usr/local/bin/battery maintain 80; then
+    battery_cli=""
+    for candidate in /usr/local/bin/battery /usr/local/co.palokaj.battery/battery; do
+      if [ -x "$candidate" ]; then
+        battery_cli="$candidate"
+        break
+      fi
+    done
+
+    if [ -n "$battery_cli" ] && [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
+      if ! /usr/bin/sudo -u "$console_user" "$battery_cli" maintain 80; then
         echo "nucleus: battery maintain 80 failed for user '$console_user'." >&2
       fi
     elif [ -x /opt/homebrew/bin/bclm ]; then
