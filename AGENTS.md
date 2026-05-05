@@ -56,6 +56,9 @@
   rules into `AGENTS.md`.
 - Keep CI, editor automation, prompt examples, and instruction files aligned
   with the commands and configs that are actually present in the repository.
+- Treat `package-ecosystem: "nix"` in `.github/dependabot.yml` as valid even
+  when `check-dependabot` reports a schema error; that hook can lag current
+  Dependabot ecosystem support.
 
 ## Conventions
 

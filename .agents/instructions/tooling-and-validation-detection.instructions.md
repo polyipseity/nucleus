@@ -50,6 +50,9 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
   from `src/`, `nix shell nixpkgs#powershell -c pwsh ...`, and
   `winget configure --what-if .\src\hosts\windows\system.dsc.yml` with
   `winget configure --what-if .\src\hosts\windows\user.dsc.yml`).
+- Treat `package-ecosystem: "nix"` in `.github/dependabot.yml` as valid even
+  when `check-dependabot` reports a schema error; that validator can lag
+  Dependabot ecosystem support.
 - When no runnable validation exists yet, say that explicitly and point to the
   files that would need to be added before validation can be automated.
 
