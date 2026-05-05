@@ -58,5 +58,5 @@ hooks = [{ id = "check-dependabot" }, { id = "check-github-workflows" }]
 [[repos]]
 repo = "local"
 hooks = [
-  { id = "powershell-syntax", name = "powershell-syntax", language = "system", files = "\\.ps1$", entry = "nix --extra-experimental-features nix-command --extra-experimental-features flakes run ./src#validate-powershell-syntax --" },
+  { id = "powershell-syntax", name = "powershell-syntax", language = "system", files = "\\.ps1$", entry = "env NIX_CONFIG=experimental-features\\ =\\ nix-command\\ flakes nix run ./src#validate-powershell-syntax --" },
 ]

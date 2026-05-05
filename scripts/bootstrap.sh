@@ -3,10 +3,26 @@
 # After running this script, apply the configuration with: nix run ./src#apply
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 VERSIONS_FILE="$SCRIPT_DIR/bootstrap-versions.env"
 COMMAND="${1:-install-deps}"
+NIX_FEATURES_CONFIG="experimental-features = nix-command flakes"
+
+merge_nix_config() {
+  # Merge caller-provided NIX_CONFIG (if any) with required flake settings so
+  # bootstrap commands stay portable without repeating feature flags.
+  if [ -n "${NIX_CONFIG:-}" ]; then
+    printf '%s\n%s' "$NIX_CONFIG" "$NIX_FEATURES_CONFIG"
+  else
+    printf '%s' "$NIX_FEATURES_CONFIG"
+  fi
+}
+
+run_nix() {
+  # Execute nix with the merged config for this script invocation.
+  NIX_CONFIG="$(merge_nix_config)" nix "$@"
+}
 
 if [ "$COMMAND" = "-h" ] || [ "$COMMAND" = "--help" ] || [ "$COMMAND" = "help" ]; then
   cat <<'EOF'
@@ -47,8 +63,8 @@ load_bootstrap_versions() {
     exit 1
   fi
 
-  # shellcheck disable=SC1090
   set -a
+  # shellcheck disable=SC1090
   . "$VERSIONS_FILE"
   set +a
 
@@ -106,7 +122,7 @@ bootstrap_nix_if_missing() {
   rm -f "$installer_path"
 
   if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
-    # shellcheck disable=SC1090
+    # shellcheck disable=SC1091
     . "$HOME/.nix-profile/etc/profile.d/nix.sh"
   elif [ -f "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" ]; then
     # shellcheck disable=SC1091
@@ -191,16 +207,16 @@ load_bootstrap_versions
 ensure_macos_nix_mount
 bootstrap_nix_if_missing
 
-if ! nix --extra-experimental-features "nix-command flakes" profile list 2>/dev/null | grep -q "bootstrap-deps"; then
+if ! run_nix profile list 2>/dev/null | grep -q "bootstrap-deps"; then
   printf '%s\n' "Installing bootstrap-managed dependencies..."
-  nix --extra-experimental-features "nix-command flakes" profile add "$REPO_ROOT/src#bootstrap-deps"
+  run_nix profile add "$REPO_ROOT/src#bootstrap-deps"
 else
   printf '%s\n' "Bootstrap dependencies already present, skipping installation."
 fi
 
 if [ "$COMMAND" = "apply" ]; then
   printf '%s\n' "Running apply flow via src#apply..."
-  nix --extra-experimental-features "nix-command flakes" run "$REPO_ROOT/src#apply"
+  run_nix run "$REPO_ROOT/src#apply"
   exit 0
 fi
 

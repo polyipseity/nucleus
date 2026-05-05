@@ -19,15 +19,35 @@
 #                      in homeConfigurations in flake.nix.
 #
 # Prerequisites: Nix installed; caller's environment must allow reaching the
-# nix binary.  nix-command and flakes features are passed explicitly so the
-# script works even when they are not pre-enabled in nix.conf.
+# nix binary.
 set -eu
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
-# Pass experimental features at every nix invocation rather than relying on
-# nix.conf so the script is portable to freshly bootstrapped machines where
-# the system config has not yet been applied.
-NIX_EXTRA_FEATURES="nix-command flakes"
+# Keep one centralized Nix config fragment for this script so every `nix` call
+# gets flake support without repeating CLI flags.
+NIX_FEATURES_CONFIG="experimental-features = nix-command flakes"
+
+merge_nix_config() {
+  # Merge caller-provided NIX_CONFIG (if any) with the required flake features
+  # so user-level overrides remain intact while the apply flow stays portable.
+  if [ -n "${NIX_CONFIG:-}" ]; then
+    printf '%s\n%s' "$NIX_CONFIG" "$NIX_FEATURES_CONFIG"
+  else
+    printf '%s' "$NIX_FEATURES_CONFIG"
+  fi
+}
+
+run_nix() {
+  # Execute nix with the merged config for non-root operations.
+  NIX_CONFIG="$(merge_nix_config)" nix "$@"
+}
+
+run_nix_as_root() {
+  # Execute nix as root while injecting the merged config explicitly so sudo's
+  # default environment filtering cannot drop required flake settings.
+  NIX_CONFIG_VALUE="$(merge_nix_config)"
+  sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" nix "$@"
+}
 
 start_sudo_keepalive() {
   # Prompt for the sudo password once, before build output floods the terminal.
@@ -68,7 +88,7 @@ case "$(uname -s)" in
     start_sudo_keepalive
     # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
     # while running as root (which otherwise produces ownership warnings).
-    sudo -H nix --extra-experimental-features "$NIX_EXTRA_FEATURES" run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
+    run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
     ;;
   Linux)
     if [ -f /etc/NIXOS ]; then
@@ -76,13 +96,13 @@ case "$(uname -s)" in
       # home-manager module are applied in a single atomic activation.
       start_sudo_keepalive
       # Keep root invocations on root-owned HOME for consistent Nix behavior.
-      sudo -H nix --extra-experimental-features "$NIX_EXTRA_FEATURES" run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
+      run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
     else
       # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
       # no sudo required — keepalive is not started.
       # The profile name must match the homeConfigurations key in flake.nix.
       target_username="${NUCLEUS_USERNAME:-$(id -un)}"
-      nix --extra-experimental-features "$NIX_EXTRA_FEATURES" run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
+      run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
     fi
     ;;
   *)

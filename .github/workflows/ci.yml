@@ -39,6 +39,10 @@ jobs:
   build:
     name: "Build & Test"
     runs-on: ubuntu-latest
+    env:
+      # Keep flake support centralized at the job level so individual commands
+      # stay readable while still working on fresh CI environments.
+      NIX_CONFIG: experimental-features = nix-command flakes
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -47,4 +51,4 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@4a754ab0c192f4d12cf88b5954b9dd13fd2d612e
 
       - name: Validate PowerShell syntax
-        run: nix --extra-experimental-features nix-command --extra-experimental-features flakes run ./src#validate-powershell-syntax
+        run: nix run ./src#validate-powershell-syntax
