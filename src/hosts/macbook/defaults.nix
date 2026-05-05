@@ -313,15 +313,16 @@ in
 
       # iTerm2: allow clipboard access from terminal applications, enable the
       # bootstrap daemon (supports shell integration without requiring a full
-      # app launch), tip of the day on, subscribe to the nightly testing feed,
-      # enable Secure Keyboard Entry.
+      # app launch), disable in-app update checks because updates are managed
+      # declaratively, suppress the secure-keyboard-entry/open-command warning,
+      # and keep Secure Keyboard Entry enabled.
       "com.googlecode.iterm2" = {
         "AllowClipboardAccess" = true;
         "BootstrapDaemon" = true;
         "NoSyncTipOfTheDay" = false;
-        "SUCheckAtStartup" = true;
-        "SUEnableAutomaticChecks" = true;
-        "SUFeedURL" = "https://iterm2.com/appcasts/testing_modern.xml"; # nightly testing feed
+        "SUCheckAtStartup" = false;
+        "SUEnableAutomaticChecks" = false;
+        "WarnAboutSecureKeyboardInputWithOpenCommand" = false;
         "Secure Input" = true;  # blocks other processes from reading keystrokes
       };
     };
