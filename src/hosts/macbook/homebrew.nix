@@ -74,6 +74,11 @@ in
   homebrew = {
     enable = true;
 
+    # Use managed Cask installs without quarantine metadata so first-launch
+    # Gatekeeper prompts do not block apps that are already declared and
+    # trusted in this host's declarative software baseline.
+    caskArgs.no_quarantine = true;
+
     onActivation.autoUpdate = true;   # refresh Homebrew itself before bundling
     onActivation.cleanup = "zap";     # remove unlisted formulae/casks and their data
     onActivation.upgrade = true;      # upgrade outdated formulae/casks automatically
