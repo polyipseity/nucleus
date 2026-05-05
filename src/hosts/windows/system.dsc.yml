@@ -133,6 +133,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure PowerShell (`pwsh`) is installed for cross-host shell and script parity with macOS and NixOS
+      settings:
+        id: Microsoft.PowerShell
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Microsoft PowerToys is installed for Windows productivity tooling; Raycast (`9PFXXSHC64H3`) is intentionally not used on Windows and Rectangle is macOS-specific
       settings:
         id: Microsoft.PowerToys

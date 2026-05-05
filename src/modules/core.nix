@@ -18,6 +18,7 @@ let
   #   gnupg      — GPG for secret management and signing
   #   jq         — JSON processor used by activation scripts
   #   opencode   — AI-native coding agent and assistant
+  #   powershell — cross-platform PowerShell runtime (`pwsh`)
   #   prek       — pre-commit hook manager used by prek.toml
   #   ripgrep    — fast grep replacement
   #   rustup     — Rust toolchain manager
@@ -35,6 +36,7 @@ let
     pkgs.gnupg
     pkgs.jq
     pkgs.opencode
+    pkgs.powershell
     pkgs.prek
     pkgs.ripgrep
     pkgs.rustup
