@@ -7,6 +7,13 @@ properties:
   resources:
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure 7-Zip is installed for cross-host archive extraction parity with macOS and NixOS
+      settings:
+        id: 7zip.7zip
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure WhatsApp Beta is installed to mirror the macOS beta-channel application baseline; Microsoft Store currently exposes only generated ID `9NBDXK71NK08` (no stable named alias)
       settings:
         id: 9NBDXK71NK08

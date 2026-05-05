@@ -18,6 +18,7 @@ let
   #   gnupg      — GPG for secret management and signing
   #   jq         — JSON processor used by activation scripts
   #   opencode   — AI-native coding agent and assistant
+  #   p7zip      — 7z compression and archive extraction utility
   #   powershell — cross-platform PowerShell runtime (`pwsh`)
   #   prek       — pre-commit hook manager used by prek.toml
   #   ripgrep    — fast grep replacement
@@ -37,6 +38,7 @@ let
     pkgs.gnupg
     pkgs.jq
     pkgs.opencode
+    pkgs.p7zip
     pkgs.powershell
     pkgs.prek
     pkgs.ripgrep
