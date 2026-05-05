@@ -91,6 +91,23 @@
           text = builtins.readFile ./scripts/apply.sh;
         }}/bin/nucleus-apply";
       };
+
+      # Build the PowerShell syntax validation app for a given package set.
+      # Runtime dependencies are bundled from this flake so CI and local runs do
+      # not depend on ad-hoc system package versions.
+      mkPowerShellSyntaxValidationApp = pkgs: {
+        type = "app";
+        program = "${pkgs.writeShellApplication {
+          name = "nucleus-validate-powershell-syntax";
+          runtimeInputs = [
+            pkgs.git
+            pkgs.powershell
+          ];
+          text = ''
+            exec pwsh -NoLogo -NoProfile -NonInteractive -File "${../scripts/validate-powershell-syntax.ps1}" "$@"
+          '';
+        }}/bin/nucleus-validate-powershell-syntax";
+      };
     in {
       # -----------------------------------------------------------------------
       # apps — runnable via `nix run .#<name>`.
@@ -107,6 +124,7 @@
             type = "app";
             program = "${darwin.packages.${systems.mac}.darwin-rebuild}/bin/darwin-rebuild";
           };
+          validate-powershell-syntax = mkPowerShellSyntaxValidationApp pkgsMac;
         };
         "${systems.linux}" = {
           apply = mkApplyApp pkgsLinux;
@@ -118,6 +136,7 @@
             type = "app";
             program = "${pkgsLinux.nixos-rebuild}/bin/nixos-rebuild";
           };
+          validate-powershell-syntax = mkPowerShellSyntaxValidationApp pkgsLinux;
         };
       };
 

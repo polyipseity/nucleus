@@ -58,5 +58,5 @@ hooks = [{ id = "check-dependabot" }, { id = "check-github-workflows" }]
 [[repos]]
 repo = "local"
 hooks = [
-  { id = "powershell-syntax", name = "powershell-syntax", language = "system", files = "\\.ps1$", entry = '''pwsh -NoLogo -NoProfile -NonInteractive -Command "$ErrorActionPreference = \"Stop\"; $parseErrors = @(); foreach ($file in $args) { $tokens = $null; $errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$tokens, [ref]$errors); if ($errors) { $parseErrors += $errors } }; if ($parseErrors.Count -gt 0) { foreach ($error in $parseErrors) { Write-Host (\"{0}:{1}:{2}: {3}\" -f $error.Extent.File, $error.Extent.StartLineNumber, $error.Extent.StartColumnNumber, $error.Message) }; exit 1 }"''' },
+  { id = "powershell-syntax", name = "powershell-syntax", language = "system", files = "\\.ps1$", entry = "nix --extra-experimental-features nix-command --extra-experimental-features flakes run ./src#validate-powershell-syntax --" },
 ]

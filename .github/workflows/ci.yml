@@ -43,28 +43,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@4a754ab0c192f4d12cf88b5954b9dd13fd2d612e
+
       - name: Validate PowerShell syntax
-        run: |
-          nix shell nixpkgs#powershell -c pwsh -NoLogo -NoProfile -NonInteractive -Command '
-            $ErrorActionPreference = "Stop"
-            $files = @(git ls-files "*.ps1")
-            $parseErrors = @()
-
-            foreach ($file in $files) {
-              $tokens = $null
-              $errors = $null
-              [void][System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$tokens, [ref]$errors)
-              if ($errors) {
-                $parseErrors += $errors
-              }
-            }
-
-            if ($parseErrors.Count -gt 0) {
-              foreach ($error in $parseErrors) {
-                Write-Host ("{0}:{1}:{2}: {3}" -f $error.Extent.File, $error.Extent.StartLineNumber, $error.Extent.StartColumnNumber, $error.Message)
-              }
-              throw "PowerShell syntax validation failed."
-            }
-
-            Write-Host ("PowerShell syntax validation passed for {0} files." -f $files.Count)
-          '
+        run: nix --extra-experimental-features nix-command --extra-experimental-features flakes run ./src#validate-powershell-syntax
