@@ -109,6 +109,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 
 $resolvedConfigDir = (Resolve-Path -Path $ConfigDir).Path
 $machineSshHostKeyPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key"
+$primarySshKeyPath = Join-Path -Path $HOME -ChildPath ".ssh\ssh_personal_$PrimaryUsername"
 
 # Resolve managed executables before running any decryption/materialization.
 $sopsPackageDir = Get-ChildItem -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath "Microsoft\WinGet\Packages\SecretsOPerationS.SOPS_*") -Directory -ErrorAction SilentlyContinue |
@@ -136,7 +137,7 @@ $gpgExe = Resolve-NucleusExecutable -Name "gpg" -CandidatePaths $gpgCandidates
 # Materialize user-scoped secrets once before DSC resources run.
 $secretsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets"
 if ($EnableSecretsParity) {
-  Sync-NucleusSecrets -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimaryUsername $PrimaryUsername -SopsExe $sopsExe
+  Sync-NucleusSecrets -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -PrimaryUsername $PrimaryUsername -SopsExe $sopsExe
 }
 else {
   Remove-NucleusManagedSecrets -PrimaryUsername $PrimaryUsername
@@ -146,7 +147,7 @@ else {
 # explicit active wallpaper path deterministically.
 $wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wallpapers"
 $wallpaperOutputDir = Join-Path -Path $HOME -ChildPath "Pictures\wallpapers"
-$activeWallpaperPath = Sync-NucleusWallpapers -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -OutputDir $wallpaperOutputDir -SopsExe $sopsExe
+$activeWallpaperPath = Sync-NucleusWallpapers -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -OutputDir $wallpaperOutputDir -SopsExe $sopsExe
 Remove-NucleusStaleWallpapers -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
 
 foreach ($configFile in $ConfigFiles) {

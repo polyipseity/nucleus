@@ -87,6 +87,10 @@ function Sync-NucleusSecretFile {
   .PARAMETER HostKeyPath
     Path to this machine's SSH host private key used as the age decryption key.
 
+  .PARAMETER PrimarySshKeyPath
+    Path to the primary user's managed SSH private key used as the final
+    fallback age decryption identity.
+
   .PARAMETER SopsExe
     Absolute path to the sops executable.
 
@@ -95,7 +99,8 @@ function Sync-NucleusSecretFile {
 
   .EXAMPLE
     Sync-NucleusSecretFile -FilePath '.\ssh-personal.yml' -GpgExe 'gpg.exe' `
-      -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' -SopsExe 'sops.exe' `
+      -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
+      -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" -SopsExe 'sops.exe' `
       -PrimaryUsername 'polyipseity'
   #>
   param(
@@ -107,6 +112,9 @@ function Sync-NucleusSecretFile {
 
     [Parameter(Mandatory = $true)]
     [string]$HostKeyPath,
+
+    [Parameter(Mandatory = $true)]
+    [string]$PrimarySshKeyPath,
 
     [Parameter(Mandatory = $true)]
     [string]$SopsExe,
@@ -132,7 +140,7 @@ function Sync-NucleusSecretFile {
   }
 
   Write-Host "Processing secrets from: $($secretFileInfo.Name)" -ForegroundColor Cyan
-  $jsonSecrets = Get-NucleusSecrets -FilePath $secretFileInfo.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -SopsExe $SopsExe
+  $jsonSecrets = Get-NucleusSecrets -FilePath $secretFileInfo.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe
 
   if ($null -ne $jsonSecrets.PSObject.Properties[$sshSecretName]) {
     $sshKeyPath = Join-Path -Path $sshDir -ChildPath $sshSecretName
@@ -260,6 +268,10 @@ function Invoke-NucleusJitSecretMaterialization {
   .PARAMETER HostKeyPath
     Path to this machine's SSH host private key used as the age decryption key.
 
+  .PARAMETER PrimarySshKeyPath
+    Path to the primary user's managed SSH private key used as the final
+    fallback age decryption identity.
+
   .PARAMETER SopsExe
     Absolute path to the sops executable.
 
@@ -269,7 +281,8 @@ function Invoke-NucleusJitSecretMaterialization {
   .EXAMPLE
     Invoke-NucleusJitSecretMaterialization -SecretsDir '.\secrets' `
       -SecretNames @('gpg-personal', 'ssh-personal') `
-      -GpgExe 'gpg.exe' -HostKeyPath '...\ssh_host_ed25519_key' -SopsExe 'sops.exe' `
+      -GpgExe 'gpg.exe' -HostKeyPath '...\ssh_host_ed25519_key' `
+      -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" -SopsExe 'sops.exe' `
       -PrimaryUsername 'polyipseity'
   #>
   param(
@@ -284,6 +297,9 @@ function Invoke-NucleusJitSecretMaterialization {
 
     [Parameter(Mandatory = $true)]
     [string]$HostKeyPath,
+
+    [Parameter(Mandatory = $true)]
+    [string]$PrimarySshKeyPath,
 
     [Parameter(Mandatory = $true)]
     [string]$SopsExe,
@@ -304,7 +320,7 @@ function Invoke-NucleusJitSecretMaterialization {
       throw "Requested JIT secret file was not found: $secretPath"
     }
 
-    Sync-NucleusSecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
+    Sync-NucleusSecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
   }
 }
 
@@ -332,6 +348,10 @@ function Sync-NucleusSecrets {
   .PARAMETER HostKeyPath
     Path to this machine's SSH host private key used as the age decryption key.
 
+  .PARAMETER PrimarySshKeyPath
+    Path to the primary user's managed SSH private key used as the final
+    fallback age decryption identity.
+
   .PARAMETER SopsExe
     Absolute path to the sops executable.
 
@@ -340,7 +360,8 @@ function Sync-NucleusSecrets {
 
   .EXAMPLE
     Sync-NucleusSecrets -SecretsDir '.\secrets' -GpgExe 'gpg.exe' `
-      -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' -SopsExe 'sops.exe' `
+      -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
+      -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" -SopsExe 'sops.exe' `
       -PrimaryUsername 'polyipseity'
   #>
   param(
@@ -352,6 +373,9 @@ function Sync-NucleusSecrets {
 
     [Parameter(Mandatory = $true)]
     [string]$HostKeyPath,
+
+    [Parameter(Mandatory = $true)]
+    [string]$PrimarySshKeyPath,
 
     [Parameter(Mandatory = $true)]
     [string]$SopsExe,
@@ -376,7 +400,7 @@ function Sync-NucleusSecrets {
       continue
     }
 
-    Sync-NucleusSecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
+    Sync-NucleusSecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
   }
 }
 

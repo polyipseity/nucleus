@@ -81,7 +81,7 @@ nucleus/
 | `src/scripts/apply.sh`                       | OS-detecting apply dispatcher (wrapped as `nix run .#apply`)                                                                                                                                  |
 | `src/hosts/windows/apply.ps1`                | Thin Windows apply wrapper; invokes WinGet DSC                                                                                                                                                |
 | `src/assets/wallpapers/*.sops`               | Encrypted wallpaper blobs                                                                                                                                                                     |
-| `.sops.yaml`                                 | Key policy: global GPG + per-machine age recipients                                                                                                                                           |
+| `.sops.yaml`                                 | Key policy: shared age recipient list (`keys.age_devices`) + global GPG backup recipient                                                                                                     |
 | `src/secrets/*.yml`                          | SOPS-encrypted identities (GPG keys, SSH keys)                                                                                                                                                |
 
 ## Apply commands
@@ -131,9 +131,12 @@ declarative layers — not in the orchestration scripts:
 - **Global admin identity**: your GPG encryption subkey can always decrypt repo secrets.
 - **Machine automation identities**: each physical machine contributes one age
   recipient derived from that machine's SSH host key.
+- **Primary SSH backup identity**: your primary personal SSH key is the final
+  entry in `keys.age_devices` and acts as the last age-recipient fallback.
 - **Recipient scope**: age recipients are shared across hosts and files; do not
   partition recipients by host class.
-- **Precedence**: machine SSH key first, then GPG keyring fallback.
+- **Precedence**: machine SSH key first, then GPG keyring fallback, then
+  primary SSH key fallback.
 
 Global automation identity is intentionally disabled. Re-enable only if a clear
 operational need arises.
@@ -164,7 +167,9 @@ prevent line-ending transforms and text diff heuristics.
 ## Managing machine recipients
 
 Use one age recipient per physical machine and keep all real recipients in
-`.sops.yaml` `keys.age_devices`. Do not commit placeholder values.
+`.sops.yaml` `keys.age_devices`, with your primary personal SSH recipient as the
+final fallback entry. Keep `keys.primary_gpg` as the global GPG backup
+recipient.
 
 ### Add a machine
 

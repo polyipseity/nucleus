@@ -102,9 +102,12 @@
   (for example Home Manager activation hooks or targeted Windows module calls).
 - **SOPS machine recipients**: keep `.sops.yaml` `keys.age_devices` scoped to
   real per-machine recipients (no placeholders), shared across hosts/files
-  rather than host-class partitions. When adding or removing a machine,
-  rewrap every encrypted file (`src/secrets/*.yml` and
-  `src/assets/wallpapers/*.sops`) with `sops updatekeys`.
+  rather than host-class partitions, with the primary personal SSH recipient as
+  the final fallback entry in that list. Keep `keys.primary_gpg` as the global
+  GPG backup recipient for all encrypted files.
+  When adding or removing a machine, rewrap every encrypted file
+  (`src/secrets/*.yml` and `src/assets/wallpapers/*.sops`) with
+  `sops updatekeys`.
 - **Sorting**: always sort items in any list (package lists, import lists,
   shell alias lists, shell completions, environment variable blocks) and any
   configuration block that lacks a natural semantic order. Alphabetical

@@ -33,7 +33,11 @@ function Sync-NucleusWallpapers {
     Absolute path to the gpg executable.
 
   .PARAMETER HostKeyPath
-    Path to the SSH host private key used as the age decryption key.
+    Path to this machine's SSH host private key used as the age decryption key.
+
+  .PARAMETER PrimarySshKeyPath
+    Path to the primary user's managed SSH private key used as the final
+    fallback age decryption identity.
 
   .PARAMETER OutputDir
     Directory where decrypted wallpaper files will be written.
@@ -50,6 +54,7 @@ function Sync-NucleusWallpapers {
         -AssetsDir '.\assets\wallpapers' `
         -GpgExe 'gpg.exe' `
         -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
+        -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" `
         -OutputDir "$HOME\Pictures\wallpapers" `
         -SopsExe 'sops.exe'
     # $wallpaper is now the path to the active wallpaper, or $null.
@@ -63,6 +68,9 @@ function Sync-NucleusWallpapers {
 
     [Parameter(Mandatory = $true)]
     [string]$HostKeyPath,
+
+    [Parameter(Mandatory = $true)]
+    [string]$PrimarySshKeyPath,
 
     [Parameter(Mandatory = $true)]
     [string]$OutputDir,
@@ -93,7 +101,7 @@ function Sync-NucleusWallpapers {
     $outputPath = Join-Path -Path $OutputDir -ChildPath $outputName
 
     Write-Host "Materializing wallpaper: $outputName" -ForegroundColor Cyan
-    Get-NucleusDecryptedBlob -FilePath $wallpaperFile.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -OutputPath $outputPath -SopsExe $SopsExe
+    Get-NucleusDecryptedBlob -FilePath $wallpaperFile.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -OutputPath $outputPath -SopsExe $SopsExe
 
     if (-not $activeWallpaperPath) {
       $activeWallpaperPath = $outputPath

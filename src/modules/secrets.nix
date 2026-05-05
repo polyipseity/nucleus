@@ -41,8 +41,8 @@
 #        ssh-to-age < /etc/ssh/ssh_host_ed25519.pub
 #        sops updatekeys src/secrets/ssh-personal.yml
 #        sops updatekeys src/secrets/gpg-personal.yml
-#      After this step sops-nix uses the machine SSH key and GPG is no longer
-#      required as the primary decryption path.
+#      After this step sops-nix uses this precedence chain:
+#        machine SSH key -> primary GPG key -> primary SSH key.
 { config, lib, pkgs, username ? null, ... }:
 let
   primaryUsername =
@@ -71,9 +71,9 @@ let
     };
 in
 lib.mkIf isPrimaryUser {
-  # Register both decryption backends for the HM sops-nix module.
+  # Register the machine-identity decryption backend for the HM sops-nix module.
   # age: machine SSH key — works once keys.age_devices is populated in .sops.yaml.
-  # gpg: fallback using the keyring populated by the bootstrap step above.
+  # Global backup recipients (primary_gpg / primary_ssh) are managed in .sops.yaml.
   sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
   sops.gnupg.home = "${config.home.homeDirectory}/.gnupg";
 

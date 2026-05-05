@@ -136,9 +136,9 @@ function Get-NucleusSecrets {
       1. Machine SSH key (age recipient derived from this machine's SSH host key).
          The key path is passed via the SOPS_AGE_SSH_PRIVATE_KEY_FILE env var
          and cleared in a `finally` block so it is never left in the environment.
-      2. GPG keyring (used when the machine SSH key is absent, e.g. first-run or
-          ephemeral environments).  Fails early with a clear message if no GPG
-          secret keys are imported.
+      2. GPG keyring.
+      3. Primary personal SSH key (age recipient derived from
+         ssh_personal_<user>.pub).
 
     The decrypted payload is parsed from JSON and returned as a PowerShell
     object so callers can access named fields with dot notation.
@@ -155,6 +155,10 @@ function Get-NucleusSecrets {
     When the file does not exist, machine-key decryption is skipped and GPG is
     tried.
 
+  .PARAMETER PrimarySshKeyPath
+    Path to the primary user's managed SSH private key used as the final
+    fallback age decryption identity.
+
   .PARAMETER SopsExe
     Absolute path to the sops executable.
 
@@ -163,7 +167,8 @@ function Get-NucleusSecrets {
 
   .EXAMPLE
     $secrets = Get-NucleusSecrets -FilePath '.\secrets.yml' -GpgExe 'gpg.exe' `
-        -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' -SopsExe 'sops.exe'
+        -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
+        -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" -SopsExe 'sops.exe'
     $secrets.ssh_keys
   #>
   param(
@@ -175,6 +180,9 @@ function Get-NucleusSecrets {
 
     [Parameter(Mandatory = $true)]
     [string]$HostKeyPath,
+
+    [Parameter(Mandatory = $true)]
+    [string]$PrimarySshKeyPath,
 
     [Parameter(Mandatory = $true)]
     [string]$SopsExe
@@ -198,12 +206,36 @@ function Get-NucleusSecrets {
   }
 
   $secretKeyInfo = & $GpgExe --list-secret-keys --with-colons 2>$null
-  if (-not $secretKeyInfo -or -not ($secretKeyInfo -match "^(sec|ssb):")) {
-    throw "No GPG secret keys detected. Import your encryption subkey before applying."
+  $hasGpgSecretKeys = ($secretKeyInfo -and ($secretKeyInfo -match "^(sec|ssb):"))
+  if ($hasGpgSecretKeys) {
+    try {
+      Write-Host "Decrypting with GPG keyring..." -ForegroundColor Cyan
+      return (& $SopsExe @sopsArgs | ConvertFrom-Json)
+    }
+    catch {
+      Write-Host "GPG decryption failed. Trying primary SSH key fallback..." -ForegroundColor Yellow
+    }
+  }
+  else {
+    Write-Host "No GPG secret keys detected. Trying primary SSH key fallback..." -ForegroundColor Yellow
   }
 
-  Write-Host "Decrypting with GPG keyring..." -ForegroundColor Cyan
-  return (& $SopsExe @sopsArgs | ConvertFrom-Json)
+  if (Test-Path -Path $PrimarySshKeyPath) {
+    Write-Host "Found primary SSH key. Trying primary-ssh decryption..." -ForegroundColor Green
+    $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $PrimarySshKeyPath
+
+    try {
+      return (& $SopsExe @sopsArgs | ConvertFrom-Json)
+    }
+    catch {
+      throw "Primary-ssh decryption failed for '$FilePath' after machine-key and GPG attempts."
+    }
+    finally {
+      Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction SilentlyContinue
+    }
+  }
+
+  throw "Unable to decrypt '$FilePath'. Machine SSH key, GPG keyring, and primary SSH key were unavailable or failed."
 }
 
 function Get-NucleusDecryptedBlob {
@@ -213,8 +245,8 @@ function Get-NucleusDecryptedBlob {
     $OutputPath.
 
   .DESCRIPTION
-    Similar key-priority logic to Get-NucleusSecrets (machine SSH key first, GPG
-    keyring fallback), but uses `sops --output` to write the raw decrypted
+    Similar key-priority logic to Get-NucleusSecrets (machine SSH key, then GPG,
+    then primary SSH key), but uses `sops --output` to write the raw decrypted
     bytes directly to $OutputPath instead of capturing stdout.  Used for binary
     assets such as wallpaper images that cannot be embedded in JSON.
 
@@ -227,6 +259,10 @@ function Get-NucleusDecryptedBlob {
   .PARAMETER HostKeyPath
     Path to this machine's SSH host private key backing the age recipient.
 
+  .PARAMETER PrimarySshKeyPath
+    Path to the primary user's managed SSH private key used as the final
+    fallback age decryption identity.
+
   .PARAMETER OutputPath
     Destination path where the decrypted bytes will be written.
 
@@ -235,8 +271,9 @@ function Get-NucleusDecryptedBlob {
 
   .EXAMPLE
     Get-NucleusDecryptedBlob -FilePath '.\wallpaper.jpg.sops' -GpgExe 'gpg.exe' `
-        -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-        -OutputPath 'C:\Users\me\Pictures\wallpaper.jpg' -SopsExe 'sops.exe'
+    -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
+    -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" `
+    -OutputPath 'C:\Users\me\Pictures\wallpaper.jpg' -SopsExe 'sops.exe'
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -247,6 +284,9 @@ function Get-NucleusDecryptedBlob {
 
     [Parameter(Mandatory = $true)]
     [string]$HostKeyPath,
+
+    [Parameter(Mandatory = $true)]
+    [string]$PrimarySshKeyPath,
 
     [Parameter(Mandatory = $true)]
     [string]$OutputPath,
@@ -274,12 +314,35 @@ function Get-NucleusDecryptedBlob {
   }
 
   $secretKeyInfo = & $GpgExe --list-secret-keys --with-colons 2>$null
-  if (-not $secretKeyInfo -or -not ($secretKeyInfo -match "^(sec|ssb):")) {
-    throw "No GPG secret keys detected. Import your encryption subkey before decrypting binary assets."
+  $hasGpgSecretKeys = ($secretKeyInfo -and ($secretKeyInfo -match "^(sec|ssb):"))
+  if ($hasGpgSecretKeys) {
+    & $SopsExe @sopsArgs
+    if ($LASTEXITCODE -eq 0) {
+      return
+    }
+
+    Write-Host "GPG decryption failed for '$FilePath'. Trying primary SSH key fallback..." -ForegroundColor Yellow
+  }
+  else {
+    Write-Host "No GPG secret keys detected. Trying primary SSH key fallback for '$FilePath'..." -ForegroundColor Yellow
   }
 
-  & $SopsExe @sopsArgs
-  if ($LASTEXITCODE -ne 0) {
-    throw "Failed to decrypt blob '$FilePath'."
+  if (Test-Path -Path $PrimarySshKeyPath) {
+    Write-Host "Found primary SSH key. Trying primary-ssh decryption for '$FilePath'..." -ForegroundColor Green
+    $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $PrimarySshKeyPath
+
+    try {
+      & $SopsExe @sopsArgs
+      if ($LASTEXITCODE -eq 0) {
+        return
+      }
+
+      throw "Primary-ssh decryption failed for '$FilePath' after machine-key and GPG attempts."
+    }
+    finally {
+      Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction SilentlyContinue
+    }
   }
+
+  throw "Failed to decrypt blob '$FilePath'. Machine SSH key, GPG keyring, and primary SSH key were unavailable or failed."
 }
