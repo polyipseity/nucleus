@@ -153,11 +153,11 @@ in
         ImportToCloudEnabled = 1;
       };
 
-      # Siri: enable keyboard shortcut (Option+Space = 1), hide menu-bar icon,
-      # enable Type to Siri (type instead of speak).
+      # Siri: enable keyboard shortcut (Option+Space = 1), hide menu-bar chrome
+      # for a cleaner UI, and keep Type to Siri enabled for fast access.
       "com.apple.Siri" = {
         KeyboardShortcut = 1;      # Option+Space invokes Siri
-        StatusMenuVisible = false; # hide Siri from the menu bar
+        StatusMenuVisible = false; # hide Siri from the menu bar; shortcut remains available
         TypeToSiriEnabled = true;  # type queries instead of speaking them
       };
 
@@ -181,10 +181,10 @@ in
       "com.apple.TextInputMenu".visible = true;
 
       # Window Manager: enable click-to-show-desktop, hide Stage Manager widgets
-      # by default, enable window tiling (macOS 15+).
+      # for lower visual noise, and keep window tiling enabled (macOS 15+).
       "com.apple.WindowManager" = {
         EnableStandardClickToShowDesktop = true;
-        StandardHideWidgets = true;   # hide Stage Manager widget strip by default
+        StandardHideWidgets = true;   # hide Stage Manager widget strip to reduce persistent chrome
         WindowTilingEnabled = true;   # enable drag-to-edge window tiling (Sequoia)
       };
 
@@ -267,9 +267,8 @@ in
         "spans-displays" = true;
       };
 
-      # Spotlight: ordered search result categories.  MENU_SUGGESTIONS and
-      # MENU_WEBSEARCH are disabled to prevent Spotlight from sending queries
-      # to Apple/Bing.
+      # Spotlight: ordered search result categories with web/suggestions enabled
+      # so search surfaces maximum context instead of hiding result classes.
       "com.apple.spotlight" = {
         orderedItems = [
           { enabled = true;  name = "APPLICATIONS"; }
@@ -288,8 +287,8 @@ in
           { enabled = true;  name = "PRESENTATIONS"; }
           { enabled = true;  name = "SPREADSHEETS"; }
           { enabled = true;  name = "SOURCE"; }
-          { enabled = false; name = "MENU_SUGGESTIONS"; } # disabled: prevents cloud lookups
-          { enabled = false; name = "MENU_WEBSEARCH"; }   # disabled: prevents web searches
+          { enabled = true;  name = "MENU_SUGGESTIONS"; }
+          { enabled = true;  name = "MENU_WEBSEARCH"; }
         ];
       };
 
@@ -331,7 +330,7 @@ in
     # Dock settings
     # -------------------------------------------------------------------------
     dock = {
-      autohide = true;               # auto-hide Dock; shown only on cursor hover
+      autohide = true;               # hide Dock chrome by default; summon on edge hover
       expose-group-apps = true;      # Mission Control groups windows by application
       largesize = 128;               # magnified icon size when hovering
       launchanim = true;             # animate app icons on launch
@@ -340,8 +339,8 @@ in
       minimize-to-application = true; # minimized windows collapse into app icon
       mru-spaces = false;            # do not reorder Spaces by recent use
       orientation = "bottom";        # Dock position
-      show-recents = false;          # hide recently opened apps section
-      static-only = true;            # show only running apps; hide pinned placeholders
+      show-recents = false;          # hide recents section to keep Dock focused on deliberate pins
+      static-only = true;            # keep Dock scoped to active apps only for minimal persistent chrome
       tilesize = 128;                # base icon size
     };
 
@@ -350,12 +349,13 @@ in
     # -------------------------------------------------------------------------
     finder = {
       _FXShowPosixPathInTitle = true;        # show full POSIX path in title bar
+      AppleShowAllFiles = true;              # always show hidden files in Finder
       AppleShowAllExtensions = true;         # always show file extensions
       CreateDesktop = true;                  # allow files/icons on the Desktop
       FXDefaultSearchScope = "SCcf";         # default search scope: current folder
-      FXEnableExtensionChangeWarning = false; # suppress warning when changing extension
+      FXEnableExtensionChangeWarning = false; # suppress extension-change dialog friction for power workflows
       FXPreferredViewStyle = "clmv";         # default view: column view
-      FXRemoveOldTrashItems = true;          # auto-delete Trash items after 30 days
+      FXRemoveOldTrashItems = true;          # auto-prune Trash after 30 days to reduce maintenance clutter
       ShowExternalHardDrivesOnDesktop = true;
       ShowHardDrivesOnDesktop = true;
       ShowMountedServersOnDesktop = true;

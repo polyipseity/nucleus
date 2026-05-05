@@ -56,10 +56,8 @@ lib.mkIf pkgs.stdenv.isLinux {
       tap-to-click = true;
     };
 
-    # Finder/Safari/Spotlight privacy intent parity:
-    # - Disable external search providers.
-    # - Avoid recent-file persistence.
-    # - Auto-clean temporary and trash content.
+    # Privacy/history defaults favor lower persistent UI/state noise while still
+    # preserving explicit discoverability controls in file/navigation surfaces.
     "org/gnome/desktop/privacy" = {
       old-files-age = lib.hm.gvariant.mkUint32 30;
       remember-recent-files = false;
@@ -67,9 +65,19 @@ lib.mkIf pkgs.stdenv.isLinux {
       remove-old-trash-files = true;
     };
 
-    # Spotlight parity: no web/external lookups from desktop search.
+    # Keep external search providers visible so GNOME search surfaces all
+    # available information sources.
     "org/gnome/desktop/search-providers" = {
-      disable-external = true;
+      disable-external = false;
+    };
+
+    # GTK file chooser visibility defaults: show hidden files and keep key
+    # columns visible for richer file metadata in open/save dialogs.
+    "org/gtk/settings/file-chooser" = {
+      location-mode = "filename-entry";
+      show-hidden = true;
+      show-size-column = true;
+      show-type-column = true;
     };
 
     # Security invariant parity: lock immediately once session idles.
@@ -103,8 +111,16 @@ lib.mkIf pkgs.stdenv.isLinux {
     # Finder-ish file-browser defaults where GNOME has equivalents.
     "org/gnome/nautilus/preferences" = {
       default-folder-viewer = "list-view";
+      show-directory-item-counts = "always";
       show-delete-permanently = true;
+      show-full-path-titles = true;
+      show-hidden-files = true;
       show-image-thumbnails = "always";
+    };
+
+    # Keep user extensions enabled to avoid hiding shell capabilities by default.
+    "org/gnome/shell" = {
+      disable-user-extensions = false;
     };
 
     # Night Shift parity (18:00 → 06:00, warm tone).

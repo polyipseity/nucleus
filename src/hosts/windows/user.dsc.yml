@@ -52,6 +52,76 @@ properties:
         valueData: "60"
         valueType: String
 
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: explorerHideFileExt
+      directives:
+        description: Keep file extensions visible so file types are never hidden in Explorer views
+      settings:
+        keyPath: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+        valueName: HideFileExt
+        valueData: 0
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: explorerHidden
+      directives:
+        description: Show hidden files and folders so Explorer surfaces full directory contents
+      settings:
+        keyPath: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+        valueName: Hidden
+        valueData: 1
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: explorerNavPaneShowAllFolders
+      directives:
+        description: Show all folders in the Explorer navigation pane so hierarchy context is always visible
+      settings:
+        keyPath: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+        valueName: NavPaneShowAllFolders
+        valueData: 1
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: explorerSearchboxTaskbarMode
+      directives:
+        description: Hide the taskbar search box to reduce persistent taskbar chrome while preserving keyboard-driven search workflows
+      settings:
+        keyPath: HKCU\Software\Microsoft\Windows\CurrentVersion\Search
+        valueName: SearchboxTaskbarMode
+        valueData: 0
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: explorerShowStatusBar
+      directives:
+        description: Keep the Explorer status bar visible so item counts and selection details are not hidden
+      settings:
+        keyPath: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+        valueName: ShowStatusBar
+        valueData: 1
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: explorerShowSuperHidden
+      directives:
+        description: Show protected operating system files for maximum filesystem transparency during maintenance tasks
+      settings:
+        keyPath: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+        valueName: ShowSuperHidden
+        valueData: 1
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: explorerShowTaskViewButton
+      directives:
+        description: Hide the Task View button to keep taskbar chrome minimal while retaining workspace switching via keyboard shortcuts
+      settings:
+        keyPath: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+        valueName: ShowTaskViewButton
+        valueData: 0
+        valueType: DWord
+
     - resource: PSDscResources/Script
       id: wallpaperRefresh
       dependsOn:
