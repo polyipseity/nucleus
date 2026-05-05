@@ -26,8 +26,10 @@
   # releases can ignore or partially override higher-level power options.
   #
   # Invariant:
-  #   - Battery: 1-minute display sleep, 1-minute system sleep, 10-minute disk
-  #     sleep, wake-on-LAN enabled
+  #   - Battery: 1-minute system sleep, 1-minute disk sleep, low-power mode on
+  #   - Battery display sleep and wake-on-LAN are intentionally unmanaged:
+  #     with low-power mode enabled on this host, macOS keeps forcing
+  #     displaysleep=2 and womp=0 after writes.
   #   - AC: 1-minute display sleep, no idle system sleep, no disk sleep,
   #     wake-on-LAN enabled
   #   - Shared: Power Nap and lid wake enabled
@@ -63,7 +65,11 @@
       # Apply explicit per-source timers and wake policy after lowpowermode so
       # platform presets cannot silently revert these managed values.
       apply_pmset -c womp 1 displaysleep 1 sleep 0 disksleep 0
-      apply_pmset -b womp 1 displaysleep 1 sleep 1 disksleep 10
+
+      # macOS currently overrides battery displaysleep and womp while
+      # lowpowermode is enabled, so only enforce the battery values that remain
+      # stable across activation runs.
+      apply_pmset -b sleep 1 disksleep 1
 
       if pmset_supports lessbright; then
         apply_pmset -c lessbright 0
@@ -88,6 +94,7 @@
     console_user="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     macos_major="$(/usr/bin/sw_vers -productVersion 2>/dev/null | /usr/bin/awk -F. '{print $1}')"
 
+    battery_app="/Applications/battery.app"
     battery_cli=""
     for candidate in /usr/local/bin/battery /usr/local/co.palokaj.battery/battery; do
       if [ -x "$candidate" ]; then
@@ -111,6 +118,8 @@
           echo "nucleus: bclm persist failed." >&2
         fi
       fi
+    elif [ -d "$battery_app" ]; then
+      echo "nucleus: battery.app is installed but the battery CLI is unavailable; open battery.app once and complete setup to install the helper command." >&2
     else
       echo "nucleus: no supported battery charge-limit tool found (expected /usr/local/bin/battery or /opt/homebrew/bin/bclm)." >&2
     fi
