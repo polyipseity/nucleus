@@ -178,6 +178,10 @@ Darwin bridge symlinks only apply when the backend resolves to Homebrew.
   BetterDisplay Pro-only operations. Do not rely on features that require Pro
   (for example connection toggles for non-virtual displays or other gated
   controls); prefer free-tier-compatible virtual-screen workflows.
+- **Battery Charge-Limit Invariant (macOS 15+)** — do not rely on `bclm` on
+  macOS 15 or newer because entitlement enforcement breaks it. Prefer the
+  `battery` app/CLI workflow for maintaining an 80% charge cap on Apple
+  Silicon hosts.
 
 ### Security Invariants (Windows)
 

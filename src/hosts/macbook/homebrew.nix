@@ -26,6 +26,7 @@ let
   staticManagedCasks = [
     "alt-tab"                    # Windows-style alt-tab switcher
     "appcleaner"                 # Thorough app uninstaller
+    "battery"                    # Apple Silicon charge-limit manager (maintains 80% cap)
     "betterdisplay"              # Advanced display management and virtual screens
     "chrome-remote-desktop-host" # Headless remote-desktop receiver
     "coolterm"                   # Serial terminal

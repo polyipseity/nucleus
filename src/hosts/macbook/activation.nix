@@ -22,34 +22,77 @@
 
   # ---------------------------------------------------------------------------
   # configureBatteryPolicy
-  # Fine-grained pmset policy not fully covered by nix-darwin's power module:
-  #   -a: shared behavior for all power sources (wake/network/background)
-  #   -c: charger profile (max performance, no forced sleep)
-  #   -b: battery profile (balanced mobile behavior)
-  # sleep/displaysleep/disksleep continue to be handled declaratively above via
-  # power.sleep.*. `autorestart` is intentionally unmanaged because this host
-  # cannot safely apply restart-after-power-failure.
-  # The -x flag check is present because pmset might be absent in certain VM
-  # or CI environments where this config could theoretically be evaluated.
+  # Enforce pmset values directly for AC and battery because newer macOS
+  # releases can ignore or partially override higher-level power options.
+  #
+  # Invariant:
+  #   - AC and battery: no idle system sleep, 1-minute display sleep,
+  #     no disk sleep
+  #   - Shared: wake-on-LAN, Power Nap, and lid wake enabled
+  #   - Battery: low-power mode on (if supported)
+  #   - AC: low-power mode off (if supported)
+  #
+  # The helper emits a clear error when any write fails so a mis-typed key
+  # does not silently leave a stale policy in place.
   # ---------------------------------------------------------------------------
   system.activationScripts.configureBatteryPolicy.text = ''
+    apply_pmset() {
+      if ! /usr/bin/pmset "$@"; then
+        echo "nucleus: failed to apply pmset settings: $*" >&2
+        return 1
+      fi
+    }
+
+    pmset_supports() {
+      capability="$1"
+      /usr/bin/pmset -g cap 2>/dev/null | /usr/bin/grep -Eq "(^|[[:space:]])$capability([[:space:]]|$)"
+    }
+
     if [ -x /usr/bin/pmset ]; then
-      /usr/bin/pmset -a womp 1 powernap 1 lidwake 1
-      /usr/bin/pmset -c highpowermode 1 disablesleep 1
-      /usr/bin/pmset -b highpowermode 0 disablesleep 0 lowpowermode 0
+      apply_pmset -a womp 1 powernap 1 lidwake 1
+      apply_pmset -c sleep 0 displaysleep 1 disksleep 0
+      apply_pmset -b sleep 0 displaysleep 1 disksleep 0
+
+      if pmset_supports lowpowermode; then
+        apply_pmset -c lowpowermode 0
+        apply_pmset -b lowpowermode 1
+      fi
     fi
   '';
 
   # ---------------------------------------------------------------------------
   # configureChargeLimit
-  # Uses bclm (Battery Charge Level Max) to cap charge at 80 % by default,
-  # reducing long-term cell stress for a mostly-docked development machine.
-  # `persist` ensures the SMC setting survives reboot.
+  # Keep charge capped at 80 % to reduce long-term battery wear on a mostly
+  # docked development machine.
+  #
+  # On macOS 15+, bclm no longer works due kernel entitlement enforcement.
+  # Prefer the maintained `battery` CLI (installed by the `battery` cask) and
+  # run it as the active console user so user-scoped launch-agent state stays
+  # in that user's home directory.
+  #
+  # bclm is retained as a fallback only for older macOS versions.
   # ---------------------------------------------------------------------------
   system.activationScripts.configureChargeLimit.text = ''
-    if [ -x /opt/homebrew/bin/bclm ]; then
-      /opt/homebrew/bin/bclm write 80 || echo "[ERROR] bclm write failed" >&2
-      /opt/homebrew/bin/bclm persist || echo "[ERROR] bclm persist failed" >&2
+    console_user="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+    macos_major="$(/usr/bin/sw_vers -productVersion 2>/dev/null | /usr/bin/awk -F. '{print $1}')"
+
+    if [ -x /usr/local/bin/battery ] && [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
+      if ! /usr/bin/sudo -u "$console_user" /usr/local/bin/battery maintain 80; then
+        echo "nucleus: battery maintain 80 failed for user '$console_user'." >&2
+      fi
+    elif [ -x /opt/homebrew/bin/bclm ]; then
+      if [ -n "$macos_major" ] && [ "$macos_major" -ge 15 ]; then
+        echo "nucleus: bclm is unsupported on macOS >= 15; install and initialize the battery app to enforce 80% charge limit." >&2
+      else
+        if ! /opt/homebrew/bin/bclm write 80; then
+          echo "nucleus: bclm write 80 failed." >&2
+        fi
+        if ! /opt/homebrew/bin/bclm persist; then
+          echo "nucleus: bclm persist failed." >&2
+        fi
+      fi
+    else
+      echo "nucleus: no supported battery charge-limit tool found (expected /usr/local/bin/battery or /opt/homebrew/bin/bclm)." >&2
     fi
   '';
 
