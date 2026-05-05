@@ -114,6 +114,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleusvscodesettings.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleuswallpapers.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "test-nucleusprimaryuser.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "verify-archiving-stack.ps1")
 
 $resolvedConfigDir = (Resolve-Path -Path $ConfigDir).Path
 $machineSshHostKeyPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key"
@@ -168,3 +169,6 @@ Sync-NucleusGitAndSshConfig -Enabled:$EnableGitSshParity -PrimaryUsername $Prima
 Sync-NucleusShellProfile -Enabled:$EnableShellParity
 Sync-NucleusOpenSshServer -Enabled:$EnableRemoteAccessParity
 Sync-NucleusPowerPolicy -Enabled:$EnablePowerParity
+
+# Health check: verify archiving ecosystem (7-Zip CLI + app) is functional post-apply.
+Test-NucleusArchivingStack | Out-Null

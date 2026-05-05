@@ -55,8 +55,8 @@ foreach ($path in $Paths | Sort-Object -Unique) {
 }
 
 if ($parseErrors.Count -gt 0) {
-  foreach ($error in $parseErrors) {
-    Write-Host ('{0}:{1}:{2}: {3}' -f $error.Extent.File, $error.Extent.StartLineNumber, $error.Extent.StartColumnNumber, $error.Message)
+  foreach ($parseError in $parseErrors) {
+    Write-Host ('{0}:{1}:{2}: {3}' -f $parseError.Extent.File, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message)
   }
 
   throw 'PowerShell syntax validation failed.'

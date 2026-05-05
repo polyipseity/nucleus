@@ -7,7 +7,7 @@ properties:
   resources:
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure 7-Zip is installed for cross-host archive extraction parity with macOS and NixOS
+        description: Ensure 7-Zip is installed with CLI PATH integration and shell extensions for cross-host archive handling parity with macOS (Keka) and NixOS (File Roller + Ark)
       settings:
         id: 7zip.7zip
         source: winget
@@ -150,6 +150,13 @@ properties:
         description: Ensure Microsoft PowerToys is installed for Windows productivity tooling; Raycast (`9PFXXSHC64H3`) is intentionally not used on Windows and Rectangle is macOS-specific
       settings:
         id: Microsoft.PowerToys
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Windows Terminal is installed to provide "Open in Windows Terminal" context menu option in Explorer for cross-platform parity with macOS (Terminal/iTerm) and NixOS (GNOME Terminal/Konsole)
+      settings:
+        id: Microsoft.WindowsTerminal
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package

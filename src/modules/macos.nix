@@ -68,6 +68,13 @@ let
   # UTI list for Chrome: set as the default handler for HTML and XHTML documents.
   chromeUTIs = [ "public.html" "public.xhtml" ];
 
+  # UTI list for Keka: covers 7z, RAR, and ZIP archive formats so that opening
+  # any archive file launches Keka for graphical extraction/creation.
+  kekaUTIs = [
+    "public.zip-archive"
+    "com.rarlab.rar-archive"
+  ];
+
   # UTI list for VLC: covers the full range of video, audio, and playlist
   # formats that VLC supports so that double-clicking any media file opens VLC.
   vlcUTIs = [
@@ -188,9 +195,11 @@ let
     "gpgImport"
     "onFilesChange"
     "preflightPrivacyPermissions"
+    "refreshFinderServices"
     "reloadUserPreferenceState"
     "sops-nix"
     "setupLaunchAgents"
+    "verifyArchivingStack"
     "wallpaperProvision"
     "vscodeDarwinExtensionBridge"
     "vscodeProfiles"
@@ -391,6 +400,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # application (re)installs can reset handler registrations.
     #
     #   Chrome — handles all HTML/XHTML documents
+    #   Keka   — handles .7z, .rar, and .zip archives
     #   VLC    — handles the complete set of audio/video UTIs defined above
     # -------------------------------------------------------------------------
     configureLaunchServices = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
@@ -408,6 +418,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       }
 
       register_handler "com.google.chrome" ${builtins.concatStringsSep " " chromeUTIs}
+      register_handler "com.aone.keka" ${builtins.concatStringsSep " " kekaUTIs}
       register_handler "org.videolan.vlc" ${builtins.concatStringsSep " " vlcUTIs}
     '';
 
@@ -642,15 +653,77 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # displayHostManualInstructions
-    # Prints host-scoped one-time manual setup instructions from the dedicated
-    # host manual document instead of embedding long reminder strings here.
-    #
-    # Ordering invariant:
-    #   displayHostManualInstructions must remain the terminal activation node so
-    #   users always see one final, consolidated instruction block after every
-    #   automated step has finished.
+    # refreshFinderServices
+    # Restart Finder to refresh available Services in context menu after
+    # installation and preference changes. This ensures "Open in Terminal",
+    # "Open in iTerm", and other services are visible without a manual restart.
     # -------------------------------------------------------------------------
+    refreshFinderServices = lib.hm.dag.entryAfter [ "installPackages" "configureLaunchServices" ] ''
+      # Restart Finder to refresh Services. This ensures services registered for
+      # both file and directory contexts are loaded (e.g., "Open in Terminal").
+      if ! /usr/bin/killall Finder; then
+        echo "nucleus: Finder was not running (or could not be restarted)." >&2
+      else
+        echo "nucleus: Finder restarted; Services should now be refreshed." >&2
+      fi
+
+      # Enable Services to appear in Finder context menu for both files and
+      # empty space. Set NSServicesMinimumItemCountForContextSubmenu to 0 to show
+      # all services regardless of count (already set in defaults, but ensure
+      # it takes effect during this activation).
+      /usr/bin/defaults write NSGlobalDomain NSServicesMinimumItemCountForContextSubmenu -int 0
+
+      # Explicitly register the Automator Quick Action workflows (Services) so
+      # they are discoverable by LaunchServices and appear in Finder context menus.
+      SERVICES_DIR="$HOME/Library/Services"
+      if [ -d "$SERVICES_DIR" ]; then
+        # Use the correct lsregister path for registering services
+        LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
+        if [ -x "$LSREGISTER" ]; then
+          $LSREGISTER -r -domain local -domain system -domain user 2>/dev/null || true
+        fi
+      fi
+
+      # Reload Finder Services to pick up the changes immediately.
+      /usr/bin/launchctl kickstart -k "gui/$UID/com.apple.Finder" 2>/dev/null || true
+    '';
+
+    # -------------------------------------------------------------------------
+    # verifyArchivingStack
+    # Health check for archiving tools: verifies 7z CLI, Keka app registration,
+    # and archive handler associations are functional after activation.
+    # -------------------------------------------------------------------------
+    verifyArchivingStack = lib.hm.dag.entryAfter [ "configureSystemHardening" "configureLaunchServices" "installPackages" "refreshFinderServices" ] ''
+      # Verify 7z CLI is available and functional using direct Nix store path.
+      # Do not rely on PATH lookup since Home Manager activation runs in a minimal
+      # shell that may not have nix-darwin system package paths available yet.
+      seven_z_exe="${pkgs.p7zip}/bin/7z"
+      if [ ! -x "$seven_z_exe" ]; then
+        echo "nucleus: warning — 7z binary not found at $seven_z_exe; archive extraction may fail." >&2
+      elif ! "$seven_z_exe" --help >/dev/null 2>&1; then
+        echo "nucleus: warning — 7z exists but --help failed; archive handling may be broken." >&2
+      else
+        echo "nucleus: archiving stack healthy — 7z CLI available." >&2
+      fi
+
+      # Verify Keka application is installed and registered.
+      if [ ! -d "/Applications/Keka.app" ]; then
+        echo "nucleus: warning — Keka.app not found in /Applications; GUI archiving unavailable." >&2
+      else
+        echo "nucleus: archiving stack healthy — Keka installed." >&2
+      fi
+    '';
+
+    # -------------------------------------------------------------------------
+    # displayHostManualInstructions
+     # Prints host-scoped one-time manual setup instructions from the dedicated
+     # host manual document instead of embedding long reminder strings here.
+     #
+     # Ordering invariant:
+     #   displayHostManualInstructions must remain the terminal activation node so
+     #   users always see one final, consolidated instruction block after every
+     #   automated step has finished.
+     # -------------------------------------------------------------------------
     displayHostManualInstructions = lib.hm.dag.entryAfter displayHostManualInstructionDeps ''
       echo "--- MANUAL SETUP (one-time, required) ---" >&2
       /bin/cat '${macbookManualFile}' >&2

@@ -14,9 +14,11 @@ function Sync-NucleusShellProfile {
       - CurrentUserAllHosts profile
 
     Managed content intentionally mirrors key POSIX shell workflow behavior:
-      - direnv integration (if direnv is present)
-      - common aliases (`g`, `ga`, `gc`, `gca`, `gco`, `gd`, `gl`, `gp`,
-        `gpl`, `gs`, `gst`, `la`, `ll`, `v`)
+       - direnv integration (if direnv is present)
+       - common aliases (`g`, `ga`, `gc`, `gca`, `gco`, `gd`, `gl`, `gp`,
+         `gpl`, `gs`, `gst`, `la`, `ll`, `v`)
+       - Python ban: blocks system-wide python/pip to prevent accidental
+         modifications to system environment
 
     Cleanup behavior when disabled removes only the managed block.
 
@@ -56,6 +58,31 @@ function Sync-NucleusShellProfile {
     'function la { Get-ChildItem -Force @Args }'
     'function ll { Get-ChildItem -Force @Args }'
     'function v { & nvim @Args }'
+    '# System-wide Python ban: redirect python/pip to warnings'
+    'function python {'
+    '  Write-Host "nucleus: system-wide Python is banned to prevent accidental modifications." -ForegroundColor Yellow >&2'
+    '  Write-Host "         Use one of these approaches instead:" -ForegroundColor Yellow >&2'
+    '  Write-Host "         - nix develop     (activate project devShell with scoped Python)" -ForegroundColor Yellow >&2'
+    '  Write-Host "         - uv run <cmd>    (run Python via uv package manager)" -ForegroundColor Yellow >&2'
+    '  Write-Host "         - uv venv         (create per-project venv managed by uv)" -ForegroundColor Yellow >&2'
+    '  Write-Host "         - .\venv\Scripts\python (use pre-existing project venv)" -ForegroundColor Yellow >&2'
+    '  return 1'
+    '}'
+    'function python3 {'
+    '  python @Args'
+    '}'
+    'function pip {'
+    '  Write-Host "nucleus: system-wide pip is banned to prevent breaking system dependencies." -ForegroundColor Yellow >&2'
+    '  Write-Host "         Use one of these approaches instead:" -ForegroundColor Yellow >&2'
+    '  Write-Host "         - nix develop     (activate project devShell with scoped Python+pip)" -ForegroundColor Yellow >&2'
+    '  Write-Host "         - uv pip install  (use uv to manage project dependencies)" -ForegroundColor Yellow >&2'
+    '  Write-Host "         - uv venv         (create per-project venv managed by uv)" -ForegroundColor Yellow >&2'
+    '  Write-Host "         - .\venv\Scripts\pip (use pre-existing project venv)" -ForegroundColor Yellow >&2'
+    '  return 1'
+    '}'
+    'function pip3 {'
+    '  pip @Args'
+    '}'
     $managedBlockEnd
   )
 

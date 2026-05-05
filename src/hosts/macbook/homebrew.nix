@@ -23,21 +23,22 @@ let
   # GUI applications managed via Homebrew Cask.
   # Dual-source casks (for example Google Chrome, VS Code, VLC) are selected
   # from core.nix and merged below so backend switches stay centralized.
-  staticManagedCasks = [
-    "alt-tab"                    # Windows-style alt-tab switcher
-    "appcleaner"                 # Thorough app uninstaller
-    "battery"                    # Apple Silicon charge-limit manager (maintains 80% cap)
-    "betterdisplay"              # Advanced display management and virtual screens
-    "chrome-remote-desktop-host" # Headless remote-desktop receiver
-    "coolterm"                   # Serial terminal
-    "google-chrome@canary"       # Chrome dev channel for web testing
-    "lulu"                       # Outbound network firewall
-    "orbstack"                   # Docker/Linux VM runtime (faster than Docker Desktop)
-    "parsec"                     # Low-latency remote gaming / desktop streaming
-    "raycast"                    # Spotlight replacement and launcher
-    "telegram-desktop@beta"      # Telegram beta channel; kept static (no exact nixpkgs beta mapping)
-    "whatsapp@beta"              # WhatsApp pre-release client
-  ];
+   staticManagedCasks = [
+     "alt-tab"                    # Windows-style alt-tab switcher
+     "appcleaner"                 # Thorough app uninstaller
+     "battery"                    # Apple Silicon charge-limit manager (maintains 80% cap)
+     "betterdisplay"              # Advanced display management and virtual screens
+     "chrome-remote-desktop-host" # Headless remote-desktop receiver
+     "coolterm"                   # Serial terminal
+     "google-chrome@canary"       # Chrome dev channel for web testing
+     "keka"                       # Graphical archiver with 7-Zip backend support
+     "lulu"                       # Outbound network firewall
+     "orbstack"                   # Docker/Linux VM runtime (faster than Docker Desktop)
+     "parsec"                     # Low-latency remote gaming / desktop streaming
+     "raycast"                    # Spotlight replacement and launcher
+     "telegram-desktop@beta"      # Telegram beta channel; kept static (no exact nixpkgs beta mapping)
+     "whatsapp@beta"              # WhatsApp pre-release client
+   ];
 
   managedCasks = builtins.sort (a: b: a < b) (lib.unique (staticManagedCasks ++ coreManagedCasks));
 
@@ -73,11 +74,6 @@ in
 
   homebrew = {
     enable = true;
-
-    # Use managed Cask installs without quarantine metadata so first-launch
-    # Gatekeeper prompts do not block apps that are already declared and
-    # trusted in this host's declarative software baseline.
-    caskArgs.no_quarantine = true;
 
     onActivation.autoUpdate = true;   # refresh Homebrew itself before bundling
     onActivation.cleanup = "zap";     # remove unlisted formulae/casks and their data

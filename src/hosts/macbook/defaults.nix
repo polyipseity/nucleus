@@ -74,14 +74,18 @@ in
         # Keep Finder context-menu Services at the default threshold so core
         # entries such as "New Terminal at Folder" remain discoverable from a
         # right-click without requiring keyboard-only fallbacks.
-        # This key is not exposed by nix-darwin's typed
-        # `system.defaults.NSGlobalDomain` options, so it must be applied
-        # through CustomUserPreferences.
+        # This key is not exposed by nix-darwin's typed options.
         NSServicesMinimumItemCountForContextSubmenu = 0;
 
         # Make toolbar title rollover hints appear instantly. This key is
         # currently outside nix-darwin's typed NSGlobalDomain option set.
         NSToolbarTitleViewRolloverDelay = 0.0;
+
+        # Ensure fullscreen exit button is always visible when a window is
+        # fullscreened in Stage Manager, so users can easily return to windowed
+        # mode. Set to false to show the standard prominent fullscreen button
+        # instead of letting macOS hide it when it deems it "optimized" away.
+        NSWindowFullScreenButtonOptimized = false;
 
         # Text substitution dictionary that suppresses autocorrect for
         # technical terms and product names used frequently in this setup.
@@ -326,10 +330,12 @@ in
       # bootstrap daemon (supports shell integration without requiring a full
       # app launch), disable in-app update checks because updates are managed
       # declaratively, suppress the secure-keyboard-entry/open-command warning,
-      # and keep Secure Keyboard Entry enabled.
+      # keep Secure Keyboard Entry enabled, and enable the Finder service so
+      # "Open in iTerm" appears in Finder right-click context menu.
       "com.googlecode.iterm2" = {
         "AllowClipboardAccess" = true;
         "BootstrapDaemon" = true;
+        "EnableFindersService" = true;   # enable "Open in iTerm" in Finder
         "NoSyncTipOfTheDay" = false;
         "SUCheckAtStartup" = false;
         "SUEnableAutomaticChecks" = false;

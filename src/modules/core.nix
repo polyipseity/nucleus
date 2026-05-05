@@ -5,6 +5,18 @@
 # option), or a standalone Home Manager profile (home.packages).  A runtime
 # options-probe via lib.mkMerge + lib.mkIf lets this single module work in all
 # three contexts without the caller having to know which option is appropriate.
+#
+# === PYTHON POLICY ===
+# System-wide Python is explicitly banned across all platforms. This prevents:
+#   - Accidental `pip install` modifying system-managed dependencies
+#   - Breakage of system packages that depend on vendored Python
+#   - Pollution of system environment with user packages
+# Python availability is scoped to:
+#   - Project-specific nix devShells (nix develop)
+#   - Per-project venv or uv-managed environments
+#   - Tools that bundle Python (e.g., ansible, pipx-installed CLIs)
+# uv (installed here) is the blessed package/project manager for when
+# project-specific Python is needed.
 { config, lib, pkgs, options, ... }:
 let
   # Packages installed on every host regardless of OS.

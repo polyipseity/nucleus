@@ -31,6 +31,50 @@ in
     enableCompletion = true;          # tab completion via compinit
     shellAliases = shellAliases;
     syntaxHighlighting.enable = true; # command colouring (valid = green, etc.)
+
+    # -----------------------------------------------------------------------
+    # initContent: system-wide Python ban via shell wrapper functions
+    # -----------------------------------------------------------------------
+    # Block direct invocation of system-wide python/pip to prevent accidental
+    # modifications to system-managed environment. Users should use nix develop
+    # (for project devShells) or uv (for project-scoped Python).
+    initContent = ''
+      # Intercept python/python3 invocations and warn about system-wide Python ban.
+      # These are functions, not aliases, so they can provide helpful context.
+      python() {
+        cat >&2 << 'EOF'
+nucleus: system-wide Python is banned to prevent accidental modifications.
+         Use one of these approaches instead:
+         - nix develop     (activate project devShell with scoped Python)
+         - uv run <cmd>    (run Python via uv package manager)
+         - uv venv         (create per-project venv managed by uv)
+         - ./venv/bin/python (use pre-existing project venv)
+EOF
+        return 1
+      }
+
+      python3() {
+        python "$@"
+      }
+
+      # Intercept pip/pip3 invocations and warn about system-wide pip ban.
+      # Remind users that modifying system Python breaks system dependencies.
+      pip() {
+        cat >&2 << 'EOF'
+nucleus: system-wide pip is banned to prevent breaking system dependencies.
+         Use one of these approaches instead:
+         - nix develop     (activate project devShell with scoped Python+pip)
+         - uv pip install  (use uv to manage project dependencies)
+         - uv venv         (create per-project venv managed by uv)
+         - ./venv/bin/pip  (use pre-existing project venv)
+EOF
+        return 1
+      }
+
+      pip3() {
+        pip "$@"
+      }
+    '';
   };
 
   home.sessionVariables = sessionVariables;
