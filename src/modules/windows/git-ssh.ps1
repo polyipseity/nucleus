@@ -68,7 +68,7 @@ function Sync-NucleusGitAndSshConfig {
 
   $managedGitSettings = [ordered]@{
     'commit.gpgsign' = 'true'
-    'core.autocrlf' = 'auto'
+    'core.autocrlf' = 'true'
     'core.symlinks' = 'true'
     'gpg.format' = 'openpgp'
     'tag.gpgsign' = 'true'

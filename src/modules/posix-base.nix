@@ -21,12 +21,13 @@ in
 
       # Enforce baseline Git behavior globally for every local account.
       # Commit/tag signing is required by default, symlinks are enabled, and
-      # line-ending handling follows core.autocrlf=auto for cross-platform repos.
+      # POSIX hosts keep core.autocrlf=false so Git never rejects an invalid
+      # boolean value and newline policy remains controlled by .gitattributes.
       environment.etc."gitconfig".text = ''
         [commit]
           gpgsign = true
         [core]
-          autocrlf = auto
+          autocrlf = false
           symlinks = true
         [tag]
           gpgsign = true
