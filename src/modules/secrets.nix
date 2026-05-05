@@ -36,6 +36,9 @@
 #        gpg --import <key-export>
 #   2. Run: home-manager switch
 #      sops-nix uses GPG to decrypt on first activation.
+#      The managed primary fingerprint from gpg-personal.yml is assigned
+#      ultimate ownertrust on every activation to keep trustdb state
+#      deterministic even when keys were pre-imported manually.
 #   3. Once SSH host keys exist on this machine, derive its age recipient and
 #      add it to .sops.yaml keys.age_devices, then rewrap encrypted files:
 #        ssh-to-age < /etc/ssh/ssh_host_ed25519.pub
@@ -145,11 +148,11 @@ lib.mkIf isPrimaryUser {
   # Runs after sops-nix has materialized decrypted secret files.
   # gpg --import is idempotent, so repeated activations are safe.
   #
-  # Trust bootstrap invariant:
-  #   If the keyring had no secret keys before this import, treat the first key
-  #   carried by the managed secret blob as the user's primary key and assign it
-  #   ultimate ownertrust. This avoids an ambiguous trustdb state on new hosts
-  #   while keeping reruns deterministic.
+  # Trust invariant:
+  #   Treat the first key carried by the managed secret blob as the user's
+  #   primary key and always enforce ultimate ownertrust for that fingerprint.
+  #   This keeps trust state deterministic even when the key material was
+  #   manually imported before the first IaC-run import.
   #
   # NOTE: GnuPG 2.5 + Kyber private key import currently fails with
   # `--batch` (`IPC parameter error`) on this key format. We intentionally use
@@ -165,9 +168,6 @@ lib.mkIf isPrimaryUser {
       exit 1
     fi
 
-    # Capture pre-import state so we only bootstrap ownertrust on first-key
-    # initialization for this user profile.
-    secret_key_count_before="$(${pkgs.gnupg}/bin/gpg --list-secret-keys --with-colons 2>/dev/null | /usr/bin/awk -F: '$1 == "sec" { count += 1 } END { print count + 0 }')"
     first_key_fingerprint="$(${pkgs.gnupg}/bin/gpg --batch --import-options show-only --dry-run --with-colons --import "${config.sops.secrets.${gpgSecretName}.path}" 2>/dev/null | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')"
 
     if ! ${pkgs.gnupg}/bin/gpg --import "${config.sops.secrets.${gpgSecretName}.path}"; then
@@ -175,16 +175,14 @@ lib.mkIf isPrimaryUser {
       exit 1
     fi
 
-    if [ "$secret_key_count_before" -eq 0 ]; then
-      if [ -z "$first_key_fingerprint" ]; then
-        echo "nucleus: imported first GPG keyring material but could not determine a fingerprint for ownertrust bootstrap." >&2
-        exit 1
-      fi
+    if [ -z "$first_key_fingerprint" ]; then
+      echo "nucleus: imported GPG keyring material but could not determine the managed primary fingerprint for ownertrust enforcement." >&2
+      exit 1
+    fi
 
-      if ! printf '%s:6:\n' "$first_key_fingerprint" | ${pkgs.gnupg}/bin/gpg --import-ownertrust; then
-        echo "nucleus: failed to assign ultimate ownertrust to $first_key_fingerprint during first-key bootstrap." >&2
-        exit 1
-      fi
+    if ! printf '%s:6:\n' "$first_key_fingerprint" | ${pkgs.gnupg}/bin/gpg --import-ownertrust; then
+      echo "nucleus: failed to enforce ultimate ownertrust for managed primary fingerprint $first_key_fingerprint." >&2
+      exit 1
     fi
   '';
 }

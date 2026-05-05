@@ -209,7 +209,6 @@ function Sync-NucleusSecretFile {
   if ($null -ne $jsonSecrets.PSObject.Properties[$gpgSecretName]) {
     $gpgKeyValue = [string]$jsonSecrets.$gpgSecretName
     if (-not [string]::IsNullOrWhiteSpace($gpgKeyValue)) {
-      $secretKeyCountBefore = @(& $GpgExe --list-secret-keys --with-colons 2>$null | Where-Object { $_ -like "sec:*" }).Count
       $firstFingerprint = $null
       $showOnlyOutput = $gpgKeyValue | & $GpgExe --batch --import-options show-only --dry-run --with-colons --import - 2>$null
       foreach ($line in $showOnlyOutput) {
@@ -227,15 +226,13 @@ function Sync-NucleusSecretFile {
         throw "Failed to import GPG material '$gpgSecretName'. Exit code: $LASTEXITCODE"
       }
 
-      if ($secretKeyCountBefore -eq 0) {
-        if ([string]::IsNullOrWhiteSpace($firstFingerprint)) {
-          throw "Imported first GPG key material but no fingerprint was detected for ownertrust bootstrap."
-        }
+      if ([string]::IsNullOrWhiteSpace($firstFingerprint)) {
+        throw "Imported GPG key material but no managed primary fingerprint was detected for ownertrust enforcement."
+      }
 
-        "${firstFingerprint}:6:" | & $GpgExe --import-ownertrust | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-          throw "Failed to assign ultimate ownertrust to '$firstFingerprint'. Exit code: $LASTEXITCODE"
-        }
+      "${firstFingerprint}:6:" | & $GpgExe --import-ownertrust | Out-Null
+      if ($LASTEXITCODE -ne 0) {
+        throw "Failed to enforce ultimate ownertrust for managed primary fingerprint '$firstFingerprint'. Exit code: $LASTEXITCODE"
       }
 
       Write-Host "  Imported GPG material: $gpgSecretName" -ForegroundColor Cyan
