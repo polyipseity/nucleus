@@ -14,7 +14,6 @@ let
   # preferred (e.g. tightly coupled to macOS internals).
   staticManagedBrews = [
     "displayplacer"              # CLI display arrangement tool
-    "p7zip"                      # 7-Zip archive extraction and compression CLI
     "smudge/smudge/nightlight"   # Night Shift schedule & temperature control
     "zackelia/formulae/bclm"     # Battery charge limit management
   ];
