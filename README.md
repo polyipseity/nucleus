@@ -65,7 +65,7 @@ nucleus/
 | `src/modules/macos.nix`                      | macOS activation hooks, display/session tuning, launch-services handlers, user-session hardening                                                                                              |
 | `src/modules/posix-base.nix`                 | Shared system-layer defaults (flakes experimental feature, system zsh) for both POSIX hosts                                                                                                   |
 | `src/modules/posix-security.nix`             | Shared sudo timeout hardening (`timestamp_timeout=5`)                                                                                                                                         |
-| `src/modules/posix-sops.nix`                 | Shared SOPS key sources: SSH host key age recipient + GnuPG home fallback                                                                                                                     |
+| `src/modules/posix-sops.nix`                 | Shared SOPS key sources: machine SSH key age recipient + GnuPG home fallback                                                                                                                  |
 | `src/modules/posix-user-shell.nix`           | Shared user account defaults (platform-correct home dir, zsh login shell)                                                                                                                     |
 | `src/modules/secrets.nix`                    | Declarative SSH/GPG secret provisioning via Home Manager activation                                                                                                                           |
 | `src/modules/shell.nix`                      | Zsh with plugins, direnv + nix-direnv, zoxide, shell aliases                                                                                                                                  |
@@ -129,9 +129,11 @@ declarative layers — not in the orchestration scripts:
 ## Security model
 
 - **Global admin identity**: your GPG encryption subkey can always decrypt repo secrets.
-- **Machine automation identity**: each host decrypts with its SSH host key
-  converted to an age recipient.
-- **Precedence**: host SSH key first, then GPG keyring fallback.
+- **Machine automation identities**: each physical machine contributes one age
+  recipient derived from that machine's SSH host key.
+- **Recipient scope**: age recipients are shared across hosts and files; do not
+  partition recipients by host class.
+- **Precedence**: machine SSH key first, then GPG keyring fallback.
 
 Global automation identity is intentionally disabled. Re-enable only if a clear
 operational need arises.
@@ -159,7 +161,12 @@ images out of the repository after encryption.
 `src/assets/wallpapers/*.sops` is marked `binary` in `.gitattributes` to
 prevent line-ending transforms and text diff heuristics.
 
-## Adding a new machine
+## Managing machine recipients
+
+Use one age recipient per physical machine and keep all real recipients in
+`.sops.yaml` `keys.age_devices`. Do not commit placeholder values.
+
+### Add a machine
 
 1. Import your GPG subkey on the new machine.
 2. Run bootstrap if Nix / WinGet prerequisites are not yet installed:
@@ -168,14 +175,35 @@ prevent line-ending transforms and text diff heuristics.
 3. Extract the machine's age recipient from its SSH host public key:
    - Unix: `ssh-to-age < /etc/ssh/ssh_host_ed25519.pub`
    - Windows: `ssh-to-age < $env:PROGRAMDATA\ssh\ssh_host_ed25519.pub`
-4. Add that recipient to `.sops.yaml`, then re-encrypt each secret file:
+4. Append the recipient to `.sops.yaml` under `keys.age_devices`.
+5. Rewrap all encrypted files so the new machine can decrypt:
 
    ```bash
    sops updatekeys src/secrets/gpg-personal.yml
    sops updatekeys src/secrets/ssh-personal.yml
+   for f in src/assets/wallpapers/*.sops; do
+     [ -e "$f" ] || continue
+     sops updatekeys "$f"
+   done
    ```
 
-5. Commit and push. Future decryptions use the host key automatically.
+6. Commit and push.
+
+### Remove a machine
+
+1. Delete the machine's recipient from `.sops.yaml` `keys.age_devices`.
+2. Rewrap all encrypted files so removed recipients lose access:
+
+   ```bash
+   sops updatekeys src/secrets/gpg-personal.yml
+   sops updatekeys src/secrets/ssh-personal.yml
+   for f in src/assets/wallpapers/*.sops; do
+     [ -e "$f" ] || continue
+     sops updatekeys "$f"
+   done
+   ```
+
+3. Commit and push.
 
 ## Notes
 

@@ -30,13 +30,12 @@
 #        gpg --import <key-export>
 #   2. Run: home-manager switch
 #      sops-nix uses GPG to decrypt on first activation.
-#   3. Once the SSH key is materialised, derive the host age key and add it to
-#      .sops.yaml, then re-encrypt both files:
-#        ssh-keyscan <host> | ssh-to-age   # get age pubkey
-#        # fill in .sops.yaml age anchors, uncomment them
+#   3. Once SSH host keys exist on this machine, derive its age recipient and
+#      add it to .sops.yaml keys.age_devices, then rewrap encrypted files:
+#        ssh-to-age < /etc/ssh/ssh_host_ed25519.pub
 #        sops updatekeys src/secrets/ssh-personal.yml
 #        sops updatekeys src/secrets/gpg-personal.yml
-#      After this step sops-nix uses the host SSH key and GPG is no longer
+#      After this step sops-nix uses the machine SSH key and GPG is no longer
 #      required as the primary decryption path.
 { config, lib, pkgs, username ? null, ... }:
 let
@@ -63,7 +62,7 @@ let
 in
 lib.mkIf isPrimaryUser {
   # Register both decryption backends for the HM sops-nix module.
-  # age: host SSH key — works once age recipients are added to .sops.yaml.
+  # age: machine SSH key — works once keys.age_devices is populated in .sops.yaml.
   # gpg: fallback using the keyring populated by the bootstrap step above.
   sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
   sops.gnupg.home = "${config.home.homeDirectory}/.gnupg";

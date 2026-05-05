@@ -2,7 +2,7 @@
 # encrypted wallpaper blobs and configures a slideshow / gallery desktop.
 #
 # Asset layout: assets/wallpapers/*.sops — each file is a binary image
-# encrypted with SOPS (age via host SSH key or GPG fallback).  On activation
+# encrypted with SOPS (age via machine SSH key or GPG fallback).  On activation
 # the blobs are decrypted into ~/Pictures/wallpapers/ and applied as a
 # rotating gallery (10-minute interval) on both macOS (desktoppr folder mode)
 # and GNOME (dynamically generated nucleus-gallery.xml).

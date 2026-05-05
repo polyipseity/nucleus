@@ -75,7 +75,7 @@ function Sync-NucleusSecretFile {
     Absolute path to the gpg executable.
 
   .PARAMETER HostKeyPath
-    Path to the SSH host private key used as the age decryption key.
+    Path to this machine's SSH host private key used as the age decryption key.
 
   .PARAMETER SopsExe
     Absolute path to the sops executable.
@@ -214,7 +214,7 @@ function Invoke-NucleusJitSecretMaterialization {
     Absolute path to the gpg executable.
 
   .PARAMETER HostKeyPath
-    Path to the SSH host private key used as the age decryption key.
+    Path to this machine's SSH host private key used as the age decryption key.
 
   .PARAMETER SopsExe
     Absolute path to the sops executable.
@@ -285,7 +285,7 @@ function Sync-NucleusSecrets {
     Absolute path to the gpg executable.
 
   .PARAMETER HostKeyPath
-    Path to the SSH host private key used as the age decryption key.
+    Path to this machine's SSH host private key used as the age decryption key.
 
   .PARAMETER SopsExe
     Absolute path to the sops executable.

@@ -31,7 +31,7 @@ applyTo: "src/**/*.nix"
   - `posix-base.nix` — shared system-layer defaults (flakes, zsh) for both
     nix-darwin and NixOS.
   - `posix-security.nix` — shared sudo timeout hardening for both POSIX hosts.
-  - `posix-sops.nix` — shared SOPS key sources (SSH host key + GPG fallback).
+  - `posix-sops.nix` — shared SOPS key sources (machine SSH key + GPG fallback).
   - `posix-user-shell.nix` — shared user account defaults (home dir, login shell).
   - `secrets.nix` — declarative SSH/GPG secret provisioning activation logic.
   - `shell.nix` — zsh, direnv, zoxide, and shell aliases.

@@ -100,6 +100,11 @@
 - **JIT secrets**: do not materialize secrets globally in orchestration
   wrappers. Materialize secrets only in the module/resource that requires them
   (for example Home Manager activation hooks or targeted Windows module calls).
+- **SOPS machine recipients**: keep `.sops.yaml` `keys.age_devices` scoped to
+  real per-machine recipients (no placeholders), shared across hosts/files
+  rather than host-class partitions. When adding or removing a machine,
+  rewrap every encrypted file (`src/secrets/*.yml` and
+  `src/assets/wallpapers/*.sops`) with `sops updatekeys`.
 - **Sorting**: always sort items in any list (package lists, import lists,
   shell alias lists, shell completions, environment variable blocks) and any
   configuration block that lacks a natural semantic order. Alphabetical

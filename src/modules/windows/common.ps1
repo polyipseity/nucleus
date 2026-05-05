@@ -133,12 +133,12 @@ function Get-NucleusSecrets {
 
   .DESCRIPTION
     Attempts decryption in priority order:
-      1. Host SSH key (age recipient derived from the machine's SSH host key).
+      1. Machine SSH key (age recipient derived from this machine's SSH host key).
          The key path is passed via the SOPS_AGE_SSH_PRIVATE_KEY_FILE env var
          and cleared in a `finally` block so it is never left in the environment.
-      2. GPG keyring (used when the host SSH key is absent, e.g. first-run or
-         ephemeral environments).  Fails early with a clear message if no GPG
-         secret keys are imported.
+      2. GPG keyring (used when the machine SSH key is absent, e.g. first-run or
+          ephemeral environments).  Fails early with a clear message if no GPG
+          secret keys are imported.
 
     The decrypted payload is parsed from JSON and returned as a PowerShell
     object so callers can access named fields with dot notation.
@@ -151,8 +151,9 @@ function Get-NucleusSecrets {
     and pre-flight key detection).
 
   .PARAMETER HostKeyPath
-    Path to the SSH host private key that backs the age recipient.  When the
-    file does not exist, host-key decryption is skipped and GPG is tried.
+    Path to this machine's SSH host private key backing the age recipient.
+    When the file does not exist, machine-key decryption is skipped and GPG is
+    tried.
 
   .PARAMETER SopsExe
     Absolute path to the sops executable.
@@ -182,14 +183,14 @@ function Get-NucleusSecrets {
   $sopsArgs = @("--decrypt", "--output-format", "json", $FilePath)
 
   if (Test-Path -Path $HostKeyPath) {
-    Write-Host "Found host SSH key. Trying host-key decryption first..." -ForegroundColor Green
+    Write-Host "Found machine SSH key. Trying machine-key decryption first..." -ForegroundColor Green
     $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $HostKeyPath
 
     try {
       return (& $SopsExe @sopsArgs | ConvertFrom-Json)
     }
     catch {
-      Write-Host "Host-key decryption failed. Falling back to GPG keyring..." -ForegroundColor Yellow
+      Write-Host "Machine-key decryption failed. Falling back to GPG keyring..." -ForegroundColor Yellow
     }
     finally {
       Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction SilentlyContinue
@@ -212,7 +213,7 @@ function Get-NucleusDecryptedBlob {
     $OutputPath.
 
   .DESCRIPTION
-    Similar key-priority logic to Get-NucleusSecrets (host SSH key first, GPG
+    Similar key-priority logic to Get-NucleusSecrets (machine SSH key first, GPG
     keyring fallback), but uses `sops --output` to write the raw decrypted
     bytes directly to $OutputPath instead of capturing stdout.  Used for binary
     assets such as wallpaper images that cannot be embedded in JSON.
@@ -224,7 +225,7 @@ function Get-NucleusDecryptedBlob {
     Absolute path to the gpg executable.
 
   .PARAMETER HostKeyPath
-    Path to the SSH host private key that backs the age recipient.
+    Path to this machine's SSH host private key backing the age recipient.
 
   .PARAMETER OutputPath
     Destination path where the decrypted bytes will be written.
@@ -265,7 +266,7 @@ function Get-NucleusDecryptedBlob {
         return
       }
 
-      Write-Host "Host-key decryption failed for '$FilePath'. Falling back to GPG keyring..." -ForegroundColor Yellow
+      Write-Host "Machine-key decryption failed for '$FilePath'. Falling back to GPG keyring..." -ForegroundColor Yellow
     }
     finally {
       Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction SilentlyContinue

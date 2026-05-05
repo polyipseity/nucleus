@@ -1,23 +1,17 @@
 keys:
-  # - &host_macbook age1replace_with_macbook_age_recipient
-  # - &host_nixos age1replace_with_nixos_age_recipient
-  # - &host_windows age1replace_with_windows_age_recipient
-  - &primary_gpg F45098829935F40E47717018FBA5C89B3E700B7339A67CD0E1AD1361C25E7CFD
+  # Per-machine age recipients (one entry per physical device).
+  # Add only real keys here; do not commit placeholders.
+  age_devices: &age_devices []
+  primary_gpg: &primary_gpg F45098829935F40E47717018FBA5C89B3E700B7339A67CD0E1AD1361C25E7CFD
 
 creation_rules:
   - path_regex: src[/\\]assets[/\\]wallpapers[/\\].*\.(gif|jpeg|jpg|png|sops|webp)$
     key_groups:
-      - age:
-          # - *host_macbook
-          # - *host_nixos
-          # - *host_windows
+      - age: *age_devices
         pgp:
           - *primary_gpg
   - path_regex: src[/\\]secrets[/\\].*\.yml$
     key_groups:
-      - age:
-          # - *host_macbook
-          # - *host_nixos
-          # - *host_windows
+      - age: *age_devices
         pgp:
           - *primary_gpg
