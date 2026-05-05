@@ -26,10 +26,11 @@
   # releases can ignore or partially override higher-level power options.
   #
   # Invariant:
-  #   - Battery: 1-minute system sleep, 1-minute disk sleep, low-power mode on
+  #   - Battery: 1-minute system sleep, low-power mode on, reduced brightness
+  #     while on battery (if supported)
   #   - Battery display sleep and wake-on-LAN are intentionally unmanaged:
   #     with low-power mode enabled on this host, macOS keeps forcing
-  #     displaysleep=2 and womp=0 after writes.
+  #     displaysleep=2, womp=0, and disksleep=10 after writes.
   #   - AC: 1-minute display sleep, no idle system sleep, no disk sleep,
   #     wake-on-LAN enabled
   #   - Shared: Power Nap and lid wake enabled
@@ -69,10 +70,11 @@
       # macOS currently overrides battery displaysleep and womp while
       # lowpowermode is enabled, so only enforce the battery values that remain
       # stable across activation runs.
-      apply_pmset -b sleep 1 disksleep 1
+      apply_pmset -b sleep 1
 
       if pmset_supports lessbright; then
-        apply_pmset -c lessbright 0
+        # lessbright is a battery-side setting; AC does not expose a separate
+        # controllable value on this host.
         apply_pmset -b lessbright 1
       fi
     fi
