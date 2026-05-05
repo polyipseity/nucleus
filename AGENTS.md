@@ -38,6 +38,13 @@
   exist before you run or document toolchain commands.
 - Detect install, build, test, lint, format, type-check, and release commands
   from actual repository files instead of assuming a default stack.
+- Always validate syntax for changed files before concluding a change. Use
+  repository-supported checks such as `nix-instantiate --parse <file.nix>`
+  (or `nix flake check` from `src/` for broader Nix validation),
+  `nix shell nixpkgs#powershell -c pwsh ...` for PowerShell parser checks, and
+  `winget configure --what-if .\src\hosts\windows\system.dsc.yml` plus
+  `winget configure --what-if .\src\hosts\windows\user.dsc.yml` for WinGet
+  DSC changes.
 - For Nix profile operations, prefer `nix profile add` over the deprecated
   `nix profile install` alias, and use presence checks (`nix profile list`)
   in bootstrap scripts to keep reruns idempotent and warning-free.
