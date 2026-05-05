@@ -12,7 +12,7 @@
 #     → configureLaunchServices, configureNightlight
 #       → ensureHeadlessDisplay
 #         → configureDisplayResolutions
-#           → displayManualInstructions
+#           → displayHostManualInstructions
 { lib, pkgs, ... }:
 let
   # Domains intentionally reset before each Home Manager write pass so stale
@@ -109,6 +109,13 @@ let
   # Absolute path to the duti binary supplied by nixpkgs.
   dutiBin = "${pkgs.duti}/bin/duti";
 
+  # Host-scoped manual checklist rendered at the end of activation so operators
+  # see one consolidated block after automation finishes.
+  macbookManualFile = builtins.path {
+    path = ../hosts/macbook/MANUAL.md;
+    name = "macbook-MANUAL.md";
+  };
+
   # Manual drift-reset helper for managed macOS preference domains.
   # This is intentionally a user-invoked command instead of an automatic
   # activation phase so destructive purge operations cannot race with
@@ -159,10 +166,11 @@ let
     echo "Managed preference domains purged. Run your apply flow to re-assert declarative defaults."
   '';
 
-  # Keep displayManualInstructions as the final user-visible activation step.
+  # Keep displayHostManualInstructions as the final user-visible activation
+  # step.
   # Any new activation entry added to this module should be appended here so
   # manual instructions remain the last script to run.
-  displayManualInstructionDeps = [
+  displayHostManualInstructionDeps = [
     "checkFilesChanged"
     "checkLinkTargets"
     "clearDesktop"
@@ -621,30 +629,18 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # displayManualInstructions
-    # Prints one-time manual setup reminders to stderr after display resolution
-    # configuration is complete.  These steps cannot be automated because they
-    # require user interaction in System Settings or a browser:
-    #
-    #   BetterDisplay — needs Accessibility + Screen Recording permissions
-    #                   to control display layout and create virtual screens.
-    #   Chrome Remote Desktop (CRD) — requires naming the Mac in the web UI
-    #                   and granting Screen Recording + Accessibility to the
-    #                   ChromeRemoteDesktopHost process.
-    #   Battery app — first launch is required once so its bundled helper can
-    #                 install the `battery` CLI used by configureChargeLimit.
+    # displayHostManualInstructions
+    # Prints host-scoped one-time manual setup instructions from the dedicated
+    # host manual document instead of embedding long reminder strings here.
     #
     # Ordering invariant:
-    #   displayManualInstructions must remain the terminal activation node so
+    #   displayHostManualInstructions must remain the terminal activation node so
     #   users always see one final, consolidated instruction block after every
     #   automated step has finished.
     # -------------------------------------------------------------------------
-    displayManualInstructions = lib.hm.dag.entryAfter displayManualInstructionDeps ''
+    displayHostManualInstructions = lib.hm.dag.entryAfter displayHostManualInstructionDeps ''
       echo "--- MANUAL SETUP (one-time, required) ---" >&2
-      echo "BetterDisplay: Grant Accessibility + Screen Recording in System Settings > Privacy & Security." >&2
-      echo "Battery: Open battery.app once and complete setup so /usr/local/bin/battery is installed." >&2
-      echo "CRD: Visit https://remotedesktop.google.com/access to name Mac and set PIN." >&2
-      echo "CRD: Enable Screen Recording + Accessibility for ChromeRemoteDesktopHost." >&2
+      /bin/cat '${macbookManualFile}' >&2
       echo "-------------------------------------------" >&2
     '';
 

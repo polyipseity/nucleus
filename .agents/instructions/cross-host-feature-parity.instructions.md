@@ -83,10 +83,10 @@ following in both configuration and deconfiguration paths:
 
 - Keep secret provisioning behavior symmetrical in intent:
   - POSIX: `src/modules/secrets.nix`
-  - Windows: `src/modules/windows/secrets.ps1` wired by `apply.ps1`
+  - Windows: `src/modules/windows/sync-nucleussecrets.ps1` wired by `apply.ps1`
 - Keep wallpaper provisioning symmetrical in intent:
   - POSIX: `src/modules/wallpapers.nix`
-  - Windows: `src/modules/windows/wallpapers.ps1` + `user.dsc.yml`
+  - Windows: `src/modules/windows/sync-nucleuswallpapers.ps1` + `user.dsc.yml`
 - Stale cleanup rules must be preserved on every host implementation.
 
 ## Allowed platform-specific exceptions

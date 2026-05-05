@@ -2,6 +2,14 @@
 # Mirrors core UX/security intent from macOS defaults where GNOME equivalents
 # exist (clock, lock behavior, touchpad/keyboard ergonomics, privacy, and power).
 { config, lib, pkgs, ... }:
+let
+  # Host-scoped manual checklist rendered at the end of Linux activation so the
+  # NixOS host keeps one visible source of one-time operator steps.
+  nixosManualFile = builtins.path {
+    path = ../hosts/nixos/MANUAL.md;
+    name = "nixos-MANUAL.md";
+  };
+in
 lib.mkIf pkgs.stdenv.isLinux {
   # Home Manager exposes GNOME settings via `dconf.*` (not `programs.dconf`).
   # Enabling this keeps `dconf.settings` declarative and idempotent.
@@ -115,5 +123,22 @@ lib.mkIf pkgs.stdenv.isLinux {
       sleep-inactive-battery-timeout = lib.hm.gvariant.mkUint32 1800;
       sleep-inactive-battery-type = "suspend";
     };
+  };
+
+  home.activation = {
+    # -----------------------------------------------------------------------
+    # displayHostManualInstructions
+    # Prints one-time Linux host instructions from the dedicated NixOS manual
+    # document after secrets/wallpaper activation work so operators get one
+    # consolidated, post-automation checklist.
+    # -----------------------------------------------------------------------
+    displayHostManualInstructions = lib.hm.dag.entryAfter [
+      "gpgImport"
+      "wallpaperProvision"
+    ] ''
+      echo "--- MANUAL SETUP (one-time, required) ---" >&2
+      /bin/cat '${nixosManualFile}' >&2
+      echo "-------------------------------------------" >&2
+    '';
   };
 }

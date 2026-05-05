@@ -4,8 +4,7 @@
 
 .DESCRIPTION
   Orchestrates the Windows configuration lifecycle in a single script:
-    1. Load helper functions from $ModuleDir (common, secrets, wallpapers,
-       editors, git-ssh, power, shell, remote-access).
+    1. Load helper functions from $ModuleDir one-function module files.
     2. Materialize primary-user secrets from src/secrets via SOPS.
     3. Materialize wallpaper blobs and remove stale decrypted files.
     4. Resolve each DSC config file relative to $ConfigDir.
@@ -27,8 +26,8 @@
   $ConfigDir.
 
 .PARAMETER ModuleDir
-  Path to the directory containing common.ps1 and other Windows module
-  helpers.  Defaults to ..\..\modules\windows relative to $PSScriptRoot.
+  Path to the directory containing one-function Windows helper modules.
+  Defaults to ..\..\modules\windows relative to $PSScriptRoot.
 
 .PARAMETER PrimaryUsername
   Username allowed to materialize user-scoped secrets. Defaults to the
@@ -98,14 +97,23 @@ $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
-. (Join-Path -Path $resolvedModuleDir -ChildPath "common.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "editors.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "get-nucleusdecryptedblob.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "get-nucleussecrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "git-ssh.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleusjitsecretmaterialization.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleuswingetconfiguration.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "power.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remote-access.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "secrets.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusmanagedsecrets.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusstalewallpapers.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "resolve-nucleusexecutable.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "shell.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecretfile.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecrets.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleusvscodeextensions.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleusvscodesettings.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleuswallpapers.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "test-nucleusprimaryuser.ps1")
 
 $resolvedConfigDir = (Resolve-Path -Path $ConfigDir).Path
 $machineSshHostKeyPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key"

@@ -75,6 +75,26 @@
 - **Windows module path**: keep reusable PowerShell functions under
   `src/modules/windows/*.ps1` using lowercase filenames; keep
   `src/hosts/windows/apply.ps1` as a thin trigger/orchestrator.
+- **Windows function isolation**: keep one reusable PowerShell function per
+  lowercase file under `src/modules/windows/`; orchestrators (for example
+  `src/hosts/windows/apply.ps1`) should dot-source only the modules needed for
+  the current run.
+- **Static config externalization**: keep shared editor settings in standalone
+  config files (for example `src/modules/configs/vscode-settings.json`) and
+  load them from Nix with `builtins.fromJSON (builtins.readFile ...)` so JSON
+  can be linted/validated independently.
+- **Manual activation docs**: keep one-time manual instructions in host Markdown
+  files (for example `src/hosts/macbook/MANUAL.md` and
+  `src/hosts/nixos/MANUAL.md`) and have activation hooks print those files,
+  rather than embedding long instruction strings directly in Nix code.
+- **Shell module granularity**: keep shell alias/environment attrsets in
+  dedicated fragments (for example `src/modules/shell/aliases.nix` and
+  `src/modules/shell/env.nix`) with strict alphabetical ordering of keys.
+- **NixOS hardware granularity**: when hardware settings grow, split
+  `src/hosts/nixos/hardware.nix` into `src/hosts/nixos/hardware/` fragments
+  (`cpu.nix`, `gpu.nix`, `disks.nix`) and import them through the host entrypoint.
+- **SOPS binary policy docs**: do not add documentation rules that require
+  marking `.sops` files as `binary` in `.gitattributes`.
 - **Declarative enforcement**: if a WinGet DSC resource can represent desired
   Windows state, prefer adding it to `system.dsc.yml` or `user.dsc.yml` rather
   than introducing new imperative commands in `bootstrap.ps1` or `apply.ps1`.
@@ -174,15 +194,16 @@ Darwin bridge symlinks only apply when the backend resolves to Homebrew.
   configuration. Any attempt to increase this delay or disable password
   requirement is a security regression.
 - **Activation Invariant: Manual Instructions Last** —
-  `src/modules/macos.nix` `home.activation.displayManualInstructions` must stay
-  the final activation step. It must depend on every other macOS/Home Manager
-  activation entry in that module, and any newly added activation step must be
-  added to its dependency list in the same change.
+  `src/modules/macos.nix` `home.activation.displayHostManualInstructions` must
+  stay the final activation step. It must depend on every other macOS/Home
+  Manager activation entry in that module, and any newly added activation step
+  must be added to its dependency list in the same change.
 - **Manual-Step Visibility Invariant** — whenever a feature requires a user
   one-time action that cannot be automated safely (for example opening an app to
   finish helper/CLI installation or granting first-run permissions), add the
-  exact step to `src/modules/macos.nix` `displayManualInstructions` in the same
-  change so activation output stays actionable.
+  exact step to the host manual document (for example
+  `src/hosts/macbook/MANUAL.md`) in the same change so activation output stays
+  actionable.
 - **Drift Reset Invariant: Manual Only** — keep macOS preference-domain purge
   logic (`purge-managed-user-preferences`, driven by
   `src/modules/macos.nix` `resetUserPreferenceDomains`) as a user-invoked
@@ -249,6 +270,10 @@ a rotating gallery, never as a single static file.
 
 - **Pre-flight check rule**: before proposing or executing edits, verify target
   paths on disk and list all files that will be changed.
+- **Pre-flight wiring check**: before concluding refactors that add new
+  `.json`, `.md`, `.nix`, or `.ps1` fragments, verify each new file is wired
+  into the relevant module/entrypoint (`readFile`/imports/dot-sourcing) and
+  that no fragment is orphaned.
 - **Cross-platform symmetry rule**: when adding a capability that exists on
   both Unix and Windows (for example secrets, fonts, or wallpapers), add or
   update both implementations in the same change:

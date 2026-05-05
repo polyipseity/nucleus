@@ -1,7 +1,7 @@
 # modules/editors.nix — Cross-platform editor configuration and VS Code symmetry.
 #
-# Source of truth for VS Code settings/extensions lives here. Installation
-# backend intentionally pivots by platform:
+# Source of truth for VS Code extensions and settings wiring lives here.
+# Installation backend intentionally pivots by platform:
 #   • Linux/NixOS: nixpkgs binaries
 #   • macOS: backend selected in modules/core.nix (Homebrew or nixpkgs)
 { config, lib, pkgs, ... }:
@@ -10,14 +10,9 @@ let
   # backend that integrates best on each OS.
   isDarwin = pkgs.stdenv.isDarwin;
 
-  # Shared VS Code settings used for both stable and insiders builds so the two
-  # editor channels stay configuration-identical.
-  sharedSettings = {
-    "editor.fontSize" = 14;
-    "nix.enableLanguageServer" = true;
-    "rust-analyzer.check.command" = "clippy";
-    "workbench.colorTheme" = "Default Dark Modern";
-  };
+  # Parse the standalone JSON settings file during evaluation so invalid JSON
+  # fails fast before activation touches user config paths.
+  sharedSettings = builtins.fromJSON (builtins.readFile ./configs/vscode-settings.json);
 
   # Serialize once and reuse for all settings targets to guarantee byte-for-
   # byte parity between stable and insiders JSON files.

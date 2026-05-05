@@ -10,7 +10,9 @@
     ../../modules/posix-sops.nix
     ../../modules/posix-user-shell.nix
     ./base.nix
-    ./hardware.nix
+    ./hardware/cpu.nix
+    ./hardware/disks.nix
+    ./hardware/gpu.nix
     ./networking.nix
     ./security.nix
     ./sops.nix

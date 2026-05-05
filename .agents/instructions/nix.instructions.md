@@ -20,6 +20,8 @@ applyTo: "src/**/*.nix"
     software not handled by nixpkgs or Homebrew.
   - `nixos/default.nix` — NixOS entrypoint; imports host fragments and the
     shared posix/gnupg modules.
+  - `macbook/MANUAL.md` and `nixos/MANUAL.md` — host-scoped one-time manual
+    instructions printed by activation hooks.
   - `windows/` — managed by WinGet DSC, not Nix (no `.nix` files here).
 - `src/modules/` — shared logic imported by hosts and home profiles.
   - `core.nix` — universal CLI packages and macOS `overlappingPackages` table.
@@ -34,7 +36,8 @@ applyTo: "src/**/*.nix"
   - `posix-sops.nix` — shared SOPS key sources (machine SSH key + GPG fallback).
   - `posix-user-shell.nix` — shared user account defaults (home dir, login shell).
   - `secrets.nix` — declarative SSH/GPG secret provisioning activation logic.
-  - `shell.nix` — zsh, direnv, zoxide, and shell aliases.
+  - `shell.nix` — zsh, direnv, zoxide wiring; aliases/environment live in
+    `shell/aliases.nix` and `shell/env.nix`.
   - `wallpapers.nix` — decrypts wallpaper blobs and applies the rotating gallery.
 
 ## Flake conventions
@@ -105,25 +108,18 @@ applyTo: "src/**/*.nix"
   `purge-managed-user-preferences` and must not be wired into automatic
   `home.activation.*` execution.
 
-## macOS activation ordering invariant
+## Host manual-step activation invariant
 
-- `src/modules/macos.nix` `home.activation.displayManualInstructions` must stay
-  the final activation step in that module.
+- `src/modules/macos.nix` `home.activation.displayHostManualInstructions` must
+  stay the final activation step in that module.
 - It must depend on every other activation entry defined in
-  `src/modules/macos.nix` plus the required Home Manager/framework activation
-  boundaries (`writeBoundary`, `linkGeneration`, and any existing helper steps
-  already used in the dependency list).
-- When adding a new `home.activation.*` entry to `src/modules/macos.nix`, update
-  `displayManualInstructions` dependencies in the same change.
-
-## macOS manual-step visibility invariant
-
-- If a feature needs a one-time manual user step that cannot be safely
-  automated (for example opening an app once to complete helper/CLI
-  installation or granting first-run permissions), update
-  `src/modules/macos.nix` `displayManualInstructions` in the same change.
-- Keep the instruction text explicit and actionable so activation logs remain a
-  complete checklist for post-apply steps.
+  `src/modules/macos.nix` plus required Home Manager/framework boundaries
+  (`writeBoundary`, `linkGeneration`, and any helper steps already used in the
+  dependency list).
+- If a feature needs a one-time manual step that cannot be safely automated,
+  update the host manual Markdown file (`src/hosts/macbook/MANUAL.md` and/or
+  `src/hosts/nixos/MANUAL.md`) in the same change so activation output remains
+  a complete checklist.
 
 ## Sorting
 
