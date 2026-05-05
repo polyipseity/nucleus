@@ -71,10 +71,13 @@ in
     CustomUserPreferences = {
       # NSGlobalDomain: global preferences that don't fit nix-darwin typed options.
       "NSGlobalDomain" = {
-        # Keep Services out of context menus. This key is not exposed by
-        # nix-darwin's typed `system.defaults.NSGlobalDomain` options, so it
-        # must be applied through CustomUserPreferences.
-        NSServicesMinimumItemCountForContextSubmenu = 9999;
+        # Keep Finder context-menu Services at the default threshold so core
+        # entries such as "New Terminal at Folder" remain discoverable from a
+        # right-click without requiring keyboard-only fallbacks.
+        # This key is not exposed by nix-darwin's typed
+        # `system.defaults.NSGlobalDomain` options, so it must be applied
+        # through CustomUserPreferences.
+        NSServicesMinimumItemCountForContextSubmenu = 0;
 
         # Make toolbar title rollover hints appear instantly. This key is
         # currently outside nix-darwin's typed NSGlobalDomain option set.
@@ -169,6 +172,13 @@ in
         CriticalUpdateInstall = true;
       };
 
+      # Hide the Spotlight menu-bar button to reduce persistent chrome while
+      # preserving keyboard launch via Cmd+Space and launcher parity via
+      # Raycast. This key is not exposed by nix-darwin typed options.
+      "com.apple.Spotlight" = {
+        MenuItemHidden = 1;
+      };
+
       # TextEdit: default to plain text mode instead of RTF.
       "com.apple.TextEdit" = {
         RichText = false;
@@ -208,7 +218,9 @@ in
         NSStatusItemSpacing = 6;          # pixels between status items
       };
 
-      # Prevent macOS from writing .DS_Store files on network volumes and USB drives.
+      # Prevent macOS from writing .DS_Store files on network and removable
+      # volumes. macOS does not provide an equivalent supported toggle for local
+      # APFS/HFS+ folders.
       "com.apple.desktopservices" = {
         DSDontWriteNetworkStores = true;
         DSDontWriteUSBStores = true;

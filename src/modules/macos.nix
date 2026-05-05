@@ -36,6 +36,7 @@ let
     "com.apple.Safari"
     "com.apple.Siri"
     "com.apple.SoftwareUpdate"
+    "com.apple.Spotlight"
     "com.apple.SubmitDiagInfo"
     "com.apple.TextEdit"
     "com.apple.TextInput.Kybd"
@@ -594,13 +595,18 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # configureSystemHardening
-    # Applies Spotlight indexing suppression for build artifact directories;
+    # Applies Spotlight indexing suppression and dev-tree metadata cleanup;
     # requires a running user session (not available to system-level scripts).
     #
     #   .metadata_never_index files: tells Spotlight not to index well-known
     #   build artifact directories under ~/dev (node_modules, target, build,
     #   dist, etc.), reducing indexing CPU/disk overhead and avoiding Spotlight
     #   surfacing compiled binaries or cache files.
+    #
+    #   .DS_Store cleanup: removes Finder metadata files under ~/dev after each
+    #   activation to keep Git worktrees cleaner. macOS cannot fully disable
+    #   .DS_Store creation on local APFS/HFS+ volumes, so this is a compensating
+    #   control for development paths.
     #
     #   Dock restart: applies any pending Dock pref changes (e.g. hot corners
     #   written declaratively via CustomUserPreferences."com.apple.dock") without
@@ -619,6 +625,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
             echo "nucleus: failed to mark one or more '$dir_name' directories as metadata_never_index." >&2
           fi
         done
+
+        # Remove Finder metadata files from development trees to reduce
+        # repository noise. This is safe/idempotent because Finder recreates
+        # files on demand when folder-view state changes.
+        if ! /usr/bin/find "$DEV_ROOT" -name ".DS_Store" -type f -delete; then
+          echo "nucleus: failed to remove one or more .DS_Store files under ~/dev." >&2
+        fi
       else
         mkdir -p "$DEV_ROOT"
       fi
