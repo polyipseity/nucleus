@@ -170,6 +170,11 @@ Darwin bridge symlinks only apply when the backend resolves to Homebrew.
   the final activation step. It must depend on every other macOS/Home Manager
   activation entry in that module, and any newly added activation step must be
   added to its dependency list in the same change.
+- **Manual-Step Visibility Invariant** — whenever a feature requires a user
+  one-time action that cannot be automated safely (for example opening an app to
+  finish helper/CLI installation or granting first-run permissions), add the
+  exact step to `src/modules/macos.nix` `displayManualInstructions` in the same
+  change so activation output stays actionable.
 - **Drift Reset Invariant: Manual Only** — keep macOS preference-domain purge
   logic (`purge-managed-user-preferences`, driven by
   `src/modules/macos.nix` `resetUserPreferenceDomains`) as a user-invoked

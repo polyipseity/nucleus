@@ -116,6 +116,15 @@ applyTo: "src/**/*.nix"
 - When adding a new `home.activation.*` entry to `src/modules/macos.nix`, update
   `displayManualInstructions` dependencies in the same change.
 
+## macOS manual-step visibility invariant
+
+- If a feature needs a one-time manual user step that cannot be safely
+  automated (for example opening an app once to complete helper/CLI
+  installation or granting first-run permissions), update
+  `src/modules/macos.nix` `displayManualInstructions` in the same change.
+- Keep the instruction text explicit and actionable so activation logs remain a
+  complete checklist for post-apply steps.
+
 ## Sorting
 
 - Package lists (e.g. `sharedPackages`, `environment.systemPackages`,

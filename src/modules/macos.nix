@@ -631,6 +631,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #   Chrome Remote Desktop (CRD) — requires naming the Mac in the web UI
     #                   and granting Screen Recording + Accessibility to the
     #                   ChromeRemoteDesktopHost process.
+    #   Battery app — first launch is required once so its bundled helper can
+    #                 install the `battery` CLI used by configureChargeLimit.
     #
     # Ordering invariant:
     #   displayManualInstructions must remain the terminal activation node so
@@ -640,6 +642,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     displayManualInstructions = lib.hm.dag.entryAfter displayManualInstructionDeps ''
       echo "--- MANUAL SETUP (one-time, required) ---" >&2
       echo "BetterDisplay: Grant Accessibility + Screen Recording in System Settings > Privacy & Security." >&2
+      echo "Battery: Open battery.app once and complete setup so /usr/local/bin/battery is installed." >&2
       echo "CRD: Visit https://remotedesktop.google.com/access to name Mac and set PIN." >&2
       echo "CRD: Enable Screen Recording + Accessibility for ChromeRemoteDesktopHost." >&2
       echo "-------------------------------------------" >&2
