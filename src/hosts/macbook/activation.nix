@@ -26,11 +26,15 @@
   # releases can ignore or partially override higher-level power options.
   #
   # Invariant:
-  #   - AC and battery: no idle system sleep, 1-minute display sleep,
-  #     no disk sleep
-  #   - Shared: wake-on-LAN, Power Nap, and lid wake enabled
-  #   - Battery: low-power mode on (if supported)
-  #   - AC: low-power mode off (if supported)
+  #   - Battery: 1-minute display sleep, 1-minute system sleep, 10-minute disk
+  #     sleep, wake-on-LAN enabled
+  #   - AC: 1-minute display sleep, no idle system sleep, no disk sleep,
+  #     wake-on-LAN enabled
+  #   - Shared: Power Nap and lid wake enabled
+  #   - Battery low-power mode on and AC low-power mode off (if supported)
+  #
+  # This intentionally mirrors the host-specific pmset target profile so that a
+  # single activation run can converge drift in both charger and battery modes.
   #
   # The helper emits a clear error when any write fails so a mis-typed key
   # does not silently leave a stale policy in place.
@@ -49,9 +53,14 @@
     }
 
     if [ -x /usr/bin/pmset ]; then
-      apply_pmset -a womp 1 powernap 1 lidwake 1
-      apply_pmset -c sleep 0 displaysleep 1 disksleep 0
-      apply_pmset -b sleep 0 displaysleep 1 disksleep 0
+      apply_pmset -a powernap 1 lidwake 1
+      apply_pmset -c womp 1 displaysleep 1 sleep 0 disksleep 0
+      apply_pmset -b womp 1 displaysleep 1 sleep 1 disksleep 10
+
+      if pmset_supports lessbright; then
+        apply_pmset -a lessbright 0
+        apply_pmset -b lessbright 1
+      fi
 
       if pmset_supports lowpowermode; then
         apply_pmset -c lowpowermode 0
