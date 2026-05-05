@@ -49,7 +49,7 @@ function Sync-NucleusSecretFile {
     Decrypts one SOPS secret file and materializes its payloads on disk.
 
   .DESCRIPTION
-    Calls Get-NucleusSecrets to decrypt $FilePath, then processes three
+    Calls Get-NucleusSecrets to decrypt $FilePath, then processes five
     username-scoped flat keys:
 
     ssh_personal_${username}
@@ -61,6 +61,16 @@ function Sync-NucleusSecretFile {
       Written to $HOME\.ssh\ssh_personal_${username}.pub using ASCII encoding
       (no BOM, no trailing newline). The file is only overwritten when content
       changes.
+
+    ssh_personal_${username}_rsa
+      Written to $HOME\.ssh\ssh_personal_${username}_rsa using ASCII encoding
+      (no BOM, no trailing newline). The file is only overwritten when content
+      changes.
+
+    ssh_personal_${username}_rsa_pub
+      Written to $HOME\.ssh\ssh_personal_${username}_rsa.pub using ASCII
+      encoding (no BOM, no trailing newline). The file is only overwritten when
+      content changes.
 
     gpg_personal_${username}
       Imported into the current GPG keyring via stdin (`gpg --batch --import -`).
@@ -113,6 +123,8 @@ function Sync-NucleusSecretFile {
   $gpgSecretName = "gpg_personal_$PrimaryUsername"
   $sshDir = Join-Path -Path $HOME -ChildPath ".ssh"
   $sshPublicSecretName = "ssh_personal_${PrimaryUsername}_pub"
+  $sshRsaPublicSecretName = "ssh_personal_${PrimaryUsername}_rsa_pub"
+  $sshRsaSecretName = "ssh_personal_${PrimaryUsername}_rsa"
   $sshSecretName = "ssh_personal_$PrimaryUsername"
 
   if (-not (Test-Path -Path $sshDir)) {
@@ -151,6 +163,38 @@ function Sync-NucleusSecretFile {
     if ($existingPublicValue -ne $sshPublicKeyValue) {
       $sshPublicKeyValue | Out-File -FilePath $sshPublicKeyPath -Encoding ascii -NoNewline
       Write-Host "  Updated SSH public key: $sshPublicSecretName" -ForegroundColor Cyan
+    }
+  }
+
+  if ($null -ne $jsonSecrets.PSObject.Properties[$sshRsaSecretName]) {
+    $sshRsaKeyPath = Join-Path -Path $sshDir -ChildPath $sshRsaSecretName
+    $sshRsaKeyValue = [string]$jsonSecrets.$sshRsaSecretName
+    $existingRsaValue = if (Test-Path -Path $sshRsaKeyPath) {
+      Get-Content -Path $sshRsaKeyPath -Raw
+    }
+    else {
+      ""
+    }
+
+    if ($existingRsaValue -ne $sshRsaKeyValue) {
+      $sshRsaKeyValue | Out-File -FilePath $sshRsaKeyPath -Encoding ascii -NoNewline
+      Write-Host "  Updated SSH key: $sshRsaSecretName" -ForegroundColor Cyan
+    }
+  }
+
+  if ($null -ne $jsonSecrets.PSObject.Properties[$sshRsaPublicSecretName]) {
+    $sshRsaPublicKeyPath = Join-Path -Path $sshDir -ChildPath "${sshRsaSecretName}.pub"
+    $sshRsaPublicKeyValue = [string]$jsonSecrets.$sshRsaPublicSecretName
+    $existingRsaPublicValue = if (Test-Path -Path $sshRsaPublicKeyPath) {
+      Get-Content -Path $sshRsaPublicKeyPath -Raw
+    }
+    else {
+      ""
+    }
+
+    if ($existingRsaPublicValue -ne $sshRsaPublicKeyValue) {
+      $sshRsaPublicKeyValue | Out-File -FilePath $sshRsaPublicKeyPath -Encoding ascii -NoNewline
+      Write-Host "  Updated SSH public key: $sshRsaPublicSecretName" -ForegroundColor Cyan
     }
   }
 
@@ -275,8 +319,9 @@ function Sync-NucleusSecrets {
       - ssh-personal.yml
 
     Each file is passed to Sync-NucleusSecretFile, which extracts only
-    `gpg_personal_${username}` and `ssh_personal_${username}` for the primary
-    user and ignores all other keys.
+    primary-user keys (`gpg_personal_${username}`, `ssh_personal_${username}`,
+    `ssh_personal_${username}_pub`, `ssh_personal_${username}_rsa`, and
+    `ssh_personal_${username}_rsa_pub`) and ignores all other keys.
 
   .PARAMETER SecretsDir
     Absolute path to the directory containing SOPS-encrypted YAML files.
@@ -342,8 +387,8 @@ function Remove-NucleusManagedSecrets {
 
   .DESCRIPTION
     Cleanup companion for secret parity toggles. Removes only files managed by
-    this repository (`ssh_personal_<user>` and corresponding `.pub`) from the
-    primary user's `~/.ssh` directory.
+    this repository (`ssh_personal_<user>`, `ssh_personal_<user>_rsa`, and
+    corresponding `.pub` files) from the primary user's `~/.ssh` directory.
 
     GPG keyring cleanup is intentionally out of scope because selective private
     key deletion is not reliably reversible without a canonical key inventory.
@@ -365,10 +410,13 @@ function Remove-NucleusManagedSecrets {
 
   $sshDir = Join-Path -Path $HOME -ChildPath '.ssh'
   $sshSecretName = "ssh_personal_$PrimaryUsername"
+  $sshRsaSecretName = "${sshSecretName}_rsa"
 
   foreach ($managedPath in @(
       (Join-Path -Path $sshDir -ChildPath $sshSecretName),
-      (Join-Path -Path $sshDir -ChildPath "${sshSecretName}.pub")
+      (Join-Path -Path $sshDir -ChildPath "${sshSecretName}.pub"),
+      (Join-Path -Path $sshDir -ChildPath $sshRsaSecretName),
+      (Join-Path -Path $sshDir -ChildPath "${sshRsaSecretName}.pub")
     )) {
     if (Test-Path -Path $managedPath) {
       Remove-Item -Path $managedPath -Force -ErrorAction SilentlyContinue

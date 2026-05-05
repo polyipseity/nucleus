@@ -13,6 +13,12 @@
 #       -----END NOT OPENSSH PRIVATE KEY-----
 #     ssh_personal_<username>_pub: |
 #       ssh-ed25519 AAAA... user@host
+#     ssh_personal_<username>_rsa: |
+#       -----BEGIN NOT OPENSSH PRIVATE KEY-----
+#       ...
+#       -----END NOT OPENSSH PRIVATE KEY-----
+#     ssh_personal_<username>_rsa_pub: |
+#       ssh-rsa AAAA... user@host
 #
 #   gpg-personal.yml:
 #     gpg_personal_<username>: |
@@ -49,8 +55,12 @@ let
   gpgSecretName = "gpg_personal_${primaryUsername}";
   sshSecretName = "ssh_personal_${primaryUsername}";
   sshPublicSecretName = "${sshSecretName}_pub";
+  sshRsaSecretName = "${sshSecretName}_rsa";
+  sshRsaPublicSecretName = "${sshRsaSecretName}_pub";
   sshPrivateKeyPath = "${config.home.homeDirectory}/.ssh/${sshSecretName}";
   sshPublicKeyPath = "${sshPrivateKeyPath}.pub";
+  sshRsaPrivateKeyPath = "${config.home.homeDirectory}/.ssh/${sshRsaSecretName}";
+  sshRsaPublicKeyPath = "${sshRsaPrivateKeyPath}.pub";
   sshIdentityFile = "~/.ssh/${sshSecretName}";
   sshExtraOptions =
     {
@@ -83,6 +93,23 @@ lib.mkIf isPrimaryUser {
   sops.secrets."${sshPublicSecretName}" = {
     sopsFile = ../secrets/ssh-personal.yml;
     path = sshPublicKeyPath;
+    mode = "0644";
+  };
+
+  # --------------------------------------------------------------------------
+  # SSH RSA keypair (legacy fallback) — still materialized for compatibility
+  # with environments that have not migrated off RSA yet, but intentionally not
+  # referenced by the default SSH match blocks below.
+  # --------------------------------------------------------------------------
+  sops.secrets."${sshRsaSecretName}" = {
+    sopsFile = ../secrets/ssh-personal.yml;
+    path = sshRsaPrivateKeyPath;
+    mode = "0600";
+  };
+
+  sops.secrets."${sshRsaPublicSecretName}" = {
+    sopsFile = ../secrets/ssh-personal.yml;
+    path = sshRsaPublicKeyPath;
     mode = "0644";
   };
 
