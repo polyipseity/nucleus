@@ -196,6 +196,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure ShellCheck is installed for cross-host shell script linting parity with macOS and NixOS
+      settings:
+        id: ShellCheck.ShellCheck
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure opencode is installed for cross-host agent tooling parity with macOS and NixOS
       settings:
         id: SST.opencode

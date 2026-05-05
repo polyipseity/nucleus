@@ -108,6 +108,23 @@
           '';
         }}/bin/nucleus-validate-powershell-syntax";
       };
+
+      # Build the shell script lint app for a given package set.
+      # Runtime dependencies are bundled from this flake so CI and local runs do
+      # not depend on host-global shellcheck/git installations.
+      mkShellScriptValidationApp = pkgs: {
+        type = "app";
+        program = "${pkgs.writeShellApplication {
+          name = "nucleus-validate-shell-scripts";
+          runtimeInputs = [
+            pkgs.git
+            pkgs.shellcheck
+          ];
+          text = ''
+            exec sh "${../scripts/validate-shell-scripts.sh}" "$@"
+          '';
+        }}/bin/nucleus-validate-shell-scripts";
+      };
     in {
       # -----------------------------------------------------------------------
       # apps — runnable via `nix run .#<name>`.
@@ -124,6 +141,7 @@
             type = "app";
             program = "${darwin.packages.${systems.mac}.darwin-rebuild}/bin/darwin-rebuild";
           };
+          validate-shell-scripts = mkShellScriptValidationApp pkgsMac;
           validate-powershell-syntax = mkPowerShellSyntaxValidationApp pkgsMac;
         };
         "${systems.linux}" = {
@@ -136,6 +154,7 @@
             type = "app";
             program = "${pkgsLinux.nixos-rebuild}/bin/nixos-rebuild";
           };
+          validate-shell-scripts = mkShellScriptValidationApp pkgsLinux;
           validate-powershell-syntax = mkPowerShellSyntaxValidationApp pkgsLinux;
         };
       };

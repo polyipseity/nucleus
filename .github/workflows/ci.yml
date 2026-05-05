@@ -52,3 +52,6 @@ jobs:
 
       - name: Validate PowerShell syntax
         run: nix run ./src#validate-powershell-syntax
+
+      - name: Validate shell scripts
+        run: nix run ./src#validate-shell-scripts

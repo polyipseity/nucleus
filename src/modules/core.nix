@@ -22,6 +22,7 @@ let
   #   prek       — pre-commit hook manager used by prek.toml
   #   ripgrep    — fast grep replacement
   #   rustup     — Rust toolchain manager
+  #   shellcheck — shell linter used by CI and pre-commit validation
   #   sops       — secret encryption/decryption tool
   #   uv         — fast Python package/project manager
   #   zoxide     — smart cd (shell integration in shell.nix)
@@ -40,6 +41,7 @@ let
     pkgs.prek
     pkgs.ripgrep
     pkgs.rustup
+    pkgs.shellcheck
     pkgs.sops
     pkgs.uv
     pkgs.zoxide
