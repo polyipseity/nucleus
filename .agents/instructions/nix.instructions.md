@@ -80,6 +80,17 @@ applyTo: "src/**/*.nix"
 - Follow `.agents/instructions/cross-host-feature-parity.instructions.md`
   when deciding scope.
 
+## Minimal-chrome UI defaults
+
+- For desktop/UI settings managed in Nix modules, prefer reducing persistent
+  chrome when equivalent keyboard/command access remains (for example auto-hide
+  dock/panel behavior, hidden optional status controls, and trimmed recents).
+- Preserve high-signal visibility defaults (for example hidden files,
+  file extensions, status/path bars, and explicit metadata) unless there is a
+  concrete reason to reduce visibility.
+- If a hide/auto-hide configuration is used, add a short WHY comment beside the
+  setting and name the alternate access path.
+
 ## Module conventions
 
 - Shared modules must guard NixOS-only options with `lib.mkIf` checks on

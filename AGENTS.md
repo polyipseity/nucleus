@@ -147,6 +147,13 @@
 - **Naming style**: avoid `nucleus` branding prefixes in new identifiers
   (activation names, helper names, options, scripts) unless a prefix is needed
   for external integration or collision avoidance.
+- **UI policy: minimal chrome, full capability**: prefer reducing persistent UI
+  chrome (for example auto-hide surfaces, hidden optional menu/task controls,
+  and trimmed recents) when equivalent keyboard or command access remains.
+  Keep high-signal context visibility enabled (for example file extensions,
+  hidden files, status/path bars, and explicit file metadata) unless there is a
+  concrete reason not to. When hiding anything that can affect discoverability
+  or safety, add a short WHY comment and note the alternate access path.
 
 ## Package Management Strategy
 

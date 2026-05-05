@@ -41,6 +41,13 @@ Do not skip categories. At minimum review: packages/tools, shell/dev workflow,
 security posture, desktop/UI behavior, remote-access behavior, secrets, editor
 experience, git/signing behavior, power/network posture, and automation hooks.
 
+When reviewing desktop/UI behavior, apply a minimal-chrome parity lens:
+prefer reducing persistent chrome (menu extras, taskbar buttons, recents,
+always-visible docks/panels) when equivalent keyboard/command workflows remain
+available. At the same time, preserve high-signal visibility defaults (for
+example hidden files, file extensions, status/path bars, and explicit metadata)
+unless there is a concrete host constraint.
+
 ## Where to implement
 
 - **POSIX shared behavior** (applies to both macOS and NixOS):
@@ -97,6 +104,10 @@ modules, Windows registry/DSC resources).
 
 When that happens, add a short WHY comment in code explaining why parity is not
 possible or not desirable.
+
+If an exception hides information or controls (for example auto-hide,
+taskbar/menu toggles, or hidden-file toggles), the WHY comment must explain the
+tradeoff and name the alternate access path (shortcut, command, or menu route).
 
 ## Pre-merge parity checklist
 

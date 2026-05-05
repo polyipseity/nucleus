@@ -66,6 +66,15 @@ packages) or `settings.valueName` / `settings.name` (for other resources).
   the setting must be machine-wide.
 - Use `%USERPROFILE%` rather than a hard-coded path for the user's home
   directory in `value` strings.
+- For UI/discoverability settings, apply a minimal-chrome rule: allow reduced
+  persistent chrome (for example hidden optional taskbar controls or compact
+  surfaces) when equivalent keyboard/command access remains available.
+- Preserve high-signal visibility defaults by default (for example hidden files,
+  file extensions, status bars, and navigation-pane folder visibility) unless a
+  concrete workflow reason justifies reducing visibility.
+- If a Windows UI choice reduces visibility or hides controls, explain the
+  tradeoff in `directives.description:` with a short WHY and include the
+  alternate access path (shortcut, command, or menu route).
 
 ## Cross-host equivalence checks
 
