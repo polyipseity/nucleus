@@ -83,7 +83,7 @@ function Get-NucleusSecrets {
     }
   }
 
-  $secretKeyInfo = & $GpgExe --list-secret-keys --with-colons 2>$null
+  $secretKeyInfo = & $GpgExe --list-secret-keys --with-colons
   $hasGpgSecretKeys = ($secretKeyInfo -and ($secretKeyInfo -match "^(sec|ssb):"))
   if ($hasGpgSecretKeys) {
     try {

@@ -51,18 +51,20 @@ function Sync-NucleusWindowsRdp {
     # Start TermService automatically so RDP survives reboots and is
     # immediately available after apply without manual intervention.
     Set-Service -Name 'TermService' -StartupType Automatic
-    Start-Service -Name 'TermService' -ErrorAction SilentlyContinue
+    Start-Service -Name 'TermService'
     # Open the built-in Windows firewall rules for RDP (TCP 3389 and UDP).
     # The rules already exist in every Windows install; we only enable them.
-    Enable-NetFirewallRule -Name 'RemoteDesktop-UserMode-In-TCP' -ErrorAction SilentlyContinue
-    Enable-NetFirewallRule -Name 'RemoteDesktop-UserMode-In-UDP' -ErrorAction SilentlyContinue
+    Enable-NetFirewallRule -Name 'RemoteDesktop-UserMode-In-TCP'
+    Enable-NetFirewallRule -Name 'RemoteDesktop-UserMode-In-UDP'
   }
   else {
     # Cleanup: stop the service and disable the firewall rules so no stale
     # RDP exposure remains when the feature is toggled off.
-    Stop-Service -Name 'TermService' -ErrorAction SilentlyContinue
+    if ((Get-Service -Name 'TermService').Status -ne 'Stopped') {
+      Stop-Service -Name 'TermService'
+    }
     Set-Service -Name 'TermService' -StartupType Manual
-    Disable-NetFirewallRule -Name 'RemoteDesktop-UserMode-In-TCP' -ErrorAction SilentlyContinue
-    Disable-NetFirewallRule -Name 'RemoteDesktop-UserMode-In-UDP' -ErrorAction SilentlyContinue
+    Disable-NetFirewallRule -Name 'RemoteDesktop-UserMode-In-TCP'
+    Disable-NetFirewallRule -Name 'RemoteDesktop-UserMode-In-UDP'
   }
 }

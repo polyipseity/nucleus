@@ -96,12 +96,14 @@ function Sync-NucleusOpenSshServer {
 
   if ($Enabled) {
     Set-Service -Name 'sshd' -StartupType Automatic
-    Start-Service -Name 'sshd' -ErrorAction SilentlyContinue
-    Enable-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -ErrorAction SilentlyContinue
+    Start-Service -Name 'sshd'
+    Enable-NetFirewallRule -Name 'OpenSSH-Server-In-TCP'
   }
   else {
-    Stop-Service -Name 'sshd' -ErrorAction SilentlyContinue
+    if ((Get-Service -Name 'sshd').Status -ne 'Stopped') {
+      Stop-Service -Name 'sshd'
+    }
     Set-Service -Name 'sshd' -StartupType Manual
-    Disable-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -ErrorAction SilentlyContinue
+    Disable-NetFirewallRule -Name 'OpenSSH-Server-In-TCP'
   }
 }

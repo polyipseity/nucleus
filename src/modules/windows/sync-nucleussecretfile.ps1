@@ -182,6 +182,10 @@ function Sync-NucleusSecretFile {
           # even when no agent is running.  Parity with POSIX sshKeyAdopt behavior.
           $sshAddCommand = Get-Command 'ssh-add' -ErrorAction SilentlyContinue
           if ($null -ne $sshAddCommand) {
+            # 2>$null is intentional: ssh-add -D emits "Could not connect to
+            # your authentication agent" when no agent is running.  That
+            # failure is benign — nothing to flush — and the noise would
+            # obscure the meaningful rotation log line below.
             & $sshAddCommand.Source -D 2>$null | Out-Null
             Write-Host "  Flushed SSH agent due to key rotation ($oldSshFingerprint -> $newSshFingerprint)" -ForegroundColor Cyan
           }
@@ -231,7 +235,7 @@ function Sync-NucleusSecretFile {
     $gpgKeyValue = [string]$jsonSecrets.$gpgSecretName
     if (-not [string]::IsNullOrWhiteSpace($gpgKeyValue)) {
       $firstFingerprint = $null
-      $showOnlyOutput = $gpgKeyValue | & $GpgExe --batch --import-options show-only --dry-run --with-colons --import - 2>$null
+      $showOnlyOutput = $gpgKeyValue | & $GpgExe --batch --import-options show-only --dry-run --with-colons --import -
       foreach ($line in $showOnlyOutput) {
         if ($line -like "fpr:*") {
           $parts = $line -split ":"
