@@ -261,7 +261,6 @@ let
     "verifyArchivingStack"
     "verifySecretDecryption"
     "vscodeDarwinExtensionBridge"
-    "vscodeProfiles"
     "wallpaperProvision"
     "writeBoundary"
   ];
