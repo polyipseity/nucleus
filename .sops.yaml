@@ -4,6 +4,7 @@ keys:
   # recipient as the last backup entry.
   age_devices: &age_devices
     - age1sx4st6vwpgd56500379qjt3tnvnc5j9q5hmcuehxelu65q6ytvesmh06dk
+    # -- machine keys end; personal SSH backup key below --
     - age19swk9khuy2t2t7z6u5j7krj87l2t6t5m9wk7r7dnp6p4xcwz9ucq8zlxp7
   primary_gpg: &primary_gpg F45098829935F40E47717018FBA5C89B3E700B7339A67CD0E1AD1361C25E7CFD
 

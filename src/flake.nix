@@ -81,13 +81,18 @@
       pkgsMac   = mkPkgs systems.mac;
 
       # Build the `nix run .#apply` app for a given package set.
-      # Wraps scripts/apply.sh in a shell application that has git on PATH,
-      # which is sufficient for repository-root resolution in apply.sh.
+      # Wraps scripts/apply.sh in a shell application that has git, sops, and
+      # ssh-to-age on PATH so the machine age key auto-registration step can
+      # derive the age public key and rewrap all SOPS-encrypted files.
       mkApplyApp = pkgs: {
         type = "app";
         program = "${pkgs.writeShellApplication {
           name = "nucleus-apply";
-          runtimeInputs = [ pkgs.git ];
+          runtimeInputs = [
+            pkgs.git
+            pkgs.sops
+            pkgs.ssh-to-age
+          ];
           text = builtins.readFile ./scripts/apply.sh;
         }}/bin/nucleus-apply";
       };
@@ -283,7 +288,7 @@
       # -----------------------------------------------------------------------
       # packages — installable via `nix profile add .#bootstrap-deps`.
       # bootstrap-deps is a symlink-joined set of the tools used for manual
-      # secret lifecycle tasks during bootstrap (gnupg, sops).
+      # secret lifecycle tasks during bootstrap (gnupg, sops, ssh-to-age).
       # -----------------------------------------------------------------------
       packages = {
         "${systems.mac}".bootstrap-deps = pkgsMac.symlinkJoin {
@@ -291,6 +296,7 @@
           paths = [
             pkgsMac.gnupg
             pkgsMac.sops
+            pkgsMac.ssh-to-age
           ];
         };
         "${systems.linux}".bootstrap-deps = pkgsLinux.symlinkJoin {
@@ -298,6 +304,7 @@
           paths = [
             pkgsLinux.gnupg
             pkgsLinux.sops
+            pkgsLinux.ssh-to-age
           ];
         };
       };
@@ -312,12 +319,14 @@
           packages = [
             pkgsMac.gnupg
             pkgsMac.sops
+            pkgsMac.ssh-to-age
           ];
         };
         "${systems.linux}".bootstrap = pkgsLinux.mkShell {
           packages = [
             pkgsLinux.gnupg
             pkgsLinux.sops
+            pkgsLinux.ssh-to-age
           ];
         };
       };

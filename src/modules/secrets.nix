@@ -42,22 +42,22 @@
 #   sops edit src/secrets/git-identities.yml   # restructure to flat format above
 #
 # Bootstrap (once per fresh machine):
-#   1. Retrieve the machine age public key from the SSH host key (the host
-#      key pair is created by the OS during installation):
-#        ssh-to-age < /etc/ssh/ssh_host_ed25519.pub
-#      Add this key to .sops.yaml keys.age_devices, then rewrap every
-#      encrypted file so the new machine can decrypt them:
-#        sops updatekeys src/secrets/git-identities.yml
-#        sops updatekeys src/secrets/gpg-personal.yml
-#        sops updatekeys src/secrets/ssh-personal.yml
-#        sops updatekeys "src/assets/wallpapers/<name>.sops"  # repeat per file
-#      Commit and deploy the updated .sops.yaml and rewrapped secrets.
-#   2. Run: darwin-rebuild switch / nixos-rebuild switch
-#      The system activation script deriveHostAgeKey (posix-sops.nix) writes
+#   1. Import your GPG private key so sops updatekeys can re-encrypt secrets
+#      for the new machine age recipient:
+#        gpg --import <backup-key-file>
+#   2. Run: ./scripts/bootstrap.sh apply   (or darwin-rebuild / nixos-rebuild)
+#      apply.sh calls register_host_age_key_if_needed which automatically:
+#        a. Derives the machine age public key from /etc/ssh/ssh_host_ed25519_key.pub.
+#        b. Inserts it into .sops.yaml before the machine-keys-end marker comment.
+#        c. Rewraps every encrypted file so this machine can decrypt them.
+#      The system activation script deriveHostAgeKey (posix-sops.nix) then writes
 #      the machine age private key to /etc/sops/age/machine.txt.  HM sops-nix
-#      then uses this file to decrypt all SOPS secrets without requiring a
-#      pre-imported GPG key.  The gpgImport activation (below) imports the
-#      managed GPG key automatically from the decrypted SOPS payload.
+#      uses this file to decrypt all SOPS secrets without a pre-imported GPG key.
+#      The gpgImport activation (below) imports the managed GPG key automatically
+#      from the decrypted SOPS payload.
+#      After apply completes, commit the updated .sops.yaml and rewrapped secrets:
+#        git add .sops.yaml src/secrets src/assets/wallpapers
+#        git commit -m "chore: register <hostname> machine age key"
 { config, lib, pkgs, username ? null, ... }:
 let
   primaryUsername =

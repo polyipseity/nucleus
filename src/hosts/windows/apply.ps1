@@ -39,6 +39,12 @@
 .PARAMETER EnableGitSshParity
   Enable managed user-level Git/SSH parity convergence and block cleanup logic.
 
+.PARAMETER EnableHostAgeKeyRegistration
+  Register this machine's SSH host public key as an age recipient in .sops.yaml
+  and rewrap all SOPS-encrypted files on first apply.  Idempotent: no-op when
+  the key is already registered.  Disable to skip registration (e.g. on
+  machines where the SSH host key is not yet a designated SOPS recipient).
+
 .PARAMETER EnablePowerParity
   Enable managed Windows power policy parity convergence and cleanup fallback.
 
@@ -76,6 +82,10 @@
   .\apply.ps1 -PrimaryUsername 'polyipseity'
 
 .EXAMPLE
+  # Apply while disabling machine age key auto-registration in .sops.yaml:
+  .\apply.ps1 -EnableHostAgeKeyRegistration:$false
+
+.EXAMPLE
   # Apply while disabling managed VS Code settings parity (cleanup only):
   .\apply.ps1 -EnableVsCodeSettingsParity:$false
 
@@ -96,6 +106,7 @@ param(
   [string]$PrimaryUsername = [System.Environment]::UserName,
   [bool]$EnableSecretsParity = $true,
   [bool]$EnableGitSshParity = $true,
+  [bool]$EnableHostAgeKeyRegistration = $true,
   [bool]$EnablePowerParity = $true,
   [bool]$EnableRdpParity = $true,
   [bool]$EnableRemoteAccessParity = $true,
@@ -109,6 +120,7 @@ $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
+. (Join-Path -Path $resolvedModuleDir -ChildPath "convert-sshpublickeytoage.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-nucleusdecryptedblob.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-nucleussecrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "git-ssh.ps1")
@@ -117,6 +129,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleuswingetconfiguration.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "power.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "rdp.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "register-nucleushostagekey.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remote-access.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusmanagedsecrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusstalewallpapers.ps1")
@@ -162,8 +175,28 @@ $gpgCandidates = @(
 $sopsExe = Resolve-NucleusExecutable -Name "sops" -CandidatePaths $sopsCandidates
 $gpgExe = Resolve-NucleusExecutable -Name "gpg" -CandidatePaths $gpgCandidates
 
-# Materialize user-scoped secrets once before DSC resources run.
+# Define shared path variables before any registration or pre-flight step so
+# both Register-NucleusHostAgeKey and the pre-flight loop reference the same
+# resolved paths without duplicate definitions later in the script.
 $secretsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets"
+$wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wallpapers"
+$machineSshHostKeyPubPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key.pub"
+$repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\")).Path
+$sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
+
+# Auto-register this machine's age key in .sops.yaml if not already present.
+# Must run before the pre-flight secret decryption check so that on the very
+# first apply the machine can already decrypt its own SOPS-encrypted secrets.
+if ($EnableHostAgeKeyRegistration) {
+  Register-NucleusHostAgeKey `
+    -MachineSshHostKeyPubPath $machineSshHostKeyPubPath `
+    -SopsExe $sopsExe `
+    -SopsYamlPath $sopsYamlPath `
+    -SecretsDir $secretsDir `
+    -WallpaperAssetsDir $wallpaperAssetsDir
+}
+
+# Materialize user-scoped secrets once before DSC resources run.
 $secretPreflightFiles = @("git-identities.yml", "gpg-personal.yml", "ssh-personal.yml")
 foreach ($secretFile in $secretPreflightFiles) {
   $secretPath = Join-Path -Path $secretsDir -ChildPath $secretFile
@@ -184,7 +217,6 @@ else {
 
 # Materialize decrypted wallpapers ahead of DSC so user.dsc.yml can resolve an
 # explicit active wallpaper path deterministically.
-$wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wallpapers"
 $wallpaperOutputDir = Join-Path -Path $HOME -ChildPath "Pictures\wallpapers"
 
 # Post-materialization health check: verify all SOPS files are decryptable by

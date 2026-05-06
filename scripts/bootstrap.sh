@@ -29,7 +29,7 @@ if [ "$COMMAND" = "-h" ] || [ "$COMMAND" = "--help" ] || [ "$COMMAND" = "help" ]
 Usage: bootstrap.sh [install-deps|apply]
 
 Installs Nix (if absent) and the Nix-managed bootstrap dependencies
-(gnupg, sops) for this host.
+(gnupg, sops, ssh-to-age) for this host.
 
 Commands:
   install-deps  Install bootstrap dependencies only (default)
