@@ -14,10 +14,10 @@ function Sync-NucleusShellProfile {
       - CurrentUserAllHosts profile
 
     Managed content intentionally mirrors key POSIX shell workflow behavior:
-       - direnv integration (if direnv is present)
-       - common aliases (`g`, `ga`, `gc`, `gca`, `gco`, `gd`, `gl`, `gp`,
-         `gpl`, `gs`, `gst`, `la`, `ll`, `v`)
-       - Python ban: blocks system-wide python/pip to prevent accidental
+      - direnv integration (if direnv is present)
+      - common aliases (`g`, `ga`, `gc`, `gca`, `gco`, `gd`, `gl`, `gp`,
+        `gpl`, `gs`, `gst`, `la`, `ll`, `v`)
+      - Python ban: blocks system-wide python/pip to prevent accidental
          modifications to system environment
 
     Cleanup behavior when disabled removes only the managed block.

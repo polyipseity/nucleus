@@ -9,12 +9,12 @@ function Sync-NucleusPowerPolicy {
     Converges active Windows power-scheme values used for remote-access parity.
 
   .DESCRIPTION
-    Applies settings on the currently active power scheme to keep the machine
-    available for remote sessions while preserving display sleep behavior:
-      - AC sleep timeout: never
-      - Battery sleep timeout: never
-      - AC display timeout: 1 minute
-      - Battery display timeout: 1 minute
+    Applies settings on the currently active power scheme that balance battery
+    efficiency with predictable responsiveness:
+      - AC sleep timeout: 20 minutes
+      - Battery sleep timeout: 10 minutes
+      - AC display timeout: 5 minutes
+      - Battery display timeout: 2 minutes
 
     When disabled, values are restored to a conservative fallback baseline:
       - AC sleep timeout: 30 minutes
@@ -44,10 +44,10 @@ function Sync-NucleusPowerPolicy {
   }
 
   if ($Enabled) {
-    & $powercfg /change monitor-timeout-ac 1
-    & $powercfg /change monitor-timeout-dc 1
-    & $powercfg /change standby-timeout-ac 0
-    & $powercfg /change standby-timeout-dc 0
+    & $powercfg /change monitor-timeout-ac 5
+    & $powercfg /change monitor-timeout-dc 2
+    & $powercfg /change standby-timeout-ac 20
+    & $powercfg /change standby-timeout-dc 10
   }
   else {
     & $powercfg /change monitor-timeout-ac 10
