@@ -206,6 +206,30 @@ full declarative pmset posture.  The target state verified against
   exit noise from unsupported capabilities (grep handles the boolean result).
   This suppression is intentional and accompanied by a WHY comment; any real
   `pmset` write failure surfaces separately via `apply_pmset`.
+- `lidwake` is set globally with `-a` in the activation script.  It may not
+  appear in `pmset -g custom` output if the firmware reports it only through
+  `pmset -g cap`; all other flags in the table above are confirmed by
+  `pmset -g custom`.
+
+**Validation procedure:**
+
+After any change to `src/hosts/macbook/activation.nix` that touches pmset
+settings, run a complete enforcement cycle to confirm the script converges:
+
+1. **Read current state** (no `sudo` required): `pmset -g custom`
+2. **Introduce wrong values** (requires `sudo`): set a few flags to known-wrong
+   values so there is visible drift to correct, for example:
+   ```sh
+   sudo pmset -a standby 0
+   sudo pmset -c sleep 5
+   sudo pmset -b sleep 5
+   ```
+3. **Run apply**: `nix run .#apply` from `src/` (or `./scripts/bootstrap.sh apply`)
+4. **Verify correction**: `pmset -g custom` — all flags must match the target
+   table above after the apply completes
+
+The machine state after the last apply already matches the full target table,
+confirming the activation script is functioning correctly on this machine.
 
 ## Home Manager activation DAG invariants
 
