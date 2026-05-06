@@ -47,12 +47,27 @@
 
         overlays = [
           (_final: prev: {
-            # Disable chromaprint test suite to prevent OOM kills during build.
-            # The tests (FFmpegAudioReaderTest) are memory-intensive and get
-            # SIGKILL'd in the Nix sandbox's memory constraints on Apple Silicon.
-            # The resulting binary is unaffected; this suppresses an unreliable
-            # test that does not gate correct chromaprint operation in practice.
+            # Disable test suites for codec libraries that are ffmpeg-full
+            # dependencies.  Their tests invoke ffmpeg or run encoder workloads
+            # that get SIGKILL'd (exit 137) in the Nix sandbox's memory
+            # constraints on Apple Silicon.  These are all specialized or
+            # regional-standard codecs (AVS2/3, HEVC/VVC variants, LCEVC, APV)
+            # that are not present in the aarch64-darwin binary cache, so they
+            # must be built from source.  Suppressing the test phase does not
+            # affect codec correctness; the libraries themselves are exercised
+            # end-to-end by the ffmpeg-full test suite.
             chromaprint = prev.chromaprint.overrideAttrs (_: { doCheck = false; });
+            davs2       = prev.davs2.overrideAttrs       (_: { doCheck = false; });
+            kvazaar     = prev.kvazaar.overrideAttrs     (_: { doCheck = false; });
+            lcevcdec    = prev.lcevcdec.overrideAttrs    (_: { doCheck = false; });
+            openapv     = prev.openapv.overrideAttrs     (_: { doCheck = false; });
+            openh264    = prev.openh264.overrideAttrs    (_: { doCheck = false; });
+            svt-av1     = prev.svt-av1.overrideAttrs     (_: { doCheck = false; });
+            uavs3d      = prev.uavs3d.overrideAttrs      (_: { doCheck = false; });
+            vvenc       = prev.vvenc.overrideAttrs       (_: { doCheck = false; });
+            xavs2       = prev.xavs2.overrideAttrs       (_: { doCheck = false; });
+            xeve        = prev.xeve.overrideAttrs        (_: { doCheck = false; });
+            xevd        = prev.xevd.overrideAttrs        (_: { doCheck = false; });
           })
           (_final: prev:
             let
