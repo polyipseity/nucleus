@@ -6,26 +6,30 @@
 function Sync-NucleusPowerPolicy {
   <#
   .SYNOPSIS
-    Converges active Windows power-scheme values used for remote-access parity.
+    Converges active Windows power-scheme values for cross-host parity.
 
   .DESCRIPTION
-    Applies settings on the currently active power scheme that balance battery
-    efficiency with predictable responsiveness:
-      - AC sleep timeout: 20 minutes
-      - Battery sleep timeout: 10 minutes
-      - AC display timeout: 5 minutes
-      - Battery display timeout: 2 minutes
+    Applies settings on the currently active power scheme matching the macOS and
+    NixOS power posture:
+      - AC display timeout: 1 minute (matches macOS pmset -c displaysleep 1)
+      - Battery display timeout: 1 minute (matches NixOS idle-delay = 60)
+      - AC system sleep: Never (matches macOS/NixOS no-sleep-on-AC for remote access)
+      - Battery system sleep: 1 minute (matches macOS/NixOS for parity)
 
-    When disabled, values are restored to a conservative fallback baseline:
-      - AC sleep timeout: 30 minutes
-      - Battery sleep timeout: 15 minutes
+    This parity ensures that development machines prioritize responsive remote
+    access and background-task continuity on AC power, with aggressive display
+    and system shutdown when unplugged.
+
+    When disabled, values are reset to Windows defaults:
       - AC display timeout: 10 minutes
       - Battery display timeout: 5 minutes
+      - AC system sleep: 25 minutes
+      - Battery system sleep: 25 minutes
 
     This function updates only managed values on the active scheme.
 
   .PARAMETER Enabled
-    Whether remote-access-oriented power parity should be enforced.
+    Whether cross-host power parity should be enforced.
 
   .EXAMPLE
     Sync-NucleusPowerPolicy -Enabled:$true
@@ -44,16 +48,18 @@ function Sync-NucleusPowerPolicy {
   }
 
   if ($Enabled) {
-    & $powercfg /change monitor-timeout-ac 5
-    & $powercfg /change monitor-timeout-dc 2
-    & $powercfg /change standby-timeout-ac 20
-    & $powercfg /change standby-timeout-dc 10
+    # Cross-host parity mode: align display and system sleep with macOS/NixOS.
+    & $powercfg /change monitor-timeout-ac 1
+    & $powercfg /change monitor-timeout-dc 1
+    & $powercfg /change standby-timeout-ac 0
+    & $powercfg /change standby-timeout-dc 1
   }
   else {
+    # Windows defaults: restore to standard Windows Home power scheme.
     & $powercfg /change monitor-timeout-ac 10
     & $powercfg /change monitor-timeout-dc 5
-    & $powercfg /change standby-timeout-ac 30
-    & $powercfg /change standby-timeout-dc 15
+    & $powercfg /change standby-timeout-ac 25
+    & $powercfg /change standby-timeout-dc 25
   }
 
   if ($LASTEXITCODE -ne 0) {

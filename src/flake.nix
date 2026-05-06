@@ -144,31 +144,32 @@
       # Build a cross-host update orchestration app.
       # It updates flake inputs, optionally upgrades Windows packages, and then
       # rewraps SOPS files for all declared recipients in one bounded workflow.
-      mkUpdateAllApp = pkgs: {
+      mkUpdateApp = pkgs: {
         type = "app";
         program = "${pkgs.writeShellApplication {
-          name = "nucleus-update-all";
+          name = "nucleus-update";
           runtimeInputs = [
             pkgs.gnupg
             pkgs.nix
             pkgs.sops
           ];
-          text = builtins.readFile ../scripts/update-all.sh;
-        }}/bin/nucleus-update-all";
+          text = builtins.readFile ../scripts/update.sh;
+        }}/bin/nucleus-update";
       };
 
-      # Build cleanup app for POSIX hosts.
-      # This runs bounded garbage/stale-file cleanup without touching unmanaged
-      # user content outside declarative scopes.
-      mkCleanupApp = pkgs: {
+      # Build garbage-collection app for POSIX hosts.
+      # This combines Nix store GC and stale wallpaper cleanup in one bounded
+      # operation without touching unmanaged user content outside declarative
+      # scopes.
+      mkGcApp = pkgs: {
         type = "app";
         program = "${pkgs.writeShellApplication {
-          name = "nucleus-cleanup";
+          name = "nucleus-gc";
           runtimeInputs = [
             pkgs.gnugrep
           ];
-          text = builtins.readFile ../scripts/cleanup.sh;
-        }}/bin/nucleus-cleanup";
+          text = builtins.readFile ../scripts/gc.sh;
+        }}/bin/nucleus-gc";
       };
 
     in {
@@ -189,9 +190,9 @@
           };
           validate-shell-scripts = mkShellScriptValidationApp pkgsMac;
           validate-powershell-syntax = mkPowerShellSyntaxValidationApp pkgsMac;
-          cleanup = mkCleanupApp pkgsMac;
+          gc = mkGcApp pkgsMac;
           health-check = mkHealthCheckApp pkgsMac;
-          update-all = mkUpdateAllApp pkgsMac;
+          update = mkUpdateApp pkgsMac;
         };
         "${systems.linux}" = {
           apply = mkApplyApp pkgsLinux;
@@ -205,9 +206,9 @@
           };
           validate-shell-scripts = mkShellScriptValidationApp pkgsLinux;
           validate-powershell-syntax = mkPowerShellSyntaxValidationApp pkgsLinux;
-          cleanup = mkCleanupApp pkgsLinux;
+          gc = mkGcApp pkgsLinux;
           health-check = mkHealthCheckApp pkgsLinux;
-          update-all = mkUpdateAllApp pkgsLinux;
+          update = mkUpdateApp pkgsLinux;
         };
       };
 

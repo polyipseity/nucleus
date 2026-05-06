@@ -8,7 +8,7 @@
     2. SOPS recipient rewrap for managed secret files
 
 .EXAMPLE
-  .\update-all.ps1
+  .\update.ps1
 #>
 [CmdletBinding()]
 param()
@@ -22,7 +22,7 @@ if (Get-Command -Name 'winget.exe' -ErrorAction SilentlyContinue) {
 }
 
 if (-not (Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue)) {
-  throw 'nucleus: sops.exe is required for update-all secret rewrap step.'
+  throw 'nucleus: sops.exe is required for update secret rewrap step.'
 }
 
 $secretFiles = @(
@@ -48,4 +48,4 @@ if (Test-Path -Path $wallpaperDir) {
   }
 }
 
-Write-Host 'nucleus: update-all workflow completed' -ForegroundColor Green
+Write-Host 'nucleus: update workflow completed' -ForegroundColor Green

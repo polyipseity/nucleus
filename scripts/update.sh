@@ -107,4 +107,4 @@ if [ "$skip_sops" = false ]; then
   rewrap_sops_files
 fi
 
-printf '%s\n' "nucleus: update-all workflow completed"
+printf '%s\n' "nucleus: update workflow completed"

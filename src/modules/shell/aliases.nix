@@ -16,10 +16,8 @@
   gst = "git status";
   la = "eza -la";
   ll = "eza -la";
-  nucleus-cleanup = "nix run ./src#cleanup";
-  nucleus-gc-home = "nix-collect-garbage --delete-older-than 30d";
-  nucleus-gc-system = "sudo nix-collect-garbage --delete-older-than 30d";
+  nucleus-gc = "nix run ./src#gc";
   nucleus-health-check = "nix run ./src#health-check";
-  nucleus-update-all = "nix run ./src#update-all";
+  nucleus-update = "nix run ./src#update";
   v = "nvim";
 }

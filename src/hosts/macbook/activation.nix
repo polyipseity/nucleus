@@ -25,19 +25,21 @@
   # Enforce pmset values directly for AC and battery because newer macOS
   # releases can ignore or partially override higher-level power options.
   #
-  # Invariant:
-  #   - Battery: 1-minute system sleep, low-power mode on, reduced brightness
-  #     while on battery (if supported)
-  #   - Battery display sleep and wake-on-LAN are intentionally unmanaged:
-  #     with low-power mode enabled on this host, macOS keeps forcing
-  #     displaysleep=2, womp=0, and disksleep=10 after writes.
-  #   - AC: 1-minute display sleep, no idle system sleep, no disk sleep,
+  # Invariant (cross-host parity with NixOS and Windows):
+  #   - AC: 1-minute display sleep, no idle system sleep (0), no disk sleep,
   #     wake-on-LAN enabled
+  #   - Battery: 1-minute system sleep (aligns with NixOS/Windows for parity),
+  #     low-power mode on, reduced brightness while on battery (if supported).
+  #     Battery display sleep and wake-on-LAN are intentionally unmanaged:
+  #     with low-power mode enabled, macOS forces displaysleep=2, womp=0,
+  #     and disksleep=10 after writes (system overrides).
   #   - Shared: Power Nap and lid wake enabled
   #   - Battery low-power mode on and AC low-power mode off (if supported)
   #
-  # This intentionally mirrors the host-specific pmset target profile so that a
-  # single activation run can converge drift in both charger and battery modes.
+  # This intentionally aligns with the NixOS power posture (zero sleep on AC,
+  # 1-minute battery suspend) and Windows cross-host parity profile to ensure
+  # consistent aggressive battery timeout and responsive remote-access behavior
+  # across all three platforms.
   #
   # The helper emits a clear error when any write fails so a mis-typed key
   # does not silently leave a stale policy in place.
@@ -63,14 +65,15 @@
         apply_pmset -b lowpowermode 1
       fi
 
-      # Apply explicit per-source timers and wake policy after lowpowermode so
-      # platform presets cannot silently revert these managed values.
-      apply_pmset -c womp 1 displaysleep 1 sleep 0 disksleep 0
+       # Apply explicit per-source timers and wake policy after lowpowermode so
+       # platform presets cannot silently revert these managed values.
+       apply_pmset -c womp 1 displaysleep 1 sleep 0 disksleep 0
 
-      # macOS currently overrides battery displaysleep and womp while
-      # lowpowermode is enabled, so only enforce the battery values that remain
-      # stable across activation runs.
-      apply_pmset -b sleep 1
+       # macOS currently overrides battery displaysleep and womp while
+       # lowpowermode is enabled, so only enforce the battery values that remain
+       # stable across activation runs. Use 1 minute for battery sleep to align
+       # with NixOS and Windows parity (cross-host consistency).
+       apply_pmset -b sleep 1
 
       if pmset_supports lessbright; then
         # lessbright is a battery-side setting; AC does not expose a separate

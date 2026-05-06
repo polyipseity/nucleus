@@ -132,11 +132,11 @@ lib.mkIf pkgs.stdenv.isLinux {
       night-light-temperature = lib.hm.gvariant.mkUint32 3700;
     };
 
-    # AC vs battery behavior parity with macOS remote-access-first profile.
+     # AC vs battery behavior parity with macOS remote-access-first profile.
     "org/gnome/settings-daemon/plugins/power" = {
       sleep-inactive-ac-timeout = lib.hm.gvariant.mkUint32 0;
       sleep-inactive-ac-type = "nothing";
-      sleep-inactive-battery-timeout = lib.hm.gvariant.mkUint32 1800;
+      sleep-inactive-battery-timeout = lib.hm.gvariant.mkUint32 60;
       sleep-inactive-battery-type = "suspend";
     };
   };

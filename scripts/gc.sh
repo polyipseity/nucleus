@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Cleans managed artifacts and old build state on POSIX hosts.
+# Performs bounded garbage collection on POSIX hosts.
 #
 # Operations:
 #   1. run nix store garbage collection (if nix is available)
@@ -96,4 +96,4 @@ if [ "$skip_wallpaper_prune" = false ]; then
   prune_stale_wallpapers
 fi
 
-printf '%s\n' "nucleus: cleanup workflow completed"
+printf '%s\n' "nucleus: gc workflow completed"
