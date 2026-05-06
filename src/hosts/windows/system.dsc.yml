@@ -49,6 +49,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure JetBrains Mono Nerd Font is installed as the open-source terminal monospace + icon baseline for Windows font parity with POSIX hosts
+      settings:
+        id: DEVCOM.JetBrainsMonoNerdFont
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure direnv is installed for cross-host per-directory environment parity with macOS and NixOS
       settings:
         id: direnv.direnv
@@ -126,20 +133,6 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Visual Studio Code is installed
-      settings:
-        id: Microsoft.VisualStudioCode
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure Visual Studio Code Insiders is installed to match the dual-channel editor baseline declared for macOS and NixOS
-      settings:
-        id: Microsoft.VisualStudioCode.Insiders
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
         description: Ensure PowerShell (`pwsh`) is installed for cross-host shell and script parity with macOS and NixOS
       settings:
         id: Microsoft.PowerShell
@@ -150,6 +143,20 @@ properties:
         description: Ensure Microsoft PowerToys is installed for Windows productivity tooling; Raycast (`9PFXXSHC64H3`) is intentionally not used on Windows and Rectangle is macOS-specific
       settings:
         id: Microsoft.PowerToys
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Visual Studio Code is installed
+      settings:
+        id: Microsoft.VisualStudioCode
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Visual Studio Code Insiders is installed to match the dual-channel editor baseline declared for macOS and NixOS
+      settings:
+        id: Microsoft.VisualStudioCode.Insiders
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -185,6 +192,13 @@ properties:
         description: Ensure rustup is installed for cross-host Rust toolchain parity with macOS and NixOS
       settings:
         id: Rustlang.Rustup
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Caskaydia Cove Nerd Font is installed from the open-source Nerd Fonts catalog to keep terminal glyph coverage declarative on Windows
+      settings:
+        id: ryanoasis.CaskaydiaCove
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
