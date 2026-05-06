@@ -386,15 +386,18 @@ lib.mkIf isPrimaryUser {
   #      non-empty.  Guards against silent sops-nix failures.
   #   2. GPG key presence: managed primary fingerprint is in the keyring.
   #      Complements gpgImport — catches keyring state divergence.
-  #   3. GPG SOPS recipient check: extract the fp: value from each SOPS file's
-  #      plaintext sops.pgp[].fp metadata and verify that fingerprint is present
-  #      in the secret keyring.  SOPS records the encryption subkey fingerprint
-  #      (not the primary key fingerprint) in the fp: field; comparing the primary
-  #      fingerprint directly produces false failures when SOPS chose a subkey.
-  #      Combined with check 2 (primary key in keyring), this confirms we have the
-  #      private key material to decrypt once the passphrase is provided.
-  #      Accumulates failures, reports all failing files.
-  #      Hard error — GPG is the last-resort global backup.
+   #   3. GPG SOPS recipient check: extract the fp: value from each SOPS file's
+   #      plaintext sops.pgp[].fp metadata and verify that fingerprint is present
+   #      in the secret keyring.  SOPS records the encryption subkey fingerprint
+   #      (not the primary key fingerprint) in the fp: field; comparing the primary
+   #      fingerprint directly produces false failures when SOPS chose a subkey.
+   #      YAML SOPS files store fp as "    fp: HEX" (unquoted); binary SOPS files
+   #      (e.g. wallpaper blobs) use JSON format with "\"fp\": \"HEX\""; both
+   #      formats are handled by the extraction logic below.
+   #      Combined with check 2 (primary key in keyring), this confirms we have the
+   #      private key material to decrypt once the passphrase is provided.
+   #      Accumulates failures, reports all failing files.
+   #      Hard error — GPG is the last-resort global backup.
   #   4. Personal SSH age recipient check: derive the age public key from the
   #      managed personal SSH public key via ssh-to-age -i (passphrase-free
   #      public-key conversion), then verify it appears in each SOPS file's
@@ -500,9 +503,18 @@ lib.mkIf isPrimaryUser {
       # failures when SOPS chose a subkey (e.g., a Kyber encryption subkey).
       # Combined with check 2 (primary key in keyring), this confirms we have the
       # private key material to decrypt once the passphrase is provided.
+      # YAML SOPS files store fp as "    fp: HEX" (unquoted); binary SOPS files
+      # (e.g. wallpaper blobs) use JSON format with "\"fp\": \"HEX\"".  The
+      # extraction below handles both formats.
       _vsd_gpg_failures=""
       ${lib.concatMapStrings ({ path, displayName }: ''
-        _vsd_sops_gpg_fp="$(/usr/bin/grep -m1 '[[:space:]]fp: ' "${toString path}" | /usr/bin/awk '{print $NF}')"
+        # Binary SOPS files use JSON format ("fp": "HEX") while YAML SOPS files
+        # use "    fp: HEX".  The combined -E pattern matches both; the second
+        # grep -oE extracts the hex fingerprint directly, avoiding the need for
+        # tr-based quote stripping.  The || true prevents a silent set -e exit
+        # when grep finds no match, allowing the [ -z ] check below to report
+        # the failure cleanly instead of silently aborting the activation chain.
+        _vsd_sops_gpg_fp="$(/usr/bin/grep -m1 -E '[[:space:]]fp: |"fp": ' "${toString path}" | /usr/bin/grep -oE '[0-9A-Fa-f]{40,}')" || true
         if [ -z "$_vsd_sops_gpg_fp" ] || \
             ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_sops_gpg_fp"; then
           _vsd_gpg_failures="$_vsd_gpg_failures ${displayName}"

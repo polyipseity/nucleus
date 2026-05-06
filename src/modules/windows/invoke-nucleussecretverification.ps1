@@ -302,12 +302,18 @@ function Invoke-NucleusSecretVerification {
   # comparing the primary fingerprint directly produces false failures when SOPS
   # chose a subkey (e.g., a Kyber encryption subkey).  Combined with check 2,
   # this confirms GPG has the private key material to decrypt.
+  # YAML SOPS files store fp as "    fp: HEX" (whitespace-prefixed, unquoted);
+  # binary SOPS files (e.g. wallpaper blobs) use JSON format with
+  # "\"fp\": \"HEX\"" (quoted key and value).  Both formats are handled below.
   # -------------------------------------------------------------------------
   Write-Host "nucleus: [3/5] checking GPG recipient registration in all SOPS files..." -ForegroundColor Gray
   $gpgFailures = @()
   foreach ($sopsFile in $sopsTestFiles) {
-    $fpLine = Get-Content -Path $sopsFile | Where-Object { $_ -match '\s+fp:\s+\S' } | Select-Object -First 1
-    $sopsGpgFp = if ($fpLine) { ($fpLine.Trim() -split '\s+')[-1] } else { '' }
+    # The combined regex matches both YAML (\s+fp:) and JSON ("fp":) formats.
+    # [regex]::Match extracts the hex fingerprint directly, so no separate
+    # quote-stripping step is needed for JSON-encoded values.
+    $fpLine = Get-Content -Path $sopsFile | Where-Object { $_ -match '(?:\s+fp:|\s*"fp":)\s' } | Select-Object -First 1
+    $sopsGpgFp = if ($fpLine) { [regex]::Match($fpLine, '[0-9A-Fa-f]{40,}').Value } else { '' }
     if ([string]::IsNullOrWhiteSpace($sopsGpgFp) -or -not ($allSecretKeysFpr -like "*$sopsGpgFp*")) {
       $gpgFailures += [System.IO.Path]::GetFileName($sopsFile)
     }
