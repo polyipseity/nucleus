@@ -8,6 +8,15 @@
 # actions in file manager context menus (nautilus-open-terminal, dolphin).
 { lib, pkgs, ... }:
 {
+  # Load the virtual KMS (vkms) kernel module to provide a software-only
+  # display device when no physical monitor is connected.  This mirrors the
+  # BetterDisplay HeadlessDisplay virtual screen on macOS: remote-desktop
+  # clients (Parsec in particular) and the display manager can use the virtual
+  # framebuffer when the lid is closed or no monitor is attached.
+  # vkms is a kernel-native virtual DRM/KMS driver; it does not replace GPU
+  # drivers — it adds a virtual display alongside any real hardware.
+  boot.kernelModules = [ "vkms" ];
+
   # Enable X11 server and desktop managers.
   services.xserver = {
     enable = true;
