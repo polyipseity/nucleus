@@ -39,8 +39,15 @@
     # Terminal emulators for "Open in Terminal" context menu actions.
     gnome.gnome-terminal  # default terminal for GNOME "Open in Terminal"
     kdePackages.konsole   # default terminal for KDE "Open in Terminal"
+
+    # Battery efficiency daemon: dynamic governor tuning based on AC/battery
+    # state gives better laptop efficiency without hard-coding static CPU caps.
+    auto-cpufreq
   ];
 
   # Enable GNOME services if GNOME is enabled above.
   services.gnome.core-utilities.enable = true;
+
+  # Run auto-cpufreq as the managed NixOS power optimizer daemon.
+  services.auto-cpufreq.enable = true;
 }
