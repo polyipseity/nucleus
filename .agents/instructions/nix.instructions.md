@@ -248,7 +248,9 @@ before handing off to `darwin-rebuild` / `nixos-rebuild`.
 `register_host_age_key_if_needed`:
 
 - Derives the machine age public key from `/etc/ssh/ssh_host_ed25519_key.pub`
-  using `ssh-to-age -i` (no private key or passphrase required).
+  using `ssh-to-age -i` (no private key or passphrase required).  `-i` without
+  `-private-key` reads an SSH public key and outputs the age **public** key
+  suitable for `.sops.yaml` recipients.
 - Checks whether that age key is already present in `.sops.yaml`; if so, it is
   a no-op (safe to re-run on every apply).
 - If the key is new, inserts it immediately before the marker comment
