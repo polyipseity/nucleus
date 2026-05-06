@@ -25,22 +25,25 @@
   # Enforce pmset values directly for AC and battery because newer macOS
   # releases can ignore or partially override higher-level power options.
   #
-   # Invariant:
-   #   - AC: 1-minute display sleep, no idle system sleep (0), no disk sleep,
-   #     wake-on-LAN enabled (womp is AC-only on this hardware: empirical testing
-   #     confirms macOS ignores battery-source womp settings even when explicitly
-   #     applied; the hardware/firmware overrides them)
-   #   - Battery: system sleep disabled (never/0).  Battery system sleep is
-   #     disabled so remote-desktop sessions (Chrome Remote Desktop, and any
-   #     VNC/ARD or tunneled SSH session) survive when the machine is on battery.
-   #     Sleeping on battery would disconnect active remote sessions and prevent
-   #     new ones from connecting.  Each platform independently disables battery
-   #     sleep for remote access; no cross-host parity assumption is made here.
-   #     Battery display sleep and wake-on-LAN are intentionally unmanaged:
-   #     with low-power mode enabled, macOS forces displaysleep=2, womp=0,
-   #     and disksleep=10 after writes (system overrides).
-   #   - Shared: Power Nap and lid wake enabled
-   #   - Battery low-power mode on and AC low-power mode off (if supported)
+  # Invariant:
+  #   Global (-a): standby=1, ttyskeepawake=1, hibernatemode=3, networkoversleep=0,
+  #     tcpkeepalive=1, powernap=1, lidwake=1, hibernatefile=/var/vm/sleepimage
+  #   AC (-c): displaysleep=1, sleep=0, disksleep=0, womp=1, lowpowermode=0
+  #   Battery (-b): displaysleep=1, sleep=0, disksleep=0, lowpowermode=1,
+  #     lessbright=1 (when supported)
+  #
+  # womp is AC-only: the NIC requires sustained power from the AC adapter to
+  # listen for magic packets during sleep; battery cannot reliably power the
+  # NIC adapter in listen mode.
+  #
+  # sleep=0 on battery: remote-desktop sessions (Chrome Remote Desktop, VNC/ARD,
+  # SSH) must survive when the machine is on battery.  Idle sleep would
+  # disconnect active sessions and prevent new inbound connections.
+  #
+  # displaysleep and disksleep are declared on both sources even with
+  # lowpowermode=1 active on battery.  Empirical testing (pmset -g custom)
+  # confirms all three battery values are honoured when applied after the
+  # lowpowermode preset is set.
   #
   # The helper emits a clear error when any write fails so a mis-typed key
   # does not silently leave a stale policy in place.
@@ -55,30 +58,56 @@
 
     pmset_supports() {
       capability="$1"
+      # pmset -g cap rarely fails on a live macOS system; stderr is suppressed
+      # to avoid confusing output when an unsupported capability probe returns
+      # non-zero (grep handles the boolean result).  Any real pmset failure
+      # surfaces separately when apply_pmset later tries to write the value.
       /usr/bin/pmset -g cap 2>/dev/null | /usr/bin/grep -Eq "(^|[[:space:]])$capability([[:space:]]|$)"
     }
 
     if [ -x /usr/bin/pmset ]; then
-      apply_pmset -a powernap 1 lidwake 1
+      # Global settings (-a) apply regardless of power source.
+      #   standby=1: allow transition to deeper standby after extended sleep;
+      #     keeps the machine in a recoverable low-power state for long idle
+      #     periods without fully powering down.
+      #   ttyskeepawake=1: prevent system sleep while any network terminal (SSH,
+      #     ARD/VNC screen sharing) holds an active tty; critical for keeping
+      #     live remote sessions from being dropped by an unexpected idle sleep.
+      #   hibernatemode=3: safe-sleep — write RAM image to disk before sleeping
+      #     so the session can be restored from disk if battery drains during
+      #     sleep (mirrors Windows hybrid sleep).
+      #   networkoversleep=0: suppress background network activity during sleep;
+      #     deliberate remote wakes are handled by womp (AC) separately.
+      #   tcpkeepalive=1: issue TCP keepalives through sleep so persistent SSH
+      #     tunnels and remote-desktop sessions stay alive across sleep/wake
+      #     cycles without requiring application-level keepalive configuration.
+      #   powernap=1: allow background mail/calendar sync during Power Nap.
+      #   lidwake=1: wake when the lid is opened (standard laptop ergonomics).
+      apply_pmset -a standby 1 ttyskeepawake 1 hibernatemode 3 networkoversleep 0 tcpkeepalive 1 powernap 1 lidwake 1
+      # hibernatefile set separately: a path argument on the same line as other
+      # flag-value pairs is easy to misread as a flag rather than a path.
+      apply_pmset -a hibernatefile /var/vm/sleepimage
 
       if pmset_supports lowpowermode; then
+        # Set lowpowermode per source BEFORE applying per-source timers so that
+        # any OS preset adjustments triggered by lowpowermode activation are
+        # then overridden by the explicit values below.
         apply_pmset -c lowpowermode 0
         apply_pmset -b lowpowermode 1
       fi
 
-       # Apply explicit per-source timers and wake policy after lowpowermode so
-       # platform presets cannot silently revert these managed values.
-       apply_pmset -c womp 1 displaysleep 1 sleep 0 disksleep 0
+      # AC settings: 1-minute display sleep, no idle system sleep, no disk sleep.
+      # womp=1 (wake-on-Ethernet LAN) is AC-only: the NIC requires sustained
+      # power from the AC adapter to listen for magic packets during sleep;
+      # battery cannot reliably sustain the NIC adapter in listen mode.
+      apply_pmset -c displaysleep 1 sleep 0 disksleep 0 womp 1
 
-       # macOS currently overrides battery displaysleep and womp while
-       # lowpowermode is enabled, so only enforce the battery values that remain
-       # stable across activation runs.  Battery system sleep is disabled (0) so
-       # remote sessions survive on battery power.
-       apply_pmset -b sleep 0
+      # Battery settings: 1-minute display sleep, no idle system sleep, no disk sleep.
+      apply_pmset -b displaysleep 1 sleep 0 disksleep 0
 
       if pmset_supports lessbright; then
-        # lessbright is a battery-side setting; AC does not expose a separate
-        # controllable value on this host.
+        # lessbright dims the display on battery to extend runtime.
+        # There is no separate AC-source control for brightness dimming.
         apply_pmset -b lessbright 1
       fi
     fi
