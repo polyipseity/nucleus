@@ -50,7 +50,8 @@
     #
     # Invariant:
     #   Global (-a): standby=1, ttyskeepawake=1, hibernatemode=3, networkoversleep=0,
-    #     tcpkeepalive=1, powernap=1, lidwake=1, hibernatefile=/var/vm/sleepimage
+    #     tcpkeepalive=1, powernap=1, lidwake=1, hibernatefile=/var/vm/sleepimage,
+    #     Sleep On Power Button=1, SleepServices=1
     #   AC (-c): displaysleep=1, sleep=0, disksleep=0, womp=1, lowpowermode=0
     #   Battery (-b): displaysleep=1, sleep=0, disksleep=0, womp=1, lowpowermode=1,
     #     lessbright=1 (when supported)
@@ -108,6 +109,14 @@
       # hibernatefile set separately: a path argument on the same line as other
       # flag-value pairs is easy to misread as a flag rather than a path.
       apply_pmset -a hibernatefile /var/vm/sleepimage
+
+      # Sleep On Power Button=1: sleep (not shut down) on power-button press;
+      #   a hard shutdown would terminate all active SSH/VNC sessions with no
+      #   recovery path, violating the remote-access-first posture.
+      # SleepServices=1: allow background network access during Power Nap so
+      #   push-notification services (Mail, iCloud) can sync; consistent with
+      #   powernap=1 above.
+      apply_pmset -a "Sleep On Power Button" 1 SleepServices 1
 
       if pmset_supports lowpowermode; then
         # Set lowpowermode per source BEFORE applying per-source timers so that
