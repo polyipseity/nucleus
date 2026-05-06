@@ -42,6 +42,9 @@
 .PARAMETER EnablePowerParity
   Enable managed Windows power policy parity convergence and cleanup fallback.
 
+.PARAMETER EnableRdpParity
+  Enable managed Windows built-in RDP convergence and cleanup fallback.
+
 .PARAMETER EnableRemoteAccessParity
   Enable managed OpenSSH remote-access convergence and cleanup fallback.
 
@@ -79,6 +82,10 @@
 .EXAMPLE
   # Apply while disabling managed remote-access parity (cleanup only):
   .\apply.ps1 -EnableRemoteAccessParity:$false
+
+.EXAMPLE
+  # Apply while disabling managed Windows built-in RDP (cleanup only):
+  .\apply.ps1 -EnableRdpParity:$false
 #>
 [CmdletBinding()]
 param(
@@ -90,6 +97,7 @@ param(
   [bool]$EnableSecretsParity = $true,
   [bool]$EnableGitSshParity = $true,
   [bool]$EnablePowerParity = $true,
+  [bool]$EnableRdpParity = $true,
   [bool]$EnableRemoteAccessParity = $true,
   [bool]$EnableShellParity = $true,
   [bool]$EnableVsCodeExtensionsParity = $true,
@@ -107,6 +115,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleusjitsecretmaterialization.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleuswingetconfiguration.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "power.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "rdp.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remote-access.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusmanagedsecrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusstalewallpapers.ps1")
@@ -188,6 +197,7 @@ Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
 Sync-NucleusGitAndSshConfig -Enabled:$EnableGitSshParity -PrimaryUsername $PrimaryUsername
 Sync-NucleusShellProfile -Enabled:$EnableShellParity
 Sync-NucleusOpenSshServer -Enabled:$EnableRemoteAccessParity
+Sync-NucleusWindowsRdp -Enabled:$EnableRdpParity
 Sync-NucleusPowerPolicy -Enabled:$EnablePowerParity
 
 # Health check: verify archiving ecosystem (7-Zip CLI + app) is functional post-apply.

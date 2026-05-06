@@ -310,6 +310,34 @@ properties:
     - resource: Microsoft.Windows.Registry/RegistryValue
       directives:
         description: >-
+          Allow inbound Remote Desktop connections by clearing the deny flag on
+          the TermService registry key.  Setting fDenyTSConnections to 0 is
+          required for the Windows built-in RDP server to accept connections;
+          the default value of 1 blocks all inbound RDP sessions regardless of
+          firewall state.
+      settings:
+        keyPath: HKLM\System\CurrentControlSet\Control\Terminal Server
+        valueName: fDenyTSConnections
+        valueData: 0
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Require Network Level Authentication (NLA) for Remote Desktop
+          connections.  NLA forces clients to authenticate before a full desktop
+          session is established, which reduces the attack surface compared to
+          the legacy mode that authenticates only after presenting the login
+          screen.
+      settings:
+        keyPath: HKLM\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp
+        valueName: UserAuthentication
+        valueData: 1
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
           Substitute Courier New with JetBrains Mono so applications that
           request the traditional monospace generic fall back to the open-source
           coding baseline; mirrors the fontconfig defaultFonts.monospace
