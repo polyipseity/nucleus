@@ -26,10 +26,17 @@
 #       ...
 #       -----END NOT PGP PRIVATE KEY BLOCK-----
 #
+#   git-identities.yml:
+#     git_identity_<username>: |
+#       name=Your Name
+#       email=your@email.example
+#       signingKey=YOUR_GPG_SIGNING_KEY!
+#
 # To flatten the existing nested-array format, run on a machine with the GPG
 # key already in the keyring:
-#   sops edit src/secrets/ssh-personal.yml   # restructure to flat format above
-#   sops edit src/secrets/gpg-personal.yml   # restructure to flat format above
+#   sops edit src/secrets/ssh-personal.yml     # restructure to flat format above
+#   sops edit src/secrets/gpg-personal.yml     # restructure to flat format above
+#   sops edit src/secrets/git-identities.yml   # restructure to flat format above
 #
 # Bootstrap (once per fresh machine):
 #   1. Import your primary GPG key manually:
@@ -44,6 +51,7 @@
 #        ssh-to-age < /etc/ssh/ssh_host_ed25519.pub
 #        sops updatekeys src/secrets/ssh-personal.yml
 #        sops updatekeys src/secrets/gpg-personal.yml
+#        sops updatekeys src/secrets/git-identities.yml
 #      After this step sops-nix uses this precedence chain:
 #        machine SSH key -> primary GPG key -> primary SSH key.
 { config, lib, pkgs, username ? null, ... }:
@@ -72,6 +80,11 @@ let
     // lib.optionalAttrs pkgs.stdenv.isDarwin {
       UseKeychain = "yes";
     };
+
+  # Git identity is sourced from the managed decrypted payload so name/email/
+  # signing key follow the same SOPS lifecycle as SSH/GPG material.
+  gitIdentitySecretName = "git_identity_${primaryUsername}";
+
 in
 lib.mkIf isPrimaryUser {
   # Register the machine-identity decryption backend for the HM sops-nix module.
@@ -126,6 +139,13 @@ lib.mkIf isPrimaryUser {
     # on Linux, or ~/Library/… on macOS; both are outside persistent storage).
   };
 
+  # --------------------------------------------------------------------------
+  # Git identity — SOPS-backed global name/email/signing key source-of-truth.
+  # --------------------------------------------------------------------------
+  sops.secrets."${gitIdentitySecretName}" = {
+    sopsFile = ../secrets/git-identities.yml;
+  };
+
   programs.ssh = {
     enable = true;
     enableDefaultConfig = false;
@@ -142,6 +162,34 @@ lib.mkIf isPrimaryUser {
       };
     };
   };
+
+  # --------------------------------------------------------------------------
+  # gitIdentityFromSops
+  # Reads SOPS-managed git_identity_<user> and writes global Git user identity
+  # and signing key non-interactively so identity stays in secret material
+  # rather than hard-coded module attrsets.
+  # --------------------------------------------------------------------------
+  home.activation.gitIdentityFromSops = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+    identity_path="${config.sops.secrets.${gitIdentitySecretName}.path}"
+
+    if [ ! -f "$identity_path" ]; then
+      echo "nucleus: missing decrypted Git identity secret at $identity_path." >&2
+      exit 1
+    fi
+
+    identity_name="$(/usr/bin/grep -m1 '^name=' "$identity_path" | /usr/bin/cut -d '=' -f 2-)"
+    identity_email="$(/usr/bin/grep -m1 '^email=' "$identity_path" | /usr/bin/cut -d '=' -f 2-)"
+    identity_signing_key="$(/usr/bin/grep -m1 '^signingKey=' "$identity_path" | /usr/bin/cut -d '=' -f 2-)"
+
+    if [ -z "$identity_name" ] || [ -z "$identity_email" ] || [ -z "$identity_signing_key" ]; then
+      echo "nucleus: git identity payload must include name/email/signingKey entries." >&2
+      exit 1
+    fi
+
+    ${pkgs.git}/bin/git config --global user.name "$identity_name"
+    ${pkgs.git}/bin/git config --global user.email "$identity_email"
+    ${pkgs.git}/bin/git config --global user.signingkey "$identity_signing_key"
+  '';
 
   # --------------------------------------------------------------------------
   # GPG import — the only remaining imperative activation step.

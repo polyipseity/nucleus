@@ -8,14 +8,16 @@ function Sync-NucleusSecrets {
     Materializes primary-user personal SSH/GPG secrets from fixed secret files.
 
   .DESCRIPTION
-    Resolves exactly two secret files from $SecretsDir (sorted):
+    Resolves exactly three secret files from $SecretsDir (sorted):
+      - git-identities.yml
       - gpg-personal.yml
       - ssh-personal.yml
 
     Each file is passed to Sync-NucleusSecretFile, which extracts only
-    primary-user keys (`gpg_personal_${username}`, `ssh_personal_${username}`,
-    `ssh_personal_${username}_pub`, `ssh_personal_${username}_rsa`, and
-    `ssh_personal_${username}_rsa_pub`) and ignores all other keys.
+    primary-user keys (`gpg_personal_${username}`, `git_identity_${username}`,
+    `ssh_personal_${username}`, `ssh_personal_${username}_pub`,
+    `ssh_personal_${username}_rsa`, and `ssh_personal_${username}_rsa_pub`)
+    and ignores all other keys.
 
   .PARAMETER SecretsDir
     Absolute path to the directory containing SOPS-encrypted YAML files.
@@ -71,7 +73,7 @@ function Sync-NucleusSecrets {
     return
   }
 
-  foreach ($secretFileName in @("gpg-personal.yml", "ssh-personal.yml")) {
+  foreach ($secretFileName in @("git-identities.yml", "gpg-personal.yml", "ssh-personal.yml")) {
     $secretPath = Join-Path -Path $SecretsDir -ChildPath $secretFileName
     if (-not (Test-Path -Path $secretPath)) {
       Write-Host "Required secret file was not found: $secretPath" -ForegroundColor Yellow

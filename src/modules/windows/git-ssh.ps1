@@ -13,9 +13,10 @@ function Sync-NucleusGitAndSshConfig {
       - commit.gpgsign=true
       - tag.gpgsign=true
       - gpg.format=openpgp
-      - user.name / user.email / user.signingkey (from per-user mapping)
+      - user.name / user.email / user.signingkey (from SOPS-managed identity)
       - url.git@github.com:.insteadOf=https://github.com/
       - ~/.ssh/config managed block for Host github.com
+      - ssh-agent service startup set to Automatic (for session persistence)
 
     When -Enabled:$false is passed, only the managed Git keys and SSH block are
     removed. Unmanaged settings remain untouched.
@@ -44,21 +45,32 @@ function Sync-NucleusGitAndSshConfig {
     return
   }
 
-  $gitIdentityByUsername = @{
-    polyipseity = @{
-      Email = 'polyipseity@gmail.com'
-      Name = 'William So'
-      SigningKey = '307DBE2F09912754!'
+  $identityPath = Join-Path -Path $HOME -ChildPath ".config\nucleus\git-identity.env"
+  if (-not (Test-Path -Path $identityPath)) {
+    throw "Missing SOPS-managed Git identity payload: '$identityPath'."
+  }
+
+  $identityLines = Get-Content -Path $identityPath -ErrorAction Stop
+  $identityKv = @{}
+  foreach ($line in $identityLines) {
+    if ([string]::IsNullOrWhiteSpace($line) -or $line.StartsWith('#') -or -not $line.Contains('=')) {
+      continue
     }
+
+    $parts = $line -split '=', 2
+    $identityKv[$parts[0]] = $parts[1]
   }
 
-  if (-not $gitIdentityByUsername.ContainsKey($PrimaryUsername)) {
-    throw "No Git identity mapping defined for primary user '$PrimaryUsername'."
+  if (-not $identityKv.ContainsKey('name') -or [string]::IsNullOrWhiteSpace($identityKv['name'])) {
+    throw "Git identity payload '$identityPath' is missing non-empty 'name='."
   }
 
-  $selectedIdentity = $gitIdentityByUsername[$PrimaryUsername]
-  if ([string]::IsNullOrWhiteSpace($selectedIdentity.SigningKey)) {
-    throw "Mapped user '$PrimaryUsername' must define a non-empty Git signing key."
+  if (-not $identityKv.ContainsKey('email') -or [string]::IsNullOrWhiteSpace($identityKv['email'])) {
+    throw "Git identity payload '$identityPath' is missing non-empty 'email='."
+  }
+
+  if (-not $identityKv.ContainsKey('signingKey') -or [string]::IsNullOrWhiteSpace($identityKv['signingKey'])) {
+    throw "Git identity payload '$identityPath' is missing non-empty 'signingKey='."
   }
 
   $gitExecutable = Get-Command -Name 'git.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
@@ -73,12 +85,22 @@ function Sync-NucleusGitAndSshConfig {
     'gpg.format' = 'openpgp'
     'tag.gpgsign' = 'true'
     'url.git@github.com:.insteadOf' = 'https://github.com/'
-    'user.email' = $selectedIdentity.Email
-    'user.name' = $selectedIdentity.Name
-    'user.signingkey' = $selectedIdentity.SigningKey
+    'user.email' = $identityKv['email']
+    'user.name' = $identityKv['name']
+    'user.signingkey' = $identityKv['signingKey']
   }
 
   if ($Enabled) {
+    # Ensure ssh-agent survives logoff/reboot so AddKeysToAgent can persist key
+    # loading behavior across sessions without manual service management.
+    $sshAgentService = Get-Service -Name 'ssh-agent' -ErrorAction SilentlyContinue
+    if ($null -ne $sshAgentService) {
+      Set-Service -Name 'ssh-agent' -StartupType Automatic
+      if ($sshAgentService.Status -ne 'Running') {
+        Start-Service -Name 'ssh-agent'
+      }
+    }
+
     foreach ($settingKey in $managedGitSettings.Keys) {
       & $gitExecutable config --global $settingKey $managedGitSettings[$settingKey]
       if ($LASTEXITCODE -ne 0) {

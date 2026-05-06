@@ -1,7 +1,7 @@
 # modules/windows/remove-nucleusmanagedsecrets.ps1 — Managed secret cleanup helper.
 #
-# Removes only repository-managed SSH key material so disable paths stay
-# idempotent and scoped.
+# Removes only repository-managed SSH key material and Git identity payload so
+# disable paths stay idempotent and scoped.
 
 function Remove-NucleusManagedSecrets {
   <#
@@ -10,8 +10,8 @@ function Remove-NucleusManagedSecrets {
 
   .DESCRIPTION
     Cleanup companion for secret parity toggles. Removes only files managed by
-    this repository (`ssh_personal_<user>`, `ssh_personal_<user>_rsa`, and
-    corresponding `.pub` files) from the primary user's `~/.ssh` directory.
+    this repository (`ssh_personal_<user>`, `ssh_personal_<user>_rsa`,
+    corresponding `.pub` files, and `~/.config/nucleus/git-identity.env`).
 
     GPG keyring cleanup is intentionally out of scope because selective private
     key deletion is not reliably reversible without a canonical key inventory.
@@ -39,7 +39,8 @@ function Remove-NucleusManagedSecrets {
       (Join-Path -Path $sshDir -ChildPath $sshSecretName),
       (Join-Path -Path $sshDir -ChildPath "${sshSecretName}.pub"),
       (Join-Path -Path $sshDir -ChildPath $sshRsaSecretName),
-      (Join-Path -Path $sshDir -ChildPath "${sshRsaSecretName}.pub")
+      (Join-Path -Path $sshDir -ChildPath "${sshRsaSecretName}.pub"),
+      (Join-Path -Path $HOME -ChildPath ".config\nucleus\git-identity.env")
     )) {
     if (Test-Path -Path $managedPath) {
       Remove-Item -Path $managedPath -Force -ErrorAction SilentlyContinue
