@@ -145,6 +145,35 @@ applyTo: "src/**/*.nix"
   `src/hosts/nixos/MANUAL.md`) in the same change so activation output remains
   a complete checklist.
 
+## Machine age key auto-registration
+
+The `apply.sh` dispatcher (wrapped as `nix run .#apply`) calls
+`register_host_age_key_if_needed` before handing off to `darwin-rebuild` /
+`nixos-rebuild`.  This function:
+
+- Derives the machine age public key from `/etc/ssh/ssh_host_ed25519_key.pub`
+  using `ssh-to-age -i` (no private key or passphrase required).
+- Checks whether that age key is already present in `.sops.yaml`; if so, it is
+  a no-op (safe to re-run on every apply).
+- If the key is new, inserts it immediately before the marker comment
+  `# -- machine keys end; personal SSH backup key below --` in `.sops.yaml`
+  using `awk`, then rewraps every SOPS-encrypted file with `sops updatekeys
+  --yes` so the machine can decrypt them.
+- Prints `git add` + `git commit` commands but does **not** commit
+  automatically; the operator must commit and push the updated `.sops.yaml`
+  and rewrapped secrets.
+- Requires the primary GPG key in the keyring (imported via `gpg --import`
+  before first apply) so `sops updatekeys` can re-encrypt data keys for all
+  recipients; fails with a clear error and a `gpg --import` hint if GPG is
+  not available.
+- `ssh-to-age` and `sops` are provided by `mkApplyApp` `runtimeInputs` in
+  `flake.nix` (alongside `git`); no separate installation is needed when using
+  `nix run .#apply`.
+
+The equivalent Windows function is `Register-NucleusHostAgeKey` in
+`src/modules/windows/register-nucleushostagekey.ps1`, called from `apply.ps1`
+when `$EnableHostAgeKeyRegistration` is `$true` (the default).
+
 ## Pre-provision key adoption semantics
 
 The `sshKeyAdopt` activation (POSIX) and the SSH fingerprint tracking block in

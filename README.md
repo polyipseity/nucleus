@@ -50,12 +50,16 @@ nucleus/
 │       │   └── env.nix
 │       ├── wallpapers.nix
 │       └── windows/
+│           ├── convert-sshpublickeytoage.ps1
 │           ├── get-nucleusdecryptedblob.ps1
 │           ├── get-nucleussecrets.ps1
 │           ├── git-ssh.ps1
 │           ├── invoke-nucleusjitsecretmaterialization.ps1
+│           ├── invoke-nucleussecretverification.ps1
 │           ├── invoke-nucleuswingetconfiguration.ps1
 │           ├── power.ps1
+│           ├── rdp.ps1
+│           ├── register-nucleushostagekey.ps1
 │           ├── remote-access.ps1
 │           ├── remove-nucleusmanagedsecrets.ps1
 │           ├── remove-nucleusstalewallpapers.ps1
@@ -66,7 +70,8 @@ nucleus/
 │           ├── sync-nucleusvscodeextensions.ps1
 │           ├── sync-nucleusvscodesettings.ps1
 │           ├── sync-nucleuswallpapers.ps1
-│           └── test-nucleusprimaryuser.ps1
+│           ├── test-nucleusprimaryuser.ps1
+│           └── verify-archiving-stack.ps1
 └── scripts/
     ├── bootstrap-versions.env
     ├── bootstrap.sh
@@ -93,7 +98,9 @@ nucleus/
 | `src/modules/shell/env.nix`                  | Shared shell environment variable attrset (strict alphabetical keys)                                                                                                                           |
 | `src/modules/wallpapers.nix`                 | Decrypts wallpaper blobs to `~/Pictures/wallpapers`; applies rotating gallery                                                                                                                 |
 | `src/modules/windows/resolve-nucleusexecutable.ps1` | WinGet/SOPS/GPG executable path resolution                                                                                                                                                     |
+| `src/modules/windows/convert-sshpublickeytoage.ps1` | Pure-PowerShell SSH Ed25519 → age bech32 public key conversion (shared by verification and registration)                                                                                      |
 | `src/modules/windows/get-nucleussecrets.ps1` | Structured secret decryption (`machine SSH -> GPG -> primary SSH`)                                                                                                                            |
+| `src/modules/windows/register-nucleushostagekey.ps1` | Machine age key auto-registration: inserts SSH host key into `.sops.yaml` and rewraps SOPS files                                                                                              |
 | `src/modules/windows/sync-nucleussecrets.ps1` | Batch secret/key materialization entrypoint                                                                                                                                                    |
 | `src/modules/windows/sync-nucleuswallpapers.ps1` | Wallpaper blob materialization on Windows                                                                                                                                                      |
 | `src/hosts/macbook/default.nix`              | nix-darwin entrypoint; imports all macbook fragments + shared posix modules                                                                                                                   |
@@ -195,27 +202,28 @@ recipient.
 
 ### Add a machine
 
-1. Import your GPG subkey on the new machine.
-2. Run bootstrap if Nix / WinGet prerequisites are not yet installed:
+1. Run bootstrap if Nix / WinGet prerequisites are not yet installed:
    - Unix: `sh scripts/bootstrap.sh`
    - Windows (Admin): `.\scripts\bootstrap.ps1`
-3. Extract the machine's age recipient from its SSH host public key:
-   - Unix: `ssh-to-age < /etc/ssh/ssh_host_ed25519.pub`
-   - Windows: `ssh-to-age < $env:PROGRAMDATA\ssh\ssh_host_ed25519.pub`
-4. Append the recipient to `.sops.yaml` under `keys.age_devices`.
-5. Rewrap all encrypted files so the new machine can decrypt:
-
+2. Import your GPG private key on the new machine so `sops updatekeys` can
+   re-encrypt secrets for the new machine age recipient:
    ```bash
-   sops updatekeys src/secrets/git-identities.yml
-   sops updatekeys src/secrets/gpg-personal.yml
-   sops updatekeys src/secrets/ssh-personal.yml
-   for f in src/assets/wallpapers/*.sops; do
-     [ -e "$f" ] || continue
-     sops updatekeys "$f"
-   done
+   gpg --import <backup-key-file>
    ```
+3. Run apply — machine age key registration is automatic:
+   - Unix: `./scripts/bootstrap.sh apply` (or `nix run ./src#apply`)
+   - Windows (Admin): `.\src\hosts\windows\apply.ps1`
 
-6. Commit and push.
+   `apply` derives the machine age public key from the SSH host key, inserts it
+   into `.sops.yaml`, and rewraps every encrypted file in one step.  It prints
+   the git commands to run afterward but does not commit automatically.
+4. Commit and push the updated `.sops.yaml` and rewrapped secrets so other
+   machines can verify the new recipient:
+   ```bash
+   git add .sops.yaml src/secrets src/assets/wallpapers
+   git commit -m "chore: register <hostname> machine age key"
+   git push
+   ```
 
 ### Remove a machine
 
