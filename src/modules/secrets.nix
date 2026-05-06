@@ -371,27 +371,41 @@ lib.mkIf isPrimaryUser {
 
   # --------------------------------------------------------------------------
   # verifySecretDecryption
-  # Post-activation health check that verifies each secret decryption backend
-  # is operational after gpgImport and sshKeyAdopt have completed.
+  # Post-activation health check that verifies ALL SOPS files can be decrypted
+  # by each registered backend after gpgImport and sshKeyAdopt have completed.
+  #
+  # Covers:
+  #   - src/secrets/git-identities.yml
+  #   - src/secrets/gpg-personal.yml
+  #   - src/secrets/ssh-personal.yml
+  #   - src/assets/wallpapers/*.sops  (enumerated dynamically via builtins.readDir)
+  # All use the same .sops.yaml key groups (age_devices + primary_gpg).
   #
   # Five checks (in order):
   #   1. Materialization sanity: all sops-nix secret paths exist and are
   #      non-empty.  Guards against silent sops-nix failures.
   #   2. GPG key presence: managed primary fingerprint is in the keyring.
   #      Complements gpgImport — catches keyring state divergence.
-  #   3. GPG SOPS end-to-end: run sops --decrypt on gpg-personal.yml with
-  #      age keys disabled (SOPS_AGE_KEY_FILE=/dev/null) and an isolated HOME
-  #      so sops cannot find a stray keys.txt; only the GPG recipient can
-  #      succeed.  Hard error — GPG is the last-resort global backup.
+  #   3. GPG SOPS end-to-end: sops --decrypt each file with age keys disabled
+  #      (SOPS_AGE_KEY_FILE=/dev/null) and an isolated HOME so sops cannot find
+  #      a stray keys.txt; only the GPG recipient can succeed.  Accumulates
+  #      failures, reports all failing files, then hard-errors.
+  #      Hard error — GPG is the last-resort global backup.
   #   4. Personal SSH age-backend SOPS end-to-end: convert the personal SSH
   #      private key to an age private key (via ssh-to-age), then sops
-  #      --decrypt ssh-personal.yml with an empty GNUPGHOME so only the age
-  #      recipient is attempted.  Hard error — the personal SSH key is the
-  #      designated personal backup age recipient in .sops.yaml.
+  #      --decrypt each file with an empty GNUPGHOME so only the age recipient
+  #      is attempted.  Accumulates failures, reports all failing files.
+  #      Hard error — the personal SSH key is the designated personal backup
+  #      age recipient in .sops.yaml.
   #   5. Machine SSH host key existence: advisory warning if
   #      /etc/ssh/ssh_host_ed25519_key is absent.  Warning-only because on
   #      first bootstrap the host key may not yet be registered in .sops.yaml
   #      (step 3 of the bootstrap docs at the top of this file).
+  #
+  # Why lib.concatMapStrings for checks 3 & 4:
+  #   Generating static inline shell commands at Nix evaluation time avoids
+  #   shell loops/arrays and keeps each invocation independently visible in
+  #   the activation trace.
   #
   # Why isolated HOME for sops subprocesses:
   #   sops searches for age keys in the OS default config dir
@@ -401,6 +415,49 @@ lib.mkIf isPrimaryUser {
   #   GNUPGHOME is set explicitly so GPG still finds the managed keyring.
   # --------------------------------------------------------------------------
   home.activation.verifySecretDecryption =
+    let
+      wallpaperDir = ../assets/wallpapers;
+      # Enumerate every *.sops blob in the wallpapers directory at eval time
+      # so new wallpapers are automatically included in the health check.
+      wallpaperSopsNames = lib.filter (n: lib.hasSuffix ".sops" n)
+        (builtins.attrNames (builtins.readDir wallpaperDir));
+      # Pair each SOPS file with a Nix-store-safe name and a human-readable
+      # display name for error messages.  Parentheses and spaces are not valid
+      # Nix store name characters and must be sanitized.
+      allSopsFiles =
+        [
+          {
+            path = builtins.path {
+              path = ../secrets/git-identities.yml;
+              name = "git-identities.yml";
+            };
+            displayName = "git-identities.yml";
+          }
+          {
+            path = builtins.path {
+              path = ../secrets/gpg-personal.yml;
+              name = "gpg-personal.yml";
+            };
+            displayName = "gpg-personal.yml";
+          }
+          {
+            path = builtins.path {
+              path = ../secrets/ssh-personal.yml;
+              name = "ssh-personal.yml";
+            };
+            displayName = "ssh-personal.yml";
+          }
+        ]
+        ++ map
+          (n: {
+            path = builtins.path {
+              path = wallpaperDir + "/${n}";
+              name = lib.replaceStrings [ "(" ")" " " ] [ "" "" "_" ] n;
+            };
+            displayName = n;
+          })
+          wallpaperSopsNames;
+    in
     lib.hm.dag.entryAfter [ "gitIdentityFromSops" "gpgImport" "sshKeyAdopt" ] ''
       # --- 1. Materialization sanity check ---
       for _vsd_path in \
@@ -428,45 +485,52 @@ lib.mkIf isPrimaryUser {
         exit 1
       fi
 
-      # --- 3. GPG SOPS end-to-end check ---
+      # --- 3. GPG SOPS end-to-end check for all SOPS files ---
+      # Disable age backends and isolate HOME so only the GPG recipient is used.
+      # Failures are accumulated so the error message lists every failing file.
       _vsd_tmp_gpg_home="$(mktemp -d)"
-      _vsd_gpg_rc=0
-      HOME="$_vsd_tmp_gpg_home" \
-        GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
-        SOPS_AGE_KEY_FILE=/dev/null \
-        SOPS_AGE_KEY="" \
-        ${pkgs.sops}/bin/sops --decrypt \
-        "${toString ../secrets/gpg-personal.yml}" > /dev/null 2>&1 \
-        || _vsd_gpg_rc=$?
+      _vsd_gpg_failures=""
+      ${lib.concatMapStrings ({ path, displayName }: ''
+        HOME="$_vsd_tmp_gpg_home" \
+          GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
+          SOPS_AGE_KEY_FILE=/dev/null \
+          SOPS_AGE_KEY="" \
+          ${pkgs.sops}/bin/sops --decrypt \
+          "${toString path}" > /dev/null 2>&1 \
+          || _vsd_gpg_failures="$_vsd_gpg_failures ${displayName}"
+      '') allSopsFiles}
       rm -rf "$_vsd_tmp_gpg_home"
-      if [ "$_vsd_gpg_rc" -ne 0 ]; then
-        echo "nucleus: ERROR — GPG SOPS decryption check failed (exit $_vsd_gpg_rc); managed GPG key may not be registered in .sops.yaml." >&2
+      if [ -n "$_vsd_gpg_failures" ]; then
+        echo "nucleus: ERROR — GPG SOPS decryption check failed for:$_vsd_gpg_failures; managed GPG key may not be registered in .sops.yaml." >&2
         exit 1
       fi
 
-      # --- 4. Personal SSH age-backend SOPS end-to-end check ---
+      # --- 4. Personal SSH age-backend SOPS end-to-end check for all SOPS files ---
       # Convert the personal SSH private key to age format so the sops age
       # backend can use it.  GPG is disabled by pointing GNUPGHOME at an
       # empty temp dir so only the age path is exercised.
+      # Failures are accumulated so the error message lists every failing file.
       _vsd_tmp_age_key="$(mktemp)"
       _vsd_tmp_ssh_gnupg="$(mktemp -d)"
       _vsd_tmp_ssh_home="$(mktemp -d)"
-      _vsd_ssh_rc=0
+      _vsd_ssh_failures=""
       if ${pkgs.ssh-to-age}/bin/ssh-to-age -private-key \
           -i "${sshPrivateKeyPath}" > "$_vsd_tmp_age_key" 2>/dev/null; then
-        HOME="$_vsd_tmp_ssh_home" \
-          GNUPGHOME="$_vsd_tmp_ssh_gnupg" \
-          SOPS_AGE_KEY_FILE="$_vsd_tmp_age_key" \
-          ${pkgs.sops}/bin/sops --decrypt \
-          "${toString ../secrets/ssh-personal.yml}" > /dev/null 2>&1 \
-          || _vsd_ssh_rc=$?
+        ${lib.concatMapStrings ({ path, displayName }: ''
+          HOME="$_vsd_tmp_ssh_home" \
+            GNUPGHOME="$_vsd_tmp_ssh_gnupg" \
+            SOPS_AGE_KEY_FILE="$_vsd_tmp_age_key" \
+            ${pkgs.sops}/bin/sops --decrypt \
+            "${toString path}" > /dev/null 2>&1 \
+            || _vsd_ssh_failures="$_vsd_ssh_failures ${displayName}"
+        '') allSopsFiles}
       else
-        _vsd_ssh_rc=1
+        _vsd_ssh_failures=" <ssh-to-age conversion failed>"
       fi
       rm -f "$_vsd_tmp_age_key"
       rm -rf "$_vsd_tmp_ssh_gnupg" "$_vsd_tmp_ssh_home"
-      if [ "$_vsd_ssh_rc" -ne 0 ]; then
-        echo "nucleus: ERROR — personal SSH key age-backend SOPS decryption check failed; SSH key may not be registered in .sops.yaml as an age recipient." >&2
+      if [ -n "$_vsd_ssh_failures" ]; then
+        echo "nucleus: ERROR — personal SSH key age-backend SOPS decryption check failed for:$_vsd_ssh_failures; SSH key may not be registered in .sops.yaml as an age recipient." >&2
         exit 1
       fi
 
