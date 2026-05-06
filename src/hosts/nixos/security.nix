@@ -17,6 +17,14 @@
       # a public/private key pair.  Eliminates brute-force password attacks
       # over SSH entirely.
       PasswordAuthentication = false;
+      # Reference the SOPS-materialized personal SSH public key so the
+      # authorized key is never hardcoded in the repository.  secrets.nix
+      # materializes ssh_personal_<username>.pub to
+      # ~/.ssh/ssh_personal_<username>.pub after SOPS decryption.
+      # %u expands to the connecting username at authentication time.
+      # .ssh/authorized_keys is retained as the conventional extensibility path
+      # for adding further authorized keys declaratively or manually later.
+      AuthorizedKeysFile = ".ssh/authorized_keys .ssh/ssh_personal_%u.pub";
     };
   };
 }
