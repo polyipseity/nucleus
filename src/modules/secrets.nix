@@ -268,7 +268,9 @@ lib.mkIf isPrimaryUser {
     # Extract the primary fingerprint from the managed secret without importing.
     # The `exit` in awk stops at the first fpr record, giving the primary key
     # fingerprint rather than a subkey fingerprint.
-    first_key_fingerprint="$(${pkgs.gnupg}/bin/gpg --batch --import-options show-only --dry-run --with-colons --import "${config.sops.secrets.${gpgSecretName}.path}" 2>/dev/null | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')"
+    # The || true prevents a silent set -e / pipefail exit if gpg emits errors;
+    # the [ -z ] guard below catches and reports an empty result explicitly.
+    first_key_fingerprint="$(${pkgs.gnupg}/bin/gpg --batch --import-options show-only --dry-run --with-colons --import "${config.sops.secrets.${gpgSecretName}.path}" | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')" || true
 
     # Remove stale managed keys: those we imported previously (per manifest)
     # that are no longer the current managed key.  Guard on a non-empty
@@ -349,7 +351,7 @@ lib.mkIf isPrimaryUser {
        echo "nucleus: managed SSH public key not found at $ssh_pub_path; skipping fingerprint adoption." >&2
      else
        new_fingerprint=""
-       new_fingerprint="$(${pkgs.openssh}/bin/ssh-keygen -lf "$ssh_pub_path" 2>/dev/null | /usr/bin/awk '{print $2}')" || true
+       new_fingerprint="$(${pkgs.openssh}/bin/ssh-keygen -lf "$ssh_pub_path" | /usr/bin/awk '{print $2}')" || true
 
        if [ -z "$new_fingerprint" ]; then
          echo "nucleus: could not extract fingerprint from $ssh_pub_path; skipping adoption." >&2
@@ -366,8 +368,12 @@ lib.mkIf isPrimaryUser {
            # any pre-placed key already loaded in the agent is also evicted.
            # AddKeysToAgent=yes in the SSH config re-loads the new key on the
            # next outbound SSH connection.
-           echo "nucleus: managed SSH key fingerprint changed ($old_fingerprint -> $new_fingerprint); flushing SSH agent." >&2
-           ${pkgs.openssh}/bin/ssh-add -D 2>/dev/null || true
+            echo "nucleus: managed SSH key fingerprint changed ($old_fingerprint -> $new_fingerprint); flushing SSH agent." >&2
+            # 2>/dev/null is intentional: ssh-add -D outputs "Could not open a
+            # connection to your authentication agent" when no agent is running.
+            # That failure is benign here — nothing to flush — and the noise
+            # would obscure the genuinely meaningful activation output above.
+            ${pkgs.openssh}/bin/ssh-add -D 2>/dev/null || true
          fi
 
         mkdir -p "$nucleus_config_dir"
@@ -497,7 +503,7 @@ lib.mkIf isPrimaryUser {
       # launching a new agent daemon (which deadlocks on macOS when the agent
       # socket directory is not yet ready during non-interactive activation).
       _vsd_gpg_all_secret_fprs="$(GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
-        ${pkgs.gnupg}/bin/gpg --with-colons --no-autostart --list-secret-keys 2>/dev/null || true)"
+        ${pkgs.gnupg}/bin/gpg --with-colons --no-autostart --list-secret-keys)" || true
       if ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_managed_fpr"; then
         echo "nucleus: ERROR — managed GPG key $_vsd_managed_fpr not in keyring after gpgImport." >&2
         exit 1
@@ -547,7 +553,7 @@ lib.mkIf isPrimaryUser {
       # No private key material is accessed.
       _vsd_ssh_age_pub=""
       _vsd_ssh_failures=""
-      _vsd_ssh_age_pub="$(${pkgs.ssh-to-age}/bin/ssh-to-age -i "${sshPublicKeyPath}" 2>/dev/null)" || true
+      _vsd_ssh_age_pub="$(${pkgs.ssh-to-age}/bin/ssh-to-age -i "${sshPublicKeyPath}")" || true
       if [ -z "$_vsd_ssh_age_pub" ]; then
         echo "nucleus: ERROR — personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure ${sshPublicKeyPath} is a valid Ed25519 public key." >&2
         exit 1

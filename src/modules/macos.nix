@@ -145,12 +145,12 @@ let
 
     # Ensure BetterDisplay is running before issuing CLI commands.
     if ! /usr/bin/pgrep -xq "BetterDisplay" 2>/dev/null; then
-      /usr/bin/open -g -a "$BD_APP" 2>/dev/null || true
+      /usr/bin/open -g -a "$BD_APP" || true
       /bin/sleep 5
     fi
 
     # Check connection state; soft-fail by treating any CLI error as unknown.
-    connected_state="$("$BD_BIN" get -name="$DISPLAY_NAME" -connected 2>/dev/null || true)"
+    connected_state="$("$BD_BIN" get -name="$DISPLAY_NAME" -connected)" || true
 
     # No-op if already connected.
     [ "$connected_state" = "on" ] && exit 0
@@ -161,10 +161,10 @@ let
     # If the toggle fails, fall back to a discard-and-recreate using the same
     # parameters as ensureHeadlessDisplay so the virtual screen specification
     # stays consistent across both code paths.
-    if ! "$BD_BIN" set -name="$DISPLAY_NAME" -connected=on 2>/dev/null; then
-      tag_ids="$("$BD_BIN" get -identifiers -name="$DISPLAY_NAME" 2>/dev/null | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u || true)"
+    if ! "$BD_BIN" set -name="$DISPLAY_NAME" -connected=on; then
+      tag_ids="$("$BD_BIN" get -identifiers -name="$DISPLAY_NAME" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)" || true
       for tag_id in $tag_ids; do
-        "$BD_BIN" discard -tagID="$tag_id" 2>/dev/null || true
+        "$BD_BIN" discard -tagID="$tag_id" || true
       done
       "$BD_BIN" create \
         -type=VirtualScreen \
@@ -173,7 +173,7 @@ let
         -aspectHeight=10 \
         -multiplierStep=160 \
         -virtualScreenHiDPI=on \
-        -connected=on 2>/dev/null || true
+        -connected=on || true
     fi
   '';
 
@@ -739,12 +739,16 @@ lib.mkIf pkgs.stdenv.isDarwin {
         # Use the correct lsregister path for registering services
         LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
         if [ -x "$LSREGISTER" ]; then
-          $LSREGISTER -r -domain local -domain system -domain user 2>/dev/null || true
+          if ! $LSREGISTER -r -domain local -domain system -domain user; then
+            echo "nucleus: lsregister failed; Finder Services may not appear in context menus until the next login." >&2
+          fi
         fi
       fi
 
       # Reload Finder Services to pick up the changes immediately.
-      /usr/bin/launchctl kickstart -k "gui/$UID/com.apple.Finder" 2>/dev/null || true
+      if ! /usr/bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
+        echo "nucleus: launchctl Finder restart failed; restart Finder manually if Services do not appear in context menus." >&2
+      fi
     '';
 
     # -------------------------------------------------------------------------
@@ -842,7 +846,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
           /bin/sleep 5  # wait for the app to initialise before issuing CLI commands
         fi
 
-        identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME" 2>/dev/null || true)"
+        identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME")" || true
         tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
         tag_count="$(printf '%s\n' "$tag_ids" | /usr/bin/awk 'NF { count += 1 } END { print count + 0 }')"
 
@@ -855,11 +859,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
             echo "nucleus: failed to create BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
           fi
           /bin/sleep 3  # wait for the virtual display to be registered
-          identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME" 2>/dev/null || true)"
+          identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME")" || true
           tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
         else
           tag_id="$(printf '%s\n' "$tag_ids" | /usr/bin/awk 'NF { print; exit }')"
-          connected_state="$($BD_BIN get -tagID="$tag_id" -connected 2>/dev/null || true)"
+          connected_state="$($BD_BIN get -tagID="$tag_id" -connected)" || true
 
           if [ "$connected_state" != "on" ]; then
             if ! "$BD_BIN" discard -tagID="$tag_id"; then
@@ -870,12 +874,12 @@ lib.mkIf pkgs.stdenv.isDarwin {
               echo "nucleus: failed to recreate BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
             fi
             /bin/sleep 3  # wait for the virtual display to be registered
-            identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME" 2>/dev/null || true)"
+            identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME")" || true
             tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
           fi
         fi
 
-        connected_after="$($BD_BIN get -name="$DISPLAY_NAME" -connected 2>/dev/null || true)"
+        connected_after="$($BD_BIN get -name="$DISPLAY_NAME" -connected)" || true
         if [ "$connected_after" != "on" ]; then
           echo "nucleus: failed to set BetterDisplay virtual screen '$DISPLAY_NAME' connected=on." >&2
         fi

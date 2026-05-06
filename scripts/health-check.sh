@@ -87,7 +87,7 @@ check_secret_health() {
       return 1
     fi
 
-    if ! sops -d "$secret_file" >/dev/null 2>&1; then
+    if ! sops -d "$secret_file" >/dev/null; then
       printf '%s\n' "nucleus: unable to decrypt secret file with current identities: $secret_file" >&2
       return 1
     fi
