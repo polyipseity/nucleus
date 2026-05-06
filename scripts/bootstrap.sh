@@ -216,7 +216,8 @@ fi
 
 if [ "$COMMAND" = "apply" ]; then
   printf '%s\n' "Running apply flow via src#apply..."
-  run_nix run "$REPO_ROOT/src#health-check"
+  # Health-check is already invoked by apply.sh for each OS branch; calling it
+  # here too would print "health checks passed" twice and slow bootstrap down.
   run_nix run "$REPO_ROOT/src#apply"
   exit 0
 fi
