@@ -158,6 +158,11 @@
   open-source only. Provide shared Latin sans/serif/monospace + Nerd Font
   coverage and CJK coverage (Simplified + Traditional) across macOS, NixOS,
   and Windows using one canonical font inventory.
+- **Atomic commits**: make one commit per coherent aspect of a change (one
+  bug fix, one new feature, one refactor, one docs update).  Commit as soon
+  as one aspect is complete and validated before beginning the next.  Never
+  mix unrelated aspects in a single commit; reviewers and bisect depend on
+  each commit being independently meaningful.
 
 ## Package Management Strategy
 
