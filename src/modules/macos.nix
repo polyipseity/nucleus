@@ -1,4 +1,4 @@
-# modules/macos.nix — macOS-only Home Manager activation hooks.
+# modules/macos.nix — macOS-only Home Manager activation hooks and LaunchAgents.
 #
 # Guards the entire module with lib.mkIf pkgs.stdenv.isDarwin so it is a no-op
 # on Linux hosts even though home.nix imports it unconditionally.
@@ -13,6 +13,10 @@
 #       → ensureHeadlessDisplay
 #         → configureDisplayResolutions
 #           → displayHostManualInstructions
+#
+# LaunchAgents managed by this module:
+#   local.betterdisplay-heartbeat — polls HeadlessDisplay every 30 s and
+#     reconnects it if BetterDisplay drops the virtual screen connection.
 { lib, pkgs, ... }:
 let
   # Domains intentionally reset before each Home Manager write pass so stale
@@ -123,6 +127,55 @@ let
     path = ../hosts/macbook/MANUAL.md;
     name = "macbook-MANUAL.md";
   };
+
+  # Periodic heartbeat script for the BetterDisplay virtual screen.
+  # Lives in the Nix store so the LaunchAgent ProgramArguments path is stable
+  # across home-manager generations without a home.file symlink.
+  # set +e at the top makes all operations fully soft-fail so launchd never
+  # marks the agent as failed and throttles future invocations.
+  betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" ''
+    set +e  # heartbeat is fully soft-fail; never abort on individual check failure
+
+    BD_BIN="/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay"
+    BD_APP="/Applications/BetterDisplay.app"
+    DISPLAY_NAME="HeadlessDisplay"
+
+    # No-op if BetterDisplay is not installed.
+    [ -f "$BD_BIN" ] || exit 0
+
+    # Ensure BetterDisplay is running before issuing CLI commands.
+    if ! /usr/bin/pgrep -xq "BetterDisplay" 2>/dev/null; then
+      /usr/bin/open -g -a "$BD_APP" 2>/dev/null || true
+      /bin/sleep 5
+    fi
+
+    # Check connection state; soft-fail by treating any CLI error as unknown.
+    connected_state="$("$BD_BIN" get -name="$DISPLAY_NAME" -connected 2>/dev/null || true)"
+
+    # No-op if already connected.
+    [ "$connected_state" = "on" ] && exit 0
+
+    # Virtual screen is disconnected or status is unknown.  Try the lightweight
+    # set -connected=on toggle first; it is free-tier-compatible for virtual
+    # screens (Pro gating applies only to physical display connection toggles).
+    # If the toggle fails, fall back to a discard-and-recreate using the same
+    # parameters as ensureHeadlessDisplay so the virtual screen specification
+    # stays consistent across both code paths.
+    if ! "$BD_BIN" set -name="$DISPLAY_NAME" -connected=on 2>/dev/null; then
+      tag_ids="$("$BD_BIN" get -identifiers -name="$DISPLAY_NAME" 2>/dev/null | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u || true)"
+      for tag_id in $tag_ids; do
+        "$BD_BIN" discard -tagID="$tag_id" 2>/dev/null || true
+      done
+      "$BD_BIN" create \
+        -type=VirtualScreen \
+        -virtualScreenName="$DISPLAY_NAME" \
+        -aspectWidth=16 \
+        -aspectHeight=10 \
+        -multiplierStep=160 \
+        -virtualScreenHiDPI=on \
+        -connected=on 2>/dev/null || true
+    fi
+  '';
 
   # Manual drift-reset helper for managed macOS preference domains.
   # This is intentionally a user-invoked command instead of an automatic
@@ -829,5 +882,38 @@ lib.mkIf pkgs.stdenv.isDarwin {
         fi
       fi
     '';
+  };
+
+  # --------------------------------------------------------------------------
+  # BetterDisplay heartbeat LaunchAgent
+  # Polls the HeadlessDisplay virtual screen every 30 seconds and reconnects
+  # it if BetterDisplay marks it as disconnected after a lid-close, sleep/wake
+  # cycle, or BetterDisplay restart.
+  #
+  # Why a LaunchAgent rather than relying on ensureHeadlessDisplay alone:
+  #   ensureHeadlessDisplay runs only during `home-manager switch`.  On a
+  #   clamshell Mac that is left closed for hours, BetterDisplay can drop the
+  #   virtual screen connection without a new activation run.  A launchd
+  #   periodic agent is the lightest-weight persistent fix without requiring a
+  #   Pro subscription or kernel extension.
+  #
+  # Output is silenced to prevent log spam from 30-second no-op runs.
+  # --------------------------------------------------------------------------
+  launchd.agents."betterdisplay-heartbeat" = {
+    enable = true;
+    config = {
+      Label = "local.betterdisplay-heartbeat";
+      ProgramArguments = [ "${betterdisplayHeartbeat}" ];
+      # Poll interval in seconds; 30 s keeps the display available for
+      # remote-desktop without generating excessive CPU or IPC overhead.
+      StartInterval = 30;
+      # Run once at load so the virtual screen is connected immediately after
+      # login or a `home-manager switch` without waiting for the first tick.
+      RunAtLoad = true;
+      # Suppress per-invocation output to avoid filling system logs with
+      # 30-second no-op heartbeat entries.
+      StandardOutPath = "/dev/null";
+      StandardErrorPath = "/dev/null";
+    };
   };
 }
