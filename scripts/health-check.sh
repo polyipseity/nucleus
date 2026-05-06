@@ -18,8 +18,11 @@
 
 set -eu
 
-SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
+# Use git to locate the repository root rather than navigating relative to $0.
+# When this script runs as a Nix-built app (writeShellApplication), $0 resolves
+# to a path inside the Nix store and $0-relative navigation would never reach
+# the actual repository — the same pattern apply.sh already uses.
+REPO_ROOT=$(git rev-parse --show-toplevel)
 
 min_free_gb="${NUCLEUS_MIN_FREE_GB:-10}"
 skip_secret_health=false

@@ -134,6 +134,7 @@
           name = "nucleus-health-check";
           runtimeInputs = [
             pkgs.curl
+            pkgs.git
             pkgs.gnupg
             pkgs.sops
           ];
