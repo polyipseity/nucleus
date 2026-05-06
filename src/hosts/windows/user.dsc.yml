@@ -113,6 +113,16 @@ properties:
         valueType: DWord
 
     - resource: Microsoft.Windows.Registry/RegistryValue
+      id: explorerShowSyncProviderNotifications
+      directives:
+        description: Suppress sync provider (OneDrive) promotional banners inside Explorer windows; the sync icon in the system tray remains available for monitoring
+      settings:
+        keyPath: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+        valueName: ShowSyncProviderNotifications
+        valueData: 0
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
       id: explorerShowTaskViewButton
       directives:
         description: Hide the Task View button to keep taskbar chrome minimal while retaining workspace switching via keyboard shortcuts
@@ -120,6 +130,36 @@ properties:
         keyPath: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
         valueName: ShowTaskViewButton
         valueData: 0
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: explorerTaskbarDa
+      directives:
+        description: Hide the Widgets taskbar button to reduce persistent taskbar chrome while retaining access via Win+W; mirrors macOS StandardHideWidgets which hides Stage Manager widget strip for the same reason
+      settings:
+        keyPath: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+        valueName: TaskbarDa
+        valueData: 0
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: explorerTaskbarMn
+      directives:
+        description: Hide the Chat (Microsoft Teams Meet Now) taskbar button to reduce persistent chrome; Teams remains accessible via the Start menu and system tray
+      settings:
+        keyPath: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced
+        valueName: TaskbarMn
+        valueData: 0
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: explorerFullPathInTitle
+      directives:
+        description: Show the full folder path in Explorer title bars to mirror macOS Finder _FXShowPosixPathInTitle and GNOME Nautilus show-full-path-titles, keeping filesystem orientation consistent across hosts
+      settings:
+        keyPath: HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\CabinetState
+        valueName: FullPath
+        valueData: 1
         valueType: DWord
 
     - resource: PSDscResources/Script
