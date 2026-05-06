@@ -182,6 +182,11 @@ else {
   Remove-NucleusManagedSecrets -PrimaryUsername $PrimaryUsername
 }
 
+# Materialize decrypted wallpapers ahead of DSC so user.dsc.yml can resolve an
+# explicit active wallpaper path deterministically.
+$wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wallpapers"
+$wallpaperOutputDir = Join-Path -Path $HOME -ChildPath "Pictures\wallpapers"
+
 # Post-materialization health check: verify all SOPS files are decryptable by
 # both the GPG and personal SSH age backends, and that managed artefacts exist.
 # Mirrors the POSIX verifySecretDecryption Home Manager activation.
@@ -189,15 +194,9 @@ Invoke-NucleusSecretVerification `
   -GpgExe $gpgExe `
   -HostKeyPath $machineSshHostKeyPath `
   -PrimaryUsername $PrimaryUsername `
-  -PrimarySshKeyPath $primarySshKeyPath `
   -SecretsDir $secretsDir `
-  -SopsExe $sopsExe `
   -WallpaperAssetsDir $wallpaperAssetsDir
 
-# Materialize decrypted wallpapers ahead of DSC so user.dsc.yml can resolve an
-# explicit active wallpaper path deterministically.
-$wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wallpapers"
-$wallpaperOutputDir = Join-Path -Path $HOME -ChildPath "Pictures\wallpapers"
 $activeWallpaperPath = Sync-NucleusWallpapers -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -OutputDir $wallpaperOutputDir -SopsExe $sopsExe
 Remove-NucleusStaleWallpapers -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
 

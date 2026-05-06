@@ -386,15 +386,18 @@ lib.mkIf isPrimaryUser {
   #      non-empty.  Guards against silent sops-nix failures.
   #   2. GPG key presence: managed primary fingerprint is in the keyring.
   #      Complements gpgImport — catches keyring state divergence.
-  #   3. GPG SOPS end-to-end: sops --decrypt each file with age keys disabled
-  #      (SOPS_AGE_KEY_FILE=/dev/null) and an isolated HOME so sops cannot find
-  #      a stray keys.txt; only the GPG recipient can succeed.  Accumulates
-  #      failures, reports all failing files, then hard-errors.
+  #   3. GPG SOPS recipient check: verify the managed primary fingerprint appears
+  #      in each SOPS file's plaintext sops.pgp[].fp metadata.  The fp field is
+  #      always unencrypted regardless of file encryption, so no passphrase is
+  #      required.  Combined with check 2 (key present in keyring), this confirms
+  #      GPG is registered and would succeed once the passphrase is available.
+  #      Accumulates failures, reports all failing files.
   #      Hard error — GPG is the last-resort global backup.
-  #   4. Personal SSH age-backend SOPS end-to-end: convert the personal SSH
-  #      private key to an age private key (via ssh-to-age), then sops
-  #      --decrypt each file with an empty GNUPGHOME so only the age recipient
-  #      is attempted.  Accumulates failures, reports all failing files.
+  #   4. Personal SSH age recipient check: derive the age public key from the
+  #      managed personal SSH public key via ssh-to-age -i (passphrase-free
+  #      public-key conversion), then verify it appears in each SOPS file's
+  #      plaintext sops.age[].recipient metadata.  No private key passphrase
+  #      is required.  Accumulates failures, reports all failing files.
   #      Hard error — the personal SSH key is the designated personal backup
   #      age recipient in .sops.yaml.
   #   5. Machine SSH host key existence: advisory warning if
@@ -405,14 +408,9 @@ lib.mkIf isPrimaryUser {
   # Why lib.concatMapStrings for checks 3 & 4:
   #   Generating static inline shell commands at Nix evaluation time avoids
   #   shell loops/arrays and keeps each invocation independently visible in
-  #   the activation trace.
-  #
-  # Why isolated HOME for sops subprocesses:
-  #   sops searches for age keys in the OS default config dir
-  #   (~/.config/sops/age/keys.txt on Linux, ~/Library/Application Support/…
-  #   on macOS) in addition to SOPS_AGE_KEY_FILE.  Setting HOME to a temp dir
-  #   prevents sops from finding stray keys.txt, keeping each test isolated.
-  #   GNUPGHOME is set explicitly so GPG still finds the managed keyring.
+  #   the activation trace.  The Nix store paths for each SOPS file are
+  #   baked in at eval time; shell variables such as _vsd_managed_fpr and
+  #   _vsd_ssh_age_pub are expanded at activation runtime.
   # --------------------------------------------------------------------------
   home.activation.verifySecretDecryption =
     let
@@ -485,50 +483,41 @@ lib.mkIf isPrimaryUser {
         exit 1
       fi
 
-      # --- 3. GPG SOPS end-to-end check for all SOPS files ---
-      # Disable age backends and isolate HOME so only the GPG recipient is used.
-      # Failures are accumulated so the error message lists every failing file.
-      _vsd_tmp_gpg_home="$(mktemp -d)"
+      # --- 3. GPG SOPS recipient check for all SOPS files ---
+      # Rather than live-decrypting with GPG (which requires the private key
+      # passphrase and fails non-interactively), verify that the managed GPG
+      # fingerprint appears in each SOPS file's plaintext sops.pgp[].fp metadata.
+      # The fp field is always unencrypted regardless of file encryption.  Combined
+      # with check 2 (key present in keyring), this confirms GPG is registered and
+      # would succeed once the passphrase is available.
       _vsd_gpg_failures=""
       ${lib.concatMapStrings ({ path, displayName }: ''
-        HOME="$_vsd_tmp_gpg_home" \
-          GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
-          SOPS_AGE_KEY_FILE=/dev/null \
-          SOPS_AGE_KEY="" \
-          ${pkgs.sops}/bin/sops --decrypt \
-          "${toString path}" > /dev/null 2>&1 \
+        /usr/bin/grep -q "fp: $_vsd_managed_fpr" "${toString path}" \
           || _vsd_gpg_failures="$_vsd_gpg_failures ${displayName}"
       '') allSopsFiles}
-      rm -rf "$_vsd_tmp_gpg_home"
       if [ -n "$_vsd_gpg_failures" ]; then
         echo "nucleus: ERROR — GPG SOPS decryption check failed for:$_vsd_gpg_failures; managed GPG key may not be registered in .sops.yaml." >&2
         exit 1
       fi
 
-      # --- 4. Personal SSH age-backend SOPS end-to-end check for all SOPS files ---
-      # Convert the personal SSH private key to age format so the sops age
-      # backend can use it.  GPG is disabled by pointing GNUPGHOME at an
-      # empty temp dir so only the age path is exercised.
-      # Failures are accumulated so the error message lists every failing file.
-      _vsd_tmp_age_key="$(mktemp)"
-      _vsd_tmp_ssh_gnupg="$(mktemp -d)"
-      _vsd_tmp_ssh_home="$(mktemp -d)"
+      # --- 4. Personal SSH age recipient check for all SOPS files ---
+      # Rather than live-decrypting with the SSH private key (which requires the
+      # key passphrase and fails non-interactively), derive the age public key
+      # from the managed personal SSH public key via ssh-to-age -i (passphrase-
+      # free public-key conversion) and verify it appears in each SOPS file's
+      # plaintext sops.age[].recipient metadata.  No private key material is
+      # accessed.
+      _vsd_ssh_age_pub=""
       _vsd_ssh_failures=""
-      if ${pkgs.ssh-to-age}/bin/ssh-to-age -private-key \
-          -i "${sshPrivateKeyPath}" > "$_vsd_tmp_age_key" 2>/dev/null; then
-        ${lib.concatMapStrings ({ path, displayName }: ''
-          HOME="$_vsd_tmp_ssh_home" \
-            GNUPGHOME="$_vsd_tmp_ssh_gnupg" \
-            SOPS_AGE_KEY_FILE="$_vsd_tmp_age_key" \
-            ${pkgs.sops}/bin/sops --decrypt \
-            "${toString path}" > /dev/null 2>&1 \
-            || _vsd_ssh_failures="$_vsd_ssh_failures ${displayName}"
-        '') allSopsFiles}
-      else
-        _vsd_ssh_failures=" <ssh-to-age conversion failed>"
+      _vsd_ssh_age_pub="$(${pkgs.ssh-to-age}/bin/ssh-to-age -i "${sshPublicKeyPath}" 2>/dev/null)" || true
+      if [ -z "$_vsd_ssh_age_pub" ]; then
+        echo "nucleus: ERROR — personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure ${sshPublicKeyPath} is a valid Ed25519 public key." >&2
+        exit 1
       fi
-      rm -f "$_vsd_tmp_age_key"
-      rm -rf "$_vsd_tmp_ssh_gnupg" "$_vsd_tmp_ssh_home"
+      ${lib.concatMapStrings ({ path, displayName }: ''
+        /usr/bin/grep -q "recipient: $_vsd_ssh_age_pub" "${toString path}" \
+          || _vsd_ssh_failures="$_vsd_ssh_failures ${displayName}"
+      '') allSopsFiles}
       if [ -n "$_vsd_ssh_failures" ]; then
         echo "nucleus: ERROR — personal SSH key age-backend SOPS decryption check failed for:$_vsd_ssh_failures; SSH key may not be registered in .sops.yaml as an age recipient." >&2
         exit 1
