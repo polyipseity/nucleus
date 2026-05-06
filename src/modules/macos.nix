@@ -190,9 +190,10 @@ let
     "configureSystemHardening"
     "configureUniversalAccessDefaults"
     "ensureHeadlessDisplay"
-    # gitIdentityFromSops is defined in secrets.nix (shared module) but runs
-    # as a Home Manager activation on this host; it must complete before the
-    # manual instructions are printed so the final output is complete.
+    # gitIdentityFromSops, gpgImport, and sshKeyAdopt are defined in
+    # secrets.nix (shared module) but run as Home Manager activations on this
+    # host; they must all complete before the manual instructions are printed
+    # so the final output is complete.
     "gitIdentityFromSops"
     "gpgImport"
     "installPackages"
@@ -203,6 +204,7 @@ let
     "reloadUserPreferenceState"
     "setupLaunchAgents"
     "sops-nix"
+    "sshKeyAdopt"
     "verifyArchivingStack"
     "vscodeDarwinExtensionBridge"
     "vscodeProfiles"

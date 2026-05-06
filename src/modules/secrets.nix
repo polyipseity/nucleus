@@ -1,8 +1,10 @@
 # modules/secrets.nix — Secret management for Home Manager.
 #
-# All decryption is delegated to sops-nix (sops.secrets). The only remaining
-# imperative step is `gpg --import`, which mutates the keyring and has no
-# declarative equivalent.
+# All decryption is delegated to sops-nix (sops.secrets). Imperative activation
+# hooks handle side-effects that have no declarative equivalent:
+#   - gpgImport:        imports the managed GPG key and enforces ownertrust
+#   - gitIdentityFromSops: writes git name/email/signingkey from SOPS payload
+#   - sshKeyAdopt:      tracks the SSH key fingerprint; flushes agent on rotation
 #
 # Required SOPS file format (flat top-level keys):
 #
@@ -231,8 +233,11 @@ lib.mkIf isPrimaryUser {
   #     2. For every fingerprint in the manifest that differs from current_fpr,
   #        delete that key from the keyring.  This removes keys that were
   #        managed by us but have since been rotated out of the SOPS secret.
-  #     3. Import the current key and set ownertrust.
-  #     4. Write current_fpr to the manifest.
+  #     3. Import the current key.
+  #     4. Write current_fpr to the manifest (before ownertrust, so the key is
+  #        tracked even if ownertrust fails on the first bootstrap run, e.g.
+  #        GnuPG 2.5 + Kyber IPC edge cases).
+  #     5. Set ownertrust (warning-only; key is already imported and tracked).
   #   Keys never added to the manifest (user-imported manually) are never
   #   touched.  If the manifest is absent (first run or manually deleted) step
   #   2 is a no-op, which is always safe.  If current_fpr cannot be determined
@@ -288,14 +293,74 @@ lib.mkIf isPrimaryUser {
       exit 1
     fi
 
-    if ! printf '%s:6:\n' "$first_key_fingerprint" | ${pkgs.gnupg}/bin/gpg --import-ownertrust; then
-      echo "nucleus: failed to enforce ultimate ownertrust for managed primary fingerprint $first_key_fingerprint." >&2
-      exit 1
-    fi
-
-    # Record the current managed fingerprint so the next activation can identify
-    # and clean up stale keys if the managed key is rotated in the future.
+    # Record the managed fingerprint immediately after a successful import so
+    # this key is tracked for stale-cleanup even if the ownertrust step fails
+    # (e.g., GnuPG 2.5 + Kyber IPC edge cases on first bootstrap).
     mkdir -p "$nucleus_config_dir"
     printf '%s\n' "$first_key_fingerprint" > "$managed_keys_manifest"
+
+    if ! printf '%s:6:\n' "$first_key_fingerprint" | ${pkgs.gnupg}/bin/gpg --import-ownertrust; then
+      echo "nucleus: warning — failed to enforce ultimate ownertrust for managed primary fingerprint $first_key_fingerprint; key is imported and tracked but trust state may require manual repair." >&2
+    fi
+  '';
+
+  # --------------------------------------------------------------------------
+  # sshKeyAdopt
+  # Tracks the fingerprint of the managed personal SSH public key in
+  # ~/.config/nucleus/managed-ssh-keys and flushes the in-memory SSH agent
+  # when the fingerprint changes (i.e., the key was rotated in the SOPS secret).
+  #
+  # Why flush on rotation:
+  #   ssh-agent caches private keys in memory by fingerprint.  After a SOPS
+  #   rotation changes the key material on disk, any cached entry for the old
+  #   fingerprint would be stale.  Flushing the entire agent ensures the new
+  #   key is loaded via AddKeysToAgent=yes on the next outbound SSH connection.
+  #
+  # Device-specific key exclusion:
+  #   /etc/ssh/ssh_host_ed25519_key is the bootstrap/backup decryption key
+  #   for sops-nix and must never be tracked or cleaned up by this module.
+  #   Only the personal user key (~/.ssh/ssh_personal_<user>.pub) is managed.
+  #
+  # Algorithm:
+  #   1. Verify the managed public key has been materialized by sops-nix.
+  #   2. Extract the SHA-256 fingerprint via ssh-keygen -lf.
+  #   3. Read the previously recorded fingerprint from the manifest.
+  #   4. If the fingerprint differs, flush the SSH agent (ssh-add -D).
+  #   5. Write the current fingerprint to the manifest.
+  # --------------------------------------------------------------------------
+  home.activation.sshKeyAdopt = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+    ssh_pub_path="${sshPublicKeyPath}"
+    nucleus_config_dir="$HOME/.config/nucleus"
+    managed_ssh_manifest="$nucleus_config_dir/managed-ssh-keys"
+
+    if [ ! -f "$ssh_pub_path" ]; then
+      # Not a hard error: sops-nix reports its own failure if materialization
+      # did not complete.  Warn and skip so this activation does not mask the
+      # upstream sops-nix error with a different message.
+      echo "nucleus: managed SSH public key not found at $ssh_pub_path; skipping fingerprint adoption." >&2
+    else
+      new_fingerprint=""
+      new_fingerprint="$(${pkgs.openssh}/bin/ssh-keygen -lf "$ssh_pub_path" 2>/dev/null | /usr/bin/awk '{print $2}')" || true
+
+      if [ -z "$new_fingerprint" ]; then
+        echo "nucleus: could not extract fingerprint from $ssh_pub_path; skipping adoption." >&2
+      else
+        old_fingerprint=""
+        if [ -f "$managed_ssh_manifest" ]; then
+          old_fingerprint="$(cat "$managed_ssh_manifest")" || old_fingerprint=""
+        fi
+
+        if [ -n "$old_fingerprint" ] && [ "$old_fingerprint" != "$new_fingerprint" ]; then
+          # Flush in-memory SSH agent so stale cached key material is cleared.
+          # AddKeysToAgent=yes in the SSH config re-loads the new key on the
+          # next outbound SSH connection.
+          echo "nucleus: managed SSH key fingerprint changed ($old_fingerprint -> $new_fingerprint); flushing SSH agent." >&2
+          ${pkgs.openssh}/bin/ssh-add -D 2>/dev/null || true
+        fi
+
+        mkdir -p "$nucleus_config_dir"
+        printf '%s\n' "$new_fingerprint" > "$managed_ssh_manifest"
+      fi
+    fi
   '';
 }
