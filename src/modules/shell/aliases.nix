@@ -12,9 +12,14 @@
   gl = "git log --oneline --decorate --graph";
   gp = "git push";
   gpl = "git pull";
-  gst = "git status";
   gs = "git status -sb";
+  gst = "git status";
   la = "eza -la";
   ll = "eza -la";
+  nucleus-cleanup = "nix run ./src#cleanup";
+  nucleus-gc-home = "nix-collect-garbage --delete-older-than 30d";
+  nucleus-gc-system = "sudo nix-collect-garbage --delete-older-than 30d";
+  nucleus-health-check = "nix run ./src#health-check";
+  nucleus-update-all = "nix run ./src#update-all";
   v = "nvim";
 }
