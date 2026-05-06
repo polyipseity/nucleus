@@ -398,13 +398,16 @@ lib.mkIf isPrimaryUser {
    #      private key material to decrypt once the passphrase is provided.
    #      Accumulates failures, reports all failing files.
    #      Hard error — GPG is the last-resort global backup.
-  #   4. Personal SSH age recipient check: derive the age public key from the
-  #      managed personal SSH public key via ssh-to-age -i (passphrase-free
-  #      public-key conversion), then verify it appears in each SOPS file's
-  #      plaintext sops.age[].recipient metadata.  No private key passphrase
-  #      is required.  Accumulates failures, reports all failing files.
-  #      Hard error — the personal SSH key is the designated personal backup
-  #      age recipient in .sops.yaml.
+   #   4. Personal SSH age recipient check: derive the age public key from the
+   #      managed personal SSH public key via ssh-to-age -i (passphrase-free
+   #      public-key conversion), then search each SOPS file's plaintext
+   #      sops.age[] metadata for the derived key value.  YAML SOPS files store
+   #      the key as "recipient: age1..." (unquoted); binary SOPS files (e.g.
+   #      wallpaper blobs) use JSON format "\"recipient\": \"age1...\"" (quoted).
+   #      Searching for the bare age key value handles both formats.  No private
+   #      key passphrase is required.  Accumulates failures, reports all failing
+   #      files.  Hard error — the personal SSH key is the designated personal
+   #      backup age recipient in .sops.yaml.
   #   5. Machine SSH host key existence: advisory warning if
   #      /etc/ssh/ssh_host_ed25519_key is absent.  Warning-only because on
   #      first bootstrap the host key may not yet be registered in .sops.yaml
@@ -530,8 +533,11 @@ lib.mkIf isPrimaryUser {
       # key passphrase and fails non-interactively), derive the age public key
       # from the managed personal SSH public key via ssh-to-age -i (passphrase-
       # free public-key conversion) and verify it appears in each SOPS file's
-      # plaintext sops.age[].recipient metadata.  No private key material is
-      # accessed.
+      # plaintext sops.age[] metadata.  YAML SOPS files store the key as
+      # "recipient: age1..." (unquoted); binary SOPS files (e.g. wallpaper blobs)
+      # use JSON format "\"recipient\": \"age1...\"" (quoted key and value).
+      # Searching for the bare age key value with grep -qF handles both formats.
+      # No private key material is accessed.
       _vsd_ssh_age_pub=""
       _vsd_ssh_failures=""
       _vsd_ssh_age_pub="$(${pkgs.ssh-to-age}/bin/ssh-to-age -i "${sshPublicKeyPath}" 2>/dev/null)" || true
@@ -540,7 +546,12 @@ lib.mkIf isPrimaryUser {
         exit 1
       fi
       ${lib.concatMapStrings ({ path, displayName }: ''
-        /usr/bin/grep -q "recipient: $_vsd_ssh_age_pub" "${toString path}" \
+        # Search for the bare age key value rather than the full "recipient: KEY"
+        # string: YAML SOPS stores "recipient: KEY" (unquoted) while binary SOPS
+        # uses JSON "\"recipient\": \"KEY\"" (quoted key and value).  The age key
+        # is a unique 59+ character bech32 string that identifies the recipient
+        # unambiguously without the surrounding field label.
+        /usr/bin/grep -qF "$_vsd_ssh_age_pub" "${toString path}" \
           || _vsd_ssh_failures="$_vsd_ssh_failures ${displayName}"
       '') allSopsFiles}
       if [ -n "$_vsd_ssh_failures" ]; then

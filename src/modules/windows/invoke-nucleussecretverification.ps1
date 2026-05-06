@@ -327,7 +327,10 @@ function Invoke-NucleusSecretVerification {
   # 4. Personal SSH age recipient check for all SOPS files.
   # Derive the age public key from the managed SSH public key file (passphrase-
   # free; the public key carries no secret material) and search each SOPS
-  # file's plaintext sops.age[].recipient metadata for the derived key.
+  # file's plaintext sops.age[] metadata for the derived key value.
+  # YAML SOPS files store the key as "recipient: age1..." (unquoted); binary
+  # SOPS files (e.g. wallpaper blobs) use JSON format with both the key name
+  # and value double-quoted.  Searching for the bare age key value handles both.
   # -------------------------------------------------------------------------
   Write-Host "nucleus: [4/5] checking personal SSH age recipient registration in all SOPS files..." -ForegroundColor Gray
   if (-not (Test-Path -Path $sshPublicKeyPath)) {
@@ -337,7 +340,10 @@ function Invoke-NucleusSecretVerification {
   $sshAgePub = ConvertFrom-SshEd25519PublicKeyToAgePubKey -SshPublicKeyLine $sshPubKeyLine
   $sshFailures = @()
   foreach ($sopsFile in $sopsTestFiles) {
-    $hasSshRecipient = Select-String -Path $sopsFile -Pattern "recipient: $sshAgePub" -SimpleMatch -Quiet -ErrorAction SilentlyContinue
+    # Search for the bare age key value (not "recipient: KEY") so both YAML
+    # (unquoted field) and JSON (double-quoted key and value) SOPS formats
+    # are handled without needing two separate search patterns.
+    $hasSshRecipient = Select-String -Path $sopsFile -Pattern $sshAgePub -SimpleMatch -Quiet -ErrorAction SilentlyContinue
     if (-not $hasSshRecipient) {
       $sshFailures += [System.IO.Path]::GetFileName($sopsFile)
     }
