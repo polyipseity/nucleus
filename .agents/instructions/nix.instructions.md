@@ -138,7 +138,7 @@ declarative pmset posture.  The target state verified against
 | `ttyskeepawake` | `-a` | `1` | Prevent sleep while a network tty (SSH/ARD) is active |
 | `hibernatemode` | `-a` | `3` | Safe-sleep: write RAM image before sleep (mirrors hybrid sleep) |
 | `hibernatefile` | `-a` | `/var/vm/sleepimage` | Canonical safe-sleep image path |
-| `networkoversleep` | `-a` | `0` | Suppress background network during sleep; wake handled by `womp` |
+| `networkoversleep` | `-a` | `0` | Suppress background network during sleep; wake handled by `womp` (set on both sources) |
 | `tcpkeepalive` | `-a` | `1` | Issue TCP keepalives through sleep to maintain SSH/RDP tunnels |
 | `powernap` | `-a` | `1` | Allow background mail/calendar sync during Power Nap |
 | `lidwake` | `-a` | `1` | Wake on lid open |
@@ -146,17 +146,20 @@ declarative pmset posture.  The target state verified against
 | `displaysleep` | `-c` | `1` | 1-minute display sleep on AC |
 | `sleep` | `-c` | `0` | No idle system sleep on AC (remote access must survive) |
 | `disksleep` | `-c` | `0` | No disk sleep on AC |
-| `womp` | `-c` | `1` | Wake-on-Ethernet LAN on AC only (see below) |
+| `womp` | `-c` | `1` | Wake-on-Ethernet LAN; set on both AC and battery so magic-packet wakes succeed regardless of power source |
 | `lowpowermode` | `-b` | `1` | Reduce CPU/GPU on battery |
 | `displaysleep` | `-b` | `1` | 1-minute display sleep on battery |
 | `sleep` | `-b` | `0` | No idle system sleep on battery (remote sessions must survive) |
-| `disksleep` | `-b` | `0` | No disk sleep on battery |
+| `disksleep` | `-b` | `0` | No disk sleep on battery; always kept equal to `sleep` |
+| `womp` | `-b` | `1` | Wake-on-Ethernet LAN on battery; empirically honoured on this hardware |
 | `lessbright` | `-b` | `1` | Dim display on battery (when hardware supports it) |
 
 **Invariants to preserve:**
 
-- `womp` is **AC-only**: the NIC requires sustained AC power to listen for
-  magic packets during sleep; do not attempt to set `womp` on `-b`.
+- `womp` is set on **both** `-c` and `-b`: empirical `pmset -g custom` output
+  confirms the machine honours `womp` on battery.  Do not revert to AC-only.
+- `disksleep` must always equal `sleep` on both sources to prevent disk sleep
+  while the system remains awake; the current policy sets both to `0`.
 - `displaysleep` and `disksleep` **are settable on battery even with
   `lowpowermode=1`**.  Do not add claims that macOS overrides these values
   when low-power mode is active — `pmset -g custom` empirically proves they

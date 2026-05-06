@@ -29,12 +29,12 @@
   #   Global (-a): standby=1, ttyskeepawake=1, hibernatemode=3, networkoversleep=0,
   #     tcpkeepalive=1, powernap=1, lidwake=1, hibernatefile=/var/vm/sleepimage
   #   AC (-c): displaysleep=1, sleep=0, disksleep=0, womp=1, lowpowermode=0
-  #   Battery (-b): displaysleep=1, sleep=0, disksleep=0, lowpowermode=1,
+  #   Battery (-b): displaysleep=1, sleep=0, disksleep=0, womp=1, lowpowermode=1,
   #     lessbright=1 (when supported)
   #
-  # womp is AC-only: the NIC requires sustained power from the AC adapter to
-  # listen for magic packets during sleep; battery cannot reliably power the
-  # NIC adapter in listen mode.
+  # womp=1 on both AC and battery: empirical pmset -g custom output confirms
+  # the machine honours womp on battery; setting it on both sources ensures
+  # inbound magic-packet wakes succeed regardless of power source.
   #
   # sleep=0 on battery: remote-desktop sessions (Chrome Remote Desktop, VNC/ARD,
   # SSH) must survive when the machine is on battery.  Idle sleep would
@@ -97,13 +97,14 @@
       fi
 
       # AC settings: 1-minute display sleep, no idle system sleep, no disk sleep.
-      # womp=1 (wake-on-Ethernet LAN) is AC-only: the NIC requires sustained
-      # power from the AC adapter to listen for magic packets during sleep;
-      # battery cannot reliably sustain the NIC adapter in listen mode.
+      # womp=1 (wake-on-Ethernet LAN): wake when a magic packet arrives over the
+      # wired network; set on both AC and battery so remote wakes succeed
+      # regardless of power source.
       apply_pmset -c displaysleep 1 sleep 0 disksleep 0 womp 1
 
       # Battery settings: 1-minute display sleep, no idle system sleep, no disk sleep.
-      apply_pmset -b displaysleep 1 sleep 0 disksleep 0
+      # womp=1: mirror the AC setting; machine honours womp on battery empirically.
+      apply_pmset -b displaysleep 1 sleep 0 disksleep 0 womp 1
 
       if pmset_supports lessbright; then
         # lessbright dims the display on battery to extend runtime.
