@@ -49,14 +49,17 @@
 #      The managed primary fingerprint from gpg-personal.yml is assigned
 #      ultimate ownertrust on every activation to keep trustdb state
 #      deterministic even when keys were pre-imported manually.
-#   3. Once SSH host keys exist on this machine, derive its age recipient and
-#      add it to .sops.yaml keys.age_devices, then rewrap encrypted files:
+#   3. The system activation script deriveHostAgeKey (posix-sops.nix)
+#      automatically derives the machine age identity from the SSH host key
+#      and writes it to /etc/sops/age/machine.txt.  Retrieve the age public
+#      key to register in .sops.yaml with:
 #        ssh-to-age < /etc/ssh/ssh_host_ed25519.pub
+#      Then add it to .sops.yaml keys.age_devices and rewrap encrypted files:
 #        sops updatekeys src/secrets/ssh-personal.yml
 #        sops updatekeys src/secrets/gpg-personal.yml
 #        sops updatekeys src/secrets/git-identities.yml
 #      After this step sops-nix uses this precedence chain:
-#        machine SSH key -> primary GPG key -> primary SSH key.
+#        machine age key (/etc/sops/age/machine.txt) -> primary GPG key -> primary SSH key.
 { config, lib, pkgs, username ? null, ... }:
 let
   primaryUsername =
@@ -91,9 +94,13 @@ let
 in
 lib.mkIf isPrimaryUser {
   # Register the machine-identity decryption backend for the HM sops-nix module.
-  # age: machine SSH key — works once keys.age_devices is populated in .sops.yaml.
-  # Global backup recipients (primary_gpg / primary_ssh) are managed in .sops.yaml.
-  sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+  # /etc/sops/age/machine.txt is derived by the system activation script
+  # deriveHostAgeKey in posix-sops.nix from /etc/ssh/ssh_host_ed25519_key.
+  # Using keyFile instead of sshKeyPaths avoids the permission issue on macOS
+  # and NixOS where /etc/ssh/ssh_host_ed25519_key is 0600 root:wheel/root:root
+  # and the Home Manager sops-nix instance runs as the regular user.
+  # Global backup recipients (primary_gpg / primary_ssh) are in .sops.yaml.
+  sops.age.keyFile = "/etc/sops/age/machine.txt";
   sops.gnupg.home = "${config.home.homeDirectory}/.gnupg";
 
   # --------------------------------------------------------------------------
@@ -559,11 +566,14 @@ lib.mkIf isPrimaryUser {
         exit 1
       fi
 
-      # --- 5. Machine SSH host key existence check (warning-only) ---
-      # Warning-only: on first bootstrap the host key may not yet be in .sops.yaml.
-      # See step 3 of the bootstrap docs at the top of this file.
-      if [ ! -f "/etc/ssh/ssh_host_ed25519_key" ]; then
-        echo "nucleus: warning — /etc/ssh/ssh_host_ed25519_key missing; this machine cannot be the primary SOPS age recipient until the host key is registered in .sops.yaml." >&2
+      # --- 5. Machine age key existence check (warning-only) ---
+      # Warning-only: on first bootstrap the host SSH key may not yet be registered
+      # in .sops.yaml as a device age recipient, so the derived key file may be
+      # absent.  Once deriveHostAgeKey (posix-sops.nix) has run and the machine
+      # age recipient is in .sops.yaml, this check will pass silently on every
+      # subsequent apply.
+      if [ ! -f "/etc/sops/age/machine.txt" ]; then
+        echo "nucleus: warning — /etc/sops/age/machine.txt missing; this machine cannot be a SOPS age device recipient until the host key is registered in .sops.yaml and deriveHostAgeKey has run successfully." >&2
       fi
     '';
 }
