@@ -206,30 +206,48 @@ full declarative pmset posture.  The target state verified against
   exit noise from unsupported capabilities (grep handles the boolean result).
   This suppression is intentional and accompanied by a WHY comment; any real
   `pmset` write failure surfaces separately via `apply_pmset`.
-- `lidwake` is set globally with `-a` in the activation script.  It may not
-  appear in `pmset -g custom` output if the firmware reports it only through
-  `pmset -g cap`; all other flags in the table above are confirmed by
-  `pmset -g custom`.
+- `lidwake` is set globally with `-a` in the activation script.  It does not
+  appear in `pmset -g custom` output on Apple Silicon; it is accepted by pmset
+  without error and is honoured by the firmware.
+- `Sleep On Power Button` and `SleepServices` appear in `pmset -g custom`
+  output (both at value `1`) but are **not writable** via `pmset` on Apple
+  Silicon / macOS 15+ — the commands are rejected with a usage error and
+  `exit 1`.  The activation script deliberately does **not** attempt to set
+  them.  `SleepServices=1` follows from `powernap=1` automatically.
+  `Sleep On Power Button` must be set manually in System Settings → General
+  (see `src/hosts/macbook/MANUAL.md`).
 
 **Validation procedure:**
 
 After any change to `src/hosts/macbook/activation.nix` that touches pmset
 settings, run a complete enforcement cycle to confirm the script converges:
 
-1. **Read current state** (no `sudo` required): `pmset -g custom`
-2. **Introduce wrong values** (requires `sudo`): set a few flags to known-wrong
-   values so there is visible drift to correct, for example:
+1. **Verify systemsetup layer** (requires `sudo`):
+   ```sh
+   sudo systemsetup -getcomputersleep   # expect: Never
+   sudo systemsetup -getdisplaysleep    # expect: after 1 minutes
+   sudo systemsetup -getharddisksleep   # expect: Never
+   ```
+2. **Read pmset state** (no `sudo` required): `pmset -g custom`
+   Expected output (all flags, both sources):
+   - **AC Power**: `lowpowermode=0 standby=1 ttyskeepawake=1 hibernatemode=3
+     powernap=1 hibernatefile=/var/vm/sleepimage displaysleep=1 womp=1
+     networkoversleep=0 sleep=0 tcpkeepalive=1 disksleep=0`
+   - **Battery Power**: `lowpowermode=1 standby=1 ttyskeepawake=1
+     hibernatemode=3 powernap=1 hibernatefile=/var/vm/sleepimage displaysleep=1
+     womp=1 networkoversleep=0 sleep=0 lessbright=1 tcpkeepalive=1 disksleep=0`
+   - Both sources also show `Sleep On Power Button=1` and `SleepServices=1`
+     (OS-managed, not written by activation.nix).
+3. **Introduce deliberate drift** (requires `sudo`): set a few flags to
+   known-wrong values so there is visible correction to verify, for example:
    ```sh
    sudo pmset -a standby 0
    sudo pmset -c sleep 5
    sudo pmset -b sleep 5
    ```
-3. **Run apply**: `nix run .#apply` from `src/` (or `./scripts/bootstrap.sh apply`)
-4. **Verify correction**: `pmset -g custom` — all flags must match the target
-   table above after the apply completes
-
-The machine state after the last apply already matches the full target table,
-confirming the activation script is functioning correctly on this machine.
+4. **Run apply**: `nix run .#apply` from `src/`
+5. **Verify correction**: re-run steps 1 and 2 — all flags must match the
+   expected values above.
 
 ## Home Manager activation DAG invariants
 
