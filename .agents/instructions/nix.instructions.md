@@ -126,10 +126,45 @@ applyTo: "src/**/*.nix"
   `purge-managed-user-preferences` and must not be wired into automatic
   `home.activation.*` execution.
 
+## nix-darwin activation scripts
+
+nix-darwin rev `8c62fba` (`lnl7/nix-darwin`) assembles activation scripts from
+a **hardcoded fixed list** only.  Any `system.activationScripts.<custom-name>`
+whose name is not in that list is silently evaluated but **never called** in the
+built `activate` binary.
+
+**Confirmed supported user extension points:**
+
+- `extraActivation` — runs after `createRun`, before `openssh`.  Use only for
+  scripts that do not need openssh to have run first.
+- `postActivation` — runs after `homebrew`; last step before the gc-root
+  symlink.  Use for everything else (including scripts that read
+  `/etc/ssh/ssh_host_ed25519_key`).
+
+**How to contribute to these hooks from multiple modules:**
+
+`postActivation.text` and `extraActivation.text` are `types.lines` values.
+Multiple modules can each contribute a fragment using
+`system.activationScripts.postActivation.text = lib.mkBefore "..."`.
+`lib.mkBefore` is priority 500; the home-manager darwin module appends its HM
+activation call at default priority 1000.  All contributions are concatenated in
+priority order in the assembled activate script.
+
+**Rules:**
+
+- Never add `system.activationScripts.<custom-name>.text` for a name outside
+  the fixed list — it will be silently ignored on Darwin.
+- Always use `lib.mkBefore` when contributing to `postActivation.text` so the
+  fragment runs before the HM activation call.
+- On NixOS, custom `system.activationScripts.<name>.text` entries **are**
+  honoured and assembled topologically; platform-conditional logic is acceptable
+  (see `posix-sops.nix` for an example).
+- Add `lib` to the module arguments whenever `lib.mkBefore` is used.
+
 ## macOS pmset power policy
 
-`src/hosts/macbook/activation.nix` `configureBatteryPolicy` owns the full
-declarative pmset posture.  The target state verified against
+`src/hosts/macbook/activation.nix` (in the `postActivation` fragment) owns the
+full declarative pmset posture.  The target state verified against
 `pmset -g custom` output is:
 
 | Flag | Scope | Value | Rationale |
@@ -172,7 +207,7 @@ declarative pmset posture.  The target state verified against
   This suppression is intentional and accompanied by a WHY comment; any real
   `pmset` write failure surfaces separately via `apply_pmset`.
 
-
+## Home Manager activation DAG invariants
 
 - Both POSIX hosts must keep `home.activation.displayHostManualInstructions`
   as the **terminal node** of the Home Manager activation DAG, so operators
