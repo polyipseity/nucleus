@@ -155,13 +155,14 @@ lib.mkIf pkgs.stdenv.isLinux {
     # consolidated, post-automation checklist.
     # -----------------------------------------------------------------------
     displayHostManualInstructions = lib.hm.dag.entryAfter [
-      # gitIdentityFromSops, gpgImport, and sshKeyAdopt are defined in
-      # secrets.nix (shared module) but run as Home Manager activations on this
-      # host; include them here so manual instructions are always the final
-      # output after all activation work.
+      # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
+      # are defined in secrets.nix (shared module) but run as Home Manager
+      # activations on this host; include them here so manual instructions
+      # are always the final output after all activation work.
       "gitIdentityFromSops"
       "gpgImport"
       "sshKeyAdopt"
+      "verifySecretDecryption"
       "wallpaperProvision"
     ] ''
       echo "--- MANUAL SETUP (one-time, required) ---" >&2

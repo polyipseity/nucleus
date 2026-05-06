@@ -2,9 +2,10 @@
 #
 # All decryption is delegated to sops-nix (sops.secrets). Imperative activation
 # hooks handle side-effects that have no declarative equivalent:
-#   - gpgImport:        imports the managed GPG key and enforces ownertrust
-#   - gitIdentityFromSops: writes git name/email/signingkey from SOPS payload
-#   - sshKeyAdopt:      tracks the SSH key fingerprint; flushes agent on rotation
+#   - gpgImport:              imports the managed GPG key and enforces ownertrust
+#   - gitIdentityFromSops:    writes git name/email/signingkey from SOPS payload
+#   - sshKeyAdopt:            tracks the SSH key fingerprint; flushes agent on rotation
+#   - verifySecretDecryption: post-activation health check for each decryption backend
 #
 # Required SOPS file format (flat top-level keys):
 #
@@ -363,4 +364,113 @@ lib.mkIf isPrimaryUser {
       fi
     fi
   '';
+
+  # --------------------------------------------------------------------------
+  # verifySecretDecryption
+  # Post-activation health check that verifies each secret decryption backend
+  # is operational after gpgImport and sshKeyAdopt have completed.
+  #
+  # Five checks (in order):
+  #   1. Materialization sanity: all sops-nix secret paths exist and are
+  #      non-empty.  Guards against silent sops-nix failures.
+  #   2. GPG key presence: managed primary fingerprint is in the keyring.
+  #      Complements gpgImport — catches keyring state divergence.
+  #   3. GPG SOPS end-to-end: run sops --decrypt on gpg-personal.yml with
+  #      age keys disabled (SOPS_AGE_KEY_FILE=/dev/null) and an isolated HOME
+  #      so sops cannot find a stray keys.txt; only the GPG recipient can
+  #      succeed.  Hard error — GPG is the last-resort global backup.
+  #   4. Personal SSH age-backend SOPS end-to-end: convert the personal SSH
+  #      private key to an age private key (via ssh-to-age), then sops
+  #      --decrypt ssh-personal.yml with an empty GNUPGHOME so only the age
+  #      recipient is attempted.  Hard error — the personal SSH key is the
+  #      designated personal backup age recipient in .sops.yaml.
+  #   5. Machine SSH host key existence: advisory warning if
+  #      /etc/ssh/ssh_host_ed25519_key is absent.  Warning-only because on
+  #      first bootstrap the host key may not yet be registered in .sops.yaml
+  #      (step 3 of the bootstrap docs at the top of this file).
+  #
+  # Why isolated HOME for sops subprocesses:
+  #   sops searches for age keys in the OS default config dir
+  #   (~/.config/sops/age/keys.txt on Linux, ~/Library/Application Support/…
+  #   on macOS) in addition to SOPS_AGE_KEY_FILE.  Setting HOME to a temp dir
+  #   prevents sops from finding stray keys.txt, keeping each test isolated.
+  #   GNUPGHOME is set explicitly so GPG still finds the managed keyring.
+  # --------------------------------------------------------------------------
+  home.activation.verifySecretDecryption =
+    lib.hm.dag.entryAfter [ "gitIdentityFromSops" "gpgImport" "sshKeyAdopt" ] ''
+      # --- 1. Materialization sanity check ---
+      for _vsd_path in \
+          "${config.sops.secrets.${sshSecretName}.path}" \
+          "${config.sops.secrets.${sshPublicSecretName}.path}" \
+          "${config.sops.secrets.${gpgSecretName}.path}" \
+          "${config.sops.secrets.${gitIdentitySecretName}.path}"; do
+        if [ ! -s "$_vsd_path" ]; then
+          echo "nucleus: ERROR — decrypted secret missing or empty at '$_vsd_path'." >&2
+          exit 1
+        fi
+      done
+
+      # --- 2. GPG key presence in keyring ---
+      _vsd_gpg_manifest="$HOME/.config/nucleus/managed-gpg-keys"
+      if [ ! -s "$_vsd_gpg_manifest" ]; then
+        echo "nucleus: ERROR — managed-gpg-keys manifest missing or empty; gpgImport may have failed." >&2
+        exit 1
+      fi
+      _vsd_managed_fpr="$(head -n1 "$_vsd_gpg_manifest")"
+      if ! GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
+          ${pkgs.gnupg}/bin/gpg --batch --list-secret-keys "$_vsd_managed_fpr" \
+          > /dev/null 2>&1; then
+        echo "nucleus: ERROR — managed GPG key $_vsd_managed_fpr not in keyring after gpgImport." >&2
+        exit 1
+      fi
+
+      # --- 3. GPG SOPS end-to-end check ---
+      _vsd_tmp_gpg_home="$(mktemp -d)"
+      _vsd_gpg_rc=0
+      HOME="$_vsd_tmp_gpg_home" \
+        GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
+        SOPS_AGE_KEY_FILE=/dev/null \
+        SOPS_AGE_KEY="" \
+        ${pkgs.sops}/bin/sops --decrypt \
+        "${toString ../secrets/gpg-personal.yml}" > /dev/null 2>&1 \
+        || _vsd_gpg_rc=$?
+      rm -rf "$_vsd_tmp_gpg_home"
+      if [ "$_vsd_gpg_rc" -ne 0 ]; then
+        echo "nucleus: ERROR — GPG SOPS decryption check failed (exit $_vsd_gpg_rc); managed GPG key may not be registered in .sops.yaml." >&2
+        exit 1
+      fi
+
+      # --- 4. Personal SSH age-backend SOPS end-to-end check ---
+      # Convert the personal SSH private key to age format so the sops age
+      # backend can use it.  GPG is disabled by pointing GNUPGHOME at an
+      # empty temp dir so only the age path is exercised.
+      _vsd_tmp_age_key="$(mktemp)"
+      _vsd_tmp_ssh_gnupg="$(mktemp -d)"
+      _vsd_tmp_ssh_home="$(mktemp -d)"
+      _vsd_ssh_rc=0
+      if ${pkgs.ssh-to-age}/bin/ssh-to-age -private-key \
+          -i "${sshPrivateKeyPath}" > "$_vsd_tmp_age_key" 2>/dev/null; then
+        HOME="$_vsd_tmp_ssh_home" \
+          GNUPGHOME="$_vsd_tmp_ssh_gnupg" \
+          SOPS_AGE_KEY_FILE="$_vsd_tmp_age_key" \
+          ${pkgs.sops}/bin/sops --decrypt \
+          "${toString ../secrets/ssh-personal.yml}" > /dev/null 2>&1 \
+          || _vsd_ssh_rc=$?
+      else
+        _vsd_ssh_rc=1
+      fi
+      rm -f "$_vsd_tmp_age_key"
+      rm -rf "$_vsd_tmp_ssh_gnupg" "$_vsd_tmp_ssh_home"
+      if [ "$_vsd_ssh_rc" -ne 0 ]; then
+        echo "nucleus: ERROR — personal SSH key age-backend SOPS decryption check failed; SSH key may not be registered in .sops.yaml as an age recipient." >&2
+        exit 1
+      fi
+
+      # --- 5. Machine SSH host key existence check (warning-only) ---
+      # Warning-only: on first bootstrap the host key may not yet be in .sops.yaml.
+      # See step 3 of the bootstrap docs at the top of this file.
+      if [ ! -f "/etc/ssh/ssh_host_ed25519_key" ]; then
+        echo "nucleus: warning — /etc/ssh/ssh_host_ed25519_key missing; this machine cannot be the primary SOPS age recipient until the host key is registered in .sops.yaml." >&2
+      fi
+    '';
 }
