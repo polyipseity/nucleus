@@ -1,4 +1,4 @@
-# nixos/desktop.nix — Multi-desktop archiving and file management ecosystem.
+# nixos/desktop.nix — Desktop, power management, and remote-access services.
 #
 # Enables both GNOME and KDE Plasma desktop managers with their respective
 # archive managers (File Roller and Ark) so users can switch between
@@ -6,6 +6,9 @@
 # The underlying p7zip engine is available system-wide.
 # Cross-platform context menu parity: both desktops include terminal opening
 # actions in file manager context menus (nautilus-open-terminal, dolphin).
+# Power management is declared here alongside the desktop services because
+# all three concerns (desktop environment, remote access, power posture) share
+# the same NixOS services layer.
 { lib, pkgs, ... }:
 {
   # Load the virtual KMS (vkms) kernel module to provide a software-only
@@ -65,6 +68,43 @@
 
   # Run auto-cpufreq as the managed NixOS power optimizer daemon.
   services.auto-cpufreq.enable = true;
+
+  # CPU governor profiles mirror macOS lowpowermode parity:
+  #   battery (lowpowermode=1 equivalent): powersave governor, prefer-power EPP,
+  #     turbo disabled — reduces heat and extends runtime when on battery.
+  #   charger (lowpowermode=0 equivalent): performance governor, prefer-performance
+  #     EPP, turbo auto — allows full CPU throughput when on AC power.
+  services.auto-cpufreq.settings = {
+    battery = {
+      energy_performance_preference = "power";
+      governor = "powersave";
+      turbo = "never";
+    };
+    charger = {
+      energy_performance_preference = "performance";
+      governor = "performance";
+      turbo = "auto";
+    };
+  };
+
+  # logind lid-close behaviour: keep the machine awake on external power with
+  # lid closed so remote-desktop sessions are not disconnected when docked or
+  # used in clamshell mode.  Default (suspend) is preserved on battery because
+  # battery-powered clamshell is not a remote-access scenario.
+  services.logind.extraConfig = ''
+    HandleLidSwitchExternalPower=ignore
+  '';
+
+  # TCP keepalive parity: maintain persistent SSH tunnels and remote-desktop
+  # connections through idle periods.  Mirrors macOS pmset tcpkeepalive=1.
+  #   tcp_keepalive_time:   60 s before the first keepalive probe is sent.
+  #   tcp_keepalive_intvl:  10 s between subsequent probes.
+  #   tcp_keepalive_probes:  6 consecutive failures before the connection is dropped.
+  boot.kernel.sysctl = {
+    "net.ipv4.tcp_keepalive_intvl" = 10;
+    "net.ipv4.tcp_keepalive_probes" = 6;
+    "net.ipv4.tcp_keepalive_time" = 60;
+  };
 
   # xrdp provides a standard RDP (Remote Desktop Protocol) server so this host
   # can be reached from any RDP client (Windows built-in Remote Desktop,
