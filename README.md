@@ -20,6 +20,7 @@ nucleus/
 │   ├── assets/
 │   │   └── wallpapers/  *.sops
 │   ├── secrets/
+│   │   ├── git-identities.yml
 │   │   ├── gpg-personal.yml
 │   │   └── ssh-personal.yml
 │   ├── hosts/
@@ -205,6 +206,7 @@ recipient.
 5. Rewrap all encrypted files so the new machine can decrypt:
 
    ```bash
+   sops updatekeys src/secrets/git-identities.yml
    sops updatekeys src/secrets/gpg-personal.yml
    sops updatekeys src/secrets/ssh-personal.yml
    for f in src/assets/wallpapers/*.sops; do
@@ -221,6 +223,7 @@ recipient.
 2. Rewrap all encrypted files so removed recipients lose access:
 
    ```bash
+   sops updatekeys src/secrets/git-identities.yml
    sops updatekeys src/secrets/gpg-personal.yml
    sops updatekeys src/secrets/ssh-personal.yml
    for f in src/assets/wallpapers/*.sops; do

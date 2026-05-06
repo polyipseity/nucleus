@@ -48,6 +48,10 @@ available. At the same time, preserve high-signal visibility defaults (for
 example hidden files, file extensions, status/path bars, and explicit metadata)
 unless there is a concrete host constraint.
 
+Typography is also a parity category: prefer a shared open-source font baseline
+(Latin sans/serif/monospace + Nerd Font + CJK) across macOS, NixOS, and
+Windows when practical.
+
 ## Where to implement
 
 - **POSIX shared behavior** (applies to both macOS and NixOS):

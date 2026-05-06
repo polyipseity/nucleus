@@ -28,6 +28,7 @@ applyTo: "src/**/*.nix"
   - `gnupg.nix` — nix-darwin GnuPG agent (guarded by option presence check).
   - `home.nix` — Home Manager entrypoint; imports all shared feature modules.
   - `editors.nix` — VS Code settings and extension management.
+  - `fonts.nix` — open-source font baseline (Latin + Nerd Font + CJK) for POSIX hosts.
   - `linux.nix` — GNOME/dconf parity settings for Linux Home Manager sessions.
   - `macos.nix` — macOS Home Manager activation hooks and user-session hardening.
   - `posix-base.nix` — shared system-layer defaults (flakes, zsh) for both
@@ -90,6 +91,12 @@ applyTo: "src/**/*.nix"
   concrete reason to reduce visibility.
 - If a hide/auto-hide configuration is used, add a short WHY comment beside the
   setting and name the alternate access path.
+
+## Open-source typography baseline
+
+- Keep typography declarative and open-source only across Nix modules.
+- Prefer one shared inventory that covers Latin sans/serif/monospace,
+  Nerd Font terminal iconography, and CJK (Simplified + Traditional) coverage.
 
 ## Module conventions
 

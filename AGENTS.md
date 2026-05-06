@@ -154,6 +154,10 @@
   hidden files, status/path bars, and explicit file metadata) unless there is a
   concrete reason not to. When hiding anything that can affect discoverability
   or safety, add a short WHY comment and note the alternate access path.
+- **Open-source font baseline**: keep cross-host typography declarative and
+  open-source only. Provide shared Latin sans/serif/monospace + Nerd Font
+  coverage and CJK coverage (Simplified + Traditional) across macOS, NixOS,
+  and Windows using one canonical font inventory.
 
 ## Package Management Strategy
 
@@ -233,6 +237,10 @@ Darwin bridge symlinks only apply when the backend resolves to Homebrew.
   macOS 15 or newer because entitlement enforcement breaks it. Prefer the
   `battery` app/CLI workflow for maintaining an 80% charge cap on Apple
   Silicon hosts.
+- **Artifact Suppression Invariant (macOS)** — keep
+  `com.apple.desktopservices.DSDontWriteNetworkStores = true` and
+  `com.apple.desktopservices.DSDontWriteUSBStores = true` in declarative
+  defaults to suppress `.DS_Store` creation on network and removable volumes.
 
 ### Security Invariants (Windows)
 
