@@ -1,2 +1,7 @@
 # self {
 # }
+
+# Nix build result symlinks created by `nix build` or `darwin-rebuild switch`.
+# These point into /nix/store and must never be committed.
+result
+result-*
