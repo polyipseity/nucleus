@@ -52,6 +52,12 @@
     # Battery efficiency daemon: dynamic governor tuning based on AC/battery
     # state gives better laptop efficiency without hard-coding static CPU caps.
     auto-cpufreq
+
+    # Remote-desktop clients for outbound access from this host.
+    # Parsec is used for low-latency GPU-accelerated remote gaming/work sessions.
+    # Chrome Remote Desktop is not available as a nixpkgs package; see MANUAL.md
+    # for the one-time browser-extension setup required for inbound CRD access.
+    parsec-bin
   ];
 
   # Enable GNOME services if GNOME is enabled above.
@@ -59,4 +65,19 @@
 
   # Run auto-cpufreq as the managed NixOS power optimizer daemon.
   services.auto-cpufreq.enable = true;
+
+  # xrdp provides a standard RDP (Remote Desktop Protocol) server so this host
+  # can be reached from any RDP client (Windows built-in Remote Desktop,
+  # Microsoft Remote Desktop for macOS, Remmina, etc.).
+  # defaultWindowManager starts a GNOME session per xrdp connection; each
+  # connection gets its own isolated X11 session rather than sharing the console
+  # session, which avoids input conflicts when multiple remote sessions are
+  # active simultaneously.
+  # openFirewall = true opens TCP 3389 in the NixOS firewall automatically;
+  # without this the RDP port would be blocked by the default deny policy.
+  services.xrdp = {
+    defaultWindowManager = "${pkgs.gnome-session}/bin/gnome-session";
+    enable = true;
+    openFirewall = true;
+  };
 }
