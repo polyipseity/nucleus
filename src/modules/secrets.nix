@@ -210,7 +210,10 @@ lib.mkIf isPrimaryUser {
   '';
 
   # --------------------------------------------------------------------------
-  # GPG import — the only remaining imperative activation step.
+  # gpgImport
+  # Imports the managed GPG private key from SOPS into the keyring and
+  # enforces ultimate ownertrust on the managed primary fingerprint.
+  #
   # Runs after sops-nix has materialized decrypted secret files.
   # gpg --import is idempotent, so repeated activations are safe.
   #
@@ -219,6 +222,21 @@ lib.mkIf isPrimaryUser {
   #   primary key and always enforce ultimate ownertrust for that fingerprint.
   #   This keeps trust state deterministic even when the key material was
   #   manually imported before the first IaC-run import.
+  #
+  # Managed-key cleanup:
+  #   We maintain a manifest at ~/.config/nucleus/managed-gpg-keys (one
+  #   fingerprint per line) recording every primary fingerprint OUR activation
+  #   has ever imported.  On each run:
+  #     1. Compute current_fpr from the SOPS secret (dry-run, before import).
+  #     2. For every fingerprint in the manifest that differs from current_fpr,
+  #        delete that key from the keyring.  This removes keys that were
+  #        managed by us but have since been rotated out of the SOPS secret.
+  #     3. Import the current key and set ownertrust.
+  #     4. Write current_fpr to the manifest.
+  #   Keys never added to the manifest (user-imported manually) are never
+  #   touched.  If the manifest is absent (first run or manually deleted) step
+  #   2 is a no-op, which is always safe.  If current_fpr cannot be determined
+  #   (dry-run failed), step 2 is also skipped to prevent accidental purge.
   #
   # NOTE: GnuPG 2.5 + Kyber private key import currently fails with
   # `--batch` (`IPC parameter error`) on this key format. We intentionally use
@@ -234,7 +252,31 @@ lib.mkIf isPrimaryUser {
       exit 1
     fi
 
+    # Extract the primary fingerprint from the managed secret without importing.
+    # The `exit` in awk stops at the first fpr record, giving the primary key
+    # fingerprint rather than a subkey fingerprint.
     first_key_fingerprint="$(${pkgs.gnupg}/bin/gpg --batch --import-options show-only --dry-run --with-colons --import "${config.sops.secrets.${gpgSecretName}.path}" 2>/dev/null | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')"
+
+    # Remove stale managed keys: those we imported previously (per manifest)
+    # that are no longer the current managed key.  Guard on a non-empty
+    # first_key_fingerprint so a dry-run parse failure never triggers deletion.
+    nucleus_config_dir="$HOME/.config/nucleus"
+    managed_keys_manifest="$nucleus_config_dir/managed-gpg-keys"
+    if [ -n "$first_key_fingerprint" ] && [ -f "$managed_keys_manifest" ]; then
+      while IFS= read -r stale_fpr; do
+        [ -z "$stale_fpr" ] && continue
+        if [ "$stale_fpr" != "$first_key_fingerprint" ]; then
+          # Only delete if the key is actually present in the keyring.
+          if ${pkgs.gnupg}/bin/gpg --batch --list-secret-keys "$stale_fpr" >/dev/null 2>&1; then
+            if ! ${pkgs.gnupg}/bin/gpg --batch --yes --delete-secret-and-public-key "$stale_fpr"; then
+              echo "nucleus: warning — failed to delete stale managed GPG key $stale_fpr from keyring." >&2
+            else
+              echo "nucleus: deleted stale managed GPG key $stale_fpr." >&2
+            fi
+          fi
+        fi
+      done < "$managed_keys_manifest"
+    fi
 
     if ! ${pkgs.gnupg}/bin/gpg --import "${config.sops.secrets.${gpgSecretName}.path}"; then
       echo "nucleus: gpg import failed for ${gpgSecretName}." >&2
@@ -250,5 +292,10 @@ lib.mkIf isPrimaryUser {
       echo "nucleus: failed to enforce ultimate ownertrust for managed primary fingerprint $first_key_fingerprint." >&2
       exit 1
     fi
+
+    # Record the current managed fingerprint so the next activation can identify
+    # and clean up stale keys if the managed key is rotated in the future.
+    mkdir -p "$nucleus_config_dir"
+    printf '%s\n' "$first_key_fingerprint" > "$managed_keys_manifest"
   '';
 }
