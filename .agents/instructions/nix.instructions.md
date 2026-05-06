@@ -126,7 +126,50 @@ applyTo: "src/**/*.nix"
   `purge-managed-user-preferences` and must not be wired into automatic
   `home.activation.*` execution.
 
-## Host manual-step activation invariant
+## macOS pmset power policy
+
+`src/hosts/macbook/activation.nix` `configureBatteryPolicy` owns the full
+declarative pmset posture.  The target state verified against
+`pmset -g custom` output is:
+
+| Flag | Scope | Value | Rationale |
+|---|---|---|---|
+| `standby` | `-a` | `1` | Transition to deep standby after extended sleep |
+| `ttyskeepawake` | `-a` | `1` | Prevent sleep while a network tty (SSH/ARD) is active |
+| `hibernatemode` | `-a` | `3` | Safe-sleep: write RAM image before sleep (mirrors hybrid sleep) |
+| `hibernatefile` | `-a` | `/var/vm/sleepimage` | Canonical safe-sleep image path |
+| `networkoversleep` | `-a` | `0` | Suppress background network during sleep; wake handled by `womp` |
+| `tcpkeepalive` | `-a` | `1` | Issue TCP keepalives through sleep to maintain SSH/RDP tunnels |
+| `powernap` | `-a` | `1` | Allow background mail/calendar sync during Power Nap |
+| `lidwake` | `-a` | `1` | Wake on lid open |
+| `lowpowermode` | `-c` | `0` | Full performance on AC |
+| `displaysleep` | `-c` | `1` | 1-minute display sleep on AC |
+| `sleep` | `-c` | `0` | No idle system sleep on AC (remote access must survive) |
+| `disksleep` | `-c` | `0` | No disk sleep on AC |
+| `womp` | `-c` | `1` | Wake-on-Ethernet LAN on AC only (see below) |
+| `lowpowermode` | `-b` | `1` | Reduce CPU/GPU on battery |
+| `displaysleep` | `-b` | `1` | 1-minute display sleep on battery |
+| `sleep` | `-b` | `0` | No idle system sleep on battery (remote sessions must survive) |
+| `disksleep` | `-b` | `0` | No disk sleep on battery |
+| `lessbright` | `-b` | `1` | Dim display on battery (when hardware supports it) |
+
+**Invariants to preserve:**
+
+- `womp` is **AC-only**: the NIC requires sustained AC power to listen for
+  magic packets during sleep; do not attempt to set `womp` on `-b`.
+- `displaysleep` and `disksleep` **are settable on battery even with
+  `lowpowermode=1`**.  Do not add claims that macOS overrides these values
+  when low-power mode is active — `pmset -g custom` empirically proves they
+  are honoured.
+- Set `lowpowermode` per source **before** applying per-source timer values so
+  that any OS preset adjustments from `lowpowermode` activation are then
+  overridden by the explicit values.
+- `pmset_supports` uses `2>/dev/null` on `pmset -g cap` to suppress non-zero
+  exit noise from unsupported capabilities (grep handles the boolean result).
+  This suppression is intentional and accompanied by a WHY comment; any real
+  `pmset` write failure surfaces separately via `apply_pmset`.
+
+
 
 - Both POSIX hosts must keep `home.activation.displayHostManualInstructions`
   as the **terminal node** of the Home Manager activation DAG, so operators
