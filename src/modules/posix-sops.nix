@@ -1,8 +1,8 @@
 # modules/posix-sops.nix — Shared SOPS decryption key sources for POSIX hosts.
-{ pkgs, username, ... }:
-{
+{ pkgs, lib, username, ... }:
+let
   # ---------------------------------------------------------------------------
-  # deriveHostAgeKey
+  # deriveHostAgeKey script text
   # Derives the age secret identity from the machine's SSH host key and writes
   # it to /etc/sops/age/machine.txt so the Home Manager sops-nix instance can
   # decrypt SOPS secrets without requiring root privileges.
@@ -25,7 +25,7 @@
   #   produce identical output.  We always overwrite to keep the file current
   #   if the host key is ever rotated.
   # ---------------------------------------------------------------------------
-  system.activationScripts.deriveHostAgeKey.text = ''
+  deriveHostAgeKeyText = ''
     age_dir="/etc/sops/age"
     age_key_file="$age_dir/machine.txt"
     host_ssh_key="/etc/ssh/ssh_host_ed25519_key"
@@ -51,6 +51,29 @@
       fi
     fi
   '';
+in
+{
+  # ---------------------------------------------------------------------------
+  # Activation script wiring — platform-conditional
+  #
+  # nix-darwin (macOS): activation-scripts.nix assembles only a hardcoded list
+  # of named scripts into the activate binary; any name outside that list is
+  # silently ignored.  The supported user extension points are:
+  #   extraActivation  — runs after createRun, before openssh
+  #   postActivation   — runs after homebrew (last hook before HM)
+  # deriveHostAgeKey reads /etc/ssh/ssh_host_ed25519_key which is written by
+  # the openssh step, so it must go in postActivation.  lib.mkBefore ensures
+  # this fragment is prepended before home-manager's HM activation call, which
+  # is also appended to postActivation.text at default priority.
+  #
+  # NixOS: system.activationScripts assembles ALL named scripts in topological
+  # order, so a custom name works correctly.
+  # ---------------------------------------------------------------------------
+  system.activationScripts = if pkgs.stdenv.isDarwin then {
+    postActivation.text = lib.mkBefore deriveHostAgeKeyText;
+  } else {
+    deriveHostAgeKey.text = deriveHostAgeKeyText;
+  };
 
   sops = {
     age = {

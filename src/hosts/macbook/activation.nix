@@ -1,9 +1,18 @@
-# macbook/activation.nix — nix-darwin system.activationScripts for the MacBook.
+# macbook/activation.nix — nix-darwin system activation hooks for the MacBook.
 #
 # All scripts run as root during `darwin-rebuild switch`.  Because
 # system.activationScripts is a nix-darwin-only option they are guaranteed to
 # execute on macOS; no OS check inside the shell body is needed.
-{ ... }:
+#
+# WHY postActivation.text, not custom script names:
+#   nix-darwin's activation-scripts.nix (rev 8c62fba) assembles only a fixed
+#   hardcoded list of named scripts into the activate binary.  Any name outside
+#   that list (e.g. configureBatteryPolicy, enableScreenSharing) is silently
+#   ignored.  The user extension points are extraActivation (before openssh)
+#   and postActivation (after homebrew, last before the gc-root symlink).
+#   lib.mkBefore ensures these fragments are prepended before home-manager's
+#   HM activation call, which is also appended to postActivation.text.
+{ lib, ... }:
 {
   # ---------------------------------------------------------------------------
   # Declarative power-management settings handled by nix-darwin's power module.
@@ -21,34 +30,46 @@
   # power.restartAfterPowerFailure = true;  # Keep the comment and keep it disabled.
 
   # ---------------------------------------------------------------------------
-  # configureBatteryPolicy
-  # Enforce pmset values directly for AC and battery because newer macOS
-  # releases can ignore or partially override higher-level power options.
+  # postActivation fragments (all macbook-specific activation scripts)
   #
-  # Invariant:
-  #   Global (-a): standby=1, ttyskeepawake=1, hibernatemode=3, networkoversleep=0,
-  #     tcpkeepalive=1, powernap=1, lidwake=1, hibernatefile=/var/vm/sleepimage
-  #   AC (-c): displaysleep=1, sleep=0, disksleep=0, womp=1, lowpowermode=0
-  #   Battery (-b): displaysleep=1, sleep=0, disksleep=0, womp=1, lowpowermode=1,
-  #     lessbright=1 (when supported)
+  # lib.mkBefore (priority 500) positions these fragments before the
+  # home-manager activation call that nix-darwin appends to postActivation.text
+  # at default priority 1000.  Each logical section is separated by a shell
+  # comment banner for readability in the assembled activate script.
   #
-  # womp=1 on both AC and battery: empirical pmset -g custom output confirms
-  # the machine honours womp on battery; setting it on both sources ensures
-  # inbound magic-packet wakes succeed regardless of power source.
-  #
-  # sleep=0 on battery: remote-desktop sessions (Chrome Remote Desktop, VNC/ARD,
-  # SSH) must survive when the machine is on battery.  Idle sleep would
-  # disconnect active sessions and prevent new inbound connections.
-  #
-  # displaysleep and disksleep are declared on both sources even with
-  # lowpowermode=1 active on battery.  Empirical testing (pmset -g custom)
-  # confirms all three battery values are honoured when applied after the
-  # lowpowermode preset is set.
-  #
-  # The helper emits a clear error when any write fails so a mis-typed key
-  # does not silently leave a stale policy in place.
+  # Scripts included:
+  #   configureBatteryPolicy           — pmset AC/battery policy
+  #   configureChargeLimit             — 80 % charge cap via battery CLI / bclm
+  #   configureMissionControlSpansDisplays — spans-displays per-user pref
+  #   configureMonitorColorProfile     — clear ColorSync device cache
   # ---------------------------------------------------------------------------
-  system.activationScripts.configureBatteryPolicy.text = ''
+  system.activationScripts.postActivation.text = lib.mkBefore ''
+    # ---- configureBatteryPolicy ------------------------------------------------
+    # Enforce pmset values directly for AC and battery because newer macOS
+    # releases can ignore or partially override higher-level power options.
+    #
+    # Invariant:
+    #   Global (-a): standby=1, ttyskeepawake=1, hibernatemode=3, networkoversleep=0,
+    #     tcpkeepalive=1, powernap=1, lidwake=1, hibernatefile=/var/vm/sleepimage
+    #   AC (-c): displaysleep=1, sleep=0, disksleep=0, womp=1, lowpowermode=0
+    #   Battery (-b): displaysleep=1, sleep=0, disksleep=0, womp=1, lowpowermode=1,
+    #     lessbright=1 (when supported)
+    #
+    # womp=1 on both AC and battery: empirical pmset -g custom output confirms
+    # the machine honours womp on battery; setting it on both sources ensures
+    # inbound magic-packet wakes succeed regardless of power source.
+    #
+    # sleep=0 on battery: remote-desktop sessions (Chrome Remote Desktop, VNC/ARD,
+    # SSH) must survive when the machine is on battery.  Idle sleep would
+    # disconnect active sessions and prevent new inbound connections.
+    #
+    # displaysleep and disksleep are declared on both sources even with
+    # lowpowermode=1 active on battery.  Empirical testing (pmset -g custom)
+    # confirms all three battery values are honoured when applied after the
+    # lowpowermode preset is set.
+    #
+    # The helper emits a clear error when any write fails so a mis-typed key
+    # does not silently leave a stale policy in place.
     apply_pmset() {
       if ! /usr/bin/pmset "$@"; then
         echo "nucleus: failed to apply pmset settings: $*" >&2
@@ -112,21 +133,17 @@
         apply_pmset -b lessbright 1
       fi
     fi
-  '';
 
-  # ---------------------------------------------------------------------------
-  # configureChargeLimit
-  # Keep charge capped at 80 % to reduce long-term battery wear on a mostly
-  # docked development machine.
-  #
-  # On macOS 15+, bclm no longer works due kernel entitlement enforcement.
-  # Prefer the maintained `battery` CLI (installed by the `battery` cask) and
-  # run it as the active console user so user-scoped launch-agent state stays
-  # in that user's home directory.
-  #
-  # bclm is retained as a fallback only for older macOS versions.
-  # ---------------------------------------------------------------------------
-  system.activationScripts.configureChargeLimit.text = ''
+    # ---- configureChargeLimit --------------------------------------------------
+    # Keep charge capped at 80 % to reduce long-term battery wear on a mostly
+    # docked development machine.
+    #
+    # On macOS 15+, bclm no longer works due kernel entitlement enforcement.
+    # Prefer the maintained `battery` CLI (installed by the `battery` cask) and
+    # run it as the active console user so user-scoped launch-agent state stays
+    # in that user's home directory.
+    #
+    # bclm is retained as a fallback only for older macOS versions.
     console_user="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     macos_major="$(/usr/bin/sw_vers -productVersion 2>/dev/null | /usr/bin/awk -F. '{print $1}')"
 
@@ -159,21 +176,17 @@
     else
       echo "nucleus: no supported battery charge-limit tool found (expected /usr/local/bin/battery or /opt/homebrew/bin/bclm)." >&2
     fi
-  '';
 
-  # ---------------------------------------------------------------------------
-  # configureMissionControlSpansDisplays
-  # Forces Mission Control to span desktops across displays for the currently
-  # logged-in console user.  Applying this from system activation ensures the
-  # preference is re-asserted after migrations and major macOS updates that
-  # sometimes reset com.apple.spaces user defaults.
-  #
-  # Algorithm:
-  #   1. Resolve the active console UID from /dev/console.
-  #   2. Skip when no non-root GUI session is present (e.g. headless rebuild).
-  #   3. Use launchctl asuser to write the per-user defaults domain as that user.
-  # ---------------------------------------------------------------------------
-  system.activationScripts.configureMissionControlSpansDisplays.text = ''
+    # ---- configureMissionControlSpansDisplays ----------------------------------
+    # Forces Mission Control to span desktops across displays for the currently
+    # logged-in console user.  Applying this from system activation ensures the
+    # preference is re-asserted after migrations and major macOS updates that
+    # sometimes reset com.apple.spaces user defaults.
+    #
+    # Algorithm:
+    #   1. Resolve the active console UID from /dev/console.
+    #   2. Skip when no non-root GUI session is present (e.g. headless rebuild).
+    #   3. Use launchctl asuser to write the per-user defaults domain as that user.
     console_uid="$(/usr/bin/stat -f%u /dev/console 2>/dev/null || true)"
 
     if [ -z "$console_uid" ] || [ "$console_uid" -eq 0 ]; then
@@ -183,16 +196,12 @@
         echo "nucleus: failed to enable Mission Control spans-displays for console uid $console_uid." >&2
       fi
     fi
-  '';
 
-  # ---------------------------------------------------------------------------
-  # configureMonitorColorProfile
-  # Clears the ColorSync device-profile cache so that newly connected monitors
-  # re-trigger profile detection and pick up the correct ICC profile.
-  # A missing key is expected on fresh installs, but we still log that state
-  # explicitly instead of suppressing errors.
-  # ---------------------------------------------------------------------------
-  system.activationScripts.configureMonitorColorProfile.text = ''
+    # ---- configureMonitorColorProfile ------------------------------------------
+    # Clears the ColorSync device-profile cache so that newly connected monitors
+    # re-trigger profile detection and pick up the correct ICC profile.
+    # A missing key is expected on fresh installs, but we still log that state
+    # explicitly instead of suppressing errors.
     if ! /usr/bin/defaults delete /Library/Preferences/com.apple.ColorSync.DeviceCache; then
       echo "nucleus: ColorSync device cache key absent; skipping delete." >&2
     fi
