@@ -36,6 +36,10 @@ function Sync-NucleusSecretFile {
       Imported into the current GPG keyring via stdin (`gpg --batch --import -`).
       No temporary plaintext files are created.
 
+    git_identity_${username}
+      Written to $HOME\.config\nucleus\git-identity.env so Git identity can be
+      converged from SOPS-managed values instead of static mappings.
+
     $HOME\.ssh is created if it does not already exist.
 
   .PARAMETER FilePath
@@ -89,6 +93,9 @@ function Sync-NucleusSecretFile {
 
   $secretFileInfo = Get-Item -Path $FilePath
   $gpgSecretName = "gpg_personal_$PrimaryUsername"
+  $gitIdentityConfigDir = Join-Path -Path $HOME -ChildPath ".config\nucleus"
+  $gitIdentityPath = Join-Path -Path $gitIdentityConfigDir -ChildPath "git-identity.env"
+  $gitIdentitySecretName = "git_identity_$PrimaryUsername"
   $sshDir = Join-Path -Path $HOME -ChildPath ".ssh"
   $sshPublicSecretName = "ssh_personal_${PrimaryUsername}_pub"
   $sshRsaPublicSecretName = "ssh_personal_${PrimaryUsername}_rsa_pub"
@@ -97,6 +104,10 @@ function Sync-NucleusSecretFile {
 
   if (-not (Test-Path -Path $sshDir)) {
     New-Item -ItemType Directory -Path $sshDir -Force | Out-Null
+  }
+
+  if (-not (Test-Path -Path $gitIdentityConfigDir)) {
+    New-Item -ItemType Directory -Path $gitIdentityConfigDir -Force | Out-Null
   }
 
   Write-Host "Processing secrets from: $($secretFileInfo.Name)" -ForegroundColor Cyan
@@ -196,6 +207,21 @@ function Sync-NucleusSecretFile {
       }
 
       Write-Host "  Imported GPG material: $gpgSecretName" -ForegroundColor Cyan
+    }
+  }
+
+  if ($null -ne $jsonSecrets.PSObject.Properties[$gitIdentitySecretName]) {
+    $gitIdentityValue = [string]$jsonSecrets.$gitIdentitySecretName
+    $existingIdentityValue = if (Test-Path -Path $gitIdentityPath) {
+      Get-Content -Path $gitIdentityPath -Raw
+    }
+    else {
+      ""
+    }
+
+    if ($existingIdentityValue -ne $gitIdentityValue) {
+      $gitIdentityValue | Out-File -FilePath $gitIdentityPath -Encoding ascii -NoNewline
+      Write-Host "  Updated Git identity payload: $gitIdentitySecretName" -ForegroundColor Cyan
     }
   }
 }
