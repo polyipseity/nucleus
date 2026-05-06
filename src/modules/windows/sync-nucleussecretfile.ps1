@@ -174,10 +174,12 @@ function Sync-NucleusSecretFile {
           ''
         }
 
-        if ($oldSshFingerprint -ne '' -and $oldSshFingerprint -ne $newSshFingerprint) {
-          # Key was rotated: flush SSH agent so stale cached keys are removed.
-          # Soft-failure so apply proceeds even when no agent is running.
-          # Parity with POSIX sshKeyAdopt behavior.
+        if ($oldSshFingerprint -ne $newSshFingerprint) {
+          # Flush SSH agent when fingerprint changes, including on first provision
+          # (absent manifest → empty $oldSshFingerprint differs from new key).
+          # This evicts any pre-placed key already loaded in the agent before
+          # the managed key was materialized.  Soft-failure so apply proceeds
+          # even when no agent is running.  Parity with POSIX sshKeyAdopt behavior.
           $sshAddCommand = Get-Command 'ssh-add' -ErrorAction SilentlyContinue
           if ($null -ne $sshAddCommand) {
             & $sshAddCommand.Source -D 2>$null | Out-Null
