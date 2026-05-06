@@ -14,11 +14,14 @@ function Sync-NucleusPowerPolicy {
       - AC display timeout: 1 minute (matches macOS pmset -c displaysleep 1)
       - Battery display timeout: 1 minute (matches NixOS idle-delay = 60)
       - AC system sleep: Never (matches macOS/NixOS no-sleep-on-AC for remote access)
-      - Battery system sleep: 1 minute (matches macOS/NixOS for parity)
+      - Battery system sleep: Never (disabled so remote-desktop sessions survive on battery)
 
-    This parity ensures that development machines prioritize responsive remote
-    access and background-task continuity on AC power, with aggressive display
-    and system shutdown when unplugged.
+    Battery system sleep is set to Never so remote-desktop sessions (Chrome
+    Remote Desktop, Windows built-in RDP, Parsec) are not disconnected when the
+    machine is on battery.  Sleeping on battery breaks active sessions and
+    prevents new connections; keeping sleep disabled matches the always-on
+    posture of AC power and aligns with the three-protocol remote-desktop
+    baseline.
 
     When disabled, values are reset to Windows defaults:
       - AC display timeout: 10 minutes
@@ -52,7 +55,7 @@ function Sync-NucleusPowerPolicy {
     & $powercfg /change monitor-timeout-ac 1
     & $powercfg /change monitor-timeout-dc 1
     & $powercfg /change standby-timeout-ac 0
-    & $powercfg /change standby-timeout-dc 1
+    & $powercfg /change standby-timeout-dc 0
   }
   else {
     # Windows defaults: restore to standard Windows Home power scheme.
