@@ -113,6 +113,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-nucleussecrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "git-ssh.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleusjitsecretmaterialization.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleussecretverification.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleuswingetconfiguration.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "power.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "rdp.ps1")
@@ -180,6 +181,18 @@ if ($EnableSecretsParity) {
 else {
   Remove-NucleusManagedSecrets -PrimaryUsername $PrimaryUsername
 }
+
+# Post-materialization health check: verify all SOPS files are decryptable by
+# both the GPG and personal SSH age backends, and that managed artefacts exist.
+# Mirrors the POSIX verifySecretDecryption Home Manager activation.
+Invoke-NucleusSecretVerification `
+  -GpgExe $gpgExe `
+  -HostKeyPath $machineSshHostKeyPath `
+  -PrimaryUsername $PrimaryUsername `
+  -PrimarySshKeyPath $primarySshKeyPath `
+  -SecretsDir $secretsDir `
+  -SopsExe $sopsExe `
+  -WallpaperAssetsDir $wallpaperAssetsDir
 
 # Materialize decrypted wallpapers ahead of DSC so user.dsc.yml can resolve an
 # explicit active wallpaper path deterministically.
