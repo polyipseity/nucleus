@@ -26,6 +26,7 @@ let
   #   direnv     — per-directory env loader (shell integration in shell.nix)
   #   eza        — modern ls with colour and icons
   #   fd         — fast find replacement
+  #   ffmpeg-full — multimedia processing and transcoding (GPL codecs; pre-built in nixos.org binary cache)
   #   fzf        — fuzzy finder used by shell widgets and neovim
   #   git        — version control
   #   gnupg      — GPG for secret management and signing
@@ -47,6 +48,7 @@ let
     pkgs.direnv
     pkgs.eza
     pkgs.fd
+    pkgs.ffmpeg-full
     pkgs.fzf
     pkgs.git
     pkgs.gnupg

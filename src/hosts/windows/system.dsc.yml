@@ -147,6 +147,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure FFmpeg is installed for cross-host multimedia processing and transcoding parity with macOS and NixOS; GPL build from gyan.dev includes comprehensive open-source codec support (x264, x265, AAC, Opus, and others)
+      settings:
+        id: Gyan.FFmpeg
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Inter is installed as the open-source sans-serif UI baseline (SIL OFL) for Windows font parity with POSIX hosts using pkgs.inter
       settings:
         id: Inter.Inter
