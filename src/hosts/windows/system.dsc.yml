@@ -21,6 +21,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Source Serif 4 is installed as the open-source serif baseline (SIL OFL) for Windows font parity with POSIX hosts using pkgs.source-serif
+      settings:
+        id: Adobe.SourceSerif4
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure zoxide is installed for cross-host shell navigation parity with macOS and NixOS
       settings:
         id: ajeetdsouza.zoxide
@@ -112,6 +119,41 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Noto Sans CJK SC is installed for Simplified Chinese sans-serif coverage on Windows, matching pkgs.noto-fonts-cjk-sans on POSIX hosts
+      settings:
+        id: Google.NotoSans.CJK.SC
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Noto Sans CJK TC is installed for Traditional Chinese sans-serif coverage on Windows, completing the Simplified+Traditional parity required by repository policy
+      settings:
+        id: Google.NotoSans.CJK.TC
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Noto Serif CJK SC is installed for Simplified Chinese serif coverage on Windows, matching pkgs.noto-fonts-cjk-serif on POSIX hosts
+      settings:
+        id: Google.NotoSerif.CJK.SC
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Noto Serif CJK TC is installed for Traditional Chinese serif coverage on Windows, completing the Simplified+Traditional parity required by repository policy
+      settings:
+        id: Google.NotoSerif.CJK.TC
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Inter is installed as the open-source sans-serif UI baseline (SIL OFL) for Windows font parity with POSIX hosts using pkgs.inter
+      settings:
+        id: Inter.Inter
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure prek is installed for cross-host pre-commit hook manager parity with macOS and NixOS
       settings:
         id: j178.Prek
@@ -196,13 +238,6 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Caskaydia Cove Nerd Font is installed from the open-source Nerd Fonts catalog to keep terminal glyph coverage declarative on Windows
-      settings:
-        id: ryanoasis.CaskaydiaCove
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
         description: Ensure SOPS is installed
       settings:
         id: SecretsOPerationS.SOPS
@@ -271,6 +306,45 @@ properties:
         valueName: LongPathsEnabled
         valueData: 1
         valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Substitute Courier New with JetBrains Mono so applications that
+          request the traditional monospace generic fall back to the open-source
+          coding baseline; mirrors the fontconfig defaultFonts.monospace
+          declaration on POSIX hosts
+      settings:
+        keyPath: HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontSubstitutes
+        valueName: Courier New
+        valueData: JetBrains Mono
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Substitute Helvetica with Inter so applications that request the
+          traditional Latin sans-serif generic fall back to the open-source UI
+          baseline; Helvetica is not present on Windows so this substitution
+          is safe and non-disruptive
+      settings:
+        keyPath: HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontSubstitutes
+        valueName: Helvetica
+        valueData: Inter
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Substitute Times New Roman with Source Serif 4 so applications that
+          request the traditional serif generic fall back to the open-source
+          document baseline; mirrors the fontconfig defaultFonts.serif
+          declaration on POSIX hosts
+      settings:
+        keyPath: HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontSubstitutes
+        valueName: Times New Roman
+        valueData: Source Serif 4
+        valueType: String
 
     - resource: Microsoft.Windows.Settings/Firewall
       directives:

@@ -42,8 +42,35 @@ in
 
     # Linux apps resolve fonts through fontconfig; enabling it keeps the
     # selected open-source families authoritative for CLI/GUI rendering parity.
+    # defaultFonts sets explicit priority so generic family queries (sans-serif,
+    # serif, monospace) resolve to our open-source baseline rather than
+    # whatever fontconfig picks by heuristic.  Noto CJK variants follow the
+    # Latin families so Latin characters use the canonical family and CJK
+    # characters fall through to the correct locale-specific Noto variant.
     (lib.optionalAttrs (options ? fonts && options.fonts ? fontconfig) {
       fonts.fontconfig.enable = true;
+      fonts.fontconfig.defaultFonts = {
+        monospace = [
+          # JetBrainsMono Nerd Font Mono is the narrowed variant from the NF
+          # package; it preserves cell-width expectations in terminal emulators
+          # while adding icon glyphs.
+          "JetBrainsMono Nerd Font Mono"
+          # Noto Sans Mono CJK provides monospace-metric CJK glyphs so CJK
+          # characters inside a terminal do not fall back to a proportional face.
+          "Noto Sans Mono CJK SC"
+          "Noto Sans Mono CJK TC"
+        ];
+        sansSerif = [
+          "Inter"
+          "Noto Sans CJK SC"
+          "Noto Sans CJK TC"
+        ];
+        serif = [
+          "Source Serif 4"
+          "Noto Serif CJK SC"
+          "Noto Serif CJK TC"
+        ];
+      };
     })
   ];
 }
