@@ -163,6 +163,20 @@
   as one aspect is complete and validated before beginning the next.  Never
   mix unrelated aspects in a single commit; reviewers and bisect depend on
   each commit being independently meaningful.
+- **No error hiding**: never use `2>/dev/null`, `>/dev/null 2>&1`,
+  unconditional `|| true` on a command that should succeed, PowerShell
+  `-ErrorAction SilentlyContinue`, or `2>$null` to silence meaningful
+  failures.  These patterns hide the root cause of bugs and make broken
+  activations appear successful.  Error suppression is only acceptable when
+  all three conditions hold: (1) the failure is genuinely expected and benign
+  in the specific context (for example `pgrep` existence probes or
+  `ssh-add -D` when no agent is running), (2) the suppression is accompanied
+  by an explicit inline comment stating WHY it is intentional, and (3) the
+  result or exit code is checked afterward so unexpected failures are still
+  caught.  Prefer `if ! cmd; then echo "..." >&2; fi` over bare `|| true`,
+  and place `|| true` outside command substitutions (`var=$(cmd) || true`)
+  rather than inside (`var=$(cmd 2>/dev/null || true)`) so stderr is never
+  discarded silently.
 
 ## Package Management Strategy
 
