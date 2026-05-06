@@ -165,9 +165,24 @@ lib.mkIf isPrimaryUser {
 
   # --------------------------------------------------------------------------
   # gitIdentityFromSops
-  # Reads SOPS-managed git_identity_<user> and writes global Git user identity
-  # and signing key non-interactively so identity stays in secret material
-  # rather than hard-coded module attrsets.
+  # Reads SOPS-managed git_identity_<user> and writes name/email/signingkey
+  # into ~/.config/git/identity so identity stays in secret material rather
+  # than hard-coded module attrsets.
+  #
+  # Why --file instead of --global:
+  #   Home Manager owns ~/.config/git/config as a symlink into the read-only
+  #   Nix store.  `git config --global` resolves to that path and fails with
+  #   "Permission denied" when it tries to lock the file.  Writing to a
+  #   separate include file avoids touching the HM-managed path entirely.
+  #   git.nix wires `include.path = ~/.config/git/identity` so git reads
+  #   the identity transparently.
+  #
+  # Algorithm:
+  #   1. Read the decrypted SOPS payload (key=value lines).
+  #   2. Validate all three required fields are non-empty.
+  #   3. Write them into ~/.config/git/identity via `git config --file`.
+  #      git config --file creates the file if absent and overwrites values
+  #      idempotently on repeated activation runs.
   # --------------------------------------------------------------------------
   home.activation.gitIdentityFromSops = lib.hm.dag.entryAfter [ "sops-nix" ] ''
     identity_path="${config.sops.secrets.${gitIdentitySecretName}.path}"
@@ -186,9 +201,12 @@ lib.mkIf isPrimaryUser {
       exit 1
     fi
 
-    ${pkgs.git}/bin/git config --global user.name "$identity_name"
-    ${pkgs.git}/bin/git config --global user.email "$identity_email"
-    ${pkgs.git}/bin/git config --global user.signingkey "$identity_signing_key"
+    # Write to the dedicated identity include file, not to the HM-managed config.
+    identity_file="$HOME/.config/git/identity"
+    mkdir -p "$(dirname "$identity_file")"
+    ${pkgs.git}/bin/git config --file "$identity_file" user.name "$identity_name"
+    ${pkgs.git}/bin/git config --file "$identity_file" user.email "$identity_email"
+    ${pkgs.git}/bin/git config --file "$identity_file" user.signingkey "$identity_signing_key"
   '';
 
   # --------------------------------------------------------------------------
