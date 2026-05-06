@@ -157,7 +157,11 @@
     done
 
     if [ -n "$battery_cli" ] && [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
-      if ! /usr/bin/sudo -u "$console_user" "$battery_cli" maintain 80; then
+      # -H sets HOME to the target user's home directory.  Without it, sudo
+      # inherits HOME=/var/root from the root activation context, causing
+      # battery to write its state files to /var/root/.battery/ which the
+      # console user cannot write to.
+      if ! /usr/bin/sudo -H -u "$console_user" "$battery_cli" maintain 80; then
         echo "nucleus: battery maintain 80 failed for user '$console_user'." >&2
       fi
     elif [ -x /opt/homebrew/bin/bclm ]; then
