@@ -168,10 +168,14 @@ function Invoke-NucleusSecretVerification {
        managed-key manifest files exist and are non-empty.
     2. GPG key presence: the managed primary fingerprint recorded in the
        managed-gpg-keys manifest is present in the GPG keyring.
-    3. GPG SOPS recipient check: searches each SOPS file's plaintext
-       sops.pgp[].fp metadata for the managed fingerprint.  The fp field is
-       always unencrypted regardless of file encryption, so no passphrase is
-       required.  Combined with check 2, this confirms GPG is registered.
+    3. GPG SOPS recipient check: extracts the fp: value from each SOPS
+       file's plaintext sops.pgp[].fp metadata and verifies that fingerprint
+       is present in the secret keyring.  SOPS records the encryption subkey
+       fingerprint rather than the primary key fingerprint in the fp: field;
+       comparing the primary fingerprint directly produces false failures when
+       SOPS chose a subkey (e.g., a Kyber encryption subkey).
+       Combined with check 2, this confirms GPG has the private key material
+       to decrypt once the passphrase is provided.
        Accumulates failures and reports all failing files.
        Hard error — GPG is the last-resort global backup.
     4. Personal SSH age recipient check: derives the age public key from the
@@ -288,16 +292,26 @@ function Invoke-NucleusSecretVerification {
 
   # -------------------------------------------------------------------------
   # 3. GPG SOPS recipient check for all SOPS files.
-  # Search each file's plaintext sops.pgp[].fp metadata for the managed
-  # fingerprint.  The fp field is always unencrypted, so no passphrase is
-  # required.  Combined with check 2, this confirms GPG is registered.
+  # Extract the fp: value from each file's unencrypted sops.pgp[].fp metadata
+  # and verify that fingerprint is present in the secret keyring.  SOPS records
+  # the encryption subkey fingerprint rather than the primary key fingerprint;
+  # comparing the primary fingerprint directly produces false failures when SOPS
+  # chose a subkey (e.g., a Kyber encryption subkey).  Combined with check 2,
+  # this confirms GPG has the private key material to decrypt.
   # -------------------------------------------------------------------------
   Write-Host "nucleus: [3/5] checking GPG recipient registration in all SOPS files..." -ForegroundColor Gray
   $gpgFailures = @()
   foreach ($sopsFile in $sopsTestFiles) {
-    $hasGpgRecipient = Select-String -Path $sopsFile -Pattern "fp: $managedFpr" -SimpleMatch -Quiet -ErrorAction SilentlyContinue
-    if (-not $hasGpgRecipient) {
+    $fpLine = Get-Content -Path $sopsFile | Where-Object { $_ -match '\s+fp:\s+\S' } | Select-Object -First 1
+    $sopsGpgFp = if ($fpLine) { ($fpLine.Trim() -split '\s+')[-1] } else { '' }
+    if ([string]::IsNullOrWhiteSpace($sopsGpgFp)) {
       $gpgFailures += [System.IO.Path]::GetFileName($sopsFile)
+    }
+    else {
+      $null = & $GpgExe --batch --list-secret-keys $sopsGpgFp 2>&1
+      if ($LASTEXITCODE -ne 0) {
+        $gpgFailures += [System.IO.Path]::GetFileName($sopsFile)
+      }
     }
   }
   if ($gpgFailures.Count -gt 0) {

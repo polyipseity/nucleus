@@ -386,11 +386,13 @@ lib.mkIf isPrimaryUser {
   #      non-empty.  Guards against silent sops-nix failures.
   #   2. GPG key presence: managed primary fingerprint is in the keyring.
   #      Complements gpgImport — catches keyring state divergence.
-  #   3. GPG SOPS recipient check: verify the managed primary fingerprint appears
-  #      in each SOPS file's plaintext sops.pgp[].fp metadata.  The fp field is
-  #      always unencrypted regardless of file encryption, so no passphrase is
-  #      required.  Combined with check 2 (key present in keyring), this confirms
-  #      GPG is registered and would succeed once the passphrase is available.
+  #   3. GPG SOPS recipient check: extract the fp: value from each SOPS file's
+  #      plaintext sops.pgp[].fp metadata and verify that fingerprint is present
+  #      in the secret keyring.  SOPS records the encryption subkey fingerprint
+  #      (not the primary key fingerprint) in the fp: field; comparing the primary
+  #      fingerprint directly produces false failures when SOPS chose a subkey.
+  #      Combined with check 2 (primary key in keyring), this confirms we have the
+  #      private key material to decrypt once the passphrase is provided.
   #      Accumulates failures, reports all failing files.
   #      Hard error — GPG is the last-resort global backup.
   #   4. Personal SSH age recipient check: derive the age public key from the
@@ -409,7 +411,7 @@ lib.mkIf isPrimaryUser {
   #   Generating static inline shell commands at Nix evaluation time avoids
   #   shell loops/arrays and keeps each invocation independently visible in
   #   the activation trace.  The Nix store paths for each SOPS file are
-  #   baked in at eval time; shell variables such as _vsd_managed_fpr and
+  #   baked in at eval time; shell variables such as _vsd_sops_gpg_fp and
   #   _vsd_ssh_age_pub are expanded at activation runtime.
   # --------------------------------------------------------------------------
   home.activation.verifySecretDecryption =
@@ -485,15 +487,23 @@ lib.mkIf isPrimaryUser {
 
       # --- 3. GPG SOPS recipient check for all SOPS files ---
       # Rather than live-decrypting with GPG (which requires the private key
-      # passphrase and fails non-interactively), verify that the managed GPG
-      # fingerprint appears in each SOPS file's plaintext sops.pgp[].fp metadata.
-      # The fp field is always unencrypted regardless of file encryption.  Combined
-      # with check 2 (key present in keyring), this confirms GPG is registered and
-      # would succeed once the passphrase is available.
+      # passphrase and fails non-interactively), extract the fp: value from each
+      # SOPS file's plaintext sops.pgp[].fp metadata (always unencrypted) and
+      # verify that fingerprint is present in our secret keyring.  SOPS records
+      # the encryption SUBKEY fingerprint in the fp: field, not the primary key
+      # fingerprint, so comparing the primary fingerprint directly produces false
+      # failures when SOPS chose a subkey (e.g., a Kyber encryption subkey).
+      # Combined with check 2 (primary key in keyring), this confirms we have the
+      # private key material to decrypt once the passphrase is provided.
       _vsd_gpg_failures=""
       ${lib.concatMapStrings ({ path, displayName }: ''
-        /usr/bin/grep -q "fp: $_vsd_managed_fpr" "${toString path}" \
-          || _vsd_gpg_failures="$_vsd_gpg_failures ${displayName}"
+        _vsd_sops_gpg_fp="$(/usr/bin/grep -m1 '[[:space:]]fp: ' "${toString path}" | /usr/bin/awk '{print $NF}')"
+        if [ -z "$_vsd_sops_gpg_fp" ] || \
+            ! GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
+              ${pkgs.gnupg}/bin/gpg --batch --list-secret-keys "$_vsd_sops_gpg_fp" \
+              > /dev/null 2>&1; then
+          _vsd_gpg_failures="$_vsd_gpg_failures ${displayName}"
+        fi
       '') allSopsFiles}
       if [ -n "$_vsd_gpg_failures" ]; then
         echo "nucleus: ERROR — GPG SOPS decryption check failed for:$_vsd_gpg_failures; managed GPG key may not be registered in .sops.yaml." >&2
