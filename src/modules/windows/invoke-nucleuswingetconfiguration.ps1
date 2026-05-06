@@ -56,6 +56,8 @@ function Invoke-NucleusWingetConfiguration {
       $effectiveWallpaperPath = $WallpaperPath
 
       if ([string]::IsNullOrWhiteSpace($effectiveWallpaperPath)) {
+        # SilentlyContinue: the Wallpaper registry value may not exist on a
+        # fresh install; $null is the expected return and is handled below.
         $existingWallpaperPath = (Get-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name Wallpaper -ErrorAction SilentlyContinue).Wallpaper
         if (-not [string]::IsNullOrWhiteSpace($existingWallpaperPath)) {
           $effectiveWallpaperPath = $existingWallpaperPath

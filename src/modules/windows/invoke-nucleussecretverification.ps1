@@ -112,6 +112,10 @@ function Invoke-NucleusSecretVerification {
     (Join-Path -Path $SecretsDir -ChildPath "ssh-personal.yml")
   )
   if (Test-Path -Path $WallpaperAssetsDir) {
+    # SilentlyContinue: WallpaperAssetsDir existence is confirmed by Test-Path
+    # above; suppression covers unlikely access-denied errors so that a
+    # permission issue on the assets folder causes an empty wallpaper list
+    # (graceful degradation) rather than aborting the verification run.
     $wallpaperSopsFiles = Get-ChildItem -Path $WallpaperAssetsDir -Filter "*.sops" -File -ErrorAction SilentlyContinue |
       Select-Object -ExpandProperty FullName
     if ($null -ne $wallpaperSopsFiles) {
@@ -198,6 +202,10 @@ function Invoke-NucleusSecretVerification {
     # Search for the bare age key value (not "recipient: KEY") so both YAML
     # (unquoted field) and JSON (double-quoted key and value) SOPS formats
     # are handled without needing two separate search patterns.
+    # SilentlyContinue: all $sopsTestFiles come from a validated list (Test-Path
+    # + Get-ChildItem enumeration) so "file not found" errors are not expected;
+    # suppression prevents Select-String from treating SOPS JSON encoding as a
+    # binary-file warning on some PowerShell versions.
     $hasSshRecipient = Select-String -Path $sopsFile -Pattern $sshAgePub -SimpleMatch -Quiet -ErrorAction SilentlyContinue
     if (-not $hasSshRecipient) {
       $sshFailures += [System.IO.Path]::GetFileName($sopsFile)

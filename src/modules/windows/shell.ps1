@@ -175,7 +175,7 @@ function Sync-NucleusShellProfile {
       [System.IO.File]::WriteAllLines($profilePath, $filteredLines, [System.Text.UTF8Encoding]::new($false))
     }
     elseif (Test-Path -Path $profilePath) {
-      Remove-Item -Path $profilePath -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path $profilePath -Force
     }
   }
 }

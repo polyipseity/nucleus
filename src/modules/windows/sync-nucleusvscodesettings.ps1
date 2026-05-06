@@ -81,7 +81,7 @@ function Sync-NucleusVsCodeSettings {
 
     if ($settingsObject.Count -eq 0) {
       if (Test-Path -Path $settingsPath) {
-        Remove-Item -Path $settingsPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $settingsPath -Force
       }
 
       continue

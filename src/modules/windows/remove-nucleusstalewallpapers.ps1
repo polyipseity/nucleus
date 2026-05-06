@@ -38,6 +38,9 @@ function Remove-NucleusStaleWallpapers {
   }
 
   $expectedWallpaperNames = @(
+    # SilentlyContinue: AssetsDir existence is confirmed by Test-Path above;
+    # suppression covers unlikely access-denied errors so the function degrades
+    # gracefully (no stale-cleanup) rather than aborting the apply run.
     Get-ChildItem -Path $AssetsDir -Filter "*.sops" -File -ErrorAction SilentlyContinue |
       ForEach-Object { [System.IO.Path]::GetFileNameWithoutExtension($_.Name) }
   )
@@ -47,6 +50,9 @@ function Remove-NucleusStaleWallpapers {
     $managedWallpaperSet[$expectedWallpaperName] = $true
   }
 
+  # SilentlyContinue: OutputDir existence is confirmed by Test-Path above;
+  # suppression covers unlikely access-denied errors (result is null/empty
+  # collection, which the foreach handles as a no-op).
   $decryptedWallpapers = Get-ChildItem -Path $OutputDir -File -ErrorAction SilentlyContinue | Sort-Object -Property Name
   foreach ($decryptedWallpaper in $decryptedWallpapers) {
     if ($decryptedWallpaper.Extension -eq ".xml") {
@@ -54,8 +60,15 @@ function Remove-NucleusStaleWallpapers {
     }
 
     if (-not $managedWallpaperSet.ContainsKey($decryptedWallpaper.Name)) {
-      Remove-Item -Path $decryptedWallpaper.FullName -Force -ErrorAction SilentlyContinue
-      Write-Host "Removed stale wallpaper: $($decryptedWallpaper.Name)" -ForegroundColor Yellow
+      # Use -ErrorAction Stop so the catch block can distinguish a real failure
+      # (e.g. file locked by the display subsystem) from a successful removal.
+      try {
+        Remove-Item -Path $decryptedWallpaper.FullName -Force -ErrorAction Stop
+        Write-Host "Removed stale wallpaper: $($decryptedWallpaper.Name)" -ForegroundColor Yellow
+      }
+      catch {
+        Write-Warning "nucleus: failed to remove stale wallpaper '$($decryptedWallpaper.Name)': $_"
+      }
     }
   }
 }
