@@ -478,9 +478,14 @@ lib.mkIf isPrimaryUser {
         exit 1
       fi
       _vsd_managed_fpr="$(head -n1 "$_vsd_gpg_manifest")"
-      if ! GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
-          ${pkgs.gnupg}/bin/gpg --batch --list-secret-keys "$_vsd_managed_fpr" \
-          > /dev/null 2>&1; then
+      # Dump all secret-key fingerprints once and cache the colon-format output;
+      # reused by check 3 to avoid repeated invocations.  --with-colons forces
+      # machine-readable non-interactive output; --no-autostart prevents GPG from
+      # launching a new agent daemon (which deadlocks on macOS when the agent
+      # socket directory is not yet ready during non-interactive activation).
+      _vsd_gpg_all_secret_fprs="$(GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
+        ${pkgs.gnupg}/bin/gpg --with-colons --no-autostart --list-secret-keys 2>/dev/null || true)"
+      if ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_managed_fpr"; then
         echo "nucleus: ERROR — managed GPG key $_vsd_managed_fpr not in keyring after gpgImport." >&2
         exit 1
       fi
@@ -499,9 +504,7 @@ lib.mkIf isPrimaryUser {
       ${lib.concatMapStrings ({ path, displayName }: ''
         _vsd_sops_gpg_fp="$(/usr/bin/grep -m1 '[[:space:]]fp: ' "${toString path}" | /usr/bin/awk '{print $NF}')"
         if [ -z "$_vsd_sops_gpg_fp" ] || \
-            ! GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
-              ${pkgs.gnupg}/bin/gpg --batch --list-secret-keys "$_vsd_sops_gpg_fp" \
-              > /dev/null 2>&1; then
+            ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_sops_gpg_fp"; then
           _vsd_gpg_failures="$_vsd_gpg_failures ${displayName}"
         fi
       '') allSopsFiles}

@@ -284,8 +284,12 @@ function Invoke-NucleusSecretVerification {
   if ([string]::IsNullOrWhiteSpace($managedFpr)) {
     throw "nucleus: ERROR — managed-gpg-keys manifest is empty; gpgImport may have failed."
   }
-  $gpgListOutput = & $GpgExe --batch --list-secret-keys $managedFpr 2>&1
-  if ($LASTEXITCODE -ne 0) {
+  # Dump all secret-key fingerprints once with --with-colons (machine-readable,
+  # non-interactive) and --no-autostart (prevents launching a new agent daemon,
+  # which can deadlock if the agent socket is not yet ready).  Cache the output
+  # for reuse in check 3 to avoid repeated invocations with per-file arguments.
+  $allSecretKeysFpr = (& $GpgExe --with-colons --no-autostart --list-secret-keys 2>&1) -join "`n"
+  if (-not ($allSecretKeysFpr -like "*$managedFpr*")) {
     throw "nucleus: ERROR — managed GPG key $managedFpr not in keyring after materialization."
   }
   Write-Host "nucleus: [2/5] GPG key presence: OK ($managedFpr)" -ForegroundColor Green
@@ -304,14 +308,8 @@ function Invoke-NucleusSecretVerification {
   foreach ($sopsFile in $sopsTestFiles) {
     $fpLine = Get-Content -Path $sopsFile | Where-Object { $_ -match '\s+fp:\s+\S' } | Select-Object -First 1
     $sopsGpgFp = if ($fpLine) { ($fpLine.Trim() -split '\s+')[-1] } else { '' }
-    if ([string]::IsNullOrWhiteSpace($sopsGpgFp)) {
+    if ([string]::IsNullOrWhiteSpace($sopsGpgFp) -or -not ($allSecretKeysFpr -like "*$sopsGpgFp*")) {
       $gpgFailures += [System.IO.Path]::GetFileName($sopsFile)
-    }
-    else {
-      $null = & $GpgExe --batch --list-secret-keys $sopsGpgFp 2>&1
-      if ($LASTEXITCODE -ne 0) {
-        $gpgFailures += [System.IO.Path]::GetFileName($sopsFile)
-      }
     }
   }
   if ($gpgFailures.Count -gt 0) {
