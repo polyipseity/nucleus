@@ -145,6 +145,27 @@ applyTo: "src/**/*.nix"
   `src/hosts/nixos/MANUAL.md`) in the same change so activation output remains
   a complete checklist.
 
+## Pre-provision key adoption semantics
+
+The `sshKeyAdopt` activation (POSIX) and the SSH fingerprint tracking block in
+`Sync-NucleusSecretFile` (Windows) flush the SSH agent whenever the recorded
+fingerprint differs from the newly materialized one.  The guard intentionally
+omits any "manifest must be non-empty" pre-condition:
+
+- When the manifest is **absent** (first provision): `old_fingerprint` is empty
+  and `new_fingerprint` is non-empty, so they differ and the agent is flushed.
+  This evicts any key that was manually pre-placed in the agent before the
+  managed key arrived.
+- When the manifest **exists** and the key **rotated**: fingerprints differ and
+  the agent is flushed to remove the stale cached entry.
+- When the manifest **exists** and the key **is unchanged**: fingerprints match;
+  no flush occurs (idempotent re-apply is a no-op).
+
+Do not add a `[ -n "$old_fingerprint" ]` guard (POSIX) or an
+`$oldSshFingerprint -ne ''` guard (Windows) back into this logic.  That pattern
+would silently skip the flush on the first provision, leaving stale keys in the
+agent when the managed key is newer.
+
 ## Sorting
 
 - Package lists (e.g. `sharedPackages`, `environment.systemPackages`,
