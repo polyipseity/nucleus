@@ -36,12 +36,13 @@ let
       echo "nucleus:   until the host key is present and registered in .sops.yaml." >&2
     else
       mkdir -p "$age_dir"
-      # Use the || exit_code=$? pattern to prevent set -e (active in
-      # nix-darwin/NixOS activation scripts) from exiting the script when
-      # ssh-to-age fails.  Without this guard a non-zero ssh-to-age exit
-      # silently aborts activation before the check below can emit a diagnostic.
+      # ssh-to-age -i reads a private key FILE and outputs the age private
+      # identity (AGE-SECRET-KEY-...).  Without -i, ssh-to-age reads stdin
+      # expecting an SSH public key and outputs an age public key — wrong for
+      # an identity file.  System activation runs as root so it can read the
+      # 0600 root-owned private key directly.
       derived_age_key_exit=0
-      derived_age_key="$(${pkgs.ssh-to-age}/bin/ssh-to-age < "$host_ssh_key")" || derived_age_key_exit=$?
+      derived_age_key="$(${pkgs.ssh-to-age}/bin/ssh-to-age -i "$host_ssh_key")" || derived_age_key_exit=$?
       if [ "$derived_age_key_exit" -ne 0 ] || [ -z "$derived_age_key" ]; then
         echo "nucleus: ssh-to-age failed (exit $derived_age_key_exit) reading $host_ssh_key; $age_key_file not written." >&2
       else
