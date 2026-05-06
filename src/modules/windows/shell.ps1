@@ -15,8 +15,14 @@ function Sync-NucleusShellProfile {
 
     Managed content intentionally mirrors key POSIX shell workflow behavior:
       - direnv integration (if direnv is present)
+      - PSReadLine predictive history completion and menu-style tab expansion
+        (if PSReadLine module is available; bundled with pwsh on all supported hosts)
+      - zoxide smart directory navigation (if zoxide is present)
+      - fzf Ctrl+R fuzzy history search via PSReadLine key handler
+        (if fzf is present and PSReadLine is available)
       - common aliases (`g`, `ga`, `gc`, `gca`, `gco`, `gd`, `gl`, `gp`,
-        `gpl`, `gs`, `gst`, `la`, `ll`, `v`)
+        `gpl`, `gs`, `gst`, `la`, `ll` (eza preferred, Get-ChildItem fallback),
+        `v`)
       - Python ban: blocks system-wide python/pip to prevent accidental
          modifications to system environment
 
@@ -44,6 +50,35 @@ function Sync-NucleusShellProfile {
     'if (Get-Command direnv -ErrorAction SilentlyContinue) {'
     '  (& direnv hook pwsh) | Out-String | Invoke-Expression'
     '}'
+    # PSReadLine: predictive history completion + menu-style tab expansion.
+    # Guards with module availability probe so the profile is safe on older hosts.
+    'if (Get-Module -ListAvailable -Name PSReadLine) {'
+    '  Import-Module PSReadLine'
+    '  Set-PSReadLineOption -PredictionSource History'
+    '  Set-PSReadLineOption -PredictionViewStyle ListView'
+    '  Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete'
+    '}'
+    # zoxide: smart directory navigation learned from visit history.
+    'if (Get-Command zoxide -ErrorAction SilentlyContinue) {'
+    '  Invoke-Expression (& zoxide init powershell | Out-String)'
+    '}'
+    # fzf: fuzzy history search on Ctrl+R via a PSReadLine key handler.
+    # Reads the PSReadLine history file directly so all sessions are searchable.
+    'if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvailable -Name PSReadLine)) {'
+    '  Set-PSReadLineKeyHandler -Key "Ctrl+r" -ScriptBlock {'
+    '    $line = $null'
+    '    $cursor = $null'
+    '    [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)'
+    '    $histFile = (Get-PSReadLineOption).HistorySavePath'
+    '    $selected = Get-Content -Path $histFile -ErrorAction SilentlyContinue |'
+    '      Where-Object { $_ } | Sort-Object -Unique |'
+    '      & fzf --tac --no-sort --height 40% --query $line'
+    '    if ($LASTEXITCODE -eq 0 -and $selected) {'
+    '      [Microsoft.PowerShell.PSConsoleReadLine]::RevertLine()'
+    '      [Microsoft.PowerShell.PSConsoleReadLine]::Insert($selected)'
+    '    }'
+    '  }'
+    '}'
     'function g { & git @Args }'
     'function ga { & git add @Args }'
     'function gc { & git commit @Args }'
@@ -55,8 +90,15 @@ function Sync-NucleusShellProfile {
     'function gpl { & git pull @Args }'
     'function gs { & git status -sb @Args }'
     'function gst { & git status @Args }'
-    'function la { Get-ChildItem -Force @Args }'
-    'function ll { Get-ChildItem -Force @Args }'
+    # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
+    # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
+    'if (Get-Command eza -ErrorAction SilentlyContinue) {'
+    '  function la { & eza -la @Args }'
+    '  function ll { & eza -la @Args }'
+    '} else {'
+    '  function la { Get-ChildItem -Force @Args }'
+    '  function ll { Get-ChildItem -Force @Args }'
+    '}'
     'function v { & nvim @Args }'
     '# System-wide Python ban: redirect python/pip to warnings'
     'function python {'

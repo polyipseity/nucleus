@@ -25,6 +25,7 @@ in
     ./git.nix
     ./linux.nix
     ./macos.nix
+    ./pwsh.nix
     ./secrets.nix
     ./shell.nix
     ./wallpapers.nix
