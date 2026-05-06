@@ -746,7 +746,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       fi
 
       # Reload Finder Services to pick up the changes immediately.
-      if ! /usr/bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
+      if ! /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
         echo "nucleus: launchctl Finder restart failed; restart Finder manually if Services do not appear in context menus." >&2
       fi
     '';
