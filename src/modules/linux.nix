@@ -155,6 +155,10 @@ lib.mkIf pkgs.stdenv.isLinux {
     # consolidated, post-automation checklist.
     # -----------------------------------------------------------------------
     displayHostManualInstructions = lib.hm.dag.entryAfter [
+      # gitIdentityFromSops is defined in secrets.nix (shared module) but runs
+      # as a Home Manager activation on this host; include it here so manual
+      # instructions are always the final output after all activation work.
+      "gitIdentityFromSops"
       "gpgImport"
       "wallpaperProvision"
     ] ''

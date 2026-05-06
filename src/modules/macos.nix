@@ -190,19 +190,23 @@ let
     "configureSystemHardening"
     "configureUniversalAccessDefaults"
     "ensureHeadlessDisplay"
+    # gitIdentityFromSops is defined in secrets.nix (shared module) but runs
+    # as a Home Manager activation on this host; it must complete before the
+    # manual instructions are printed so the final output is complete.
+    "gitIdentityFromSops"
+    "gpgImport"
     "installPackages"
     "linkGeneration"
-    "gpgImport"
     "onFilesChange"
     "preflightPrivacyPermissions"
     "refreshFinderServices"
     "reloadUserPreferenceState"
-    "sops-nix"
     "setupLaunchAgents"
+    "sops-nix"
     "verifyArchivingStack"
-    "wallpaperProvision"
     "vscodeDarwinExtensionBridge"
     "vscodeProfiles"
+    "wallpaperProvision"
     "writeBoundary"
   ];
 in

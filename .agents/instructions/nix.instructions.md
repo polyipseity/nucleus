@@ -128,12 +128,18 @@ applyTo: "src/**/*.nix"
 
 ## Host manual-step activation invariant
 
-- `src/modules/macos.nix` `home.activation.displayHostManualInstructions` must
-  stay the final activation step in that module.
-- It must depend on every other activation entry defined in
-  `src/modules/macos.nix` plus required Home Manager/framework boundaries
-  (`writeBoundary`, `linkGeneration`, and any helper steps already used in the
-  dependency list).
+- Both POSIX hosts must keep `home.activation.displayHostManualInstructions`
+  as the **terminal node** of the Home Manager activation DAG, so operators
+  always see one consolidated manual checklist after every automated step.
+  - macOS: defined in `src/modules/macos.nix` via `displayHostManualInstructionDeps`.
+  - NixOS/Linux: defined in `src/modules/linux.nix` via its `entryAfter` list.
+- The dependency list must cover **all** activation entries across **all**
+  modules that run on that host — not just entries in the same file.  When a
+  shared module (e.g. `secrets.nix`, `wallpapers.nix`) adds a new
+  `home.activation` entry that will run on both POSIX hosts, add that name to
+  the deps in **both** `macos.nix` and `linux.nix` in the same change.
+- Keep `displayHostManualInstructionDeps` (macOS) and the `entryAfter` list
+  (Linux) alphabetically sorted.
 - If a feature needs a one-time manual step that cannot be safely automated,
   update the host manual Markdown file (`src/hosts/macbook/MANUAL.md` and/or
   `src/hosts/nixos/MANUAL.md`) in the same change so activation output remains
