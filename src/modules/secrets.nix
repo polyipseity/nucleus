@@ -42,24 +42,22 @@
 #   sops edit src/secrets/git-identities.yml   # restructure to flat format above
 #
 # Bootstrap (once per fresh machine):
-#   1. Import your primary GPG key manually:
-#        gpg --import <key-export>
-#   2. Run: home-manager switch
-#      sops-nix uses GPG to decrypt on first activation.
-#      The managed primary fingerprint from gpg-personal.yml is assigned
-#      ultimate ownertrust on every activation to keep trustdb state
-#      deterministic even when keys were pre-imported manually.
-#   3. The system activation script deriveHostAgeKey (posix-sops.nix)
-#      automatically derives the machine age identity from the SSH host key
-#      and writes it to /etc/sops/age/machine.txt.  Retrieve the age public
-#      key to register in .sops.yaml with:
+#   1. Retrieve the machine age public key from the SSH host key (the host
+#      key pair is created by the OS during installation):
 #        ssh-to-age < /etc/ssh/ssh_host_ed25519.pub
-#      Then add it to .sops.yaml keys.age_devices and rewrap encrypted files:
-#        sops updatekeys src/secrets/ssh-personal.yml
-#        sops updatekeys src/secrets/gpg-personal.yml
+#      Add this key to .sops.yaml keys.age_devices, then rewrap every
+#      encrypted file so the new machine can decrypt them:
 #        sops updatekeys src/secrets/git-identities.yml
-#      After this step sops-nix uses this precedence chain:
-#        machine age key (/etc/sops/age/machine.txt) -> primary GPG key -> primary SSH key.
+#        sops updatekeys src/secrets/gpg-personal.yml
+#        sops updatekeys src/secrets/ssh-personal.yml
+#        sops updatekeys "src/assets/wallpapers/<name>.sops"  # repeat per file
+#      Commit and deploy the updated .sops.yaml and rewrapped secrets.
+#   2. Run: darwin-rebuild switch / nixos-rebuild switch
+#      The system activation script deriveHostAgeKey (posix-sops.nix) writes
+#      the machine age private key to /etc/sops/age/machine.txt.  HM sops-nix
+#      then uses this file to decrypt all SOPS secrets without requiring a
+#      pre-imported GPG key.  The gpgImport activation (below) imports the
+#      managed GPG key automatically from the decrypted SOPS payload.
 { config, lib, pkgs, username ? null, ... }:
 let
   primaryUsername =
@@ -99,9 +97,12 @@ lib.mkIf isPrimaryUser {
   # Using keyFile instead of sshKeyPaths avoids the permission issue on macOS
   # and NixOS where /etc/ssh/ssh_host_ed25519_key is 0600 root:wheel/root:root
   # and the Home Manager sops-nix instance runs as the regular user.
-  # Global backup recipients (primary_gpg / primary_ssh) are in .sops.yaml.
+  # sops.gnupg.home is intentionally absent: sops-nix rejects keyFile and
+  # gnupgHome being set simultaneously (manifest validation error).  The machine
+  # age key registered in .sops.yaml age_devices is sufficient for all secret
+  # decryption at HM activation time; GPG is populated by gpgImport (below)
+  # from the decrypted SOPS payload and remains available for signing thereafter.
   sops.age.keyFile = "/etc/sops/age/machine.txt";
-  sops.gnupg.home = "${config.home.homeDirectory}/.gnupg";
 
   # --------------------------------------------------------------------------
   # SSH private key — sops-nix owns decryption, file write, and chmod 600.
