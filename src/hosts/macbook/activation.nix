@@ -25,21 +25,22 @@
   # Enforce pmset values directly for AC and battery because newer macOS
   # releases can ignore or partially override higher-level power options.
   #
-  # Invariant (cross-host parity with NixOS and Windows):
-  #   - AC: 1-minute display sleep, no idle system sleep (0), no disk sleep,
-  #     wake-on-LAN enabled
-  #   - Battery: 1-minute system sleep (aligns with NixOS/Windows for parity),
-  #     low-power mode on, reduced brightness while on battery (if supported).
-  #     Battery display sleep and wake-on-LAN are intentionally unmanaged:
-  #     with low-power mode enabled, macOS forces displaysleep=2, womp=0,
-  #     and disksleep=10 after writes (system overrides).
-  #   - Shared: Power Nap and lid wake enabled
-  #   - Battery low-power mode on and AC low-power mode off (if supported)
-  #
-  # This intentionally aligns with the NixOS power posture (zero sleep on AC,
-  # 1-minute battery suspend) and Windows cross-host parity profile to ensure
-  # consistent aggressive battery timeout and responsive remote-access behavior
-  # across all three platforms.
+   # Invariant:
+   #   - AC: 1-minute display sleep, no idle system sleep (0), no disk sleep,
+   #     wake-on-LAN enabled (womp is AC-only on this hardware: empirical testing
+   #     confirms macOS ignores battery-source womp settings even when explicitly
+   #     applied; the hardware/firmware overrides them)
+   #   - Battery: system sleep disabled (never/0).  Battery system sleep is
+   #     disabled so remote-desktop sessions (Chrome Remote Desktop, and any
+   #     VNC/ARD or tunneled SSH session) survive when the machine is on battery.
+   #     Sleeping on battery would disconnect active remote sessions and prevent
+   #     new ones from connecting.  Each platform independently disables battery
+   #     sleep for remote access; no cross-host parity assumption is made here.
+   #     Battery display sleep and wake-on-LAN are intentionally unmanaged:
+   #     with low-power mode enabled, macOS forces displaysleep=2, womp=0,
+   #     and disksleep=10 after writes (system overrides).
+   #   - Shared: Power Nap and lid wake enabled
+   #   - Battery low-power mode on and AC low-power mode off (if supported)
   #
   # The helper emits a clear error when any write fails so a mis-typed key
   # does not silently leave a stale policy in place.
@@ -71,9 +72,9 @@
 
        # macOS currently overrides battery displaysleep and womp while
        # lowpowermode is enabled, so only enforce the battery values that remain
-       # stable across activation runs. Use 1 minute for battery sleep to align
-       # with NixOS and Windows parity (cross-host consistency).
-       apply_pmset -b sleep 1
+       # stable across activation runs.  Battery system sleep is disabled (0) so
+       # remote sessions survive on battery power.
+       apply_pmset -b sleep 0
 
       if pmset_supports lessbright; then
         # lessbright is a battery-side setting; AC does not expose a separate
