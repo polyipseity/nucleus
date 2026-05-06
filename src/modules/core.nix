@@ -22,6 +22,7 @@ let
   # Packages installed on every host regardless of OS.
   #   bat        — syntax-highlighted cat replacement
   #   bottom     — cross-platform system monitor (btm)
+  #   cargo-cache — reclaim disk space from ~/.cargo registry, git, and advisory-db clones
   #   direnv     — per-directory env loader (shell integration in shell.nix)
   #   eza        — modern ls with colour and icons
   #   fd         — fast find replacement
@@ -42,6 +43,7 @@ let
   baseSharedPackages = [
     pkgs.bat
     pkgs.bottom
+    pkgs.cargo-cache
     pkgs.direnv
     pkgs.eza
     pkgs.fd
