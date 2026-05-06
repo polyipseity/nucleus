@@ -81,6 +81,48 @@ start_sudo_keepalive() {
   trap "kill $SUDO_KEEPALIVE_PID 2>/dev/null || true" EXIT INT TERM
 }
 
+generate_ssh_host_key_if_needed() {
+  # Ensure /etc/ssh/ssh_host_ed25519_key exists before
+  # register_host_age_key_if_needed tries to derive the machine age public key
+  # from it.  On freshly provisioned machines the OS may not have generated host
+  # keys yet; ssh-keygen -A creates all standard host key types without
+  # overwriting any that already exist, making this call idempotent.
+  #
+  # Why before register_host_age_key_if_needed:
+  #   register_host_age_key_if_needed derives the machine age public key from
+  #   /etc/ssh/ssh_host_ed25519_key.pub.  If the key does not exist it skips
+  #   registration silently, so the machine can never decrypt its own SOPS
+  #   secrets until the operator re-runs apply after the OS has generated the
+  #   key.  Generating it here makes first-apply fully self-contained.
+  #
+  # Requires: sudo session already acquired (start_sudo_keepalive must have
+  #   been called before this function).
+  # PATH: ssh-keygen is provided by openssh in mkApplyApp runtimeInputs.
+  #   The sudo invocation carries PATH explicitly so the Nix-wrapped binary
+  #   is found even after sudo resets the environment.
+  _gsk_host_key="/etc/ssh/ssh_host_ed25519_key"
+
+  if [ -f "$_gsk_host_key" ]; then
+    return
+  fi
+
+  printf 'nucleus: %s not found; generating SSH host keys...\n' "$_gsk_host_key"
+  # Pass PATH explicitly so sudo finds the Nix openssh ssh-keygen rather than
+  # any older system ssh-keygen that may be shadowed by runtimeInputs.
+  if ! sudo env "PATH=$PATH" ssh-keygen -A; then
+    printf 'nucleus: ERROR — ssh-keygen -A failed; cannot generate SSH host keys.\n' >&2
+    exit 1
+  fi
+
+  if [ ! -f "$_gsk_host_key" ]; then
+    printf 'nucleus: ERROR — ssh-keygen -A completed but %s is still absent.\n' \
+      "$_gsk_host_key" >&2
+    exit 1
+  fi
+
+  printf 'nucleus: SSH host keys generated successfully.\n'
+}
+
 register_host_age_key_if_needed() {
   # Derive this machine's age public key from its SSH host public key and
   # register it in .sops.yaml as a new recipient, then rewrap every
@@ -201,6 +243,7 @@ case "$(uname -s)" in
     # nix-darwin manages both the system layer and the user Home Manager
     # profile.  darwin-rebuild invokes sudo internally for system activation.
     start_sudo_keepalive
+    generate_ssh_host_key_if_needed
     register_host_age_key_if_needed
     run_nix run "$REPO_ROOT/src#health-check"
     # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
@@ -212,6 +255,7 @@ case "$(uname -s)" in
       # NixOS: use nixos-rebuild so the system layer and the embedded
       # home-manager module are applied in a single atomic activation.
       start_sudo_keepalive
+      generate_ssh_host_key_if_needed
       register_host_age_key_if_needed
       run_nix run "$REPO_ROOT/src#health-check"
       # Keep root invocations on root-owned HOME for consistent Nix behavior.

@@ -194,8 +194,23 @@ declarative pmset posture.  The target state verified against
 ## Machine age key auto-registration
 
 The `apply.sh` dispatcher (wrapped as `nix run .#apply`) calls
-`register_host_age_key_if_needed` before handing off to `darwin-rebuild` /
-`nixos-rebuild`.  This function:
+`generate_ssh_host_key_if_needed` then `register_host_age_key_if_needed`
+before handing off to `darwin-rebuild` / `nixos-rebuild`.
+
+`generate_ssh_host_key_if_needed`:
+
+- Checks for `/etc/ssh/ssh_host_ed25519_key`; returns immediately if present
+  (idempotent on every subsequent apply).
+- If absent, runs `sudo env "PATH=$PATH" ssh-keygen -A` to generate all
+  standard host key types.  `PATH` is passed explicitly so sudo finds the
+  Nix-wrapped openssh binary from `mkApplyApp` `runtimeInputs`.
+- Fails fast with a clear error if key generation fails or if the expected
+  file is still absent after the call.
+- Only called from the Darwin and NixOS branches (not standalone Home Manager),
+  since those are the only branches with an active sudo session and a managed
+  `/etc/ssh/` directory.
+
+`register_host_age_key_if_needed`:
 
 - Derives the machine age public key from `/etc/ssh/ssh_host_ed25519_key.pub`
   using `ssh-to-age -i` (no private key or passphrase required).
@@ -212,9 +227,9 @@ The `apply.sh` dispatcher (wrapped as `nix run .#apply`) calls
   before first apply) so `sops updatekeys` can re-encrypt data keys for all
   recipients; fails with a clear error and a `gpg --import` hint if GPG is
   not available.
-- `ssh-to-age` and `sops` are provided by `mkApplyApp` `runtimeInputs` in
-  `flake.nix` (alongside `git`); no separate installation is needed when using
-  `nix run .#apply`.
+- `ssh-to-age`, `sops`, `openssh`, and `git` are provided by `mkApplyApp`
+  `runtimeInputs` in `flake.nix`; no separate installation is needed when
+  using `nix run .#apply`.
 
 The equivalent Windows function is `Register-NucleusHostAgeKey` in
 `src/modules/windows/register-nucleushostagekey.ps1`, called from `apply.ps1`

@@ -81,15 +81,18 @@
       pkgsMac   = mkPkgs systems.mac;
 
       # Build the `nix run .#apply` app for a given package set.
-      # Wraps scripts/apply.sh in a shell application that has git, sops, and
-      # ssh-to-age on PATH so the machine age key auto-registration step can
-      # derive the age public key and rewrap all SOPS-encrypted files.
+      # Wraps scripts/apply.sh in a shell application that has git, openssh,
+      # sops, and ssh-to-age on PATH so the machine age key auto-registration
+      # step can derive the age public key and rewrap all SOPS-encrypted files.
+      # openssh provides ssh-keygen for the generate_ssh_host_key_if_needed step
+      # that creates /etc/ssh/ssh_host_ed25519_key on first-provision machines.
       mkApplyApp = pkgs: {
         type = "app";
         program = "${pkgs.writeShellApplication {
           name = "nucleus-apply";
           runtimeInputs = [
             pkgs.git
+            pkgs.openssh
             pkgs.sops
             pkgs.ssh-to-age
           ];

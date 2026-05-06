@@ -124,6 +124,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-nucleusdecryptedblob.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-nucleussecrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "git-ssh.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "initialize-nucleussshshostkey.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleusjitsecretmaterialization.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleussecretverification.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleuswingetconfiguration.ps1")
@@ -184,6 +185,14 @@ $machineSshHostKeyPubPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\")).Path
 $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 
+# Ensure the SSH host key exists before age key registration.  On a fresh
+# machine the key is absent until the OpenSSH Server service first starts;
+# Initialize-NucleusSshHostKey starts it briefly if the service is installed
+# but the key has not yet been written.
+if ($EnableHostAgeKeyRegistration) {
+  Initialize-NucleusSshHostKey -MachineSshHostKeyPath $machineSshHostKeyPath
+}
+
 # Auto-register this machine's age key in .sops.yaml if not already present.
 # Must run before the pre-flight secret decryption check so that on the very
 # first apply the machine can already decrypt its own SOPS-encrypted secrets.
@@ -241,6 +250,18 @@ Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
 Sync-NucleusGitAndSshConfig -Enabled:$EnableGitSshParity -PrimaryUsername $PrimaryUsername
 Sync-NucleusShellProfile -Enabled:$EnableShellParity
 Sync-NucleusOpenSshServer -Enabled:$EnableRemoteAccessParity
+# Re-run host age key registration after Sync-NucleusOpenSshServer has started
+# the sshd service (which generates host keys on a fresh machine).  This second
+# call is a no-op when the key is already registered; on first-ever apply it
+# completes registration in the same run without requiring a second apply.
+if ($EnableHostAgeKeyRegistration) {
+  Register-NucleusHostAgeKey `
+    -MachineSshHostKeyPubPath $machineSshHostKeyPubPath `
+    -SopsExe $sopsExe `
+    -SopsYamlPath $sopsYamlPath `
+    -SecretsDir $secretsDir `
+    -WallpaperAssetsDir $wallpaperAssetsDir
+}
 Sync-NucleusWindowsRdp -Enabled:$EnableRdpParity
 Sync-NucleusPowerPolicy -Enabled:$EnablePowerParity
 
