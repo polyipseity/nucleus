@@ -1,7 +1,9 @@
 # modules/windows/sync-nucleussecretfile.ps1 — Per-file secret materialization.
 #
 # Decrypts one SOPS file and converges only managed SSH/GPG payloads for the
-# configured primary user.
+# configured primary user.  Also maintains managed-key manifest files in
+# ~/.config/nucleus/ to enable rotation detection and agent flush on rotation,
+# mirroring the POSIX gpgImport and sshKeyAdopt Home Manager activations.
 
 function Sync-NucleusSecretFile {
   <#
@@ -20,7 +22,9 @@ function Sync-NucleusSecretFile {
     ssh_personal_${username}_pub
       Written to $HOME\.ssh\ssh_personal_${username}.pub using ASCII encoding
       (no BOM, no trailing newline). The file is only overwritten when content
-      changes.
+      changes.  The SHA-256 fingerprint is recorded in
+      $HOME\.config\nucleus\managed-ssh-keys for rotation detection; the
+      SSH agent is flushed (ssh-add -D) when the fingerprint changes.
 
     ssh_personal_${username}_rsa
       Written to $HOME\.ssh\ssh_personal_${username}_rsa using ASCII encoding
@@ -34,13 +38,17 @@ function Sync-NucleusSecretFile {
 
     gpg_personal_${username}
       Imported into the current GPG keyring via stdin (`gpg --batch --import -`).
-      No temporary plaintext files are created.
+      No temporary plaintext files are created.  The managed primary fingerprint
+      is recorded in $HOME\.config\nucleus\managed-gpg-keys immediately after a
+      successful import so the key is tracked even if ownertrust enforcement
+      fails transiently.
 
     git_identity_${username}
       Written to $HOME\.config\nucleus\git-identity.env so Git identity can be
       converged from SOPS-managed values instead of static mappings.
 
     $HOME\.ssh is created if it does not already exist.
+    $HOME\.config\nucleus is created if it does not already exist.
 
   .PARAMETER FilePath
     Absolute path to the SOPS-encrypted YAML file.
@@ -96,6 +104,10 @@ function Sync-NucleusSecretFile {
   $gitIdentityConfigDir = Join-Path -Path $HOME -ChildPath ".config\nucleus"
   $gitIdentityPath = Join-Path -Path $gitIdentityConfigDir -ChildPath "git-identity.env"
   $gitIdentitySecretName = "git_identity_$PrimaryUsername"
+  # Manifest files record managed key fingerprints for rotation detection,
+  # mirroring the POSIX gpgImport and sshKeyAdopt Home Manager activations.
+  $managedGpgKeysManifest = Join-Path -Path $gitIdentityConfigDir -ChildPath 'managed-gpg-keys'
+  $managedSshKeysManifest = Join-Path -Path $gitIdentityConfigDir -ChildPath 'managed-ssh-keys'
   $sshDir = Join-Path -Path $HOME -ChildPath ".ssh"
   $sshPublicSecretName = "ssh_personal_${PrimaryUsername}_pub"
   $sshRsaPublicSecretName = "ssh_personal_${PrimaryUsername}_rsa_pub"
@@ -142,6 +154,42 @@ function Sync-NucleusSecretFile {
     if ($existingPublicValue -ne $sshPublicKeyValue) {
       $sshPublicKeyValue | Out-File -FilePath $sshPublicKeyPath -Encoding ascii -NoNewline
       Write-Host "  Updated SSH public key: $sshPublicSecretName" -ForegroundColor Cyan
+    }
+
+    # Track the SHA-256 fingerprint of the SSH public key for rotation
+    # detection and SSH agent flush on rotation.  Mirrors the POSIX
+    # sshKeyAdopt Home Manager activation in secrets.nix.
+    try {
+      $sshKeyParts = $sshPublicKeyValue.Trim() -split '\s+'
+      if ($sshKeyParts.Length -ge 2) {
+        $sshKeyBytes = [System.Convert]::FromBase64String($sshKeyParts[1])
+        $sha256Hasher = [System.Security.Cryptography.SHA256]::Create()
+        $hashBytes = $sha256Hasher.ComputeHash($sshKeyBytes)
+        $newSshFingerprint = 'SHA256:' + [System.Convert]::ToBase64String($hashBytes).TrimEnd('=')
+
+        $oldSshFingerprint = if (Test-Path -Path $managedSshKeysManifest) {
+          (Get-Content -Path $managedSshKeysManifest -Raw).Trim()
+        }
+        else {
+          ''
+        }
+
+        if ($oldSshFingerprint -ne '' -and $oldSshFingerprint -ne $newSshFingerprint) {
+          # Key was rotated: flush SSH agent so stale cached keys are removed.
+          # Soft-failure so apply proceeds even when no agent is running.
+          # Parity with POSIX sshKeyAdopt behavior.
+          $sshAddCommand = Get-Command 'ssh-add' -ErrorAction SilentlyContinue
+          if ($null -ne $sshAddCommand) {
+            & $sshAddCommand.Source -D 2>$null | Out-Null
+            Write-Host "  Flushed SSH agent due to key rotation ($oldSshFingerprint -> $newSshFingerprint)" -ForegroundColor Cyan
+          }
+        }
+
+        $newSshFingerprint | Out-File -FilePath $managedSshKeysManifest -Encoding ascii -NoNewline
+      }
+    }
+    catch {
+      Write-Warning "nucleus: could not update SSH fingerprint manifest: $_"
     }
   }
 
@@ -201,9 +249,18 @@ function Sync-NucleusSecretFile {
         throw "Imported GPG key material but no managed primary fingerprint was detected for ownertrust enforcement."
       }
 
+      # Write the manifest before ownertrust so the key is tracked even if
+      # ownertrust enforcement fails transiently (e.g. GnuPG 2.5 + Kyber IPC
+      # edge cases on first bootstrap).  Mirrors the POSIX gpgImport order in
+      # secrets.nix.
+      $firstFingerprint | Out-File -FilePath $managedGpgKeysManifest -Encoding ascii -NoNewline
+
+      # Ownertrust is best-effort: demote failure to a warning so a transient
+      # GnuPG IPC error doesn't abort the whole apply run.  The key is already
+      # in the keyring and tracked in the manifest at this point.
       "${firstFingerprint}:6:" | & $GpgExe --import-ownertrust | Out-Null
       if ($LASTEXITCODE -ne 0) {
-        throw "Failed to enforce ultimate ownertrust for managed primary fingerprint '$firstFingerprint'. Exit code: $LASTEXITCODE"
+        Write-Warning "nucleus: ownertrust enforcement for '$firstFingerprint' exited $LASTEXITCODE — key imported and manifest updated, ownertrust may need a retry"
       }
 
       Write-Host "  Imported GPG material: $gpgSecretName" -ForegroundColor Cyan
