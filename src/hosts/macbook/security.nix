@@ -13,8 +13,9 @@
   security.pam.services.sudo_local.touchIdAuth = true;
 
   # Enable Remote Login (OpenSSH server) so this Mac is reachable over SSH
-  # for administration and tunneling.
-  services.ssh.enable = true;
+  # for administration and tunneling.  In this version of nix-darwin the
+  # correct option path is services.openssh, not services.ssh.
+  services.openssh.enable = true;
 
   # Enforce key-only authentication for the SSH server and configure the
   # AuthorizedKeysFile to read from the SOPS-materialized personal public key
