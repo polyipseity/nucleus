@@ -5,6 +5,7 @@
 .DESCRIPTION
   Installs GnuPG and SOPS via winget using pinned versions from
   scripts/bootstrap-versions.env.
+  Runs a pre-flight health check before invoking apply when -Apply is used.
   Use -Apply to run the Windows apply script after dependency installation.
 
 .PARAMETER Apply
@@ -237,6 +238,14 @@ if ($Apply) {
   $applyScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\windows\apply.ps1"
   if (-not (Test-Path -Path $applyScriptPath)) {
     throw "Apply script not found: $applyScriptPath"
+  }
+
+  $healthCheckPath = Join-Path -Path $PSScriptRoot -ChildPath "health-check.ps1"
+  if (Test-Path -Path $healthCheckPath) {
+    & $healthCheckPath -MinFreeGB 10
+    if ($LASTEXITCODE -ne 0) {
+      throw "Windows pre-flight health check failed with exit code $LASTEXITCODE."
+    }
   }
 
   Write-Host "Running apply flow via $applyScriptPath" -ForegroundColor Cyan

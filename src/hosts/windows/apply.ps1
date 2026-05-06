@@ -54,6 +54,9 @@
 .PARAMETER EnableVsCodeSettingsParity
   Enable managed VS Code settings parity convergence and managed-key cleanup.
 
+.PARAMETER MinFreeDiskGB
+  Minimum free space threshold (GiB) used by the pre-flight health check.
+
 .PARAMETER Help
   When present, prints this help text and exits without applying anything.
 
@@ -90,7 +93,8 @@ param(
   [bool]$EnableRemoteAccessParity = $true,
   [bool]$EnableShellParity = $true,
   [bool]$EnableVsCodeExtensionsParity = $true,
-  [bool]$EnableVsCodeSettingsParity = $true
+  [bool]$EnableVsCodeSettingsParity = $true,
+  [int]$MinFreeDiskGB = 10
 )
 
 $ErrorActionPreference = "Stop"
@@ -115,6 +119,11 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleuswallpapers.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "test-nucleusprimaryuser.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "verify-archiving-stack.ps1")
+
+$healthCheckScript = Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\scripts\health-check.ps1"
+if (Test-Path -Path $healthCheckScript) {
+  & $healthCheckScript -MinFreeGB $MinFreeDiskGB -SkipSecretTooling
+}
 
 $resolvedConfigDir = (Resolve-Path -Path $ConfigDir).Path
 $machineSshHostKeyPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key"
@@ -145,6 +154,17 @@ $gpgExe = Resolve-NucleusExecutable -Name "gpg" -CandidatePaths $gpgCandidates
 
 # Materialize user-scoped secrets once before DSC resources run.
 $secretsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets"
+$secretPreflightFiles = @("git-identities.yml", "gpg-personal.yml", "ssh-personal.yml")
+foreach ($secretFile in $secretPreflightFiles) {
+  $secretPath = Join-Path -Path $secretsDir -ChildPath $secretFile
+  if (-not (Test-Path -Path $secretPath)) {
+    throw "Required secret file was not found: $secretPath"
+  }
+
+  # Fail fast if current machine identities cannot decrypt managed secrets.
+  Get-NucleusSecrets -FilePath $secretPath -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe | Out-Null
+}
+
 if ($EnableSecretsParity) {
   Sync-NucleusSecrets -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -PrimaryUsername $PrimaryUsername -SopsExe $sopsExe
 }

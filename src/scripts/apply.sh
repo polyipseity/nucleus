@@ -86,6 +86,7 @@ case "$(uname -s)" in
     # nix-darwin manages both the system layer and the user Home Manager
     # profile.  darwin-rebuild invokes sudo internally for system activation.
     start_sudo_keepalive
+    run_nix run "$REPO_ROOT/src#health-check"
     # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
     # while running as root (which otherwise produces ownership warnings).
     run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
@@ -95,6 +96,7 @@ case "$(uname -s)" in
       # NixOS: use nixos-rebuild so the system layer and the embedded
       # home-manager module are applied in a single atomic activation.
       start_sudo_keepalive
+      run_nix run "$REPO_ROOT/src#health-check"
       # Keep root invocations on root-owned HOME for consistent Nix behavior.
       run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
     else
@@ -102,6 +104,7 @@ case "$(uname -s)" in
       # no sudo required — keepalive is not started.
       # The profile name must match the homeConfigurations key in flake.nix.
       target_username="${NUCLEUS_USERNAME:-$(id -un)}"
+      run_nix run "$REPO_ROOT/src#health-check"
       run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
     fi
     ;;

@@ -216,6 +216,7 @@ fi
 
 if [ "$COMMAND" = "apply" ]; then
   printf '%s\n' "Running apply flow via src#apply..."
+  run_nix run "$REPO_ROOT/src#health-check"
   run_nix run "$REPO_ROOT/src#apply"
   exit 0
 fi
