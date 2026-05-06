@@ -132,12 +132,18 @@ lib.mkIf pkgs.stdenv.isLinux {
       night-light-temperature = lib.hm.gvariant.mkUint32 3700;
     };
 
-     # AC vs battery behavior parity with macOS remote-access-first profile.
+    # Battery suspend is disabled (type = "nothing", timeout = 0) so that
+    # remote-desktop sessions (xrdp, Chrome Remote Desktop, Parsec) survive
+    # when the machine is on battery.  Sleeping on battery would silently
+    # disconnect active remote sessions and block new inbound connections.
+    # Both AC and battery postures are set to "nothing" so behavior is
+    # consistent regardless of power source — avoiding confusing disconnects
+    # that only happen when the laptop is unplugged.
     "org/gnome/settings-daemon/plugins/power" = {
       sleep-inactive-ac-timeout = lib.hm.gvariant.mkUint32 0;
       sleep-inactive-ac-type = "nothing";
-      sleep-inactive-battery-timeout = lib.hm.gvariant.mkUint32 60;
-      sleep-inactive-battery-type = "suspend";
+      sleep-inactive-battery-timeout = lib.hm.gvariant.mkUint32 0;
+      sleep-inactive-battery-type = "nothing";
     };
   };
 
