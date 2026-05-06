@@ -46,6 +46,14 @@
         config.allowUnfree = true;
 
         overlays = [
+          (_final: prev: {
+            # Disable chromaprint test suite to prevent OOM kills during build.
+            # The tests (FFmpegAudioReaderTest) are memory-intensive and get
+            # SIGKILL'd in the Nix sandbox's memory constraints on Apple Silicon.
+            # The resulting binary is unaffected; this suppresses an unreliable
+            # test that does not gate correct chromaprint operation in practice.
+            chromaprint = prev.chromaprint.overrideAttrs (_: { doCheck = false; });
+          })
           (_final: prev:
             let
               # Pin GnuPG to 2.5.x so PQC/Kyber subkeys can be decrypted.
