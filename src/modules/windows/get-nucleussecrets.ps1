@@ -79,6 +79,8 @@ function Get-NucleusSecrets {
       Write-Host "Machine-key decryption failed. Falling back to GPG keyring..." -ForegroundColor Yellow
     }
     finally {
+      # SilentlyContinue in a finally block prevents a cleanup failure from
+      # masking the original exception from the try block above.
       Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction SilentlyContinue
     }
   }
@@ -109,6 +111,8 @@ function Get-NucleusSecrets {
       throw "Primary-ssh decryption failed for '$FilePath' after machine-key and GPG attempts."
     }
     finally {
+      # SilentlyContinue in a finally block prevents a cleanup failure from
+      # masking the original exception from the try block above.
       Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction SilentlyContinue
     }
   }

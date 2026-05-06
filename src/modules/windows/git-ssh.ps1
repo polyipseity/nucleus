@@ -167,6 +167,6 @@ function Sync-NucleusGitAndSshConfig {
     [System.IO.File]::WriteAllLines($sshConfigPath, $outputSshLines, [System.Text.UTF8Encoding]::new($false))
   }
   elseif (Test-Path -Path $sshConfigPath) {
-    Remove-Item -Path $sshConfigPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $sshConfigPath -Force
   }
 }

@@ -81,6 +81,8 @@ function Invoke-NucleusWingetConfiguration {
   }
   finally {
     if ($tempConfigPath -and (Test-Path -Path $tempConfigPath)) {
+      # SilentlyContinue in a finally block prevents a temp-file cleanup failure
+      # from masking the original winget configure exception from the try block.
       Remove-Item -Path $tempConfigPath -Force -ErrorAction SilentlyContinue
     }
   }

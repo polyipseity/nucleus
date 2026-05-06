@@ -74,11 +74,13 @@ function Get-NucleusDecryptedBlob {
       Write-Host "Machine-key decryption failed for '$FilePath'. Falling back to GPG keyring..." -ForegroundColor Yellow
     }
     finally {
+      # SilentlyContinue in a finally block prevents a cleanup failure from
+      # masking the original exception from the try block above.
       Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction SilentlyContinue
     }
   }
 
-  $secretKeyInfo = & $GpgExe --list-secret-keys --with-colons 2>$null
+  $secretKeyInfo = & $GpgExe --list-secret-keys --with-colons
   $hasGpgSecretKeys = ($secretKeyInfo -and ($secretKeyInfo -match "^(sec|ssb):"))
   if ($hasGpgSecretKeys) {
     & $SopsExe @sopsArgs
@@ -105,6 +107,8 @@ function Get-NucleusDecryptedBlob {
       throw "Primary-ssh decryption failed for '$FilePath' after machine-key and GPG attempts."
     }
     finally {
+      # SilentlyContinue in a finally block prevents a cleanup failure from
+      # masking the original exception from the try block above.
       Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction SilentlyContinue
     }
   }

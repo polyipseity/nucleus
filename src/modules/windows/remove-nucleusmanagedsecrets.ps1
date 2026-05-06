@@ -50,7 +50,7 @@ function Remove-NucleusManagedSecrets {
       (Join-Path -Path $nucleusConfigDir -ChildPath 'managed-ssh-keys')
     )) {
     if (Test-Path -Path $managedPath) {
-      Remove-Item -Path $managedPath -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path $managedPath -Force
     }
   }
 }
