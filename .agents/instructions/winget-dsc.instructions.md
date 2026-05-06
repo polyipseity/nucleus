@@ -36,6 +36,8 @@ file):
 2. System settings (`Microsoft.Windows.Settings/*`)
 3. Registry tweaks (`Microsoft.Windows.Registry/*`)
 4. Environment variables (`Microsoft.Windows.Environment/*`)
+5. Script resources (`PSDscResources/Script`) — only for imperative steps that
+   cannot be expressed by any declarative resource type; keep these rare
 
 Within each group, sort entries alphabetically by the `settings.id` (for
 packages) or `settings.valueName` / `settings.name` (for other resources).
@@ -75,6 +77,39 @@ packages) or `settings.valueName` / `settings.name` (for other resources).
 - If a Windows UI choice reduces visibility or hides controls, explain the
   tradeoff in `directives.description:` with a short WHY and include the
   alternate access path (shortcut, command, or menu route).
+
+## PowerShell DSC resource modules
+
+`winget configure` resolves each `resource: Module/Resource` identifier against
+the PowerShell Gallery and **auto-installs** the required module if it is not
+already present in `$env:PSModulePath`.  No separate install step is needed —
+any `PSDscResources/Script` entry will cause WinGet to download and install the
+`PSDscResources` module automatically before invoking the resource.
+
+Use `PSDscResources/Script` only for imperative steps that cannot be expressed
+by any declarative resource type.  Prefer moving complex logic to
+`src/modules/windows/*.ps1` (dot-sourced by `apply.ps1`) so the DSC file stays
+a state declaration rather than a script host.
+
+**When PATH is not guaranteed during DSC execution:**
+DSC resources run in a fresh PowerShell session where `$env:PATH` may not
+include user-level tool directories (for example `~\.cargo\bin` from a prior
+`rustup init` call).  Any `PSDscResources/Script` block that invokes a
+user-installed binary must prepend the relevant path explicitly in `SetScript`
+and `TestScript`.  If that cannot be done reliably, do not add the resource —
+document the gap and rely on a graceful probe in `apply.ps1` or a
+`scripts/gc.ps1`-style script instead.
+
+**cargo-cache is intentionally NOT in `system.dsc.yml`:** `cargo-cache` has no
+WinGet package ID, and a `PSDscResources/Script` block installing it via
+`cargo install cargo-cache` would require `~\.cargo\bin` to be on PATH during
+DSC execution — which is not guaranteed after a fresh `Rustlang.Rustup` install.
+`scripts/gc.ps1` already skips the pruning step gracefully when `cargo-cache`
+is absent (`Get-Command cargo-cache` probe).  Users who want cargo-cache on
+Windows must run `cargo install cargo-cache` manually after `rustup init`.
+
+**`winget cache purge` and `winget clean` do not exist** — WinGet has no cache
+management subcommands.  Do not add either as a `SetScript` body.
 
 ## Cross-host equivalence checks
 
