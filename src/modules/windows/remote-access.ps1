@@ -13,8 +13,16 @@ function Sync-NucleusOpenSshServer {
       - Service startup type: Automatic
       - Service state: Running
       - sshd_config managed keys:
-          PasswordAuthentication no
+          AuthorizedKeysFile .ssh/authorized_keys .ssh/ssh_personal_%u.pub
           KbdInteractiveAuthentication no
+          PasswordAuthentication no
+
+    AuthorizedKeysFile is set to two paths: `.ssh/authorized_keys` (standard
+    extensibility path for future keys) and `.ssh/ssh_personal_%u.pub` (the
+    SOPS-materialized personal public key, where %u expands to the connecting
+    username at auth time).  The key is not embedded in the repository; sshd is
+    pointed at the materialized path so the authorized key follows the secret
+    management lifecycle without duplication.
 
     Also ensures the built-in "OpenSSH-Server-In-TCP" firewall rule is enabled.
 
@@ -44,8 +52,9 @@ function Sync-NucleusOpenSshServer {
   }
 
   $managedKeys = @(
-    'PasswordAuthentication',
-    'KbdInteractiveAuthentication'
+    'AuthorizedKeysFile',
+    'KbdInteractiveAuthentication',
+    'PasswordAuthentication'
   )
 
   $existingConfigLines = @(Get-Content -Path $sshdConfigPath)
@@ -67,6 +76,11 @@ function Sync-NucleusOpenSshServer {
 
   if ($Enabled) {
     $retainedConfigLines += @(
+      # %u expands to the connecting username, matching the filename that
+      # sync-nucleussecretfile.ps1 materializes from the SOPS secret bundle.
+      # .ssh/authorized_keys is retained as an extensibility slot so additional
+      # keys can be added without touching the managed config lines.
+      'AuthorizedKeysFile .ssh/authorized_keys .ssh/ssh_personal_%u.pub',
       'KbdInteractiveAuthentication no',
       'PasswordAuthentication no'
     )
