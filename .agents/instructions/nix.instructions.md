@@ -276,6 +276,59 @@ settings, run a complete enforcement cycle to confirm the script converges:
   `src/hosts/nixos/MANUAL.md`) in the same change so activation output remains
   a complete checklist.
 
+## sops-nix macOS LaunchAgent async behaviour
+
+sops-nix on macOS installs secrets via a LaunchAgent, not inline during
+activation. `launchctl bootstrap` returns before `sops-install-secrets`
+finishes writing files to `~/.config/sops-nix/secrets/`. This means:
+
+- `entryAfter = [ "sops-nix" ]` only gates on the Home Manager step that
+  *registers* the LaunchAgent — it does **not** gate on secret files actually
+  landing on disk.
+- Any activation entry that reads from `~/.config/sops-nix/secrets/`
+  (e.g. `gitIdentityFromSops`, `gpgImport`, `sshKeyAdopt`) must depend on a
+  **polling barrier** instead.
+- On Linux, sops-nix writes secrets synchronously; the barrier is a no-op there.
+
+**The `waitForSopsSecrets` pattern**
+
+Add a `home.activation.waitForSopsSecrets` entry (after `sops-nix`) that polls
+for a sentinel secret file with a 1-second sleep loop:
+
+```nix
+home.activation.waitForSopsSecrets = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+  # sops-nix on macOS installs secrets via a LaunchAgent; launchctl bootstrap
+  # returns before sops-install-secrets finishes writing files.  Poll for the
+  # git-identity sentinel (smallest secret, appears early in sops output) so
+  # subsequent activation steps read fully-written files.
+  # On Linux sops-nix writes synchronously; skip the poll immediately.
+  if [ "$(uname)" = "Darwin" ]; then
+    _sentinel="''${XDG_RUNTIME_DIR:-$HOME/.config}/sops-nix/secrets/git-identity"
+    _waited=0
+    while [ ! -s "$_sentinel" ] && [ "$_waited" -lt 30 ]; do
+      sleep 1
+      _waited=$((_waited + 1))
+    done
+    if [ ! -s "$_sentinel" ]; then
+      printf '%s\n' "nucleus: timed out waiting for sops-nix secrets after ${_waited}s" >&2
+      exit 1
+    fi
+  fi
+'';
+```
+
+**Rules:**
+
+- Wire `gitIdentityFromSops`, `gpgImport`, `sshKeyAdopt`, and any other entry
+  that reads sops-materialized secrets to depend on `waitForSopsSecrets`, not
+  `sops-nix` directly.
+- Add `"waitForSopsSecrets"` to `displayHostManualInstructionDeps` in
+  `macos.nix` and to the `entryAfter` list in `linux.nix` in the same change
+  (it must precede the terminal node on both hosts).
+- The sentinel file is the git-identity secret: smallest file, appears early in
+  `sops-install-secrets` output; once it is non-empty (`-s` test), all other
+  secrets are effectively written.
+
 ## Machine age key auto-registration
 
 The `apply.sh` dispatcher (wrapped as `nix run .#apply`) calls
@@ -353,6 +406,21 @@ agent when the managed key is newer.
 - Do not sort items whose order is semantically significant:
   `boot.initrd.availableKernelModules`, ordered `imports` lists where one
   module precedes another by design.
+
+## Shell module authoring rules
+
+**zsh alias-vs-function precedence**
+
+In zsh, aliases are expanded during the parsing phase, **before** function
+lookup. This means a `shellAliases` entry with the same name as a function will
+silently shadow the function — the function's body never executes.
+
+Consequence: never add a `shellAliases` / `programs.zsh.shellAliases` entry
+whose name matches a function defined in `initContent` or `initExtra`. The
+canonical example is thefuck: `eval $(thefuck --alias)` defines a `fuck` shell
+function that captures history and auto-executes corrections; adding
+`fuck = "thefuck"` as an alias would shadow that function with a bare binary
+invocation that neither executes the fix nor records it in history.
 
 ## Naming
 

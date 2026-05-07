@@ -83,3 +83,36 @@ applyTo: "scripts/**"
 - When script location or behavior changes, re-check `.github/workflows/ci.yml`,
   `.vscode/settings.json`, and any prompt or instruction files that reference
   it.
+
+## health-check.sh SOPS identity resolution
+
+`scripts/health-check.sh` calls `sops -d <file>` to verify that current machine
+identities can decrypt each managed secret before activation proceeds.
+
+sops does **not** search `/etc/sops/age/machine.txt` by default — it only
+checks standard user-level locations (`SOPS_AGE_KEY_FILE` env var,
+`~/Library/Application Support/sops/age/keys.txt`,
+`~/.config/sops/age/keys.txt`, etc.). On provisioned machines the machine age
+private key is written to `/etc/sops/age/machine.txt` by `deriveHostAgeKey`
+(in `posix-sops.nix`). Without an explicit pointer, every `sops -d` call falls
+through to GPG, which may not have the secret key in the keyring at
+health-check time.
+
+**Required pattern** — export `SOPS_AGE_KEY_FILE` before the sops probe loop:
+
+```sh
+# The machine age private key lives at /etc/sops/age/machine.txt (written by
+# deriveHostAgeKey).  sops does not search this path by default; set
+# SOPS_AGE_KEY_FILE so the machine identity is used on provisioned hosts.
+# On first bootstrap before deriveHostAgeKey has run the file is absent;
+# sops falls back to GPG (imported as a bootstrap prerequisite).
+_sch_machine_key="/etc/sops/age/machine.txt"
+if [ -f "$_sch_machine_key" ]; then
+  SOPS_AGE_KEY_FILE="$_sch_machine_key"
+  export SOPS_AGE_KEY_FILE
+fi
+```
+
+Without this, the health-check will fail on provisioned machines whenever the
+GPG private key is not in the running keyring (common in headless sessions or
+after a fresh login).
