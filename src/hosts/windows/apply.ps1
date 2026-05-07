@@ -67,6 +67,11 @@
 .PARAMETER EnableVsCodeSettingsParity
   Enable managed VS Code settings parity convergence and managed-key cleanup.
 
+.PARAMETER SkipAiSync
+  When specified, suppresses the post-apply Ollama model sync step.  Useful in
+  CI or on low-bandwidth connections where model pulls (2-20 GB each) are
+  undesirable.
+
 .PARAMETER MinFreeDiskGB
   Minimum free space threshold (GiB) used by the pre-flight health check.
 
@@ -84,6 +89,10 @@
 .EXAMPLE
   # Apply while explicitly scoping secret materialization to one user:
   .\apply.ps1 -PrimaryUsername 'polyipseity'
+
+.EXAMPLE
+  # Apply while skipping the post-apply Ollama model sync:
+  .\apply.ps1 -SkipAiSync
 
 .EXAMPLE
   # Apply while disabling machine age key auto-registration in .sops.yaml:
@@ -118,13 +127,15 @@ param(
   [bool]$EnableShellParity = $true,
   [bool]$EnableVsCodeExtensionsParity = $true,
   [bool]$EnableVsCodeSettingsParity = $true,
-  [int]$MinFreeDiskGB = 10
+  [int]$MinFreeDiskGB = 10,
+  [switch]$SkipAiSync
 )
 
 $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
+. (Join-Path -Path $resolvedModuleDir -ChildPath "ai-sync.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "bun-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "cargo-binstall-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "convert-sshpublickeytoage.ps1")
@@ -289,3 +300,20 @@ Sync-NucleusPowerPolicy -Enabled:$EnablePowerParity
 
 # Health check: verify archiving ecosystem (7-Zip CLI + app) is functional post-apply.
 Test-NucleusArchivingStack | Out-Null
+
+# Converge locally installed Ollama models with the declarative manifest as the
+# final step of every apply.  Model pulls are 2-20 GB, so this runs last to
+# avoid blocking earlier configuration steps.  The sync is best-effort: a
+# missing or unreachable ollama binary is informational, not a hard failure,
+# because the system configuration has already been applied successfully.
+if ($SkipAiSync) {
+  Write-Host "nucleus: -SkipAiSync set; skipping post-apply model sync"
+} else {
+  $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
+  if ($null -eq $ollamaOnPath) {
+    Write-Host "nucleus: ollama not found in PATH; skipping post-apply model sync"
+  } else {
+    Write-Host "nucleus: running post-apply AI model sync..."
+    Invoke-AiSync -RepoRoot $repoRoot
+  }
+}
