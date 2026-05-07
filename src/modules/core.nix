@@ -36,8 +36,10 @@ let
   #                    (run `nix-index` once after first activation to build the file-index database)
   #   opencode       — AI-native coding agent and assistant
   #   p7zip          — 7z compression and archive extraction utility
-  #   pay-respects   — corrects errors in previous console commands; actively maintained fork of thefuck
-  #   powershell     — cross-platform PowerShell runtime (`pwsh`)
+  #   pay-respects    — corrects errors in previous console commands; actively maintained fork of thefuck
+  #   pi-coding-agent — coding agent CLI with read, bash, edit, write tools and session management
+  #                     (Windows parity not practical: no WinGet/Scoop/cargo-binstall package; npm-only install)
+  #   powershell      — cross-platform PowerShell runtime (`pwsh`)
   #   prek           — pre-commit hook manager used by prek.toml
   #   ripgrep        — fast grep replacement
   #   rustup         — Rust toolchain manager
@@ -62,6 +64,7 @@ let
     pkgs.opencode
     pkgs.p7zip
     pkgs.pay-respects
+    pkgs.pi-coding-agent
     pkgs.powershell
     pkgs.prek
     pkgs.ripgrep
