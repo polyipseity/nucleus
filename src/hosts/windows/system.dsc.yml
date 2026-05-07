@@ -231,6 +231,18 @@ properties:
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Ensure Ollama is installed as the local LLM inference backend for
+          cross-host AI parity with macOS (launchd user agent) and NixOS
+          (system services.ollama unit).  The WinGet installer registers Ollama
+          as a background service that starts at user login and binds to
+          127.0.0.1:11434 by default.
+      settings:
+        id: Ollama.Ollama
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
       id: BunInstall
       directives:
         description: >-

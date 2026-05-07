@@ -204,6 +204,19 @@ properties:
         scope: User
 
     - resource: Microsoft.Windows.Environment/Variable
+      id: ollamaHostEnvVar
+      directives:
+        description: >-
+          Bind Ollama client tools (ollama CLI, oterm) to the loopback address
+          so API calls never cross to LAN peers.  Mirrors OLLAMA_HOST set in
+          home.sessionVariables on macOS and NixOS; explicit declaration guards
+          against upstream Ollama default changes.
+      settings:
+        name: OLLAMA_HOST
+        value: "127.0.0.1:11434"
+        scope: User
+
+    - resource: Microsoft.Windows.Environment/Variable
       id: visualEnvVar
       directives:
         description: Set VISUAL to nvim so terminal tooling follows the same preferred editor as POSIX hosts

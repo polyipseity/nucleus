@@ -19,6 +19,7 @@ let
 in
 {
   imports = [
+    ./ai
     ./core.nix
     ./editors.nix
     ./fonts.nix

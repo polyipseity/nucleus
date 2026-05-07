@@ -9,6 +9,7 @@
     ../../modules/posix-security.nix
     ../../modules/posix-sops.nix
     ../../modules/posix-user-shell.nix
+    ./ai.nix
     ./base.nix
     ./desktop.nix
     ./hardware/cpu.nix
