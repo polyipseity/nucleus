@@ -111,6 +111,165 @@ Windows must run `cargo install cargo-cache` manually after `rustup init`.
 **`winget cache purge` and `winget clean` do not exist** — WinGet has no cache
 management subcommands.  Do not add either as a `SetScript` body.
 
+## PSDscResources/Script resource
+
+### Purpose and advantages
+
+Wrapping imperative logic in a `PSDscResources/Script` block makes the
+*management* of that logic declarative, even though the code inside remains
+imperative. Four concrete benefits:
+
+1. **Idempotency by design** — `TestScript` is the authoritative check;
+   `SetScript` only runs when `TestScript` returns `$false`, so no manual
+   `if`-guards needed.
+2. **Dependency orchestration** — `dependsOn` ensures ordering relative to
+   other resources (e.g., run after a package is installed).
+3. **`--what-if` support** — `winget configure --what-if` executes `TestScript`
+   for all resources and reports what *would* change without applying
+   `SetScript`.
+4. **Drift detection** — re-running `TestScript` later reveals configuration
+   drift without triggering re-installation.
+
+### YAML structure
+
+```yaml
+- resource: PSDscResources/Script
+  id: ExampleResourceId          # required when other resources use dependsOn
+  directives:
+    description: >-
+      WHY this resource exists and what invariant it maintains.
+  settings:
+    GetScript: |
+      return @{ Result = if (Test-Path "$env:USERPROFILE\.example") { "Present" } else { "Absent" } }
+    TestScript: |
+      return Test-Path "$env:USERPROFILE\.example"
+    SetScript: |
+      New-Item -Path "$env:USERPROFILE\.example" -ItemType Directory -Force
+```
+
+### Candidacy criteria — ALL four must hold
+
+Use `PSDscResources/Script` only when:
+
+1. A meaningful `TestScript` can be written — a simple, reliable boolean check
+   of the desired state.
+2. No native DSC resource (`Microsoft.Windows.Registry`,
+   `Microsoft.Windows.Environment`, etc.) already covers the same state.
+3. PATH is guaranteed or can be explicitly prepended in both `TestScript` and
+   `SetScript`. DSC runs in a fresh PowerShell session where user-level tool
+   directories (e.g., `~\.cargo\bin`, `~\scoop\shims`) may not be on PATH.
+   Any block invoking a user-installed binary must prepend its directory
+   explicitly.
+4. Moving to DSC provides a genuine benefit — idempotency, `dependsOn`
+   ordering, or `--what-if` reporting — that the existing `apply.ps1` call
+   does not already provide.
+
+### Path resolution in DSC context
+
+When dot-sourcing repo modules from `SetScript`, use an explicit repo-relative
+path anchored to `$PSScriptRoot` or a known env var rather than assuming the
+working directory:
+
+```powershell
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+. "$repoRoot\src\modules\windows\your-module.ps1"
+Your-Function
+```
+
+### When NOT to use PSDscResources/Script
+
+Do **not** use a Script block for:
+
+- **Secrets/SOPS/GPG operations**: PATH dependencies on GPG, complex state,
+  explicitly excluded by policy.
+- **Wallpaper provisioning**: SOPS decryption, complex multi-file management,
+  explicitly excluded by policy.
+- **SSH host key bootstrap or registration**: service lifecycle,
+  network/git operations, timing-dependent state.
+- **VS Code extension management**: `code`/`code-insiders` CLI not guaranteed
+  in PATH during DSC execution.
+- **Git/SSH config sync**: depends on SOPS-materialized files produced *outside*
+  DSC — `dependsOn` cannot model this ordering.
+- **Shell profile editing (managed-block pattern)**: complex file editing;
+  inline YAML PowerShell would be fragile.
+- **Service lifecycle management** (OpenSSH, RDP TermService): no reliable
+  boolean `TestScript` without running `Get-Service` inline.
+- **`powercfg.exe`-based power policy**: no structured query API; output
+  parsing fragile in YAML.
+- **Health checks / post-apply probes**: these are assertions, not convergence
+  state.
+
+### Audit result for this repository
+
+A full audit of every `apply.ps1` operation against the four candidacy
+criteria found **zero candidates**: every operation fails at least one criterion
+(complex state, uncertain PATH, existing native resource, or
+service/crypto dependency). The existing architecture — DSC for
+packages/registry/environment/settings, `apply.ps1` for everything requiring
+crypto, service lifecycle, file-editing with managed blocks, or CLI tools with
+uncertain PATH — is correct.
+
+## Scoop as user-space package manager
+
+### Role and scope
+
+Scoop is the user-space package manager for portable CLI utilities that have no
+WinGet package ID. It installs to `%USERPROFILE%\scoop\` without requiring
+admin rights. Use Scoop for tools like `thefuck` that are not available via
+WinGet.
+
+### Declaring Scoop in system.dsc.yml
+
+Install Scoop itself via WinGet (package ID `Scoop.Scoop`). Scoop requires
+`Git.Git` for bucket management; ensure it appears in the packages list. Use
+`dependsOn` to enforce ordering:
+
+```yaml
+- resource: Microsoft.WinGet.Client/Package
+  id: ScoopInstall
+  directives:
+    description: >-
+      Scoop user-space package manager for portable CLI utilities not
+      available via WinGet (e.g. thefuck).  Requires Git for bucket
+      management; declared after Git.Git via dependsOn.
+  settings:
+    id: Scoop.Scoop
+    source: winget
+  dependsOn:
+    - GitInstall   # the id: of the Git.Git package entry
+```
+
+### Scoop bucket and app provisioning
+
+Do **not** use `PSDscResources/Script` for Scoop bucket or app management after
+a fresh `Scoop.Scoop` install. Reason: `scoop` lives at
+`~\scoop\shims\scoop.ps1` which is not on PATH in the DSC execution session
+immediately after WinGet installs Scoop — the same PATH-guarantee constraint
+that excludes cargo-cache.
+
+Instead, manage Scoop buckets and apps in a dedicated module
+`src/modules/windows/scoop-setup.ps1` dot-sourced and called by `apply.ps1`
+**after** the DSC run completes, so `~\scoop\shims` is resolvable by then.
+
+### Idempotency in Scoop operations
+
+All Scoop install/bucket operations must be guarded:
+
+```powershell
+if (-not (scoop bucket list | Select-String -Quiet "^extras$")) {
+    scoop bucket add extras
+}
+if (-not (scoop which thefuck -ErrorAction SilentlyContinue 2>$null)) {
+    # -ErrorAction SilentlyContinue is intentional: scoop which exits non-zero
+    # when the app is absent, which is the expected probe condition.  The if-guard
+    # checks the result immediately.
+    scoop install thefuck
+    if (-not (Get-Command thefuck -ErrorAction SilentlyContinue)) {
+        Write-Error "scoop: thefuck install failed — 'thefuck' binary not found after install"
+    }
+}
+```
+
 ## Cross-host equivalence checks
 
 - Before adding a Windows package, check whether the capability should be
