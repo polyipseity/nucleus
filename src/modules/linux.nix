@@ -4,7 +4,7 @@
 #
 # Systemd user units managed by this module:
 #   nix-index-update.service — rebuilds the nix-index file database on demand.
-#   nix-index-update.timer   — fires weekly (Sunday 03:00) with Persistent=true.
+#   nix-index-update.timer   — fires weekly (Sunday 00:00) with Persistent=true.
 { config, lib, pkgs, ... }:
 let
   # Host-scoped manual checklist rendered at the end of Linux activation so the
@@ -204,7 +204,7 @@ lib.mkIf pkgs.stdenv.isLinux {
   # Keeps the nix-index file database current so pay-respects can suggest
   # `nix profile install` commands when an unknown command is typed.
   #
-  # The timer fires weekly (Sunday 03:00, Persistent=true) so the DB stays
+  # The timer fires weekly (Sunday 00:00, Persistent=true) so the DB stays
   # fresh even on infrequently used machines.  buildNixIndex handles the
   # first-provision case so the DB is available before the timer first fires.
   # --------------------------------------------------------------------------
@@ -225,11 +225,11 @@ lib.mkIf pkgs.stdenv.isLinux {
       Description = "Weekly nix-index database refresh";
     };
     Timer = {
-      # Fire every Sunday at 03:00 local time.  Persistent=true ensures the
+      # Fire every Sunday at 00:00 local time.  Persistent=true ensures the
       # timer fires on the next login when the machine was off at the
       # scheduled time, preventing the DB from going indefinitely stale on
       # infrequently-used machines.
-      OnCalendar = "Sun 03:00:00";
+      OnCalendar = "Sun 00:00:00";
       Persistent = true;
       Unit = "nix-index-update.service";
     };

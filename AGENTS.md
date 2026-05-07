@@ -144,6 +144,11 @@
   ascending order is the default. Do not sort items whose order is load-order
   or semantically significant (e.g. `boot.initrd.availableKernelModules`,
   module import lists where one module must precede another).
+- **Scheduled task time slots**: when adding or updating any recurring background
+  task (launchd `StartCalendarInterval`, systemd `OnCalendar`, Task Scheduler
+  trigger, etc.) use these canonical fire times: daily → 00:00; weekly → Sunday
+  00:00; monthly → first day of the month at 00:00. Do not use arbitrary
+  off-peak times (e.g. 03:00); 00:00 is the repository-wide standard.
 - **Naming style**: avoid `nucleus` branding prefixes in new identifiers
   (activation names, helper names, options, scripts) unless a prefix is needed
   for external integration or collision avoidance.

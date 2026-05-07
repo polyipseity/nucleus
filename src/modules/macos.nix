@@ -18,7 +18,7 @@
 #   local.betterdisplay-heartbeat — polls HeadlessDisplay every 30 s and
 #     reconnects it if BetterDisplay drops the virtual screen connection.
 #   local.nix-index-update — rebuilds the nix-index file database weekly
-#     (Sunday 03:00) and on every agent load; a freshness check makes
+#     (Sunday 00:00) and on every agent load; a freshness check makes
 #     reloads a fast no-op when the DB was updated within the past 6 days.
 { lib, pkgs, ... }:
 let
@@ -974,9 +974,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
       # DB is absent or stale gets an immediate rebuild rather than waiting
       # for the next weekly calendar window.
       RunAtLoad = true;
-      # Weekly Sunday 03:00 rebuild to keep the index current with nixpkgs
+      # Weekly Sunday 00:00 rebuild to keep the index current with nixpkgs
       # updates.  Weekday 0 = Sunday in launchd's calendar convention.
-      StartCalendarInterval = [{ Hour = 3; Minute = 0; Weekday = 0; }];
+      StartCalendarInterval = [{ Hour = 0; Minute = 0; Weekday = 0; }];
       # Suppress per-build output to avoid filling system logs.  See above.
       StandardOutPath = "/dev/null";
       StandardErrorPath = "/dev/null";
