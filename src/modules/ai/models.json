@@ -1,0 +1,14 @@
+{
+  "models": {
+    "mac": [
+      "gemma4:26b-a4b-q4_K_M",
+      "phi4:latest",
+      "qwen3-coder:32b-q4_K_S"
+    ],
+    "pc": [
+      "gemma4:e4b-q8_0",
+      "phi4:latest",
+      "qwen3-coder:14b-q5_K_M"
+    ]
+  }
+}
