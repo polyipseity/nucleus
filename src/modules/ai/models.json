@@ -1,14 +1,10 @@
 {
   "models": {
     "mac": [
-      "phi4-mini:3.8b",
-      "qwen2.5-coder:14b",
       "qwen3:14b"
     ],
     "pc": [
-      "phi4-mini:3.8b",
-      "qwen2.5-coder:7b",
-      "qwen2.5:1.5b"
+      "qwen3:8b"
     ]
   }
 }
