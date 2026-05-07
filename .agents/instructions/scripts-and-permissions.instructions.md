@@ -1,7 +1,7 @@
 ---
-description: "Use when adding or editing files under scripts/. Covers script placement, newline policy, cross-platform behavior, runtime detection, and permission expectations."
+description: "Use when adding or editing files under scripts/, src/scripts/, or src/modules/windows/. Covers script placement, newline policy, cross-platform behavior, runtime detection, and permission expectations."
 name: "Scripts and Executable Permissions"
-applyTo: "scripts/**"
+applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
 ---
 
 # Scripts and Executable Permissions
@@ -46,15 +46,17 @@ applyTo: "scripts/**"
   - `*.ps1` uses CRLF
   - `*.bat` uses CRLF
   - additional script types should get explicit policy before widespread use
-- Every script file in `scripts/` must have its executable bit tracked in Git,
-  regardless of extension (`.sh`, `.ps1`, `.bat`, or others). This applies to
-  Windows scripts too — Git stores the executable bit independent of CRLF line
-  endings, and many CI environments and tooling wrappers check the mode before
-  invoking scripts. Set it with
-  `git update-index --chmod=+x scripts/<name>.<ext>` when adding or renaming
-  any script. Verify the stored mode with `git ls-files --stage scripts/`
-  (mode `100755` is correct; `100644` is not). Non-script data files such as
-  `bootstrap-versions.env` should remain `100644`.
+- Every `.sh`, `.ps1`, and `.bat` script file anywhere in the repository must
+  have its executable bit tracked in Git, regardless of location (`scripts/`,
+  `src/scripts/`, `src/hosts/windows/`, `src/modules/windows/`, or elsewhere).
+  This applies to Windows scripts too — Git stores the executable bit
+  independent of CRLF line endings, and many CI environments and tooling
+  wrappers check the mode before invoking scripts. Set it with
+  `git update-index --chmod=+x <path>` when adding or renaming any script.
+  Verify the stored mode with `git ls-files --stage <path>` (mode `100755` is
+  correct; `100644` is not). Non-script data files such as
+  `bootstrap-versions.env`, `.yml`, `.json`, and `.nix` files must remain
+  `100644`.
 - If you add a new script extension or change placement conventions, update the
   related config and any tests in the same change.
 

@@ -79,6 +79,13 @@
   `.opencode/commands/` when both copies exist.
 - Respect the repository newline policy: Markdown and shell scripts use LF;
   PowerShell and batch scripts use CRLF.
+- **Executable bit policy**: every `.sh`, `.ps1`, and `.bat` file anywhere in
+  the repository must be tracked in Git with mode `100755`. This includes
+  `src/hosts/windows/apply.ps1`, all `src/modules/windows/*.ps1`, and
+  `src/scripts/apply.sh`. Set the bit with
+  `git update-index --chmod=+x <path>` when adding or renaming any script.
+  Non-script files (`.env`, `.yml`, `.json`, `.nix`, `.md`, `.jsonc`) must
+  remain `100644`.
 - **YAML extension policy**: use `.yml` for repository YAML files. Do not add
   long-extension YAML filenames. Exception: `.sops.yaml` is required by SOPS
   config discovery and must keep that exact name.
