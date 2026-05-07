@@ -6,10 +6,11 @@
 #   • OLLAMA_HOST session variable that binds client tools to the loopback address
 #   • macOS: launchd user agent that keeps the Ollama server running persistently
 #
-# Model management is intentionally NOT part of activation — model pulls are
-# 2–20 GB and would make `nix run .#apply` hang indefinitely.  Use
-# scripts/ai-sync.sh to synchronise the declared model manifest with the
-# locally installed set after provisioning.
+# Model management is NOT part of Home Manager activation — model pulls are
+# 2–20 GB and would make `nix run .#apply` hang indefinitely if run inline.
+# Instead, apply.sh and apply.ps1 call scripts/ai-sync.sh / Invoke-AiSync as
+# the final step of every apply run.  Pass --skip-ai-sync (-SkipAiSync on
+# Windows) to suppress the sync step in CI or on low-bandwidth connections.
 { lib, pkgs, ... }:
 lib.mkMerge [
   {
