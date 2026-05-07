@@ -163,6 +163,7 @@ lib.mkIf pkgs.stdenv.isLinux {
       "gpgImport"
       "sshKeyAdopt"
       "verifySecretDecryption"
+      "waitForSopsSecrets"
       "wallpaperProvision"
     ] ''
       echo "--- MANUAL SETUP (one-time, required) ---" >&2

@@ -175,6 +175,39 @@ lib.mkIf isPrimaryUser {
   };
 
   # --------------------------------------------------------------------------
+  # waitForSopsSecrets
+  # Synchronises downstream activation on macOS where sops-nix registers a
+  # LaunchAgent (org.nix-community.home.sops-nix) that runs
+  # sops-install-secrets asynchronously.  launchctl bootstrap returns before
+  # decryption completes, so without this barrier the hooks
+  # gitIdentityFromSops, gpgImport, and sshKeyAdopt would fail with "missing
+  # decrypted secret" on first apply or after a clean bootstrap.
+  #
+  # We poll the git identity secret as a sentinel: it is the smallest file
+  # written by sops-install-secrets and serves as a reliable proxy for a
+  # successful decryption run.  A 30-second deadline is intentionally generous
+  # — sops-install-secrets completes in well under a second when
+  # /etc/sops/age/machine.txt is present.
+  #
+  # On Linux, sops-nix runs sops-install-secrets inline (no LaunchAgent) so
+  # the sentinel already exists when this hook fires; the loop exits
+  # immediately with no added latency.
+  # --------------------------------------------------------------------------
+  home.activation.waitForSopsSecrets = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+    _wss_sentinel="${config.sops.secrets.${gitIdentitySecretName}.path}"
+    _wss_deadline=30
+    _wss_waited=0
+    while [ ! -s "$_wss_sentinel" ] && [ "$_wss_waited" -lt "$_wss_deadline" ]; do
+      sleep 1
+      _wss_waited=$((_wss_waited + 1))
+    done
+    if [ ! -s "$_wss_sentinel" ]; then
+      echo "nucleus: timed out after 30 s waiting for sops-nix to materialize secrets; sops-install-secrets may have failed or /etc/sops/age/machine.txt may be absent." >&2
+      exit 1
+    fi
+  '';
+
+  # --------------------------------------------------------------------------
   # gitIdentityFromSops
   # Reads SOPS-managed git_identity_<user> and writes name/email/signingkey
   # into ~/.config/git/identity so identity stays in secret material rather
@@ -195,7 +228,7 @@ lib.mkIf isPrimaryUser {
   #      git config --file creates the file if absent and overwrites values
   #      idempotently on repeated activation runs.
   # --------------------------------------------------------------------------
-  home.activation.gitIdentityFromSops = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+  home.activation.gitIdentityFromSops = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
     identity_path="${config.sops.secrets.${gitIdentitySecretName}.path}"
 
     if [ ! -f "$identity_path" ]; then
@@ -225,8 +258,8 @@ lib.mkIf isPrimaryUser {
   # Imports the managed GPG private key from SOPS into the keyring and
   # enforces ultimate ownertrust on the managed primary fingerprint.
   #
-  # Runs after sops-nix has materialized decrypted secret files.
-  # gpg --import is idempotent, so repeated activations are safe.
+  # Runs after waitForSopsSecrets has confirmed decrypted secret files are
+  # present; gpg --import is idempotent, so repeated activations are safe.
   #
   # Trust invariant:
   #   Treat the first key carried by the managed secret blob as the user's
@@ -256,7 +289,7 @@ lib.mkIf isPrimaryUser {
   # `--batch` (`IPC parameter error`) on this key format. We intentionally use
   # a non-batch import invocation to ensure a successful secret-key import.
   # --------------------------------------------------------------------------
-  home.activation.gpgImport = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+  home.activation.gpgImport = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
     export GNUPGHOME="${config.home.homeDirectory}/.gnupg"
     mkdir -p "$GNUPGHOME"
     chmod 700 "$GNUPGHOME"
@@ -340,7 +373,7 @@ lib.mkIf isPrimaryUser {
    #      provision), flush the SSH agent (ssh-add -D).
    #   5. Write the current fingerprint to the manifest.
    # --------------------------------------------------------------------------
-   home.activation.sshKeyAdopt = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+   home.activation.sshKeyAdopt = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
      ssh_pub_path="${sshPublicKeyPath}"
      nucleus_config_dir="$HOME/.config/nucleus"
      managed_ssh_manifest="$nucleus_config_dir/managed-ssh-keys"

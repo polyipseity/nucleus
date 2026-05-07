@@ -261,6 +261,7 @@ let
     "verifyArchivingStack"
     "verifySecretDecryption"
     "vscodeDarwinExtensionBridge"
+    "waitForSopsSecrets"
     "wallpaperProvision"
     "writeBoundary"
   ];
