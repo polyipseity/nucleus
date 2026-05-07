@@ -194,6 +194,18 @@ in
       # Show the Input Menu (language switcher) in the menu bar.
       "com.apple.TextInputMenu".visible = true;
 
+      # Voice Memos: always record at uncompressed (lossless) quality.
+      # RCVoiceMemosAudioQualityKey controls recording format:
+      #   0 = AAC (compressed) — the factory default, trades quality for file size
+      #   1 = Uncompressed (AIFF/WAV lossless) — preferred here because recordings
+      #       retain full fidelity for archival, transcription, and re-export; any
+      #       lossy transcoding can be done downstream on a copy without degrading
+      #       the original capture.
+      # Voice Memos is Apple-only; no Windows/NixOS equivalent exists.
+      "com.apple.VoiceMemos" = {
+        RCVoiceMemosAudioQualityKey = 1;
+      };
+
       # Window Manager: enable click-to-show-desktop, hide Stage Manager widgets
       # for lower visual noise, and keep window tiling enabled (macOS 15+).
       "com.apple.WindowManager" = {

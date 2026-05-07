@@ -45,6 +45,7 @@ let
     "com.apple.TextEdit"
     "com.apple.TextInput.Kybd"
     "com.apple.TextInputMenu"
+    "com.apple.VoiceMemos"
     "com.apple.WindowManager"
     "com.apple.assistant.support"
     "com.apple.commerce"
