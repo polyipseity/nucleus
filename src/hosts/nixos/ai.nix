@@ -23,5 +23,22 @@
     # Enable NVIDIA or AMD acceleration by setting:
     #   acceleration = "cuda";  # NVIDIA
     #   acceleration = "rocm";  # AMD (also requires compatible hardware modules)
+
+    # Compress the KV cache with 4-bit quantisation to halve KV-cache RAM
+    # footprint, enable flash attention to reduce attention memory overhead,
+    # and set a 32 k token default context window so models that default to
+    # 2 k or 4 k do not silently truncate long conversations.
+    environmentVariables = {
+      OLLAMA_FLASH_ATTENTION = "1";
+      OLLAMA_KV_CACHE_TYPE = "q4_0";
+      OLLAMA_NUM_CTX = "32768";
+    };
   };
+
+  # Cap the Ollama systemd service at 16 GB RSS so an oversized model pull
+  # or runaway inference session cannot exhaust RAM and cause OOM kills of
+  # unrelated system services.  macOS has no equivalent RLIMIT-based RAM cap
+  # mechanism via launchd; the loopback-only binding and model manifest are
+  # the macOS memory guard instead.
+  systemd.services.ollama.serviceConfig.MemoryMax = "16G";
 }

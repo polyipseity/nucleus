@@ -50,7 +50,19 @@ lib.mkMerge [
         # Ollama default on some versions) would expose model inference to
         # anyone on the local network without any authentication requirement.
         EnvironmentVariables = {
+          # Compress the KV cache with 4-bit quantisation to halve the
+          # KV-cache RAM footprint so larger context windows fit in unified
+          # memory without evicting model weights from the metal buffer pool.
+          OLLAMA_FLASH_ATTENTION = "1";
           OLLAMA_HOST = "127.0.0.1:11434";
+          # q4_0 compression paired with flash attention achieves a good
+          # quality/memory tradeoff; switch to f16 if accuracy regressions
+          # appear on specific models.
+          OLLAMA_KV_CACHE_TYPE = "q4_0";
+          # Set a 32 k token default context window so models that default to
+          # 2 k or 4 k do not silently truncate long conversations.  Individual
+          # `ollama run` calls can still override with --ctx=N.
+          OLLAMA_NUM_CTX = "32768";
         };
         # Restart the server automatically after crashes or macOS restarts
         # so the inference endpoint is always available without manual

@@ -204,6 +204,20 @@ properties:
         scope: User
 
     - resource: Microsoft.Windows.Environment/Variable
+      id: ollamaFlashAttentionEnvVar
+      directives:
+        description: >-
+          Enable Ollama flash attention to reduce the memory overhead of the
+          attention mechanism during inference, keeping peak VRAM usage lower
+          on GPU-backed sessions and reducing RAM pressure on CPU-only runs.
+          Mirrors OLLAMA_FLASH_ATTENTION set in the macOS launchd agent and
+          the NixOS services.ollama.environmentVariables block.
+      settings:
+        name: OLLAMA_FLASH_ATTENTION
+        value: "1"
+        scope: User
+
+    - resource: Microsoft.Windows.Environment/Variable
       id: ollamaHostEnvVar
       directives:
         description: >-
@@ -214,6 +228,32 @@ properties:
       settings:
         name: OLLAMA_HOST
         value: "127.0.0.1:11434"
+        scope: User
+
+    - resource: Microsoft.Windows.Environment/Variable
+      id: ollamaKvCacheTypeEnvVar
+      directives:
+        description: >-
+          Compress the KV cache with 4-bit quantisation to halve the KV-cache
+          RAM footprint so larger context windows fit without evicting model
+          weights.  Mirrors OLLAMA_KV_CACHE_TYPE set in the macOS launchd
+          agent and the NixOS services.ollama.environmentVariables block.
+      settings:
+        name: OLLAMA_KV_CACHE_TYPE
+        value: q4_0
+        scope: User
+
+    - resource: Microsoft.Windows.Environment/Variable
+      id: ollamaNumCtxEnvVar
+      directives:
+        description: >-
+          Set a 32 k token default context window so models that default to
+          2 k or 4 k do not silently truncate long conversations.  Mirrors
+          OLLAMA_NUM_CTX set in the macOS launchd agent and the NixOS
+          services.ollama.environmentVariables block.
+      settings:
+        name: OLLAMA_NUM_CTX
+        value: "32768"
         scope: User
 
     - resource: Microsoft.Windows.Environment/Variable
