@@ -81,12 +81,6 @@ in
         # currently outside nix-darwin's typed NSGlobalDomain option set.
         NSToolbarTitleViewRolloverDelay = 0.0;
 
-        # Ensure fullscreen exit button is always visible when a window is
-        # fullscreened in Stage Manager, so users can easily return to windowed
-        # mode. Set to false to show the standard prominent fullscreen button
-        # instead of letting macOS hide it when it deems it "optimized" away.
-        NSWindowFullScreenButtonOptimized = false;
-
         # Text substitution dictionary that suppresses autocorrect for
         # technical terms and product names used frequently in this setup.
         # This key is not available as a typed nix-darwin NSGlobalDomain
