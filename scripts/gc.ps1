@@ -12,9 +12,13 @@
         binary is present on PATH.  cargo-cache is installed via cargo-binstall
         by Invoke-CargoBinstallSetup (apply.ps1).  The presence probe below keeps
         this step a no-op until cargo-binstall setup has run.
-    3. Remove old Scoop app versions and installer caches via `scoop cleanup *`.
-       Guarded by a Scoop presence check so the step is a no-op when Scoop is
-       not yet installed (e.g. before the first apply.ps1 run).
+     3. Remove old Scoop app versions and installer caches via `scoop cleanup *`.
+        Guarded by a Scoop presence check so the step is a no-op when Scoop is
+        not yet installed (e.g. before the first apply.ps1 run).
+     4. Remove locally installed Ollama models absent from the declarative manifest
+        at src/modules/ai/models.json.  Uses Invoke-AiSync -PruneOnly so no new
+        model pulls are triggered — GC only reclaims space.  Guarded by an ollama
+        presence check so the step is a no-op when Ollama is not installed.
 
   All file operations are scoped to the primary user profile.  The script is
   idempotent and safe to re-run.
@@ -30,6 +34,9 @@
 .PARAMETER SkipCargoCache
   Skip cargo-cache pruning even when cargo-cache is available on PATH.
 
+.PARAMETER SkipOllamaPrune
+  Skip Ollama orphaned model removal even when ollama is installed.
+
 .PARAMETER SkipScoopCleanup
   Skip Scoop cache and old-version cleanup even when Scoop is installed.
 
@@ -39,6 +46,7 @@
 .EXAMPLE
   .\scripts\gc.ps1
   .\scripts\gc.ps1 -SkipCargoCache
+  .\scripts\gc.ps1 -SkipOllamaPrune
   .\scripts\gc.ps1 -SkipScoopCleanup
   .\scripts\gc.ps1 -SkipWallpaperPrune -SkipCargoCache
 #>
@@ -47,6 +55,7 @@ param(
   [string]$ModuleDir = (Join-Path -Path $PSScriptRoot -ChildPath "..\src\modules\windows"),
   [string]$RepoRoot  = (Join-Path -Path $PSScriptRoot -ChildPath ".."),
   [switch]$SkipCargoCache,
+  [switch]$SkipOllamaPrune,
   [switch]$SkipScoopCleanup,
   [switch]$SkipWallpaperPrune
 )
@@ -58,6 +67,7 @@ $resolvedRepoRoot  = (Resolve-Path -Path $RepoRoot).Path
 
 # Load only the modules required by this script.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusstalewallpapers.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "ai-sync.ps1")
 
 # ---- Step 1: stale wallpaper cleanup ----------------------------------------
 # Keeps the decrypted gallery in sync with declarative source blobs.  Without
@@ -107,6 +117,20 @@ if (-not $SkipScoopCleanup) {
     if ($LASTEXITCODE -ne 0) {
       Write-Warning "gc: scoop cleanup exited with code $LASTEXITCODE"
     }
+  }
+}
+
+# ---- Step 4: Ollama orphaned model prune ------------------------------------
+# Removes locally installed Ollama models that are absent from the declarative
+# manifest at src/modules/ai/models.json.  Uses -PruneOnly so GC never
+# triggers multi-GB model pulls — only space reclamation.  Guarded by an
+# ollama presence check so this step is a no-op before Ollama is installed.
+if (-not $SkipOllamaPrune) {
+  $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
+  if ($null -eq $ollamaCmd) {
+    Write-Host "gc: ollama not installed; skipping ollama model prune"
+  } else {
+    Invoke-AiSync -PruneOnly -RepoRoot $resolvedRepoRoot
   }
 }
 

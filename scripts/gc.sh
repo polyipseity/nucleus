@@ -6,11 +6,13 @@
 #   2. run nix store garbage collection (if nix is available)
 #   3. remove stale decrypted wallpaper files under ~/Pictures/wallpapers
 #   4. prune cargo source/registry/advisory-db cache (if cargo-cache is available)
+#   5. remove locally installed Ollama models absent from the manifest (if ollama is available)
 #
 # Arguments:
 #   --skip-cargo-cache     skip cargo-cache -r all
 #   --skip-hm-gc           skip home-manager expire-generations
 #   --skip-nix-gc          skip nix-collect-garbage
+#   --skip-ollama-prune    skip stale Ollama model removal
 #   --skip-wallpaper-prune skip stale wallpaper cleanup
 #
 # Environment variables:
@@ -27,6 +29,7 @@ REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 skip_cargo_cache=false
 skip_hm_gc=false
 skip_nix_gc=false
+skip_ollama_prune=false
 skip_wallpaper_prune=false
 
 while [ "$#" -gt 0 ]; do
@@ -39,6 +42,9 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-nix-gc)
       skip_nix_gc=true
+      ;;
+    --skip-ollama-prune)
+      skip_ollama_prune=true
       ;;
     --skip-wallpaper-prune)
       skip_wallpaper_prune=true
@@ -134,6 +140,30 @@ prune_cargo_cache_if_available() {
   cargo-cache -r all
 }
 
+prune_ollama_models_if_available() {
+  # Remove locally installed Ollama models that are absent from the declarative
+  # manifest at src/modules/ai/models.json.  Delegates to ai-sync.sh with
+  # --prune-only so no new pulls are attempted during GC — a GC run should only
+  # reclaim space, not trigger multi-GB model downloads.
+  #
+  # The probe below checks for both ollama and jq before delegating; ai-sync.sh
+  # performs the same checks internally but printing a single skip message here
+  # avoids noise from two separate absence warnings.
+  if ! command -v ollama >/dev/null 2>&1; then
+    # Existence probe — tool absent is expected and benign before Ollama
+    # has been provisioned on this host.
+    printf '%s\n' "nucleus: ollama unavailable; skipping ollama model prune"
+    return 0
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    # jq is required by ai-sync.sh to parse the JSON manifest.
+    printf '%s\n' "nucleus: jq unavailable; skipping ollama model prune"
+    return 0
+  fi
+
+  "$SCRIPT_DIR/ai-sync.sh" --prune-only
+}
+
 # Step 1: expire HM generations before Nix store GC so the store can reclaim
 # paths that were previously held alive as generation GC roots.
 if [ "$skip_hm_gc" = false ]; then
@@ -153,6 +183,11 @@ fi
 # Step 4: cargo cache prune (independent of Nix, runs last).
 if [ "$skip_cargo_cache" = false ]; then
   prune_cargo_cache_if_available
+fi
+
+# Step 5: remove orphaned Ollama models not declared in the manifest.
+if [ "$skip_ollama_prune" = false ]; then
+  prune_ollama_models_if_available
 fi
 
 printf '%s\n' "nucleus: gc workflow completed"
