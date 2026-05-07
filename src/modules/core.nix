@@ -20,9 +20,10 @@
 { config, lib, pkgs, options, ... }:
 let
   # Packages installed on every host regardless of OS.
-  #   bat        — syntax-highlighted cat replacement
-  #   bottom     — cross-platform system monitor (btm)
-  #   cargo-cache — reclaim disk space from ~/.cargo registry, git, and advisory-db clones
+  #   bat            — syntax-highlighted cat replacement
+  #   bottom         — cross-platform system monitor (btm)
+  #   cargo-binstall — Rust crate binary installer; last-resort fallback when a package is absent from nixpkgs/WinGet/Scoop
+  #   cargo-cache    — reclaim disk space from ~/.cargo registry, git, and advisory-db clones
   #   direnv     — per-directory env loader (shell integration in shell.nix)
   #   eza        — modern ls with colour and icons
   #   fd         — fast find replacement
@@ -45,6 +46,7 @@ let
   baseSharedPackages = [
     pkgs.bat
     pkgs.bottom
+    pkgs.cargo-binstall
     pkgs.cargo-cache
     pkgs.direnv
     pkgs.eza

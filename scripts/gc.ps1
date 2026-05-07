@@ -8,9 +8,10 @@
 
     1. Remove stale decrypted wallpaper files under %USERPROFILE%\Pictures\wallpapers
        that no longer have a matching *.sops blob in src/assets/wallpapers/.
-    2. Prune the Cargo source/registry/advisory-db cache via cargo-cache if the
-       binary is present on PATH.  cargo-cache has no WinGet package; install it
-       with `cargo install cargo-cache` after rustup sets up the toolchain.
+     2. Prune the Cargo source/registry/advisory-db cache via cargo-cache if the
+        binary is present on PATH.  cargo-cache is installed via cargo-binstall
+        by Invoke-CargoBinstallSetup (apply.ps1).  The presence probe below keeps
+        this step a no-op until cargo-binstall setup has run.
     3. Remove old Scoop app versions and installer caches via `scoop cleanup *`.
        Guarded by a Scoop presence check so the step is a no-op when Scoop is
        not yet installed (e.g. before the first apply.ps1 run).
@@ -73,10 +74,9 @@ if (-not $SkipWallpaperPrune) {
 # %USERPROFILE%\.cargo\registry, %USERPROFILE%\.cargo\git, and advisory-db
 # clones that accumulate during Rust development sessions.
 #
-# cargo-cache has no WinGet package; the binary becomes available after running
-# `cargo install cargo-cache` once rustup (Rustlang.Rustup, system.dsc.yml)
-# has set up the toolchain.  The presence probe below keeps this step a no-op
-# until then so gc.ps1 is safe to run at any time.
+# cargo-cache is installed via cargo-binstall by Invoke-CargoBinstallSetup.
+# The presence probe below keeps this step a no-op on machines where
+# cargo-binstall setup has not yet run, so gc.ps1 is safe to call at any time.
 if (-not $SkipCargoCache) {
   # Existence probe — command absent is expected and benign before cargo-cache
   # is manually installed.  The result is checked immediately below.

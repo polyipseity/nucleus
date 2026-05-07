@@ -100,13 +100,11 @@ and `TestScript`.  If that cannot be done reliably, do not add the resource —
 document the gap and rely on a graceful probe in `apply.ps1` or a
 `scripts/gc.ps1`-style script instead.
 
-**cargo-cache is intentionally NOT in `system.dsc.yml`:** `cargo-cache` has no
-WinGet package ID, and a `PSDscResources/Script` block installing it via
-`cargo install cargo-cache` would require `~\.cargo\bin` to be on PATH during
-DSC execution — which is not guaranteed after a fresh `Rustlang.Rustup` install.
-`scripts/gc.ps1` already skips the pruning step gracefully when `cargo-cache`
-is absent (`Get-Command cargo-cache` probe).  Users who want cargo-cache on
-Windows must run `cargo install cargo-cache` manually after `rustup init`.
+**cargo-cache is managed via cargo-binstall, not `system.dsc.yml`:** `cargo-cache`
+has no WinGet package ID and is not in Scoop.  It is installed declaratively by
+`Invoke-CargoBinstallSetup` (in `src/modules/windows/cargo-binstall-setup.ps1`)
+which runs after the DSC step in `apply.ps1`.  `scripts/gc.ps1` probes for the
+binary gracefully and skips pruning when it is absent.
 
 **`winget cache purge` and `winget clean` do not exist** — WinGet has no cache
 management subcommands.  Do not add either as a `SetScript` body.

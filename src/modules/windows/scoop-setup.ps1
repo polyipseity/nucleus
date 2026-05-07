@@ -1,7 +1,10 @@
 # modules/windows/scoop-setup.ps1 — Scoop bucket and app provisioning for Windows.
 #
 # Idempotently ensures the main and extras Scoop buckets exist and installs
-# thefuck for cross-host shell correction parity with macOS and NixOS.
+# cargo-binstall from the Scoop main bucket.  cargo-binstall is the
+# last-resort install channel (nixpkgs/winget > scoop > cargo binstall) for
+# Rust CLI tools absent from WinGet and Scoop; it is itself only available
+# via Scoop on Windows.
 
 function Invoke-ScoopSetup {
   <#
@@ -10,7 +13,10 @@ function Invoke-ScoopSetup {
 
   .DESCRIPTION
     Ensures the 'main' and 'extras' Scoop buckets are registered, then
-    installs thefuck if it is not already present.
+    installs cargo-binstall from the Scoop main bucket if it is not already
+    present.  cargo-binstall is not available in WinGet, making Scoop the
+    correct install channel per the repository preference hierarchy
+    (nixpkgs/winget > scoop > cargo binstall).
 
     This function must run after the WinGet DSC step that installs Scoop.Scoop,
     because Scoop shims are written to %USERPROFILE%\scoop\shims which is not
@@ -41,7 +47,7 @@ function Invoke-ScoopSetup {
 
   # Ensure required buckets are registered.  'main' is the default bucket but
   # may be absent on a fresh Scoop install depending on the version.  'extras'
-  # is required for thefuck.
+  # is registered as a standard supplement bucket for future tool additions.
   foreach ($bucket in @('extras', 'main')) {
     # -ErrorAction SilentlyContinue is intentional: 'scoop bucket list' may
     # exit non-zero when no buckets are registered yet (fresh install).
@@ -57,23 +63,26 @@ function Invoke-ScoopSetup {
     }
   }
 
-  # Install thefuck if the shim is not yet present.  The shim file is the
-  # reliable post-install artefact; checking it avoids running 'scoop status'
-  # which requires network access.
-  $tfBin = Join-Path $scoopShims "thefuck.cmd"
-  if (-not (Test-Path $tfBin)) {
-    Write-Host "scoop: installing thefuck"
-    scoop install thefuck
+  # Install cargo-binstall if the shim is not yet present.  cargo-binstall is
+  # available in the Scoop main bucket and NOT available in WinGet, making
+  # Scoop the correct install channel per the repository preference hierarchy
+  # (nixpkgs/winget > scoop > cargo binstall).  The shim file is the reliable
+  # post-install artefact; checking it avoids running 'scoop status' which
+  # requires network access.
+  $cbBin = Join-Path $scoopShims "cargo-binstall.cmd"
+  if (-not (Test-Path $cbBin)) {
+    Write-Host "scoop: installing cargo-binstall"
+    scoop install cargo-binstall
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "scoop: 'scoop install thefuck' failed (exit $LASTEXITCODE)"
+      Write-Error "scoop: 'scoop install cargo-binstall' failed (exit $LASTEXITCODE)"
       return
     }
-    if (-not (Test-Path $tfBin)) {
-      Write-Error "scoop: thefuck installed but binary not found at '$tfBin'"
+    if (-not (Test-Path $cbBin)) {
+      Write-Error "scoop: cargo-binstall installed but shim not found at '$cbBin'"
       return
     }
-    Write-Host "scoop: thefuck installed successfully"
+    Write-Host "scoop: cargo-binstall installed successfully"
   } else {
-    Write-Host "scoop: thefuck already installed — skipping"
+    Write-Host "scoop: cargo-binstall already installed — skipping"
   }
 }

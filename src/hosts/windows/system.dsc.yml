@@ -249,8 +249,8 @@ properties:
       directives:
         description: >-
           Scoop user-space package manager for portable CLI utilities not
-          available in WinGet (e.g. thefuck).  Git is required by Scoop for
-          bucket management and updates; declared via dependsOn to ensure
+          available in WinGet (e.g. cargo-binstall).  Git is required by Scoop
+          for bucket management and updates; declared via dependsOn to ensure
           Git is present before Scoop initialises.
       settings:
         id: Scoop.Scoop

@@ -11,8 +11,9 @@
     5. Pass each file to Invoke-NucleusWingetConfiguration, which substitutes
        the __NUCLEUS_ACTIVE_WALLPAPER__ token (when present) and runs
        `winget configure`.
-    6. Converge user-level shell/editor/Git/SSH parity state.
-    7. Converge remote-access and power posture parity state.
+    6. Provision Scoop buckets and cargo-binstall managed packages.
+    7. Converge user-level shell/editor/Git/SSH parity state.
+    8. Converge remote-access and power posture parity state.
   The script is idempotent: re-running it re-applies all DSC resources and
   converges any drift from the desired state.
 
@@ -120,6 +121,7 @@ $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
+. (Join-Path -Path $resolvedModuleDir -ChildPath "cargo-binstall-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "convert-sshpublickeytoage.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-nucleusdecryptedblob.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-nucleussecrets.ps1")
@@ -251,6 +253,9 @@ foreach ($configFile in $ConfigFiles) {
 # the current session until explicitly prepended; Invoke-ScoopSetup handles
 # that prepend internally.
 Invoke-ScoopSetup
+# cargo-binstall managed packages run after Invoke-ScoopSetup has installed
+# cargo-binstall from Scoop and prepended the shims directory to PATH.
+Invoke-CargoBinstallSetup
 
 Sync-NucleusVsCodeSettings -Enabled:$EnableVsCodeSettingsParity
 Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
