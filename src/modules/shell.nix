@@ -35,13 +35,19 @@ in
     # -----------------------------------------------------------------------
     # initContent: thefuck shell integration + system-wide Python ban
     # -----------------------------------------------------------------------
-    # thefuck is initialised first so its `fuck` function is available from
-    # the start of the session alongside the typed alias defined in aliases.nix.
+    # thefuck is initialised here rather than via a shell alias because
+    # `eval $(thefuck --alias)` creates a zsh FUNCTION named `fuck` that
+    # captures TF_HISTORY and auto-executes the corrected command via eval.
+    # A plain alias (aliases.nix) would shadow the function — aliases expand
+    # before functions in zsh — reducing `fuck` to a bare `thefuck` invocation
+    # that neither executes the fix nor records it in history.
     # The Python ban wrappers follow; they must remain as functions (not aliases)
     # so they can emit multi-line guidance via heredoc.
     initContent = ''
       # thefuck: register the shell hook so `fuck` replays the last failed
       # command with the corrected invocation suggested by thefuck.
+      # The generated function captures TF_HISTORY and runs `eval $TF_CMD`
+      # so the correction is both executed and saved to shell history.
       eval $(thefuck --alias)
 
       # Intercept python/python3 invocations and warn about system-wide Python ban.
