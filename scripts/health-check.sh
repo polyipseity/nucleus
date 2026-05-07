@@ -81,6 +81,20 @@ check_connectivity() {
 check_secret_health() {
   # Ensures encryption identities currently available on the machine can decrypt
   # repository-managed secret files before activation depends on them.
+  #
+  # The machine age private key lives at /etc/sops/age/machine.txt (written by
+  # deriveHostAgeKey in posix-sops.nix) and is the primary decryption identity
+  # on provisioned machines.  sops does not search that path by default — it
+  # only checks user-level standard locations — so SOPS_AGE_KEY_FILE must be
+  # set explicitly.  On first bootstrap before deriveHostAgeKey has run, the
+  # file is absent and sops falls back to the primary GPG key in the keyring,
+  # which is imported via `gpg --import` as part of the bootstrap pre-requisite.
+  _sch_machine_key="/etc/sops/age/machine.txt"
+  if [ -f "$_sch_machine_key" ]; then
+    SOPS_AGE_KEY_FILE="$_sch_machine_key"
+    export SOPS_AGE_KEY_FILE
+  fi
+
   for secret_file in "$REPO_ROOT/src/secrets/git-identities.yml" "$REPO_ROOT/src/secrets/gpg-personal.yml" "$REPO_ROOT/src/secrets/ssh-personal.yml"; do
     if [ ! -f "$secret_file" ]; then
       printf '%s\n' "nucleus: expected secret file missing: $secret_file" >&2
