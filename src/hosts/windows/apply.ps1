@@ -11,7 +11,7 @@
     5. Pass each file to Invoke-NucleusWingetConfiguration, which substitutes
        the __NUCLEUS_ACTIVE_WALLPAPER__ token (when present) and runs
        `winget configure`.
-    6. Provision Scoop buckets and cargo-binstall managed packages.
+    6. Provision Scoop buckets, cargo-binstall, and bun global packages.
     7. Converge user-level shell/editor/Git/SSH parity state.
     8. Converge remote-access and power posture parity state.
   The script is idempotent: re-running it re-applies all DSC resources and
@@ -36,6 +36,9 @@
 
 .PARAMETER EnableSecretsParity
   Enable managed secret materialization and managed SSH key cleanup fallback.
+
+.PARAMETER EnableBunParity
+  Enable managed bun global package provisioning (pi-coding-agent and future bun-only tools).
 
 .PARAMETER EnableGitSshParity
   Enable managed user-level Git/SSH parity convergence and block cleanup logic.
@@ -106,6 +109,7 @@ param(
   [string]$ModuleDir = (Join-Path -Path $PSScriptRoot -ChildPath "..\..\modules\windows"),
   [string]$PrimaryUsername = [System.Environment]::UserName,
   [bool]$EnableSecretsParity = $true,
+  [bool]$EnableBunParity = $true,
   [bool]$EnableGitSshParity = $true,
   [bool]$EnableHostAgeKeyRegistration = $true,
   [bool]$EnablePowerParity = $true,
@@ -121,6 +125,7 @@ $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
+. (Join-Path -Path $resolvedModuleDir -ChildPath "bun-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "cargo-binstall-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "convert-sshpublickeytoage.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-nucleusdecryptedblob.ps1")
@@ -256,6 +261,11 @@ Invoke-ScoopSetup
 # cargo-binstall managed packages run after Invoke-ScoopSetup has installed
 # cargo-binstall from Scoop and prepended the shims directory to PATH.
 Invoke-CargoBinstallSetup
+# bun global packages run after WinGet DSC has installed Oven-sh.Bun.
+# bun-setup prepends ~/.bun/bin to PATH internally for this session.
+if ($EnableBunParity) {
+  Invoke-BunSetup
+}
 
 Sync-NucleusVsCodeSettings -Enabled:$EnableVsCodeSettingsParity
 Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
