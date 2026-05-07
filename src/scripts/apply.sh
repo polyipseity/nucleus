@@ -94,12 +94,27 @@ start_sudo_keepalive() {
   # Loop: sleep first (timestamp was just refreshed by sudo -v), then check
   # the parent is still alive before touching sudo, then refresh.
   # kill -0 sends no signal; it just tests whether the PID exists.
+  #
+  # The compound command is redirected to /dev/null so that the background
+  # subshell and its children (sleep, sudo) do not inherit this script's
+  # stdout/stderr file descriptors.  Without this redirect, when the script is
+  # run with stdout connected to a pipe (e.g. a CI step or a tool call), the
+  # pipe reader blocks until every process holding the write end closes it.
+  # In non-interactive mode a shell receiving SIGTERM exits immediately but
+  # does NOT kill its foreground child (the sleep); that orphaned sleep holds
+  # the write end open for up to 55 s after the main script has already exited,
+  # making the caller appear hung.  In a terminal stdout is a TTY — no pipe,
+  # no hang — so the problem is invisible outside automated contexts.
+  # sudo -n true failures are benign (session may expire mid-build; the loop
+  # simply retries on the next iteration); suppression here is intentional.
   SCRIPT_PID=$$
-  while true; do
-    sleep 55
-    kill -0 "$SCRIPT_PID" 2>/dev/null || exit
-    sudo -n true
-  done &
+  {
+    while true; do
+      sleep 55
+      kill -0 "$SCRIPT_PID" 2>/dev/null || exit
+      sudo -n true
+    done
+  } </dev/null >/dev/null 2>&1 &
   SUDO_KEEPALIVE_PID=$!
 
   # Kill the keepalive on any exit (success, error, INT, or TERM) so no
