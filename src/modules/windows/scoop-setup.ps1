@@ -1,10 +1,10 @@
 # modules/windows/scoop-setup.ps1 — Scoop bucket and app provisioning for Windows.
 #
 # Idempotently ensures the main and extras Scoop buckets exist and installs
-# cargo-binstall from the Scoop main bucket.  cargo-binstall is the
-# last-resort install channel (nixpkgs/winget > scoop > cargo binstall) for
-# Rust CLI tools absent from WinGet and Scoop; it is itself only available
-# via Scoop on Windows.
+# cargo-binstall from the Scoop main bucket.  cargo-binstall occupies the
+# third tier of the install preference hierarchy
+# (winget > scoop > cargo binstall > bun) for Rust CLI tools absent from
+# WinGet and Scoop; it is itself only available via Scoop on Windows.
 
 function Invoke-ScoopSetup {
   <#

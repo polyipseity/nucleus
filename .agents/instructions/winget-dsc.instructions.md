@@ -220,8 +220,13 @@ When adding a new tool or capability, choose the package manager in this order:
 3. **cargo binstall (`src/modules/windows/cargo-binstall-setup.ps1`)** — for
    Rust CLI tools not available in WinGet or Scoop.  cargo-binstall downloads
    prebuilt binaries without requiring a local Rust toolchain.
+4. **bun (`src/modules/windows/bun-setup.ps1`)** — last resort for JS/npm-only
+   tools absent from WinGet, Scoop, and cargo-binstall.  `bun install -g`
+   places binaries in `%USERPROFILE%\.bun\bin`.  Bun itself is installed via
+   WinGet (`Oven-sh.Bun` in `system.dsc.yml`).
 
-The equivalent hierarchy on POSIX hosts is: `nixpkgs > cargo binstall`.
+The equivalent hierarchy on POSIX hosts is:
+`nixpkgs > cargo binstall > bun`.
 
 Document any departure from this order with a short WHY comment explaining why
 a higher tier was unavailable for the specific package.

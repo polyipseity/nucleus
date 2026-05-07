@@ -2,7 +2,7 @@
 #
 # Installs and removes Rust CLI binaries via cargo-binstall for tools that are
 # not available in WinGet or Scoop (the preferred channels per the repository
-# install preference hierarchy: nixpkgs/winget > scoop > cargo binstall).
+# install preference hierarchy: winget > scoop > cargo binstall > bun).
 #
 # cargo-binstall itself is installed from the Scoop main bucket by
 # Invoke-ScoopSetup; this module must run after that step.
