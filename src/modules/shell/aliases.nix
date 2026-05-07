@@ -16,8 +16,13 @@
   gst = "git status";
   la = "eza -la";
   ll = "eza -la";
+  # bun shortcuts — mirror the Windows bun function aliases in shell.ps1 managed block.
+  # ni/nr/nx are concise but unambiguous; `bun x` replaces npx for one-shot package execution.
+  ni = "bun install";
+  nr = "bun run";
   nucleus-gc = "nix run ./src#gc";
   nucleus-health-check = "nix run ./src#health-check";
   nucleus-update = "nix run ./src#update";
+  nx = "bun x";
   v = "nvim";
 }

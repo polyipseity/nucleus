@@ -24,7 +24,7 @@ function Sync-NucleusShellProfile {
         via cargo-binstall by Invoke-CargoBinstallSetup)
       - common aliases (`g`, `ga`, `gc`, `gca`, `gco`, `gd`, `gl`, `gp`,
         `gpl`, `gs`, `gst`, `la`, `ll` (eza preferred, Get-ChildItem fallback),
-        `v`)
+        `ni`, `nr`, `nx` (bun shortcuts, if bun present), `v`)
       - Python ban: blocks system-wide python/pip to prevent accidental
          modifications to system environment
 
@@ -92,6 +92,14 @@ function Sync-NucleusShellProfile {
     'if (Get-Command pay-respects -ErrorAction SilentlyContinue) {'
     '  iex (& pay-respects pwsh --alias | Out-String)'
     '}'
+    # bun global packages land in ~\.bun\bin (BUN_INSTALL_BIN default).
+    # WinGet bun installer adds this to the user PATH registry entry; the
+    # prepend here covers sessions opened before that registry change was
+    # applied (for example the terminal running apply.ps1 itself).
+    '$bunBinDir = Join-Path $env:USERPROFILE ".bun\bin"'
+    'if ((Test-Path $bunBinDir) -and ($env:PATH -notlike "*$bunBinDir*")) {'
+    '  $env:PATH = "$bunBinDir;$env:PATH"'
+    '}'
     'function g { & git @Args }'
     'function ga { & git add @Args }'
     'function gc { & git commit @Args }'
@@ -111,6 +119,13 @@ function Sync-NucleusShellProfile {
     '} else {'
     '  function la { Get-ChildItem -Force @Args }'
     '  function ll { Get-ChildItem -Force @Args }'
+    '}'
+    # bun shortcuts: mirrors ni/nr/nx aliases in shell/aliases.nix on POSIX hosts.
+    # Guarded so the profile loads safely on machines where bun is not yet installed.
+    'if (Get-Command bun -ErrorAction SilentlyContinue) {'
+    '  function ni { & bun install @Args }'
+    '  function nr { & bun run @Args }'
+    '  function nx { & bun x @Args }'
     '}'
     'function v { & nvim @Args }'
     '# System-wide Python ban: redirect python/pip to warnings'
