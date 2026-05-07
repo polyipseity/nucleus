@@ -168,7 +168,17 @@
       # inherits HOME=/var/root from the root activation context, causing
       # battery to write its state files to /var/root/.battery/ which the
       # console user cannot write to.
-      if ! /usr/bin/sudo -H -u "$console_user" "$battery_cli" maintain 80; then
+      #
+      # Redirect stdin/stdout/stderr to /dev/null: battery maintain forks a
+      # long-running background daemon via `nohup ... &` that inherits open
+      # file descriptors.  Without this redirect, the daemon holds the
+      # activation pipeline's pipe write-end open indefinitely, causing any
+      # `./scripts/bootstrap.sh apply ... | <cmd>` invocation to hang until
+      # the daemon exits (which is never during normal operation).  The exit
+      # code is still checked below so real failures are not silenced;
+      # battery's own log file (~/.battery/battery.log) retains full
+      # diagnostic output for post-failure inspection.
+      if ! /usr/bin/sudo -H -u "$console_user" "$battery_cli" maintain 80 </dev/null >/dev/null 2>&1; then
         echo "nucleus: battery maintain 80 failed for user '$console_user'." >&2
       fi
     elif [ -x /opt/homebrew/bin/bclm ]; then
