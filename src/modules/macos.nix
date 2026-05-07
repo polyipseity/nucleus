@@ -17,6 +17,9 @@
 # LaunchAgents managed by this module:
 #   local.betterdisplay-heartbeat — polls HeadlessDisplay every 30 s and
 #     reconnects it if BetterDisplay drops the virtual screen connection.
+#   local.nix-index-update — rebuilds the nix-index file database weekly
+#     (Sunday 03:00) and on every agent load; a freshness check makes
+#     reloads a fast no-op when the DB was updated within the past 6 days.
 { lib, pkgs, ... }:
 let
   # Domains intentionally reset before each Home Manager write pass so stale
@@ -176,6 +179,28 @@ let
         -virtualScreenHiDPI=on \
         -connected=on || true
     fi
+  '';
+
+  # Wrapper script for the nix-index weekly database rebuild LaunchAgent.
+  # Lives in the Nix store so the ProgramArguments path is stable across
+  # home-manager generations without a home.file symlink.
+  #
+  # A freshness check prevents a full rebuild on every home-manager switch:
+  # the LaunchAgent is reloaded on each switch because its plist embeds the
+  # Nix store derivation path (which changes per generation).  Skipping the
+  # rebuild when the DB was updated within the past 6 days keeps normal
+  # apply runs fast.
+  nixIndexUpdate = pkgs.writeShellScript "nix-index-update" ''
+    db_file="$HOME/.cache/nix-index/files"
+
+    # Skip rebuild when the DB file exists and was modified within the last
+    # 6 days.  find -mtime +6 matches files with modification time strictly
+    # greater than 6x24 h ago; empty output means the file is still fresh.
+    if [ -f "$db_file" ] && [ -z "$(find "$db_file" -mtime +6)" ]; then
+      exit 0
+    fi
+
+    exec ${pkgs.nix-index}/bin/nix-index
   '';
 
   # Manual drift-reset helper for managed macOS preference domains.
@@ -917,6 +942,42 @@ lib.mkIf pkgs.stdenv.isDarwin {
       RunAtLoad = true;
       # Suppress per-invocation output to avoid filling system logs with
       # 30-second no-op heartbeat entries.
+      StandardOutPath = "/dev/null";
+      StandardErrorPath = "/dev/null";
+    };
+  };
+
+  # --------------------------------------------------------------------------
+  # nix-index rebuild LaunchAgent
+  # Keeps the nix-index file database current so pay-respects can suggest
+  # `nix profile install` commands when an unknown command is typed.
+  #
+  # Why a LaunchAgent rather than a synchronous activation step:
+  #   A full nix-index build takes several minutes.  Running it inline during
+  #   `home-manager switch` would block the activation chain on every apply.
+  #   A launchd agent runs the build asynchronously after login, with a
+  #   freshness guard that makes agent reloads during apply a fast no-op.
+  #
+  # Output is suppressed because nix-index emits verbose per-channel progress
+  # on stdout even for successful builds, which would fill the system log.
+  # This suppression is intentional: failure is benign (stale DB means
+  # pay-respects falls back to not suggesting packages), and the agent retries
+  # on the next weekly run or load.  Check exit status with:
+  #   launchctl list | grep nix-index-update
+  # --------------------------------------------------------------------------
+  launchd.agents."nix-index-update" = {
+    enable = true;
+    config = {
+      Label = "local.nix-index-update";
+      ProgramArguments = [ "${nixIndexUpdate}" ];
+      # Run once at load so a freshly provisioned machine or a machine whose
+      # DB is absent or stale gets an immediate rebuild rather than waiting
+      # for the next weekly calendar window.
+      RunAtLoad = true;
+      # Weekly Sunday 03:00 rebuild to keep the index current with nixpkgs
+      # updates.  Weekday 0 = Sunday in launchd's calendar convention.
+      StartCalendarInterval = [{ Hour = 3; Minute = 0; Weekday = 0; }];
+      # Suppress per-build output to avoid filling system logs.  See above.
       StandardOutPath = "/dev/null";
       StandardErrorPath = "/dev/null";
     };

@@ -1,6 +1,10 @@
 # modules/linux.nix — Linux-only Home Manager desktop/session parity settings.
 # Mirrors core UX/security intent from macOS defaults where GNOME equivalents
 # exist (clock, lock behavior, touchpad/keyboard ergonomics, privacy, and power).
+#
+# Systemd user units managed by this module:
+#   nix-index-update.service — rebuilds the nix-index file database on demand.
+#   nix-index-update.timer   — fires weekly (Sunday 03:00) with Persistent=true.
 { config, lib, pkgs, ... }:
 let
   # Host-scoped manual checklist rendered at the end of Linux activation so the
@@ -149,12 +153,35 @@ lib.mkIf pkgs.stdenv.isLinux {
 
   home.activation = {
     # -----------------------------------------------------------------------
+    # buildNixIndex
+    # Starts a background nix-index build on first provision so the database
+    # is available shortly after provisioning without waiting for the weekly
+    # systemd timer.  Subsequent refreshes are handled by the timer.
+    #
+    # The build is backgrounded to avoid blocking the activation chain; a full
+    # nix-index build takes several minutes.  Output is suppressed because
+    # nix-index emits verbose per-channel progress on stdout that would
+    # pollute the activation log.  This suppression is intentional: (1) a
+    # failed build is benign (pay-respects falls back to not suggesting
+    # packages), (2) this comment explains why, and (3) the timer and any
+    # subsequent provision run serve as implicit follow-up checks.
+    # -----------------------------------------------------------------------
+    buildNixIndex = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      _db_file="$HOME/.cache/nix-index/files"
+      if [ ! -f "$_db_file" ]; then
+        ${pkgs.nix-index}/bin/nix-index >/dev/null 2>&1 &
+        echo "nucleus: nix-index database build started in background; this may take a few minutes." >&2
+      fi
+    '';
+
+    # -----------------------------------------------------------------------
     # displayHostManualInstructions
     # Prints one-time Linux host instructions from the dedicated NixOS manual
     # document after secrets/wallpaper activation work so operators get one
     # consolidated, post-automation checklist.
     # -----------------------------------------------------------------------
     displayHostManualInstructions = lib.hm.dag.entryAfter [
+      "buildNixIndex"
       # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
       # are defined in secrets.nix (shared module) but run as Home Manager
       # activations on this host; include them here so manual instructions
@@ -170,5 +197,44 @@ lib.mkIf pkgs.stdenv.isLinux {
       /bin/cat '${nixosManualFile}' >&2
       echo "-------------------------------------------" >&2
     '';
+  };
+
+  # --------------------------------------------------------------------------
+  # nix-index-update systemd service and timer
+  # Keeps the nix-index file database current so pay-respects can suggest
+  # `nix profile install` commands when an unknown command is typed.
+  #
+  # The timer fires weekly (Sunday 03:00, Persistent=true) so the DB stays
+  # fresh even on infrequently used machines.  buildNixIndex handles the
+  # first-provision case so the DB is available before the timer first fires.
+  # --------------------------------------------------------------------------
+  systemd.user.services."nix-index-update" = {
+    Unit = {
+      Description = "Rebuild nix-index file database";
+      # Defer until network is available so channel index fetches succeed.
+      After = "network.target";
+    };
+    Service = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.nix-index}/bin/nix-index";
+    };
+  };
+
+  systemd.user.timers."nix-index-update" = {
+    Unit = {
+      Description = "Weekly nix-index database refresh";
+    };
+    Timer = {
+      # Fire every Sunday at 03:00 local time.  Persistent=true ensures the
+      # timer fires on the next login when the machine was off at the
+      # scheduled time, preventing the DB from going indefinitely stale on
+      # infrequently-used machines.
+      OnCalendar = "Sun 03:00:00";
+      Persistent = true;
+      Unit = "nix-index-update.service";
+    };
+    Install = {
+      WantedBy = [ "timers.target" ];
+    };
   };
 }

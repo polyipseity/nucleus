@@ -47,6 +47,11 @@ function Invoke-CargoBinstallSetup {
   # WinGet and Scoop.
   $desiredPackages = @(
     'cargo-cache'
+    # nix-index is managed on POSIX hosts (pkgs.nix-index in core.nix plus
+    # a LaunchAgent/systemd timer for periodic DB builds) but has no Windows
+    # equivalent and is not needed here.  pay-respects on Windows never
+    # attempts nix package lookup because `nix` is never in PATH; the
+    # nix-locate code path is simply never reached.
     'pay-respects'
   )
 

@@ -1,7 +1,6 @@
 # nixos manual steps
 
 - Review generated hardware config after first install (`nixos-generate-config`) and replace temporary hardware fragments when real device-specific values are available.
-- nix-index: run `nix-index` once after first activation to build the file-index database. This is required for pay-respects to suggest `nix profile install` commands when an unknown command is typed. Re-run periodically (e.g. weekly) to keep the index current with nixpkgs updates.
 - Re-run apply (`nix run ./src#apply`) after any manual hardware migration to verify declarative convergence.
 
 ## Remote desktop
