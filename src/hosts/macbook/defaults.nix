@@ -341,18 +341,26 @@ in
       # iTerm2: allow clipboard access from terminal applications, enable the
       # bootstrap daemon (supports shell integration without requiring a full
       # app launch), disable in-app update checks because updates are managed
-      # declaratively, suppress the secure-keyboard-entry/open-command warning,
-      # keep Secure Keyboard Entry enabled, and enable the Finder service so
-      # "Open in iTerm" appears in Finder right-click context menu.
+      # declaratively, suppress the tip-of-the-day feature and its first-launch
+      # permission prompt so fresh sessions are never interrupted, suppress the
+      # secure-keyboard-entry/open-command warning, keep Secure Keyboard Entry
+      # enabled, and enable the Finder service so "Open in iTerm" appears in
+      # Finder right-click context menu.
       "com.googlecode.iterm2" = {
         "AllowClipboardAccess" = true;
         "BootstrapDaemon" = true;
         "EnableFindersService" = true;   # enable "Open in iTerm" in Finder
+        # Pre-answer the first-launch "may we show you tips?" permission prompt
+        # so iTerm2 never shows that dialog on a fresh provision.  Combining
+        # PermissionToShowTip=true with TipOfTheDay=false simulates the state
+        # where the user already answered yes to the prompt but then disabled
+        # tips in preferences, preventing any re-prompt on subsequent launches.
+        "NoSyncPermissionToShowTip" = true;
         "NoSyncTipOfTheDay" = false;
+        "Secure Input" = true;  # blocks other processes from reading keystrokes
         "SUCheckAtStartup" = false;
         "SUEnableAutomaticChecks" = false;
         "WarnAboutSecureKeyboardInputWithOpenCommand" = false;
-        "Secure Input" = true;  # blocks other processes from reading keystrokes
       };
     };
 
