@@ -22,7 +22,9 @@ let
   # Packages installed on every host regardless of OS.
   #   bat            — syntax-highlighted cat replacement
   #   bottom         — cross-platform system monitor (btm)
-  #   cargo-binstall — Rust crate binary installer; last-resort fallback when a package is absent from nixpkgs/WinGet/Scoop
+  #   bun            — high-speed all-in-one JS toolkit (runtime, package manager, bundler); global runtime for JS ecosystem tasks
+  #                    (Windows: Oven-sh.Bun in system.dsc.yml; last tier in install hierarchy: nixpkgs/winget > scoop > cargo binstall > bun)
+  #   cargo-binstall — Rust crate binary installer; second-to-last-resort fallback when a package is absent from nixpkgs/WinGet/Scoop
   #   cargo-cache    — reclaim disk space from ~/.cargo registry, git, and advisory-db clones
   #   direnv         — per-directory env loader (shell integration in shell.nix)
   #   eza            — modern ls with colour and icons
@@ -50,6 +52,7 @@ let
   baseSharedPackages = [
     pkgs.bat
     pkgs.bottom
+    pkgs.bun
     pkgs.cargo-binstall
     pkgs.cargo-cache
     pkgs.direnv

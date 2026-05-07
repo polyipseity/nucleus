@@ -231,6 +231,19 @@ properties:
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
+      id: BunInstall
+      directives:
+        description: >-
+          Ensure Bun is installed as the global JS runtime and package manager; provides
+          `bun` CLI for running JS ecosystem tools and `bun install -g` for global package
+          installs (for example pi-coding-agent).  Bun fills the last tier of the install
+          hierarchy (winget > scoop > cargo binstall > bun) for JS-only tools absent from
+          all higher tiers.
+      settings:
+        id: Oven-sh.Bun
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
       directives:
         description: Ensure Parsec is installed to mirror the macOS low-latency remote-desktop package declaration
       settings:
