@@ -33,12 +33,17 @@ in
     syntaxHighlighting.enable = true; # command colouring (valid = green, etc.)
 
     # -----------------------------------------------------------------------
-    # initContent: system-wide Python ban via shell wrapper functions
+    # initContent: thefuck shell integration + system-wide Python ban
     # -----------------------------------------------------------------------
-    # Block direct invocation of system-wide python/pip to prevent accidental
-    # modifications to system-managed environment. Users should use nix develop
-    # (for project devShells) or uv (for project-scoped Python).
+    # thefuck is initialised first so its `fuck` function is available from
+    # the start of the session alongside the typed alias defined in aliases.nix.
+    # The Python ban wrappers follow; they must remain as functions (not aliases)
+    # so they can emit multi-line guidance via heredoc.
     initContent = ''
+      # thefuck: register the shell hook so `fuck` replays the last failed
+      # command with the corrected invocation suggested by thefuck.
+      eval $(thefuck --alias)
+
       # Intercept python/python3 invocations and warn about system-wide Python ban.
       # These are functions, not aliases, so they can provide helpful context.
       python() {

@@ -3,6 +3,7 @@
 # Keep keys strictly alphabetical so diffs stay deterministic and accidental
 # duplicate alias intent is easy to detect during review.
 {
+  fuck = "thefuck";
   g = "git";
   ga = "git add";
   gc = "git commit";
