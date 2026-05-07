@@ -1,14 +1,14 @@
 {
   "models": {
     "mac": [
-      "gemma4:26b-a4b-it-q4_K_M",
-      "phi4:latest",
-      "qwen2.5-coder:14b-instruct-q6_K"
+      "qwen2.5-coder:14b-instruct-q6_K",
+      "qwen3:1.7b",
+      "qwen3:14b-q4_K_M"
     ],
     "pc": [
-      "gemma4:e4b-it-q8_0",
-      "phi4:latest",
-      "qwen2.5-coder:14b-instruct-q5_K_M"
+      "qwen2.5-coder:7b-instruct-q4_K_M",
+      "qwen3:1.7b",
+      "qwen3:8b-q4_K_M"
     ]
   }
 }
