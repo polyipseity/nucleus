@@ -40,7 +40,7 @@ let
   #   rustup     — Rust toolchain manager
   #   shellcheck — shell linter used by CI and pre-commit validation
   #   sops       — secret encryption/decryption tool
-  #   thefuck    — corrects errors in previous console commands by re-running with suggested fix
+  #   pay-respects — corrects errors in previous console commands; actively maintained fork of thefuck
   #   uv         — fast Python package/project manager
   #   zoxide     — smart cd (shell integration in shell.nix)
   baseSharedPackages = [
@@ -64,7 +64,7 @@ let
     pkgs.rustup
     pkgs.shellcheck
     pkgs.sops
-    pkgs.thefuck
+    pkgs.pay-respects
     pkgs.uv
     pkgs.zoxide
   ];

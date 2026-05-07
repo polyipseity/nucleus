@@ -20,6 +20,8 @@ function Sync-NucleusShellProfile {
       - zoxide smart directory navigation (if zoxide is present)
       - fzf Ctrl+R fuzzy history search via PSReadLine key handler
         (if fzf is present and PSReadLine is available)
+      - pay-respects command correction hook (if pay-respects is present; installed
+        via cargo-binstall by Invoke-CargoBinstallSetup)
       - common aliases (`g`, `ga`, `gc`, `gca`, `gco`, `gd`, `gl`, `gp`,
         `gpl`, `gs`, `gst`, `la`, `ll` (eza preferred, Get-ChildItem fallback),
         `v`)
@@ -79,15 +81,16 @@ function Sync-NucleusShellProfile {
     '    }'
     '  }'
     '}'
-    # thefuck: register correction hook when the binary is present.
-    # -ErrorAction SilentlyContinue is intentional: thefuck may be absent on
-    # first-provision before Scoop setup has run; the if-guard checks the
-    # result immediately so no failure is silently swallowed.
+    # pay-respects: register correction hook when the binary is present.
+    # -ErrorAction SilentlyContinue is intentional: pay-respects may be absent
+    # on first-provision before cargo-binstall setup has run; the if-guard
+    # checks the result immediately so no failure is silently swallowed.
     # In PowerShell, functions take higher precedence than aliases in command
-    # lookup, so the `fuck` function defined by thefuck --alias is not shadowed
-    # by any alias of the same name (unlike zsh where aliases shadow functions).
-    'if (Get-Command thefuck -ErrorAction SilentlyContinue) {'
-    '  iex (thefuck --alias | Out-String)'
+    # lookup, so the `f` function defined by pay-respects --alias is not
+    # shadowed by any alias of the same name (unlike zsh where aliases shadow
+    # functions).
+    'if (Get-Command pay-respects -ErrorAction SilentlyContinue) {'
+    '  iex (& pay-respects pwsh --alias | Out-String)'
     '}'
     'function g { & git @Args }'
     'function ga { & git add @Args }'

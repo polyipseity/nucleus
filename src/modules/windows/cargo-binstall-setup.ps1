@@ -23,9 +23,12 @@ function Invoke-CargoBinstallSetup {
     the repository preference hierarchy (nixpkgs/winget > scoop > cargo binstall).
 
     Currently managed:
-      - cargo-cache — reclaim disk space from ~/.cargo registry, git, and
-                      advisory-db clones; fills the Windows cargo-cache gap
-                      (no WinGet package ID; not in Scoop)
+      - cargo-cache    — reclaim disk space from ~/.cargo registry, git, and
+                         advisory-db clones; fills the Windows cargo-cache gap
+                         (no WinGet package ID; not in Scoop)
+      - pay-respects   — command correction tool (actively maintained fork of
+                         thefuck); fills the Windows pay-respects gap
+                         (no WinGet package ID; not in Scoop)
 
     Requires cargo-binstall to be on PATH (installed from Scoop main bucket by
     Invoke-ScoopSetup).  Prepends %USERPROFILE%\.cargo\bin to PATH internally
@@ -44,6 +47,7 @@ function Invoke-CargoBinstallSetup {
   # WinGet and Scoop.
   $desiredPackages = @(
     'cargo-cache'
+    'pay-respects'
   )
 
   $manifestPath = Join-Path $HOME ".config\nucleus\cargo-binstall-packages.json"

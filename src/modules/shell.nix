@@ -33,22 +33,22 @@ in
     syntaxHighlighting.enable = true; # command colouring (valid = green, etc.)
 
     # -----------------------------------------------------------------------
-    # initContent: thefuck shell integration + system-wide Python ban
+    # initContent: pay-respects shell integration + system-wide Python ban
     # -----------------------------------------------------------------------
-    # thefuck is initialised here rather than via a shell alias because
-    # `eval $(thefuck --alias)` creates a zsh FUNCTION named `fuck` that
-    # captures TF_HISTORY and auto-executes the corrected command via eval.
-    # A plain alias (aliases.nix) would shadow the function — aliases expand
-    # before functions in zsh — reducing `fuck` to a bare `thefuck` invocation
+    # pay-respects is initialised here rather than via a shell alias because
+    # `eval "$(pay-respects zsh --alias)"` creates a zsh FUNCTION named `f`
+    # that captures shell history and auto-executes the corrected command via
+    # eval.  A plain alias (aliases.nix) would shadow the function — aliases
+    # expand before functions in zsh — leaving `f` as a bare binary invocation
     # that neither executes the fix nor records it in history.
     # The Python ban wrappers follow; they must remain as functions (not aliases)
     # so they can emit multi-line guidance via heredoc.
     initContent = ''
-      # thefuck: register the shell hook so `fuck` replays the last failed
-      # command with the corrected invocation suggested by thefuck.
-      # The generated function captures TF_HISTORY and runs `eval $TF_CMD`
-      # so the correction is both executed and saved to shell history.
-      eval $(thefuck --alias)
+      # pay-respects: register the shell hook so `f` replays the last failed
+      # command with the corrected invocation suggested by pay-respects.
+      # The generated function captures shell history and runs the corrected
+      # command via eval so the fix is both executed and saved to shell history.
+      eval "$(pay-respects zsh --alias)"
 
       # Intercept python/python3 invocations and warn about system-wide Python ban.
       # These are functions, not aliases, so they can provide helpful context.
