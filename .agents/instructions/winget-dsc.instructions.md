@@ -207,14 +207,33 @@ packages/registry/environment/settings, `apply.ps1` for everything requiring
 crypto, service lifecycle, file-editing with managed blocks, or CLI tools with
 uncertain PATH — is correct.
 
+## Package manager preference hierarchy
+
+When adding a new tool or capability, choose the package manager in this order:
+
+1. **WinGet (`system.dsc.yml`)** — preferred for any package with a WinGet ID.
+   Declarative, `--what-if`-capable, and centrally tracked.
+2. **Scoop (`src/modules/windows/scoop-setup.ps1`)** — for portable CLI
+   utilities that have no WinGet ID but exist in a Scoop bucket.  Scoop is the
+   user-space fallback: it requires no admin rights and installs to
+   `%USERPROFILE%\scoop\`.
+3. **cargo binstall (`src/modules/windows/cargo-binstall-setup.ps1`)** — for
+   Rust CLI tools not available in WinGet or Scoop.  cargo-binstall downloads
+   prebuilt binaries without requiring a local Rust toolchain.
+
+The equivalent hierarchy on POSIX hosts is: `nixpkgs > cargo binstall`.
+
+Document any departure from this order with a short WHY comment explaining why
+a higher tier was unavailable for the specific package.
+
 ## Scoop as user-space package manager
 
 ### Role and scope
 
 Scoop is the user-space package manager for portable CLI utilities that have no
 WinGet package ID. It installs to `%USERPROFILE%\scoop\` without requiring
-admin rights. Use Scoop for tools like `thefuck` that are not available via
-WinGet.
+admin rights. Use Scoop when a tool is absent from WinGet but available in a
+Scoop bucket (e.g. `cargo-binstall` from the `main` bucket).
 
 ### Declaring Scoop in system.dsc.yml
 
@@ -228,7 +247,7 @@ Install Scoop itself via WinGet (package ID `Scoop.Scoop`). Scoop requires
   directives:
     description: >-
       Scoop user-space package manager for portable CLI utilities not
-      available via WinGet (e.g. thefuck).  Requires Git for bucket
+      available via WinGet (e.g. cargo-binstall).  Requires Git for bucket
       management; declared after Git.Git via dependsOn.
   settings:
     id: Scoop.Scoop
@@ -257,16 +276,31 @@ All Scoop install/bucket operations must be guarded:
 if (-not (scoop bucket list | Select-String -Quiet "^extras$")) {
     scoop bucket add extras
 }
-if (-not (scoop which thefuck -ErrorAction SilentlyContinue 2>$null)) {
-    # -ErrorAction SilentlyContinue is intentional: scoop which exits non-zero
-    # when the app is absent, which is the expected probe condition.  The if-guard
-    # checks the result immediately.
-    scoop install thefuck
-    if (-not (Get-Command thefuck -ErrorAction SilentlyContinue)) {
-        Write-Error "scoop: thefuck install failed — 'thefuck' binary not found after install"
+$cbBin = Join-Path $scoopShims "cargo-binstall.cmd"
+if (-not (Test-Path $cbBin)) {
+    # cargo-binstall has no WinGet package ID; Scoop main bucket is the
+    # preferred source.  Use Test-Path on the shim rather than Get-Command so
+    # the check is reliable before ~\scoop\shims is on PATH in this session.
+    scoop install cargo-binstall
+    if (-not (Test-Path $cbBin)) {
+        Write-Error "scoop: cargo-binstall install failed — shim not found after install"
     }
 }
 ```
+
+### cargo binstall for Rust tools
+
+After Scoop installs cargo-binstall, `src/modules/windows/cargo-binstall-setup.ps1`
+manages Rust CLI tools that have no WinGet or Scoop equivalent (e.g.
+`cargo-cache`, `pay-respects`).  It maintains a desired-state list and a
+manifest at `~\.config\nucleus\cargo-binstall-packages.json`; on each apply it
+installs additions via `cargo binstall --no-confirm` and removes deletions via
+`cargo uninstall`.
+
+**PATH note**: DSC runs in a fresh session where `~\.cargo\bin` is not on PATH.
+The setup module prepends `~\.cargo\bin` internally before any `cargo uninstall`
+call.  When invoking cargo-binstall from `apply.ps1` (after the DSC run), Scoop
+shims at `~\scoop\shims` are already resolvable.
 
 ## Cross-host equivalence checks
 
