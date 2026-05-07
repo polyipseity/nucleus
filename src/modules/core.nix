@@ -24,25 +24,27 @@ let
   #   bottom         — cross-platform system monitor (btm)
   #   cargo-binstall — Rust crate binary installer; last-resort fallback when a package is absent from nixpkgs/WinGet/Scoop
   #   cargo-cache    — reclaim disk space from ~/.cargo registry, git, and advisory-db clones
-  #   direnv     — per-directory env loader (shell integration in shell.nix)
-  #   eza        — modern ls with colour and icons
-  #   fd         — fast find replacement
-  #   ffmpeg-full — multimedia processing and transcoding (GPL codecs; pre-built in nixos.org binary cache)
-  #   fzf        — fuzzy finder used by shell widgets and neovim
-  #   git        — version control
-  #   gnupg      — GPG for secret management and signing
-  #   jq         — JSON processor used by activation scripts
-  #   opencode   — AI-native coding agent and assistant
-  #   p7zip      — 7z compression and archive extraction utility
-  #   powershell — cross-platform PowerShell runtime (`pwsh`)
-  #   prek       — pre-commit hook manager used by prek.toml
-  #   ripgrep    — fast grep replacement
-  #   rustup     — Rust toolchain manager
-  #   shellcheck — shell linter used by CI and pre-commit validation
-  #   sops       — secret encryption/decryption tool
-  #   pay-respects — corrects errors in previous console commands; actively maintained fork of thefuck
-  #   uv         — fast Python package/project manager
-  #   zoxide     — smart cd (shell integration in shell.nix)
+  #   direnv         — per-directory env loader (shell integration in shell.nix)
+  #   eza            — modern ls with colour and icons
+  #   fd             — fast find replacement
+  #   ffmpeg-full    — multimedia processing and transcoding (GPL codecs; pre-built in nixos.org binary cache)
+  #   fzf            — fuzzy finder used by shell widgets and neovim
+  #   git            — version control
+  #   gnupg          — GPG for secret management and signing
+  #   jq             — JSON processor used by activation scripts
+  #   nix-index      — provides nix-locate; required by pay-respects to suggest nixpkgs packages for unknown commands
+  #                    (run `nix-index` once after first activation to build the file-index database)
+  #   opencode       — AI-native coding agent and assistant
+  #   p7zip          — 7z compression and archive extraction utility
+  #   pay-respects   — corrects errors in previous console commands; actively maintained fork of thefuck
+  #   powershell     — cross-platform PowerShell runtime (`pwsh`)
+  #   prek           — pre-commit hook manager used by prek.toml
+  #   ripgrep        — fast grep replacement
+  #   rustup         — Rust toolchain manager
+  #   shellcheck     — shell linter used by CI and pre-commit validation
+  #   sops           — secret encryption/decryption tool
+  #   uv             — fast Python package/project manager
+  #   zoxide         — smart cd (shell integration in shell.nix)
   baseSharedPackages = [
     pkgs.bat
     pkgs.bottom
@@ -56,15 +58,16 @@ let
     pkgs.git
     pkgs.gnupg
     pkgs.jq
+    pkgs.nix-index
     pkgs.opencode
     pkgs.p7zip
+    pkgs.pay-respects
     pkgs.powershell
     pkgs.prek
     pkgs.ripgrep
     pkgs.rustup
     pkgs.shellcheck
     pkgs.sops
-    pkgs.pay-respects
     pkgs.uv
     pkgs.zoxide
   ];
