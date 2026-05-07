@@ -161,6 +161,30 @@ priority order in the assembled activate script.
   (see `posix-sops.nix` for an example).
 - Add `lib` to the module arguments whenever `lib.mkBefore` is used.
 
+**Background daemon fd inheritance hazard:**
+
+Any command inside `postActivation.text` or `extraActivation.text` that forks
+a long-running background process inherits the activation pipeline's open file
+descriptors, including the pipe write-end that `darwin-rebuild activate` uses
+to stream output.  As long as the daemon holds that fd open, the pipeline
+**never completes** — `nix run .#apply` or `./scripts/bootstrap.sh apply` will
+hang indefinitely.
+
+Canonical example: `battery maintain 80` (the `battery` Homebrew CLI) forks a
+`nohup … &` daemon that inherits stderr from the activation context.  The fix —
+and the required pattern for every forked background process — is to redirect
+all three standard streams to `/dev/null` at the call site:
+
+```sh
+sudo battery maintain 80 </dev/null >/dev/null 2>&1
+```
+
+**Rule**: every command in `postActivation.text` / `extraActivation.text` that
+forks a persistent daemon **must** include `</dev/null >/dev/null 2>&1` (or an
+equivalent explicit `3>&- … n>&-` fd-closing block) so the daemon does not
+inherit any pipe end from the activation context.  The exit code of the
+foreground command is still checked normally after the redirect.
+
 ## macOS pmset power policy
 
 `src/hosts/macbook/activation.nix` (in the `postActivation` fragment) owns the
