@@ -11,6 +11,9 @@
     2. Prune the Cargo source/registry/advisory-db cache via cargo-cache if the
        binary is present on PATH.  cargo-cache has no WinGet package; install it
        with `cargo install cargo-cache` after rustup sets up the toolchain.
+    3. Remove old Scoop app versions and installer caches via `scoop cleanup *`.
+       Guarded by a Scoop presence check so the step is a no-op when Scoop is
+       not yet installed (e.g. before the first apply.ps1 run).
 
   All file operations are scoped to the primary user profile.  The script is
   idempotent and safe to re-run.
@@ -26,12 +29,16 @@
 .PARAMETER SkipCargoCache
   Skip cargo-cache pruning even when cargo-cache is available on PATH.
 
+.PARAMETER SkipScoopCleanup
+  Skip Scoop cache and old-version cleanup even when Scoop is installed.
+
 .PARAMETER SkipWallpaperPrune
   Skip stale wallpaper file cleanup.
 
 .EXAMPLE
   .\scripts\gc.ps1
   .\scripts\gc.ps1 -SkipCargoCache
+  .\scripts\gc.ps1 -SkipScoopCleanup
   .\scripts\gc.ps1 -SkipWallpaperPrune -SkipCargoCache
 #>
 [CmdletBinding()]
@@ -39,6 +46,7 @@ param(
   [string]$ModuleDir = (Join-Path -Path $PSScriptRoot -ChildPath "..\src\modules\windows"),
   [string]$RepoRoot  = (Join-Path -Path $PSScriptRoot -ChildPath ".."),
   [switch]$SkipCargoCache,
+  [switch]$SkipScoopCleanup,
   [switch]$SkipWallpaperPrune
 )
 
@@ -77,6 +85,28 @@ if (-not $SkipCargoCache) {
     Write-Host "nucleus: cargo-cache unavailable; skipping cargo cache prune"
   } else {
     & $cargoCacheCmd.Source -r all
+  }
+}
+
+# ---- Step 3: Scoop cache and old-version cleanup ----------------------------
+# 'scoop cleanup *' removes all old app versions and installer caches that
+# Scoop retains by default, reclaiming disk space after updates.
+# Guarded by a shim presence check because Scoop may not be installed on
+# minimal setups or before the first apply.ps1 run.
+if (-not $SkipScoopCleanup) {
+  $scoopShims = Join-Path $env:USERPROFILE "scoop\shims"
+  $scoopCmd   = Join-Path $scoopShims "scoop.cmd"
+  if (-not (Test-Path $scoopCmd)) {
+    Write-Host "gc: scoop not installed; skipping scoop cleanup"
+  } else {
+    if ($env:PATH -notlike "*$scoopShims*") {
+      $env:PATH = "$scoopShims;$env:PATH"
+    }
+    Write-Host "gc: running scoop cleanup..."
+    scoop cleanup *
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "gc: scoop cleanup exited with code $LASTEXITCODE"
+    }
   }
 }
 

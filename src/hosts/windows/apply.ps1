@@ -135,6 +135,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusmanagedsecrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusstalewallpapers.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "resolve-nucleusexecutable.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "scoop-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "shell.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecretfile.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecrets.ps1")
@@ -244,6 +245,12 @@ Remove-NucleusStaleWallpapers -AssetsDir $wallpaperAssetsDir -OutputDir $wallpap
 foreach ($configFile in $ConfigFiles) {
   Invoke-NucleusWingetConfiguration -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath $configFile) -WallpaperPath $activeWallpaperPath
 }
+
+# Scoop bucket and app provisioning must run after DSC installs Scoop.Scoop.
+# scoop shims are written to a user-local directory that is not on PATH in
+# the current session until explicitly prepended; Invoke-ScoopSetup handles
+# that prepend internally.
+Invoke-ScoopSetup
 
 Sync-NucleusVsCodeSettings -Enabled:$EnableVsCodeSettingsParity
 Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity

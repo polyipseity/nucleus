@@ -83,6 +83,7 @@ properties:
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
+      id: GitInstall
       directives:
         description: Ensure Git is installed
       settings:
@@ -242,6 +243,20 @@ properties:
       settings:
         id: Rustlang.Rustup
         source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      id: ScoopInstall
+      directives:
+        description: >-
+          Scoop user-space package manager for portable CLI utilities not
+          available in WinGet (e.g. thefuck).  Git is required by Scoop for
+          bucket management and updates; declared via dependsOn to ensure
+          Git is present before Scoop initialises.
+      settings:
+        id: Scoop.Scoop
+        source: winget
+      dependsOn:
+        - GitInstall
 
     - resource: Microsoft.WinGet.Client/Package
       directives:

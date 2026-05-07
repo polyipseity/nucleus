@@ -79,6 +79,16 @@ function Sync-NucleusShellProfile {
     '    }'
     '  }'
     '}'
+    # thefuck: register correction hook when the binary is present.
+    # -ErrorAction SilentlyContinue is intentional: thefuck may be absent on
+    # first-provision before Scoop setup has run; the if-guard checks the
+    # result immediately so no failure is silently swallowed.
+    # In PowerShell, functions take higher precedence than aliases in command
+    # lookup, so the `fuck` function defined by thefuck --alias is not shadowed
+    # by any alias of the same name (unlike zsh where aliases shadow functions).
+    'if (Get-Command thefuck -ErrorAction SilentlyContinue) {'
+    '  iex (thefuck --alias | Out-String)'
+    '}'
     'function g { & git @Args }'
     'function ga { & git add @Args }'
     'function gc { & git commit @Args }'
