@@ -238,13 +238,21 @@ settings, run a complete enforcement cycle to confirm the script converges:
      womp=1 networkoversleep=0 sleep=0 lessbright=1 tcpkeepalive=1 disksleep=0`
    - Both sources also show `Sleep On Power Button=1` and `SleepServices=1`
      (OS-managed, not written by activation.nix).
-3. **Introduce deliberate drift** (requires `sudo`): set a few flags to
-   known-wrong values so there is visible correction to verify, for example:
+3. **Introduce deliberate drift to ALL managed flags** (requires `sudo`): set
+   every managed flag in every source to a known-wrong value so the full
+   correction sweep is visible:
    ```sh
-   sudo pmset -a standby 0
-   sudo pmset -c sleep 5
-   sudo pmset -b sleep 5
+   # Global flags (both sources)
+   sudo pmset -a standby 0 ttyskeepawake 0 hibernatemode 0 \
+     networkoversleep 1 tcpkeepalive 0 powernap 0 lidwake 0
+   sudo pmset -a hibernatefile /private/tmp/nucleus-drift-test
+   # AC-specific flags
+   sudo pmset -c lowpowermode 1 displaysleep 10 sleep 5 disksleep 5 womp 0
+   # Battery-specific flags
+   sudo pmset -b lowpowermode 0 displaysleep 10 sleep 5 disksleep 5 womp 0 lessbright 0
    ```
+   After these commands `pmset -g custom` must show all flags at the wrong
+   values before proceeding to the apply step.
 4. **Run apply**: `nix run .#apply` from `src/`
 5. **Verify correction**: re-run steps 1 and 2 — all flags must match the
    expected values above.
