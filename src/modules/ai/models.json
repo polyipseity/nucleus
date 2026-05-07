@@ -1,6 +1,7 @@
 {
   "models": {
     "mac": [
+      "gemma4:e4b",
       "qwen3:14b"
     ],
     "pc": [
