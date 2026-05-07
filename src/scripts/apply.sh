@@ -12,6 +12,14 @@
 # Standalone Linux (plain Linux / WSL) runs home-manager without sudo and
 # skips the keepalive entirely.
 #
+# After the main apply command succeeds, scripts/ai-sync.sh is called to
+# converge locally installed Ollama models with the declarative manifest.
+# Pass --skip-ai-sync to suppress the model sync step — useful in CI or on
+# low-bandwidth connections where model pulls (2–20 GB each) are undesirable.
+#
+# Arguments:
+#   --skip-ai-sync  skip the post-apply Ollama model sync step
+#
 # Environment variables:
 #   NUCLEUS_USERNAME — override the Home Manager profile name used on standalone
 #                      Linux.  Defaults to `id -un` (the current user).  Set
@@ -21,6 +29,25 @@
 # Prerequisites: Nix installed; caller's environment must allow reaching the
 # nix binary.
 set -eu
+
+# ---------------------------------------------------------------------------
+# Flag parsing
+# ---------------------------------------------------------------------------
+skip_ai_sync=false
+
+for _arg in "$@"; do
+  case "$_arg" in
+    --skip-ai-sync)
+      # Model pulls are 2–20 GB and may be undesirable in CI or on
+      # low-bandwidth connections; this flag opts out of the post-apply sync.
+      skip_ai_sync=true
+      ;;
+    *)
+      printf '%s\n' "apply: unsupported argument '$_arg'" >&2
+      exit 1
+      ;;
+  esac
+done
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 # Keep one centralized Nix config fragment for this script so every `nix` call
@@ -79,6 +106,54 @@ start_sudo_keepalive() {
   # background job is leaked to the calling shell.
   # shellcheck disable=SC2064  # intentional: expand PID now, not at trap time
   trap "kill $SUDO_KEEPALIVE_PID 2>/dev/null || true" EXIT INT TERM
+}
+
+run_ai_sync() {
+  # Call scripts/ai-sync.sh to converge locally installed Ollama models with
+  # the declarative manifest after the system configuration has been applied.
+  #
+  # Why post-apply rather than pre-apply:
+  #   Model pulls are 2–20 GB; running them before activation could block the
+  #   critical configuration path.  Post-apply makes sync a best-effort step
+  #   that does not gate the system coming up.
+  #
+  # Why best-effort (no hard failure):
+  #   The system configuration applied successfully.  Model sync is additive —
+  #   a missing model does not break any declared system state.  Treating a
+  #   sync failure as fatal would roll back a successful system apply.
+  #
+  # Why resolve from REPO_ROOT rather than $SCRIPT_DIR:
+  #   When running via `nix run .#apply`, $SCRIPT_DIR points into the Nix
+  #   store where scripts/ai-sync.sh does not exist.  REPO_ROOT is derived
+  #   from `git rev-parse --show-toplevel` and always refers to the live
+  #   working tree.
+  #
+  # Why detect ollama from $PATH rather than adding it to runtimeInputs:
+  #   ollama is a user-installed daemon managed declaratively by the AI
+  #   module (src/modules/ai/default.nix and hosts/nixos/ai.nix).  Bundling
+  #   it in runtimeInputs would create a second, potentially different binary
+  #   that could mismatch the running server's version.  PATH detection keeps
+  #   the sync aligned with the actual runtime binary.
+  if [ "$skip_ai_sync" = true ]; then
+    printf '%s\n' "nucleus: --skip-ai-sync set; skipping post-apply model sync"
+    return
+  fi
+
+  _ras_script="$REPO_ROOT/scripts/ai-sync.sh"
+  if [ ! -f "$_ras_script" ]; then
+    printf '%s\n' "nucleus: scripts/ai-sync.sh not found at $_ras_script; skipping model sync"
+    return
+  fi
+
+  if ! command -v ollama >/dev/null 2>&1; then
+    printf '%s\n' "nucleus: ollama not found in PATH; skipping post-apply model sync"
+    return
+  fi
+
+  printf '%s\n' "nucleus: running post-apply AI model sync..."
+  if ! sh "$_ras_script"; then
+    printf '%s\n' "nucleus: ai-sync.sh exited with an error; model sync incomplete (system apply succeeded)" >&2
+  fi
 }
 
 generate_ssh_host_key_if_needed() {
@@ -249,6 +324,7 @@ case "$(uname -s)" in
     # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
     # while running as root (which otherwise produces ownership warnings).
     run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
+    run_ai_sync
     ;;
   Linux)
     if [ -f /etc/NIXOS ]; then
@@ -260,6 +336,7 @@ case "$(uname -s)" in
       run_nix run "$REPO_ROOT/src#health-check"
       # Keep root invocations on root-owned HOME for consistent Nix behavior.
       run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
+      run_ai_sync
     else
       # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
       # no sudo required — keepalive is not started.
@@ -267,6 +344,7 @@ case "$(uname -s)" in
       target_username="${NUCLEUS_USERNAME:-$(id -un)}"
       run_nix run "$REPO_ROOT/src#health-check"
       run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
+      run_ai_sync
     fi
     ;;
   *)
