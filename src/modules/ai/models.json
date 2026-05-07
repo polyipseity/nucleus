@@ -2,12 +2,12 @@
   "models": {
     "mac": [
       "phi4-mini:3.8b",
-      "phi4-reasoning:plus",
-      "qwen2.5-coder:14b-instruct-q6_K"
+      "qwen2.5-coder:14b",
+      "qwen3:14b"
     ],
     "pc": [
       "phi4-mini:3.8b",
-      "qwen2.5-coder:7b-instruct-q4_K_M",
+      "qwen2.5-coder:7b",
       "qwen2.5:1.5b"
     ]
   }
