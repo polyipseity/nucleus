@@ -35,9 +35,15 @@
   current interactive user.
 
 .PARAMETER EnableAgentsConfigParity
-  Enable managed user-level agents config junction (%USERPROFILE%\.agents ->
-  src\modules\configs\agents\) so coding agents write directly into the repo
-  tree.  False removes the managed junction (cleanup path).
+  Enable managed per-subdir symlinks in %USERPROFILE%\.agents\ pointing into
+  src\modules\configs\agents\ (excluding skills\) so coding agents write
+  directly into the repo tree.  False removes managed symlinks (cleanup path).
+
+.PARAMETER EnableAgentsSkillsParity
+  Enable managed per-skill symlinks in %USERPROFILE%\.agents\skills\ for
+  committed (System 1 / AGPL-compatible) skills in
+  src\modules\configs\agents\skills\.  False removes managed skill symlinks
+  (cleanup path); System 2 clawhub downloads in that directory are left intact.
 
 .PARAMETER EnableSecretsParity
   Enable managed secret materialization and managed SSH key cleanup fallback.
@@ -117,6 +123,10 @@
   .\apply.ps1 -EnableAgentsConfigParity:$false
 
 .EXAMPLE
+  # Apply while disabling managed agents committed skill symlinks (cleanup only):
+  .\apply.ps1 -EnableAgentsSkillsParity:$false
+
+.EXAMPLE
   # Apply while disabling managed VS Code settings parity (cleanup only):
   .\apply.ps1 -EnableVsCodeSettingsParity:$false
 
@@ -140,6 +150,7 @@ param(
   [string]$ModuleDir = (Join-Path -Path $PSScriptRoot -ChildPath "..\..\modules\windows"),
   [string]$PrimaryUsername = [System.Environment]::UserName,
   [bool]$EnableAgentsConfigParity = $true,
+  [bool]$EnableAgentsSkillsParity = $true,
   [bool]$EnableSecretsParity = $true,
   [bool]$EnableBunParity = $true,
   [bool]$EnableGitSshParity = $true,
@@ -181,6 +192,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "set-vscodeworkspacetrust.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "shell.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsconfig.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsskills.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecretfile.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleusvscodeextensions.ps1")
@@ -322,6 +334,7 @@ if ($EnableBunParity) {
 }
 
 Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
+Sync-AgentsSkills -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
 Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity
 Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
