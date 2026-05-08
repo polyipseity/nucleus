@@ -108,6 +108,17 @@ function Sync-VscodeConfig {
     "tasks.json"                      = "tasks.json"
   }
 
+  # Managed directories: ordered hashtable of repo dir alias -> channel-side
+  # relative path inside the User/ data directory.  copilot-memories uses a
+  # short repo alias because VS Code stores memories under a long per-extension
+  # subpath that is inconvenient to navigate in a git tree.
+  $managedDirs = [ordered]@{
+    "copilot-memories" = "globalStorage\github.copilot-chat\memory-tool\memories"
+    "profiles"         = "profiles"
+    "prompts"          = "prompts"
+    "snippets"         = "snippets"
+  }
+
   foreach ($channelDir in $channelDirs) {
 
     # --- Managed files ---
