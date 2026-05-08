@@ -210,9 +210,11 @@ in
     # -----------------------------------------------------------------------
     # vscodeDarwinExtensionBridge
     # Homebrew VS Code reads extensions from ~/.vscode{,-insiders}/extensions,
-    # while Nix-managed extensions live in the store. Keep both app channels in
-    # sync by replacing those mutable directories with symlinks to the single
-    # Nix-store extension tree derived from sharedExtensions above.
+    # while Nix-managed extensions live in the Nix store.  The directory must
+    # remain a real writable path (not a symlink to the store) because VS Code
+    # writes extensions.json inside it at startup; a whole-directory symlink
+    # to the immutable store causes EACCES.  Instead, keep a real writable
+    # directory and populate it with per-extension symlinks into the store.
     # -----------------------------------------------------------------------
     vscodeDarwinExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
@@ -221,24 +223,71 @@ in
       stable_extensions="$HOME/.vscode/extensions"
       insiders_extensions="$HOME/.vscode-insiders/extensions"
 
+      # setup_extension_dir CHANNEL_EXTENSIONS
+      # Ensures CHANNEL_EXTENSIONS is a real writable directory containing
+      # per-extension symlinks into the Nix-managed source tree.  VS Code must
+      # write extensions.json inside this directory; a whole-directory symlink
+      # to the immutable Nix store prevents that with EACCES.
+      #
+      # Algorithm:
+      #   1. Migrate the old whole-directory Nix-store symlink (if present) to
+      #      a real writable directory so VS Code can write files inside it.
+      #   2. Add a per-extension symlink for every entry under source_extensions.
+      #      Correct symlinks → no-op; wrong symlinks → replaced; non-symlinks
+      #      (user-installed extensions) → left untouched.
+      #   3. Remove stale per-extension symlinks whose source entry no longer
+      #      exists (extension removed from the Nix manifest).
+      setup_extension_dir() {
+        _sed_dir="$1"
+
+        # Step 1: migrate old whole-directory symlink to a real writable directory.
+        # The previous approach linked the entire extensions/ dir to the Nix store,
+        # which made VS Code's extensions.json writes fail with EACCES.
+        if [ -L "$_sed_dir" ]; then
+          rm "$_sed_dir"
+        fi
+        mkdir -p "$_sed_dir"
+
+        # Step 2: add a per-extension symlink for each Nix-managed extension.
+        # Trailing-slash glob only matches actual directories (and symlinked dirs);
+        # the -d guard handles the empty-source no-op without error.
+        for _sed_src in "$source_extensions"/*/; do
+          [ -d "$_sed_src" ] || continue
+          _sed_src="''${_sed_src%/}"
+          _sed_ext_name="''${_sed_src##*/}"
+          _sed_link="$_sed_dir/$_sed_ext_name"
+
+          if [ -L "$_sed_link" ]; then
+            # Correct symlink → no-op; wrong target (e.g. after store upgrade) → replace.
+            [ "$(readlink "$_sed_link")" = "$_sed_src" ] && continue
+            rm "$_sed_link"
+          elif [ -e "$_sed_link" ]; then
+            # Non-symlink entry (user-installed extension): leave untouched.
+            continue
+          fi
+
+          ln -s "$_sed_src" "$_sed_link"
+        done
+
+        # Step 3: remove stale symlinks for extensions removed from the Nix manifest.
+        # Use bare-star glob (no trailing /) to catch broken symlinks as well.
+        for _sed_existing in "$_sed_dir"/*; do
+          # Only process symlinks; real files/dirs are user-installed, leave them.
+          [ -L "$_sed_existing" ] || continue
+          _sed_ext_name="''${_sed_existing##*/}"
+          [ -e "$source_extensions/$_sed_ext_name" ] && continue
+          rm "$_sed_existing"
+        done
+      }
+
       ${lib.optionalString stableUsesHomebrew ''
       mkdir -p "$HOME/.vscode"
-
-      if [ -L "$stable_extensions" ] || [ -e "$stable_extensions" ]; then
-        rm -rf "$stable_extensions"
-      fi
-
-      ln -s "$source_extensions" "$stable_extensions"
+      setup_extension_dir "$stable_extensions"
       ''}
 
       ${lib.optionalString insidersUsesHomebrew ''
       mkdir -p "$HOME/.vscode-insiders"
-
-      if [ -L "$insiders_extensions" ] || [ -e "$insiders_extensions" ]; then
-        rm -rf "$insiders_extensions"
-      fi
-
-      ln -s "$source_extensions" "$insiders_extensions"
+      setup_extension_dir "$insiders_extensions"
       ''}
     '';
   };
