@@ -2,29 +2,148 @@
 #
 # Source of truth for VS Code extensions and config wiring lives here.
 # Installation backend intentionally pivots by platform:
-#   • Linux/NixOS: nixpkgs binaries
-#   • macOS: backend selected in modules/core.nix (Homebrew or nixpkgs)
+#   • Linux/NixOS: nixpkgs binaries; extensions installed via programs.vscode.
+#   • macOS: backend selected in modules/core.nix (Homebrew or nixpkgs);
+#     Homebrew-backed channels receive extensions via vscodeDarwinExtensionBridge.
+#
+# The full 64-extension baseline is built entirely from Nix derivations:
+#   • 44 extensions packaged directly in nixpkgs (pkgs.vscode-extensions).
+#   • 20 extensions sourced from the VS Code Marketplace via the
+#     nix-vscode-extensions flake input (vscodeMarketplace extraSpecialArg).
 #
 # VS Code config files (settings, per-host keybindings, MCP, tasks, snippets,
 # prompts, profiles, and Copilot Chat memory) are kept as live repo files under
 # src/modules/configs/vscode/ so that every VS Code write appears as an
 # unstaged git change.  The vscodeSymlinks activation creates symlinks from
 # the per-channel User/ directories to those repo files at apply time.
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, vscodeMarketplace, ... }:
 let
   # Platform switch used to keep one declarative config while selecting the
   # backend that integrates best on each OS.
   isDarwin = pkgs.stdenv.isDarwin;
 
-  # Canonical extension set shared by both platforms.
+  # Safe accessor for VS Code Marketplace extensions provided by
+  # nix-vscode-extensions.  Returns a single-element list when the extension is
+  # indexed, or an empty list with a trace warning when absent (e.g. for very
+  # recently published extensions not yet in the index snapshot).  The list
+  # wrapper lets callers use this in builtins.concatLists without special-casing.
+  mkMktx = pub: name:
+    let pubAttrs = vscodeMarketplace.${pub} or {};
+    in if pubAttrs ? ${name}
+       then [ pubAttrs.${name} ]
+       else builtins.trace
+         "nucleus: nix-vscode-extensions: ${pub}.${name} not in marketplace index — skipping"
+         [];
+
+  # Canonical extension set shared by both platforms, sorted alphabetically by
+  # publisher.name.  44 extensions come from nixpkgs; 20 come from the VS Code
+  # Marketplace via nix-vscode-extensions (via mkMktx).  A missing marketplace
+  # entry degrades gracefully to an empty contribution rather than failing eval.
   # On Linux, Home Manager installs these directly via programs.vscode.
-  # On macOS, activation links Homebrew's expected extension path to a Nix-store
-  # directory built from this same list.
-  sharedExtensions = [
-    pkgs.vscode-extensions.jnoortheen.nix-ide
-    pkgs.vscode-extensions.myriad-dreamin.tinymist
-    pkgs.vscode-extensions.rust-lang.rust-analyzer
-    pkgs.vscode-extensions.tamasfe.even-better-toml
+  # On macOS, vscodeDarwinExtensionBridge symlinks each extension into the
+  # writable ~/.vscode{,-insiders}/extensions directory.
+  sharedExtensions = builtins.concatLists [
+    # astral-sh
+    (mkMktx "astral-sh" "ty")
+    # charliermarsh
+    [ pkgs.vscode-extensions.charliermarsh.ruff ]
+    # christian-kohler
+    [ pkgs.vscode-extensions.christian-kohler.npm-intellisense ]
+    [ pkgs.vscode-extensions.christian-kohler.path-intellisense ]
+    # cl
+    (mkMktx "cl" "eide")
+    # cschlosser
+    (mkMktx "cschlosser" "doxdocgen")
+    # davidanson
+    [ pkgs.vscode-extensions.davidanson.vscode-markdownlint ]
+    # dbaeumer
+    [ pkgs.vscode-extensions.dbaeumer.vscode-eslint ]
+    # docker
+    [ pkgs.vscode-extensions.docker.docker ]
+    # editorconfig
+    [ pkgs.vscode-extensions.editorconfig.editorconfig ]
+    # esbenp
+    [ pkgs.vscode-extensions.esbenp.prettier-vscode ]
+    # github
+    [ pkgs.vscode-extensions.github.codespaces ]
+    (mkMktx "github" "remotehub")
+    [ pkgs.vscode-extensions.github.vscode-github-actions ]
+    # heaths
+    (mkMktx "heaths" "vscode-guid")
+    # ibm
+    [ pkgs.vscode-extensions.ibm.output-colorizer ]
+    # icrawl
+    (mkMktx "icrawl" "discord-vscode")
+    # james-yu
+    [ pkgs.vscode-extensions.james-yu.latex-workshop ]
+    # jnoortheen
+    [ pkgs.vscode-extensions.jnoortheen.nix-ide ]
+    # keroc
+    (mkMktx "keroc" "hex-fmt")
+    # mark-hansen
+    (mkMktx "mark-hansen" "hledger-vscode")
+    # ms-azuretools
+    [ pkgs.vscode-extensions.ms-azuretools.vscode-containers ]
+    [ pkgs.vscode-extensions.ms-azuretools.vscode-docker ]
+    # ms-ceintl
+    [ pkgs.vscode-extensions.ms-ceintl.vscode-language-pack-zh-hant ]
+    # ms-python
+    [ pkgs.vscode-extensions.ms-python.debugpy ]
+    [ pkgs.vscode-extensions.ms-python.isort ]
+    [ pkgs.vscode-extensions.ms-python.python ]
+    (mkMktx "ms-python" "vscode-python-envs")
+    # ms-toolsai
+    [ pkgs.vscode-extensions.ms-toolsai.datawrangler ]
+    [ pkgs.vscode-extensions.ms-toolsai.jupyter ]
+    [ pkgs.vscode-extensions.ms-toolsai.jupyter-keymap ]
+    [ pkgs.vscode-extensions.ms-toolsai.jupyter-renderers ]
+    [ pkgs.vscode-extensions.ms-toolsai.vscode-jupyter-cell-tags ]
+    [ pkgs.vscode-extensions.ms-toolsai.vscode-jupyter-slideshow ]
+    # ms-vscode-remote
+    [ pkgs.vscode-extensions.ms-vscode-remote.remote-containers ]
+    [ pkgs.vscode-extensions.ms-vscode-remote.remote-ssh ]
+    [ pkgs.vscode-extensions.ms-vscode-remote.remote-ssh-edit ]
+    [ pkgs.vscode-extensions.ms-vscode-remote.remote-wsl ]
+    # ms-vscode
+    [ pkgs.vscode-extensions.ms-vscode.cmake-tools ]
+    (mkMktx "ms-vscode" "cpp-devtools")
+    [ pkgs.vscode-extensions.ms-vscode.cpptools ]
+    [ pkgs.vscode-extensions.ms-vscode.cpptools-extension-pack ]
+    (mkMktx "ms-vscode" "cpptools-themes")
+    [ pkgs.vscode-extensions.ms-vscode.hexeditor ]
+    [ pkgs.vscode-extensions.ms-vscode.makefile-tools ]
+    [ pkgs.vscode-extensions.ms-vscode.powershell ]
+    [ pkgs.vscode-extensions.ms-vscode.remote-explorer ]
+    (mkMktx "ms-vscode" "remote-repositories")
+    (mkMktx "ms-vscode" "remote-server")
+    (mkMktx "ms-vscode" "vscode-chat-customizations-evaluations")
+    (mkMktx "ms-vscode" "vscode-serial-monitor")
+    # ms-vsliveshare
+    [ pkgs.vscode-extensions.ms-vsliveshare.vsliveshare ]
+    # myriad-dreamin (stable only — pre-release builds have caused editor crashes)
+    [ pkgs.vscode-extensions.myriad-dreamin.tinymist ]
+    # redhat
+    [ pkgs.vscode-extensions.redhat.vscode-yaml ]
+    # rust-lang
+    [ pkgs.vscode-extensions.rust-lang.rust-analyzer ]
+    # s-nlf-fh
+    (mkMktx "s-nlf-fh" "glassit")
+    # sjhuangx
+    (mkMktx "sjhuangx" "vscode-scheme")
+    # sst-dev
+    (mkMktx "sst-dev" "opencode-v2")
+    # streetsidesoftware
+    [ pkgs.vscode-extensions.streetsidesoftware.code-spell-checker ]
+    # svelte
+    [ pkgs.vscode-extensions.svelte.svelte-vscode ]
+    # takumii
+    (mkMktx "takumii" "markdowntable")
+    # tamasfe
+    [ pkgs.vscode-extensions.tamasfe.even-better-toml ]
+    # tweag
+    (mkMktx "tweag" "vscode-nickel")
+    # vadimcn
+    [ pkgs.vscode-extensions.vadimcn.vscode-lldb ]
   ];
 
   # Materialize the extension list under a deterministic Nix-store directory so
@@ -222,124 +341,6 @@ in
         # the repo uses a flat alias so the directory is easy to navigate.
         ensure_dir_symlink  "$_vsym_config_dir/copilot-memories" \
           "$_vsym_base_dir/globalStorage/github.copilot-chat/memory-tool/memories"
-      done
-    '';
-    # -------------------------------------------------------------------------
-    # vscodeExtensions
-    # Installs the full managed extension baseline via the VS Code CLI so that
-    # extensions not packaged in nixpkgs are still present after apply.
-    #
-    # The 4 extensions in sharedExtensions are already handled by
-    # programs.vscode / vscodeDarwinExtensionBridge via the Nix store; they
-    # are included here too because --force is a no-op when the same version
-    # is already installed, and the CLI path guarantees pre-release builds are
-    # fetched when available.
-    #
-    # Strategy:
-    #   - --pre-release --force for all extensions; VS Code falls back to
-    #     stable automatically when no pre-release channel exists.
-    #   - myriad-dreamin.tinymist: stable only — pre-release builds have
-    #     caused editor crashes.
-    #   - CLIs absent from PATH are skipped gracefully; VS Code may not be on
-    #     PATH yet when this runs during a fresh bootstrap.
-    #   - Per-extension failures are reported to stderr but do not abort the
-    #     activation so a single unavailable extension cannot block all others.
-    # -------------------------------------------------------------------------
-    vscodeExtensions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      set -eu
-
-      # Install via each available VS Code CLI.  Both stable and insiders are
-      # targeted so both channels share the same extension baseline.
-      for _vext_cli in code code-insiders; do
-        # command -v exits non-zero when the binary is absent; the if-wrapper
-        # prevents set -e from aborting and stdout (the path) is discarded
-        # since we invoke the CLI directly by name below.
-        if ! command -v "$_vext_cli" > /dev/null 2>&1; then
-          # CLI absent from PATH — VS Code not installed yet or Homebrew PATH
-          # not sourced in this activation context; skip gracefully.
-          continue
-        fi
-
-        for _vext_id in \
-          'astral-sh.ty' \
-          'charliermarsh.ruff' \
-          'christian-kohler.npm-intellisense' \
-          'christian-kohler.path-intellisense' \
-          'cl.eide' \
-          'cschlosser.doxdocgen' \
-          'davidanson.vscode-markdownlint' \
-          'dbaeumer.vscode-eslint' \
-          'docker.docker' \
-          'editorconfig.editorconfig' \
-          'esbenp.prettier-vscode' \
-          'github.codespaces' \
-          'github.remotehub' \
-          'github.vscode-github-actions' \
-          'heaths.vscode-guid' \
-          'ibm.output-colorizer' \
-          'icrawl.discord-vscode' \
-          'james-yu.latex-workshop' \
-          'jnoortheen.nix-ide' \
-          'keroc.hex-fmt' \
-          'mark-hansen.hledger-vscode' \
-          'ms-azuretools.vscode-containers' \
-          'ms-azuretools.vscode-docker' \
-          'ms-ceintl.vscode-language-pack-zh-hant' \
-          'ms-python.debugpy' \
-          'ms-python.isort' \
-          'ms-python.python' \
-          'ms-python.vscode-python-envs' \
-          'ms-toolsai.datawrangler' \
-          'ms-toolsai.jupyter' \
-          'ms-toolsai.jupyter-keymap' \
-          'ms-toolsai.jupyter-renderers' \
-          'ms-toolsai.vscode-jupyter-cell-tags' \
-          'ms-toolsai.vscode-jupyter-slideshow' \
-          'ms-vscode-remote.remote-containers' \
-          'ms-vscode-remote.remote-ssh' \
-          'ms-vscode-remote.remote-ssh-edit' \
-          'ms-vscode-remote.remote-wsl' \
-          'ms-vscode.cmake-tools' \
-          'ms-vscode.cpp-devtools' \
-          'ms-vscode.cpptools' \
-          'ms-vscode.cpptools-extension-pack' \
-          'ms-vscode.cpptools-themes' \
-          'ms-vscode.hexeditor' \
-          'ms-vscode.makefile-tools' \
-          'ms-vscode.powershell' \
-          'ms-vscode.remote-explorer' \
-          'ms-vscode.remote-repositories' \
-          'ms-vscode.remote-server' \
-          'ms-vscode.vscode-chat-customizations-evaluations' \
-          'ms-vscode.vscode-serial-monitor' \
-          'ms-vsliveshare.vsliveshare' \
-          'myriad-dreamin.tinymist' \
-          'redhat.vscode-yaml' \
-          'rust-lang.rust-analyzer' \
-          's-nlf-fh.glassit' \
-          'sjhuangx.vscode-scheme' \
-          'sst-dev.opencode-v2' \
-          'streetsidesoftware.code-spell-checker' \
-          'svelte.svelte-vscode' \
-          'takumii.markdowntable' \
-          'tamasfe.even-better-toml' \
-          'tweag.vscode-nickel' \
-          'vadimcn.vscode-lldb' \
-        ; do
-          if [ "$_vext_id" = 'myriad-dreamin.tinymist' ]; then
-            # tinymist: stable only — pre-release builds have caused editor
-            # crashes; omit --pre-release so the stable channel is used.
-            if ! "$_vext_cli" --install-extension "$_vext_id" --force; then
-              printf 'nucleus: vscodeExtensions: failed to install %s\n' "$_vext_id" >&2
-            fi
-          else
-            # All other extensions: request pre-release; VS Code falls back to
-            # stable when no pre-release channel exists for an extension.
-            if ! "$_vext_cli" --install-extension "$_vext_id" --pre-release --force; then
-              printf 'nucleus: vscodeExtensions: failed to install %s\n' "$_vext_id" >&2
-            fi
-          fi
-        done
       done
     '';
   } // lib.optionalAttrs (isDarwin && needsDarwinExtensionBridge) {

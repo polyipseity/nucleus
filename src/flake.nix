@@ -17,6 +17,13 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # nix-vscode-extensions: provides Nix derivations for VS Code Marketplace
+    # extensions not yet packaged in nixpkgs, enabling a fully declarative
+    # extension baseline without CLI-based activation fallbacks.
+    nix-vscode-extensions = {
+      url = "github:nix-community/nix-vscode-extensions";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     # nixpkgs: the single shared package set; pinned to nixos-unstable for
     # access to recent packages on both NixOS and Darwin.
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -28,7 +35,7 @@
     };
   };
 
-  outputs = { darwin, home-manager, nixpkgs, sops-nix, ... }:
+  outputs = { darwin, home-manager, nix-vscode-extensions, nixpkgs, sops-nix, ... }:
     let
       # Shared user account name propagated to every host via specialArgs.
       username = "polyipseity";
@@ -102,6 +109,13 @@
 
       pkgsLinux = mkPkgs systems.linux;
       pkgsMac   = mkPkgs systems.mac;
+
+      # Per-system VS Code Marketplace derivation sets from nix-vscode-extensions.
+      # Used by editors.nix to build Nix derivations for the ~20 extensions that
+      # are not yet packaged in nixpkgs, replacing CLI-based activation with
+      # fully declarative Nix store derivations.
+      vscodeMarketplaceMac   = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
+      vscodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
       # Build the `nix run .#apply` app for a given package set.
       # Wraps scripts/apply.sh in a shell application that has git, openssh,
@@ -268,7 +282,10 @@
             home-manager.useGlobalPkgs = true;
             # Install user packages into the user profile rather than /etc.
             home-manager.useUserPackages = true;
-            home-manager.extraSpecialArgs = { inherit username; };
+            home-manager.extraSpecialArgs = {
+              inherit username;
+              vscodeMarketplace = vscodeMarketplaceMac;
+            };
             home-manager.users.${username} = {
               imports = [
                 sops-nix.homeManagerModules.sops
@@ -300,7 +317,10 @@
 
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
-            home-manager.extraSpecialArgs = { inherit username; };
+            home-manager.extraSpecialArgs = {
+              inherit username;
+              vscodeMarketplace = vscodeMarketplaceLinux;
+            };
             home-manager.users.${username} = {
               imports = [
                 sops-nix.homeManagerModules.sops
@@ -364,7 +384,10 @@
       # profile can be applied to WSL (which is x86_64-linux) without changes.
       # -----------------------------------------------------------------------
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
-        extraSpecialArgs = { inherit username; };
+        extraSpecialArgs = {
+          inherit username;
+          vscodeMarketplace = vscodeMarketplaceLinux;
+        };
         modules = [
           sops-nix.homeManagerModules.sops
           ./modules/home.nix
