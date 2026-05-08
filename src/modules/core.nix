@@ -46,8 +46,9 @@ let
   #   ripgrep        — fast grep replacement
   #   rustup         — Rust toolchain manager
   #   shellcheck     — shell linter used by CI and pre-commit validation
-  #   sops           — secret encryption/decryption tool
-  #   uv             — fast Python package/project manager
+#   sops           — secret encryption/decryption tool
+#   typst          — modern document-composition compiler; pairs with the Tinymist LSP in editors.nix
+#   uv             — fast Python package/project manager
   #   zoxide         — smart cd (shell integration in shell.nix)
   baseSharedPackages = [
     pkgs.bat
@@ -74,6 +75,7 @@ let
     pkgs.rustup
     pkgs.shellcheck
     pkgs.sops
+    pkgs.typst
     pkgs.uv
     pkgs.zoxide
   ];

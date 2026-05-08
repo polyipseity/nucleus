@@ -24,6 +24,7 @@ let
   # directory built from this same list.
   sharedExtensions = [
     pkgs.vscode-extensions.jnoortheen.nix-ide
+    pkgs.vscode-extensions.myriad-dreamin.tinymist
     pkgs.vscode-extensions.rust-lang.rust-analyzer
     pkgs.vscode-extensions.tamasfe.even-better-toml
   ];

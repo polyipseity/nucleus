@@ -327,6 +327,17 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          Ensure Typst is installed as the command-line document-composition
+          compiler for cross-host parity with macOS and NixOS (pkgs.typst);
+          pairs with the Tinymist language server managed by VS Code extension
+          sync on all platforms.
+      settings:
+        id: Typst.Typst
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure VLC media player is installed to mirror the macOS GUI package declaration
       settings:
         id: VideoLAN.VLC

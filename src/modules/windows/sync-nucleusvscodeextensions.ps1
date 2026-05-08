@@ -32,6 +32,7 @@ function Sync-NucleusVsCodeExtensions {
 
   $managedExtensions = @(
     'jnoortheen.nix-ide',
+    'myriad-dreamin.tinymist',
     'rust-lang.rust-analyzer',
     'tamasfe.even-better-toml'
   )
