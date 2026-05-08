@@ -65,7 +65,10 @@
   Enable managed VS Code extension parity convergence and cleanup fallback.
 
 .PARAMETER EnableVsCodeSettingsParity
-  Enable managed VS Code settings parity convergence and managed-key cleanup.
+  Enable managed VS Code config symlinks (settings, keybindings, MCP, tasks,
+  snippets, prompts, profiles, and Copilot memories) pointing into the live
+  repo tree.  False removes managed symlinks (cleanup path); VS Code recreates
+  plain files on next launch.
 
 .PARAMETER SkipAiSync
   When specified, suppresses the post-apply Ollama model sync step.  Useful in
@@ -160,6 +163,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleusvscodeextensions.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleusvscodesettings.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleuswallpapers.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-vscodeconfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "test-nucleusprimaryuser.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "verify-archiving-stack.ps1")
 
@@ -203,6 +207,22 @@ $wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wal
 $machineSshHostKeyPubPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key.pub"
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\")).Path
 $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
+
+# Expose the repo root to any subprocesses (e.g. DSC script resources) that
+# may need to locate repo-relative files.  Also write it to a stable file path
+# so Home Manager activation scripts (e.g. vscodeSymlinks in editors.nix) can
+# read it after the sudo boundary that darwin-rebuild/nixos-rebuild crosses,
+# where environment variables are not reliably propagated.
+$env:NUCLEUS_REPO = $repoRoot
+$nucleusConfigDir = Join-Path -Path $HOME -ChildPath ".config\nucleus"
+if (-not (Test-Path -LiteralPath $nucleusConfigDir -PathType Container)) {
+  New-Item -ItemType Directory -Path $nucleusConfigDir -Force | Out-Null
+}
+[System.IO.File]::WriteAllText(
+  (Join-Path -Path $nucleusConfigDir -ChildPath "repo-root"),
+  "$repoRoot`n",
+  [System.Text.UTF8Encoding]::new($false)
+)
 
 # Ensure the SSH host key exists before age key registration.  On a fresh
 # machine the key is absent until the OpenSSH Server service first starts;
@@ -278,7 +298,7 @@ if ($EnableBunParity) {
   Invoke-BunSetup
 }
 
-Sync-NucleusVsCodeSettings -Enabled:$EnableVsCodeSettingsParity
+Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity
 Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
 Sync-NucleusGitAndSshConfig -Enabled:$EnableGitSshParity -PrimaryUsername $PrimaryUsername
 Sync-NucleusShellProfile -Enabled:$EnableShellParity
