@@ -224,6 +224,124 @@ in
           "$_vsym_base_dir/globalStorage/github.copilot-chat/memory-tool/memories"
       done
     '';
+    # -------------------------------------------------------------------------
+    # vscodeExtensions
+    # Installs the full managed extension baseline via the VS Code CLI so that
+    # extensions not packaged in nixpkgs are still present after apply.
+    #
+    # The 4 extensions in sharedExtensions are already handled by
+    # programs.vscode / vscodeDarwinExtensionBridge via the Nix store; they
+    # are included here too because --force is a no-op when the same version
+    # is already installed, and the CLI path guarantees pre-release builds are
+    # fetched when available.
+    #
+    # Strategy:
+    #   - --pre-release --force for all extensions; VS Code falls back to
+    #     stable automatically when no pre-release channel exists.
+    #   - myriad-dreamin.tinymist: stable only — pre-release builds have
+    #     caused editor crashes.
+    #   - CLIs absent from PATH are skipped gracefully; VS Code may not be on
+    #     PATH yet when this runs during a fresh bootstrap.
+    #   - Per-extension failures are reported to stderr but do not abort the
+    #     activation so a single unavailable extension cannot block all others.
+    # -------------------------------------------------------------------------
+    vscodeExtensions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      set -eu
+
+      # Install via each available VS Code CLI.  Both stable and insiders are
+      # targeted so both channels share the same extension baseline.
+      for _vext_cli in code code-insiders; do
+        # command -v exits non-zero when the binary is absent; the if-wrapper
+        # prevents set -e from aborting and stdout (the path) is discarded
+        # since we invoke the CLI directly by name below.
+        if ! command -v "$_vext_cli" > /dev/null 2>&1; then
+          # CLI absent from PATH — VS Code not installed yet or Homebrew PATH
+          # not sourced in this activation context; skip gracefully.
+          continue
+        fi
+
+        for _vext_id in \
+          'astral-sh.ty' \
+          'charliermarsh.ruff' \
+          'christian-kohler.npm-intellisense' \
+          'christian-kohler.path-intellisense' \
+          'cl.eide' \
+          'cschlosser.doxdocgen' \
+          'davidanson.vscode-markdownlint' \
+          'dbaeumer.vscode-eslint' \
+          'docker.docker' \
+          'editorconfig.editorconfig' \
+          'esbenp.prettier-vscode' \
+          'github.codespaces' \
+          'github.remotehub' \
+          'github.vscode-github-actions' \
+          'heaths.vscode-guid' \
+          'ibm.output-colorizer' \
+          'icrawl.discord-vscode' \
+          'james-yu.latex-workshop' \
+          'jnoortheen.nix-ide' \
+          'keroc.hex-fmt' \
+          'mark-hansen.hledger-vscode' \
+          'ms-azuretools.vscode-containers' \
+          'ms-azuretools.vscode-docker' \
+          'ms-ceintl.vscode-language-pack-zh-hant' \
+          'ms-python.debugpy' \
+          'ms-python.isort' \
+          'ms-python.python' \
+          'ms-python.vscode-python-envs' \
+          'ms-toolsai.datawrangler' \
+          'ms-toolsai.jupyter' \
+          'ms-toolsai.jupyter-keymap' \
+          'ms-toolsai.jupyter-renderers' \
+          'ms-toolsai.vscode-jupyter-cell-tags' \
+          'ms-toolsai.vscode-jupyter-slideshow' \
+          'ms-vscode-remote.remote-containers' \
+          'ms-vscode-remote.remote-ssh' \
+          'ms-vscode-remote.remote-ssh-edit' \
+          'ms-vscode-remote.remote-wsl' \
+          'ms-vscode.cmake-tools' \
+          'ms-vscode.cpp-devtools' \
+          'ms-vscode.cpptools' \
+          'ms-vscode.cpptools-extension-pack' \
+          'ms-vscode.cpptools-themes' \
+          'ms-vscode.hexeditor' \
+          'ms-vscode.makefile-tools' \
+          'ms-vscode.powershell' \
+          'ms-vscode.remote-explorer' \
+          'ms-vscode.remote-repositories' \
+          'ms-vscode.remote-server' \
+          'ms-vscode.vscode-chat-customizations-evaluations' \
+          'ms-vscode.vscode-serial-monitor' \
+          'ms-vsliveshare.vsliveshare' \
+          'myriad-dreamin.tinymist' \
+          'redhat.vscode-yaml' \
+          'rust-lang.rust-analyzer' \
+          's-nlf-fh.glassit' \
+          'sjhuangx.vscode-scheme' \
+          'sst-dev.opencode-v2' \
+          'streetsidesoftware.code-spell-checker' \
+          'svelte.svelte-vscode' \
+          'takumii.markdowntable' \
+          'tamasfe.even-better-toml' \
+          'tweag.vscode-nickel' \
+          'vadimcn.vscode-lldb' \
+        ; do
+          if [ "$_vext_id" = 'myriad-dreamin.tinymist' ]; then
+            # tinymist: stable only — pre-release builds have caused editor
+            # crashes; omit --pre-release so the stable channel is used.
+            if ! "$_vext_cli" --install-extension "$_vext_id" --force; then
+              printf 'nucleus: vscodeExtensions: failed to install %s\n' "$_vext_id" >&2
+            fi
+          else
+            # All other extensions: request pre-release; VS Code falls back to
+            # stable when no pre-release channel exists for an extension.
+            if ! "$_vext_cli" --install-extension "$_vext_id" --pre-release --force; then
+              printf 'nucleus: vscodeExtensions: failed to install %s\n' "$_vext_id" >&2
+            fi
+          fi
+        done
+      done
+    '';
   } // lib.optionalAttrs (isDarwin && needsDarwinExtensionBridge) {
     # -----------------------------------------------------------------------
     # vscodeDarwinExtensionBridge
