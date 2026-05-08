@@ -1,0 +1,17 @@
+[
+	{
+		"name": "OpenAI Compatible (Ollama)",
+		"vendor": "customoai",
+		"models": [
+			{
+				"id": "qwen3:8b",
+				"maxInputTokens": 32768,
+				"maxOutputTokens": 8192,
+				"name": "Qwen3 8B",
+				"toolCalling": true,
+				"url": "http://localhost:11434/v1",
+				"vision": false
+			}
+		]
+	}
+]

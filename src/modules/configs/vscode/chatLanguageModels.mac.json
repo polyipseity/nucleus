@@ -1,0 +1,26 @@
+[
+	{
+		"name": "OpenAI Compatible (Ollama)",
+		"vendor": "customoai",
+		"models": [
+			{
+				"id": "gemma4:e4b",
+				"maxInputTokens": 32768,
+				"maxOutputTokens": 8192,
+				"name": "Gemma 4 E4B",
+				"toolCalling": true,
+				"url": "http://localhost:11434/v1",
+				"vision": false
+			},
+			{
+				"id": "qwen3:14b",
+				"maxInputTokens": 32768,
+				"maxOutputTokens": 8192,
+				"name": "Qwen3 14B",
+				"toolCalling": true,
+				"url": "http://localhost:11434/v1",
+				"vision": false
+			}
+		]
+	}
+]

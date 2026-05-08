@@ -64,6 +64,14 @@ let
   vscodeKeybindingsFile =
     if isDarwin then "keybindings.mac.json"
     else "keybindings.nixos.json";
+
+  # Select the per-host Copilot chat model list so that each machine only
+  # surfaces the Ollama models that fit within its VRAM budget.
+  # mac: gemma4:e4b + qwen3:14b (24 GB unified memory allows both).
+  # nixos/other: qwen3:8b only (discrete GPU capped at 6 GB VRAM).
+  vscodeChatLanguageModelsFile =
+    if isDarwin then "chatLanguageModels.mac.json"
+    else "chatLanguageModels.nixos.json";
 in
 {
   programs.neovim = {
@@ -102,7 +110,8 @@ in
     # appears immediately as an unstaged git diff.
     #
     # Files managed: settings.json, keybindings.<host>.json (linked as
-    #   keybindings.json), mcp.json, tasks.json.
+    #   keybindings.json), chatLanguageModels.<host>.json (linked as
+    #   chatLanguageModels.json), mcp.json, tasks.json.
     # Directories managed: snippets/, prompts/, profiles/,
     #   and globalStorage/github.copilot-chat/memory-tool/memories/
     #   (aliased in the repo as copilot-memories/).
@@ -203,6 +212,7 @@ in
       for _vsym_base_dir in "${stableBaseDir}" "${insidersBaseDir}"; do
         ensure_file_symlink "$_vsym_config_dir/settings.json"    "$_vsym_base_dir/settings.json"
         ensure_file_symlink "$_vsym_config_dir/${vscodeKeybindingsFile}" "$_vsym_base_dir/keybindings.json"
+        ensure_file_symlink "$_vsym_config_dir/${vscodeChatLanguageModelsFile}" "$_vsym_base_dir/chatLanguageModels.json"
         ensure_file_symlink "$_vsym_config_dir/mcp.json"         "$_vsym_base_dir/mcp.json"
         ensure_file_symlink "$_vsym_config_dir/tasks.json"       "$_vsym_base_dir/tasks.json"
         ensure_dir_symlink  "$_vsym_config_dir/snippets"         "$_vsym_base_dir/snippets"

@@ -16,15 +16,17 @@ function Sync-VscodeConfig {
     Symlinks VS Code config files and directories to the live repo tree.
 
   .DESCRIPTION
-    For each managed item (keybindings.json, mcp.json, settings.json,
-    tasks.json, and the snippets/, prompts/, profiles/, and copilot-memories/
-    directories) and for both the stable (Code) and insiders (Code - Insiders)
-    channels, creates a symlink from the VS Code User data directory into
-    $RepoRoot\src\modules\configs\vscode\.
+    For each managed item (chatLanguageModels.json, keybindings.json, mcp.json,
+    settings.json, tasks.json, and the snippets/, prompts/, profiles/, and
+    copilot-memories/ directories) and for both the stable (Code) and insiders
+    (Code - Insiders) channels, creates a symlink from the VS Code User data
+    directory into $RepoRoot\src\modules\configs\vscode\.
 
-    Keybindings use a Windows-specific repo source file (keybindings.windows.json)
-    so that Windows (Ctrl-key) shortcut definitions are tracked independently
-    from macOS (keybindings.mac.json) and NixOS (keybindings.nixos.json) without
+    Both chatLanguageModels and keybindings use Windows-specific repo source
+    files (chatLanguageModels.windows.json and keybindings.windows.json) so
+    that Windows model budgets (Ctrl-key shortcuts) are tracked independently
+    from macOS (chatLanguageModels.mac.json / keybindings.mac.json) and NixOS
+    (chatLanguageModels.nixos.json / keybindings.nixos.json) without
     cross-host pollution in a shared file.
 
     Migration safety applied to each item:
@@ -95,14 +97,15 @@ function Sync-VscodeConfig {
   )
 
   # Managed single files: ordered hashtable of repo file name -> channel-side
-  # file name.  Per-host keybindings use a Windows-specific repo source so that
-  # Windows (Ctrl-key) shortcut definitions are tracked independently from macOS
-  # (Cmd-key) and NixOS host files without cross-host pollution.
+  # file name.  Per-host chatLanguageModels and keybindings use Windows-specific
+  # repo sources so that each host's model budget and key shortcuts are tracked
+  # independently without cross-host pollution.
   $managedFiles = [ordered]@{
-    "keybindings.windows.json" = "keybindings.json"
-    "mcp.json"                 = "mcp.json"
-    "settings.json"            = "settings.json"
-    "tasks.json"               = "tasks.json"
+    "chatLanguageModels.windows.json" = "chatLanguageModels.json"
+    "keybindings.windows.json"        = "keybindings.json"
+    "mcp.json"                        = "mcp.json"
+    "settings.json"                   = "settings.json"
+    "tasks.json"                      = "tasks.json"
   }
 
   foreach ($channelDir in $channelDirs) {
