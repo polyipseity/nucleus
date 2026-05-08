@@ -298,7 +298,7 @@ let
     "sshKeyAdopt"
     "verifyArchivingStack"
     "verifySecretDecryption"
-    "vscodeDarwinExtensionBridge"
+    "vscodeExtensionBridge"
     "vscodeSymlinks"
     "waitForSopsSecrets"
     "wallpaperProvision"

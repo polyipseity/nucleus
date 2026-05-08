@@ -2,9 +2,9 @@
 #
 # Source of truth for VS Code extensions and config wiring lives here.
 # Installation backend intentionally pivots by platform:
-#   • Linux/NixOS: nixpkgs binaries; extensions installed via programs.vscode.
+#   • Linux/NixOS: nixpkgs binaries; extensions managed by vscodeExtensionBridge.
 #   • macOS: backend selected in modules/core.nix (Homebrew or nixpkgs);
-#     Homebrew-backed channels receive extensions via vscodeDarwinExtensionBridge.
+#     extensions managed by vscodeExtensionBridge on all backends.
 #
 # The full 64-extension baseline is built entirely from Nix derivations:
 #   • 44 extensions packaged directly in nixpkgs (pkgs.vscode-extensions).
@@ -16,7 +16,7 @@
 # src/modules/configs/vscode/ so that every VS Code write appears as an
 # unstaged git change.  The vscodeSymlinks activation creates symlinks from
 # the per-channel User/ directories to those repo files at apply time.
-{ config, lib, pkgs, vscodeMarketplace, ... }:
+{ lib, pkgs, vscodeMarketplace, ... }:
 let
   # Platform switch used to keep one declarative config while selecting the
   # backend that integrates best on each OS.
@@ -39,9 +39,9 @@ let
   # publisher.name.  44 extensions come from nixpkgs; 20 come from the VS Code
   # Marketplace via nix-vscode-extensions (via mkMktx).  A missing marketplace
   # entry degrades gracefully to an empty contribution rather than failing eval.
-  # On Linux, Home Manager installs these directly via programs.vscode.
-  # On macOS, vscodeDarwinExtensionBridge symlinks each extension into the
-  # writable ~/.vscode{,-insiders}/extensions directory.
+  # On all platforms, vscodeExtensionBridge symlinks each extension into the
+  # writable ~/.vscode/extensions and ~/.vscode-insiders/extensions directories
+  # so both stable and insiders channels share an identical extension payload.
   sharedExtensions = builtins.concatLists [
     # astral-sh
     (mkMktx "astral-sh" "ty")
@@ -147,24 +147,13 @@ let
   ];
 
   # Materialize the extension list under a deterministic Nix-store directory so
-  # Darwin Homebrew app bundles can consume the exact same extension payload.
-  darwinExtensionStore = pkgs.symlinkJoin {
+  # all VS Code app bundles (both stable and insiders, Homebrew or nixpkgs) can
+  # consume the exact same extension payload via per-extension symlinks in the
+  # vscodeExtensionBridge activation.
+  extensionStore = pkgs.symlinkJoin {
     name = "nucleus-vscode-extensions";
     paths = sharedExtensions;
   };
-
-  # On Darwin, core.nix computes overlap-package backend routing and exposes
-  # the selected Homebrew casks here. editors.nix consumes that resolved output
-  # so VS Code behavior follows one canonical backend decision path.
-  darwinManagedCasks =
-    if isDarwin then config.nucleus.macos.generatedHomebrew.casks else [ ];
-
-  # Channel-specific backend resolution derived from core.nix output.
-  stableUsesHomebrew = builtins.elem "visual-studio-code" darwinManagedCasks;
-  insidersUsesHomebrew = builtins.elem "visual-studio-code@insiders" darwinManagedCasks;
-
-  # Bridge only the channels currently routed to Homebrew.
-  needsDarwinExtensionBridge = stableUsesHomebrew || insidersUsesHomebrew;
 
   # Per-channel User data directories referenced by the vscodeSymlinks activation.
   # These are shell strings whose $HOME is intentionally left unexpanded so the
@@ -211,13 +200,14 @@ in
   ];
 
   programs.vscode = {
-    # Enable native Home Manager integration whenever stable VS Code is routed
-    # to nixpkgs (all non-Darwin hosts and Darwin override-to-nixpkgs cases).
-    # When stable is Homebrew-managed, extension sync is handled via the
-    # Darwin bridge activation instead.
-    enable = !isDarwin || !stableUsesHomebrew;
+    # Enable native Home Manager integration on non-Darwin hosts so the VS Code
+    # binary is registered via the HM module.  On Darwin the backend is selected
+    # in core.nix (Homebrew or nixpkgs) and must not be duplicated here.
+    # Extension management is handled exclusively by vscodeExtensionBridge on all
+    # platforms; do not add extensions here to avoid a dual-manager conflict where
+    # both HM and the bridge simultaneously write to ~/.vscode/extensions.
+    enable = !isDarwin;
     package = pkgs.vscode;
-    profiles.default.extensions = sharedExtensions;
   };
 
   home.activation = {
@@ -343,20 +333,24 @@ in
           "$_vsym_base_dir/globalStorage/github.copilot-chat/memory-tool/memories"
       done
     '';
-  } // lib.optionalAttrs (isDarwin && needsDarwinExtensionBridge) {
+
     # -----------------------------------------------------------------------
-    # vscodeDarwinExtensionBridge
-    # Homebrew VS Code reads extensions from ~/.vscode{,-insiders}/extensions,
-    # while Nix-managed extensions live in the Nix store.  The directory must
-    # remain a real writable path (not a symlink to the store) because VS Code
-    # writes extensions.json inside it at startup; a whole-directory symlink
-    # to the immutable store causes EACCES.  Instead, keep a real writable
-    # directory and populate it with per-extension symlinks into the store.
+    # vscodeExtensionBridge
+    # Populates both ~/.vscode/extensions and ~/.vscode-insiders/extensions
+    # with per-extension symlinks into the Nix-managed extension store.  This
+    # bridge runs unconditionally on ALL platforms (macOS and Linux) and for
+    # BOTH channels (stable and insiders) so extension parity is guaranteed
+    # regardless of the VS Code installation backend (Homebrew or nixpkgs).
+    #
+    # The directory must remain a real writable path rather than a symlink to
+    # the Nix store because VS Code writes extensions.json inside it at startup;
+    # a whole-directory store symlink would cause EACCES.  Instead, keep a real
+    # writable directory and populate it with per-extension symlinks.
     # -----------------------------------------------------------------------
-    vscodeDarwinExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    vscodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
 
-      source_extensions='${darwinExtensionStore}/share/vscode/extensions'
+      source_extensions='${extensionStore}/share/vscode/extensions'
       stable_extensions="$HOME/.vscode/extensions"
       insiders_extensions="$HOME/.vscode-insiders/extensions"
 
@@ -417,15 +411,11 @@ in
         done
       }
 
-      ${lib.optionalString stableUsesHomebrew ''
       mkdir -p "$HOME/.vscode"
       setup_extension_dir "$stable_extensions"
-      ''}
 
-      ${lib.optionalString insidersUsesHomebrew ''
       mkdir -p "$HOME/.vscode-insiders"
       setup_extension_dir "$insiders_extensions"
-      ''}
     '';
   };
 }
