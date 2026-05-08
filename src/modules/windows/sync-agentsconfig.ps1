@@ -1,42 +1,52 @@
 <#
 .SYNOPSIS
-  Sync the user-level ~/.agents directory as a managed directory symlink.
+  Sync the user-level ~/.agents directory as a managed per-subdir layout.
 
 .DESCRIPTION
-  Creates %USERPROFILE%\.agents as a directory symbolic link pointing to the
-  live src\modules\configs\agents\ tree in the repo checkout.  Every file
-  written by a coding agent under %USERPROFILE%\.agents\ therefore appears
-  immediately as an unstaged git diff, keeping user-level agent instructions
-  under version control.
+  Creates %USERPROFILE%\.agents\ as a real directory, then creates a per-entry
+  directory symbolic link inside it for every top-level entry in
+  src\modules\configs\agents\ except skills\.
 
-  Directory symbolic links (not NTFS junctions) are used because Developer Mode
-  is enabled on this machine (Microsoft.Windows.Settings/DeveloperMode in
-  system.dsc.yml), which permits unprivileged symlink creation.  Symlinks are
-  preferred over junctions because they are a proper POSIX-equivalent reparse
-  point and are correctly followed by cross-host tooling (editors, language
-  servers) that inspect the link target rather than traversing the reparse data.
+  skills\ is excluded here because it is managed by Sync-AgentsSkills and may
+  contain System 2 (clawhub) skill downloads that must not be committed.  Using
+  a real ~/.agents\ directory with per-subdir symlinks (rather than a single
+  whole-dir symlink) lets clawhub write into ~/.agents\skills\ without those
+  writes landing inside the tracked repo tree.
+
+  Migration: if %USERPROFILE%\.agents is the old whole-dir symlink pointing at
+  src\modules\configs\agents\, it is removed automatically and the per-subdir
+  layout is created in its place.
 
   Migration safety:
-    - Correct symlink  -> no-op.
-    - Wrong symlink    -> remove and recreate pointing to the current repo.
-    - Real directory   -> fail fast with an actionable error (no silent merge).
-      The operator must manually merge any wanted content into
-      src\modules\configs\agents\ and remove the directory before re-running.
+    - Old whole-dir symlink  -> removed automatically; real directory created.
+    - Correct per-subdir symlink  -> no-op.
+    - Wrong per-subdir symlink    -> remove and recreate.
+    - Real path at sub-entry      -> fail fast (no silent overwrite).
+    - Stale per-subdir symlink    -> removed (source entry deleted from repo).
+
+  Directory symbolic links require Developer Mode or an elevated session.
+  Developer Mode is enabled on this machine via system.dsc.yml
+  (Microsoft.Windows.Settings/DeveloperMode), which permits unprivileged symlink
+  creation.  Symlinks are preferred over NTFS junctions because they are a proper
+  POSIX-equivalent reparse point and are followed correctly by cross-host tooling
+  (editors, language servers) that inspects the link target rather than traversal
+  through reparse data.
 
 .PARAMETER RepoRoot
   Absolute path to the root of the nucleus repository checkout.  apply.ps1
   resolves this from $PSScriptRoot and passes it explicitly.
 
 .PARAMETER Enabled
-  When $true (default), ensures the symlink exists and points to the managed
-  source.  When $false, removes the symlink if it currently points to the
-  managed source (cleanup path); does nothing otherwise.
+  When $true (default), ensures the per-subdir layout exists.  When $false,
+  removes all managed per-subdir symlinks that point into the managed source
+  and, if ~/.agents\ then contains only managed entries, removes it too.
+  Unrecognised symlinks and real directories are left untouched.
 
 .EXAMPLE
   Sync-AgentsConfig -RepoRoot 'C:\Users\user\repos\nucleus'
 
 .EXAMPLE
-  # Remove the managed symlink (cleanup path):
+  # Remove all managed per-subdir symlinks (cleanup path):
   Sync-AgentsConfig -RepoRoot 'C:\Users\user\repos\nucleus' -Enabled:$false
 #>
 function Sync-AgentsConfig {
@@ -48,11 +58,11 @@ function Sync-AgentsConfig {
     [bool]$Enabled = $true
   )
 
-  # The managed source is always the live agents config tree in the repo.
-  # Coding agents write through the symlink directly into the repo checkout so
-  # every change appears as an unstaged git diff.
+  # The managed source is the live agents config tree in the repo.  Coding agents
+  # write through per-subdir symlinks directly into the repo checkout so every
+  # change appears as an unstaged git diff.
   $agentsSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\agents"
-  $agentsLink   = Join-Path -Path $HOME     -ChildPath ".agents"
+  $agentsDir    = Join-Path -Path $HOME     -ChildPath ".agents"
 
   # Directory symlinks require Developer Mode or an elevated session.  Check
   # once upfront so any failure message is actionable rather than cryptic.
@@ -68,15 +78,21 @@ function Sync-AgentsConfig {
   }
 
   if (-not $Enabled) {
-    # Cleanup path: remove only the symlink that points to our managed source.
+    # Cleanup path: remove per-subdir symlinks that point into the managed source.
     # Leave unrecognised symlinks and real directories untouched.
-    if (Test-Path -LiteralPath $agentsLink) {
-      $item = Get-Item -LiteralPath $agentsLink
-      $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
-                     -and $item.LinkType -eq 'SymbolicLink'
-      if ($isSymlink -and [string]::Equals($item.Target, $agentsSource, [System.StringComparison]::OrdinalIgnoreCase)) {
-        Remove-Item -LiteralPath $agentsLink -Force
-        Write-Host "nucleus: removed agents config symlink: $agentsLink"
+    if (Test-Path -LiteralPath $agentsDir -PathType Container) {
+      $children = Get-ChildItem -LiteralPath $agentsDir -Force
+      foreach ($child in $children) {
+        if ($child.Name -eq "skills") { continue }  # managed by Sync-AgentsSkills
+        $isSymlink = ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
+                       -and $child.LinkType -eq 'SymbolicLink'
+        if ($isSymlink) {
+          $targetPath = Join-Path -Path $agentsSource -ChildPath $child.Name
+          if ([string]::Equals($child.Target, $targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Remove-Item -LiteralPath $child.FullName -Force
+            Write-Host "nucleus: removed managed agents subdir symlink: $($child.FullName)"
+          }
+        }
       }
     }
     return
@@ -87,26 +103,67 @@ function Sync-AgentsConfig {
     return
   }
 
-  if (Test-Path -LiteralPath $agentsLink) {
-    $item = Get-Item -LiteralPath $agentsLink
-    $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
-                   -and $item.LinkType -eq 'SymbolicLink'
-
-    if ($isSymlink) {
-      if ([string]::Equals($item.Target, $agentsSource, [System.StringComparison]::OrdinalIgnoreCase)) {
-        return  # Correct symlink — no-op.
-      }
-      # Wrong target (e.g. leftover from a previous checkout path): replace.
-      Remove-Item -LiteralPath $agentsLink -Force
-    } else {
-      # Real directory (or an old NTFS junction): fail fast to prevent silent
-      # data loss.  The operator must manually merge any wanted content into
-      # src\modules\configs\agents\ and remove the path before re-running apply.
-      Write-Error "nucleus: Sync-AgentsConfig: $agentsLink is not a managed symlink — merge its content into src\modules\configs\agents\ and remove it, then re-run apply."
-      return
+  # Migration: remove the old whole-dir symlink if it still points to the managed
+  # source.  All old-scheme symlinks at $agentsDir were created by this function;
+  # user-created symlinks at this path are not expected.
+  if (Test-Path -LiteralPath $agentsDir) {
+    $agentsDirItem = Get-Item -LiteralPath $agentsDir -Force
+    $isWholeDirSymlink = ($agentsDirItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
+                           -and $agentsDirItem.LinkType -eq 'SymbolicLink'
+    if ($isWholeDirSymlink) {
+      Remove-Item -LiteralPath $agentsDir -Force
+      Write-Host "nucleus: Sync-AgentsConfig: migrated from whole-dir symlink to per-subdir layout"
     }
   }
 
-  New-Item -ItemType SymbolicLink -Path $agentsLink -Target $agentsSource | Out-Null
-  Write-Host "nucleus: linked agents config: $agentsLink -> $agentsSource"
+  # Ensure ~/.agents\ exists as a real (writable) directory.
+  if (-not (Test-Path -LiteralPath $agentsDir -PathType Container)) {
+    New-Item -ItemType Directory -Path $agentsDir | Out-Null
+    Write-Host "nucleus: Sync-AgentsConfig: created $agentsDir"
+  }
+
+  # Remove stale per-subdir symlinks: any symlink in ~/.agents\ that once pointed
+  # into $agentsSource but whose source entry no longer exists there.
+  $existingChildren = Get-ChildItem -LiteralPath $agentsDir -Force
+  foreach ($child in $existingChildren) {
+    if ($child.Name -eq "skills") { continue }  # managed by Sync-AgentsSkills
+    $isSymlink = ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
+                   -and $child.LinkType -eq 'SymbolicLink'
+    if ($isSymlink) {
+      $expectedSource = Join-Path -Path $agentsSource -ChildPath $child.Name
+      if ([string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
+        # Managed symlink: remove if the source entry no longer exists.
+        if (-not (Test-Path -LiteralPath $expectedSource)) {
+          Remove-Item -LiteralPath $child.FullName -Force
+          Write-Host "nucleus: Sync-AgentsConfig: removed stale link for $($child.Name) (source removed)"
+        }
+      }
+    }
+  }
+
+  # Create or update per-entry symlinks for every top-level source entry except
+  # skills\ (managed independently by Sync-AgentsSkills).
+  $sourceEntries = Get-ChildItem -LiteralPath $agentsSource -Force
+  foreach ($entry in $sourceEntries) {
+    if ($entry.Name -eq "skills") { continue }  # owned by Sync-AgentsSkills
+    $linkPath = Join-Path -Path $agentsDir -ChildPath $entry.Name
+    if (Test-Path -LiteralPath $linkPath) {
+      $linkItem = Get-Item -LiteralPath $linkPath -Force
+      $isSymlink = ($linkItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
+                     -and $linkItem.LinkType -eq 'SymbolicLink'
+      if ($isSymlink) {
+        if ([string]::Equals($linkItem.Target, $entry.FullName, [System.StringComparison]::OrdinalIgnoreCase)) {
+          continue  # Correct symlink — no-op.
+        }
+        # Wrong target (e.g. leftover from a previous checkout path): replace.
+        Remove-Item -LiteralPath $linkPath -Force
+      } else {
+        # Real file or directory: fail fast to prevent silent data loss.
+        Write-Error "nucleus: Sync-AgentsConfig: $linkPath is not a managed symlink — merge any wanted content into $($entry.FullName) and remove it, then re-run apply."
+        return
+      }
+    }
+    New-Item -ItemType SymbolicLink -Path $linkPath -Target $entry.FullName | Out-Null
+    Write-Host "nucleus: Sync-AgentsConfig: linked $linkPath -> $($entry.FullName)"
+  }
 }

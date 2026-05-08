@@ -269,6 +269,7 @@ let
   # Any new activation entry added to this module should be appended here so
   # manual instructions remain the last script to run.
   displayHostManualInstructionDeps = [
+    "agentsSkills"
     "agentsSymlink"
     "checkFilesChanged"
     "checkLinkTargets"

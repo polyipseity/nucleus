@@ -181,6 +181,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     # consolidated, post-automation checklist.
     # -----------------------------------------------------------------------
     displayHostManualInstructions = lib.hm.dag.entryAfter [
+      "agentsSkills"
       "agentsSymlink"
       "buildNixIndex"
       # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
