@@ -34,6 +34,11 @@
   Username allowed to materialize user-scoped secrets. Defaults to the
   current interactive user.
 
+.PARAMETER EnableAgentsConfigParity
+  Enable managed user-level agents config junction (%USERPROFILE%\.agents ->
+  src\modules\configs\agents\) so coding agents write directly into the repo
+  tree.  False removes the managed junction (cleanup path).
+
 .PARAMETER EnableSecretsParity
   Enable managed secret materialization and managed SSH key cleanup fallback.
 
@@ -102,6 +107,10 @@
   .\apply.ps1 -EnableHostAgeKeyRegistration:$false
 
 .EXAMPLE
+  # Apply while disabling managed agents config junction (cleanup only):
+  .\apply.ps1 -EnableAgentsConfigParity:$false
+
+.EXAMPLE
   # Apply while disabling managed VS Code settings parity (cleanup only):
   .\apply.ps1 -EnableVsCodeSettingsParity:$false
 
@@ -120,6 +129,7 @@ param(
   [switch]$Help,
   [string]$ModuleDir = (Join-Path -Path $PSScriptRoot -ChildPath "..\..\modules\windows"),
   [string]$PrimaryUsername = [System.Environment]::UserName,
+  [bool]$EnableAgentsConfigParity = $true,
   [bool]$EnableSecretsParity = $true,
   [bool]$EnableBunParity = $true,
   [bool]$EnableGitSshParity = $true,
@@ -158,6 +168,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "resolve-nucleusexecutable.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "scoop-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "shell.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsconfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecretfile.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleusvscodeextensions.ps1")
@@ -298,6 +309,7 @@ if ($EnableBunParity) {
   Invoke-BunSetup
 }
 
+Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
 Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity
 Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
 Sync-NucleusGitAndSshConfig -Enabled:$EnableGitSshParity -PrimaryUsername $PrimaryUsername
