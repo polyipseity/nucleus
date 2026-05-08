@@ -11,6 +11,13 @@
 # Instead, apply.sh and apply.ps1 call scripts/ai-sync.sh / Invoke-AiSync as
 # the final step of every apply run.  Pass --skip-ai-sync (-SkipAiSync on
 # Windows) to suppress the sync step in CI or on low-bandwidth connections.
+#
+# Model manifest: src/modules/ai/models.json
+#   mac: gemma4:e4b, qwen3:14b  — tool-calling curl-tested on Mac: both PASS
+#   pc:  qwen3:8b               — tool-calling NOT yet curl-tested on PC;
+#                                  same family as qwen3:14b (passes on Mac)
+#                                  but verify with the same curl test before
+#                                  relying on tool-calling on the PC host.
 { lib, pkgs, ... }:
 lib.mkMerge [
   {
