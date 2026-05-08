@@ -45,6 +45,14 @@
   src\modules\configs\agents\skills\.  False removes managed skill symlinks
   (cleanup path); System 2 clawhub downloads in that directory are left intact.
 
+.PARAMETER EnableAgentsClawhubSkillsParity
+  Download and update System 2 (non-AGPL-compatible) skills listed in
+  src\modules\configs\agents\clawhub-skills.json into
+  %USERPROFILE%\.agents\skills\ via the clawhub CLI.  False skips the sync;
+  already-downloaded skill directories are left intact (no cleanup path needed
+  because clawhub downloads are self-contained real directories, not managed
+  symlinks).
+
 .PARAMETER EnableSecretsParity
   Enable managed secret materialization and managed SSH key cleanup fallback.
 
@@ -127,6 +135,10 @@
   .\apply.ps1 -EnableAgentsSkillsParity:$false
 
 .EXAMPLE
+  # Apply while disabling System 2 clawhub skill sync (skip only):
+  .\apply.ps1 -EnableAgentsClawhubSkillsParity:$false
+
+.EXAMPLE
   # Apply while disabling managed VS Code settings parity (cleanup only):
   .\apply.ps1 -EnableVsCodeSettingsParity:$false
 
@@ -151,6 +163,7 @@ param(
   [string]$PrimaryUsername = [System.Environment]::UserName,
   [bool]$EnableAgentsConfigParity = $true,
   [bool]$EnableAgentsSkillsParity = $true,
+  [bool]$EnableAgentsClawhubSkillsParity = $true,
   [bool]$EnableSecretsParity = $true,
   [bool]$EnableBunParity = $true,
   [bool]$EnableGitSshParity = $true,
@@ -193,6 +206,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "shell.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsconfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsskills.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsclawhubskills.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecretfile.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleusvscodeextensions.ps1")
@@ -335,6 +349,7 @@ if ($EnableBunParity) {
 
 Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
 Sync-AgentsSkills -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
+Sync-AgentsClawhubSkills -RepoRoot $repoRoot -Enabled:$EnableAgentsClawhubSkillsParity
 Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity
 Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
