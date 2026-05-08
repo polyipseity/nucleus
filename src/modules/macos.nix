@@ -298,6 +298,7 @@ let
     "verifyArchivingStack"
     "verifySecretDecryption"
     "vscodeDarwinExtensionBridge"
+    "vscodeSymlinks"
     "waitForSopsSecrets"
     "wallpaperProvision"
     "writeBoundary"

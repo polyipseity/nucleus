@@ -190,6 +190,7 @@ lib.mkIf pkgs.stdenv.isLinux {
       "gpgImport"
       "sshKeyAdopt"
       "verifySecretDecryption"
+      "vscodeSymlinks"
       "waitForSopsSecrets"
       "wallpaperProvision"
     ] ''

@@ -50,6 +50,15 @@ for _arg in "$@"; do
 done
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
+
+# Write the repo root to a well-known path so Home Manager activation scripts
+# (particularly vscodeSymlinks in editors.nix) can locate live repo files such
+# as src/modules/configs/vscode/.  Environment variables are not reliably
+# propagated through the sudo sessions that darwin-rebuild and nixos-rebuild
+# invoke, so a stable file path is the safe transport mechanism.
+mkdir -p "$HOME/.config/nucleus"
+printf '%s\n' "$REPO_ROOT" > "$HOME/.config/nucleus/repo-root"
+
 # Keep one centralized Nix config fragment for this script so every `nix` call
 # gets flake support without repeating CLI flags.
 NIX_FEATURES_CONFIG="experimental-features = nix-command flakes"
