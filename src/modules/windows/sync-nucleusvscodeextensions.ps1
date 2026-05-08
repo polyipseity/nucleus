@@ -104,8 +104,7 @@ function Sync-NucleusVsCodeExtensions {
     'takumii.markdowntable',
     'tamasfe.even-better-toml',
     'tweag.vscode-nickel',
-    'vadimcn.vscode-lldb',
-    'vscodevim.vim'
+    'vadimcn.vscode-lldb'
   )
 
   $channels = @(
