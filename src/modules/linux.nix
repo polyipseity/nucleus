@@ -193,6 +193,7 @@ lib.mkIf pkgs.stdenv.isLinux {
       "verifySecretDecryption"
       "vscodeExtensionBridge"
       "vscodeSymlinks"
+      "vscodeWorkspaceTrust"
       "waitForSopsSecrets"
       "wallpaperProvision"
     ] ''

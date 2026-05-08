@@ -300,6 +300,7 @@ let
     "verifySecretDecryption"
     "vscodeExtensionBridge"
     "vscodeSymlinks"
+    "vscodeWorkspaceTrust"
     "waitForSopsSecrets"
     "wallpaperProvision"
     "writeBoundary"

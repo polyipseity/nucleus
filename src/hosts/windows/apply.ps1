@@ -75,6 +75,12 @@
   repo tree.  False removes managed symlinks (cleanup path); VS Code recreates
   plain files on next launch.
 
+.PARAMETER EnableVsCodeWorkspaceTrustParity
+  Enable managed VS Code workspace trust for %USERPROFILE%\dev.  Writes the
+  trust entry directly to state.vscdb via Bun's built-in bun:sqlite module so
+  the folder opens without a trust prompt.  False skips the write; no cleanup
+  is needed because VS Code manages its own trust DB state.
+
 .PARAMETER SkipAiSync
   When specified, suppresses the post-apply Ollama model sync step.  Useful in
   CI or on low-bandwidth connections where model pulls (2-20 GB each) are
@@ -115,6 +121,10 @@
   .\apply.ps1 -EnableVsCodeSettingsParity:$false
 
 .EXAMPLE
+  # Apply while disabling managed VS Code workspace trust (skip only):
+  .\apply.ps1 -EnableVsCodeWorkspaceTrustParity:$false
+
+.EXAMPLE
   # Apply while disabling managed remote-access parity (cleanup only):
   .\apply.ps1 -EnableRemoteAccessParity:$false
 
@@ -140,6 +150,7 @@ param(
   [bool]$EnableShellParity = $true,
   [bool]$EnableVsCodeExtensionsParity = $true,
   [bool]$EnableVsCodeSettingsParity = $true,
+  [bool]$EnableVsCodeWorkspaceTrustParity = $true,
   [int]$MinFreeDiskGB = 10,
   [switch]$SkipAiSync
 )
@@ -167,6 +178,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusstalewallpapers.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "resolve-nucleusexecutable.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "scoop-setup.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "set-vscodeworkspacetrust.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "shell.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsconfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecretfile.ps1")
@@ -312,6 +324,7 @@ if ($EnableBunParity) {
 Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
 Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity
 Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
+Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-NucleusGitAndSshConfig -Enabled:$EnableGitSshParity -PrimaryUsername $PrimaryUsername
 Sync-NucleusShellProfile -Enabled:$EnableShellParity
 Sync-NucleusOpenSshServer -Enabled:$EnableRemoteAccessParity

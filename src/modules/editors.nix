@@ -180,6 +180,96 @@ let
   vscodeChatLanguageModelsFile =
     if isDarwin then "chatLanguageModels.mac.json"
     else "chatLanguageModels.nixos.json";
+
+  # Python script that inserts a workspace trust entry for ~/dev into VS Code's
+  # SQLite state database (globalStorage/state.vscdb) for both stable and
+  # insiders channels.  pkgs.writeText is used instead of a shell heredoc to
+  # avoid the column-0 delimiter constraint imposed by Nix ''...'' indentation
+  # stripping; Nix strips the 4-space common prefix automatically, yielding
+  # valid zero-indented Python.
+  #
+  # The script is non-fatal: a locked or absent DB produces a warning on stderr
+  # so that a running VS Code instance or a fresh install (never launched) does
+  # not break the activation chain.
+  #
+  # ~/dev is only provisioned on macOS; on NixOS where the directory is absent
+  # the script exits immediately (no-op).
+  vscodeWorkspaceTrustPy = pkgs.writeText "vscode-workspace-trust.py" ''
+    import json
+    import os
+    import sqlite3
+    import sys
+
+    HOME = os.environ.get("HOME", "")
+    dev_path = os.path.join(HOME, "dev")
+
+    # Only trust the dev directory when it actually exists on this machine.
+    # On NixOS where ~/dev is not provisioned this exits immediately (no-op).
+    if not os.path.isdir(dev_path):
+        sys.exit(0)
+
+    trust_entry = {
+        "uri": {"$mid": 1, "path": dev_path, "scheme": "file"},
+        "trusted": True,
+    }
+
+    # Locate the state.vscdb for both stable and insiders channels.
+    # The per-channel globalStorage directory is the authoritative location
+    # for VS Code APPLICATION-scope storage regardless of installation backend.
+    if sys.platform == "darwin":
+        app_support = os.path.join(HOME, "Library", "Application Support")
+        db_paths = [
+            os.path.join(app_support, "Code", "User", "globalStorage", "state.vscdb"),
+            os.path.join(app_support, "Code - Insiders", "User", "globalStorage", "state.vscdb"),
+        ]
+    else:
+        config_home = os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
+        db_paths = [
+            os.path.join(config_home, "Code", "User", "globalStorage", "state.vscdb"),
+            os.path.join(config_home, "Code - Insiders", "User", "globalStorage", "state.vscdb"),
+        ]
+
+    TRUST_KEY = "content.trust.model.key"
+
+    for db_path in db_paths:
+        if not os.path.isfile(db_path):
+            continue
+        try:
+            # timeout=5 waits up to 5 s for a SQLite lock; if VS Code holds
+            # the lock longer the OperationalError is caught below (non-fatal).
+            conn = sqlite3.connect(db_path, timeout=5)
+            try:
+                cur = conn.cursor()
+                cur.execute("SELECT value FROM ItemTable WHERE key = ?", (TRUST_KEY,))
+                row = cur.fetchone()
+                if row:
+                    data = json.loads(row[0])
+                    entries = data.get("uriTrustInfo", [])
+                    already_trusted = any(
+                        e.get("uri", {}).get("path") == dev_path
+                        and e.get("uri", {}).get("scheme") == "file"
+                        for e in entries
+                    )
+                    if already_trusted:
+                        continue
+                    entries.append(trust_entry)
+                    data["uriTrustInfo"] = entries
+                else:
+                    data = {"uriTrustInfo": [trust_entry]}
+                new_value = json.dumps(data, separators=(",", ":"))
+                cur.execute(
+                    "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)",
+                    (TRUST_KEY, new_value),
+                )
+                conn.commit()
+                print("nucleus: vscodeWorkspaceTrust: trusted", dev_path, "in", db_path, file=sys.stderr)
+            finally:
+                conn.close()
+        except Exception as e:
+            # Non-fatal: DB may be locked by a running VS Code instance, or
+            # absent on a fresh install before VS Code has been launched once.
+            print("nucleus: vscodeWorkspaceTrust: warning:", db_path, "-", e, file=sys.stderr)
+  '';
 in
 {
   programs.neovim = {
@@ -428,6 +518,31 @@ in
 
       mkdir -p "$HOME/.vscode-insiders"
       setup_extension_dir "$insiders_extensions"
+    '';
+
+    # -----------------------------------------------------------------------
+    # vscodeWorkspaceTrust
+    # Inserts a workspace trust entry for ~/dev into VS Code's SQLite state
+    # database (globalStorage/state.vscdb) for both stable and insiders
+    # channels so that the repository workspace opens without a trust prompt.
+    #
+    # VS Code workspace trust state lives in the SQLite DB, not in
+    # settings.json; the settings.json keys only control the trust UI
+    # (banner, startup prompt, empty-window behavior) and cannot pre-trust a
+    # specific folder.  The DB is written directly via Python's built-in
+    # sqlite3 module to avoid adding a heavyweight dependency.
+    #
+    # The activation is non-fatal when the DB is absent (VS Code not yet
+    # launched once) or locked (VS Code currently running); both conditions
+    # produce a warning to stderr so the operator is informed but the
+    # activation chain is not interrupted.
+    #
+    # ~/dev is only provisioned on macOS; on NixOS where the directory is
+    # absent the Python script exits immediately, making this a no-op.
+    # -----------------------------------------------------------------------
+    vscodeWorkspaceTrust = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      set -eu
+      ${pkgs.python3}/bin/python3 '${vscodeWorkspaceTrustPy}'
     '';
   };
 }
