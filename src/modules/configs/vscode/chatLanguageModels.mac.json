@@ -1,6 +1,6 @@
 [
 	{
-		"name": "OpenAI Compatible (Ollama)",
+		"name": "Ollama",
 		"vendor": "customoai",
 		"models": [
 			{
