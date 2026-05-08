@@ -5,8 +5,8 @@
 #   • Linux/NixOS: nixpkgs binaries
 #   • macOS: backend selected in modules/core.nix (Homebrew or nixpkgs)
 #
-# VS Code config files (settings, keybindings, MCP, tasks, snippets, prompts,
-# profiles, and Copilot Chat memory) are kept as live repo files under
+# VS Code config files (settings, per-host keybindings, MCP, tasks, snippets,
+# prompts, profiles, and Copilot Chat memory) are kept as live repo files under
 # src/modules/configs/vscode/ so that every VS Code write appears as an
 # unstaged git change.  The vscodeSymlinks activation creates symlinks from
 # the per-channel User/ directories to those repo files at apply time.
@@ -57,6 +57,13 @@ let
   insidersBaseDir =
     if isDarwin then "$HOME/Library/Application Support/Code - Insiders/User"
     else "$HOME/.config/Code - Insiders/User";
+
+  # Select the per-host keybindings source file so that platform-specific
+  # shortcuts (Cmd on macOS vs Ctrl on NixOS/Linux) are tracked independently
+  # without cross-host pollution in a shared repo file.
+  vscodeKeybindingsFile =
+    if isDarwin then "keybindings.mac.json"
+    else "keybindings.nixos.json";
 in
 {
   programs.neovim = {
@@ -94,7 +101,8 @@ in
     # (settings change, keybinding edit, MCP server addition, Copilot memory)
     # appears immediately as an unstaged git diff.
     #
-    # Files managed: settings.json, keybindings.json, mcp.json, tasks.json.
+    # Files managed: settings.json, keybindings.<host>.json (linked as
+    #   keybindings.json), mcp.json, tasks.json.
     # Directories managed: snippets/, prompts/, profiles/,
     #   and globalStorage/github.copilot-chat/memory-tool/memories/
     #   (aliased in the repo as copilot-memories/).
@@ -194,7 +202,7 @@ in
 
       for _vsym_base_dir in "${stableBaseDir}" "${insidersBaseDir}"; do
         ensure_file_symlink "$_vsym_config_dir/settings.json"    "$_vsym_base_dir/settings.json"
-        ensure_file_symlink "$_vsym_config_dir/keybindings.json" "$_vsym_base_dir/keybindings.json"
+        ensure_file_symlink "$_vsym_config_dir/${vscodeKeybindingsFile}" "$_vsym_base_dir/keybindings.json"
         ensure_file_symlink "$_vsym_config_dir/mcp.json"         "$_vsym_base_dir/mcp.json"
         ensure_file_symlink "$_vsym_config_dir/tasks.json"       "$_vsym_base_dir/tasks.json"
         ensure_dir_symlink  "$_vsym_config_dir/snippets"         "$_vsym_base_dir/snippets"

@@ -22,6 +22,11 @@ function Sync-VscodeConfig {
     channels, creates a symlink from the VS Code User data directory into
     $RepoRoot\src\modules\configs\vscode\.
 
+    Keybindings use a Windows-specific repo source file (keybindings.windows.json)
+    so that Windows (Ctrl-key) shortcut definitions are tracked independently
+    from macOS (keybindings.mac.json) and NixOS (keybindings.nixos.json) without
+    cross-host pollution in a shared file.
+
     Migration safety applied to each item:
       Correct symlink     — no-op.
       Wrong symlink       — remove, create correct symlink.  Handles the
@@ -89,30 +94,24 @@ function Sync-VscodeConfig {
     (Join-Path -Path $env:APPDATA -ChildPath "Code - Insiders\User")
   )
 
-  # Managed single files: each symlinked directly to the corresponding repo file.
-  $managedFiles = @(
-    "keybindings.json",
-    "mcp.json",
-    "settings.json",
-    "tasks.json"
-  )
-
-  # Managed directories: repo alias -> relative path under the channel User dir.
-  # copilot-memories/ is a flat repo alias for the deep Copilot Chat storage
-  # subpath so the directory is easy to navigate in the repo tree.
-  $managedDirs = [ordered]@{
-    "copilot-memories" = "globalStorage\github.copilot-chat\memory-tool\memories"
-    "profiles"         = "profiles"
-    "prompts"          = "prompts"
-    "snippets"         = "snippets"
+  # Managed single files: ordered hashtable of repo file name -> channel-side
+  # file name.  Per-host keybindings use a Windows-specific repo source so that
+  # Windows (Ctrl-key) shortcut definitions are tracked independently from macOS
+  # (Cmd-key) and NixOS host files without cross-host pollution.
+  $managedFiles = [ordered]@{
+    "keybindings.windows.json" = "keybindings.json"
+    "mcp.json"                 = "mcp.json"
+    "settings.json"            = "settings.json"
+    "tasks.json"               = "tasks.json"
   }
 
   foreach ($channelDir in $channelDirs) {
 
     # --- Managed files ---
-    foreach ($fileName in $managedFiles) {
-      $repoTarget = Join-Path -Path $vsConfigDir -ChildPath $fileName
-      $linkPath   = Join-Path -Path $channelDir  -ChildPath $fileName
+    foreach ($repoFileName in $managedFiles.Keys) {
+      $linkFileName = $managedFiles[$repoFileName]
+      $repoTarget = Join-Path -Path $vsConfigDir -ChildPath $repoFileName
+      $linkPath   = Join-Path -Path $channelDir  -ChildPath $linkFileName
 
       if (-not $Enabled) {
         # Cleanup: remove the symlink only when it points to our repo target.
