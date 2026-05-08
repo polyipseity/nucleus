@@ -368,6 +368,9 @@ in
       #      (user-installed extensions) → left untouched.
       #   3. Remove stale per-extension symlinks whose source entry no longer
       #      exists (extension removed from the Nix manifest).
+      #   4. Remove extensions.json so VS Code rescans the directory on next
+      #      invocation.  When absent, VS Code derives the manifest from the
+      #      directory; when present it trusts the file and skips the scan.
       setup_extension_dir() {
         _sed_dir="$1"
 
@@ -409,6 +412,15 @@ in
           [ -e "$source_extensions/$_sed_ext_name" ] && continue
           rm "$_sed_existing"
         done
+
+        # Step 4: remove extensions.json so VS Code rescans the directory on
+        # next invocation and derives a fresh manifest from the symlink set.
+        # VS Code creates this file from a directory scan when absent; when the
+        # file is present VS Code trusts it and skips the scan, so a stale file
+        # (e.g. from a previous apply with fewer managed extensions) would make
+        # newly added extensions invisible.  The bridge owns the directory
+        # state; extensions.json is a derived artifact, not a source of truth.
+        rm -f "$_sed_dir/extensions.json"
       }
 
       mkdir -p "$HOME/.vscode"
