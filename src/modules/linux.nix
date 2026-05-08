@@ -181,6 +181,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     # consolidated, post-automation checklist.
     # -----------------------------------------------------------------------
     displayHostManualInstructions = lib.hm.dag.entryAfter [
+      "agentsSymlink"
       "buildNixIndex"
       # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
       # are defined in secrets.nix (shared module) but run as Home Manager
