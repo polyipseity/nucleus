@@ -17,7 +17,7 @@ function Set-VscodeWorkspaceTrust {
 
   The function is a no-op when:
     - Enabled is $false.
-    - %USERPROFILE%\dev does not exist (~/dev is only provisioned on macOS).
+    - %USERPROFILE%\dev does not exist (edge case: run before Provision-DevDirectory).
     - A DB path does not exist (VS Code channel not yet installed or never launched).
     - The trust entry is already present (idempotent re-apply).
     - bun is not found in PATH or ~/.bun/bin (warns and skips without error).
@@ -50,8 +50,8 @@ function Set-VscodeWorkspaceTrust {
 
     $devPath = Join-Path -Path $HOME -ChildPath "dev"
     if (-not (Test-Path -LiteralPath $devPath -PathType Container)) {
-        # ~/dev is only provisioned on macOS; skip silently on machines that do
-        # not have this directory so the function is a no-op without false alarms.
+        # dev directory not found; skip — Initialize-DevDirectory should run
+        # before this function in apply.ps1 so this is only hit on edge cases.
         Write-Output "vscode-workspace-trust: Set-VscodeWorkspaceTrust: $devPath not found; skipping"
         return
     }

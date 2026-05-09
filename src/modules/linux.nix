@@ -174,6 +174,18 @@ lib.mkIf pkgs.stdenv.isLinux {
     '';
 
     # -----------------------------------------------------------------------
+    # provisionDevDirectory
+    # Creates ~/dev when absent so NixOS mirrors the macOS
+    # configureSystemHardening behaviour.  VS Code workspace trust and editor
+    # tooling rely on the directory existing on all hosts.
+    # -----------------------------------------------------------------------
+    provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      if [ ! -d "$HOME/dev" ]; then
+        mkdir -p "$HOME/dev"
+      fi
+    '';
+
+    # -----------------------------------------------------------------------
     # displayHostManualInstructions
     # Prints one-time Linux host instructions from the dedicated NixOS manual
     # document after secrets/wallpaper activation work so operators get one
@@ -191,6 +203,7 @@ lib.mkIf pkgs.stdenv.isLinux {
       "gpgImport"
       "installBunPackages"
       "installPwshScriptAnalyzer"
+      "provisionDevDirectory"
       "sshKeyAdopt"
       "syncClawhubSkills"
       "verifySecretDecryption"

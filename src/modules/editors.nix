@@ -196,8 +196,8 @@ let
   # so that a running VS Code instance or a fresh install (never launched) does
   # not break the activation chain.
   #
-  # ~/dev is only provisioned on macOS; on NixOS where the directory is absent
-  # the script exits immediately (no-op).
+  # The script exits immediately when ~/dev does not yet exist (no-op for
+  # edge cases such as a first-run race before provisionDevDirectory completes).
   vscodeWorkspaceTrustPy = pkgs.writeText "vscode-workspace-trust.py" ''
     import json
     import os
@@ -208,7 +208,8 @@ let
     dev_path = os.path.join(HOME, "dev")
 
     # Only trust the dev directory when it actually exists on this machine.
-    # On NixOS where ~/dev is not provisioned this exits immediately (no-op).
+    # Exits immediately when ~/dev is absent (edge case: first-run race before
+    # provisionDevDirectory completes; resolved on the next apply).
     if not os.path.isdir(dev_path):
         sys.exit(0)
 
@@ -541,8 +542,8 @@ in
     # produce a warning to stderr so the operator is informed but the
     # activation chain is not interrupted.
     #
-    # ~/dev is only provisioned on macOS; on NixOS where the directory is
-    # absent the Python script exits immediately, making this a no-op.
+    # The Python script exits immediately when ~/dev is absent (edge case:
+    # first-run race before provisionDevDirectory completes).
     # -----------------------------------------------------------------------
     vscodeWorkspaceTrust = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       set -eu

@@ -105,6 +105,11 @@
   repo tree.  False removes managed symlinks (cleanup path); VS Code recreates
   plain files on next launch.
 
+.PARAMETER EnableDevDirectoryParity
+  Create %USERPROFILE%\dev when absent.  Mirrors macOS configureSystemHardening
+  and NixOS provisionDevDirectory which both provision ~/dev during activation.
+  False skips creation without error.
+
 .PARAMETER EnableVsCodeWorkspaceTrustParity
   Enable managed VS Code workspace trust for %USERPROFILE%\dev.  Writes the
   trust entry directly to state.vscdb via Bun's built-in bun:sqlite module so
@@ -171,6 +176,7 @@ param(
   [bool]$EnableRdpParity = $true,
   [bool]$EnableRemoteAccessParity = $true,
   [bool]$EnableShellParity = $true,
+  [bool]$EnableDevDirectoryParity = $true,
   [bool]$EnableVsCodeExtensionsParity = $true,
   [bool]$EnableVsCodeSettingsParity = $true,
   [bool]$EnableVsCodeWorkspaceTrustParity = $true,
@@ -195,6 +201,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-wingetconfiguration.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "load-userregistry.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "power.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "provision-devdirectory.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "rdp.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "register-hostagekey.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remote-access.ps1")
@@ -368,6 +375,7 @@ Sync-AgentsSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
 Sync-AgentsClawhubSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsClawhubSkillsParity
 Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $Users[0]
 Sync-VSCodeExtension -Enabled:$EnableVsCodeExtensionsParity
+Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 Sync-ShellProfile -Enabled:$EnableShellParity -Username $Users[0]
