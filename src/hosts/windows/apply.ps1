@@ -419,14 +419,16 @@ Sync-AgentsClawhubSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsClawhubSkillsP
 Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $Users[0]
 Sync-VSCodeExtension -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
+Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
+Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 # Default to false if devReposEnabled not yet set (user not in registry or no repos configured).
 if ($null -eq $EnableDevReposParity) {
   $EnableDevReposParity = $devReposEnabled
 }
 
+# Keep dev repo provisioning after Git/SSH config so clones see the same
+# secret/key ordering across macOS, NixOS, and Windows.
 Sync-DevRepo -Enabled:$EnableDevReposParity -Repositories $devRepositories
-Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
-Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 Sync-ShellProfile -Enabled:$EnableShellParity
 Sync-OpenSshServer -Enabled:$EnableRemoteAccessParity
 # Re-run host age key registration after Sync-OpenSshServer has started

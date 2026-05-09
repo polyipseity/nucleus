@@ -288,6 +288,9 @@ Darwin bridge symlinks only apply when the backend resolves to Homebrew.
   (`waitForSopsSecrets`, `gitIdentityFromSops`, `gpgImport`, `sshKeyAdopt`,
   `verifySecretDecryption`) so Git-over-SSH provisioning always sees imported
   keys and the final verified secret state before any clone/update runs.
+  Windows `src/hosts/windows/apply.ps1` must keep `Sync-DevRepo` after
+  `Sync-GitAndSshConfig` so all hosts converge dev repos after the same
+  secret/key setup phase.
 - **Manual-Step Visibility Invariant** — whenever a feature requires a user
   one-time action that cannot be automated safely (for example opening an app to
   finish helper/CLI installation or granting first-run permissions), add the
