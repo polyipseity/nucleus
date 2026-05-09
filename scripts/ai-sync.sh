@@ -47,10 +47,6 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-echo "ai-sync: called with dry_run=${dry_run:-0} prune_only=${prune_only:-0}"
-
-# Determine the active model profile.
-
 # Determine the active model profile.  OLLAMA_PROFILE env var overrides
 # auto-detection so callers can test a non-native profile without changing OS.
 if [ -n "${OLLAMA_PROFILE:-}" ]; then
