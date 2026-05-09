@@ -31,7 +31,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --min-free-gb)
       if [ "$#" -lt 2 ]; then
-        printf '%s\n' "nucleus: --min-free-gb requires a value" >&2
+        printf '%s\n' "health: --min-free-gb requires a value" >&2
         exit 1
       fi
       min_free_gb="$2"
@@ -42,7 +42,7 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     *)
-      printf '%s\n' "nucleus: unsupported argument '$1'" >&2
+      printf '%s\n' "health: unsupported argument '$1'" >&2
       exit 1
       ;;
   esac
@@ -55,7 +55,7 @@ check_disk_space() {
   available_kb=$(df -Pk "$REPO_ROOT" | awk 'NR == 2 { print $4 }')
 
   if [ -z "$available_kb" ] || [ "$available_kb" -lt "$min_kb" ]; then
-    printf '%s\n' "nucleus: insufficient disk space at repo filesystem (${available_kb:-0} KiB available, requires ${min_kb} KiB)." >&2
+    printf '%s\n' "health: insufficient disk space at repo filesystem (${available_kb:-0} KiB available, requires ${min_kb} KiB)." >&2
     return 1
   fi
 
@@ -66,12 +66,12 @@ check_connectivity() {
   # Verifies network reachability to critical artifact/dependency endpoints.
   # This avoids launching expensive flows that are guaranteed to fail offline.
   if ! curl -fsSI --max-time 10 https://github.com >/dev/null; then
-    printf '%s\n' "nucleus: connectivity check failed for https://github.com" >&2
+    printf '%s\n' "health: connectivity check failed for https://github.com" >&2
     return 1
   fi
 
   if ! curl -fsSI --max-time 10 https://cache.nixos.org >/dev/null; then
-    printf '%s\n' "nucleus: connectivity check failed for https://cache.nixos.org" >&2
+    printf '%s\n' "health: connectivity check failed for https://cache.nixos.org" >&2
     return 1
   fi
 
@@ -97,12 +97,12 @@ check_secret_health() {
 
   for secret_file in "$REPO_ROOT/src/secrets/git-identities.yml" "$REPO_ROOT/src/secrets/gpg-personal.yml" "$REPO_ROOT/src/secrets/ssh-personal.yml"; do
     if [ ! -f "$secret_file" ]; then
-      printf '%s\n' "nucleus: expected secret file missing: $secret_file" >&2
+      printf '%s\n' "health: expected secret file missing: $secret_file" >&2
       return 1
     fi
 
     if ! sops -d "$secret_file" >/dev/null; then
-      printf '%s\n' "nucleus: unable to decrypt secret file with current identities: $secret_file" >&2
+      printf '%s\n' "health: unable to decrypt secret file with current identities: $secret_file" >&2
       return 1
     fi
   done
@@ -116,4 +116,4 @@ if [ "$skip_secret_health" = false ]; then
   check_secret_health
 fi
 
-printf '%s\n' "nucleus: health checks passed"
+printf '%s\n' "health: health checks passed"

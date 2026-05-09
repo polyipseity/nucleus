@@ -51,13 +51,13 @@
       elif [ -f "$_as_repo_root_file" ]; then
         _as_repo_root="$(cat "$_as_repo_root_file")"
       else
-        echo "nucleus: agentsSymlink: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
+        echo "agents-config: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
         exit 1
       fi
 
       _as_agents_source="$_as_repo_root/src/modules/configs/agents"
       if [ ! -d "$_as_agents_source" ]; then
-        echo "nucleus: agentsSymlink: agents config dir not found: $_as_agents_source" >&2
+        echo "agents-config: agents config dir not found: $_as_agents_source" >&2
         exit 1
       fi
 
@@ -69,17 +69,17 @@
       # created by the old activation; user-created symlinks are not expected.
       if [ -L "$_as_agents_dir" ]; then
         rm "$_as_agents_dir"
-        echo "nucleus: agentsSymlink: migrated from whole-dir symlink to per-subdir layout"
+        echo "agents-config: migrated from whole-dir symlink to per-subdir layout"
       elif [ -e "$_as_agents_dir" ] && [ ! -d "$_as_agents_dir" ]; then
         # Unexpected non-directory, non-symlink file: fail fast.
-        echo "nucleus: agentsSymlink: $HOME/.agents exists but is not a directory or symlink — remove it and re-run apply." >&2
+        echo "agents-config: $HOME/.agents exists but is not a directory or symlink — remove it and re-run apply." >&2
         exit 1
       fi
 
       # Ensure ~/.agents exists as a real (writable) directory.
       if [ ! -d "$_as_agents_dir" ]; then
         mkdir "$_as_agents_dir"
-        echo "nucleus: agentsSymlink: created $HOME/.agents"
+        echo "agents-config: created $HOME/.agents"
       fi
 
       # Remove stale per-subdir symlinks: any symlink in ~/.agents/ that once
@@ -97,7 +97,7 @@
             # Managed per-subdir symlink: remove if its source no longer exists.
             if [ ! -e "$_as_ctarget" ] && [ ! -L "$_as_ctarget" ]; then
               rm "$_as_candidate"
-              echo "nucleus: agentsSymlink: removed stale link for $_as_cname (source removed)"
+              echo "agents-config: removed stale link for $_as_cname (source removed)"
             fi
             ;;
         esac
@@ -121,14 +121,14 @@
           # Wrong target (e.g. leftover from a previous checkout path): replace.
           rm "$_as_link"
           ln -s "$_as_entry" "$_as_link"
-          echo "nucleus: agentsSymlink: updated $HOME/.agents/$_as_name -> $_as_entry"
+          echo "agents-config: updated $HOME/.agents/$_as_name -> $_as_entry"
         elif [ -e "$_as_link" ]; then
           # Real file or directory: fail fast to prevent silent data loss.
-          echo "nucleus: agentsSymlink: $HOME/.agents/$_as_name is not a managed symlink — merge any wanted content into $_as_entry and remove it, then re-run apply." >&2
+          echo "agents-config: $HOME/.agents/$_as_name is not a managed symlink — merge any wanted content into $_as_entry and remove it, then re-run apply." >&2
           exit 1
         else
           ln -s "$_as_entry" "$_as_link"
-          echo "nucleus: agentsSymlink: linked $HOME/.agents/$_as_name -> $_as_entry"
+          echo "agents-config: linked $HOME/.agents/$_as_name -> $_as_entry"
         fi
       done < "$_as_source_list"
       rm -f "$_as_source_list"
@@ -164,13 +164,13 @@
       elif [ -f "$_ask_repo_root_file" ]; then
         _ask_repo_root="$(cat "$_ask_repo_root_file")"
       else
-        echo "nucleus: agentsSkills: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
+        echo "agents-skills: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
         exit 1
       fi
 
       _ask_skills_source="$_ask_repo_root/src/modules/configs/agents/skills"
       if [ ! -d "$_ask_skills_source" ]; then
-        echo "nucleus: agentsSkills: skills source dir not found: $_ask_skills_source" >&2
+        echo "agents-skills: skills source dir not found: $_ask_skills_source" >&2
         exit 1
       fi
 
@@ -181,11 +181,11 @@
       if [ -L "$_ask_skills_dir" ]; then
         # Old whole-dir symlink to source/skills/ — remove so it becomes real.
         rm "$_ask_skills_dir"
-        echo "nucleus: agentsSkills: migrated ~/.agents/skills from symlink to real directory"
+        echo "agents-skills: migrated ~/.agents/skills from symlink to real directory"
       fi
       if [ ! -d "$_ask_skills_dir" ]; then
         mkdir -p "$_ask_skills_dir"
-        echo "nucleus: agentsSkills: created $HOME/.agents/skills"
+        echo "agents-skills: created $HOME/.agents/skills"
       fi
 
       # Remove stale per-skill symlinks: skill dirs that once existed in the
@@ -200,7 +200,7 @@
             # Managed per-skill symlink: remove if its source no longer exists.
             if [ ! -e "$_ask_ctarget" ] && [ ! -L "$_ask_ctarget" ]; then
               rm "$_ask_candidate"
-              echo "nucleus: agentsSkills: removed stale skill link for $_ask_cname (source removed)"
+              echo "agents-skills: removed stale skill link for $_ask_cname (source removed)"
             fi
             ;;
         esac
@@ -222,16 +222,16 @@
           # Wrong target: replace symlink.
           rm "$_ask_link"
           ln -s "$_ask_skill_dir" "$_ask_link"
-          echo "nucleus: agentsSkills: updated $HOME/.agents/skills/$_ask_skill_name -> $_ask_skill_dir"
+          echo "agents-skills: updated $HOME/.agents/skills/$_ask_skill_name -> $_ask_skill_dir"
         elif [ -d "$_ask_link" ]; then
           # Real directory in place of a committed skill — could be a fetched
           # download with the same name, or user data.  Fail fast to prevent
           # silent overwrites; the operator must resolve the conflict manually.
-          echo "nucleus: agentsSkills: $HOME/.agents/skills/$_ask_skill_name is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply." >&2
+          echo "agents-skills: $HOME/.agents/skills/$_ask_skill_name is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply." >&2
           exit 1
         else
           ln -s "$_ask_skill_dir" "$_ask_link"
-          echo "nucleus: agentsSkills: linked $HOME/.agents/skills/$_ask_skill_name -> $_ask_skill_dir"
+          echo "agents-skills: linked $HOME/.agents/skills/$_ask_skill_name -> $_ask_skill_dir"
         fi
       done < "$_ask_source_list"
       rm -f "$_ask_source_list"
@@ -296,7 +296,7 @@
       # bun is now on PATH after the profile directory probes above.  Fail fast
       # if bun remains absent so the operator knows a full apply is needed.
       if ! command -v bun >/dev/null 2>&1; then
-        echo "nucleus: installBunPackages: bun not found in PATH; cannot install bun global packages" >&2
+        echo "bun: bun not found in PATH; cannot install bun global packages" >&2
         exit 1
       fi
 
@@ -348,9 +348,9 @@
       # Remove packages no longer in the desired list.
       while IFS= read -r _ibp_pkg; do
         [ -z "$_ibp_pkg" ] && continue
-        echo "nucleus: installBunPackages: removing $_ibp_pkg"
+        echo "bun: removing $_ibp_pkg"
         if ! bun remove -g "$_ibp_pkg"; then
-          echo "nucleus: installBunPackages: 'bun remove -g $_ibp_pkg' failed" >&2
+          echo "bun: 'bun remove -g $_ibp_pkg' failed" >&2
           rm -f "$_ibp_desired" "$_ibp_previous" "$_ibp_to_remove" "$_ibp_to_install"
           exit 1
         fi
@@ -359,20 +359,20 @@
       # Install packages whose binary is absent from ~/.bun/bin.
       while IFS= read -r _ibp_pkg; do
         [ -z "$_ibp_pkg" ] && continue
-        echo "nucleus: installBunPackages: installing $_ibp_pkg"
+        echo "bun: installing $_ibp_pkg"
         if ! bun install -g "$_ibp_pkg"; then
-          echo "nucleus: installBunPackages: 'bun install -g $_ibp_pkg' failed" >&2
+          echo "bun: 'bun install -g $_ibp_pkg' failed" >&2
           rm -f "$_ibp_desired" "$_ibp_previous" "$_ibp_to_remove" "$_ibp_to_install"
           exit 1
         fi
         _ibp_bin="''${_ibp_pkg##*/}"
         if [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] && \
            [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; then
-          echo "nucleus: installBunPackages: $_ibp_pkg installed but binary '$_ibp_bin' not found in '$HOME/.bun/bin'" >&2
+          echo "bun: $_ibp_pkg installed but binary '$_ibp_bin' not found in '$HOME/.bun/bin'" >&2
           rm -f "$_ibp_desired" "$_ibp_previous" "$_ibp_to_remove" "$_ibp_to_install"
           exit 1
         fi
-        echo "nucleus: installBunPackages: $_ibp_pkg installed successfully"
+        echo "bun: $_ibp_pkg installed successfully"
       done < "$_ibp_to_install"
 
       # Persist the current desired set as the new managed manifest.  Future
@@ -417,22 +417,22 @@
       elif [ -f "$_scs_repo_root_file" ]; then
         _scs_repo_root="$(cat "$_scs_repo_root_file")"
       else
-        echo "nucleus: syncClawhubSkills: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
+        echo "clawhub: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
         exit 1
       fi
 
       _scs_script="$_scs_repo_root/scripts/sync-agents-clawhub-skills.sh"
       if [ ! -f "$_scs_script" ]; then
-        echo "nucleus: syncClawhubSkills: sync script not found at $_scs_script; skipping fetched skill sync"
+        echo "clawhub: sync script not found at $_scs_script; skipping fetched skill sync"
         exit 0
       fi
 
-      echo "nucleus: syncClawhubSkills: running fetched skill sync..."
+      echo "clawhub: running fetched skill sync..."
       # Best-effort: a failed sync does not abort activation.  The system
       # configuration applied successfully; skill sync is additive.  Warn
       # and continue so displayHostManualInstructions is always reached.
       if ! sh "$_scs_script" "$_scs_repo_root"; then
-        echo "nucleus: syncClawhubSkills: sync-agents-clawhub-skills.sh exited with an error; fetched skill sync incomplete (activation continues)" >&2
+        echo "clawhub: sync-agents-clawhub-skills.sh exited with an error; fetched skill sync incomplete (activation continues)" >&2
       fi
     '';
   };

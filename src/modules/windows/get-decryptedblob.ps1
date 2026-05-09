@@ -38,7 +38,7 @@ function Get-DecryptedBlob {
     Get-DecryptedBlob -FilePath '.\wallpaper.jpg.sops' -GpgExe 'gpg.exe' `
     -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
     -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" `
-    -OutputPath 'C:\Users\me\Pictures\wallpaper.jpg' -SopsExe 'sops.exe'
+    -OutputPath 'C:\Users\primary\Pictures\wallpaper.jpg' -SopsExe 'sops.exe'
   #>
   param(
     [Parameter(Mandatory = $true)]

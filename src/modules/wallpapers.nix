@@ -6,7 +6,7 @@
 # are encrypted with SOPS (age via machine SSH key or GPG fallback).  On
 # activation the blobs are decrypted into ~/Pictures/wallpapers/ and applied
 # as a rotating gallery (10-minute interval) on both macOS (desktoppr folder
-# mode) and GNOME (dynamically generated nucleus-gallery.xml).
+# mode) and GNOME (dynamically generated wallpaper-gallery.xml).
 #
 # Multi-user support: each subdirectory in assets/wallpapers/ is treated as a
 # separate user.  Home Manager activation for each user runs the provision
@@ -94,11 +94,11 @@ in
   assertions = [
     {
       assertion = builtins.pathExists wallpapersDir;
-      message = "nucleus: required wallpapers directory is missing at ${toString wallpapersDir}.";
+      message = "wallpapers: required wallpapers directory is missing at ${toString wallpapersDir}.";
     }
     {
       assertion = builtins.any (u: u == currentUsername) userDirs;
-      message = "nucleus: current user ${currentUsername} has no wallpaper directory at ${toString wallpapersDir}/${currentUsername}.";
+      message = "wallpapers: current user ${currentUsername} has no wallpaper directory at ${toString wallpapersDir}/${currentUsername}.";
     }
   ];
 
@@ -125,12 +125,12 @@ in
       fi
 
       if ! chmod 555 "$picturesDir"; then
-        echo "nucleus: failed to set read-only mode on wallpaper directory $picturesDir." >&2
+        echo "wallpapers: failed to set read-only mode on wallpaper directory $picturesDir." >&2
         return 1
       fi
 
       if ! /usr/bin/chflags uchg "$picturesDir"; then
-        echo "nucleus: failed to set immutable flag on wallpaper directory $picturesDir." >&2
+        echo "wallpapers: failed to set immutable flag on wallpaper directory $picturesDir." >&2
         return 1
       fi
 
@@ -140,7 +140,7 @@ in
     fail_wallpaper_provision() {
       echo "$1" >&2
       if ! lock_wallpaper_dir; then
-        echo "nucleus: failed to re-lock wallpaper directory after an earlier error." >&2
+        echo "wallpapers: failed to re-lock wallpaper directory after an earlier error." >&2
       fi
       exit 1
     }
@@ -148,22 +148,22 @@ in
     # Refuse to operate on symlinks or non-directories to avoid writing or
     # deleting outside the intended managed wallpaper location.
     if [ -L "$picturesDir" ]; then
-      fail_wallpaper_provision "nucleus: wallpaper directory path $picturesDir is a symlink; refusing to manage wallpapers there."
+      fail_wallpaper_provision "wallpapers: wallpaper directory path $picturesDir is a symlink; refusing to manage wallpapers there."
     fi
 
     if [ -e "$picturesDir" ] && [ ! -d "$picturesDir" ]; then
-      fail_wallpaper_provision "nucleus: wallpaper path $picturesDir exists but is not a directory."
+      fail_wallpaper_provision "wallpapers: wallpaper path $picturesDir exists but is not a directory."
     fi
 
     # Keep the managed wallpaper directory mutable only during activation so
     # users/apps cannot accidentally delete or rename it between runs.
     if [ "$isDarwin" -eq 1 ] && [ -d "$picturesDir" ]; then
       if ! /usr/bin/chflags nouchg "$picturesDir"; then
-        fail_wallpaper_provision "nucleus: failed to clear immutable flag on wallpaper directory $picturesDir."
+        fail_wallpaper_provision "wallpapers: failed to clear immutable flag on wallpaper directory $picturesDir."
       fi
 
       if ! chmod 755 "$picturesDir"; then
-        fail_wallpaper_provision "nucleus: failed to restore writable mode on wallpaper directory $picturesDir before managed updates."
+        fail_wallpaper_provision "wallpapers: failed to restore writable mode on wallpaper directory $picturesDir before managed updates."
       fi
     fi
 
@@ -171,7 +171,7 @@ in
     chmod 755 "$picturesDir"
     if [ "$isDarwin" -eq 1 ]; then
       if ! /usr/bin/chflags nouchg "$picturesDir"; then
-        fail_wallpaper_provision "nucleus: failed to clear immutable flag on wallpaper directory $picturesDir after create."
+        fail_wallpaper_provision "wallpapers: failed to clear immutable flag on wallpaper directory $picturesDir after create."
       fi
     fi
 
@@ -181,13 +181,13 @@ in
         targetFile="$picturesDir/${item.wallpaperName}"
 
         if [ ! -f "$secretPath" ]; then
-          fail_wallpaper_provision "nucleus: missing decrypted wallpaper secret at $secretPath; cannot apply wallpaper gallery."
+          fail_wallpaper_provision "wallpapers: missing decrypted wallpaper secret at $secretPath; cannot apply wallpaper gallery."
         fi
 
         case "$targetFile" in
           "$picturesDir"/*) ;;
           *)
-            fail_wallpaper_provision "nucleus: refusing to write wallpaper outside $picturesDir: $targetFile"
+            fail_wallpaper_provision "wallpapers: refusing to write wallpaper outside $picturesDir: $targetFile"
             ;;
         esac
 
@@ -213,7 +213,7 @@ in
       baseName="$(basename "$decryptedFile")"
       if [ ! -e "${toString wallpapersDir}/${currentUsername}/$baseName.sops" ]; then
         rm -f "$decryptedFile"
-        echo "nucleus: removed stale wallpaper $baseName (no matching .sops source)."
+        echo "wallpapers: removed stale wallpaper $baseName (no matching .sops source)."
       fi
     done
 
@@ -221,7 +221,7 @@ in
     # macOS: use desktoppr to set the wallpaper source to the decrypted folder.
     # This avoids brittle AppleScript and private database mutation paths while
     # keeping the assignment in a user-session-safe command line tool.
-    # GNOME: generate nucleus-gallery.xml listing all decrypted images, then
+    # GNOME: generate wallpaper-gallery.xml listing all decrypted images, then
     #        point picture-uri at the XML file.  Each image displays for 595 s
     #        with a 5 s overlay transition (600 s / 10 min total per slide).
     hasWallpapers=0
@@ -234,7 +234,7 @@ in
     done
 
     if [ "$hasWallpapers" -ne 1 ]; then
-      fail_wallpaper_provision "nucleus: no decrypted wallpapers found in $picturesDir; cannot apply wallpaper gallery."
+      fail_wallpaper_provision "wallpapers: no decrypted wallpapers found in $picturesDir; cannot apply wallpaper gallery."
     fi
 
     if [ "$isDarwin" -eq 1 ]; then
@@ -245,16 +245,16 @@ in
       desktopprTarget="$resolvedPicturesDir/."
 
       if [ ! -x "$desktopprBin" ]; then
-        fail_wallpaper_provision "nucleus: desktoppr is not executable at $desktopprBin; cannot set macOS wallpaper gallery."
+        fail_wallpaper_provision "wallpapers: desktoppr is not executable at $desktopprBin; cannot set macOS wallpaper gallery."
       elif [ ! -d "$resolvedPicturesDir" ]; then
-        fail_wallpaper_provision "nucleus: resolved wallpaper directory is not a folder: $resolvedPicturesDir"
+        fail_wallpaper_provision "wallpapers: resolved wallpaper directory is not a folder: $resolvedPicturesDir"
       else
         if ! "$desktopprBin" all "$desktopprTarget"; then
-          fail_wallpaper_provision "nucleus: desktoppr failed to set wallpaper directory $desktopprTarget."
+          fail_wallpaper_provision "wallpapers: desktoppr failed to set wallpaper directory $desktopprTarget."
         fi
       fi
     elif command -v gsettings >/dev/null 2>&1; then
-      xmlFile="$picturesDir/nucleus-gallery.xml"
+      xmlFile="$picturesDir/wallpaper-gallery.xml"
       tmpXml="$(mktemp)"
       firstImg=""
       prevImg=""
@@ -292,11 +292,11 @@ in
       chmod 444 "$_xml_tmp_final"
       mv "$_xml_tmp_final" "$xmlFile"
       if ! gsettings set org.gnome.desktop.background picture-uri "file://$xmlFile"; then
-        fail_wallpaper_provision "nucleus: failed to set GNOME picture-uri to wallpaper gallery XML."
+        fail_wallpaper_provision "wallpapers: failed to set GNOME picture-uri to wallpaper gallery XML."
       fi
 
       if ! gsettings set org.gnome.desktop.background picture-uri-dark "file://$xmlFile"; then
-        fail_wallpaper_provision "nucleus: failed to set GNOME picture-uri-dark to wallpaper gallery XML."
+        fail_wallpaper_provision "wallpapers: failed to set GNOME picture-uri-dark to wallpaper gallery XML."
       fi
       rm -f "$tmpXml"
     fi

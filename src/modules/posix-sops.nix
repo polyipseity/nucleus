@@ -31,9 +31,9 @@ let
     host_ssh_key="/etc/ssh/ssh_host_ed25519_key"
 
     if [ ! -f "$host_ssh_key" ]; then
-      echo "nucleus: /etc/ssh/ssh_host_ed25519_key absent; skipping age key derivation." >&2
-      echo "nucleus:   This machine cannot decrypt SOPS secrets as a device age recipient" >&2
-      echo "nucleus:   until the host key is present and registered in .sops.yaml." >&2
+      echo "sops: /etc/ssh/ssh_host_ed25519_key absent; skipping age key derivation." >&2
+      echo "sops:   This machine cannot decrypt SOPS secrets as a device age recipient" >&2
+      echo "sops:   until the host key is present and registered in .sops.yaml." >&2
     else
       mkdir -p "$age_dir"
       # ssh-to-age -private-key -i reads an SSH private key FILE and outputs
@@ -44,7 +44,7 @@ let
       derived_age_key_exit=0
       derived_age_key="$(${pkgs.ssh-to-age}/bin/ssh-to-age -private-key -i "$host_ssh_key")" || derived_age_key_exit=$?
       if [ "$derived_age_key_exit" -ne 0 ] || [ -z "$derived_age_key" ]; then
-        echo "nucleus: ssh-to-age failed (exit $derived_age_key_exit) reading $host_ssh_key; $age_key_file not written." >&2
+        echo "sops: ssh-to-age failed (exit $derived_age_key_exit) reading $host_ssh_key; $age_key_file not written." >&2
       else
         printf '%s\n' "$derived_age_key" > "$age_key_file"
         chown "${username}" "$age_key_file"

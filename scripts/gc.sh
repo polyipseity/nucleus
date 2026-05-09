@@ -50,7 +50,7 @@ while [ "$#" -gt 0 ]; do
       skip_wallpaper_prune=true
       ;;
     *)
-      printf '%s\n' "nucleus: unsupported argument '$1'" >&2
+      printf '%s\n' "gc: unsupported argument '$1'" >&2
       exit 1
       ;;
   esac
@@ -67,7 +67,7 @@ expire_hm_generations_if_available() {
   # home-manager in PATH.
   if ! command -v home-manager >/dev/null 2>&1; then
     # Existence probe — tool absent is expected and benign on some hosts.
-    printf '%s\n' "nucleus: home-manager unavailable; skipping generation expiry"
+    printf '%s\n' "gc: home-manager unavailable; skipping generation expiry"
     return 0
   fi
 
@@ -79,7 +79,7 @@ run_nix_gc_if_available() {
   # Nix may not be installed (for example minimal CI images).
   if ! command -v nix-collect-garbage >/dev/null 2>&1; then
     # Existence probe — tool absent is expected and benign on some hosts.
-    printf '%s\n' "nucleus: nix-collect-garbage unavailable; skipping Nix GC"
+    printf '%s\n' "gc: nix-collect-garbage unavailable; skipping Nix GC"
     return 0
   fi
 
@@ -133,7 +133,7 @@ prune_cargo_cache_if_available() {
   # package set).
   if ! command -v cargo-cache >/dev/null 2>&1; then
     # Existence probe — tool absent is expected and benign on some hosts.
-    printf '%s\n' "nucleus: cargo-cache unavailable; skipping cargo cache prune"
+    printf '%s\n' "gc: cargo-cache unavailable; skipping cargo cache prune"
     return 0
   fi
 
@@ -152,12 +152,12 @@ prune_ollama_models_if_available() {
   if ! command -v ollama >/dev/null 2>&1; then
     # Existence probe — tool absent is expected and benign before Ollama
     # has been provisioned on this host.
-    printf '%s\n' "nucleus: ollama unavailable; skipping ollama model prune"
+    printf '%s\n' "gc: ollama unavailable; skipping ollama model prune"
     return 0
   fi
   if ! command -v jq >/dev/null 2>&1; then
     # jq is required by ai-sync.sh to parse the JSON manifest.
-    printf '%s\n' "nucleus: jq unavailable; skipping ollama model prune"
+    printf '%s\n' "gc: jq unavailable; skipping ollama model prune"
     return 0
   fi
 
@@ -190,4 +190,4 @@ if [ "$skip_ollama_prune" = false ]; then
   prune_ollama_models_if_available
 fi
 
-printf '%s\n' "nucleus: gc workflow completed"
+printf '%s\n' "gc: gc workflow completed"

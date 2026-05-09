@@ -43,11 +43,11 @@
   None.  Writes status messages to the host.
 
 .EXAMPLE
-  Sync-AgentsSkills -RepoRoot 'C:\Users\user\repos\nucleus'
+  Sync-AgentsSkills -RepoRoot 'C:\Users\guest\repos\nucleus'
 
 .EXAMPLE
   # Remove only managed per-skill symlinks (cleanup path); leave fetched dirs:
-  Sync-AgentsSkills -RepoRoot 'C:\Users\user\repos\nucleus' -Enabled:$false
+  Sync-AgentsSkills -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
 #>
 function Sync-AgentsSkills {
   [CmdletBinding()]

@@ -43,11 +43,11 @@
   Unrecognised symlinks and real directories are left untouched.
 
 .EXAMPLE
-  Sync-AgentsConfig -RepoRoot 'C:\Users\user\repos\nucleus'
+  Sync-AgentsConfig -RepoRoot 'C:\Users\guest\repos\nucleus'
 
 .EXAMPLE
   # Remove all managed per-subdir symlinks (cleanup path):
-  Sync-AgentsConfig -RepoRoot 'C:\Users\user\repos\nucleus' -Enabled:$false
+  Sync-AgentsConfig -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
 #>
 function Sync-AgentsConfig {
   [CmdletBinding()]

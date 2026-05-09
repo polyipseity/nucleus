@@ -170,7 +170,7 @@ lib.mkIf pkgs.stdenv.isLinux {
       _db_file="$HOME/.cache/nix-index/files"
       if [ ! -f "$_db_file" ]; then
         ${pkgs.nix-index}/bin/nix-index >/dev/null 2>&1 &
-        echo "nucleus: nix-index database build started in background; this may take a few minutes." >&2
+        echo "linux: nix-index database build started in background; this may take a few minutes." >&2
       fi
     '';
 

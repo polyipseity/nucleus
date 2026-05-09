@@ -82,7 +82,7 @@ let
     # System-wide Python ban: redirect python/pip to warnings so users are
     # guided to scoped alternatives instead of modifying the system environment.
     function python {
-      Write-Host "nucleus: system-wide Python is banned to prevent accidental modifications." -ForegroundColor Yellow
+      Write-Host "shell: system-wide Python is banned to prevent accidental modifications." -ForegroundColor Yellow
       Write-Host "         Use one of these approaches instead:" -ForegroundColor Yellow
       Write-Host "         - nix develop     (activate project devShell with scoped Python)" -ForegroundColor Yellow
       Write-Host "         - uv run <cmd>    (run Python via uv package manager)" -ForegroundColor Yellow
@@ -94,7 +94,7 @@ let
       python @Args
     }
     function pip {
-      Write-Host "nucleus: system-wide pip is banned to prevent breaking system dependencies." -ForegroundColor Yellow
+      Write-Host "shell: system-wide pip is banned to prevent breaking system dependencies." -ForegroundColor Yellow
       Write-Host "         Use one of these approaches instead:" -ForegroundColor Yellow
       Write-Host "         - nix develop     (activate project devShell with scoped Python+pip)" -ForegroundColor Yellow
       Write-Host "         - uv pip install  (use uv to manage project dependencies)" -ForegroundColor Yellow

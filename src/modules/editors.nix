@@ -32,7 +32,7 @@ let
     in if pubAttrs ? ${name}
        then [ pubAttrs.${name} ]
        else builtins.trace
-         "nucleus: nix-vscode-extensions: ${pub}.${name} not in marketplace index — skipping"
+         "vscode: ${pub}.${name} not in marketplace index — skipping"
          [];
 
   # Canonical extension set shared by both platforms, sorted alphabetically by
@@ -262,13 +262,13 @@ let
                     (TRUST_KEY, new_value),
                 )
                 conn.commit()
-                print("nucleus: vscodeWorkspaceTrust: trusted", dev_path, "in", db_path, file=sys.stderr)
+                print("vscode-trust: trusted", dev_path, "in", db_path, file=sys.stderr)
             finally:
                 conn.close()
         except Exception as e:
             # Non-fatal: DB may be locked by a running VS Code instance, or
             # absent on a fresh install before VS Code has been launched once.
-            print("nucleus: vscodeWorkspaceTrust: warning:", db_path, "-", e, file=sys.stderr)
+            print("vscode-trust: warning:", db_path, "-", e, file=sys.stderr)
   '';
 in
 {
@@ -348,13 +348,13 @@ in
       elif [ -f "$_vsym_repo_root_file" ]; then
         _vsym_repo_root="$(cat "$_vsym_repo_root_file")"
       else
-        echo "nucleus: vscodeSymlinks: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
+        echo "vscode: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
         exit 1
       fi
 
       _vsym_config_dir="$_vsym_repo_root/src/modules/configs/vscode"
       if [ ! -d "$_vsym_config_dir" ]; then
-        echo "nucleus: vscodeSymlinks: config dir not found: $_vsym_config_dir" >&2
+        echo "vscode: config dir not found: $_vsym_config_dir" >&2
         exit 1
       fi
 

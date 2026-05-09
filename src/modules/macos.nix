@@ -225,7 +225,7 @@ let
     # If verification fails we skip purge so an unrelated store issue cannot be
     # compounded by deleting user preference state in the same maintenance run.
     if ! ${pkgs.nix}/bin/nix-store --verify --check-contents >/dev/null 2>&1; then
-      echo "nucleus: store integrity check failed; skipping managed preference purge for safety." >&2
+      echo "macos: store integrity check failed; skipping managed preference purge for safety." >&2
       exit 0
     fi
 
@@ -339,7 +339,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     clearDesktop = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       for proc in Finder SystemUIServer WindowManager; do
         if ! /usr/bin/killall "$proc"; then
-          echo "nucleus: $proc was not running (or could not be restarted)." >&2
+          echo "macos: $proc was not running (or could not be restarted)." >&2
         fi
       done
     '';
@@ -405,7 +405,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         # Apply the target mode on the primary display and refresh the list.
         if [ -n "$MODE4_STR" ]; then
           if ! "$DP_BIN" "id:$PRIMARY_ID $MODE4_STR"; then
-            echo "nucleus: failed to apply primary display mode with displayplacer." >&2
+            echo "macos: failed to apply primary display mode with displayplacer." >&2
           fi
           /bin/sleep 1
           FULL_LIST=$("$DP_BIN" list)
@@ -449,7 +449,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
           if [ -n "$BEST_MODE" ]; then
             if ! "$DP_BIN" "id:$ID $BEST_MODE"; then
-              echo "nucleus: failed to apply mode '$BEST_MODE' to display id $ID." >&2
+              echo "macos: failed to apply mode '$BEST_MODE' to display id $ID." >&2
             fi
           fi
         done
@@ -475,15 +475,15 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     configureInputAndSiri = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       if ! /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 176 "<dict><key>enabled</key><false/></dict>"; then
-        echo "nucleus: failed to update symbolic hotkey 176." >&2
+        echo "macos: failed to update symbolic hotkey 176." >&2
       fi
 
       if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-        echo "nucleus: activateSettings -u failed; input settings may apply on next login." >&2
+        echo "macos: activateSettings -u failed; input settings may apply on next login." >&2
       fi
 
       if ! /usr/bin/killall -HUP TISwitcher; then
-        echo "nucleus: TISwitcher was not running (or could not be signaled)." >&2
+        echo "macos: TISwitcher was not running (or could not be signaled)." >&2
       fi
     '';
 
@@ -499,7 +499,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       "configureUniversalAccessDefaults"
     ] ''
       if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-        echo "nucleus: activateSettings -u failed; some preference updates may require relogin." >&2
+        echo "macos: activateSettings -u failed; some preference updates may require relogin." >&2
       fi
     '';
 
@@ -529,7 +529,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
         for uti in "$@"; do
           if ! "${dutiBin}" -s "$handler" "$uti" all; then
-            echo "nucleus: failed to register LaunchServices handler $handler for UTI $uti." >&2
+            echo "macos: failed to register LaunchServices handler $handler for UTI $uti." >&2
           fi
         done
       }
@@ -552,21 +552,21 @@ lib.mkIf pkgs.stdenv.isDarwin {
     configureNightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       if [ -x "/opt/homebrew/bin/nightlight" ]; then
         if ! /opt/homebrew/bin/nightlight schedule start; then
-          echo "nucleus: failed to configure Nightlight schedule." >&2
+          echo "macos: failed to configure Nightlight schedule." >&2
         fi
 
         if ! /opt/homebrew/bin/nightlight temp 50; then
-          echo "nucleus: failed to set Nightlight temperature." >&2
+          echo "macos: failed to set Nightlight temperature." >&2
         fi
 
         current_hour=$(date +%H)
         if [ "$current_hour" -ge 18 ] || [ "$current_hour" -lt 6 ]; then
           if ! /opt/homebrew/bin/nightlight on; then
-            echo "nucleus: failed to enable Nightlight." >&2
+            echo "macos: failed to enable Nightlight." >&2
           fi
         else
           if ! /opt/homebrew/bin/nightlight off; then
-            echo "nucleus: failed to disable Nightlight." >&2
+            echo "macos: failed to disable Nightlight." >&2
           fi
         fi
       fi
@@ -586,7 +586,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #      converge in the same run.
     # -------------------------------------------------------------------------
     preflightPrivacyPermissions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      echo "nucleus: checking macOS privacy permissions before defaults writes..." >&2
+      echo "macos: checking macOS privacy permissions before defaults writes..." >&2
 
       print_fda_warning() {
         bold="$(printf '\033[1m')"
@@ -611,7 +611,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         if printf '%s' "$probe_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
           print_fda_warning
         else
-          echo "nucleus: privacy preflight probe failed unexpectedly ($probe_err); continuing with best-effort defaults writes." >&2
+          echo "macos: privacy preflight probe failed unexpectedly ($probe_err); continuing with best-effort defaults writes." >&2
         fi
       fi
     '';
@@ -654,9 +654,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
         if ! write_err="$({ /usr/bin/defaults write com.apple.Safari "$key" "-$value_type" "$value"; } 2>&1)"; then
           if printf '%s' "$write_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
             print_fda_warning
-            echo "nucleus: failed to set Safari key $key due to missing privacy authorization." >&2
+            echo "macos: failed to set Safari key $key due to missing privacy authorization." >&2
           else
-            echo "nucleus: failed to set Safari key $key ($write_err)." >&2
+            echo "macos: failed to set Safari key $key ($write_err)." >&2
           fi
         fi
       }
@@ -709,7 +709,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
             print_fda_warning
             printf '%s![Permission Denied]%s Failed to set %s%s %s%s. Ensure Full Disk Access and Accessibility permissions are granted.\n' "$yellow" "$reset" "$bold" "$domain" "$key" "$reset" >&2
           else
-            echo "nucleus: failed to set $domain $key ($write_err)." >&2
+            echo "macos: failed to set $domain $key ($write_err)." >&2
           fi
         fi
       }
@@ -750,7 +750,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         # artifact directory found under ~/dev so Spotlight skips them.
         for dir_name in ".gradle" ".next" ".turbo" ".venv" "__pycache__" "bin" "build" "dist" "incremental" "node_modules" "obj" "target" "venv" "vendor"; do
           if ! /usr/bin/find "$DEV_ROOT" -name "$dir_name" -type d -prune -exec touch "{}/.metadata_never_index" \;; then
-            echo "nucleus: failed to mark one or more '$dir_name' directories as metadata_never_index." >&2
+            echo "macos: failed to mark one or more '$dir_name' directories as metadata_never_index." >&2
           fi
         done
 
@@ -758,14 +758,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
         # repository noise. This is safe/idempotent because Finder recreates
         # files on demand when folder-view state changes.
         if ! /usr/bin/find "$DEV_ROOT" -name ".DS_Store" -type f -delete; then
-          echo "nucleus: failed to remove one or more .DS_Store files under ~/dev." >&2
+          echo "macos: failed to remove one or more .DS_Store files under ~/dev." >&2
         fi
       else
         mkdir -p "$DEV_ROOT"
       fi
 
       if ! /usr/bin/killall Dock; then
-        echo "nucleus: Dock was not running (or could not be restarted)." >&2
+        echo "macos: Dock was not running (or could not be restarted)." >&2
       fi
     '';
 
@@ -779,9 +779,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
       # Restart Finder to refresh Services. This ensures services registered for
       # both file and directory contexts are loaded (e.g., "Open in Terminal").
       if ! /usr/bin/killall Finder; then
-        echo "nucleus: Finder was not running (or could not be restarted)." >&2
+        echo "macos: Finder was not running (or could not be restarted)." >&2
       else
-        echo "nucleus: Finder restarted; Services should now be refreshed." >&2
+        echo "macos: Finder restarted; Services should now be refreshed." >&2
       fi
 
       # Enable Services to appear in Finder context menu for both files and
@@ -798,14 +798,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
         LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
         if [ -x "$LSREGISTER" ]; then
           if ! $LSREGISTER -r -domain local -domain system -domain user; then
-            echo "nucleus: lsregister failed; Finder Services may not appear in context menus until the next login." >&2
+            echo "macos: lsregister failed; Finder Services may not appear in context menus until the next login." >&2
           fi
         fi
       fi
 
       # Reload Finder Services to pick up the changes immediately.
       if ! /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
-        echo "nucleus: launchctl Finder restart failed; restart Finder manually if Services do not appear in context menus." >&2
+        echo "macos: launchctl Finder restart failed; restart Finder manually if Services do not appear in context menus." >&2
       fi
     '';
 
@@ -820,18 +820,18 @@ lib.mkIf pkgs.stdenv.isDarwin {
       # shell that may not have nix-darwin system package paths available yet.
       seven_z_exe="${pkgs.p7zip}/bin/7z"
       if [ ! -x "$seven_z_exe" ]; then
-        echo "nucleus: warning — 7z binary not found at $seven_z_exe; archive extraction may fail." >&2
+        echo "macos: warning — 7z binary not found at $seven_z_exe; archive extraction may fail." >&2
       elif ! "$seven_z_exe" --help >/dev/null 2>&1; then
-        echo "nucleus: warning — 7z exists but --help failed; archive handling may be broken." >&2
+        echo "macos: warning — 7z exists but --help failed; archive handling may be broken." >&2
       else
-        echo "nucleus: archiving stack healthy — 7z CLI available." >&2
+        echo "macos: archiving stack healthy — 7z CLI available." >&2
       fi
 
       # Verify Keka application is installed and registered.
       if [ ! -d "/Applications/Keka.app" ]; then
-        echo "nucleus: warning — Keka.app not found in /Applications; GUI archiving unavailable." >&2
+        echo "macos: warning — Keka.app not found in /Applications; GUI archiving unavailable." >&2
       else
-        echo "nucleus: archiving stack healthy — Keka installed." >&2
+        echo "macos: archiving stack healthy — Keka installed." >&2
       fi
     '';
 
@@ -893,7 +893,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         # screens and avoid affecting physical monitors.
         for tag_id in $1; do
           if ! "$BD_BIN" discard -tagID="$tag_id"; then
-            echo "nucleus: failed to discard duplicate BetterDisplay virtual screen tagID=$tag_id." >&2
+            echo "macos: failed to discard duplicate BetterDisplay virtual screen tagID=$tag_id." >&2
           fi
         done
       }
@@ -914,7 +914,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
           fi
 
           if ! create_headless_display; then
-            echo "nucleus: failed to create BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
+            echo "macos: failed to create BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
           fi
           /bin/sleep 3  # wait for the virtual display to be registered
           identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME")" || true
@@ -925,11 +925,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
           if [ "$connected_state" != "on" ]; then
             if ! "$BD_BIN" discard -tagID="$tag_id"; then
-              echo "nucleus: failed to discard disconnected BetterDisplay virtual screen '$DISPLAY_NAME' (tagID=$tag_id)." >&2
+              echo "macos: failed to discard disconnected BetterDisplay virtual screen '$DISPLAY_NAME' (tagID=$tag_id)." >&2
             fi
 
             if ! create_headless_display; then
-              echo "nucleus: failed to recreate BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
+              echo "macos: failed to recreate BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
             fi
             /bin/sleep 3  # wait for the virtual display to be registered
             identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME")" || true
@@ -939,7 +939,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
         connected_after="$($BD_BIN get -name="$DISPLAY_NAME" -connected)" || true
         if [ "$connected_after" != "on" ]; then
-          echo "nucleus: failed to set BetterDisplay virtual screen '$DISPLAY_NAME' connected=on." >&2
+          echo "macos: failed to set BetterDisplay virtual screen '$DISPLAY_NAME' connected=on." >&2
         fi
       fi
     '';

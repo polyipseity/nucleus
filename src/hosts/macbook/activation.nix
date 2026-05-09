@@ -79,7 +79,7 @@
     # does not silently leave a stale policy in place.
     apply_pmset() {
       if ! /usr/bin/pmset "$@"; then
-        echo "nucleus: failed to apply pmset settings: $*" >&2
+        echo "power: failed to apply pmset settings: $*" >&2
         return 1
       fi
     }
@@ -179,23 +179,23 @@
       # battery's own log file (~/.battery/battery.log) retains full
       # diagnostic output for post-failure inspection.
       if ! /usr/bin/sudo -H -u "$console_user" "$battery_cli" maintain 80 </dev/null >/dev/null 2>&1; then
-        echo "nucleus: battery maintain 80 failed for user '$console_user'." >&2
+        echo "power: battery maintain 80 failed for user '$console_user'." >&2
       fi
     elif [ -x /opt/homebrew/bin/bclm ]; then
       if [ -n "$macos_major" ] && [ "$macos_major" -ge 15 ]; then
-        echo "nucleus: bclm is unsupported on macOS >= 15; install and initialize the battery app to enforce 80% charge limit." >&2
+        echo "power: bclm is unsupported on macOS >= 15; install and initialize the battery app to enforce 80% charge limit." >&2
       else
         if ! /opt/homebrew/bin/bclm write 80; then
-          echo "nucleus: bclm write 80 failed." >&2
+          echo "power: bclm write 80 failed." >&2
         fi
         if ! /opt/homebrew/bin/bclm persist; then
-          echo "nucleus: bclm persist failed." >&2
+          echo "power: bclm persist failed." >&2
         fi
       fi
     elif [ -d "$battery_app" ]; then
-      echo "nucleus: battery.app is installed but the battery CLI is unavailable; open battery.app once and complete setup to install the helper command." >&2
+      echo "power: battery.app is installed but the battery CLI is unavailable; open battery.app once and complete setup to install the helper command." >&2
     else
-      echo "nucleus: no supported battery charge-limit tool found (expected /usr/local/bin/battery or /opt/homebrew/bin/bclm)." >&2
+      echo "power: no supported battery charge-limit tool found (expected /usr/local/bin/battery or /opt/homebrew/bin/bclm)." >&2
     fi
 
     # ---- configureMissionControlSpansDisplays ----------------------------------
@@ -211,10 +211,10 @@
     console_uid="$(/usr/bin/stat -f%u /dev/console 2>/dev/null || true)"
 
     if [ -z "$console_uid" ] || [ "$console_uid" -eq 0 ]; then
-      echo "nucleus: no active non-root console user; skipping spans-displays write." >&2
+      echo "power: no active non-root console user; skipping spans-displays write." >&2
     else
       if ! /bin/launchctl asuser "$console_uid" /usr/bin/defaults write com.apple.spaces spans-displays -bool true; then
-        echo "nucleus: failed to enable Mission Control spans-displays for console uid $console_uid." >&2
+        echo "power: failed to enable Mission Control spans-displays for console uid $console_uid." >&2
       fi
     fi
 

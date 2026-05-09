@@ -159,24 +159,24 @@ run_ai_sync() {
   #   that could mismatch the running server's version.  PATH detection keeps
   #   the sync aligned with the actual runtime binary.
   if [ "$skip_ai_sync" = true ]; then
-    printf '%s\n' "nucleus: --skip-ai-sync set; skipping post-apply model sync"
+    printf '%s\n' "ai-sync: --skip-ai-sync set; skipping post-apply model sync"
     return
   fi
 
   _ras_script="$REPO_ROOT/scripts/ai-sync.sh"
   if [ ! -f "$_ras_script" ]; then
-    printf '%s\n' "nucleus: scripts/ai-sync.sh not found at $_ras_script; skipping model sync"
+    printf '%s\n' "ai-sync: scripts/ai-sync.sh not found at $_ras_script; skipping model sync"
     return
   fi
 
   if ! command -v ollama >/dev/null 2>&1; then
-    printf '%s\n' "nucleus: ollama not found in PATH; skipping post-apply model sync"
+    printf '%s\n' "ai-sync: ollama not found in PATH; skipping post-apply model sync"
     return
   fi
 
-  printf '%s\n' "nucleus: running post-apply AI model sync..."
+  printf '%s\n' "ai-sync: running post-apply AI model sync..."
   if ! sh "$_ras_script"; then
-    printf '%s\n' "nucleus: ai-sync.sh exited with an error; model sync incomplete (system apply succeeded)" >&2
+    printf '%s\n' "ai-sync: ai-sync.sh exited with an error; model sync incomplete (system apply succeeded)" >&2
   fi
 }
 
@@ -205,21 +205,21 @@ generate_ssh_host_key_if_needed() {
     return
   fi
 
-  printf 'nucleus: %s not found; generating SSH host keys...\n' "$_gsk_host_key"
+  printf 'ssh: %s not found; generating SSH host keys...\n' "$_gsk_host_key"
   # Pass PATH explicitly so sudo finds the Nix openssh ssh-keygen rather than
   # any older system ssh-keygen that may be shadowed by runtimeInputs.
   if ! sudo env "PATH=$PATH" ssh-keygen -A; then
-    printf 'nucleus: ERROR — ssh-keygen -A failed; cannot generate SSH host keys.\n' >&2
+    printf 'ssh: ERROR — ssh-keygen -A failed; cannot generate SSH host keys.\n' >&2
     exit 1
   fi
 
   if [ ! -f "$_gsk_host_key" ]; then
-    printf 'nucleus: ERROR — ssh-keygen -A completed but %s is still absent.\n' \
+    printf 'ssh: ERROR — ssh-keygen -A completed but %s is still absent.\n' \
       "$_gsk_host_key" >&2
     exit 1
   fi
 
-  printf 'nucleus: SSH host keys generated successfully.\n'
+  printf 'ssh: SSH host keys generated successfully.\n'
 }
 
 register_host_age_key_if_needed() {
@@ -248,7 +248,7 @@ register_host_age_key_if_needed() {
   _rak_sops_yaml="$REPO_ROOT/.sops.yaml"
 
   if [ ! -f "$_rak_host_pub" ]; then
-    printf 'nucleus: %s not found; skipping machine age key auto-registration.\n' \
+    printf 'sops: %s not found; skipping machine age key auto-registration.\n' \
       "$_rak_host_pub" >&2
     return
   fi
@@ -257,23 +257,23 @@ register_host_age_key_if_needed() {
   # conversion; no passphrase or private key material is accessed).
   _rak_age_pub=""
   if ! _rak_age_pub="$(ssh-to-age -i "$_rak_host_pub")"; then
-    printf 'nucleus: ERROR — ssh-to-age failed to derive age public key from %s.\n' \
+    printf 'sops: ERROR — ssh-to-age failed to derive age public key from %s.\n' \
       "$_rak_host_pub" >&2
     exit 1
   fi
   if [ -z "$_rak_age_pub" ]; then
-    printf 'nucleus: ERROR — ssh-to-age returned an empty age public key for %s.\n' \
+    printf 'sops: ERROR — ssh-to-age returned an empty age public key for %s.\n' \
       "$_rak_host_pub" >&2
     exit 1
   fi
 
   # Idempotency: skip insertion and rewrap when this machine is already registered.
   if grep -qF "$_rak_age_pub" "$_rak_sops_yaml"; then
-    printf 'nucleus: machine age key already registered in .sops.yaml; skipping auto-registration.\n'
+    printf 'sops: machine age key already registered in .sops.yaml; skipping auto-registration.\n'
     return
   fi
 
-  printf 'nucleus: registering machine age key in .sops.yaml and rewrapping SOPS files...\n'
+  printf 'sops: registering machine age key in .sops.yaml and rewrapping SOPS files...\n'
 
   # Insert the new age key line immediately before the marker comment.
   # The marker delineates machine recipients from the personal SSH backup key
@@ -293,7 +293,7 @@ register_host_age_key_if_needed() {
   # Verify the insertion succeeded; catches the case where the marker comment
   # was removed or mistyped.
   if ! grep -qF "$_rak_age_pub" "$_rak_sops_yaml"; then
-    printf 'nucleus: ERROR — failed to insert machine age key into .sops.yaml; is the marker comment present?\n' >&2
+    printf 'sops: ERROR — failed to insert machine age key into .sops.yaml; is the marker comment present?\n' >&2
     exit 1
   fi
 
@@ -305,9 +305,9 @@ register_host_age_key_if_needed() {
       "$REPO_ROOT/src/secrets/gpg-personal.yml" \
       "$REPO_ROOT/src/secrets/ssh-personal.yml"; do
     if ! sops updatekeys --yes "$_rak_secret"; then
-      printf 'nucleus: ERROR — sops updatekeys failed for %s.\n' "$_rak_secret" >&2
-      printf 'nucleus: Ensure the primary GPG key is imported first:\n' >&2
-      printf 'nucleus:   gpg --import <backup-key-file>\n' >&2
+      printf 'sops: ERROR — sops updatekeys failed for %s.\n' "$_rak_secret" >&2
+      printf 'sops: Ensure the primary GPG key is imported first:\n' >&2
+      printf 'sops:   gpg --import <backup-key-file>\n' >&2
       exit 1
     fi
   done
@@ -326,19 +326,19 @@ register_host_age_key_if_needed() {
         # the script immediately; the OS reclaims /tmp files on reboot.
         # Removing it inside the read-loop body would trigger SC2094 (the
         # same variable appears in both `rm` and `done < file`).
-        printf 'nucleus: ERROR — sops updatekeys failed for %s.\n' "$_rak_wallpaper" >&2
-        printf 'nucleus: Ensure the primary GPG key is imported first:\n' >&2
-        printf 'nucleus:   gpg --import <backup-key-file>\n' >&2
+        printf 'sops: ERROR — sops updatekeys failed for %s.\n' "$_rak_wallpaper" >&2
+        printf 'sops: Ensure the primary GPG key is imported first:\n' >&2
+        printf 'sops:   gpg --import <backup-key-file>\n' >&2
         exit 1
       fi
     done < "$_rak_wallpaper_list"
     rm -f "$_rak_wallpaper_list"
   fi
 
-  printf 'nucleus: machine age key registered and SOPS files rewrapped.\n'
-  printf 'nucleus: Commit the changes before deploying to other machines:\n'
-  printf 'nucleus:   git add .sops.yaml src/secrets src/assets/wallpapers\n'
-  printf 'nucleus:   git commit -m "chore: register <hostname> machine age key"\n'
+  printf 'sops: machine age key registered and SOPS files rewrapped.\n'
+  printf 'sops: Commit the changes before deploying to other machines:\n'
+  printf 'sops:   git add .sops.yaml src/secrets src/assets/wallpapers\n'
+  printf 'sops:   git commit -m "chore: register <hostname> machine age key"\n'
 }
 
 case "$(uname -s)" in

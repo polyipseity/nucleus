@@ -38,7 +38,7 @@ while [ "$#" -gt 0 ]; do
       skip_sops=true
       ;;
     *)
-      printf '%s\n' "nucleus: unsupported argument '$1'" >&2
+      printf '%s\n' "update: unsupported argument '$1'" >&2
       exit 1
       ;;
   esac
@@ -68,7 +68,7 @@ update_windows_packages_if_available() {
   # Winget upgrades are executed only when winget is present, allowing this
   # script to stay portable across POSIX and Windows hosts.
   if ! command -v winget >/dev/null 2>&1; then
-    printf '%s\n' "nucleus: winget unavailable on this host, skipping Windows package upgrade step"
+    printf '%s\n' "update: winget unavailable on this host, skipping Windows package upgrade step"
     return 0
   fi
 
@@ -107,4 +107,4 @@ if [ "$skip_sops" = false ]; then
   rewrap_sops_files
 fi
 
-printf '%s\n' "nucleus: update workflow completed"
+printf '%s\n' "update: update workflow completed"

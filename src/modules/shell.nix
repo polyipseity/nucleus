@@ -54,7 +54,7 @@ in
       # These are functions, not aliases, so they can provide helpful context.
       python() {
         cat >&2 << 'EOF'
-nucleus: system-wide Python is banned to prevent accidental modifications.
+shell: system-wide Python is banned to prevent accidental modifications.
          Use one of these approaches instead:
          - nix develop     (activate project devShell with scoped Python)
          - uv run <cmd>    (run Python via uv package manager)
@@ -72,7 +72,7 @@ EOF
       # Remind users that modifying system Python breaks system dependencies.
       pip() {
         cat >&2 << 'EOF'
-nucleus: system-wide pip is banned to prevent breaking system dependencies.
+shell: system-wide pip is banned to prevent breaking system dependencies.
          Use one of these approaches instead:
          - nix develop     (activate project devShell with scoped Python+pip)
          - uv pip install  (use uv to manage project dependencies)

@@ -202,7 +202,7 @@ lib.mkIf isPrimaryUser {
       _wss_waited=$((_wss_waited + 1))
     done
     if [ ! -s "$_wss_sentinel" ]; then
-      echo "nucleus: timed out after 30 s waiting for sops-nix to materialize secrets; sops-install-secrets may have failed or /etc/sops/age/machine.txt may be absent." >&2
+      echo "secrets: timed out after 30 s waiting for sops-nix to materialize secrets; sops-install-secrets may have failed or /etc/sops/age/machine.txt may be absent." >&2
       exit 1
     fi
   '';
@@ -232,7 +232,7 @@ lib.mkIf isPrimaryUser {
     identity_path="${config.sops.secrets.${gitIdentitySecretName}.path}"
 
     if [ ! -f "$identity_path" ]; then
-      echo "nucleus: missing decrypted Git identity secret at $identity_path." >&2
+      echo "secrets: missing decrypted Git identity secret at $identity_path." >&2
       exit 1
     fi
 
@@ -241,7 +241,7 @@ lib.mkIf isPrimaryUser {
     identity_signing_key="$(/usr/bin/grep -m1 '^signingKey=' "$identity_path" | /usr/bin/cut -d '=' -f 2-)"
 
     if [ -z "$identity_name" ] || [ -z "$identity_email" ] || [ -z "$identity_signing_key" ]; then
-      echo "nucleus: git identity payload must include name/email/signingKey entries." >&2
+      echo "secrets: git identity payload must include name/email/signingKey entries." >&2
       exit 1
     fi
 
@@ -298,7 +298,7 @@ lib.mkIf isPrimaryUser {
     chmod 700 "$GNUPGHOME"
 
     if [ ! -f "${config.sops.secrets.${gpgSecretName}.path}" ]; then
-      echo "nucleus: missing decrypted GPG secret at ${config.sops.secrets.${gpgSecretName}.path}; cannot import key material." >&2
+      echo "secrets: missing decrypted GPG secret at ${config.sops.secrets.${gpgSecretName}.path}; cannot import key material." >&2
       exit 1
     fi
 
@@ -321,9 +321,9 @@ lib.mkIf isPrimaryUser {
           # Only delete if the key is actually present in the keyring.
           if ${pkgs.gnupg}/bin/gpg --batch --list-secret-keys "$stale_fpr" >/dev/null 2>&1; then
             if ! ${pkgs.gnupg}/bin/gpg --batch --yes --delete-secret-and-public-key "$stale_fpr"; then
-              echo "nucleus: warning — failed to delete stale managed GPG key $stale_fpr from keyring." >&2
+              echo "secrets: warning — failed to delete stale managed GPG key $stale_fpr from keyring." >&2
             else
-              echo "nucleus: deleted stale managed GPG key $stale_fpr." >&2
+              echo "secrets: deleted stale managed GPG key $stale_fpr." >&2
             fi
           fi
         fi
@@ -331,12 +331,12 @@ lib.mkIf isPrimaryUser {
     fi
 
     if ! ${pkgs.gnupg}/bin/gpg --import "${config.sops.secrets.${gpgSecretName}.path}"; then
-      echo "nucleus: gpg import failed for ${gpgSecretName}." >&2
+      echo "secrets: gpg import failed for ${gpgSecretName}." >&2
       exit 1
     fi
 
     if [ -z "$first_key_fingerprint" ]; then
-      echo "nucleus: imported GPG keyring material but could not determine the managed primary fingerprint for ownertrust enforcement." >&2
+      echo "secrets: imported GPG keyring material but could not determine the managed primary fingerprint for ownertrust enforcement." >&2
       exit 1
     fi
 
@@ -350,7 +350,7 @@ lib.mkIf isPrimaryUser {
     chmod 600 "$managed_keys_manifest"
 
     if ! printf '%s:6:\n' "$first_key_fingerprint" | ${pkgs.gnupg}/bin/gpg --import-ownertrust; then
-      echo "nucleus: warning — failed to enforce ultimate ownertrust for managed primary fingerprint $first_key_fingerprint; key is imported and tracked but trust state may require manual repair." >&2
+      echo "secrets: warning — failed to enforce ultimate ownertrust for managed primary fingerprint $first_key_fingerprint; key is imported and tracked but trust state may require manual repair." >&2
     fi
   '';
 
@@ -388,13 +388,13 @@ lib.mkIf isPrimaryUser {
        # Not a hard error: sops-nix reports its own failure if materialization
        # did not complete.  Warn and skip so this activation does not mask the
        # upstream sops-nix error with a different message.
-       echo "nucleus: managed SSH public key not found at $ssh_pub_path; skipping fingerprint adoption." >&2
+       echo "secrets: managed SSH public key not found at $ssh_pub_path; skipping fingerprint adoption." >&2
      else
        new_fingerprint=""
        new_fingerprint="$(${pkgs.openssh}/bin/ssh-keygen -lf "$ssh_pub_path" | /usr/bin/awk '{print $2}')" || true
 
        if [ -z "$new_fingerprint" ]; then
-         echo "nucleus: could not extract fingerprint from $ssh_pub_path; skipping adoption." >&2
+         echo "secrets: could not extract fingerprint from $ssh_pub_path; skipping adoption." >&2
        else
          old_fingerprint=""
          if [ -f "$managed_ssh_manifest" ]; then
@@ -408,7 +408,7 @@ lib.mkIf isPrimaryUser {
            # any pre-placed key already loaded in the agent is also evicted.
            # AddKeysToAgent=yes in the SSH config re-loads the new key on the
            # next outbound SSH connection.
-            echo "nucleus: managed SSH key fingerprint changed ($old_fingerprint -> $new_fingerprint); flushing SSH agent." >&2
+            echo "secrets: managed SSH key fingerprint changed ($old_fingerprint -> $new_fingerprint); flushing SSH agent." >&2
             # 2>/dev/null is intentional: ssh-add -D outputs "Could not open a
             # connection to your authentication agent" when no agent is running.
             # That failure is benign here — nothing to flush — and the noise
@@ -528,7 +528,7 @@ lib.mkIf isPrimaryUser {
           "${config.sops.secrets.${gpgSecretName}.path}" \
           "${config.sops.secrets.${gitIdentitySecretName}.path}"; do
         if [ ! -s "$_vsd_path" ]; then
-          echo "nucleus: ERROR — decrypted secret missing or empty at '$_vsd_path'." >&2
+          echo "secrets: ERROR — decrypted secret missing or empty at '$_vsd_path'." >&2
           exit 1
         fi
       done
@@ -536,7 +536,7 @@ lib.mkIf isPrimaryUser {
       # --- 2. GPG key presence in keyring ---
       _vsd_gpg_manifest="$HOME/.config/nucleus/managed-gpg-keys"
       if [ ! -s "$_vsd_gpg_manifest" ]; then
-        echo "nucleus: ERROR — managed-gpg-keys manifest missing or empty; gpgImport may have failed." >&2
+        echo "secrets: ERROR — managed-gpg-keys manifest missing or empty; gpgImport may have failed." >&2
         exit 1
       fi
       _vsd_managed_fpr="$(head -n1 "$_vsd_gpg_manifest")"
@@ -548,7 +548,7 @@ lib.mkIf isPrimaryUser {
       _vsd_gpg_all_secret_fprs="$(GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
         ${pkgs.gnupg}/bin/gpg --with-colons --no-autostart --list-secret-keys)" || true
       if ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_managed_fpr"; then
-        echo "nucleus: ERROR — managed GPG key $_vsd_managed_fpr not in keyring after gpgImport." >&2
+        echo "secrets: ERROR — managed GPG key $_vsd_managed_fpr not in keyring after gpgImport." >&2
         exit 1
       fi
 
@@ -580,7 +580,7 @@ lib.mkIf isPrimaryUser {
         fi
       '') allSopsFiles}
       if [ -n "$_vsd_gpg_failures" ]; then
-        echo "nucleus: ERROR — GPG SOPS decryption check failed for:$_vsd_gpg_failures; managed GPG key may not be registered in .sops.yaml." >&2
+        echo "secrets: ERROR — GPG SOPS decryption check failed for:$_vsd_gpg_failures; managed GPG key may not be registered in .sops.yaml." >&2
         exit 1
       fi
 
@@ -598,7 +598,7 @@ lib.mkIf isPrimaryUser {
       _vsd_ssh_failures=""
       _vsd_ssh_age_pub="$(${pkgs.ssh-to-age}/bin/ssh-to-age -i "${sshPublicKeyPath}")" || true
       if [ -z "$_vsd_ssh_age_pub" ]; then
-        echo "nucleus: ERROR — personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure ${sshPublicKeyPath} is a valid Ed25519 public key." >&2
+        echo "secrets: ERROR — personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure ${sshPublicKeyPath} is a valid Ed25519 public key." >&2
         exit 1
       fi
       ${lib.concatMapStrings ({ path, displayName }: ''
@@ -611,7 +611,7 @@ lib.mkIf isPrimaryUser {
           || _vsd_ssh_failures="$_vsd_ssh_failures ${displayName}"
       '') allSopsFiles}
       if [ -n "$_vsd_ssh_failures" ]; then
-        echo "nucleus: ERROR — personal SSH key age-backend SOPS decryption check failed for:$_vsd_ssh_failures; SSH key may not be registered in .sops.yaml as an age recipient." >&2
+        echo "secrets: ERROR — personal SSH key age-backend SOPS decryption check failed for:$_vsd_ssh_failures; SSH key may not be registered in .sops.yaml as an age recipient." >&2
         exit 1
       fi
 
@@ -622,7 +622,7 @@ lib.mkIf isPrimaryUser {
       # age recipient is in .sops.yaml, this check will pass silently on every
       # subsequent apply.
       if [ ! -f "/etc/sops/age/machine.txt" ]; then
-        echo "nucleus: warning — /etc/sops/age/machine.txt missing; this machine cannot be a SOPS age device recipient until the host key is registered in .sops.yaml and deriveHostAgeKey has run successfully." >&2
+        echo "secrets: warning — /etc/sops/age/machine.txt missing; this machine cannot be a SOPS age device recipient until the host key is registered in .sops.yaml and deriveHostAgeKey has run successfully." >&2
       fi
     '';
 }

@@ -37,14 +37,14 @@ fi
 # ~/.agents/skills/ when their .clawhub/origin.json marker is present.
 _manifest="$_repo_root/src/modules/configs/agents/clawhub-skills.json"
 if [ ! -f "$_manifest" ]; then
-  printf '%s\n' "nucleus: sync-agents-clawhub-skills: manifest not found at $_manifest; skipping"
+  printf '%s\n' "clawhub-skills: manifest not found at $_manifest; skipping"
   exit 0
 fi
 
 # Parse skill slugs from the manifest using jq.  jq is available via
 # home.packages in core.nix on all POSIX hosts.
 if ! command -v jq >/dev/null 2>&1; then
-  printf '%s\n' "nucleus: sync-agents-clawhub-skills: jq not found in PATH; cannot parse manifest" >&2
+  printf '%s\n' "clawhub-skills: jq not found in PATH; cannot parse manifest" >&2
   exit 1
 fi
 
@@ -53,7 +53,7 @@ jq -r '.skills[]?' "$_manifest" > "$_slugs_file"
 
 if [ ! -s "$_slugs_file" ]; then
   rm -f "$_slugs_file"
-  printf '%s\n' "nucleus: sync-agents-clawhub-skills: no fetched skills in manifest; skipping"
+  printf '%s\n' "clawhub-skills: no fetched skills in manifest; skipping"
   exit 0
 fi
 
@@ -80,7 +80,7 @@ fi
 # command -v is expected and benign when the binary is absent; the result
 # drives the conditional skip below.
 if ! command -v clawhub >/dev/null 2>&1; then
-  printf '%s\n' "nucleus: sync-agents-clawhub-skills: clawhub not found in PATH; the installBunPackages activation must complete before running this script; skipping fetched skill sync" >&2
+  printf '%s\n' "clawhub-skills: clawhub not found in PATH; the installBunPackages activation must complete before running this script; skipping fetched skill sync" >&2
   rm -f "$_slugs_file"
   exit 0
 fi
@@ -96,7 +96,7 @@ while IFS= read -r _slug; do
     # A committed-skill (bundled) symlink exists with the same slug.  Skip to
     # avoid overwriting the managed symlink; the slug must be removed from the
     # manifest or the committed skill must be removed first.
-    printf '%s\n' "nucleus: sync-agents-clawhub-skills: skipping '$_slug' — a committed-skill symlink exists at $_skill_path; remove it from clawhub-skills.json or from src/modules/configs/agents/skills/" >&2
+    printf '%s\n' "clawhub-skills: skipping '$_slug' — a committed-skill symlink exists at $_skill_path; remove it from clawhub-skills.json or from src/modules/configs/agents/skills/" >&2
     continue
   fi
   # Unlock an existing fetched skill directory before updating so clawhub can
@@ -104,7 +104,7 @@ while IFS= read -r _slug; do
   if [ -d "$_skill_path" ]; then
     chmod -R u+w "$_skill_path"
   fi
-  printf '%s\n' "nucleus: sync-agents-clawhub-skills: installing/updating fetched skill '$_slug'..."
+  printf '%s\n' "clawhub-skills: installing/updating fetched skill '$_slug'..."
   # Non-zero exit from clawhub is non-fatal: the system apply already succeeded;
   # skill sync is additive.  A warning is printed and the loop continues.
   if clawhub install --workdir "$HOME/.agents" --no-input "$_slug"; then
@@ -114,7 +114,7 @@ while IFS= read -r _slug; do
       chmod -R a-w "$_skill_path"
     fi
   else
-    printf '%s\n' "nucleus: sync-agents-clawhub-skills: clawhub install failed for '$_slug' (system apply succeeded)" >&2
+    printf '%s\n' "clawhub-skills: clawhub install failed for '$_slug' (system apply succeeded)" >&2
   fi
 done < "$_slugs_file"
 
@@ -132,7 +132,7 @@ while IFS= read -r _candidate; do
   # clawhub download; do not remove directories that lack it.
   [ ! -f "$_candidate/.clawhub/origin.json" ] && continue
   if ! grep -qxF "$_cname" "$_slugs_file"; then
-    printf '%s\n' "nucleus: sync-agents-clawhub-skills: removing stale fetched skill '$_cname' (removed from manifest)"
+    printf '%s\n' "clawhub-skills: removing stale fetched skill '$_cname' (removed from manifest)"
     # Unlock before removal: the skill was locked a-w after install; rm -rf
     # needs user-write permission on subdirectories to remove their contents.
     chmod -R u+w "$_candidate"
@@ -141,4 +141,4 @@ while IFS= read -r _candidate; do
 done < "$_stale_list"
 rm -f "$_stale_list" "$_slugs_file"
 
-printf '%s\n' "nucleus: sync-agents-clawhub-skills: fetched skill sync complete"
+printf '%s\n' "clawhub-skills: fetched skill sync complete"
