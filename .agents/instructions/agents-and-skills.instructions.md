@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing agents configuration, skill management, or clawhub provisioning. Covers ~/.agents directory layout, bundled vs. fetched skill licensing rules, permission patterns, and the installBunPackages/syncClawhubSkills activation DAG."
 name: "Agents and Skills"
-applyTo: "src/modules/agents.nix, src/modules/windows/sync-agentsskills.ps1, src/modules/windows/sync-agentsclawhubskills.ps1, src/modules/windows/bun-setup.ps1, scripts/sync-agents-clawhub-skills.sh, src/modules/configs/agents/**"
+applyTo: "src/modules/agents.nix, src/modules/windows/sync-agentsskills.ps1, src/modules/windows/sync-agentsclawhubskills.ps1, src/modules/windows/bun-setup.ps1, src/modules/configs/agents/**"
 ---
 
 # Agents and Skills
@@ -31,8 +31,9 @@ creates a symlink at `~/.agents/skills/<name>` that points into the store.
 
 **Fetched**: non-AGPL-compatible license → never commit; list the skill slug in
 `src/modules/configs/agents/clawhub-skills.json` under `"skills"`.  The
-`syncClawhubSkills` activation calls `scripts/sync-agents-clawhub-skills.sh`,
-which downloads the skill at apply time via the clawhub CLI.
+`syncClawhubSkills` activation in `src/modules/agents.nix` runs the fetched
+skill convergence logic inline, downloading skills at apply time via the
+clawhub CLI.
 
 The `.clawhub/origin.json` marker written by clawhub during install is the
 **sole** reliable signal that a directory in `~/.agents/skills/` is a fetched
@@ -78,10 +79,10 @@ Home Manager activation in `src/modules/agents.nix`.  The activation:
 5. Removes packages no longer desired (via `bun remove -g`).
 6. Persists the managed set to `~/.config/nucleus/bun-packages.json`.
 
-**Do not add a fallback `bun install -g clawhub` call inside**
-`scripts/sync-agents-clawhub-skills.sh`.  If clawhub is absent when the sync
-script runs, the `installBunPackages` activation failed; the script must warn
-and skip rather than attempt a second install.
+**Do not add a fallback `bun install -g clawhub` call inside** the
+`syncClawhubSkills` activation logic.  If clawhub is absent when sync runs,
+the `installBunPackages` activation failed; sync must warn and skip rather
+than attempt a second install.
 
 ### Windows
 
@@ -103,7 +104,7 @@ linkGeneration
   └─ agentsSymlink      (creates real ~/.agents/; per-subdir symlinks)
        └─ agentsSkills  (creates real ~/.agents/skills/; bundled skill symlinks)
             └─ installBunPackages  (installs bun global packages incl. clawhub)
-                 └─ syncClawhubSkills  (calls sync-agents-clawhub-skills.sh)
+                 └─ syncClawhubSkills  (inline fetched skill convergence)
                       └─ displayHostManualInstructions  (terminal node)
 ```
 
@@ -132,7 +133,6 @@ WinGet DSC (system.dsc.yml)
 | `src/modules/linux.nix` | `displayHostManualInstructions` `entryAfter` must include all activation names |
 | `src/modules/configs/agents/clawhub-skills.json` | Declarative fetched skill manifest (`{"skills":[...slugs...]}`) |
 | `src/modules/configs/agents/skills/` | Bundled (committed, AGPL-compatible) skill directories |
-| `scripts/sync-agents-clawhub-skills.sh` | POSIX fetched skill sync helper; called by `syncClawhubSkills` activation |
 | `src/modules/windows/bun-setup.ps1` | Windows bun global package manager; includes clawhub |
 | `src/modules/windows/sync-agentsskills.ps1` | Windows bundled skill sync |
 | `src/modules/windows/sync-agentsclawhubskills.ps1` | Windows fetched skill sync; expects clawhub pre-installed by `Invoke-BunSetup` |
@@ -140,8 +140,9 @@ WinGet DSC (system.dsc.yml)
 
 ## Authoring rules
 
-- **No fallback installs in sync functions**: the sync helpers (`sync-agents-clawhub-skills.sh`,
-  `Sync-AgentsClawhubSkills`) must not attempt to install clawhub themselves.
+- **No fallback installs in sync functions**: the POSIX `syncClawhubSkills`
+  activation logic and Windows `Sync-AgentsClawhubSkills` helper must not
+  attempt to install clawhub themselves.
   Provisioning belongs to `installBunPackages` (POSIX) / `Invoke-BunSetup` (Windows).
 - **Stale cleanup scoped to fetched downloads**: only remove directories that
   carry a `.clawhub/origin.json` marker; never touch bundled symlinks or unknown

@@ -388,9 +388,9 @@
 
     # -------------------------------------------------------------------------
     # syncClawhubSkills
-    # Calls scripts/sync-agents-clawhub-skills.sh to converge fetched skills
-    # (non-AGPL-compatible, downloaded at apply time via clawhub) with the
-    # declarative manifest in src/modules/configs/agents/clawhub-skills.json.
+    # Converges fetched skills (non-AGPL-compatible, downloaded at apply time
+    # via clawhub) with the declarative manifest in
+    # src/modules/configs/agents/clawhub-skills.json.
     #
     # Why after installBunPackages: requires the clawhub CLI, which is
     # installed by installBunPackages.  Ordering ensures clawhub is present
@@ -421,19 +421,108 @@
         exit 1
       fi
 
-      _scs_script="$_scs_repo_root/scripts/sync-agents-clawhub-skills.sh"
-      if [ ! -f "$_scs_script" ]; then
-        echo "clawhub: sync script not found at $_scs_script; skipping fetched skill sync"
+      # Path to the declarative fetched skill manifest.  Slugs listed here are
+      # downloaded by clawhub; slugs absent from the manifest are cleaned up
+      # from ~/.agents/skills/ when their .clawhub/origin.json marker is
+      # present.
+      _scs_manifest="$_scs_repo_root/src/modules/configs/agents/clawhub-skills.json"
+      if [ ! -f "$_scs_manifest" ]; then
+        echo "clawhub: manifest not found at $_scs_manifest; skipping fetched skill sync"
+        exit 0
+      fi
+
+      # Parse skill slugs from the manifest using jq.  jq is available via
+      # home.packages in core.nix on all POSIX hosts.
+      if ! command -v jq >/dev/null 2>&1; then
+        echo "clawhub: jq not found in PATH; cannot parse fetched-skill manifest" >&2
+        exit 1
+      fi
+
+      _scs_slugs_file="$(mktemp)"
+      jq -r '.skills[]?' "$_scs_manifest" > "$_scs_slugs_file"
+
+      if [ ! -s "$_scs_slugs_file" ]; then
+        rm -f "$_scs_slugs_file"
+        echo "clawhub: no fetched skills in manifest; skipping"
+        exit 0
+      fi
+
+      _scs_skills_dir="$HOME/.agents/skills"
+
+      # Ensure ~/.agents/skills/ exists.  The agentsSkills activation creates
+      # it during home-manager switch; this guards against running before that
+      # activation has run.
+      if [ ! -d "$_scs_skills_dir" ]; then
+        mkdir -p "$_scs_skills_dir"
+      fi
+
+      # Probe for the clawhub CLI.  clawhub must be pre-installed by the
+      # installBunPackages activation before this step is called; this step
+      # never installs clawhub itself.
+      if ! command -v clawhub >/dev/null 2>&1; then
+        echo "clawhub: clawhub not found in PATH; installBunPackages must complete before fetched skill sync; skipping" >&2
+        rm -f "$_scs_slugs_file"
         exit 0
       fi
 
       echo "clawhub: running fetched skill sync..."
-      # Best-effort: a failed sync does not abort activation.  The system
-      # configuration applied successfully; skill sync is additive.  Warn
-      # and continue so displayHostManualInstructions is always reached.
-      if ! sh "$_scs_script" "$_scs_repo_root"; then
-        echo "clawhub: sync-agents-clawhub-skills.sh exited with an error; fetched skill sync incomplete (activation continues)" >&2
-      fi
+
+      # Install or update each skill from the manifest.
+      #   --workdir "$HOME/.agents" installs to $HOME/.agents/skills/<slug>/
+      #                            (default --dir value is "skills")
+      #   --no-input               disables interactive prompts for apply safety
+      while IFS= read -r _scs_slug; do
+        [ -z "$_scs_slug" ] && continue
+        _scs_skill_path="$_scs_skills_dir/$_scs_slug"
+        if [ -L "$_scs_skill_path" ]; then
+          # A committed-skill (bundled) symlink exists with the same slug.
+          # Skip to avoid overwriting the managed symlink; the slug must be
+          # removed from clawhub-skills.json or the committed skill removed.
+          echo "clawhub: skipping '$_scs_slug' — a committed-skill symlink exists at $_scs_skill_path" >&2
+          continue
+        fi
+        # Unlock an existing fetched skill directory before updating so
+        # clawhub can overwrite files locked a-w on a previous install.
+        if [ -d "$_scs_skill_path" ]; then
+          chmod -R u+w "$_scs_skill_path"
+        fi
+        echo "clawhub: installing/updating fetched skill '$_scs_slug'..."
+        # Best-effort: non-zero exit from clawhub is non-fatal because the
+        # system apply already succeeded and skill sync is additive.
+        if clawhub install --workdir "$HOME/.agents" --no-input "$_scs_slug"; then
+          # Lock installed content so files cannot be modified outside a
+          # managed apply run.  The unlock above re-opens write access before
+          # the next update.
+          if [ -d "$_scs_skill_path" ]; then
+            chmod -R a-w "$_scs_skill_path"
+          fi
+        else
+          echo "clawhub: clawhub install failed for '$_scs_slug' (system apply succeeded)" >&2
+        fi
+      done < "$_scs_slugs_file"
+
+      # Stale cleanup: remove real directories in ~/.agents/skills/ that have
+      # a .clawhub/origin.json marker (written by clawhub at install time,
+      # identifying fetched downloads) but whose slug is no longer in manifest.
+      # Directories without this marker (bundled symlinks or user content) are
+      # never touched.
+      _scs_stale_list="$(mktemp)"
+      find "$_scs_skills_dir" -mindepth 1 -maxdepth 1 -type d > "$_scs_stale_list"
+      while IFS= read -r _scs_candidate; do
+        [ -z "$_scs_candidate" ] && continue
+        _scs_name="$(basename "$_scs_candidate")"
+        [ ! -f "$_scs_candidate/.clawhub/origin.json" ] && continue
+        if ! grep -qxF "$_scs_name" "$_scs_slugs_file"; then
+          echo "clawhub: removing stale fetched skill '$_scs_name' (removed from manifest)"
+          # Unlock before removal: fetched skill trees are locked a-w after
+          # install, so rm -rf needs write access restored first.
+          chmod -R u+w "$_scs_candidate"
+          rm -rf "$_scs_candidate"
+        fi
+      done < "$_scs_stale_list"
+
+      rm -f "$_scs_stale_list" "$_scs_slugs_file"
+      echo "clawhub: fetched skill sync complete"
     '';
   };
 }
