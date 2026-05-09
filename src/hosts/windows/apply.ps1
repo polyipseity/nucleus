@@ -61,12 +61,12 @@
   src\modules\configs\agents\skills\.  False removes managed skill symlinks
   (cleanup path); fetched clawhub downloads in that directory are left intact.
 
-.PARAMETER EnableAgentsClawhubSkillsParity
+.PARAMETER EnableAgentsClawHubSkillsParity
   Download and update fetched (non-AGPL-compatible) skills listed in
   src\modules\configs\agents\clawhub-skills.json into
-  %USERPROFILE%\.agents\skills\ via the clawhub CLI.  False skips the sync;
+  %USERPROFILE%\.agents\skills\ via the ClawHub CLI.  False skips the sync;
   already-downloaded skill directories are left intact (no cleanup path needed
-  because clawhub downloads are self-contained real directories, not managed
+  because ClawHub downloads are self-contained real directories, not managed
   symlinks).
 
 .PARAMETER EnableSecretsParity
@@ -174,7 +174,7 @@ param(
   [string[]]$Users,
   [bool]$EnableAgentsConfigParity = $true,
   [bool]$EnableAgentsSkillsParity = $true,
-  [bool]$EnableAgentsClawhubSkillsParity = $true,
+  [bool]$EnableAgentsClawHubSkillsParity = $true,
   [bool]$EnableSecretsParity = $true,
   [bool]$EnableBunParity = $true,
   [bool]$EnableGitSshParity = $true,
@@ -221,7 +221,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-ShellProfile.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-AgentsConfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-AgentsSkill.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-AgentsClawhubSkill.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-AgentsClawHubSkill.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-DevRepo.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-SecretFile.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-Secret.ps1")
@@ -415,7 +415,7 @@ if ($userDevRepos -and $userDevRepos.repositories) {
 
 Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
 Sync-AgentsSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
-Sync-AgentsClawhubSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsClawhubSkillsParity
+Sync-AgentsClawHubSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsClawHubSkillsParity
 Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $Users[0]
 Sync-VSCodeExtension -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity

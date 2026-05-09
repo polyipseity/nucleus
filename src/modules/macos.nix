@@ -292,7 +292,7 @@ let
     "setupLaunchAgents"
     "sops-nix"
     "sshKeyAdopt"
-    "syncClawhubSkills"
+    "syncClawHubSkills"
     "verifyArchivingStack"
     "verifySecretDecryption"
     "vscodeExtensionBridge"
