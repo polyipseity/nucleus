@@ -14,7 +14,7 @@ function Test-PrimaryUser {
     users are always skipped.
 
   .PARAMETER PrimaryUsername
-    Canonical primary username (for example: 'polyipseity').
+    Canonical primary username (for example: 'admin').
 
   .PARAMETER Quiet
     Suppress the skip warning when the username does not match.

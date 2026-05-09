@@ -77,6 +77,45 @@ applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
   Bash and document that requirement.
 - For PowerShell, prefer clear cmdlet names over aliases in committed scripts.
 
+## Explicit Parameter Passing (PowerShell)
+
+**All PowerShell functions must enforce caller awareness through explicit parameters.**
+
+- **Mandatory behavioral parameters**: parameters controlling state changes
+  (`Enabled`, `Users`, `Activated`, etc.) must be `[Parameter(Mandatory)]`.
+  Do not default to `$true` or assume the current user.
+- **No path auto-derivation**: never auto-derive `RepoRoot`, `ModuleDir`,
+  `ConfigDir`, or other paths from `$PSScriptRoot`. Callers must pass them
+  explicitly so they are aware of which paths will be modified.
+- **Explicit user context always**: functions touching user profiles or home
+  directories must have explicit `-Username` or `-Users` parameters. Never
+  silently default to the current user or auto-discover users from the
+  filesystem.
+- **Remove backwards compatibility code**: this repository does not require
+  support for deprecated parameters, conditional migration paths, or old
+  configuration formats. If a feature has changed, remove the old path
+  completely and document the breaking change clearly in examples and
+  commit messages. Git preserves all history; archived code does not need
+  to live alongside the current implementation.
+- **Complete function signatures**: every function signature must show all
+  mandatory parameters in its `.SYNOPSIS` and `.EXAMPLE` sections so callers
+  know what they are required to pass.
+
+## Terminology in Examples
+
+**Use canonical usernames in all code examples and documentation:**
+
+- **`admin`**: represents the primary/elevated user in examples. Use this for
+  any context where the primary user is required or most common (e.g.
+  `-PrimaryUsername 'admin'`, `-Users @('admin')`). Replaces historical
+  context-specific usernames like `polyipseity`, `root`, etc.
+- **`guest`**: represents any secondary or unprivileged user. Use when examples
+  need to show multi-user scenarios (e.g. `-Users @('admin', 'guest')`). Replaces
+  historical placeholders like `john`, `otheruser`, `someone`, etc.
+
+This standardization makes examples portable and immediately clear about user
+context without needing explanation or configuration.
+
 ## Tooling alignment
 
 - Keep script behavior consistent with CI, `AGENTS.md`, and prompt guidance.

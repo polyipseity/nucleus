@@ -10,28 +10,28 @@ function Sync-Wallpaper {
     the path of the first decrypted file (the active wallpaper).
 
   .DESCRIPTION
-    Enumerates all user subdirectories in $AssetsDir and processes the *.sops
-    files within each subdirectory.  Each subdirectory name corresponds to a
-    username, and its .sops files are decrypted to that user's
-    Pictures\wallpapers directory using Get-DecryptedBlob.  The output
-    filename is the blob's base name with the .sops extension stripped.
+    Materializes SOPS-encrypted wallpaper blobs for each user in the $Users
+    list. For each user, the *.sops files in $AssetsDir/$User are decrypted
+    to that user's Pictures\wallpapers directory using Get-DecryptedBlob.
+    The output filename is the blob's base name with the .sops extension
+    stripped.
 
-    For each discovered user subdirectory, the home directory is resolved via
-    [Environment]::GetFolderPath('SpecialFolder', $user) and the wallpaper
-    directory is set to $userHome\Pictures\wallpapers\.  The directory is created
-    automatically if it does not exist.
+    For each user, the home directory is resolved via the registry and the
+    wallpaper directory is set to $userHome\Pictures\wallpapers\. The
+    directory is created automatically if it does not exist.
 
-    The function returns the path of the first successfully decrypted wallpaper
-    so the caller can pass it to Invoke-NucleusWingetConfiguration as the
-    __NUCLEUS_ACTIVE_WALLPAPER__ token value.
+    The function returns the path of the first successfully decrypted
+    wallpaper so the caller can pass it to
+    Invoke-WingetConfiguration as the __NUCLEUS_ACTIVE_WALLPAPER__ token.
 
     No-op (returns $null with a warning) when:
       - $AssetsDir does not exist, or
-      - $AssetsDir contains no user subdirectories.
+      - No user subdirectories matching $Users exist in $AssetsDir.
 
   .PARAMETER AssetsDir
-    Absolute path to the directory containing user subdirectories with SOPS-encrypted
-    wallpaper blobs (*.sops files).  Each subdirectory name represents a username.
+    Absolute path to the directory containing user subdirectories with
+    SOPS-encrypted wallpaper blobs (*.sops files). Subdirectory names
+    must match usernames in the $Users list.
 
   .PARAMETER GpgExe
     Absolute path to the gpg executable.
@@ -44,8 +44,10 @@ function Sync-Wallpaper {
     fallback age decryption identity.
 
   .PARAMETER Users
-    This parameter is deprecated and has no effect.  Users are now discovered
-    automatically from subdirectory names in $AssetsDir.
+    Mandatory: array of usernames for which wallpapers should be materialized.
+    Only user subdirectories matching names in this list are processed. Callers
+    must pass this explicitly so they are aware of which users' wallpapers will
+    be decrypted and written to their home directories.
 
   .PARAMETER SopsExe
     Absolute path to the sops executable.
@@ -55,15 +57,15 @@ function Sync-Wallpaper {
               when no wallpapers were found.
 
   .EXAMPLE
-    $wallpaper = Sync-Wallpapers `
-        -AssetsDir '.\assets\wallpapers' `
+    $wallpaper = Sync-Wallpaper `
+        -AssetsDir 'C:\Users\admin\nucleus\src\assets\wallpapers' `
         -GpgExe 'gpg.exe' `
         -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-        -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" `
-        -Users @('polyipseity', 'john') `
+        -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" `
+        -Users @('admin', 'guest') `
         -SopsExe 'sops.exe'
-    # Wallpapers materialized to C:\Users\polyipseity\Pictures\wallpapers\ and
-    # C:\Users\john\Pictures\wallpapers\.  $wallpaper is the active wallpaper path.
+    # Wallpapers materialized to C:\Users\admin\Pictures\wallpapers\ and
+    # C:\Users\guest\Pictures\wallpapers\. $wallpaper is the first active path.
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -78,7 +80,7 @@ function Sync-Wallpaper {
     [Parameter(Mandatory = $false)]
     [string]$PrimarySshKeyPath,
 
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $true)]
     [string[]]$Users,
 
     [Parameter(Mandatory = $true)]
@@ -86,16 +88,14 @@ function Sync-Wallpaper {
   )
 
   if (-not (Test-Path -Path $AssetsDir)) {
-    Write-Output "$($PSStyle.Foreground.Yellow)No wallpaper assets directory found at $AssetsDir; skipping wallpaper sync.$($PSStyle.Reset)"
+    Write-Output "$($PSStyle.Foreground.Yellow)Wallpaper assets directory not found at $AssetsDir; skipping wallpaper sync.$($PSStyle.Reset)"
     return $null
   }
 
-  $userDirs = @(Get-ChildItem -Path $AssetsDir -Directory | Sort-Object Name)
-  if ($Users) {
-    $userDirs = @($userDirs | Where-Object { $Users -contains $_.Name })
-  }
+  # Only process user subdirectories explicitly listed in $Users.
+  $userDirs = @(Get-ChildItem -Path $AssetsDir -Directory | Where-Object { $Users -contains $_.Name } | Sort-Object Name)
   if ($userDirs.Count -eq 0) {
-    Write-Output "$($PSStyle.Foreground.Yellow)No user subdirectories found in $AssetsDir; skipping wallpaper sync.$($PSStyle.Reset)"
+    Write-Output "$($PSStyle.Foreground.Yellow)No user subdirectories matching specified users found in $AssetsDir; skipping wallpaper sync.$($PSStyle.Reset)"
     return $null
   }
 

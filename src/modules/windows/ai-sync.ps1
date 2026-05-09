@@ -61,9 +61,9 @@ function Invoke-AiSync {
     None.  Progress and skip messages are written to the host.
 
   .EXAMPLE
-    Invoke-AiSync -RepoRoot "C:\Users\polyipseity\nucleus"
-    Invoke-AiSync -RepoRoot "C:\Users\polyipseity\nucleus" -PruneOnly
-    Invoke-AiSync -RepoRoot "C:\Users\polyipseity\nucleus" -DryRun
+    Invoke-AiSync -RepoRoot "C:\Users\admin\nucleus"
+    Invoke-AiSync -RepoRoot "C:\Users\admin\nucleus" -PruneOnly
+    Invoke-AiSync -RepoRoot "C:\Users\admin\nucleus" -DryRun
   #>
   [CmdletBinding()]
   param(

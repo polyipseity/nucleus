@@ -124,31 +124,31 @@
 
 .EXAMPLE
   # Apply with explicit module directory and user list:
-  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity')
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin')
 
 .EXAMPLE
   # Apply only the user-level DSC file:
-  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity') -ConfigFiles @('user.dsc.yml')
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin') -ConfigFiles @('user.dsc.yml')
 
 .EXAMPLE
   # Apply while explicitly scoping secret materialization to one user:
-  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity') -PrimaryUsername 'polyipseity'
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin') -PrimaryUsername 'admin'
 
 .EXAMPLE
   # Apply while skipping the post-apply Ollama model sync:
-  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity') -SkipAiSync
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin') -SkipAiSync
 
 .EXAMPLE
   # Apply while disabling machine age key auto-registration in .sops.yaml:
-  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity') -EnableHostAgeKeyRegistration:$false
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin') -EnableHostAgeKeyRegistration:$false
 
 .EXAMPLE
   # Apply while disabling managed VS Code settings parity (cleanup only):
-  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity') -EnableVsCodeSettingsParity:$false
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin') -EnableVsCodeSettingsParity:$false
 
 .EXAMPLE
   # Apply while disabling managed remote-access parity (cleanup only):
-  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity') -EnableRemoteAccessParity:$false
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin', 'guest') -EnableRemoteAccessParity:$false
 #>
 [CmdletBinding()]
 param(
@@ -320,7 +320,7 @@ Invoke-SecretVerification `
   -SecretsDir $secretsDir `
   -WallpaperAssetsDir $wallpaperAssetsDir
 
-$activeWallpaperPath = Sync-Wallpaper -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -SopsExe $sopsExe
+$activeWallpaperPath = Sync-Wallpaper -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
 Remove-StaleWallpaper -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
 
 foreach ($configFile in $ConfigFiles) {

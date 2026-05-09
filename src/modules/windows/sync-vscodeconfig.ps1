@@ -69,10 +69,10 @@ function Sync-VscodeConfig {
     None.  Writes informational messages to the host output stream.
 
   .EXAMPLE
-    Sync-VscodeConfig -RepoRoot "C:\Users\polyipseity\nucleus" -Enabled:$true
+    Sync-VscodeConfig -RepoRoot "C:\Users\admin\nucleus" -Enabled:$true -Username 'admin'
 
   .EXAMPLE
-    Sync-VscodeConfig -RepoRoot "C:\Users\polyipseity\nucleus" -Enabled:$false
+    Sync-VscodeConfig -RepoRoot "C:\Users\admin\nucleus" -Enabled:$false -Username 'guest'
   #>
   param(
     [Parameter(Mandatory)]

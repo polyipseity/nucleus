@@ -63,6 +63,33 @@ PowerShell and is required on every function and entry-point script.
   (e.g. "env var cleared in `finally` so it is never left in the environment on
   failure") and any non-obvious fallback behaviour or error handling choices.
 
+### Explicit Parameter Passing Requirement (PowerShell)
+
+**No implicit defaults, no auto-derived paths, no backwards compatibility code.**
+
+All PowerShell functions and scripts must enforce explicit parameter passing:
+
+- **Mandatory behavioral parameters**: all parameters that control system state
+  changes (e.g. `Enabled`, `Users`, `Activated`) must be `[Parameter(Mandatory)]`.
+  Callers must explicitly choose `$true` or `$false` — never default to "enabled"
+  or "process current user."
+- **No path auto-derivation**: do not auto-derive paths from `$PSScriptRoot` or
+  current working directory. All path parameters must be explicitly passed by
+  callers so they are aware of which repository, module directory, or user
+  home will be modified.
+- **Explicit user context**: functions that operate on user profiles or home
+  directories must have explicit `-Username` or `-Users` parameters. Never
+  assume the current user or auto-discover users from filesystem locations.
+- **No backwards compatibility code**: remove deprecated parameters, conditional
+  fallback logic, and migration shims. If a feature no longer exists or has been
+  restructured, document the change clearly in examples and breaking change
+  notes. Repository history is preserved in Git; code does not need to support
+  old incompatible configurations.
+- **Documentation examples must be complete**: every `.EXAMPLE` block must show
+  all mandatory parameters. Use canonical usernames in examples: `admin` for
+  primary/elevated user, `guest` for secondary/unprivileged users. This ensures
+  examples are copy-paste-ready and reflect the actual calling convention.
+
 ## WinGet DSC YAML (`src/hosts/windows/**/*.yml`)
 
 The `directives.description:` field on each resource entry is the formal

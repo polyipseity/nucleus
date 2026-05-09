@@ -23,7 +23,7 @@ function Remove-ManagedSecret {
     List of usernames whose managed secrets should be removed.
 
   .EXAMPLE
-    Remove-NucleusManagedSecrets -Users @('polyipseity', 'someone')
+    Remove-NucleusManagedSecrets -Users @('admin', 'guest')
   #>
   [CmdletBinding(SupportsShouldProcess = $true)]
   param(

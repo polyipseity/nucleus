@@ -44,8 +44,8 @@ function Sync-Secret {
   .EXAMPLE
     Sync-Secrets -SecretsDir '.\secrets' -GpgExe 'gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-      -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" -SopsExe 'sops.exe' `
-      -Users @('polyipseity', 'otheruser')
+      -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe' `
+      -Users @('admin', 'guest')
   #>
   param(
     [Parameter(Mandatory = $true)]

@@ -67,7 +67,7 @@ function Invoke-SecretVerification {
     Invoke-SecretVerification `
       -GpgExe 'C:\Program Files\GnuPG\bin\gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-      -PrimaryUsername 'polyipseity' `
+      -PrimaryUsername 'admin' `
       -SecretsDir '.\src\secrets' `
       -WallpaperAssetsDir '.\src\assets\wallpapers'
   #>

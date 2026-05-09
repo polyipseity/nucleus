@@ -72,8 +72,8 @@ function Sync-SecretFile {
   .EXAMPLE
     Sync-SecretFile -FilePath '.\ssh-personal.yml' -GpgExe 'gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-      -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" -SopsExe 'sops.exe' `
-      -PrimaryUsername 'polyipseity'
+      -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe' `
+      -PrimaryUsername 'admin'
   #>
   param(
     [Parameter(Mandatory = $true)]

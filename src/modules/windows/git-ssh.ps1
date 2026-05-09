@@ -29,10 +29,10 @@ function Sync-GitAndSshConfig {
     List of usernames for which managed Git/SSH state is applied.
 
   .EXAMPLE
-    Sync-GitAndSshConfig -Enabled:$true -Users @('polyipseity', 'otheruser')
+    Sync-GitAndSshConfig -Enabled:$true -Users @('admin', 'guest')
 
   .EXAMPLE
-    Sync-GitAndSshConfig -Enabled:$false -Users @('polyipseity', 'otheruser')
+    Sync-GitAndSshConfig -Enabled:$false -Users @('admin', 'guest')
   #>
   param(
     [Parameter()]

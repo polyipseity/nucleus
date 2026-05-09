@@ -42,10 +42,10 @@ function Sync-ShellProfile {
     in the signature to force awareness of user context.
 
   .EXAMPLE
-    Sync-ShellProfile -Enabled:$true -Username 'polyipseity'
+    Sync-ShellProfile -Enabled:$true -Username 'admin'
 
   .EXAMPLE
-    Sync-ShellProfile -Enabled:$false -Username 'polyipseity'
+    Sync-ShellProfile -Enabled:$false -Username 'guest'
   #>
   param(
     [Parameter(Mandatory)]

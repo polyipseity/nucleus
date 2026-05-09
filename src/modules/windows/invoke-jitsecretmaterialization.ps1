@@ -42,8 +42,8 @@ function Invoke-JITSecretMaterialization {
     Invoke-JITSecretMaterialization -SecretsDir '.\secrets' `
       -SecretNames @('gpg-personal', 'ssh-personal') `
       -GpgExe 'gpg.exe' -HostKeyPath '...\ssh_host_ed25519_key' `
-      -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" -SopsExe 'sops.exe' `
-      -PrimaryUsername 'polyipseity'
+      -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe' `
+      -PrimaryUsername 'admin'
   #>
   param(
     [Parameter(Mandatory = $true)]
