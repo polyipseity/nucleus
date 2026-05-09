@@ -1,16 +1,16 @@
 # modules/wallpapers.nix — Home Manager activation hook that decrypts SOPS-
 # encrypted wallpaper blobs and configures a slideshow / gallery desktop.
 #
-# Asset layout: assets/wallpapers/*.sops — each file is a binary image
-# encrypted with SOPS (age via machine SSH key or GPG fallback).  On activation
-# the blobs are decrypted into ~/Pictures/wallpapers/ and applied as a
-# rotating gallery (10-minute interval) on both macOS (desktoppr folder mode)
-# and GNOME (dynamically generated nucleus-gallery.xml).
+# Asset layout: assets/wallpapers/<username>/*.sops — each subdirectory
+# represents a user, and all .sops files inside belong to that user.  Files
+# are encrypted with SOPS (age via machine SSH key or GPG fallback).  On
+# activation the blobs are decrypted into ~/Pictures/wallpapers/ and applied
+# as a rotating gallery (10-minute interval) on both macOS (desktoppr folder
+# mode) and GNOME (dynamically generated nucleus-gallery.xml).
 #
-# Multi-user support: this module imports the user registry from
-# nucleus.users and generates wallpaper secrets for ALL managed users.  Each
-# user's Home Manager activation runs the provision script to their own
-# ~/Pictures/wallpapers/ directory.
+# Multi-user support: each subdirectory in assets/wallpapers/ is treated as a
+# separate user.  Home Manager activation for each user runs the provision
+# script to their own ~/Pictures/wallpapers/ directory.
 #
 # Stale cleanup: any file in ~/Pictures/wallpapers/ that no longer has a
 # matching *.sops source is removed so the gallery stays current.
@@ -19,26 +19,13 @@
 # happened before wallpaper decryption attempts.
 { config, lib, pkgs, ... }:
 let
-  # Import the user registry module to access config.nucleus.users.
-  usersModule = import ./users/default.nix { lib = lib; };
-
-  # Get all managed users from the nucleus.users registry.
-  # Each user gets wallpaper secrets materialized to their home directory.
-  managedUsers = config.nucleus.users;
-
-  # Derive the current user's username from the Home Manager config.
-  currentUsername = config.home.username;
-
-  # Derive the current user's home directory from the registry.
-  # Fall back to config.home.homeDirectory for compatibility.
-  currentUserHome =
-    if managedUsers ? ${currentUsername} then
-      managedUsers.${currentUsername}.homeDirectory
-    else
-      config.home.homeDirectory;
-
-  # Nix store path to the wallpaper blob directory (evaluated at build time).
   wallpapersDir = ../assets/wallpapers;
+
+  # Get all user subdirectories (each is a username).
+  userDirs = lib.attrNames (
+    lib.filterAttrs (_: type: type == "directory")
+    (builtins.readDir wallpapersDir)
+  );
 
   # Convert a wallpaper filename into a stable secret key suffix so sops-nix
   # keys remain path-safe while still being traceable to the source file.
@@ -48,17 +35,21 @@ let
       [ "_" "" "" "_" "_" ]
       value;
 
-  # Collect all encrypted wallpaper blobs from assets/wallpapers/.
-  wallpaperBlobs =
-    lib.attrNames
-      (lib.filterAttrs
+  # For each user, collect their wallpaper blobs from their subdirectory.
+  wallpaperBlobsForUser = userName:
+    lib.attrNames (
+      lib.filterAttrs
         (name: type: type == "regular" && lib.hasSuffix ".sops" name)
-        (builtins.readDir wallpapersDir));
+        (builtins.readDir (wallpapersDir + "/${userName}"))
+    );
 
-  # Generate wallpaper secret specs for a given user.
-  # Creates one secret per wallpaper blob, named with the user's username.
+  currentUsername = config.home.username;
+  currentUserHome = config.home.homeDirectory;
+
+  # Generate wallpaper secrets for a given user.
   mkWallpaperSecretsForUser = userName:
     let
+      blobs = wallpaperBlobsForUser userName;
       items = map
         (blobName:
           let
@@ -67,7 +58,7 @@ let
             inherit blobName wallpaperName;
             secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${userName}";
           })
-        wallpaperBlobs;
+        blobs;
     in
     lib.listToAttrs (map
       (item: {
@@ -75,21 +66,20 @@ let
         value = {
           format = "binary";
           mode = "0400";
-          # Keep the source filename for output path fidelity, but give the
-          # copied store path a sanitized name so Nix accepts it.
           sopsFile = builtins.path {
-            path = wallpapersDir + "/${item.blobName}";
+            path = wallpapersDir + "/${userName}/${item.blobName}";
             name = "wallpaper-${sanitizeSecretSuffix item.blobName}";
           };
         };
       })
       items);
 
-  # Generate wallpaper secrets for ALL users in the registry.
+  # Generate wallpaper secrets for ALL user directories.
   wallpaperSecrets =
-    lib.foldl' lib.recursiveUpdate {} (map mkWallpaperSecretsForUser (builtins.attrNames managedUsers));
+    lib.foldl' lib.recursiveUpdate {} (map mkWallpaperSecretsForUser userDirs);
 
   # Items list for the activation script - use current user's secrets.
+  wallpaperBlobsCurrentUser = wallpaperBlobsForUser currentUsername;
   wallpaperItemsForCurrentUser = map
     (blobName:
       let
@@ -98,25 +88,20 @@ let
         inherit blobName wallpaperName;
         secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${currentUsername}";
       })
-    wallpaperBlobs;
+    wallpaperBlobsCurrentUser;
 in
 {
-  imports = [ usersModule ];
-
-  # Fail fast at eval time if the expected asset directory is absent from the repo.
   assertions = [
     {
       assertion = builtins.pathExists wallpapersDir;
       message = "nucleus: required wallpapers directory is missing at ${toString wallpapersDir}.";
     }
     {
-      assertion = managedUsers ? ${currentUsername};
-      message = "nucleus: current user ${currentUsername} is not defined in nucleus.users registry.";
+      assertion = builtins.any (u: u == currentUsername) userDirs;
+      message = "nucleus: current user ${currentUsername} has no wallpaper directory at ${toString wallpapersDir}/${currentUsername}.";
     }
   ];
 
-  # Materialize wallpapers through sops-nix directly so this path follows the
-  # same decryption flow as other secrets.
   sops.secrets = wallpaperSecrets;
 
   home.activation.wallpaperProvision = lib.hm.dag.entryAfter [ "sops-nix" ] ''
@@ -226,7 +211,7 @@ in
       [ -f "$decryptedFile" ] || continue
       case "$decryptedFile" in *.xml) continue;; esac
       baseName="$(basename "$decryptedFile")"
-      if [ ! -e "${wallpapersDir}/$baseName.sops" ]; then
+      if [ ! -e "${toString wallpapersDir}/${currentUsername}/$baseName.sops" ]; then
         rm -f "$decryptedFile"
         echo "nucleus: removed stale wallpaper $baseName (no matching .sops source)."
       fi

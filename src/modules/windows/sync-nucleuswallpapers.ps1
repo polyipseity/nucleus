@@ -1,5 +1,5 @@
 # modules/windows/sync-nucleuswallpapers.ps1 — Managed wallpaper materialization.
-#
+
 # Decrypts wallpaper blobs into the declarative output directory and returns the
 # first active file path for DSC token replacement.
 
@@ -10,13 +10,14 @@ function Sync-NucleusWallpapers {
     the path of the first decrypted file (the active wallpaper).
 
   .DESCRIPTION
-    Enumerates all *.sops files in $AssetsDir (sorted alphabetically) and
-    decrypts each one to each user's Pictures\wallpapers directory using
-    Get-NucleusDecryptedBlob.  The output filename is the blob's base name with
-    the .sops extension stripped.
+    Enumerates all user subdirectories in $AssetsDir and processes the *.sops
+    files within each subdirectory.  Each subdirectory name corresponds to a
+    username, and its .sops files are decrypted to that user's
+    Pictures\wallpapers directory using Get-NucleusDecryptedBlob.  The output
+    filename is the blob's base name with the .sops extension stripped.
 
-    For each user in $Users, the home directory is resolved via
-    [Environment]::GetFolderPath('SpecialFolder', $User) and the wallpaper
+    For each discovered user subdirectory, the home directory is resolved via
+    [Environment]::GetFolderPath('SpecialFolder', $user) and the wallpaper
     directory is set to $userHome\Pictures\wallpapers\.  The directory is created
     automatically if it does not exist.
 
@@ -26,11 +27,11 @@ function Sync-NucleusWallpapers {
 
     No-op (returns $null with a warning) when:
       - $AssetsDir does not exist, or
-      - $AssetsDir contains no *.sops files.
+      - $AssetsDir contains no user subdirectories.
 
   .PARAMETER AssetsDir
-    Absolute path to the directory containing SOPS-encrypted wallpaper blobs
-    (*.sops files).
+    Absolute path to the directory containing user subdirectories with SOPS-encrypted
+    wallpaper blobs (*.sops files).  Each subdirectory name represents a username.
 
   .PARAMETER GpgExe
     Absolute path to the gpg executable.
@@ -43,9 +44,8 @@ function Sync-NucleusWallpapers {
     fallback age decryption identity.
 
   .PARAMETER Users
-    Array of usernames whose wallpaper directories should be populated.
-    Each user's wallpapers are written to $userHome\Pictures\wallpapers\,
-    where $userHome is resolved via [Environment]::GetFolderPath('SpecialFolder', $User).
+    This parameter is deprecated and has no effect.  Users are now discovered
+    automatically from subdirectory names in $AssetsDir.
 
   .PARAMETER SopsExe
     Absolute path to the sops executable.
@@ -75,10 +75,10 @@ function Sync-NucleusWallpapers {
     [Parameter(Mandatory = $true)]
     [string]$HostKeyPath,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$PrimarySshKeyPath,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string[]]$Users,
 
     [Parameter(Mandatory = $true)]
@@ -90,15 +90,23 @@ function Sync-NucleusWallpapers {
     return $null
   }
 
-  $wallpaperFiles = @(Get-ChildItem -Path $AssetsDir -Filter "*.sops" | Sort-Object Name)
-  if ($wallpaperFiles.Count -eq 0) {
-    Write-Host "No wallpaper blobs (*.sops) found in $AssetsDir; skipping wallpaper sync." -ForegroundColor Yellow
+  $userDirs = @(Get-ChildItem -Path $AssetsDir -Directory | Sort-Object Name)
+  if ($userDirs.Count -eq 0) {
+    Write-Host "No user subdirectories found in $AssetsDir; skipping wallpaper sync." -ForegroundColor Yellow
     return $null
   }
 
   $activeWallpaperPath = $null
 
-  foreach ($user in $Users) {
+  foreach ($userDir in $userDirs) {
+    $user = $userDir.Name
+    $wallpaperFiles = @(Get-ChildItem -Path $userDir.FullName -Filter "*.sops" | Sort-Object Name)
+
+    if ($wallpaperFiles.Count -eq 0) {
+      Write-Host "No wallpaper blobs (*.sops) found in $userDir.FullName; skipping." -ForegroundColor Yellow
+      continue
+    }
+
     $userHome = [Environment]::GetFolderPath('SpecialFolder', $user)
     $outputDir = Join-Path -Path $userHome -ChildPath 'Pictures\wallpapers'
 
@@ -110,8 +118,6 @@ function Sync-NucleusWallpapers {
       $outputName = [System.IO.Path]::GetFileNameWithoutExtension($wallpaperFile.Name)
       $outputPath = Join-Path -Path $outputDir -ChildPath $outputName
 
-      # Clear ReadOnly before overwrite so Get-NucleusDecryptedBlob can update
-      # the file on subsequent applies.  Mirrors POSIX u+w unlock before install.
       if (Test-Path -LiteralPath $outputPath) {
         $existingWallpaper = Get-Item -LiteralPath $outputPath -Force
         if ($existingWallpaper.Attributes -band [System.IO.FileAttributes]::ReadOnly) {
@@ -122,9 +128,6 @@ function Sync-NucleusWallpapers {
       Write-Host "Materializing wallpaper for $user`: $outputName" -ForegroundColor Cyan
       Get-NucleusDecryptedBlob -FilePath $wallpaperFile.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -OutputPath $outputPath -SopsExe $SopsExe
 
-      # Set ReadOnly: managed gallery content must not be modified outside activation.
-      # Mirrors POSIX chmod 444.  Applied after write so Get-NucleusDecryptedBlob can
-      # create or overwrite the file without attribute conflicts on this apply.
       if (Test-Path -LiteralPath $outputPath) {
         $decryptedWallpaper = Get-Item -LiteralPath $outputPath -Force
         $decryptedWallpaper.Attributes = $decryptedWallpaper.Attributes -bor [System.IO.FileAttributes]::ReadOnly

@@ -344,7 +344,7 @@ Invoke-NucleusSecretVerification `
   -SecretsDir $secretsDir `
   -WallpaperAssetsDir $wallpaperAssetsDir
 
-$activeWallpaperPath = Sync-NucleusWallpapers -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
+$activeWallpaperPath = Sync-NucleusWallpapers -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -SopsExe $sopsExe
 Remove-NucleusStaleWallpapers -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
 
 foreach ($configFile in $ConfigFiles) {
