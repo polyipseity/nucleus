@@ -3,11 +3,11 @@
 # Creates ~/.agents/ as a real directory, then creates a per-entry symlink inside
 # it for every top-level entry in src/modules/configs/agents/ except skills/.
 # skills/ is excluded here because it is managed by agentsSkills (below) and may
-# contain downloaded content that must not be committed (System 2 / clawhub).
+# contain downloaded content that must not be committed (fetched / clawhub).
 #
 # This per-subdir layout replaces the old whole-directory symlink scheme.  The
 # old scheme made ~/.agents an alias for the entire source tree, which prevented
-# clawhub from writing System 2 skill downloads into ~/.agents/skills/ without
+# clawhub from writing fetched skill downloads into ~/.agents/skills/ without
 # those writes entering the tracked repo tree.
 #
 # Activation reads the repo root from:
@@ -31,7 +31,7 @@
     # agentsSymlink
     # Creates ~/.agents/ as a real directory and populates it with per-entry
     # symlinks for every top-level entry in src/modules/configs/agents/ except
-    # skills/ (which is managed by agentsSkills so System 2 clawhub downloads
+    # skills/ (which is managed by agentsSkills so fetched clawhub downloads
     # land in a real, untracked directory rather than inside the repo tree).
     #
     # Migration: if ~/.agents is still the old whole-dir symlink it is removed
@@ -111,7 +111,7 @@
       while IFS= read -r _as_entry; do
         _as_name="$(basename "$_as_entry")"
         # skills/ is managed by agentsSkills; skip it here to avoid conflicts
-        # with the real directory that agentsSkills creates for System 2 downloads.
+        # with the real directory that agentsSkills creates for fetched downloads.
         [ "$_as_name" = "skills" ] && continue
         _as_link="$_as_agents_dir/$_as_name"
         if [ -L "$_as_link" ]; then
@@ -138,20 +138,20 @@
     # agentsSkills
     # Creates ~/.agents/skills/ as a real (writable) directory, then creates a
     # per-skill symlink inside it for every skill subdirectory committed to
-    # src/modules/configs/agents/skills/ (System 1 / AGPL-compatible skills).
+    # src/modules/configs/agents/skills/ (bundled / AGPL-compatible skills).
     #
-    # System 2 skills (non-AGPL / clawhub-managed) are downloaded directly into
+    # Fetched skills (non-AGPL / clawhub-managed) are downloaded directly into
     # ~/.agents/skills/<name>/ by the post-apply sync step in apply.sh; they
     # are never committed to the repo and are not managed here.
     #
     # The skills/ tree is a real directory — not a symlink — so that:
-    #   1. System 1 per-skill symlinks can coexist with System 2 real dirs.
+    #   1. Bundled per-skill symlinks can coexist with fetched real dirs.
     #   2. clawhub can write into ~/.agents/skills/ without the writes landing
     #      inside the tracked repo tree (which would happen with a whole-dir
     #      symlink back to src/modules/configs/agents/skills/).
     #
     # Conflict safety: if a committed skill name collides with an existing real
-    # directory in ~/.agents/skills/ (e.g. a System 2 download), the activation
+    # directory in ~/.agents/skills/ (e.g. a fetched download), the activation
     # fails fast rather than silently overwriting the downloaded content.
     # -------------------------------------------------------------------------
     agentsSkills = lib.hm.dag.entryAfter [ "agentsSymlink" ] ''
@@ -176,7 +176,7 @@
 
       _ask_skills_dir="$HOME/.agents/skills"
 
-      # Ensure ~/.agents/skills/ exists as a real directory so System 2 clawhub
+      # Ensure ~/.agents/skills/ exists as a real directory so fetched clawhub
       # downloads can be written here without entering the tracked repo tree.
       if [ -L "$_ask_skills_dir" ]; then
         # Old whole-dir symlink to source/skills/ — remove so it becomes real.
@@ -224,10 +224,10 @@
           ln -s "$_ask_skill_dir" "$_ask_link"
           echo "nucleus: agentsSkills: updated $HOME/.agents/skills/$_ask_skill_name -> $_ask_skill_dir"
         elif [ -d "$_ask_link" ]; then
-          # Real directory in place of a committed skill — could be a System 2
+          # Real directory in place of a committed skill — could be a fetched
           # download with the same name, or user data.  Fail fast to prevent
           # silent overwrites; the operator must resolve the conflict manually.
-          echo "nucleus: agentsSkills: $HOME/.agents/skills/$_ask_skill_name is a real directory — if it is a System 2 clawhub download for a skill that has been re-committed, remove it and re-run apply." >&2
+          echo "nucleus: agentsSkills: $HOME/.agents/skills/$_ask_skill_name is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply." >&2
           exit 1
         else
           ln -s "$_ask_skill_dir" "$_ask_link"

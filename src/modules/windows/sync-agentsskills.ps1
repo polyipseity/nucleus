@@ -1,17 +1,17 @@
 <#
 .SYNOPSIS
-  Sync committed (System 1) skill directories into ~/.agents/skills/ as symlinks.
+  Sync committed (bundled) skill directories into ~/.agents/skills/ as symlinks.
 
 .DESCRIPTION
   Creates %USERPROFILE%\.agents\skills\ as a real (writable) directory, then
   creates a per-skill directory symbolic link inside it for every subdirectory
-  committed to src\modules\configs\agents\skills\ (System 1 / AGPL-compatible
+  committed to   src\modules\configs\agents\skills\ (bundled / AGPL-compatible
   skills).
 
-  System 1 skills are committed to the repository because their license is
-  AGPL-compatible (MIT-0, MIT, Apache 2.0, etc.).  System 2 skills are managed
+  Bundled skills are committed to the repository because their license is
+  AGPL-compatible (MIT-0, MIT, Apache 2.0, etc.).  Fetched skills are managed
   by the post-apply sync step in apply.ps1 (Sync-AgentsSkills is NOT called for
-  System 2); clawhub downloads them directly into %USERPROFILE%\.agents\skills\
+  fetched); clawhub downloads them directly into %USERPROFILE%\.agents\skills\
   at apply time without committing any files to the repo.
 
   Non-directory entries in src\modules\configs\agents\skills\ (such as .gitkeep)
@@ -21,7 +21,7 @@
     - Old whole-dir symlink to skills source -> removed; real directory created.
     - Correct per-skill symlink  -> no-op.
     - Wrong per-skill symlink    -> remove and recreate.
-    - Real directory at skill path -> fail fast (could be System 2 download or
+    -     Real directory at skill path -> fail fast (could be fetched download or
       user data; operator must resolve the conflict manually).
     - Stale per-skill symlink (source removed) -> removed automatically.
 
@@ -36,7 +36,7 @@
 .PARAMETER Enabled
   When $true (default), ensures per-skill symlinks exist for all committed
   skills.  When $false, removes managed per-skill symlinks (those pointing into
-  the committed source); real directories from System 2 clawhub downloads are
+  the committed source); real directories from fetched clawhub downloads are
   left untouched.
 
 .OUTPUTS
@@ -46,7 +46,7 @@
   Sync-AgentsSkills -RepoRoot 'C:\Users\user\repos\nucleus'
 
 .EXAMPLE
-  # Remove only managed per-skill symlinks (cleanup path); leave System 2 dirs:
+  # Remove only managed per-skill symlinks (cleanup path); leave fetched dirs:
   Sync-AgentsSkills -RepoRoot 'C:\Users\user\repos\nucleus' -Enabled:$false
 #>
 function Sync-AgentsSkills {
@@ -58,7 +58,7 @@ function Sync-AgentsSkills {
     [bool]$Enabled = $true
   )
 
-  # Committed (System 1) skills live under this path in the repo.
+  # Committed (bundled) skills live under this path in the repo.
   $skillsSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\agents\skills"
   $skillsDir    = Join-Path -Path $HOME     -ChildPath ".agents\skills"
 
@@ -77,7 +77,7 @@ function Sync-AgentsSkills {
 
   if (-not $Enabled) {
     # Cleanup path: remove only per-skill symlinks that point into the committed
-    # source.  Real directories (System 2 / clawhub downloads) are left intact.
+    # source.  Real directories (fetched / clawhub downloads) are left intact.
     if (Test-Path -LiteralPath $skillsDir -PathType Container) {
       $children = Get-ChildItem -LiteralPath $skillsDir -Force
       foreach ($child in $children) {
@@ -112,7 +112,7 @@ function Sync-AgentsSkills {
     }
   }
 
-  # Ensure ~/.agents\skills\ exists as a real (writable) directory so System 2
+    # Ensure ~/.agents\skills\ exists as a real (writable) directory so fetched
   # clawhub downloads can land here without entering the tracked repo tree.
   if (-not (Test-Path -LiteralPath $skillsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $skillsDir -Force | Out-Null
@@ -154,10 +154,10 @@ function Sync-AgentsSkills {
         # Wrong target: replace symlink.
         Remove-Item -LiteralPath $linkPath -Force
       } else {
-        # Real directory in place of a committed skill — could be a System 2
+        # Real directory in place of a committed skill — could be a fetched
         # (clawhub) download with the same name, or user data.  Fail fast to
         # prevent silent overwrites; the operator must resolve the conflict.
-        Write-Error "nucleus: Sync-AgentsSkills: $linkPath is a real directory — if it is a System 2 clawhub download for a skill that has been re-committed, remove it and re-run apply."
+        Write-Error "nucleus: Sync-AgentsSkills: $linkPath is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply."
         return
       }
     }

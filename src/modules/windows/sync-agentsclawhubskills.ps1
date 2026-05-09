@@ -1,19 +1,19 @@
 <#
 .SYNOPSIS
-  Download and update System 2 (non-AGPL-compatible) skills via the clawhub CLI.
+  Download and update fetched (non-AGPL-compatible) skills via the clawhub CLI.
 
 .DESCRIPTION
-  Reads the declarative System 2 skill manifest at
+  Reads the declarative fetched skill manifest at
   src\modules\configs\agents\clawhub-skills.json and converges
   %USERPROFILE%\.agents\skills\ with its contents.
 
-  System 2 skills are those whose license is not AGPL-compatible and therefore
-  cannot be committed to this repository.  System 1 (AGPL-compatible, committed)
-  skills are managed by Sync-AgentsSkills; this function manages only System 2
+  Fetched skills are those whose license is not AGPL-compatible and therefore
+  cannot be committed to this repository.  Bundled (AGPL-compatible, committed)
+  skills are managed by Sync-AgentsSkills; this function manages only fetched
   clawhub-downloaded skills.
 
   For each slug in the manifest:
-    - If a committed-skill symlink (System 1) already occupies that slot, a
+    -   If a committed-skill symlink (bundled) already occupies that slot, a
       warning is printed and the slug is skipped; the conflict must be resolved
       manually before clawhub can write there.
     - Otherwise, `clawhub install --workdir $HOME\.agents --no-input <slug>` is
@@ -34,7 +34,7 @@
   resolves this from $PSScriptRoot and passes it explicitly.
 
 .PARAMETER Enabled
-  When $true (default), converges System 2 skill directories with the manifest.
+  When $true (default), converges fetched skill directories with the manifest.
   When $false, skips the sync entirely; already-downloaded skill directories are
   left intact.
 
@@ -45,7 +45,7 @@
   Sync-AgentsClawhubSkills -RepoRoot 'C:\Users\user\repos\nucleus'
 
 .EXAMPLE
-  # Skip the System 2 skill sync without removing any existing downloads:
+  # Skip the fetched skill sync without removing any existing downloads:
   Sync-AgentsClawhubSkills -RepoRoot 'C:\Users\user\repos\nucleus' -Enabled:$false
 #>
 function Sync-AgentsClawhubSkills {
@@ -58,15 +58,15 @@ function Sync-AgentsClawhubSkills {
   )
 
   if (-not $Enabled) {
-    # When disabled, leave any existing System 2 clawhub downloads untouched.
+    # When disabled, leave any existing fetched clawhub downloads untouched.
     # Unlike Sync-AgentsSkills there are no managed symlinks to clean up here;
     # the downloaded directories are self-contained real directories created by
     # clawhub.
-    Write-Host "nucleus: Sync-AgentsClawhubSkills: disabled; skipping System 2 skill sync"
+    Write-Host "nucleus: Sync-AgentsClawhubSkills: disabled; skipping fetched skill sync"
     return
   }
 
-  # Read the declarative System 2 skill manifest.
+  # Read the declarative fetched skill manifest.
   $manifest = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\agents\clawhub-skills.json"
   if (-not (Test-Path -LiteralPath $manifest)) {
     Write-Host "nucleus: Sync-AgentsClawhubSkills: manifest not found at $manifest; skipping"
@@ -79,7 +79,7 @@ function Sync-AgentsClawhubSkills {
   $slugs = if ($null -ne $data.skills) { @($data.skills) } else { @() }
 
   if ($slugs.Count -eq 0) {
-    Write-Host "nucleus: Sync-AgentsClawhubSkills: no System 2 skills in manifest; skipping"
+    Write-Host "nucleus: Sync-AgentsClawhubSkills: no fetched skills in manifest; skipping"
     return
   }
 
@@ -113,14 +113,14 @@ function Sync-AgentsClawhubSkills {
     # Neither PATH nor the bun bin dir has clawhub; try installing it now.
     $bunExe = Get-Command -Name "bun" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
     if ([string]::IsNullOrEmpty($bunExe)) {
-      Write-Warning "nucleus: Sync-AgentsClawhubSkills: bun not found in PATH; cannot install clawhub; skipping System 2 skill sync"
+      Write-Warning "nucleus: Sync-AgentsClawhubSkills: bun not found in PATH; cannot install clawhub; skipping fetched skill sync"
       return
     }
 
     Write-Host "nucleus: Sync-AgentsClawhubSkills: clawhub not found; installing via bun..."
     & $bunExe install -g clawhub
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning "nucleus: Sync-AgentsClawhubSkills: bun install -g clawhub failed; skipping System 2 skill sync"
+      Write-Warning "nucleus: Sync-AgentsClawhubSkills: bun install -g clawhub failed; skipping fetched skill sync"
       return
     }
 
@@ -130,7 +130,7 @@ function Sync-AgentsClawhubSkills {
     if (Test-Path -LiteralPath $clawhubCandidate) {
       $clawhubExe = $clawhubCandidate
     } else {
-      Write-Warning "nucleus: Sync-AgentsClawhubSkills: clawhub not found at $clawhubCandidate after install; skipping System 2 skill sync"
+      Write-Warning "nucleus: Sync-AgentsClawhubSkills: clawhub not found at $clawhubCandidate after install; skipping fetched skill sync"
       return
     }
   }
@@ -146,7 +146,7 @@ function Sync-AgentsClawhubSkills {
       $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
                      -and $item.LinkType -eq 'SymbolicLink'
       if ($isSymlink) {
-        # A committed-skill (System 1) symlink occupies this slot.  Skip rather
+        # A committed-skill (bundled) symlink occupies this slot.  Skip rather
         # than overwriting the managed symlink; the operator must remove the slug
         # from clawhub-skills.json or the committed skill from the repo first.
         Write-Warning "nucleus: Sync-AgentsClawhubSkills: skipping '$slug' — a committed-skill symlink exists at $skillPath; remove it from clawhub-skills.json or from src\modules\configs\agents\skills\"
@@ -154,7 +154,7 @@ function Sync-AgentsClawhubSkills {
       }
     }
 
-    Write-Host "nucleus: Sync-AgentsClawhubSkills: installing/updating System 2 skill '$slug'..."
+    Write-Host "nucleus: Sync-AgentsClawhubSkills: installing/updating fetched skill '$slug'..."
     # Non-zero exit from clawhub is non-fatal: the system apply succeeded; skill
     # sync is additive.  A warning is printed and the loop continues.
     & $clawhubExe install --workdir "$HOME\.agents" --no-input $slug
@@ -165,21 +165,21 @@ function Sync-AgentsClawhubSkills {
 
   # Stale cleanup: remove real directories in ~/.agents\skills\ that carry a
   # .clawhub\origin.json marker (written by clawhub at install time, reliably
-  # identifying them as System 2 downloads) but whose slug is no longer in the
+      # identifying them as fetched downloads) but whose slug is no longer in the
   # manifest.  Directories without the marker are never removed.
   if (Test-Path -LiteralPath $skillsDir -PathType Container) {
     $children = Get-ChildItem -LiteralPath $skillsDir -Force -Directory
     foreach ($child in $children) {
       $originMarker = Join-Path -Path $child.FullName -ChildPath ".clawhub\origin.json"
       if (-not (Test-Path -LiteralPath $originMarker)) {
-        continue  # Not a clawhub download; skip (could be user data or System 1 symlink).
+        continue  # Not a clawhub download; skip (could be user data or bundled symlink).
       }
       if ($slugs -notcontains $child.Name) {
-        Write-Host "nucleus: Sync-AgentsClawhubSkills: removing stale System 2 skill '$($child.Name)' (removed from manifest)"
+        Write-Host "nucleus: Sync-AgentsClawhubSkills: removing stale fetched skill '$($child.Name)' (removed from manifest)"
         Remove-Item -LiteralPath $child.FullName -Recurse -Force
       }
     }
   }
 
-  Write-Host "nucleus: Sync-AgentsClawhubSkills: System 2 skill sync complete"
+  Write-Host "nucleus: Sync-AgentsClawhubSkills: fetched skill sync complete"
 }

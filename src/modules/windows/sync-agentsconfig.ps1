@@ -8,7 +8,7 @@
   src\modules\configs\agents\ except skills\.
 
   skills\ is excluded here because it is managed by Sync-AgentsSkills and may
-  contain System 2 (clawhub) skill downloads that must not be committed.  Using
+  contain fetched (clawhub) skill downloads that must not be committed.  Using
   a real ~/.agents\ directory with per-subdir symlinks (rather than a single
   whole-dir symlink) lets clawhub write into ~/.agents\skills\ without those
   writes landing inside the tracked repo tree.

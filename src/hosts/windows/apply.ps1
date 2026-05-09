@@ -41,12 +41,12 @@
 
 .PARAMETER EnableAgentsSkillsParity
   Enable managed per-skill symlinks in %USERPROFILE%\.agents\skills\ for
-  committed (System 1 / AGPL-compatible) skills in
+  committed (bundled / AGPL-compatible) skills in
   src\modules\configs\agents\skills\.  False removes managed skill symlinks
-  (cleanup path); System 2 clawhub downloads in that directory are left intact.
+  (cleanup path); fetched clawhub downloads in that directory are left intact.
 
 .PARAMETER EnableAgentsClawhubSkillsParity
-  Download and update System 2 (non-AGPL-compatible) skills listed in
+  Download and update fetched (non-AGPL-compatible) skills listed in
   src\modules\configs\agents\clawhub-skills.json into
   %USERPROFILE%\.agents\skills\ via the clawhub CLI.  False skips the sync;
   already-downloaded skill directories are left intact (no cleanup path needed
@@ -135,7 +135,7 @@
   .\apply.ps1 -EnableAgentsSkillsParity:$false
 
 .EXAMPLE
-  # Apply while disabling System 2 clawhub skill sync (skip only):
+  # Apply while disabling fetched clawhub skill sync (skip only):
   .\apply.ps1 -EnableAgentsClawhubSkillsParity:$false
 
 .EXAMPLE

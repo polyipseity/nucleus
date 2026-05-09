@@ -1,13 +1,13 @@
 #!/usr/bin/env sh
-# scripts/sync-agents-clawhub-skills.sh — Converge System 2 skills with the manifest.
+# scripts/sync-agents-clawhub-skills.sh — Converge fetched skills with the manifest.
 #
 # Downloads or updates skills listed in src/modules/configs/agents/clawhub-skills.json
 # via the clawhub CLI into ~/.agents/skills/ (each as a real directory, not a
-# committed symlink).  Removes real directories marked as System 2 downloads
+# committed symlink).  Removes real directories marked as fetched downloads
 # (.clawhub/origin.json present) whose slug is no longer in the manifest.
 #
-# System 2 skills are those whose license is not AGPL-compatible and therefore
-# cannot be committed to this repository.  System 1 (committed, AGPL-compatible)
+# Fetched skills are those whose license is not AGPL-compatible and therefore
+# cannot be committed to this repository.  Bundled (committed, AGPL-compatible)
 # skills are managed by the agentsSkills activation (agents.nix / Sync-AgentsSkills).
 #
 # Commands: none (clawhub CLI is checked/installed if absent)
@@ -31,7 +31,7 @@ if [ -z "$_repo_root" ]; then
   exit 1
 fi
 
-# Path to the declarative System 2 skill manifest.  Slugs listed here are
+# Path to the declarative fetched skill manifest.  Slugs listed here are
 # downloaded by clawhub; slugs absent from the manifest are cleaned up from
 # ~/.agents/skills/ when their .clawhub/origin.json marker is present.
 _manifest="$_repo_root/src/modules/configs/agents/clawhub-skills.json"
@@ -60,7 +60,7 @@ PYEOF
 
 if [ ! -s "$_slugs_file" ]; then
   rm -f "$_slugs_file"
-  printf '%s\n' "nucleus: sync-agents-clawhub-skills: no System 2 skills in manifest; skipping"
+  printf '%s\n' "nucleus: sync-agents-clawhub-skills: no fetched skills in manifest; skipping"
   exit 0
 fi
 
@@ -79,13 +79,13 @@ fi
 # when the tool is absent; the result drives the conditional install.
 if ! command -v clawhub >/dev/null 2>&1; then
   if ! command -v bun >/dev/null 2>&1; then
-    printf '%s\n' "nucleus: sync-agents-clawhub-skills: bun not found in PATH; cannot install clawhub; skipping System 2 skill sync" >&2
+    printf '%s\n' "nucleus: sync-agents-clawhub-skills: bun not found in PATH; cannot install clawhub; skipping fetched skill sync" >&2
     rm -f "$_slugs_file"
     exit 0
   fi
   printf '%s\n' "nucleus: sync-agents-clawhub-skills: clawhub not found; installing via bun..."
   if ! bun install -g clawhub; then
-    printf '%s\n' "nucleus: sync-agents-clawhub-skills: bun install -g clawhub failed; skipping System 2 skill sync" >&2
+    printf '%s\n' "nucleus: sync-agents-clawhub-skills: bun install -g clawhub failed; skipping fetched skill sync" >&2
     rm -f "$_slugs_file"
     exit 0
   fi
@@ -105,13 +105,13 @@ while IFS= read -r _slug; do
   [ -z "$_slug" ] && continue
   _skill_path="$_skills_dir/$_slug"
   if [ -L "$_skill_path" ]; then
-    # A committed-skill (System 1) symlink exists with the same slug.  Skip to
+    # A committed-skill (bundled) symlink exists with the same slug.  Skip to
     # avoid overwriting the managed symlink; the slug must be removed from the
     # manifest or the committed skill must be removed first.
     printf '%s\n' "nucleus: sync-agents-clawhub-skills: skipping '$_slug' — a committed-skill symlink exists at $_skill_path; remove it from clawhub-skills.json or from src/modules/configs/agents/skills/" >&2
     continue
   fi
-  printf '%s\n' "nucleus: sync-agents-clawhub-skills: installing/updating System 2 skill '$_slug'..."
+  printf '%s\n' "nucleus: sync-agents-clawhub-skills: installing/updating fetched skill '$_slug'..."
   # Non-zero exit from clawhub is non-fatal: the system apply already succeeded;
   # skill sync is additive.  A warning is printed and the loop continues.
   if ! clawhub install --workdir "$HOME/.agents" --no-input "$_slug"; then
@@ -121,22 +121,22 @@ done < "$_slugs_file"
 
 # Stale cleanup: remove real directories in ~/.agents/skills/ that have a
 # .clawhub/origin.json marker (written by clawhub at install time, identifying
-# them as System 2 downloads) but whose slug is no longer in the manifest.
-# Directories without the marker (System 1 committed-skill symlinks or user
+# them as fetched downloads) but whose slug is no longer in the manifest.
+# Directories without the marker (bundled committed-skill symlinks or user
 # content) are never touched.
 _stale_list="$(mktemp)"
 find "$_skills_dir" -mindepth 1 -maxdepth 1 -type d > "$_stale_list"
 while IFS= read -r _candidate; do
   [ -z "$_candidate" ] && continue
   _cname="$(basename "$_candidate")"
-  # Presence of .clawhub/origin.json is the reliable marker for a System 2
+  # Presence of .clawhub/origin.json is the reliable marker for a fetched
   # clawhub download; do not remove directories that lack it.
   [ ! -f "$_candidate/.clawhub/origin.json" ] && continue
   if ! grep -qxF "$_cname" "$_slugs_file"; then
-    printf '%s\n' "nucleus: sync-agents-clawhub-skills: removing stale System 2 skill '$_cname' (removed from manifest)"
+    printf '%s\n' "nucleus: sync-agents-clawhub-skills: removing stale fetched skill '$_cname' (removed from manifest)"
     rm -rf "$_candidate"
   fi
 done < "$_stale_list"
 rm -f "$_stale_list" "$_slugs_file"
 
-printf '%s\n' "nucleus: sync-agents-clawhub-skills: System 2 skill sync complete"
+printf '%s\n' "nucleus: sync-agents-clawhub-skills: fetched skill sync complete"

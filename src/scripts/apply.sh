@@ -181,7 +181,7 @@ run_ai_sync() {
 }
 
 run_sync_clawhub_skills() {
-  # Call scripts/sync-agents-clawhub-skills.sh to converge System 2 skills
+  # Call scripts/sync-agents-clawhub-skills.sh to converge fetched skills
   # (non-AGPL-compatible, downloaded at apply time via clawhub) with the
   # declarative manifest in src/modules/configs/agents/clawhub-skills.json.
   #
@@ -199,13 +199,13 @@ run_sync_clawhub_skills() {
   # the live working tree.
   _rsc_script="$REPO_ROOT/scripts/sync-agents-clawhub-skills.sh"
   if [ ! -f "$_rsc_script" ]; then
-    printf '%s\n' "nucleus: scripts/sync-agents-clawhub-skills.sh not found at $_rsc_script; skipping System 2 skill sync"
+    printf '%s\n' "nucleus: scripts/sync-agents-clawhub-skills.sh not found at $_rsc_script; skipping fetched skill sync"
     return
   fi
 
-  printf '%s\n' "nucleus: running post-apply System 2 skill sync..."
+  printf '%s\n' "nucleus: running post-apply fetched skill sync..."
   if ! sh "$_rsc_script" "$REPO_ROOT"; then
-    printf '%s\n' "nucleus: sync-agents-clawhub-skills.sh exited with an error; System 2 skill sync incomplete (system apply succeeded)" >&2
+    printf '%s\n' "nucleus: sync-agents-clawhub-skills.sh exited with an error; fetched skill sync incomplete (system apply succeeded)" >&2
   fi
 }
 
