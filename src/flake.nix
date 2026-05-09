@@ -42,8 +42,8 @@
       # The primary user receives secret materialization.
       # Shell paths are deferred to activation time via posix-user-shell.nix.
       users = {
-        admin = {
-          homeDirectory = "/Users/admin";
+        polyipseity = {
+          homeDirectory = "/Users/polyipseity";
           isPrimary = true;
         };
       };
