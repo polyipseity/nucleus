@@ -6,15 +6,14 @@
 #   nix-index-update.service — rebuilds the nix-index file database on demand.
 #   nix-index-update.timer   — fires weekly (Sunday 00:00) with Persistent=true.
 { config, lib, pkgs, ... }:
-let
-  # Host-scoped manual checklist rendered at the end of Linux activation so the
-  # NixOS host keeps one visible source of one-time operator steps.
-  nixosManualFile = builtins.path {
-    path = ../hosts/nixos/MANUAL.md;
-    name = "nixos-MANUAL.md";
-  };
-in
 lib.mkIf pkgs.stdenv.isLinux {
+  assertions = [
+    {
+      assertion = config.nucleus.hostManualFile != null;
+      message = "modules/linux.nix requires nucleus.hostManualFile to be set by the Linux host entrypoint (for example ./MANUAL.md in src/hosts/nixos/default.nix).";
+    }
+  ];
+
   # Home Manager exposes GNOME settings via `dconf.*` (not `programs.dconf`).
   # Enabling this keeps `dconf.settings` declarative and idempotent.
   dconf.enable = true;
@@ -202,7 +201,7 @@ lib.mkIf pkgs.stdenv.isLinux {
       "wallpaperProvision"
     ] ''
       echo "--- MANUAL SETUP (one-time, required) ---" >&2
-      /bin/cat '${nixosManualFile}' >&2
+      /bin/cat '${config.nucleus.hostManualFile}' >&2
       echo "-------------------------------------------" >&2
     '';
   };

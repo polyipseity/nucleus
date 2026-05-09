@@ -61,6 +61,10 @@ applyTo: "src/**/*.nix"
   duplicated system-layer options that previously lived in each host directly.
 - System-specific options (drivers, hardware modules, kernel args) belong in the
   host file, not in shared modules.
+- Shared modules must not hardcode paths under `src/hosts/` (for example
+  `../hosts/<host>/MANUAL.md`). If a shared module needs host-scoped data,
+  declare a shared option in `src/modules/home.nix` (or another shared module)
+  and set it from each host entrypoint.
 - Set `system.stateVersion` (NixOS) or `system.stateVersion` (nix-darwin) to
   the version that was current when the host was first bootstrapped; never bump
   it automatically.

@@ -18,6 +18,12 @@ let
   dotfilesRoot = ../dotfiles;
 in
 {
+  options.nucleus.hostManualFile = lib.mkOption {
+    type = lib.types.nullOr lib.types.path;
+    default = null;
+    description = "Host-scoped MANUAL.md path printed by OS-specific activation modules at the end of Home Manager activation.";
+  };
+
   imports = [
     ./agents.nix
     ./ai

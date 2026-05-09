@@ -20,7 +20,7 @@
 #   local.nix-index-update — rebuilds the nix-index file database weekly
 #     (Sunday 00:00) and on every agent load; a freshness check makes
 #     reloads a fast no-op when the DB was updated within the past 6 days.
-{ lib, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
   # Domains intentionally reset before each Home Manager write pass so stale
   # manual overrides do not survive forever in ~/Library/Preferences.
@@ -124,13 +124,6 @@ let
 
   # Absolute path to the duti binary supplied by nixpkgs.
   dutiBin = "${pkgs.duti}/bin/duti";
-
-  # Host-scoped manual checklist rendered at the end of activation so operators
-  # see one consolidated block after automation finishes.
-  macbookManualFile = builtins.path {
-    path = ../hosts/macbook/MANUAL.md;
-    name = "macbook-MANUAL.md";
-  };
 
   # Periodic heartbeat script for the BetterDisplay virtual screen.
   # Lives in the Nix store so the LaunchAgent ProgramArguments path is stable
@@ -311,6 +304,13 @@ let
   ];
 in
 lib.mkIf pkgs.stdenv.isDarwin {
+  assertions = [
+    {
+      assertion = config.nucleus.hostManualFile != null;
+      message = "modules/macos.nix requires nucleus.hostManualFile to be set by the Darwin host entrypoint (for example ./MANUAL.md in src/hosts/macbook/default.nix).";
+    }
+  ];
+
   home.packages = [ managedPreferencesPurgeScript ];
 
   # Place the pinned iTerm2 zsh shell integration script at the well-known
@@ -848,7 +848,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
      # -------------------------------------------------------------------------
     displayHostManualInstructions = lib.hm.dag.entryAfter displayHostManualInstructionDeps ''
       echo "--- MANUAL SETUP (one-time, required) ---" >&2
-      /bin/cat '${macbookManualFile}' >&2
+      /bin/cat '${config.nucleus.hostManualFile}' >&2
       echo "-------------------------------------------" >&2
     '';
 
