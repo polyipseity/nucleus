@@ -1,4 +1,4 @@
-# modules/windows/invoke-nucleussecretverification.ps1 — Post-apply secret health check.
+# modules/windows/invoke-secretverification.ps1 — Post-apply secret health check.
 #
 # Mirrors the POSIX verifySecretDecryption Home Manager activation in secrets.nix.
 # Verifies that all SOPS files have the correct recipients registered and that
@@ -9,7 +9,7 @@
 # convert-sshpublickeytoage.ps1, which apply.ps1 dot-sources before this file
 # (alphabetical order ensures 'c' < 'i').
 
-function Invoke-NucleusSecretVerification {
+function Invoke-SecretVerification {
   <#
   .SYNOPSIS
     Post-apply health check that verifies all SOPS files are decryptable by
@@ -64,7 +64,7 @@ function Invoke-NucleusSecretVerification {
     (src/assets/wallpapers).
 
   .EXAMPLE
-    Invoke-NucleusSecretVerification `
+    Invoke-SecretVerification `
       -GpgExe 'C:\Program Files\GnuPG\bin\gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
       -PrimaryUsername 'polyipseity' `
@@ -89,7 +89,7 @@ function Invoke-NucleusSecretVerification {
     [string]$WallpaperAssetsDir
   )
 
-  if (-not (Test-NucleusPrimaryUser -PrimaryUsername $PrimaryUsername -Quiet)) {
+  if (-not (Test-PrimaryUser -PrimaryUsername $PrimaryUsername -Quiet)) {
     return
   }
 

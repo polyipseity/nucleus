@@ -8,7 +8,7 @@
     2. Materialize primary-user secrets from src/secrets via SOPS.
     3. Materialize wallpaper blobs and remove stale decrypted files.
     4. Resolve each DSC config file relative to $ConfigDir.
-    5. Pass each file to Invoke-NucleusWingetConfiguration, which substitutes
+    5. Pass each file to Invoke-WingetConfiguration, which substitutes
        the __NUCLEUS_ACTIVE_WALLPAPER__ token (when present) and runs
        `winget configure`.
     6. Provision Scoop buckets, cargo-binstall, and bun global packages.
@@ -205,8 +205,8 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "bun-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "cargo-binstall-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "convert-sshpublickeytoage.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "get-nucleusdecryptedblob.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "get-nucleussecrets.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "get-decryptedblob.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "get-secrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "git-ssh.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "initialize-nucleussshshostkey.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleusjitsecretmaterialization.ps1")
@@ -216,8 +216,8 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "rdp.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "register-nucleushostagekey.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remote-access.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusmanagedsecrets.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusstalewallpapers.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-managedsecrets.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpapers.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "resolve-nucleusexecutable.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "scoop-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "set-vscodeworkspacetrust.ps1")
@@ -225,11 +225,11 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsconfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsskills.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsclawhubskills.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecretfile.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleussecrets.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-secretfile.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-secrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleusvscodeextensions.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleusvscodesettings.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleuswallpapers.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-wallpapers.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-vscodeconfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "test-nucleusprimaryuser.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "verify-archiving-stack.ps1")
@@ -263,11 +263,11 @@ $gpgCandidates = @(
   (Get-Command -Name "gpg.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
-$sopsExe = Resolve-NucleusExecutable -Name "sops" -CandidatePaths $sopsCandidates
-$gpgExe = Resolve-NucleusExecutable -Name "gpg" -CandidatePaths $gpgCandidates
+$sopsExe = Resolve-Executable -Name "sops" -CandidatePaths $sopsCandidates
+$gpgExe = Resolve-Executable -Name "gpg" -CandidatePaths $gpgCandidates
 
 # Define shared path variables before any registration or pre-flight step so
-# both Register-NucleusHostAgeKey and the pre-flight loop reference the same
+# both Register-HostAgeKey and the pre-flight loop reference the same
 # resolved paths without duplicate definitions later in the script.
 $secretsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets"
 $wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wallpapers"
@@ -293,17 +293,17 @@ if (-not (Test-Path -LiteralPath $nucleusConfigDir -PathType Container)) {
 
 # Ensure the SSH host key exists before age key registration.  On a fresh
 # machine the key is absent until the OpenSSH Server service first starts;
-# Initialize-NucleusSshHostKey starts it briefly if the service is installed
+# Initialize-SSHHostKey starts it briefly if the service is installed
 # but the key has not yet been written.
 if ($EnableHostAgeKeyRegistration) {
-  Initialize-NucleusSshHostKey -MachineSshHostKeyPath $machineSshHostKeyPath
+  Initialize-SSHHostKey -MachineSshHostKeyPath $machineSshHostKeyPath
 }
 
 # Auto-register this machine's age key in .sops.yaml if not already present.
 # Must run before the pre-flight secret decryption check so that on the very
 # first apply the machine can already decrypt its own SOPS-encrypted secrets.
 if ($EnableHostAgeKeyRegistration) {
-  Register-NucleusHostAgeKey `
+  Register-HostAgeKey `
     -MachineSshHostKeyPubPath $machineSshHostKeyPubPath `
     -SopsExe $sopsExe `
     -SopsYamlPath $sopsYamlPath `
@@ -320,14 +320,14 @@ foreach ($secretFile in $secretPreflightFiles) {
   }
 
   # Fail fast if current machine identities cannot decrypt managed secrets.
-  Get-NucleusSecrets -FilePath $secretPath -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe | Out-Null
+  Get-Secrets -FilePath $secretPath -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe | Out-Null
 }
 
 if ($EnableSecretsParity) {
-  Sync-NucleusSecrets -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
+  Sync-Secrets -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
 }
 else {
-  Remove-NucleusManagedSecrets -Users $Users
+  Remove-ManagedSecrets -Users $Users
 }
 
 # Materialize decrypted wallpapers ahead of DSC so user.dsc.yml can resolve an
@@ -337,18 +337,18 @@ $wallpaperOutputDir = Join-Path -Path $HOME -ChildPath "Pictures\wallpapers"
 # Post-materialization health check: verify all SOPS files are decryptable by
 # both the GPG and personal SSH age backends, and that managed artefacts exist.
 # Mirrors the POSIX verifySecretDecryption Home Manager activation.
-Invoke-NucleusSecretVerification `
+Invoke-SecretVerification `
   -GpgExe $gpgExe `
   -HostKeyPath $machineSshHostKeyPath `
   -PrimaryUsername $PrimaryUsername `
   -SecretsDir $secretsDir `
   -WallpaperAssetsDir $wallpaperAssetsDir
 
-$activeWallpaperPath = Sync-NucleusWallpapers -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -SopsExe $sopsExe
-Remove-NucleusStaleWallpapers -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
+$activeWallpaperPath = Sync-Wallpapers -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -SopsExe $sopsExe
+Remove-StaleWallpapers -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
 
 foreach ($configFile in $ConfigFiles) {
-  Invoke-NucleusWingetConfiguration -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath $configFile) -WallpaperPath $activeWallpaperPath
+  Invoke-WingetConfiguration -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath $configFile) -WallpaperPath $activeWallpaperPath
 }
 
 # Scoop bucket and app provisioning must run after DSC installs Scoop.Scoop.
@@ -369,28 +369,28 @@ Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
 Sync-AgentsSkills -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
 Sync-AgentsClawhubSkills -RepoRoot $repoRoot -Enabled:$EnableAgentsClawhubSkillsParity
 Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity
-Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
+Sync-VSCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
-Sync-NucleusGitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
-Sync-NucleusShellProfile -Enabled:$EnableShellParity
-Sync-NucleusOpenSshServer -Enabled:$EnableRemoteAccessParity
-# Re-run host age key registration after Sync-NucleusOpenSshServer has started
+Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
+Sync-ShellProfile -Enabled:$EnableShellParity
+Sync-OpenSshServer -Enabled:$EnableRemoteAccessParity
+# Re-run host age key registration after Sync-OpenSshServer has started
 # the sshd service (which generates host keys on a fresh machine).  This second
 # call is a no-op when the key is already registered; on first-ever apply it
 # completes registration in the same run without requiring a second apply.
 if ($EnableHostAgeKeyRegistration) {
-  Register-NucleusHostAgeKey `
+  Register-HostAgeKey `
     -MachineSshHostKeyPubPath $machineSshHostKeyPubPath `
     -SopsExe $sopsExe `
     -SopsYamlPath $sopsYamlPath `
     -SecretsDir $secretsDir `
     -WallpaperAssetsDir $wallpaperAssetsDir
 }
-Sync-NucleusWindowsRdp -Enabled:$EnableRdpParity
-Sync-NucleusPowerPolicy -Enabled:$EnablePowerParity
+Sync-WindowsRdp -Enabled:$EnableRdpParity
+Sync-PowerPolicy -Enabled:$EnablePowerParity
 
 # Health check: verify archiving ecosystem (7-Zip CLI + app) is functional post-apply.
-Test-NucleusArchivingStack | Out-Null
+Test-ArchivingStack | Out-Null
 
 # Converge locally installed Ollama models with the declarative manifest as the
 # final step of every apply.  Model pulls are 2-20 GB, so this runs last to

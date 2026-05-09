@@ -1,4 +1,4 @@
-# modules/windows/register-nucleushostagekey.ps1 — Machine age key auto-registration.
+# modules/windows/register-hostagekey.ps1 — Machine age key auto-registration.
 #
 # Mirrors register_host_age_key_if_needed in src/scripts/apply.sh.
 # Derives the machine age public key from the Windows SSH host public key,
@@ -9,7 +9,7 @@
 # convert-sshpublickeytoage.ps1, which apply.ps1 dot-sources before this file
 # (alphabetical order ensures 'c' < 'r').
 
-function Register-NucleusHostAgeKey {
+function Register-HostAgeKey {
   <#
   .SYNOPSIS
     Registers this machine's SSH host public key as an age recipient in
@@ -57,7 +57,7 @@ function Register-NucleusHostAgeKey {
     (src/assets/wallpapers).
 
   .EXAMPLE
-    Register-NucleusHostAgeKey `
+    Register-HostAgeKey `
       -MachineSshHostKeyPubPath 'C:\ProgramData\ssh\ssh_host_ed25519_key.pub' `
       -SopsExe 'C:\...\sops.exe' `
       -SopsYamlPath 'C:\...\nucleus\.sops.yaml' `

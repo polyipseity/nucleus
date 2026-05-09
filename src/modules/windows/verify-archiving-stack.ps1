@@ -16,9 +16,9 @@
 
 .EXAMPLE
   # Run archiving stack health check:
-  Test-NucleusArchivingStack
+  Test-ArchivingStack
 #>
-function Test-NucleusArchivingStack {
+function Test-ArchivingStack {
   [CmdletBinding()]
   param()
 
@@ -64,4 +64,4 @@ function Test-NucleusArchivingStack {
 }
 
 # Export function so it can be dot-sourced and invoked.
-Export-ModuleMember -Function @("Test-NucleusArchivingStack")
+Export-ModuleMember -Function @("Test-ArchivingStack")

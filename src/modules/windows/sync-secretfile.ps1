@@ -1,17 +1,17 @@
-# modules/windows/sync-nucleussecretfile.ps1 — Per-file secret materialization.
+# modules/windows/sync-secretfile.ps1 — Per-file secret materialization.
 #
 # Decrypts one SOPS file and converges only managed SSH/GPG payloads for the
 # configured primary user.  Also maintains managed-key manifest files in
 # ~/.config/nucleus/ to enable rotation detection and agent flush on rotation,
 # mirroring the POSIX gpgImport and sshKeyAdopt Home Manager activations.
 
-function Sync-NucleusSecretFile {
+function Sync-SecretFile {
   <#
   .SYNOPSIS
     Decrypts one SOPS secret file and materializes its payloads on disk.
 
   .DESCRIPTION
-    Calls Get-NucleusSecrets to decrypt $FilePath, then processes five
+    Calls Get-Secrets to decrypt $FilePath, then processes five
     username-scoped flat keys:
 
     ssh_personal_${username}
@@ -70,7 +70,7 @@ function Sync-NucleusSecretFile {
     Canonical primary username allowed to materialize/import secrets.
 
   .EXAMPLE
-    Sync-NucleusSecretFile -FilePath '.\ssh-personal.yml' -GpgExe 'gpg.exe' `
+    Sync-SecretFile -FilePath '.\ssh-personal.yml' -GpgExe 'gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
       -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" -SopsExe 'sops.exe' `
       -PrimaryUsername 'polyipseity'
@@ -95,7 +95,7 @@ function Sync-NucleusSecretFile {
     [string]$PrimaryUsername
   )
 
-  if (-not (Test-NucleusPrimaryUser -PrimaryUsername $PrimaryUsername -Quiet)) {
+  if (-not (Test-PrimaryUser -PrimaryUsername $PrimaryUsername -Quiet)) {
     return
   }
 
@@ -140,7 +140,7 @@ function Sync-NucleusSecretFile {
   }
 
   Write-Host "Processing secrets from: $($secretFileInfo.Name)" -ForegroundColor Cyan
-  $jsonSecrets = Get-NucleusSecrets -FilePath $secretFileInfo.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe
+  $jsonSecrets = Get-Secrets -FilePath $secretFileInfo.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe
 
   if ($null -ne $jsonSecrets.PSObject.Properties[$sshSecretName]) {
     $sshKeyPath = Join-Path -Path $sshDir -ChildPath $sshSecretName

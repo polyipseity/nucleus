@@ -1,9 +1,9 @@
-# modules/windows/sync-nucleuswallpapers.ps1 — Managed wallpaper materialization.
+# modules/windows/sync-wallpapers.ps1 — Managed wallpaper materialization.
 
 # Decrypts wallpaper blobs into the declarative output directory and returns the
 # first active file path for DSC token replacement.
 
-function Sync-NucleusWallpapers {
+function Sync-Wallpapers {
   <#
   .SYNOPSIS
     Decrypts all SOPS-encrypted wallpaper blobs for each managed user and returns
@@ -13,7 +13,7 @@ function Sync-NucleusWallpapers {
     Enumerates all user subdirectories in $AssetsDir and processes the *.sops
     files within each subdirectory.  Each subdirectory name corresponds to a
     username, and its .sops files are decrypted to that user's
-    Pictures\wallpapers directory using Get-NucleusDecryptedBlob.  The output
+    Pictures\wallpapers directory using Get-DecryptedBlob.  The output
     filename is the blob's base name with the .sops extension stripped.
 
     For each discovered user subdirectory, the home directory is resolved via
@@ -55,7 +55,7 @@ function Sync-NucleusWallpapers {
               when no wallpapers were found.
 
   .EXAMPLE
-    $wallpaper = Sync-NucleusWallpapers `
+    $wallpaper = Sync-Wallpapers `
         -AssetsDir '.\assets\wallpapers' `
         -GpgExe 'gpg.exe' `
         -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
@@ -126,7 +126,7 @@ function Sync-NucleusWallpapers {
       }
 
       Write-Host "Materializing wallpaper for $user`: $outputName" -ForegroundColor Cyan
-      Get-NucleusDecryptedBlob -FilePath $wallpaperFile.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -OutputPath $outputPath -SopsExe $SopsExe
+      Get-DecryptedBlob -FilePath $wallpaperFile.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -OutputPath $outputPath -SopsExe $SopsExe
 
       if (Test-Path -LiteralPath $outputPath) {
         $decryptedWallpaper = Get-Item -LiteralPath $outputPath -Force

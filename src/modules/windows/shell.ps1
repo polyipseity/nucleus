@@ -3,7 +3,7 @@
 # Maintains a managed block in PowerShell profile files for cross-host shell
 # behavior parity (direnv hook and helper aliases).
 
-function Sync-NucleusShellProfile {
+function Sync-ShellProfile {
   <#
   .SYNOPSIS
     Converges a managed shell-parity block in PowerShell profile files.
@@ -35,10 +35,10 @@ function Sync-NucleusShellProfile {
     block from profile files.
 
   .EXAMPLE
-    Sync-NucleusShellProfile -Enabled:$true
+    Sync-ShellProfile -Enabled:$true
 
   .EXAMPLE
-    Sync-NucleusShellProfile -Enabled:$false
+    Sync-ShellProfile -Enabled:$false
   #>
   param(
     [Parameter()]

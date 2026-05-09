@@ -1,16 +1,16 @@
-# modules/windows/get-nucleusdecryptedblob.ps1 — Binary blob decryption helper.
+# modules/windows/get-decryptedblob.ps1 — Binary blob decryption helper.
 #
 # Decrypts SOPS binary payloads with the same key precedence chain used for
 # structured secrets and writes plaintext directly to disk.
 
-function Get-NucleusDecryptedBlob {
+function Get-DecryptedBlob {
   <#
   .SYNOPSIS
     Decrypts a SOPS-encrypted binary blob and writes the plaintext to
     $OutputPath.
 
   .DESCRIPTION
-    Similar key-priority logic to Get-NucleusSecrets (machine SSH key, then GPG,
+    Similar key-priority logic to Get-Secrets (machine SSH key, then GPG,
     then primary SSH key), but uses `sops --output` to write the raw decrypted
     bytes directly to $OutputPath instead of capturing stdout.  Used for binary
     assets such as wallpaper images that cannot be embedded in JSON.
@@ -35,7 +35,7 @@ function Get-NucleusDecryptedBlob {
     Absolute path to the sops executable.
 
   .EXAMPLE
-    Get-NucleusDecryptedBlob -FilePath '.\wallpaper.jpg.sops' -GpgExe 'gpg.exe' `
+    Get-DecryptedBlob -FilePath '.\wallpaper.jpg.sops' -GpgExe 'gpg.exe' `
     -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
     -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" `
     -OutputPath 'C:\Users\me\Pictures\wallpaper.jpg' -SopsExe 'sops.exe'

@@ -1,9 +1,9 @@
-# modules/windows/remove-nucleusmanagedsecrets.ps1 — Managed secret cleanup helper.
+# modules/windows/remove-managedsecrets.ps1 — Managed secret cleanup helper.
 #
 # Removes only repository-managed SSH key material, Git identity payload, and
 # key-manifest files so disable paths stay idempotent and scoped.
 
-function Remove-NucleusManagedSecrets {
+function Remove-ManagedSecrets {
   <#
   .SYNOPSIS
     Removes managed SSH key material and key manifests for each specified user.

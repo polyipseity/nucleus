@@ -3,7 +3,7 @@
 # Keeps user-level Git identity/signing and SSH host rules aligned with the
 # POSIX baseline while preserving cleanup behavior when disabled.
 
-function Sync-NucleusGitAndSshConfig {
+function Sync-GitAndSshConfig {
   <#
   .SYNOPSIS
     Converges Git + SSH user configuration for all managed Windows users.
@@ -29,10 +29,10 @@ function Sync-NucleusGitAndSshConfig {
     List of usernames for which managed Git/SSH state is applied.
 
   .EXAMPLE
-    Sync-NucleusGitAndSshConfig -Enabled:$true -Users @('polyipseity', 'otheruser')
+    Sync-GitAndSshConfig -Enabled:$true -Users @('polyipseity', 'otheruser')
 
   .EXAMPLE
-    Sync-NucleusGitAndSshConfig -Enabled:$false -Users @('polyipseity', 'otheruser')
+    Sync-GitAndSshConfig -Enabled:$false -Users @('polyipseity', 'otheruser')
   #>
   param(
     [Parameter()]

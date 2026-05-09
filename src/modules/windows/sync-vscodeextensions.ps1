@@ -1,9 +1,9 @@
-# modules/windows/sync-nucleusvscodeextensions.ps1 — VS Code extension parity helper.
+# modules/windows/sync-vscodeextensions.ps1 — VS Code extension parity helper.
 #
 # Converges a managed extension baseline across stable and insiders channels
 # without touching unmanaged extension installs.
 
-function Sync-NucleusVsCodeExtensions {
+function Sync-VSCodeExtensions {
   <#
   .SYNOPSIS
     Converges managed VS Code extension parity for stable and insiders.
@@ -30,10 +30,10 @@ function Sync-NucleusVsCodeExtensions {
     managed extensions from discovered VS Code channels.
 
   .EXAMPLE
-    Sync-NucleusVsCodeExtensions -Enabled:$true
+    Sync-VSCodeExtensions -Enabled:$true
 
   .EXAMPLE
-    Sync-NucleusVsCodeExtensions -Enabled:$false
+    Sync-VSCodeExtensions -Enabled:$false
   #>
   param(
     [Parameter()]

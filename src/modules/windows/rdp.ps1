@@ -3,7 +3,7 @@
 # Manages TermService startup, firewall access, and cleanup with an explicit
 # deconfiguration path when disabled.
 
-function Sync-NucleusWindowsRdp {
+function Sync-WindowsRdp {
   <#
   .SYNOPSIS
     Converges Windows Remote Desktop (RDP) service state and firewall access.
@@ -31,10 +31,10 @@ function Sync-NucleusWindowsRdp {
     Whether Windows built-in RDP parity should be enforced. False applies cleanup.
 
   .EXAMPLE
-    Sync-NucleusWindowsRdp -Enabled:$true
+    Sync-WindowsRdp -Enabled:$true
 
   .EXAMPLE
-    Sync-NucleusWindowsRdp -Enabled:$false
+    Sync-WindowsRdp -Enabled:$false
   #>
   param(
     [Parameter()]

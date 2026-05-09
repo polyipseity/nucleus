@@ -1,8 +1,8 @@
-# modules/windows/sync-nucleussecrets.ps1 — Baseline managed secret sync entrypoint.
+# modules/windows/sync-secrets.ps1 — Baseline managed secret sync entrypoint.
 #
 # Materializes the fixed secret inventory expected by Windows host orchestration.
 
-function Sync-NucleusSecrets {
+function Sync-Secrets {
   <#
   .SYNOPSIS
     Materializes personal SSH/GPG secrets for users that have secrets defined.
@@ -17,7 +17,7 @@ function Sync-NucleusSecrets {
     defined (keys matching `gpg_personal_<username>`, `git_identity_<username>`,
     `ssh_personal_<username>`, `ssh_personal_<username>_pub`,
     `ssh_personal_<username>_rsa`, or `ssh_personal_<username>_rsa_pub`).
-    Only those users are passed to Sync-NucleusSecretFile.  Users that have
+    Only those users are passed to Sync-SecretFile.  Users that have
     no secrets in a given file are skipped gracefully.  Each user may have
     a different set of secrets (or none); the function materializes only what
     is actually defined for each user.
@@ -42,7 +42,7 @@ function Sync-NucleusSecrets {
     Array of usernames for which to materialize/import secrets.
 
   .EXAMPLE
-    Sync-NucleusSecrets -SecretsDir '.\secrets' -GpgExe 'gpg.exe' `
+    Sync-Secrets -SecretsDir '.\secrets' -GpgExe 'gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
       -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" -SopsExe 'sops.exe' `
       -Users @('polyipseity', 'otheruser')
@@ -107,7 +107,7 @@ function Sync-NucleusSecrets {
     }
 
     foreach ($user in $usersInThisFile) {
-      Sync-NucleusSecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe -PrimaryUsername $user
+      Sync-SecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe -PrimaryUsername $user
     }
   }
 }

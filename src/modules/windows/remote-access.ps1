@@ -2,7 +2,7 @@
 #
 # Applies SSH-server remote access posture with explicit managed cleanup path.
 
-function Sync-NucleusOpenSshServer {
+function Sync-OpenSshServer {
   <#
   .SYNOPSIS
     Converges OpenSSH Server startup, auth policy, and firewall access.
@@ -35,10 +35,10 @@ function Sync-NucleusOpenSshServer {
     Whether remote-access parity should be enforced. False applies cleanup.
 
   .EXAMPLE
-    Sync-NucleusOpenSshServer -Enabled:$true
+    Sync-OpenSshServer -Enabled:$true
 
   .EXAMPLE
-    Sync-NucleusOpenSshServer -Enabled:$false
+    Sync-OpenSshServer -Enabled:$false
   #>
   param(
     [Parameter()]
@@ -77,7 +77,7 @@ function Sync-NucleusOpenSshServer {
   if ($Enabled) {
     $retainedConfigLines += @(
       # %u expands to the connecting username, matching the filename that
-      # sync-nucleussecretfile.ps1 materializes from the SOPS secret bundle.
+      # sync-secretfile.ps1 materializes from the SOPS secret bundle.
       # .ssh/authorized_keys is retained as an extensibility slot so additional
       # keys can be added without touching the managed config lines.
       'AuthorizedKeysFile .ssh/authorized_keys .ssh/ssh_personal_%u.pub',

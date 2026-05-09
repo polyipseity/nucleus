@@ -1,9 +1,9 @@
-# modules/windows/sync-nucleusvscodesettings.ps1 — VS Code settings parity helper.
+# modules/windows/sync-vscodesettings.ps1 — VS Code settings parity helper.
 #
 # Converges managed settings keys across stable and insiders while preserving
 # unmanaged user-defined keys.
 
-function Sync-NucleusVsCodeSettings {
+function Sync-VSCodeSettings {
   <#
   .SYNOPSIS
     Converges managed VS Code user settings for stable and insiders channels.
@@ -22,10 +22,10 @@ function Sync-NucleusVsCodeSettings {
     cleanup-only behavior.
 
   .EXAMPLE
-    Sync-NucleusVsCodeSettings -Enabled:$true
+    Sync-VSCodeSettings -Enabled:$true
 
   .EXAMPLE
-    Sync-NucleusVsCodeSettings -Enabled:$false
+    Sync-VSCodeSettings -Enabled:$false
   #>
   param(
     [Parameter()]

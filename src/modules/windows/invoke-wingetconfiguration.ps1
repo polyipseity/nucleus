@@ -1,9 +1,9 @@
-# modules/windows/invoke-nucleuswingetconfiguration.ps1 — DSC apply wrapper.
+# modules/windows/invoke-wingetconfiguration.ps1 — DSC apply wrapper.
 #
 # Applies WinGet DSC manifests with managed wallpaper-token replacement while
 # preserving source files untouched.
 
-function Invoke-NucleusWingetConfiguration {
+function Invoke-WingetConfiguration {
   <#
   .SYNOPSIS
     Applies a WinGet DSC v3 configuration file, substituting the wallpaper path
@@ -32,7 +32,7 @@ function Invoke-NucleusWingetConfiguration {
     wallpaper or a fallback path is used instead.
 
   .EXAMPLE
-    Invoke-NucleusWingetConfiguration -ConfigPath '.\user.dsc.yml' -WallpaperPath 'C:\Users\me\Pictures\bg.png'
+    Invoke-WingetConfiguration -ConfigPath '.\user.dsc.yml' -WallpaperPath 'C:\Users\me\Pictures\bg.png'
   #>
   param(
     [Parameter(Mandatory = $true)]

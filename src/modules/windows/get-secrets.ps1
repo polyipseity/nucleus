@@ -1,9 +1,9 @@
-# modules/windows/get-nucleussecrets.ps1 — Structured secret decryption helper.
+# modules/windows/get-secrets.ps1 — Structured secret decryption helper.
 #
 # Decrypts SOPS YAML and returns JSON-decoded secret objects using the shared
 # machine-ssh -> gpg -> primary-ssh fallback chain.
 
-function Get-NucleusSecrets {
+function Get-Secrets {
   <#
   .SYNOPSIS
     Decrypts a SOPS-encrypted YAML file and returns its contents as a

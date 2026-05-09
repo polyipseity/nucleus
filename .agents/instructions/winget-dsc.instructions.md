@@ -363,3 +363,10 @@ in `src/modules/windows/*.ps1` + `apply.ps1`, enforce all of the following:
   specific release is intentional; WinGet resolves the latest by default.
 - Do not leave commented-out resources in the file; remove them or track
   intent in a separate note.
+
+## Naming
+
+- Avoid repository-brand prefixes (for example `nucleus*`) in new PowerShell
+  function names and filenames unless the prefix is required for cross-module
+  disambiguation or external integration points.  Use descriptive verb-noun
+  patterns instead (e.g., `Sync-Wallpapers` instead of `Sync-NucleusWallpapers`).

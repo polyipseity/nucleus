@@ -1,9 +1,9 @@
-# modules/windows/test-nucleusprimaryuser.ps1 — Primary-user guard helper.
+# modules/windows/test-primaryuser.ps1 — Primary-user guard helper.
 #
 # Keeps secret and user-scoped parity mutations restricted to the configured
 # primary account.
 
-function Test-NucleusPrimaryUser {
+function Test-PrimaryUser {
   <#
   .SYNOPSIS
     Returns whether the current Windows user is the configured primary user.

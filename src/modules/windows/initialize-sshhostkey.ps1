@@ -1,4 +1,4 @@
-# modules/windows/initialize-nucleussshshostkey.ps1 — SSH host key bootstrap helper.
+# modules/windows/initialize-sshhostkey.ps1 — SSH host key bootstrap helper.
 #
 # Mirrors generate_ssh_host_key_if_needed in src/scripts/apply.sh.
 # Ensures the Windows SSH host Ed25519 key exists before
@@ -8,7 +8,7 @@
 # briefly to trigger automatic key generation when the service is already
 # installed but the key file has not yet been written.
 
-function Initialize-NucleusSshHostKey {
+function Initialize-SSHHostKey {
   <#
   .SYNOPSIS
     Ensures the Windows SSH host Ed25519 key exists, generating it if absent.
@@ -27,7 +27,7 @@ function Initialize-NucleusSshHostKey {
     WinGet DSC has run), emits an advisory warning and returns without error.
     After DSC installs OpenSSH and Sync-NucleusOpenSshServer starts the service,
     the keys will be generated in the same apply run and the trailing call to
-    Register-NucleusHostAgeKey will complete registration automatically.
+    Register-HostAgeKey will complete registration automatically.
 
   .PARAMETER MachineSshHostKeyPath
     Path to the SSH host Ed25519 private key file.
@@ -38,10 +38,10 @@ function Initialize-NucleusSshHostKey {
     is started.  Defaults to 10.
 
   .EXAMPLE
-    Initialize-NucleusSshHostKey
+    Initialize-SSHHostKey
 
   .EXAMPLE
-    Initialize-NucleusSshHostKey -MachineSshHostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key'
+    Initialize-SSHHostKey -MachineSshHostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key'
   #>
   [CmdletBinding()]
   param(

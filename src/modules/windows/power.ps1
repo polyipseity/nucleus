@@ -3,7 +3,7 @@
 # Applies a remote-access-friendly power profile with an explicit cleanup path
 # when disabled.
 
-function Sync-NucleusPowerPolicy {
+function Sync-PowerPolicy {
   <#
   .SYNOPSIS
     Converges active Windows power-scheme values for cross-host parity.
@@ -54,10 +54,10 @@ function Sync-NucleusPowerPolicy {
     Whether cross-host power parity should be enforced.
 
   .EXAMPLE
-    Sync-NucleusPowerPolicy -Enabled:$true
+    Sync-PowerPolicy -Enabled:$true
 
   .EXAMPLE
-    Sync-NucleusPowerPolicy -Enabled:$false
+    Sync-PowerPolicy -Enabled:$false
   #>
   param(
     [Parameter()]

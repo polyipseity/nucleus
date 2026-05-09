@@ -1,9 +1,9 @@
-# modules/windows/invoke-nucleusjitsecretmaterialization.ps1 — Targeted JIT secret sync helper.
+# modules/windows/invoke-jitsecretmaterialization.ps1 — Targeted JIT secret sync helper.
 #
 # Allows modules to request only specific secret files instead of running the
 # full baseline sync.
 
-function Invoke-NucleusJitSecretMaterialization {
+function Invoke-JITSecretMaterialization {
   <#
   .SYNOPSIS
     Materializes a specific subset of named secret files on demand (JIT).
@@ -12,7 +12,7 @@ function Invoke-NucleusJitSecretMaterialization {
     Designed for modules that need exactly one or two secrets rather than the
     full batch sync.  For each name in $SecretNames, the function resolves the
     corresponding .yml file under $SecretsDir (appending .yml if omitted) and
-    calls Sync-NucleusSecretFile.  Throws immediately if a requested secret
+    calls Sync-SecretFile.  Throws immediately if a requested secret
     file does not exist.
 
   .PARAMETER SecretsDir
@@ -39,7 +39,7 @@ function Invoke-NucleusJitSecretMaterialization {
     Canonical primary username allowed to materialize/import secrets.
 
   .EXAMPLE
-    Invoke-NucleusJitSecretMaterialization -SecretsDir '.\secrets' `
+    Invoke-JITSecretMaterialization -SecretsDir '.\secrets' `
       -SecretNames @('gpg-personal', 'ssh-personal') `
       -GpgExe 'gpg.exe' -HostKeyPath '...\ssh_host_ed25519_key' `
       -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" -SopsExe 'sops.exe' `
@@ -68,7 +68,7 @@ function Invoke-NucleusJitSecretMaterialization {
     [string]$PrimaryUsername
   )
 
-  if (-not (Test-NucleusPrimaryUser -PrimaryUsername $PrimaryUsername)) {
+  if (-not (Test-PrimaryUser -PrimaryUsername $PrimaryUsername)) {
     return
   }
 
@@ -80,6 +80,6 @@ function Invoke-NucleusJitSecretMaterialization {
       throw "Requested JIT secret file was not found: $secretPath"
     }
 
-    Sync-NucleusSecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
+    Sync-SecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
   }
 }

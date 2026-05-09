@@ -1,9 +1,9 @@
-# modules/windows/remove-nucleusstalewallpapers.ps1 — Managed wallpaper stale-file cleanup.
+# modules/windows/remove-stalewallpapers.ps1 — Managed wallpaper stale-file cleanup.
 #
 # Removes only decrypted files without matching source blobs so gallery state
 # stays aligned with declarative assets.
 
-function Remove-NucleusStaleWallpapers {
+function Remove-StaleWallpapers {
   <#
   .SYNOPSIS
     Removes decrypted wallpaper files that no longer have a matching *.sops

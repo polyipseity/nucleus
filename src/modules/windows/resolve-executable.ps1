@@ -1,9 +1,9 @@
-# modules/windows/resolve-nucleusexecutable.ps1 — Managed executable resolver.
+# modules/windows/resolve-executable.ps1 — Managed executable resolver.
 #
 # Ensures Windows apply scripts use deterministic executable resolution without
 # relying on PATH ordering drift.
 
-function Resolve-NucleusExecutable {
+function Resolve-Executable {
   <#
   .SYNOPSIS
     Returns the first candidate path that exists on disk.
@@ -25,7 +25,7 @@ function Resolve-NucleusExecutable {
     [string]  Absolute path of the first candidate that exists.
 
   .EXAMPLE
-    Resolve-NucleusExecutable -Name 'sops' -CandidatePaths @(
+    Resolve-Executable -Name 'sops' -CandidatePaths @(
       (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\sops\sops.exe'),
       'C:\ProgramData\scoop\shims\sops.exe'
     )
