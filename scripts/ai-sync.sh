@@ -28,16 +28,16 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 MANIFEST="$REPO_ROOT/src/modules/ai/models.json"
 
-dry_run=false
-prune_only=false
+dry_run=
+prune_only=
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dry-run)
-      dry_run=true
+      dry_run=1
       ;;
     --prune-only)
-      prune_only=true
+      prune_only=1
       ;;
     *)
       printf '%s\n' "ai-sync: unsupported argument '$1'" >&2
@@ -46,6 +46,10 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+
+echo "ai-sync: called with dry_run=${dry_run:-0} prune_only=${prune_only:-0}"
+
+# Determine the active model profile.
 
 # Determine the active model profile.  OLLAMA_PROFILE env var overrides
 # auto-detection so callers can test a non-native profile without changing OS.
@@ -126,4 +130,4 @@ printf '%s\n' "$installed_models" | while IFS= read -r model; do
   fi
 done
 
-printf '%s\n' "ai-sync: sync completed (profile=$profile${dry_run:+ dry-run}${prune_only:+ prune-only})"
+printf '%s\n' "ai-sync: sync completed (profile=$profile${dry_run:+, not actually running due to --dry-run}${prune_only:+, prune-only mode (no pulls)})"

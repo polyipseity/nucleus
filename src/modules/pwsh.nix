@@ -116,13 +116,14 @@ in
   # Install PSScriptAnalyzer for PowerShell linting if pwsh is available.
   # This enables the lint phase in scripts/check-pwsh.ps1.
   home.activation.installPwshScriptAnalyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    if command -v pwsh >/dev/null 2>&1; then
-      pwsh -NoProfile -Command "
+    _pwsh="${pkgs.powershell}/bin/pwsh"
+    if [ -x "$_pwsh" ]; then
+      "$_pwsh" -NoProfile -Command "
         if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
-          Write-Host 'pwsh: installing PSScriptAnalyzer for lint support...' -ForegroundColor Cyan
-          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction SilentlyContinue
+          Write-Host 'installPwshScriptAnalyzer: installing PSScriptAnalyzer...' -ForegroundColor Cyan
+          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
         }
-      " 2>/dev/null || true
+      "
     fi
   '';
 }
