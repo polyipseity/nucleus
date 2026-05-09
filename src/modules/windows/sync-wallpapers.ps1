@@ -91,6 +91,9 @@ function Sync-Wallpapers {
   }
 
   $userDirs = @(Get-ChildItem -Path $AssetsDir -Directory | Sort-Object Name)
+  if ($Users) {
+    $userDirs = @($userDirs | Where-Object { $Users -contains $_.Name })
+  }
   if ($userDirs.Count -eq 0) {
     Write-Output "$($PSStyle.Foreground.Yellow)No user subdirectories found in $AssetsDir; skipping wallpaper sync.$($PSStyle.Reset)"
     return $null
