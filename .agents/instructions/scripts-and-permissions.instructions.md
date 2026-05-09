@@ -39,30 +39,26 @@ applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
   it is embedded in the flake as `apps.apply`; it follows the same doc and
   line-ending rules as `scripts/` shell scripts.
 
-## PowerShell Module Script Naming (Windows)
+## PowerShell file naming
 
-Every PowerShell file under `src/hosts/windows/modules/` that exports exactly one
-function must follow a strict naming convention: the kebab-case filename must
-convert to the function's PascalCase name.
+When adding or renaming standalone PowerShell entry points, use PascalCase and
+an approved `Verb-Noun` form for the filename, for example
+`Get-SystemInventory.ps1` or `Backup-Database.ps1`.
 
-**Conversion rule**: split the filename (without `.ps1`) by hyphens, then
-PascalCase each part and concatenate.
+The `scripts/` directory is the exception: helper scripts there keep the paired
+shell basename so the `.sh` and `.ps1` entry points stay aligned. That means
+`bootstrap.sh` pairs with `bootstrap.ps1`, `check-sh.sh` pairs with
+`check-pwsh.ps1`, and the existing `check-pwsh.ps1` name is intentional
+because it checks PowerShell rather than shell.
 
-- Examples:
-  - `sync-wallpaper.ps1` → `Sync-Wallpaper`
-  - `initialize-devdirectory.ps1` → `Initialize-DevDirectory`
-  - `invoke-cargobinstallsetup.ps1` → `Invoke-CargoBinstallSetup`
-  - `convertfrom-sshed25519publickeytoagepubkey.ps1` →
-    `ConvertFrom-SshEd25519PublicKeyToAgePubKey`
+For reusable Windows modules under `src/hosts/windows/modules/`, keep the file
+name aligned with the exported function name and prefer a single exported
+`Verb-Noun` function per file. If a module is renamed, update the dot-sourcing
+paths in `src/hosts/windows/apply.ps1` in the same change.
 
-**Why**: this makes the module discoverable by reading filenames and helps
-maintainers quickly identify which function a script exports without opening
-the file. Violations indicate the filename is either misleading or the function
-name is not aligned with the intended task.
-
-If a PowerShell file exports multiple functions or none, place it only in
-`src/hosts/windows/modules/` as a utility module and prefix its name to indicate
-utility scope (e.g. `load-userregistry.ps1` for a multi-function module).
+If a PowerShell file exports multiple functions or none, keep it in
+`src/hosts/windows/modules/` as a utility module and give the filename a scope
+that describes the shared purpose of the file.
 
 ## Line endings and permissions
 

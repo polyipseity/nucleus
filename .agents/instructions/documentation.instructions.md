@@ -48,6 +48,12 @@ the documentation mechanism.
 Comment-based help (`<# … #>`) is the formal documentation mechanism for
 PowerShell and is required on every function and entry-point script.
 
+- **Filename convention**: when adding or renaming standalone PowerShell entry
+  points, use PascalCase and an approved `Verb-Noun` form for the filename.
+  Files in `scripts/` are the exception and must keep the paired shell basename
+  so the `.sh` and `.ps1` entry points stay aligned; `check-pwsh.ps1` remains
+  the intentional runtime-specific exception to `check-sh.sh`.
+
 - **Script-level help**: every `.ps1` script that is invoked as an entry point
   must open with a `<# .SYNOPSIS … .DESCRIPTION … .PARAMETER … .EXAMPLE … #>`
   block placed directly before the `[CmdletBinding()]` or `param(…)` declaration.

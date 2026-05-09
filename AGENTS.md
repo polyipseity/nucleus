@@ -89,11 +89,17 @@
 - **YAML extension policy**: use `.yml` for repository YAML files. Do not add
   long-extension YAML filenames. Exception: `.sops.yaml` is required by SOPS
   config discovery and must keep that exact name.
+- **PowerShell filename policy**: when adding or renaming standalone PowerShell
+  entry points, use PascalCase `Verb-Noun` filenames with approved verbs.
+  Files in `scripts/` are the exception: they keep the paired shell basename so
+  the `.sh` and `.ps1` entry points stay aligned; `check-pwsh.ps1` is the
+  intentional runtime-specific exception to `check-sh.sh`.
 - **Windows module path**: keep reusable PowerShell functions under
-  `src/hosts/windows/modules/*.ps1` using lowercase filenames; keep
-  `src/hosts/windows/apply.ps1` as a thin trigger/orchestrator.
+  `src/hosts/windows/modules/*.ps1` with filenames that match the exported
+  function name; keep `src/hosts/windows/apply.ps1` as a thin
+  trigger/orchestrator.
 - **Windows function isolation**: keep one reusable PowerShell function per
-  lowercase file under `src/hosts/windows/modules/`; orchestrators (for example
+  file under `src/hosts/windows/modules/`; orchestrators (for example
   `src/hosts/windows/apply.ps1`) should dot-source only the modules needed for
   the current run.
 - **Static config externalization**: keep shared editor settings in standalone
