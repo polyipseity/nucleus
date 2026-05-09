@@ -49,12 +49,6 @@ function Set-VscodeWorkspaceTrust {
     }
 
     $devPath = Join-Path -Path $HOME -ChildPath "dev"
-    if (-not (Test-Path -LiteralPath $devPath -PathType Container)) {
-        # dev directory not found; skip — Initialize-DevDirectory should run
-        # before this function in apply.ps1 so this is only hit on edge cases.
-        Write-Output "vscode-workspace-trust: Set-VscodeWorkspaceTrust: $devPath not found; skipping"
-        return
-    }
 
     # Convert the Windows absolute path to VS Code's internal file URI path format.
     # VS Code encodes file URIs with a lowercase drive letter, a colon, and
