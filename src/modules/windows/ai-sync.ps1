@@ -77,7 +77,7 @@ function Invoke-AiSync {
 
   # Windows always uses the `pc` profile — the manifest's `mac` profile is
   # tuned for Apple Silicon unified-memory hardware and is not applicable.
-  $profile = "pc"
+  $profileName = "pc"
 
   # Skip gracefully when ollama is not installed or not on PATH.
   # Existence probe — absent binary is expected and benign before Ollama
@@ -101,7 +101,7 @@ function Invoke-AiSync {
 
   # Parse the manifest and extract the desired model list for the pc profile.
   $manifest      = Get-Content -Raw -Path $manifestPath | ConvertFrom-Json
-  $desiredModels = @($manifest.models.$profile)
+  $desiredModels = @($manifest.models.$profileName)
 
   # Parse `ollama list` output.  Format: NAME  ID  SIZE  MODIFIED (header + rows).
   # Skip the header line (index 0) and extract the first whitespace-delimited
