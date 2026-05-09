@@ -7,19 +7,35 @@
 # rotating gallery (10-minute interval) on both macOS (desktoppr folder mode)
 # and GNOME (dynamically generated nucleus-gallery.xml).
 #
+# Multi-user support: this module imports the user registry from
+# nucleus.users and generates wallpaper secrets for ALL managed users.  Each
+# user's Home Manager activation runs the provision script to their own
+# ~/Pictures/wallpapers/ directory.
+#
 # Stale cleanup: any file in ~/Pictures/wallpapers/ that no longer has a
 # matching *.sops source is removed so the gallery stays current.
 #
 # This activation runs after gpgImport so the keyring import has already
 # happened before wallpaper decryption attempts.
-{ config, lib, pkgs, username ? null, ... }:
+{ config, lib, pkgs, ... }:
 let
-  primaryUsername =
-    if username == null then
-      throw "modules/wallpapers.nix requires `username` in extraSpecialArgs to scope wallpaper secret provisioning."
+  # Import the user registry module to access config.nucleus.users.
+  usersModule = import ./users/default.nix { lib = lib; };
+
+  # Get all managed users from the nucleus.users registry.
+  # Each user gets wallpaper secrets materialized to their home directory.
+  managedUsers = config.nucleus.users;
+
+  # Derive the current user's username from the Home Manager config.
+  currentUsername = config.home.username;
+
+  # Derive the current user's home directory from the registry.
+  # Fall back to config.home.homeDirectory for compatibility.
+  currentUserHome =
+    if managedUsers ? ${currentUsername} then
+      managedUsers.${currentUsername}.homeDirectory
     else
-      username;
-  isPrimaryUser = config.home.username == primaryUsername;
+      config.home.homeDirectory;
 
   # Nix store path to the wallpaper blob directory (evaluated at build time).
   wallpapersDir = ../assets/wallpapers;
@@ -39,18 +55,20 @@ let
         (name: type: type == "regular" && lib.hasSuffix ".sops" name)
         (builtins.readDir wallpapersDir));
 
-  wallpaperItems = map
-    (blobName:
-      let
-        wallpaperName = lib.removeSuffix ".sops" blobName;
-      in {
-        inherit blobName wallpaperName;
-        secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${primaryUsername}";
-      })
-    wallpaperBlobs;
-
-  # Declarative secret specs for every wallpaper blob.
-  wallpaperSecrets =
+  # Generate wallpaper secret specs for a given user.
+  # Creates one secret per wallpaper blob, named with the user's username.
+  mkWallpaperSecretsForUser = userName:
+    let
+      items = map
+        (blobName:
+          let
+            wallpaperName = lib.removeSuffix ".sops" blobName;
+          in {
+            inherit blobName wallpaperName;
+            secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${userName}";
+          })
+        wallpaperBlobs;
+    in
     lib.listToAttrs (map
       (item: {
         name = item.secretName;
@@ -65,14 +83,35 @@ let
           };
         };
       })
-      wallpaperItems);
+      items);
+
+  # Generate wallpaper secrets for ALL users in the registry.
+  wallpaperSecrets =
+    lib.foldl' lib.recursiveUpdate {} (map mkWallpaperSecretsForUser (builtins.attrNames managedUsers));
+
+  # Items list for the activation script - use current user's secrets.
+  wallpaperItemsForCurrentUser = map
+    (blobName:
+      let
+        wallpaperName = lib.removeSuffix ".sops" blobName;
+      in {
+        inherit blobName wallpaperName;
+        secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${currentUsername}";
+      })
+    wallpaperBlobs;
 in
-lib.mkIf isPrimaryUser {
+{
+  imports = [ usersModule ];
+
   # Fail fast at eval time if the expected asset directory is absent from the repo.
   assertions = [
     {
       assertion = builtins.pathExists wallpapersDir;
       message = "nucleus: required wallpapers directory is missing at ${toString wallpapersDir}.";
+    }
+    {
+      assertion = managedUsers ? ${currentUsername};
+      message = "nucleus: current user ${currentUsername} is not defined in nucleus.users registry.";
     }
   ];
 
@@ -81,7 +120,7 @@ lib.mkIf isPrimaryUser {
   sops.secrets = wallpaperSecrets;
 
   home.activation.wallpaperProvision = lib.hm.dag.entryAfter [ "sops-nix" ] ''
-    export HOME="${config.home.homeDirectory}"
+    export HOME="${currentUserHome}"
 
     picturesDir="$HOME/Pictures/wallpapers"
     isDarwin=0
@@ -178,7 +217,7 @@ lib.mkIf isPrimaryUser {
           mv "$tmpTarget" "$targetFile"
         fi
       '')
-      wallpaperItems}
+      wallpaperItemsForCurrentUser}
 
     # Stale cleanup: remove decrypted files that no longer have a matching
     # .sops source so the gallery does not show deleted assets.
