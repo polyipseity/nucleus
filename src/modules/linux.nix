@@ -191,6 +191,7 @@ lib.mkIf pkgs.stdenv.isLinux {
       "gitIdentityFromSops"
       "gpgImport"
       "installBunPackages"
+      "installPwshScriptAnalyzer"
       "sshKeyAdopt"
       "syncClawhubSkills"
       "verifySecretDecryption"

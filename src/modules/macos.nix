@@ -290,6 +290,7 @@ let
     "gpgImport"
     "installBunPackages"
     "installPackages"
+    "installPwshScriptAnalyzer"
     "linkGeneration"
     "onFilesChange"
     "preflightPrivacyPermissions"

@@ -5,7 +5,7 @@
 # Sync-NucleusShellProfile on Windows (src/modules/windows/shell.ps1).
 # Keeping both in sync makes PowerShell behavior consistent across all three
 # host types when pwsh is invoked on macOS or NixOS.
-{ ... }:
+{ config, lib, pkgs, ... }:
 let
   # Profile content mirroring the Windows managed block in shell.ps1.
   # Using a Nix ''...'' string so the file is written verbatim; single
@@ -112,4 +112,17 @@ in
   # interactive pwsh sessions.  On macOS and Linux, pwsh reads this path from
   # $PROFILE.CurrentUserCurrentHost at startup.
   home.file.".config/powershell/Microsoft.PowerShell_profile.ps1".text = profileContent;
+
+  # Install PSScriptAnalyzer for PowerShell linting if pwsh is available.
+  # This enables the lint phase in scripts/check-pwsh.ps1.
+  home.activation.installPwshScriptAnalyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    if command -v pwsh >/dev/null 2>&1; then
+      pwsh -NoProfile -Command "
+        if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+          Write-Host 'pwsh: installing PSScriptAnalyzer for lint support...' -ForegroundColor Cyan
+          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction SilentlyContinue
+        }
+      " 2>/dev/null || true
+    fi
+  '';
 }
