@@ -139,7 +139,7 @@ function Sync-SecretFile {
     }
   }
 
-  Write-Host "Processing secrets from: $($secretFileInfo.Name)" -ForegroundColor Cyan
+  Write-Output "$($PSStyle.Foreground.Cyan)Processing secrets from: $($secretFileInfo.Name)$($PSStyle.Reset)"
   $jsonSecrets = Get-Secrets -FilePath $secretFileInfo.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe
 
   if ($null -ne $jsonSecrets.PSObject.Properties[$sshSecretName]) {
@@ -154,7 +154,7 @@ function Sync-SecretFile {
 
     if ($existingValue -ne $sshKeyValue) {
       $sshKeyValue | Out-File -FilePath $sshKeyPath -Encoding ascii -NoNewline
-      Write-Host "  Updated SSH key: $sshSecretName" -ForegroundColor Cyan
+      Write-Output "$($PSStyle.Foreground.Cyan)  Updated SSH key: $sshSecretName$($PSStyle.Reset)"
     }
     # Restrict ACL unconditionally so idempotent re-applies re-lock the key even
     # when content is unchanged.  Mirrors POSIX chmod 600.
@@ -173,7 +173,7 @@ function Sync-SecretFile {
 
     if ($existingPublicValue -ne $sshPublicKeyValue) {
       $sshPublicKeyValue | Out-File -FilePath $sshPublicKeyPath -Encoding ascii -NoNewline
-      Write-Host "  Updated SSH public key: $sshPublicSecretName" -ForegroundColor Cyan
+      Write-Output "$($PSStyle.Foreground.Cyan)  Updated SSH public key: $sshPublicSecretName$($PSStyle.Reset)"
     }
 
     # Track the SHA-256 fingerprint of the SSH public key for rotation
@@ -207,7 +207,7 @@ function Sync-SecretFile {
             # failure is benign — nothing to flush — and the noise would
             # obscure the meaningful rotation log line below.
             & $sshAddCommand.Source -D 2>$null | Out-Null
-            Write-Host "  Flushed SSH agent due to key rotation ($oldSshFingerprint -> $newSshFingerprint)" -ForegroundColor Cyan
+            Write-Output "$($PSStyle.Foreground.Cyan)  Flushed SSH agent due to key rotation ($oldSshFingerprint -> $newSshFingerprint)$($PSStyle.Reset)"
           }
         }
 
@@ -234,7 +234,7 @@ function Sync-SecretFile {
 
     if ($existingRsaValue -ne $sshRsaKeyValue) {
       $sshRsaKeyValue | Out-File -FilePath $sshRsaKeyPath -Encoding ascii -NoNewline
-      Write-Host "  Updated SSH key: $sshRsaSecretName" -ForegroundColor Cyan
+      Write-Output "$($PSStyle.Foreground.Cyan)  Updated SSH key: $sshRsaSecretName$($PSStyle.Reset)"
     }
     # Restrict ACL unconditionally.  Mirrors POSIX chmod 600.
     & $restrictAcl -Path $sshRsaKeyPath
@@ -252,7 +252,7 @@ function Sync-SecretFile {
 
     if ($existingRsaPublicValue -ne $sshRsaPublicKeyValue) {
       $sshRsaPublicKeyValue | Out-File -FilePath $sshRsaPublicKeyPath -Encoding ascii -NoNewline
-      Write-Host "  Updated SSH public key: $sshRsaPublicSecretName" -ForegroundColor Cyan
+      Write-Output "$($PSStyle.Foreground.Cyan)  Updated SSH public key: $sshRsaPublicSecretName$($PSStyle.Reset)"
     }
   }
 
@@ -297,7 +297,7 @@ function Sync-SecretFile {
         Write-Warning "secrets: ownertrust enforcement for '$firstFingerprint' exited $LASTEXITCODE — key imported and manifest updated, ownertrust may need a retry"
       }
 
-      Write-Host "  Imported GPG material: $gpgSecretName" -ForegroundColor Cyan
+      Write-Output "$($PSStyle.Foreground.Cyan)  Imported GPG material: $gpgSecretName$($PSStyle.Reset)"
     }
   }
 
@@ -312,7 +312,7 @@ function Sync-SecretFile {
 
     if ($existingIdentityValue -ne $gitIdentityValue) {
       $gitIdentityValue | Out-File -FilePath $gitIdentityPath -Encoding ascii -NoNewline
-      Write-Host "  Updated Git identity payload: $gitIdentitySecretName" -ForegroundColor Cyan
+      Write-Output "$($PSStyle.Foreground.Cyan)  Updated Git identity payload: $gitIdentitySecretName$($PSStyle.Reset)"
     }
     # Restrict ACL unconditionally; git-identity.env contains name/email and
     # should not be world-readable.  Mirrors POSIX chmod 600.

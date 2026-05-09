@@ -62,14 +62,14 @@ function Sync-AgentsClawhubSkills {
     # Unlike Sync-AgentsSkills there are no managed symlinks to clean up here;
     # the downloaded directories are self-contained real directories created by
     # clawhub.
-    Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: disabled; skipping fetched skill sync"
+    Write-Output "clawhub-skills: Sync-AgentsClawhubSkills: disabled; skipping fetched skill sync"
     return
   }
 
   # Read the declarative fetched skill manifest.
   $manifest = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\agents\clawhub-skills.json"
   if (-not (Test-Path -LiteralPath $manifest)) {
-    Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: manifest not found at $manifest; skipping"
+    Write-Output "clawhub-skills: Sync-AgentsClawhubSkills: manifest not found at $manifest; skipping"
     return
   }
 
@@ -79,7 +79,7 @@ function Sync-AgentsClawhubSkills {
   $slugs = if ($null -ne $data.skills) { @($data.skills) } else { @() }
 
   if ($slugs.Count -eq 0) {
-    Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: no fetched skills in manifest; skipping"
+    Write-Output "clawhub-skills: Sync-AgentsClawhubSkills: no fetched skills in manifest; skipping"
     return
   }
 
@@ -90,7 +90,7 @@ function Sync-AgentsClawhubSkills {
   # standalone (e.g. for testing) before Sync-AgentsSkills has run.
   if (-not (Test-Path -LiteralPath $skillsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $skillsDir -Force | Out-Null
-    Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: created $skillsDir"
+    Write-Output "clawhub-skills: Sync-AgentsClawhubSkills: created $skillsDir"
   }
 
   # Resolve the clawhub binary.  Invoke-BunSetup (called earlier in apply.ps1)
@@ -146,7 +146,7 @@ function Sync-AgentsClawhubSkills {
         }
     }
 
-    Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: installing/updating fetched skill '$slug'..."
+    Write-Output "clawhub-skills: Sync-AgentsClawhubSkills: installing/updating fetched skill '$slug'..."
     # Non-zero exit from clawhub is non-fatal: the system apply succeeded; skill
     # sync is additive.  A warning is printed and the loop continues.
     & $clawhubExe install --workdir "$HOME\.agents" --no-input $slug
@@ -173,11 +173,11 @@ function Sync-AgentsClawhubSkills {
         continue  # Not a clawhub download; skip (could be user data or bundled symlink).
       }
       if ($slugs -notcontains $child.Name) {
-        Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: removing stale fetched skill '$($child.Name)' (removed from manifest)"
+        Write-Output "clawhub-skills: Sync-AgentsClawhubSkills: removing stale fetched skill '$($child.Name)' (removed from manifest)"
         Remove-Item -LiteralPath $child.FullName -Recurse -Force
       }
     }
   }
 
-  Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: fetched skill sync complete"
+  Write-Output "clawhub-skills: Sync-AgentsClawhubSkills: fetched skill sync complete"
 }

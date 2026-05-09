@@ -47,7 +47,7 @@ function Sync-OpenSshServer {
 
   $sshdConfigPath = Join-Path -Path $env:ProgramData -ChildPath 'ssh\sshd_config'
   if (-not (Test-Path -Path $sshdConfigPath)) {
-    Write-Host "OpenSSH server config not found at '$sshdConfigPath'; skipping OpenSSH parity." -ForegroundColor Yellow
+    Write-Output "$($PSStyle.Formatting.Warning)OpenSSH server config not found at '$sshdConfigPath'; skipping OpenSSH parity.$($PSStyle.Reset)"
     return
   }
 
@@ -90,7 +90,7 @@ function Sync-OpenSshServer {
 
   $sshdService = Get-Service -Name 'sshd' -ErrorAction SilentlyContinue
   if ($null -eq $sshdService) {
-    Write-Host 'OpenSSH service not installed; skipping service and firewall convergence.' -ForegroundColor Yellow
+    Write-Output "$($PSStyle.Formatting.Warning)OpenSSH service not installed; skipping service and firewall convergence.$($PSStyle.Reset)"
     return
   }
 

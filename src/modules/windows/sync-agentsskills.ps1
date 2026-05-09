@@ -87,7 +87,7 @@ function Sync-AgentsSkills {
           $expectedSource = Join-Path -Path $skillsSource -ChildPath $child.Name
           if ([string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-Item -LiteralPath $child.FullName -Force
-            Write-Host "agents-skills: removed managed skill symlink: $($child.FullName)"
+            Write-Output "agents-skills: removed managed skill symlink: $($child.FullName)"
           }
         }
       }
@@ -108,7 +108,7 @@ function Sync-AgentsSkills {
                            -and $skillsDirItem.LinkType -eq 'SymbolicLink'
     if ($isWholeDirSymlink) {
       Remove-Item -LiteralPath $skillsDir -Force
-      Write-Host "agents-skills: Sync-AgentsSkills: migrated ~/.agents\skills from symlink to real directory"
+      Write-Output "agents-skills: Sync-AgentsSkills: migrated ~/.agents\skills from symlink to real directory"
     }
   }
 
@@ -116,7 +116,7 @@ function Sync-AgentsSkills {
   # clawhub downloads can land here without entering the tracked repo tree.
   if (-not (Test-Path -LiteralPath $skillsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $skillsDir -Force | Out-Null
-    Write-Host "agents-skills: Sync-AgentsSkills: created $skillsDir"
+    Write-Output "agents-skills: Sync-AgentsSkills: created $skillsDir"
   }
 
   # Remove stale per-skill symlinks: committed skills that have since been
@@ -131,7 +131,7 @@ function Sync-AgentsSkills {
         # Managed per-skill symlink: remove if its source no longer exists.
         if (-not (Test-Path -LiteralPath $expectedSource)) {
           Remove-Item -LiteralPath $child.FullName -Force
-          Write-Host "agents-skills: Sync-AgentsSkills: removed stale skill link for $($child.Name) (source removed)"
+          Write-Output "agents-skills: Sync-AgentsSkills: removed stale skill link for $($child.Name) (source removed)"
         }
       }
     }
@@ -162,6 +162,6 @@ function Sync-AgentsSkills {
       }
     }
     New-Item -ItemType SymbolicLink -Path $linkPath -Target $skillEntry.FullName | Out-Null
-    Write-Host "agents-skills: Sync-AgentsSkills: linked $linkPath -> $($skillEntry.FullName)"
+    Write-Output "agents-skills: Sync-AgentsSkills: linked $linkPath -> $($skillEntry.FullName)"
   }
 }

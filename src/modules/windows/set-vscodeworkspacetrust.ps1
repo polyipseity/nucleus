@@ -44,7 +44,7 @@ function Set-VscodeWorkspaceTrust {
     )
 
     if (-not $Enabled) {
-        Write-Host "vscode-workspace-trust: Set-VscodeWorkspaceTrust: disabled; skipping"
+        Write-Output "vscode-workspace-trust: Set-VscodeWorkspaceTrust: disabled; skipping"
         return
     }
 
@@ -52,7 +52,7 @@ function Set-VscodeWorkspaceTrust {
     if (-not (Test-Path -LiteralPath $devPath -PathType Container)) {
         # ~/dev is only provisioned on macOS; skip silently on machines that do
         # not have this directory so the function is a no-op without false alarms.
-        Write-Host "vscode-workspace-trust: Set-VscodeWorkspaceTrust: $devPath not found; skipping"
+        Write-Output "vscode-workspace-trust: Set-VscodeWorkspaceTrust: $devPath not found; skipping"
         return
     }
 

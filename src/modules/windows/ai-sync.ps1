@@ -84,7 +84,7 @@ function Invoke-AiSync {
   # has been installed by WinGet (system.dsc.yml).
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
-    Write-Host "ai-sync: ollama not found; skipping sync"
+    Write-Output "ai-sync: ollama not found; skipping sync"
     return
   }
 
@@ -95,7 +95,7 @@ function Invoke-AiSync {
   # checked (LASTEXITCODE) so unexpected failures still surface.
   $listOutput = & $ollamaCmd.Source list 2>&1
   if ($LASTEXITCODE -ne 0) {
-    Write-Host "ai-sync: ollama server unavailable; skipping sync"
+    Write-Output "ai-sync: ollama server unavailable; skipping sync"
     return
   }
 
@@ -120,9 +120,9 @@ function Invoke-AiSync {
         continue
       }
       if ($DryRun) {
-        Write-Host "ai-sync: would pull $model"
+        Write-Output "ai-sync: would pull $model"
       } else {
-        Write-Host "ai-sync: pulling $model"
+        Write-Output "ai-sync: pulling $model"
         & $ollamaCmd.Source pull $model
         if ($LASTEXITCODE -ne 0) {
           Write-Error "ai-sync: ollama pull $model failed with exit code $LASTEXITCODE"
@@ -139,9 +139,9 @@ function Invoke-AiSync {
       continue
     }
     if ($DryRun) {
-      Write-Host "ai-sync: would remove $model"
+        Write-Output "ai-sync: would remove $model"
     } else {
-      Write-Host "ai-sync: removing $model"
+        Write-Output "ai-sync: removing $model"
       & $ollamaCmd.Source rm $model
       if ($LASTEXITCODE -ne 0) {
         Write-Error "ai-sync: ollama rm $model failed with exit code $LASTEXITCODE"
@@ -153,5 +153,5 @@ function Invoke-AiSync {
   if ($DryRun)    { $flags += "dry-run" }
   if ($PruneOnly) { $flags += "prune-only" }
   $flagStr = if ($flags.Count -gt 0) { " ($($flags -join ', '))" } else { "" }
-  Write-Host "ai-sync: sync completed (profile=$profile$flagStr)"
+  Write-Output "ai-sync: sync completed (profile=$profile$flagStr)"
 }

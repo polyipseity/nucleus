@@ -92,7 +92,7 @@ if (-not $SkipCargoCache) {
   # is manually installed.  The result is checked immediately below.
   $cargoCacheCmd = Get-Command -Name "cargo-cache" -ErrorAction SilentlyContinue
   if ($null -eq $cargoCacheCmd) {
-    Write-Host "nucleus: cargo-cache unavailable; skipping cargo cache prune"
+    Write-Output "nucleus: cargo-cache unavailable; skipping cargo cache prune"
   } else {
     & $cargoCacheCmd.Source -r all
   }
@@ -107,12 +107,12 @@ if (-not $SkipScoopCleanup) {
   $scoopShims = Join-Path $env:USERPROFILE "scoop\shims"
   $scoopCmd   = Join-Path $scoopShims "scoop.cmd"
   if (-not (Test-Path $scoopCmd)) {
-    Write-Host "gc: scoop not installed; skipping scoop cleanup"
+    Write-Output "gc: scoop not installed; skipping scoop cleanup"
   } else {
     if ($env:PATH -notlike "*$scoopShims*") {
       $env:PATH = "$scoopShims;$env:PATH"
     }
-    Write-Host "gc: running scoop cleanup..."
+    Write-Output "gc: running scoop cleanup..."
     scoop cleanup *
     if ($LASTEXITCODE -ne 0) {
       Write-Warning "gc: scoop cleanup exited with code $LASTEXITCODE"
@@ -128,10 +128,10 @@ if (-not $SkipScoopCleanup) {
 if (-not $SkipOllamaPrune) {
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
-    Write-Host "gc: ollama not installed; skipping ollama model prune"
+    Write-Output "gc: ollama not installed; skipping ollama model prune"
   } else {
     Invoke-AiSync -PruneOnly -RepoRoot $resolvedRepoRoot
   }
 }
 
-Write-Host "nucleus: gc workflow completed"
+Write-Output "nucleus: gc workflow completed"

@@ -64,7 +64,7 @@ function Remove-StaleWallpapers {
       # (e.g. file locked by the display subsystem) from a successful removal.
       try {
         Remove-Item -Path $decryptedWallpaper.FullName -Force -ErrorAction Stop
-        Write-Host "Removed stale wallpaper: $($decryptedWallpaper.Name)" -ForegroundColor Yellow
+        Write-Output "Removed stale wallpaper: $($decryptedWallpaper.Name)"
       }
       catch {
         Write-Warning "wallpapers: failed to remove stale wallpaper '$($decryptedWallpaper.Name)': $_"

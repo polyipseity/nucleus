@@ -48,4 +48,4 @@ if (Test-Path -Path $wallpaperDir) {
   }
 }
 
-Write-Host 'nucleus: update workflow completed' -ForegroundColor Green
+Write-Output "$($PSStyle.Foreground.Green)nucleus: update workflow completed$($PSStyle.Reset)"

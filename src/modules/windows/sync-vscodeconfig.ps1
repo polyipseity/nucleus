@@ -136,7 +136,7 @@ function Sync-VscodeConfig {
           $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
           if ($isSymlink -and [string]::Equals($item.Target, $repoTarget, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-Item -LiteralPath $linkPath -Force
-            Write-Host "vscode-config: removed VS Code config symlink: $linkPath"
+            Write-Output "vscode-config: removed VS Code config symlink: $linkPath"
           }
         }
         continue
@@ -174,7 +174,7 @@ function Sync-VscodeConfig {
         New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
       }
       New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget | Out-Null
-      Write-Host "vscode-config: linked VS Code config file: $linkPath -> $repoTarget"
+      Write-Output "vscode-config: linked VS Code config file: $linkPath -> $repoTarget"
     }
 
     # --- Managed directories ---
@@ -188,7 +188,7 @@ function Sync-VscodeConfig {
           $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
           if ($isSymlink -and [string]::Equals($item.Target, $repoTarget, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-Item -LiteralPath $linkPath -Force
-            Write-Host "vscode-config: removed VS Code config dir symlink: $linkPath"
+            Write-Output "vscode-config: removed VS Code config dir symlink: $linkPath"
           }
         }
         continue
@@ -222,7 +222,7 @@ function Sync-VscodeConfig {
         New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
       }
       New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget | Out-Null
-      Write-Host "vscode-config: linked VS Code config dir: $linkPath -> $repoTarget"
+      Write-Output "vscode-config: linked VS Code config dir: $linkPath -> $repoTarget"
     }
   }
 }

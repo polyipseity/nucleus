@@ -106,4 +106,4 @@ if (-not $SkipSecretTooling) {
   Test-SecretTooling
 }
 
-Write-Host 'nucleus: Windows health checks passed' -ForegroundColor Green
+Write-Output "$($PSStyle.Foreground.Green)nucleus: Windows health checks passed$($PSStyle.Reset)"

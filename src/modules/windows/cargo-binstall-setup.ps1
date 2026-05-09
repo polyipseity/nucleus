@@ -99,7 +99,7 @@ function Invoke-CargoBinstallSetup {
   })
 
   foreach ($pkg in $toRemove) {
-    Write-Host "cargo-binstall-setup: uninstalling $pkg"
+    Write-Output "cargo-binstall-setup: uninstalling $pkg"
     cargo uninstall $pkg
     if ($LASTEXITCODE -ne 0) {
       Write-Error "cargo-binstall-setup: 'cargo uninstall $pkg' failed (exit $LASTEXITCODE)"
@@ -108,7 +108,7 @@ function Invoke-CargoBinstallSetup {
   }
 
   foreach ($pkg in $toInstall) {
-    Write-Host "cargo-binstall-setup: installing $pkg"
+    Write-Output "cargo-binstall-setup: installing $pkg"
     cargo-binstall --no-confirm $pkg
     if ($LASTEXITCODE -ne 0) {
       Write-Error "cargo-binstall-setup: 'cargo-binstall $pkg' failed (exit $LASTEXITCODE)"
@@ -118,7 +118,7 @@ function Invoke-CargoBinstallSetup {
       Write-Error "cargo-binstall-setup: $pkg installed but binary not found at '$cargoBinDir\$pkg.exe'"
       return
     }
-    Write-Host "cargo-binstall-setup: $pkg installed successfully"
+    Write-Output "cargo-binstall-setup: $pkg installed successfully"
   }
 
   # Persist the current desired set as the new managed manifest so future

@@ -69,14 +69,14 @@ function Get-Secrets {
   $sopsArgs = @("--decrypt", "--output-format", "json", $FilePath)
 
   if (Test-Path -Path $HostKeyPath) {
-    Write-Host "Found machine SSH key. Trying machine-key decryption first..." -ForegroundColor Green
+    Write-Output "$($PSStyle.Foreground.Green)Found machine SSH key. Trying machine-key decryption first...$($PSStyle.Reset)"
     $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $HostKeyPath
 
     try {
       return (& $SopsExe @sopsArgs | ConvertFrom-Json)
     }
     catch {
-      Write-Host "Machine-key decryption failed. Falling back to GPG keyring..." -ForegroundColor Yellow
+      Write-Output "$($PSStyle.Foreground.Yellow)Machine-key decryption failed. Falling back to GPG keyring...$($PSStyle.Reset)"
     }
     finally {
       # SilentlyContinue in a finally block prevents a cleanup failure from
@@ -89,19 +89,19 @@ function Get-Secrets {
   $hasGpgSecretKeys = ($secretKeyInfo -and ($secretKeyInfo -match "^(sec|ssb):"))
   if ($hasGpgSecretKeys) {
     try {
-      Write-Host "Decrypting with GPG keyring..." -ForegroundColor Cyan
+      Write-Output "$($PSStyle.Foreground.Cyan)Decrypting with GPG keyring...$($PSStyle.Reset)"
       return (& $SopsExe @sopsArgs | ConvertFrom-Json)
     }
     catch {
-      Write-Host "GPG decryption failed. Trying primary SSH key fallback..." -ForegroundColor Yellow
+      Write-Output "$($PSStyle.Foreground.Yellow)GPG decryption failed. Trying primary SSH key fallback...$($PSStyle.Reset)"
     }
   }
   else {
-    Write-Host "No GPG secret keys detected. Trying primary SSH key fallback..." -ForegroundColor Yellow
+    Write-Output "$($PSStyle.Foreground.Yellow)No GPG secret keys detected. Trying primary SSH key fallback...$($PSStyle.Reset)"
   }
 
   if (Test-Path -Path $PrimarySshKeyPath) {
-    Write-Host "Found primary SSH key. Trying primary-ssh decryption..." -ForegroundColor Green
+    Write-Output "$($PSStyle.Foreground.Green)Found primary SSH key. Trying primary-ssh decryption...$($PSStyle.Reset)"
     $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $PrimarySshKeyPath
 
     try {

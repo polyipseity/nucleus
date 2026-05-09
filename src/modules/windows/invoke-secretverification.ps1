@@ -93,7 +93,7 @@ function Invoke-SecretVerification {
     return
   }
 
-  Write-Host "verification: running post-apply secret verification..." -ForegroundColor Cyan
+  Write-Output "$($PSStyle.Foreground.Cyan)verification: running post-apply secret verification...$($PSStyle.Foreground.Default)"
 
   $configDir = Join-Path -Path $HOME -ChildPath ".config\nucleus"
   $managedGpgKeysManifest = Join-Path -Path $configDir -ChildPath "managed-gpg-keys"
@@ -126,19 +126,19 @@ function Invoke-SecretVerification {
   # -------------------------------------------------------------------------
   # 1. Materialization sanity: key files must exist and be non-empty.
   # -------------------------------------------------------------------------
-  Write-Host "verification: [1/5] checking secret materialization..." -ForegroundColor Gray
+  Write-Output "$($PSStyle.Foreground.BrightBlack)verification: [1/5] checking secret materialization...$($PSStyle.Foreground.Default)"
   $sanityPaths = @($sshKeyPath, $sshPublicKeyPath, $managedGpgKeysManifest, $managedSshKeysManifest, $gitIdentityPath)
   foreach ($sanityPath in $sanityPaths) {
     if (-not (Test-Path -Path $sanityPath) -or (Get-Item -Path $sanityPath).Length -eq 0) {
       throw "verification: ERROR — managed secret artefact missing or empty: $sanityPath"
     }
   }
-  Write-Host "verification: [1/5] materialization sanity: OK" -ForegroundColor Green
+  Write-Output "$($PSStyle.Foreground.Green)verification: [1/5] materialization sanity: OK$($PSStyle.Foreground.Default)"
 
   # -------------------------------------------------------------------------
   # 2. GPG key presence: the managed fingerprint must be in the keyring.
   # -------------------------------------------------------------------------
-  Write-Host "verification: [2/5] checking GPG key presence..." -ForegroundColor Gray
+  Write-Output "$($PSStyle.Foreground.BrightBlack)verification: [2/5] checking GPG key presence...$($PSStyle.Foreground.Default)"
   $managedFpr = (Get-Content -Path $managedGpgKeysManifest -Raw).Trim()
   if ([string]::IsNullOrWhiteSpace($managedFpr)) {
     throw "verification: ERROR — managed-gpg-keys manifest is empty; gpgImport may have failed."
@@ -151,7 +151,7 @@ function Invoke-SecretVerification {
   if (-not ($allSecretKeysFpr -like "*$managedFpr*")) {
     throw "verification: ERROR — managed GPG key $managedFpr not in keyring after materialization."
   }
-  Write-Host "verification: [2/5] GPG key presence: OK ($managedFpr)" -ForegroundColor Green
+  Write-Output "$($PSStyle.Foreground.Green)verification: [2/5] GPG key presence: OK ($managedFpr)$($PSStyle.Foreground.Default)"
 
   # -------------------------------------------------------------------------
   # 3. GPG SOPS recipient check for all SOPS files.
@@ -165,7 +165,7 @@ function Invoke-SecretVerification {
   # binary SOPS files (e.g. wallpaper blobs) use JSON format with
   # "\"fp\": \"HEX\"" (quoted key and value).  Both formats are handled below.
   # -------------------------------------------------------------------------
-  Write-Host "verification: [3/5] checking GPG recipient registration in all SOPS files..." -ForegroundColor Gray
+  Write-Output "$($PSStyle.Foreground.BrightBlack)verification: [3/5] checking GPG recipient registration in all SOPS files...$($PSStyle.Foreground.Default)"
   $gpgFailures = @()
   foreach ($sopsFile in $sopsTestFiles) {
     # The combined regex matches both YAML (\s+fp:) and JSON ("fp":) formats.
@@ -180,7 +180,7 @@ function Invoke-SecretVerification {
   if ($gpgFailures.Count -gt 0) {
     throw "verification: ERROR — GPG SOPS decryption check failed for: $($gpgFailures -join ', '); managed GPG key may not be registered in .sops.yaml."
   }
-  Write-Host "verification: [3/5] GPG SOPS recipient check: OK" -ForegroundColor Green
+  Write-Output "$($PSStyle.Foreground.Green)verification: [3/5] GPG SOPS recipient check: OK$($PSStyle.Foreground.Default)"
 
   # -------------------------------------------------------------------------
   # 4. Personal SSH age recipient check for all SOPS files.
@@ -191,7 +191,7 @@ function Invoke-SecretVerification {
   # SOPS files (e.g. wallpaper blobs) use JSON format with both the key name
   # and value double-quoted.  Searching for the bare age key value handles both.
   # -------------------------------------------------------------------------
-  Write-Host "verification: [4/5] checking personal SSH age recipient registration in all SOPS files..." -ForegroundColor Gray
+  Write-Output "$($PSStyle.Foreground.BrightBlack)verification: [4/5] checking personal SSH age recipient registration in all SOPS files...$($PSStyle.Foreground.Default)"
   if (-not (Test-Path -Path $sshPublicKeyPath)) {
     throw "verification: ERROR — managed personal SSH public key not found at $sshPublicKeyPath; cannot derive age public key for recipient check."
   }
@@ -214,20 +214,20 @@ function Invoke-SecretVerification {
   if ($sshFailures.Count -gt 0) {
     throw "verification: ERROR — personal SSH key age-backend SOPS decryption check failed for: $($sshFailures -join ', '); SSH key may not be registered in .sops.yaml as an age recipient."
   }
-  Write-Host "verification: [4/5] SSH age SOPS recipient check: OK ($sshAgePub)" -ForegroundColor Green
+  Write-Output "$($PSStyle.Foreground.Green)verification: [4/5] SSH age SOPS recipient check: OK ($sshAgePub)$($PSStyle.Foreground.Default)"
 
   # -------------------------------------------------------------------------
   # 5. Machine SSH host key existence check (advisory warning only).
   # Warning-only: on first bootstrap the host key may not yet be registered
   # in .sops.yaml.  See the bootstrap instructions in secrets.nix.
   # -------------------------------------------------------------------------
-  Write-Host "verification: [5/5] checking machine SSH host key..." -ForegroundColor Gray
+  Write-Output "$($PSStyle.Foreground.BrightBlack)verification: [5/5] checking machine SSH host key...$($PSStyle.Foreground.Default)"
   if (-not (Test-Path -Path $HostKeyPath)) {
     Write-Warning "verification: $HostKeyPath missing; this machine cannot be the primary SOPS age recipient until the host key is registered in .sops.yaml."
   }
   else {
-    Write-Host "verification: [5/5] machine SSH host key: present ($HostKeyPath)" -ForegroundColor Green
+    Write-Output "$($PSStyle.Foreground.Green)verification: [5/5] machine SSH host key: present ($HostKeyPath)$($PSStyle.Foreground.Default)"
   }
 
-  Write-Host "verification: post-apply secret verification passed." -ForegroundColor Green
+  Write-Output "$($PSStyle.Foreground.Green)verification: post-apply secret verification passed.$($PSStyle.Foreground.Default)"
 }

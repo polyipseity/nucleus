@@ -43,7 +43,7 @@ function Sync-WindowsRdp {
 
   $rdpService = Get-Service -Name 'TermService' -ErrorAction SilentlyContinue
   if ($null -eq $rdpService) {
-    Write-Host 'Remote Desktop service (TermService) not found; skipping RDP convergence.' -ForegroundColor Yellow
+    Write-Output "$($PSStyle.Formatting.Warning)Remote Desktop service (TermService) not found; skipping RDP convergence.$($PSStyle.Reset)"
     return
   }
 

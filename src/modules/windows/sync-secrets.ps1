@@ -68,20 +68,20 @@ function Sync-Secrets {
   )
 
   if (-not (Test-Path -Path $SecretsDir)) {
-    Write-Host "No secrets directory found at $SecretsDir; skipping key provisioning." -ForegroundColor Yellow
+    Write-Output "$($PSStyle.Foreground.Yellow)No secrets directory found at $SecretsDir; skipping key provisioning.$($PSStyle.Reset)"
     return
   }
 
   foreach ($secretFileName in @("git-identities.yml", "gpg-personal.yml", "ssh-personal.yml")) {
     $secretPath = Join-Path -Path $SecretsDir -ChildPath $secretFileName
     if (-not (Test-Path -Path $secretPath)) {
-      Write-Host "Required secret file was not found: $secretPath" -ForegroundColor Yellow
+      Write-Output "$($PSStyle.Foreground.Yellow)Required secret file was not found: $secretPath$($PSStyle.Reset)"
       continue
     }
 
     $decryptedContent = & $SopsExe -d $secretPath 2>&1
     if ($LASTEXITCODE -ne 0) {
-      Write-Host "sops: failed to decrypt $secretFileName; skipping" -ForegroundColor Yellow
+      Write-Output "$($PSStyle.Foreground.Yellow)sops: failed to decrypt $secretFileName; skipping$($PSStyle.Reset)"
       continue
     }
 

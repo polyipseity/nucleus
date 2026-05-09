@@ -59,7 +59,7 @@ function Invoke-ScoopSetup {
     # The result string is checked immediately by the -notmatch guard.
     $existing = scoop bucket list 2>&1
     if ($existing -notmatch "(?m)^$bucket\b") {
-      Write-Host "scoop: adding bucket '$bucket'"
+      Write-Output "scoop: adding bucket '$bucket'"
       scoop bucket add $bucket
       if ($LASTEXITCODE -ne 0) {
         Write-Error "scoop: failed to add bucket '$bucket' (exit $LASTEXITCODE)"
@@ -76,7 +76,7 @@ function Invoke-ScoopSetup {
   # requires network access.
   $cbBin = Join-Path $scoopShims "cargo-binstall.cmd"
   if (-not (Test-Path $cbBin)) {
-    Write-Host "scoop: installing cargo-binstall"
+    Write-Output "scoop: installing cargo-binstall"
     scoop install cargo-binstall
     if ($LASTEXITCODE -ne 0) {
       Write-Error "scoop: 'scoop install cargo-binstall' failed (exit $LASTEXITCODE)"
@@ -86,9 +86,9 @@ function Invoke-ScoopSetup {
       Write-Error "scoop: cargo-binstall installed but shim not found at '$cbBin'"
       return
     }
-    Write-Host "scoop: cargo-binstall installed successfully"
+    Write-Output "scoop: cargo-binstall installed successfully"
   } else {
-    Write-Host "scoop: cargo-binstall already installed — skipping"
+    Write-Output "scoop: cargo-binstall already installed — skipping"
   }
 
   # Install gopass if the shim is not yet present.  gopass is the cross-platform
@@ -98,7 +98,7 @@ function Invoke-ScoopSetup {
   # hierarchy (winget > scoop > cargo binstall > bun).
   $gopassBin = Join-Path $scoopShims "gopass.exe"
   if (-not (Test-Path $gopassBin)) {
-    Write-Host "scoop: installing gopass"
+    Write-Output "scoop: installing gopass"
     scoop install gopass
     if ($LASTEXITCODE -ne 0) {
       Write-Error "scoop: 'scoop install gopass' failed (exit $LASTEXITCODE)"
@@ -108,8 +108,8 @@ function Invoke-ScoopSetup {
       Write-Error "scoop: gopass installed but binary not found at '$gopassBin'"
       return
     }
-    Write-Host "scoop: gopass installed successfully"
+    Write-Output "scoop: gopass installed successfully"
   } else {
-    Write-Host "scoop: gopass already installed — skipping"
+    Write-Output "scoop: gopass already installed — skipping"
   }
 }

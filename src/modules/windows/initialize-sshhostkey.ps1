@@ -76,7 +76,7 @@ function Initialize-SSHHostKey {
   # Sync-NucleusOpenSshServer, called later in the apply run.
   $wasRunning = $sshdService.Status -eq 'Running'
   if (-not $wasRunning) {
-    Write-Host "ssh: starting sshd temporarily to generate SSH host keys..." -ForegroundColor Cyan
+    Write-Output "$($PSStyle.Foreground.Cyan)ssh: starting sshd temporarily to generate SSH host keys...$($PSStyle.Reset)"
     Start-Service -Name 'sshd'
   }
 
@@ -103,6 +103,6 @@ function Initialize-SSHHostKey {
                    "${StartupTimeoutSeconds}s.  Run apply again after sshd fully initializes.")
   }
   else {
-    Write-Host "ssh: SSH host keys generated." -ForegroundColor Green
+    Write-Output "$($PSStyle.Foreground.Green)ssh: SSH host keys generated.$($PSStyle.Reset)"
   }
 }

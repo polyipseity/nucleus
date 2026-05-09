@@ -90,7 +90,7 @@ function Sync-AgentsConfig {
           $targetPath = Join-Path -Path $agentsSource -ChildPath $child.Name
           if ([string]::Equals($child.Target, $targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-Item -LiteralPath $child.FullName -Force
-            Write-Host "agents-config: removed managed agents subdir symlink: $($child.FullName)"
+            Write-Output "agents-config: removed managed agents subdir symlink: $($child.FullName)"
           }
         }
       }
@@ -112,14 +112,14 @@ function Sync-AgentsConfig {
                            -and $agentsDirItem.LinkType -eq 'SymbolicLink'
     if ($isWholeDirSymlink) {
       Remove-Item -LiteralPath $agentsDir -Force
-      Write-Host "agents-config: Sync-AgentsConfig: migrated from whole-dir symlink to per-subdir layout"
+      Write-Output "agents-config: Sync-AgentsConfig: migrated from whole-dir symlink to per-subdir layout"
     }
   }
 
   # Ensure ~/.agents\ exists as a real (writable) directory.
   if (-not (Test-Path -LiteralPath $agentsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $agentsDir | Out-Null
-    Write-Host "agents-config: Sync-AgentsConfig: created $agentsDir"
+    Write-Output "agents-config: Sync-AgentsConfig: created $agentsDir"
   }
 
   # Remove stale per-subdir symlinks: any symlink in ~/.agents\ that once pointed
@@ -135,7 +135,7 @@ function Sync-AgentsConfig {
         # Managed symlink: remove if the source entry no longer exists.
         if (-not (Test-Path -LiteralPath $expectedSource)) {
           Remove-Item -LiteralPath $child.FullName -Force
-          Write-Host "agents-config: Sync-AgentsConfig: removed stale link for $($child.Name) (source removed)"
+          Write-Output "agents-config: Sync-AgentsConfig: removed stale link for $($child.Name) (source removed)"
         }
       }
     }
@@ -164,6 +164,6 @@ function Sync-AgentsConfig {
       }
     }
     New-Item -ItemType SymbolicLink -Path $linkPath -Target $entry.FullName | Out-Null
-    Write-Host "agents-config: Sync-AgentsConfig: linked $linkPath -> $($entry.FullName)"
+    Write-Output "agents-config: Sync-AgentsConfig: linked $linkPath -> $($entry.FullName)"
   }
 }

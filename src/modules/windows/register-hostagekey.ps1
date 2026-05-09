@@ -100,11 +100,11 @@ function Register-HostAgeKey {
   # Idempotency: skip insertion and rewrap when this machine is already registered.
   $rawContent = [System.IO.File]::ReadAllText($SopsYamlPath)
   if ($rawContent -like "*$agePub*") {
-    Write-Host "sops: machine age key already registered in .sops.yaml; skipping auto-registration." -ForegroundColor Gray
+    Write-Output "sops: machine age key already registered in .sops.yaml; skipping auto-registration."
     return
   }
 
-  Write-Host "sops: registering machine age key in .sops.yaml and rewrapping SOPS files..." -ForegroundColor Cyan
+  Write-Output "$($PSStyle.Foreground.FromName('Cyan'))sops: registering machine age key in .sops.yaml and rewrapping SOPS files...$($PSStyle.Reset)"
 
   # Detect the existing line-ending style so the file is written back with the
   # same convention.  .sops.yaml is committed from POSIX systems and uses LF;
@@ -149,7 +149,7 @@ function Register-HostAgeKey {
   }
 
   foreach ($sopsFile in $sopsFiles) {
-    Write-Host "sops: sops updatekeys $sopsFile" -ForegroundColor Gray
+    Write-Output "sops: sops updatekeys $sopsFile"
     # --yes skips the interactive "update recipients?" confirmation (sops v3.8+).
     $sopsResult = & $SopsExe updatekeys --yes $sopsFile 2>&1
     if ($LASTEXITCODE -ne 0) {
@@ -160,8 +160,8 @@ function Register-HostAgeKey {
     }
   }
 
-  Write-Host "sops: machine age key registered and SOPS files rewrapped." -ForegroundColor Green
-  Write-Host "sops: Commit the changes before deploying to other machines:" -ForegroundColor Yellow
-  Write-Host "sops:   git add .sops.yaml src/secrets src/assets/wallpapers" -ForegroundColor Yellow
-  Write-Host "sops:   git commit -m `"chore: register $(hostname) machine age key`"" -ForegroundColor Yellow
+  Write-Output "$($PSStyle.Foreground.FromName('Green'))sops: machine age key registered and SOPS files rewrapped.$($PSStyle.Reset)"
+  Write-Output "$($PSStyle.Formatting.Warning)sops: Commit the changes before deploying to other machines:$($PSStyle.Reset)"
+  Write-Output "$($PSStyle.Formatting.Warning)sops:   git add .sops.yaml src/secrets src/assets/wallpapers$($PSStyle.Reset)"
+  Write-Output "$($PSStyle.Formatting.Warning)sops:   git commit -m `"chore: register $(hostname) machine age key`"$($PSStyle.Reset)"
 }

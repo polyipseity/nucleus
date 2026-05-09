@@ -25,7 +25,7 @@ function Test-ArchivingStack {
   $healthCheckPassed = $true
 
   # Check: 7z CLI is available in PATH and responds to --help.
-  Write-Host "archiving-stack: checking 7z CLI availability..." -ForegroundColor Gray
+  Write-Output "archiving-stack: checking 7z CLI availability..."
   $sevenZipExe = Get-Command -Name "7z.exe" -ErrorAction SilentlyContinue
   if ($null -eq $sevenZipExe) {
     Write-Error "archiving-stack: warning — 7z.exe not found in PATH; archive extraction may fail." -ErrorAction Continue
@@ -43,7 +43,7 @@ function Test-ArchivingStack {
   }
 
   # Check: 7-Zip application is installed in Program Files.
-  Write-Host "archiving-stack: checking 7-Zip application installation..." -ForegroundColor Gray
+  Write-Output "archiving-stack: checking 7-Zip application installation..."
   $sevenZipAppPath = Join-Path -Path $env:ProgramFiles -ChildPath "7-Zip"
   if (-not (Test-Path -Path $sevenZipAppPath)) {
     Write-Error "archiving-stack: warning — 7-Zip not found in $env:ProgramFiles; GUI archive handler may be unavailable." -ErrorAction Continue

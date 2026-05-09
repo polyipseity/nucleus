@@ -198,11 +198,11 @@ function Ensure-WingetPackage {
     }
 
     if ($LASTEXITCODE -eq $NoApplicableUpgradeExitCode) {
-      Write-Host "Package '$Id' is already installed at the requested version (or newer available version is not applicable)." -ForegroundColor Green
+      Write-Output "$($PSStyle.Foreground.Green)Package '$Id' is already installed at the requested version (or newer available version is not applicable).$($PSStyle.Reset)"
       return
     }
 
-    Write-Host "Requested version '$Version' for '$Id' not available. Falling back to latest." -ForegroundColor Yellow
+    Write-Output "$($PSStyle.Foreground.Yellow)Requested version '$Version' for '$Id' not available. Falling back to latest.$($PSStyle.Reset)"
   }
 
   & winget @installArgs
@@ -212,7 +212,7 @@ function Ensure-WingetPackage {
   }
 
   if ($LASTEXITCODE -eq $NoApplicableUpgradeExitCode) {
-    Write-Host "Package '$Id' is already installed and up to date." -ForegroundColor Green
+    Write-Output "$($PSStyle.Foreground.Green)Package '$Id' is already installed and up to date.$($PSStyle.Reset)"
     return
   }
 
@@ -248,7 +248,7 @@ if ($Apply) {
     }
   }
 
-  Write-Host "Running apply flow via $applyScriptPath" -ForegroundColor Cyan
+  Write-Output "$($PSStyle.Foreground.Cyan)Running apply flow via $applyScriptPath$($PSStyle.Reset)"
   & $applyScriptPath @ApplyArgs
 
   if ($LASTEXITCODE -ne 0) {
@@ -258,4 +258,4 @@ if ($Apply) {
   return
 }
 
-Write-Host "Bootstrap complete. Run '.\src\hosts\windows\apply.ps1' to configure this host, or use -Apply." -ForegroundColor Green
+Write-Output "$($PSStyle.Foreground.Green)Bootstrap complete. Run '.\src\hosts\windows\apply.ps1' to configure this host, or use -Apply.$($PSStyle.Reset)"

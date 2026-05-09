@@ -36,7 +36,7 @@ function Test-PrimaryUser {
   }
 
   if (-not $Quiet) {
-    Write-Host "Skipping secret materialization for non-primary user '$currentUsername'. Expected '$PrimaryUsername'." -ForegroundColor Yellow
+    Write-Output "$([System.Management.Automation.Psstyle]::Foreground.Yellow)Skipping secret materialization for non-primary user '$currentUsername'. Expected '$PrimaryUsername'."
   }
 
   return $false

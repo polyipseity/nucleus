@@ -43,7 +43,7 @@ if (-not $Paths -or $Paths.Count -eq 0) {
 }
 
 if (-not $Paths -or $Paths.Count -eq 0) {
-  Write-Host 'No PowerShell files to check.'
+  Write-Output 'No PowerShell files to check.'
   exit 0
 }
 
@@ -70,13 +70,13 @@ foreach ($path in $Paths | Sort-Object -Unique) {
 
 if ($parseErrors.Count -gt 0) {
   foreach ($parseError in $parseErrors) {
-    Write-Host ('{0}:{1}:{2}: {3}' -f $parseError.Extent.File, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message)
+    Write-Output ('{0}:{1}:{2}: {3}' -f $parseError.Extent.File, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message)
   }
 
   throw 'PowerShell syntax check failed.'
 }
 
-Write-Host ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
+Write-Output ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
 
 # ---------------------------------------------------------------------------
 # Phase 2: PSScriptAnalyzer lint (best-effort).
@@ -100,10 +100,10 @@ else {
 
   if ($lintResults.Count -gt 0) {
     $lintResults | ForEach-Object {
-      Write-Host ('{0}:{1}:{2}: [{3}] {4}' -f $_.ScriptPath, $_.Line, $_.Column, $_.Severity, $_.Message)
+      Write-Output ('{0}:{1}:{2}: [{3}] {4}' -f $_.ScriptPath, $_.Line, $_.Column, $_.Severity, $_.Message)
     }
     throw 'PowerShell lint check failed.'
   }
 
-  Write-Host ("PowerShell lint check passed for {0} files." -f $Paths.Count)
+  Write-Output ("PowerShell lint check passed for {0} files." -f $Paths.Count)
 }

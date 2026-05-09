@@ -86,13 +86,13 @@ function Sync-Wallpapers {
   )
 
   if (-not (Test-Path -Path $AssetsDir)) {
-    Write-Host "No wallpaper assets directory found at $AssetsDir; skipping wallpaper sync." -ForegroundColor Yellow
+    Write-Output "$($PSStyle.Foreground.Yellow)No wallpaper assets directory found at $AssetsDir; skipping wallpaper sync.$($PSStyle.Reset)"
     return $null
   }
 
   $userDirs = @(Get-ChildItem -Path $AssetsDir -Directory | Sort-Object Name)
   if ($userDirs.Count -eq 0) {
-    Write-Host "No user subdirectories found in $AssetsDir; skipping wallpaper sync." -ForegroundColor Yellow
+    Write-Output "$($PSStyle.Foreground.Yellow)No user subdirectories found in $AssetsDir; skipping wallpaper sync.$($PSStyle.Reset)"
     return $null
   }
 
@@ -103,7 +103,7 @@ function Sync-Wallpapers {
     $wallpaperFiles = @(Get-ChildItem -Path $userDir.FullName -Filter "*.sops" | Sort-Object Name)
 
     if ($wallpaperFiles.Count -eq 0) {
-      Write-Host "No wallpaper blobs (*.sops) found in $userDir.FullName; skipping." -ForegroundColor Yellow
+      Write-Output "$($PSStyle.Foreground.Yellow)No wallpaper blobs (*.sops) found in $userDir.FullName; skipping.$($PSStyle.Reset)"
       continue
     }
 
@@ -125,7 +125,7 @@ function Sync-Wallpapers {
         }
       }
 
-      Write-Host "Materializing wallpaper for $user`: $outputName" -ForegroundColor Cyan
+      Write-Output "$($PSStyle.Foreground.Cyan)Materializing wallpaper for $user`: $outputName$($PSStyle.Reset)"
       Get-DecryptedBlob -FilePath $wallpaperFile.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -OutputPath $outputPath -SopsExe $SopsExe
 
       if (Test-Path -LiteralPath $outputPath) {
@@ -139,6 +139,6 @@ function Sync-Wallpapers {
     }
   }
 
-  Write-Host "Wallpaper sync complete." -ForegroundColor Green
+  Write-Output "$($PSStyle.Foreground.Green)Wallpaper sync complete.$($PSStyle.Reset)"
   return $activeWallpaperPath
 }

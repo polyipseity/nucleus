@@ -74,7 +74,7 @@ function Invoke-WingetConfiguration {
       $resolvedConfigPath = $tempConfigPath
     }
 
-    Write-Host "Applying WinGet DSC: $resolvedConfigPath" -ForegroundColor Cyan
+    Write-Output "Applying WinGet DSC: $resolvedConfigPath"
     winget configure --accept-configuration-agreements --disable-interactivity "$resolvedConfigPath"
 
     if ($LASTEXITCODE -ne 0) {

@@ -106,7 +106,7 @@ function Invoke-BunSetup {
   })
 
   foreach ($pkg in $toRemove) {
-    Write-Host "bun-setup: removing $pkg"
+    Write-Output "bun-setup: removing $pkg"
     bun remove -g $pkg
     if ($LASTEXITCODE -ne 0) {
       Write-Error "bun-setup: 'bun remove -g $pkg' failed (exit $LASTEXITCODE)"
@@ -115,7 +115,7 @@ function Invoke-BunSetup {
   }
 
   foreach ($pkg in $toInstall) {
-    Write-Host "bun-setup: installing $pkg"
+    Write-Output "bun-setup: installing $pkg"
     bun install -g $pkg
     if ($LASTEXITCODE -ne 0) {
       Write-Error "bun-setup: 'bun install -g $pkg' failed (exit $LASTEXITCODE)"
@@ -130,7 +130,7 @@ function Invoke-BunSetup {
       Write-Error "bun-setup: $pkg installed but binary '$binName' not found in '$bunBinDir'"
       return
     }
-    Write-Host "bun-setup: $pkg installed successfully"
+    Write-Output "bun-setup: $pkg installed successfully"
   }
 
   # Persist the current desired set as the new managed manifest so future

@@ -71,7 +71,7 @@ function Get-DecryptedBlob {
         return
       }
 
-      Write-Host "Machine-key decryption failed for '$FilePath'. Falling back to GPG keyring..." -ForegroundColor Yellow
+      Write-Output "Machine-key decryption failed for '$FilePath'. Falling back to GPG keyring..."
     }
     finally {
       # SilentlyContinue in a finally block prevents a cleanup failure from
@@ -88,14 +88,14 @@ function Get-DecryptedBlob {
       return
     }
 
-    Write-Host "GPG decryption failed for '$FilePath'. Trying primary SSH key fallback..." -ForegroundColor Yellow
+    Write-Output "GPG decryption failed for '$FilePath'. Trying primary SSH key fallback..."
   }
   else {
-    Write-Host "No GPG secret keys detected. Trying primary SSH key fallback for '$FilePath'..." -ForegroundColor Yellow
+    Write-Output "No GPG secret keys detected. Trying primary SSH key fallback for '$FilePath'..."
   }
 
   if (Test-Path -Path $PrimarySshKeyPath) {
-    Write-Host "Found primary SSH key. Trying primary-ssh decryption for '$FilePath'..." -ForegroundColor Green
+    Write-Output "Found primary SSH key. Trying primary-ssh decryption for '$FilePath'..."
     $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $PrimarySshKeyPath
 
     try {
