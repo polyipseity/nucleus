@@ -90,7 +90,7 @@ function Sync-AgentsConfig {
           $targetPath = Join-Path -Path $agentsSource -ChildPath $child.Name
           if ([string]::Equals($child.Target, $targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-Item -LiteralPath $child.FullName -Force
-            Write-Host "nucleus: removed managed agents subdir symlink: $($child.FullName)"
+            Write-Host "agents-config: removed managed agents subdir symlink: $($child.FullName)"
           }
         }
       }
@@ -99,7 +99,7 @@ function Sync-AgentsConfig {
   }
 
   if (-not (Test-Path -LiteralPath $agentsSource -PathType Container)) {
-    Write-Error "nucleus: Sync-AgentsConfig: agents config dir not found: $agentsSource"
+    Write-Error "agents-config: Sync-AgentsConfig: agents config dir not found: $agentsSource"
     return
   }
 
@@ -112,14 +112,14 @@ function Sync-AgentsConfig {
                            -and $agentsDirItem.LinkType -eq 'SymbolicLink'
     if ($isWholeDirSymlink) {
       Remove-Item -LiteralPath $agentsDir -Force
-      Write-Host "nucleus: Sync-AgentsConfig: migrated from whole-dir symlink to per-subdir layout"
+      Write-Host "agents-config: Sync-AgentsConfig: migrated from whole-dir symlink to per-subdir layout"
     }
   }
 
   # Ensure ~/.agents\ exists as a real (writable) directory.
   if (-not (Test-Path -LiteralPath $agentsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $agentsDir | Out-Null
-    Write-Host "nucleus: Sync-AgentsConfig: created $agentsDir"
+    Write-Host "agents-config: Sync-AgentsConfig: created $agentsDir"
   }
 
   # Remove stale per-subdir symlinks: any symlink in ~/.agents\ that once pointed
@@ -135,7 +135,7 @@ function Sync-AgentsConfig {
         # Managed symlink: remove if the source entry no longer exists.
         if (-not (Test-Path -LiteralPath $expectedSource)) {
           Remove-Item -LiteralPath $child.FullName -Force
-          Write-Host "nucleus: Sync-AgentsConfig: removed stale link for $($child.Name) (source removed)"
+          Write-Host "agents-config: Sync-AgentsConfig: removed stale link for $($child.Name) (source removed)"
         }
       }
     }
@@ -159,11 +159,11 @@ function Sync-AgentsConfig {
         Remove-Item -LiteralPath $linkPath -Force
       } else {
         # Real file or directory: fail fast to prevent silent data loss.
-        Write-Error "nucleus: Sync-AgentsConfig: $linkPath is not a managed symlink — merge any wanted content into $($entry.FullName) and remove it, then re-run apply."
+        Write-Error "agents-config: Sync-AgentsConfig: $linkPath is not a managed symlink — merge any wanted content into $($entry.FullName) and remove it, then re-run apply."
         return
       }
     }
     New-Item -ItemType SymbolicLink -Path $linkPath -Target $entry.FullName | Out-Null
-    Write-Host "nucleus: Sync-AgentsConfig: linked $linkPath -> $($entry.FullName)"
+    Write-Host "agents-config: Sync-AgentsConfig: linked $linkPath -> $($entry.FullName)"
   }
 }

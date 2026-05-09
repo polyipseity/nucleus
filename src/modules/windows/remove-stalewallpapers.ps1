@@ -67,7 +67,7 @@ function Remove-StaleWallpapers {
         Write-Host "Removed stale wallpaper: $($decryptedWallpaper.Name)" -ForegroundColor Yellow
       }
       catch {
-        Write-Warning "nucleus: failed to remove stale wallpaper '$($decryptedWallpaper.Name)': $_"
+        Write-Warning "wallpapers: failed to remove stale wallpaper '$($decryptedWallpaper.Name)': $_"
       }
     }
   }

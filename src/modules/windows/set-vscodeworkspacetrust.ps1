@@ -44,7 +44,7 @@ function Set-VscodeWorkspaceTrust {
     )
 
     if (-not $Enabled) {
-        Write-Host "nucleus: Set-VscodeWorkspaceTrust: disabled; skipping"
+        Write-Host "vscode-workspace-trust: Set-VscodeWorkspaceTrust: disabled; skipping"
         return
     }
 
@@ -52,7 +52,7 @@ function Set-VscodeWorkspaceTrust {
     if (-not (Test-Path -LiteralPath $devPath -PathType Container)) {
         # ~/dev is only provisioned on macOS; skip silently on machines that do
         # not have this directory so the function is a no-op without false alarms.
-        Write-Host "nucleus: Set-VscodeWorkspaceTrust: $devPath not found; skipping"
+        Write-Host "vscode-workspace-trust: Set-VscodeWorkspaceTrust: $devPath not found; skipping"
         return
     }
 
@@ -115,11 +115,11 @@ for (const dbPath of dbPaths) {
             "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)",
             [TRUST_KEY, JSON.stringify(data)]
         );
-        console.error("nucleus: Set-VscodeWorkspaceTrust: trusted", uriPath, "in", dbPath);
+        console.error("vscode-workspace-trust: Set-VscodeWorkspaceTrust: trusted", uriPath, "in", dbPath);
     } catch (e) {
         // Non-fatal: DB may be locked by a running VS Code instance.
         // Writing a warning so the operator knows to re-run apply after closing VS Code.
-        console.error("nucleus: Set-VscodeWorkspaceTrust: warning:", dbPath, "-", e.message);
+        console.error("vscode-workspace-trust: Set-VscodeWorkspaceTrust: warning:", dbPath, "-", e.message);
     } finally {
         if (db) db.close();
     }
@@ -136,7 +136,7 @@ for (const dbPath of dbPaths) {
 
         $bunCmd = Get-Command -Name "bun" -ErrorAction SilentlyContinue
         if ($null -eq $bunCmd) {
-            Write-Warning "nucleus: Set-VscodeWorkspaceTrust: bun not found in PATH; skipping workspace trust write"
+            Write-Warning "vscode-workspace-trust: Set-VscodeWorkspaceTrust: bun not found in PATH; skipping workspace trust write"
             return
         }
 
@@ -144,7 +144,7 @@ for (const dbPath of dbPaths) {
         # body contains no interpolated values and is safe to write as a literal.
         & $bunCmd.Source $tempScript $uriPath @dbPaths
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning "nucleus: Set-VscodeWorkspaceTrust: bun script exited with code $LASTEXITCODE"
+            Write-Warning "vscode-workspace-trust: Set-VscodeWorkspaceTrust: bun script exited with code $LASTEXITCODE"
         }
     }
     finally {

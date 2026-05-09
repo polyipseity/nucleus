@@ -79,8 +79,8 @@ function Sync-GitAndSshConfig {
     }
 
     $sshConfigPath = Join-Path -Path $sshDir -ChildPath 'config'
-    $managedBlockStart = "# >>> nucleus managed github ssh [$User] >>>"
-    $managedBlockEnd = "# <<< nucleus managed github ssh [$User] <<<"
+    $managedBlockStart = "# >>> config managed github ssh [$User] >>>"
+    $managedBlockEnd = "# <<< config managed github ssh [$User] <<<"
     $managedSshBlock = @(
       $managedBlockStart
       'Host github.com'

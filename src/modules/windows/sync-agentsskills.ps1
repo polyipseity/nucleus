@@ -87,7 +87,7 @@ function Sync-AgentsSkills {
           $expectedSource = Join-Path -Path $skillsSource -ChildPath $child.Name
           if ([string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-Item -LiteralPath $child.FullName -Force
-            Write-Host "nucleus: removed managed skill symlink: $($child.FullName)"
+            Write-Host "agents-skills: removed managed skill symlink: $($child.FullName)"
           }
         }
       }
@@ -96,7 +96,7 @@ function Sync-AgentsSkills {
   }
 
   if (-not (Test-Path -LiteralPath $skillsSource -PathType Container)) {
-    Write-Error "nucleus: Sync-AgentsSkills: skills source dir not found: $skillsSource"
+    Write-Error "agents-skills: Sync-AgentsSkills: skills source dir not found: $skillsSource"
     return
   }
 
@@ -108,7 +108,7 @@ function Sync-AgentsSkills {
                            -and $skillsDirItem.LinkType -eq 'SymbolicLink'
     if ($isWholeDirSymlink) {
       Remove-Item -LiteralPath $skillsDir -Force
-      Write-Host "nucleus: Sync-AgentsSkills: migrated ~/.agents\skills from symlink to real directory"
+      Write-Host "agents-skills: Sync-AgentsSkills: migrated ~/.agents\skills from symlink to real directory"
     }
   }
 
@@ -116,7 +116,7 @@ function Sync-AgentsSkills {
   # clawhub downloads can land here without entering the tracked repo tree.
   if (-not (Test-Path -LiteralPath $skillsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $skillsDir -Force | Out-Null
-    Write-Host "nucleus: Sync-AgentsSkills: created $skillsDir"
+    Write-Host "agents-skills: Sync-AgentsSkills: created $skillsDir"
   }
 
   # Remove stale per-skill symlinks: committed skills that have since been
@@ -131,7 +131,7 @@ function Sync-AgentsSkills {
         # Managed per-skill symlink: remove if its source no longer exists.
         if (-not (Test-Path -LiteralPath $expectedSource)) {
           Remove-Item -LiteralPath $child.FullName -Force
-          Write-Host "nucleus: Sync-AgentsSkills: removed stale skill link for $($child.Name) (source removed)"
+          Write-Host "agents-skills: Sync-AgentsSkills: removed stale skill link for $($child.Name) (source removed)"
         }
       }
     }
@@ -157,11 +157,11 @@ function Sync-AgentsSkills {
         # Real directory in place of a committed skill — could be a fetched
         # (clawhub) download with the same name, or user data.  Fail fast to
         # prevent silent overwrites; the operator must resolve the conflict.
-        Write-Error "nucleus: Sync-AgentsSkills: $linkPath is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply."
+        Write-Error "agents-skills: Sync-AgentsSkills: $linkPath is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply."
         return
       }
     }
     New-Item -ItemType SymbolicLink -Path $linkPath -Target $skillEntry.FullName | Out-Null
-    Write-Host "nucleus: Sync-AgentsSkills: linked $linkPath -> $($skillEntry.FullName)"
+    Write-Host "agents-skills: Sync-AgentsSkills: linked $linkPath -> $($skillEntry.FullName)"
   }
 }

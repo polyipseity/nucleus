@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Apply the nucleus configuration for Windows.
+  Apply the configuration for Windows.
 
 .DESCRIPTION
   Orchestrates the Windows configuration lifecycle in a single script:
@@ -208,17 +208,17 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-decryptedblob.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-secrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "git-ssh.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "initialize-nucleussshshostkey.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleusjitsecretmaterialization.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleussecretverification.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-nucleuswingetconfiguration.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "initialize-sshhostkey.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-jitsecretmaterialization.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-secretverification.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-wingetconfiguration.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "power.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "rdp.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "register-nucleushostagekey.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "register-hostagekey.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remote-access.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-managedsecrets.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpapers.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "resolve-nucleusexecutable.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "resolve-executable.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "scoop-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "set-vscodeworkspacetrust.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "shell.ps1")
@@ -227,11 +227,11 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsclawhubskills.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-secretfile.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-secrets.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleusvscodeextensions.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-nucleusvscodesettings.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-vscodeextensions.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-vscodesettings.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-wallpapers.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-vscodeconfig.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "test-nucleusprimaryuser.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "test-primaryuser.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "verify-archiving-stack.ps1")
 
 $healthCheckScript = Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\scripts\health-check.ps1"
@@ -281,12 +281,13 @@ $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 # read it after the sudo boundary that darwin-rebuild/nixos-rebuild crosses,
 # where environment variables are not reliably propagated.
 $env:NUCLEUS_REPO = $repoRoot
-$nucleusConfigDir = Join-Path -Path $HOME -ChildPath ".config\nucleus"
-if (-not (Test-Path -LiteralPath $nucleusConfigDir -PathType Container)) {
-  New-Item -ItemType Directory -Path $nucleusConfigDir -Force | Out-Null
-}
-[System.IO.File]::WriteAllText(
-  (Join-Path -Path $nucleusConfigDir -ChildPath "repo-root"),
+$configDir = Join-Path -Path $HOME -ChildPath ".config\nucleus"
+  if (-not (Test-Path -LiteralPath $configDir -PathType Container)) {
+    New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+  }
+
+  $configManifest = @(
+    (Join-Path -Path $configDir -ChildPath "repo-root"),
   "$repoRoot`n",
   [System.Text.UTF8Encoding]::new($false)
 )
@@ -398,13 +399,13 @@ Test-ArchivingStack | Out-Null
 # missing or unreachable ollama binary is informational, not a hard failure,
 # because the system configuration has already been applied successfully.
 if ($SkipAiSync) {
-  Write-Host "nucleus: -SkipAiSync set; skipping post-apply model sync"
+  Write-Host "ai-sync: -SkipAiSync set; skipping post-apply model sync"
 } else {
   $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaOnPath) {
-    Write-Host "nucleus: ollama not found in PATH; skipping post-apply model sync"
+    Write-Host "ai-sync: ollama not found in PATH; skipping post-apply model sync"
   } else {
-    Write-Host "nucleus: running post-apply AI model sync..."
+    Write-Host "ai-sync: running post-apply AI model sync..."
     Invoke-AiSync -RepoRoot $repoRoot
   }
 }

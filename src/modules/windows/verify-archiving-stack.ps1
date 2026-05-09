@@ -25,39 +25,39 @@ function Test-ArchivingStack {
   $healthCheckPassed = $true
 
   # Check: 7z CLI is available in PATH and responds to --help.
-  Write-Host "nucleus: checking 7z CLI availability..." -ForegroundColor Gray
+  Write-Host "archiving-stack: checking 7z CLI availability..." -ForegroundColor Gray
   $sevenZipExe = Get-Command -Name "7z.exe" -ErrorAction SilentlyContinue
   if ($null -eq $sevenZipExe) {
-    Write-Error "nucleus: warning — 7z.exe not found in PATH; archive extraction may fail." -ErrorAction Continue
+    Write-Error "archiving-stack: warning — 7z.exe not found in PATH; archive extraction may fail." -ErrorAction Continue
     $healthCheckPassed = $false
   }
   else {
     try {
       & $sevenZipExe.Source --help | Out-Null
-      Write-Error "nucleus: archiving stack healthy — 7z CLI available and functional." -ErrorAction Continue
+      Write-Error "archiving-stack: archiving stack healthy — 7z CLI available and functional." -ErrorAction Continue
     }
     catch {
-      Write-Error "nucleus: warning — 7z.exe exists but --help failed: $_" -ErrorAction Continue
+      Write-Error "archiving-stack: warning — 7z.exe exists but --help failed: $_" -ErrorAction Continue
       $healthCheckPassed = $false
     }
   }
 
   # Check: 7-Zip application is installed in Program Files.
-  Write-Host "nucleus: checking 7-Zip application installation..." -ForegroundColor Gray
+  Write-Host "archiving-stack: checking 7-Zip application installation..." -ForegroundColor Gray
   $sevenZipAppPath = Join-Path -Path $env:ProgramFiles -ChildPath "7-Zip"
   if (-not (Test-Path -Path $sevenZipAppPath)) {
-    Write-Error "nucleus: warning — 7-Zip not found in $env:ProgramFiles; GUI archive handler may be unavailable." -ErrorAction Continue
+    Write-Error "archiving-stack: warning — 7-Zip not found in $env:ProgramFiles; GUI archive handler may be unavailable." -ErrorAction Continue
     $healthCheckPassed = $false
   }
   else {
-    Write-Error "nucleus: archiving stack healthy — 7-Zip application found." -ErrorAction Continue
+    Write-Error "archiving-stack: archiving stack healthy — 7-Zip application found." -ErrorAction Continue
   }
 
   if (-not $healthCheckPassed) {
-    Write-Error "nucleus: archiving stack health check completed with warnings. See messages above." -ErrorAction Continue
+    Write-Error "archiving-stack: archiving stack health check completed with warnings. See messages above." -ErrorAction Continue
   }
   else {
-    Write-Error "nucleus: archiving stack health check passed." -ErrorAction Continue
+    Write-Error "archiving-stack: archiving stack health check passed." -ErrorAction Continue
   }
 
   return $healthCheckPassed

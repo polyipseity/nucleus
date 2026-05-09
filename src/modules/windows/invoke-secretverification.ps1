@@ -93,12 +93,12 @@ function Invoke-SecretVerification {
     return
   }
 
-  Write-Host "nucleus: running post-apply secret verification..." -ForegroundColor Cyan
+  Write-Host "verification: running post-apply secret verification..." -ForegroundColor Cyan
 
-  $nucleusConfigDir = Join-Path -Path $HOME -ChildPath ".config\nucleus"
-  $managedGpgKeysManifest = Join-Path -Path $nucleusConfigDir -ChildPath "managed-gpg-keys"
-  $managedSshKeysManifest = Join-Path -Path $nucleusConfigDir -ChildPath "managed-ssh-keys"
-  $gitIdentityPath = Join-Path -Path $nucleusConfigDir -ChildPath "git-identity.env"
+  $configDir = Join-Path -Path $HOME -ChildPath ".config\nucleus"
+  $managedGpgKeysManifest = Join-Path -Path $configDir -ChildPath "managed-gpg-keys"
+  $managedSshKeysManifest = Join-Path -Path $configDir -ChildPath "managed-ssh-keys"
+  $gitIdentityPath = Join-Path -Path $configDir -ChildPath "git-identity.env"
   $sshDir = Join-Path -Path $HOME -ChildPath ".ssh"
   $sshKeyPath = Join-Path -Path $sshDir -ChildPath "ssh_personal_$PrimaryUsername"
   $sshPublicKeyPath = Join-Path -Path $sshDir -ChildPath "ssh_personal_$PrimaryUsername.pub"
@@ -126,22 +126,22 @@ function Invoke-SecretVerification {
   # -------------------------------------------------------------------------
   # 1. Materialization sanity: key files must exist and be non-empty.
   # -------------------------------------------------------------------------
-  Write-Host "nucleus: [1/5] checking secret materialization..." -ForegroundColor Gray
+  Write-Host "verification: [1/5] checking secret materialization..." -ForegroundColor Gray
   $sanityPaths = @($sshKeyPath, $sshPublicKeyPath, $managedGpgKeysManifest, $managedSshKeysManifest, $gitIdentityPath)
   foreach ($sanityPath in $sanityPaths) {
     if (-not (Test-Path -Path $sanityPath) -or (Get-Item -Path $sanityPath).Length -eq 0) {
-      throw "nucleus: ERROR — managed secret artefact missing or empty: $sanityPath"
+      throw "verification: ERROR — managed secret artefact missing or empty: $sanityPath"
     }
   }
-  Write-Host "nucleus: [1/5] materialization sanity: OK" -ForegroundColor Green
+  Write-Host "verification: [1/5] materialization sanity: OK" -ForegroundColor Green
 
   # -------------------------------------------------------------------------
   # 2. GPG key presence: the managed fingerprint must be in the keyring.
   # -------------------------------------------------------------------------
-  Write-Host "nucleus: [2/5] checking GPG key presence..." -ForegroundColor Gray
+  Write-Host "verification: [2/5] checking GPG key presence..." -ForegroundColor Gray
   $managedFpr = (Get-Content -Path $managedGpgKeysManifest -Raw).Trim()
   if ([string]::IsNullOrWhiteSpace($managedFpr)) {
-    throw "nucleus: ERROR — managed-gpg-keys manifest is empty; gpgImport may have failed."
+    throw "verification: ERROR — managed-gpg-keys manifest is empty; gpgImport may have failed."
   }
   # Dump all secret-key fingerprints once with --with-colons (machine-readable,
   # non-interactive) and --no-autostart (prevents launching a new agent daemon,
@@ -149,9 +149,9 @@ function Invoke-SecretVerification {
   # for reuse in check 3 to avoid repeated invocations with per-file arguments.
   $allSecretKeysFpr = (& $GpgExe --with-colons --no-autostart --list-secret-keys 2>&1) -join "`n"
   if (-not ($allSecretKeysFpr -like "*$managedFpr*")) {
-    throw "nucleus: ERROR — managed GPG key $managedFpr not in keyring after materialization."
+    throw "verification: ERROR — managed GPG key $managedFpr not in keyring after materialization."
   }
-  Write-Host "nucleus: [2/5] GPG key presence: OK ($managedFpr)" -ForegroundColor Green
+  Write-Host "verification: [2/5] GPG key presence: OK ($managedFpr)" -ForegroundColor Green
 
   # -------------------------------------------------------------------------
   # 3. GPG SOPS recipient check for all SOPS files.
@@ -165,7 +165,7 @@ function Invoke-SecretVerification {
   # binary SOPS files (e.g. wallpaper blobs) use JSON format with
   # "\"fp\": \"HEX\"" (quoted key and value).  Both formats are handled below.
   # -------------------------------------------------------------------------
-  Write-Host "nucleus: [3/5] checking GPG recipient registration in all SOPS files..." -ForegroundColor Gray
+  Write-Host "verification: [3/5] checking GPG recipient registration in all SOPS files..." -ForegroundColor Gray
   $gpgFailures = @()
   foreach ($sopsFile in $sopsTestFiles) {
     # The combined regex matches both YAML (\s+fp:) and JSON ("fp":) formats.
@@ -178,9 +178,9 @@ function Invoke-SecretVerification {
     }
   }
   if ($gpgFailures.Count -gt 0) {
-    throw "nucleus: ERROR — GPG SOPS decryption check failed for: $($gpgFailures -join ', '); managed GPG key may not be registered in .sops.yaml."
+    throw "verification: ERROR — GPG SOPS decryption check failed for: $($gpgFailures -join ', '); managed GPG key may not be registered in .sops.yaml."
   }
-  Write-Host "nucleus: [3/5] GPG SOPS recipient check: OK" -ForegroundColor Green
+  Write-Host "verification: [3/5] GPG SOPS recipient check: OK" -ForegroundColor Green
 
   # -------------------------------------------------------------------------
   # 4. Personal SSH age recipient check for all SOPS files.
@@ -191,9 +191,9 @@ function Invoke-SecretVerification {
   # SOPS files (e.g. wallpaper blobs) use JSON format with both the key name
   # and value double-quoted.  Searching for the bare age key value handles both.
   # -------------------------------------------------------------------------
-  Write-Host "nucleus: [4/5] checking personal SSH age recipient registration in all SOPS files..." -ForegroundColor Gray
+  Write-Host "verification: [4/5] checking personal SSH age recipient registration in all SOPS files..." -ForegroundColor Gray
   if (-not (Test-Path -Path $sshPublicKeyPath)) {
-    throw "nucleus: ERROR — managed personal SSH public key not found at $sshPublicKeyPath; cannot derive age public key for recipient check."
+    throw "verification: ERROR — managed personal SSH public key not found at $sshPublicKeyPath; cannot derive age public key for recipient check."
   }
   $sshPubKeyLine = (Get-Content -Path $sshPublicKeyPath -Raw).Trim()
   $sshAgePub = ConvertFrom-SshEd25519PublicKeyToAgePubKey -SshPublicKeyLine $sshPubKeyLine
@@ -212,22 +212,22 @@ function Invoke-SecretVerification {
     }
   }
   if ($sshFailures.Count -gt 0) {
-    throw "nucleus: ERROR — personal SSH key age-backend SOPS decryption check failed for: $($sshFailures -join ', '); SSH key may not be registered in .sops.yaml as an age recipient."
+    throw "verification: ERROR — personal SSH key age-backend SOPS decryption check failed for: $($sshFailures -join ', '); SSH key may not be registered in .sops.yaml as an age recipient."
   }
-  Write-Host "nucleus: [4/5] SSH age SOPS recipient check: OK ($sshAgePub)" -ForegroundColor Green
+  Write-Host "verification: [4/5] SSH age SOPS recipient check: OK ($sshAgePub)" -ForegroundColor Green
 
   # -------------------------------------------------------------------------
   # 5. Machine SSH host key existence check (advisory warning only).
   # Warning-only: on first bootstrap the host key may not yet be registered
   # in .sops.yaml.  See the bootstrap instructions in secrets.nix.
   # -------------------------------------------------------------------------
-  Write-Host "nucleus: [5/5] checking machine SSH host key..." -ForegroundColor Gray
+  Write-Host "verification: [5/5] checking machine SSH host key..." -ForegroundColor Gray
   if (-not (Test-Path -Path $HostKeyPath)) {
-    Write-Warning "nucleus: $HostKeyPath missing; this machine cannot be the primary SOPS age recipient until the host key is registered in .sops.yaml."
+    Write-Warning "verification: $HostKeyPath missing; this machine cannot be the primary SOPS age recipient until the host key is registered in .sops.yaml."
   }
   else {
-    Write-Host "nucleus: [5/5] machine SSH host key: present ($HostKeyPath)" -ForegroundColor Green
+    Write-Host "verification: [5/5] machine SSH host key: present ($HostKeyPath)" -ForegroundColor Green
   }
 
-  Write-Host "nucleus: post-apply secret verification passed." -ForegroundColor Green
+  Write-Host "verification: post-apply secret verification passed." -ForegroundColor Green
 }

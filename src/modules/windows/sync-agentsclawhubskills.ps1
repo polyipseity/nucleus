@@ -62,14 +62,14 @@ function Sync-AgentsClawhubSkills {
     # Unlike Sync-AgentsSkills there are no managed symlinks to clean up here;
     # the downloaded directories are self-contained real directories created by
     # clawhub.
-    Write-Host "nucleus: Sync-AgentsClawhubSkills: disabled; skipping fetched skill sync"
+    Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: disabled; skipping fetched skill sync"
     return
   }
 
   # Read the declarative fetched skill manifest.
   $manifest = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\agents\clawhub-skills.json"
   if (-not (Test-Path -LiteralPath $manifest)) {
-    Write-Host "nucleus: Sync-AgentsClawhubSkills: manifest not found at $manifest; skipping"
+    Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: manifest not found at $manifest; skipping"
     return
   }
 
@@ -79,7 +79,7 @@ function Sync-AgentsClawhubSkills {
   $slugs = if ($null -ne $data.skills) { @($data.skills) } else { @() }
 
   if ($slugs.Count -eq 0) {
-    Write-Host "nucleus: Sync-AgentsClawhubSkills: no fetched skills in manifest; skipping"
+    Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: no fetched skills in manifest; skipping"
     return
   }
 
@@ -90,7 +90,7 @@ function Sync-AgentsClawhubSkills {
   # standalone (e.g. for testing) before Sync-AgentsSkills has run.
   if (-not (Test-Path -LiteralPath $skillsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $skillsDir -Force | Out-Null
-    Write-Host "nucleus: Sync-AgentsClawhubSkills: created $skillsDir"
+    Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: created $skillsDir"
   }
 
   # Resolve the clawhub binary.  Invoke-BunSetup (called earlier in apply.ps1)
@@ -114,7 +114,7 @@ function Sync-AgentsClawhubSkills {
   }
 
   if ([string]::IsNullOrEmpty($clawhubExe)) {
-    Write-Warning "nucleus: Sync-AgentsClawhubSkills: clawhub not found; Invoke-BunSetup must have failed; skipping fetched skill sync"
+    Write-Warning "clawhub-skills: Sync-AgentsClawhubSkills: clawhub not found; Invoke-BunSetup must have failed; skipping fetched skill sync"
     return
   }
 
@@ -132,7 +132,7 @@ function Sync-AgentsClawhubSkills {
         # A committed-skill (bundled) symlink occupies this slot.  Skip rather
         # than overwriting the managed symlink; the operator must remove the slug
         # from clawhub-skills.json or the committed skill from the repo first.
-        Write-Warning "nucleus: Sync-AgentsClawhubSkills: skipping '$slug' — a committed-skill symlink exists at $skillPath; remove it from clawhub-skills.json or from src\modules\configs\agents\skills\"
+        Write-Warning "clawhub-skills: Sync-AgentsClawhubSkills: skipping '$slug' — a committed-skill symlink exists at $skillPath; remove it from clawhub-skills.json or from src\modules\configs\agents\skills\"
         continue
       }
       # Unlock an existing fetched skill directory before updating so clawhub can
@@ -146,12 +146,12 @@ function Sync-AgentsClawhubSkills {
         }
     }
 
-    Write-Host "nucleus: Sync-AgentsClawhubSkills: installing/updating fetched skill '$slug'..."
+    Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: installing/updating fetched skill '$slug'..."
     # Non-zero exit from clawhub is non-fatal: the system apply succeeded; skill
     # sync is additive.  A warning is printed and the loop continues.
     & $clawhubExe install --workdir "$HOME\.agents" --no-input $slug
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning "nucleus: Sync-AgentsClawhubSkills: clawhub install failed for '$slug' (system apply succeeded)"
+      Write-Warning "clawhub-skills: Sync-AgentsClawhubSkills: clawhub install failed for '$slug' (system apply succeeded)"
     } elseif (Test-Path -LiteralPath $skillPath -PathType Container) {
       # Lock installed skill files to prevent modification outside a managed apply
       # run.  Mirrors POSIX chmod -R a-w after install.  The unlock above
@@ -173,11 +173,11 @@ function Sync-AgentsClawhubSkills {
         continue  # Not a clawhub download; skip (could be user data or bundled symlink).
       }
       if ($slugs -notcontains $child.Name) {
-        Write-Host "nucleus: Sync-AgentsClawhubSkills: removing stale fetched skill '$($child.Name)' (removed from manifest)"
+        Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: removing stale fetched skill '$($child.Name)' (removed from manifest)"
         Remove-Item -LiteralPath $child.FullName -Recurse -Force
       }
     }
   }
 
-  Write-Host "nucleus: Sync-AgentsClawhubSkills: fetched skill sync complete"
+  Write-Host "clawhub-skills: Sync-AgentsClawhubSkills: fetched skill sync complete"
 }

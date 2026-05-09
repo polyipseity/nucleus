@@ -86,7 +86,7 @@ function Register-HostAgeKey {
     # Advisory: host key may not yet exist on a freshly installed system that
     # has not yet enabled the OpenSSH server feature.  Registration cannot
     # proceed without it; warn and skip rather than hard-failing apply.
-    Write-Warning "nucleus: $MachineSshHostKeyPubPath not found; skipping machine age key auto-registration."
+    Write-Warning "sops: $MachineSshHostKeyPubPath not found; skipping machine age key auto-registration."
     return
   }
 
@@ -100,11 +100,11 @@ function Register-HostAgeKey {
   # Idempotency: skip insertion and rewrap when this machine is already registered.
   $rawContent = [System.IO.File]::ReadAllText($SopsYamlPath)
   if ($rawContent -like "*$agePub*") {
-    Write-Host "nucleus: machine age key already registered in .sops.yaml; skipping auto-registration." -ForegroundColor Gray
+    Write-Host "sops: machine age key already registered in .sops.yaml; skipping auto-registration." -ForegroundColor Gray
     return
   }
 
-  Write-Host "nucleus: registering machine age key in .sops.yaml and rewrapping SOPS files..." -ForegroundColor Cyan
+  Write-Host "sops: registering machine age key in .sops.yaml and rewrapping SOPS files..." -ForegroundColor Cyan
 
   # Detect the existing line-ending style so the file is written back with the
   # same convention.  .sops.yaml is committed from POSIX systems and uses LF;
@@ -117,7 +117,7 @@ function Register-HostAgeKey {
   $marker = "    # -- machine keys end; personal SSH backup key below --"
   $newKeyLine = "    - $agePub"
   if (-not ($rawContent -like "*$marker*")) {
-    throw "nucleus: ERROR — .sops.yaml marker comment not found; cannot insert machine age key.  " +
+    throw "sops: ERROR — .sops.yaml marker comment not found; cannot insert machine age key.  " +
           "Expected: '$marker'.  Ensure the marker is present in .sops.yaml."
   }
   $newContent = $rawContent.Replace($marker, "$newKeyLine$eol$marker")
@@ -129,7 +129,7 @@ function Register-HostAgeKey {
   # due to an encoding mismatch or unexpected whitespace in the marker.
   $verifyContent = [System.IO.File]::ReadAllText($SopsYamlPath)
   if (-not ($verifyContent -like "*$agePub*")) {
-    throw "nucleus: ERROR — failed to insert machine age key into .sops.yaml; " +
+    throw "sops: ERROR — failed to insert machine age key into .sops.yaml; " +
           "verify the marker comment is present and the file encoding is UTF-8."
   }
 
@@ -149,19 +149,19 @@ function Register-HostAgeKey {
   }
 
   foreach ($sopsFile in $sopsFiles) {
-    Write-Host "nucleus: sops updatekeys $sopsFile" -ForegroundColor Gray
+    Write-Host "sops: sops updatekeys $sopsFile" -ForegroundColor Gray
     # --yes skips the interactive "update recipients?" confirmation (sops v3.8+).
     $sopsResult = & $SopsExe updatekeys --yes $sopsFile 2>&1
     if ($LASTEXITCODE -ne 0) {
       # Surface sops stderr so the operator can diagnose GPG key import failures.
       Write-Error ($sopsResult | Out-String)
-      throw ("nucleus: ERROR — sops updatekeys failed for $sopsFile.  " +
+      throw ("sops: ERROR — sops updatekeys failed for $sopsFile.  " +
              "Ensure the primary GPG key is imported first: gpg --import <backup-key-file>")
     }
   }
 
-  Write-Host "nucleus: machine age key registered and SOPS files rewrapped." -ForegroundColor Green
-  Write-Host "nucleus: Commit the changes before deploying to other machines:" -ForegroundColor Yellow
-  Write-Host "nucleus:   git add .sops.yaml src/secrets src/assets/wallpapers" -ForegroundColor Yellow
-  Write-Host "nucleus:   git commit -m `"chore: register $(hostname) machine age key`"" -ForegroundColor Yellow
+  Write-Host "sops: machine age key registered and SOPS files rewrapped." -ForegroundColor Green
+  Write-Host "sops: Commit the changes before deploying to other machines:" -ForegroundColor Yellow
+  Write-Host "sops:   git add .sops.yaml src/secrets src/assets/wallpapers" -ForegroundColor Yellow
+  Write-Host "sops:   git commit -m `"chore: register $(hostname) machine age key`"" -ForegroundColor Yellow
 }

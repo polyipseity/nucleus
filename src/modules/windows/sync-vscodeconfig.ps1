@@ -5,7 +5,7 @@
 # appears immediately as an unstaged git diff rather than being silently managed
 # away by a deployment layer.
 #
-# Supersedes sync-nucleusvscodesettings.ps1, which used a managed-key merge
+# Supersedes sync-vscodesettings.ps1, which used a managed-key merge
 # approach that prevented VS Code from owning its own settings file.  The
 # symlink approach gives the repo complete, transparent ownership of all VS
 # Code config while still allowing VS Code to write through the link freely.
@@ -136,7 +136,7 @@ function Sync-VscodeConfig {
           $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
           if ($isSymlink -and [string]::Equals($item.Target, $repoTarget, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-Item -LiteralPath $linkPath -Force
-            Write-Host "nucleus: removed VS Code config symlink: $linkPath"
+            Write-Host "vscode-config: removed VS Code config symlink: $linkPath"
           }
         }
         continue
@@ -174,7 +174,7 @@ function Sync-VscodeConfig {
         New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
       }
       New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget | Out-Null
-      Write-Host "nucleus: linked VS Code config file: $linkPath -> $repoTarget"
+      Write-Host "vscode-config: linked VS Code config file: $linkPath -> $repoTarget"
     }
 
     # --- Managed directories ---
@@ -188,7 +188,7 @@ function Sync-VscodeConfig {
           $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
           if ($isSymlink -and [string]::Equals($item.Target, $repoTarget, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-Item -LiteralPath $linkPath -Force
-            Write-Host "nucleus: removed VS Code config dir symlink: $linkPath"
+            Write-Host "vscode-config: removed VS Code config dir symlink: $linkPath"
           }
         }
         continue
@@ -222,7 +222,7 @@ function Sync-VscodeConfig {
         New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
       }
       New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget | Out-Null
-      Write-Host "nucleus: linked VS Code config dir: $linkPath -> $repoTarget"
+      Write-Host "vscode-config: linked VS Code config dir: $linkPath -> $repoTarget"
     }
   }
 }

@@ -110,16 +110,16 @@ function Sync-PowerPolicy {
     foreach ($adapter in $physicalAdapters) {
       $pm = $adapter | Get-NetAdapterPowerManagement -ErrorAction SilentlyContinue
       if ($null -eq $pm) {
-        Write-Warning "nucleus: could not read power management for adapter '$($adapter.Name)'; skipping WoL."
+        Write-Warning "power: could not read power management for adapter '$($adapter.Name)'; skipping WoL."
         continue
       }
       if ($pm.WakeOnMagicPacket -ne 'Enabled') {
         $adapter | Set-NetAdapterPowerManagement -WakeOnMagicPacket Enabled -ErrorAction SilentlyContinue
         if ($?) {
-          Write-Verbose "nucleus: enabled Wake-on-LAN for adapter '$($adapter.Name)'."
+          Write-Verbose "power: enabled Wake-on-LAN for adapter '$($adapter.Name)'."
         }
         else {
-          Write-Warning "nucleus: failed to enable Wake-on-LAN for adapter '$($adapter.Name)'; adapter may not support WoL."
+          Write-Warning "power: failed to enable Wake-on-LAN for adapter '$($adapter.Name)'; adapter may not support WoL."
         }
       }
     }

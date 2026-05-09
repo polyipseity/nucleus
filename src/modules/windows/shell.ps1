@@ -45,8 +45,8 @@ function Sync-ShellProfile {
     [bool]$Enabled = $true
   )
 
-  $managedBlockStart = '# >>> nucleus managed shell parity >>>'
-  $managedBlockEnd = '# <<< nucleus managed shell parity <<<'
+  $managedBlockStart = '# >>> config managed shell parity >>>'
+  $managedBlockEnd = '# <<< config managed shell parity <<<'
   $managedBlock = @(
     $managedBlockStart
     'if (Get-Command direnv -ErrorAction SilentlyContinue) {'
@@ -130,7 +130,7 @@ function Sync-ShellProfile {
     'function v { & nvim @Args }'
     '# System-wide Python ban: redirect python/pip to warnings'
     'function python {'
-    '  Write-Host "nucleus: system-wide Python is banned to prevent accidental modifications." -ForegroundColor Yellow >&2'
+    '  Write-Host "python-ban: system-wide Python is banned to prevent accidental modifications." -ForegroundColor Yellow >&2'
     '  Write-Host "         Use one of these approaches instead:" -ForegroundColor Yellow >&2'
     '  Write-Host "         - nix develop     (activate project devShell with scoped Python)" -ForegroundColor Yellow >&2'
     '  Write-Host "         - uv run <cmd>    (run Python via uv package manager)" -ForegroundColor Yellow >&2'
@@ -142,7 +142,7 @@ function Sync-ShellProfile {
     '  python @Args'
     '}'
     'function pip {'
-    '  Write-Host "nucleus: system-wide pip is banned to prevent breaking system dependencies." -ForegroundColor Yellow >&2'
+    '  Write-Host "python-ban: system-wide pip is banned to prevent breaking system dependencies." -ForegroundColor Yellow >&2'
     '  Write-Host "         Use one of these approaches instead:" -ForegroundColor Yellow >&2'
     '  Write-Host "         - nix develop     (activate project devShell with scoped Python+pip)" -ForegroundColor Yellow >&2'
     '  Write-Host "         - uv pip install  (use uv to manage project dependencies)" -ForegroundColor Yellow >&2'

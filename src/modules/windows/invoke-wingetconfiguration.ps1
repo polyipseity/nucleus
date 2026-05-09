@@ -69,7 +69,7 @@ function Invoke-WingetConfiguration {
       }
 
       $configContent = $configContent.Replace("__NUCLEUS_ACTIVE_WALLPAPER__", $effectiveWallpaperPath)
-      $tempConfigPath = Join-Path -Path $env:TEMP -ChildPath ("nucleus-winget-config-" + [System.Guid]::NewGuid().ToString() + ".yml")
+      $tempConfigPath = Join-Path -Path $env:TEMP -ChildPath ("winget-config-" + [System.Guid]::NewGuid().ToString() + ".yml")
       $configContent | Out-File -FilePath $tempConfigPath -Encoding utf8 -NoNewline
       $resolvedConfigPath = $tempConfigPath
     }

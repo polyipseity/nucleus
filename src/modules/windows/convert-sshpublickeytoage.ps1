@@ -2,8 +2,8 @@
 #
 # Provides ConvertFrom-SshEd25519PublicKeyToAgePubKey, a pure-PowerShell
 # implementation of the ssh-to-age public-key conversion path.  Used by both
-# invoke-nucleussecretverification.ps1 (SOPS recipient checks) and
-# register-nucleushostagekey.ps1 (machine age key auto-registration) so a
+# invoke-secretverification.ps1 (SOPS recipient checks) and
+# register-hostagekey.ps1 (machine age key auto-registration) so a
 # single authoritative implementation is shared across both call sites.
 
 function ConvertFrom-SshEd25519PublicKeyToAgePubKey {

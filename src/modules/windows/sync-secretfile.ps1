@@ -135,7 +135,7 @@ function Sync-SecretFile {
     # sandboxed environments; warn and continue rather than aborting the apply.
     & icacls.exe $Path /inheritance:r /grant:r "${currentUser}:(F)" | Out-Null
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning "nucleus: could not restrict ACL on $Path (icacls exit $LASTEXITCODE)"
+      Write-Warning "secrets: could not restrict ACL on $Path (icacls exit $LASTEXITCODE)"
     }
   }
 
@@ -218,7 +218,7 @@ function Sync-SecretFile {
       }
     }
     catch {
-      Write-Warning "nucleus: could not update SSH fingerprint manifest: $_"
+      Write-Warning "secrets: could not update SSH fingerprint manifest: $_"
     }
   }
 
@@ -294,7 +294,7 @@ function Sync-SecretFile {
       # in the keyring and tracked in the manifest at this point.
       "${firstFingerprint}:6:" | & $GpgExe --import-ownertrust | Out-Null
       if ($LASTEXITCODE -ne 0) {
-        Write-Warning "nucleus: ownertrust enforcement for '$firstFingerprint' exited $LASTEXITCODE — key imported and manifest updated, ownertrust may need a retry"
+        Write-Warning "secrets: ownertrust enforcement for '$firstFingerprint' exited $LASTEXITCODE — key imported and manifest updated, ownertrust may need a retry"
       }
 
       Write-Host "  Imported GPG material: $gpgSecretName" -ForegroundColor Cyan

@@ -2,7 +2,7 @@
 #
 # Mirrors generate_ssh_host_key_if_needed in src/scripts/apply.sh.
 # Ensures the Windows SSH host Ed25519 key exists before
-# register-nucleushostagekey.ps1 tries to derive the machine age public key from
+# register-hostagekey.ps1 tries to derive the machine age public key from
 # the corresponding .pub file.  On a fresh machine the key is absent until the
 # OpenSSH Server Windows service first starts; this module starts the service
 # briefly to trigger automatic key generation when the service is already
@@ -64,7 +64,7 @@ function Initialize-SSHHostKey {
     # Sync-NucleusOpenSshServer then starts the service and host keys are
     # generated; the trailing Register-NucleusHostAgeKey call completes
     # registration in the same run.
-    Write-Warning ("nucleus: sshd service not installed; SSH host key cannot be " +
+    Write-Warning ("ssh: sshd service not installed; SSH host key cannot be " +
                    "generated yet.  Keys will be generated when Sync-NucleusOpenSshServer " +
                    "starts sshd after DSC installs OpenSSH.")
     return
@@ -76,7 +76,7 @@ function Initialize-SSHHostKey {
   # Sync-NucleusOpenSshServer, called later in the apply run.
   $wasRunning = $sshdService.Status -eq 'Running'
   if (-not $wasRunning) {
-    Write-Host "nucleus: starting sshd temporarily to generate SSH host keys..." -ForegroundColor Cyan
+    Write-Host "ssh: starting sshd temporarily to generate SSH host keys..." -ForegroundColor Cyan
     Start-Service -Name 'sshd'
   }
 
@@ -99,10 +99,10 @@ function Initialize-SSHHostKey {
     # Advisory warning: a second apply run will succeed once the keys are fully
     # written to disk (for example if sshd initialisation takes longer than
     # StartupTimeoutSeconds on this hardware).
-    Write-Warning ("nucleus: sshd started but $MachineSshHostKeyPath still absent after " +
+    Write-Warning ("ssh: sshd started but $MachineSshHostKeyPath still absent after " +
                    "${StartupTimeoutSeconds}s.  Run apply again after sshd fully initializes.")
   }
   else {
-    Write-Host "nucleus: SSH host keys generated." -ForegroundColor Green
+    Write-Host "ssh: SSH host keys generated." -ForegroundColor Green
   }
 }
