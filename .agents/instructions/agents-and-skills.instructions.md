@@ -9,35 +9,35 @@ applyTo: "src/modules/agents.nix, src/modules/windows/sync-agentsskills.ps1, src
 ## Directory layout
 
 The `~/.agents/` directory is the runtime home for all agent configuration,
-prompts, and skills.  It is a real (writable) directory, **not** a whole-dir
+prompts, and skills. It is a real (writable) directory, **not** a whole-dir
 symlink into the repo tree.
 
-| Path | Owner | Purpose |
-|---|---|---|
-| `~/.agents/` | `agentsSymlink` activation | Real directory; per-subdir symlinks for every `src/modules/configs/agents/` entry except `skills/` |
-| `~/.agents/skills/` | `agentsSkills` activation | Real directory; per-skill symlinks for bundled skills + real dirs for fetched skills |
-| `~/.agents/skills/<name>/` (symlink) | `agentsSkills` | Bundled skill committed to `src/modules/configs/agents/skills/<name>/` |
-| `~/.agents/skills/<name>/` (real dir) | `syncClawhubSkills` / `Sync-AgentsClawhubSkills` | Fetched skill downloaded by clawhub; contains a `.clawhub/origin.json` marker |
+| Path                                  | Owner                                            | Purpose                                                                                            |
+| ------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `~/.agents/`                          | `agentsSymlink` activation                       | Real directory; per-subdir symlinks for every `src/modules/configs/agents/` entry except `skills/` |
+| `~/.agents/skills/`                   | `agentsSkills` activation                        | Real directory; per-skill symlinks for bundled skills + real dirs for fetched skills               |
+| `~/.agents/skills/<name>/` (symlink)  | `agentsSkills`                                   | Bundled skill committed to `src/modules/configs/agents/skills/<name>/`                             |
+| `~/.agents/skills/<name>/` (real dir) | `syncClawhubSkills` / `Sync-AgentsClawhubSkills` | Fetched skill downloaded by clawhub; contains a `.clawhub/origin.json` marker                      |
 
-The per-subdir layout replaces an older whole-dir symlink scheme.  The old
+The per-subdir layout replaces an older whole-dir symlink scheme. The old
 scheme forced every clawhub download into the tracked repo tree; the real-dir
 layout lets the `skills/` subtree be writable without any writes entering Git.
 
 ## Bundled vs. fetched skills
 
 **Bundled**: AGPL-compatible license → commit all skill files to
-`src/modules/configs/agents/skills/<name>/`.  The `agentsSkills` activation
+`src/modules/configs/agents/skills/<name>/`. The `agentsSkills` activation
 creates a symlink at `~/.agents/skills/<name>` that points into the store.
 
 **Fetched**: non-AGPL-compatible license → never commit; list the skill slug in
-`src/modules/configs/agents/clawhub-skills.json` under `"skills"`.  The
+`src/modules/configs/agents/clawhub-skills.json` under `"skills"`. The
 `syncClawhubSkills` activation in `src/modules/agents.nix` runs the fetched
 skill convergence logic inline, downloading skills at apply time via the
 clawhub CLI.
 
 The `.clawhub/origin.json` marker written by clawhub during install is the
 **sole** reliable signal that a directory in `~/.agents/skills/` is a fetched
-download.  Stale cleanup must check for this marker before removing any
+download. Stale cleanup must check for this marker before removing any
 directory; directories without it (bundled symlinks, user content) are never
 removed.
 
@@ -49,7 +49,7 @@ can write there.
 ## Permission locking
 
 Installed skill files are locked read-only after each install or update to
-prevent accidental modification outside a managed apply run.  The lock is
+prevent accidental modification outside a managed apply run. The lock is
 cleared before an update so clawhub can overwrite existing files.
 
 **POSIX**: `chmod -R a-w` after install; `chmod -R u+w` before update/cleanup.
@@ -63,14 +63,14 @@ stricter `$restrictAcl` block (`icacls /inheritance:r /grant:r`) on top of
 
 ## Clawhub provisioning
 
-Clawhub is the install vehicle for fetched skills.  It is a JS CLI tool absent
+Clawhub is the install vehicle for fetched skills. It is a JS CLI tool absent
 from nixpkgs, cargo-binstall, WinGet, and Scoop — bun is therefore the only
 viable install tier.
 
 ### POSIX
 
 Clawhub is installed and managed declaratively by the `installBunPackages`
-Home Manager activation in `src/modules/agents.nix`.  The activation:
+Home Manager activation in `src/modules/agents.nix`. The activation:
 
 1. Prepends `~/.bun/bin` to `PATH` for the current session.
 2. Guards that `bun` is on `PATH` (provided by `pkgs.bun` via `core.nix`).
@@ -80,7 +80,7 @@ Home Manager activation in `src/modules/agents.nix`.  The activation:
 6. Persists the managed set to `~/.config/nucleus/bun-packages.json`.
 
 **Do not add a fallback `bun install -g clawhub` call inside** the
-`syncClawhubSkills` activation logic.  If clawhub is absent when sync runs,
+`syncClawhubSkills` activation logic. If clawhub is absent when sync runs,
 the `installBunPackages` activation failed; sync must warn and skip rather
 than attempt a second install.
 
@@ -88,13 +88,13 @@ than attempt a second install.
 
 Clawhub is managed by `Invoke-BunSetup` in
 `src/modules/windows/bun-setup.ps1`, which is called by `apply.ps1` before
-`Sync-AgentsClawhubSkills`.  `Invoke-BunSetup` manages a
+`Sync-AgentsClawhubSkills`. `Invoke-BunSetup` manages a
 `$desiredPackages` list (currently `@mariozechner/pi-coding-agent` and
 `clawhub`) and writes a manifest to
 `%USERPROFILE%\.config\nucleus\bun-packages.json`.
 
 **Do not add a fallback `bun install -g clawhub` call inside**
-`Sync-AgentsClawhubSkills`.  If clawhub is absent when the function runs,
+`Sync-AgentsClawhubSkills`. If clawhub is absent when the function runs,
 `Invoke-BunSetup` failed; the function must warn and skip.
 
 ## Activation DAG (POSIX)
@@ -109,6 +109,7 @@ linkGeneration
 ```
 
 Both `installBunPackages` and `syncClawhubSkills` must be added to:
+
 - `displayHostManualInstructionDeps` in `src/modules/macos.nix`
 - `entryAfter` list of `displayHostManualInstructions` in `src/modules/linux.nix`
 
@@ -126,18 +127,18 @@ WinGet DSC (system.dsc.yml)
 
 ## Key files
 
-| File | Purpose |
-|---|---|
-| `src/modules/agents.nix` | POSIX activation DAG: `agentsSymlink`, `agentsSkills`, `installBunPackages`, `syncClawhubSkills` |
-| `src/modules/macos.nix` | `displayHostManualInstructionDeps` must include all activation names |
-| `src/modules/linux.nix` | `displayHostManualInstructions` `entryAfter` must include all activation names |
-| `src/hosts/windows/apply.ps1` | Windows orchestrator; displays `MANUAL.md` as the final step after all convergence |
-| `src/modules/configs/agents/clawhub-skills.json` | Declarative fetched skill manifest (`{"skills":[...slugs...]}`) |
-| `src/modules/configs/agents/skills/` | Bundled (committed, AGPL-compatible) skill directories |
-| `src/modules/windows/bun-setup.ps1` | Windows bun global package manager; includes clawhub |
-| `src/modules/windows/sync-agentsskills.ps1` | Windows bundled skill sync |
-| `src/modules/windows/sync-agentsclawhubskills.ps1` | Windows fetched skill sync; expects clawhub pre-installed by `Invoke-BunSetup` |
-| `src/hosts/windows/apply.ps1` | Windows orchestrator; calls `Invoke-BunSetup` before `Sync-AgentsClawhubSkills` |
+| File                                               | Purpose                                                                                          |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `src/modules/agents.nix`                           | POSIX activation DAG: `agentsSymlink`, `agentsSkills`, `installBunPackages`, `syncClawhubSkills` |
+| `src/modules/macos.nix`                            | `displayHostManualInstructionDeps` must include all activation names                             |
+| `src/modules/linux.nix`                            | `displayHostManualInstructions` `entryAfter` must include all activation names                   |
+| `src/hosts/windows/apply.ps1`                      | Windows orchestrator; displays `MANUAL.md` as the final step after all convergence               |
+| `src/modules/configs/agents/clawhub-skills.json`   | Declarative fetched skill manifest (`{"skills":[...slugs...]}`)                                  |
+| `src/modules/configs/agents/skills/`               | Bundled (committed, AGPL-compatible) skill directories                                           |
+| `src/modules/windows/bun-setup.ps1`                | Windows bun global package manager; includes clawhub                                             |
+| `src/modules/windows/sync-agentsskills.ps1`        | Windows bundled skill sync                                                                       |
+| `src/modules/windows/sync-agentsclawhubskills.ps1` | Windows fetched skill sync; expects clawhub pre-installed by `Invoke-BunSetup`                   |
+| `src/hosts/windows/apply.ps1`                      | Windows orchestrator; calls `Invoke-BunSetup` before `Sync-AgentsClawhubSkills`                  |
 
 ## Authoring rules
 
@@ -149,7 +150,7 @@ WinGet DSC (system.dsc.yml)
   carry a `.clawhub/origin.json` marker; never touch bundled symlinks or unknown
   directories.
 - **Skill sync is best-effort**: a failed sync does not break the activated
-  system.  Print a warning and continue so `displayHostManualInstructions` is
+  system. Print a warning and continue so `displayHostManualInstructions` is
   always reached.
 - **Desired-package list sorted alphabetically**: keep `$desiredPackages` in
   `bun-setup.ps1` and the equivalent list in `installBunPackages` sorted.
