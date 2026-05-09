@@ -173,7 +173,7 @@ param(
   [switch]$Help,
   [string]$ModuleDir = (Join-Path -Path $PSScriptRoot -ChildPath "..\..\modules\windows"),
   [string]$PrimaryUsername = [System.Environment]::UserName,
-  [string[]]$Users = @(),  # Empty array defaults to @($PrimaryUsername) below
+  [string[]]$Users = @(),  # Array of users to configure; each user gets their secrets if defined in SOPS
   [bool]$EnableAgentsConfigParity = $true,
   [bool]$EnableAgentsSkillsParity = $true,
   [bool]$EnableAgentsClawhubSkillsParity = $true,
@@ -192,12 +192,10 @@ param(
   [switch]$SkipAiSync
 )
 
-# Default Users to @($PrimaryUsername) if not specified, maintaining backward compatibility.
+# Default to current user if no users specified.
 if ($Users.Count -eq 0) {
-  $Users = @($PrimaryUsername)
+  $Users = @([System.Environment]::UserName)
 }
-# Also ensure PrimaryUsername is set to the first user for backward compatibility.
-$PrimaryUsername = $Users[0]
 
 $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
@@ -326,10 +324,10 @@ foreach ($secretFile in $secretPreflightFiles) {
 }
 
 if ($EnableSecretsParity) {
-  Sync-NucleusSecrets -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -PrimaryUsername $PrimaryUsername -SopsExe $sopsExe
+  Sync-NucleusSecrets -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
 }
 else {
-  Remove-NucleusManagedSecrets -PrimaryUsername $PrimaryUsername
+  Remove-NucleusManagedSecrets -Users $Users
 }
 
 # Materialize decrypted wallpapers ahead of DSC so user.dsc.yml can resolve an
@@ -373,7 +371,7 @@ Sync-AgentsClawhubSkills -RepoRoot $repoRoot -Enabled:$EnableAgentsClawhubSkills
 Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity
 Sync-NucleusVsCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
-Sync-NucleusGitAndSshConfig -Enabled:$EnableGitSshParity -PrimaryUsername $PrimaryUsername
+Sync-NucleusGitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 Sync-NucleusShellProfile -Enabled:$EnableShellParity
 Sync-NucleusOpenSshServer -Enabled:$EnableRemoteAccessParity
 # Re-run host age key registration after Sync-NucleusOpenSshServer has started

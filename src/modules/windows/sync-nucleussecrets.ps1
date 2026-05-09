@@ -5,19 +5,22 @@
 function Sync-NucleusSecrets {
   <#
   .SYNOPSIS
-    Materializes primary-user personal SSH/GPG secrets from fixed secret files.
+    Materializes personal SSH/GPG secrets for users that have secrets defined.
 
   .DESCRIPTION
-    Resolves exactly three secret files from $SecretsDir (sorted):
+    Iterates over three SOPS-encrypted secret files (sorted):
       - git-identities.yml
       - gpg-personal.yml
       - ssh-personal.yml
 
-    Each file is passed to Sync-NucleusSecretFile, which extracts only
-    primary-user keys (`gpg_personal_${username}`, `git_identity_${username}`,
-    `ssh_personal_${username}`, `ssh_personal_${username}_pub`,
-    `ssh_personal_${username}_rsa`, and `ssh_personal_${username}_rsa_pub`)
-    and ignores all other keys.
+    For each file, decrypts it and checks which users in $Users have secrets
+    defined (keys matching `gpg_personal_<username>`, `git_identity_<username>`,
+    `ssh_personal_<username>`, `ssh_personal_<username>_pub`,
+    `ssh_personal_<username>_rsa`, or `ssh_personal_<username>_rsa_pub`).
+    Only those users are passed to Sync-NucleusSecretFile.  Users that have
+    no secrets in a given file are skipped gracefully.  Each user may have
+    a different set of secrets (or none); the function materializes only what
+    is actually defined for each user.
 
   .PARAMETER SecretsDir
     Absolute path to the directory containing SOPS-encrypted YAML files.
@@ -35,14 +38,14 @@ function Sync-NucleusSecrets {
   .PARAMETER SopsExe
     Absolute path to the sops executable.
 
-  .PARAMETER PrimaryUsername
-    Canonical primary username allowed to materialize/import secrets.
+  .PARAMETER Users
+    Array of usernames for which to materialize/import secrets.
 
   .EXAMPLE
     Sync-NucleusSecrets -SecretsDir '.\secrets' -GpgExe 'gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
       -PrimarySshKeyPath "$HOME\.ssh\ssh_personal_polyipseity" -SopsExe 'sops.exe' `
-      -PrimaryUsername 'polyipseity'
+      -Users @('polyipseity', 'otheruser')
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -61,12 +64,8 @@ function Sync-NucleusSecrets {
     [string]$SopsExe,
 
     [Parameter(Mandatory = $true)]
-    [string]$PrimaryUsername
+    [string[]]$Users
   )
-
-  if (-not (Test-NucleusPrimaryUser -PrimaryUsername $PrimaryUsername)) {
-    return
-  }
 
   if (-not (Test-Path -Path $SecretsDir)) {
     Write-Host "No secrets directory found at $SecretsDir; skipping key provisioning." -ForegroundColor Yellow
@@ -80,6 +79,35 @@ function Sync-NucleusSecrets {
       continue
     }
 
-    Sync-NucleusSecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
+    $decryptedContent = & $SopsExe -d $secretPath 2>&1
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "sops: failed to decrypt $secretFileName; skipping" -ForegroundColor Yellow
+      continue
+    }
+
+    $decryptedYaml = $decryptedContent | ConvertFrom-Yaml -Ordered
+    $secretKeys = @($decryptedYaml.PSObject.Properties.Name)
+    $usersInThisFile = @()
+
+    foreach ($user in $Users) {
+      $hasSecret = $false
+      foreach ($key in $secretKeys) {
+        if ($key -cmatch "_${user}$" -or $key -eq "git_identity_$user" -or $key -eq "gpg_personal_$user" -or $key -eq "ssh_personal_$user") {
+          $hasSecret = $true
+          break
+        }
+      }
+      if ($hasSecret) {
+        $usersInThisFile += $user
+      }
+    }
+
+    if ($usersInThisFile.Count -eq 0) {
+      continue
+    }
+
+    foreach ($user in $usersInThisFile) {
+      Sync-NucleusSecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe -PrimaryUsername $user
+    }
   }
 }
