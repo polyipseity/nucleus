@@ -224,7 +224,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "shell.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsconfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsskill.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsclawhunskill.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsclawhubskill.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-secretfile.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-secret.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-vscodeextension.ps1")
