@@ -1,8 +1,8 @@
-# modules/windows/sync-secrets.ps1 — Baseline managed secret sync entrypoint.
+# modules/windows/sync-secret.ps1 — Baseline managed secret sync entrypoint.
 #
 # Materializes the fixed secret inventory expected by Windows host orchestration.
 
-function Sync-Secrets {
+function Sync-Secret {
   <#
   .SYNOPSIS
     Materializes personal SSH/GPG secrets for users that have secrets defined.

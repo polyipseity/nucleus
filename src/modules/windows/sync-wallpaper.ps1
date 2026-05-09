@@ -1,9 +1,9 @@
-# modules/windows/sync-wallpapers.ps1 — Managed wallpaper materialization.
+# modules/windows/sync-wallpaper.ps1 — Managed wallpaper materialization.
 
 # Decrypts wallpaper blobs into the declarative output directory and returns the
 # first active file path for DSC token replacement.
 
-function Sync-Wallpapers {
+function Sync-Wallpaper {
   <#
   .SYNOPSIS
     Decrypts all SOPS-encrypted wallpaper blobs for each managed user and returns

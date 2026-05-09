@@ -206,7 +206,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "cargo-binstall-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "convert-sshpublickeytoage.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-decryptedblob.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "get-secrets.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "get-secret.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "git-ssh.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "initialize-sshhostkey.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-jitsecretmaterialization.ps1")
@@ -216,20 +216,20 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "rdp.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "register-hostagekey.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remote-access.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-managedsecrets.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpapers.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-managedsecret.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "resolve-executable.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "scoop-setup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "set-vscodeworkspacetrust.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "shell.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsconfig.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsskills.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsclawhubskills.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsskill.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsclawhunskill.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-secretfile.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-secrets.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-vscodeextensions.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-vscodesettings.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-wallpapers.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-secret.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-vscodeextension.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-vscodesetting.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-wallpaper.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-vscodeconfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "test-primaryuser.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "verify-archiving-stack.ps1")
@@ -315,14 +315,14 @@ foreach ($secretFile in $secretPreflightFiles) {
   }
 
   # Fail fast if current machine identities cannot decrypt managed secrets.
-  Get-Secrets -FilePath $secretPath -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe | Out-Null
+  Get-Secret -FilePath $secretPath -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe | Out-Null
 }
 
 if ($EnableSecretsParity) {
-  Sync-Secrets -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
+  Sync-Secret -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
 }
 else {
-  Remove-ManagedSecrets -Users $Users
+  Remove-ManagedSecret -Users $Users
 }
 
 # Materialize decrypted wallpapers ahead of DSC so user.dsc.yml can resolve an
@@ -339,8 +339,8 @@ Invoke-SecretVerification `
   -SecretsDir $secretsDir `
   -WallpaperAssetsDir $wallpaperAssetsDir
 
-$activeWallpaperPath = Sync-Wallpapers -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -SopsExe $sopsExe
-Remove-StaleWallpapers -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
+$activeWallpaperPath = Sync-Wallpaper -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -SopsExe $sopsExe
+Remove-StaleWallpaper -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
 
 foreach ($configFile in $ConfigFiles) {
   Invoke-WingetConfiguration -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath $configFile) -WallpaperPath $activeWallpaperPath
@@ -361,10 +361,10 @@ if ($EnableBunParity) {
 }
 
 Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
-Sync-AgentsSkills -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
-Sync-AgentsClawhubSkills -RepoRoot $repoRoot -Enabled:$EnableAgentsClawhubSkillsParity
+Sync-AgentsSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
+Sync-AgentsClawhubSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsClawhubSkillsParity
 Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity
-Sync-VSCodeExtensions -Enabled:$EnableVsCodeExtensionsParity
+Sync-VSCodeExtension -Enabled:$EnableVsCodeExtensionsParity
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 Sync-ShellProfile -Enabled:$EnableShellParity

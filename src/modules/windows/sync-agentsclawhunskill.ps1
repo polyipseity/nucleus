@@ -42,13 +42,13 @@
   None.  Writes status messages to the host.
 
 .EXAMPLE
-  Sync-AgentsClawhubSkills -RepoRoot 'C:\Users\guest\repos\nucleus'
+  Sync-AgentsClawhubSkill -RepoRoot 'C:\Users\guest\repos\nucleus'
 
 .EXAMPLE
   # Skip the fetched skill sync without removing any existing downloads:
-  Sync-AgentsClawhubSkills -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
+  Sync-AgentsClawhubSkill -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
 #>
-function Sync-AgentsClawhubSkills {
+function Sync-AgentsClawhubSkill {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]

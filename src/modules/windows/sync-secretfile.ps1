@@ -140,7 +140,7 @@ function Sync-SecretFile {
   }
 
   Write-Output "$($PSStyle.Foreground.Cyan)Processing secrets from: $($secretFileInfo.Name)$($PSStyle.Reset)"
-  $jsonSecrets = Get-Secrets -FilePath $secretFileInfo.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe
+  $jsonSecrets = Get-Secret -FilePath $secretFileInfo.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe
 
   if ($null -ne $jsonSecrets.PSObject.Properties[$sshSecretName]) {
     $sshKeyPath = Join-Path -Path $sshDir -ChildPath $sshSecretName
