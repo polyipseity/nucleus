@@ -25,6 +25,7 @@ function Remove-StaleWallpapers {
   .EXAMPLE
     Remove-NucleusStaleWallpapers -AssetsDir '.\assets\wallpapers' -OutputDir "$HOME\Pictures\wallpapers"
   #>
+  [CmdletBinding(SupportsShouldProcess = $true)]
   param(
     [Parameter(Mandatory = $true)]
     [string]$AssetsDir,
@@ -63,8 +64,10 @@ function Remove-StaleWallpapers {
       # Use -ErrorAction Stop so the catch block can distinguish a real failure
       # (e.g. file locked by the display subsystem) from a successful removal.
       try {
-        Remove-Item -Path $decryptedWallpaper.FullName -Force -ErrorAction Stop
-        Write-Output "Removed stale wallpaper: $($decryptedWallpaper.Name)"
+        if ($PSCmdlet.ShouldProcess($decryptedWallpaper.FullName, 'Remove')) {
+          Remove-Item -Path $decryptedWallpaper.FullName -Force -ErrorAction Stop
+          Write-Output "Removed stale wallpaper: $($decryptedWallpaper.Name)"
+        }
       }
       catch {
         Write-Warning "wallpapers: failed to remove stale wallpaper '$($decryptedWallpaper.Name)': $_"

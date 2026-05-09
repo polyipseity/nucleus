@@ -38,7 +38,7 @@ function Set-VscodeWorkspaceTrust {
   Set-VscodeWorkspaceTrust -Enabled:$false
   # No-op; skips all trust DB writes.
 #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true)]
     param(
         [bool]$Enabled = $true
     )
@@ -142,9 +142,11 @@ for (const dbPath of dbPaths) {
 
         # Pass uriPath and each DB path as positional arguments so the script
         # body contains no interpolated values and is safe to write as a literal.
-        & $bunCmd.Source $tempScript $uriPath @dbPaths
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "vscode-workspace-trust: Set-VscodeWorkspaceTrust: bun script exited with code $LASTEXITCODE"
+        if ($PSCmdlet.ShouldProcess("VS Code workspace trust database", "Set")) {
+            & $bunCmd.Source $tempScript $uriPath @dbPaths
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "vscode-workspace-trust: Set-VscodeWorkspaceTrust: bun script exited with code $LASTEXITCODE"
+            }
         }
     }
     finally {

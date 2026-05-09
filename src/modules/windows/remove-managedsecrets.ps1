@@ -25,6 +25,7 @@ function Remove-ManagedSecrets {
   .EXAMPLE
     Remove-NucleusManagedSecrets -Users @('polyipseity', 'someone')
   #>
+  [CmdletBinding(SupportsShouldProcess = $true)]
   param(
     [Parameter(Mandatory = $true)]
     [string[]]$Users
@@ -47,7 +48,9 @@ function Remove-ManagedSecrets {
         (Join-Path -Path $configDir -ChildPath 'managed-ssh-keys')
       )) {
       if (Test-Path -Path $managedPath) {
-        Remove-Item -Path $managedPath -Force
+        if ($PSCmdlet.ShouldProcess($managedPath, 'Remove')) {
+          Remove-Item -Path $managedPath -Force
+        }
       }
     }
   }
