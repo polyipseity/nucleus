@@ -188,29 +188,29 @@ $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
-. (Join-Path -Path $resolvedModuleDir -ChildPath "ai-sync.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "bun-setup.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "cargo-binstall-setup.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "convert-sshpublickeytoage.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-aisync.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-bunsetup.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-cargobinstallsetup.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "convertfrom-sshed25519publickeytoagepubkey.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-decryptedblob.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "get-secret.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "git-ssh.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-gitandsshconfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "initialize-sshhostkey.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-jitsecretmaterialization.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-secretverification.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-wingetconfiguration.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "load-userregistry.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "power.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "provision-devdirectory.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "rdp.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "register-hostagekey.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "remote-access.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-powerpolicy.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "initialize-devdirectory.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-windowsrdp.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "register-hostaagekey.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-opensshserver.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-managedsecret.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "resolve-executable.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "scoop-setup.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-scoopsetup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "set-vscodeworkspacetrust.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "shell.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-shellprofile.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsconfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsskill.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsclawhubskill.ps1")
@@ -378,7 +378,7 @@ Sync-VSCodeExtension -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
-Sync-ShellProfile -Enabled:$EnableShellParity -Username $Users[0]
+Sync-ShellProfile -Enabled:$EnableShellParity
 Sync-OpenSshServer -Enabled:$EnableRemoteAccessParity
 # Re-run host age key registration after Sync-OpenSshServer has started
 # the sshd service (which generates host keys on a fresh machine).  This second

@@ -35,23 +35,15 @@ function Sync-ShellProfile {
     explicitly choose true (apply) or false (cleanup). False removes the managed
     block from profile files.
 
-  .PARAMETER Username
-    Username for which the shell profile is being managed. Explicitly passed
-    to ensure caller is aware of which user's profile will be modified.
-    Defaults to the current user if omitted, but the parameter must be present
-    in the signature to force awareness of user context.
+  .EXAMPLE
+    Sync-ShellProfile -Enabled:$true
 
   .EXAMPLE
-    Sync-ShellProfile -Enabled:$true -Username 'admin'
-
-  .EXAMPLE
-    Sync-ShellProfile -Enabled:$false -Username 'guest'
+    Sync-ShellProfile -Enabled:$false
   #>
   param(
     [Parameter(Mandatory)]
-    [bool]$Enabled,
-    [Parameter()]
-    [string]$Username = [System.Environment]::UserName
+    [bool]$Enabled
   )
 
   $managedBlockStart = '# >>> config managed shell parity >>>'
