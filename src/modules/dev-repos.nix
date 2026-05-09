@@ -149,9 +149,11 @@ in
         printf '%s\n' "$repoRoot"
       }
 
-      # Read only top-level submodule paths from .gitmodules. The earlier
-      # name-only query returned config keys rather than paths, so nested repo
-      # initialization quietly targeted nonsense paths.
+      # Read submodule paths from the repository root .gitmodules file. That
+      # file already enumerates the repo's direct submodules, and many valid
+      # direct entries live under grouping prefixes such as ext/foo or self/bar.
+      # Do not reject paths with '/': that was skipping every grouped direct
+      # submodule in the monorepo layout.
       list_direct_submodules() {
         repoTarget="$1"
 
@@ -161,13 +163,7 @@ in
         fi
 
         printf '%s\n' "$submoduleConfig" | while IFS=' ' read -r _submoduleKey _submodulePath; do
-          case "$_submodulePath" in
-            */*)
-              ;;
-            *)
-              printf '%s\n' "$_submodulePath"
-              ;;
-          esac
+          printf '%s\n' "$_submodulePath"
         done
       }
 
@@ -251,7 +247,7 @@ in
             if directSubmodules=$(list_direct_submodules "$repoTarget"); then
               for submodulePath in $directSubmodules; do
                 submoduleTarget="$repoTarget/$submodulePath"
-                if [ ! -d "$submoduleTarget/.git" ]; then
+                if [ ! -e "$submoduleTarget/.git" ]; then
                   if submoduleErr=$(cd "$repoTarget" && "$gitBin" submodule update --init "$submodulePath" 2>&1); then
                     echo "devReposProvision: initialized direct submodule $submodulePath in $repoName"
                   else
@@ -286,7 +282,7 @@ in
             if directSubmodules=$(list_direct_submodules "$repoTarget"); then
               for submodulePath in $directSubmodules; do
                 submoduleTarget="$repoTarget/$submodulePath"
-                if [ ! -d "$submoduleTarget/.git" ]; then
+                if [ ! -e "$submoduleTarget/.git" ]; then
                   if submoduleErr=$(cd "$repoTarget" && "$gitBin" submodule update --init "$submodulePath" 2>&1); then
                     echo "devReposProvision: initialized direct submodule $submodulePath in $repoName"
                   else

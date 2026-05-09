@@ -424,7 +424,7 @@ if ($null -eq $EnableDevReposParity) {
   $EnableDevReposParity = $devReposEnabled
 }
 
-Sync-DevRepos -Enabled:$EnableDevReposParity -Repositories $devRepositories
+Sync-DevRepo -Enabled:$EnableDevReposParity -Repositories $devRepositories
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 Sync-ShellProfile -Enabled:$EnableShellParity

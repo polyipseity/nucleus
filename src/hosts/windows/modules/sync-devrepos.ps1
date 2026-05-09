@@ -12,7 +12,7 @@
 #   • soft-fail on errors (write warnings, do not throw)
 #   • remote URLs are verified and updated if needed
 
-function Sync-DevRepos {
+function Sync-DevRepo {
   <#
   .SYNOPSIS
     Provision development repositories in ~/dev on Windows.
@@ -49,10 +49,10 @@ function Sync-DevRepos {
       @{ name = 'nucleus'; target = 'dev\nucleus'; symlink = 'C:\path\to\repo' }
       @{ name = 'monorepo'; target = 'dev\monorepo'; url = 'git@github.com:user/monorepo.git' }
     )
-    Sync-DevRepos -Enabled:$true -Repositories $repos
+    Sync-DevRepo -Enabled:$true -Repositories $repos
 
   .EXAMPLE
-    Sync-DevRepos -Enabled:$false
+    Sync-DevRepo -Enabled:$false
   #>
   param(
     [Parameter()]
@@ -63,12 +63,12 @@ function Sync-DevRepos {
   )
 
   if (-not $Enabled) {
-    Write-Verbose "Sync-DevRepos: provisioning is disabled."
+    Write-Verbose "Sync-DevRepo: provisioning is disabled."
     return
   }
 
   if ($Repositories.Count -eq 0) {
-    Write-Verbose "Sync-DevRepos: no repositories configured for this user."
+    Write-Verbose "Sync-DevRepo: no repositories configured for this user."
     return
   }
 
@@ -79,16 +79,17 @@ function Sync-DevRepos {
   if (-not (Test-Path -PathType Container -Path $devDir)) {
     try {
       New-Item -ItemType Directory -Path $devDir -Force | Out-Null
-      Write-Verbose "Sync-DevRepos: created dev directory at $devDir"
+      Write-Verbose "Sync-DevRepo: created dev directory at $devDir"
     }
     catch {
-      Write-Warning "Sync-DevRepos: failed to create dev directory $devDir : $_"
+      Write-Warning "Sync-DevRepo: failed to create dev directory $devDir : $_"
       return
     }
   }
 
   # Helper function: create a symlink for a repository.
   function New-RepositorySymlink {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
       [Parameter(Mandatory = $true)]
       [string]$SymlinkTarget,
@@ -104,11 +105,13 @@ function Sync-DevRepos {
       try {
         # On Windows, use New-Item with -ItemType SymbolicLink.
         # Requires admin or developer mode on Windows 10+.
-        New-Item -ItemType SymbolicLink -Path $SymlinkPath -Target $SymlinkTarget -Force -ErrorAction Stop | Out-Null
-        Write-Verbose "Sync-DevRepos: created symlink $SymlinkPath -> $SymlinkTarget"
+        if ($PSCmdlet.ShouldProcess($SymlinkPath, "Create symlink to $SymlinkTarget")) {
+          New-Item -ItemType SymbolicLink -Path $SymlinkPath -Target $SymlinkTarget -Force -ErrorAction Stop | Out-Null
+          Write-Verbose "Sync-DevRepo: created symlink $SymlinkPath -> $SymlinkTarget"
+        }
       }
       catch {
-        Write-Warning "Sync-DevRepos: failed to create symlink for $RepoName : $_"
+        Write-Warning "Sync-DevRepo: failed to create symlink for $RepoName : $_"
       }
     }
   }
@@ -136,25 +139,27 @@ function Sync-DevRepos {
         if ($currentRemote -ne $RepoUrl) {
           & git -C $RepoTarget remote set-url origin $RepoUrl 2>$null
           if ($LASTEXITCODE -eq 0) {
-            Write-Verbose "Sync-DevRepos: updated remote for $RepoName to $RepoUrl"
+            Write-Verbose "Sync-DevRepo: updated remote for $RepoName to $RepoUrl"
           }
           else {
-            Write-Warning "Sync-DevRepos: failed to update remote for $RepoName (soft fail)"
+            Write-Warning "Sync-DevRepo: failed to update remote for $RepoName (soft fail)"
           }
         }
       }
       catch {
-        Write-Warning "Sync-DevRepos: error checking remote for $RepoName : $_"
+        Write-Warning "Sync-DevRepo: error checking remote for $RepoName : $_"
       }
 
       # Ensure direct submodules are initialized.
       try {
         $gitmodulesPath = Join-Path -Path $RepoTarget -ChildPath '.gitmodules'
         if (Test-Path -Path $gitmodulesPath) {
-          # Parse .gitmodules to find direct submodule paths (no slashes).
+          # Parse paths from the repository root .gitmodules file. That file
+          # already enumerates the direct submodules, and grouped paths such as
+          # ext\foo or self\bar are still direct entries in this repo layout.
           $submodulePaths = @()
           Get-Content -Path $gitmodulesPath | ForEach-Object {
-            if ($_ -match '^\s*path\s*=\s*([^\s/]+)\s*$') {
+            if ($_ -match '^\s*path\s*=\s*(\S+)\s*$') {
               $submodulePaths += $Matches[1]
             }
           }
@@ -162,20 +167,20 @@ function Sync-DevRepos {
           foreach ($submodulePath in $submodulePaths) {
             $submoduleTarget = Join-Path -Path $RepoTarget -ChildPath $submodulePath
             $submoduleGitDir = Join-Path -Path $submoduleTarget -ChildPath '.git'
-            if (-not (Test-Path -PathType Container -Path $submoduleGitDir)) {
+            if (-not (Test-Path -Path $submoduleGitDir)) {
               & git -C $RepoTarget submodule update --init $submodulePath 2>$null
               if ($LASTEXITCODE -eq 0) {
-                Write-Verbose "Sync-DevRepos: initialized direct submodule $submodulePath in $RepoName"
+                Write-Verbose "Sync-DevRepo: initialized direct submodule $submodulePath in $RepoName"
               }
               else {
-                Write-Warning "Sync-DevRepos: failed to initialize direct submodule $submodulePath in $RepoName (soft fail)"
+                Write-Warning "Sync-DevRepo: failed to initialize direct submodule $submodulePath in $RepoName (soft fail)"
               }
             }
           }
         }
       }
       catch {
-        Write-Warning "Sync-DevRepos: error initializing submodules for $RepoName : $_"
+        Write-Warning "Sync-DevRepo: error initializing submodules for $RepoName : $_"
       }
 
       return
@@ -183,7 +188,7 @@ function Sync-DevRepos {
 
     # Repo not initialized; check if target exists and is non-empty.
     if ((Test-Path -Path $RepoTarget) -and (Get-ChildItem -Path $RepoTarget -ErrorAction SilentlyContinue | Measure-Object).Count -gt 0) {
-      Write-Warning "Sync-DevRepos: $RepoTarget exists but is not a git repo (soft fail)"
+      Write-Warning "Sync-DevRepo: $RepoTarget exists but is not a git repo (soft fail)"
       return
     }
 
@@ -195,7 +200,7 @@ function Sync-DevRepos {
 
       & git clone $RepoUrl $RepoTarget 2>$null
       if ($LASTEXITCODE -eq 0) {
-        Write-Verbose "Sync-DevRepos: cloned $RepoName to $RepoTarget"
+        Write-Verbose "Sync-DevRepo: cloned $RepoName to $RepoTarget"
 
         # Initialize direct submodules after clone.
         try {
@@ -203,7 +208,7 @@ function Sync-DevRepos {
           if (Test-Path -Path $gitmodulesPath) {
             $submodulePaths = @()
             Get-Content -Path $gitmodulesPath | ForEach-Object {
-              if ($_ -match '^\s*path\s*=\s*([^\s/]+)\s*$') {
+              if ($_ -match '^\s*path\s*=\s*(\S+)\s*$') {
                 $submodulePaths += $Matches[1]
               }
             }
@@ -211,31 +216,31 @@ function Sync-DevRepos {
             foreach ($submodulePath in $submodulePaths) {
               & git -C $RepoTarget submodule update --init $submodulePath 2>$null
               if ($LASTEXITCODE -eq 0) {
-                Write-Verbose "Sync-DevRepos: initialized direct submodule $submodulePath in $RepoName"
+                Write-Verbose "Sync-DevRepo: initialized direct submodule $submodulePath in $RepoName"
               }
               else {
-                Write-Warning "Sync-DevRepos: failed to initialize direct submodule $submodulePath in $RepoName (soft fail)"
+                Write-Warning "Sync-DevRepo: failed to initialize direct submodule $submodulePath in $RepoName (soft fail)"
               }
             }
           }
         }
         catch {
-          Write-Warning "Sync-DevRepos: error initializing submodules after clone for $RepoName : $_"
+          Write-Warning "Sync-DevRepo: error initializing submodules after clone for $RepoName : $_"
         }
       }
       else {
-        Write-Warning "Sync-DevRepos: failed to clone $RepoName from $RepoUrl (soft fail)"
+        Write-Warning "Sync-DevRepo: failed to clone $RepoName from $RepoUrl (soft fail)"
       }
     }
     catch {
-      Write-Warning "Sync-DevRepos: error during clone of $RepoName : $_"
+      Write-Warning "Sync-DevRepo: error during clone of $RepoName : $_"
     }
   }
 
   # Provision repositories from the passed list.
   foreach ($repo in $Repositories) {
     if ($null -eq $repo -or $null -eq $repo.name -or $null -eq $repo.target) {
-      Write-Warning "Sync-DevRepos: repository entry missing required 'name' or 'target' field (skipping)"
+      Write-Warning "Sync-DevRepo: repository entry missing required 'name' or 'target' field (skipping)"
       continue
     }
 
@@ -250,9 +255,9 @@ function Sync-DevRepos {
       Initialize-RepositoryWithSubmodule -RepoUrl $repo.url -RepoTarget $repoTarget -RepoName $repoName
     }
     else {
-      Write-Warning "Sync-DevRepos: repository '$repoName' has neither 'symlink' nor 'url' configured (skipping)"
+      Write-Warning "Sync-DevRepo: repository '$repoName' has neither 'symlink' nor 'url' configured (skipping)"
     }
   }
 
-  Write-Verbose "Sync-DevRepos: completed provisioning dev repositories"
+  Write-Verbose "Sync-DevRepo: completed provisioning dev repositories"
 }
