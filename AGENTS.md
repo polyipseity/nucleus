@@ -282,6 +282,12 @@ Darwin bridge symlinks only apply when the backend resolves to Homebrew.
   stay the final activation step. It must depend on every other macOS/Home
   Manager activation entry in that module, and any newly added activation step
   must be added to its dependency list in the same change.
+- **Activation Invariant: Dev Repos After Secrets** —
+  `src/modules/dev-repos.nix` `home.activation.devReposProvision` must stay
+  after the secret-materialization activations from `src/modules/secrets.nix`
+  (`waitForSopsSecrets`, `gitIdentityFromSops`, `gpgImport`, `sshKeyAdopt`,
+  `verifySecretDecryption`) so Git-over-SSH provisioning always sees imported
+  keys and the final verified secret state before any clone/update runs.
 - **Manual-Step Visibility Invariant** — whenever a feature requires a user
   one-time action that cannot be automated safely (for example opening an app to
   finish helper/CLI installation or granting first-run permissions), add the
