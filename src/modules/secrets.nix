@@ -202,7 +202,7 @@ lib.mkIf isPrimaryUser {
       _wss_waited=$((_wss_waited + 1))
     done
     if [ ! -s "$_wss_sentinel" ]; then
-      echo "secrets: timed out after 30 s waiting for sops-nix to materialize secrets; sops-install-secrets may have failed or /etc/sops/age/machine.txt may be absent." >&2
+      echo "waitForSopsSecrets: timed out after 30 s waiting for sops-nix to materialize secrets; sops-install-secrets may have failed or /etc/sops/age/machine.txt may be absent." >&2
       exit 1
     fi
   '';
@@ -232,7 +232,7 @@ lib.mkIf isPrimaryUser {
     identity_path="${config.sops.secrets.${gitIdentitySecretName}.path}"
 
     if [ ! -f "$identity_path" ]; then
-      echo "secrets: missing decrypted Git identity secret at $identity_path." >&2
+      echo "gitIdentityFromSops: missing decrypted Git identity secret at $identity_path." >&2
       exit 1
     fi
 
@@ -241,7 +241,7 @@ lib.mkIf isPrimaryUser {
     identity_signing_key="$(/usr/bin/grep -m1 '^signingKey=' "$identity_path" | /usr/bin/cut -d '=' -f 2-)"
 
     if [ -z "$identity_name" ] || [ -z "$identity_email" ] || [ -z "$identity_signing_key" ]; then
-      echo "secrets: git identity payload must include name/email/signingKey entries." >&2
+      echo "gitIdentityFromSops: git identity payload must include name/email/signingKey entries." >&2
       exit 1
     fi
 
@@ -298,7 +298,7 @@ lib.mkIf isPrimaryUser {
     chmod 700 "$GNUPGHOME"
 
     if [ ! -f "${config.sops.secrets.${gpgSecretName}.path}" ]; then
-      echo "secrets: missing decrypted GPG secret at ${config.sops.secrets.${gpgSecretName}.path}; cannot import key material." >&2
+      echo "gpgImport: missing decrypted GPG secret at ${config.sops.secrets.${gpgSecretName}.path}; cannot import key material." >&2
       exit 1
     fi
 
@@ -321,9 +321,9 @@ lib.mkIf isPrimaryUser {
           # Only delete if the key is actually present in the keyring.
           if ${pkgs.gnupg}/bin/gpg --batch --list-secret-keys "$stale_fpr" >/dev/null 2>&1; then
             if ! ${pkgs.gnupg}/bin/gpg --batch --yes --delete-secret-and-public-key "$stale_fpr"; then
-              echo "secrets: warning — failed to delete stale managed GPG key $stale_fpr from keyring." >&2
+              echo "gpgImport: warning — failed to delete stale managed GPG key $stale_fpr from keyring." >&2
             else
-              echo "secrets: deleted stale managed GPG key $stale_fpr." >&2
+              echo "gpgImport: deleted stale managed GPG key $stale_fpr." >&2
             fi
           fi
         fi
