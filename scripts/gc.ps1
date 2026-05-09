@@ -46,8 +46,8 @@
   Skip stale wallpaper file cleanup.
 
 .EXAMPLE
-  .\scripts\gc.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -RepoRoot "C:\Users\polyipseity\nucleus"
-  .\scripts\gc.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -RepoRoot "C:\Users\polyipseity\nucleus" -SkipCargoCache
+  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -RepoRoot "C:\Users\admin\nucleus"
+  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -RepoRoot "C:\Users\admin\nucleus" -SkipCargoCache
 #>
 [CmdletBinding()]
 param(
@@ -67,8 +67,8 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 $resolvedRepoRoot  = (Resolve-Path -Path $RepoRoot).Path
 
 # Load only the modules required by this script.
-. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-nucleusstalewallpapers.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "ai-sync.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-aisync.ps1")
 
 # ---- Step 1: stale wallpaper cleanup ----------------------------------------
 # Keeps the decrypted gallery in sync with declarative source blobs.  Without
@@ -77,7 +77,7 @@ $resolvedRepoRoot  = (Resolve-Path -Path $RepoRoot).Path
 if (-not $SkipWallpaperPrune) {
   $wallpaperAssetsDir = Join-Path -Path $resolvedRepoRoot -ChildPath "src\assets\wallpapers"
   $wallpaperOutputDir = Join-Path -Path $env:USERPROFILE   -ChildPath "Pictures\wallpapers"
-  Remove-NucleusStaleWallpapers -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
+  Remove-StaleWallpaper -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
 }
 
 # ---- Step 2: cargo cache prune ----------------------------------------------

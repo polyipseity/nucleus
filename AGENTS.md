@@ -81,7 +81,7 @@
   PowerShell and batch scripts use CRLF.
 - **Executable bit policy**: every `.sh`, `.ps1`, and `.bat` file anywhere in
   the repository must be tracked in Git with mode `100755`. This includes
-  `src/hosts/windows/apply.ps1`, all `src/modules/windows/*.ps1`, and
+  `src/hosts/windows/apply.ps1`, all `src/hosts/windows/modules/*.ps1`, and
   `src/scripts/apply.sh`. Set the bit with
   `git update-index --chmod=+x <path>` when adding or renaming any script.
   Non-script files (`.env`, `.yml`, `.json`, `.nix`, `.md`, `.jsonc`) must
@@ -90,10 +90,10 @@
   long-extension YAML filenames. Exception: `.sops.yaml` is required by SOPS
   config discovery and must keep that exact name.
 - **Windows module path**: keep reusable PowerShell functions under
-  `src/modules/windows/*.ps1` using lowercase filenames; keep
+  `src/hosts/windows/modules/*.ps1` using lowercase filenames; keep
   `src/hosts/windows/apply.ps1` as a thin trigger/orchestrator.
 - **Windows function isolation**: keep one reusable PowerShell function per
-  lowercase file under `src/modules/windows/`; orchestrators (for example
+  lowercase file under `src/hosts/windows/modules/`; orchestrators (for example
   `src/hosts/windows/apply.ps1`) should dot-source only the modules needed for
   the current run.
 - **Static config externalization**: keep shared editor settings in standalone
@@ -364,9 +364,9 @@ a rotating gallery, never as a single static file.
   both Unix and Windows (for example secrets, fonts, or wallpapers), add or
   update both implementations in the same change:
   - Unix side under `src/modules/*.nix`
-  - Windows side under `src/modules/windows/*.ps1`
+  - Windows side under `src/hosts/windows/modules/*.ps1`
 - **Windows module enforcement**: all reusable PowerShell functions must live
-  under `src/modules/windows/*.ps1` with lowercase filenames; keep
+  under `src/hosts/windows/modules/*.ps1` with lowercase filenames; keep
   `src/hosts/windows/apply.ps1` orchestration-only.
 
 ## Key References

@@ -240,6 +240,16 @@ if ($Apply) {
     throw "Apply script not found: $applyScriptPath"
   }
 
+  # Windows apply requires an explicit module path so operators are aware of
+  # which helper modules will be loaded. Add a default here unless the caller
+  # already provided an explicit override in -ApplyArgs.
+  $effectiveApplyArgs = @($ApplyArgs)
+  $applyArgsText = ($effectiveApplyArgs -join " ")
+  if ($applyArgsText -notmatch "(?i)(^|\s)-ModuleDir(\s|$)") {
+    $defaultModuleDir = Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\windows\modules"
+    $effectiveApplyArgs += @("-ModuleDir", $defaultModuleDir)
+  }
+
   $healthCheckPath = Join-Path -Path $PSScriptRoot -ChildPath "health-check.ps1"
   if (Test-Path -Path $healthCheckPath) {
     & $healthCheckPath -MinFreeGB 10
@@ -249,7 +259,7 @@ if ($Apply) {
   }
 
   Write-Output "$($PSStyle.Foreground.Cyan)Running apply flow via $applyScriptPath$($PSStyle.Reset)"
-  & $applyScriptPath @ApplyArgs
+  & $applyScriptPath @effectiveApplyArgs
 
   if ($LASTEXITCODE -ne 0) {
     throw "Apply script exited with code $LASTEXITCODE."

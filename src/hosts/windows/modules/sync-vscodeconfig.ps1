@@ -1,4 +1,4 @@
-# modules/windows/sync-vscodeconfig.ps1 — VS Code git-backed config symlinks.
+# hosts/windows/modules/sync-vscodeconfig.ps1 — VS Code git-backed config symlinks.
 #
 # Replaces VS Code's per-channel config files and directories with symlinks
 # into the live repo tree (src/modules/configs/vscode/) so every VS Code write
@@ -100,11 +100,17 @@ function Sync-VscodeConfig {
     }
   }
 
+  # Build the target user's AppData\Roaming root from the explicit Username
+  # parameter so callers control which profile receives managed VS Code
+  # symlinks.
+  $userProfile = Join-Path -Path "C:\Users" -ChildPath $Username
+  $appDataRoaming = Join-Path -Path $userProfile -ChildPath "AppData\Roaming"
+
   # Both stable and insiders channels share the same repo-backed config so
   # edits in either channel appear in the same git diff.
   $channelDirs = @(
-    (Join-Path -Path $env:APPDATA -ChildPath "Code\User"),
-    (Join-Path -Path $env:APPDATA -ChildPath "Code - Insiders\User")
+    (Join-Path -Path $appDataRoaming -ChildPath "Code\User"),
+    (Join-Path -Path $appDataRoaming -ChildPath "Code - Insiders\User")
   )
 
   # Managed single files: ordered hashtable of repo file name -> channel-side

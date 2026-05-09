@@ -19,7 +19,7 @@
 
 .PARAMETER RepoRoot
   Root of the repository.  Defaults to two levels above $PSScriptRoot
-  (i.e. the repo root when called from src\modules\windows).
+  (i.e. the repo root when called from src\hosts\windows\modules).
 
 .PARAMETER DryRun
   Print planned actions without executing pulls or removals.
@@ -30,7 +30,7 @@
   downloading new models.
 
 .EXAMPLE
-  . .\src\modules\windows\ai-sync.ps1
+  . .\src\hosts\windows\modules\invoke-aisync.ps1
   Invoke-AiSync
   Invoke-AiSync -PruneOnly
   Invoke-AiSync -DryRun
@@ -156,5 +156,5 @@ function Invoke-AiSync {
   if ($DryRun)    { $flags += "dry-run" }
   if ($PruneOnly) { $flags += "prune-only" }
   $flagStr = if ($flags.Count -gt 0) { " ($($flags -join ', '))" } else { "" }
-  Write-Output "ai-sync: sync completed (profile=$profile$flagStr)"
+  Write-Output "ai-sync: sync completed (profile=$profileName$flagStr)"
 }

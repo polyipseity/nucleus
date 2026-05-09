@@ -113,7 +113,7 @@ When a Nix feature is restructured, moved, or replaced:
   wallpaper provisioning policy), update the Windows declarative path in the
   same change where practical:
   - `src/hosts/windows/*.dsc.yml` for declarative state
-  - `src/modules/windows/*.ps1` for reusable helper logic
+  - `src/hosts/windows/modules/*.ps1` for reusable helper logic
 - If a capability intentionally remains POSIX-only, add a short WHY comment in
   code explaining the platform constraint.
 - Follow `.agents/instructions/cross-host-feature-parity.instructions.md`
@@ -434,7 +434,7 @@ before handing off to `darwin-rebuild` / `nixos-rebuild`.
   using `nix run .#apply`.
 
 The equivalent Windows function is `Register-NucleusHostAgeKey` in
-`src/modules/windows/register-nucleushostagekey.ps1`, called from `apply.ps1`
+`src/hosts/windows/modules/register-hostaagekey.ps1`, called from `apply.ps1`
 when `$EnableHostAgeKeyRegistration` is `$true` (the default).
 
 ## Pre-provision key adoption semantics

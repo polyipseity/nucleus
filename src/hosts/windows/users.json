@@ -1,0 +1,10 @@
+{
+  "description": "Windows host user registry — defines users managed by this host configuration. Each user has a home directory and role (primary vs secondary). The primary user receives secret materialization; secondary users get base configuration only. This mirrors the Nix users/default.nix structure.",
+  "users": {
+    "polyipseity": {
+      "description": "Primary user receiving secret materialization and full configuration",
+      "homeDirectory": "C:\\Users\\polyipseity",
+      "isPrimary": true
+    }
+  }
+}

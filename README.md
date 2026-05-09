@@ -28,6 +28,7 @@ nucleus/
 │   │   ├── nixos/     (MANUAL, base, hardware/{cpu,disks,gpu}, networking, security, sops, users)
 │   │   └── windows/
 │   │       ├── apply.ps1
+│   │       ├── modules/  *.ps1
 │   │       ├── system.dsc.yml
 │   │       └── user.dsc.yml
 │   └── modules/
@@ -48,30 +49,7 @@ nucleus/
 │       ├── shell/
 │       │   ├── aliases.nix
 │       │   └── env.nix
-│       ├── wallpapers.nix
-│       └── windows/
-│           ├── convert-sshpublickeytoage.ps1
-│           ├── get-nucleusdecryptedblob.ps1
-│           ├── get-nucleussecrets.ps1
-│           ├── git-ssh.ps1
-│           ├── invoke-nucleusjitsecretmaterialization.ps1
-│           ├── invoke-nucleussecretverification.ps1
-│           ├── invoke-nucleuswingetconfiguration.ps1
-│           ├── power.ps1
-│           ├── rdp.ps1
-│           ├── register-nucleushostagekey.ps1
-│           ├── remote-access.ps1
-│           ├── remove-nucleusmanagedsecrets.ps1
-│           ├── remove-nucleusstalewallpapers.ps1
-│           ├── resolve-nucleusexecutable.ps1
-│           ├── shell.ps1
-│           ├── sync-nucleussecretfile.ps1
-│           ├── sync-nucleussecrets.ps1
-│           ├── sync-nucleusvscodeextensions.ps1
-│           ├── sync-nucleusvscodesettings.ps1
-│           ├── sync-nucleuswallpapers.ps1
-│           ├── test-nucleusprimaryuser.ps1
-│           └── verify-archiving-stack.ps1
+│       └── wallpapers.nix
 └── scripts/
     ├── bootstrap-versions.env
     ├── bootstrap.sh
@@ -80,41 +58,34 @@ nucleus/
 
 ## What each layer does
 
-| File / module                                | Purpose                                                                                                                                                                                       |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/modules/core.nix`                       | Shared CLI packages (`bat`, `bottom`, `direnv`, `eza`, `fd`, `fzf`, `git`, `gnupg`, `jq`, `opencode`, `ripgrep`, `rustup`, `sops`, `uv`, `zoxide`) plus the macOS `overlappingPackages` table |
-| `src/modules/gnupg.nix`                      | nix-darwin GnuPG agent (option-presence-guarded; imported by both POSIX hosts)                                                                                                                |
-| `src/modules/home.nix`                       | Home Manager entrypoint; imports all feature modules                                                                                                                                          |
-| `src/modules/editors.nix`                    | VS Code settings/extension management and backend parity wiring across platforms                                                                                                              |
-| `src/modules/linux.nix`                      | GNOME/dconf parity settings for NixOS Home Manager sessions                                                                                                                                   |
-| `src/modules/macos.nix`                      | macOS activation hooks, display/session tuning, launch-services handlers, user-session hardening                                                                                              |
-| `src/modules/posix-base.nix`                 | Shared system-layer defaults (flakes experimental feature, system zsh) for both POSIX hosts                                                                                                   |
-| `src/modules/posix-security.nix`             | Shared sudo timeout hardening (`timestamp_timeout=5`)                                                                                                                                         |
-| `src/modules/posix-sops.nix`                 | Shared SOPS key sources: machine SSH key age recipient + GnuPG home fallback                                                                                                                  |
-| `src/modules/posix-user-shell.nix`           | Shared user account defaults (platform-correct home dir, zsh login shell)                                                                                                                     |
-| `src/modules/secrets.nix`                    | Declarative SSH/GPG secret provisioning via Home Manager activation                                                                                                                           |
-| `src/modules/shell.nix`                      | Shared shell feature wiring (zsh, direnv, zoxide)                                                                                                                                             |
-| `src/modules/shell/aliases.nix`              | Shared shell aliases (strict alphabetical keys)                                                                                                                                                |
-| `src/modules/shell/env.nix`                  | Shared shell environment variable attrset (strict alphabetical keys)                                                                                                                           |
-| `src/modules/wallpapers.nix`                 | Decrypts wallpaper blobs to `~/Pictures/wallpapers`; applies rotating gallery                                                                                                                 |
-| `src/modules/windows/resolve-nucleusexecutable.ps1` | WinGet/SOPS/GPG executable path resolution                                                                                                                                                     |
-| `src/modules/windows/convert-sshpublickeytoage.ps1` | Pure-PowerShell SSH Ed25519 → age bech32 public key conversion (shared by verification and registration)                                                                                      |
-| `src/modules/windows/get-nucleussecrets.ps1` | Structured secret decryption (`machine SSH -> GPG -> primary SSH`)                                                                                                                            |
-| `src/modules/windows/register-nucleushostagekey.ps1` | Machine age key auto-registration: inserts SSH host key into `.sops.yaml` and rewraps SOPS files                                                                                              |
-| `src/modules/windows/sync-nucleussecrets.ps1` | Batch secret/key materialization entrypoint                                                                                                                                                    |
-| `src/modules/windows/sync-nucleuswallpapers.ps1` | Wallpaper blob materialization on Windows                                                                                                                                                      |
-| `src/hosts/macbook/default.nix`              | nix-darwin entrypoint; imports all macbook fragments + shared posix modules                                                                                                                   |
-| `src/hosts/macbook/MANUAL.md`                | One-time manual macOS steps printed at activation tail                                                                                                                                        |
-| `src/hosts/macbook/manual-installations.nix` | Imperative installers for software not in nixpkgs or Homebrew                                                                                                                                 |
-| `src/hosts/nixos/default.nix`                | NixOS entrypoint; imports all nixos fragments + shared posix modules                                                                                                                          |
-| `src/hosts/nixos/MANUAL.md`                  | One-time manual NixOS steps printed at activation tail                                                                                                                                        |
-| `src/hosts/windows/system.dsc.yml`           | Pre-provision Windows baseline: packages + machine settings                                                                                                                                   |
-| `src/hosts/windows/user.dsc.yml`             | Post-provision Windows baseline: folders + user settings                                                                                                                                      |
-| `src/scripts/apply.sh`                       | OS-detecting apply dispatcher (wrapped as `nix run .#apply`)                                                                                                                                  |
-| `src/hosts/windows/apply.ps1`                | Thin Windows apply wrapper; invokes WinGet DSC                                                                                                                                                |
-| `src/assets/wallpapers/*.sops`               | Encrypted wallpaper blobs                                                                                                                                                                     |
-| `.sops.yaml`                                 | Key policy: shared age recipient list (`keys.age_devices`) + global GPG backup recipient                                                                                                     |
-| `src/secrets/*.yml`                          | SOPS-encrypted identities (GPG keys, SSH keys)                                                                                                                                                |
+- `src/modules/core.nix`: shared CLI packages plus the macOS `overlappingPackages` table.
+- `src/modules/gnupg.nix`: nix-darwin GnuPG agent (option-presence-guarded; imported by both POSIX hosts).
+- `src/modules/home.nix`: Home Manager entrypoint; imports all feature modules.
+- `src/modules/editors.nix`: VS Code settings/extension management and backend parity wiring.
+- `src/modules/linux.nix`: GNOME/dconf parity settings for NixOS Home Manager sessions.
+- `src/modules/macos.nix`: macOS activation hooks and user-session hardening.
+- `src/modules/posix-base.nix`: shared system-layer defaults for both POSIX hosts.
+- `src/modules/posix-security.nix`: shared sudo timeout hardening (`timestamp_timeout=5`).
+- `src/modules/posix-sops.nix`: shared SOPS key sources.
+- `src/modules/posix-user-shell.nix`: shared user-account defaults.
+- `src/modules/secrets.nix`: declarative SSH/GPG secret provisioning via Home Manager activation.
+- `src/modules/shell.nix`: shared shell feature wiring (zsh, direnv, zoxide).
+- `src/modules/shell/aliases.nix`: shared shell aliases (strict alphabetical keys).
+- `src/modules/shell/env.nix`: shared shell environment attrset (strict alphabetical keys).
+- `src/modules/wallpapers.nix`: decrypts wallpaper blobs to `~/Pictures/wallpapers` and applies gallery rotation.
+- `src/hosts/windows/modules/*.ps1`: reusable Windows helper modules (secret materialization, executable resolution, host age-key registration, wallpaper sync).
+- `src/hosts/macbook/default.nix`: nix-darwin entrypoint for the macbook host.
+- `src/hosts/macbook/MANUAL.md`: one-time manual macOS steps printed at activation tail.
+- `src/hosts/macbook/manual-installations.nix`: imperative installers for software not in nixpkgs/Homebrew.
+- `src/hosts/nixos/default.nix`: NixOS entrypoint for the nixos host.
+- `src/hosts/nixos/MANUAL.md`: one-time manual NixOS steps printed at activation tail.
+- `src/hosts/windows/system.dsc.yml`: pre-provision Windows baseline (packages + machine settings).
+- `src/hosts/windows/user.dsc.yml`: post-provision Windows baseline (folders + user settings).
+- `src/scripts/apply.sh`: OS-detecting apply dispatcher (wrapped as `nix run .#apply`).
+- `src/hosts/windows/apply.ps1`: Windows apply orchestrator; invokes WinGet DSC and helper modules.
+- `src/assets/wallpapers/*.sops`: encrypted wallpaper blobs.
+- `.sops.yaml`: recipient policy (shared age recipients + global GPG backup recipient).
+- `src/secrets/*.yml`: SOPS-encrypted identities (GPG keys and SSH keys).
 
 ## Apply commands
 
@@ -188,7 +159,7 @@ Apply-time materialization:
 - **Unix/macOS**: Home Manager activation (`wallpapers.nix`) decrypts all blobs
   to `~/Pictures/wallpapers/`, deletes stale files with no matching `.sops`
   source, then applies the rotating gallery (folder on macOS; XML on GNOME).
-- **Windows**: JIT decryption via `src/modules/windows/sync-nucleuswallpapers.ps1`.
+- **Windows**: JIT decryption via `src/hosts/windows/modules/sync-wallpaper.ps1`.
 
 Naming: `<original-name>.<ext>.sops` (e.g. `aurora.jpg.sops`). Keep plaintext
 images out of the repository after encryption.
@@ -207,18 +178,22 @@ recipient.
    - Windows (Admin): `.\scripts\bootstrap.ps1`
 2. Import your GPG private key on the new machine so `sops updatekeys` can
    re-encrypt secrets for the new machine age recipient:
+
    ```bash
    gpg --import <backup-key-file>
    ```
+
 3. Run apply — machine age key registration is automatic:
    - Unix: `./scripts/bootstrap.sh apply` (or `nix run ./src#apply`)
    - Windows (Admin): `.\src\hosts\windows\apply.ps1`
 
    `apply` derives the machine age public key from the SSH host key, inserts it
-   into `.sops.yaml`, and rewraps every encrypted file in one step.  It prints
+   into `.sops.yaml`, and rewraps every encrypted file in one step. It prints
    the git commands to run afterward but does not commit automatically.
+
 4. Commit and push the updated `.sops.yaml` and rewrapped secrets so other
    machines can verify the new recipient:
+
    ```bash
    git add .sops.yaml src/secrets src/assets/wallpapers
    git commit -m "chore: register <hostname> machine age key"

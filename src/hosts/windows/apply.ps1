@@ -46,8 +46,8 @@
 
   Note: For full multi-user support where each user gets their own secrets,
   SSH keys, and home directory state, run apply.ps1 separately for each user:
-    .\apply.ps1 -ModuleDir "C:\path\to\modules" -Users @('admin')
-    .\apply.ps1 -ModuleDir "C:\path\to\modules" -Users @('guest')
+    .\apply.ps1 -ModuleDir "C:\path\to\src\hosts\windows\modules" -Users @('admin')
+    .\apply.ps1 -ModuleDir "C:\path\to\src\hosts\windows\modules" -Users @('guest')
   This ensures each user gets properly isolated secret materialization.
 
 .PARAMETER EnableAgentsConfigParity
@@ -129,31 +129,31 @@
 
 .EXAMPLE
   # Apply with explicit module directory and user list:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin')
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin')
 
 .EXAMPLE
   # Apply only the user-level DSC file:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin') -ConfigFiles @('user.dsc.yml')
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -ConfigFiles @('user.dsc.yml')
 
 .EXAMPLE
   # Apply while explicitly scoping secret materialization to one user:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin') -PrimaryUsername 'admin'
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -PrimaryUsername 'admin'
 
 .EXAMPLE
   # Apply while skipping the post-apply Ollama model sync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin') -SkipAiSync
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -SkipAiSync
 
 .EXAMPLE
   # Apply while disabling machine age key auto-registration in .sops.yaml:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin') -EnableHostAgeKeyRegistration:$false
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -EnableHostAgeKeyRegistration:$false
 
 .EXAMPLE
   # Apply while disabling managed VS Code settings parity (cleanup only):
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin') -EnableVsCodeSettingsParity:$false
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -EnableVsCodeSettingsParity:$false
 
 .EXAMPLE
   # Apply while disabling managed remote-access parity (cleanup only):
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\modules\windows" -Users @('admin', 'guest') -EnableRemoteAccessParity:$false
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin', 'guest') -EnableRemoteAccessParity:$false
 #>
 [CmdletBinding()]
 param(
@@ -228,11 +228,11 @@ if (Test-Path -Path $healthCheckScript) {
   & $healthCheckScript -MinFreeGB $MinFreeDiskGB -SkipSecretTooling
 }
 
-# Load the user registry from src/modules/windows/users.json. This declarative
+# Load the user registry from src/hosts/windows/users.json. This declarative
 # configuration defines all users managed by this Windows host (primary and
 # secondary) and mirrors the Nix users/default.nix module structure. Validate
 # that all users in -Users parameter are registered in this registry.
-$userRegistryPath = Join-Path -Path $resolvedModuleDir -ChildPath "users.json"
+$userRegistryPath = Join-Path -Path $PSScriptRoot -ChildPath "users.json"
 $userRegistry = & (Join-Path -Path $resolvedModuleDir -ChildPath "load-userregistry.ps1") -RegistryPath $userRegistryPath
 $registeredUserNames = @($userRegistry.users.name)
 

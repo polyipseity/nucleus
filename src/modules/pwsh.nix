@@ -2,7 +2,7 @@
 #
 # Manages ~/.config/powershell/Microsoft.PowerShell_profile.ps1 so that
 # cross-host pwsh behavior mirrors the managed block written by
-# Sync-NucleusShellProfile on Windows (src/modules/windows/shell.ps1).
+# Sync-NucleusShellProfile on Windows (src/hosts/windows/modules/sync-shellprofile.ps1).
 # Keeping both in sync makes PowerShell behavior consistent across all three
 # host types when pwsh is invoked on macOS or NixOS.
 { config, lib, pkgs, ... }:

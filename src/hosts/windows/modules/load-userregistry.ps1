@@ -1,32 +1,33 @@
 <#
 .SYNOPSIS
-  Load and validate the Windows user registry from src/modules/windows/users.json.
+  Load and validate the Windows user registry from src/hosts/windows/users.json.
 
 .DESCRIPTION
   Reads the declarative user registry and exposes functions for querying user
-  configuration. The registry defines all users managed by this configuration
-  (primary and secondary) and their home directories. This mirrors the Nix
-  users/default.nix module.
+  configuration. The registry defines all users managed by this host
+  configuration (primary and secondary) and their home directories. This
+  mirrors the Nix users/default.nix module.
 
   The user registry is loaded once and cached during apply execution. All
   user-specific configuration (secrets, DSC, VSCode settings) must query this
   registry to determine which users to process.
 
 .PARAMETER RegistryPath
-  Absolute path to src/modules/windows/users.json. Mandatory: callers must
-  explicitly pass the path so they are aware of where user configuration lives.
+  Absolute path to src/hosts/windows/users.json. Mandatory: callers must
+  explicitly pass the path so they are aware of where host user configuration
+  lives.
 
 .OUTPUTS
   Returns a hashtable with keys: 'users' (array of user objects) and
   'primaryUser' (the user with isPrimary=true, or $null if none).
 
 .EXAMPLE
-  $registry = & "$ModuleDir\load-userregistry.ps1" -RegistryPath "$ModuleDir\users.json"
+  $registry = & "$ModuleDir\load-userregistry.ps1" -RegistryPath "$PSScriptRoot\users.json"
   $adminUser = $registry.users | Where-Object { $_.name -eq 'admin' }
   Write-Host "Admin home: $($adminUser.homeDirectory)"
 
 .EXAMPLE
-  $registry = & "$ModuleDir\load-userregistry.ps1" -RegistryPath "$ModuleDir\users.json"
+  $registry = & "$ModuleDir\load-userregistry.ps1" -RegistryPath "$PSScriptRoot\users.json"
   if ($registry.primaryUser) {
     Write-Host "Materializing secrets for: $($registry.primaryUser.name)"
   }

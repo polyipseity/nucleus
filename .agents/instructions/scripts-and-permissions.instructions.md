@@ -1,5 +1,5 @@
 ---
-description: "Use when adding or editing files under scripts/, src/scripts/, or src/modules/windows/. Covers script placement, newline policy, cross-platform behavior, runtime detection, and permission expectations."
+description: "Use when adding or editing files under scripts/, src/scripts/, or src/hosts/windows/modules/. Covers script placement, newline policy, cross-platform behavior, runtime detection, and permission expectations."
 name: "Scripts and Executable Permissions"
 applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
 ---
@@ -41,7 +41,7 @@ applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
 
 ## PowerShell Module Script Naming (Windows)
 
-Every PowerShell file under `src/modules/windows/` that exports exactly one
+Every PowerShell file under `src/hosts/windows/modules/` that exports exactly one
 function must follow a strict naming convention: the kebab-case filename must
 convert to the function's PascalCase name.
 
@@ -61,7 +61,7 @@ the file. Violations indicate the filename is either misleading or the function
 name is not aligned with the intended task.
 
 If a PowerShell file exports multiple functions or none, place it only in
-`src/modules/windows/` as a utility module and prefix its name to indicate
+`src/hosts/windows/modules/` as a utility module and prefix its name to indicate
 utility scope (e.g. `load-userregistry.ps1` for a multi-function module).
 
 ## Line endings and permissions
@@ -73,7 +73,7 @@ utility scope (e.g. `load-userregistry.ps1` for a multi-function module).
   - additional script types should get explicit policy before widespread use
 - Every `.sh`, `.ps1`, and `.bat` script file anywhere in the repository must
   have its executable bit tracked in Git, regardless of location (`scripts/`,
-  `src/scripts/`, `src/hosts/windows/`, `src/modules/windows/`, or elsewhere).
+  `src/scripts/`, `src/hosts/windows/`, `src/hosts/windows/modules/`, or elsewhere).
   This applies to Windows scripts too — Git stores the executable bit
   independent of CRLF line endings, and many CI environments and tooling
   wrappers check the mode before invoking scripts. Set it with

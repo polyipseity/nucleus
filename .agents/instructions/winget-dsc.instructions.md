@@ -13,7 +13,7 @@ applyTo: "src/hosts/windows/**/*.yml"
 - `src/hosts/windows/user.dsc.yml` contains post-provision user baseline
   resources (folder layout, user registry, user environment variables).
 - They are applied in-order by `src/hosts/windows/apply.ps1`.
-- Reusable Windows helper logic is loaded from `src/modules/windows/*.ps1`; DSC
+- Reusable Windows helper logic is loaded from `src/hosts/windows/modules/*.ps1`; DSC
   files should remain state declarations rather than script logic.
 
 ## DSC v3 document structure
@@ -88,39 +88,39 @@ packages) or `settings.valueName` / `settings.name` (for other resources).
 
 `winget configure` resolves each `resource: Module/Resource` identifier against
 the PowerShell Gallery and **auto-installs** the required module if it is not
-already present in `$env:PSModulePath`.  No separate install step is needed —
+already present in `$env:PSModulePath`. No separate install step is needed —
 any `PSDscResources/Script` entry will cause WinGet to download and install the
 `PSDscResources` module automatically before invoking the resource.
 
 Use `PSDscResources/Script` only for imperative steps that cannot be expressed
-by any declarative resource type.  Prefer moving complex logic to
-`src/modules/windows/*.ps1` (dot-sourced by `apply.ps1`) so the DSC file stays
+by any declarative resource type. Prefer moving complex logic to
+`src/hosts/windows/modules/*.ps1` (dot-sourced by `apply.ps1`) so the DSC file stays
 a state declaration rather than a script host.
 
 **When PATH is not guaranteed during DSC execution:**
 DSC resources run in a fresh PowerShell session where `$env:PATH` may not
 include user-level tool directories (for example `~\.cargo\bin` from a prior
-`rustup init` call).  Any `PSDscResources/Script` block that invokes a
+`rustup init` call). Any `PSDscResources/Script` block that invokes a
 user-installed binary must prepend the relevant path explicitly in `SetScript`
-and `TestScript`.  If that cannot be done reliably, do not add the resource —
+and `TestScript`. If that cannot be done reliably, do not add the resource —
 document the gap and rely on a graceful probe in `apply.ps1` or a
 `scripts/gc.ps1`-style script instead.
 
 **cargo-cache is managed via cargo-binstall, not `system.dsc.yml`:** `cargo-cache`
-has no WinGet package ID and is not in Scoop.  It is installed declaratively by
-`Invoke-CargoBinstallSetup` (in `src/modules/windows/cargo-binstall-setup.ps1`)
-which runs after the DSC step in `apply.ps1`.  `scripts/gc.ps1` probes for the
+has no WinGet package ID and is not in Scoop. It is installed declaratively by
+`Invoke-CargoBinstallSetup` (in `src/hosts/windows/modules/invoke-cargobinstallsetup.ps1`)
+which runs after the DSC step in `apply.ps1`. `scripts/gc.ps1` probes for the
 binary gracefully and skips pruning when it is absent.
 
 **`winget cache purge` and `winget clean` do not exist** — WinGet has no cache
-management subcommands.  Do not add either as a `SetScript` body.
+management subcommands. Do not add either as a `SetScript` body.
 
 ## PSDscResources/Script resource
 
 ### Purpose and advantages
 
 Wrapping imperative logic in a `PSDscResources/Script` block makes the
-*management* of that logic declarative, even though the code inside remains
+_management_ of that logic declarative, even though the code inside remains
 imperative. Four concrete benefits:
 
 1. **Idempotency by design** — `TestScript` is the authoritative check;
@@ -129,7 +129,7 @@ imperative. Four concrete benefits:
 2. **Dependency orchestration** — `dependsOn` ensures ordering relative to
    other resources (e.g., run after a package is installed).
 3. **`--what-if` support** — `winget configure --what-if` executes `TestScript`
-   for all resources and reports what *would* change without applying
+   for all resources and reports what _would_ change without applying
    `SetScript`.
 4. **Drift detection** — re-running `TestScript` later reveals configuration
    drift without triggering re-installation.
@@ -138,7 +138,7 @@ imperative. Four concrete benefits:
 
 ```yaml
 - resource: PSDscResources/Script
-  id: ExampleResourceId          # required when other resources use dependsOn
+  id: ExampleResourceId # required when other resources use dependsOn
   directives:
     description: >-
       WHY this resource exists and what invariant it maintains.
@@ -176,7 +176,7 @@ working directory:
 
 ```powershell
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-. "$repoRoot\src\modules\windows\your-module.ps1"
+. "$repoRoot\src\hosts\windows\modules\your-module.ps1"
 Your-Function
 ```
 
@@ -192,7 +192,7 @@ Do **not** use a Script block for:
   network/git operations, timing-dependent state.
 - **VS Code extension management**: `code`/`code-insiders` CLI not guaranteed
   in PATH during DSC execution.
-- **Git/SSH config sync**: depends on SOPS-materialized files produced *outside*
+- **Git/SSH config sync**: depends on SOPS-materialized files produced _outside_
   DSC — `dependsOn` cannot model this ordering.
 - **Shell profile editing (managed-block pattern)**: complex file editing;
   inline YAML PowerShell would be fragile.
@@ -219,16 +219,16 @@ When adding a new tool or capability, choose the package manager in this order:
 
 1. **WinGet (`system.dsc.yml`)** — preferred for any package with a WinGet ID.
    Declarative, `--what-if`-capable, and centrally tracked.
-2. **Scoop (`src/modules/windows/scoop-setup.ps1`)** — for portable CLI
-   utilities that have no WinGet ID but exist in a Scoop bucket.  Scoop is the
+2. **Scoop (`src/hosts/windows/modules/invoke-scoopsetup.ps1`)** — for portable CLI
+   utilities that have no WinGet ID but exist in a Scoop bucket. Scoop is the
    user-space fallback: it requires no admin rights and installs to
    `%USERPROFILE%\scoop\`.
-3. **cargo binstall (`src/modules/windows/cargo-binstall-setup.ps1`)** — for
-   Rust CLI tools not available in WinGet or Scoop.  cargo-binstall downloads
+3. **cargo binstall (`src/hosts/windows/modules/invoke-cargobinstallsetup.ps1`)** — for
+   Rust CLI tools not available in WinGet or Scoop. cargo-binstall downloads
    prebuilt binaries without requiring a local Rust toolchain.
-4. **bun (`src/modules/windows/bun-setup.ps1`)** — last resort for JS/npm-only
-   tools absent from WinGet, Scoop, and cargo-binstall.  `bun install -g`
-   places binaries in `%USERPROFILE%\.bun\bin`.  Bun itself is installed via
+4. **bun (`src/hosts/windows/modules/invoke-bunsetup.ps1`)** — last resort for JS/npm-only
+   tools absent from WinGet, Scoop, and cargo-binstall. `bun install -g`
+   places binaries in `%USERPROFILE%\.bun\bin`. Bun itself is installed via
    WinGet (`Oven-sh.Bun` in `system.dsc.yml`).
 
 The equivalent hierarchy on POSIX hosts is:
@@ -264,7 +264,7 @@ Install Scoop itself via WinGet (package ID `Scoop.Scoop`). Scoop requires
     id: Scoop.Scoop
     source: winget
   dependsOn:
-    - GitInstall   # the id: of the Git.Git package entry
+    - GitInstall # the id: of the Git.Git package entry
 ```
 
 ### Scoop bucket and app provisioning
@@ -276,7 +276,7 @@ immediately after WinGet installs Scoop — the same PATH-guarantee constraint
 that excludes cargo-cache.
 
 Instead, manage Scoop buckets and apps in a dedicated module
-`src/modules/windows/scoop-setup.ps1` dot-sourced and called by `apply.ps1`
+`src/hosts/windows/modules/invoke-scoopsetup.ps1` dot-sourced and called by `apply.ps1`
 **after** the DSC run completes, so `~\scoop\shims` is resolvable by then.
 
 ### Idempotency in Scoop operations
@@ -301,16 +301,16 @@ if (-not (Test-Path $cbBin)) {
 
 ### cargo binstall for Rust tools
 
-After Scoop installs cargo-binstall, `src/modules/windows/cargo-binstall-setup.ps1`
+After Scoop installs cargo-binstall, `src/hosts/windows/modules/invoke-cargobinstallsetup.ps1`
 manages Rust CLI tools that have no WinGet or Scoop equivalent (e.g.
-`cargo-cache`, `pay-respects`).  It maintains a desired-state list and a
+`cargo-cache`, `pay-respects`). It maintains a desired-state list and a
 manifest at `~\.config\nucleus\cargo-binstall-packages.json`; on each apply it
 installs additions via `cargo binstall --no-confirm` and removes deletions via
 `cargo uninstall`.
 
 **PATH note**: DSC runs in a fresh session where `~\.cargo\bin` is not on PATH.
 The setup module prepends `~\.cargo\bin` internally before any `cargo uninstall`
-call.  When invoking cargo-binstall from `apply.ps1` (after the DSC run), Scoop
+call. When invoking cargo-binstall from `apply.ps1` (after the DSC run), Scoop
 shims at `~\scoop\shims` are already resolvable.
 
 ## Cross-host equivalence checks
@@ -327,7 +327,7 @@ shims at `~\scoop\shims` are already resolvable.
 ## Imperative fallback safety (Windows modules)
 
 When a capability cannot be represented in WinGet DSC and must be implemented
-in `src/modules/windows/*.ps1` + `apply.ps1`, enforce all of the following:
+in `src/hosts/windows/modules/*.ps1` + `apply.ps1`, enforce all of the following:
 
 - **Managed-scope only**: modify only declaratively managed files/blocks/keys.
   Do not overwrite or delete unrelated user content.
@@ -368,5 +368,5 @@ in `src/modules/windows/*.ps1` + `apply.ps1`, enforce all of the following:
 
 - Avoid repository-brand prefixes (for example `nucleus*`) in new PowerShell
   function names and filenames unless the prefix is required for cross-module
-  disambiguation or external integration points.  Use descriptive verb-noun
+  disambiguation or external integration points. Use descriptive verb-noun
   patterns instead (e.g., `Sync-Wallpapers` instead of `Sync-NucleusWallpapers`).
