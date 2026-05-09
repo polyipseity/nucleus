@@ -37,8 +37,24 @@
 
   outputs = { darwin, home-manager, nix-vscode-extensions, nixpkgs, sops-nix, ... }:
     let
-      # Shared user account name propagated to every host via specialArgs.
-      username = "polyipseity";
+      # User registry — defines all users managed by this configuration.
+      # Each user has homeDirectory, shell (as string path), and isPrimary flag.
+      # The primary user receives secret materialization.
+      # Shell paths are deferred to activation time via posix-user-shell.nix.
+      users = {
+        polyipseity = {
+          homeDirectory = "/Users/polyipseity";
+          isPrimary = true;
+        };
+      };
+
+      # Derive the primary username from the registry for backward compatibility.
+      # This replaces the old hardcoded username = "polyipseity".
+      # Filter users by isPrimary=true and extract the name (the attr key).
+      username = builtins.head (
+        builtins.filter (name: users.${name}.isPrimary)
+        (builtins.attrNames users)
+      );
 
       # Canonical system strings for the two supported architectures.
       systems = {

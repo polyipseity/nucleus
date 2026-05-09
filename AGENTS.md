@@ -308,9 +308,7 @@ Darwin bridge symlinks only apply when the backend resolves to Homebrew.
   `HKLM\System\CurrentControlSet\Control\FileSystem\LongPathsEnabled = 1`
   in `src/hosts/windows/system.dsc.yml`. This prevents Nix/Git path failures
   on deep directory trees.
-- **Primary User Secrets Invariant** — keep Windows secret materialization
-  scoped to the primary user via `Sync-NucleusSecrets` and
-  `Test-NucleusPrimaryUser`; do not broaden secret writes to all users.
+
 - **Managed Wallpaper Source Invariant** — keep wallpaper paths sourced from
   declaratively materialized files in `%USERPROFILE%\Pictures\wallpapers`
   (via `Sync-NucleusWallpapers`), not arbitrary unmanaged file paths.
