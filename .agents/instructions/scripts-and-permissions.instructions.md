@@ -118,3 +118,14 @@ fi
 Without this, the health-check will fail on provisioned machines whenever the
 GPG private key is not in the running keyring (common in headless sessions or
 after a fresh login).
+
+## PowerShell Linting
+
+Always suppress the `PSUseBOMForUnicodeEncodedFile` lint rule when:
+
+- Running the PowerShell analyzer (`Invoke-ScriptAnalyzer`)
+- Configuring suppressions in `scripts/check-pwsh.ps1`
+
+This rule should be consistently suppressed across the repository's PowerShell
+scripts since UTF-8 without BOM is the standard encoding for the codebase
+and enforced by `.editorconfig` and other repository policies.
