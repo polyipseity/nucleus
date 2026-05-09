@@ -152,6 +152,15 @@ function Sync-AgentsClawhubSkills {
         Write-Warning "nucleus: Sync-AgentsClawhubSkills: skipping '$slug' — a committed-skill symlink exists at $skillPath; remove it from clawhub-skills.json or from src\modules\configs\agents\skills\"
         continue
       }
+      # Unlock an existing fetched skill directory before updating so clawhub can
+      # overwrite files that were locked ReadOnly on a previous install.
+      # Mirrors POSIX chmod -R u+w before update.
+      Get-ChildItem -LiteralPath $skillPath -Recurse -Force -ErrorAction SilentlyContinue |
+        ForEach-Object {
+          if ($_.Attributes -band [System.IO.FileAttributes]::ReadOnly) {
+            $_.Attributes = $_.Attributes -band -bnot [System.IO.FileAttributes]::ReadOnly
+          }
+        }
     }
 
     Write-Host "nucleus: Sync-AgentsClawhubSkills: installing/updating fetched skill '$slug'..."
@@ -160,6 +169,12 @@ function Sync-AgentsClawhubSkills {
     & $clawhubExe install --workdir "$HOME\.agents" --no-input $slug
     if ($LASTEXITCODE -ne 0) {
       Write-Warning "nucleus: Sync-AgentsClawhubSkills: clawhub install failed for '$slug' (system apply succeeded)"
+    } elseif (Test-Path -LiteralPath $skillPath -PathType Container) {
+      # Lock installed skill files to prevent modification outside a managed apply
+      # run.  Mirrors POSIX chmod -R a-w after install.  The unlock above
+      # re-opens write access before the next update.
+      Get-ChildItem -LiteralPath $skillPath -Recurse -Force -ErrorAction SilentlyContinue |
+        ForEach-Object { $_.Attributes = $_.Attributes -bor [System.IO.FileAttributes]::ReadOnly }
     }
   }
 

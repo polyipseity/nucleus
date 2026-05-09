@@ -99,8 +99,25 @@ function Sync-NucleusWallpapers {
     $outputName = [System.IO.Path]::GetFileNameWithoutExtension($wallpaperFile.Name)
     $outputPath = Join-Path -Path $OutputDir -ChildPath $outputName
 
+    # Clear ReadOnly before overwrite so Get-NucleusDecryptedBlob can update
+    # the file on subsequent applies.  Mirrors POSIX u+w unlock before install.
+    if (Test-Path -LiteralPath $outputPath) {
+      $existingWallpaper = Get-Item -LiteralPath $outputPath -Force
+      if ($existingWallpaper.Attributes -band [System.IO.FileAttributes]::ReadOnly) {
+        $existingWallpaper.Attributes = $existingWallpaper.Attributes -band -bnot [System.IO.FileAttributes]::ReadOnly
+      }
+    }
+
     Write-Host "Materializing wallpaper: $outputName" -ForegroundColor Cyan
     Get-NucleusDecryptedBlob -FilePath $wallpaperFile.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -OutputPath $outputPath -SopsExe $SopsExe
+
+    # Set ReadOnly: managed gallery content must not be modified outside activation.
+    # Mirrors POSIX chmod 444.  Applied after write so Get-NucleusDecryptedBlob can
+    # create or overwrite the file without attribute conflicts on this apply.
+    if (Test-Path -LiteralPath $outputPath) {
+      $decryptedWallpaper = Get-Item -LiteralPath $outputPath -Force
+      $decryptedWallpaper.Attributes = $decryptedWallpaper.Attributes -bor [System.IO.FileAttributes]::ReadOnly
+    }
 
     if (-not $activeWallpaperPath) {
       $activeWallpaperPath = $outputPath

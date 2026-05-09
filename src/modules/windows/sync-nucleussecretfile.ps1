@@ -122,6 +122,23 @@ function Sync-NucleusSecretFile {
     New-Item -ItemType Directory -Path $gitIdentityConfigDir -Force | Out-Null
   }
 
+  # Script block that removes inherited ACEs and grants only the current user
+  # FullControl on a file.  Removing inherited entries eliminates the default
+  # Users/Everyone grants that make private key and config material world-readable.
+  # Mirrors POSIX chmod 600.  Called unconditionally so the ACL is idempotent
+  # across apply runs even when file content has not changed.
+  $restrictAcl = {
+    param([string]$Path)
+    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    # /inheritance:r removes inherited ACEs; /grant:r replaces any existing rule.
+    # Soft-failure: icacls may not be available on non-NTFS volumes or in some
+    # sandboxed environments; warn and continue rather than aborting the apply.
+    & icacls.exe $Path /inheritance:r /grant:r "${currentUser}:(F)" | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "nucleus: could not restrict ACL on $Path (icacls exit $LASTEXITCODE)"
+    }
+  }
+
   Write-Host "Processing secrets from: $($secretFileInfo.Name)" -ForegroundColor Cyan
   $jsonSecrets = Get-NucleusSecrets -FilePath $secretFileInfo.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe
 
@@ -139,6 +156,9 @@ function Sync-NucleusSecretFile {
       $sshKeyValue | Out-File -FilePath $sshKeyPath -Encoding ascii -NoNewline
       Write-Host "  Updated SSH key: $sshSecretName" -ForegroundColor Cyan
     }
+    # Restrict ACL unconditionally so idempotent re-applies re-lock the key even
+    # when content is unchanged.  Mirrors POSIX chmod 600.
+    & $restrictAcl -Path $sshKeyPath
   }
 
   if ($null -ne $jsonSecrets.PSObject.Properties[$sshPublicSecretName]) {
@@ -192,6 +212,9 @@ function Sync-NucleusSecretFile {
         }
 
         $newSshFingerprint | Out-File -FilePath $managedSshKeysManifest -Encoding ascii -NoNewline
+        # Restrict ACL unconditionally; manifest contains key fingerprints that
+        # should not be world-readable.  Mirrors POSIX chmod 600.
+        & $restrictAcl -Path $managedSshKeysManifest
       }
     }
     catch {
@@ -213,6 +236,8 @@ function Sync-NucleusSecretFile {
       $sshRsaKeyValue | Out-File -FilePath $sshRsaKeyPath -Encoding ascii -NoNewline
       Write-Host "  Updated SSH key: $sshRsaSecretName" -ForegroundColor Cyan
     }
+    # Restrict ACL unconditionally.  Mirrors POSIX chmod 600.
+    & $restrictAcl -Path $sshRsaKeyPath
   }
 
   if ($null -ne $jsonSecrets.PSObject.Properties[$sshRsaPublicSecretName]) {
@@ -260,6 +285,9 @@ function Sync-NucleusSecretFile {
       # edge cases on first bootstrap).  Mirrors the POSIX gpgImport order in
       # secrets.nix.
       $firstFingerprint | Out-File -FilePath $managedGpgKeysManifest -Encoding ascii -NoNewline
+      # Restrict ACL unconditionally; manifest contains the managed GPG
+      # fingerprint and must not be world-readable.  Mirrors POSIX chmod 600.
+      & $restrictAcl -Path $managedGpgKeysManifest
 
       # Ownertrust is best-effort: demote failure to a warning so a transient
       # GnuPG IPC error doesn't abort the whole apply run.  The key is already
@@ -286,5 +314,8 @@ function Sync-NucleusSecretFile {
       $gitIdentityValue | Out-File -FilePath $gitIdentityPath -Encoding ascii -NoNewline
       Write-Host "  Updated Git identity payload: $gitIdentitySecretName" -ForegroundColor Cyan
     }
+    # Restrict ACL unconditionally; git-identity.env contains name/email and
+    # should not be world-readable.  Mirrors POSIX chmod 600.
+    & $restrictAcl -Path $gitIdentityPath
   }
 }
