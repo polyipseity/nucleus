@@ -28,8 +28,8 @@
       };
     });
     default = {
-      polyipseity = {
-        homeDirectory = "/Users/polyipseity";
+      admin = {
+        homeDirectory = "/Users/admin";
         shell = lib.mkDefault /run/current-system/sw/bin/zsh;
         isPrimary = true;
       };

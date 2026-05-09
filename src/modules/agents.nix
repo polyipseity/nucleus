@@ -5,23 +5,14 @@
 # skills/ is excluded here because it is managed by agentsSkills (below) and may
 # contain downloaded content that must not be committed (fetched / clawhub).
 #
-# This per-subdir layout replaces the old whole-directory symlink scheme.  The
-# old scheme made ~/.agents an alias for the entire source tree, which prevented
-# clawhub from writing fetched skill downloads into ~/.agents/skills/ without
-# those writes entering the tracked repo tree.
+# The per-subdir layout creates ~/.agents as a real directory with per-entry
+# symlinks. This allows clawhub to write fetched skill downloads into
+# ~/.agents/skills/ without those writes entering the tracked repo tree.
 #
 # Activation reads the repo root from:
 #   1. $NUCLEUS_REPO  (set by apply.sh before the rebuild call)
 #   2. ~/.config/nucleus/repo-root  (written by apply.sh, survives the sudo boundary)
 # Both paths mirror the pattern used by vscodeSymlinks in editors.nix.
-#
-# Migration safety:
-#   - Old whole-dir symlink → removed automatically (all old-scheme symlinks
-#     pointed at src/modules/configs/agents/; none were user-created).
-#   - Correct per-subdir symlink  → no-op.
-#   - Wrong per-subdir symlink    → remove and recreate.
-#   - Real directory at sub-path  → fail fast with an actionable message.
-#   - Stale per-subdir symlink    → removed (source entry no longer exists).
 #
 # agentsSkills (below) manages ~/.agents/skills/ independently.
 { lib, ... }:
@@ -33,10 +24,6 @@
     # symlinks for every top-level entry in src/modules/configs/agents/ except
     # skills/ (which is managed by agentsSkills so fetched clawhub downloads
     # land in a real, untracked directory rather than inside the repo tree).
-    #
-    # Migration: if ~/.agents is still the old whole-dir symlink it is removed
-    # first; the activation then re-creates the structure as a real directory
-    # with per-subdir symlinks.
     # -------------------------------------------------------------------------
     agentsSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
@@ -63,23 +50,14 @@
 
       _as_agents_dir="$HOME/.agents"
 
-      # Migration: the old agentsSymlink scheme created ~/.agents as a single
-      # whole-dir symlink pointing to _as_agents_source.  Remove it so a real
-      # directory can be created in its place.  Any symlink at this path was
-      # created by the old activation; user-created symlinks are not expected.
-      if [ -L "$_as_agents_dir" ]; then
-        rm "$_as_agents_dir"
-        echo "agents-config: migrated from whole-dir symlink to per-subdir layout"
-      elif [ -e "$_as_agents_dir" ] && [ ! -d "$_as_agents_dir" ]; then
-        # Unexpected non-directory, non-symlink file: fail fast.
-        echo "agents-config: $HOME/.agents exists but is not a directory or symlink — remove it and re-run apply." >&2
-        exit 1
-      fi
-
       # Ensure ~/.agents exists as a real (writable) directory.
       if [ ! -d "$_as_agents_dir" ]; then
         mkdir "$_as_agents_dir"
         echo "agents-config: created $HOME/.agents"
+      elif [ -e "$_as_agents_dir" ] && [ ! -d "$_as_agents_dir" ]; then
+        # Unexpected non-directory file: fail fast.
+        echo "agents-config: $HOME/.agents exists but is not a directory — remove it and re-run apply." >&2
+        exit 1
       fi
 
       # Remove stale per-subdir symlinks: any symlink in ~/.agents/ that once
@@ -178,11 +156,6 @@
 
       # Ensure ~/.agents/skills/ exists as a real directory so fetched clawhub
       # downloads can be written here without entering the tracked repo tree.
-      if [ -L "$_ask_skills_dir" ]; then
-        # Old whole-dir symlink to source/skills/ — remove so it becomes real.
-        rm "$_ask_skills_dir"
-        echo "agents-skills: migrated ~/.agents/skills from symlink to real directory"
-      fi
       if [ ! -d "$_ask_skills_dir" ]; then
         mkdir -p "$_ask_skills_dir"
         echo "agents-skills: created $HOME/.agents/skills"

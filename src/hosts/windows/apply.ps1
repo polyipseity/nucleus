@@ -42,12 +42,12 @@
   converged. Callers must explicitly pass this list so they are aware of
   which user profiles will be modified. The first user in the list is used
   for secrets materialization.
-  Example: -Users @('polyipseity', 'john')
+  Example: -Users @('admin', 'guest')
 
   Note: For full multi-user support where each user gets their own secrets,
   SSH keys, and home directory state, run apply.ps1 separately for each user:
-    .\apply.ps1 -ModuleDir "C:\path\to\modules" -Users @('polyipseity')
-    .\apply.ps1 -ModuleDir "C:\path\to\modules" -Users @('john')
+    .\apply.ps1 -ModuleDir "C:\path\to\modules" -Users @('admin')
+    .\apply.ps1 -ModuleDir "C:\path\to\modules" -Users @('guest')
   This ensures each user gets properly isolated secret materialization.
 
 .PARAMETER EnableAgentsConfigParity

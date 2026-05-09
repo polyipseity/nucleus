@@ -90,6 +90,34 @@ All PowerShell functions and scripts must enforce explicit parameter passing:
   primary/elevated user, `guest` for secondary/unprivileged users. This ensures
   examples are copy-paste-ready and reflect the actual calling convention.
 
+### Explicit Parameter Passing Requirement (Nix)
+
+**No implicit defaults, no auto-derived paths, no backwards compatibility code.**
+
+All Nix modules must enforce explicit configuration and avoid implicit assumptions:
+
+- **No backwards compatibility code**: remove deprecated options, conditional
+  fallback logic, and migration shims. If a feature has been restructured or
+  moved (e.g. old symlink schemes replaced with modern layouts), document the
+  change clearly in comments. Repository history is preserved in Git; code does
+  not need to support old incompatible configurations. Add a clear WHY comment
+  explaining what changed and when if the current implementation diverged from
+  a previous approach.
+- **Explicit option defaults**: when defining `lib.mkOption`, provide
+  meaningful default values only when the default is obvious (e.g. `false` for
+  feature flags, `[ ]` for lists). For complex or context-dependent defaults,
+  require the user to specify them; use `description` to explain the choice.
+- **Documentation examples must use canonical usernames**: any `.example` field
+  in module options or inline code examples must use `admin` for primary/elevated
+  users and `guest` for secondary/unprivileged users. Paths should reference
+  `/home/admin` or `/Users/admin` rather than real usernames from the repo
+  history. This ensures examples are portable and immediately understandable.
+- **Avoid `with` statements in module-level code**: explicit `pkgs.name` or
+  `lib.name` references keep derivations traceable and prevent naming conflicts.
+- **Guard platform-specific options**: shared modules that reference NixOS-only
+  or nix-darwin-only options must use `lib.mkIf` checks to avoid evaluation
+  errors on incompatible platforms.
+
 ## WinGet DSC YAML (`src/hosts/windows/**/*.yml`)
 
 The `directives.description:` field on each resource entry is the formal
