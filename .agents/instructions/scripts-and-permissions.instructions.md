@@ -39,6 +39,31 @@ applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
   it is embedded in the flake as `apps.apply`; it follows the same doc and
   line-ending rules as `scripts/` shell scripts.
 
+## PowerShell Module Script Naming (Windows)
+
+Every PowerShell file under `src/modules/windows/` that exports exactly one
+function must follow a strict naming convention: the kebab-case filename must
+convert to the function's PascalCase name.
+
+**Conversion rule**: split the filename (without `.ps1`) by hyphens, then
+PascalCase each part and concatenate.
+
+- Examples:
+  - `sync-wallpaper.ps1` → `Sync-Wallpaper`
+  - `initialize-devdirectory.ps1` → `Initialize-DevDirectory`
+  - `invoke-cargobinstallsetup.ps1` → `Invoke-CargoBinstallSetup`
+  - `convertfrom-sshed25519publickeytoagepubkey.ps1` →
+    `ConvertFrom-SshEd25519PublicKeyToAgePubKey`
+
+**Why**: this makes the module discoverable by reading filenames and helps
+maintainers quickly identify which function a script exports without opening
+the file. Violations indicate the filename is either misleading or the function
+name is not aligned with the intended task.
+
+If a PowerShell file exports multiple functions or none, place it only in
+`src/modules/windows/` as a utility module and prefix its name to indicate
+utility scope (e.g. `load-userregistry.ps1` for a multi-function module).
+
 ## Line endings and permissions
 
 - Respect both `.editorconfig` and `.gitattributes`:
