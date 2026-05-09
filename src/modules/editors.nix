@@ -6,9 +6,9 @@
 #   • macOS: backend selected in modules/core.nix (Homebrew or nixpkgs);
 #     extensions managed by vscodeExtensionBridge on all backends.
 #
-# The full 64-extension baseline is built entirely from Nix derivations:
+# The full 66-extension baseline is built entirely from Nix derivations:
 #   • 44 extensions packaged directly in nixpkgs (pkgs.vscode-extensions).
-#   • 20 extensions sourced from the VS Code Marketplace via the
+#   • 22 extensions sourced from the VS Code Marketplace via the
 #     nix-vscode-extensions flake input (vscodeMarketplace extraSpecialArg).
 #
 # VS Code config files (settings, per-host keybindings, MCP, tasks, snippets,
@@ -36,13 +36,15 @@ let
          [];
 
   # Canonical extension set shared by both platforms, sorted alphabetically by
-  # publisher.name.  44 extensions come from nixpkgs; 20 come from the VS Code
+  # publisher.name.  44 extensions come from nixpkgs; 22 come from the VS Code
   # Marketplace via nix-vscode-extensions (via mkMktx).  A missing marketplace
   # entry degrades gracefully to an empty contribution rather than failing eval.
   # On all platforms, vscodeExtensionBridge symlinks each extension into the
   # writable ~/.vscode/extensions and ~/.vscode-insiders/extensions directories
   # so both stable and insiders channels share an identical extension payload.
   sharedExtensions = builtins.concatLists [
+    # arrterian
+    (mkMktx "arrterian" "nix-env-selector")
     # astral-sh
     (mkMktx "astral-sh" "ty")
     # charliermarsh
@@ -82,6 +84,8 @@ let
     (mkMktx "keroc" "hex-fmt")
     # mark-hansen
     (mkMktx "mark-hansen" "hledger-vscode")
+    # mkhl
+    (mkMktx "mkhl" "direnv")
     # ms-azuretools
     [ pkgs.vscode-extensions.ms-azuretools.vscode-containers ]
     [ pkgs.vscode-extensions.ms-azuretools.vscode-docker ]

@@ -41,6 +41,7 @@ function Sync-VSCodeExtensions {
   )
 
   $managedExtensions = @(
+    'arrterian.nix-env-selector',
     'astral-sh.ty',
     'charliermarsh.ruff',
     'christian-kohler.npm-intellisense',
@@ -62,6 +63,7 @@ function Sync-VSCodeExtensions {
     'jnoortheen.nix-ide',
     'keroc.hex-fmt',
     'mark-hansen.hledger-vscode',
+    'mkhl.direnv',
     'ms-azuretools.vscode-containers',
     'ms-azuretools.vscode-docker',
     'ms-ceintl.vscode-language-pack-zh-hant',
