@@ -101,9 +101,11 @@
   load them from Nix with `builtins.fromJSON (builtins.readFile ...)` so JSON
   can be linted/validated independently.
 - **Manual activation docs**: keep one-time manual instructions in host Markdown
-  files (for example `src/hosts/macbook/MANUAL.md` and
-  `src/hosts/nixos/MANUAL.md`) and have activation hooks print those files,
-  rather than embedding long instruction strings directly in Nix code.
+  files (for example `src/hosts/macbook/MANUAL.md`,
+  `src/hosts/nixos/MANUAL.md`, and `src/hosts/windows/MANUAL.md`) and have
+  activation hooks print those files at the end of every apply (Nix:
+  `displayHostManualInstructions`; Windows: `apply.ps1` final step), rather
+  than embedding long instruction strings directly in code.
 - **Shell module granularity**: keep shell alias/environment attrsets in
   dedicated fragments (for example `src/modules/shell/aliases.nix` and
   `src/modules/shell/env.nix`) with strict alphabetical ordering of keys.
@@ -171,21 +173,21 @@
   coverage and CJK coverage (Simplified + Traditional) across macOS, NixOS,
   and Windows using one canonical font inventory.
 - **Atomic commits**: make one commit per coherent aspect of a change (one
-  bug fix, one new feature, one refactor, one docs update).  Commit as soon
-  as one aspect is complete and validated before beginning the next.  Never
+  bug fix, one new feature, one refactor, one docs update). Commit as soon
+  as one aspect is complete and validated before beginning the next. Never
   mix unrelated aspects in a single commit; reviewers and bisect depend on
   each commit being independently meaningful.
 - **No error hiding**: never use `2>/dev/null`, `>/dev/null 2>&1`,
   unconditional `|| true` on a command that should succeed, PowerShell
   `-ErrorAction SilentlyContinue`, or `2>$null` to silence meaningful
-  failures.  These patterns hide the root cause of bugs and make broken
-  activations appear successful.  Error suppression is only acceptable when
+  failures. These patterns hide the root cause of bugs and make broken
+  activations appear successful. Error suppression is only acceptable when
   all three conditions hold: (1) the failure is genuinely expected and benign
   in the specific context (for example `pgrep` existence probes or
   `ssh-add -D` when no agent is running), (2) the suppression is accompanied
   by an explicit inline comment stating WHY it is intentional, and (3) the
   result or exit code is checked afterward so unexpected failures are still
-  caught.  Prefer `if ! cmd; then echo "..." >&2; fi` over bare `|| true`,
+  caught. Prefer `if ! cmd; then echo "..." >&2; fi` over bare `|| true`,
   and place `|| true` outside command substitutions (`var=$(cmd) || true`)
   rather than inside (`var=$(cmd 2>/dev/null || true)`) so stderr is never
   discarded silently.
@@ -198,15 +200,15 @@ When a package exists in both nixpkgs and Homebrew, agents must apply the
 following logic:
 
 1. **CLI Tools**: Must use `nixpkgs`. Never install CLI tools via Homebrew
-  unless the Nix version is broken on Darwin.
+   unless the Nix version is broken on Darwin.
 2. **GUI Apps**: Must use `homebrew.casks`. Nix-installed GUI apps are
-  discouraged due to Spotlight and permission issues (unless mac-app-util is
-  explicitly configured).
+   discouraged due to Spotlight and permission issues (unless mac-app-util is
+   explicitly configured).
 3. **Hardware/Drivers**: Use Homebrew. Any tool requiring kernel extensions or
-  deep system integration (for example `bclm`) should be managed via Homebrew.
+   deep system integration (for example `bclm`) should be managed via Homebrew.
 4. **Symmetry**: When adding a package, check whether a Windows equivalent
-  exists in `src/hosts/windows/system.dsc.yml` to maintain cross-platform
-  parity.
+   exists in `src/hosts/windows/system.dsc.yml` to maintain cross-platform
+   parity.
 
 ### Channel Preference Policy (All Platforms)
 
@@ -222,6 +224,7 @@ Apply this rule when:
 - The preview channel is at minimum functional (not severely broken).
 
 Examples already following this policy:
+
 - Discord: `discord@canary` (macOS cask / Windows WinGet `Discord.Discord.Canary`)
 - Google Chrome: `google-chrome@canary` (macOS cask / Windows `Google.Chrome.Canary`)
 - VS Code: `visual-studio-code@insiders` / `Microsoft.VisualStudioCode.Insiders`
@@ -234,7 +237,7 @@ platform, use the stable release and add a short inline `# WHY` comment
 explaining the exception.
 
 Agents must apply this rule when adding or updating any package on any
-platform.  When reviewing existing package declarations, flag stable
+platform. When reviewing existing package declarations, flag stable
 entries that have an available preview/beta channel as parity debt.
 
 ### VS Code Symmetry Protocol
@@ -340,14 +343,14 @@ a rotating gallery, never as a single static file.
    `<static>` (595 s) and `<transition type="overlay">` (5 s) elements that
    loop back to the first image. `picture-uri` must point to this XML file.
 4. **Windows**: user wallpaper registry state must point to a path generated
-  from declaratively managed wallpaper assets (`assets/wallpapers/*.sops`
-  materialized to `%USERPROFILE%\Pictures\wallpapers`). Keep the
-  `__NUCLEUS_ACTIVE_WALLPAPER__` replacement flow in the Windows apply path so
-  DSC always receives a managed file path.
+   from declaratively managed wallpaper assets (`assets/wallpapers/*.sops`
+   materialized to `%USERPROFILE%\Pictures\wallpapers`). Keep the
+   `__NUCLEUS_ACTIVE_WALLPAPER__` replacement flow in the Windows apply path so
+   DSC always receives a managed file path.
 5. **Stale cleanup**: before applying the gallery, delete any file in
    `~/Pictures/wallpapers/` (excluding `*.xml`) that has no corresponding
-  `assets/wallpapers/$name.sops` source in the repository (Windows equivalent:
-  `Remove-NucleusStaleWallpapers`).
+   `assets/wallpapers/$name.sops` source in the repository (Windows equivalent:
+   `Remove-NucleusStaleWallpapers`).
 
 ## Refactoring Guardrails
 

@@ -20,8 +20,8 @@ applyTo: "src/**/*.nix"
     software not handled by nixpkgs or Homebrew.
   - `nixos/default.nix` — NixOS entrypoint; imports host fragments and the
     shared posix/gnupg modules.
-  - `macbook/MANUAL.md` and `nixos/MANUAL.md` — host-scoped one-time manual
-    instructions printed by activation hooks.
+  - `macbook/MANUAL.md`, `nixos/MANUAL.md`, and `windows/MANUAL.md` —
+    host-scoped one-time manual instructions printed by activation hooks.
   - `windows/` — managed by WinGet DSC, not Nix (no `.nix` files here).
 - `src/modules/` — shared logic imported by hosts and home profiles.
   - `core.nix` — universal CLI packages and macOS `overlappingPackages` table.
@@ -334,9 +334,9 @@ womp=1 networkoversleep=0 sleep=0 lessbright=1 tcpkeepalive=1 disksleep=0`
 - Keep `displayHostManualInstructionDeps` (macOS) and the `entryAfter` list
   (Linux) alphabetically sorted.
 - If a feature needs a one-time manual step that cannot be safely automated,
-  update the host manual Markdown file (`src/hosts/macbook/MANUAL.md` and/or
-  `src/hosts/nixos/MANUAL.md`) in the same change so activation output remains
-  a complete checklist.
+  update the host manual Markdown file (`src/hosts/macbook/MANUAL.md`,
+  `src/hosts/nixos/MANUAL.md`, and/or `src/hosts/windows/MANUAL.md`) in the
+  same change so activation output remains a complete checklist.
 
 ## sops-nix macOS LaunchAgent async behaviour
 

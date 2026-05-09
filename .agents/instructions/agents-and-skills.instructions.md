@@ -131,6 +131,7 @@ WinGet DSC (system.dsc.yml)
 | `src/modules/agents.nix` | POSIX activation DAG: `agentsSymlink`, `agentsSkills`, `installBunPackages`, `syncClawhubSkills` |
 | `src/modules/macos.nix` | `displayHostManualInstructionDeps` must include all activation names |
 | `src/modules/linux.nix` | `displayHostManualInstructions` `entryAfter` must include all activation names |
+| `src/hosts/windows/apply.ps1` | Windows orchestrator; displays `MANUAL.md` as the final step after all convergence |
 | `src/modules/configs/agents/clawhub-skills.json` | Declarative fetched skill manifest (`{"skills":[...slugs...]}`) |
 | `src/modules/configs/agents/skills/` | Bundled (committed, AGPL-compatible) skill directories |
 | `src/modules/windows/bun-setup.ps1` | Windows bun global package manager; includes clawhub |

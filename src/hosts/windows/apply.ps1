@@ -414,3 +414,11 @@ if ($SkipAiSync) {
     Invoke-AiSync -RepoRoot $repoRoot
   }
 }
+
+# Display host-scoped one-time manual setup instructions as the final step so
+# operators always see the checklist after automation completes, mirroring the
+# displayHostManualInstructions activation on macOS and NixOS hosts.
+$manualPath = Join-Path -Path $PSScriptRoot -ChildPath "MANUAL.md"
+Write-Output "--- MANUAL SETUP (one-time, required) ---"
+Get-Content -Path $manualPath | Write-Output
+Write-Output "-------------------------------------------"
