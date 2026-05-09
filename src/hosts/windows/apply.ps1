@@ -32,7 +32,19 @@
 
 .PARAMETER PrimaryUsername
   Username allowed to materialize user-scoped secrets. Defaults to the
-  current interactive user.
+  current interactive user. Deprecated: use -Users instead.
+
+.PARAMETER Users
+  Array of usernames to configure. Each user gets their secrets materialized,
+  SSH keys adopted, and home directory state converged. The first user in
+  the list is used for secrets materialization. Defaults to @($env:USERNAME).
+  Example: -Users @('polyipseity', 'john')
+
+  Note: For full multi-user support where each user gets their own secrets,
+  SSH keys, and home directory state, run apply.ps1 separately for each user:
+    .\apply.ps1 -Users @('polyipseity')
+    .\apply.ps1 -Users @('john')
+  This ensures each user gets properly isolated secret materialization.
 
 .PARAMETER EnableAgentsConfigParity
   Enable managed per-subdir symlinks in %USERPROFILE%\.agents\ pointing into
@@ -161,6 +173,7 @@ param(
   [switch]$Help,
   [string]$ModuleDir = (Join-Path -Path $PSScriptRoot -ChildPath "..\..\modules\windows"),
   [string]$PrimaryUsername = [System.Environment]::UserName,
+  [string[]]$Users = @(),  # Empty array defaults to @($PrimaryUsername) below
   [bool]$EnableAgentsConfigParity = $true,
   [bool]$EnableAgentsSkillsParity = $true,
   [bool]$EnableAgentsClawhubSkillsParity = $true,
@@ -178,6 +191,13 @@ param(
   [int]$MinFreeDiskGB = 10,
   [switch]$SkipAiSync
 )
+
+# Default Users to @($PrimaryUsername) if not specified, maintaining backward compatibility.
+if ($Users.Count -eq 0) {
+  $Users = @($PrimaryUsername)
+}
+# Also ensure PrimaryUsername is set to the first user for backward compatibility.
+$PrimaryUsername = $Users[0]
 
 $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }

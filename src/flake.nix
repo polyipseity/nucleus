@@ -56,6 +56,18 @@
         (builtins.attrNames users)
       );
 
+      # Generate home-manager.users attrset from the user registry.
+      # Each user gets the home.nix module and optionally sops-nix if isPrimary.
+      mkHomeManagerUsers = userModulesPath: builtins.mapAttrs (name: user:
+        {
+          imports = [
+            userModulesPath
+          ] ++ (builtins.filter (m: m != null) [
+            (if user.isPrimary then sops-nix.homeManagerModules.sops else null)
+          ]);
+        }
+      ) users;
+
       # Canonical system strings for the two supported architectures.
       systems = {
         linux = "x86_64-linux";
@@ -302,12 +314,7 @@
               inherit username;
               vscodeMarketplace = vscodeMarketplaceMac;
             };
-            home-manager.users.${username} = {
-              imports = [
-                sops-nix.homeManagerModules.sops
-                ./modules/home.nix
-              ];
-            };
+            home-manager.users = mkHomeManagerUsers ./modules/home.nix;
           }
         ];
       };
@@ -337,12 +344,7 @@
               inherit username;
               vscodeMarketplace = vscodeMarketplaceLinux;
             };
-            home-manager.users.${username} = {
-              imports = [
-                sops-nix.homeManagerModules.sops
-                ./modules/home.nix
-              ];
-            };
+            home-manager.users = mkHomeManagerUsers ./modules/home.nix;
           }
         ];
       };
