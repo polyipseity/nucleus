@@ -5,7 +5,7 @@
 #   • resolving the platform-appropriate home directory path
 #   • importing all shared feature modules
 #   • symlinking dotfiles from the repo's dotfiles/ tree into the home directory
-{ config, lib, pkgs, username, ... }:
+{ config, lib, pkgs, username, hostManualFile ? null, ... }:
 let
   # Derive the home directory from platform conventions. Keeping this local to
   # the module avoids relying on ad-hoc `_module.args` plumbed through every
@@ -20,7 +20,7 @@ in
 {
   options.nucleus.hostManualFile = lib.mkOption {
     type = lib.types.nullOr lib.types.path;
-    default = null;
+    default = hostManualFile;
     description = "Host-scoped MANUAL.md path printed by OS-specific activation modules at the end of Home Manager activation.";
   };
 
@@ -40,31 +40,33 @@ in
     ./wallpapers.nix
   ];
 
-  home = {
-    inherit username;
-    homeDirectory = resolvedHomeDirectory;
-    # Pin the Home Manager state version; changing this after initial
-    # activation requires a deliberate migration.
-    stateVersion = "24.11";
+  config = {
+    home = {
+      inherit username;
+      homeDirectory = resolvedHomeDirectory;
+      # Pin the Home Manager state version; changing this after initial
+      # activation requires a deliberate migration.
+      stateVersion = "24.11";
+    };
+
+    # Allow Home Manager to manage its own activation and generation GC.
+    programs.home-manager.enable = true;
+
+    # Declaratively symlink dotfile directories/files into the home directory.
+    # Each entry is guarded by pathExists so a missing dotfiles subtree does not
+    # cause an eval error on a fresh checkout.
+    home.file = lib.mkMerge [
+      (lib.optionalAttrs (builtins.pathExists (dotfilesRoot + "/.config")) {
+        ".config".source = dotfilesRoot + "/.config";
+      })
+      (lib.optionalAttrs (builtins.pathExists (dotfilesRoot + "/.gitconfig")) {
+        ".gitconfig".source = dotfilesRoot + "/.gitconfig";
+      })
+      (lib.optionalAttrs pkgs.stdenv.isDarwin {
+        # Keep iCloud Drive reachable from a short, stable path for all managed
+        # macOS users so scripts and shell workflows avoid long spaced paths.
+        "iCloud".source = config.lib.file.mkOutOfStoreSymlink "${resolvedHomeDirectory}/Library/Mobile Documents/com~apple~CloudDocs";
+      })
+    ];
   };
-
-  # Allow Home Manager to manage its own activation and generation GC.
-  programs.home-manager.enable = true;
-
-  # Declaratively symlink dotfile directories/files into the home directory.
-  # Each entry is guarded by pathExists so a missing dotfiles subtree does not
-  # cause an eval error on a fresh checkout.
-  home.file = lib.mkMerge [
-    (lib.optionalAttrs (builtins.pathExists (dotfilesRoot + "/.config")) {
-      ".config".source = dotfilesRoot + "/.config";
-    })
-    (lib.optionalAttrs (builtins.pathExists (dotfilesRoot + "/.gitconfig")) {
-      ".gitconfig".source = dotfilesRoot + "/.gitconfig";
-    })
-    (lib.optionalAttrs pkgs.stdenv.isDarwin {
-      # Keep iCloud Drive reachable from a short, stable path for all managed
-      # macOS users so scripts and shell workflows avoid long spaced paths.
-      "iCloud".source = config.lib.file.mkOutOfStoreSymlink "${resolvedHomeDirectory}/Library/Mobile Documents/com~apple~CloudDocs";
-    })
-  ];
 }

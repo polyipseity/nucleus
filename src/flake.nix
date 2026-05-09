@@ -54,18 +54,21 @@
             repositories = [
               {
                 name = "nucleus";
-                symlink = ../..;  # Flake root (this repo)
-                target = "~/dev/nucleus";
+                # Resolve this symlink from the live checkout path recorded by
+                # apply.sh so ~/dev/nucleus points at the working tree rather
+                # than an immutable Nix store snapshot.
+                symlinkFromRepoRoot = true;
+                target = "dev/nucleus";
               }
               {
                 name = "monorepo";
                 url = "git@github.com:polyipseity/monorepo.git";
-                target = "~/dev/monorepo";
+                target = "dev/monorepo";
               }
               {
                 name = "monorepo-private";
                 url = "git@github.com:polyipseity/monorepo-private.git";
-                target = "~/dev/monorepo-private";
+                target = "dev/monorepo-private";
               }
             ];
           };
@@ -426,6 +429,7 @@
       # -----------------------------------------------------------------------
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
         extraSpecialArgs = {
+          hostManualFile = ../hosts/nixos/MANUAL.md;
           inherit username;
           vscodeMarketplace = vscodeMarketplaceLinux;
         };

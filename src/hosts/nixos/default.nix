@@ -2,10 +2,13 @@
 # Aggregates all host-specific module fragments; no settings live here directly.
 { ... }:
 {
-  # Host-scoped manual checklist consumed by shared Home Manager activation
-  # modules. Keep this in the host entrypoint so shared modules never hardcode
-  # paths under src/hosts/.
-  nucleus.hostManualFile = ./MANUAL.md;
+  # Inject the host manual path into Home Manager at the user layer so the
+  # system entrypoint never needs to define a Home Manager-only option.
+  home-manager.sharedModules = [
+    {
+      nucleus.hostManualFile = ./MANUAL.md;
+    }
+  ];
 
   imports = [
     ../../modules/core.nix
