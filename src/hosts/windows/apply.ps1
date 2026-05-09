@@ -286,12 +286,6 @@ $configDir = Join-Path -Path $HOME -ChildPath ".config\nucleus"
     New-Item -ItemType Directory -Path $configDir -Force | Out-Null
   }
 
-  $configManifest = @(
-    (Join-Path -Path $configDir -ChildPath "repo-root"),
-  "$repoRoot`n",
-  [System.Text.UTF8Encoding]::new($false)
-)
-
 # Ensure the SSH host key exists before age key registration.  On a fresh
 # machine the key is absent until the OpenSSH Server service first starts;
 # Initialize-SSHHostKey starts it briefly if the service is installed
