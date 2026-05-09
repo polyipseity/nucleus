@@ -51,7 +51,10 @@ function Sync-PowerPolicy {
     This function updates only managed values on the active scheme.
 
   .PARAMETER Enabled
-    Whether cross-host power parity should be enforced.
+    Whether cross-host power parity should be enforced. Mandatory: caller must
+    explicitly choose true (apply managed power policy) or false (reset to
+    Windows defaults). No implicit default is permitted so the caller is always
+    aware of what state change they are authorizing.
 
   .EXAMPLE
     Sync-PowerPolicy -Enabled:$true
@@ -60,8 +63,8 @@ function Sync-PowerPolicy {
     Sync-PowerPolicy -Enabled:$false
   #>
   param(
-    [Parameter()]
-    [bool]$Enabled = $true
+    [Parameter(Mandatory)]
+    [bool]$Enabled
   )
 
   $powercfg = Join-Path -Path $env:SystemRoot -ChildPath 'System32\powercfg.exe'

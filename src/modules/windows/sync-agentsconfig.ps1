@@ -37,13 +37,13 @@
   resolves this from $PSScriptRoot and passes it explicitly.
 
 .PARAMETER Enabled
-  When $true (default), ensures the per-subdir layout exists.  When $false,
-  removes all managed per-subdir symlinks that point into the managed source
-  and, if ~/.agents\ then contains only managed entries, removes it too.
-  Unrecognised symlinks and real directories are left untouched.
+  Whether per-subdir symlinks should be managed. Mandatory: caller must
+  explicitly choose true (ensure symlinks exist) or false (remove managed
+  symlinks). When $false, unrecognised symlinks and real directories are
+  left untouched.
 
 .EXAMPLE
-  Sync-AgentsConfig -RepoRoot 'C:\Users\guest\repos\nucleus'
+  Sync-AgentsConfig -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$true
 
 .EXAMPLE
   # Remove all managed per-subdir symlinks (cleanup path):
@@ -54,8 +54,8 @@ function Sync-AgentsConfig {
   param(
     [Parameter(Mandatory)]
     [string]$RepoRoot,
-
-    [bool]$Enabled = $true
+    [Parameter(Mandatory)]
+    [bool]$Enabled
   )
 
   # The managed source is the live agents config tree in the repo.  Coding agents

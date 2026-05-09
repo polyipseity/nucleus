@@ -34,15 +34,15 @@
   resolves this from $PSScriptRoot and passes it explicitly.
 
 .PARAMETER Enabled
-  When $true (default), converges fetched skill directories with the manifest.
-  When $false, skips the sync entirely; already-downloaded skill directories are
-  left intact.
+  Whether fetched skills should be synced. Mandatory: caller must explicitly
+  choose true (converge with manifest) or false (skip sync). When $false,
+  already-downloaded skill directories are left intact.
 
 .OUTPUTS
   None.  Writes status messages to the host.
 
 .EXAMPLE
-  Sync-AgentsClawhubSkill -RepoRoot 'C:\Users\guest\repos\nucleus'
+  Sync-AgentsClawhubSkill -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$true
 
 .EXAMPLE
   # Skip the fetched skill sync without removing any existing downloads:
@@ -53,8 +53,8 @@ function Sync-AgentsClawhubSkill {
   param(
     [Parameter(Mandatory)]
     [string]$RepoRoot,
-
-    [bool]$Enabled = $true
+    [Parameter(Mandatory)]
+    [bool]$Enabled
   )
 
   if (-not $Enabled) {

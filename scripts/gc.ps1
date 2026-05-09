@@ -24,12 +24,14 @@
   idempotent and safe to re-run.
 
 .PARAMETER ModuleDir
-  Path to the Windows helper module directory.
-  Defaults to src\modules\windows relative to the repository root.
+  Path to the Windows helper module directory. Mandatory: caller must
+  explicitly pass the module directory so they are aware of which modules
+  will be loaded and executed.
 
 .PARAMETER RepoRoot
-  Root of the repository.  Defaults to the parent of the scripts\ directory
-  (i.e. $PSScriptRoot\..).
+  Root of the repository. Mandatory: caller must explicitly pass the repo root
+  so they are aware of which repository's assets and manifests will be accessed
+  and modified.
 
 .PARAMETER SkipCargoCache
   Skip cargo-cache pruning even when cargo-cache is available on PATH.
@@ -44,16 +46,15 @@
   Skip stale wallpaper file cleanup.
 
 .EXAMPLE
-  .\scripts\gc.ps1
-  .\scripts\gc.ps1 -SkipCargoCache
-  .\scripts\gc.ps1 -SkipOllamaPrune
-  .\scripts\gc.ps1 -SkipScoopCleanup
-  .\scripts\gc.ps1 -SkipWallpaperPrune -SkipCargoCache
+  .\scripts\gc.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -RepoRoot "C:\Users\polyipseity\nucleus"
+  .\scripts\gc.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -RepoRoot "C:\Users\polyipseity\nucleus" -SkipCargoCache
 #>
 [CmdletBinding()]
 param(
-  [string]$ModuleDir = (Join-Path -Path $PSScriptRoot -ChildPath "..\src\modules\windows"),
-  [string]$RepoRoot  = (Join-Path -Path $PSScriptRoot -ChildPath ".."),
+  [Parameter(Mandatory)]
+  [string]$ModuleDir,
+  [Parameter(Mandatory)]
+  [string]$RepoRoot,
   [switch]$SkipCargoCache,
   [switch]$SkipOllamaPrune,
   [switch]$SkipScoopCleanup,

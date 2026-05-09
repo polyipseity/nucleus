@@ -47,7 +47,9 @@ function Invoke-AiSync {
     absent or the server is unreachable.
 
   .PARAMETER RepoRoot
-    Repository root path.  Auto-detected from $PSScriptRoot when omitted.
+    Repository root path. Mandatory: caller must explicitly pass the repo root
+    so they are aware of which repository's model manifest will be consulted
+    and which machine context will be used for model operations.
 
   .PARAMETER DryRun
     Print planned actions without executing any ollama commands.
@@ -59,13 +61,14 @@ function Invoke-AiSync {
     None.  Progress and skip messages are written to the host.
 
   .EXAMPLE
-    Invoke-AiSync
-    Invoke-AiSync -PruneOnly
-    Invoke-AiSync -DryRun
+    Invoke-AiSync -RepoRoot "C:\Users\polyipseity\nucleus"
+    Invoke-AiSync -RepoRoot "C:\Users\polyipseity\nucleus" -PruneOnly
+    Invoke-AiSync -RepoRoot "C:\Users\polyipseity\nucleus" -DryRun
   #>
   [CmdletBinding()]
   param(
-    [string]$RepoRoot  = (Join-Path -Path $PSScriptRoot -ChildPath "..\.."),
+    [Parameter(Mandatory)]
+    [string]$RepoRoot,
     [switch]$DryRun,
     [switch]$PruneOnly
   )

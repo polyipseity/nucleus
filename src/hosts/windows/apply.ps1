@@ -28,22 +28,26 @@
 
 .PARAMETER ModuleDir
   Path to the directory containing one-function Windows helper modules.
-  Defaults to ..\..\modules\windows relative to $PSScriptRoot.
+  Mandatory: caller must explicitly pass the module directory so they are
+  aware of which modules will be loaded and executed.
 
 .PARAMETER PrimaryUsername
   Username allowed to materialize user-scoped secrets. Defaults to the
-  current interactive user. Deprecated: use -Users instead.
+  current interactive user for legacy compatibility, but -Users is the
+  preferred way to specify configured users. Deprecated: use -Users instead.
 
 .PARAMETER Users
-  Array of usernames to configure. Each user gets their secrets materialized,
-  SSH keys adopted, and home directory state converged. The first user in
-  the list is used for secrets materialization. Defaults to @($env:USERNAME).
+  Array of usernames to configure. Mandatory: each user in this list gets
+  their secrets materialized, SSH keys adopted, and home directory state
+  converged. Callers must explicitly pass this list so they are aware of
+  which user profiles will be modified. The first user in the list is used
+  for secrets materialization.
   Example: -Users @('polyipseity', 'john')
 
   Note: For full multi-user support where each user gets their own secrets,
   SSH keys, and home directory state, run apply.ps1 separately for each user:
-    .\apply.ps1 -Users @('polyipseity')
-    .\apply.ps1 -Users @('john')
+    .\apply.ps1 -ModuleDir "C:\path\to\modules" -Users @('polyipseity')
+    .\apply.ps1 -ModuleDir "C:\path\to\modules" -Users @('john')
   This ensures each user gets properly isolated secret materialization.
 
 .PARAMETER EnableAgentsConfigParity
@@ -119,61 +123,43 @@
   When present, prints this help text and exits without applying anything.
 
 .EXAMPLE
-  # Apply with defaults (both DSC files, from the script's own directory):
-  .\apply.ps1
+  # Apply with explicit module directory and user list:
+  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity')
 
 .EXAMPLE
   # Apply only the user-level DSC file:
-  .\apply.ps1 -ConfigFiles @('user.dsc.yml')
+  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity') -ConfigFiles @('user.dsc.yml')
 
 .EXAMPLE
   # Apply while explicitly scoping secret materialization to one user:
-  .\apply.ps1 -PrimaryUsername 'polyipseity'
+  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity') -PrimaryUsername 'polyipseity'
 
 .EXAMPLE
   # Apply while skipping the post-apply Ollama model sync:
-  .\apply.ps1 -SkipAiSync
+  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity') -SkipAiSync
 
 .EXAMPLE
   # Apply while disabling machine age key auto-registration in .sops.yaml:
-  .\apply.ps1 -EnableHostAgeKeyRegistration:$false
-
-.EXAMPLE
-  # Apply while disabling managed agents config junction (cleanup only):
-  .\apply.ps1 -EnableAgentsConfigParity:$false
-
-.EXAMPLE
-  # Apply while disabling managed agents committed skill symlinks (cleanup only):
-  .\apply.ps1 -EnableAgentsSkillsParity:$false
-
-.EXAMPLE
-  # Apply while disabling fetched clawhub skill sync (skip only):
-  .\apply.ps1 -EnableAgentsClawhubSkillsParity:$false
+  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity') -EnableHostAgeKeyRegistration:$false
 
 .EXAMPLE
   # Apply while disabling managed VS Code settings parity (cleanup only):
-  .\apply.ps1 -EnableVsCodeSettingsParity:$false
-
-.EXAMPLE
-  # Apply while disabling managed VS Code workspace trust (skip only):
-  .\apply.ps1 -EnableVsCodeWorkspaceTrustParity:$false
+  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity') -EnableVsCodeSettingsParity:$false
 
 .EXAMPLE
   # Apply while disabling managed remote-access parity (cleanup only):
-  .\apply.ps1 -EnableRemoteAccessParity:$false
-
-.EXAMPLE
-  # Apply while disabling managed Windows built-in RDP (cleanup only):
-  .\apply.ps1 -EnableRdpParity:$false
+  .\apply.ps1 -ModuleDir "C:\Users\polyipseity\nucleus\src\modules\windows" -Users @('polyipseity') -EnableRemoteAccessParity:$false
 #>
 [CmdletBinding()]
 param(
   [string]$ConfigDir = $PSScriptRoot,
   [string[]]$ConfigFiles = @("system.dsc.yml", "user.dsc.yml"),
   [switch]$Help,
-  [string]$ModuleDir = (Join-Path -Path $PSScriptRoot -ChildPath "..\..\modules\windows"),
+  [Parameter(Mandatory)]
+  [string]$ModuleDir,
   [string]$PrimaryUsername = [System.Environment]::UserName,
-  [string[]]$Users = @(),  # Array of users to configure; each user gets their secrets if defined in SOPS
+  [Parameter(Mandatory)]
+  [string[]]$Users,
   [bool]$EnableAgentsConfigParity = $true,
   [bool]$EnableAgentsSkillsParity = $true,
   [bool]$EnableAgentsClawhubSkillsParity = $true,
@@ -191,11 +177,6 @@ param(
   [int]$MinFreeDiskGB = 10,
   [switch]$SkipAiSync
 )
-
-# Default to current user if no users specified.
-if ($Users.Count -eq 0) {
-  $Users = @([System.Environment]::UserName)
-}
 
 $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
@@ -363,11 +344,11 @@ if ($EnableBunParity) {
 Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
 Sync-AgentsSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
 Sync-AgentsClawhubSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsClawhubSkillsParity
-Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity
+Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $Users[0]
 Sync-VSCodeExtension -Enabled:$EnableVsCodeExtensionsParity
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
-Sync-ShellProfile -Enabled:$EnableShellParity
+Sync-ShellProfile -Enabled:$EnableShellParity -Username $Users[0]
 Sync-OpenSshServer -Enabled:$EnableRemoteAccessParity
 # Re-run host age key registration after Sync-OpenSshServer has started
 # the sshd service (which generates host keys on a fresh machine).  This second

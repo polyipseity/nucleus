@@ -28,7 +28,8 @@ function Sync-WindowsRdp {
       - Disables the RemoteDesktop-UserMode-In-UDP firewall rule
 
   .PARAMETER Enabled
-    Whether Windows built-in RDP parity should be enforced. False applies cleanup.
+    Whether Windows built-in RDP parity should be enforced. Mandatory: caller
+    must explicitly choose true (apply managed RDP state) or false (cleanup).
 
   .EXAMPLE
     Sync-WindowsRdp -Enabled:$true
@@ -37,8 +38,8 @@ function Sync-WindowsRdp {
     Sync-WindowsRdp -Enabled:$false
   #>
   param(
-    [Parameter()]
-    [bool]$Enabled = $true
+    [Parameter(Mandatory)]
+    [bool]$Enabled
   )
 
   $rdpService = Get-Service -Name 'TermService' -ErrorAction SilentlyContinue

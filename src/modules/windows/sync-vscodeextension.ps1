@@ -26,18 +26,19 @@ function Sync-VSCodeExtension {
     Cleanup behavior when disabled removes only managed extensions.
 
   .PARAMETER Enabled
-    Whether managed extension parity should be enforced. False removes the
-    managed extensions from discovered VS Code channels.
+    Whether managed extension parity should be enforced. Mandatory: caller
+    must explicitly choose true (install managed extensions) or false
+    (remove managed extensions).
 
   .EXAMPLE
-    Sync-VSCodeExtensions -Enabled:$true
+    Sync-VSCodeExtension -Enabled:$true
 
   .EXAMPLE
-    Sync-VSCodeExtensions -Enabled:$false
+    Sync-VSCodeExtension -Enabled:$false
   #>
   param(
-    [Parameter()]
-    [bool]$Enabled = $true
+    [Parameter(Mandatory)]
+    [bool]$Enabled
   )
 
   $managedExtensions = @(

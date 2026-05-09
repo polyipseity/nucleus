@@ -31,18 +31,27 @@ function Sync-ShellProfile {
     Cleanup behavior when disabled removes only the managed block.
 
   .PARAMETER Enabled
-    Whether managed shell parity should be enforced. False removes the managed
+    Whether managed shell parity should be enforced. Mandatory: caller must
+    explicitly choose true (apply) or false (cleanup). False removes the managed
     block from profile files.
 
-  .EXAMPLE
-    Sync-ShellProfile -Enabled:$true
+  .PARAMETER Username
+    Username for which the shell profile is being managed. Explicitly passed
+    to ensure caller is aware of which user's profile will be modified.
+    Defaults to the current user if omitted, but the parameter must be present
+    in the signature to force awareness of user context.
 
   .EXAMPLE
-    Sync-ShellProfile -Enabled:$false
+    Sync-ShellProfile -Enabled:$true -Username 'polyipseity'
+
+  .EXAMPLE
+    Sync-ShellProfile -Enabled:$false -Username 'polyipseity'
   #>
   param(
+    [Parameter(Mandatory)]
+    [bool]$Enabled,
     [Parameter()]
-    [bool]$Enabled = $true
+    [string]$Username = [System.Environment]::UserName
   )
 
   $managedBlockStart = '# >>> config managed shell parity >>>'

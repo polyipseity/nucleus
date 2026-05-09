@@ -34,16 +34,16 @@
   resolves this from $PSScriptRoot and passes it explicitly.
 
 .PARAMETER Enabled
-  When $true (default), ensures per-skill symlinks exist for all committed
-  skills.  When $false, removes managed per-skill symlinks (those pointing into
-  the committed source); real directories from fetched clawhub downloads are
-  left untouched.
+  Whether per-skill symlinks should be managed. Mandatory: caller must
+  explicitly choose true (ensure symlinks exist) or false (remove managed
+  symlinks). When $false, real directories from fetched clawhub downloads
+  are left untouched.
 
 .OUTPUTS
   None.  Writes status messages to the host.
 
 .EXAMPLE
-  Sync-AgentsSkill -RepoRoot 'C:\Users\guest\repos\nucleus'
+  Sync-AgentsSkill -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$true
 
 .EXAMPLE
   # Remove only managed per-skill symlinks (cleanup path); leave fetched dirs:
@@ -54,8 +54,8 @@ function Sync-AgentsSkill {
   param(
     [Parameter(Mandatory)]
     [string]$RepoRoot,
-
-    [bool]$Enabled = $true
+    [Parameter(Mandatory)]
+    [bool]$Enabled
   )
 
   # Committed (bundled) skills live under this path in the repo.

@@ -50,18 +50,26 @@ function Sync-VscodeConfig {
     session.
 
   .PARAMETER RepoRoot
-    Absolute path to the repository root.  Passed explicitly so the function
-    does not re-derive the repo from the working directory.
+    Absolute path to the repository root.  Mandatory: passed explicitly so the
+    function does not re-derive the repo from the working directory and to
+    ensure callers are aware of which repository will be modified.
 
   .PARAMETER Enabled
-    When $true (default), creates or validates all managed symlinks.
-    When $false, removes managed symlinks (cleanup path only).
+    Whether VS Code config symlinks should be managed. Mandatory: caller must
+    explicitly choose true (create/validate symlinks) or false (remove managed
+    symlinks). No implicit default is permitted.
+
+  .PARAMETER Username
+    Username for which VS Code config is being managed. Explicitly passed to
+    ensure caller is aware of which user's profile will be modified. Defaults to
+    the current user if omitted, but the parameter must be present in the
+    signature to force awareness of user context.
 
   .OUTPUTS
     None.  Writes informational messages to the host output stream.
 
   .EXAMPLE
-    Sync-VscodeConfig -RepoRoot "C:\Users\polyipseity\nucleus"
+    Sync-VscodeConfig -RepoRoot "C:\Users\polyipseity\nucleus" -Enabled:$true
 
   .EXAMPLE
     Sync-VscodeConfig -RepoRoot "C:\Users\polyipseity\nucleus" -Enabled:$false
@@ -69,7 +77,10 @@ function Sync-VscodeConfig {
   param(
     [Parameter(Mandatory)]
     [string]$RepoRoot,
-    [bool]$Enabled = $true
+    [Parameter(Mandatory)]
+    [bool]$Enabled,
+    [Parameter()]
+    [string]$Username = [System.Environment]::UserName
   )
 
   $vsConfigDir = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\vscode"
