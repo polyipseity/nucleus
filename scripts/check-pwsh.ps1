@@ -95,13 +95,19 @@ else {
     if (-not (Test-Path -Path $path)) {
       continue
     }
-    $lintResults += Invoke-ScriptAnalyzer -Path $path -Severity @('Error', 'Warning') -ExcludeRule @('PSUseBOMForUnicodeEncodedFile')
+    $lintResults += Invoke-ScriptAnalyzer -Path $path -Severity @('Error', 'Warning', 'Information') -ExcludeRule @('PSUseBOMForUnicodeEncodedFile')
   }
+
+  # Filter results to only non-Info lints for failure determination
+  $nonInfoLints = $lintResults | Where-Object { $_.Severity -ne 'Information' }
 
   if ($lintResults.Count -gt 0) {
     $lintResults | ForEach-Object {
       Write-Output ('{0}:{1}:{2}: [{3}] {4}' -f $_.ScriptPath, $_.Line, $_.Column, $_.Severity, $_.Message)
     }
+  }
+
+  if ($nonInfoLints.Count -gt 0) {
     throw 'PowerShell lint check failed.'
   }
 
