@@ -29,8 +29,10 @@ function Sync-DevRepos {
     warnings but do not halt provisioning.
 
   .PARAMETER Enabled
-    Whether dev repos should be provisioned. If $null, reads from user
-    registry (defaults to true for polyipseity, false for others).
+    Whether dev repos should be provisioned. Mandatory: caller must explicitly
+    pass true to enable or false to disable. Apply.ps1 reads this from the user
+    registry (users.json) to ensure enable status is derived from centralized
+    configuration, not from implicit username checks.
 
   .PARAMETER Repositories
     Array of repository objects from the user registry. Each object must have:
@@ -54,16 +56,11 @@ function Sync-DevRepos {
   #>
   param(
     [Parameter()]
-    [bool]$Enabled = $null,
+    [bool]$Enabled,
 
     [Parameter()]
     [object[]]$Repositories = @()
   )
-
-  # Default to enabled for polyipseity, disabled for others if not explicitly set.
-  if ($null -eq $Enabled) {
-    $Enabled = ([System.Environment]::UserName -eq 'polyipseity')
-  }
 
   if (-not $Enabled) {
     Write-Verbose "Sync-DevRepos: provisioning is disabled."

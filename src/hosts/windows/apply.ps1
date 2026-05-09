@@ -390,7 +390,10 @@ foreach ($user in $userRegistry.users) {
 }
 
 $devRepositories = @()
+$devReposEnabled = $false
+
 if ($userDevRepos -and $userDevRepos.repositories) {
+  $devReposEnabled = if ($userDevRepos.enable) { $true } else { $false }
   $userHome = [Environment]::GetFolderPath('UserProfile')
   foreach ($repo in $userDevRepos.repositories) {
     $repoEntry = @{
@@ -416,6 +419,11 @@ Sync-AgentsClawhubSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsClawhubSkillsP
 Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $Users[0]
 Sync-VSCodeExtension -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
+# Default to false if devReposEnabled not yet set (user not in registry or no repos configured).
+if ($null -eq $EnableDevReposParity) {
+  $EnableDevReposParity = $devReposEnabled
+}
+
 Sync-DevRepos -Enabled:$EnableDevReposParity -Repositories $devRepositories
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
