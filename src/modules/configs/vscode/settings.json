@@ -86,6 +86,7 @@
   "github.copilot.chat.anthropic.tools.websearch.enabled": true,
   "github.copilot.chat.codesearch.enabled": true,
   "github.copilot.chat.executionSubagent.enabled": true,
+  "github.copilot.chat.inlineChat.reasoningEffort": "high",
   "github.copilot.chat.inlineEdits.diagnosticsContextProvider.enabled": true,
   "github.copilot.chat.languageContext.fix.typescript.enabled": true,
   "github.copilot.chat.languageContext.inline.typescript.enabled": true,
