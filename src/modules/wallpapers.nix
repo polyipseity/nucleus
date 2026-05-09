@@ -172,7 +172,9 @@ lib.mkIf isPrimaryUser {
         if [ -L "$targetFile" ] || [ ! -f "$targetFile" ] || ! cmp -s "$secretPath" "$targetFile"; then
           tmpTarget="$(mktemp)"
           cp "$secretPath" "$tmpTarget"
-          chmod 644 "$tmpTarget"
+          # 444: managed wallpaper content must not be modified outside
+          # activation; GUI consumers and desktoppr need only read access.
+          chmod 444 "$tmpTarget"
           mv "$tmpTarget" "$targetFile"
         fi
       '')
@@ -251,6 +253,7 @@ lib.mkIf isPrimaryUser {
         prevImg="$img"
       done
 
+      _xml_tmp_final="$(mktemp)"
       {
         printf '<?xml version="1.0" encoding="UTF-8"?>\n'
         printf '<background>\n'
@@ -258,7 +261,12 @@ lib.mkIf isPrimaryUser {
         printf '  <transition type="overlay">\n    <duration>5.0</duration>\n    <from>%s</from>\n    <to>%s</to>\n  </transition>\n' \
           "$prevImg" "$firstImg"
         printf '</background>\n'
-      } > "$xmlFile"
+      } > "$_xml_tmp_final"
+      # 444: the gallery descriptor is regenerated on every activation; GUI
+      # consumers need only read access.  Immutability prevents accidental
+      # manual edits from silently overriding managed state.
+      chmod 444 "$_xml_tmp_final"
+      mv "$_xml_tmp_final" "$xmlFile"
       if ! gsettings set org.gnome.desktop.background picture-uri "file://$xmlFile"; then
         fail_wallpaper_provision "nucleus: failed to set GNOME picture-uri to wallpaper gallery XML."
       fi

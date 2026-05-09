@@ -251,6 +251,9 @@ lib.mkIf isPrimaryUser {
     ${pkgs.git}/bin/git config --file "$identity_file" user.name "$identity_name"
     ${pkgs.git}/bin/git config --file "$identity_file" user.email "$identity_email"
     ${pkgs.git}/bin/git config --file "$identity_file" user.signingkey "$identity_signing_key"
+    # Restrict the identity include file to owner-read-only: it contains the
+    # GPG signing key reference, which minimises visibility to other local users.
+    chmod 600 "$identity_file"
   '';
 
   # --------------------------------------------------------------------------
@@ -342,6 +345,9 @@ lib.mkIf isPrimaryUser {
     # (e.g., GnuPG 2.5 + Kyber IPC edge cases on first bootstrap).
     mkdir -p "$nucleus_config_dir"
     printf '%s\n' "$first_key_fingerprint" > "$managed_keys_manifest"
+    # Restrict manifest to owner-read-only: the fingerprint identifies the
+    # managed key; excess visibility could aid key targeting.
+    chmod 600 "$managed_keys_manifest"
 
     if ! printf '%s:6:\n' "$first_key_fingerprint" | ${pkgs.gnupg}/bin/gpg --import-ownertrust; then
       echo "nucleus: warning — failed to enforce ultimate ownertrust for managed primary fingerprint $first_key_fingerprint; key is imported and tracked but trust state may require manual repair." >&2
@@ -412,6 +418,9 @@ lib.mkIf isPrimaryUser {
 
         mkdir -p "$nucleus_config_dir"
         printf '%s\n' "$new_fingerprint" > "$managed_ssh_manifest"
+        # Restrict manifest to owner-read-only: SSH fingerprint data can be
+        # used to correlate keys across systems; minimise unnecessary visibility.
+        chmod 600 "$managed_ssh_manifest"
       fi
     fi
   '';

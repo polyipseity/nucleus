@@ -313,6 +313,10 @@ register_host_age_key_if_needed() {
     /    # -- machine keys end; personal SSH backup key below --/ { print "    - " age_pub }
     { print }
   ' "$_rak_sops_yaml" > "$_rak_tmp"
+  # mktemp creates files at mode 0600; .sops.yaml is a config file (not a
+  # secret) and must be 0644 so other tools can read the recipient list.
+  # Set the mode before the atomic rename so the file is never visible at 0600.
+  chmod 644 "$_rak_tmp"
   mv "$_rak_tmp" "$_rak_sops_yaml"
 
   # Verify the insertion succeeded; catches the case where the marker comment

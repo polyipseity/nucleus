@@ -111,10 +111,21 @@ while IFS= read -r _slug; do
     printf '%s\n' "nucleus: sync-agents-clawhub-skills: skipping '$_slug' — a committed-skill symlink exists at $_skill_path; remove it from clawhub-skills.json or from src/modules/configs/agents/skills/" >&2
     continue
   fi
+  # Unlock an existing fetched skill directory before updating so clawhub can
+  # overwrite files that were locked a-w on a previous install.
+  if [ -d "$_skill_path" ]; then
+    chmod -R u+w "$_skill_path"
+  fi
   printf '%s\n' "nucleus: sync-agents-clawhub-skills: installing/updating fetched skill '$_slug'..."
   # Non-zero exit from clawhub is non-fatal: the system apply already succeeded;
   # skill sync is additive.  A warning is printed and the loop continues.
-  if ! clawhub install --workdir "$HOME/.agents" --no-input "$_slug"; then
+  if clawhub install --workdir "$HOME/.agents" --no-input "$_slug"; then
+    # Lock installed content so files cannot be modified outside a managed apply
+    # run.  The unlock above re-opens write access before the next update.
+    if [ -d "$_skill_path" ]; then
+      chmod -R a-w "$_skill_path"
+    fi
+  else
     printf '%s\n' "nucleus: sync-agents-clawhub-skills: clawhub install failed for '$_slug' (system apply succeeded)" >&2
   fi
 done < "$_slugs_file"
@@ -134,6 +145,9 @@ while IFS= read -r _candidate; do
   [ ! -f "$_candidate/.clawhub/origin.json" ] && continue
   if ! grep -qxF "$_cname" "$_slugs_file"; then
     printf '%s\n' "nucleus: sync-agents-clawhub-skills: removing stale fetched skill '$_cname' (removed from manifest)"
+    # Unlock before removal: the skill was locked a-w after install; rm -rf
+    # needs user-write permission on subdirectories to remove their contents.
+    chmod -R u+w "$_candidate"
     rm -rf "$_candidate"
   fi
 done < "$_stale_list"
