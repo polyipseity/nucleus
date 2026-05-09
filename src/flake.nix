@@ -140,35 +140,35 @@
       # Build the PowerShell syntax validation app for a given package set.
       # Runtime dependencies are bundled from this flake so CI and local runs do
       # not depend on ad-hoc system package versions.
-      mkPowerShellSyntaxValidationApp = pkgs: {
+      mkCheckPwshApp = pkgs: {
         type = "app";
         program = "${pkgs.writeShellApplication {
-          name = "nucleus-validate-powershell-syntax";
+          name = "nucleus-check-pwsh";
           runtimeInputs = [
             pkgs.git
             pkgs.powershell
           ];
           text = ''
-            exec pwsh -NoLogo -NoProfile -NonInteractive -File "${../scripts/validate-powershell-syntax.ps1}" "$@"
+            exec pwsh -NoLogo -NoProfile -NonInteractive -File "${../scripts/check-pwsh.ps1}" "$@"
           '';
-        }}/bin/nucleus-validate-powershell-syntax";
+        }}/bin/nucleus-check-pwsh";
       };
 
       # Build the shell script lint app for a given package set.
       # Runtime dependencies are bundled from this flake so CI and local runs do
       # not depend on host-global shellcheck/git installations.
-      mkShellScriptValidationApp = pkgs: {
+      mkCheckShApp = pkgs: {
         type = "app";
         program = "${pkgs.writeShellApplication {
-          name = "nucleus-validate-shell-scripts";
+          name = "nucleus-check-sh";
           runtimeInputs = [
             pkgs.git
             pkgs.shellcheck
           ];
           text = ''
-            exec sh "${../scripts/validate-shell-scripts.sh}" "$@"
+            exec sh "${../scripts/check-sh.sh}" "$@"
           '';
-        }}/bin/nucleus-validate-shell-scripts";
+        }}/bin/nucleus-check-sh";
       };
 
       # Build pre-flight health checks as a runnable app that fails fast before
@@ -234,8 +234,8 @@
             type = "app";
             program = "${darwin.packages.${systems.mac}.darwin-rebuild}/bin/darwin-rebuild";
           };
-          validate-shell-scripts = mkShellScriptValidationApp pkgsMac;
-          validate-powershell-syntax = mkPowerShellSyntaxValidationApp pkgsMac;
+          check-sh = mkCheckShApp pkgsMac;
+          check-pwsh = mkCheckPwshApp pkgsMac;
           gc = mkGcApp pkgsMac;
           health-check = mkHealthCheckApp pkgsMac;
           update = mkUpdateApp pkgsMac;
@@ -250,8 +250,8 @@
             type = "app";
             program = "${pkgsLinux.nixos-rebuild}/bin/nixos-rebuild";
           };
-          validate-shell-scripts = mkShellScriptValidationApp pkgsLinux;
-          validate-powershell-syntax = mkPowerShellSyntaxValidationApp pkgsLinux;
+          check-sh = mkCheckShApp pkgsLinux;
+          check-pwsh = mkCheckPwshApp pkgsLinux;
           gc = mkGcApp pkgsLinux;
           health-check = mkHealthCheckApp pkgsLinux;
           update = mkUpdateApp pkgsLinux;

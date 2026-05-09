@@ -50,8 +50,8 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@4a754ab0c192f4d12cf88b5954b9dd13fd2d612e
 
-      - name: Validate PowerShell syntax
-        run: nix run ./src#validate-powershell-syntax
+      - name: Check PowerShell syntax and lint
+        run: nix run ./src#check-pwsh
 
-      - name: Validate shell scripts
-        run: nix run ./src#validate-shell-scripts
+      - name: Check shell scripts
+        run: nix run ./src#check-sh

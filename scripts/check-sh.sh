@@ -1,12 +1,12 @@
 #!/usr/bin/env sh
-# Validate shell script syntax and lint quality with ShellCheck.
+# scripts/check-sh.sh — Validate shell script syntax and lint quality with ShellCheck.
 #
 # Usage:
-#   validate-shell-scripts.sh [path ...]
+#   check-sh.sh [path ...]
 #
 # Behavior:
-#   - With no arguments, validates all tracked `*.sh` files from Git.
-#   - With arguments, validates only the provided paths.
+#   - With no arguments, checks all tracked `*.sh` files from Git.
+#   - With arguments, checks only the provided paths.
 #
 # Environment:
 #   - Requires `git` and `shellcheck` in PATH (provided by flake app wrapper).
@@ -22,7 +22,7 @@ else
 fi
 
 if [ -z "$files" ]; then
-  printf '%s\n' 'No shell scripts to validate.'
+  printf '%s\n' 'No shell scripts to check.'
   exit 0
 fi
 
@@ -31,4 +31,4 @@ fi
 shellcheck $files
 
 count=$(printf '%s\n' "$files" | awk 'NF { c += 1 } END { print c + 0 }')
-printf 'Shell script validation passed for %s files.\n' "$count"
+printf 'Shell script check passed for %s files.\n' "$count"
