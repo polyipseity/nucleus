@@ -208,6 +208,35 @@ following logic:
   exists in `src/hosts/windows/system.dsc.yml` to maintain cross-platform
   parity.
 
+### Channel Preference Policy (All Platforms)
+
+When an application offers a preview, beta, canary, or insider release
+channel, **prefer that channel over the stable release** on all platforms.
+This keeps the managed environment at the leading edge of each tool and
+ensures consistent behaviour with the upstream development track.
+
+Apply this rule when:
+
+- A dedicated preview/beta/canary/insider package exists in the relevant
+  package manager for that platform.
+- The preview channel is at minimum functional (not severely broken).
+
+Examples already following this policy:
+- Discord: `discord@canary` (macOS cask / Windows WinGet `Discord.Discord.Canary`)
+- Google Chrome: `google-chrome@canary` (macOS cask / Windows `Google.Chrome.Canary`)
+- VS Code: `visual-studio-code@insiders` / `Microsoft.VisualStudioCode.Insiders`
+- Telegram: `telegram-desktop@beta` / `Telegram.TelegramDesktop.Beta`
+- WhatsApp: `whatsapp@beta`
+- Windows Terminal: `Microsoft.WindowsTerminal.Preview`
+
+When a preview channel is **not available or not viable** for a specific
+platform, use the stable release and add a short inline `# WHY` comment
+explaining the exception.
+
+Agents must apply this rule when adding or updating any package on any
+platform.  When reviewing existing package declarations, flag stable
+entries that have an available preview/beta channel as parity debt.
+
 ### VS Code Symmetry Protocol
 
 For Visual Studio Code, keep one declarative source of truth in

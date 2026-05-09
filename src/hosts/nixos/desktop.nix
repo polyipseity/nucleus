@@ -61,6 +61,21 @@
     # Chrome Remote Desktop is not available as a nixpkgs package; see MANUAL.md
     # for the one-time browser-extension setup required for inbound CRD access.
     parsec-bin
+
+    # Productivity and creative applications.
+    # GIMP and Krita: raster and digital painting editors.
+    # LibreOffice: office suite.
+    # Blender: 3D modelling, animation, and rendering.
+    # Zoom: video conferencing.
+    # pass: Unix password manager (compatible with gopass on Windows).
+    # qtpass: Qt GUI frontend for pass/gopass.
+    blender
+    gimp
+    krita
+    libreoffice
+    pass
+    qtpass
+    zoom-us
   ];
 
   # Enable GNOME services if GNOME is enabled above.

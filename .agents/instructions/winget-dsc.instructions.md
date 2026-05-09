@@ -58,6 +58,12 @@ packages) or `settings.valueName` / `settings.name` (for other resources).
   entries; do not omit it even if it is technically the default.
 - Use the canonical WinGet package identifier (verified via `winget search`)
   rather than a display name or URL.
+- When a WinGet package has a Preview or Canary variant (for example
+  `Microsoft.WindowsTerminal.Preview` vs `Microsoft.WindowsTerminal`),
+  prefer the preview channel per the repository-wide Channel Preference
+  Policy in `AGENTS.md`. Use the stable ID only when the preview channel
+  is unavailable or severely broken; document the exception with a
+  `directives.description:` note.
 - Prefer human-readable named package IDs over opaque Microsoft Store-generated
   IDs whenever a named ID exists.
 - When a Microsoft Store package only exposes a generated ID, keep using that

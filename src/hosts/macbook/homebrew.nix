@@ -29,8 +29,9 @@ let
      "battery"                    # Apple Silicon charge-limit manager (maintains 80% cap)
      "betterdisplay"              # Advanced display management and virtual screens
      "chrome-remote-desktop-host" # Headless remote-desktop receiver
-     "coolterm"                   # Serial terminal
-     "google-chrome@canary"       # Chrome dev channel for web testing
+      "coolterm"                   # Serial terminal
+      "gimp"                       # Raster image editor; macOS-only cask (nixpkgs gimp is Linux-only)
+      "google-chrome@canary"       # Chrome dev channel for web testing
      "keka"                       # Graphical archiver with 7-Zip backend support
      "lulu"                       # Outbound network firewall
      "orbstack"                   # Docker/Linux VM runtime (faster than Docker Desktop)
@@ -40,6 +41,10 @@ let
      "whatsapp@beta"              # WhatsApp pre-release client
    ];
 
+  # QtPass (GUI frontend for pass/gopass) is intentionally absent from macOS.
+  # The Homebrew cask fails Gatekeeper checks (app not notarized) and is
+  # scheduled for removal in September 2026.  Use pass from the CLI or
+  # the nixpkgs-based qtpass on NixOS.  Windows uses WinGet IJHack.QtPass.
   managedCasks = builtins.sort (a: b: a < b) (lib.unique (staticManagedCasks ++ coreManagedCasks));
 
   # Nix-managed packages that must be in the system environment (not just the

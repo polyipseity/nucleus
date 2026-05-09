@@ -42,6 +42,15 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          Blender — 3D creation suite for modelling, animation, rendering, and video
+          editing. Cross-platform parity with macOS (Homebrew cask) and NixOS (nixpkgs).
+      settings:
+        id: BlenderFoundation.Blender
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure ripgrep is installed for cross-host search tooling parity with macOS and NixOS
       settings:
         id: BurntSushi.ripgrep
@@ -80,6 +89,15 @@ properties:
         description: Ensure eza is installed for cross-host shell listing parity with macOS and NixOS
       settings:
         id: eza-community.eza
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          GIMP — raster image editor. Cross-platform parity with macOS (Homebrew cask)
+          and NixOS (nixpkgs).
+      settings:
+        id: GIMP.GIMP
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -155,6 +173,15 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          QtPass — Qt GUI frontend for gopass/pass. Parity with NixOS (nixpkgs qtpass);
+          macOS excluded because the Homebrew cask fails Gatekeeper checks.
+      settings:
+        id: IJHack.QtPass
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Inter is installed as the open-source sans-serif UI baseline (SIL OFL) for Windows font parity with POSIX hosts using pkgs.inter
       settings:
         id: Inter.Inter
@@ -179,6 +206,15 @@ properties:
         description: Ensure fzf is installed for cross-host fuzzy finder parity with macOS and NixOS
       settings:
         id: junegunn.fzf
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Krita — digital painting and illustration editor. Cross-platform parity with
+          macOS (Homebrew cask) and NixOS (nixpkgs).
+      settings:
+        id: KDE.Krita
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -211,9 +247,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Windows Terminal is installed to provide "Open in Windows Terminal" context menu option in Explorer for cross-platform parity with macOS (Terminal/iTerm) and NixOS (GNOME Terminal/Konsole)
+        description: >-
+          Windows Terminal Preview — preferred over stable per repository policy
+          (preview/beta channels are favoured when available).  Provides "Open in
+          Windows Terminal" context menu option in Explorer for cross-platform parity
+          with macOS (Terminal/iTerm) and NixOS (GNOME Terminal/Konsole).
       settings:
-        id: Microsoft.WindowsTerminal
+        id: Microsoft.WindowsTerminal.Preview
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -328,6 +368,15 @@ properties:
     - resource: Microsoft.WinGet.Client/Package
       directives:
         description: >-
+          LibreOffice — open-source office suite. Cross-platform parity with macOS
+          (Homebrew cask) and NixOS (nixpkgs).
+      settings:
+        id: TheDocumentFoundation.LibreOffice
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
           Ensure Typst is installed as the command-line document-composition
           compiler for cross-host parity with macOS and NixOS (pkgs.typst);
           pairs with the Tinymist language server managed by VS Code extension
@@ -341,6 +390,15 @@ properties:
         description: Ensure VLC media player is installed to mirror the macOS GUI package declaration
       settings:
         id: VideoLAN.VLC
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Zoom — video conferencing client. Cross-platform parity with macOS (Homebrew
+          cask) and NixOS (nixpkgs zoom-us).
+      settings:
+        id: Zoom.Zoom
         source: winget
 
     - resource: Microsoft.Windows.Settings/DeveloperMode

@@ -18,6 +18,11 @@ function Invoke-ScoopSetup {
     correct install channel per the repository preference hierarchy
     (nixpkgs/winget > scoop > cargo binstall).
 
+    Also installs gopass (the cross-platform Go reimplementation of the Unix
+    pass password manager) from the Scoop main bucket for Windows parity
+    with pkgs.pass on POSIX hosts.  No WinGet package exists for gopass; Scoop
+    is the correct install tier.
+
     This function must run after the WinGet DSC step that installs Scoop.Scoop,
     because Scoop shims are written to %USERPROFILE%\scoop\shims which is not
     on PATH in the parent PowerShell session until explicitly prepended.
@@ -84,5 +89,27 @@ function Invoke-ScoopSetup {
     Write-Host "scoop: cargo-binstall installed successfully"
   } else {
     Write-Host "scoop: cargo-binstall already installed — skipping"
+  }
+
+  # Install gopass if the shim is not yet present.  gopass is the cross-platform
+  # Go reimplementation of the Unix pass password manager; it is the Windows
+  # equivalent of pkgs.pass used on POSIX hosts.  No WinGet package exists;
+  # Scoop main bucket is the correct install tier per the repository preference
+  # hierarchy (winget > scoop > cargo binstall > bun).
+  $gopassBin = Join-Path $scoopShims "gopass.exe"
+  if (-not (Test-Path $gopassBin)) {
+    Write-Host "scoop: installing gopass"
+    scoop install gopass
+    if ($LASTEXITCODE -ne 0) {
+      Write-Error "scoop: 'scoop install gopass' failed (exit $LASTEXITCODE)"
+      return
+    }
+    if (-not (Test-Path $gopassBin)) {
+      Write-Error "scoop: gopass installed but binary not found at '$gopassBin'"
+      return
+    }
+    Write-Host "scoop: gopass installed successfully"
+  } else {
+    Write-Host "scoop: gopass already installed — skipping"
   }
 }

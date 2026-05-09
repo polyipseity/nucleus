@@ -98,7 +98,20 @@ let
   # Selection defaults follow AGENTS.md policy:
   #   CLI → nixpkgs
   #   GUI/hardware-integrated apps → Homebrew
+  # Entries here install via Homebrew on macOS (when backend resolves to
+  # homebrew).  NixOS installs for these GUI apps must be declared separately
+  # in host configs (e.g. src/hosts/nixos/desktop.nix), as the overlap routing
+  # logic is macOS-only.
   overlappingPackages = {
+    blender = {
+      # Available on Linux via nixpkgs; macOS routes to Homebrew cask.
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "blender";
+      };
+      nixpkgsAttr = "blender";
+    };
     "discord@canary" = {
       category = "gui";
       homebrew = {
@@ -122,6 +135,24 @@ let
         name = "iterm2";
       };
       nixpkgsAttr = "iterm2";
+    };
+    krita = {
+      # Available on Linux via nixpkgs; macOS routes to Homebrew cask.
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "krita";
+      };
+      nixpkgsAttr = "krita";
+    };
+    libreoffice = {
+      # Available on Linux via nixpkgs; macOS routes to Homebrew cask.
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "libreoffice";
+      };
+      nixpkgsAttr = "libreoffice";
     };
     obsidian = {
       category = "gui";
@@ -178,6 +209,16 @@ let
         name = "vlc";
       };
       nixpkgsAttr = "vlc";
+    };
+    zoom = {
+      # nixpkgs attr is zoom-us (not zoom); Homebrew cask is zoom.
+      # Only macOS routes this to Homebrew; NixOS installs via nixpkgs in desktop.nix.
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "zoom";
+      };
+      nixpkgsAttr = "zoom-us";
     };
   };
 

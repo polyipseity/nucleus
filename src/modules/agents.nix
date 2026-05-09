@@ -265,12 +265,36 @@
         export PATH
       fi
 
-      # bun is provided by pkgs.bun in core.nix (baseSharedPackages) and must
-      # already be on PATH after linkGeneration.  An absent bun means the
-      # package set has not been applied; fail fast so the operator knows to
-      # run a full apply before retrying.
-      # Probe: non-zero exit when bun is absent is expected and benign;
-      # checked immediately below.
+      # Also prepend the nix profile bin directory, Home Manager profile bin
+      # directory, and directly probe the nix store for common package bins.
+      # After linkGeneration the profile symlinks exist, but the activation
+      # shell's PATH may not include them.
+      for _dir in \
+        "$HOME/.local/state/nix/profiles/profile/bin" \
+        "$HOME/.nix-profile/bin" \
+        "$HOME/.local/state/home-manager/profile/bin" \
+        "$HOME/.local/home-manager/profile/bin"; do
+        if [ -x "$_dir/bun" ]; then
+          PATH="$_dir:$PATH"
+          export PATH
+          break
+        fi
+      done
+
+      # If bun is still not found, search the nix store for any bun binary
+      # and add its parent directory to PATH.
+      if ! command -v bun >/dev/null 2>&1; then
+        _bun_store_path="$(find /nix/store -name 'bun' -type f 2>/dev/null | head -1)"
+        if [ -n "$_bun_store_path" ] && [ -x "$_bun_store_path" ]; then
+          _bun_store_dir="$(dirname "$_bun_store_path")"
+          PATH="$_bun_store_dir:$PATH"
+          export PATH
+        fi
+      fi
+
+      # bun is provided by pkgs.bun in core.nix (baseSharedPackages).  Verify
+      # bun is now on PATH after the profile directory probes above.  Fail fast
+      # if bun remains absent so the operator knows a full apply is needed.
       if ! command -v bun >/dev/null 2>&1; then
         echo "nucleus: installBunPackages: bun not found in PATH; cannot install bun global packages" >&2
         exit 1
