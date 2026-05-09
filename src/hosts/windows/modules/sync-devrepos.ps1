@@ -55,7 +55,7 @@ function Sync-DevRepo {
     Sync-DevRepo -Enabled:$false
   #>
   param(
-    [Parameter()]
+    [Parameter(Mandatory = $true)]
     [bool]$Enabled,
 
     [Parameter()]
@@ -130,19 +130,38 @@ function Sync-DevRepo {
       [string]$RepoName
     )
 
+    # Helper wrapper that captures stdout/stderr together and returns both the
+    # command output and success state. This keeps the soft-fail behavior while
+    # avoiding hidden git diagnostics.
+    function Invoke-GitCommand {
+      param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+      )
+
+      $commandOutput = (& git @Arguments 2>&1) | ForEach-Object { [string]$_ }
+      $exitCode = $LASTEXITCODE
+      [pscustomobject]@{
+        Succeeded = ($exitCode -eq 0)
+        ExitCode  = $exitCode
+        Output    = ($commandOutput -join "`n").Trim()
+      }
+    }
+
     # Check if repo is initialized.
     $gitDir = Join-Path -Path $RepoTarget -ChildPath '.git'
     if (Test-Path -PathType Container -Path $gitDir) {
       # Repo already initialized; verify/update remote.
       try {
-        $currentRemote = & git -C $RepoTarget config --get remote.origin.url 2>$null
+        $remoteLookup = Invoke-GitCommand -Arguments @('-C', $RepoTarget, 'config', '--get', 'remote.origin.url')
+        $currentRemote = $remoteLookup.Output
         if ($currentRemote -ne $RepoUrl) {
-          & git -C $RepoTarget remote set-url origin $RepoUrl 2>$null
-          if ($LASTEXITCODE -eq 0) {
+          $remoteUpdate = Invoke-GitCommand -Arguments @('-C', $RepoTarget, 'remote', 'set-url', 'origin', $RepoUrl)
+          if ($remoteUpdate.Succeeded) {
             Write-Verbose "Sync-DevRepo: updated remote for $RepoName to $RepoUrl"
           }
           else {
-            Write-Warning "Sync-DevRepo: failed to update remote for $RepoName (soft fail)"
+            Write-Warning "Sync-DevRepo: failed to update remote for $RepoName (soft fail, exit $($remoteUpdate.ExitCode)): $($remoteUpdate.Output)"
           }
         }
       }
@@ -168,12 +187,12 @@ function Sync-DevRepo {
             $submoduleTarget = Join-Path -Path $RepoTarget -ChildPath $submodulePath
             $submoduleGitDir = Join-Path -Path $submoduleTarget -ChildPath '.git'
             if (-not (Test-Path -Path $submoduleGitDir)) {
-              & git -C $RepoTarget submodule update --init $submodulePath 2>$null
-              if ($LASTEXITCODE -eq 0) {
+              $submoduleInit = Invoke-GitCommand -Arguments @('-C', $RepoTarget, 'submodule', 'update', '--init', $submodulePath)
+              if ($submoduleInit.Succeeded) {
                 Write-Verbose "Sync-DevRepo: initialized direct submodule $submodulePath in $RepoName"
               }
               else {
-                Write-Warning "Sync-DevRepo: failed to initialize direct submodule $submodulePath in $RepoName (soft fail)"
+                Write-Warning "Sync-DevRepo: failed to initialize direct submodule $submodulePath in $RepoName (soft fail, exit $($submoduleInit.ExitCode)): $($submoduleInit.Output)"
               }
             }
           }
@@ -187,7 +206,17 @@ function Sync-DevRepo {
     }
 
     # Repo not initialized; check if target exists and is non-empty.
-    if ((Test-Path -Path $RepoTarget) -and (Get-ChildItem -Path $RepoTarget -ErrorAction SilentlyContinue | Measure-Object).Count -gt 0) {
+    $targetHasContents = $false
+    if (Test-Path -Path $RepoTarget) {
+      try {
+        $targetHasContents = (Get-ChildItem -Path $RepoTarget -ErrorAction Stop | Measure-Object).Count -gt 0
+      }
+      catch {
+        Write-Warning "Sync-DevRepo: unable to inspect $RepoTarget before clone (soft fail): $_"
+        return
+      }
+    }
+    if ((Test-Path -Path $RepoTarget) -and $targetHasContents) {
       Write-Warning "Sync-DevRepo: $RepoTarget exists but is not a git repo (soft fail)"
       return
     }
@@ -198,8 +227,8 @@ function Sync-DevRepo {
         New-Item -ItemType Directory -Path $RepoTarget -Force | Out-Null
       }
 
-      & git clone $RepoUrl $RepoTarget 2>$null
-      if ($LASTEXITCODE -eq 0) {
+      $cloneResult = Invoke-GitCommand -Arguments @('clone', $RepoUrl, $RepoTarget)
+      if ($cloneResult.Succeeded) {
         Write-Verbose "Sync-DevRepo: cloned $RepoName to $RepoTarget"
 
         # Initialize direct submodules after clone.
@@ -214,12 +243,12 @@ function Sync-DevRepo {
             }
 
             foreach ($submodulePath in $submodulePaths) {
-              & git -C $RepoTarget submodule update --init $submodulePath 2>$null
-              if ($LASTEXITCODE -eq 0) {
+              $submoduleInit = Invoke-GitCommand -Arguments @('-C', $RepoTarget, 'submodule', 'update', '--init', $submodulePath)
+              if ($submoduleInit.Succeeded) {
                 Write-Verbose "Sync-DevRepo: initialized direct submodule $submodulePath in $RepoName"
               }
               else {
-                Write-Warning "Sync-DevRepo: failed to initialize direct submodule $submodulePath in $RepoName (soft fail)"
+                Write-Warning "Sync-DevRepo: failed to initialize direct submodule $submodulePath in $RepoName (soft fail, exit $($submoduleInit.ExitCode)): $($submoduleInit.Output)"
               }
             }
           }
@@ -229,7 +258,7 @@ function Sync-DevRepo {
         }
       }
       else {
-        Write-Warning "Sync-DevRepo: failed to clone $RepoName from $RepoUrl (soft fail)"
+        Write-Warning "Sync-DevRepo: failed to clone $RepoName from $RepoUrl (soft fail, exit $($cloneResult.ExitCode)): $($cloneResult.Output)"
       }
     }
     catch {

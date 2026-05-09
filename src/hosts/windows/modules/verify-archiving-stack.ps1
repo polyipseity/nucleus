@@ -11,8 +11,8 @@
   missing components; its purpose is visibility and early failure detection.
 
 .OUTPUTS
-  Writes status messages to stderr and exits with code 0 (health check is
-  informational; failures do not halt apply).
+  [bool]. Returns `$true` when both the 7z CLI and 7-Zip app checks pass,
+  otherwise `$false`. Also writes status and warning messages.
 
 .EXAMPLE
   # Run archiving stack health check:
@@ -20,6 +20,7 @@
 #>
 function Test-ArchivingStack {
   [CmdletBinding()]
+  [OutputType([bool])]
   param()
 
   $healthCheckPassed = $true
