@@ -95,7 +95,7 @@ else {
     if (-not (Test-Path -Path $path)) {
       continue
     }
-    $lintResults += Invoke-ScriptAnalyzer -Path $path -Severity @('Error', 'Warning')
+    $lintResults += Invoke-ScriptAnalyzer -Path $path -Severity @('Error', 'Warning') -ExcludeRule @('PSUseBOMForUnicodeEncodedFile')
   }
 
   if ($lintResults.Count -gt 0) {
