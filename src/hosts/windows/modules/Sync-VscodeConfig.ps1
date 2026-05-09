@@ -1,4 +1,4 @@
-# hosts/windows/modules/sync-vscodeconfig.ps1 — VS Code git-backed config symlinks.
+# hosts/windows/modules/Sync-VscodeConfig.ps1 — VS Code git-backed config symlinks.
 #
 # Replaces VS Code's per-channel config files and directories with symlinks
 # into the live repo tree (src/modules/configs/vscode/) so every VS Code write

@@ -108,7 +108,7 @@ document the gap and rely on a graceful probe in `apply.ps1` or a
 
 **cargo-cache is managed via cargo-binstall, not `system.dsc.yml`:** `cargo-cache`
 has no WinGet package ID and is not in Scoop. It is installed declaratively by
-`Invoke-CargoBinstallSetup` (in `src/hosts/windows/modules/invoke-cargobinstallsetup.ps1`)
+`Invoke-CargoBinstallSetup` (in `src/hosts/windows/modules/Invoke-CargoBinstallSetup.ps1`)
 which runs after the DSC step in `apply.ps1`. `scripts/gc.ps1` probes for the
 binary gracefully and skips pruning when it is absent.
 
@@ -219,14 +219,14 @@ When adding a new tool or capability, choose the package manager in this order:
 
 1. **WinGet (`system.dsc.yml`)** — preferred for any package with a WinGet ID.
    Declarative, `--what-if`-capable, and centrally tracked.
-2. **Scoop (`src/hosts/windows/modules/invoke-scoopsetup.ps1`)** — for portable CLI
+2. **Scoop (`src/hosts/windows/modules/Invoke-ScoopSetup.ps1`)** — for portable CLI
    utilities that have no WinGet ID but exist in a Scoop bucket. Scoop is the
    user-space fallback: it requires no admin rights and installs to
    `%USERPROFILE%\scoop\`.
-3. **cargo binstall (`src/hosts/windows/modules/invoke-cargobinstallsetup.ps1`)** — for
+3. **cargo binstall (`src/hosts/windows/modules/Invoke-CargoBinstallSetup.ps1`)** — for
    Rust CLI tools not available in WinGet or Scoop. cargo-binstall downloads
    prebuilt binaries without requiring a local Rust toolchain.
-4. **bun (`src/hosts/windows/modules/invoke-bunsetup.ps1`)** — last resort for JS/npm-only
+4. **bun (`src/hosts/windows/modules/Invoke-BunSetup.ps1`)** — last resort for JS/npm-only
    tools absent from WinGet, Scoop, and cargo-binstall. `bun install -g`
    places binaries in `%USERPROFILE%\.bun\bin`. Bun itself is installed via
    WinGet (`Oven-sh.Bun` in `system.dsc.yml`).
@@ -276,7 +276,7 @@ immediately after WinGet installs Scoop — the same PATH-guarantee constraint
 that excludes cargo-cache.
 
 Instead, manage Scoop buckets and apps in a dedicated module
-`src/hosts/windows/modules/invoke-scoopsetup.ps1` dot-sourced and called by `apply.ps1`
+`src/hosts/windows/modules/Invoke-ScoopSetup.ps1` dot-sourced and called by `apply.ps1`
 **after** the DSC run completes, so `~\scoop\shims` is resolvable by then.
 
 ### Idempotency in Scoop operations
@@ -301,7 +301,7 @@ if (-not (Test-Path $cbBin)) {
 
 ### cargo binstall for Rust tools
 
-After Scoop installs cargo-binstall, `src/hosts/windows/modules/invoke-cargobinstallsetup.ps1`
+After Scoop installs cargo-binstall, `src/hosts/windows/modules/Invoke-CargoBinstallSetup.ps1`
 manages Rust CLI tools that have no WinGet or Scoop equivalent (e.g.
 `cargo-cache`, `pay-respects`). It maintains a desired-state list and a
 manifest at `~\.config\nucleus\cargo-binstall-packages.json`; on each apply it

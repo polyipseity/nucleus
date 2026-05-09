@@ -1,4 +1,4 @@
-# modules/windows/set-vscodeworkspacetrust.ps1 — Pre-trust %USERPROFILE%\dev in VS Code workspace trust DB.
+# modules/windows/Set-VscodeWorkspaceTrust.ps1 — Pre-trust %USERPROFILE%\dev in VS Code workspace trust DB.
 # Writes a trust entry for %USERPROFILE%\dev to the SQLite state.vscdb for
 # both stable and insiders channels using Bun's built-in bun:sqlite module.
 # Non-fatal when the DB is absent (VS Code not yet launched once) or locked
