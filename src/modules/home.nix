@@ -28,6 +28,7 @@ in
     ./agents.nix
     ./ai
     ./core.nix
+    ./dev-repos.nix
     ./editors.nix
     ./fonts.nix
     ./git.nix

@@ -38,13 +38,37 @@
   outputs = { darwin, home-manager, nix-vscode-extensions, nixpkgs, sops-nix, ... }:
     let
       # User registry — defines all users managed by this configuration.
-      # Each user has homeDirectory, shell (as string path), and isPrimary flag.
+      # Each user has homeDirectory, shell (as string path), isPrimary flag, and optional
+      # devRepos configuration.
       # The primary user receives secret materialization.
       # Shell paths are deferred to activation time via posix-user-shell.nix.
       users = {
         polyipseity = {
           homeDirectory = "/Users/polyipseity";
           isPrimary = true;
+          # Dev repository provisioning for this user.
+          devRepos = {
+            enable = true;
+            gitHubUsername = "polyipseity";
+            # Repository list: each entry specifies either a symlink or git URL.
+            repositories = [
+              {
+                name = "nucleus";
+                symlink = ../..;  # Flake root (this repo)
+                target = "~/dev/nucleus";
+              }
+              {
+                name = "monorepo";
+                url = "git@github.com:polyipseity/monorepo.git";
+                target = "~/dev/monorepo";
+              }
+              {
+                name = "monorepo-private";
+                url = "git@github.com:polyipseity/monorepo-private.git";
+                target = "~/dev/monorepo-private";
+              }
+            ];
+          };
         };
       };
 
@@ -294,7 +318,7 @@
         # Reuse the shared package set so allowUnfree policy from mkPkgs is
         # applied consistently to both system and embedded Home Manager evals.
         pkgs = pkgsMac;
-        specialArgs = { inherit username; };
+        specialArgs = { inherit username users; };
         system = systems.mac;
         modules = [
           ./hosts/macbook/default.nix
@@ -310,7 +334,7 @@
             # Install user packages into the user profile rather than /etc.
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
-              inherit username;
+              inherit username users;
               vscodeMarketplace = vscodeMarketplaceMac;
             };
             home-manager.users = mkHomeManagerUsers ./modules/home.nix;
@@ -326,7 +350,7 @@
         # Keep NixOS evaluation aligned with the same pinned package set and
         # unfree policy used by the rest of the flake outputs.
         pkgs = pkgsLinux;
-        specialArgs = { inherit username; };
+        specialArgs = { inherit username users; };
         system = systems.linux;
         modules = [
           ./hosts/nixos/default.nix

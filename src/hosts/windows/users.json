@@ -1,10 +1,31 @@
 {
-  "description": "Windows host user registry — defines users managed by this host configuration. Each user has a home directory and role (primary vs secondary). The primary user receives secret materialization; secondary users get base configuration only. This mirrors the Nix users/default.nix structure.",
+  "description": "Windows host user registry — defines users managed by this host configuration. Each user has a home directory, role (primary vs secondary), and optional devRepos config. The primary user receives secret materialization; secondary users get base configuration only. This mirrors the Nix users/default.nix structure.",
   "users": {
     "polyipseity": {
       "description": "Primary user receiving secret materialization and full configuration",
       "homeDirectory": "C:\\Users\\polyipseity",
-      "isPrimary": true
+      "isPrimary": true,
+      "devRepos": {
+        "enable": true,
+        "gitHubUsername": "polyipseity",
+        "repositories": [
+          {
+            "name": "nucleus",
+            "symlinkFromRepoRoot": true,
+            "target": "dev\\nucleus"
+          },
+          {
+            "name": "monorepo",
+            "url": "git@github.com:polyipseity/monorepo.git",
+            "target": "dev\\monorepo"
+          },
+          {
+            "name": "monorepo-private",
+            "url": "git@github.com:polyipseity/monorepo-private.git",
+            "target": "dev\\monorepo-private"
+          }
+        ]
+      }
     }
   }
 }

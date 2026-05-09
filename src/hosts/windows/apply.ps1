@@ -110,6 +110,13 @@
   and NixOS provisionDevDirectory which both provision ~/dev during activation.
   False skips creation without error.
 
+.PARAMETER EnableDevReposParity
+  Enable provisioning of development repositories (nucleus symlink, monorepo,
+  and monorepo-private) in %USERPROFILE%\dev. Defaults to enabled for
+  polyipseity, disabled for other users. Each user can provision their own
+  repos using their GitHub username via the Home Manager dev-repos module.
+  False skips provisioning without error.
+
 .PARAMETER EnableVsCodeWorkspaceTrustParity
   Enable managed VS Code workspace trust for %USERPROFILE%\dev.  Writes the
   trust entry directly to state.vscdb via Bun's built-in bun:sqlite module so
@@ -177,6 +184,7 @@ param(
   [bool]$EnableRemoteAccessParity = $true,
   [bool]$EnableShellParity = $true,
   [bool]$EnableDevDirectoryParity = $true,
+  [bool]$EnableDevReposParity = $null,
   [bool]$EnableVsCodeExtensionsParity = $true,
   [bool]$EnableVsCodeSettingsParity = $true,
   [bool]$EnableVsCodeWorkspaceTrustParity = $true,
@@ -214,6 +222,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsconfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsskill.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-agentsclawhubskill.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "sync-devrepos.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-secretfile.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-secret.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "sync-vscodeextension.ps1")
@@ -370,12 +379,44 @@ if ($EnableBunParity) {
   Invoke-BunSetup
 }
 
+# Build dev repositories list from user registry, resolving symlink targets.
+$currentUser = [System.Environment]::UserName
+$userDevRepos = $null
+foreach ($user in $userRegistry.users) {
+  if ($user.name -eq $currentUser) {
+    $userDevRepos = $user.devRepos
+    break
+  }
+}
+
+$devRepositories = @()
+if ($userDevRepos -and $userDevRepos.repositories) {
+  $userHome = [Environment]::GetFolderPath('UserProfile')
+  foreach ($repo in $userDevRepos.repositories) {
+    $repoEntry = @{
+      name   = $repo.name
+      target = (Join-Path -Path $userHome -ChildPath $repo.target)
+    }
+
+    # Resolve symlink: if marked as symlinkFromRepoRoot, target is $repoRoot
+    if ($repo.symlinkFromRepoRoot) {
+      $repoEntry.symlink = $repoRoot
+    }
+    elseif ($repo.url) {
+      $repoEntry.url = $repo.url
+    }
+
+    $devRepositories += $repoEntry
+  }
+}
+
 Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
 Sync-AgentsSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
 Sync-AgentsClawhubSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsClawhubSkillsParity
 Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $Users[0]
 Sync-VSCodeExtension -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
+Sync-DevRepos -Enabled:$EnableDevReposParity -Repositories $devRepositories
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 Sync-ShellProfile -Enabled:$EnableShellParity
