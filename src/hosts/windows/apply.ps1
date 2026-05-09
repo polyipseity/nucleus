@@ -193,6 +193,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-jitsecretmaterialization.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-secretverification.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-wingetconfiguration.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "load-userregistry.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "power.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "rdp.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "register-hostagekey.ps1")
@@ -218,6 +219,27 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 $healthCheckScript = Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\scripts\health-check.ps1"
 if (Test-Path -Path $healthCheckScript) {
   & $healthCheckScript -MinFreeGB $MinFreeDiskGB -SkipSecretTooling
+}
+
+# Load the user registry from src/modules/windows/users.json. This declarative
+# configuration defines all users managed by this Windows host (primary and
+# secondary) and mirrors the Nix users/default.nix module structure. Validate
+# that all users in -Users parameter are registered in this registry.
+$userRegistryPath = Join-Path -Path $resolvedModuleDir -ChildPath "users.json"
+$userRegistry = & (Join-Path -Path $resolvedModuleDir -ChildPath "load-userregistry.ps1") -RegistryPath $userRegistryPath
+$registeredUserNames = @($userRegistry.users.name)
+
+# Validate that all explicitly provided users exist in the registry.
+foreach ($user in $Users) {
+  if ($user -notin $registeredUserNames) {
+    Write-Error "User '$user' not found in registry. Registered users: $($registeredUserNames -join ', ')" -ErrorAction Stop
+    exit 1
+  }
+}
+
+if (-not $userRegistry.primaryUser) {
+  Write-Error "No primary user marked (isPrimary=true) in user registry" -ErrorAction Stop
+  exit 1
 }
 
 $resolvedConfigDir = (Resolve-Path -Path $ConfigDir).Path

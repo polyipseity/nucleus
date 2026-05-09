@@ -1,0 +1,10 @@
+{
+  "users": {
+    "admin": {
+      "homeDirectory": "C:\\Users\\admin",
+      "isPrimary": true,
+      "description": "Primary user receiving secret materialization and full configuration"
+    }
+  },
+  "description": "Windows user registry — defines users managed by this configuration. Each user has a home directory and role (primary vs secondary). The primary user receives secret materialization; secondary users get base configuration only. This mirrors the Nix users/default.nix structure."
+}
