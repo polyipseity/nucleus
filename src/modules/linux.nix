@@ -190,7 +190,9 @@ lib.mkIf pkgs.stdenv.isLinux {
       # are always the final output after all activation work.
       "gitIdentityFromSops"
       "gpgImport"
+      "installBunPackages"
       "sshKeyAdopt"
+      "syncClawhubSkills"
       "verifySecretDecryption"
       "vscodeExtensionBridge"
       "vscodeSymlinks"

@@ -180,35 +180,6 @@ run_ai_sync() {
   fi
 }
 
-run_sync_clawhub_skills() {
-  # Call scripts/sync-agents-clawhub-skills.sh to converge fetched skills
-  # (non-AGPL-compatible, downloaded at apply time via clawhub) with the
-  # declarative manifest in src/modules/configs/agents/clawhub-skills.json.
-  #
-  # Why post-apply rather than pre-apply: requires network and the clawhub CLI,
-  # which is installed via bun (managed by nixpkgs).  Running post-apply ensures
-  # the full package set — including bun — is already on PATH.
-  #
-  # Why best-effort (no hard failure): the system configuration applied
-  # successfully.  Skill sync is additive; a missing skill does not break any
-  # declared system state.
-  #
-  # Why resolve from REPO_ROOT: when running via `nix run .#apply`, this
-  # script's directory points into the Nix store where scripts/ does not exist.
-  # REPO_ROOT comes from `git rev-parse --show-toplevel` and always resolves to
-  # the live working tree.
-  _rsc_script="$REPO_ROOT/scripts/sync-agents-clawhub-skills.sh"
-  if [ ! -f "$_rsc_script" ]; then
-    printf '%s\n' "nucleus: scripts/sync-agents-clawhub-skills.sh not found at $_rsc_script; skipping fetched skill sync"
-    return
-  fi
-
-  printf '%s\n' "nucleus: running post-apply fetched skill sync..."
-  if ! sh "$_rsc_script" "$REPO_ROOT"; then
-    printf '%s\n' "nucleus: sync-agents-clawhub-skills.sh exited with an error; fetched skill sync incomplete (system apply succeeded)" >&2
-  fi
-}
-
 generate_ssh_host_key_if_needed() {
   # Ensure /etc/ssh/ssh_host_ed25519_key exists before
   # register_host_age_key_if_needed tries to derive the machine age public key
@@ -382,7 +353,6 @@ case "$(uname -s)" in
     # while running as root (which otherwise produces ownership warnings).
     run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
     run_ai_sync
-    run_sync_clawhub_skills
     ;;
   Linux)
     if [ -f /etc/NIXOS ]; then
@@ -395,7 +365,6 @@ case "$(uname -s)" in
       # Keep root invocations on root-owned HOME for consistent Nix behavior.
       run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
       run_ai_sync
-      run_sync_clawhub_skills
     else
       # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
       # no sudo required — keepalive is not started.
@@ -404,7 +373,6 @@ case "$(uname -s)" in
       run_nix run "$REPO_ROOT/src#health-check"
       run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
       run_ai_sync
-      run_sync_clawhub_skills
     fi
     ;;
   *)

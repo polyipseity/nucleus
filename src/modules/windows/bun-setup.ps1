@@ -29,6 +29,9 @@ function Invoke-BunSetup {
                                          nixpkgs on POSIX (pkgs.pi-coding-agent)
                                          but has no WinGet, Scoop, or
                                          cargo-binstall package on Windows
+      - clawhub                        — fetched skill install vehicle; absent
+                                         from WinGet, Scoop, and cargo-binstall;
+                                         bun is the only viable install tier
 
     Requires bun to be on PATH (installed from WinGet by system.dsc.yml).
     Prepends %USERPROFILE%\.bun\bin to PATH internally so bun-installed
@@ -47,7 +50,10 @@ function Invoke-BunSetup {
   $desiredPackages = @(
     # coding agent CLI; available via pkgs.pi-coding-agent on POSIX but absent
     # from WinGet, Scoop, and cargo-binstall on Windows
-    '@mariozechner/pi-coding-agent'
+    '@mariozechner/pi-coding-agent',
+    # fetched skill install vehicle; absent from WinGet, Scoop, and
+    # cargo-binstall; bun is the only viable install tier on Windows
+    'clawhub'
   )
 
   # bun install -g places binaries in ~\.bun\bin by default (BUN_INSTALL_BIN).

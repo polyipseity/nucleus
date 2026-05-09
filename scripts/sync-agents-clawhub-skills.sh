@@ -10,7 +10,8 @@
 # cannot be committed to this repository.  Bundled (committed, AGPL-compatible)
 # skills are managed by the agentsSkills activation (agents.nix / Sync-AgentsSkills).
 #
-# Commands: none (clawhub CLI is checked/installed if absent)
+# Commands: none (clawhub CLI must be pre-installed by the installBunPackages
+#   Home Manager activation before this script is called)
 # Arguments:
 #   $1 — absolute path to the nucleus repository checkout root
 #
@@ -19,7 +20,7 @@
 # Exit conditions:
 #   0 — manifest absent or empty (nothing to do)
 #   0 — all skills converged successfully (new installs may have been performed)
-#   1 — critical error: repo root argument missing, python3 unavailable, or
+#   1 — critical error: repo root argument missing, jq unavailable, or
 #       manifest unreadable.  Individual skill install failures are non-fatal
 #       and produce a warning rather than exiting non-zero; the system apply
 #       succeeded and skill sync is best-effort.
@@ -40,23 +41,15 @@ if [ ! -f "$_manifest" ]; then
   exit 0
 fi
 
-# Parse skill slugs from the manifest using python3.  jq is not added to
-# runtimeInputs solely for this purpose; python3 is available on both macOS
-# and NixOS without additional dependencies.
-if ! command -v python3 >/dev/null 2>&1; then
-  printf '%s\n' "nucleus: sync-agents-clawhub-skills: python3 not found in PATH; cannot parse manifest" >&2
+# Parse skill slugs from the manifest using jq.  jq is available via
+# home.packages in core.nix on all POSIX hosts.
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' "nucleus: sync-agents-clawhub-skills: jq not found in PATH; cannot parse manifest" >&2
   exit 1
 fi
 
 _slugs_file="$(mktemp)"
-# Args: $1 = manifest path.  Outputs one slug per line.
-python3 - "$_manifest" > "$_slugs_file" <<'PYEOF'
-import json, sys
-with open(sys.argv[1]) as f:
-    data = json.load(f)
-for slug in data.get("skills", []):
-    print(slug)
-PYEOF
+jq -r '.skills[]?' "$_manifest" > "$_slugs_file"
 
 if [ ! -s "$_slugs_file" ]; then
   rm -f "$_slugs_file"
@@ -73,28 +66,23 @@ if [ ! -d "$_skills_dir" ]; then
   mkdir -p "$_skills_dir"
 fi
 
-# Ensure the clawhub CLI is available.  clawhub is not in nixpkgs; bun
-# (installed via nixpkgs on POSIX hosts) is used as the install vehicle.
-# `command -v clawhub` is a probe — a non-zero exit is expected and benign
-# when the tool is absent; the result drives the conditional install.
+# Prepend ~/.bun/bin so the clawhub binary installed by installBunPackages is
+# discoverable in the current session.  installBunPackages places bun-managed
+# binaries at this path; the prepend is safe even when the directory is absent.
+if [ -d "$HOME/.bun/bin" ]; then
+  PATH="$HOME/.bun/bin:$PATH"
+  export PATH
+fi
+
+# Probe for the clawhub CLI.  clawhub must be pre-installed by the
+# installBunPackages Home Manager activation before this script is called;
+# this script never installs clawhub itself.  A non-zero exit from
+# command -v is expected and benign when the binary is absent; the result
+# drives the conditional skip below.
 if ! command -v clawhub >/dev/null 2>&1; then
-  if ! command -v bun >/dev/null 2>&1; then
-    printf '%s\n' "nucleus: sync-agents-clawhub-skills: bun not found in PATH; cannot install clawhub; skipping fetched skill sync" >&2
-    rm -f "$_slugs_file"
-    exit 0
-  fi
-  printf '%s\n' "nucleus: sync-agents-clawhub-skills: clawhub not found; installing via bun..."
-  if ! bun install -g clawhub; then
-    printf '%s\n' "nucleus: sync-agents-clawhub-skills: bun install -g clawhub failed; skipping fetched skill sync" >&2
-    rm -f "$_slugs_file"
-    exit 0
-  fi
-  # Prepend ~/.bun/bin so the newly installed clawhub binary is discoverable
-  # in the current session without spawning a new shell.
-  if [ -d "$HOME/.bun/bin" ]; then
-    PATH="$HOME/.bun/bin:$PATH"
-    export PATH
-  fi
+  printf '%s\n' "nucleus: sync-agents-clawhub-skills: clawhub not found in PATH; the installBunPackages activation must complete before running this script; skipping fetched skill sync" >&2
+  rm -f "$_slugs_file"
+  exit 0
 fi
 
 # Install or update each skill from the manifest.

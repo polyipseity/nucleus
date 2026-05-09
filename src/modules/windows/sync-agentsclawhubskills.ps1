@@ -94,15 +94,19 @@ function Sync-AgentsClawhubSkills {
   }
 
   # Resolve the clawhub binary.  Invoke-BunSetup (called earlier in apply.ps1)
-  # prepends ~\.bun\bin to PATH for this session, so Get-Command should find
-  # clawhub there if it was already installed.  If clawhub is absent, attempt a
-  # one-time install via `bun install -g clawhub`.
-  $clawhubExe = Get-Command -Name "clawhub" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+  # installs clawhub and prepends ~\.bun\bin to PATH for this session.
+  # Provisioning clawhub is Invoke-BunSetup's responsibility; this function
+  # does not attempt a fallback install — if clawhub is absent, Invoke-BunSetup
+  # failed and the operator should investigate.
+  $bunBinDir = Join-Path -Path $HOME -ChildPath ".bun\bin"
+  $clawhubExe = Get-Command -Name "clawhub" -ErrorAction SilentlyContinue |
+    Select-Object -First 1 -ExpandProperty Source
+  # -ErrorAction SilentlyContinue is intentional: absence of clawhub is an
+  # expected probe condition when Invoke-BunSetup failed; the if-guard below
+  # checks the result immediately.
   if ([string]::IsNullOrEmpty($clawhubExe)) {
-    # clawhub not on PATH — check the canonical bun global bin directory directly
-    # before attempting an install, because the session PATH update from
-    # Invoke-BunSetup may not have propagated to Get-Command in all contexts.
-    $bunBinDir = Join-Path -Path $HOME -ChildPath ".bun\bin"
+    # Get-Command may miss the binary if the PATH update from Invoke-BunSetup
+    # did not propagate to this session; check the bun bin directory directly.
     $clawhubCandidate = Join-Path -Path $bunBinDir -ChildPath "clawhub"
     if (Test-Path -LiteralPath $clawhubCandidate) {
       $clawhubExe = $clawhubCandidate
@@ -110,29 +114,8 @@ function Sync-AgentsClawhubSkills {
   }
 
   if ([string]::IsNullOrEmpty($clawhubExe)) {
-    # Neither PATH nor the bun bin dir has clawhub; try installing it now.
-    $bunExe = Get-Command -Name "bun" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
-    if ([string]::IsNullOrEmpty($bunExe)) {
-      Write-Warning "nucleus: Sync-AgentsClawhubSkills: bun not found in PATH; cannot install clawhub; skipping fetched skill sync"
-      return
-    }
-
-    Write-Host "nucleus: Sync-AgentsClawhubSkills: clawhub not found; installing via bun..."
-    & $bunExe install -g clawhub
-    if ($LASTEXITCODE -ne 0) {
-      Write-Warning "nucleus: Sync-AgentsClawhubSkills: bun install -g clawhub failed; skipping fetched skill sync"
-      return
-    }
-
-    # Re-resolve after install; the binary lands in ~\.bun\bin\.
-    $bunBinDir = Join-Path -Path $HOME -ChildPath ".bun\bin"
-    $clawhubCandidate = Join-Path -Path $bunBinDir -ChildPath "clawhub"
-    if (Test-Path -LiteralPath $clawhubCandidate) {
-      $clawhubExe = $clawhubCandidate
-    } else {
-      Write-Warning "nucleus: Sync-AgentsClawhubSkills: clawhub not found at $clawhubCandidate after install; skipping fetched skill sync"
-      return
-    }
+    Write-Warning "nucleus: Sync-AgentsClawhubSkills: clawhub not found; Invoke-BunSetup must have failed; skipping fetched skill sync"
+    return
   }
 
   # Install or update each skill listed in the manifest.

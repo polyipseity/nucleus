@@ -236,5 +236,180 @@
       done < "$_ask_source_list"
       rm -f "$_ask_source_list"
     '';
+
+    # -------------------------------------------------------------------------
+    # installBunPackages
+    # Idempotently converges the declarative bun global package set.
+    #
+    # Maintains a managed set of JS CLI tools installed via `bun install -g`.
+    # On each apply it compares the desired list against a per-user manifest at
+    # ~/.config/nucleus/bun-packages.json, installs additions, and removes
+    # deletions.
+    #
+    # Only packages absent from nixpkgs and cargo-binstall are managed here
+    # (install preference: nixpkgs > cargo binstall > bun).
+    #
+    # Currently managed:
+    #   clawhub — fetched skill install vehicle; absent from nixpkgs and
+    #             cargo-binstall; bun is the only viable install tier.
+    # -------------------------------------------------------------------------
+    installBunPackages = lib.hm.dag.entryAfter [ "agentsSkills" ] ''
+      set -eu
+
+      # Prepend ~/.bun/bin so binaries installed by previous apply runs and
+      # by this activation are discoverable in subsequent activation steps
+      # without spawning a new shell session.  bun install -g places binaries
+      # here by default (BUN_INSTALL_BIN defaults to ~/.bun).
+      if [ -d "$HOME/.bun/bin" ]; then
+        PATH="$HOME/.bun/bin:$PATH"
+        export PATH
+      fi
+
+      # bun is provided by pkgs.bun in core.nix (baseSharedPackages) and must
+      # already be on PATH after linkGeneration.  An absent bun means the
+      # package set has not been applied; fail fast so the operator knows to
+      # run a full apply before retrying.
+      # Probe: non-zero exit when bun is absent is expected and benign;
+      # checked immediately below.
+      if ! command -v bun >/dev/null 2>&1; then
+        echo "nucleus: installBunPackages: bun not found in PATH; cannot install bun global packages" >&2
+        exit 1
+      fi
+
+      # Declarative desired-state list.  One package per line.
+      # Add a package name here to install it; remove it to trigger uninstall
+      # on the next apply.  Only add packages absent from nixpkgs and
+      # cargo-binstall (install preference: nixpkgs > cargo binstall > bun).
+      _ibp_desired="$(mktemp)"
+      printf '%s\n' \
+        'clawhub' \
+        > "$_ibp_desired"
+
+      _ibp_manifest="$HOME/.config/nucleus/bun-packages.json"
+      _ibp_manifest_dir="$(dirname "$_ibp_manifest")"
+
+      # Read the previously-managed package list.  An absent or malformed
+      # manifest (first run) is treated as an empty set so all desired packages
+      # become additions.  jq -r '.[]?' exits non-zero only on malformed JSON;
+      # || true is intentional and benign: the fallback is an empty previous
+      # set, which is safe (all desired packages install; nothing is removed).
+      _ibp_previous="$(mktemp)"
+      if [ -f "$_ibp_manifest" ]; then
+        jq -r '.[]?' "$_ibp_manifest" > "$_ibp_previous" || true
+      fi
+
+      # Packages no longer desired: present in the previous manifest but absent
+      # from the desired list.
+      _ibp_to_remove="$(mktemp)"
+      while IFS= read -r _ibp_pkg; do
+        [ -z "$_ibp_pkg" ] && continue
+        if ! grep -qxF "$_ibp_pkg" "$_ibp_desired"; then
+          printf '%s\n' "$_ibp_pkg" >> "$_ibp_to_remove"
+        fi
+      done < "$_ibp_previous"
+
+      # Desired packages whose binary is absent from ~/.bun/bin.  Binary name
+      # = last path component after '/' so @scope/name becomes name (bun uses
+      # the unscoped basename as the binary name).
+      _ibp_to_install="$(mktemp)"
+      while IFS= read -r _ibp_pkg; do
+        [ -z "$_ibp_pkg" ] && continue
+        _ibp_bin="''${_ibp_pkg##*/}"
+        if [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] && \
+           [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; then
+          printf '%s\n' "$_ibp_pkg" >> "$_ibp_to_install"
+        fi
+      done < "$_ibp_desired"
+
+      # Remove packages no longer in the desired list.
+      while IFS= read -r _ibp_pkg; do
+        [ -z "$_ibp_pkg" ] && continue
+        echo "nucleus: installBunPackages: removing $_ibp_pkg"
+        if ! bun remove -g "$_ibp_pkg"; then
+          echo "nucleus: installBunPackages: 'bun remove -g $_ibp_pkg' failed" >&2
+          rm -f "$_ibp_desired" "$_ibp_previous" "$_ibp_to_remove" "$_ibp_to_install"
+          exit 1
+        fi
+      done < "$_ibp_to_remove"
+
+      # Install packages whose binary is absent from ~/.bun/bin.
+      while IFS= read -r _ibp_pkg; do
+        [ -z "$_ibp_pkg" ] && continue
+        echo "nucleus: installBunPackages: installing $_ibp_pkg"
+        if ! bun install -g "$_ibp_pkg"; then
+          echo "nucleus: installBunPackages: 'bun install -g $_ibp_pkg' failed" >&2
+          rm -f "$_ibp_desired" "$_ibp_previous" "$_ibp_to_remove" "$_ibp_to_install"
+          exit 1
+        fi
+        _ibp_bin="''${_ibp_pkg##*/}"
+        if [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] && \
+           [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; then
+          echo "nucleus: installBunPackages: $_ibp_pkg installed but binary '$_ibp_bin' not found in '$HOME/.bun/bin'" >&2
+          rm -f "$_ibp_desired" "$_ibp_previous" "$_ibp_to_remove" "$_ibp_to_install"
+          exit 1
+        fi
+        echo "nucleus: installBunPackages: $_ibp_pkg installed successfully"
+      done < "$_ibp_to_install"
+
+      # Persist the current desired set as the new managed manifest.  Future
+      # applies read this to compute removals when a package is dropped from
+      # the desired list above.
+      if [ ! -d "$_ibp_manifest_dir" ]; then
+        mkdir -p "$_ibp_manifest_dir"
+      fi
+      jq -Rn '[inputs | select(length > 0)]' "$_ibp_desired" > "$_ibp_manifest"
+
+      rm -f "$_ibp_desired" "$_ibp_previous" "$_ibp_to_remove" "$_ibp_to_install"
+    '';
+
+    # -------------------------------------------------------------------------
+    # syncClawhubSkills
+    # Calls scripts/sync-agents-clawhub-skills.sh to converge fetched skills
+    # (non-AGPL-compatible, downloaded at apply time via clawhub) with the
+    # declarative manifest in src/modules/configs/agents/clawhub-skills.json.
+    #
+    # Why after installBunPackages: requires the clawhub CLI, which is
+    # installed by installBunPackages.  Ordering ensures clawhub is present
+    # before this step tries to invoke it.
+    #
+    # Why best-effort: the system configuration applied successfully.  Skill
+    # sync is additive; a missing skill does not break any declared system
+    # state.  Warn and continue so displayHostManualInstructions is reached.
+    # -------------------------------------------------------------------------
+    syncClawhubSkills = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
+      set -eu
+
+      # Prepend ~/.bun/bin so the clawhub binary installed by installBunPackages
+      # is on PATH for this activation step.
+      if [ -d "$HOME/.bun/bin" ]; then
+        PATH="$HOME/.bun/bin:$PATH"
+        export PATH
+      fi
+
+      # Resolve the repo root (same mechanism as agentsSymlink and agentsSkills).
+      _scs_repo_root_file="$HOME/.config/nucleus/repo-root"
+      if [ -n "''${NUCLEUS_REPO:-}" ]; then
+        _scs_repo_root="$NUCLEUS_REPO"
+      elif [ -f "$_scs_repo_root_file" ]; then
+        _scs_repo_root="$(cat "$_scs_repo_root_file")"
+      else
+        echo "nucleus: syncClawhubSkills: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
+        exit 1
+      fi
+
+      _scs_script="$_scs_repo_root/scripts/sync-agents-clawhub-skills.sh"
+      if [ ! -f "$_scs_script" ]; then
+        echo "nucleus: syncClawhubSkills: sync script not found at $_scs_script; skipping fetched skill sync"
+        exit 0
+      fi
+
+      echo "nucleus: syncClawhubSkills: running fetched skill sync..."
+      # Best-effort: a failed sync does not abort activation.  The system
+      # configuration applied successfully; skill sync is additive.  Warn
+      # and continue so displayHostManualInstructions is always reached.
+      if ! sh "$_scs_script" "$_scs_repo_root"; then
+        echo "nucleus: syncClawhubSkills: sync-agents-clawhub-skills.sh exited with an error; fetched skill sync incomplete (activation continues)" >&2
+      fi
+    '';
   };
 }

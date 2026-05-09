@@ -288,6 +288,7 @@ let
     # instructions are printed so the final output is complete.
     "gitIdentityFromSops"
     "gpgImport"
+    "installBunPackages"
     "installPackages"
     "linkGeneration"
     "onFilesChange"
@@ -297,6 +298,7 @@ let
     "setupLaunchAgents"
     "sops-nix"
     "sshKeyAdopt"
+    "syncClawhubSkills"
     "verifyArchivingStack"
     "verifySecretDecryption"
     "vscodeExtensionBridge"
