@@ -141,7 +141,7 @@ function Import-BootstrapVersions {
   return $settings
 }
 
-function Ensure-WingetPackage {
+function Invoke-WingetPackageInstall {
   <#
   .SYNOPSIS
     Installs or verifies a winget package at an optional pinned version.
@@ -231,7 +231,7 @@ $BootstrapPackageVersions = [ordered]@{
 }
 
 foreach ($package in $BootstrapPackageVersions.GetEnumerator()) {
-  Ensure-WingetPackage -Id $package.Key -Version $package.Value
+  Invoke-WingetPackageInstall -Id $package.Key -Version $package.Value
 }
 
 if ($Apply) {
