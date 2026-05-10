@@ -10,7 +10,9 @@
   nested sub-components.
 - `scripts/` contains bootstrap automation: `bootstrap.sh` (Unix) and
   `bootstrap.ps1` (Windows).
-- `tests/` is still a placeholder; test infrastructure has not been added yet.
+- `tests/` contains automated tests: `tests/nix/` for Nix logic tests,
+  `tests/windows/` for Pester DSC validation. All changes require corresponding
+  tests; see `.agents/instructions/testing.instructions.md`.
 - Keep this file short and durable. Put file-type and workflow-specific rules
   in `.agents/instructions/*.instructions.md`, reusable workflows in
   `.agents/prompts/*.prompt.md`, and skill assets in `.agents/skills/<skill>/`.
@@ -59,6 +61,39 @@
 - Treat `package-ecosystem: "nix"` in `.github/dependabot.yml` as valid even
   when `check-dependabot` reports a schema error; that hook can lag current
   Dependabot ecosystem support.
+
+## Testing Strategy
+
+**nucleus** uses test-driven development (TDD) to catch regressions across
+POSIX (macOS/NixOS) and Windows hosts. Tests are mandatory for all feature
+additions and breaking changes.
+
+### Nix Testing (macOS/NixOS)
+
+- **Evaluation checks** (`nix flake check`): Ensures all configurations parse
+  and module imports are acyclic. Runs on every commit in CI and catches syntax
+  errors before they reach live machines.
+- **Unit tests** (`tests/nix/*.nix`): Pure logic tests using `nix-instantiate
+  --eval` to verify package categorization, backend selection, and module
+  defaults. Add tests for any Nix functions with conditional logic or data
+  transformations.
+
+### Windows Testing (Pester)
+
+- **DSC validation** (`tests/windows/*.Tests.ps1`): Pester tests verify that
+  WinGet packages are installed, registry settings are correct, and security
+  invariants are enforced. Run locally on Windows before commit; not run in CI
+  (CI uses Linux runners).
+
+### Test Workflow
+
+1. **Write the test first** — describe what correct behavior looks like
+2. **Watch it fail** — confirm the test catches the missing feature
+3. **Implement the feature** — make the test pass
+4. **Commit atomically** — test + implementation in one commit
+
+See `.agents/instructions/testing.instructions.md` for detailed guidance,
+quick-start commands, and troubleshooting.
 
 ## Conventions
 
