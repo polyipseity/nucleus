@@ -259,8 +259,20 @@ in
         wdev-tr = 0;
       };
 
-      # Finder: allow text selection in Quick Look previews.
+      # Finder: desktop visibility, iCloud Drive folder pinning, and UI prefs.
+      # WHY in CustomUserPreferences: Finder reads these from the user domain
+      # (~/.Library/Preferences/com.apple.finder.plist), not system domain.
+      # These settings MUST be written via CustomUserPreferences to take effect.
       "com.apple.finder" = {
+        # Desktop visibility: show mounted drives, external drives, servers, removable media.
+        # These are intentionally kept in user domain (not system.defaults.finder) because
+        # Finder only respects them when written to per-user preferences.
+        CreateDesktop = true;                        # allow files/icons on the Desktop
+        ShowExternalHardDrivesOnDesktop = true;      # show external drives on Desktop
+        ShowHardDrivesOnDesktop = true;              # show internal hard drives on Desktop
+        ShowMountedServersOnDesktop = true;          # show mounted NFS/SMB shares on Desktop
+        ShowRemovableMediaOnDesktop = true;          # show USB drives and optical media on Desktop
+
         # Keep Desktop and Documents in iCloud Drive. These knobs are not
         # currently part of nix-darwin's typed `system.defaults.finder` set,
         # so they are expressed as custom domain values.
@@ -392,22 +404,18 @@ in
     };
 
     # -------------------------------------------------------------------------
-    # Finder settings
+    # Finder settings (user domain via system.defaults.finder; some settings
+    # like desktop visibility are defined in CustomUserPreferences instead)
     # -------------------------------------------------------------------------
     finder = {
       _FXShowPosixPathInTitle = true;        # show full POSIX path in title bar
       AppleShowAllFiles = true;              # always show hidden files in Finder
       AppleShowAllExtensions = true;         # always show file extensions
-      CreateDesktop = true;                  # allow files/icons on the Desktop
       FXDefaultSearchScope = "SCcf";         # default search scope: current folder
       FXEnableExtensionChangeWarning = false; # suppress extension-change dialog friction for power workflows
       FXPreferredViewStyle = "clmv";         # default view: column view
       FXRemoveOldTrashItems = true;          # auto-prune Trash after 30 days to reduce maintenance clutter
-      ShowExternalHardDrivesOnDesktop = true;
-      ShowHardDrivesOnDesktop = true;
-      ShowMountedServersOnDesktop = true;
       ShowPathbar = true;                    # show path breadcrumb bar at bottom
-      ShowRemovableMediaOnDesktop = true;
       ShowStatusBar = true;                  # show item count / available space bar
     };
 
