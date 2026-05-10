@@ -1,7 +1,8 @@
 {
   "chat.agent.maxRequests": 250,
   "chat.agentFilesLocations": {
-    ".agents/agents": true
+    ".agents/agents": true,
+    "~/.agents/agents": true
   },
   "chat.agentHost.enabled": true,
   "chat.agentsControl.enabled": "badge",
@@ -18,17 +19,20 @@
   "chat.fontSize": 14,
   "chat.generalPurposeAgent.enabled": true,
   "chat.hookFilesLocations": {
-    ".agents/hooks": true
+    ".agents/hooks": true,
+    "~/.agents/hooks": true
   },
   "chat.implicitContext.suggestedContext": false,
   "chat.includeReferencedInstructions": true,
   "chat.instructionsFilesLocations": {
-    ".agents/instructions": true
+    ".agents/instructions": true,
+    "~/.agents/instructions": true
   },
   "chat.mcp.apps.enabled": true,
   "chat.mcp.assisted.nuget.enabled": true,
   "chat.promptFilesLocations": {
-    ".agents/prompts": true
+    ".agents/prompts": true,
+    "~/.agents/prompts": true
   },
   "chat.restoreLastPanelSession": true,
   "chat.tools.terminal.outputLocation": "chat",
