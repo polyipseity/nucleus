@@ -89,6 +89,10 @@ let
         secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${currentUsername}";
       })
     wallpaperBlobsCurrentUser;
+
+  # desktoppr is darwin-only; keep this reference lazy so Linux evaluation
+  # does not attempt to instantiate an unsupported package.
+  desktopprBinPath = if pkgs.stdenv.isDarwin then "${pkgs.desktoppr}/bin/desktoppr" else "";
 in
 {
   assertions = [
@@ -238,7 +242,7 @@ in
     fi
 
     if [ "$isDarwin" -eq 1 ]; then
-      desktopprBin="${pkgs.desktoppr}/bin/desktoppr"
+      desktopprBin="${desktopprBinPath}"
       resolvedPicturesDir="$(${pkgs.coreutils}/bin/readlink -f "$picturesDir" 2>/dev/null || printf '%s' "$picturesDir")"
       # desktoppr interprets bare directory paths as their parent; appending
       # '/.' preserves the intended directory so all Spaces follow the gallery.

@@ -23,22 +23,22 @@
   # Enable X11 server and desktop managers.
   services.xserver = {
     enable = true;
-
-    # Enable GNOME desktop environment with File Roller archive manager.
-    desktopManager.gnome.enable = true;
-
-    # Enable KDE Plasma 6 desktop environment with Ark archive manager.
-    desktopManager.plasma6.enable = true;
-
-    # Use a display manager that can launch both GNOME and KDE sessions.
-    displayManager.gdm.enable = true;
   };
 
+  # Enable GNOME desktop environment with File Roller archive manager.
+  services.desktopManager.gnome.enable = true;
+
+  # Enable KDE Plasma 6 desktop environment with Ark archive manager.
+  services.desktopManager.plasma6.enable = true;
+
+  # Use a display manager that can launch both GNOME and KDE sessions.
+  services.displayManager.gdm.enable = true;
+
   # Install graphical archive managers per desktop environment.
-  environment.systemPackages = with pkgs; [
-    # GNOME archive manager and terminal extension for Files (Nautilus).
-    gnome.file-roller
-    gnome.nautilus-open-terminal  # adds "Open in Terminal" to Files context menu
+  environment.systemPackages =
+    (with pkgs; [
+    # GNOME archive manager.
+    file-roller
 
     # KDE archive manager with built-in terminal opening support.
     kdePackages.ark
@@ -49,7 +49,7 @@
     p7zip
 
     # Terminal emulators for "Open in Terminal" context menu actions.
-    gnome.gnome-terminal  # default terminal for GNOME "Open in Terminal"
+    gnome-terminal  # default terminal for GNOME "Open in Terminal"
     kdePackages.konsole   # default terminal for KDE "Open in Terminal"
 
     # Battery efficiency daemon: dynamic governor tuning based on AC/battery
@@ -76,13 +76,21 @@
     pass
     qtpass
     zoom-us
-  ];
+    ])
+    ++ lib.optionals (pkgs.gnome ? nautilus-open-terminal) [
+      pkgs.gnome.nautilus-open-terminal # adds "Open in Terminal" to Files context menu when available
+    ];
 
   # Enable GNOME services if GNOME is enabled above.
-  services.gnome.core-utilities.enable = true;
+  services.gnome.core-apps.enable = true;
 
   # Run auto-cpufreq as the managed NixOS power optimizer daemon.
   services.auto-cpufreq.enable = true;
+
+  # GNOME may enable power-profiles-daemon by default, but that service
+  # conflicts with auto-cpufreq (both attempt to control CPU governor policy).
+  # Keep auto-cpufreq as the single source of truth for power tuning.
+  services.power-profiles-daemon.enable = false;
 
   # CPU governor profiles mirror macOS lowpowermode parity:
   #   battery (lowpowermode=1 equivalent): powersave governor, prefer-power EPP,
@@ -106,9 +114,9 @@
   # lid closed so remote-desktop sessions are not disconnected when docked or
   # used in clamshell mode.  Default (suspend) is preserved on battery because
   # battery-powered clamshell is not a remote-access scenario.
-  services.logind.extraConfig = ''
-    HandleLidSwitchExternalPower=ignore
-  '';
+  services.logind.settings.Login = {
+    HandleLidSwitchExternalPower = "ignore";
+  };
 
   # TCP keepalive parity: maintain persistent SSH tunnels and remote-desktop
   # connections through idle periods.  Mirrors macOS pmset tcpkeepalive=1.

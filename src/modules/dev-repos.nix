@@ -15,8 +15,9 @@
 # Dependency:
 #   • This hook runs after writeBoundary so basic file operations are available.
 #   • No secrets or decryption needed; cloning happens via Git SSH (configured separately).
-{ config, lib, pkgs, users, ... }:
+args@{ config, lib, pkgs, ... }:
 let
+  users = args.users or { };
   currentUserHome = config.home.homeDirectory;
   currentUsername = config.home.username;
   # macOS ssh_config commonly uses Apple-only directives such as UseKeychain.

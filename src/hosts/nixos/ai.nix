@@ -14,11 +14,8 @@
     # on some versions) would expose the API to all LAN peers without any
     # authentication requirement.
     #
-    # Note: if evaluation fails with "unknown option services.ollama.listenAddress",
-    # the pinned nixpkgs uses the older split interface; replace with:
-    #   host = "127.0.0.1";
-    #   port = 11434;
-    listenAddress = "127.0.0.1:11434";
+    host = "127.0.0.1";
+    port = 11434;
     # GPU acceleration intentionally unset to use the safe CPU-only default.
     # Enable NVIDIA or AMD acceleration by setting:
     #   acceleration = "cuda";  # NVIDIA

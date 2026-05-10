@@ -289,10 +289,9 @@ in
   # Keep VS Code binaries in nixpkgs on non-Darwin systems. On Darwin, package
   # installation backend is selected in core.nix and must not be duplicated
   # here, or backend overrides would diverge between modules.
-  home.packages = lib.optionals (!isDarwin) [
-    pkgs.vscode
-    pkgs.vscode-insiders
-  ];
+  home.packages =
+    lib.optionals (!isDarwin) [ pkgs.vscode ]
+    ++ lib.optionals (!isDarwin && pkgs ? vscode-insiders) [ pkgs.vscode-insiders ];
 
   programs.vscode = {
     # Enable native Home Manager integration on non-Darwin hosts so the VS Code
