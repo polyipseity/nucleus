@@ -234,6 +234,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure LLVM/Clang is installed so clang and lld are available for cross-host native build parity with macOS and NixOS
+      settings:
+        id: LLVM.LLVM
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure PowerShell (`pwsh`) is installed for cross-host shell and script parity with macOS and NixOS
       settings:
         id: Microsoft.PowerShell

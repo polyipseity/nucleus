@@ -186,6 +186,15 @@ function Sync-ShellProfile {
     'if ((Test-Path $bunBinDir) -and ($env:PATH -notlike "*$bunBinDir*")) {'
     '  $env:PATH = "$bunBinDir;$env:PATH"'
     '}'
+    # LLVM/Clang: add LLVM bin directory to PATH for the current session so
+    # newly provisioned hosts can run clang/ld.lld immediately.
+    '$llvmBinDir = "C:\Program Files\LLVM\bin"'
+    'if ((Test-Path $llvmBinDir) -and ($env:PATH -notlike "*$llvmBinDir*")) {'
+    '  $env:PATH = "$llvmBinDir;$env:PATH"'
+    '}'
+    '$env:CC = "clang"'
+    '$env:CXX = "clang++"'
+    '$env:LD = "ld.lld"'
     'function g { & git @Args }'
     'function ga { & git add @Args }'
     'function gc { & git commit @Args }'

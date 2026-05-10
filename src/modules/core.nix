@@ -39,6 +39,9 @@ let
   #   ghostscript    — PostScript/PDF interpreter (`gs`) for document workflows
   #                    and CLI parity with Windows (ArtifexSoftware.GhostScript)
   #   jq             — JSON processor used by activation scripts
+  #   llvmPackages_18.bintools — LLVM toolchain binutils (`llvm-ar`, `llvm-nm`, etc.)
+  #   llvmPackages_18.clang    — unified C/C++ compiler frontend
+  #   llvmPackages_18.lld      — LLVM linker (`ld.lld`) for cross-host link parity
   #   nix-index      — provides nix-locate; required by pay-respects to suggest nixpkgs packages for unknown commands
   #                    (run `nix-index` once after first activation to build the file-index database)
   #   opencode       — AI-native coding agent and assistant
@@ -72,6 +75,9 @@ let
     pkgs.gnupg
     pkgs.ghostscript
     pkgs.jq
+    pkgs.llvmPackages_18.bintools
+    pkgs.llvmPackages_18.clang
+    pkgs.llvmPackages_18.lld
     pkgs.nix-index
     pkgs.opencode
     pkgs.p7zip

@@ -35,6 +35,11 @@ let
       Invoke-Expression (& zoxide init powershell | Out-String)
     }
 
+    # LLVM/Clang toolchain defaults for cross-host compiler parity.
+    $env:CC = "clang"
+    $env:CXX = "clang++"
+    $env:LD = "ld.lld"
+
     # prek: install repository-local Git hooks automatically the first time a
     # shell session enters a repo that opted into prek via prek.toml.
     # The hook first checks for the canonical generated shims so already-
