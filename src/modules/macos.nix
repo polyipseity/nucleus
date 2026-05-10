@@ -284,6 +284,7 @@ let
     "installBunPackages"
     "installPackages"
     "installPwshScriptAnalyzer"
+    "linearmouseSymlinks"
     "linkGeneration"
     "onFilesChange"
     "preflightPrivacyPermissions"
@@ -321,17 +322,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # the script version tracks the pinned hash in iterm2ZshIntegration above.
   home.file.".iterm2_shell_integration.zsh".source = iterm2ZshIntegration;
 
-  # Enforce LinearMouse scrolling behavior declaratively on macOS.
-  # LinearMouse resolves configuration from either:
-  #   1) ~/Library/Application Support/linearmouse/linearmouse.json
-  #   2) ~/.config/linearmouse/linearmouse.json
-  # Keep both paths managed and identical so whichever location the running
-  # app version prefers still yields the same declarative behavior.
-  home.file = {
-    ".config/linearmouse/linearmouse.json".source = ./configs/linearmouse/linearmouse.json;
-    "Library/Application Support/linearmouse/linearmouse.json".source = ./configs/linearmouse/linearmouse.json;
-  };
-
   # Source iTerm2 shell integration when the script is present.  The test-e
   # guard makes this a no-op in non-iTerm2 terminals (VS Code terminal, SSH,
   # Ghostty, etc.) where the iTerm2 escape sequences produce no useful output
@@ -341,6 +331,62 @@ lib.mkIf pkgs.stdenv.isDarwin {
   '';
 
   home.activation = {
+    # -------------------------------------------------------------------------
+    # linearmouseSymlinks
+    # VS Code-style bidirectional sync for LinearMouse config:
+    # symlink both runtime config paths directly to the repo file so edits made
+    # by the app are reflected immediately as git changes.
+    #
+    # Managed runtime paths:
+    #   1) ~/.config/linearmouse/linearmouse.json
+    #   2) ~/Library/Application Support/linearmouse/linearmouse.json
+    #
+    # Migration safety mirrors vscodeSymlinks behavior:
+    #   - Correct symlink      -> no-op
+    #   - Wrong symlink        -> replace
+    #   - Real file            -> copy to repo only if repo target is empty,
+    #                             then replace with symlink
+    # -------------------------------------------------------------------------
+    linearmouseSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      set -eu
+
+      _lms_repo_root_file="$HOME/.config/nucleus/repo-root"
+      if [ -n "''${NUCLEUS_REPO:-}" ]; then
+        _lms_repo_root="$NUCLEUS_REPO"
+      elif [ -f "$_lms_repo_root_file" ]; then
+        _lms_repo_root="$(cat "$_lms_repo_root_file")"
+      else
+        echo "linearmouse: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
+        exit 1
+      fi
+
+      _lms_repo_file="$_lms_repo_root/src/modules/configs/linearmouse/linearmouse.json"
+      if [ ! -f "$_lms_repo_file" ]; then
+        echo "linearmouse: repo config file not found: $_lms_repo_file" >&2
+        exit 1
+      fi
+
+      ensure_linearmouse_symlink() {
+        _lms_target="$1"
+
+        if [ -L "$_lms_target" ]; then
+          [ "$(readlink "$_lms_target")" = "$_lms_repo_file" ] && return 0
+          rm "$_lms_target"
+        elif [ -f "$_lms_target" ]; then
+          if [ ! -s "$_lms_repo_file" ]; then
+            cp "$_lms_target" "$_lms_repo_file"
+          fi
+          rm "$_lms_target"
+        fi
+
+        mkdir -p "$(dirname "$_lms_target")"
+        ln -s "$_lms_repo_file" "$_lms_target"
+      }
+
+      ensure_linearmouse_symlink "$HOME/.config/linearmouse/linearmouse.json"
+      ensure_linearmouse_symlink "$HOME/Library/Application Support/linearmouse/linearmouse.json"
+    '';
+
     # -------------------------------------------------------------------------
     # clearDesktop
     # Restarts the three system UI processes that cache defaults values so that
