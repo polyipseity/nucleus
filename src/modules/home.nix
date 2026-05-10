@@ -83,20 +83,94 @@ in
       PASSWORD_STORE_DIR = passwordStoreDir;
     };
 
-    # QtPass keeps its own persisted `passStore` setting. On macOS that value
-    # is stored in the com.ijhack.QtPass defaults domain and can override the
-    # shell-exported PASSWORD_STORE_DIR when QtPass is launched from GUI
-    # surfaces. Keep it aligned with the per-user passwordStoreDir.
+    # QtPass keeps its own persisted `passStore` setting, which can override
+    # PASSWORD_STORE_DIR when launched from GUI surfaces.
+    #
+    # - macOS: configure the com.ijhack.QtPass defaults domain.
+    # - Linux: configure Qt's INI-backed settings file (QSettings).
+    #
+    # Keep both aligned with the per-user passwordStoreDir.
     home.activation.configureQtPassStore = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      if [ "$(uname -s)" = "Darwin" ]; then
-        _qtpass_store=${lib.escapeShellArg passwordStoreDir}
-        case "$_qtpass_store" in
-          */) ;;
-          *) _qtpass_store="$_qtpass_store/" ;;
-        esac
+      _qtpass_store=${lib.escapeShellArg passwordStoreDir}
+      case "$_qtpass_store" in
+        */) ;;
+        *) _qtpass_store="$_qtpass_store/" ;;
+      esac
 
-        /usr/bin/defaults write com.ijhack.QtPass passStore -string "$_qtpass_store"
-      fi
+      _update_qtpass_ini() {
+        _conf="$1"
+        _conf_dir="$(dirname "$_conf")"
+        mkdir -p "$_conf_dir"
+
+        if [ -f "$_conf" ]; then
+          _tmp="$(mktemp "$_conf.XXXXXX")"
+          awk -v store="$_qtpass_store" '
+            BEGIN { in_general = 0; wrote = 0 }
+            {
+              if ($0 ~ /^\[General\]$/) {
+                if (in_general && wrote == 0) {
+                  print "passStore=" store
+                  wrote = 1
+                }
+                in_general = 1
+                print
+                next
+              }
+
+              if ($0 ~ /^\[/ && $0 !~ /^\[General\]$/) {
+                if (in_general && wrote == 0) {
+                  print "passStore=" store
+                  wrote = 1
+                }
+                in_general = 0
+                print
+                next
+              }
+
+              if (in_general && $0 ~ /^passStore=/) {
+                if (wrote == 0) {
+                  print "passStore=" store
+                  wrote = 1
+                }
+                next
+              }
+
+              print
+            }
+            END {
+              if (wrote == 0) {
+                if (in_general == 0) {
+                  print "[General]"
+                }
+                print "passStore=" store
+              }
+            }
+          ' "$_conf" > "$_tmp"
+          mv "$_tmp" "$_conf"
+        else
+          cat > "$_conf" <<EOF
+[General]
+passStore=$_qtpass_store
+EOF
+        fi
+      }
+
+      case "$(uname -s)" in
+        Darwin)
+          /usr/bin/defaults write com.ijhack.QtPass passStore -string "$_qtpass_store"
+          ;;
+        Linux)
+          # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
+          _primary_conf="$HOME/.config/IJHack/QtPass.conf"
+          # Some builds may resolve via organization-domain pathing.
+          _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
+
+          _update_qtpass_ini "$_primary_conf"
+          if [ -f "$_secondary_conf" ]; then
+            _update_qtpass_ini "$_secondary_conf"
+          fi
+          ;;
+      esac
     '';
 
     # Allow Home Manager to manage its own activation and generation GC.
