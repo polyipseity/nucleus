@@ -29,6 +29,12 @@ let
       winget = "Git.Git"; # Provided by Git for Windows installation
     }
     {
+      name = "github-cli";
+      nixpkgs = "gh";
+      homebrew = "gh";
+      winget = "GitHub.cli";
+    }
+    {
       name = "zsh";
       nixpkgs = "zsh";
       homebrew = "zsh";

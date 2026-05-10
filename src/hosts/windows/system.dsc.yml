@@ -109,6 +109,14 @@ properties:
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
+      id: GithubCliInstall
+      directives:
+        description: Ensure GitHub CLI is installed for cross-host Git repository management parity with macOS and NixOS
+      settings:
+        id: GitHub.cli
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
       directives:
         description: Ensure Gpg4win is installed
       settings:

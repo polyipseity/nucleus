@@ -31,6 +31,7 @@ let
   #   fd             — fast find replacement
   #   ffmpeg-full    — multimedia processing and transcoding (GPL codecs; pre-built in nixos.org binary cache)
   #   fzf            — fuzzy finder used by shell widgets and neovim
+  #   gh             — GitHub CLI for repository and issue management
   #   gitFull        — version control (includes Tcl/Tk tools like `gitk`)
   #   gnupg          — GPG for secret management and signing
   #   jq             — JSON processor used by activation scripts
@@ -61,6 +62,7 @@ let
     pkgs.fd
     pkgs.ffmpeg-full
     pkgs.fzf
+    pkgs.gh
     pkgs.gitFull
     pkgs.gnupg
     pkgs.jq
