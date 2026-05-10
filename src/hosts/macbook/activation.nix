@@ -40,8 +40,11 @@
   # Scripts included:
   #   configureBatteryPolicy           — pmset AC/battery policy
   #   configureChargeLimit             — 80 % charge cap via battery CLI / bclm
+  #   configureGimpScrollSensitivity   — GIMP drag-zoom-speed (25% of default)
+  #   configureLinearMousePreferences  — LinearMouse update-check suppression
   #   configureMissionControlSpansDisplays — spans-displays per-user pref
   #   configureMonitorColorProfile     — clear ColorSync device cache
+  #   clearFinderCache                 — purge stale Finder state for desktop visibility
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
     # ---- configureBatteryPolicy ------------------------------------------------
