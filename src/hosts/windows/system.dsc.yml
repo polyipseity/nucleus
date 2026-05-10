@@ -35,6 +35,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Ghostscript is installed to provide the `gs` PostScript/PDF CLI for cross-host parity with macOS and NixOS
+      settings:
+        id: ArtifexSoftware.GhostScript
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure uv is installed for cross-host Python workflow parity with macOS and NixOS
       settings:
         id: astral-sh.uv

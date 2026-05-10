@@ -36,6 +36,8 @@ let
   #   gh             — GitHub CLI for repository and issue management
   #   gitFull        — version control (includes Tcl/Tk tools like `gitk`)
   #   gnupg          — GPG for secret management and signing
+  #   ghostscript    — PostScript/PDF interpreter (`gs`) for document workflows
+  #                    and CLI parity with Windows (ArtifexSoftware.GhostScript)
   #   jq             — JSON processor used by activation scripts
   #   nix-index      — provides nix-locate; required by pay-respects to suggest nixpkgs packages for unknown commands
   #                    (run `nix-index` once after first activation to build the file-index database)
@@ -68,6 +70,7 @@ let
     pkgs.gh
     pkgs.gitFull
     pkgs.gnupg
+    pkgs.ghostscript
     pkgs.jq
     pkgs.nix-index
     pkgs.opencode
