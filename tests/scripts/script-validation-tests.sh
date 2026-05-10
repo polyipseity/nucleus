@@ -23,14 +23,14 @@ TESTS_FAILED=0
 assert_pass() {
     local test_name="$1"
     echo -e "${GREEN}✓${NC} $test_name"
-    ((TESTS_PASSED++))
+    ((++TESTS_PASSED))
 }
 
 assert_fail() {
     local test_name="$1"
     local reason="$2"
     echo -e "${RED}✗${NC} $test_name: $reason"
-    ((TESTS_FAILED++))
+    ((++TESTS_FAILED))
 }
 
 # Test 1: Verify shell syntax (bash -n does parse-only check)
