@@ -13,6 +13,11 @@
 let
   inherit (lib) topologicalSort unique;
 
+  # Read live module files so ordering/name regressions are caught by tests
+  # instead of relying only on mocked activation maps.
+  agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
+  macosModuleText = builtins.readFile ../../src/modules/macos.nix;
+
   # Assertion helper.
   assert' = cond: msg: if !cond then builtins.throw msg else null;
 
@@ -66,8 +71,8 @@ let
         gitConfig = { after = [ ]; };
         sshConfig = { after = [ ]; };
         wallpapers = { after = [ ]; };
-        displayHostManualInstructions = { 
-          after = [ "gitConfig" "sshConfig" "wallpapers" ]; 
+        displayHostManualInstructions = {
+          after = [ "gitConfig" "sshConfig" "wallpapers" ];
         };
       };
     in
@@ -201,6 +206,13 @@ let
        (builtins.elem "step1" activations.step2.after))
       "Before/after lists should be bidirectionally consistent";
 
+  # === TEST: syncClawhubSkills dependency name stays aligned across modules ===
+  test_sync_clawhub_dependency_name_alignment =
+    assert'
+      ((lib.hasInfix "syncClawhubSkills = lib.hm.dag.entryAfter" agentsModuleText) &&
+       (lib.hasInfix "\"syncClawhubSkills\"" macosModuleText))
+      "syncClawhubSkills activation name must match between agents.nix and macos.nix dependency list";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -215,6 +227,7 @@ let
     test_packages_before_hm
     test_valid_dependency_references
     test_before_after_consistency
+    test_sync_clawhub_dependency_name_alignment
   ];
 in
 {
@@ -234,5 +247,6 @@ in
     "10: System packages available before Home Manager"
     "11: Activation dependencies reference valid steps"
     "12: Before/after dependency consistency"
+    "13: syncClawhubSkills dependency name alignment"
   ];
 }

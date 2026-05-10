@@ -292,7 +292,9 @@ let
     "setupLaunchAgents"
     "sops-nix"
     "sshKeyAdopt"
-    "syncClawHubSkills"
+    # Keep exact activation name casing aligned with agents.nix
+    # (`syncClawhubSkills`) so manual instructions remain the terminal node.
+    "syncClawhubSkills"
     "verifyArchivingStack"
     "verifySecretDecryption"
     "vscodeExtensionBridge"
