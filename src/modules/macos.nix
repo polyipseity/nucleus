@@ -9,6 +9,7 @@
 #     → preflightPrivacyPermissions
 #       → configureSafariDefaults, configureUniversalAccessDefaults
 #       → reloadUserPreferenceState
+#       → syncDownloadsToICloud
 #     → configureLaunchServices, configureNightlight
 #       → ensureHeadlessDisplay
 #         → configureDisplayResolutions
@@ -298,6 +299,7 @@ let
     # Keep exact activation name casing aligned with agents.nix
     # (`syncClawHubSkills`) so manual instructions remain the terminal node.
     "syncClawHubSkills"
+    "syncDownloadsToICloud"
     "verifyArchivingStack"
     "verifySecretDecryption"
     "vscodeExtensionBridge"
@@ -898,6 +900,61 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
+    # syncDownloadsToICloud
+    # Converges ~/Downloads to an iCloud-backed path by symlinking it to
+    # ~/Library/Mobile Documents/com~apple~CloudDocs/Downloads.
+    #
+    # Migration algorithm (idempotent):
+    #   1. Ensure iCloud Downloads directory exists.
+    #   2. If ~/Downloads is a real directory with files, move its contents
+    #      into iCloud Downloads/local (or local-<n> when local already exists).
+    #   3. Replace ~/Downloads with a symlink to iCloud Downloads.
+    #
+    # WHY: macOS has no built-in per-folder relocation toggle for Downloads
+    # equivalent to iCloud Desktop/Documents sync. Symlink convergence keeps
+    # the canonical path stable for apps while placing data under iCloud.
+    # -------------------------------------------------------------------------
+    syncDownloadsToICloud = lib.hm.dag.entryAfter [ "reloadUserPreferenceState" ] ''
+      set -eu
+
+      _local_downloads="$HOME/Downloads"
+      _icloud_root="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
+      _icloud_downloads="$_icloud_root/Downloads"
+
+      mkdir -p "$_icloud_downloads"
+
+      if [ -L "$_local_downloads" ]; then
+        if [ "$(readlink "$_local_downloads")" = "$_icloud_downloads" ]; then
+          exit 0
+        fi
+        rm "$_local_downloads"
+      elif [ -d "$_local_downloads" ]; then
+        if [ -n "$(find "$_local_downloads" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
+          _suffix=0
+          _migration_dir="$_icloud_downloads/local"
+          while [ -e "$_migration_dir" ]; do
+            _suffix=$((_suffix + 1))
+            _migration_dir="$_icloud_downloads/local-$_suffix"
+          done
+
+          mkdir -p "$_migration_dir"
+
+          if ! find "$_local_downloads" -mindepth 1 -maxdepth 1 -exec mv {} "$_migration_dir/" \;; then
+            echo "macos: failed to migrate one or more Downloads entries into $_migration_dir." >&2
+            exit 1
+          fi
+        fi
+
+        rmdir "$_local_downloads" 2>/dev/null || true
+      elif [ -e "$_local_downloads" ]; then
+        echo "macos: $_local_downloads exists but is not a directory/symlink; refusing to replace it." >&2
+        exit 1
+      fi
+
+      ln -s "$_icloud_downloads" "$_local_downloads"
+    '';
+
+    # -------------------------------------------------------------------------
     # ensureICloudFilesLocal
     # Forces all iCloud-synced files to be downloaded and cached locally so they
     # remain available offline. Includes the main iCloud Drive (com~apple~CloudDocs)
@@ -914,7 +971,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #
     # No-op if iCloud is not configured / the path does not exist.
     # -------------------------------------------------------------------------
-    ensureICloudFilesLocal = lib.hm.dag.entryAfter [ "reloadUserPreferenceState" ] ''
+    ensureICloudFilesLocal = lib.hm.dag.entryAfter [ "syncDownloadsToICloud" ] ''
       set +e  # soft-fail: iCloud may not be configured on all machines
 
       ICLOUD_BASE="$HOME/Library/Mobile Documents"
