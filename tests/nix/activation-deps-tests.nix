@@ -213,6 +213,19 @@ let
        (lib.hasInfix "\"syncClawHubSkills\"" macosModuleText))
       "syncClawHubSkills activation name must match between agents.nix and macos.nix dependency list";
 
+  # === TEST: syncClawHubSkills must not short-circuit activation ===
+  test_sync_clawhub_does_not_exit_activation =
+    let
+      syncHasExitZero =
+        builtins.match
+          "(.|\n)*syncClawHubSkills = lib.hm.dag.entryAfter(.|\n)*exit 0(.|\n)*"
+          agentsModuleText
+        != null;
+    in
+    assert'
+      (!syncHasExitZero)
+      "syncClawHubSkills must not call exit 0, or later activation steps (including displayHostManualInstructions) are skipped";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -228,6 +241,7 @@ let
     test_valid_dependency_references
     test_before_after_consistency
     test_sync_clawhub_dependency_name_alignment
+    test_sync_clawhub_does_not_exit_activation
   ];
 in
 {
@@ -248,5 +262,6 @@ in
     "11: Activation dependencies reference valid steps"
     "12: Before/after dependency consistency"
     "13: syncClawHubSkills dependency name alignment"
+    "14: syncClawHubSkills does not exit activation"
   ];
 }

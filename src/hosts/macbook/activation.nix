@@ -236,7 +236,7 @@
           fi
           /bin/rm -f "$gimprc_file.bak"
         else
-          if ! /bin/printf '\n(drag-zoom-speed 25.0)\n' >> "$gimprc_file"; then
+          if ! printf '\n(drag-zoom-speed 25.0)\n' >> "$gimprc_file"; then
             echo "gimp: failed to append drag-zoom-speed to $gimprc_file." >&2
           fi
         fi

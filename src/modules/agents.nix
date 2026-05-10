@@ -376,6 +376,8 @@
     syncClawHubSkills = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
       set -eu
 
+      _scs_skip_sync=false
+
       # Prepend ~/.bun/bin so the ClawHub binary installed by installBunPackages
       # is on PATH for this activation step.
       if [ -d "$HOME/.bun/bin" ]; then
@@ -401,7 +403,7 @@
       _scs_manifest="$_scs_repo_root/src/modules/configs/agents/clawhub-skills.json"
       if [ ! -f "$_scs_manifest" ]; then
         echo "clawhub: manifest not found at $_scs_manifest; skipping fetched skill sync"
-        exit 0
+        _scs_skip_sync=true
       fi
 
       # Parse skill slugs from the manifest using jq.  jq is available via
@@ -412,12 +414,13 @@
       fi
 
       _scs_slugs_file="$(mktemp)"
-      jq -r '.skills[]?' "$_scs_manifest" > "$_scs_slugs_file"
+      if [ "$_scs_skip_sync" = false ]; then
+        jq -r '.skills[]?' "$_scs_manifest" > "$_scs_slugs_file"
 
-      if [ ! -s "$_scs_slugs_file" ]; then
-        rm -f "$_scs_slugs_file"
-        echo "clawhub: no fetched skills in manifest; skipping"
-        exit 0
+        if [ ! -s "$_scs_slugs_file" ]; then
+          echo "clawhub: no fetched skills in manifest; skipping"
+          _scs_skip_sync=true
+        fi
       fi
 
       _scs_skills_dir="$HOME/.agents/skills"
@@ -432,70 +435,72 @@
       # Probe for the ClawHub CLI.  ClawHub must be pre-installed by the
       # installBunPackages activation before this step is called; this step
       # never installs ClawHub itself.
-      if ! command -v clawhub >/dev/null 2>&1; then
+      if [ "$_scs_skip_sync" = false ] && ! command -v clawhub >/dev/null 2>&1; then
         echo "clawhub: clawhub not found in PATH; installBunPackages must complete before fetched skill sync; skipping" >&2
-        rm -f "$_scs_slugs_file"
-        exit 0
+        _scs_skip_sync=true
       fi
 
-      echo "clawhub: running fetched skill sync..."
+      if [ "$_scs_skip_sync" = false ]; then
+        echo "clawhub: running fetched skill sync..."
 
-      # Install or update each skill from the manifest.
-      #   --workdir "$HOME/.agents" installs to $HOME/.agents/skills/<slug>/
-      #                            (default --dir value is "skills")
-      #   --no-input               disables interactive prompts for apply safety
-      while IFS= read -r _scs_slug; do
-        [ -z "$_scs_slug" ] && continue
-        _scs_skill_path="$_scs_skills_dir/$_scs_slug"
-        if [ -L "$_scs_skill_path" ]; then
-          # A committed-skill (bundled) symlink exists with the same slug.
-          # Skip to avoid overwriting the managed symlink; the slug must be
-          # removed from clawhub-skills.json or the committed skill removed.
-          echo "clawhub: skipping '$_scs_slug' — a committed-skill symlink exists at $_scs_skill_path" >&2
-          continue
-        fi
-        # Unlock an existing fetched skill directory before updating so
-        # ClawHub can overwrite files locked a-w on a previous install.
-        if [ -d "$_scs_skill_path" ]; then
-          chmod -R u+w "$_scs_skill_path"
-        fi
-        echo "clawhub: installing/updating fetched skill '$_scs_slug'..."
-        # Best-effort: non-zero exit from ClawHub is non-fatal because the
-        # system apply already succeeded and skill sync is additive.
-        if clawhub install --workdir "$HOME/.agents" --no-input "$_scs_slug"; then
-          # Lock installed content so files cannot be modified outside a
-          # managed apply run.  The unlock above re-opens write access before
-          # the next update.
-          if [ -d "$_scs_skill_path" ]; then
-            chmod -R a-w "$_scs_skill_path"
+        # Install or update each skill from the manifest.
+        #   --workdir "$HOME/.agents" installs to $HOME/.agents/skills/<slug>/
+        #                            (default --dir value is "skills")
+        #   --no-input               disables interactive prompts for apply safety
+        while IFS= read -r _scs_slug; do
+          [ -z "$_scs_slug" ] && continue
+          _scs_skill_path="$_scs_skills_dir/$_scs_slug"
+          if [ -L "$_scs_skill_path" ]; then
+            # A committed-skill (bundled) symlink exists with the same slug.
+            # Skip to avoid overwriting the managed symlink; the slug must be
+            # removed from clawhub-skills.json or the committed skill removed.
+            echo "clawhub: skipping '$_scs_slug' — a committed-skill symlink exists at $_scs_skill_path" >&2
+            continue
           fi
-        else
-          echo "clawhub: clawhub install failed for '$_scs_slug' (system apply succeeded)" >&2
-        fi
-      done < "$_scs_slugs_file"
+          # Unlock an existing fetched skill directory before updating so
+          # ClawHub can overwrite files locked a-w on a previous install.
+          if [ -d "$_scs_skill_path" ]; then
+            chmod -R u+w "$_scs_skill_path"
+          fi
+          echo "clawhub: installing/updating fetched skill '$_scs_slug'..."
+          # Best-effort: non-zero exit from ClawHub is non-fatal because the
+          # system apply already succeeded and skill sync is additive.
+          if clawhub install --workdir "$HOME/.agents" --no-input "$_scs_slug"; then
+            # Lock installed content so files cannot be modified outside a
+            # managed apply run.  The unlock above re-opens write access before
+            # the next update.
+            if [ -d "$_scs_skill_path" ]; then
+              chmod -R a-w "$_scs_skill_path"
+            fi
+          else
+            echo "clawhub: clawhub install failed for '$_scs_slug' (system apply succeeded)" >&2
+          fi
+        done < "$_scs_slugs_file"
 
-      # Stale cleanup: remove real directories in ~/.agents/skills/ that have
-      # a .clawhub/origin.json marker (written by ClawHub at install time,
-      # identifying fetched downloads) but whose slug is no longer in manifest.
-      # Directories without this marker (bundled symlinks or user content) are
-      # never touched.
-      _scs_stale_list="$(mktemp)"
-      find "$_scs_skills_dir" -mindepth 1 -maxdepth 1 -type d > "$_scs_stale_list"
-      while IFS= read -r _scs_candidate; do
-        [ -z "$_scs_candidate" ] && continue
-        _scs_name="$(basename "$_scs_candidate")"
-        [ ! -f "$_scs_candidate/.clawhub/origin.json" ] && continue
-        if ! grep -qxF "$_scs_name" "$_scs_slugs_file"; then
-          echo "clawhub: removing stale fetched skill '$_scs_name' (removed from manifest)"
-          # Unlock before removal: fetched skill trees are locked a-w after
-          # install, so rm -rf needs write access restored first.
-          chmod -R u+w "$_scs_candidate"
-          rm -rf "$_scs_candidate"
-        fi
-      done < "$_scs_stale_list"
+        # Stale cleanup: remove real directories in ~/.agents/skills/ that have
+        # a .clawhub/origin.json marker (written by ClawHub at install time,
+        # identifying fetched downloads) but whose slug is no longer in manifest.
+        # Directories without this marker (bundled symlinks or user content) are
+        # never touched.
+        _scs_stale_list="$(mktemp)"
+        find "$_scs_skills_dir" -mindepth 1 -maxdepth 1 -type d > "$_scs_stale_list"
+        while IFS= read -r _scs_candidate; do
+          [ -z "$_scs_candidate" ] && continue
+          _scs_name="$(basename "$_scs_candidate")"
+          [ ! -f "$_scs_candidate/.clawhub/origin.json" ] && continue
+          if ! grep -qxF "$_scs_name" "$_scs_slugs_file"; then
+            echo "clawhub: removing stale fetched skill '$_scs_name' (removed from manifest)"
+            # Unlock before removal: fetched skill trees are locked a-w after
+            # install, so rm -rf needs write access restored first.
+            chmod -R u+w "$_scs_candidate"
+            rm -rf "$_scs_candidate"
+          fi
+        done < "$_scs_stale_list"
+        rm -f "$_scs_stale_list"
+        echo "clawhub: fetched skill sync complete"
+      fi
 
-      rm -f "$_scs_stale_list" "$_scs_slugs_file"
-      echo "clawhub: fetched skill sync complete"
+      rm -f "$_scs_slugs_file"
     '';
   };
 }
