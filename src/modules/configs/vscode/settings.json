@@ -120,7 +120,7 @@
   "jsts-chat-features.skills.enabled": true,
   "latex-workshop.formatting.latex": "tex-fmt",
   "latex-workshop.linting.run": "onType",
-  "lldb.executable": "lldb",
+  "lldb.suppressUpdateNotifications": true,
   "markdown.preview.fontSize": 14,
   "markdown.validate.enabled": true,
   "nix.enableLanguageServer": true,
