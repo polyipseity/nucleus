@@ -3,6 +3,9 @@
   "users": {
     "polyipseity": {
       "description": "Primary user receiving secret materialization and full configuration",
+      "dscConfigFiles": [
+        "user.dsc.yml"
+      ],
       "homeDirectory": "C:\\Users\\polyipseity",
       "isPrimary": true,
       "devRepos": {

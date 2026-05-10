@@ -67,6 +67,12 @@ foreach ($userName in $rawRegistry.users.PSObject.Properties.Name) {
   }
   $userList += @{
     name          = $userName
+    dscConfigFiles = if ($userConfig.dscConfigFiles -is [System.Array]) {
+      @($userConfig.dscConfigFiles | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    }
+    else {
+      @()
+    }
     homeDirectory = $userConfig.homeDirectory
     isPrimary     = if ($userConfig.isPrimary) { $true } else { $false }
     description   = if ($userConfig.description) { $userConfig.description } else { "" }

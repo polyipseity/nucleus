@@ -26,6 +26,11 @@
   @('system.dsc.yml', 'user.dsc.yml').  Filenames are resolved relative to
   $ConfigDir.
 
+  Additional per-user DSC files can be declared in users.json under each
+  user's dscConfigFiles array.  apply.ps1 appends those files for every user
+  listed in -Users (de-duplicated, preserving order) so each managed user can
+  extend the declarative DSC set without editing script code.
+
 .PARAMETER ModuleDir
   Path to the directory containing one-function Windows helper modules.
   Mandatory: caller must explicitly pass the module directory so they are
@@ -253,6 +258,26 @@ foreach ($user in $Users) {
   }
 }
 
+# Build effective DSC file list from explicit -ConfigFiles plus optional
+# per-user extensions declared in users.json (`dscConfigFiles`).  This keeps
+# DSC selection declarative and user-scoped while preserving the canonical
+# system/user baseline defaults.
+$effectiveConfigFiles = @($ConfigFiles)
+foreach ($configuredUser in $userRegistry.users) {
+  if ($configuredUser.name -notin $Users) {
+    continue
+  }
+
+  foreach ($userConfigFile in @($configuredUser.dscConfigFiles)) {
+    if ([string]::IsNullOrWhiteSpace($userConfigFile)) {
+      continue
+    }
+    if ($userConfigFile -notin $effectiveConfigFiles) {
+      $effectiveConfigFiles += $userConfigFile
+    }
+  }
+}
+
 if (-not $userRegistry.primaryUser) {
   Write-Error "No primary user marked (isPrimary=true) in user registry" -ErrorAction Stop
   exit 1
@@ -361,7 +386,7 @@ Invoke-SecretVerification `
 $activeWallpaperPath = Sync-Wallpaper -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
 Remove-StaleWallpaper -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
 
-foreach ($configFile in $ConfigFiles) {
+foreach ($configFile in $effectiveConfigFiles) {
   Invoke-WingetConfiguration -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath $configFile) -WallpaperPath $activeWallpaperPath
 }
 
