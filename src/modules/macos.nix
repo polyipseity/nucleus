@@ -901,18 +901,19 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # syncDownloadsToICloud
-    # Converges ~/Downloads to an iCloud-backed path by symlinking it to
-    # ~/Library/Mobile Documents/com~apple~CloudDocs/Downloads.
+    # Creates a symlink ~/Downloads/iCloud that points to
+    # ~/Library/Mobile Documents/com~apple~CloudDocs/Downloads for convenient
+    # access to iCloud-backed files without replacing ~/Downloads itself.
     #
-    # Migration algorithm (idempotent):
-    #   1. Ensure iCloud Downloads directory exists.
-    #   2. If ~/Downloads is a real directory with files, move its contents
-    #      into iCloud Downloads/local (or local-<n> when local already exists).
-    #   3. Replace ~/Downloads with a symlink to iCloud Downloads.
+    # Algorithm (idempotent, non-destructive):
+    #   1. Ensure both ~/Downloads and iCloud Downloads directory exist.
+    #   2. If ~/Downloads/iCloud already exists as a file or directory,
+    #      rename it to iCloud-old (or iCloud-<n> if iCloud-old exists).
+    #   3. If ~/Downloads/iCloud is a symlink to the correct target, exit.
+    #   4. Create symlink ~/Downloads/iCloud → iCloud Downloads.
     #
-    # WHY: macOS has no built-in per-folder relocation toggle for Downloads
-    # equivalent to iCloud Desktop/Documents sync. Symlink convergence keeps
-    # the canonical path stable for apps while placing data under iCloud.
+    # WHY: Non-destructive approach lets users keep local downloads in ~/Downloads
+    # while having convenient access to iCloud-backed Downloads via symlink.
     # -------------------------------------------------------------------------
     syncDownloadsToICloud = lib.hm.dag.entryAfter [ "reloadUserPreferenceState" ] ''
       set -eu
@@ -920,38 +921,31 @@ lib.mkIf pkgs.stdenv.isDarwin {
       _local_downloads="$HOME/Downloads"
       _icloud_root="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
       _icloud_downloads="$_icloud_root/Downloads"
+      _icloud_symlink="$_local_downloads/iCloud"
 
-      mkdir -p "$_icloud_downloads"
+      mkdir -p "$_local_downloads" "$_icloud_downloads"
 
-      if [ -L "$_local_downloads" ]; then
-        if [ "$(readlink "$_local_downloads")" = "$_icloud_downloads" ]; then
-          exit 0
-        fi
-        rm "$_local_downloads"
-      elif [ -d "$_local_downloads" ]; then
-        if [ -n "$(find "$_local_downloads" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
-          _suffix=0
-          _migration_dir="$_icloud_downloads/local"
-          while [ -e "$_migration_dir" ]; do
-            _suffix=$((_suffix + 1))
-            _migration_dir="$_icloud_downloads/local-$_suffix"
-          done
-
-          mkdir -p "$_migration_dir"
-
-          if ! find "$_local_downloads" -mindepth 1 -maxdepth 1 -exec mv {} "$_migration_dir/" \;; then
-            echo "macos: failed to migrate one or more Downloads entries into $_migration_dir." >&2
-            exit 1
-          fi
-        fi
-
-        rmdir "$_local_downloads" 2>/dev/null || true
-      elif [ -e "$_local_downloads" ]; then
-        echo "macos: $_local_downloads exists but is not a directory/symlink; refusing to replace it." >&2
-        exit 1
+      # If symlink already exists and points to the correct target, we're done
+      if [ -L "$_icloud_symlink" ] && [ "$(readlink "$_icloud_symlink")" = "$_icloud_downloads" ]; then
+        exit 0
       fi
 
-      ln -s "$_icloud_downloads" "$_local_downloads"
+      # If something already exists at the symlink path, rename it to avoid clobbering
+      if [ -e "$_icloud_symlink" ] || [ -L "$_icloud_symlink" ]; then
+        _suffix=0
+        _backup_path="$_local_downloads/iCloud-old"
+        while [ -e "$_backup_path" ] || [ -L "$_backup_path" ]; do
+          _suffix=$((_suffix + 1))
+          _backup_path="$_local_downloads/iCloud-$_suffix"
+        done
+
+        if ! mv "$_icloud_symlink" "$_backup_path"; then
+          echo "macos: failed to backup existing $_icloud_symlink to $_backup_path." >&2
+          exit 1
+        fi
+      fi
+
+      ln -s "$_icloud_downloads" "$_icloud_symlink"
     '';
 
     # -------------------------------------------------------------------------
