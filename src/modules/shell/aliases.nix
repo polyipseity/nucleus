@@ -9,10 +9,9 @@
   gca = "git commit --amend";
   gco = "git checkout";
   gd = "git diff";
-  gl = "git log --oneline --decorate --graph";
+  gll = "git log --oneline --decorate --graph";
   gp = "git push";
   gpl = "git pull";
-  gs = "git status -sb";
   gst = "git status";
   la = "eza -la";
   ll = "eza -la";

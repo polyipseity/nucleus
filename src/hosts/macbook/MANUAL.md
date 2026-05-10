@@ -21,10 +21,9 @@ These aliases are managed declaratively and are available in both zsh and PowerS
 | `gca`                  | `git commit --amend`                   | Amend the most recent commit.                      |
 | `gco`                  | `git checkout`                         | Switch branches or restore paths.                  |
 | `gd`                   | `git diff`                             | Show working tree/staged diffs.                    |
-| `gl`                   | `git log --oneline --decorate --graph` | Compact decorated commit graph.                    |
+| `gll`                  | `git log --oneline --decorate --graph` | Compact decorated commit graph.                    |
 | `gp`                   | `git push`                             | Push refs to remote.                               |
 | `gpl`                  | `git pull`                             | Pull/fetch and integrate upstream changes.         |
-| `gs`                   | `git status -sb`                       | Short branch-aware Git status.                     |
 | `gst`                  | `git status`                           | Full Git status output.                            |
 | `la`                   | `eza -la`                              | Detailed all-files directory listing.              |
 | `ll`                   | `eza -la`                              | Same as `la` for muscle-memory parity.             |

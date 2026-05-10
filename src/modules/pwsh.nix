@@ -159,10 +159,9 @@ let
     function gca { & git commit --amend @Args }
     function gco { & git checkout @Args }
     function gd { & git diff @Args }
-    function gl { & git log --oneline --decorate --graph @Args }
+    function gll { & git log --oneline --decorate --graph @Args }
     function gp { & git push @Args }
     function gpl { & git pull @Args }
-    function gs { & git status -sb @Args }
     function gst { & git status @Args }
 
     # la/ll: prefer eza for colour, icons, and extended metadata; fall back to

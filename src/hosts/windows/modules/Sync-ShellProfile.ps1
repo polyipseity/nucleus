@@ -22,8 +22,8 @@ function Sync-ShellProfile {
         (if fzf is present and PSReadLine is available)
       - pay-respects command correction hook (if pay-respects is present; installed
         via cargo-binstall by Invoke-CargoBinstallSetup)
-      - common aliases (`g`, `ga`, `gc`, `gca`, `gco`, `gd`, `gl`, `gp`,
-        `gpl`, `gs`, `gst`, `la`, `ll` (eza preferred, Get-ChildItem fallback),
+      - common aliases (`g`, `ga`, `gc`, `gca`, `gco`, `gd`, `gll`, `gp`,
+        `gpl`, `gst`, `la`, `ll` (eza preferred, Get-ChildItem fallback),
         `ni`, `nr`, `nx` (bun shortcuts, if bun present), `v`)
       - Python ban: blocks system-wide python/pip to prevent accidental
          modifications to system environment
@@ -192,10 +192,9 @@ function Sync-ShellProfile {
     'function gca { & git commit --amend @Args }'
     'function gco { & git checkout @Args }'
     'function gd { & git diff @Args }'
-    'function gl { & git log --oneline --decorate --graph @Args }'
+    'function gll { & git log --oneline --decorate --graph @Args }'
     'function gp { & git push @Args }'
     'function gpl { & git pull @Args }'
-    'function gs { & git status -sb @Args }'
     'function gst { & git status @Args }'
     # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
     # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
