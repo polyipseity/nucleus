@@ -321,6 +321,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # the script version tracks the pinned hash in iterm2ZshIntegration above.
   home.file.".iterm2_shell_integration.zsh".source = iterm2ZshIntegration;
 
+  # Enforce LinearMouse scrolling behavior declaratively on macOS.
+  # This repository manages only the JSON config payload and does not mutate
+  # unrelated app preferences.
+  home.file.".config/linearmouse/linearmouse.json".source = ./configs/linearmouse/linearmouse.json;
+
   # Source iTerm2 shell integration when the script is present.  The test-e
   # guard makes this a no-op in non-iTerm2 terminals (VS Code terminal, SSH,
   # Ghostty, etc.) where the iTerm2 escape sequences produce no useful output

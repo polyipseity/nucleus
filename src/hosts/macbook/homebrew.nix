@@ -23,23 +23,24 @@ let
   # GUI applications managed via Homebrew Cask.
   # Dual-source casks (for example Google Chrome, VS Code, VLC) are selected
   # from core.nix and merged below so backend switches stay centralized.
-   staticManagedCasks = [
-     "alt-tab"                    # Windows-style alt-tab switcher
-     "appcleaner"                 # Thorough app uninstaller
-     "battery"                    # Apple Silicon charge-limit manager (maintains 80% cap)
-     "betterdisplay"              # Advanced display management and virtual screens
-     "chrome-remote-desktop-host" # Headless remote-desktop receiver
-      "coolterm"                   # Serial terminal
-      "gimp"                       # Raster image editor; macOS-only cask (nixpkgs gimp is Linux-only)
-      "google-chrome@canary"       # Chrome dev channel for web testing
-     "keka"                       # Graphical archiver with 7-Zip backend support
-     "lulu"                       # Outbound network firewall
-     "orbstack"                   # Docker/Linux VM runtime (faster than Docker Desktop)
-     "parsec"                     # Low-latency remote gaming / desktop streaming
-     "raycast"                    # Spotlight replacement and launcher
-     "telegram-desktop@beta"      # Telegram beta channel; kept static (no exact nixpkgs beta mapping)
-     "whatsapp@beta"              # WhatsApp pre-release client
-   ];
+  staticManagedCasks = [
+    "alt-tab"                    # Windows-style alt-tab switcher
+    "appcleaner"                 # Thorough app uninstaller
+    "battery"                    # Apple Silicon charge-limit manager (maintains 80% cap)
+    "betterdisplay"              # Advanced display management and virtual screens
+    "chrome-remote-desktop-host" # Headless remote-desktop receiver
+    "coolterm"                   # Serial terminal
+    "gimp"                       # Raster image editor; macOS-only cask (nixpkgs gimp is Linux-only)
+    "google-chrome@canary"       # Chrome dev channel for web testing
+    "keka"                       # Graphical archiver with 7-Zip backend support
+    "linearmouse"                # Per-device mouse/trackpad scrolling behavior and sensitivity
+    "lulu"                       # Outbound network firewall
+    "orbstack"                   # Docker/Linux VM runtime (faster than Docker Desktop)
+    "parsec"                     # Low-latency remote gaming / desktop streaming
+    "raycast"                    # Spotlight replacement and launcher
+    "telegram-desktop@beta"      # Telegram beta channel; kept static (no exact nixpkgs beta mapping)
+    "whatsapp@beta"              # WhatsApp pre-release client
+  ];
 
   # QtPass (GUI frontend for pass/gopass) is intentionally absent from macOS
   # Homebrew. The Homebrew cask fails Gatekeeper checks (app not notarized) and

@@ -1,0 +1,44 @@
+{
+  "schemes": [
+    {
+      "if": {
+        "device": {
+          "category": "mouse"
+        }
+      },
+      "scrolling": {
+        "reverse": {
+          "horizontal": false,
+          "vertical": false
+        }
+      }
+    },
+    {
+      "if": {
+        "device": {
+          "category": "trackpad"
+        }
+      },
+      "scrolling": {
+        "reverse": {
+          "horizontal": true,
+          "vertical": true
+        }
+      }
+    },
+    {
+      "if": {
+        "app": "org.gimp.gimp",
+        "device": {
+          "category": "mouse"
+        }
+      },
+      "scrolling": {
+        "speed": {
+          "horizontal": 0.25,
+          "vertical": 0.25
+        }
+      }
+    }
+  ]
+}
