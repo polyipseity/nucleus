@@ -1,8 +1,9 @@
 # modules/git.nix — Shared Git behavior; identity is sourced from managed secrets.
-{ ... }:
+{ pkgs, ... }:
 {
   programs.git = {
     enable = true;
+    package = pkgs.gitFull;
     # Keep OpenPGP signing format pinned; user name/email/signing key are set by
     # the secrets activation path so identity stays SOPS-driven across hosts.
     # Enforce signed commits and tags by default on POSIX hosts to match the

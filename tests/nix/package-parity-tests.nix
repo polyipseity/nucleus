@@ -24,7 +24,7 @@ let
     }
     {
       name = "gitk";
-      nixpkgs = "gitAndTools.gitk";
+      nixpkgs = "gitk";
       homebrew = null; # Provided by Git formula/cask on macOS; no standalone package needed
       winget = "Git.Git"; # Provided by Git for Windows installation
     }
