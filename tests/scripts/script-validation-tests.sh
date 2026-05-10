@@ -64,6 +64,7 @@ test_is_executable() {
 }
 
 # Test 4: Verify critical functions/variables are defined
+# shellcheck disable=SC2329  # Reserved for future test expansion; not yet invoked.
 test_has_function_or_variable() {
     local script="$1"
     local identifier="$2"
@@ -107,8 +108,10 @@ test_error_handling() {
 # Test 7: Verify comments explain critical sections
 test_has_documentation() {
     local script="$1"
-    local comment_lines=$(grep -c "^\s*#" "$script" || echo 0)
-    local total_lines=$(wc -l < "$script")
+    local comment_lines
+    comment_lines=$(grep -c "^\s*#" "$script" || echo 0)
+    local total_lines
+    total_lines=$(wc -l < "$script")
     local comment_ratio=$((comment_lines * 100 / total_lines))
 
     if [[ $comment_ratio -ge 15 ]]; then
@@ -124,6 +127,7 @@ test_no_dangerous_patterns() {
     local dangerous=0
 
     # Check for unquoted variables in potentially dangerous contexts
+    # shellcheck disable=SC2016  # $ chars are literal regex metacharacters, not shell expansions.
     if grep -E '\$[A-Za-z_][A-Za-z0-9_]*\s+(&&|;|\||>)' "$script" | grep -v '\$([^)]*' | grep -v '${' >/dev/null 2>&1; then
         ((dangerous++))
         echo -e "${YELLOW}⚠${NC}  Potential unquoted variable: $(basename "$script")"
