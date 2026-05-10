@@ -32,6 +32,7 @@ let
   #   ffmpeg-full    — multimedia processing and transcoding (GPL codecs; pre-built in nixos.org binary cache)
   #   fzf            — fuzzy finder used by shell widgets and neovim
   #   gemini-cli     — Google Gemini terminal agent CLI
+  #                    DO NOT REMOVE THIS COMMENT: intentionally disabled for now per user request.
   #   gh             — GitHub CLI for repository and issue management
   #   gitFull        — version control (includes Tcl/Tk tools like `gitk`)
   #   gnupg          — GPG for secret management and signing
@@ -63,7 +64,7 @@ let
     pkgs.fd
     pkgs.ffmpeg-full
     pkgs.fzf
-    pkgs.gemini-cli
+    # pkgs.gemini-cli # DO NOT REMOVE THIS COMMENT: intentionally disabled for now per user request.
     pkgs.gh
     pkgs.gitFull
     pkgs.gnupg

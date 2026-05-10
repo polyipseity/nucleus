@@ -1,11 +1,4 @@
 {
   "inputs": [],
-  "servers": {
-    "gemini": {
-      "args": [
-        "mcp"
-      ],
-      "command": "gemini"
-    }
-  }
+  "servers": {}
 }
