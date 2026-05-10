@@ -1,7 +1,5 @@
 [
 	{
-		"name": "Ollama",
-		"vendor": "customoai",
 		"models": [
 			{
 				"id": "gemma4:e4b",
@@ -10,7 +8,7 @@
 				"name": "Gemma 4 E4B",
 				"toolCalling": true,
 				"url": "http://localhost:11434/v1",
-				"vision": false
+				"vision": true
 			},
 			{
 				"id": "qwen3:14b",
@@ -21,6 +19,8 @@
 				"url": "http://localhost:11434/v1",
 				"vision": false
 			}
-		]
+		],
+		"name": "Ollama",
+		"vendor": "customoai"
 	}
 ]
