@@ -66,7 +66,7 @@ in
         # stderr from non-repository directories and branch on the exit status.
         repo_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null)" || return
         [[ -f "$repo_root/prek.toml" ]] || return
-        [[ -n "${_prek_hook_checked_repos[$repo_root]-}" ]] && return
+        [[ -n "''${_prek_hook_checked_repos[$repo_root]-}" ]] && return
 
         print -r -- "prek: installing hooks in $repo_root"
         if (cd "$repo_root" && prek install); then
