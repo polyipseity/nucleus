@@ -85,7 +85,13 @@ Located in `tests/nix/`, run via `nix-instantiate --eval` in CI.
 - **Status**: All 15 tests passing
 - **Coverage**: SOPS structure without requiring encryption
 
-**Nix Test Totals**: **89 tests** across 8 files (was 53 tests in 5 files)
+#### ✅ **vscode-extension-pruning-tests.nix** (2 tests - NEW)
+- VS Code extension directory pruning validation
+- Managed extension folders only; derived metadata cleanup (`extensions.json`, `.obsolete`)
+- **Status**: All 2 tests passing
+- **Coverage**: VS Code extension provisioning cleanup across POSIX and Windows
+
+**Nix Test Totals**: **91 tests** across 9 files (was 53 tests in 5 files)
 
 ---
 

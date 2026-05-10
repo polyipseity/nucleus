@@ -111,8 +111,8 @@ function Sync-VSCodeExtension {
   )
 
   $channels = @(
-    @{ Name = 'stable'; Command = 'code' },
-    @{ Name = 'insiders'; Command = 'code-insiders' }
+    @{ Name = 'stable';   Command = 'code';          ExtDir = Join-Path $env:USERPROFILE '.vscode\extensions' },
+    @{ Name = 'insiders'; Command = 'code-insiders'; ExtDir = Join-Path $env:USERPROFILE '.vscode-insiders\extensions' }
   )
 
   foreach ($channel in $channels) {
@@ -141,6 +141,30 @@ function Sync-VSCodeExtension {
           Write-Warning "vscode-extensions: VS Code extension uninstall failed: $extensionId (exit $LASTEXITCODE) — $output"
         }
       }
+    }
+
+    if ($Enabled -and (Test-Path $channel.ExtDir)) {
+      # Prune the extensions directory so the managed baseline is the sole
+      # source of truth.  Extension folders are named publisher.name-version;
+      # match against managed IDs (publisher.name) using a prefix check.
+      Get-ChildItem -Path $channel.ExtDir -Directory | ForEach-Object {
+        $folderName = $_.Name
+        $isManaged = $managedExtensions | Where-Object { $folderName -like "$_-*" -or $folderName -eq $_ }
+        if (-not $isManaged) {
+          Remove-Item -Path $_.FullName -Recurse -Force
+          Write-Output "vscode-extensions: pruned non-managed folder: $folderName ($($channel.Name))"
+        }
+      }
+
+      # extensions.json is a derived manifest VS Code writes on startup; a stale
+      # one hides newly added managed extensions on the next launch.  Remove it
+      # unconditionally so VS Code rescans the directory from the actual contents.
+      # Absence is expected when VS Code has not yet been launched — benign.
+      Remove-Item -Path (Join-Path $channel.ExtDir 'extensions.json') -Force -ErrorAction SilentlyContinue
+
+      # .obsolete is VS Code's deferred-deletion marker; remove it so the bridge
+      # fully owns the directory state.  Absence is expected and benign.
+      Remove-Item -Path (Join-Path $channel.ExtDir '.obsolete') -Force -ErrorAction SilentlyContinue
     }
   }
 }

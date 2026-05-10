@@ -461,8 +461,9 @@ in
       #   2. Add a per-extension symlink for every entry under source_extensions.
       #      Correct symlinks → no-op; wrong symlinks → replaced; non-symlinks
       #      (user-installed extensions) → left untouched.
-      #   3. Remove stale per-extension symlinks whose source entry no longer
-      #      exists (extension removed from the Nix manifest).
+      #   3. Prune all entries not in the Nix-managed extension set (both stale
+      #      symlinks and non-managed real directories/files) and remove
+      #      .obsolete (VS Code deferred-deletion dotfile).
       #   4. Remove extensions.json so VS Code rescans the directory on next
       #      invocation.  When absent, VS Code derives the manifest from the
       #      directory; when present it trusts the file and skips the scan.
@@ -498,15 +499,20 @@ in
           ln -s "$_sed_src" "$_sed_link"
         done
 
-        # Step 3: remove stale symlinks for extensions removed from the Nix manifest.
-        # Use bare-star glob (no trailing /) to catch broken symlinks as well.
+        # Step 3: prune all entries not in the Nix-managed extension set.
+        # Removes both stale symlinks and non-managed real directories/files so the
+        # bridge is the sole source of truth for the directory contents.  Use a
+        # bare-star glob (no trailing /) to catch broken symlinks as well.
         for _sed_existing in "$_sed_dir"/*; do
-          # Only process symlinks; real files/dirs are user-installed, leave them.
-          [ -L "$_sed_existing" ] || continue
+          [ -e "$_sed_existing" ] || [ -L "$_sed_existing" ] || continue
           _sed_ext_name="''${_sed_existing##*/}"
           [ -e "$source_extensions/$_sed_ext_name" ] && continue
-          rm "$_sed_existing"
+          rm -rf "$_sed_existing"
         done
+        # .obsolete is a VS Code deferred-deletion marker written as a dotfile
+        # (not matched by the * glob above); remove it unconditionally so the
+        # bridge fully owns the directory state.
+        rm -f "$_sed_dir/.obsolete"
 
         # Step 4: remove extensions.json so VS Code rescans the directory on
         # next invocation and derives a fresh manifest from the symlink set.
