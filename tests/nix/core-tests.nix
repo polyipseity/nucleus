@@ -10,9 +10,9 @@ let
 
   # === BACKEND SELECTION RESOLUTION LOGIC ===
   # Mimics core.nix resolveBackend: check overrides → check policy → fall back to global backend.
-  
+
   # Test 1: Per-package override takes precedence over everything.
-  test_override_precedence = 
+  test_override_precedence =
     let
       overrides = { "google-chrome" = "nixpkgs"; };
       overlapBackend = "homebrew";
@@ -34,10 +34,10 @@ let
         "visual-studio-code" = { category = "gui"; };
       };
       packageSelection = { overlapBackend = "policy"; overrides = { }; };
-      
+
       defaultBackendFor = category:
         if category == "cli" then "nixpkgs" else "homebrew";
-      
+
       resolveBackend = packageName:
         if builtins.hasAttr packageName packageSelection.overrides then
           builtins.getAttr packageName packageSelection.overrides
@@ -73,10 +73,10 @@ let
         "blender" = { category = "gui"; };
       };
       packageSelection = { overlapBackend = "policy"; overrides = { }; };
-      
+
       defaultBackendFor = category:
         if category == "cli" then "nixpkgs" else "homebrew";
-      
+
       resolveBackend = packageName:
         if builtins.hasAttr packageName packageSelection.overrides then
           builtins.getAttr packageName packageSelection.overrides
@@ -96,14 +96,14 @@ let
         "ripgrep" = { category = "cli"; };  # Default: nixpkgs
         "fzf" = { category = "cli"; };       # Default: nixpkgs
       };
-      packageSelection = { 
-        overlapBackend = "policy"; 
+      packageSelection = {
+        overlapBackend = "policy";
         overrides = { "ripgrep" = "homebrew"; };  # Override ripgrep only
       };
-      
+
       defaultBackendFor = category:
         if category == "cli" then "nixpkgs" else "homebrew";
-      
+
       resolveBackend = packageName:
         if builtins.hasAttr packageName packageSelection.overrides then
           builtins.getAttr packageName packageSelection.overrides
@@ -128,10 +128,10 @@ let
         overlapBackend = "policy";
         overrides = { "discord" = "nixpkgs"; "vscode" = "nixpkgs"; };
       };
-      
+
       defaultBackendFor = category:
         if category == "cli" then "nixpkgs" else "homebrew";
-      
+
       resolveBackend = packageName:
         if builtins.hasAttr packageName packageSelection.overrides then
           builtins.getAttr packageName packageSelection.overrides
