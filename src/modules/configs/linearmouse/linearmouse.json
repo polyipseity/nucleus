@@ -42,6 +42,24 @@
           "device": {
             "category": "mouse"
           }
+        },
+        {
+          "processPath": "/Applications/GIMP.app/Contents/MacOS/gimp",
+          "device": {
+            "category": "mouse"
+          }
+        },
+        {
+          "processPath": "/Applications/GIMP.app/Contents/MacOS/gimp-3",
+          "device": {
+            "category": "mouse"
+          }
+        },
+        {
+          "processPath": "/Applications/GIMP.app/Contents/MacOS/gimp-3.2",
+          "device": {
+            "category": "mouse"
+          }
         }
       ],
       "scrolling": {

@@ -322,9 +322,15 @@ lib.mkIf pkgs.stdenv.isDarwin {
   home.file.".iterm2_shell_integration.zsh".source = iterm2ZshIntegration;
 
   # Enforce LinearMouse scrolling behavior declaratively on macOS.
-  # This repository manages only the JSON config payload and does not mutate
-  # unrelated app preferences.
-  home.file.".config/linearmouse/linearmouse.json".source = ./configs/linearmouse/linearmouse.json;
+  # LinearMouse resolves configuration from either:
+  #   1) ~/Library/Application Support/linearmouse/linearmouse.json
+  #   2) ~/.config/linearmouse/linearmouse.json
+  # Keep both paths managed and identical so whichever location the running
+  # app version prefers still yields the same declarative behavior.
+  home.file = {
+    ".config/linearmouse/linearmouse.json".source = ./configs/linearmouse/linearmouse.json;
+    "Library/Application Support/linearmouse/linearmouse.json".source = ./configs/linearmouse/linearmouse.json;
+  };
 
   # Source iTerm2 shell integration when the script is present.  The test-e
   # guard makes this a no-op in non-iTerm2 terminals (VS Code terminal, SSH,
