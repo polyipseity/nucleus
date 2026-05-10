@@ -23,7 +23,7 @@ function Sync-ShellProfile {
       - pay-respects command correction hook (if pay-respects is present; installed
         via cargo-binstall by Invoke-CargoBinstallSetup)
       - common aliases (`g`, `ga`, `gc`, `gca`, `gco`, `gd`, `gll`, `gp`,
-        `gpl`, `gst`, `la`, `ll` (eza preferred, Get-ChildItem fallback),
+        `gpl`, `gs-pdf-opt-*` (Ghostscript PDF presets), `gst`, `la`, `ll` (eza preferred, Get-ChildItem fallback),
         `ni`, `nr`, `nx` (bun shortcuts, if bun present), `v`)
       - Python ban: blocks system-wide python/pip to prevent accidental
          modifications to system environment
@@ -204,6 +204,20 @@ function Sync-ShellProfile {
     'function gll { & git log --oneline --decorate --graph @Args }'
     'function gp { & git push @Args }'
     'function gpl { & git pull @Args }'
+    'function Invoke-NucleusGhostscript {'
+    '  if (Get-Command gs -ErrorAction SilentlyContinue) { & gs @Args; return }'
+    '  if (Get-Command gswin64c -ErrorAction SilentlyContinue) { & gswin64c @Args; return }'
+    '  if (Get-Command gswin32c -ErrorAction SilentlyContinue) { & gswin32c @Args; return }'
+    '  throw "Ghostscript CLI not found. Expected one of: gs, gswin64c, gswin32c"'
+    '}'
+    # Ghostscript PDF optimization presets.
+    # CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
+    # newer PDF compatibility target is released by Ghostscript.
+    'function gs-pdf-opt-default  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default  -dNOPAUSE -dQUIET -dBATCH @Args }'
+    'function gs-pdf-opt-ebook    { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args }'
+    'function gs-pdf-opt-prepress { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }'
+    'function gs-pdf-opt-printer  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }'
+    'function gs-pdf-opt-screen   { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }'
     'function gst { & git status @Args }'
     # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
     # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
