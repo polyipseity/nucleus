@@ -13,6 +13,7 @@
     };
     settings = {
       commit.gpgsign = true;
+      init.defaultBranch = "main";
       # Pull in name/email/signingkey written by the gitIdentityFromSops activation
       # hook at ~/.config/git/identity.  Using an include file lets the hook write
       # to a path it owns without touching the HM-managed (read-only) config symlink.

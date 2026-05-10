@@ -147,6 +147,7 @@ function Sync-GitAndSshConfig {
         'core.autocrlf' = 'true'
         'core.symlinks' = 'true'
         'gpg.format' = 'openpgp'
+        'init.defaultBranch' = 'main'
         'tag.gpgsign' = 'true'
         'url.git@github.com:.insteadOf' = 'https://github.com/'
       }
@@ -176,6 +177,7 @@ function Sync-GitAndSshConfig {
           'core.autocrlf' = 'true'
           'core.symlinks' = 'true'
           'gpg.format' = 'openpgp'
+          'init.defaultBranch' = 'main'
           'tag.gpgsign' = 'true'
           'url.git@github.com:.insteadOf' = 'https://github.com/'
           'user.email' = $null
