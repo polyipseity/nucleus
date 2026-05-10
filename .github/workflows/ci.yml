@@ -50,6 +50,9 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@4a754ab0c192f4d12cf88b5954b9dd13fd2d612e
 
+      - name: Check Nix flake evaluation
+        run: cd src && nix flake check
+
       - name: Check PowerShell syntax and lint
         run: nix run ./src#check-pwsh
 
