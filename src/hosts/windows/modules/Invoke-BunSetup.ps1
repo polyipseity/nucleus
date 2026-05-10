@@ -25,6 +25,11 @@ function Invoke-BunSetup {
     (nixpkgs/winget > scoop > cargo binstall > bun).
 
     Currently managed:
+      - @google/gemini-cli         — Gemini terminal agent CLI.  Dedicated
+                                     WinGet package ID is not currently
+                                     confirmed in winget-pkgs manifests, so
+                                     bun is the reliable install tier on
+                                     Windows for now
       - @mariozechner/pi-coding-agent — coding agent CLI (pi); available in
                                          nixpkgs on POSIX (pkgs.pi-coding-agent)
                                          but has no WinGet, Scoop, or
@@ -48,6 +53,9 @@ function Invoke-BunSetup {
   # package name (including scope if applicable).  Only add packages absent
   # from WinGet, Scoop, and cargo-binstall.
   $desiredPackages = @(
+    # Gemini terminal agent CLI; no confirmed dedicated WinGet package ID in
+    # winget-pkgs manifests at time of writing, so bun is used as fallback.
+    '@google/gemini-cli',
     # coding agent CLI; available via pkgs.pi-coding-agent on POSIX but absent
     # from WinGet, Scoop, and cargo-binstall on Windows
     '@mariozechner/pi-coding-agent',

@@ -4,8 +4,16 @@
 - Battery: open battery.app once and complete setup so `/usr/local/bin/battery` is installed.
 - Chrome Remote Desktop: visit <https://remotedesktop.google.com/access> to name this Mac and set a PIN.
 - Chrome Remote Desktop: grant Screen Recording + Accessibility to `ChromeRemoteDesktopHost`.
+- Gemini app: open `Google Gemini.app` once to complete first-run setup and sign in.
+- Gemini app: enable/verify the global shortcut (for example Option+Space) in the app settings if you want quick-launch behavior.
 - LinearMouse: open `LinearMouse.app` once and grant Accessibility permission in System Settings > Privacy & Security > Accessibility.
 - Power button: System Settings → General → Shutdown Behavior → set "When I press the power button" to **Sleep** (not Shut Down). This cannot be set via pmset; it is a user preference managed by the OS.
+
+## Gemini CLI first-run initialization
+
+1. Run `gemini` in any terminal.
+2. Select **Sign in with Google**.
+3. Verify with `gemini --version` (expected: `0.38` or newer).
 
 ## Shell aliases (full reference)
 

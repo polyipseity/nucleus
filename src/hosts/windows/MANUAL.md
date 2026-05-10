@@ -1,5 +1,11 @@
 # windows manual steps
 
+## Gemini CLI first-run initialization
+
+1. Run `gemini` in any terminal.
+2. Select **Sign in with Google**.
+3. Verify with `gemini --version` (expected: `0.38` or newer).
+
 ## Shell aliases (full reference)
 
 These aliases are managed declaratively and are available in both zsh and PowerShell profiles.

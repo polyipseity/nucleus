@@ -32,6 +32,7 @@ let
     "coolterm"                   # Serial terminal
     "gimp"                       # Raster image editor; macOS-only cask (nixpkgs gimp is Linux-only)
     "google-chrome@canary"       # Chrome dev channel for web testing
+    "google-gemini"              # Gemini native desktop application
     "keka"                       # Graphical archiver with 7-Zip backend support
     "linearmouse"                # Per-device mouse/trackpad scrolling behavior and sensitivity
     "lulu"                       # Outbound network firewall
