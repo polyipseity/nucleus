@@ -276,6 +276,7 @@ let
     "configureSystemHardening"
     "configureUniversalAccessDefaults"
     "ensureHeadlessDisplay"
+    "ensureICloudFilesLocal"
     # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
     # are defined in secrets.nix (shared module) but run as Home Manager
     # activations on this host; they must all complete before the manual
@@ -894,6 +895,50 @@ lib.mkIf pkgs.stdenv.isDarwin {
       else
         echo "macos: archiving stack healthy — Keka installed." >&2
       fi
+    '';
+
+    # -------------------------------------------------------------------------
+    # ensureICloudFilesLocal
+    # Forces all iCloud-synced files to be downloaded and cached locally so they
+    # remain available offline. Includes the main iCloud Drive (com~apple~CloudDocs)
+    # and all app-specific iCloud containers under ~/Library/Mobile Documents/.
+    # Runs after system defaults are applied to ensure iCloud optimization and
+    # syncing settings take effect, then issues force-download commands.
+    #
+    # Constraints:
+    #   - If physical storage < total iCloud size, this command will download
+    #     what fits and macOS may re-offload the remainder when space runs low.
+    #   - System updates or cache clears can re-index files as cloud-only
+    #     (little cloud icon) until they are accessed/re-downloaded.
+    #   - This is idempotent and can be re-run safely without side effects.
+    #
+    # No-op if iCloud is not configured / the path does not exist.
+    # -------------------------------------------------------------------------
+    ensureICloudFilesLocal = lib.hm.dag.entryAfter [ "reloadUserPreferenceState" ] ''
+      set +e  # soft-fail: iCloud may not be configured on all machines
+
+      ICLOUD_BASE="$HOME/Library/Mobile Documents"
+
+      if [ ! -d "$ICLOUD_BASE" ]; then
+        exit 0  # iCloud not configured; nothing to do
+      fi
+
+      echo "macos: forcing all iCloud files to download locally..." >&2
+
+      # Force download of all iCloud-synced files (main iCloud Drive + app
+      # containers) so they are cached locally and remain available offline.
+      # brctl is the official macOS command for managing iCloud file state
+      # (part of CloudKit); available natively in /usr/bin/brctl on all
+      # modern macOS releases.
+      if ! /usr/bin/brctl download "$ICLOUD_BASE"/* 2>/dev/null; then
+        # If brctl fails (e.g. iCloud not fully initialised), do not fail the
+        # entire activation; log a warning and continue.
+        echo "macos: warning — brctl download did not complete; iCloud files may download on first access." >&2
+      else
+        echo "macos: all iCloud-synced files forced to local cache." >&2
+      fi
+
+      set -e
     '';
 
     # -------------------------------------------------------------------------

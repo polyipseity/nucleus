@@ -133,15 +133,18 @@ in
         kDimTime = 5;   # dim after 5 seconds
       };
 
-      # iCloud: disable "Optimize Mac Storage" so macOS maintains a full local
-      # mirror of iCloud Drive instead of offloading files to the cloud when space
-      # is low. Constraints: (1) if physical storage < total iCloud size, macOS
-      # will ignore this setting; (2) system updates / cache clears can trigger
-      # re-indexing, causing files to appear as cloud-only (little cloud icon)
-      # until re-downloaded; (3) manual recovery available via `brctl download`.
-      # See AGENTS.md security invariants for drift reset handling.
+      # iCloud: disable "Optimize Mac Storage" and enable syncing so macOS
+      # maintains a full local mirror of iCloud Drive instead of offloading files
+      # to the cloud when space is low. An activation hook forcibly downloads all
+      # iCloud files via `brctl download` at apply-time to ensure local presence.
+      # Constraints: (1) if physical storage < total iCloud size, macOS will
+      # ignore OptimizeStorage; (2) system updates / cache clears can trigger
+      # re-indexing, causing files to appear as cloud-only until re-downloaded;
+      # (3) manual recovery available via `brctl download`. See AGENTS.md
+      # security invariants for drift reset handling.
       "com.apple.CloudDocs" = {
-        OptimizeStorage = false;
+        BRCloudDriveSyncingEnabled = true;   # enable iCloud Drive syncing
+        OptimizeStorage = false;             # disable "Optimize Mac Storage"
       };
 
       # Input sources: set the full ordered list of enabled input methods,
