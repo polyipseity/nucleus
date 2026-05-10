@@ -19,6 +19,8 @@
 #
 # Arguments:
 #   --skip-ai-sync  skip the post-apply Ollama model sync step
+#   --target-user   select the Home Manager flake profile key on standalone
+#                   Linux hosts (ignored on Darwin and NixOS system rebuilds)
 #
 # Environment variables:
 #   NUCLEUS_USERNAME — override the Home Manager profile name used on standalone
@@ -34,13 +36,35 @@ set -eu
 # Flag parsing
 # ---------------------------------------------------------------------------
 skip_ai_sync=false
+target_user=""
+_aas_expect_target_user=false
 
 for _arg in "$@"; do
+  if [ "$_aas_expect_target_user" = true ]; then
+    if [ -z "$_arg" ]; then
+      printf '%s\n' "apply: --target-user requires a non-empty value" >&2
+      exit 1
+    fi
+    target_user="$_arg"
+    _aas_expect_target_user=false
+    continue
+  fi
+
   case "$_arg" in
     --skip-ai-sync)
       # Model pulls are 2–20 GB and may be undesirable in CI or on
       # low-bandwidth connections; this flag opts out of the post-apply sync.
       skip_ai_sync=true
+      ;;
+    --target-user)
+      _aas_expect_target_user=true
+      ;;
+    --target-user=*)
+      target_user="${_arg#--target-user=}"
+      if [ -z "$target_user" ]; then
+        printf '%s\n' "apply: --target-user requires a non-empty value" >&2
+        exit 1
+      fi
       ;;
     *)
       printf '%s\n' "apply: unsupported argument '$_arg'" >&2
@@ -48,6 +72,11 @@ for _arg in "$@"; do
       ;;
   esac
 done
+
+if [ "$_aas_expect_target_user" = true ]; then
+  printf '%s\n' "apply: --target-user requires a value" >&2
+  exit 1
+fi
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 
@@ -345,6 +374,9 @@ case "$(uname -s)" in
   Darwin)
     # nix-darwin manages both the system layer and the user Home Manager
     # profile.  darwin-rebuild invokes sudo internally for system activation.
+    if [ -n "$target_user" ]; then
+      printf '%s\n' "apply: --target-user is ignored on Darwin system rebuilds (host-level configuration selects the Home Manager user)."
+    fi
     start_sudo_keepalive
     generate_ssh_host_key_if_needed
     register_host_age_key_if_needed
@@ -358,6 +390,9 @@ case "$(uname -s)" in
     if [ -f /etc/NIXOS ]; then
       # NixOS: use nixos-rebuild so the system layer and the embedded
       # home-manager module are applied in a single atomic activation.
+      if [ -n "$target_user" ]; then
+        printf '%s\n' "apply: --target-user is ignored on NixOS system rebuilds (host-level configuration selects the Home Manager user)."
+      fi
       start_sudo_keepalive
       generate_ssh_host_key_if_needed
       register_host_age_key_if_needed
@@ -369,7 +404,7 @@ case "$(uname -s)" in
       # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
       # no sudo required — keepalive is not started.
       # The profile name must match the homeConfigurations key in flake.nix.
-      target_username="${NUCLEUS_USERNAME:-$(id -un)}"
+      target_username="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
       run_nix run "$REPO_ROOT/src#health-check"
       run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
       run_ai_sync

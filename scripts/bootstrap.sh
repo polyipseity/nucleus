@@ -10,6 +10,8 @@
 #   --skip-ai-sync  Pass through to nix run .#apply; suppresses the post-apply
 #                   Ollama model sync step.  Useful in CI or on low-bandwidth
 #                   connections where model pulls (2–20 GB) are undesirable.
+#   --target-user   Pass through to src/scripts/apply.sh; selects the Home
+#                   Manager flake profile on standalone Linux hosts.
 set -eu
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -22,21 +24,43 @@ NIX_FEATURES_CONFIG="experimental-features = nix-command flakes"
 # Flag parsing — collect extra flags to pass through to apply
 # ---------------------------------------------------------------------------
 skip_ai_sync=false
-# Shift past the command positional arg before scanning remaining args.
-# If no command arg was given, $# is 0 and the loop is a no-op.
-_bsh_remaining_args=""
+target_user=""
 _bsh_first=true
+_bsh_expect_target_user=false
 for _bsh_arg in "$@"; do
   # Skip the first argument (the command word) so subsequent flags are parsed.
   if [ "$_bsh_first" = true ]; then
     _bsh_first=false
     continue
   fi
+
+  if [ "$_bsh_expect_target_user" = true ]; then
+    if [ -z "$_bsh_arg" ]; then
+      printf '%s\n' "error: --target-user requires a non-empty value" >&2
+      exit 1
+    fi
+    target_user="$_bsh_arg"
+    _bsh_expect_target_user=false
+    continue
+  fi
+
   case "$_bsh_arg" in
     --skip-ai-sync)
       # Model pulls are 2–20 GB; suppress post-apply sync in CI or on
       # low-bandwidth connections.
       skip_ai_sync=true
+      ;;
+    --target-user)
+      # Standalone Linux parity: explicitly select which HM profile key to
+      # activate instead of relying on the local account name.
+      _bsh_expect_target_user=true
+      ;;
+    --target-user=*)
+      target_user="${_bsh_arg#--target-user=}"
+      if [ -z "$target_user" ]; then
+        printf '%s\n' "error: --target-user requires a non-empty value" >&2
+        exit 1
+      fi
       ;;
     *)
       printf '%s\n' "error: unsupported argument '$_bsh_arg'" >&2
@@ -44,6 +68,10 @@ for _bsh_arg in "$@"; do
       ;;
   esac
 done
+if [ "$_bsh_expect_target_user" = true ]; then
+  printf '%s\n' "error: --target-user requires a value" >&2
+  exit 1
+fi
 
 merge_nix_config() {
   # Merge caller-provided NIX_CONFIG (if any) with required flake settings so
@@ -62,7 +90,7 @@ run_nix() {
 
 if [ "$COMMAND" = "-h" ] || [ "$COMMAND" = "--help" ] || [ "$COMMAND" = "help" ]; then
   cat <<'EOF'
-Usage: bootstrap.sh [install-deps|apply] [--skip-ai-sync]
+Usage: bootstrap.sh [install-deps|apply] [--skip-ai-sync] [--target-user=<name>]
 
 Installs Nix (if absent) and the Nix-managed bootstrap dependencies
 (gnupg, sops, ssh-to-age) for this host.
@@ -75,6 +103,9 @@ Options:
   --skip-ai-sync  Suppress the post-apply Ollama model sync step.  Useful in
                   CI or on low-bandwidth connections where model pulls
                   (2–20 GB each) are undesirable.
+  --target-user   Select the Home Manager flake profile key for standalone
+                  Linux apply runs (parity with Windows per-user config
+                  selection). Ignored on Darwin/NixOS system rebuild flows.
   -h, --help    Show this help message
 EOF
   exit 0
@@ -258,9 +289,17 @@ if [ "$COMMAND" = "apply" ]; then
   # Health-check is already invoked by apply.sh for each OS branch; calling it
   # here too would print "health checks passed" twice and slow bootstrap down.
   if [ "$skip_ai_sync" = true ]; then
-    run_nix run "$REPO_ROOT/src#apply" -- --skip-ai-sync
+    if [ -n "$target_user" ]; then
+      run_nix run "$REPO_ROOT/src#apply" -- --skip-ai-sync --target-user "$target_user"
+    else
+      run_nix run "$REPO_ROOT/src#apply" -- --skip-ai-sync
+    fi
   else
-    run_nix run "$REPO_ROOT/src#apply"
+    if [ -n "$target_user" ]; then
+      run_nix run "$REPO_ROOT/src#apply" -- --target-user "$target_user"
+    else
+      run_nix run "$REPO_ROOT/src#apply"
+    fi
   fi
   exit 0
 fi
