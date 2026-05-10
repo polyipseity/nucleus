@@ -22,12 +22,12 @@
   'primaryUser' (the user with isPrimary=true, or $null if none).
 
 .EXAMPLE
-  $registry = & "$ModuleDir\load-userregistry.ps1" -RegistryPath "$PSScriptRoot\users.json"
+  $registry = & "$ModuleDir\Load-UserRegistry.ps1" -RegistryPath "$PSScriptRoot\users.json"
   $adminUser = $registry.users | Where-Object { $_.name -eq 'admin' }
   Write-Host "Admin home: $($adminUser.homeDirectory)"
 
 .EXAMPLE
-  $registry = & "$ModuleDir\load-userregistry.ps1" -RegistryPath "$PSScriptRoot\users.json"
+  $registry = & "$ModuleDir\Load-UserRegistry.ps1" -RegistryPath "$PSScriptRoot\users.json"
   if ($registry.primaryUser) {
     Write-Host "Materializing secrets for: $($registry.primaryUser.name)"
   }

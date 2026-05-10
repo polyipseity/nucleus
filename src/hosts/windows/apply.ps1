@@ -207,7 +207,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-JITSecretMaterialization.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-SecretVerification.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "load-userregistry.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-PowerPolicy.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Initialize-DevDirectory.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-WindowsRdp.ps1")
@@ -242,7 +242,7 @@ if (Test-Path -Path $healthCheckScript) {
 # secondary) and mirrors the Nix users/default.nix module structure. Validate
 # that all users in -Users parameter are registered in this registry.
 $userRegistryPath = Join-Path -Path $PSScriptRoot -ChildPath "users.json"
-$userRegistry = & (Join-Path -Path $resolvedModuleDir -ChildPath "load-userregistry.ps1") -RegistryPath $userRegistryPath
+$userRegistry = & (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1") -RegistryPath $userRegistryPath
 $registeredUserNames = @($userRegistry.users.name)
 
 # Validate that all explicitly provided users exist in the registry.

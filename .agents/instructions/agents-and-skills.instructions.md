@@ -136,7 +136,7 @@ WinGet DSC (system.dsc.yml)
 | `src/modules/configs/agents/clawhub-skills.json`        | Declarative fetched skill manifest (`{"skills":[...slugs...]}`)                                  |
 | `src/modules/configs/agents/skills/`                    | Bundled (committed, AGPL-compatible) skill directories                                           |
 | `src/hosts/windows/modules/Invoke-BunSetup.ps1`         | Windows bun global package manager; includes clawhub                                             |
-| `src/hosts/windows/modules/Sync-AgentsSkill.ps1`         | Windows bundled skill sync                                                                       |
+| `src/hosts/windows/modules/Sync-AgentsSkill.ps1`        | Windows bundled skill sync                                                                       |
 | `src/hosts/windows/modules/Sync-AgentsClawHubSkill.ps1` | Windows fetched skill sync; expects ClawHub pre-installed by `Invoke-BunSetup`                   |
 | `src/hosts/windows/apply.ps1`                           | Windows orchestrator; calls `Invoke-BunSetup` before `Sync-AgentsClawHubSkills`                  |
 
