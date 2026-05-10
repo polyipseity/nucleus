@@ -53,8 +53,17 @@ jobs:
       - name: Check Nix flake evaluation
         run: cd src && nix flake check
 
-      - name: Run Nix logic tests
-        run: nix-instantiate --eval tests/nix/core-tests.nix && nix-instantiate --eval tests/nix/module-imports-tests.nix
+      - name: Run comprehensive Nix test suite
+        run: |
+          echo "Running Nix unit tests..."
+          nix-instantiate --eval tests/nix/core-tests.nix
+          nix-instantiate --eval tests/nix/module-imports-tests.nix
+          nix-instantiate --eval tests/nix/module-options-tests.nix
+          nix-instantiate --eval tests/nix/config-composition-tests.nix
+          nix-instantiate --eval tests/nix/package-parity-tests.nix
+
+      - name: Run shell script validation tests
+        run: bash tests/scripts/script-validation-tests.sh
 
       - name: Check PowerShell syntax and lint
         run: nix run ./src#check-pwsh
