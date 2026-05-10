@@ -30,6 +30,12 @@
   },
   "chat.mcp.apps.enabled": true,
   "chat.mcp.assisted.nuget.enabled": true,
+  "chat.mcp.discovery.enabled": {
+    "claude-desktop": true,
+    "cursor-global": true,
+    "cursor-workspace": true,
+    "windsurf": true
+  },
   "chat.promptFilesLocations": {
     ".agents/prompts": true,
     "~/.agents/prompts": true
@@ -67,7 +73,11 @@
   "explorer.confirmDelete": false,
   "explorer.confirmDragAndDrop": false,
   "explorer.confirmPasteNative": false,
+  "extensions.allowOpenInModalEditor": true,
+  "extensions.autoCheckUpdates": false,
   "extensions.autoUpdate": false,
+  "extensions.experimental.deferredStartupFinishedActivation": true,
+  "extensions.supportNodeGlobalNavigator": true,
   "files.associations": {
     ".prettierignore": "ignore"
   },
@@ -95,12 +105,14 @@
   "git.pruneOnFetch": true,
   "git.replaceTagsWhenPull": true,
   "git.supportCancellation": true,
+  "github.codespaces.showPerformanceExplorer": true,
   "github.copilot.chat.alternateGptPrompt.enabled": true,
   "github.copilot.chat.anthropic.tools.websearch.enabled": true,
   "github.copilot.chat.codesearch.enabled": true,
   "github.copilot.chat.executionSubagent.enabled": true,
   "github.copilot.chat.inlineChat.reasoningEffort": "high",
   "github.copilot.chat.inlineEdits.diagnosticsContextProvider.enabled": true,
+  "github.copilot.chat.installExtensionSkill.enabled": true,
   "github.copilot.chat.languageContext.fix.typescript.enabled": true,
   "github.copilot.chat.languageContext.inline.typescript.enabled": true,
   "github.copilot.chat.languageContext.typescript.enabled": true,
