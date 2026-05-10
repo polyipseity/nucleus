@@ -39,9 +39,11 @@ let
   #   ghostscript    — PostScript/PDF interpreter (`gs`) for document workflows
   #                    and CLI parity with Windows (ArtifexSoftware.GhostScript)
   #   jq             — JSON processor used by activation scripts
+  #   dotnetCorePackages.runtime_6_0 — .NET 6 runtime required by EIDE and legacy tooling parity
   #   llvmPackages_18.clang    — unified C/C++ compiler frontend
   #   llvmPackages_18.lldb     — LLVM debugger (`lldb`) for cross-host debug parity
   #   llvmPackages_18.lld      — LLVM linker (`ld.lld`) for cross-host link parity
+  #   nixd           — Nix language server (LSP) for nix-ide in VS Code on POSIX hosts
   #   nix-index      — provides nix-locate; required by pay-respects to suggest nixpkgs packages for unknown commands
   #                    (run `nix-index` once after first activation to build the file-index database)
   #   opencode       — AI-native coding agent and assistant
@@ -53,8 +55,10 @@ let
   #   prek           — pre-commit hook manager used by prek.toml
   #   ripgrep        — fast grep replacement
   #   rustup         — Rust toolchain manager
+  #   ruff           — fast Python linter/formatter CLI
   #   shellcheck     — shell linter used by CI and pre-commit validation
 #   sops           — secret encryption/decryption tool
+#   ty             — Astral ty Python type checker / language server CLI
 #   typst          — modern document-composition compiler; pairs with the Tinymist LSP in editors.nix
 #   uv             — fast Python package/project manager
   #   zoxide         — smart cd (shell integration in shell.nix)
@@ -69,6 +73,7 @@ let
     pkgs.fd
     pkgs.ffmpeg-full
     pkgs.fzf
+    pkgs.dotnetCorePackages.runtime_6_0
     # pkgs.gemini-cli # DO NOT REMOVE THIS COMMENT: intentionally disabled for now per user request.
     pkgs.gh
     pkgs.gitFull
@@ -78,6 +83,7 @@ let
     pkgs.llvmPackages_18.clang
     pkgs.llvmPackages_18.lldb
     pkgs.llvmPackages_18.lld
+    pkgs.nixd
     pkgs.nix-index
     pkgs.opencode
     pkgs.p7zip
@@ -86,9 +92,11 @@ let
     pkgs.powershell
     pkgs.prek
     pkgs.ripgrep
+    pkgs.ruff
     pkgs.rustup
     pkgs.shellcheck
     pkgs.sops
+    pkgs.ty
     pkgs.typst
     pkgs.uv
     pkgs.zoxide

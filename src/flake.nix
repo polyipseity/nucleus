@@ -105,6 +105,12 @@
       mkPkgs = system: import nixpkgs {
         inherit system;
         config.allowUnfree = true;
+        # .NET 6 is intentionally pinned for EIDE/runtime compatibility across
+        # hosts. Upstream marks it insecure because it is EOL; keep this
+        # exception narrowly scoped to the exact runtime derivation.
+        config.permittedInsecurePackages = [
+          "dotnet-runtime-6.0.36"
+        ];
 
         overlays = [
           (_final: prev: {

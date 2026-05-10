@@ -49,6 +49,20 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Ruff is installed for cross-host Python lint/format CLI parity with macOS and NixOS
+      settings:
+        id: astral-sh.ruff
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure ty is installed for cross-host Python type-check/LSP CLI parity with macOS and NixOS
+      settings:
+        id: astral-sh.ty
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: >-
           Blender — 3D creation suite for modelling, animation, rendering, and video
           editing. Cross-platform parity with macOS (Homebrew cask) and NixOS (nixpkgs).
@@ -237,6 +251,13 @@ properties:
         description: Ensure LLVM/Clang is installed so clang and lld are available for cross-host native build parity with macOS and NixOS
       settings:
         id: LLVM.LLVM
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure .NET 6 runtime is installed for EIDE/runtime parity with macOS and NixOS
+      settings:
+        id: Microsoft.DotNet.Runtime.6
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
