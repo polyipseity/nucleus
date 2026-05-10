@@ -83,6 +83,22 @@ in
       PASSWORD_STORE_DIR = passwordStoreDir;
     };
 
+    # QtPass keeps its own persisted `passStore` setting. On macOS that value
+    # is stored in the com.ijhack.QtPass defaults domain and can override the
+    # shell-exported PASSWORD_STORE_DIR when QtPass is launched from GUI
+    # surfaces. Keep it aligned with the per-user passwordStoreDir.
+    home.activation.configureQtPassStore = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      if [ "$(uname -s)" = "Darwin" ]; then
+        _qtpass_store=${lib.escapeShellArg passwordStoreDir}
+        case "$_qtpass_store" in
+          */) ;;
+          *) _qtpass_store="$_qtpass_store/" ;;
+        esac
+
+        /usr/bin/defaults write com.ijhack.QtPass passStore -string "$_qtpass_store"
+      fi
+    '';
+
     # Allow Home Manager to manage its own activation and generation GC.
     programs.home-manager.enable = true;
 
