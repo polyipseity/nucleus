@@ -37,6 +37,7 @@ let
     "com.apple.AdLib"
     "com.apple.AppleMultitouchTrackpad"
     "com.apple.BezelServices"
+    "com.apple.CloudDocs"
     "com.apple.HIToolbox"
     "com.apple.LaunchServices"
     "com.apple.Photos"

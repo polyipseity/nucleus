@@ -133,6 +133,17 @@ in
         kDimTime = 5;   # dim after 5 seconds
       };
 
+      # iCloud: disable "Optimize Mac Storage" so macOS maintains a full local
+      # mirror of iCloud Drive instead of offloading files to the cloud when space
+      # is low. Constraints: (1) if physical storage < total iCloud size, macOS
+      # will ignore this setting; (2) system updates / cache clears can trigger
+      # re-indexing, causing files to appear as cloud-only (little cloud icon)
+      # until re-downloaded; (3) manual recovery available via `brctl download`.
+      # See AGENTS.md security invariants for drift reset handling.
+      "com.apple.CloudDocs" = {
+        OptimizeStorage = false;
+      };
+
       # Input sources: set the full ordered list of enabled input methods,
       # select the first one (US keyboard) as the active source, and configure
       # dictation and keyboard behaviour.
