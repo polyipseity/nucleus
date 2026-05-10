@@ -1,0 +1,78 @@
+# modules/windows/install-prek-hook.ps1 — Repository-local prek hook installer.
+#
+# Ensures repositories that opt into prek via prek.toml have their Git hooks
+# installed during the Windows apply flow.
+
+function Install-PrekHook {
+  <#
+  .SYNOPSIS
+    Installs prek-managed Git hooks for a repository that declares prek.toml.
+
+  .DESCRIPTION
+    Checks whether the target repository contains a prek.toml file and, when it
+    does, runs `prek install` from that repository root. This keeps the live
+    nucleus checkout protected during the same provision run that installs or
+    updates the prek binary.
+
+    The operation is idempotent because `prek install` safely re-writes the
+    managed hook shims when they already exist.
+
+  .PARAMETER RepositoryRoot
+    Absolute or relative path to the repository root that should receive prek
+    hook installation.
+
+  .PARAMETER PrekExecutablePath
+    Optional explicit path to the prek executable. Callers can pass a resolved
+    WinGet package path so the first apply after installation does not depend on
+    the current session PATH already containing prek.
+
+  .EXAMPLE
+    Install-PrekHook -RepositoryRoot 'C:\Users\admin\dev\nucleus'
+
+  .EXAMPLE
+    Install-PrekHook -RepositoryRoot 'C:\Users\admin\dev\nucleus' -PrekExecutablePath 'C:\Users\admin\AppData\Local\Microsoft\WinGet\Packages\j178.Prek\prek.exe'
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$RepositoryRoot,
+
+    [string]$PrekExecutablePath
+  )
+
+  if (-not (Test-Path -Path $RepositoryRoot -PathType Container)) {
+    throw "Install-PrekHook: repository root not found: $RepositoryRoot"
+  }
+
+  $resolvedRepositoryRoot = (Resolve-Path -Path $RepositoryRoot).Path
+  $prekConfigPath = Join-Path -Path $resolvedRepositoryRoot -ChildPath "prek.toml"
+  if (-not (Test-Path -Path $prekConfigPath -PathType Leaf)) {
+    return
+  }
+
+  $resolvedPrekPath = $PrekExecutablePath
+  if ([string]::IsNullOrWhiteSpace($resolvedPrekPath)) {
+    # Get-Command is a presence probe here; absence is expected on unmanaged
+    # shells, and the result is checked immediately.
+    $resolvedPrekPath = Get-Command -Name "prek.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+  }
+  if ([string]::IsNullOrWhiteSpace($resolvedPrekPath)) {
+    $resolvedPrekPath = Get-Command -Name "prek" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+  }
+  if ([string]::IsNullOrWhiteSpace($resolvedPrekPath)) {
+    Write-Warning "prek: prek executable not found; skipping hook installation for $resolvedRepositoryRoot"
+    return
+  }
+
+  Write-Output "prek: installing hooks in $resolvedRepositoryRoot"
+  Push-Location -Path $resolvedRepositoryRoot
+  try {
+    & $resolvedPrekPath install
+    if ($LASTEXITCODE -ne 0) {
+      throw "prek install failed with exit code $LASTEXITCODE"
+    }
+  }
+  finally {
+    Pop-Location
+  }
+}

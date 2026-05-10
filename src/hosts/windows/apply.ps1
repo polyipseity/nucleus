@@ -216,6 +216,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-PowerPolicy.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Initialize-DevDirectory.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-WindowsRdp.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Install-PrekHook.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Register-HostAgeKey.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-OpenSshServer.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Remove-ManagedSecret.ps1")
@@ -307,8 +308,30 @@ $gpgCandidates = @(
   (Get-Command -Name "gpg.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
+$prekPackageDir = Get-ChildItem -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath "Microsoft\WinGet\Packages\j178.Prek_*") -Directory -ErrorAction SilentlyContinue |
+  Sort-Object -Property Name -Descending |
+  Select-Object -First 1
+
+$prekExecutableFromWinget = $null
+if ($null -ne $prekPackageDir) {
+  $prekExecutableFromWinget = Get-ChildItem -Path $prekPackageDir.FullName -Filter "prek*.exe" -File -Recurse -ErrorAction SilentlyContinue |
+    Sort-Object -Property FullName |
+    Select-Object -First 1 -ExpandProperty FullName
+}
+
+$prekCandidates = @(
+  $prekExecutableFromWinget,
+  (Get-Command -Name "prek.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source),
+  (Get-Command -Name "prek" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
 $sopsExe = Resolve-Executable -Name "sops" -CandidatePaths $sopsCandidates
 $gpgExe = Resolve-Executable -Name "gpg" -CandidatePaths $gpgCandidates
+$prekExe = if ($prekCandidates.Count -gt 0) {
+  Resolve-Executable -Name "prek" -CandidatePaths $prekCandidates
+} else {
+  $null
+}
 
 # Define shared path variables before any registration or pre-flight step so
 # both Register-HostAgeKey and the pre-flight loop reference the same
@@ -403,6 +426,10 @@ Invoke-CargoBinstallSetup
 if ($EnableBunParity) {
   Invoke-BunSetup
 }
+
+# Ensure the live nucleus checkout installs its own Git hooks during the same
+# provision run that installs or updates prek itself.
+Install-PrekHook -PrekExecutablePath $prekExe -RepositoryRoot $repoRoot
 
 # Build dev repositories list from user registry, resolving symlink targets.
 $currentUser = [System.Environment]::UserName

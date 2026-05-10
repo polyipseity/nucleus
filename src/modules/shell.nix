@@ -50,6 +50,35 @@ in
       # command via eval so the fix is both executed and saved to shell history.
       eval "$(pay-respects zsh --alias)"
 
+      # prek: install repository-local Git hooks automatically the first time a
+      # shell session enters a repo that opted into prek via prek.toml.
+      # The per-session cache avoids re-running `prek install` on every prompt
+      # while still fixing freshly cloned repos as soon as they are entered.
+      typeset -gA _prek_hook_checked_repos
+      _prek_hook_install_if_needed() {
+        local repo_root
+
+        if ! command -v git >/dev/null 2>&1 || ! command -v prek >/dev/null 2>&1; then
+          return
+        fi
+
+        # git rev-parse is a repo-membership probe here; suppress the expected
+        # stderr from non-repository directories and branch on the exit status.
+        repo_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null)" || return
+        [[ -f "$repo_root/prek.toml" ]] || return
+        [[ -n "${_prek_hook_checked_repos[$repo_root]-}" ]] && return
+
+        print -r -- "prek: installing hooks in $repo_root"
+        if (cd "$repo_root" && prek install); then
+          _prek_hook_checked_repos[$repo_root]=1
+        else
+          print -r -- "prek: failed to install hooks in $repo_root" >&2
+        fi
+      }
+      autoload -Uz add-zsh-hook
+      add-zsh-hook chpwd _prek_hook_install_if_needed
+      _prek_hook_install_if_needed
+
       # Intercept python/python3 invocations and warn about system-wide Python ban.
       # These are functions, not aliases, so they can provide helpful context.
       python() {

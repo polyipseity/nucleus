@@ -35,6 +35,74 @@ let
       Invoke-Expression (& zoxide init powershell | Out-String)
     }
 
+    # prek: install repository-local Git hooks automatically the first time a
+    # shell session enters a repo that opted into prek via prek.toml.
+    # The per-session cache avoids repeated installs on every prompt while
+    # still fixing freshly cloned repos as soon as pwsh enters them.
+    $global:__nucleusPrekCheckedRepos = @{}
+    function Invoke-PrekHookInstallIfNeeded {
+      # Get-Command is a presence probe here; absence is expected on unmanaged
+      # shells, and the function returns immediately after the check.
+      if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        return
+      }
+      if (-not (Get-Command prek -ErrorAction SilentlyContinue)) {
+        return
+      }
+
+      # git rev-parse is a repo-membership probe here; suppress the expected
+      # stderr from non-repository directories and branch on the result.
+      $repoRoot = (& git -C (Get-Location).Path rev-parse --show-toplevel 2>$null).Trim()
+      if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+        return
+      }
+
+      $prekConfigPath = Join-Path $repoRoot "prek.toml"
+      if (-not (Test-Path -Path $prekConfigPath -PathType Leaf)) {
+        return
+      }
+      if ($global:__nucleusPrekCheckedRepos.ContainsKey($repoRoot)) {
+        return
+      }
+
+      Write-Host "prek: installing hooks in $repoRoot" -ForegroundColor Cyan
+      Push-Location $repoRoot
+      try {
+        & prek install
+        if ($LASTEXITCODE -ne 0) {
+          throw "prek install failed with exit code $LASTEXITCODE"
+        }
+
+        $global:__nucleusPrekCheckedRepos[$repoRoot] = $true
+      }
+      catch {
+        Write-Warning "prek: failed to install hooks in $repoRoot — $($_.Exception.Message)"
+      }
+      finally {
+        Pop-Location
+      }
+    }
+
+    if (-not $global:__nucleusPrekPromptWrapped) {
+      $global:__nucleusPrekPromptWrapped = $true
+      $global:__nucleusPrekPreviousPrompt = if (Test-Path Function:\prompt) {
+        (Get-Command prompt -CommandType Function).ScriptBlock
+      } else {
+        $null
+      }
+
+      function global:prompt {
+        Invoke-PrekHookInstallIfNeeded
+        if ($null -ne $global:__nucleusPrekPreviousPrompt) {
+          & $global:__nucleusPrekPreviousPrompt
+        } else {
+          "PS $(Get-Location)> "
+        }
+      }
+    }
+
+    Invoke-PrekHookInstallIfNeeded
+
     # fzf: fuzzy history search on Ctrl+R via a PSReadLine key handler.
     # Reads the PSReadLine history file directly so all sessions are searchable.
     # Guard requires both fzf and PSReadLine to avoid silently failing on a

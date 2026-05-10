@@ -26,6 +26,7 @@ Describe "Windows Package Installation" {
             @{ id = "7zip.7zip"; displayName = "7-Zip (archive handling)" }
             @{ id = "BurntSushi.ripgrep.MSVC"; displayName = "ripgrep (fast text search)" }
             @{ id = "junegunn.fzf"; displayName = "fzf (fuzzy finder)" }
+            @{ id = "j178.Prek"; displayName = "prek (git hook manager)" }
         )
 
         foreach ($tool in $cliTools) {

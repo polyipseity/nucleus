@@ -114,6 +114,32 @@ run_nix_as_root() {
   sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" nix "$@"
 }
 
+ensure_prek_hooks_installed() {
+  # Install repository-local Git hooks for repos that opt into prek.
+  # This runs after a successful apply so the current nucleus checkout is
+  # protected on the same provision pass that installed or updated the binary.
+  # mkApplyApp bundles pkgs.prek in runtimeInputs so first-run `nix run .#apply`
+  # can install hooks without depending on host-global PATH state.
+  # Args: $1 — absolute path to the repository root to inspect
+  _ephi_repo_root="$1"
+  _ephi_config_path="$_ephi_repo_root/prek.toml"
+
+  if [ ! -f "$_ephi_config_path" ]; then
+    return
+  fi
+
+  if ! command -v prek >/dev/null 2>&1; then
+    printf '%s\n' "prek: prek binary not found; skipping hook installation for $_ephi_repo_root" >&2
+    return
+  fi
+
+  printf '%s\n' "prek: installing hooks in $_ephi_repo_root"
+  if ! (cd "$_ephi_repo_root" && prek install); then
+    printf '%s\n' "prek: failed to install hooks in $_ephi_repo_root" >&2
+    exit 1
+  fi
+}
+
 start_sudo_keepalive() {
   # Prompt for the sudo password once, before build output floods the terminal.
   # sudo -v validates (and refreshes) credentials without running any
@@ -384,6 +410,7 @@ case "$(uname -s)" in
     # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
     # while running as root (which otherwise produces ownership warnings).
     run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
+    ensure_prek_hooks_installed "$REPO_ROOT"
     run_ai_sync
     ;;
   Linux)
@@ -399,6 +426,7 @@ case "$(uname -s)" in
       run_nix run "$REPO_ROOT/src#health-check"
       # Keep root invocations on root-owned HOME for consistent Nix behavior.
       run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
+      ensure_prek_hooks_installed "$REPO_ROOT"
       run_ai_sync
     else
       # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
@@ -407,6 +435,7 @@ case "$(uname -s)" in
       target_username="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
       run_nix run "$REPO_ROOT/src#health-check"
       run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
+      ensure_prek_hooks_installed "$REPO_ROOT"
       run_ai_sync
     fi
     ;;

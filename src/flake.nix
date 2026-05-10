@@ -173,8 +173,10 @@
 
       # Build the `nix run .#apply` app for a given package set.
       # Wraps scripts/apply.sh in a shell application that has git, openssh,
-      # sops, and ssh-to-age on PATH so the machine age key auto-registration
-      # step can derive the age public key and rewrap all SOPS-encrypted files.
+      # prek, sops, and ssh-to-age on PATH so the machine age key
+      # auto-registration step can derive the age public key and rewrap all
+      # SOPS-encrypted files, and the apply flow can install repository-local
+      # prek hooks on the first successful run.
       # openssh provides ssh-keygen for the generate_ssh_host_key_if_needed step
       # that creates /etc/ssh/ssh_host_ed25519_key on first-provision machines.
       mkApplyApp = pkgs: {
@@ -184,6 +186,7 @@
           runtimeInputs = [
             pkgs.git
             pkgs.openssh
+            pkgs.prek
             pkgs.sops
             pkgs.ssh-to-age
           ];
