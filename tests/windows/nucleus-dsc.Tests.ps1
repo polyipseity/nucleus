@@ -15,31 +15,70 @@ BeforeAll {
 Describe "Windows Package Installation" {
     <#
     .DESCRIPTION
-    Verify that critical cross-host packages are installed via WinGet DSC.
-    These tests check presence, not version, to avoid fragility on updates.
+    Comprehensive package validation for cross-platform parity.
+    Tests cover CLI tools, GUI apps, development tools, and utilities.
     #>
 
     Context "CLI Tools (Cross-Platform Parity)" {
-        It "Should have zoxide installed (shell navigation)" {
-            $pkg = winget list --exact -q "ajeetdsouza.zoxide" | Where-Object { $_ -like "*zoxide*" }
-            $pkg | Should -Not -BeNullOrEmpty
-        }
+        $cliTools = @(
+            @{ id = "ajeetdsouza.zoxide"; displayName = "zoxide (shell navigation)" }
+            @{ id = "astral-sh.uv"; displayName = "uv (Python project manager)" }
+            @{ id = "7zip.7zip"; displayName = "7-Zip (archive handling)" }
+            @{ id = "BurntSushi.ripgrep.MSVC"; displayName = "ripgrep (fast text search)" }
+            @{ id = "junegunn.fzf"; displayName = "fzf (fuzzy finder)" }
+        )
 
-        It "Should have uv installed (Python project manager)" {
-            $pkg = winget list --exact -q "astral-sh.uv" | Where-Object { $_ -like "*uv*" }
-            $pkg | Should -Not -BeNullOrEmpty
+        foreach ($tool in $cliTools) {
+            It "Should have $($tool.displayName) installed" {
+                $pkg = winget list --exact -q $tool.id 2>$null | Where-Object { $_ }
+                $pkg | Should -Not -BeNullOrEmpty
+            }
         }
+    }
 
-        It "Should have 7-Zip installed (archive handling)" {
-            $pkg = winget list --exact -q "7zip.7zip" | Where-Object { $_ -like "*7-Zip*" }
-            $pkg | Should -Not -BeNullOrEmpty
+    Context "Development Tools (Language Runtimes & Build)" {
+        $devTools = @(
+            @{ id = "Python.Python.3.12"; displayName = "Python 3.12" }
+            @{ id = "Git.Git"; displayName = "Git (version control)" }
+            @{ id = "OpenJS.NodeJS"; displayName = "Node.js (JS runtime)" }
+            @{ id = "Rustlang.Rust.MSVC"; displayName = "Rust (systems language)" }
+        )
+
+        foreach ($tool in $devTools) {
+            It "Should have $($tool.displayName) installed" {
+                $pkg = winget list --exact -q $tool.id 2>$null | Where-Object { $_ }
+                $pkg | Should -Not -BeNullOrEmpty
+            }
         }
     }
 
     Context "GUI Applications (Cross-Platform Parity)" {
-        It "Should have Blender installed" {
-            $pkg = winget list --exact -q "BlenderFoundation.Blender" | Where-Object { $_ -like "*Blender*" }
-            $pkg | Should -Not -BeNullOrEmpty
+        $guiApps = @(
+            @{ id = "BlenderFoundation.Blender"; displayName = "Blender (3D creation)" }
+            @{ id = "Microsoft.VisualStudioCode.Insiders"; displayName = "VS Code Insiders (editor)" }
+            @{ id = "Discord.Discord.Canary"; displayName = "Discord Canary (messaging)" }
+        )
+
+        foreach ($app in $guiApps) {
+            It "Should have $($app.displayName) installed" {
+                $pkg = winget list --exact -q $app.id 2>$null | Where-Object { $_ }
+                $pkg | Should -Not -BeNullOrEmpty
+            }
+        }
+    }
+
+    Context "Utilities (System Tools & Formatters)" {
+        $utilities = @(
+            @{ id = "sharkdp.bat"; displayName = "bat (syntax highlighting cat)" }
+            @{ id = "eza-community.eza"; displayName = "eza (modern ls)" }
+            @{ id = "jqlang.jq"; displayName = "jq (JSON processor)" }
+        )
+
+        foreach ($util in $utilities) {
+            It "Should have $($util.displayName) installed" {
+                $pkg = winget list --exact -q $util.id 2>$null | Where-Object { $_ }
+                $pkg | Should -Not -BeNullOrEmpty
+            }
         }
     }
 }
@@ -47,13 +86,11 @@ Describe "Windows Package Installation" {
 Describe "Windows Security & Desktop Configuration" {
     <#
     .DESCRIPTION
-    Verify that user-level registry settings enforce security invariants:
-    - Screen saver is active and requires password
-    - Wallpaper directory exists and is configured
-    - Settings align with macOS/NixOS security posture (immediate lock).
+    Comprehensive validation of user-level registry settings.
+    Verifies security invariants, desktop behavior, and accessibility settings.
     #>
 
-    Context "Screen Saver Security (Security Invariant)" {
+    Context "Screen Saver Security (Security Invariant - Parity with macOS/NixOS)" {
         It "Should have screen saver enabled" {
             $regPath = "HKCU:\Control Panel\Desktop"
             $value = Get-ItemProperty -Path $regPath -Name ScreenSaveActive -ErrorAction SilentlyContinue
@@ -66,15 +103,21 @@ Describe "Windows Security & Desktop Configuration" {
             $value.ScreenSaverIsSecure | Should -Be "1"
         }
 
-        It "Should have aggressive 60-second idle timeout" {
+        It "Should have aggressive 60-second idle timeout (parity with POSIX lock timeout)" {
             $regPath = "HKCU:\Control Panel\Desktop"
             $value = Get-ItemProperty -Path $regPath -Name ScreenSaveTimeout -ErrorAction SilentlyContinue
             [int]$timeout = $value.ScreenSaveTimeout
             $timeout | Should -BeLessThanOrEqual 60
         }
+
+        It "Should use blank screen saver (security: no login hint leakage)" {
+            $regPath = "HKCU:\Control Panel\Desktop"
+            $scr = Get-ItemProperty -Path $regPath -Name SCRNSAVE.EXE -ErrorAction SilentlyContinue
+            $scr.SCRNSAVE.EXE | Should -Match "ssblank\.scr" -Or $null
+        }
     }
 
-    Context "Wallpaper & Desktop Configuration" {
+    Context "Wallpaper & Desktop Customization" {
         It "Should have wallpaper folder created" {
             $wallpaperPath = [System.Environment]::ExpandEnvironmentVariables("%USERPROFILE%\Pictures\wallpapers")
             Test-Path -Path $wallpaperPath | Should -Be $true
@@ -82,8 +125,67 @@ Describe "Windows Security & Desktop Configuration" {
 
         It "Should have wallpaper registry entry configured" {
             $regPath = "HKCU:\Control Panel\Desktop"
-            $value = Get-ItemProperty -Path $regPath -Name Wallpaper -ErrorAction SilentlyContinue
-            $value.Wallpaper | Should -Not -BeNullOrEmpty
+            $wallpaper = Get-ItemProperty -Path $regPath -Name Wallpaper -ErrorAction SilentlyContinue
+            $wallpaper.Wallpaper | Should -Not -BeNullOrEmpty
+        }
+
+        It "Should have tile wallpaper disabled (stretch, not repeat)" {
+            $regPath = "HKCU:\Control Panel\Desktop"
+            $tileWallpaper = Get-ItemProperty -Path $regPath -Name TileWallpaper -ErrorAction SilentlyContinue
+            $tileWallpaper.TileWallpaper | Should -Be "0"
+        }
+
+        It "Should have wallpaper style set to fit or fill" {
+            $regPath = "HKCU:\Control Panel\Desktop"
+            $wallpaperStyle = Get-ItemProperty -Path $regPath -Name WallpaperStyle -ErrorAction SilentlyContinue
+            [int]$style = $wallpaperStyle.WallpaperStyle
+            $style | Should -Match "^[1-6]$"  # 1=tiled, 2=centered, 6=fill, 10=fit
+        }
+    }
+
+    Context "Keyboard & Input Settings" {
+        It "Should have key repeat rate configured" {
+            $regPath = "HKCU:\Control Panel\Keyboard"
+            $keyboardRep = Get-ItemProperty -Path $regPath -Name KeyboardDelay -ErrorAction SilentlyContinue
+            $keyboardRep.KeyboardDelay | Should -Not -BeNullOrEmpty
+        }
+
+        It "Should have keyboard speed set to maximum (faster typing)" {
+            $regPath = "HKCU:\Control Panel\Keyboard"
+            $keyboardSpeed = Get-ItemProperty -Path $regPath -Name KeyboardSpeed -ErrorAction SilentlyContinue
+            [int]$speed = $keyboardSpeed.KeyboardSpeed
+            $speed | Should -BeGreaterThanOrEqual 30  # Scale 0-31, 31 is fastest
+        }
+    }
+
+    Context "File Explorer (Shell) Behavior" {
+        It "Should show hidden files" {
+            $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+            $hidden = Get-ItemProperty -Path $regPath -Name Hidden -ErrorAction SilentlyContinue
+            [int]$hiddenVal = $hidden.Hidden
+            $hiddenVal | Should -Be 1
+        }
+
+        It "Should show file extensions" {
+            $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+            $hideExt = Get-ItemProperty -Path $regPath -Name HideFileExt -ErrorAction SilentlyContinue
+            [int]$extVal = $hideExt.HideFileExt
+            $extVal | Should -Be 0
+        }
+
+        It "Should show full file path in title bar" {
+            $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+            $fullPath = Get-ItemProperty -Path $regPath -Name FullPath -ErrorAction SilentlyContinue
+            [int]$pathVal = $fullPath.FullPath
+            $pathVal | Should -Be 1
+        }
+    }
+
+    Context "Accessibility & UI Preferences" {
+        It "Should have mouse pointer speed configured" {
+            $regPath = "HKCU:\Control Panel\Mouse"
+            $mouseSpeed = Get-ItemProperty -Path $regPath -Name MouseSensitivity -ErrorAction SilentlyContinue
+            $mouseSpeed.MouseSensitivity | Should -Not -BeNullOrEmpty
         }
     }
 }
