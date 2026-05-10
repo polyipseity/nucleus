@@ -32,6 +32,7 @@ let
   #   ffmpeg-full    — multimedia processing and transcoding (GPL codecs; pre-built in nixos.org binary cache)
   #   fzf            — fuzzy finder used by shell widgets and neovim
   #   git            — version control
+  #   gitk           — Tcl/Tk Git history browser GUI (`gitk`)
   #   gnupg          — GPG for secret management and signing
   #   jq             — JSON processor used by activation scripts
   #   nix-index      — provides nix-locate; required by pay-respects to suggest nixpkgs packages for unknown commands
@@ -62,6 +63,7 @@ let
     pkgs.ffmpeg-full
     pkgs.fzf
     pkgs.git
+    pkgs.gitAndTools.gitk
     pkgs.gnupg
     pkgs.jq
     pkgs.nix-index

@@ -51,6 +51,11 @@ Describe "Windows Package Installation" {
                 $pkg | Should -Not -BeNullOrEmpty
             }
         }
+
+        It "Should have gitk available from the Git installation" {
+            $gitk = Get-Command -Name gitk -ErrorAction SilentlyContinue
+            $gitk | Should -Not -BeNullOrEmpty
+        }
     }
 
     Context "GUI Applications (Cross-Platform Parity)" {

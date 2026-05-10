@@ -103,7 +103,7 @@ properties:
     - resource: Microsoft.WinGet.Client/Package
       id: GitInstall
       directives:
-        description: Ensure Git is installed
+        description: Ensure Git is installed (includes gitk for cross-host Git history browser parity with macOS and NixOS)
       settings:
         id: Git.Git
         source: winget
