@@ -2,11 +2,11 @@
 #
 # Keeps shell aliases and environment variables in dedicated fragments to make
 # ordering checks and targeted reviews straightforward.
-{ ... }:
+{ config, ... }:
 let
   # Dedicated alias/env fragments keep list-like attrsets isolated so sort order
   # can be audited without scanning unrelated shell options.
-  shellAliases = import ./shell/aliases.nix;
+  shellAliases = import ./shell/aliases.nix { homeDirectory = config.home.homeDirectory; };
   sessionVariables = import ./shell/env.nix;
 in
 {

@@ -2,6 +2,7 @@
 #
 # Keep keys strictly alphabetical so diffs stay deterministic and accidental
 # duplicate alias intent is easy to detect during review.
+{ homeDirectory }:
 {
   g = "git";
   ga = "git add";
@@ -27,9 +28,11 @@
   # ni/nr/nx are concise but unambiguous; `bun x` replaces npx for one-shot package execution.
   ni = "bun install";
   nr = "bun run";
-  nucleus-gc = "nix run ./src#gc";
-  nucleus-health-check = "nix run ./src#health-check";
-  nucleus-update = "nix run ./src#update";
+  # nucleus-* commands use the canonical clone path so they run from any working
+  # directory, not just inside the nucleus repository.
+  nucleus-gc = "nix run ${homeDirectory}/dev/nucleus/src#gc";
+  nucleus-health-check = "nix run ${homeDirectory}/dev/nucleus/src#health-check";
+  nucleus-update = "nix run ${homeDirectory}/dev/nucleus/src#update";
   nx = "bun x";
   v = "nvim";
 }
