@@ -54,32 +54,30 @@ function Sync-GitAndSshConfig {
 
     $gitConfigPath = Join-Path -Path $userHome -ChildPath '.gitconfig'
     $identityPath = Join-Path -Path $userHome -ChildPath ".config\nucleus\git-identity.env"
-    if (-not (Test-Path -Path $identityPath)) {
-      Write-Warning "Missing SOPS-managed Git identity payload for user '$User': '$identityPath'. Skipping."
-      continue
-    }
-
-    $identityLines = Get-Content -Path $identityPath -ErrorAction Stop
     $identityKv = @{}
-    foreach ($line in $identityLines) {
-      if ([string]::IsNullOrWhiteSpace($line) -or $line.StartsWith('#') -or -not $line.Contains('=')) {
-        continue
+    $hasCompleteIdentity = $false
+    if (Test-Path -Path $identityPath) {
+      $identityLines = Get-Content -Path $identityPath -ErrorAction Stop
+      foreach ($line in $identityLines) {
+        if ([string]::IsNullOrWhiteSpace($line) -or $line.StartsWith('#') -or -not $line.Contains('=')) {
+          continue
+        }
+
+        $parts = $line -split '=', 2
+        $identityKv[$parts[0]] = $parts[1]
       }
 
-      $parts = $line -split '=', 2
-      $identityKv[$parts[0]] = $parts[1]
-    }
+      $hasCompleteIdentity =
+        ($identityKv.ContainsKey('name') -and -not [string]::IsNullOrWhiteSpace($identityKv['name'])) -and
+        ($identityKv.ContainsKey('email') -and -not [string]::IsNullOrWhiteSpace($identityKv['email'])) -and
+        ($identityKv.ContainsKey('signingKey') -and -not [string]::IsNullOrWhiteSpace($identityKv['signingKey']))
 
-    if (-not $identityKv.ContainsKey('name') -or [string]::IsNullOrWhiteSpace($identityKv['name'])) {
-      throw "Git identity payload '$identityPath' is missing non-empty 'name='."
+      if (-not $hasCompleteIdentity) {
+        Write-Warning "Git identity payload for user '$User' is incomplete at '$identityPath'; applying managed Git baseline only."
+      }
     }
-
-    if (-not $identityKv.ContainsKey('email') -or [string]::IsNullOrWhiteSpace($identityKv['email'])) {
-      throw "Git identity payload '$identityPath' is missing non-empty 'email='."
-    }
-
-    if (-not $identityKv.ContainsKey('signingKey') -or [string]::IsNullOrWhiteSpace($identityKv['signingKey'])) {
-      throw "Git identity payload '$identityPath' is missing non-empty 'signingKey='."
+    else {
+      Write-Warning "Missing SOPS-managed Git identity payload for user '$User': '$identityPath'. Applying managed Git baseline only."
     }
 
     $sshDir = Join-Path -Path $userHome -ChildPath '.ssh'
@@ -151,9 +149,12 @@ function Sync-GitAndSshConfig {
         'gpg.format' = 'openpgp'
         'tag.gpgsign' = 'true'
         'url.git@github.com:.insteadOf' = 'https://github.com/'
-        'user.email' = $identityKv['email']
-        'user.name' = $identityKv['name']
-        'user.signingkey' = $identityKv['signingKey']
+      }
+
+      if ($hasCompleteIdentity) {
+        $managedGitSettings['user.email'] = $identityKv['email']
+        $managedGitSettings['user.name'] = $identityKv['name']
+        $managedGitSettings['user.signingkey'] = $identityKv['signingKey']
       }
 
       foreach ($settingKey in $managedGitSettings.Keys) {
@@ -161,6 +162,10 @@ function Sync-GitAndSshConfig {
         if ($LASTEXITCODE -ne 0) {
           throw "Failed to set Git config '$settingKey' for user '$User'."
         }
+      }
+
+      if (-not $hasCompleteIdentity) {
+        Write-Warning "Applied managed Git signing defaults for user '$User' without user identity keys."
       }
     }
     else {
