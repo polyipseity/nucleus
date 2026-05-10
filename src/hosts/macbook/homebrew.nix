@@ -23,6 +23,9 @@ let
   # GUI applications managed via Homebrew Cask.
   # Dual-source casks (for example Google Chrome, VS Code, VLC) are selected
   # from core.nix and merged below so backend switches stay centralized.
+  # Google Gemini is intentionally not managed on macOS: its global launcher
+  # competes with Raycast, and the app does not expose a stable declarative
+  # preference key we can enforce to reserve Option+Space for Raycast only.
   staticManagedCasks = [
     "alt-tab"                    # Windows-style alt-tab switcher
     "appcleaner"                 # Thorough app uninstaller
@@ -32,7 +35,6 @@ let
     "coolterm"                   # Serial terminal
     "gimp"                       # Raster image editor; macOS-only cask (nixpkgs gimp is Linux-only)
     "google-chrome@canary"       # Chrome dev channel for web testing
-    "google-gemini"              # Gemini native desktop application
     "keka"                       # Graphical archiver with 7-Zip backend support
     "linearmouse"                # Per-device mouse/trackpad scrolling behavior and sensitivity
     "lulu"                       # Outbound network firewall

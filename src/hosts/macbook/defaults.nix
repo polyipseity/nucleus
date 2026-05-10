@@ -168,11 +168,12 @@ in
         ImportToCloudEnabled = 1;
       };
 
-      # Siri: enable keyboard shortcut (Option+Space = 1), hide menu-bar chrome
-      # for a cleaner UI, and keep Type to Siri enabled for fast access.
+      # Siri: disable the global keyboard shortcut so Raycast remains the only
+      # launcher allowed to own Option+Space on this host. Siri itself stays
+      # available through other OS surfaces when needed.
       "com.apple.Siri" = {
-        KeyboardShortcut = 1;      # Option+Space invokes Siri
-        StatusMenuVisible = false; # hide Siri from the menu bar; shortcut remains available
+        KeyboardShortcut = 0;      # 0 disables the Siri shortcut reservation
+        StatusMenuVisible = false; # hide Siri from the menu bar; keep chrome minimal
         TypeToSiriEnabled = true;  # type queries instead of speaking them
       };
 
