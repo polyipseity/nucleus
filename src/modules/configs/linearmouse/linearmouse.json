@@ -1,4 +1,45 @@
 {
-  "$schema": "https://schema.linearmouse.app/0.11.2",
-  "schemes": []
+  "$schema" : "https:\/\/schema.linearmouse.app\/0.11.2",
+  "schemes" : [
+    {
+      "if" : {
+        "device" : {
+          "category" : "trackpad",
+          "productID" : "0x0",
+          "productName" : "Apple Internal Keyboard \/ Trackpad",
+          "serialNumber" : "FM7HNS0DMS20000J45+AKXN",
+          "vendorID" : "0x0"
+        }
+      },
+      "pointer" : {
+        "acceleration" : 20,
+        "disableAcceleration" : true,
+        "redirectsToScroll" : false,
+        "speed" : "unset"
+      },
+      "scrolling" : {
+        "acceleration" : 1,
+        "distance" : "auto",
+        "smoothed" : {
+          "enabled" : false
+        },
+        "speed" : 0
+      }
+    },
+    {
+      "if" : {
+        "app" : "org.gimp.gimp",
+        "device" : {
+          "category" : "trackpad",
+          "productID" : "0x0",
+          "productName" : "Apple Internal Keyboard \/ Trackpad",
+          "serialNumber" : "FM7HNS0DMS20000J45+AKXN",
+          "vendorID" : "0x0"
+        }
+      },
+      "scrolling" : {
+        "distance" : "1px"
+      }
+    }
+  ]
 }
