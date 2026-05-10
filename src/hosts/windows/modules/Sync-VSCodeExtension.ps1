@@ -69,7 +69,6 @@ function Sync-VSCodeExtension {
     'ms-azuretools.vscode-docker',
     'ms-ceintl.vscode-language-pack-zh-hant',
     'ms-python.debugpy',
-    'ms-python.isort',
     'ms-python.python',
     'ms-python.vscode-python-envs',
     'ms-toolsai.datawrangler',
