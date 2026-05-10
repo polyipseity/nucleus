@@ -206,12 +206,12 @@ let
        (builtins.elem "step1" activations.step2.after))
       "Before/after lists should be bidirectionally consistent";
 
-  # === TEST: syncClawhubSkills dependency name stays aligned across modules ===
+  # === TEST: syncClawHubSkills dependency name stays aligned across modules ===
   test_sync_clawhub_dependency_name_alignment =
     assert'
-      ((lib.hasInfix "syncClawhubSkills = lib.hm.dag.entryAfter" agentsModuleText) &&
-       (lib.hasInfix "\"syncClawhubSkills\"" macosModuleText))
-      "syncClawhubSkills activation name must match between agents.nix and macos.nix dependency list";
+      ((lib.hasInfix "syncClawHubSkills = lib.hm.dag.entryAfter" agentsModuleText) &&
+       (lib.hasInfix "\"syncClawHubSkills\"" macosModuleText))
+      "syncClawHubSkills activation name must match between agents.nix and macos.nix dependency list";
 
   # Collect all tests.
   allTests = [
@@ -247,6 +247,6 @@ in
     "10: System packages available before Home Manager"
     "11: Activation dependencies reference valid steps"
     "12: Before/after dependency consistency"
-    "13: syncClawhubSkills dependency name alignment"
+    "13: syncClawHubSkills dependency name alignment"
   ];
 }

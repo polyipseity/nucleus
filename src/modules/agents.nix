@@ -3,10 +3,10 @@
 # Creates ~/.agents/ as a real directory, then creates a per-entry symlink inside
 # it for every top-level entry in src/modules/configs/agents/ except skills/.
 # skills/ is excluded here because it is managed by agentsSkills (below) and may
-# contain downloaded content that must not be committed (fetched / clawhub).
+# contain downloaded content that must not be committed (fetched / ClawHub).
 #
 # The per-subdir layout creates ~/.agents as a real directory with per-entry
-# symlinks. This allows clawhub to write fetched skill downloads into
+# symlinks. This allows ClawHub to write fetched skill downloads into
 # ~/.agents/skills/ without those writes entering the tracked repo tree.
 #
 # Activation reads the repo root from:
@@ -22,7 +22,7 @@
     # agentsSymlink
     # Creates ~/.agents/ as a real directory and populates it with per-entry
     # symlinks for every top-level entry in src/modules/configs/agents/ except
-    # skills/ (which is managed by agentsSkills so fetched clawhub downloads
+    # skills/ (which is managed by agentsSkills so fetched ClawHub downloads
     # land in a real, untracked directory rather than inside the repo tree).
     # -------------------------------------------------------------------------
     agentsSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
@@ -118,13 +118,13 @@
     # per-skill symlink inside it for every skill subdirectory committed to
     # src/modules/configs/agents/skills/ (bundled / AGPL-compatible skills).
     #
-    # Fetched skills (non-AGPL / clawhub-managed) are downloaded directly into
+    # Fetched skills (non-AGPL / ClawHub-managed) are downloaded directly into
     # ~/.agents/skills/<name>/ by the post-apply sync step in apply.sh; they
     # are never committed to the repo and are not managed here.
     #
     # The skills/ tree is a real directory — not a symlink — so that:
     #   1. Bundled per-skill symlinks can coexist with fetched real dirs.
-    #   2. clawhub can write into ~/.agents/skills/ without the writes landing
+    #   2. ClawHub can write into ~/.agents/skills/ without the writes landing
     #      inside the tracked repo tree (which would happen with a whole-dir
     #      symlink back to src/modules/configs/agents/skills/).
     #
@@ -154,7 +154,7 @@
 
       _ask_skills_dir="$HOME/.agents/skills"
 
-      # Ensure ~/.agents/skills/ exists as a real directory so fetched clawhub
+      # Ensure ~/.agents/skills/ exists as a real directory so fetched ClawHub
       # downloads can be written here without entering the tracked repo tree.
       if [ ! -d "$_ask_skills_dir" ]; then
         mkdir -p "$_ask_skills_dir"
@@ -200,7 +200,7 @@
           # Real directory in place of a committed skill — could be a fetched
           # download with the same name, or user data.  Fail fast to prevent
           # silent overwrites; the operator must resolve the conflict manually.
-          echo "agents-skills: $HOME/.agents/skills/$_ask_skill_name is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply." >&2
+          echo "agents-skills: $HOME/.agents/skills/$_ask_skill_name is a real directory — if it is a fetched ClawHub download for a skill that has been re-committed, remove it and re-run apply." >&2
           exit 1
         else
           ln -s "$_ask_skill_dir" "$_ask_link"
@@ -360,23 +360,23 @@
     '';
 
     # -------------------------------------------------------------------------
-    # syncClawhubSkills
+    # syncClawHubSkills
     # Converges fetched skills (non-AGPL-compatible, downloaded at apply time
-    # via clawhub) with the declarative manifest in
+    # via ClawHub) with the declarative manifest in
     # src/modules/configs/agents/clawhub-skills.json.
     #
-    # Why after installBunPackages: requires the clawhub CLI, which is
-    # installed by installBunPackages.  Ordering ensures clawhub is present
+    # Why after installBunPackages: requires the ClawHub CLI, which is
+    # installed by installBunPackages.  Ordering ensures ClawHub is present
     # before this step tries to invoke it.
     #
     # Why best-effort: the system configuration applied successfully.  Skill
     # sync is additive; a missing skill does not break any declared system
     # state.  Warn and continue so displayHostManualInstructions is reached.
     # -------------------------------------------------------------------------
-    syncClawhubSkills = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
+    syncClawHubSkills = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
       set -eu
 
-      # Prepend ~/.bun/bin so the clawhub binary installed by installBunPackages
+      # Prepend ~/.bun/bin so the ClawHub binary installed by installBunPackages
       # is on PATH for this activation step.
       if [ -d "$HOME/.bun/bin" ]; then
         PATH="$HOME/.bun/bin:$PATH"
@@ -395,7 +395,7 @@
       fi
 
       # Path to the declarative fetched skill manifest.  Slugs listed here are
-      # downloaded by clawhub; slugs absent from the manifest are cleaned up
+      # downloaded by ClawHub; slugs absent from the manifest are cleaned up
       # from ~/.agents/skills/ when their .clawhub/origin.json marker is
       # present.
       _scs_manifest="$_scs_repo_root/src/modules/configs/agents/clawhub-skills.json"
@@ -429,9 +429,9 @@
         mkdir -p "$_scs_skills_dir"
       fi
 
-      # Probe for the clawhub CLI.  clawhub must be pre-installed by the
+      # Probe for the ClawHub CLI.  ClawHub must be pre-installed by the
       # installBunPackages activation before this step is called; this step
-      # never installs clawhub itself.
+      # never installs ClawHub itself.
       if ! command -v clawhub >/dev/null 2>&1; then
         echo "clawhub: clawhub not found in PATH; installBunPackages must complete before fetched skill sync; skipping" >&2
         rm -f "$_scs_slugs_file"
@@ -455,12 +455,12 @@
           continue
         fi
         # Unlock an existing fetched skill directory before updating so
-        # clawhub can overwrite files locked a-w on a previous install.
+        # ClawHub can overwrite files locked a-w on a previous install.
         if [ -d "$_scs_skill_path" ]; then
           chmod -R u+w "$_scs_skill_path"
         fi
         echo "clawhub: installing/updating fetched skill '$_scs_slug'..."
-        # Best-effort: non-zero exit from clawhub is non-fatal because the
+        # Best-effort: non-zero exit from ClawHub is non-fatal because the
         # system apply already succeeded and skill sync is additive.
         if clawhub install --workdir "$HOME/.agents" --no-input "$_scs_slug"; then
           # Lock installed content so files cannot be modified outside a
@@ -475,7 +475,7 @@
       done < "$_scs_slugs_file"
 
       # Stale cleanup: remove real directories in ~/.agents/skills/ that have
-      # a .clawhub/origin.json marker (written by clawhub at install time,
+      # a .clawhub/origin.json marker (written by ClawHub at install time,
       # identifying fetched downloads) but whose slug is no longer in manifest.
       # Directories without this marker (bundled symlinks or user content) are
       # never touched.

@@ -205,7 +205,7 @@ lib.mkIf pkgs.stdenv.isLinux {
       "installPwshScriptAnalyzer"
       "provisionDevDirectory"
       "sshKeyAdopt"
-      "syncClawhubSkills"
+      "syncClawHubSkills"
       "verifySecretDecryption"
       "vscodeExtensionBridge"
       "vscodeSymlinks"
