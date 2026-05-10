@@ -5,7 +5,7 @@
 # Sync-NucleusShellProfile on Windows (src/hosts/windows/modules/sync-shellprofile.ps1).
 # Keeping both in sync makes PowerShell behavior consistent across all three
 # host types when pwsh is invoked on macOS or NixOS.
-{ config, lib, pkgs, ... }:
+{ lib, pkgs, ... }:
 let
   # Profile content mirroring the Windows managed block in shell.ps1.
   # Using a Nix ''...'' string so the file is written verbatim; single
