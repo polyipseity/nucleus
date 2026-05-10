@@ -40,6 +40,12 @@
   exist before you run or document toolchain commands.
 - Detect install, build, test, lint, format, type-check, and release commands
   from actual repository files instead of assuming a default stack.
+- Known upstream warning: Nix may emit a warning about `builtins.derivation`
+  creating `options.json` with a contextless source-path reference during
+  flake evaluation. In this repository that warning is currently upstream
+  (nixpkgs/Nix internals), not a local module regression. Do not repeatedly
+  rework local modules solely to silence that warning unless a concrete local
+  source path and functional breakage are demonstrated.
 - Always validate syntax for changed files before concluding a change. Use
   repository-supported checks such as `nix-instantiate --parse <file.nix>`
   (or `nix flake check` from `src/` for broader Nix validation),
