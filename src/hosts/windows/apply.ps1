@@ -449,6 +449,15 @@ Sync-PowerPolicy -Enabled:$EnablePowerParity
 # Health check: verify archiving ecosystem (7-Zip CLI + app) is functional post-apply.
 Test-ArchivingStack | Out-Null
 
+# Display host-scoped one-time manual setup instructions after all main
+# convergence is complete but before post-apply tasks (like AI model downloads)
+# so operators see the checklist while configuration is still in their context,
+# mirroring the displayHostManualInstructions activation on macOS and NixOS hosts.
+$manualPath = Join-Path -Path $PSScriptRoot -ChildPath "MANUAL.md"
+Write-Output "--- MANUAL SETUP (one-time, required) ---"
+Get-Content -Path $manualPath | Write-Output
+Write-Output "-------------------------------------------"
+
 # Converge locally installed Ollama models with the declarative manifest as the
 # final step of every apply.  Model pulls are 2-20 GB, so this runs last to
 # avoid blocking earlier configuration steps.  The sync is best-effort: a
@@ -465,11 +474,3 @@ if ($SkipAiSync) {
     Invoke-AiSync -RepoRoot $repoRoot
   }
 }
-
-# Display host-scoped one-time manual setup instructions as the final step so
-# operators always see the checklist after automation completes, mirroring the
-# displayHostManualInstructions activation on macOS and NixOS hosts.
-$manualPath = Join-Path -Path $PSScriptRoot -ChildPath "MANUAL.md"
-Write-Output "--- MANUAL SETUP (one-time, required) ---"
-Get-Content -Path $manualPath | Write-Output
-Write-Output "-------------------------------------------"
