@@ -124,7 +124,17 @@
   "markdown.preview.fontSize": 14,
   "markdown.validate.enabled": true,
   "nix.enableLanguageServer": true,
+  "nix.formatterPath": "nixfmt",
   "nix.serverPath": "nixd",
+  "nix.serverSettings": {
+    "nixd": {
+      "formatting": {
+        "command": [
+          "nixfmt"
+        ]
+      }
+    }
+  },
   "notebook.insertFinalNewline": true,
   "notebook.lineNumbers": "on",
   "path-intellisense.extensionOnImport": true,

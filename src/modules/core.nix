@@ -44,6 +44,7 @@ let
   #   llvmPackages_18.lldb     — LLVM debugger (`lldb`) for cross-host debug parity
   #   llvmPackages_18.lld      — LLVM linker (`ld.lld`) for cross-host link parity
   #   nixd           — Nix language server (LSP) for nix-ide in VS Code on POSIX hosts
+  #   nixfmt         — Nix formatter used by nix-ide/VS Code formatting pipeline
   #   nix-index      — provides nix-locate; required by pay-respects to suggest nixpkgs packages for unknown commands
   #                    (run `nix-index` once after first activation to build the file-index database)
   #   opencode       — AI-native coding agent and assistant
@@ -84,6 +85,7 @@ let
     pkgs.llvmPackages_18.lldb
     pkgs.llvmPackages_18.lld
     pkgs.nixd
+    pkgs.nixfmt
     pkgs.nix-index
     pkgs.opencode
     pkgs.p7zip
