@@ -19,6 +19,7 @@ let
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
   macbookActivationText = builtins.readFile ../../src/hosts/macbook/activation.nix;
   windowsGitSshModuleText = builtins.readFile ../../src/hosts/windows/modules/Sync-GitAndSshConfig.ps1;
+  sharedGitModuleText = builtins.readFile ../../src/modules/git.nix;
 
   # Assertion helper.
   assert' = cond: msg: if !cond then builtins.throw msg else null;
@@ -243,6 +244,13 @@ let
        !(lib.hasInfix "config --global" windowsGitSshModuleText))
       "Windows Git identity must write via --file $gitConfigPath, not --global, so each managed user profile gets the correct target path";
 
+  # === TEST: POSIX Git defaults enforce signed commits and tags ===
+  test_posix_git_signing_defaults_enabled =
+    assert'
+      ((lib.hasInfix "commit.gpgsign = true;" sharedGitModuleText) &&
+       (lib.hasInfix "tag.gpgsign = true;" sharedGitModuleText))
+      "POSIX Git defaults must keep commit.gpgsign and tag.gpgsign enabled for cross-host signing parity";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -261,6 +269,7 @@ let
     test_sync_clawhub_does_not_exit_activation
     test_gimp_sensitivity_version_tracking
     test_windows_git_identity_targets_user_gitconfig
+    test_posix_git_signing_defaults_enabled
   ];
 in
 {
@@ -284,5 +293,6 @@ in
     "14: syncClawHubSkills does not exit activation"
     "15: GIMP sensitivity tracks installed app version"
     "16: Windows Git identity targets per-user .gitconfig"
+    "17: POSIX Git defaults enforce signed commits and tags"
   ];
 }
