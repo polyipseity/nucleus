@@ -483,39 +483,29 @@ lib.mkIf isPrimaryUser {
       # so new wallpapers are automatically included in the health check.
       wallpaperSopsNames = lib.filter (n: lib.hasSuffix ".sops" n)
         (builtins.attrNames (builtins.readDir wallpaperDir));
-      # Pair each SOPS file with a Nix-store-safe name and a human-readable
-      # display name for error messages.  Parentheses and spaces are not valid
-      # Nix store name characters and must be sanitized.
+      # Build list of SOPS files with their paths and display names.
+      # WHY regular paths instead of builtins.path: Avoid creating derivation
+      # context warnings. The activation script will convert these to strings
+      # naturally during shell code generation without requiring explicit
+      # store-path construction.
       allSopsFiles =
         [
           {
-            path = builtins.path {
-              path = ../secrets/git-identities.yml;
-              name = "git-identities.yml";
-            };
+            path = ../secrets/git-identities.yml;
             displayName = "git-identities.yml";
           }
           {
-            path = builtins.path {
-              path = ../secrets/gpg-personal.yml;
-              name = "gpg-personal.yml";
-            };
+            path = ../secrets/gpg-personal.yml;
             displayName = "gpg-personal.yml";
           }
           {
-            path = builtins.path {
-              path = ../secrets/ssh-personal.yml;
-              name = "ssh-personal.yml";
-            };
+            path = ../secrets/ssh-personal.yml;
             displayName = "ssh-personal.yml";
           }
         ]
         ++ map
           (n: {
-            path = builtins.path {
-              path = wallpaperDir + "/${n}";
-              name = lib.replaceStrings [ "(" ")" " " ] [ "" "" "_" ] n;
-            };
+            path = wallpaperDir + "/${n}";
             displayName = n;
           })
           wallpaperSopsNames;
