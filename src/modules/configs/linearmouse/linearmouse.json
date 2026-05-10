@@ -38,7 +38,18 @@
         }
       },
       "scrolling" : {
-        "distance" : "1px"
+        "acceleration" : 0,
+        "distance" : "auto",
+        "modifiers" : {
+          "control" : {
+            "scale" : 10,
+            "type" : "changeSpeed"
+          }
+        },
+        "smoothed" : {
+          "enabled" : false
+        },
+        "speed" : 1
       }
     }
   ]
