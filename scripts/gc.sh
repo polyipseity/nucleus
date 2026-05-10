@@ -23,8 +23,32 @@
 
 set -eu
 
-SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
+# Locate the nucleus repository root.  Resolution order:
+#   1. ~/.config/nucleus/repo-root — written by apply.sh; reliable from
+#      anywhere once apply has been run at least once.
+#   2. git rev-parse --show-toplevel — works when CWD is inside the repo.
+#      Stderr is suppressed because a non-repo CWD is expected and benign;
+#      the exit code is checked via the conditional.
+#   3. ~/dev/nucleus — canonical clone location declared in devRepos config.
+resolve_nucleus_root() {
+  _rnr_config_file="$HOME/.config/nucleus/repo-root"
+  if [ -f "$_rnr_config_file" ]; then
+    _rnr_root="$(cat "$_rnr_config_file")"
+    if [ -n "$_rnr_root" ] && [ -d "$_rnr_root" ]; then
+      printf '%s\n' "$_rnr_root"
+      return 0
+    fi
+  fi
+  # Stderr suppressed: git failure when CWD is not inside a repository is
+  # expected and benign; the exit code is checked via the conditional.
+  if _rnr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+    printf '%s\n' "$_rnr_git_root"
+    return 0
+  fi
+  # Final fallback: canonical clone location declared in devRepos config.
+  printf '%s\n' "$HOME/dev/nucleus"
+}
+REPO_ROOT="$(resolve_nucleus_root)"
 
 skip_cargo_cache=false
 skip_hm_gc=false
@@ -161,7 +185,7 @@ prune_ollama_models_if_available() {
     return 0
   fi
 
-  "$SCRIPT_DIR/ai-sync.sh" --prune-only
+  "$REPO_ROOT/scripts/ai-sync.sh" --prune-only
 }
 
 # Step 1: expire HM generations before Nix store GC so the store can reclaim

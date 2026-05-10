@@ -18,11 +18,32 @@
 
 set -eu
 
-# Use git to locate the repository root rather than navigating relative to $0.
-# When this script runs as a Nix-built app (writeShellApplication), $0 resolves
-# to a path inside the Nix store and $0-relative navigation would never reach
-# the actual repository — the same pattern apply.sh already uses.
-REPO_ROOT=$(git rev-parse --show-toplevel)
+# Locate the nucleus repository root.  Resolution order:
+#   1. ~/.config/nucleus/repo-root — written by apply.sh; reliable from
+#      anywhere once apply has been run at least once.
+#   2. git rev-parse --show-toplevel — works when CWD is inside the repo.
+#      Stderr is suppressed because a non-repo CWD is expected and benign;
+#      the exit code is checked via the conditional.
+#   3. ~/dev/nucleus — canonical clone location declared in devRepos config.
+resolve_nucleus_root() {
+  _rnr_config_file="$HOME/.config/nucleus/repo-root"
+  if [ -f "$_rnr_config_file" ]; then
+    _rnr_root="$(cat "$_rnr_config_file")"
+    if [ -n "$_rnr_root" ] && [ -d "$_rnr_root" ]; then
+      printf '%s\n' "$_rnr_root"
+      return 0
+    fi
+  fi
+  # Stderr suppressed: git failure when CWD is not inside a repository is
+  # expected and benign; the exit code is checked via the conditional.
+  if _rnr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+    printf '%s\n' "$_rnr_git_root"
+    return 0
+  fi
+  # Final fallback: canonical clone location declared in devRepos config.
+  printf '%s\n' "$HOME/dev/nucleus"
+}
+REPO_ROOT="$(resolve_nucleus_root)"
 
 min_free_gb="${NUCLEUS_MIN_FREE_GB:-10}"
 skip_secret_health=false
