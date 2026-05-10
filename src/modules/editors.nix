@@ -6,8 +6,8 @@
 #   • macOS: backend selected in modules/core.nix (Homebrew or nixpkgs);
 #     extensions managed by vscodeExtensionBridge on all backends.
 #
-# The full 66-extension baseline is built entirely from Nix derivations:
-#   • 44 extensions packaged directly in nixpkgs (pkgs.vscode-extensions).
+# The full 65-extension baseline is built entirely from Nix derivations:
+#   • 43 extensions packaged directly in nixpkgs (pkgs.vscode-extensions).
 #   • 22 extensions sourced from the VS Code Marketplace via the
 #     nix-vscode-extensions flake input (vscodeMarketplace extraSpecialArg).
 #
@@ -93,7 +93,6 @@ let
     [ pkgs.vscode-extensions.ms-ceintl.vscode-language-pack-zh-hant ]
     # ms-python
     [ pkgs.vscode-extensions.ms-python.debugpy ]
-    [ pkgs.vscode-extensions.ms-python.isort ]
     [ pkgs.vscode-extensions.ms-python.python ]
     (mkMktx "ms-python" "vscode-python-envs")
     # ms-toolsai
