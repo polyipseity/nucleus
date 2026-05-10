@@ -6,7 +6,7 @@
   # system entrypoint never needs to define a Home Manager-only option.
   home-manager.sharedModules = [
     {
-      nucleus.hostManualFile = ./MANUAL.md;
+      nucleus.hostManualFile = "src/hosts/macbook/MANUAL.md";
     }
   ];
 

@@ -34,6 +34,11 @@
   # Use a display manager that can launch both GNOME and KDE sessions.
   services.displayManager.gdm.enable = true;
 
+  # GNOME (seahorse) and Plasma (ksshaskpass) both define programs.ssh.askPassword.
+  # Pin one deterministic askpass implementation so full toplevel evaluation
+  # does not fail with conflicting option values when both desktops are enabled.
+  programs.ssh.askPassword = lib.mkForce "${pkgs.kdePackages.ksshaskpass}/bin/ksshaskpass";
+
   # Install graphical archive managers per desktop environment.
   environment.systemPackages =
     (with pkgs; [

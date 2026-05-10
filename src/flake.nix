@@ -432,7 +432,7 @@
       # -----------------------------------------------------------------------
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
         extraSpecialArgs = {
-          hostManualFile = ../hosts/nixos/MANUAL.md;
+          hostManualFile = "src/hosts/nixos/MANUAL.md";
           inherit username;
           vscodeMarketplace = vscodeMarketplaceLinux;
         };

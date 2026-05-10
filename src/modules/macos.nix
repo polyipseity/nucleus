@@ -952,8 +952,28 @@ lib.mkIf pkgs.stdenv.isDarwin {
      #   automated step has finished.
      # -------------------------------------------------------------------------
     displayHostManualInstructions = lib.hm.dag.entryAfter displayHostManualInstructionDeps ''
+      _manual_path='${config.nucleus.hostManualFile}'
+      _repo_root_file="$HOME/.config/nucleus/repo-root"
+      _resolved_manual_path="$_manual_path"
+
+      case "$_manual_path" in
+        /*) ;;
+        *)
+          if [ -n "''${NUCLEUS_REPO:-}" ]; then
+            _resolved_manual_path="$NUCLEUS_REPO/$_manual_path"
+          elif [ -f "$_repo_root_file" ]; then
+            _resolved_manual_path="$(cat "$_repo_root_file")/$_manual_path"
+          fi
+          ;;
+      esac
+
+      if [ ! -f "$_resolved_manual_path" ]; then
+        echo "macos: host manual not found at $_resolved_manual_path (configured: $_manual_path)." >&2
+        exit 1
+      fi
+
       echo "--- MANUAL SETUP (one-time, required) ---" >&2
-      /bin/cat '${config.nucleus.hostManualFile}' >&2
+      /bin/cat "$_resolved_manual_path" >&2
       echo "-------------------------------------------" >&2
     '';
 
