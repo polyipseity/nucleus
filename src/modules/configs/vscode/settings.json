@@ -38,8 +38,10 @@
   "chat.viewSessions.orientation": "stacked",
   "cSpell.blockCheckingWhenAverageChunkSizeGreaterThan": 1000,
   "cSpell.blockCheckingWhenTextChunkSizeGreaterThan": 4096,
+  "cSpell.checkVSCodeSystemFiles": true,
   "cSpell.maxNumberOfProblems": 1000,
   "debug.console.fontSize": 14,
+  "debug.javascript.autoAttachFilter": "onlyWithFlag",
   "diffEditor.ignoreTrimWhitespace": false,
   "editor.accessibilitySupport": "auto",
   "editor.aiStats.enabled": true,
@@ -55,6 +57,7 @@
   "explorer.confirmDelete": false,
   "explorer.confirmDragAndDrop": false,
   "explorer.confirmPasteNative": false,
+  "extensions.autoUpdate": false,
   "files.associations": {
     ".prettierignore": "ignore"
   },
@@ -112,6 +115,7 @@
   "nix.enableLanguageServer": true,
   "notebook.insertFinalNewline": true,
   "notebook.lineNumbers": "on",
+  "path-intellisense.extensionOnImport": true,
   "python-envs.terminal.autoActivationType": "shellStartup",
   "python.createEnvironment.contentButton": "show",
   "python.createEnvironment.trigger": "off",
