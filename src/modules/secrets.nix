@@ -563,7 +563,7 @@ lib.mkIf isPrimaryUser {
         # tr-based quote stripping.  The || true prevents a silent set -e exit
         # when grep finds no match, allowing the [ -z ] check below to report
         # the failure cleanly instead of silently aborting the activation chain.
-        _vsd_sops_gpg_fp="$(/usr/bin/grep -m1 -E '[[:space:]]fp: |"fp": ' "${toString path}" | /usr/bin/grep -oE '[0-9A-Fa-f]{40,}')" || true
+        _vsd_sops_gpg_fp="$(/usr/bin/grep -m1 -E '[[:space:]]fp: |"fp": ' "${path}" | /usr/bin/grep -oE '[0-9A-Fa-f]{40,}')" || true
         if [ -z "$_vsd_sops_gpg_fp" ] || \
             ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_sops_gpg_fp"; then
           _vsd_gpg_failures="$_vsd_gpg_failures ${displayName}"
@@ -597,7 +597,7 @@ lib.mkIf isPrimaryUser {
         # uses JSON "\"recipient\": \"KEY\"" (quoted key and value).  The age key
         # is a unique 59+ character bech32 string that identifies the recipient
         # unambiguously without the surrounding field label.
-        /usr/bin/grep -qF "$_vsd_ssh_age_pub" "${toString path}" \
+        /usr/bin/grep -qF "$_vsd_ssh_age_pub" "${path}" \
           || _vsd_ssh_failures="$_vsd_ssh_failures ${displayName}"
       '') allSopsFiles}
       if [ -n "$_vsd_ssh_failures" ]; then

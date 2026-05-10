@@ -94,11 +94,11 @@ in
   assertions = [
     {
       assertion = builtins.pathExists wallpapersDir;
-      message = "wallpapers: required wallpapers directory is missing at ${toString wallpapersDir}.";
+      message = "wallpapers: required wallpapers directory is missing.";
     }
     {
       assertion = builtins.any (u: u == currentUsername) userDirs;
-      message = "wallpapers: current user ${currentUsername} has no wallpaper directory at ${toString wallpapersDir}/${currentUsername}.";
+      message = "wallpapers: current user has no managed wallpaper directory.";
     }
   ];
 
@@ -211,7 +211,7 @@ in
       [ -f "$decryptedFile" ] || continue
       case "$decryptedFile" in *.xml) continue;; esac
       baseName="$(basename "$decryptedFile")"
-      if [ ! -e "${toString wallpapersDir}/${currentUsername}/$baseName.sops" ]; then
+      if [ ! -e "${wallpapersDir}/${currentUsername}/$baseName.sops" ]; then
         rm -f "$decryptedFile"
         echo "wallpaperProvision: removed stale wallpaper $baseName (no matching .sops source)."
       fi

@@ -20,7 +20,7 @@ in
 {
   options.nucleus.hostManualFile = lib.mkOption {
     type = lib.types.nullOr lib.types.path;
-    default = hostManualFile;
+    default = null;
     description = "Host-scoped MANUAL.md path printed by OS-specific activation modules at the end of Home Manager activation.";
   };
 
@@ -41,6 +41,11 @@ in
   ];
 
   config = {
+    # Preserve call-site convenience for standalone Home Manager invocations
+    # that pass hostManualFile via module arguments, while keeping the option
+    # default path-free to avoid options.json derivation context warnings.
+    nucleus.hostManualFile = lib.mkDefault hostManualFile;
+
     home = {
       inherit username;
       homeDirectory = resolvedHomeDirectory;
