@@ -80,6 +80,9 @@ let
   sshExtraOptions =
     {
       AddKeysToAgent = "yes";
+      # Non-Apple OpenSSH (for example nixpkgs openssh) rejects UseKeychain.
+      # IgnoreUnknown keeps one shared ~/.ssh/config usable across clients.
+      IgnoreUnknown = "UseKeychain";
     }
     // lib.optionalAttrs pkgs.stdenv.isDarwin {
       UseKeychain = "yes";
