@@ -17,6 +17,7 @@ let
   # instead of relying only on mocked activation maps.
   agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
+  macbookActivationText = builtins.readFile ../../src/hosts/macbook/activation.nix;
 
   # Assertion helper.
   assert' = cond: msg: if !cond then builtins.throw msg else null;
@@ -226,6 +227,14 @@ let
       (!syncHasExitZero)
       "syncClawHubSkills must not call exit 0, or later activation steps (including displayHostManualInstructions) are skipped";
 
+  # === TEST: GIMP sensitivity targets installed app version dynamically ===
+  test_gimp_sensitivity_version_tracking =
+    assert'
+      ((lib.hasInfix "/Applications/GIMP.app/Contents/Info" macbookActivationText) &&
+       (lib.hasInfix "gimp_version_branch" macbookActivationText) &&
+       !(lib.hasInfix "for gimp_version in 2.10 3.0" macbookActivationText))
+      "GIMP sensitivity provisioning must derive version from installed GIMP.app (no hardcoded version loop)";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -242,6 +251,7 @@ let
     test_before_after_consistency
     test_sync_clawhub_dependency_name_alignment
     test_sync_clawhub_does_not_exit_activation
+    test_gimp_sensitivity_version_tracking
   ];
 in
 {
@@ -263,5 +273,6 @@ in
     "12: Before/after dependency consistency"
     "13: syncClawHubSkills dependency name alignment"
     "14: syncClawHubSkills does not exit activation"
+    "15: GIMP sensitivity tracks installed app version"
   ];
 }
