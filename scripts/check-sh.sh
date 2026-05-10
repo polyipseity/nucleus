@@ -27,8 +27,8 @@ if [ -z "$files" ]; then
 fi
 
 # Run ShellCheck once across the selected file set for consistent output ordering.
-# shellcheck disable=SC2086
-shellcheck $files
+# Use -0 with xargs to safely handle filenames with spaces or special characters.
+git ls-files -z '*.sh' | xargs -0 shellcheck
 
-count=$(printf '%s\n' "$files" | awk 'NF { c += 1 } END { print c + 0 }')
+count=$(git ls-files '*.sh' | awk 'NF { c += 1 } END { print c + 0 }')
 printf 'Shell script check passed for %s files.\n' "$count"

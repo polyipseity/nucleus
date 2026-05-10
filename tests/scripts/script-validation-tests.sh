@@ -64,17 +64,18 @@ test_is_executable() {
 }
 
 # Test 4: Verify critical functions/variables are defined
-# shellcheck disable=SC2329  # Reserved for future test expansion; not yet invoked.
-test_has_function_or_variable() {
-    local script="$1"
-    local identifier="$2"
-    if grep -q "^\s*$identifier\s*=" "$script" || grep -q "^\s*function\s*$identifier" "$script" || grep -q "^\s*$identifier\s*()" "$script"; then
-        assert_pass "Defines $identifier: $(basename "$script")"
-    else
-        # Non-fatal: some scripts may not need this
-        echo -e "${YELLOW}⚠${NC}  Could not find $identifier in $(basename "$script")"
-    fi
-}
+# Reserved for future test expansion; currently not invoked.
+# Uncomment when adding identifier checks to a specific test.
+# test_has_function_or_variable() {
+#     local script="$1"
+#     local identifier="$2"
+#     if grep -q "^\s*$identifier\s*=" "$script" || grep -q "^\s*function\s*$identifier" "$script" || grep -q "^\s*$identifier\s*()" "$script"; then
+#         assert_pass "Defines $identifier: $(basename "$script")"
+#     else
+#         # Non-fatal: some scripts may not need this
+#         echo -e "${YELLOW}⚠${NC}  Could not find $identifier in $(basename "$script")"
+#     fi
+# }
 
 # Test 5: Verify critical dependencies are available
 test_dependencies_available() {

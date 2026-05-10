@@ -134,7 +134,7 @@ load_bootstrap_versions() {
   fi
 
   set -a
-  # shellcheck disable=SC1090
+  # shellcheck disable=SC1090,SC1091  # WHY: Dynamic source validated above; necessary for bootstrap config discovery
   . "$VERSIONS_FILE"
   set +a
 
