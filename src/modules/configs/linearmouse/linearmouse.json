@@ -1,4 +1,5 @@
 {
+  "$schema": "https://schema.linearmouse.app/0.11.2",
   "schemes": [
     {
       "if": {
@@ -32,28 +33,10 @@
     {
       "if": [
         {
-          "app": "org.gimp.gimp",
-          "device": {
-            "category": "mouse"
-          }
+          "app": "org.gimp.gimp"
         },
         {
-          "processName": "gimp",
-          "device": {
-            "category": "mouse"
-          }
-        },
-        {
-          "processPath": "/Applications/GIMP.app/Contents/MacOS/gimp",
-          "device": {
-            "category": "mouse"
-          }
-        },
-        {
-          "processPath": "/Applications/GIMP.app/Contents/MacOS/gimp-3",
-          "device": {
-            "category": "mouse"
-          }
+          "processPath": "/Applications/GIMP.app/Contents/MacOS/gimp"
         },
         {
           "processPath": "/Applications/GIMP.app/Contents/MacOS/gimp-3.2",
