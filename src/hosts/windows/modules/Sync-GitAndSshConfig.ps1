@@ -43,7 +43,16 @@ function Sync-GitAndSshConfig {
   )
 
   foreach ($User in $Users) {
-    $userHome = [Environment]::GetFolderPath('SpecialFolder', $User)
+    # Resolve the target profile path explicitly from the managed username.
+    # WHY: `git config --global` always targets the current process user, so
+    # we need deterministic per-user paths to converge each managed profile.
+    $userHome = Join-Path -Path $env:SystemDrive -ChildPath "Users\$User"
+    if (-not (Test-Path -Path $userHome)) {
+      Write-Warning "User profile path for '$User' does not exist: '$userHome'. Skipping."
+      continue
+    }
+
+    $gitConfigPath = Join-Path -Path $userHome -ChildPath '.gitconfig'
     $identityPath = Join-Path -Path $userHome -ChildPath ".config\nucleus\git-identity.env"
     if (-not (Test-Path -Path $identityPath)) {
       Write-Warning "Missing SOPS-managed Git identity payload for user '$User': '$identityPath'. Skipping."
@@ -148,7 +157,7 @@ function Sync-GitAndSshConfig {
       }
 
       foreach ($settingKey in $managedGitSettings.Keys) {
-        & $gitExecutable config --global $settingKey $managedGitSettings[$settingKey]
+        & $gitExecutable config --file $gitConfigPath $settingKey $managedGitSettings[$settingKey]
         if ($LASTEXITCODE -ne 0) {
           throw "Failed to set Git config '$settingKey' for user '$User'."
         }
@@ -170,7 +179,7 @@ function Sync-GitAndSshConfig {
         }
 
         foreach ($settingKey in $managedGitSettings.Keys) {
-          & $gitExecutable config --global --unset-all $settingKey *> $null
+          & $gitExecutable config --file $gitConfigPath --unset-all $settingKey *> $null
         }
       }
     }

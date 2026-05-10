@@ -18,6 +18,7 @@ let
   agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
   macbookActivationText = builtins.readFile ../../src/hosts/macbook/activation.nix;
+  windowsGitSshModuleText = builtins.readFile ../../src/hosts/windows/modules/Sync-GitAndSshConfig.ps1;
 
   # Assertion helper.
   assert' = cond: msg: if !cond then builtins.throw msg else null;
@@ -235,6 +236,13 @@ let
        !(lib.hasInfix "for gimp_version in 2.10 3.0" macbookActivationText))
       "GIMP sensitivity provisioning must derive version from installed GIMP.app (no hardcoded version loop)";
 
+  # === TEST: Windows Git identity applies to each managed profile path ===
+  test_windows_git_identity_targets_user_gitconfig =
+    assert'
+      ((lib.hasInfix "config --file $gitConfigPath" windowsGitSshModuleText) &&
+       !(lib.hasInfix "config --global" windowsGitSshModuleText))
+      "Windows Git identity must write via --file $gitConfigPath, not --global, so each managed user profile gets the correct target path";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -252,6 +260,7 @@ let
     test_sync_clawhub_dependency_name_alignment
     test_sync_clawhub_does_not_exit_activation
     test_gimp_sensitivity_version_tracking
+    test_windows_git_identity_targets_user_gitconfig
   ];
 in
 {
@@ -274,5 +283,6 @@ in
     "13: syncClawHubSkills dependency name alignment"
     "14: syncClawHubSkills does not exit activation"
     "15: GIMP sensitivity tracks installed app version"
+    "16: Windows Git identity targets per-user .gitconfig"
   ];
 }
