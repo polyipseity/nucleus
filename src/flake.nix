@@ -46,6 +46,11 @@
         polyipseity = {
           homeDirectory = "/Users/polyipseity";
           isPrimary = true;
+          # Per-user password-store root used by pass / QtPass / gopass.
+          # `~` is expanded in modules/home.nix to the user's homeDirectory.
+          passwordStore = {
+            path = "~/dev/monorepo-private/self/passwords";
+          };
           # Dev repository provisioning for this user.
           devRepos = {
             enable = true;
@@ -87,6 +92,12 @@
       mkHomeManagerUsers = userModulesPath: builtins.mapAttrs (name: user:
         {
           imports = [
+            {
+              _module.args = {
+                managedUser = user;
+                managedUsername = name;
+              };
+            }
             userModulesPath
           ] ++ (builtins.filter (m: m != null) [
             (if user.isPrimary then sops-nix.homeManagerModules.sops else null)
@@ -376,7 +387,7 @@
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
-              inherit username;
+              inherit username users;
               vscodeMarketplace = vscodeMarketplaceLinux;
             };
             home-manager.users = mkHomeManagerUsers ./modules/home.nix;
@@ -439,7 +450,7 @@
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
         extraSpecialArgs = {
           hostManualFile = "src/hosts/nixos/MANUAL.md";
-          inherit username;
+          inherit username users;
           vscodeMarketplace = vscodeMarketplaceLinux;
         };
         modules = [
