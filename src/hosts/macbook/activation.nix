@@ -198,6 +198,23 @@
       echo "power: no supported battery charge-limit tool found (expected /usr/local/bin/battery or /opt/homebrew/bin/bclm)." >&2
     fi
 
+    # ---- configureLinearMousePreferences --------------------------------------
+    # Keep LinearMouse update checks and auto-update disabled declaratively.
+    # These are Sparkle preferences in the app's defaults domain.
+    if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
+      if [ -d "/Applications/LinearMouse.app" ]; then
+        console_uid="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
+        if [ -n "$console_uid" ]; then
+          if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" /usr/bin/defaults write com.lujjjh.LinearMouse SUEnableAutomaticChecks -bool false; then
+            echo "linearmouse: failed to disable automatic update checks for user '$console_user'." >&2
+          fi
+          if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" /usr/bin/defaults write com.lujjjh.LinearMouse SUAutomaticallyUpdate -bool false; then
+            echo "linearmouse: failed to disable automatic updates for user '$console_user'." >&2
+          fi
+        fi
+      fi
+    fi
+
     # ---- configureGimpScrollSensitivity ---------------------------------------
     # Reduce GIMP zoom sensitivity to 25% of upstream default by setting the
     # drag-zoom-speed token in the active user gimprc to 25.0 (default 100.0).

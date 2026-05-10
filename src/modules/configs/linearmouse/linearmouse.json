@@ -6,6 +6,9 @@
           "category": "mouse"
         }
       },
+      "pointer": {
+        "acceleration": 0
+      },
       "scrolling": {
         "reverse": {
           "horizontal": false,
@@ -27,12 +30,20 @@
       }
     },
     {
-      "if": {
-        "app": "org.gimp.gimp",
-        "device": {
-          "category": "mouse"
+      "if": [
+        {
+          "app": "org.gimp.gimp",
+          "device": {
+            "category": "mouse"
+          }
+        },
+        {
+          "processName": "gimp",
+          "device": {
+            "category": "mouse"
+          }
         }
-      },
+      ],
       "scrolling": {
         "speed": {
           "horizontal": 0.25,

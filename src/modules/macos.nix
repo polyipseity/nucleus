@@ -987,6 +987,27 @@ lib.mkIf pkgs.stdenv.isDarwin {
   };
 
   # --------------------------------------------------------------------------
+  # LinearMouse autostart LaunchAgent
+  # Starts LinearMouse at user login so per-device scroll behavior is active
+  # without manual app launch.
+  # --------------------------------------------------------------------------
+  launchd.agents."linearmouse-autostart" = {
+    enable = true;
+    config = {
+      Label = "local.linearmouse-autostart";
+      ProgramArguments = [
+        "/usr/bin/open"
+        "-gj"
+        "-a"
+        "/Applications/LinearMouse.app"
+      ];
+      RunAtLoad = true;
+      StandardOutPath = "/dev/null";
+      StandardErrorPath = "/dev/null";
+    };
+  };
+
+  # --------------------------------------------------------------------------
   # nix-index rebuild LaunchAgent
   # Keeps the nix-index file database current so pay-respects can suggest
   # `nix profile install` commands when an unknown command is typed.
