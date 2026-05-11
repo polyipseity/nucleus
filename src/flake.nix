@@ -204,6 +204,38 @@
       # prek hooks on the first successful run.
       # openssh provides ssh-keygen for the generate_ssh_host_key_if_needed step
       # that creates /etc/ssh/ssh_host_ed25519_key on first-provision machines.
+      # Build a pre-compiled uv 0.10.x binary derivation.
+      # Fetches the official upstream release tarball for each platform so we
+      # get an exact minor-version pin rather than whatever nixpkgs ships.
+      # musl is used for Linux so the binary is statically linked and works on
+      # NixOS without patchelf.
+      mkUv0_10_12 = pkgs:
+        let
+          version = "0.10.12";
+          srcs = {
+            "aarch64-darwin" = {
+              url = "https://github.com/astral-sh/uv/releases/download/${version}/uv-aarch64-apple-darwin.tar.gz";
+              hash = "sha256-rnOLVmGpAFeexiHTkYwO8XvewNoqim2LFhE3zRXyVBQ=";
+            };
+            "x86_64-linux" = {
+              url = "https://github.com/astral-sh/uv/releases/download/${version}/uv-x86_64-unknown-linux-musl.tar.gz";
+              hash = "sha256-rcz0C10ZOaXgCTCB7CMH6iQjWt98LZaxIsVh+jdxHEY=";
+            };
+          };
+          plat = pkgs.stdenv.hostPlatform.system;
+        in
+        pkgs.stdenv.mkDerivation {
+          pname = "uv";
+          inherit version;
+          src = pkgs.fetchurl srcs.${plat};
+          dontUnpack = true;
+          installPhase = ''
+            mkdir -p $out/bin
+            tar -xzf $src --strip-components=1 -C $out/bin
+          '';
+          meta.mainProgram = "uv";
+        };
+
       mkApplyApp = pkgs: {
         type = "app";
         program = "${pkgs.writeShellApplication {
@@ -448,7 +480,7 @@
               pkgsMac.bun
               pkgsMac.cargo
               pkgsMac.rustc
-              pkgsMac.uv
+              (mkUv0_10_12 pkgsMac)
             ];
           };
           bootstrap = pkgsMac.mkShell {
@@ -465,7 +497,7 @@
               pkgsLinux.bun
               pkgsLinux.cargo
               pkgsLinux.rustc
-              pkgsLinux.uv
+              (mkUv0_10_12 pkgsLinux)
             ];
           };
           bootstrap = pkgsLinux.mkShell {
