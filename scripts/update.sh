@@ -91,7 +91,24 @@ run_nix() {
 
 update_flake_inputs() {
   # Updates pinned upstream revisions in src/flake.lock.
-  run_nix flake update --flake "$REPO_ROOT/src"
+  if flake_output="$(run_nix flake update --flake "$REPO_ROOT/src" 2>&1)"; then
+    if [ -n "$flake_output" ]; then
+      printf '%s\n' "$flake_output"
+    fi
+    return 0
+  fi
+
+  printf '%s\n' "$flake_output" >&2
+
+  # Transient network / GitHub API-rate-limit failures should not abort the
+  # whole update workflow: continue with host package updates and SOPS rewrap.
+  if printf '%s' "$flake_output" | grep -Eq 'API rate limit exceeded|unable to download|HTTP error 403'; then
+    printf '%s\n' "update: warning: flake update skipped due to transient fetch/rate-limit error" >&2
+    return 0
+  fi
+
+  printf '%s\n' "update: error: flake update failed" >&2
+  return 1
 }
 
 update_homebrew_if_available() {
@@ -123,18 +140,20 @@ update_windows_packages_if_available() {
 rewrap_sops_files() {
   # Rewrap every encrypted repository asset so recipients stay in sync with
   # .sops.yaml key declarations after machine additions/removals.
+  sops_config="$REPO_ROOT/.sops.yaml"
+
   for encrypted_file in \
     "$REPO_ROOT/src/secrets/git-identities.yml" \
     "$REPO_ROOT/src/secrets/gpg-personal.yml" \
     "$REPO_ROOT/src/secrets/ssh-personal.yml"; do
-    sops updatekeys --yes "$encrypted_file"
+    sops --config "$sops_config" updatekeys --yes "$encrypted_file"
   done
 
   wallpaper_dir="$REPO_ROOT/src/assets/wallpapers"
   if [ -d "$wallpaper_dir" ]; then
     for encrypted_wallpaper in "$wallpaper_dir"/*.sops; do
       if [ -f "$encrypted_wallpaper" ]; then
-        sops updatekeys --yes "$encrypted_wallpaper"
+        sops --config "$sops_config" updatekeys --yes "$encrypted_wallpaper"
       fi
     done
   fi

@@ -19,9 +19,15 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
 
 if (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue) {
-  & nix.exe flake update --flake (Join-Path -Path $repoRoot -ChildPath 'src')
+  $flakeOutput = & nix.exe flake update --flake (Join-Path -Path $repoRoot -ChildPath 'src') 2>&1
   if ($LASTEXITCODE -ne 0) {
-    throw 'nucleus: nix flake update failed.'
+    $joined = ($flakeOutput | Out-String)
+    if ($joined -match 'API rate limit exceeded|unable to download|HTTP error 403') {
+      Write-Warning 'nucleus: flake update skipped due to transient fetch/rate-limit error.'
+    }
+    else {
+      throw 'nucleus: nix flake update failed.'
+    }
   }
 }
 
@@ -33,6 +39,8 @@ if (-not (Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue)) {
   throw 'nucleus: sops.exe is required for update secret rewrap step.'
 }
 
+$sopsConfig = Join-Path -Path $repoRoot -ChildPath '.sops.yaml'
+
 $secretFiles = @(
   (Join-Path -Path $repoRoot -ChildPath 'src\secrets\git-identities.yml'),
   (Join-Path -Path $repoRoot -ChildPath 'src\secrets\gpg-personal.yml'),
@@ -40,7 +48,7 @@ $secretFiles = @(
 )
 
 foreach ($secretFile in $secretFiles) {
-  & sops updatekeys --yes $secretFile
+  & sops --config $sopsConfig updatekeys --yes $secretFile
   if ($LASTEXITCODE -ne 0) {
     throw "nucleus: failed to rewrap secret file '$secretFile'."
   }
@@ -49,7 +57,7 @@ foreach ($secretFile in $secretFiles) {
 $wallpaperDir = Join-Path -Path $repoRoot -ChildPath 'src\assets\wallpapers'
 if (Test-Path -Path $wallpaperDir) {
   Get-ChildItem -Path $wallpaperDir -Filter '*.sops' -File | ForEach-Object {
-    & sops updatekeys --yes $_.FullName
+    & sops --config $sopsConfig updatekeys --yes $_.FullName
     if ($LASTEXITCODE -ne 0) {
       throw "nucleus: failed to rewrap wallpaper blob '$($_.FullName)'."
     }
