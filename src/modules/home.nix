@@ -66,7 +66,7 @@ in
 
     home = {
       username = effectiveUsername;
-      homeDirectory = resolvedHomeDirectory;
+      homeDirectory = lib.mkDefault resolvedHomeDirectory;
       # Pin the Home Manager state version; changing this after initial
       # activation requires a deliberate migration.
       stateVersion = "24.11";
