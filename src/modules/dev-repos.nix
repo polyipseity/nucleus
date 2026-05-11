@@ -17,13 +17,18 @@
 #   • submoduleDirectories: list of folder paths where submodules should be cloned (supports globs)
 #
 # Submodule directory entries:
-#   • path: directory path where submodules will be cloned (supports globbing: monorepo-private/orgs/*)
+#   • path: directory path where submodules will be cloned (supports globbing: e.g. 'myrepo/subdir/*')
 #   • recursive: whether to recursively clone nested submodules (boolean; presence implies enabled)
 #
 # Dependency:
 #   • This hook runs after writeBoundary so basic file operations are available.
 #   • No secrets or decryption needed; cloning happens via Git SSH (configured separately).
-args@{ config, lib, pkgs, ... }:
+args@{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   users = args.users or { };
   currentUserHome = config.home.homeDirectory;
@@ -35,12 +40,13 @@ let
 
   # Read user-specific dev repos config from the centralized user registry.
   # Falls back to disabled if not defined for this user.
-  userConfig = users.${currentUsername}.devRepos or {
-    enable = false;
-    gitHubUsername = currentUsername;
-    repositories = [];
-    submoduleDirectories = [];
-  };
+  userConfig =
+    users.${currentUsername}.devRepos or {
+      enable = false;
+      gitHubUsername = currentUsername;
+      repositories = [ ];
+      submoduleDirectories = [ ];
+    };
 in
 {
   options.nucleus.devRepos = {
@@ -57,51 +63,55 @@ in
     };
 
     repositories = lib.mkOption {
-      type = lib.types.listOf (lib.types.submodule {
-        options = {
-          name = lib.mkOption {
-            type = lib.types.str;
-            description = "Repository name (used for logging).";
+      type = lib.types.listOf (
+        lib.types.submodule {
+          options = {
+            name = lib.mkOption {
+              type = lib.types.str;
+              description = "Repository name (used for logging).";
+            };
+            target = lib.mkOption {
+              type = lib.types.str;
+              description = "Target path where repo/symlink should be created. Relative paths are resolved under the managed user's home directory; absolute paths are used as-is.";
+            };
+            symlink = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "If set, create a symlink to this path instead of cloning. Relative paths are resolved under the managed user's home directory; absolute paths are used as-is.";
+            };
+            symlinkFromRepoRoot = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "When true, use the live repository checkout root recorded by apply.sh as the symlink target. This keeps dev symlinks pointed at the working tree instead of a Nix store snapshot.";
+            };
+            url = lib.mkOption {
+              type = lib.types.nullOr lib.types.str;
+              default = null;
+              description = "If set (and symlink is null), clone from this Git URL.";
+            };
           };
-          target = lib.mkOption {
-            type = lib.types.str;
-            description = "Target path where repo/symlink should be created. Relative paths are resolved under the managed user's home directory; absolute paths are used as-is.";
-          };
-          symlink = lib.mkOption {
-            type = lib.types.nullOr lib.types.str;
-            default = null;
-            description = "If set, create a symlink to this path instead of cloning. Relative paths are resolved under the managed user's home directory; absolute paths are used as-is.";
-          };
-          symlinkFromRepoRoot = lib.mkOption {
-            type = lib.types.bool;
-            default = false;
-            description = "When true, use the live repository checkout root recorded by apply.sh as the symlink target. This keeps dev symlinks pointed at the working tree instead of a Nix store snapshot.";
-          };
-          url = lib.mkOption {
-            type = lib.types.nullOr lib.types.str;
-            default = null;
-            description = "If set (and symlink is null), clone from this Git URL.";
-          };
-        };
-      });
+        }
+      );
       default = userConfig.repositories;
       description = "List of repositories to provision (clone/symlink). Configured per-user in the user registry.";
     };
 
     submoduleDirectories = lib.mkOption {
-      type = lib.types.listOf (lib.types.submodule {
-        options = {
-          path = lib.mkOption {
-            type = lib.types.str;
-            description = "Directory path where direct submodules should be cloned. Supports globbing (e.g., 'monorepo-private/orgs/*'). Relative paths are resolved under the managed user's home directory.";
+      type = lib.types.listOf (
+        lib.types.submodule {
+          options = {
+            path = lib.mkOption {
+              type = lib.types.str;
+              description = "Directory path where direct submodules should be cloned. Supports globbing (e.g., 'myrepo/subdir/*'). Relative paths are resolved under the managed user's home directory.";
+            };
+            recursive = lib.mkOption {
+              type = lib.types.bool;
+              default = false;
+              description = "Whether to recursively clone nested submodules (--recursive flag). Presence of this directory implies submodules are enabled.";
+            };
           };
-          recursive = lib.mkOption {
-            type = lib.types.bool;
-            default = false;
-            description = "Whether to recursively clone nested submodules (--recursive flag). Presence of this directory implies submodules are enabled.";
-          };
-        };
-      });
+        }
+      );
       default = userConfig.submoduleDirectories;
       description = "List of folder directories where submodules should be cloned. Processed sequentially to support dependencies between clones. Configured per-user in the user registry.";
     };
@@ -112,300 +122,301 @@ in
     # identity include, and decryption health checks from secrets.nix. Keep
     # this activation ordered after the secrets pipeline so every managed user
     # sees the same post-secrets provisioning order on both macOS and NixOS.
-    home.activation.devReposProvision = lib.hm.dag.entryAfter [
-      "gitIdentityFromSops"
-      "gpgImport"
-      "sshKeyAdopt"
-      "verifySecretDecryption"
-      "waitForSopsSecrets"
-      "writeBoundary"
-    ] ''
-      set -eu
+    home.activation.devReposProvision =
+      lib.hm.dag.entryAfter
+        [
+          "gitIdentityFromSops"
+          "gpgImport"
+          "sshKeyAdopt"
+          "verifySecretDecryption"
+          "waitForSopsSecrets"
+          "writeBoundary"
+        ]
+        ''
+          set -eu
 
-      export HOME="${currentUserHome}"
-      export PATH="${pkgs.git}/bin:$PATH"
-      export GIT_SSH_COMMAND="${sshClient}"
+          export HOME="${currentUserHome}"
+          export PATH="${pkgs.git}/bin:$PATH"
+          export GIT_SSH_COMMAND="${sshClient}"
 
-      # Resolve the live checkout root written by apply.sh before the rebuild.
-      # Repo-root symlinks must target the mutable working tree rather than the
-      # Nix store copy of flake inputs, or ~/dev/nucleus drifts away from the
-      # user's actual checkout after every rebuild.
-      repoRootFile="$HOME/.config/nucleus/repo-root"
-      repoRoot=""
-      gitBin="${pkgs.git}/bin/git"
-      if [ -n "''${NUCLEUS_REPO:-}" ]; then
-        repoRoot="$NUCLEUS_REPO"
-      elif [ -f "$repoRootFile" ]; then
-        repoRoot="$(cat "$repoRootFile")"
-      fi
-
-      devDir="$HOME/dev"
-      mkdir -p "$devDir" || { echo "devReposProvision: failed to create $devDir" >&2; exit 1; }
-
-      # Convert declarative repo paths into real filesystem paths for the
-      # managed user. Relative paths live under $HOME; ~/... expands to the
-      # same place explicitly because quoted shell arguments suppress tilde
-      # expansion.
-      resolve_repo_path() {
-        pathInput="$1"
-
-        case "$pathInput" in
-          "~")
-            printf '%s\n' "$HOME"
-            ;;
-          ~/*)
-            printf '%s/%s\n' "$HOME" "''${pathInput#~/}"
-            ;;
-          /*)
-            printf '%s\n' "$pathInput"
-            ;;
-          *)
-            printf '%s/%s\n' "$HOME" "$pathInput"
-            ;;
-        esac
-      }
-
-      # Repo-root-backed symlinks are only valid when apply.sh has recorded the
-      # live checkout path. Failing fast here avoids quietly linking dev repos
-      # to an empty string or a stale store path.
-      resolve_repo_root_target() {
-        if [ -z "$repoRoot" ]; then
-          echo "devReposProvision: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
-          return 1
-        fi
-
-        printf '%s\n' "$repoRoot"
-      }
-
-      # Expand glob pattern and return matching paths. If no matches, return empty.
-      expand_glob_paths() {
-        baseDir="$1"
-        pattern="$2"
-
-        # Use shell globbing with set -f/+f to safely expand patterns
-        ( cd "$baseDir" 2>/dev/null && ls -1d $pattern 2>/dev/null ) || true
-      }
-
-      # Read direct submodule paths from the repository .gitmodules file.
-      # Direct submodules are those listed in .gitmodules without nesting.
-      list_direct_submodules() {
-        repoTarget="$1"
-
-        if ! submoduleConfig=$(cd "$repoTarget" && "$gitBin" config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>&1); then
-          echo "devReposProvision: failed to read .gitmodules in $repoTarget ($submoduleConfig)" >&2
-          return 1
-        fi
-
-        printf '%s\n' "$submoduleConfig" | while IFS=' ' read -r _submoduleKey _submodulePath; do
-          printf '%s\n' "$_submodulePath"
-        done
-      }
-
-      # Helper function: create a symlink for a repository.
-      ensure_symlink() {
-        local symlinkTarget="$1"
-        local symlinkPath="$2"
-        local repoName="$3"
-        local currentTarget
-        local symlinkParent
-
-        symlinkParent=$(dirname "$symlinkPath")
-        if ! mkdir -p "$symlinkParent"; then
-          echo "devReposProvision: failed to create parent directory $symlinkParent for $repoName" >&2
-          return 0
-        fi
-
-        if [ -L "$symlinkPath" ]; then
-          currentTarget=$(readlink "$symlinkPath")
-          if [ "$currentTarget" = "$symlinkTarget" ]; then
-            echo "devReposProvision: symlink for $repoName already points to $symlinkTarget"
-            return 0
+          # Resolve the live checkout root written by apply.sh before the rebuild.
+          # Repo-root symlinks must target the mutable working tree rather than the
+          # Nix store copy of flake inputs, or ~/dev/nucleus drifts away from the
+          # user's actual checkout after every rebuild.
+          repoRootFile="$HOME/.config/nucleus/repo-root"
+          repoRoot=""
+          gitBin="${pkgs.git}/bin/git"
+          if [ -n "''${NUCLEUS_REPO:-}" ]; then
+            repoRoot="$NUCLEUS_REPO"
+          elif [ -f "$repoRootFile" ]; then
+            repoRoot="$(cat "$repoRootFile")"
           fi
 
-          if ! rm "$symlinkPath"; then
-            echo "devReposProvision: failed to replace stale symlink for $repoName" >&2
-            return 0
-          fi
-        elif [ -e "$symlinkPath" ]; then
-          echo "devReposProvision: $symlinkPath exists and is not a symlink for $repoName (soft fail)" >&2
-          return 0
-        fi
+          devDir="$HOME/dev"
+          mkdir -p "$devDir" || { echo "devReposProvision: failed to create $devDir" >&2; exit 1; }
 
-        if ln -s "$symlinkTarget" "$symlinkPath"; then
-          echo "devReposProvision: linked $symlinkPath -> $symlinkTarget"
-        else
-          echo "devReposProvision: failed to create symlink for $repoName (soft fail)" >&2
-        fi
-      }
+          # Convert declarative repo paths into real filesystem paths for the
+          # managed user. Relative paths live under $HOME; ~/... expands to the
+          # same place explicitly because quoted shell arguments suppress tilde
+          # expansion.
+          resolve_repo_path() {
+            pathInput="$1"
 
-      # Helper function: clone or update a repository (no submodule logic here).
-      ensure_repo() {
-        local repoUrl="$1"
-        local repoTarget="$2"
-        local repoName="$3"
-        local parentDir
-        local currentRemote
-        local remoteErr
-        local cloneErr
-
-        parentDir=$(dirname "$repoTarget")
-        if ! mkdir -p "$parentDir"; then
-          echo "devReposProvision: failed to create parent directory $parentDir for $repoName" >&2
-          return 0
-        fi
-
-        # Check if repo is initialized.
-        if [ -d "$repoTarget/.git" ]; then
-          # Repo already initialized; verify/update remote.
-          if [ -d "$repoTarget" ]; then
-            if ! currentRemote=$(cd "$repoTarget" && "$gitBin" config --get remote.origin.url 2>&1); then
-              echo "devReposProvision: failed to read remote for $repoName ($currentRemote)" >&2
-              currentRemote=""
-            fi
-
-            if [ "$currentRemote" != "$repoUrl" ]; then
-              if remoteErr=$(cd "$repoTarget" && "$gitBin" remote set-url origin "$repoUrl" 2>&1); then
-                echo "devReposProvision: updated remote for $repoName to $repoUrl"
-              else
-                echo "devReposProvision: failed to update remote for $repoName ($remoteErr)" >&2
-              fi
-            fi
-          fi
-
-          return 0
-        fi
-
-        # Repo not initialized; clone it.
-        if [ -e "$repoTarget" ] && [ ! -d "$repoTarget" ]; then
-          echo "devReposProvision: $repoTarget exists and is not a directory (soft fail)" >&2
-          return 0
-        fi
-
-        if [ -d "$repoTarget" ] && [ "$(ls -A "$repoTarget" 2>/dev/null)" != "" ]; then
-          echo "devReposProvision: $repoTarget exists but is not a git repo (soft fail)" >&2
-          return 0
-        fi
-
-        if cloneErr=$("$gitBin" clone "$repoUrl" "$repoTarget" 2>&1); then
-          echo "devReposProvision: cloned $repoName to $repoTarget"
-          return 0
-        else
-          echo "devReposProvision: failed to clone $repoName from $repoUrl ($cloneErr)" >&2
-          return 0
-        fi
-      }
-
-      # Helper function: clone direct submodules from a directory path.
-      # Arguments: directoryPath recursive(0|1) directoryLabel
-      clone_directory_submodules() {
-        local dirPath="$1"
-        local recursive="$2"
-        local dirLabel="$3"
-        local directSubmodules
-        local submodulePath
-        local submoduleTarget
-        local submoduleErr
-
-        # Directory must exist and have a .gitmodules file
-        if [ ! -f "$dirPath/.gitmodules" ]; then
-          echo "devReposProvision: $dirLabel has no .gitmodules (skipping)" >&2
-          return 0
-        fi
-
-        if ! directSubmodules=$(list_direct_submodules "$dirPath"); then
-          echo "devReposProvision: failed to list submodules in $dirLabel (skipping)" >&2
-          return 0
-        fi
-
-        # Initialize each direct submodule
-        for submodulePath in $directSubmodules; do
-          submoduleTarget="$dirPath/$submodulePath"
-
-          if [ -e "$submoduleTarget/.git" ]; then
-            echo "devReposProvision: submodule $submodulePath already initialized in $dirLabel (skipping)"
-            continue
-          fi
-
-          if [ "$recursive" = "1" ]; then
-            if submoduleErr=$(cd "$dirPath" && "$gitBin" submodule update --init --recursive "$submodulePath" 2>&1); then
-              echo "devReposProvision: initialized submodule $submodulePath (recursive) in $dirLabel"
-            else
-              echo "devReposProvision: failed to initialize submodule $submodulePath (recursive) in $dirLabel ($submoduleErr)" >&2
-            fi
-          else
-            if submoduleErr=$(cd "$dirPath" && "$gitBin" submodule update --init "$submodulePath" 2>&1); then
-              echo "devReposProvision: initialized submodule $submodulePath in $dirLabel"
-            else
-              echo "devReposProvision: failed to initialize submodule $submodulePath in $dirLabel ($submoduleErr)" >&2
-            fi
-          fi
-        done
-      }
-
-      # Step 1: Provision configured repositories
-      ${lib.concatMapStringsSep "\n"
-        (repo:
-          if repo.symlinkFromRepoRoot then
-            ''
-              repoTargetPath="$(resolve_repo_path "${repo.target}")"
-              if repoSymlinkTarget="$(resolve_repo_root_target)"; then
-                ensure_symlink "$repoSymlinkTarget" "$repoTargetPath" "${repo.name}"
-              else
-                echo "devReposProvision: repo-root symlink target unavailable for ${repo.name} (skipping)" >&2
-              fi
-            ''
-          else if repo.symlink != null then
-            ''ensure_symlink "$(resolve_repo_path "${repo.symlink}")" "$(resolve_repo_path "${repo.target}")" "${repo.name}"''
-          else if repo.url != null then
-            ''ensure_repo "${repo.url}" "$(resolve_repo_path "${repo.target}")" "${repo.name}"''
-          else
-            ''echo "devReposProvision: repository '${repo.name}' has neither symlink nor url configured (skipping)" >&2''
-        )
-        config.nucleus.devRepos.repositories}
-
-      # Step 2: Clone submodules from specified directories (sequential processing)
-      ${lib.concatMapStringsSep "\n"
-        (submoduleDir:
-          let
-            recursive = if submoduleDir.recursive then "1" else "0";
-          in
-          ''
-            # Expand glob patterns in submodule directory paths
-            resolvedPath="$(resolve_repo_path "${submoduleDir.path}")"
-
-            # Check if path contains glob characters
-            case "$resolvedPath" in
-              *\*|*\?|*\[*)
-                # Glob pattern detected; expand it
-                baseDir=$(dirname "$resolvedPath")
-                pattern=$(basename "$resolvedPath")
-                if [ -d "$baseDir" ]; then
-                  expandedPaths=$(expand_glob_paths "$baseDir" "$pattern")
-                  if [ -z "$expandedPaths" ]; then
-                    echo "devReposProvision: no matches for glob pattern '${submoduleDir.path}' (skipping)" >&2
-                  else
-                    while IFS= read -r matchedPath; do
-                      clone_directory_submodules "$matchedPath" "${recursive}" "''${matchedPath#$HOME/}"
-                    done <<< "$expandedPaths"
-                  fi
-                else
-                  echo "devReposProvision: base directory $baseDir does not exist for glob pattern '${submoduleDir.path}' (skipping)" >&2
-                fi
+            case "$pathInput" in
+              "~")
+                printf '%s\n' "$HOME"
+                ;;
+              ~/*)
+                printf '%s/%s\n' "$HOME" "''${pathInput#~/}"
+                ;;
+              /*)
+                printf '%s\n' "$pathInput"
                 ;;
               *)
-                # No glob; process literal path
-                if [ -d "$resolvedPath" ]; then
-                  clone_directory_submodules "$resolvedPath" "${recursive}" "${submoduleDir.path}"
-                else
-                  echo "devReposProvision: directory '${submoduleDir.path}' does not exist (skipping)" >&2
-                fi
+                printf '%s/%s\n' "$HOME" "$pathInput"
                 ;;
             esac
-          ''
-        )
-        config.nucleus.devRepos.submoduleDirectories}
+          }
 
-      echo "devReposProvision: completed provisioning dev repositories and submodules"
-    '';
+          # Repo-root-backed symlinks are only valid when apply.sh has recorded the
+          # live checkout path. Failing fast here avoids quietly linking dev repos
+          # to an empty string or a stale store path.
+          resolve_repo_root_target() {
+            if [ -z "$repoRoot" ]; then
+              echo "devReposProvision: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
+              return 1
+            fi
+
+            printf '%s\n' "$repoRoot"
+          }
+
+          # Expand glob pattern and return matching paths. If no matches, return empty.
+          expand_glob_paths() {
+            baseDir="$1"
+            pattern="$2"
+
+            # Use shell globbing with set -f/+f to safely expand patterns
+            ( cd "$baseDir" 2>/dev/null && ls -1d $pattern 2>/dev/null ) || true
+          }
+
+          # Read direct submodule paths from the repository .gitmodules file.
+          # Direct submodules are those listed in .gitmodules without nesting.
+          list_direct_submodules() {
+            repoTarget="$1"
+
+            if ! submoduleConfig=$(cd "$repoTarget" && "$gitBin" config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>&1); then
+              echo "devReposProvision: failed to read .gitmodules in $repoTarget ($submoduleConfig)" >&2
+              return 1
+            fi
+
+            printf '%s\n' "$submoduleConfig" | while IFS=' ' read -r _submoduleKey _submodulePath; do
+              printf '%s\n' "$_submodulePath"
+            done
+          }
+
+          # Helper function: create a symlink for a repository.
+          ensure_symlink() {
+            local symlinkTarget="$1"
+            local symlinkPath="$2"
+            local repoName="$3"
+            local currentTarget
+            local symlinkParent
+
+            symlinkParent=$(dirname "$symlinkPath")
+            if ! mkdir -p "$symlinkParent"; then
+              echo "devReposProvision: failed to create parent directory $symlinkParent for $repoName" >&2
+              return 0
+            fi
+
+            if [ -L "$symlinkPath" ]; then
+              currentTarget=$(readlink "$symlinkPath")
+              if [ "$currentTarget" = "$symlinkTarget" ]; then
+                echo "devReposProvision: symlink for $repoName already points to $symlinkTarget"
+                return 0
+              fi
+
+              if ! rm "$symlinkPath"; then
+                echo "devReposProvision: failed to replace stale symlink for $repoName" >&2
+                return 0
+              fi
+            elif [ -e "$symlinkPath" ]; then
+              echo "devReposProvision: $symlinkPath exists and is not a symlink for $repoName (soft fail)" >&2
+              return 0
+            fi
+
+            if ln -s "$symlinkTarget" "$symlinkPath"; then
+              echo "devReposProvision: linked $symlinkPath -> $symlinkTarget"
+            else
+              echo "devReposProvision: failed to create symlink for $repoName (soft fail)" >&2
+            fi
+          }
+
+          # Helper function: clone or update a repository (no submodule logic here).
+          ensure_repo() {
+            local repoUrl="$1"
+            local repoTarget="$2"
+            local repoName="$3"
+            local parentDir
+            local currentRemote
+            local remoteErr
+            local cloneErr
+
+            parentDir=$(dirname "$repoTarget")
+            if ! mkdir -p "$parentDir"; then
+              echo "devReposProvision: failed to create parent directory $parentDir for $repoName" >&2
+              return 0
+            fi
+
+            # Check if repo is initialized.
+            if [ -d "$repoTarget/.git" ]; then
+              # Repo already initialized; verify/update remote.
+              if [ -d "$repoTarget" ]; then
+                if ! currentRemote=$(cd "$repoTarget" && "$gitBin" config --get remote.origin.url 2>&1); then
+                  echo "devReposProvision: failed to read remote for $repoName ($currentRemote)" >&2
+                  currentRemote=""
+                fi
+
+                if [ "$currentRemote" != "$repoUrl" ]; then
+                  if remoteErr=$(cd "$repoTarget" && "$gitBin" remote set-url origin "$repoUrl" 2>&1); then
+                    echo "devReposProvision: updated remote for $repoName to $repoUrl"
+                  else
+                    echo "devReposProvision: failed to update remote for $repoName ($remoteErr)" >&2
+                  fi
+                fi
+              fi
+
+              return 0
+            fi
+
+            # Repo not initialized; clone it.
+            if [ -e "$repoTarget" ] && [ ! -d "$repoTarget" ]; then
+              echo "devReposProvision: $repoTarget exists and is not a directory (soft fail)" >&2
+              return 0
+            fi
+
+            if [ -d "$repoTarget" ] && [ "$(ls -A "$repoTarget" 2>/dev/null)" != "" ]; then
+              echo "devReposProvision: $repoTarget exists but is not a git repo (soft fail)" >&2
+              return 0
+            fi
+
+            if cloneErr=$("$gitBin" clone "$repoUrl" "$repoTarget" 2>&1); then
+              echo "devReposProvision: cloned $repoName to $repoTarget"
+              return 0
+            else
+              echo "devReposProvision: failed to clone $repoName from $repoUrl ($cloneErr)" >&2
+              return 0
+            fi
+          }
+
+          # Helper function: clone direct submodules from a directory path.
+          # Arguments: directoryPath recursive(0|1) directoryLabel
+          clone_directory_submodules() {
+            local dirPath="$1"
+            local recursive="$2"
+            local dirLabel="$3"
+            local directSubmodules
+            local submodulePath
+            local submoduleTarget
+            local submoduleErr
+
+            # Directory must exist and have a .gitmodules file
+            if [ ! -f "$dirPath/.gitmodules" ]; then
+              echo "devReposProvision: $dirLabel has no .gitmodules (skipping)" >&2
+              return 0
+            fi
+
+            if ! directSubmodules=$(list_direct_submodules "$dirPath"); then
+              echo "devReposProvision: failed to list submodules in $dirLabel (skipping)" >&2
+              return 0
+            fi
+
+            # Initialize each direct submodule
+            for submodulePath in $directSubmodules; do
+              submoduleTarget="$dirPath/$submodulePath"
+
+              if [ -e "$submoduleTarget/.git" ]; then
+                echo "devReposProvision: submodule $submodulePath already initialized in $dirLabel (skipping)"
+                continue
+              fi
+
+              if [ "$recursive" = "1" ]; then
+                if submoduleErr=$(cd "$dirPath" && "$gitBin" submodule update --init --recursive "$submodulePath" 2>&1); then
+                  echo "devReposProvision: initialized submodule $submodulePath (recursive) in $dirLabel"
+                else
+                  echo "devReposProvision: failed to initialize submodule $submodulePath (recursive) in $dirLabel ($submoduleErr)" >&2
+                fi
+              else
+                if submoduleErr=$(cd "$dirPath" && "$gitBin" submodule update --init "$submodulePath" 2>&1); then
+                  echo "devReposProvision: initialized submodule $submodulePath in $dirLabel"
+                else
+                  echo "devReposProvision: failed to initialize submodule $submodulePath in $dirLabel ($submoduleErr)" >&2
+                fi
+              fi
+            done
+          }
+
+          # Step 1: Provision configured repositories
+          ${lib.concatMapStringsSep "\n" (
+            repo:
+            if repo.symlinkFromRepoRoot then
+              ''
+                repoTargetPath="$(resolve_repo_path "${repo.target}")"
+                if repoSymlinkTarget="$(resolve_repo_root_target)"; then
+                  ensure_symlink "$repoSymlinkTarget" "$repoTargetPath" "${repo.name}"
+                else
+                  echo "devReposProvision: repo-root symlink target unavailable for ${repo.name} (skipping)" >&2
+                fi
+              ''
+            else if repo.symlink != null then
+              ''ensure_symlink "$(resolve_repo_path "${repo.symlink}")" "$(resolve_repo_path "${repo.target}")" "${repo.name}"''
+            else if repo.url != null then
+              ''ensure_repo "${repo.url}" "$(resolve_repo_path "${repo.target}")" "${repo.name}"''
+            else
+              ''echo "devReposProvision: repository '${repo.name}' has neither symlink nor url configured (skipping)" >&2''
+          ) config.nucleus.devRepos.repositories}
+
+          # Step 2: Clone submodules from specified directories (sequential processing)
+          ${lib.concatMapStringsSep "\n" (
+            submoduleDir:
+            let
+              recursive = if submoduleDir.recursive then "1" else "0";
+            in
+            ''
+              # Expand glob patterns in submodule directory paths
+              resolvedPath="$(resolve_repo_path "${submoduleDir.path}")"
+
+              # Check if path contains glob characters
+              case "$resolvedPath" in
+                *\*|*\?|*\[*)
+                  # Glob pattern detected; expand it
+                  baseDir=$(dirname "$resolvedPath")
+                  pattern=$(basename "$resolvedPath")
+                  if [ -d "$baseDir" ]; then
+                    expandedPaths=$(expand_glob_paths "$baseDir" "$pattern")
+                    if [ -z "$expandedPaths" ]; then
+                      echo "devReposProvision: no matches for glob pattern '${submoduleDir.path}' (skipping)" >&2
+                    else
+                      while IFS= read -r matchedPath; do
+                        clone_directory_submodules "$matchedPath" "${recursive}" "''${matchedPath#$HOME/}"
+                      done <<< "$expandedPaths"
+                    fi
+                  else
+                    echo "devReposProvision: base directory $baseDir does not exist for glob pattern '${submoduleDir.path}' (skipping)" >&2
+                  fi
+                  ;;
+                *)
+                  # No glob; process literal path
+                  if [ -d "$resolvedPath" ]; then
+                    clone_directory_submodules "$resolvedPath" "${recursive}" "${submoduleDir.path}"
+                  else
+                    echo "devReposProvision: directory '${submoduleDir.path}' does not exist (skipping)" >&2
+                  fi
+                  ;;
+              esac
+            ''
+          ) config.nucleus.devRepos.submoduleDirectories}
+
+          echo "devReposProvision: completed provisioning dev repositories and submodules"
+        '';
   };
 }

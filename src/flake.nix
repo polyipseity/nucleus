@@ -76,6 +76,14 @@
                 target = "dev/monorepo-private";
               }
             ];
+            # Submodule directory provisioning: clone direct submodules from these
+            # folders sequentially. Later directories can depend on earlier submodule clones.
+            submoduleDirectories = [
+              { path = "dev/monorepo"; recursive = false; }
+              { path = "dev/monorepo-private"; recursive = false; }
+              { path = "dev/monorepo/self/obsidian-monorepo"; recursive = false; }
+              { path = "dev/monorepo-private/orgs/*"; recursive = false; }
+            ];
           };
         };
       };
