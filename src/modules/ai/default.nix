@@ -18,7 +18,26 @@
 #                                  same family as qwen3:14b (passes on Mac)
 #                                  but verify with the same curl test before
 #                                  relying on tool-calling on the PC host.
-{ lib, pkgs, ... }:
+{ lib, nixpkgs, pkgs, ... }:
+let
+  # Only Apple Silicon macOS currently needs an opt-in permissive import for
+  # oterm's dependency chain. Keeping the import lazy and isolated preserves
+  # strict evaluation for the rest of the package set.
+  appleSiliconDarwin = pkgs.stdenv.isDarwin && pkgs.stdenv.hostPlatform.system == "aarch64-darwin";
+
+  otermPkg =
+    if appleSiliconDarwin then
+      let
+        permissivePkgs = import nixpkgs {
+          inherit (pkgs.stdenv.hostPlatform) system;
+          config.allowUnfree = true;
+          config.allowUnsupportedSystem = true;
+        };
+      in
+      permissivePkgs.oterm
+    else
+      pkgs.oterm;
+in
 lib.mkMerge [
   {
     home.packages = [
@@ -29,7 +48,7 @@ lib.mkMerge [
       pkgs.ollama
       # Terminal-native chat frontend for interactive sessions.  Speaks the
       # Ollama HTTP API directly; works against any running Ollama server.
-      pkgs.oterm
+      otermPkg
     ];
 
     # Bind all Ollama client tools (oterm, ollama pull/run/list) to the

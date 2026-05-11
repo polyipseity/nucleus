@@ -116,12 +116,6 @@
       mkPkgs = system: import nixpkgs {
         inherit system;
         config.allowUnfree = true;
-        # Temporary Apple Silicon compatibility workaround:
-        # oterm -> python fastmcp -> lupa currently pulls a luajit source
-        # derivation whose metadata still excludes aarch64-darwin. We keep
-        # oterm enabled on macOS (no package gating) and allow unsupported
-        # evaluation on this host platform until upstream metadata is fixed.
-        config.allowUnsupportedSystem = (system == "aarch64-darwin");
         # .NET 6 is intentionally pinned for EIDE/runtime compatibility across
         # hosts. Upstream marks it insecure because it is EOL; keep this
         # exception narrowly scoped to the exact runtime derivation.
@@ -367,7 +361,7 @@
             # Install user packages into the user profile rather than /etc.
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
-              inherit username users;
+              inherit nixpkgs username users;
               vscodeMarketplace = vscodeMarketplaceMac;
             };
             home-manager.users = mkHomeManagerUsers ./modules/home.nix;
@@ -397,7 +391,7 @@
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
-              inherit username users;
+              inherit nixpkgs username users;
               vscodeMarketplace = vscodeMarketplaceLinux;
             };
             home-manager.users = mkHomeManagerUsers ./modules/home.nix;
@@ -460,7 +454,7 @@
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
         extraSpecialArgs = {
           hostManualFile = "src/hosts/nixos/MANUAL.md";
-          inherit username users;
+          inherit nixpkgs username users;
           vscodeMarketplace = vscodeMarketplaceLinux;
         };
         modules = [
