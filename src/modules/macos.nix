@@ -925,27 +925,27 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       mkdir -p "$_local_downloads" "$_icloud_downloads"
 
-      # If symlink already exists and points to the correct target, we're done
-      if [ -L "$_icloud_symlink" ] && [ "$(readlink "$_icloud_symlink")" = "$_icloud_downloads" ]; then
-        exit 0
-      fi
+      # If symlink already exists and points to the correct target, do nothing.
+      # IMPORTANT: never `exit` here — that would terminate the whole Home
+      # Manager activation script and skip subsequent activation hooks.
+      if [ ! -L "$_icloud_symlink" ] || [ "$(readlink "$_icloud_symlink")" != "$_icloud_downloads" ]; then
+        # If something already exists at the symlink path, rename it to avoid clobbering.
+        if [ -e "$_icloud_symlink" ] || [ -L "$_icloud_symlink" ]; then
+          _suffix=0
+          _backup_path="$_local_downloads/iCloud-old"
+          while [ -e "$_backup_path" ] || [ -L "$_backup_path" ]; do
+            _suffix=$((_suffix + 1))
+            _backup_path="$_local_downloads/iCloud-$_suffix"
+          done
 
-      # If something already exists at the symlink path, rename it to avoid clobbering
-      if [ -e "$_icloud_symlink" ] || [ -L "$_icloud_symlink" ]; then
-        _suffix=0
-        _backup_path="$_local_downloads/iCloud-old"
-        while [ -e "$_backup_path" ] || [ -L "$_backup_path" ]; do
-          _suffix=$((_suffix + 1))
-          _backup_path="$_local_downloads/iCloud-$_suffix"
-        done
-
-        if ! mv "$_icloud_symlink" "$_backup_path"; then
-          echo "macos: failed to backup existing $_icloud_symlink to $_backup_path." >&2
-          exit 1
+          if ! mv "$_icloud_symlink" "$_backup_path"; then
+            echo "macos: failed to backup existing $_icloud_symlink to $_backup_path." >&2
+            exit 1
+          fi
         fi
-      fi
 
-      ln -s "$_icloud_downloads" "$_icloud_symlink"
+        ln -s "$_icloud_downloads" "$_icloud_symlink"
+      fi
     '';
 
     # -------------------------------------------------------------------------
