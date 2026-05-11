@@ -46,6 +46,7 @@
   "chat.useNestedAgentsMdFiles": true,
   "chat.viewProgressBadge.enabled": true,
   "chat.viewSessions.orientation": "stacked",
+  "cmake.ignoreCMakeListsMissing": true,
   "cSpell.blockCheckingWhenAverageChunkSizeGreaterThan": 1000,
   "cSpell.blockCheckingWhenTextChunkSizeGreaterThan": 4096,
   "cSpell.checkVSCodeSystemFiles": true,
