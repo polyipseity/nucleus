@@ -4,8 +4,9 @@
 
 .DESCRIPTION
   Executes the native Windows update sequence in one command:
-    1. winget package upgrades (when available)
-    2. SOPS recipient rewrap for managed secret files
+    1. flake input updates (when nix is available)
+    2. winget package upgrades (when available)
+    3. SOPS recipient rewrap for managed secret files
 
 .EXAMPLE
   .\update.ps1
@@ -16,6 +17,13 @@ param()
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
+
+if (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue) {
+  & nix.exe flake update --flake (Join-Path -Path $repoRoot -ChildPath 'src')
+  if ($LASTEXITCODE -ne 0) {
+    throw 'nucleus: nix flake update failed.'
+  }
+}
 
 if (Get-Command -Name 'winget.exe' -ErrorAction SilentlyContinue) {
   winget upgrade --all --accept-package-agreements --accept-source-agreements --disable-interactivity
