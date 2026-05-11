@@ -60,6 +60,12 @@ let
       winget = "junegunn.fzf";
     }
     {
+      name = "imagemagick";
+      nixpkgs = "imagemagick";
+      homebrew = null; # CLI tool; installed via nixpkgs on macOS per policy
+      winget = "ImageMagick.ImageMagick";
+    }
+    {
       name = "ripgrep";
       nixpkgs = "ripgrep";
       homebrew = "ripgrep";

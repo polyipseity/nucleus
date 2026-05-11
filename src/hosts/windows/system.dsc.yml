@@ -211,6 +211,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure ImageMagick is installed for cross-host image conversion and processing parity with macOS and NixOS (`convert`, `magick`)
+      settings:
+        id: ImageMagick.ImageMagick
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Inter is installed as the open-source sans-serif UI baseline (SIL OFL) for Windows font parity with POSIX hosts using pkgs.inter
       settings:
         id: Inter.Inter
