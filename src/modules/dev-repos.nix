@@ -8,9 +8,16 @@
 # Behavior:
 #   • symlinks are created if absent
 #   • repos are cloned only if uninitialized
-#   • direct submodules are individually checked and cloned if absent
+#   • submodules can be configured per-repository (enable/disable, recursive flag, specific paths)
+#   • direct submodules are initialized by default if enable is not set
 #   • soft-fail on errors (log warnings, do not exit)
 #   • remote URLs are verified and updated if needed
+#
+# Submodule configuration:
+#   Each repository can specify a .submodules attribute with:
+#   • enable: whether to initialize any submodules (default: false, unless recursive is set)
+#   • recursive: whether to recursively initialize nested submodules (default: false)
+#   • paths: list of specific submodule paths to clone (default: empty = all direct submodules)
 #
 # Dependency:
 #   • This hook runs after writeBoundary so basic file operations are available.
@@ -72,6 +79,29 @@ in
             type = lib.types.nullOr lib.types.str;
             default = null;
             description = "If set (and symlink is null), clone from this Git URL.";
+          };
+          submodules = lib.mkOption {
+            type = lib.types.submodule {
+              options = {
+                enable = lib.mkOption {
+                  type = lib.types.bool;
+                  default = false;
+                  description = "Whether to clone submodules for this repository.";
+                };
+                recursive = lib.mkOption {
+                  type = lib.types.bool;
+                  default = false;
+                  description = "Whether to recursively clone nested submodules (--recursive flag).";
+                };
+                paths = lib.mkOption {
+                  type = lib.types.listOf lib.types.str;
+                  default = [];
+                  description = "Specific submodule paths to clone. If empty, clone direct submodules. Relative paths are resolved within the repository.";
+                };
+              };
+            };
+            default = {};
+            description = "Submodule cloning configuration. Controls which submodules to initialize and whether to do so recursively.";
           };
         };
       });
@@ -205,11 +235,15 @@ in
         fi
       }
 
-      # Helper function: clone or update a repository with direct submodule support.
+      # Helper function: clone or update a repository with configurable submodule support.
+      # Arguments: repoUrl repoTarget repoName enableSubmodules recursiveSubmodules submodulePaths
       ensure_repo_with_submodules() {
         local repoUrl="$1"
         local repoTarget="$2"
         local repoName="$3"
+        local enableSubmodules="$4"
+        local recursiveSubmodules="$5"
+        local submodulePaths="$6"  # space-separated list of specific paths, or empty for auto-detect
         local parentDir
         local currentRemote
         local remoteErr
@@ -218,6 +252,7 @@ in
         local submoduleTarget
         local submoduleErr
         local cloneErr
+        local submoduleFilter
 
         parentDir=$(dirname "$repoTarget")
         if ! mkdir -p "$parentDir"; then
@@ -243,21 +278,43 @@ in
             fi
           fi
 
-          # Ensure direct submodules are initialized.
-          if [ -f "$repoTarget/.gitmodules" ]; then
+          # Ensure submodules are initialized if enabled.
+          if [ "$enableSubmodules" = "1" ] && [ -f "$repoTarget/.gitmodules" ]; then
             if directSubmodules=$(list_direct_submodules "$repoTarget"); then
               for submodulePath in $directSubmodules; do
+                # If specific paths are provided, only initialize those.
+                if [ -n "$submodulePaths" ]; then
+                  submoduleFilter=0
+                  for specPath in $submodulePaths; do
+                    if [ "$specPath" = "$submodulePath" ]; then
+                      submoduleFilter=1
+                      break
+                    fi
+                  done
+                  if [ "$submoduleFilter" = "0" ]; then
+                    continue
+                  fi
+                fi
+
                 submoduleTarget="$repoTarget/$submodulePath"
                 if [ ! -e "$submoduleTarget/.git" ]; then
-                  if submoduleErr=$(cd "$repoTarget" && "$gitBin" submodule update --init "$submodulePath" 2>&1); then
-                    echo "devReposProvision: initialized direct submodule $submodulePath in $repoName"
+                  if [ "$recursiveSubmodules" = "1" ]; then
+                    if submoduleErr=$(cd "$repoTarget" && "$gitBin" submodule update --init --recursive "$submodulePath" 2>&1); then
+                      echo "devReposProvision: initialized submodule $submodulePath (recursive) in $repoName"
+                    else
+                      echo "devReposProvision: failed to initialize submodule $submodulePath (recursive) in $repoName ($submoduleErr)" >&2
+                    fi
                   else
-                    echo "devReposProvision: failed to initialize direct submodule $submodulePath in $repoName ($submoduleErr)" >&2
+                    if submoduleErr=$(cd "$repoTarget" && "$gitBin" submodule update --init "$submodulePath" 2>&1); then
+                      echo "devReposProvision: initialized submodule $submodulePath in $repoName"
+                    else
+                      echo "devReposProvision: failed to initialize submodule $submodulePath in $repoName ($submoduleErr)" >&2
+                    fi
                   fi
                 fi
               done
             else
-              echo "devReposProvision: skipping direct submodule initialization in $repoName after .gitmodules read failure" >&2
+              echo "devReposProvision: skipping submodule initialization in $repoName after .gitmodules read failure" >&2
             fi
           fi
 
@@ -278,21 +335,43 @@ in
         if cloneErr=$("$gitBin" clone "$repoUrl" "$repoTarget" 2>&1); then
           echo "devReposProvision: cloned $repoName to $repoTarget"
 
-          # Initialize direct submodules after clone.
-          if [ -f "$repoTarget/.gitmodules" ]; then
+          # Initialize submodules after clone if enabled.
+          if [ "$enableSubmodules" = "1" ] && [ -f "$repoTarget/.gitmodules" ]; then
             if directSubmodules=$(list_direct_submodules "$repoTarget"); then
               for submodulePath in $directSubmodules; do
+                # If specific paths are provided, only initialize those.
+                if [ -n "$submodulePaths" ]; then
+                  submoduleFilter=0
+                  for specPath in $submodulePaths; do
+                    if [ "$specPath" = "$submodulePath" ]; then
+                      submoduleFilter=1
+                      break
+                    fi
+                  done
+                  if [ "$submoduleFilter" = "0" ]; then
+                    continue
+                  fi
+                fi
+
                 submoduleTarget="$repoTarget/$submodulePath"
                 if [ ! -e "$submoduleTarget/.git" ]; then
-                  if submoduleErr=$(cd "$repoTarget" && "$gitBin" submodule update --init "$submodulePath" 2>&1); then
-                    echo "devReposProvision: initialized direct submodule $submodulePath in $repoName"
+                  if [ "$recursiveSubmodules" = "1" ]; then
+                    if submoduleErr=$(cd "$repoTarget" && "$gitBin" submodule update --init --recursive "$submodulePath" 2>&1); then
+                      echo "devReposProvision: initialized submodule $submodulePath (recursive) in $repoName"
+                    else
+                      echo "devReposProvision: failed to initialize submodule $submodulePath (recursive) in $repoName ($submoduleErr)" >&2
+                    fi
                   else
-                    echo "devReposProvision: failed to initialize direct submodule $submodulePath in $repoName ($submoduleErr)" >&2
+                    if submoduleErr=$(cd "$repoTarget" && "$gitBin" submodule update --init "$submodulePath" 2>&1); then
+                      echo "devReposProvision: initialized submodule $submodulePath in $repoName"
+                    else
+                      echo "devReposProvision: failed to initialize submodule $submodulePath in $repoName ($submoduleErr)" >&2
+                    fi
                   fi
                 fi
               done
             else
-              echo "devReposProvision: skipping direct submodule initialization in $repoName after .gitmodules read failure" >&2
+              echo "devReposProvision: skipping submodule initialization in $repoName after .gitmodules read failure" >&2
             fi
           fi
 
@@ -308,6 +387,11 @@ in
       # avoid brittle literal /Users/... paths in flake data.
       ${lib.concatMapStringsSep "\n"
         (repo:
+          let
+            enableSubmodules = if repo.submodules.enable then "1" else "0";
+            recursiveSubmodules = if repo.submodules.recursive then "1" else "0";
+            submodulePaths = lib.concatStringsSep " " repo.submodules.paths;
+          in
           if repo.symlinkFromRepoRoot then
             ''
               repoTargetPath="$(resolve_repo_path "${repo.target}")"
@@ -320,7 +404,7 @@ in
           else if repo.symlink != null then
             ''ensure_symlink "$(resolve_repo_path "${repo.symlink}")" "$(resolve_repo_path "${repo.target}")" "${repo.name}"''
           else if repo.url != null then
-            ''ensure_repo_with_submodules "${repo.url}" "$(resolve_repo_path "${repo.target}")" "${repo.name}"''
+            ''ensure_repo_with_submodules "${repo.url}" "$(resolve_repo_path "${repo.target}")" "${repo.name}" "${enableSubmodules}" "${recursiveSubmodules}" "${submodulePaths}"''
           else
             ''echo "devReposProvision: repository '${repo.name}' has neither symlink nor url configured (skipping)" >&2''
         )
