@@ -458,6 +458,12 @@
           vscodeMarketplace = vscodeMarketplaceLinux;
         };
         modules = [
+          {
+            _module.args = {
+              managedUsername = username;
+              managedUser = users.${username};
+            };
+          }
           sops-nix.homeManagerModules.sops
           ./modules/home.nix
         ];
