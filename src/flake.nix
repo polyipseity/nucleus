@@ -270,9 +270,12 @@
           name = "nucleus-update";
           runtimeInputs = [
             pkgs.gnupg
-            pkgs.nix
             pkgs.sops
           ];
+          # Intentionally do not inject nixpkgs `pkgs.nix` into PATH here.
+          # update.sh should use the host nix binary so host-specific nix.conf
+          # settings (e.g. Determinate Nix keys like eval-cores/lazy-trees)
+          # are interpreted by the matching implementation without warnings.
           text = builtins.readFile ../scripts/update.sh;
         }}/bin/nucleus-update";
       };
