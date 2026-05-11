@@ -35,21 +35,26 @@ lib.mkIf isPrimaryUser {
 
 ### When to Hardcode "polyipseity"
 
-Use hardcoded `"polyipseity"` in modules that implement features available only to the primary user:
+Use hardcoded `"polyipseity"` check in modules that implement features available only to the primary user:
 - AI model provisioning (src/modules/ai/default.nix)
 - Agent configuration (src/modules/agents.nix)
 - ClawHub skill syncing
 - Developer workspace setup
 - VS Code configuration and extensions
 
+**Important**: Even when using hardcoded checks, always read the feature configuration from the **centralized user registry** (flake.nix users.<username>). Only the primary user ("polyipseity") has these features enabled in the registry.
+
 Example:
 ```nix
-lib.mkIf (config.home.username == "polyipseity") {
-  # Feature only for the primary user
+# In agents.nix:
+agentsConfig = users.${currentUsername}.agents or { enable = false; };
+
+lib.mkIf (config.home.username == "polyipseity" && agentsConfig.enable) {
+  # Read polyipseity's agents config from the registry, then apply it
 }
 ```
 
-**Why**: These are intentionally primary-user-only features that should not accidentally run for other users. Hardcoding makes this intent explicit and prevents silent failures if a non-primary user is added later.
+**Why**: This pattern ensures that if a future primary user is added, the feature infrastructure automatically flows through the registry without code changes. The hardcoded check is just a safety gate.
 
 ### Multi-User Aware Modules
 
@@ -74,14 +79,19 @@ Before committing changes that affect users:
 
 ## Common Patterns
 
-### Pattern 1: Primary-User-Only Feature
+### Pattern 1: Primary-User-Only Feature (Registry-Driven + Hardcoded Guard)
 ```nix
-lib.mkIf (config.home.username == "polyipseity") {
-  # Agents configuration only for polyipseity
+# In agents.nix:
+agentsConfig = users.${currentUsername}.agents or { enable = false; };
+
+lib.mkIf (config.home.username == "polyipseity" && agentsConfig.enable) {
+  # Read from registry, guard with hardcoded check
   nucleus.agents.enable = true;
   ...
 }
 ```
+
+**Explanation**: Always read from the registry first. The hardcoded `"polyipseity"` check is a safety gate that prevents accidental feature activation for non-primary users.
 
 ### Pattern 2: Multi-User Feature (Registry-Driven)
 ```nix
@@ -107,3 +117,10 @@ lib.mkIf isPrimaryUser {
 - The primary username ("polyipseity") is derived from the user registry in flake.nix by filtering for `isPrimary = true`
 - If a new primary user is added to the registry, update all hardcoded primary-user-only features to use a new mechanism (e.g., a derived variable) rather than a string literal
 - This distinction allows clean separation between multi-user infrastructure (secrets, shell, home) and primary-user applications (agents, AI, workspace tools)
+
+## CI Checking Workflow
+
+When checking GitHub Actions CI status:
+- **Always use `gh cli`** instead of opening the web interface
+- Commands: `gh run list --limit N`, `gh run view <run-id> --log-failed`, `gh run view <run-id> --json status,conclusion`
+- This is faster, scriptable, and keeps the development workflow terminal-native
