@@ -27,7 +27,6 @@ lib.mkMerge [
       # here provides the `ollama` CLI for user-facing pulls, queries, and
       # model management.  On macOS the launchd agent below starts the server.
       pkgs.ollama
-    ] ++ lib.optionals (lib.meta.availableOn pkgs.stdenv.hostPlatform pkgs.oterm) [
       # Terminal-native chat frontend for interactive sessions.  Speaks the
       # Ollama HTTP API directly; works against any running Ollama server.
       pkgs.oterm

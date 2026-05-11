@@ -116,6 +116,12 @@
       mkPkgs = system: import nixpkgs {
         inherit system;
         config.allowUnfree = true;
+        # Temporary Apple Silicon compatibility workaround:
+        # oterm -> python fastmcp -> lupa currently pulls a luajit source
+        # derivation whose metadata still excludes aarch64-darwin. We keep
+        # oterm enabled on macOS (no package gating) and allow unsupported
+        # evaluation on this host platform until upstream metadata is fixed.
+        config.allowUnsupportedSystem = (system == systems.mac);
         # .NET 6 is intentionally pinned for EIDE/runtime compatibility across
         # hosts. Upstream marks it insecure because it is EOL; keep this
         # exception narrowly scoped to the exact runtime derivation.
