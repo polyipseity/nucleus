@@ -113,7 +113,8 @@ run_nix_gc_if_available() {
 prune_stale_wallpapers() {
   # Keep the decrypted wallpaper output directory in sync with declarative
   # sources so stale files do not accumulate across apply cycles.
-  assets_dir="$REPO_ROOT/src/assets/wallpapers"
+  current_user="${USER:-$(id -un)}"
+  assets_dir="$REPO_ROOT/src/assets/wallpapers/$current_user"
   output_dir="$HOME/Pictures/wallpapers"
 
   if [ ! -d "$assets_dir" ] || [ ! -d "$output_dir" ]; then
@@ -141,9 +142,13 @@ prune_stale_wallpapers() {
         ;;
     esac
 
-    candidate_base=${candidate_name%.*}
-    if ! grep -Fxq "$candidate_base" "$managed_names_tmp"; then
-      rm -f "$candidate"
+    if ! grep -Fxq "$candidate_name" "$managed_names_tmp"; then
+      if ! rm -f "$candidate" 2>/dev/null; then
+        # Non-fatal: some files under ~/Pictures may be protected by Finder
+        # metadata/ACL flags (for example iCloud-managed placeholders). GC
+        # should continue pruning other files even if one deletion is denied.
+        printf '%s\n' "gc: warning: failed to remove stale wallpaper '$candidate'" >&2
+      fi
     fi
   done
 }
@@ -161,7 +166,15 @@ prune_cargo_cache_if_available() {
     return 0
   fi
 
-  cargo-cache -r all
+  cargo_home_dir="${CARGO_HOME:-$HOME/.cargo}"
+  if [ ! -d "$cargo_home_dir" ]; then
+    printf '%s\n' "gc: cargo cache directory '$cargo_home_dir' is missing; skipping cargo cache prune"
+    return 0
+  fi
+
+  if ! cargo-cache -r all; then
+    printf '%s\n' "gc: warning: cargo-cache prune failed; continuing GC workflow" >&2
+  fi
 }
 
 prune_ollama_models_if_available() {
