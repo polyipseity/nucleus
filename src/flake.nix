@@ -432,24 +432,49 @@
       };
 
       # -----------------------------------------------------------------------
-      # devShells — entered via `nix develop .#bootstrap`.
-      # Provides the same bootstrap tool set as bootstrap-deps but as an
-      # interactive shell environment for manual troubleshooting.
+      # devShells — entered via `nix develop .#<name>` or auto-loaded by
+      # nix-direnv when an .envrc with `use flake` is present.
+      #
+      #   default   — general development tools: bun (JS runtime), uv (Python
+      #               package manager), cargo + rustc (Rust toolchain).
+      #               Auto-loaded by nix-direnv from the repo root .envrc.
+      #   bootstrap — bootstrap tool set (gnupg, sops, ssh-to-age) for manual
+      #               secret lifecycle tasks during initial provisioning.
       # -----------------------------------------------------------------------
       devShells = {
-        "${systems.mac}".bootstrap = pkgsMac.mkShell {
-          packages = [
-            pkgsMac.gnupg
-            pkgsMac.sops
-            pkgsMac.ssh-to-age
-          ];
+        "${systems.mac}" = {
+          default = pkgsMac.mkShell {
+            packages = [
+              pkgsMac.bun
+              pkgsMac.cargo
+              pkgsMac.rustc
+              pkgsMac.uv
+            ];
+          };
+          bootstrap = pkgsMac.mkShell {
+            packages = [
+              pkgsMac.gnupg
+              pkgsMac.sops
+              pkgsMac.ssh-to-age
+            ];
+          };
         };
-        "${systems.linux}".bootstrap = pkgsLinux.mkShell {
-          packages = [
-            pkgsLinux.gnupg
-            pkgsLinux.sops
-            pkgsLinux.ssh-to-age
-          ];
+        "${systems.linux}" = {
+          default = pkgsLinux.mkShell {
+            packages = [
+              pkgsLinux.bun
+              pkgsLinux.cargo
+              pkgsLinux.rustc
+              pkgsLinux.uv
+            ];
+          };
+          bootstrap = pkgsLinux.mkShell {
+            packages = [
+              pkgsLinux.gnupg
+              pkgsLinux.sops
+              pkgsLinux.ssh-to-age
+            ];
+          };
         };
       };
 
