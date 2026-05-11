@@ -210,11 +210,11 @@ in
         ImportToCloudEnabled = 1;
       };
 
-      # Siri: disable the global keyboard shortcut so Raycast remains the only
-      # launcher allowed to own Option+Space on this host. Siri itself stays
-      # available through other OS surfaces when needed.
+      # Siri: enable the double-press Command shortcut for Type to Siri so the
+      # keyboard shortcut launches Siri in text-input mode. This does not
+      # conflict with Raycast's Option+Space binding.
       "com.apple.Siri" = {
-        KeyboardShortcut = 0; # 0 disables the Siri shortcut reservation
+        KeyboardShortcut = 3; # 3 = double-press Command: invoke Type to Siri
         StatusMenuVisible = false; # hide Siri from the menu bar; keep chrome minimal
         TypeToSiriEnabled = true; # type queries instead of speaking them
       };
@@ -334,6 +334,13 @@ in
         ShowDate = 1;
         ShowDayOfWeek = true;
         ShowSeconds = true;
+      };
+
+      # Screenshot: save to clipboard by default; format is set to PNG via
+      # system.defaults.screencapture.type. The `target` key is not exposed as a
+      # typed nix-darwin option so it is declared here.
+      "com.apple.screencapture" = {
+        target = "clipboard"; # default destination: clipboard instead of Desktop file
       };
 
       # Screensaver: require password immediately after the screensaver engages.
