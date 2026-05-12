@@ -437,7 +437,8 @@
       # nix-direnv when an .envrc with `use flake` is present.
       #
       #   default   — general development tools: bun (JS runtime), uv (Python
-      #               package manager), cargo + rustc (Rust toolchain).
+      #               package manager), cargo + rustc (Rust toolchain), prek
+      #               (Git hook manager for repos that opt in via prek.toml).
       #               Auto-loaded by nix-direnv from the repo root .envrc.
       #   bootstrap — bootstrap tool set (gnupg, sops, ssh-to-age) for manual
       #               secret lifecycle tasks during initial provisioning.
@@ -448,6 +449,7 @@
             packages = [
               pkgsMac.bun
               pkgsMac.cargo
+              pkgsMac.prek
               pkgsMac.rustc
               pkgsMac.uv
             ];
@@ -465,6 +467,7 @@
             packages = [
               pkgsLinux.bun
               pkgsLinux.cargo
+              pkgsLinux.prek
               pkgsLinux.rustc
               pkgsLinux.uv
             ];
