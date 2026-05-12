@@ -6,6 +6,30 @@
 # options-probe via lib.mkMerge + lib.mkIf lets this single module work in all
 # three contexts without the caller having to know which option is appropriate.
 #
+# === SYSTEM BUILD TOOL POLICY ===
+# Several build tools are installed globally for system package management ONLY:
+#   python / pip — BANNED entirely; see Python section below.
+#   bun          — installs global Node/JS ecosystem system packages via
+#                  `bun add -g`.  Direct developer use is forbidden.
+#   cargo        — used only by cargo-binstall to install Rust binary system
+#                  packages.  Direct developer use is forbidden.
+#   rustc        — companion to cargo for compilation during cargo-binstall
+#                  runs.  Direct developer use is forbidden.
+#   uv           — installs system-level Python tooling (e.g. `uv tool install`).
+#                  Direct developer use is forbidden.
+# All of the above are blocked at the interactive shell level (shell.nix zsh
+# functions; pwsh.nix / Sync-ShellProfile.ps1 PowerShell functions) so that
+# direct invocations in a user session are intercepted and redirected.
+# The block passes through when DIRENV_DIR is set (POSIX) or an equivalent
+# devShell sentinel is active (Windows) so that devShell-scoped binaries
+# (provided by devShells.default in flake.nix) remain accessible.
+#
+# For any development work, always enter the repository devShell:
+#   - POSIX: direnv auto-loads .envrc (`use flake "./src"`) on directory entry.
+#   - POSIX manual: run `nix develop` from the repo root.
+#   - Windows: run the equivalent `nix develop` or use WSL with direnv.
+# The devShell provides bun, cargo, rustc, uv, and prek scoped to the project.
+#
 # === PYTHON POLICY ===
 # System-wide Python is explicitly banned across all platforms. This prevents:
 #   - Accidental `pip install` modifying system-managed dependencies

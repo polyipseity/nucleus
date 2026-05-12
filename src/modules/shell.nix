@@ -153,6 +153,72 @@ in
             pip3() {
               pip "$@"
             }
+
+            # Intercept system-wide bun/cargo/rustc/uv invocations.
+            # These tools are installed globally for system package management only:
+            #   bun    — installs global Node/JS ecosystem system packages
+            #   cargo  — cargo-binstall installs Rust binary system packages
+            #   rustc  — companion to cargo for compilation during binstall
+            #   uv     — installs system-level Python tooling
+            # Direct developer use of these system binaries is blocked.
+            # When DIRENV_DIR is set, a direnv environment (devShell) is active and
+            # its scoped binaries shadow the system tools; pass through to those.
+            bun() {
+              if [[ -n "''${DIRENV_DIR:-}" ]]; then
+                command bun "$@"
+                return $?
+              fi
+              cat >&2 << 'EOF'
+      shell: system-wide bun is for system package installation only; direct invocation is blocked.
+               For development, enter a devShell where bun is scoped to the project:
+               - Enter a project directory with .envrc (direnv auto-loads the devShell)
+               - Or run: nix develop
+               Shell shortcuts ni/nr/nx also work inside a devShell.
+      EOF
+              return 1
+            }
+
+            cargo() {
+              if [[ -n "''${DIRENV_DIR:-}" ]]; then
+                command cargo "$@"
+                return $?
+              fi
+              cat >&2 << 'EOF'
+      shell: system-wide cargo is for system package installation only; direct invocation is blocked.
+               For Rust development, enter a devShell where cargo is scoped to the project:
+               - Enter a project directory with .envrc (direnv auto-loads the devShell)
+               - Or run: nix develop
+      EOF
+              return 1
+            }
+
+            rustc() {
+              if [[ -n "''${DIRENV_DIR:-}" ]]; then
+                command rustc "$@"
+                return $?
+              fi
+              cat >&2 << 'EOF'
+      shell: system-wide rustc is for system package installation only; direct invocation is blocked.
+               For Rust development, enter a devShell where rustc is scoped to the project:
+               - Enter a project directory with .envrc (direnv auto-loads the devShell)
+               - Or run: nix develop
+      EOF
+              return 1
+            }
+
+            uv() {
+              if [[ -n "''${DIRENV_DIR:-}" ]]; then
+                command uv "$@"
+                return $?
+              fi
+              cat >&2 << 'EOF'
+      shell: system-wide uv is for system package installation only; direct invocation is blocked.
+               For Python development, enter a devShell where uv is scoped to the project:
+               - Enter a project directory with .envrc (direnv auto-loads the devShell)
+               - Or run: nix develop
+      EOF
+              return 1
+            }
     '';
   };
 
