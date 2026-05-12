@@ -149,6 +149,12 @@ quick-start commands, and troubleshooting.
   file under `src/hosts/windows/modules/`; orchestrators (for example
   `src/hosts/windows/apply.ps1`) should dot-source only the modules needed for
   the current run.
+- **App config storage and overrides**: store app settings in the format the app
+  directly reads from (separate JSON only if app reads JSON; otherwise use Nix,
+  defaults, INI, registry). All app settings must support per-user overrides via
+  flake.nix (Nix) or users.json (Windows); see
+  `.agents/instructions/app-config-management.instructions.md` for the complete
+  pattern, examples (QtPass, LinearMouse, VS Code), and checklist.
 - **Static config externalization**: keep shared editor settings in standalone
   config files (for example `src/modules/configs/vscode-settings.json`) and
   load them from Nix with `builtins.fromJSON (builtins.readFile ...)` so JSON
