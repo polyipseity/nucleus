@@ -204,6 +204,7 @@ lib.mkIf pkgs.stdenv.isLinux {
       "gpgImport"
       "installBunPackages"
       "installPwshScriptAnalyzer"
+      "opencodeSymlinks"
       "provisionDevDirectory"
       "sshKeyAdopt"
       "syncClawHubSkills"

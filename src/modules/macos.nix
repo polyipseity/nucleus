@@ -290,6 +290,7 @@ let
     "installPwshScriptAnalyzer"
     "linearmouseSymlinks"
     "linkGeneration"
+    "opencodeSymlinks"
     "onFilesChange"
     "preflightPrivacyPermissions"
     "refreshFinderServices"
