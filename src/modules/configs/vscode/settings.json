@@ -100,6 +100,7 @@
   "git.blame.statusBarItem.enabled": false,
   "git.confirmSync": false,
   "git.defaultBranchName": "",
+  "git.detectSubmodulesLimit": 100,
   "git.fetchOnPull": true,
   "git.mergeEditor": true,
   "git.openRepositoryInParentFolders": "always",
