@@ -1,4 +1,9 @@
-# Continue Agent Prompt
+---
+name: continue
+description: Resume work from a previous session, ensuring full context recovery and seamless continuation.
+---
+
+# Continue
 
 You are resuming work from a previous session.
 
