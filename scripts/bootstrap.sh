@@ -202,6 +202,28 @@ bootstrap_nix_if_missing() {
   require_command nix
 }
 
+allow_repo_direnv_if_available() {
+  # Auto-allow this repository's .envrc when direnv is installed.
+  # This keeps first-run developer UX smooth: entering the repo immediately
+  # loads the nix-direnv-managed devShell without an extra manual allow step.
+  #
+  # Non-fatal behavior is intentional:
+  # - direnv might not be installed yet on fresh machines.
+  # - .envrc may be absent in forks/partial checkouts.
+  # - failing hard here would block bootstrap/apply for a convenience feature.
+  if ! command -v direnv >/dev/null 2>&1; then
+    return
+  fi
+
+  if [ ! -f "$REPO_ROOT/.envrc" ]; then
+    return
+  fi
+
+  if ! direnv allow "$REPO_ROOT"; then
+    printf '%s\n' "warning: failed to run 'direnv allow' for $REPO_ROOT" >&2
+  fi
+}
+
 ensure_macos_nix_mount() {
   # Ensures the /nix synthetic mount point exists on macOS before any Nix
   # installation is attempted.
@@ -283,6 +305,8 @@ if ! run_nix profile list 2>/dev/null | grep -q "bootstrap-deps"; then
 else
   printf '%s\n' "Bootstrap dependencies already present, skipping installation."
 fi
+
+allow_repo_direnv_if_available
 
 if [ "$COMMAND" = "apply" ]; then
   printf '%s\n' "Running apply flow via src#apply..."
