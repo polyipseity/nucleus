@@ -6,10 +6,9 @@ function Sync-QtPassConfig {
     Applies the repository-managed QtPass Settings/Template tab values for each managed user.
 
   .DESCRIPTION
-    Reads the shared screenshot-backed defaults from the JSON file in
-    src\modules\configs\qtpass\settings.json, merges any per-user overrides
-    declared in src\hosts\windows\users.json, then writes the resulting
-    QSettings values into each user's QtPass registry hive.
+    Reads the shared screenshot-backed defaults from src\modules\home.nix (Nix),
+    merges any per-user overrides declared in src\hosts\windows\users.json,
+    then writes the resulting QSettings values into each user's QtPass registry hive.
 
     When a managed user's profile hive is not already loaded under HKEY_USERS,
     this function temporarily loads NTUSER.DAT, writes the managed values, and
@@ -20,8 +19,9 @@ function Sync-QtPassConfig {
     True applies the managed values. False removes the managed QtPass values.
 
   .PARAMETER SettingsPath
-    Absolute path to the shared QtPass JSON settings file. Mandatory: callers
-    must pass the path explicitly so they are aware of the cross-platform
+    Absolute path to the file containing the shared QtPass settings (typically
+    derived from the Nix qtPassDefaultSettings attrset in home.nix). Callers
+    must pass this path explicitly so they are aware of the cross-platform
     source of truth being applied.
 
   .PARAMETER Users
@@ -29,10 +29,10 @@ function Sync-QtPassConfig {
     user can optionally include qtpass.settings overrides.
 
   .EXAMPLE
-    Sync-QtPassConfig -Enabled:$true -SettingsPath 'C:\Users\admin\nucleus\src\modules\configs\qtpass\settings.json' -Users $userRegistry.users
+    Sync-QtPassConfig -Enabled:$true -SettingsPath 'C:\Users\admin\nucleus\settings.json' -Users $userRegistry.users
 
   .EXAMPLE
-    Sync-QtPassConfig -Enabled:$false -SettingsPath 'C:\Users\admin\nucleus\src\modules\configs\qtpass\settings.json' -Users $userRegistry.users
+    Sync-QtPassConfig -Enabled:$false -SettingsPath 'C:\Users\admin\nucleus\settings.json' -Users $userRegistry.users
   #>
   [CmdletBinding()]
   param(

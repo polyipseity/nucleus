@@ -32,7 +32,42 @@ let
       builtins.replaceStrings [ "~" ] [ resolvedHomeDirectory ] effectiveUser.passwordStore.path
     else "${resolvedHomeDirectory}/.password-store";
 
-  qtPassDefaultSettings = builtins.fromJSON (builtins.readFile ./configs/qtpass/settings.json);
+  # QtPass settings baseline (screenshot-verified): shared across all platforms
+  # unless overridden by platform-specific or per-user settings.
+  # Platform overrides: hideOnClose=false on macOS; user overrides from flake.nix.
+  qtPassDefaultSettings = {
+    addGPGId = true;
+    alwaysOnTop = true;
+    autoPull = false;
+    autoPush = false;
+    autoclearPanelSeconds = 5;
+    autoclearSeconds = 10;
+    avoidCapitals = false;
+    avoidNumbers = false;
+    clipBoardType = 2;
+    displayAsIs = false;
+    hideContent = false;
+    hideOnClose = true;
+    hidePassword = true;
+    lessRandom = false;
+    noLineWrapping = false;
+    passTemplate = "login\nurl\ndescription\n";
+    passwordCharsselection = 0;
+    passwordLength = 15;
+    startMinimized = false;
+    templateAllFields = true;
+    useAutoclear = true;
+    useAutoclearPanel = true;
+    useGit = true;
+    useMonospace = true;
+    useOtp = true;
+    usePwgen = true;
+    useQrencode = false;
+    useSelection = false;
+    useSymbols = true;
+    useTemplate = true;
+    useTrayIcon = true;
+  };
 
   qtPassPlatformSettings = lib.optionalAttrs pkgs.stdenv.isDarwin {
     # macOS keeps Hide on close disabled, per the requested platform-specific

@@ -10,35 +10,45 @@ let
   loadUserRegistryText = builtins.readFile ../../src/hosts/windows/modules/Load-UserRegistry.ps1;
   syncQtPassText = builtins.readFile ../../src/hosts/windows/modules/Sync-QtPassConfig.ps1;
   windowsUsers = builtins.fromJSON (builtins.readFile ../../src/hosts/windows/users.json);
-  qtPassSettings = builtins.fromJSON (builtins.readFile ../../src/modules/configs/qtpass/settings.json);
 in
-assert qtPassSettings.addGPGId == true;
-assert qtPassSettings.alwaysOnTop == true;
-assert qtPassSettings.autoclearPanelSeconds == 5;
-assert qtPassSettings.autoclearSeconds == 10;
-assert qtPassSettings.clipBoardType == 2;
-assert qtPassSettings.hideOnClose == true;
-assert qtPassSettings.hidePassword == true;
-assert qtPassSettings.passTemplate == "login\nurl\ndescription\n";
-assert qtPassSettings.passwordCharsselection == 0;
-assert qtPassSettings.passwordLength == 15;
-assert qtPassSettings.templateAllFields == true;
-assert qtPassSettings.useAutoclear == true;
-assert qtPassSettings.useAutoclearPanel == true;
-assert qtPassSettings.useGit == true;
-assert qtPassSettings.useOtp == true;
-assert qtPassSettings.usePwgen == true;
-assert qtPassSettings.useTemplate == true;
-assert qtPassSettings.useTrayIcon == true;
-assert containsRegex "hideOnClose = false;" homeText;
-assert containsRegex "qtPassDefaultSettings = builtins\.fromJSON" homeText;
-assert containsRegex "configs/qtpass/settings\.json" homeText;
+# Verify QtPass settings are now stored in home.nix (not separate JSON)
+assert containsRegex "qtPassDefaultSettings = " homeText;
+assert containsRegex "addGPGId = true" homeText;
+assert containsRegex "alwaysOnTop = true" homeText;
+assert containsRegex "autoclearPanelSeconds = 5" homeText;
+assert containsRegex "autoclearSeconds = 10" homeText;
+assert containsRegex "clipBoardType = 2" homeText;
+assert containsRegex "hideOnClose = true" homeText;
+assert containsRegex "hidePassword = true" homeText;
+assert containsRegex "passTemplate = " homeText;
+assert containsRegex "passwordCharsselection = 0" homeText;
+assert containsRegex "passwordLength = 15" homeText;
+assert containsRegex "templateAllFields = true" homeText;
+assert containsRegex "useAutoclear = true" homeText;
+assert containsRegex "useAutoclearPanel = true" homeText;
+assert containsRegex "useGit = true" homeText;
+assert containsRegex "useOtp = true" homeText;
+assert containsRegex "usePwgen = true" homeText;
+assert containsRegex "useTemplate = true" homeText;
+assert containsRegex "useTrayIcon = true" homeText;
+# Verify platform override (macOS sets hideOnClose = false)
+assert containsRegex "hideOnClose = false" homeText;
+# Verify integration points
 assert containsRegex "Sync-QtPassConfig -Enabled:" applyText;
 assert containsRegex "qtPassSettingsPath" applyText;
 assert containsRegex "EnableQtPassParity" applyText;
-assert builtins.attrNames windowsUsers.users.polyipseity.qtpass.settings == [ ];
-assert containsRegex "qtpass =" flakeText;
+# Verify user override structure for all app configs
+assert builtins.hasAttr "qtpass" windowsUsers.users.polyipseity;
+assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.qtpass;
+assert builtins.hasAttr "linearmouse" windowsUsers.users.polyipseity;
+assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.linearmouse;
+assert builtins.hasAttr "vscode" windowsUsers.users.polyipseity;
+assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.vscode;
 assert containsRegex "ConvertTo-PlainObject -InputObject" loadUserRegistryText;
 assert containsRegex "qtpass" loadUserRegistryText;
 assert containsRegex "function Sync-QtPassConfig" syncQtPassText;
+# Verify flake.nix has all app overrides defined
+assert containsRegex "qtpass =" flakeText;
+assert containsRegex "linearmouse =" flakeText;
+assert containsRegex "vscode =" flakeText;
 true

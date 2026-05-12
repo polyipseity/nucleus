@@ -11,6 +11,12 @@
       "qtpass": {
         "settings": {}
       },
+      "linearmouse": {
+        "settings": {}
+      },
+      "vscode": {
+        "settings": {}
+      },
       "devRepos": {
         "enable": true,
         "gitHubUsername": "polyipseity",

@@ -56,17 +56,11 @@ jobs:
       - name: Run comprehensive Nix test suite
         run: |
           echo "Running Nix unit tests..."
-          nix-instantiate --eval tests/nix/core-tests.nix
-          nix-instantiate --eval tests/nix/module-imports-tests.nix
-          nix-instantiate --eval tests/nix/module-options-tests.nix
-          nix-instantiate --eval tests/nix/config-composition-tests.nix
-          nix-instantiate --eval tests/nix/package-parity-tests.nix
-          nix-instantiate --eval tests/nix/option-conflict-tests.nix
-          nix-instantiate --eval tests/nix/activation-deps-tests.nix
-          nix-instantiate --eval tests/nix/default-dev-tooling-tests.nix
-          nix-instantiate --eval tests/nix/lid-closed-agent-runtime-tests.nix
-          nix-instantiate --eval tests/nix/qtpass-settings-tests.nix
-          nix-instantiate --eval tests/nix/sops-mock-tests.nix
+          # Auto-discover and run all *.nix test files under tests/nix/
+          find tests/nix -maxdepth 1 -name '*.nix' -type f | sort | while read test; do
+            echo "Running: $test"
+            nix-instantiate --eval "$test" || exit 1
+          done
 
       - name: Run shell script validation tests
         run: bash tests/scripts/script-validation-tests.sh

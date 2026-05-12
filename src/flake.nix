@@ -52,8 +52,19 @@
             path = "~/dev/monorepo-private/self/passwords";
           };
           # Per-user QtPass overrides merge on top of the repository-wide
-          # screenshot-backed defaults in src/modules/configs/qtpass/settings.json.
+          # screenshot-backed defaults defined in src/modules/home.nix.
           qtpass = {
+            settings = { };
+          };
+          # Per-user LinearMouse overrides: leave empty to use defaults from
+          # src/modules/configs/linearmouse/linearmouse.json (macOS only).
+          # For platform-specific config merging patterns, see AGENTS.md.
+          linearmouse = {
+            settings = { };
+          };
+          # Per-user VS Code settings overrides (if needed). See
+          # src/modules/editors.nix for settings storage and merge patterns.
+          vscode = {
             settings = { };
           };
           # Dev repository provisioning for this user.
