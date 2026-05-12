@@ -51,6 +51,11 @@
           passwordStore = {
             path = "~/dev/monorepo-private/self/passwords";
           };
+          # Per-user QtPass overrides merge on top of the repository-wide
+          # screenshot-backed defaults in src/modules/configs/qtpass/settings.json.
+          qtpass = {
+            settings = { };
+          };
           # Dev repository provisioning for this user.
           devRepos = {
             enable = true;

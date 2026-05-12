@@ -38,6 +38,40 @@ param(
   [string]$RegistryPath
 )
 
+function ConvertTo-PlainObject {
+  param(
+    [Parameter(Mandatory = $false)]
+    [AllowNull()]
+    [object]$InputObject
+  )
+
+  if ($null -eq $InputObject) {
+    return $null
+  }
+
+  if ($InputObject -is [System.Collections.IDictionary]) {
+    $hash = @{}
+    foreach ($key in $InputObject.Keys) {
+      $hash[$key] = ConvertTo-PlainObject -InputObject $InputObject[$key]
+    }
+    return $hash
+  }
+
+  if ($InputObject -is [pscustomobject]) {
+    $hash = @{}
+    foreach ($property in $InputObject.PSObject.Properties) {
+      $hash[$property.Name] = ConvertTo-PlainObject -InputObject $property.Value
+    }
+    return $hash
+  }
+
+  if ($InputObject -is [System.Collections.IEnumerable] -and $InputObject -isnot [string]) {
+    return @($InputObject | ForEach-Object { ConvertTo-PlainObject -InputObject $_ })
+  }
+
+  return $InputObject
+}
+
 # Load and validate the JSON registry file.
 if (-not (Test-Path -Path $RegistryPath -PathType Leaf)) {
   Write-Error "User registry not found: $RegistryPath" -ErrorAction Stop
@@ -66,16 +100,18 @@ foreach ($userName in $rawRegistry.users.PSObject.Properties.Name) {
     exit 1
   }
   $userList += @{
-    name          = $userName
+    name           = $userName
     dscConfigFiles = if ($userConfig.dscConfigFiles -is [System.Array]) {
       @($userConfig.dscConfigFiles | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     }
     else {
       @()
     }
-    homeDirectory = $userConfig.homeDirectory
-    isPrimary     = if ($userConfig.isPrimary) { $true } else { $false }
-    description   = if ($userConfig.description) { $userConfig.description } else { "" }
+    devRepos       = ConvertTo-PlainObject -InputObject $userConfig.devRepos
+    homeDirectory  = $userConfig.homeDirectory
+    isPrimary      = if ($userConfig.isPrimary) { $true } else { $false }
+    qtpass         = ConvertTo-PlainObject -InputObject $userConfig.qtpass
+    description    = if ($userConfig.description) { $userConfig.description } else { "" }
   }
 }
 

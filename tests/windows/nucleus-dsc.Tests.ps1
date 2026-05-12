@@ -232,6 +232,54 @@ Describe "Windows Power & Remote-Access Parity" {
     }
 }
 
+Describe "Windows QtPass Settings Parity" {
+    <#
+    .DESCRIPTION
+    Validate the managed QtPass Settings + Template tab values so the Windows
+    host matches the shared screenshot-backed baseline.
+    #>
+
+    It "Should configure QtPass clipboard, auto-clear, and visibility behavior" {
+        $regPath = "HKCU:\Software\IJHack\QtPass"
+        $qtpass = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
+
+        $qtpass.clipBoardType | Should -Be 2
+        $qtpass.useAutoclear | Should -Be 1
+        $qtpass.autoclearSeconds | Should -Be 10
+        $qtpass.useAutoclearPanel | Should -Be 1
+        $qtpass.autoclearPanelSeconds | Should -Be 5
+        $qtpass.hideContent | Should -Be 0
+        $qtpass.hidePassword | Should -Be 1
+        $qtpass.useMonospace | Should -Be 1
+        $qtpass.displayAsIs | Should -Be 0
+        $qtpass.noLineWrapping | Should -Be 0
+    }
+
+    It "Should configure QtPass generation, git, and template values" {
+        $regPath = "HKCU:\Software\IJHack\QtPass"
+        $qtpass = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
+
+        $qtpass.addGPGId | Should -Be 1
+        $qtpass.alwaysOnTop | Should -Be 1
+        $qtpass.autoPull | Should -Be 0
+        $qtpass.autoPush | Should -Be 0
+        $qtpass.hideOnClose | Should -Be 1
+        $qtpass.passwordCharsselection | Should -Be 0
+        $qtpass.passwordLength | Should -Be 15
+        $qtpass.passTemplate | Should -Be "login`nurl`ndescription`n"
+        $qtpass.startMinimized | Should -Be 0
+        $qtpass.templateAllFields | Should -Be 1
+        $qtpass.useGit | Should -Be 1
+        $qtpass.useOtp | Should -Be 1
+        $qtpass.usePwgen | Should -Be 1
+        $qtpass.useQrencode | Should -Be 0
+        $qtpass.useSelection | Should -Be 0
+        $qtpass.useSymbols | Should -Be 1
+        $qtpass.useTemplate | Should -Be 1
+        $qtpass.useTrayIcon | Should -Be 1
+    }
+}
+
 Describe "Test-Driven Development Scaffolding" {
     <#
     .DESCRIPTION

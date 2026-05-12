@@ -8,6 +8,9 @@
       ],
       "homeDirectory": "C:\\Users\\polyipseity",
       "isPrimary": true,
+      "qtpass": {
+        "settings": {}
+      },
       "devRepos": {
         "enable": true,
         "gitHubUsername": "polyipseity",

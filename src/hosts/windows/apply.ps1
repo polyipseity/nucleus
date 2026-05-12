@@ -92,6 +92,9 @@
 .PARAMETER EnablePowerParity
   Enable managed Windows power policy parity convergence and cleanup fallback.
 
+.PARAMETER EnableQtPassParity
+  Enable managed QtPass Settings/Template tab parity convergence and cleanup fallback.
+
 .PARAMETER EnableRdpParity
   Enable managed Windows built-in RDP convergence and cleanup fallback.
 
@@ -185,6 +188,7 @@ param(
   [bool]$EnableGitSshParity = $true,
   [bool]$EnableHostAgeKeyRegistration = $true,
   [bool]$EnablePowerParity = $true,
+  [bool]$EnableQtPassParity = $true,
   [bool]$EnableRdpParity = $true,
   [bool]$EnableRemoteAccessParity = $true,
   [bool]$EnableShellParity = $true,
@@ -214,6 +218,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-PowerPolicy.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-QtPassConfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Initialize-DevDirectory.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-WindowsRdp.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Install-PrekHook.ps1")
@@ -250,6 +255,7 @@ if (Test-Path -Path $healthCheckScript) {
 $userRegistryPath = Join-Path -Path $PSScriptRoot -ChildPath "users.json"
 $userRegistry = & (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1") -RegistryPath $userRegistryPath
 $registeredUserNames = @($userRegistry.users.name)
+$selectedUserRecords = @($userRegistry.users | Where-Object { $Users -contains $_.name })
 
 # Validate that all explicitly provided users exist in the registry.
 foreach ($user in $Users) {
@@ -340,6 +346,7 @@ $secretsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets"
 $wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wallpapers"
 $machineSshHostKeyPubPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key.pub"
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\")).Path
+$qtPassSettingsPath = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\qtpass\settings.json"
 $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 
 # Expose the repo root to any subprocesses (e.g. DSC script resources) that
@@ -473,6 +480,7 @@ Sync-VSCodeExtension -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
+Sync-QtPassConfig -Enabled:$EnableQtPassParity -SettingsPath $qtPassSettingsPath -Users $selectedUserRecords
 # Default to false if devReposEnabled not yet set (user not in registry or no repos configured).
 if ($null -eq $EnableDevReposParity) {
   $EnableDevReposParity = $devReposEnabled

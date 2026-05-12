@@ -32,6 +32,68 @@ let
       builtins.replaceStrings [ "~" ] [ resolvedHomeDirectory ] effectiveUser.passwordStore.path
     else "${resolvedHomeDirectory}/.password-store";
 
+  qtPassDefaultSettings = builtins.fromJSON (builtins.readFile ./configs/qtpass/settings.json);
+
+  qtPassPlatformSettings = lib.optionalAttrs pkgs.stdenv.isDarwin {
+    # macOS keeps Hide on close disabled, per the requested platform-specific
+    # exception to the shared QtPass baseline.
+    hideOnClose = false;
+  };
+
+  qtPassUserSettings =
+    if effectiveUser ? qtpass && effectiveUser.qtpass ? settings then
+      effectiveUser.qtpass.settings
+    else
+      { };
+
+  qtPassManagedSettings =
+    (qtPassDefaultSettings // qtPassPlatformSettings // qtPassUserSettings)
+    // {
+      passStore = "${lib.removeSuffix "/" passwordStoreDir}/";
+    };
+
+  renderQtPassValue = value:
+    if builtins.isBool value then
+      if value then "true" else "false"
+    else if builtins.isInt value then
+      toString value
+    else
+      value;
+
+  renderQtPassDefaultsCommand = name: value:
+    let
+      renderedValue = renderQtPassValue value;
+      valueArg = lib.escapeShellArg renderedValue;
+      valueFlag =
+        if builtins.isBool value then "-bool"
+        else if builtins.isInt value then "-int"
+        else "-string";
+    in
+    "/usr/bin/defaults write com.ijhack.QtPass ${name} ${valueFlag} ${valueArg}";
+
+  renderQtPassIniCommand = confVar: name: value:
+    let
+      renderedValue = renderQtPassValue value;
+      valueArg =
+        if builtins.isString value then
+          ''"$(_escape_qsettings_ini_string ${lib.escapeShellArg renderedValue})"''
+        else
+          lib.escapeShellArg renderedValue;
+    in
+    ''_update_qtpass_ini_value "${confVar}" "${name}" ${valueArg}'';
+
+  qtPassDarwinCommands = builtins.concatStringsSep "\n" (
+    lib.mapAttrsToList renderQtPassDefaultsCommand qtPassManagedSettings
+  );
+
+  qtPassPrimaryIniCommands = builtins.concatStringsSep "\n" (
+    lib.mapAttrsToList (name: value: renderQtPassIniCommand "$_primary_conf" name value) qtPassManagedSettings
+  );
+
+  qtPassSecondaryIniCommands = builtins.concatStringsSep "\n" (
+    lib.mapAttrsToList (name: value: renderQtPassIniCommand "$_secondary_conf" name value) qtPassManagedSettings
+  );
+
   # Path to the checked-out dotfiles/ directory at the root of this repo.
   dotfilesRoot = ../dotfiles;
 in
@@ -83,33 +145,35 @@ in
       PASSWORD_STORE_DIR = passwordStoreDir;
     };
 
-    # QtPass keeps its own persisted `passStore` setting, which can override
-    # PASSWORD_STORE_DIR when launched from GUI surfaces.
+    # QtPass keeps its own persisted settings store, which can override
+    # PASSWORD_STORE_DIR and GUI behavior when launched outside the shell.
     #
     # - macOS: configure the com.ijhack.QtPass defaults domain.
     # - Linux: configure Qt's INI-backed settings file (QSettings).
     #
-    # Keep both aligned with the per-user passwordStoreDir.
-    home.activation.configureQtPassStore = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      _qtpass_store=${lib.escapeShellArg passwordStoreDir}
-      case "$_qtpass_store" in
-        */) ;;
-        *) _qtpass_store="$_qtpass_store/" ;;
-      esac
+    # Keep both aligned with the per-user passwordStoreDir and the shared
+    # screenshot-backed Settings + Template tab baseline, while still allowing
+    # centralized per-user overrides from flake.nix.
+    home.activation.configureQtPassSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      _escape_qsettings_ini_string() {
+        printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e ':join' -e 'N' -e '$!b join' -e 's/\n/\\n/g'
+      }
 
-      _update_qtpass_ini() {
+      _update_qtpass_ini_value() {
         _conf="$1"
+        _key="$2"
+        _value="$3"
         _conf_dir="$(dirname "$_conf")"
         mkdir -p "$_conf_dir"
 
         if [ -f "$_conf" ]; then
           _tmp="$(mktemp "$_conf.XXXXXX")"
-          awk -v store="$_qtpass_store" '
+          awk -v key="$_key" -v value="$_value" '
             BEGIN { in_general = 0; wrote = 0 }
             {
               if ($0 ~ /^\[General\]$/) {
                 if (in_general && wrote == 0) {
-                  print "passStore=" store
+                  print key "=" value
                   wrote = 1
                 }
                 in_general = 1
@@ -119,7 +183,7 @@ in
 
               if ($0 ~ /^\[/ && $0 !~ /^\[General\]$/) {
                 if (in_general && wrote == 0) {
-                  print "passStore=" store
+                  print key "=" value
                   wrote = 1
                 }
                 in_general = 0
@@ -127,9 +191,9 @@ in
                 next
               }
 
-              if (in_general && $0 ~ /^passStore=/) {
+              if (in_general && $0 ~ ("^" key "=")) {
                 if (wrote == 0) {
-                  print "passStore=" store
+                  print key "=" value
                   wrote = 1
                 }
                 next
@@ -142,7 +206,7 @@ in
                 if (in_general == 0) {
                   print "[General]"
                 }
-                print "passStore=" store
+                print key "=" value
               }
             }
           ' "$_conf" > "$_tmp"
@@ -150,14 +214,14 @@ in
         else
           cat > "$_conf" <<EOF
 [General]
-passStore=$_qtpass_store
+$_key=$_value
 EOF
         fi
       }
 
       case "$(uname -s)" in
         Darwin)
-          /usr/bin/defaults write com.ijhack.QtPass passStore -string "$_qtpass_store"
+          ${qtPassDarwinCommands}
           ;;
         Linux)
           # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
@@ -165,9 +229,9 @@ EOF
           # Some builds may resolve via organization-domain pathing.
           _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
 
-          _update_qtpass_ini "$_primary_conf"
+          ${qtPassPrimaryIniCommands}
           if [ -f "$_secondary_conf" ]; then
-            _update_qtpass_ini "$_secondary_conf"
+            ${qtPassSecondaryIniCommands}
           fi
           ;;
       esac
