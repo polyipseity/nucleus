@@ -138,7 +138,7 @@
       fi
 
       _ocs_opencode_source="$_ocs_repo_root/.opencode"
-      _ocs_opencode_json="$_ocs_repo_root/opencode.jsonc"
+      _ocs_opencode_json="$_ocs_repo_root/src/modules/configs/agents/opencode.user.jsonc"
       if [ ! -d "$_ocs_opencode_source" ]; then
         echo "opencode: source directory not found: $_ocs_opencode_source" >&2
         exit 1
