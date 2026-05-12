@@ -142,9 +142,56 @@ function Sync-GitAndSshConfig {
         throw 'git.exe is required for managed Git parity but was not found in PATH.'
       }
 
+      # Global + user-specific gitignore layering:
+      # - global baseline in ProgramData (machine scope, shared by all users)
+      # - user overlay in each profile
+      # - merged effective file consumed by core.excludesFile
+      $globalIgnoreDir = Join-Path -Path $env:ProgramData -ChildPath 'nucleus\git'
+      $globalIgnorePath = Join-Path -Path $globalIgnoreDir -ChildPath 'ignore-global'
+      $userGitConfigDir = Join-Path -Path $userHome -ChildPath '.config\git'
+      $userIgnorePath = Join-Path -Path $userGitConfigDir -ChildPath 'ignore-user'
+      $effectiveIgnorePath = Join-Path -Path $userGitConfigDir -ChildPath 'ignore'
+
+      if (-not (Test-Path -Path $globalIgnoreDir)) {
+        New-Item -ItemType Directory -Path $globalIgnoreDir -Force | Out-Null
+      }
+      if (-not (Test-Path -Path $userGitConfigDir)) {
+        New-Item -ItemType Directory -Path $userGitConfigDir -Force | Out-Null
+      }
+
+      $globalIgnoreLines = @(
+        '# https://github.com/github/gitignore/blob/1046d8fba6b42d367da6314c934cddb6bfe5662e/Nix.gitignore {'
+        '# Ignore build outputs from performing a nix-build or `nix build` command'
+        'result'
+        'result-*'
+        ''
+        '# Ignore automatically generated direnv output'
+        '.direnv'
+        ''
+        '# Ignore NixOS interactive test driver history'
+        '**/.nixos-test-history'
+        '# }'
+      )
+      [System.IO.File]::WriteAllLines($globalIgnorePath, $globalIgnoreLines, [System.Text.UTF8Encoding]::new($false))
+
+      if (-not (Test-Path -Path $userIgnorePath)) {
+        $userIgnoreTemplate = @(
+          '# User-specific Git ignore patterns.'
+          '# Add one pattern per line; these are appended after ignore-global.'
+        )
+        [System.IO.File]::WriteAllLines($userIgnorePath, $userIgnoreTemplate, [System.Text.UTF8Encoding]::new($false))
+      }
+
+      $effectiveIgnoreLines = @()
+      $effectiveIgnoreLines += Get-Content -Path $globalIgnorePath -ErrorAction Stop
+      $effectiveIgnoreLines += ''
+      $effectiveIgnoreLines += Get-Content -Path $userIgnorePath -ErrorAction Stop
+      [System.IO.File]::WriteAllLines($effectiveIgnorePath, $effectiveIgnoreLines, [System.Text.UTF8Encoding]::new($false))
+
       $managedGitSettings = [ordered]@{
         'commit.gpgsign' = 'true'
         'core.autocrlf' = 'true'
+        'core.excludesFile' = $effectiveIgnorePath
         'core.symlinks' = 'true'
         'gpg.format' = 'openpgp'
         'init.defaultBranch' = 'main'
@@ -175,6 +222,7 @@ function Sync-GitAndSshConfig {
         $managedGitSettings = [ordered]@{
           'commit.gpgsign' = 'true'
           'core.autocrlf' = 'true'
+          'core.excludesFile' = $null
           'core.symlinks' = 'true'
           'gpg.format' = 'openpgp'
           'init.defaultBranch' = 'main'

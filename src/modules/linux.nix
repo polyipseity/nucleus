@@ -200,6 +200,7 @@ lib.mkIf pkgs.stdenv.isLinux {
       # activations on this host; include them here so manual instructions
       # are always the final output after all activation work.
       "gitIdentityFromSops"
+      "gitIgnoreAssemble"
       "gpgImport"
       "installBunPackages"
       "installPwshScriptAnalyzer"

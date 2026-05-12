@@ -283,6 +283,7 @@ let
     # activations on this host; they must all complete before the manual
     # instructions are printed so the final output is complete.
     "gitIdentityFromSops"
+    "gitIgnoreAssemble"
     "gpgImport"
     "installBunPackages"
     "installPackages"
