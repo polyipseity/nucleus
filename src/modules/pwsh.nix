@@ -233,6 +233,56 @@ let
     function pip3 {
       pip @Args
     }
+
+    # System-wide build tool block: redirect bun/cargo/rustc/uv to warnings.
+    # These tools are installed globally for system package management only.
+    # When DIRENV_DIR is set, a direnv environment (devShell) is active; pass
+    # through to the scoped binary from the devShell's PATH.
+    function bun {
+      if ($env:DIRENV_DIR) {
+        & (Get-Command -Name bun -CommandType Application | Select-Object -First 1).Source @Args
+        return
+      }
+      Write-Host "shell: system-wide bun is for system package installation only; direct invocation is blocked." -ForegroundColor Yellow
+      Write-Host "         For development, enter a devShell where bun is scoped to the project:" -ForegroundColor Yellow
+      Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
+      Write-Host "         - Or run: nix develop" -ForegroundColor Yellow
+      Write-Host "         Shell shortcuts ni/nr/nx also work inside a devShell." -ForegroundColor Yellow
+      return 1
+    }
+    function cargo {
+      if ($env:DIRENV_DIR) {
+        & (Get-Command -Name cargo -CommandType Application | Select-Object -First 1).Source @Args
+        return
+      }
+      Write-Host "shell: system-wide cargo is for system package installation only; direct invocation is blocked." -ForegroundColor Yellow
+      Write-Host "         For Rust development, enter a devShell where cargo is scoped to the project:" -ForegroundColor Yellow
+      Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
+      Write-Host "         - Or run: nix develop" -ForegroundColor Yellow
+      return 1
+    }
+    function rustc {
+      if ($env:DIRENV_DIR) {
+        & (Get-Command -Name rustc -CommandType Application | Select-Object -First 1).Source @Args
+        return
+      }
+      Write-Host "shell: system-wide rustc is for system package installation only; direct invocation is blocked." -ForegroundColor Yellow
+      Write-Host "         For Rust development, enter a devShell where rustc is scoped to the project:" -ForegroundColor Yellow
+      Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
+      Write-Host "         - Or run: nix develop" -ForegroundColor Yellow
+      return 1
+    }
+    function uv {
+      if ($env:DIRENV_DIR) {
+        & (Get-Command -Name uv -CommandType Application | Select-Object -First 1).Source @Args
+        return
+      }
+      Write-Host "shell: system-wide uv is for system package installation only; direct invocation is blocked." -ForegroundColor Yellow
+      Write-Host "         For Python development, enter a devShell where uv is scoped to the project:" -ForegroundColor Yellow
+      Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
+      Write-Host "         - Or run: nix develop" -ForegroundColor Yellow
+      return 1
+    }
   '';
 in
 {
