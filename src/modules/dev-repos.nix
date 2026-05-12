@@ -310,6 +310,74 @@ in
 
           # Helper function: clone direct submodules from a directory path.
           # Arguments: directoryPath recursive(0|1) directoryLabel
+          resolve_submodule_branch() {
+            local repoPath="$1"
+            local submodulePath="$2"
+            local submoduleConfigKey
+            local submoduleName
+            local branchName
+            local originHeadRef
+
+            # Map submodule path -> submodule.<name>.path key in .gitmodules.
+            submoduleConfigKey="$(
+              cd "$repoPath" && "$gitBin" config --file .gitmodules --get-regexp '^submodule\..*\.path$' | while IFS=' ' read -r _key _path; do
+                if [ "$_path" = "$submodulePath" ]; then
+                  printf '%s\n' "$_key"
+                  break
+                fi
+              done
+            )"
+            [ -n "$submoduleConfigKey" ] || return 1
+
+            submoduleName="''${submoduleConfigKey#submodule.}"
+            submoduleName="''${submoduleName%.path}"
+
+            # submodule.<name>.branch is optional in .gitmodules; absence means
+            # "follow remote HEAD".
+            branchName="$(cd "$repoPath" && "$gitBin" config --file .gitmodules --get "submodule.$submoduleName.branch" || true)"
+            if [ "$branchName" = "." ] || [ -z "$branchName" ]; then
+              originHeadRef="$(cd "$repoPath/$submodulePath" && "$gitBin" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+              branchName="''${originHeadRef#origin/}"
+            fi
+
+            [ -n "$branchName" ] || return 1
+            printf '%s\n' "$branchName"
+          }
+
+          ensure_submodule_on_branch() {
+            local repoPath="$1"
+            local submodulePath="$2"
+            local dirLabel="$3"
+            local submoduleTarget
+            local currentBranch
+            local branchName
+            local branchErr
+
+            submoduleTarget="$repoPath/$submodulePath"
+            [ -e "$submoduleTarget/.git" ] || return 0
+
+            if currentBranch=$(cd "$submoduleTarget" && "$gitBin" symbolic-ref --quiet --short HEAD 2>&1); then
+              echo "devReposProvision: submodule $submodulePath already on branch '$currentBranch' in $dirLabel"
+              return 0
+            fi
+
+            if ! branchName=$(resolve_submodule_branch "$repoPath" "$submodulePath"); then
+              echo "devReposProvision: could not resolve branch for submodule $submodulePath in $dirLabel (leaving detached)" >&2
+              return 0
+            fi
+
+            if branchErr=$(cd "$submoduleTarget" && "$gitBin" checkout "$branchName" 2>&1); then
+              echo "devReposProvision: checked out submodule $submodulePath on branch '$branchName' in $dirLabel"
+              return 0
+            fi
+
+            if branchErr=$(cd "$submoduleTarget" && "$gitBin" checkout -b "$branchName" --track "origin/$branchName" 2>&1); then
+              echo "devReposProvision: created+checked out branch '$branchName' for submodule $submodulePath in $dirLabel"
+            else
+              echo "devReposProvision: failed to switch submodule $submodulePath to branch '$branchName' in $dirLabel ($branchErr)" >&2
+            fi
+          }
+
           clone_directory_submodules() {
             local dirPath="$1"
             local recursive="$2"
@@ -336,18 +404,21 @@ in
 
               if [ -e "$submoduleTarget/.git" ]; then
                 echo "devReposProvision: submodule $submodulePath already initialized in $dirLabel (skipping)"
+                ensure_submodule_on_branch "$dirPath" "$submodulePath" "$dirLabel"
                 continue
               fi
 
               if [ "$recursive" = "1" ]; then
                 if submoduleErr=$(cd "$dirPath" && "$gitBin" submodule update --init --recursive "$submodulePath" 2>&1); then
                   echo "devReposProvision: initialized submodule $submodulePath (recursive) in $dirLabel"
+                  ensure_submodule_on_branch "$dirPath" "$submodulePath" "$dirLabel"
                 else
                   echo "devReposProvision: failed to initialize submodule $submodulePath (recursive) in $dirLabel ($submoduleErr)" >&2
                 fi
               else
                 if submoduleErr=$(cd "$dirPath" && "$gitBin" submodule update --init "$submodulePath" 2>&1); then
                   echo "devReposProvision: initialized submodule $submodulePath in $dirLabel"
+                  ensure_submodule_on_branch "$dirPath" "$submodulePath" "$dirLabel"
                 else
                   echo "devReposProvision: failed to initialize submodule $submodulePath in $dirLabel ($submoduleErr)" >&2
                 fi
