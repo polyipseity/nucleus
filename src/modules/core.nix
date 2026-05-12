@@ -20,15 +20,18 @@
 # All of the above are blocked at the interactive shell level (shell.nix zsh
 # functions; pwsh.nix / Sync-ShellProfile.ps1 PowerShell functions) so that
 # direct invocations in a user session are intercepted and redirected.
-# The block passes through when DIRENV_DIR is set (POSIX) or an equivalent
-# devShell sentinel is active (Windows) so that devShell-scoped binaries
-# (provided by devShells.default in flake.nix) remain accessible.
+# The block passes through when a project direnv/devShell is active or when the
+# managed default dev environment is active for repositories without `.envrc`.
+# On POSIX that fallback points at a dedicated Nix-built tool bundle; on
+# Windows it reuses the managed user PATH entries because there is no separate
+# nix-direnv-backed fallback root in the PowerShell workflow yet.
 #
-# For any development work, always enter the repository devShell:
+# For project-specific development, prefer the repository devShell:
 #   - POSIX: direnv auto-loads .envrc (`use flake "./src"`) on directory entry.
 #   - POSIX manual: run `nix develop` from the repo root.
 #   - Windows: run the equivalent `nix develop` or use WSL with direnv.
-# The devShell provides bun, cargo, rustc, uv, and prek scoped to the project.
+# For repositories without direnv/Nix metadata, the managed default shell
+# environment provides the same baseline bun/cargo/rustc/uv/prek inventory.
 #
 # === PYTHON POLICY ===
 # System-wide Python is explicitly banned across all platforms. This prevents:

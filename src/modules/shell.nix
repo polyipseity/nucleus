@@ -9,6 +9,29 @@ let
   shellAliases = import ./shell/aliases.nix { };
   sessionVariables = import ./shell/env.nix;
 
+  # Keep a user-scoped baseline toolchain available even in repositories that do
+  # not ship direnv or Nix metadata. This preserves the "no direct system tool
+  # invocation" policy while still giving unmanaged projects a predictable bun /
+  # cargo / rustc / uv / prek bundle.
+  defaultDevTools = pkgs.symlinkJoin {
+    name = "default-dev-tools";
+    paths = [
+      pkgs.bun
+      pkgs.cargo
+      pkgs.prek
+      pkgs.rustc
+      pkgs.uv
+    ];
+  };
+
+  # Publish the fallback toolchain path as a session variable so every managed
+  # shell can reach the same user-scoped binaries without duplicating the store
+  # path string in multiple helper functions.
+  mergedSessionVariables = sessionVariables // {
+    NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin";
+    NUCLEUS_DEFAULT_DEV_ENV = "1";
+  };
+
   # Build wrapper commands that always target the canonical nucleus flake path,
   # making nucleus-* commands runnable from any working directory and any shell
   # (without relying on shell alias expansion state).
@@ -59,13 +82,40 @@ in
     # that neither executes the fix nor records it in history.
     # The build-tool ban wrappers follow; they must remain as functions (not aliases)
     # so they can emit multi-line guidance via heredoc and pass through when in a
-    # devShell (DIRENV_DIR set).
+    # devShell (DIRENV_DIR set) or via the managed default toolchain.
     initContent = ''
             # pay-respects: register the shell hook so `f` replays the last failed
             # command with the corrected invocation suggested by pay-respects.
             # The generated function captures shell history and runs the corrected
             # command via eval so the fix is both executed and saved to shell history.
             eval "$(pay-respects zsh --alias)"
+
+            # home.sessionVariables does not reliably populate plain interactive
+            # `zsh -i` sessions in every launch path, so export the fallback tool
+            # coordinates here as well.  This keeps repositories without .envrc
+            # usable even when the shell did not start as a login shell.
+            export NUCLEUS_DEFAULT_DEV_BIN="${defaultDevTools}/bin"
+            export NUCLEUS_DEFAULT_DEV_ENV="1"
+
+            # Route managed development tools through either the active direnv
+            # environment or the user-scoped default toolchain for repositories
+            # that do not provide their own .envrc / nix develop entrypoint.
+            __nucleus_run_managed_dev_tool() {
+              _tool_name="$1"
+              shift
+
+              if [[ -n "''${DIRENV_DIR:-}" ]]; then
+                command "$_tool_name" "$@"
+                return $?
+              fi
+
+              if [[ -n "''${NUCLEUS_DEFAULT_DEV_BIN:-}" && -x "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" ]]; then
+                "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" "$@"
+                return $?
+              fi
+
+              return 127
+            }
 
             # Intercept python/python3 invocations and warn about system-wide Python ban.
             # These are functions, not aliases, so they can provide helpful context.
@@ -111,65 +161,70 @@ in
             #   uv     — installs system-level Python tooling
             # Direct developer use of these system binaries is blocked.
             # When DIRENV_DIR is set, a direnv environment (devShell) is active and
-            # its scoped binaries shadow the system tools; pass through to those.
+            # its scoped binaries shadow the system tools; otherwise use the
+            # managed default toolchain installed under the user's profile.
             bun() {
-              if [[ -n "''${DIRENV_DIR:-}" ]]; then
-                command bun "$@"
-                return $?
+              __nucleus_run_managed_dev_tool bun "$@"
+              _status=$?
+              if [[ "$_status" -ne 127 ]]; then
+                return "$_status"
               fi
               cat >&2 << 'EOF'
-      shell: system-wide bun is for system package installation only; direct invocation is blocked.
-               For development, enter a devShell where bun is scoped to the project:
+      shell: managed bun is unavailable right now.
+               For development, use one of these managed entrypoints:
                - Enter a project directory with .envrc (direnv auto-loads the devShell)
-               - Or run: nix develop
+               - Or use the user-scoped default toolchain installed by nucleus apply
                Shell shortcuts ni/nr/nx also work inside a devShell.
       EOF
               return 1
             }
 
             cargo() {
-              if [[ -n "''${DIRENV_DIR:-}" ]]; then
-                command cargo "$@"
-                return $?
+              __nucleus_run_managed_dev_tool cargo "$@"
+              _status=$?
+              if [[ "$_status" -ne 127 ]]; then
+                return "$_status"
               fi
               cat >&2 << 'EOF'
-      shell: system-wide cargo is for system package installation only; direct invocation is blocked.
-               For Rust development, enter a devShell where cargo is scoped to the project:
+      shell: managed cargo is unavailable right now.
+               For Rust development, use one of these managed entrypoints:
                - Enter a project directory with .envrc (direnv auto-loads the devShell)
-               - Or run: nix develop
+               - Or use the user-scoped default toolchain installed by nucleus apply
       EOF
               return 1
             }
 
             rustc() {
-              if [[ -n "''${DIRENV_DIR:-}" ]]; then
-                command rustc "$@"
-                return $?
+              __nucleus_run_managed_dev_tool rustc "$@"
+              _status=$?
+              if [[ "$_status" -ne 127 ]]; then
+                return "$_status"
               fi
               cat >&2 << 'EOF'
-      shell: system-wide rustc is for system package installation only; direct invocation is blocked.
-               For Rust development, enter a devShell where rustc is scoped to the project:
+      shell: managed rustc is unavailable right now.
+               For Rust development, use one of these managed entrypoints:
                - Enter a project directory with .envrc (direnv auto-loads the devShell)
-               - Or run: nix develop
+               - Or use the user-scoped default toolchain installed by nucleus apply
       EOF
               return 1
             }
 
             uv() {
-              if [[ -n "''${DIRENV_DIR:-}" ]]; then
-                command uv "$@"
-                return $?
+              __nucleus_run_managed_dev_tool uv "$@"
+              _status=$?
+              if [[ "$_status" -ne 127 ]]; then
+                return "$_status"
               fi
               cat >&2 << 'EOF'
-      shell: system-wide uv is for system package installation only; direct invocation is blocked.
-               For Python development, enter a devShell where uv is scoped to the project:
+      shell: managed uv is unavailable right now.
+               For Python development, use one of these managed entrypoints:
                - Enter a project directory with .envrc (direnv auto-loads the devShell)
-               - Or run: nix develop
+               - Or use the user-scoped default toolchain installed by nucleus apply
       EOF
               return 1
             }
     '';
   };
 
-  home.sessionVariables = sessionVariables;
+  home.sessionVariables = mergedSessionVariables;
 }

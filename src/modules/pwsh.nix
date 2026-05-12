@@ -7,6 +7,19 @@
 # host types when pwsh is invoked on macOS or NixOS.
 { lib, pkgs, ... }:
 let
+  # Keep the same fallback tool inventory as the POSIX zsh profile so managed
+  # pwsh sessions can work in repositories that do not provide direnv/Nix hooks.
+  defaultDevTools = pkgs.symlinkJoin {
+    name = "default-dev-tools";
+    paths = [
+      pkgs.bun
+      pkgs.cargo
+      pkgs.prek
+      pkgs.rustc
+      pkgs.uv
+    ];
+  };
+
   # Profile content mirroring the Windows managed block in shell.ps1.
   # Using a Nix ''...'' string so the file is written verbatim; single
   # dollar signs and PowerShell variables ($line, $cursor, etc.) do not
@@ -19,6 +32,11 @@ let
     if (Get-Command direnv -ErrorAction SilentlyContinue) {
       (& direnv hook pwsh) | Out-String | Invoke-Expression
     }
+
+    # Keep a user-scoped fallback toolchain available when the current project
+    # does not provide a direnv/devShell entrypoint.
+    $env:NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin"
+    $env:NUCLEUS_DEFAULT_DEV_ENV = "1"
 
     # PSReadLine: predictive history completion and menu-style tab expansion.
     # Guards with module availability probe so the profile loads on hosts where
@@ -78,7 +96,11 @@ let
 
       # git rev-parse is a repo-membership probe here; suppress the expected
       # stderr from non-repository directories and branch on the result.
-      $repoRoot = (& git -C (Get-Location).Path rev-parse --show-toplevel 2>$null).Trim()
+      $repoRootOutput = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null
+      if ($null -eq $repoRootOutput) {
+        return
+      }
+      $repoRoot = ($repoRootOutput | Out-String).Trim()
       if ([string]::IsNullOrWhiteSpace($repoRoot)) {
         return
       }
@@ -234,53 +256,82 @@ let
       pip @Args
     }
 
+    # Route managed development tools through either an active direnv context
+    # or the user-scoped fallback toolchain for unmanaged repositories.
+    function Invoke-NucleusManagedDevTool {
+      param(
+        [Parameter(Mandatory = $true)]
+        [string]$ToolName,
+
+        [Parameter(Mandatory = $false)]
+        [string]$FallbackBinDirectory,
+
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [object[]]$ToolArguments
+      )
+
+      if ($env:DIRENV_DIR) {
+        $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -ne $application) {
+          & $application.Source @ToolArguments
+          return $true
+        }
+      }
+
+      if (-not [string]::IsNullOrWhiteSpace($FallbackBinDirectory)) {
+        $fallbackToolPath = Join-Path $FallbackBinDirectory $ToolName
+        if (Test-Path -Path $fallbackToolPath -PathType Leaf) {
+          & $fallbackToolPath @ToolArguments
+          return $true
+        }
+      }
+
+      return $false
+    }
+
     # System-wide build tool block: redirect bun/cargo/rustc/uv to warnings.
     # These tools are installed globally for system package management only.
-    # When DIRENV_DIR is set, a direnv environment (devShell) is active; pass
-    # through to the scoped binary from the devShell's PATH.
+    # When DIRENV_DIR is set, a direnv environment (devShell) is active; when it
+    # is absent, fall back to the managed default toolchain installed by apply.
     function bun {
-      if ($env:DIRENV_DIR) {
-        & (Get-Command -Name bun -CommandType Application | Select-Object -First 1).Source @Args
+      if (Invoke-NucleusManagedDevTool -ToolName "bun" -FallbackBinDirectory $env:NUCLEUS_DEFAULT_DEV_BIN @Args) {
         return
       }
-      Write-Host "shell: system-wide bun is for system package installation only; direct invocation is blocked." -ForegroundColor Yellow
-      Write-Host "         For development, enter a devShell where bun is scoped to the project:" -ForegroundColor Yellow
+      Write-Host "shell: managed bun is unavailable right now." -ForegroundColor Yellow
+      Write-Host "         For development, use one of these managed entrypoints:" -ForegroundColor Yellow
       Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
-      Write-Host "         - Or run: nix develop" -ForegroundColor Yellow
+      Write-Host "         - Or use the user-scoped default toolchain installed by nucleus apply" -ForegroundColor Yellow
       Write-Host "         Shell shortcuts ni/nr/nx also work inside a devShell." -ForegroundColor Yellow
       return 1
     }
     function cargo {
-      if ($env:DIRENV_DIR) {
-        & (Get-Command -Name cargo -CommandType Application | Select-Object -First 1).Source @Args
+      if (Invoke-NucleusManagedDevTool -ToolName "cargo" -FallbackBinDirectory $env:NUCLEUS_DEFAULT_DEV_BIN @Args) {
         return
       }
-      Write-Host "shell: system-wide cargo is for system package installation only; direct invocation is blocked." -ForegroundColor Yellow
-      Write-Host "         For Rust development, enter a devShell where cargo is scoped to the project:" -ForegroundColor Yellow
+      Write-Host "shell: managed cargo is unavailable right now." -ForegroundColor Yellow
+      Write-Host "         For Rust development, use one of these managed entrypoints:" -ForegroundColor Yellow
       Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
-      Write-Host "         - Or run: nix develop" -ForegroundColor Yellow
+      Write-Host "         - Or use the user-scoped default toolchain installed by nucleus apply" -ForegroundColor Yellow
       return 1
     }
     function rustc {
-      if ($env:DIRENV_DIR) {
-        & (Get-Command -Name rustc -CommandType Application | Select-Object -First 1).Source @Args
+      if (Invoke-NucleusManagedDevTool -ToolName "rustc" -FallbackBinDirectory $env:NUCLEUS_DEFAULT_DEV_BIN @Args) {
         return
       }
-      Write-Host "shell: system-wide rustc is for system package installation only; direct invocation is blocked." -ForegroundColor Yellow
-      Write-Host "         For Rust development, enter a devShell where rustc is scoped to the project:" -ForegroundColor Yellow
+      Write-Host "shell: managed rustc is unavailable right now." -ForegroundColor Yellow
+      Write-Host "         For Rust development, use one of these managed entrypoints:" -ForegroundColor Yellow
       Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
-      Write-Host "         - Or run: nix develop" -ForegroundColor Yellow
+      Write-Host "         - Or use the user-scoped default toolchain installed by nucleus apply" -ForegroundColor Yellow
       return 1
     }
     function uv {
-      if ($env:DIRENV_DIR) {
-        & (Get-Command -Name uv -CommandType Application | Select-Object -First 1).Source @Args
+      if (Invoke-NucleusManagedDevTool -ToolName "uv" -FallbackBinDirectory $env:NUCLEUS_DEFAULT_DEV_BIN @Args) {
         return
       }
-      Write-Host "shell: system-wide uv is for system package installation only; direct invocation is blocked." -ForegroundColor Yellow
-      Write-Host "         For Python development, enter a devShell where uv is scoped to the project:" -ForegroundColor Yellow
+      Write-Host "shell: managed uv is unavailable right now." -ForegroundColor Yellow
+      Write-Host "         For Python development, use one of these managed entrypoints:" -ForegroundColor Yellow
       Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
-      Write-Host "         - Or run: nix develop" -ForegroundColor Yellow
+      Write-Host "         - Or use the user-scoped default toolchain installed by nucleus apply" -ForegroundColor Yellow
       return 1
     }
   '';

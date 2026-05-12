@@ -63,6 +63,7 @@ jobs:
           nix-instantiate --eval tests/nix/package-parity-tests.nix
           nix-instantiate --eval tests/nix/option-conflict-tests.nix
           nix-instantiate --eval tests/nix/activation-deps-tests.nix
+          nix-instantiate --eval tests/nix/default-dev-tooling-tests.nix
           nix-instantiate --eval tests/nix/sops-mock-tests.nix
 
       - name: Run shell script validation tests

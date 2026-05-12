@@ -22,7 +22,8 @@ interactive sessions:
 | `python` / `pip` | **banned** | no permitted system use; all Python via devShell or uv venv |
 
 Direct developer invocation of any of the above in an interactive shell session
-is **forbidden**.
+must go through a **managed development environment** rather than the raw
+system install.
 
 ## Shell-level enforcement
 
@@ -37,22 +38,31 @@ Functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`,
 1. Check `$DIRENV_DIR` — set by direnv whenever an `.envrc` is active.
 2. If set, invoke `command <tool>` to bypass the function and reach the
    devShell-scoped binary at the front of `PATH`.
-3. If unset, print a `shell: …` banner to stderr and return 1.
+3. Otherwise, invoke the managed fallback toolchain published via
+   `$NUCLEUS_DEFAULT_DEV_BIN`. On POSIX this path points at a dedicated
+   Nix-built bundle containing the default development tools.
+4. If neither context is available, print a `shell: …` banner to stderr and
+   return 1.
 
 ### POSIX (pwsh) — `src/modules/pwsh.nix`
 
-Equivalent PowerShell functions in `profileContent`. Pass-through check uses
-`$env:DIRENV_DIR`.
+Equivalent PowerShell functions in `profileContent`. Pass-through first uses
+`$env:DIRENV_DIR`, then the managed fallback toolchain published via
+`$env:NUCLEUS_DEFAULT_DEV_BIN`.
 
 ### Windows (PowerShell) — `src/hosts/windows/modules/Sync-ShellProfile.ps1`
 
-Same functions emitted into the managed block. Identical pass-through logic via
-`$env:DIRENV_DIR`.
+Same functions emitted into the managed block. Pass-through uses
+`$env:DIRENV_DIR` when present and otherwise the managed default shell
+environment flag (`$env:NUCLEUS_DEFAULT_DEV_ENV`). Windows currently reuses the
+managed user PATH entries instead of a second Nix-backed fallback root because
+the WinGet/PowerShell workflow has no nix-direnv-equivalent store path today.
 
 ## devShell — development environment
 
-For all development work, enter the project devShell. The nucleus default
-devShell provides:
+For project-specific development, enter the project devShell. For repositories
+without direnv/Nix metadata, nucleus also provisions a managed default shell
+environment with the same baseline tools. The shared inventory is:
 
 | Tool | Purpose |
 |---|---|
@@ -70,8 +80,12 @@ required once direnv is configured.
 
 **POSIX — manual:** `nix develop` from the repo root (or any subdirectory).
 
-**Windows:** `nix develop` from WSL, or use the PowerShell prek hook which
-provides hook installation without a full devShell.
+**POSIX — default fallback:** outside any active `.envrc`, the managed shell
+profile exposes the same bun/cargo/prek/rustc/uv inventory from the
+user-scoped fallback bundle at `$NUCLEUS_DEFAULT_DEV_BIN`.
+
+**Windows:** `nix develop` from WSL when a project provides it, or use the
+managed PowerShell profile fallback for repositories without direnv/Nix wiring.
 
 ## prek hook installation
 
@@ -104,7 +118,9 @@ prompt hook remains as the Windows parity mechanism.
 ## Invariants
 
 - The `DIRENV_DIR` pass-through must be present in every blocking function.
-  Omitting it would prevent the tool from working inside nix devShells.
+   Omitting it would prevent the tool from working inside nix devShells.
+- The managed fallback environment must expose the same baseline inventory as
+   `devShells.default`: `bun`, `cargo`, `prek`, `rustc`, and `uv`.
 - `cargo-binstall` and `cargo-cache` are **not** blocked — they are the
   permitted system-package-management invocations of the Rust toolchain.
 - `rustup` is **not** blocked — it is the toolchain manager and must remain

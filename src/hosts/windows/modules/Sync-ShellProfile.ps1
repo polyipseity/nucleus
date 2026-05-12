@@ -28,7 +28,9 @@ function Sync-ShellProfile {
       - Python ban: blocks system-wide python/pip to prevent accidental
          modifications to system environment
       - Build tool ban: blocks system-wide bun/cargo/rustc/uv direct invocation;
-         passes through when DIRENV_DIR is set (active direnv/devShell context)
+        passes through when DIRENV_DIR is set (active direnv/devShell context)
+        or when the managed default dev environment is active for repositories
+        that do not ship direnv/Nix metadata
 
     Cleanup behavior when disabled removes only the managed block.
 
@@ -55,6 +57,11 @@ function Sync-ShellProfile {
     'if (Get-Command direnv -ErrorAction SilentlyContinue) {'
     '  (& direnv hook pwsh) | Out-String | Invoke-Expression'
     '}'
+    '# Keep the managed default dev environment active outside project-specific'
+    '# direnv contexts. Windows does not have a separate nix-direnv-backed store'
+    '# path here, so the fallback reuses the managed user PATH entries applied by'
+    '# WinGet/bootstrap while still gating invocation through this profile layer.'
+    '$env:NUCLEUS_DEFAULT_DEV_ENV = "1"'
     # PSReadLine: predictive history completion + menu-style tab expansion.
     # Guards with module availability probe so the profile is safe on older hosts.
     'if (Get-Module -ListAvailable -Name PSReadLine) {'
@@ -129,7 +136,11 @@ function Sync-ShellProfile {
     '  }'
     '  # git rev-parse is a repo-membership probe here; suppress the expected'
     '  # stderr from non-repository directories and branch on the result.'
-    '  $repoRoot = (& git -C (Get-Location).Path rev-parse --show-toplevel 2>$null).Trim()'
+    '  $repoRootOutput = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null'
+    '  if ($null -eq $repoRootOutput) {'
+    '    return'
+    '  }'
+    '  $repoRoot = ($repoRootOutput | Out-String).Trim()'
     '  if ([string]::IsNullOrWhiteSpace($repoRoot)) {'
     '    return'
     '  }'
@@ -263,56 +274,71 @@ function Sync-ShellProfile {
     'function pip3 {'
     '  pip @Args'
     '}'
+    '# Route managed development tools through either an active direnv context'
+    '# or the managed default shell environment for repositories without .envrc.'
+    'function Invoke-NucleusManagedDevTool {'
+    '  param('
+    '    [Parameter(Mandatory = $true)]'
+    '    [string]$ToolName,'
+    '    [Parameter(ValueFromRemainingArguments = $true)]'
+    '    [object[]]$ToolArguments'
+    '  )'
+    '  $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1'
+    '  if ($null -eq $application) {'
+    '    return $false'
+    '  }'
+    '  if ($env:DIRENV_DIR -or $env:NUCLEUS_DEFAULT_DEV_ENV) {'
+    '    & $application.Source @ToolArguments'
+    '    return $true'
+    '  }'
+    '  return $false'
+    '}'
     # System-wide build tool block: redirect bun/cargo/rustc/uv to warnings.
     # These tools are installed globally for system package management only.
-    # When DIRENV_DIR is set, a direnv environment (devShell) is active; pass
-    # through to the scoped binary that direnv put at the front of PATH.
-    # WHY: same policy as the Python ban; system bun/cargo/rustc/uv must only
-    # be invoked by managed automation (Invoke-BunSetup, Invoke-CargoBinstallSetup,
-    # etc.), not directly by a developer in an interactive session.
+    # When DIRENV_DIR is set, a direnv environment (devShell) is active; when it
+    # is absent, use the managed default shell environment so plain repos still
+    # have a safe baseline toolchain. WHY: Windows does not have a separate
+    # nix-direnv-backed fallback store path in this workflow yet, so parity uses
+    # the user-scoped managed PATH instead of a second binary install root.
     'function bun {'
-    '  if ($env:DIRENV_DIR) {'
-    '    & (Get-Command -Name bun -CommandType Application | Select-Object -First 1).Source @Args'
+    '  if (Invoke-NucleusManagedDevTool -ToolName "bun" @Args) {'
     '    return'
     '  }'
-    '  Write-Host "shell: system-wide bun is for system package installation only; direct invocation is blocked." -ForegroundColor Yellow'
-    '  Write-Host "         For development, enter a devShell where bun is scoped to the project:" -ForegroundColor Yellow'
+    '  Write-Host "shell: managed bun is unavailable right now." -ForegroundColor Yellow'
+    '  Write-Host "         For development, use one of these managed entrypoints:" -ForegroundColor Yellow'
     '  Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow'
-    '  Write-Host "         - Or run: nix develop" -ForegroundColor Yellow'
+    '  Write-Host "         - Or use the managed default shell environment installed by apply.ps1" -ForegroundColor Yellow'
     '  Write-Host "         Shell shortcuts ni/nr/nx also work inside a devShell." -ForegroundColor Yellow'
     '  return 1'
     '}'
     'function cargo {'
-    '  if ($env:DIRENV_DIR) {'
-    '    & (Get-Command -Name cargo -CommandType Application | Select-Object -First 1).Source @Args'
+    '  if (Invoke-NucleusManagedDevTool -ToolName "cargo" @Args) {'
     '    return'
     '  }'
-    '  Write-Host "shell: system-wide cargo is for system package installation only; direct invocation is blocked." -ForegroundColor Yellow'
-    '  Write-Host "         For Rust development, enter a devShell where cargo is scoped to the project:" -ForegroundColor Yellow'
+    '  Write-Host "shell: managed cargo is unavailable right now." -ForegroundColor Yellow'
+    '  Write-Host "         For Rust development, use one of these managed entrypoints:" -ForegroundColor Yellow'
     '  Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow'
-    '  Write-Host "         - Or run: nix develop" -ForegroundColor Yellow'
+    '  Write-Host "         - Or use the managed default shell environment installed by apply.ps1" -ForegroundColor Yellow'
     '  return 1'
     '}'
     'function rustc {'
-    '  if ($env:DIRENV_DIR) {'
-    '    & (Get-Command -Name rustc -CommandType Application | Select-Object -First 1).Source @Args'
+    '  if (Invoke-NucleusManagedDevTool -ToolName "rustc" @Args) {'
     '    return'
     '  }'
-    '  Write-Host "shell: system-wide rustc is for system package installation only; direct invocation is blocked." -ForegroundColor Yellow'
-    '  Write-Host "         For Rust development, enter a devShell where rustc is scoped to the project:" -ForegroundColor Yellow'
+    '  Write-Host "shell: managed rustc is unavailable right now." -ForegroundColor Yellow'
+    '  Write-Host "         For Rust development, use one of these managed entrypoints:" -ForegroundColor Yellow'
     '  Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow'
-    '  Write-Host "         - Or run: nix develop" -ForegroundColor Yellow'
+    '  Write-Host "         - Or use the managed default shell environment installed by apply.ps1" -ForegroundColor Yellow'
     '  return 1'
     '}'
     'function uv {'
-    '  if ($env:DIRENV_DIR) {'
-    '    & (Get-Command -Name uv -CommandType Application | Select-Object -First 1).Source @Args'
+    '  if (Invoke-NucleusManagedDevTool -ToolName "uv" @Args) {'
     '    return'
     '  }'
-    '  Write-Host "shell: system-wide uv is for system package installation only; direct invocation is blocked." -ForegroundColor Yellow'
-    '  Write-Host "         For Python development, enter a devShell where uv is scoped to the project:" -ForegroundColor Yellow'
+    '  Write-Host "shell: managed uv is unavailable right now." -ForegroundColor Yellow'
+    '  Write-Host "         For Python development, use one of these managed entrypoints:" -ForegroundColor Yellow'
     '  Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow'
-    '  Write-Host "         - Or run: nix develop" -ForegroundColor Yellow'
+    '  Write-Host "         - Or use the managed default shell environment installed by apply.ps1" -ForegroundColor Yellow'
     '  return 1'
     '}'
     $managedBlockEnd
