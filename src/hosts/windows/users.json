@@ -3,20 +3,6 @@
   "users": {
     "polyipseity": {
       "description": "Primary user receiving secret materialization and full configuration",
-      "dscConfigFiles": [
-        "user.dsc.yml"
-      ],
-      "homeDirectory": "C:\\Users\\polyipseity",
-      "isPrimary": true,
-      "qtpass": {
-        "settings": {}
-      },
-      "linearmouse": {
-        "settings": {}
-      },
-      "vscode": {
-        "settings": {}
-      },
       "devRepos": {
         "enable": true,
         "gitHubUsername": "polyipseity",
@@ -28,15 +14,29 @@
           },
           {
             "name": "monorepo",
-            "url": "git@github.com:polyipseity/monorepo.git",
-            "target": "dev\\monorepo"
+            "target": "dev\\monorepo",
+            "url": "git@github.com:polyipseity/monorepo.git"
           },
           {
             "name": "monorepo-private",
-            "url": "git@github.com:polyipseity/monorepo-private.git",
-            "target": "dev\\monorepo-private"
+            "target": "dev\\monorepo-private",
+            "url": "git@github.com:polyipseity/monorepo-private.git"
           }
         ]
+      },
+      "dscConfigFiles": [
+        "user.dsc.yml"
+      ],
+      "homeDirectory": "C:\\Users\\polyipseity",
+      "isPrimary": true,
+      "linearmouse": {
+        "settings": {}
+      },
+      "qtpass": {
+        "settings": {}
+      },
+      "vscode": {
+        "settings": {}
       }
     }
   }
