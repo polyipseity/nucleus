@@ -5,11 +5,11 @@
 #   1. expire Home Manager generations older than 30 days (if home-manager is available)
 #   2. run nix store garbage collection (if nix is available)
 #   3. remove stale decrypted wallpaper files under ~/Pictures/wallpapers
-#   4. prune cargo source/registry/advisory-db cache (if cargo-cache is available)
+#   4. prune bun/cargo/rustc/uv caches and the repo-local .direnv environment
 #   5. remove locally installed Ollama models absent from the manifest (if ollama is available)
 #
 # Arguments:
-#   --skip-cargo-cache     skip cargo-cache -r all
+#   --skip-tool-cache-prune skip bun/cargo/rustc/uv and repo-local .direnv cache cleanup
 #   --skip-hm-gc           skip home-manager expire-generations
 #   --skip-nix-gc          skip nix-collect-garbage
 #   --skip-ollama-prune    skip stale Ollama model removal
@@ -50,7 +50,7 @@ resolve_nucleus_root() {
 }
 REPO_ROOT="$(resolve_nucleus_root)"
 
-skip_cargo_cache=false
+skip_tool_cache_prune=false
 skip_hm_gc=false
 skip_nix_gc=false
 skip_ollama_prune=false
@@ -58,8 +58,8 @@ skip_wallpaper_prune=false
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --skip-cargo-cache)
-      skip_cargo_cache=true
+    --skip-tool-cache-prune)
+      skip_tool_cache_prune=true
       ;;
     --skip-hm-gc)
       skip_hm_gc=true
@@ -153,27 +153,70 @@ prune_stale_wallpapers() {
   done
 }
 
-prune_cargo_cache_if_available() {
-  # cargo-cache (github.com/matthiaskrgr/cargo-cache) reclaims space from
-  # ~/.cargo/registry, ~/.cargo/git, and advisory-db clones that accumulate
-  # across Rust development sessions.  Installed declaratively via
-  # pkgs.cargo-cache on POSIX hosts.  This step is a no-op if the binary is
-  # absent (for example on minimal CI images that do not have the full
-  # package set).
-  if ! command -v cargo-cache >/dev/null 2>&1; then
-    # Existence probe — tool absent is expected and benign on some hosts.
-    printf '%s\n' "gc: cargo-cache unavailable; skipping cargo cache prune"
+prune_dir_contents_if_present() {
+  # Clears the contents of a cache directory while preserving the directory
+  # itself so future tool invocations do not have to recreate parent paths.
+  # Args:
+  #   $1 — cache directory path
+  #   $2 — human-readable label for logs
+  cache_dir="$1"
+  cache_label="$2"
+
+  if [ ! -d "$cache_dir" ]; then
     return 0
   fi
+
+  if ! find "$cache_dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} +; then
+    printf '%s\n' "gc: warning: failed to prune $cache_label at '$cache_dir'" >&2
+  fi
+}
+
+prune_tool_caches_if_available() {
+  # bun/cargo/rustc/uv all accumulate user-scoped caches under HOME, regardless
+  # of whether the binary came from the system profile or a direnv-loaded
+  # devShell.  Clearing those shared cache locations reclaims space for both
+  # system and devShell use without touching project-managed dependencies.
+  # rustc has no standalone cache tree; its heavy artifacts live in cargo and
+  # rustup-managed directories, which are pruned below.
 
   cargo_home_dir="${CARGO_HOME:-$HOME/.cargo}"
-  if [ ! -d "$cargo_home_dir" ]; then
-    printf '%s\n' "gc: cargo cache directory '$cargo_home_dir' is missing; skipping cargo cache prune"
-    return 0
+  rustup_home_dir="${RUSTUP_HOME:-$HOME/.rustup}"
+  if [ "$(uname -s)" = "Darwin" ]; then
+    platform_cache_root="$HOME/Library/Caches"
+  else
+    platform_cache_root="${XDG_CACHE_HOME:-$HOME/.cache}"
   fi
 
-  if ! cargo-cache -r all; then
+  bun_cache_dir="${BUN_INSTALL_CACHE_DIR:-$HOME/.bun/install/cache}"
+  uv_cache_dir="$platform_cache_root/uv"
+  cargo_binstall_cache_dir="$platform_cache_root/cargo-binstall"
+  rustup_tmp_dir="$rustup_home_dir/tmp"
+  repo_direnv_dir="$REPO_ROOT/.direnv"
+
+  prune_dir_contents_if_present "$bun_cache_dir" "bun install cache"
+  prune_dir_contents_if_present "$cargo_binstall_cache_dir" "cargo-binstall cache"
+  prune_dir_contents_if_present "$rustup_tmp_dir" "rustup temporary cache"
+
+  # cargo-cache (github.com/matthiaskrgr/cargo-cache) reclaims space from
+  # ~/.cargo/registry, ~/.cargo/git, and advisory-db clones.  This remains the
+  # authoritative cleanup path when the binary is available.
+  if ! command -v cargo-cache >/dev/null 2>&1; then
+    printf '%s\n' "gc: cargo-cache unavailable; skipping cargo cache prune"
+  elif [ ! -d "$cargo_home_dir" ]; then
+    printf '%s\n' "gc: cargo cache directory '$cargo_home_dir' is missing; skipping cargo cache prune"
+  elif ! cargo-cache -r all; then
     printf '%s\n' "gc: warning: cargo-cache prune failed; continuing GC workflow" >&2
+  fi
+
+  prune_dir_contents_if_present "$uv_cache_dir" "uv cache"
+
+  # direnv materializes the current repository's nix devShell under .direnv.
+  # Clearing only the nucleus checkout keeps scope bounded to managed content;
+  # unrelated repositories are left untouched.
+  if [ -d "$repo_direnv_dir" ]; then
+    if ! rm -rf "$repo_direnv_dir"; then
+      printf '%s\n' "gc: warning: failed to remove repo-local direnv cache '$repo_direnv_dir'" >&2
+    fi
   fi
 }
 
@@ -217,9 +260,9 @@ if [ "$skip_wallpaper_prune" = false ]; then
   prune_stale_wallpapers
 fi
 
-# Step 4: cargo cache prune (independent of Nix, runs last).
-if [ "$skip_cargo_cache" = false ]; then
-  prune_cargo_cache_if_available
+# Step 4: tool cache prune (independent of Nix, runs last).
+if [ "$skip_tool_cache_prune" = false ]; then
+  prune_tool_caches_if_available
 fi
 
 # Step 5: remove orphaned Ollama models not declared in the manifest.

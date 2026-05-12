@@ -8,11 +8,11 @@
 
     1. Remove stale decrypted wallpaper files under %USERPROFILE%\Pictures\wallpapers
        that no longer have a matching *.sops blob in src/assets/wallpapers/.
-     2. Prune the Cargo source/registry/advisory-db cache via cargo-cache if the
-        binary is present on PATH.  cargo-cache is installed via cargo-binstall
-        by Invoke-CargoBinstallSetup (apply.ps1).  The presence probe below keeps
-        this step a no-op until cargo-binstall setup has run.
-     3. Remove old Scoop app versions and installer caches via `scoop cleanup *`.
+    2. Prune bun/cargo/rustc/uv caches and the nucleus repo-local .direnv
+      environment. cargo-cache remains the authoritative cleanup path for the
+      Cargo registry/git/advisory-db cache when present; rustc-specific temp
+      state is cleared via rustup's tmp directory.
+    3. Remove old Scoop app versions and installer caches via `scoop cleanup *`.
         Guarded by a Scoop presence check so the step is a no-op when Scoop is
         not yet installed (e.g. before the first apply.ps1 run).
      4. Remove locally installed Ollama models absent from the declarative manifest
@@ -33,8 +33,8 @@
   so they are aware of which repository's assets and manifests will be accessed
   and modified.
 
-.PARAMETER SkipCargoCache
-  Skip cargo-cache pruning even when cargo-cache is available on PATH.
+.PARAMETER SkipToolCachePrune
+  Skip bun/cargo/rustc/uv and repo-local .direnv cache cleanup.
 
 .PARAMETER SkipOllamaPrune
   Skip Ollama orphaned model removal even when ollama is installed.
@@ -47,7 +47,7 @@
 
 .EXAMPLE
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -RepoRoot "C:\Users\admin\nucleus"
-  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -RepoRoot "C:\Users\admin\nucleus" -SkipCargoCache
+  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -RepoRoot "C:\Users\admin\nucleus" -SkipToolCachePrune
 #>
 [CmdletBinding()]
 param(
@@ -55,7 +55,7 @@ param(
   [string]$ModuleDir,
   [Parameter(Mandatory)]
   [string]$RepoRoot,
-  [switch]$SkipCargoCache,
+  [switch]$SkipToolCachePrune,
   [switch]$SkipOllamaPrune,
   [switch]$SkipScoopCleanup,
   [switch]$SkipWallpaperPrune
@@ -80,22 +80,63 @@ if (-not $SkipWallpaperPrune) {
   Remove-StaleWallpaper -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
 }
 
-# ---- Step 2: cargo cache prune ----------------------------------------------
-# cargo-cache (github.com/matthiaskrgr/cargo-cache) reclaims space from
-# %USERPROFILE%\.cargo\registry, %USERPROFILE%\.cargo\git, and advisory-db
-# clones that accumulate during Rust development sessions.
-#
-# cargo-cache is installed via cargo-binstall by Invoke-CargoBinstallSetup.
-# The presence probe below keeps this step a no-op on machines where
-# cargo-binstall setup has not yet run, so gc.ps1 is safe to call at any time.
-if (-not $SkipCargoCache) {
-  # Existence probe — command absent is expected and benign before cargo-cache
-  # is manually installed.  The result is checked immediately below.
+# ---- Step 2: tool cache prune -----------------------------------------------
+# bun/cargo/rustc/uv all accumulate user-scoped caches under the Windows user
+# profile, regardless of whether the binary came from the system install path
+# or a direnv-loaded shell. Clearing those shared cache locations reclaims
+# space for both system and devShell use without touching project-managed
+# dependencies. rustc has no standalone cache tree; its transient artifacts are
+# cleaned via cargo-cache and rustup's tmp directory.
+if (-not $SkipToolCachePrune) {
+  function Clear-DirectoryContentsIfPresent {
+    param(
+      [Parameter(Mandatory = $true)]
+      [string]$Path,
+
+      [Parameter(Mandatory = $true)]
+      [string]$Label
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+      return
+    }
+
+    try {
+      Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop | Remove-Item -Recurse -Force -ErrorAction Stop
+    }
+    catch {
+      Write-Warning "gc: failed to prune $Label at '$Path' — $($_.Exception.Message)"
+    }
+  }
+
+  $bunCacheDir = Join-Path $HOME ".bun\install\cache"
+  $cargoBinstallCacheDir = Join-Path $env:LOCALAPPDATA "cargo-binstall\cache"
+  $rustupTmpDir = Join-Path $HOME ".rustup\tmp"
+  $uvCacheDir = Join-Path $env:LOCALAPPDATA "uv\cache"
+  $repoDirenvDir = Join-Path $resolvedRepoRoot ".direnv"
+
+  Clear-DirectoryContentsIfPresent -Path $bunCacheDir -Label "bun install cache"
+  Clear-DirectoryContentsIfPresent -Path $cargoBinstallCacheDir -Label "cargo-binstall cache"
+  Clear-DirectoryContentsIfPresent -Path $rustupTmpDir -Label "rustup temporary cache"
+
   $cargoCacheCmd = Get-Command -Name "cargo-cache" -ErrorAction SilentlyContinue
   if ($null -eq $cargoCacheCmd) {
     Write-Output "nucleus: cargo-cache unavailable; skipping cargo cache prune"
   } else {
     & $cargoCacheCmd.Source -r all
+  }
+
+  # uv does not need to be installed to clear its cache directory; remove the
+  # cached wheels and artifacts directly when the platform-default path exists.
+  Clear-DirectoryContentsIfPresent -Path $uvCacheDir -Label "uv cache"
+
+  if (Test-Path -LiteralPath $repoDirenvDir -PathType Container) {
+    try {
+      Remove-Item -LiteralPath $repoDirenvDir -Recurse -Force -ErrorAction Stop
+    }
+    catch {
+      Write-Warning "gc: failed to remove repo-local direnv cache '$repoDirenvDir' — $($_.Exception.Message)"
+    }
   }
 }
 
