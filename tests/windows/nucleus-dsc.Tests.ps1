@@ -211,6 +211,27 @@ Describe "Long Path Support (Windows-Specific Invariant)" {
     }
 }
 
+Describe "Windows Power & Remote-Access Parity" {
+    <#
+    .DESCRIPTION
+    Validate the Windows power posture required for unattended closed-lid
+    work: lid-close must not suspend the machine, and TCP keepalives must stay
+    aggressive enough for remote sessions to survive idle network equipment.
+    #>
+
+    It "Should keep TCP keepalive at 60 seconds" {
+        $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
+        $value = Get-ItemProperty -Path $regPath -Name KeepAliveTime -ErrorAction SilentlyContinue
+        $value.KeepAliveTime | Should -Be 60000
+    }
+
+    It "Should set lid close action to Do Nothing on AC and battery" {
+        $lidQuery = powercfg /query scheme_current SUB_BUTTONS LIDACTION | Out-String
+        $lidQuery | Should -Match 'Current AC Power Setting Index:\s+0x00000000'
+        $lidQuery | Should -Match 'Current DC Power Setting Index:\s+0x00000000'
+    }
+}
+
 Describe "Test-Driven Development Scaffolding" {
     <#
     .DESCRIPTION

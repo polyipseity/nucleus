@@ -115,11 +115,14 @@
     };
   };
 
-  # logind lid-close behaviour: keep the machine awake on external power with
-  # lid closed so remote-desktop sessions are not disconnected when docked or
-  # used in clamshell mode.  Default (suspend) is preserved on battery because
-  # battery-powered clamshell is not a remote-access scenario.
+  # logind lid-close behaviour: keep the machine awake with the lid closed on
+  # every power source so long-running AI agents and remote-desktop sessions do
+  # not die just because the panel was shut.  linux.nix already disables idle
+  # sleep on both AC and battery; lid handling must match that always-on
+  # posture instead of reintroducing a suspend path only for the lid switch.
   services.logind.settings.Login = {
+    HandleLidSwitch = "ignore";
+    HandleLidSwitchDocked = "ignore";
     HandleLidSwitchExternalPower = "ignore";
   };
 

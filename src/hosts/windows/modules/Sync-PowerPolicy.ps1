@@ -13,6 +13,8 @@ function Sync-PowerPolicy {
     NixOS power posture:
       - AC display timeout:   1 minute  (matches macOS pmset -c displaysleep 1)
       - Battery display timeout: 1 minute (matches NixOS idle-delay = 60)
+      - AC lid close action: Do Nothing (keep unattended work alive with lid shut)
+      - Battery lid close action: Do Nothing (same behavior on battery)
       - AC system sleep:   Never  (matches macOS/NixOS no-sleep-on-AC for remote access)
       - Battery system sleep: Never  (disabled so remote-desktop sessions survive on battery)
       - AC disk timeout:      Never  (matches macOS pmset -c disksleep 0)
@@ -26,6 +28,12 @@ function Sync-PowerPolicy {
     prevents new connections; keeping sleep disabled matches the always-on
     posture of AC power and aligns with the three-protocol remote-desktop
     baseline.
+
+    Lid switch close action is set to Do Nothing on both AC and battery because
+    Windows does not inherit "never sleep" from standby timers when the user
+    explicitly closes the lid.  Without this, the laptop can still suspend the
+    instant the panel shuts, which pauses long-running AI jobs and drops the
+    network even though the idle timers say to stay awake.
 
     TCP keepalive (KeepAliveTime registry value) is set to 60,000 ms so
     persistent SSH tunnels and remote-desktop connections remain alive through
@@ -41,6 +49,8 @@ function Sync-PowerPolicy {
     When disabled, values are reset to Windows defaults:
       - AC display timeout:   10 minutes
       - Battery display timeout: 5 minutes
+      - AC lid close action:  Sleep
+      - Battery lid close action: Sleep
       - AC system sleep:     25 minutes
       - Battery system sleep:   25 minutes
       - AC disk timeout:     20 minutes
@@ -72,6 +82,56 @@ function Sync-PowerPolicy {
     throw "powercfg executable not found at '$powercfg'."
   }
 
+  # powercfg uses the active power-scheme GUID for hidden lid settings such as
+  # LIDACTION.  Resolve it once up front so both convergence and cleanup paths
+  # target the same live scheme instead of guessing a vendor-specific default.
+  $activeSchemeOutput = & $powercfg /getactivescheme
+  if ($LASTEXITCODE -ne 0) {
+    throw "Failed to resolve the active Windows power scheme. Exit code: $LASTEXITCODE"
+  }
+
+  $activeSchemeText = ($activeSchemeOutput | Out-String).Trim()
+  $activeSchemeMatch = [regex]::Match($activeSchemeText, '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})')
+  if (-not $activeSchemeMatch.Success) {
+    throw "Failed to parse active power scheme GUID from output: $activeSchemeText"
+  }
+
+  $activeSchemeGuid = $activeSchemeMatch.Groups[1].Value
+  $lidActionSubgroup = 'SUB_BUTTONS'
+  $lidActionSetting = 'LIDACTION'
+
+  function Invoke-PowerCfgChecked {
+    <#
+    .SYNOPSIS
+      Runs powercfg and throws on non-zero exit.
+
+    .DESCRIPTION
+      Centralizes powercfg exit-code validation so hidden lid-action writes and
+      ordinary timeout updates fail fast with an operation-specific message.
+
+    .PARAMETER Arguments
+      The exact argument array forwarded to powercfg.exe.
+
+    .PARAMETER FailureMessage
+      Human-readable context appended to the thrown error when powercfg fails.
+
+    .EXAMPLE
+      Invoke-PowerCfgChecked -Arguments @('/change', 'standby-timeout-ac', '0') -FailureMessage 'Failed to disable AC system sleep.'
+    #>
+    param(
+      [Parameter(Mandatory)]
+      [string[]]$Arguments,
+
+      [Parameter(Mandatory)]
+      [string]$FailureMessage
+    )
+
+    & $powercfg @Arguments
+    if ($LASTEXITCODE -ne 0) {
+      throw "$FailureMessage Exit code: $LASTEXITCODE"
+    }
+  }
+
   # TCP keepalive is a registry value, not a powercfg setting.
   # KeepAliveTime controls the idle period in milliseconds before the first
   # keepalive probe is issued; Windows reverts to its built-in default
@@ -81,19 +141,21 @@ function Sync-PowerPolicy {
   if ($Enabled) {
     # Cross-host parity mode: align display, system sleep, and disk sleep
     # with macOS pmset and NixOS logind/auto-cpufreq posture.
-    & $powercfg /change monitor-timeout-ac 1
-    & $powercfg /change monitor-timeout-dc 1
-    & $powercfg /change standby-timeout-ac 0
-    & $powercfg /change standby-timeout-dc 0
+    Invoke-PowerCfgChecked -Arguments @('/change', 'monitor-timeout-ac', '1') -FailureMessage 'Failed to set AC display timeout.'
+    Invoke-PowerCfgChecked -Arguments @('/change', 'monitor-timeout-dc', '1') -FailureMessage 'Failed to set battery display timeout.'
+    Invoke-PowerCfgChecked -Arguments @('/setacvalueindex', $activeSchemeGuid, $lidActionSubgroup, $lidActionSetting, '0') -FailureMessage 'Failed to set AC lid close action to Do Nothing.'
+    Invoke-PowerCfgChecked -Arguments @('/setdcvalueindex', $activeSchemeGuid, $lidActionSubgroup, $lidActionSetting, '0') -FailureMessage 'Failed to set battery lid close action to Do Nothing.'
+    Invoke-PowerCfgChecked -Arguments @('/change', 'standby-timeout-ac', '0') -FailureMessage 'Failed to disable AC system sleep.'
+    Invoke-PowerCfgChecked -Arguments @('/change', 'standby-timeout-dc', '0') -FailureMessage 'Failed to disable battery system sleep.'
     # Disk timeout: prevent automatic disk spindown to mirror macOS disksleep=0.
     # Disk sleep during a remote session causes visible latency spikes when the
     # disk must spin up again mid-operation; keeping it always-on reduces jitter.
-    & $powercfg /change disk-timeout-ac 0
-    & $powercfg /change disk-timeout-dc 0
-
-    if ($LASTEXITCODE -ne 0) {
-      throw "Failed to apply managed Windows power policy. Exit code: $LASTEXITCODE"
-    }
+    Invoke-PowerCfgChecked -Arguments @('/change', 'disk-timeout-ac', '0') -FailureMessage 'Failed to disable AC disk timeout.'
+    Invoke-PowerCfgChecked -Arguments @('/change', 'disk-timeout-dc', '0') -FailureMessage 'Failed to disable battery disk timeout.'
+    # Hidden per-scheme settings only become live after the scheme is re-set as
+    # active. Re-applying the current scheme is a no-op for users but forces the
+    # new lid-action indexes to take effect immediately.
+    Invoke-PowerCfgChecked -Arguments @('/setactive', $activeSchemeGuid) -FailureMessage 'Failed to reactivate the current power scheme after lid-action changes.'
 
     # TCP keepalive: issue keepalive probes after 60 s of idle TCP so persistent
     # SSH tunnels and remote-desktop sessions survive idle periods without being
@@ -129,16 +191,15 @@ function Sync-PowerPolicy {
   }
   else {
     # Windows defaults: restore to standard Windows Home power scheme values.
-    & $powercfg /change monitor-timeout-ac 10
-    & $powercfg /change monitor-timeout-dc 5
-    & $powercfg /change standby-timeout-ac 25
-    & $powercfg /change standby-timeout-dc 25
-    & $powercfg /change disk-timeout-ac 20
-    & $powercfg /change disk-timeout-dc 10
-
-    if ($LASTEXITCODE -ne 0) {
-      throw "Failed to restore Windows power policy defaults. Exit code: $LASTEXITCODE"
-    }
+    Invoke-PowerCfgChecked -Arguments @('/change', 'monitor-timeout-ac', '10') -FailureMessage 'Failed to restore AC display timeout.'
+    Invoke-PowerCfgChecked -Arguments @('/change', 'monitor-timeout-dc', '5') -FailureMessage 'Failed to restore battery display timeout.'
+    Invoke-PowerCfgChecked -Arguments @('/setacvalueindex', $activeSchemeGuid, $lidActionSubgroup, $lidActionSetting, '1') -FailureMessage 'Failed to restore AC lid close action to Sleep.'
+    Invoke-PowerCfgChecked -Arguments @('/setdcvalueindex', $activeSchemeGuid, $lidActionSubgroup, $lidActionSetting, '1') -FailureMessage 'Failed to restore battery lid close action to Sleep.'
+    Invoke-PowerCfgChecked -Arguments @('/change', 'standby-timeout-ac', '25') -FailureMessage 'Failed to restore AC system sleep timeout.'
+    Invoke-PowerCfgChecked -Arguments @('/change', 'standby-timeout-dc', '25') -FailureMessage 'Failed to restore battery system sleep timeout.'
+    Invoke-PowerCfgChecked -Arguments @('/change', 'disk-timeout-ac', '20') -FailureMessage 'Failed to restore AC disk timeout.'
+    Invoke-PowerCfgChecked -Arguments @('/change', 'disk-timeout-dc', '10') -FailureMessage 'Failed to restore battery disk timeout.'
+    Invoke-PowerCfgChecked -Arguments @('/setactive', $activeSchemeGuid) -FailureMessage 'Failed to reactivate the current power scheme after restoring defaults.'
 
     # Remove the managed KeepAliveTime value; Windows reverts to its built-in
     # default (~2 hours) when the value is absent from the registry.
