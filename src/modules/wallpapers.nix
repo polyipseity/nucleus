@@ -17,51 +17,55 @@
 #
 # This activation runs after gpgImport so the keyring import has already
 # happened before wallpaper decryption attempts.
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   wallpapersDir = ../assets/wallpapers;
 
   # Get all user subdirectories (each is a username).
   userDirs = lib.attrNames (
-    lib.filterAttrs (_: type: type == "directory")
-    (builtins.readDir wallpapersDir)
+    lib.filterAttrs (_: type: type == "directory") (builtins.readDir wallpapersDir)
   );
 
   # Convert a wallpaper filename into a stable secret key suffix so sops-nix
   # keys remain path-safe while still being traceable to the source file.
-  sanitizeSecretSuffix = value:
-    lib.replaceStrings
-      [ " " "(" ")" "." "-" ]
-      [ "_" "" "" "_" "_" ]
-      value;
+  sanitizeSecretSuffix =
+    value: lib.replaceStrings [ " " "(" ")" "." "-" ] [ "_" "" "" "_" "_" ] value;
 
   # For each user, collect their wallpaper blobs from their subdirectory.
-  wallpaperBlobsForUser = userName:
+  wallpaperBlobsForUser =
+    userName:
     lib.attrNames (
-      lib.filterAttrs
-        (name: type: type == "regular" && lib.hasSuffix ".sops" name)
-        (builtins.readDir (wallpapersDir + "/${userName}"))
+      lib.filterAttrs (name: type: type == "regular" && lib.hasSuffix ".sops" name) (
+        builtins.readDir (wallpapersDir + "/${userName}")
+      )
     );
 
   currentUsername = config.home.username;
   currentUserHome = config.home.homeDirectory;
 
   # Generate wallpaper secrets for a given user.
-  mkWallpaperSecretsForUser = userName:
+  mkWallpaperSecretsForUser =
+    userName:
     let
       blobs = wallpaperBlobsForUser userName;
-      items = map
-        (blobName:
-          let
-            wallpaperName = lib.removeSuffix ".sops" blobName;
-          in {
-            inherit blobName wallpaperName;
-            secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${userName}";
-          })
-        blobs;
+      items = map (
+        blobName:
+        let
+          wallpaperName = lib.removeSuffix ".sops" blobName;
+        in
+        {
+          inherit blobName wallpaperName;
+          secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${userName}";
+        }
+      ) blobs;
     in
-    lib.listToAttrs (map
-      (item: {
+    lib.listToAttrs (
+      map (item: {
         name = item.secretName;
         value = {
           format = "binary";
@@ -71,24 +75,24 @@ let
             name = "wallpaper-${sanitizeSecretSuffix item.blobName}";
           };
         };
-      })
-      items);
+      }) items
+    );
 
   # Generate wallpaper secrets for ALL user directories.
-  wallpaperSecrets =
-    lib.foldl' lib.recursiveUpdate {} (map mkWallpaperSecretsForUser userDirs);
+  wallpaperSecrets = lib.foldl' lib.recursiveUpdate { } (map mkWallpaperSecretsForUser userDirs);
 
   # Items list for the activation script - use current user's secrets.
   wallpaperBlobsCurrentUser = wallpaperBlobsForUser currentUsername;
-  wallpaperItemsForCurrentUser = map
-    (blobName:
-      let
-        wallpaperName = lib.removeSuffix ".sops" blobName;
-      in {
-        inherit blobName wallpaperName;
-        secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${currentUsername}";
-      })
-    wallpaperBlobsCurrentUser;
+  wallpaperItemsForCurrentUser = map (
+    blobName:
+    let
+      wallpaperName = lib.removeSuffix ".sops" blobName;
+    in
+    {
+      inherit blobName wallpaperName;
+      secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${currentUsername}";
+    }
+  ) wallpaperBlobsCurrentUser;
 
   # desktoppr is darwin-only; keep this reference lazy so Linux evaluation
   # does not attempt to instantiate an unsupported package.
@@ -179,34 +183,32 @@ in
       fi
     fi
 
-    ${lib.concatMapStringsSep "\n"
-      (item: ''
-        secretPath="${config.sops.defaultSymlinkPath}/${item.secretName}"
-        targetFile="$picturesDir/${item.wallpaperName}"
+    ${lib.concatMapStringsSep "\n" (item: ''
+      secretPath="${config.sops.defaultSymlinkPath}/${item.secretName}"
+      targetFile="$picturesDir/${item.wallpaperName}"
 
-        if [ ! -f "$secretPath" ]; then
-          fail_wallpaper_provision "wallpaperProvision: missing decrypted wallpaper secret at $secretPath; cannot apply wallpaper gallery."
-        fi
+      if [ ! -f "$secretPath" ]; then
+        fail_wallpaper_provision "wallpaperProvision: missing decrypted wallpaper secret at $secretPath; cannot apply wallpaper gallery."
+      fi
 
-        case "$targetFile" in
-          "$picturesDir"/*) ;;
-          *)
-            fail_wallpaper_provision "wallpaperProvision: refusing to write wallpaper outside $picturesDir: $targetFile"
-            ;;
-        esac
+      case "$targetFile" in
+        "$picturesDir"/*) ;;
+        *)
+          fail_wallpaper_provision "wallpaperProvision: refusing to write wallpaper outside $picturesDir: $targetFile"
+          ;;
+      esac
 
-        # Copy decrypted material out of the runtime secret symlink directory
-        # so GUI consumers can read a normal file under ~/Pictures.
-        if [ -L "$targetFile" ] || [ ! -f "$targetFile" ] || ! cmp -s "$secretPath" "$targetFile"; then
-          tmpTarget="$(mktemp)"
-          cp "$secretPath" "$tmpTarget"
-          # 444: managed wallpaper content must not be modified outside
-          # activation; GUI consumers and desktoppr need only read access.
-          chmod 444 "$tmpTarget"
-          mv "$tmpTarget" "$targetFile"
-        fi
-      '')
-      wallpaperItemsForCurrentUser}
+      # Copy decrypted material out of the runtime secret symlink directory
+      # so GUI consumers can read a normal file under ~/Pictures.
+      if [ -L "$targetFile" ] || [ ! -f "$targetFile" ] || ! cmp -s "$secretPath" "$targetFile"; then
+        tmpTarget="$(mktemp)"
+        cp "$secretPath" "$tmpTarget"
+        # 444: managed wallpaper content must not be modified outside
+        # activation; GUI consumers and desktoppr need only read access.
+        chmod 444 "$tmpTarget"
+        mv "$tmpTarget" "$targetFile"
+      fi
+    '') wallpaperItemsForCurrentUser}
 
     # Stale cleanup: remove decrypted files that no longer have a matching
     # .sops source so the gallery does not show deleted assets.

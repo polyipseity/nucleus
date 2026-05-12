@@ -42,45 +42,45 @@
   # Install graphical archive managers per desktop environment.
   environment.systemPackages =
     (with pkgs; [
-    # GNOME archive manager.
-    file-roller
+      # GNOME archive manager.
+      file-roller
 
-    # KDE archive manager with built-in terminal opening support.
-    kdePackages.ark
+      # KDE archive manager with built-in terminal opening support.
+      kdePackages.ark
 
-    # Ensure the 7z engine is available globally for both GUI tools
-    # (though p7zip is also declared in modules/core.nix, re-declare here
-    # for explicit system-level availability in case core is not applied).
-    p7zip
+      # Ensure the 7z engine is available globally for both GUI tools
+      # (though p7zip is also declared in modules/core.nix, re-declare here
+      # for explicit system-level availability in case core is not applied).
+      p7zip
 
-    # Terminal emulators for "Open in Terminal" context menu actions.
-    gnome-terminal  # default terminal for GNOME "Open in Terminal"
-    kdePackages.konsole   # default terminal for KDE "Open in Terminal"
+      # Terminal emulators for "Open in Terminal" context menu actions.
+      gnome-terminal # default terminal for GNOME "Open in Terminal"
+      kdePackages.konsole # default terminal for KDE "Open in Terminal"
 
-    # Battery efficiency daemon: dynamic governor tuning based on AC/battery
-    # state gives better laptop efficiency without hard-coding static CPU caps.
-    auto-cpufreq
+      # Battery efficiency daemon: dynamic governor tuning based on AC/battery
+      # state gives better laptop efficiency without hard-coding static CPU caps.
+      auto-cpufreq
 
-    # Remote-desktop clients for outbound access from this host.
-    # Parsec is used for low-latency GPU-accelerated remote gaming/work sessions.
-    # Chrome Remote Desktop is not available as a nixpkgs package; see MANUAL.md
-    # for the one-time browser-extension setup required for inbound CRD access.
-    parsec-bin
+      # Remote-desktop clients for outbound access from this host.
+      # Parsec is used for low-latency GPU-accelerated remote gaming/work sessions.
+      # Chrome Remote Desktop is not available as a nixpkgs package; see MANUAL.md
+      # for the one-time browser-extension setup required for inbound CRD access.
+      parsec-bin
 
-    # Productivity and creative applications.
-    # GIMP and Krita: raster and digital painting editors.
-    # LibreOffice: office suite.
-    # Blender: 3D modelling, animation, and rendering.
-    # Zoom: video conferencing.
-    # pass: Unix password manager (compatible with gopass on Windows).
-    # qtpass: Qt GUI frontend for pass/gopass.
-    blender
-    gimp
-    krita
-    libreoffice
-    pass
-    qtpass
-    zoom-us
+      # Productivity and creative applications.
+      # GIMP and Krita: raster and digital painting editors.
+      # LibreOffice: office suite.
+      # Blender: 3D modelling, animation, and rendering.
+      # Zoom: video conferencing.
+      # pass: Unix password manager (compatible with gopass on Windows).
+      # qtpass: Qt GUI frontend for pass/gopass.
+      blender
+      gimp
+      krita
+      libreoffice
+      pass
+      qtpass
+      zoom-us
     ])
     ++ lib.optionals (pkgs.gnome ? nautilus-open-terminal) [
       pkgs.gnome.nautilus-open-terminal # adds "Open in Terminal" to Files context menu when available

@@ -1,5 +1,10 @@
 # modules/posix-sops.nix — Shared SOPS decryption key sources for POSIX hosts.
-{ pkgs, lib, username, ... }:
+{
+  pkgs,
+  lib,
+  username,
+  ...
+}:
 let
   # ---------------------------------------------------------------------------
   # deriveHostAgeKey script text
@@ -70,11 +75,15 @@ in
   # NixOS: system.activationScripts assembles ALL named scripts in topological
   # order, so a custom name works correctly.
   # ---------------------------------------------------------------------------
-  system.activationScripts = if pkgs.stdenv.isDarwin then {
-    postActivation.text = lib.mkBefore deriveHostAgeKeyText;
-  } else {
-    deriveHostAgeKey.text = deriveHostAgeKeyText;
-  };
+  system.activationScripts =
+    if pkgs.stdenv.isDarwin then
+      {
+        postActivation.text = lib.mkBefore deriveHostAgeKeyText;
+      }
+    else
+      {
+        deriveHostAgeKey.text = deriveHostAgeKeyText;
+      };
 
   sops = {
     age = {
@@ -88,9 +97,6 @@ in
 
     # GnuPG fallback path differs by platform home directory convention.
     gnupg.home =
-      if pkgs.stdenv.isDarwin then
-        "/Users/${username}/.gnupg"
-      else
-        "/home/${username}/.gnupg";
+      if pkgs.stdenv.isDarwin then "/Users/${username}/.gnupg" else "/home/${username}/.gnupg";
   };
 }

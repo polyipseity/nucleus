@@ -18,7 +18,12 @@
 #                                  same family as qwen3:14b (passes on Mac)
 #                                  but verify with the same curl test before
 #                                  relying on tool-calling on the PC host.
-{ lib, nixpkgs, pkgs, ... }:
+{
+  lib,
+  nixpkgs,
+  pkgs,
+  ...
+}:
 let
   # Only Apple Silicon macOS currently needs an opt-in permissive import for
   # oterm's dependency chain. Keeping the import lazy and isolated preserves
@@ -70,7 +75,10 @@ lib.mkMerge [
       enable = true;
       config = {
         Label = "local.ollama";
-        ProgramArguments = [ "${pkgs.ollama}/bin/ollama" "serve" ];
+        ProgramArguments = [
+          "${pkgs.ollama}/bin/ollama"
+          "serve"
+        ];
         # Bind the server to loopback so the unauthenticated Ollama REST API
         # is never reachable from LAN peers.  0.0.0.0 binding (the historic
         # Ollama default on some versions) would expose model inference to

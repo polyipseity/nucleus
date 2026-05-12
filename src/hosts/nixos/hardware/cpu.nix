@@ -8,5 +8,10 @@
   # input are available before the root filesystem mounts.
   # xhci_pci: USB 3.x host controller | nvme: NVMe SSD | usbhid: USB HID input
   # sd_mod: SCSI/SATA disk support (also required for some USB mass storage).
-  boot.initrd.availableKernelModules = [ "xhci_pci" "nvme" "usbhid" "sd_mod" ];
+  boot.initrd.availableKernelModules = [
+    "xhci_pci"
+    "nvme"
+    "usbhid"
+    "sd_mod"
+  ];
 }

@@ -6,10 +6,10 @@
 # real machine values to override these defaults later.
 { lib, ... }:
 {
-	fileSystems."/" = lib.mkDefault {
-		device = "/dev/disk/by-label/nixos";
-		fsType = "ext4";
-	};
+  fileSystems."/" = lib.mkDefault {
+    device = "/dev/disk/by-label/nixos";
+    fsType = "ext4";
+  };
 
-	boot.loader.grub.devices = lib.mkDefault [ "/dev/sda" ];
+  boot.loader.grub.devices = lib.mkDefault [ "/dev/sda" ];
 }

@@ -9,9 +9,17 @@
 #
 # Run with: nix-instantiate --eval tests/nix/sops-mock-tests.nix
 
-{ lib ? import <nixpkgs/lib> }:
+{
+  lib ? import <nixpkgs/lib>,
+}:
 let
-  inherit (lib) hasAttr isList isString isAttrs all;
+  inherit (lib)
+    hasAttr
+    isList
+    isString
+    isAttrs
+    all
+    ;
 
   # Assertion helper.
   assert' = cond: msg: if !cond then builtins.throw msg else null;
@@ -27,22 +35,26 @@ let
       primary_gpg = [ "0x1234ABCD" ];
     };
     creation_rules = [
-      { path_regex = "src/secrets/.*"; key_groups = [ { age = "age_devices"; } ]; }
-      { path_regex = "src/assets/wallpapers/.*"; key_groups = [ { age = "age_devices"; } ]; }
+      {
+        path_regex = "src/secrets/.*";
+        key_groups = [ { age = "age_devices"; } ];
+      }
+      {
+        path_regex = "src/assets/wallpapers/.*";
+        key_groups = [ { age = "age_devices"; } ];
+      }
     ];
   };
 
   # === TEST: SOPS keys structure is present ===
-  test_sops_keys_present =
-    assert'
-      ((hasAttr "keys" mockSopsConfig) && (hasAttr "age_devices" mockSopsConfig.keys))
-      "SOPS config must have keys.age_devices for age encryption";
+  test_sops_keys_present = assert' (
+    (hasAttr "keys" mockSopsConfig) && (hasAttr "age_devices" mockSopsConfig.keys)
+  ) "SOPS config must have keys.age_devices for age encryption";
 
   # === TEST: Primary GPG key configured ===
-  test_primary_gpg_configured =
-    assert'
-      ((hasAttr "primary_gpg" mockSopsConfig.keys) && (isList mockSopsConfig.keys.primary_gpg))
-      "SOPS config must have primary_gpg backup key";
+  test_primary_gpg_configured = assert' (
+    (hasAttr "primary_gpg" mockSopsConfig.keys) && (isList mockSopsConfig.keys.primary_gpg)
+  ) "SOPS config must have primary_gpg backup key";
 
   # === TEST: Age device keys are strings ===
   test_age_keys_are_strings =
@@ -50,9 +62,7 @@ let
       ageKeys = mockSopsConfig.keys.age_devices;
       allStrings = all isString ageKeys;
     in
-    assert'
-      (allStrings)
-      "All age device keys must be strings";
+    assert' (allStrings) "All age device keys must be strings";
 
   # === TEST: Age key format validation (mock) ===
   test_age_key_format =
@@ -61,68 +71,58 @@ let
       # In real SOPS, keys start with "age1"; this test validates the pattern exists
       validFormats = all (key: builtins.match "^age1.*" key != null) ageKeys;
     in
-    assert'
-      (validFormats)
-      "Age device keys should match age1... format";
+    assert' (validFormats) "Age device keys should match age1... format";
 
   # === TEST: Creation rules are defined ===
-  test_creation_rules_present =
-    assert'
-      ((hasAttr "creation_rules" mockSopsConfig) && (isList mockSopsConfig.creation_rules))
-      "SOPS config must have creation_rules";
+  test_creation_rules_present = assert' (
+    (hasAttr "creation_rules" mockSopsConfig) && (isList mockSopsConfig.creation_rules)
+  ) "SOPS config must have creation_rules";
 
   # === TEST: Creation rules specify paths and key groups ===
   test_creation_rules_structure =
     let
       rules = mockSopsConfig.creation_rules;
-      allValid = all (rule:
-        (hasAttr "path_regex" rule) && (hasAttr "key_groups" rule)
-      ) rules;
+      allValid = all (rule: (hasAttr "path_regex" rule) && (hasAttr "key_groups" rule)) rules;
     in
-    assert'
-      (allValid)
-      "All creation rules must have path_regex and key_groups";
+    assert' (allValid) "All creation rules must have path_regex and key_groups";
 
   # === TEST: Secrets directory covered by creation rules ===
   test_secrets_dir_covered =
     let
       rules = mockSopsConfig.creation_rules;
-      hasSecretsPath = any (rule:
-        builtins.match ".*src/secrets.*" rule.path_regex != null
-      ) rules;
+      hasSecretsPath = any (rule: builtins.match ".*src/secrets.*" rule.path_regex != null) rules;
     in
-    assert'
-      (hasSecretsPath)
-      "Creation rules must cover src/secrets/ directory";
+    assert' (hasSecretsPath) "Creation rules must cover src/secrets/ directory";
 
   # === TEST: Wallpapers directory covered by creation rules ===
   test_wallpapers_dir_covered =
     let
       rules = mockSopsConfig.creation_rules;
-      hasWallpapersPath = any (rule:
-        builtins.match ".*src/assets/wallpapers.*" rule.path_regex != null
+      hasWallpapersPath = any (
+        rule: builtins.match ".*src/assets/wallpapers.*" rule.path_regex != null
       ) rules;
     in
-    assert'
-      (hasWallpapersPath)
-      "Creation rules must cover src/assets/wallpapers/ directory";
+    assert' (hasWallpapersPath) "Creation rules must cover src/assets/wallpapers/ directory";
 
   # === TEST: Mock secret file structure ===
   test_mock_secret_structure =
     let
       mockSecret = {
-        sops.kms = [ ];  # Or populated for AWS KMS, etc.
+        sops.kms = [ ]; # Or populated for AWS KMS, etc.
         sops.pgp = [ "ABCD1234" ];
-        sops.age = [ "age1key1" "age1key2" ];
+        sops.age = [
+          "age1key1"
+          "age1key2"
+        ];
         git_identity = {
           name = "Test User";
           email = "test@example.com";
         };
       };
     in
-    assert'
-      ((hasAttr "sops" mockSecret) && (hasAttr "git_identity" mockSecret))
-      "Secret file structure should have sops metadata and payload";
+    assert' (
+      (hasAttr "sops" mockSecret) && (hasAttr "git_identity" mockSecret)
+    ) "Secret file structure should have sops metadata and payload";
 
   # === TEST: Secret payload is present ===
   test_secret_payload_present =
@@ -135,13 +135,12 @@ let
           signingKey = "0x1234ABCD";
         };
       };
-      hasPayload = (hasAttr "git_identity" mockSecret) &&
-                   (hasAttr "name" mockSecret.git_identity) &&
-                   (hasAttr "email" mockSecret.git_identity);
+      hasPayload =
+        (hasAttr "git_identity" mockSecret)
+        && (hasAttr "name" mockSecret.git_identity)
+        && (hasAttr "email" mockSecret.git_identity);
     in
-    assert'
-      (hasPayload)
-      "Encrypted secret should contain expected payload fields";
+    assert' (hasPayload) "Encrypted secret should contain expected payload fields";
 
   # === TEST: Age key count is sufficient ===
   test_age_key_count_sufficient =
@@ -150,9 +149,7 @@ let
       # Need at least 1 key (preferably multiple for redundancy)
       sufficient = (builtins.length ageKeys) >= 1;
     in
-    assert'
-      (sufficient)
-      "SOPS config must have at least one age device key";
+    assert' (sufficient) "SOPS config must have at least one age device key";
 
   # === TEST: GPG key is not empty ===
   test_gpg_key_not_empty =
@@ -160,25 +157,27 @@ let
       gpgKeys = mockSopsConfig.keys.primary_gpg;
       notEmpty = (builtins.length gpgKeys) > 0;
     in
-    assert'
-      (notEmpty)
-      "SOPS config must have at least one primary GPG key";
+    assert' (notEmpty) "SOPS config must have at least one primary GPG key";
 
   # === TEST: Mock secret recipient list structure ===
   test_secret_recipients_structure =
     let
       mockSecretConfig = {
         recipients = {
-          age_devices = [ "age1key1" "age1key2" "age1key3" ];
+          age_devices = [
+            "age1key1"
+            "age1key2"
+            "age1key3"
+          ];
           primary_gpg = [ "0xABCD1234" ];
         };
       };
       hasAgeRecipients = (builtins.length mockSecretConfig.recipients.age_devices) > 0;
       hasGpgRecipient = (builtins.length mockSecretConfig.recipients.primary_gpg) > 0;
     in
-    assert'
-      (hasAgeRecipients && hasGpgRecipient)
-      "Secret recipients must include both age devices and GPG key";
+    assert' (
+      hasAgeRecipients && hasGpgRecipient
+    ) "Secret recipients must include both age devices and GPG key";
 
   # === TEST: Secret materialization paths are absolute ===
   test_secret_materialization_paths =
@@ -188,13 +187,11 @@ let
         ssh_key = "\${HOME}/.ssh/id_ed25519_nucleus";
         gpg_keys = "\${HOME}/.gnupg/nucleus";
       };
-      allAbsolute = all (path:
-        (builtins.match "^\$.*" path) != null
-      ) (builtins.attrValues materializedPaths);
+      allAbsolute = all (path: (builtins.match "^\$.*" path) != null) (
+        builtins.attrValues materializedPaths
+      );
     in
-    assert'
-      (allAbsolute)
-      "Secret materialization paths must be absolute or use environment vars";
+    assert' (allAbsolute) "Secret materialization paths must be absolute or use environment vars";
 
   # === TEST: SOPS updatekeys frequency is reasonable ===
   test_sops_updatekeys_frequency =
@@ -202,9 +199,7 @@ let
       # Document that sops updatekeys should be run when machines are added/removed
       updatePolicy = "Run 'sops updatekeys' whenever machines are added to or removed from keys.age_devices";
     in
-    assert'
-      (isString updatePolicy)
-      "SOPS update policy must be documented";
+    assert' (isString updatePolicy) "SOPS update policy must be documented";
 
   # Helper: any predicate
   any = pred: list: builtins.any pred list;

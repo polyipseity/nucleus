@@ -17,5 +17,6 @@
   # Avoid contextless nixpkgs source-path references in /etc/inputrc by
   # materializing the upstream baseline inputrc content into a text-backed
   # derivation instead of linking directly to the nixpkgs source tree path.
-  environment.etc."inputrc".text = builtins.readFile "${pkgs.path}/nixos/modules/programs/bash/inputrc";
+  environment.etc."inputrc".text =
+    builtins.readFile "${pkgs.path}/nixos/modules/programs/bash/inputrc";
 }

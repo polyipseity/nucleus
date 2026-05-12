@@ -3,7 +3,12 @@
 # nix-darwin's homebrew module is the declarative bridge: on every activation
 # it runs `brew bundle` from a generated Brewfile, then removes any formula/cask
 # not listed here (cleanup = "zap" also removes app data).
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   # Package overlap decisions are centralized in modules/core.nix.
   coreManagedBrews = config.nucleus.macos.generatedHomebrew.brews;
@@ -13,9 +18,9 @@ let
   # These are tools unavailable in nixpkgs or where the Homebrew build is
   # preferred (e.g. tightly coupled to macOS internals).
   staticManagedBrews = [
-    "displayplacer"              # CLI display arrangement tool
-    "smudge/smudge/nightlight"   # Night Shift schedule & temperature control
-    "zackelia/formulae/bclm"     # Battery charge limit management
+    "displayplacer" # CLI display arrangement tool
+    "smudge/smudge/nightlight" # Night Shift schedule & temperature control
+    "zackelia/formulae/bclm" # Battery charge limit management
   ];
 
   managedBrews = builtins.sort (a: b: a < b) (lib.unique (staticManagedBrews ++ coreManagedBrews));
@@ -27,22 +32,22 @@ let
   # competes with Raycast, and the app does not expose a stable declarative
   # preference key we can enforce to reserve Option+Space for Raycast only.
   staticManagedCasks = [
-    "alt-tab"                    # Windows-style alt-tab switcher
-    "appcleaner"                 # Thorough app uninstaller
-    "battery"                    # Apple Silicon charge-limit manager (maintains 80% cap)
-    "betterdisplay"              # Advanced display management and virtual screens
+    "alt-tab" # Windows-style alt-tab switcher
+    "appcleaner" # Thorough app uninstaller
+    "battery" # Apple Silicon charge-limit manager (maintains 80% cap)
+    "betterdisplay" # Advanced display management and virtual screens
     "chrome-remote-desktop-host" # Headless remote-desktop receiver
-    "coolterm"                   # Serial terminal
-    "gimp"                       # Raster image editor; macOS-only cask (nixpkgs gimp is Linux-only)
-    "google-chrome@canary"       # Chrome dev channel for web testing
-    "keka"                       # Graphical archiver with 7-Zip backend support
-    "linearmouse"                # Per-device mouse/trackpad scrolling behavior and sensitivity
-    "lulu"                       # Outbound network firewall
-    "orbstack"                   # Docker/Linux VM runtime (faster than Docker Desktop)
-    "parsec"                     # Low-latency remote gaming / desktop streaming
-    "raycast"                    # Spotlight replacement and launcher
-    "telegram-desktop@beta"      # Telegram beta channel; kept static (no exact nixpkgs beta mapping)
-    "whatsapp@beta"              # WhatsApp pre-release client
+    "coolterm" # Serial terminal
+    "gimp" # Raster image editor; macOS-only cask (nixpkgs gimp is Linux-only)
+    "google-chrome@canary" # Chrome dev channel for web testing
+    "keka" # Graphical archiver with 7-Zip backend support
+    "linearmouse" # Per-device mouse/trackpad scrolling behavior and sensitivity
+    "lulu" # Outbound network firewall
+    "orbstack" # Docker/Linux VM runtime (faster than Docker Desktop)
+    "parsec" # Low-latency remote gaming / desktop streaming
+    "raycast" # Spotlight replacement and launcher
+    "telegram-desktop@beta" # Telegram beta channel; kept static (no exact nixpkgs beta mapping)
+    "whatsapp@beta" # WhatsApp pre-release client
   ];
 
   # QtPass (GUI frontend for pass/gopass) is intentionally absent from macOS
@@ -63,14 +68,18 @@ let
 
   # Extract the tap name from a fully qualified formula/cask reference such as
   # "owner/repo/formula".  Returns null for unqualified names like "git".
-  extractTap = item:
+  extractTap =
+    item:
     let
       matches = builtins.match "(.*)/[^/]+" item;
     in
     if matches == null then null else builtins.elemAt matches 0;
 
   # Taps bundled with every Homebrew installation; no explicit `tap` entry needed.
-  defaultTaps = [ "homebrew/cask" "homebrew/core" ];
+  defaultTaps = [
+    "homebrew/cask"
+    "homebrew/core"
+  ];
 
   # Derive the unique set of non-default taps referenced by any brew or cask entry.
   allTaps =
@@ -87,9 +96,9 @@ in
   homebrew = {
     enable = true;
 
-    onActivation.autoUpdate = true;   # refresh Homebrew itself before bundling
-    onActivation.cleanup = "zap";     # remove unlisted formulae/casks and their data
-    onActivation.upgrade = true;      # upgrade outdated formulae/casks automatically
+    onActivation.autoUpdate = true; # refresh Homebrew itself before bundling
+    onActivation.cleanup = "zap"; # remove unlisted formulae/casks and their data
+    onActivation.upgrade = true; # upgrade outdated formulae/casks automatically
 
     taps = allTaps;
     brews = managedBrews;

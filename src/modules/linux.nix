@@ -5,7 +5,12 @@
 # Systemd user units managed by this module:
 #   nix-index-update.service — rebuilds the nix-index file database on demand.
 #   nix-index-update.timer   — fires weekly (Sunday 00:00) with Persistent=true.
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 lib.mkIf pkgs.stdenv.isLinux {
   assertions = [
     {
@@ -24,7 +29,10 @@ lib.mkIf pkgs.stdenv.isLinux {
     # - Leave additional IME engines to user-installed ibus engines.
     "org/gnome/desktop/input-sources" = {
       sources = [
-        (lib.hm.gvariant.mkTuple [ "xkb" "us" ])
+        (lib.hm.gvariant.mkTuple [
+          "xkb"
+          "us"
+        ])
       ];
     };
 
@@ -191,53 +199,56 @@ lib.mkIf pkgs.stdenv.isLinux {
     # document after secrets/wallpaper activation work so operators get one
     # consolidated, post-automation checklist.
     # -----------------------------------------------------------------------
-    displayHostManualInstructions = lib.hm.dag.entryAfter [
-      "agentsSkills"
-      "agentsSymlink"
-      "buildNixIndex"
-      # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
-      # are defined in secrets.nix (shared module) but run as Home Manager
-      # activations on this host; include them here so manual instructions
-      # are always the final output after all activation work.
-      "gitIdentityFromSops"
-      "gitIgnoreAssemble"
-      "gpgImport"
-      "installBunPackages"
-      "installPwshScriptAnalyzer"
-      "provisionDevDirectory"
-      "sshKeyAdopt"
-      "syncClawHubSkills"
-      "verifySecretDecryption"
-      "vscodeExtensionBridge"
-      "vscodeSymlinks"
-      "vscodeWorkspaceTrust"
-      "waitForSopsSecrets"
-      "wallpaperProvision"
-    ] ''
-      _manual_path='${config.nucleus.hostManualFile}'
-      _repo_root_file="$HOME/.config/nucleus/repo-root"
-      _resolved_manual_path="$_manual_path"
+    displayHostManualInstructions =
+      lib.hm.dag.entryAfter
+        [
+          "agentsSkills"
+          "agentsSymlink"
+          "buildNixIndex"
+          # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
+          # are defined in secrets.nix (shared module) but run as Home Manager
+          # activations on this host; include them here so manual instructions
+          # are always the final output after all activation work.
+          "gitIdentityFromSops"
+          "gitIgnoreAssemble"
+          "gpgImport"
+          "installBunPackages"
+          "installPwshScriptAnalyzer"
+          "provisionDevDirectory"
+          "sshKeyAdopt"
+          "syncClawHubSkills"
+          "verifySecretDecryption"
+          "vscodeExtensionBridge"
+          "vscodeSymlinks"
+          "vscodeWorkspaceTrust"
+          "waitForSopsSecrets"
+          "wallpaperProvision"
+        ]
+        ''
+          _manual_path='${config.nucleus.hostManualFile}'
+          _repo_root_file="$HOME/.config/nucleus/repo-root"
+          _resolved_manual_path="$_manual_path"
 
-      case "$_manual_path" in
-        /*) ;;
-        *)
-          if [ -n "''${NUCLEUS_REPO:-}" ]; then
-            _resolved_manual_path="$NUCLEUS_REPO/$_manual_path"
-          elif [ -f "$_repo_root_file" ]; then
-            _resolved_manual_path="$(cat "$_repo_root_file")/$_manual_path"
+          case "$_manual_path" in
+            /*) ;;
+            *)
+              if [ -n "''${NUCLEUS_REPO:-}" ]; then
+                _resolved_manual_path="$NUCLEUS_REPO/$_manual_path"
+              elif [ -f "$_repo_root_file" ]; then
+                _resolved_manual_path="$(cat "$_repo_root_file")/$_manual_path"
+              fi
+              ;;
+          esac
+
+          if [ ! -f "$_resolved_manual_path" ]; then
+            echo "linux: host manual not found at $_resolved_manual_path (configured: $_manual_path)." >&2
+            exit 1
           fi
-          ;;
-      esac
 
-      if [ ! -f "$_resolved_manual_path" ]; then
-        echo "linux: host manual not found at $_resolved_manual_path (configured: $_manual_path)." >&2
-        exit 1
-      fi
-
-      echo "--- MANUAL SETUP (one-time, required) ---" >&2
-      /bin/cat "$_resolved_manual_path" >&2
-      echo "-------------------------------------------" >&2
-    '';
+          echo "--- MANUAL SETUP (one-time, required) ---" >&2
+          /bin/cat "$_resolved_manual_path" >&2
+          echo "-------------------------------------------" >&2
+        '';
   };
 
   # --------------------------------------------------------------------------

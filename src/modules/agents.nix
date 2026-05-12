@@ -24,9 +24,12 @@ let
 in
 {
   home.file = {
-    ".config/opencode/agents".source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/agents";
-    ".config/opencode/commands".source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
-    ".config/opencode/opencode.jsonc".source = config.lib.file.mkOutOfStoreSymlink "${liveRepoRoot}/src/modules/configs/agents/opencode.user.jsonc";
+    ".config/opencode/agents".source =
+      config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/agents";
+    ".config/opencode/commands".source =
+      config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
+    ".config/opencode/opencode.jsonc".source =
+      config.lib.file.mkOutOfStoreSymlink "${liveRepoRoot}/src/modules/configs/agents/opencode.user.jsonc";
   };
 
   home.activation = {

@@ -35,7 +35,15 @@
     };
   };
 
-  outputs = { darwin, home-manager, nix-vscode-extensions, nixpkgs, sops-nix, ... }:
+  outputs =
+    {
+      darwin,
+      home-manager,
+      nix-vscode-extensions,
+      nixpkgs,
+      sops-nix,
+      ...
+    }:
     let
       # User registry — defines all users managed by this configuration.
       # Each user has homeDirectory, shell (as string path), isPrimary flag, and optional
@@ -95,10 +103,22 @@
             # Submodule directory provisioning: clone direct submodules from these
             # folders sequentially. Later directories can depend on earlier submodule clones.
             submoduleDirectories = [
-              { path = "dev/monorepo"; recursive = false; }
-              { path = "dev/monorepo-private"; recursive = false; }
-              { path = "dev/monorepo/self/obsidian-monorepo"; recursive = false; }
-              { path = "dev/monorepo-private/orgs/*"; recursive = false; }
+              {
+                path = "dev/monorepo";
+                recursive = false;
+              }
+              {
+                path = "dev/monorepo-private";
+                recursive = false;
+              }
+              {
+                path = "dev/monorepo/self/obsidian-monorepo";
+                recursive = false;
+              }
+              {
+                path = "dev/monorepo-private/orgs/*";
+                recursive = false;
+              }
             ];
           };
         };
@@ -107,14 +127,14 @@
       # Derive the primary username from the registry.
       # Filter users by isPrimary=true and extract the name (the attr key).
       username = builtins.head (
-        builtins.filter (name: users.${name}.isPrimary)
-        (builtins.attrNames users)
+        builtins.filter (name: users.${name}.isPrimary) (builtins.attrNames users)
       );
 
       # Generate home-manager.users attrset from the user registry.
       # Each user gets the home.nix module and optionally sops-nix if isPrimary.
-      mkHomeManagerUsers = userModulesPath: builtins.mapAttrs (name: user:
-        {
+      mkHomeManagerUsers =
+        userModulesPath:
+        builtins.mapAttrs (name: user: {
           imports = [
             {
               _module.args = {
@@ -123,11 +143,11 @@
               };
             }
             userModulesPath
-          ] ++ (builtins.filter (m: m != null) [
+          ]
+          ++ (builtins.filter (m: m != null) [
             (if user.isPrimary then sops-nix.homeManagerModules.sops else null)
           ]);
-        }
-      ) users;
+        }) users;
 
       # Canonical system strings for the two supported architectures.
       systems = {
@@ -137,79 +157,108 @@
 
       # Build a nixpkgs package set for a given system with unfree packages
       # permitted (required for VS Code, Discord, Spotify, etc.).
-      mkPkgs = system: import nixpkgs {
-        inherit system;
-        config.allowUnfree = true;
-        # .NET 6 is intentionally pinned for EIDE/runtime compatibility across
-        # hosts. Upstream marks it insecure because it is EOL; keep this
-        # exception narrowly scoped to the exact runtime derivation.
-        config.permittedInsecurePackages = [
-          "dotnet-runtime-6.0.36"
-        ];
+      mkPkgs =
+        system:
+        import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+          # .NET 6 is intentionally pinned for EIDE/runtime compatibility across
+          # hosts. Upstream marks it insecure because it is EOL; keep this
+          # exception narrowly scoped to the exact runtime derivation.
+          config.permittedInsecurePackages = [
+            "dotnet-runtime-6.0.36"
+          ];
 
-        overlays = [
-          (_final: prev: {
-            # Disable test suites for codec libraries that are ffmpeg-full
-            # dependencies.  Their tests invoke ffmpeg or run encoder workloads
-            # that get SIGKILL'd (exit 137) in the Nix sandbox's memory
-            # constraints on Apple Silicon.  These are all specialized or
-            # regional-standard codecs (AVS2/3, HEVC/VVC variants, LCEVC, APV)
-            # that are not present in the aarch64-darwin binary cache, so they
-            # must be built from source.  Suppressing the test phase does not
-            # affect codec correctness; the libraries themselves are exercised
-            # end-to-end by the ffmpeg-full test suite.
-            chromaprint = prev.chromaprint.overrideAttrs (_: { doCheck = false; });
-            davs2       = prev.davs2.overrideAttrs       (_: { doCheck = false; });
-            kvazaar     = prev.kvazaar.overrideAttrs     (_: { doCheck = false; });
-            lcevcdec    = prev.lcevcdec.overrideAttrs    (_: { doCheck = false; });
-            openapv     = prev.openapv.overrideAttrs     (_: { doCheck = false; });
-            openh264    = prev.openh264.overrideAttrs    (_: { doCheck = false; });
-            svt-av1     = prev.svt-av1.overrideAttrs     (_: { doCheck = false; });
-            uavs3d      = prev.uavs3d.overrideAttrs      (_: { doCheck = false; });
-            vvenc       = prev.vvenc.overrideAttrs       (_: { doCheck = false; });
-            xavs2       = prev.xavs2.overrideAttrs       (_: { doCheck = false; });
-            xeve        = prev.xeve.overrideAttrs        (_: { doCheck = false; });
-            xevd        = prev.xevd.overrideAttrs        (_: { doCheck = false; });
-          })
-          (_final: prev:
-            let
-              # Pin GnuPG to 2.5.x so PQC/Kyber subkeys can be decrypted.
-              # The nixpkgs 2.4.x patch stack is intentionally dropped here,
-              # because those patches target the 2.4 branch only.
-              gnupg25 = prev.callPackage "${nixpkgs}/pkgs/tools/security/gnupg/24.nix" {
-                enableMinimal = false;
-                guiSupport = prev.stdenv.hostPlatform.isDarwin;
-                pinentry = if prev.stdenv.hostPlatform.isDarwin then prev.pinentry_mac else prev.pinentry-gtk2;
-                withPcsc = true;
-                withTpm2Tss = !prev.stdenv.hostPlatform.isDarwin;
-              };
-
-              gnupg25_pinned = gnupg25.overrideAttrs (_old: rec {
-                version = "2.5.19";
-                src = prev.fetchurl {
-                  url = "mirror://gnupg/gnupg/gnupg-${version}.tar.bz2";
-                  hash = "sha256-ciqopCbdm0Tg0ZS3O/7jo+YX1lZ0zU0dBi5t8p8XiMY=";
+          overlays = [
+            (_final: prev: {
+              # Disable test suites for codec libraries that are ffmpeg-full
+              # dependencies.  Their tests invoke ffmpeg or run encoder workloads
+              # that get SIGKILL'd (exit 137) in the Nix sandbox's memory
+              # constraints on Apple Silicon.  These are all specialized or
+              # regional-standard codecs (AVS2/3, HEVC/VVC variants, LCEVC, APV)
+              # that are not present in the aarch64-darwin binary cache, so they
+              # must be built from source.  Suppressing the test phase does not
+              # affect codec correctness; the libraries themselves are exercised
+              # end-to-end by the ffmpeg-full test suite.
+              chromaprint = prev.chromaprint.overrideAttrs (_: {
+                doCheck = false;
+              });
+              davs2 = prev.davs2.overrideAttrs (_: {
+                doCheck = false;
+              });
+              kvazaar = prev.kvazaar.overrideAttrs (_: {
+                doCheck = false;
+              });
+              lcevcdec = prev.lcevcdec.overrideAttrs (_: {
+                doCheck = false;
+              });
+              openapv = prev.openapv.overrideAttrs (_: {
+                doCheck = false;
+              });
+              openh264 = prev.openh264.overrideAttrs (_: {
+                doCheck = false;
+              });
+              svt-av1 = prev.svt-av1.overrideAttrs (_: {
+                doCheck = false;
+              });
+              uavs3d = prev.uavs3d.overrideAttrs (_: {
+                doCheck = false;
+              });
+              vvenc = prev.vvenc.overrideAttrs (_: {
+                doCheck = false;
+              });
+              xavs2 = prev.xavs2.overrideAttrs (_: {
+                doCheck = false;
+              });
+              xeve = prev.xeve.overrideAttrs (_: {
+                doCheck = false;
+              });
+              xevd = prev.xevd.overrideAttrs (_: {
+                doCheck = false;
+              });
+            })
+            (
+              _final: prev:
+              let
+                # Pin GnuPG to 2.5.x so PQC/Kyber subkeys can be decrypted.
+                # The nixpkgs 2.4.x patch stack is intentionally dropped here,
+                # because those patches target the 2.4 branch only.
+                gnupg25 = prev.callPackage "${nixpkgs}/pkgs/tools/security/gnupg/24.nix" {
+                  enableMinimal = false;
+                  guiSupport = prev.stdenv.hostPlatform.isDarwin;
+                  pinentry = if prev.stdenv.hostPlatform.isDarwin then prev.pinentry_mac else prev.pinentry-gtk2;
+                  withPcsc = true;
+                  withTpm2Tss = !prev.stdenv.hostPlatform.isDarwin;
                 };
 
-                patches = [ ];
-                postPatch = "";
-                env.NIX_CFLAGS_COMPILE = prev.lib.optionalString prev.stdenv.hostPlatform.isDarwin "-Wno-implicit-function-declaration -D_DARWIN_C_SOURCE";
-              });
-            in {
-              gnupg = gnupg25_pinned;
-              gnupg24 = gnupg25_pinned;
-            })
-        ];
-      };
+                gnupg25_pinned = gnupg25.overrideAttrs (_old: rec {
+                  version = "2.5.19";
+                  src = prev.fetchurl {
+                    url = "mirror://gnupg/gnupg/gnupg-${version}.tar.bz2";
+                    hash = "sha256-ciqopCbdm0Tg0ZS3O/7jo+YX1lZ0zU0dBi5t8p8XiMY=";
+                  };
+
+                  patches = [ ];
+                  postPatch = "";
+                  env.NIX_CFLAGS_COMPILE = prev.lib.optionalString prev.stdenv.hostPlatform.isDarwin "-Wno-implicit-function-declaration -D_DARWIN_C_SOURCE";
+                });
+              in
+              {
+                gnupg = gnupg25_pinned;
+                gnupg24 = gnupg25_pinned;
+              }
+            )
+          ];
+        };
 
       pkgsLinux = mkPkgs systems.linux;
-      pkgsMac   = mkPkgs systems.mac;
+      pkgsMac = mkPkgs systems.mac;
 
       # Per-system VS Code Marketplace derivation sets from nix-vscode-extensions.
       # Used by editors.nix to build Nix derivations for the ~20 extensions that
       # are not yet packaged in nixpkgs, replacing CLI-based activation with
       # fully declarative Nix store derivations.
-      vscodeMarketplaceMac   = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
+      vscodeMarketplaceMac = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
       vscodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
       # Build the `nix run .#apply` app for a given package set.
@@ -223,17 +272,19 @@
 
       mkApplyApp = pkgs: {
         type = "app";
-        program = "${pkgs.writeShellApplication {
-          name = "nucleus-apply";
-          runtimeInputs = [
-            pkgs.git
-            pkgs.openssh
-            pkgs.prek
-            pkgs.sops
-            pkgs.ssh-to-age
-          ];
-          text = builtins.readFile ./scripts/apply.sh;
-        }}/bin/nucleus-apply";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-apply";
+            runtimeInputs = [
+              pkgs.git
+              pkgs.openssh
+              pkgs.prek
+              pkgs.sops
+              pkgs.ssh-to-age
+            ];
+            text = builtins.readFile ./scripts/apply.sh;
+          }
+        }/bin/nucleus-apply";
       };
 
       # Build the PowerShell syntax validation app for a given package set.
@@ -241,16 +292,18 @@
       # not depend on ad-hoc system package versions.
       mkCheckPwshApp = pkgs: {
         type = "app";
-        program = "${pkgs.writeShellApplication {
-          name = "nucleus-check-pwsh";
-          runtimeInputs = [
-            pkgs.git
-            pkgs.powershell
-          ];
-          text = ''
-            exec pwsh -NoLogo -NoProfile -NonInteractive -File "${../scripts/check-pwsh.ps1}" "$@"
-          '';
-        }}/bin/nucleus-check-pwsh";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-check-pwsh";
+            runtimeInputs = [
+              pkgs.git
+              pkgs.powershell
+            ];
+            text = ''
+              exec pwsh -NoLogo -NoProfile -NonInteractive -File "${../scripts/check-pwsh.ps1}" "$@"
+            '';
+          }
+        }/bin/nucleus-check-pwsh";
       };
 
       # Build the shell script lint app for a given package set.
@@ -258,32 +311,36 @@
       # not depend on host-global shellcheck/git installations.
       mkCheckShApp = pkgs: {
         type = "app";
-        program = "${pkgs.writeShellApplication {
-          name = "nucleus-check-sh";
-          runtimeInputs = [
-            pkgs.git
-            pkgs.shellcheck
-          ];
-          text = ''
-            exec sh "${../scripts/check-sh.sh}" "$@"
-          '';
-        }}/bin/nucleus-check-sh";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-check-sh";
+            runtimeInputs = [
+              pkgs.git
+              pkgs.shellcheck
+            ];
+            text = ''
+              exec sh "${../scripts/check-sh.sh}" "$@"
+            '';
+          }
+        }/bin/nucleus-check-sh";
       };
 
       # Build pre-flight health checks as a runnable app that fails fast before
       # apply/bootstrap flows attempt large downloads or secret-dependent work.
       mkHealthCheckApp = pkgs: {
         type = "app";
-        program = "${pkgs.writeShellApplication {
-          name = "nucleus-health-check";
-          runtimeInputs = [
-            pkgs.curl
-            pkgs.git
-            pkgs.gnupg
-            pkgs.sops
-          ];
-          text = builtins.readFile ../scripts/health-check.sh;
-        }}/bin/nucleus-health-check";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-health-check";
+            runtimeInputs = [
+              pkgs.curl
+              pkgs.git
+              pkgs.gnupg
+              pkgs.sops
+            ];
+            text = builtins.readFile ../scripts/health-check.sh;
+          }
+        }/bin/nucleus-health-check";
       };
 
       # Build a cross-host update orchestration app.
@@ -291,18 +348,20 @@
       # rewraps SOPS files for all declared recipients in one bounded workflow.
       mkUpdateApp = pkgs: {
         type = "app";
-        program = "${pkgs.writeShellApplication {
-          name = "nucleus-update";
-          runtimeInputs = [
-            pkgs.gnupg
-            pkgs.sops
-          ];
-          # Intentionally do not inject nixpkgs `pkgs.nix` into PATH here.
-          # update.sh should use the host nix binary so host-specific nix.conf
-          # settings (e.g. Determinate Nix keys like eval-cores/lazy-trees)
-          # are interpreted by the matching implementation without warnings.
-          text = builtins.readFile ../scripts/update.sh;
-        }}/bin/nucleus-update";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-update";
+            runtimeInputs = [
+              pkgs.gnupg
+              pkgs.sops
+            ];
+            # Intentionally do not inject nixpkgs `pkgs.nix` into PATH here.
+            # update.sh should use the host nix binary so host-specific nix.conf
+            # settings (e.g. Determinate Nix keys like eval-cores/lazy-trees)
+            # are interpreted by the matching implementation without warnings.
+            text = builtins.readFile ../scripts/update.sh;
+          }
+        }/bin/nucleus-update";
       };
 
       # Build garbage-collection app for POSIX hosts.
@@ -311,17 +370,20 @@
       # scopes.
       mkGcApp = pkgs: {
         type = "app";
-        program = "${pkgs.writeShellApplication {
-          name = "nucleus-gc";
-          runtimeInputs = [
-            pkgs.gnugrep
-            pkgs.home-manager
-          ];
-          text = builtins.readFile ../scripts/gc.sh;
-        }}/bin/nucleus-gc";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-gc";
+            runtimeInputs = [
+              pkgs.gnugrep
+              pkgs.home-manager
+            ];
+            text = builtins.readFile ../scripts/gc.sh;
+          }
+        }/bin/nucleus-gc";
       };
 
-    in {
+    in
+    {
       # -----------------------------------------------------------------------
       # apps — runnable via `nix run .#<name>`.
       # Each host exposes:

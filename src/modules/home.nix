@@ -5,32 +5,47 @@
 #   • resolving the platform-appropriate home directory path
 #   • importing all shared feature modules
 #   • symlinking dotfiles from the repo's dotfiles/ tree into the home directory
-{ config, lib, pkgs, username, users ? null, managedUsername ? null, managedUser ? null, hostManualFile ? null, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  username,
+  users ? null,
+  managedUsername ? null,
+  managedUser ? null,
+  hostManualFile ? null,
+  ...
+}:
 let
   # Determine the effective user context for this Home Manager evaluation.
   # managedUsername/managedUser are injected by mkHomeManagerUsers for
   # multi-user host evaluations; fallback to legacy args for standalone usage.
-  effectiveUsername =
-    if managedUsername != null then managedUsername
-    else username;
+  effectiveUsername = if managedUsername != null then managedUsername else username;
 
   effectiveUser =
-    if managedUser != null then managedUser
-    else if users != null && builtins.hasAttr effectiveUsername users then users.${effectiveUsername}
-    else { };
+    if managedUser != null then
+      managedUser
+    else if users != null && builtins.hasAttr effectiveUsername users then
+      users.${effectiveUsername}
+    else
+      { };
 
   # Derive the home directory from platform conventions. Keeping this local to
   # the module avoids relying on ad-hoc `_module.args` plumbed through every
   # call site.
   resolvedHomeDirectory =
-    if effectiveUser ? homeDirectory then effectiveUser.homeDirectory
-    else if pkgs.stdenv.isDarwin then "/Users/${effectiveUsername}"
-    else "/home/${effectiveUsername}";
+    if effectiveUser ? homeDirectory then
+      effectiveUser.homeDirectory
+    else if pkgs.stdenv.isDarwin then
+      "/Users/${effectiveUsername}"
+    else
+      "/home/${effectiveUsername}";
 
   passwordStoreDir =
     if effectiveUser ? passwordStore && effectiveUser.passwordStore ? path then
       builtins.replaceStrings [ "~" ] [ resolvedHomeDirectory ] effectiveUser.passwordStore.path
-    else "${resolvedHomeDirectory}/.password-store";
+    else
+      "${resolvedHomeDirectory}/.password-store";
 
   # QtPass settings baseline (screenshot-verified): shared across all platforms
   # unless overridden by platform-specific or per-user settings.
@@ -81,13 +96,12 @@ let
     else
       { };
 
-  qtPassManagedSettings =
-    (qtPassDefaultSettings // qtPassPlatformSettings // qtPassUserSettings)
-    // {
-      passStore = "${lib.removeSuffix "/" passwordStoreDir}/";
-    };
+  qtPassManagedSettings = (qtPassDefaultSettings // qtPassPlatformSettings // qtPassUserSettings) // {
+    passStore = "${lib.removeSuffix "/" passwordStoreDir}/";
+  };
 
-  renderQtPassValue = value:
+  renderQtPassValue =
+    value:
     if builtins.isBool value then
       if value then "true" else "false"
     else if builtins.isInt value then
@@ -95,18 +109,23 @@ let
     else
       value;
 
-  renderQtPassDefaultsCommand = name: value:
+  renderQtPassDefaultsCommand =
+    name: value:
     let
       renderedValue = renderQtPassValue value;
       valueArg = lib.escapeShellArg renderedValue;
       valueFlag =
-        if builtins.isBool value then "-bool"
-        else if builtins.isInt value then "-int"
-        else "-string";
+        if builtins.isBool value then
+          "-bool"
+        else if builtins.isInt value then
+          "-int"
+        else
+          "-string";
     in
     "/usr/bin/defaults write com.ijhack.QtPass ${name} ${valueFlag} ${valueArg}";
 
-  renderQtPassIniCommand = confVar: name: value:
+  renderQtPassIniCommand =
+    confVar: name: value:
     let
       renderedValue = renderQtPassValue value;
       valueArg =
@@ -122,11 +141,15 @@ let
   );
 
   qtPassPrimaryIniCommands = builtins.concatStringsSep "\n" (
-    lib.mapAttrsToList (name: value: renderQtPassIniCommand "$_primary_conf" name value) qtPassManagedSettings
+    lib.mapAttrsToList (
+      name: value: renderQtPassIniCommand "$_primary_conf" name value
+    ) qtPassManagedSettings
   );
 
   qtPassSecondaryIniCommands = builtins.concatStringsSep "\n" (
-    lib.mapAttrsToList (name: value: renderQtPassIniCommand "$_secondary_conf" name value) qtPassManagedSettings
+    lib.mapAttrsToList (
+      name: value: renderQtPassIniCommand "$_secondary_conf" name value
+    ) qtPassManagedSettings
   );
 
   # Path to the checked-out dotfiles/ directory at the root of this repo.
@@ -190,86 +213,86 @@ in
     # screenshot-backed Settings + Template tab baseline, while still allowing
     # centralized per-user overrides from flake.nix.
     home.activation.configureQtPassSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      _escape_qsettings_ini_string() {
-        printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e ':join' -e 'N' -e '$!b join' -e 's/\n/\\n/g'
-      }
-
-      _update_qtpass_ini_value() {
-        _conf="$1"
-        _key="$2"
-        _value="$3"
-        _conf_dir="$(dirname "$_conf")"
-        mkdir -p "$_conf_dir"
-
-        if [ -f "$_conf" ]; then
-          _tmp="$(mktemp "$_conf.XXXXXX")"
-          awk -v key="$_key" -v value="$_value" '
-            BEGIN { in_general = 0; wrote = 0 }
-            {
-              if ($0 ~ /^\[General\]$/) {
-                if (in_general && wrote == 0) {
-                  print key "=" value
-                  wrote = 1
-                }
-                in_general = 1
-                print
-                next
-              }
-
-              if ($0 ~ /^\[/ && $0 !~ /^\[General\]$/) {
-                if (in_general && wrote == 0) {
-                  print key "=" value
-                  wrote = 1
-                }
-                in_general = 0
-                print
-                next
-              }
-
-              if (in_general && $0 ~ ("^" key "=")) {
-                if (wrote == 0) {
-                  print key "=" value
-                  wrote = 1
-                }
-                next
-              }
-
-              print
+            _escape_qsettings_ini_string() {
+              printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e ':join' -e 'N' -e '$!b join' -e 's/\n/\\n/g'
             }
-            END {
-              if (wrote == 0) {
-                if (in_general == 0) {
-                  print "[General]"
-                }
-                print key "=" value
-              }
+
+            _update_qtpass_ini_value() {
+              _conf="$1"
+              _key="$2"
+              _value="$3"
+              _conf_dir="$(dirname "$_conf")"
+              mkdir -p "$_conf_dir"
+
+              if [ -f "$_conf" ]; then
+                _tmp="$(mktemp "$_conf.XXXXXX")"
+                awk -v key="$_key" -v value="$_value" '
+                  BEGIN { in_general = 0; wrote = 0 }
+                  {
+                    if ($0 ~ /^\[General\]$/) {
+                      if (in_general && wrote == 0) {
+                        print key "=" value
+                        wrote = 1
+                      }
+                      in_general = 1
+                      print
+                      next
+                    }
+
+                    if ($0 ~ /^\[/ && $0 !~ /^\[General\]$/) {
+                      if (in_general && wrote == 0) {
+                        print key "=" value
+                        wrote = 1
+                      }
+                      in_general = 0
+                      print
+                      next
+                    }
+
+                    if (in_general && $0 ~ ("^" key "=")) {
+                      if (wrote == 0) {
+                        print key "=" value
+                        wrote = 1
+                      }
+                      next
+                    }
+
+                    print
+                  }
+                  END {
+                    if (wrote == 0) {
+                      if (in_general == 0) {
+                        print "[General]"
+                      }
+                      print key "=" value
+                    }
+                  }
+                ' "$_conf" > "$_tmp"
+                mv "$_tmp" "$_conf"
+              else
+                cat > "$_conf" <<EOF
+      [General]
+      $_key=$_value
+      EOF
+              fi
             }
-          ' "$_conf" > "$_tmp"
-          mv "$_tmp" "$_conf"
-        else
-          cat > "$_conf" <<EOF
-[General]
-$_key=$_value
-EOF
-        fi
-      }
 
-      case "$(uname -s)" in
-        Darwin)
-          ${qtPassDarwinCommands}
-          ;;
-        Linux)
-          # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
-          _primary_conf="$HOME/.config/IJHack/QtPass.conf"
-          # Some builds may resolve via organization-domain pathing.
-          _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
+            case "$(uname -s)" in
+              Darwin)
+                ${qtPassDarwinCommands}
+                ;;
+              Linux)
+                # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
+                _primary_conf="$HOME/.config/IJHack/QtPass.conf"
+                # Some builds may resolve via organization-domain pathing.
+                _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
 
-          ${qtPassPrimaryIniCommands}
-          if [ -f "$_secondary_conf" ]; then
-            ${qtPassSecondaryIniCommands}
-          fi
-          ;;
-      esac
+                ${qtPassPrimaryIniCommands}
+                if [ -f "$_secondary_conf" ]; then
+                  ${qtPassSecondaryIniCommands}
+                fi
+                ;;
+            esac
     '';
 
     # Allow Home Manager to manage its own activation and generation GC.
@@ -288,7 +311,8 @@ EOF
       (lib.optionalAttrs pkgs.stdenv.isDarwin {
         # Keep iCloud Drive reachable from a short, stable path for all managed
         # macOS users so scripts and shell workflows avoid long spaced paths.
-        "iCloud".source = config.lib.file.mkOutOfStoreSymlink "${resolvedHomeDirectory}/Library/Mobile Documents/com~apple~CloudDocs";
+        "iCloud".source =
+          config.lib.file.mkOutOfStoreSymlink "${resolvedHomeDirectory}/Library/Mobile Documents/com~apple~CloudDocs";
       })
     ];
   };

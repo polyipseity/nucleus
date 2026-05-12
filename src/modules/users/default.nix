@@ -10,23 +10,25 @@
 { lib, ... }:
 {
   options.nucleus.users = lib.mkOption {
-    type = lib.types.attrsOf (lib.types.submodule {
-      options = {
-        homeDirectory = lib.mkOption {
-          type = lib.types.str;
-          description = "Absolute path to the user's home directory";
+    type = lib.types.attrsOf (
+      lib.types.submodule {
+        options = {
+          homeDirectory = lib.mkOption {
+            type = lib.types.str;
+            description = "Absolute path to the user's home directory";
+          };
+          shell = lib.mkOption {
+            type = lib.types.path;
+            description = "Path to the user's login shell";
+          };
+          isPrimary = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = "Whether this user receives secret materialization";
+          };
         };
-        shell = lib.mkOption {
-          type = lib.types.path;
-          description = "Path to the user's login shell";
-        };
-        isPrimary = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Whether this user receives secret materialization";
-        };
-      };
-    });
+      }
+    );
     default = {
       admin = {
         homeDirectory = "/Users/admin";

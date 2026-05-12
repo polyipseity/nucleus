@@ -58,7 +58,13 @@
 #      After apply completes, commit the updated .sops.yaml and rewrapped secrets:
 #        git add .sops.yaml src/secrets src/assets/wallpapers
 #        git commit -m "chore: register <hostname> machine age key"
-{ config, lib, pkgs, username ? null, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  username ? null,
+  ...
+}:
 let
   primaryUsername =
     if username == null then
@@ -77,16 +83,15 @@ let
   sshRsaPrivateKeyPath = "${config.home.homeDirectory}/.ssh/${sshRsaSecretName}";
   sshRsaPublicKeyPath = "${sshRsaPrivateKeyPath}.pub";
   sshIdentityFile = "~/.ssh/${sshSecretName}";
-  sshExtraOptions =
-    {
-      AddKeysToAgent = "yes";
-      # Non-Apple OpenSSH (for example nixpkgs openssh) rejects UseKeychain.
-      # IgnoreUnknown keeps one shared ~/.ssh/config usable across clients.
-      IgnoreUnknown = "UseKeychain";
-    }
-    // lib.optionalAttrs pkgs.stdenv.isDarwin {
-      UseKeychain = "yes";
-    };
+  sshExtraOptions = {
+    AddKeysToAgent = "yes";
+    # Non-Apple OpenSSH (for example nixpkgs openssh) rejects UseKeychain.
+    # IgnoreUnknown keeps one shared ~/.ssh/config usable across clients.
+    IgnoreUnknown = "UseKeychain";
+  }
+  // lib.optionalAttrs pkgs.stdenv.isDarwin {
+    UseKeychain = "yes";
+  };
 
   # Git identity is sourced from the managed decrypted payload so name/email/
   # signing key follow the same SOPS lifecycle as SSH/GPG material.
@@ -301,7 +306,9 @@ lib.mkIf isPrimaryUser {
     chmod 700 "$GNUPGHOME"
 
     if [ ! -f "${config.sops.secrets.${gpgSecretName}.path}" ]; then
-      echo "gpgImport: missing decrypted GPG secret at ${config.sops.secrets.${gpgSecretName}.path}; cannot import key material." >&2
+      echo "gpgImport: missing decrypted GPG secret at ${
+        config.sops.secrets.${gpgSecretName}.path
+      }; cannot import key material." >&2
       exit 1
     fi
 
@@ -310,7 +317,9 @@ lib.mkIf isPrimaryUser {
     # fingerprint rather than a subkey fingerprint.
     # The || true prevents a silent set -e / pipefail exit if gpg emits errors;
     # the [ -z ] guard below catches and reports an empty result explicitly.
-    first_key_fingerprint="$(${pkgs.gnupg}/bin/gpg --batch --import-options show-only --dry-run --with-colons --import "${config.sops.secrets.${gpgSecretName}.path}" | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')" || true
+    first_key_fingerprint="$(${pkgs.gnupg}/bin/gpg --batch --import-options show-only --dry-run --with-colons --import "${
+      config.sops.secrets.${gpgSecretName}.path
+    }" | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')" || true
 
     # Remove stale managed keys: those we imported previously (per manifest)
     # that are no longer the current managed key.  Guard on a non-empty
@@ -374,15 +383,15 @@ lib.mkIf isPrimaryUser {
   #   for sops-nix and must never be tracked or cleaned up by this module.
   #   Only the personal user key (~/.ssh/ssh_personal_<user>.pub) is managed.
   #
-   # Algorithm:
-   #   1. Verify the managed public key has been materialized by sops-nix.
-   #   2. Extract the SHA-256 fingerprint via ssh-keygen -lf.
-   #   3. Read the previously recorded fingerprint from the manifest.
-   #   4. If the fingerprint differs (including when manifest is absent on first
-   #      provision), flush the SSH agent (ssh-add -D).
-   #   5. Write the current fingerprint to the manifest.
-   # --------------------------------------------------------------------------
-   home.activation.sshKeyAdopt = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
+  # Algorithm:
+  #   1. Verify the managed public key has been materialized by sops-nix.
+  #   2. Extract the SHA-256 fingerprint via ssh-keygen -lf.
+  #   3. Read the previously recorded fingerprint from the manifest.
+  #   4. If the fingerprint differs (including when manifest is absent on first
+  #      provision), flush the SSH agent (ssh-add -D).
+  #   5. Write the current fingerprint to the manifest.
+  # --------------------------------------------------------------------------
+  home.activation.sshKeyAdopt = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
      ssh_pub_path="${sshPublicKeyPath}"
      nucleus_config_dir="$HOME/.config/nucleus"
      managed_ssh_manifest="$nucleus_config_dir/managed-ssh-keys"
@@ -445,28 +454,28 @@ lib.mkIf isPrimaryUser {
   #      non-empty.  Guards against silent sops-nix failures.
   #   2. GPG key presence: managed primary fingerprint is in the keyring.
   #      Complements gpgImport — catches keyring state divergence.
-   #   3. GPG SOPS recipient check: extract the fp: value from each SOPS file's
-   #      plaintext sops.pgp[].fp metadata and verify that fingerprint is present
-   #      in the secret keyring.  SOPS records the encryption subkey fingerprint
-   #      (not the primary key fingerprint) in the fp: field; comparing the primary
-   #      fingerprint directly produces false failures when SOPS chose a subkey.
-   #      YAML SOPS files store fp as "    fp: HEX" (unquoted); binary SOPS files
-   #      (e.g. wallpaper blobs) use JSON format with "\"fp\": \"HEX\""; both
-   #      formats are handled by the extraction logic below.
-   #      Combined with check 2 (primary key in keyring), this confirms we have the
-   #      private key material to decrypt once the passphrase is provided.
-   #      Accumulates failures, reports all failing files.
-   #      Hard error — GPG is the last-resort global backup.
-   #   4. Personal SSH age recipient check: derive the age public key from the
-   #      managed personal SSH public key via ssh-to-age -i (passphrase-free
-   #      public-key conversion), then search each SOPS file's plaintext
-   #      sops.age[] metadata for the derived key value.  YAML SOPS files store
-   #      the key as "recipient: age1..." (unquoted); binary SOPS files (e.g.
-   #      wallpaper blobs) use JSON format "\"recipient\": \"age1...\"" (quoted).
-   #      Searching for the bare age key value handles both formats.  No private
-   #      key passphrase is required.  Accumulates failures, reports all failing
-   #      files.  Hard error — the personal SSH key is the designated personal
-   #      backup age recipient in .sops.yaml.
+  #   3. GPG SOPS recipient check: extract the fp: value from each SOPS file's
+  #      plaintext sops.pgp[].fp metadata and verify that fingerprint is present
+  #      in the secret keyring.  SOPS records the encryption subkey fingerprint
+  #      (not the primary key fingerprint) in the fp: field; comparing the primary
+  #      fingerprint directly produces false failures when SOPS chose a subkey.
+  #      YAML SOPS files store fp as "    fp: HEX" (unquoted); binary SOPS files
+  #      (e.g. wallpaper blobs) use JSON format with "\"fp\": \"HEX\""; both
+  #      formats are handled by the extraction logic below.
+  #      Combined with check 2 (primary key in keyring), this confirms we have the
+  #      private key material to decrypt once the passphrase is provided.
+  #      Accumulates failures, reports all failing files.
+  #      Hard error — GPG is the last-resort global backup.
+  #   4. Personal SSH age recipient check: derive the age public key from the
+  #      managed personal SSH public key via ssh-to-age -i (passphrase-free
+  #      public-key conversion), then search each SOPS file's plaintext
+  #      sops.age[] metadata for the derived key value.  YAML SOPS files store
+  #      the key as "recipient: age1..." (unquoted); binary SOPS files (e.g.
+  #      wallpaper blobs) use JSON format "\"recipient\": \"age1...\"" (quoted).
+  #      Searching for the bare age key value handles both formats.  No private
+  #      key passphrase is required.  Accumulates failures, reports all failing
+  #      files.  Hard error — the personal SSH key is the designated personal
+  #      backup age recipient in .sops.yaml.
   #   5. Machine SSH host key existence: advisory warning if
   #      /etc/ssh/ssh_host_ed25519_key is absent.  Warning-only because on
   #      first bootstrap the host key may not yet be registered in .sops.yaml
@@ -484,34 +493,32 @@ lib.mkIf isPrimaryUser {
       wallpaperDir = ../assets/wallpapers;
       # Enumerate every *.sops blob in the wallpapers directory at eval time
       # so new wallpapers are automatically included in the health check.
-      wallpaperSopsNames = lib.filter (n: lib.hasSuffix ".sops" n)
-        (builtins.attrNames (builtins.readDir wallpaperDir));
+      wallpaperSopsNames = lib.filter (n: lib.hasSuffix ".sops" n) (
+        builtins.attrNames (builtins.readDir wallpaperDir)
+      );
       # Build list of SOPS files with their paths and display names.
       # WHY regular paths instead of builtins.path: Avoid creating derivation
       # context warnings. The activation script will convert these to strings
       # naturally during shell code generation without requiring explicit
       # store-path construction.
-      allSopsFiles =
-        [
-          {
-            path = ../secrets/git-identities.yml;
-            displayName = "git-identities.yml";
-          }
-          {
-            path = ../secrets/gpg-personal.yml;
-            displayName = "gpg-personal.yml";
-          }
-          {
-            path = ../secrets/ssh-personal.yml;
-            displayName = "ssh-personal.yml";
-          }
-        ]
-        ++ map
-          (n: {
-            path = wallpaperDir + "/${n}";
-            displayName = n;
-          })
-          wallpaperSopsNames;
+      allSopsFiles = [
+        {
+          path = ../secrets/git-identities.yml;
+          displayName = "git-identities.yml";
+        }
+        {
+          path = ../secrets/gpg-personal.yml;
+          displayName = "gpg-personal.yml";
+        }
+        {
+          path = ../secrets/ssh-personal.yml;
+          displayName = "ssh-personal.yml";
+        }
+      ]
+      ++ map (n: {
+        path = wallpaperDir + "/${n}";
+        displayName = n;
+      }) wallpaperSopsNames;
     in
     lib.hm.dag.entryAfter [ "gitIdentityFromSops" "gpgImport" "sshKeyAdopt" ] ''
       # --- 1. Materialization sanity check ---
@@ -559,19 +566,22 @@ lib.mkIf isPrimaryUser {
       # (e.g. wallpaper blobs) use JSON format with "\"fp\": \"HEX\"".  The
       # extraction below handles both formats.
       _vsd_gpg_failures=""
-      ${lib.concatMapStrings ({ path, displayName }: ''
-        # Binary SOPS files use JSON format ("fp": "HEX") while YAML SOPS files
-        # use "    fp: HEX".  The combined -E pattern matches both; the second
-        # grep -oE extracts the hex fingerprint directly, avoiding the need for
-        # tr-based quote stripping.  The || true prevents a silent set -e exit
-        # when grep finds no match, allowing the [ -z ] check below to report
-        # the failure cleanly instead of silently aborting the activation chain.
-        _vsd_sops_gpg_fp="$(/usr/bin/grep -m1 -E '[[:space:]]fp: |"fp": ' "${path}" | /usr/bin/grep -oE '[0-9A-Fa-f]{40,}')" || true
-        if [ -z "$_vsd_sops_gpg_fp" ] || \
-            ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_sops_gpg_fp"; then
-          _vsd_gpg_failures="$_vsd_gpg_failures ${displayName}"
-        fi
-      '') allSopsFiles}
+      ${lib.concatMapStrings (
+        { path, displayName }:
+        ''
+          # Binary SOPS files use JSON format ("fp": "HEX") while YAML SOPS files
+          # use "    fp: HEX".  The combined -E pattern matches both; the second
+          # grep -oE extracts the hex fingerprint directly, avoiding the need for
+          # tr-based quote stripping.  The || true prevents a silent set -e exit
+          # when grep finds no match, allowing the [ -z ] check below to report
+          # the failure cleanly instead of silently aborting the activation chain.
+          _vsd_sops_gpg_fp="$(/usr/bin/grep -m1 -E '[[:space:]]fp: |"fp": ' "${path}" | /usr/bin/grep -oE '[0-9A-Fa-f]{40,}')" || true
+          if [ -z "$_vsd_sops_gpg_fp" ] || \
+              ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_sops_gpg_fp"; then
+            _vsd_gpg_failures="$_vsd_gpg_failures ${displayName}"
+          fi
+        ''
+      ) allSopsFiles}
       if [ -n "$_vsd_gpg_failures" ]; then
         echo "secrets: ERROR — GPG SOPS decryption check failed for:$_vsd_gpg_failures; managed GPG key may not be registered in .sops.yaml." >&2
         exit 1
@@ -594,15 +604,18 @@ lib.mkIf isPrimaryUser {
         echo "secrets: ERROR — personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure ${sshPublicKeyPath} is a valid Ed25519 public key." >&2
         exit 1
       fi
-      ${lib.concatMapStrings ({ path, displayName }: ''
-        # Search for the bare age key value rather than the full "recipient: KEY"
-        # string: YAML SOPS stores "recipient: KEY" (unquoted) while binary SOPS
-        # uses JSON "\"recipient\": \"KEY\"" (quoted key and value).  The age key
-        # is a unique 59+ character bech32 string that identifies the recipient
-        # unambiguously without the surrounding field label.
-        /usr/bin/grep -qF "$_vsd_ssh_age_pub" "${path}" \
-          || _vsd_ssh_failures="$_vsd_ssh_failures ${displayName}"
-      '') allSopsFiles}
+      ${lib.concatMapStrings (
+        { path, displayName }:
+        ''
+          # Search for the bare age key value rather than the full "recipient: KEY"
+          # string: YAML SOPS stores "recipient: KEY" (unquoted) while binary SOPS
+          # uses JSON "\"recipient\": \"KEY\"" (quoted key and value).  The age key
+          # is a unique 59+ character bech32 string that identifies the recipient
+          # unambiguously without the surrounding field label.
+          /usr/bin/grep -qF "$_vsd_ssh_age_pub" "${path}" \
+            || _vsd_ssh_failures="$_vsd_ssh_failures ${displayName}"
+        ''
+      ) allSopsFiles}
       if [ -n "$_vsd_ssh_failures" ]; then
         echo "secrets: ERROR — personal SSH key age-backend SOPS decryption check failed for:$_vsd_ssh_failures; SSH key may not be registered in .sops.yaml as an age recipient." >&2
         exit 1

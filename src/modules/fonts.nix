@@ -3,7 +3,12 @@
 # Provides one declarative font source-of-truth for Latin and CJK workflows.
 # All selected families are open-source so host parity does not depend on
 # proprietary system fonts that vary by platform image.
-{ lib, options, pkgs, ... }:
+{
+  lib,
+  options,
+  pkgs,
+  ...
+}:
 let
   # Canonical open-source font package set used by both macOS and Linux.
   # - Inter: modern sans-serif for UI/document reading.

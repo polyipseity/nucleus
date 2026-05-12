@@ -12,7 +12,10 @@ in
         # reduce steady-state disk usage on both hosts.
         auto-optimise-store = true;
         # Keep flakes and modern nix CLI enabled consistently on both hosts.
-        experimental-features = [ "flakes" "nix-command" ];
+        experimental-features = [
+          "flakes"
+          "nix-command"
+        ];
         # Preserve derivation/output metadata for active shells and rollback
         # workflows so GC does not prune still-useful build context.
         keep-derivations = true;

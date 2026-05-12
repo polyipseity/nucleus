@@ -20,7 +20,12 @@
 #   local.nix-index-update — rebuilds the nix-index file database weekly
 #     (Sunday 00:00) and on every agent load; a freshness check makes
 #     reloads a fast no-op when the DB was updated within the past 6 days.
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   # The canonical live checkout path is ~/dev/nucleus.  Use out-of-store
   # symlinks so app-managed config writes land in the mutable working tree
@@ -82,7 +87,10 @@ let
   ];
 
   # UTI list for Chrome: set as the default handler for HTML and XHTML documents.
-  chromeUTIs = [ "public.html" "public.xhtml" ];
+  chromeUTIs = [
+    "public.html"
+    "public.xhtml"
+  ];
 
   # UTI list for Keka: covers 7z, RAR, and ZIP archive formats so that opening
   # any archive file launches Keka for graphical extraction/creation.
@@ -334,8 +342,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # Keep both LinearMouse runtime config paths pointed at the canonical
     # repo-backed JSON so app writes appear immediately as working-tree diffs.
-    ".config/linearmouse/linearmouse.json".source = config.lib.file.mkOutOfStoreSymlink liveLinearmouseConfig;
-    "Library/Application Support/linearmouse/linearmouse.json".source = config.lib.file.mkOutOfStoreSymlink liveLinearmouseConfig;
+    ".config/linearmouse/linearmouse.json".source =
+      config.lib.file.mkOutOfStoreSymlink liveLinearmouseConfig;
+    "Library/Application Support/linearmouse/linearmouse.json".source =
+      config.lib.file.mkOutOfStoreSymlink liveLinearmouseConfig;
 
     # Keep iCloud Downloads reachable from a short stable path without
     # replacing ~/Downloads itself.
@@ -517,15 +527,18 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # writes and domain-specific hooks.  This minimizes "ghost" values staying
     # in memory until logout/login after a rebuild.
     # -------------------------------------------------------------------------
-    reloadUserPreferenceState = lib.hm.dag.entryAfter [
-      "configureInputAndSiri"
-      "configureSafariDefaults"
-      "configureUniversalAccessDefaults"
-    ] ''
-      if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-        echo "macos: activateSettings -u failed; some preference updates may require relogin." >&2
-      fi
-    '';
+    reloadUserPreferenceState =
+      lib.hm.dag.entryAfter
+        [
+          "configureInputAndSiri"
+          "configureSafariDefaults"
+          "configureUniversalAccessDefaults"
+        ]
+        ''
+          if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
+            echo "macos: activateSettings -u failed; some preference updates may require relogin." >&2
+          fi
+        '';
 
     # -------------------------------------------------------------------------
     # configureITerm2Settings was removed: `BootstrapDaemon = true` is now
@@ -838,26 +851,29 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Health check for archiving tools: verifies 7z CLI, Keka app registration,
     # and archive handler associations are functional after activation.
     # -------------------------------------------------------------------------
-    verifyArchivingStack = lib.hm.dag.entryAfter [ "configureSystemHardening" "configureLaunchServices" "installPackages" "refreshFinderServices" ] ''
-      # Verify 7z CLI is available and functional using direct Nix store path.
-      # Do not rely on PATH lookup since Home Manager activation runs in a minimal
-      # shell that may not have nix-darwin system package paths available yet.
-      seven_z_exe="${pkgs.p7zip}/bin/7z"
-      if [ ! -x "$seven_z_exe" ]; then
-        echo "macos: warning — 7z binary not found at $seven_z_exe; archive extraction may fail." >&2
-      elif ! "$seven_z_exe" --help >/dev/null 2>&1; then
-        echo "macos: warning — 7z exists but --help failed; archive handling may be broken." >&2
-      else
-        echo "macos: archiving stack healthy — 7z CLI available." >&2
-      fi
+    verifyArchivingStack =
+      lib.hm.dag.entryAfter
+        [ "configureSystemHardening" "configureLaunchServices" "installPackages" "refreshFinderServices" ]
+        ''
+          # Verify 7z CLI is available and functional using direct Nix store path.
+          # Do not rely on PATH lookup since Home Manager activation runs in a minimal
+          # shell that may not have nix-darwin system package paths available yet.
+          seven_z_exe="${pkgs.p7zip}/bin/7z"
+          if [ ! -x "$seven_z_exe" ]; then
+            echo "macos: warning — 7z binary not found at $seven_z_exe; archive extraction may fail." >&2
+          elif ! "$seven_z_exe" --help >/dev/null 2>&1; then
+            echo "macos: warning — 7z exists but --help failed; archive handling may be broken." >&2
+          else
+            echo "macos: archiving stack healthy — 7z CLI available." >&2
+          fi
 
-      # Verify Keka application is installed and registered.
-      if [ ! -d "/Applications/Keka.app" ]; then
-        echo "macos: warning — Keka.app not found in /Applications; GUI archiving unavailable." >&2
-      else
-        echo "macos: archiving stack healthy — Keka installed." >&2
-      fi
-    '';
+          # Verify Keka application is installed and registered.
+          if [ ! -d "/Applications/Keka.app" ]; then
+            echo "macos: warning — Keka.app not found in /Applications; GUI archiving unavailable." >&2
+          else
+            echo "macos: archiving stack healthy — Keka installed." >&2
+          fi
+        '';
 
     # -------------------------------------------------------------------------
     # ensureICloudFilesLocal
@@ -905,14 +921,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # displayHostManualInstructions
-     # Prints host-scoped one-time manual setup instructions from the dedicated
-     # host manual document instead of embedding long reminder strings here.
-     #
-     # Ordering invariant:
-     #   displayHostManualInstructions must remain the terminal activation node so
-     #   users always see one final, consolidated instruction block after every
-     #   automated step has finished.
-     # -------------------------------------------------------------------------
+    # Prints host-scoped one-time manual setup instructions from the dedicated
+    # host manual document instead of embedding long reminder strings here.
+    #
+    # Ordering invariant:
+    #   displayHostManualInstructions must remain the terminal activation node so
+    #   users always see one final, consolidated instruction block after every
+    #   automated step has finished.
+    # -------------------------------------------------------------------------
     displayHostManualInstructions = lib.hm.dag.entryAfter displayHostManualInstructionDeps ''
       _manual_path='${config.nucleus.hostManualFile}'
       _repo_root_file="$HOME/.config/nucleus/repo-root"
@@ -1116,7 +1132,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
       RunAtLoad = true;
       # Weekly Sunday 00:00 rebuild to keep the index current with nixpkgs
       # updates.  Weekday 0 = Sunday in launchd's calendar convention.
-      StartCalendarInterval = [{ Hour = 0; Minute = 0; Weekday = 0; }];
+      StartCalendarInterval = [
+        {
+          Hour = 0;
+          Minute = 0;
+          Weekday = 0;
+        }
+      ];
       # Suppress per-build output to avoid filling system logs.  See above.
       StandardOutPath = "/dev/null";
       StandardErrorPath = "/dev/null";

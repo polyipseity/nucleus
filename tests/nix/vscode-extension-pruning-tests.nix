@@ -6,29 +6,26 @@
 #
 # Run with: nix-instantiate --eval tests/nix/vscode-extension-pruning-tests.nix
 
-{ lib ? import <nixpkgs/lib> }:
+{
+  lib ? import <nixpkgs/lib>,
+}:
 let
-  assert' = cond: msg:
-    if !cond then builtins.throw "ASSERTION FAILED: ${msg}" else null;
+  assert' = cond: msg: if !cond then builtins.throw "ASSERTION FAILED: ${msg}" else null;
 
   posixEditors = builtins.readFile ../../src/modules/editors.nix;
   windowsExtensions = builtins.readFile ../../src/hosts/windows/modules/Sync-VSCodeExtension.ps1;
 
-  test_posix_prunes_all_unmanaged_entries = assert'
-    (
-      lib.hasInfix ''rm -rf "$_sed_existing"'' posixEditors
-      && lib.hasInfix ''rm -f "$_sed_dir/.obsolete"'' posixEditors
-      && lib.hasInfix ''rm -f "$_sed_dir/extensions.json"'' posixEditors
-    )
-    "POSIX VS Code extension provisioning must prune unmanaged entries and remove derived metadata";
+  test_posix_prunes_all_unmanaged_entries = assert' (
+    lib.hasInfix ''rm -rf "$_sed_existing"'' posixEditors
+    && lib.hasInfix ''rm -f "$_sed_dir/.obsolete"'' posixEditors
+    && lib.hasInfix ''rm -f "$_sed_dir/extensions.json"'' posixEditors
+  ) "POSIX VS Code extension provisioning must prune unmanaged entries and remove derived metadata";
 
-  test_windows_prunes_all_unmanaged_entries = assert'
-    (
-      lib.hasInfix ''Remove-Item -Path $_.FullName -Recurse -Force'' windowsExtensions
-      && lib.hasInfix ''Remove-Item -Path (Join-Path $channel.ExtDir 'extensions.json') -Force -ErrorAction SilentlyContinue'' windowsExtensions
-      && lib.hasInfix ''Remove-Item -Path (Join-Path $channel.ExtDir '.obsolete') -Force -ErrorAction SilentlyContinue'' windowsExtensions
-    )
-    "Windows VS Code extension provisioning must prune unmanaged entries and remove derived metadata";
+  test_windows_prunes_all_unmanaged_entries = assert' (
+    lib.hasInfix "Remove-Item -Path $_.FullName -Recurse -Force" windowsExtensions
+    && lib.hasInfix "Remove-Item -Path (Join-Path $channel.ExtDir 'extensions.json') -Force -ErrorAction SilentlyContinue" windowsExtensions
+    && lib.hasInfix "Remove-Item -Path (Join-Path $channel.ExtDir '.obsolete') -Force -ErrorAction SilentlyContinue" windowsExtensions
+  ) "Windows VS Code extension provisioning must prune unmanaged entries and remove derived metadata";
 in
 {
   success = true;

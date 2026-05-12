@@ -7,7 +7,9 @@
 #
 # Run with: nix-instantiate --eval tests/nix/module-imports-tests.nix
 
-{ lib ? import <nixpkgs/lib> }:
+{
+  lib ? import <nixpkgs/lib>,
+}:
 let
   # List of all shared modules under src/modules/ that should be importable.
   # If any import fails, evaluation will throw an error (causing CI to fail).
@@ -34,7 +36,8 @@ let
 
   # Helper: verify a path exists by attempting to read it.
   # (In practice, Nix will fail the build if the path doesn't exist anyway.)
-  pathExistsOrThrow = moduleName:
+  pathExistsOrThrow =
+    moduleName:
     let
       # Intentionally not directly importing here to avoid circular dependencies.
       # Instead, we just verify the module name is recognized.
@@ -59,8 +62,10 @@ let
         "agents" = true;
       };
     in
-    if builtins.hasAttr moduleName knownModules then true
-    else builtins.throw "Module ${moduleName} not recognized in import test";
+    if builtins.hasAttr moduleName knownModules then
+      true
+    else
+      builtins.throw "Module ${moduleName} not recognized in import test";
 in
 {
   # Verify all modules are recognized and can be imported.

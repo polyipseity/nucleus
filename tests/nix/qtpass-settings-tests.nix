@@ -1,8 +1,7 @@
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
 
-  containsRegex = pattern: haystack:
-    builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
 
   applyText = builtins.readFile ../../src/hosts/windows/apply.ps1;
   flakeText = builtins.readFile ../../src/flake.nix;

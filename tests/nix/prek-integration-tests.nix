@@ -5,7 +5,9 @@
 #
 # Run with: nix-instantiate --eval tests/nix/prek-integration-tests.nix
 
-{ lib ? import <nixpkgs/lib> }:
+{
+  lib ? import <nixpkgs/lib>,
+}:
 let
   # Read the live files so this test catches wiring drift in the real repo.
   applyScriptText = builtins.readFile ../../src/scripts/apply.sh;
@@ -21,57 +23,43 @@ let
   # Simple assertion helper with descriptive errors.
   assert' = cond: msg: if !cond then builtins.throw msg else null;
 
-  test_posix_binary_baseline =
-    assert'
-      (lib.hasInfix "pkgs.prek" coreModuleText)
-      "POSIX shared package baseline must include pkgs.prek";
+  test_posix_binary_baseline = assert' (lib.hasInfix "pkgs.prek" coreModuleText) "POSIX shared package baseline must include pkgs.prek";
 
-  test_windows_binary_baseline =
-    assert'
-      (lib.hasInfix "id: j178.Prek" windowsSystemDscText)
-      "Windows system.dsc.yml must include the j178.Prek package";
+  test_windows_binary_baseline = assert' (lib.hasInfix "id: j178.Prek" windowsSystemDscText) "Windows system.dsc.yml must include the j178.Prek package";
 
-  test_apply_runtime_bundles_prek =
-    assert'
-      ((lib.hasInfix "runtimeInputs = [" flakeText) &&
-       (lib.hasInfix "pkgs.prek" flakeText))
-      "mkApplyApp runtimeInputs must bundle pkgs.prek for first-run apply hook installation";
+  test_apply_runtime_bundles_prek = assert' (
+    (lib.hasInfix "runtimeInputs = [" flakeText) && (lib.hasInfix "pkgs.prek" flakeText)
+  ) "mkApplyApp runtimeInputs must bundle pkgs.prek for first-run apply hook installation";
 
-  test_posix_apply_installs_hooks =
-    assert'
-      ((lib.hasInfix "ensure_prek_hooks_installed()" applyScriptText) &&
-       (lib.hasInfix "prek install" applyScriptText))
-      "POSIX apply flow must install prek hooks for the live repository";
+  test_posix_apply_installs_hooks = assert' (
+    (lib.hasInfix "ensure_prek_hooks_installed()" applyScriptText)
+    && (lib.hasInfix "prek install" applyScriptText)
+  ) "POSIX apply flow must install prek hooks for the live repository";
 
-  test_zsh_hook_installs_hooks =
-    assert'
-      ((lib.hasInfix "_prek_hook_install_if_needed()" posixShellText) &&
-       (lib.hasInfix "add-zsh-hook chpwd _prek_hook_install_if_needed" posixShellText))
-      "zsh initContent must auto-install prek hooks on directory change";
+  test_zsh_hook_installs_hooks = assert' (
+    (lib.hasInfix "_prek_hook_install_if_needed()" posixShellText)
+    && (lib.hasInfix "add-zsh-hook chpwd _prek_hook_install_if_needed" posixShellText)
+  ) "zsh initContent must auto-install prek hooks on directory change";
 
-  test_posix_pwsh_hook_installs_hooks =
-    assert'
-      ((lib.hasInfix "Invoke-PrekHookInstallIfNeeded" posixPwshText) &&
-       (lib.hasInfix "function global:prompt" posixPwshText))
-      "POSIX PowerShell profile must auto-install prek hooks when pwsh enters a repo";
+  test_posix_pwsh_hook_installs_hooks = assert' (
+    (lib.hasInfix "Invoke-PrekHookInstallIfNeeded" posixPwshText)
+    && (lib.hasInfix "function global:prompt" posixPwshText)
+  ) "POSIX PowerShell profile must auto-install prek hooks when pwsh enters a repo";
 
-  test_windows_apply_installs_hooks =
-    assert'
-      ((lib.hasInfix "Install-PrekHook.ps1" windowsApplyText) &&
-       (lib.hasInfix "Install-PrekHook -PrekExecutablePath $prekExe -RepositoryRoot $repoRoot" windowsApplyText))
-      "Windows apply flow must install prek hooks for the live repository";
+  test_windows_apply_installs_hooks = assert' (
+    (lib.hasInfix "Install-PrekHook.ps1" windowsApplyText)
+    && (lib.hasInfix "Install-PrekHook -PrekExecutablePath $prekExe -RepositoryRoot $repoRoot" windowsApplyText)
+  ) "Windows apply flow must install prek hooks for the live repository";
 
-  test_windows_install_module_exists =
-    assert'
-      ((lib.hasInfix "function Install-PrekHook" windowsInstallModuleText) &&
-       (lib.hasInfix "prek install" windowsInstallModuleText))
-      "Windows Install-PrekHook module must exist and run prek install";
+  test_windows_install_module_exists = assert' (
+    (lib.hasInfix "function Install-PrekHook" windowsInstallModuleText)
+    && (lib.hasInfix "prek install" windowsInstallModuleText)
+  ) "Windows Install-PrekHook module must exist and run prek install";
 
-  test_windows_shell_hook_installs_hooks =
-    assert'
-      ((lib.hasInfix "Invoke-PrekHookInstallIfNeeded" windowsShellProfileText) &&
-       (lib.hasInfix "function global:prompt" windowsShellProfileText))
-      "Windows shell profile must auto-install prek hooks when pwsh enters a repo";
+  test_windows_shell_hook_installs_hooks = assert' (
+    (lib.hasInfix "Invoke-PrekHookInstallIfNeeded" windowsShellProfileText)
+    && (lib.hasInfix "function global:prompt" windowsShellProfileText)
+  ) "Windows shell profile must auto-install prek hooks when pwsh enters a repo";
 
   allTests = [
     test_posix_binary_baseline

@@ -16,7 +16,12 @@
 # src/modules/configs/vscode/ so that every VS Code write appears as an
 # unstaged git change.  The vscodeSymlinks activation creates symlinks from
 # the per-channel User/ directories to those repo files at apply time.
-{ lib, pkgs, vscodeMarketplace, ... }:
+{
+  lib,
+  pkgs,
+  vscodeMarketplace,
+  ...
+}:
 let
   # Platform switch used to keep one declarative config while selecting the
   # backend that integrates best on each OS.
@@ -27,13 +32,15 @@ let
   # indexed, or an empty list with a trace warning when absent (e.g. for very
   # recently published extensions not yet in the index snapshot).  The list
   # wrapper lets callers use this in builtins.concatLists without special-casing.
-  mkMktx = pub: name:
-    let pubAttrs = vscodeMarketplace.${pub} or {};
-    in if pubAttrs ? ${name}
-       then [ pubAttrs.${name} ]
-       else builtins.trace
-         "vscode: ${pub}.${name} not in marketplace index — skipping"
-         [];
+  mkMktx =
+    pub: name:
+    let
+      pubAttrs = vscodeMarketplace.${pub} or { };
+    in
+    if pubAttrs ? ${name} then
+      [ pubAttrs.${name} ]
+    else
+      builtins.trace "vscode: ${pub}.${name} not in marketplace index — skipping" [ ];
 
   # Canonical extension set shared by both platforms, sorted alphabetically by
   # publisher.name.  44 extensions come from nixpkgs; 22 come from the VS Code
@@ -162,27 +169,25 @@ let
   # These are shell strings whose $HOME is intentionally left unexpanded so the
   # activation script evaluates them at runtime with the actual home directory.
   stableBaseDir =
-    if isDarwin then "$HOME/Library/Application Support/Code/User"
-    else "$HOME/.config/Code/User";
+    if isDarwin then "$HOME/Library/Application Support/Code/User" else "$HOME/.config/Code/User";
 
   insidersBaseDir =
-    if isDarwin then "$HOME/Library/Application Support/Code - Insiders/User"
-    else "$HOME/.config/Code - Insiders/User";
+    if isDarwin then
+      "$HOME/Library/Application Support/Code - Insiders/User"
+    else
+      "$HOME/.config/Code - Insiders/User";
 
   # Select the per-host keybindings source file so that platform-specific
   # shortcuts (Cmd on macOS vs Ctrl on NixOS/Linux) are tracked independently
   # without cross-host pollution in a shared repo file.
-  vscodeKeybindingsFile =
-    if isDarwin then "keybindings.mac.json"
-    else "keybindings.nixos.json";
+  vscodeKeybindingsFile = if isDarwin then "keybindings.mac.json" else "keybindings.nixos.json";
 
   # Select the per-host Copilot chat model list so that each machine only
   # surfaces the Ollama models that fit within its VRAM budget.
   # mac: gemma4:e4b + qwen3:14b (24 GB unified memory allows both).
   # nixos/other: qwen3:8b only (discrete GPU capped at 6 GB VRAM).
   vscodeChatLanguageModelsFile =
-    if isDarwin then "chatLanguageModels.mac.json"
-    else "chatLanguageModels.nixos.json";
+    if isDarwin then "chatLanguageModels.mac.json" else "chatLanguageModels.nixos.json";
 
   # Python script that inserts a workspace trust entry for ~/dev into VS Code's
   # SQLite state database (globalStorage/state.vscdb) for both stable and

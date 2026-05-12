@@ -44,7 +44,13 @@
 #   - Tools that bundle Python (e.g., ansible, pipx-installed CLIs)
 # uv (installed here) is the blessed package/project manager for when
 # project-specific Python is needed.
-{ config, lib, pkgs, options, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  options,
+  ...
+}:
 let
   # Packages installed on every host regardless of OS.
   #   bat            — syntax-highlighted cat replacement
@@ -87,10 +93,10 @@ let
   #   rustup         — Rust toolchain manager
   #   ruff           — fast Python linter/formatter CLI
   #   shellcheck     — shell linter used by CI and pre-commit validation
-#   sops           — secret encryption/decryption tool
-#   ty             — Astral ty Python type checker / language server CLI
-#   typst          — modern document-composition compiler; pairs with the Tinymist LSP in editors.nix
-#   uv             — fast Python package/project manager
+  #   sops           — secret encryption/decryption tool
+  #   ty             — Astral ty Python type checker / language server CLI
+  #   typst          — modern document-composition compiler; pairs with the Tinymist LSP in editors.nix
+  #   uv             — fast Python package/project manager
   #   zoxide         — smart cd (shell integration in shell.nix)
   baseSharedPackages = [
     pkgs.bat
@@ -284,14 +290,14 @@ let
   # Policy function: maps a package category to its default backend.
   # CLI tools default to nixpkgs; GUI/hardware-integrated apps default to
   # Homebrew, following the AGENTS.md package selection policy.
-  defaultBackendFor = category:
-    if category == "cli" then "nixpkgs" else "homebrew";
+  defaultBackendFor = category: if category == "cli" then "nixpkgs" else "homebrew";
 
   # Per-package backend resolver — applies in priority order:
   #   1. Explicit per-package override (packageSelection.overrides).
   #   2. Policy function (defaultBackendFor) when overlapBackend == "policy".
   #   3. Global backend setting ("homebrew" or "nixpkgs") otherwise.
-  resolveBackend = packageName:
+  resolveBackend =
+    packageName:
     if builtins.hasAttr packageName packageSelection.overrides then
       builtins.getAttr packageName packageSelection.overrides
     else if packageSelection.overlapBackend == "policy" then
@@ -301,66 +307,74 @@ let
 
   # Resolved backend attrset for every overlap package:
   #   { "<package-name>" = "nixpkgs" | "homebrew"; }
-  selectedOverlapBackends = builtins.listToAttrs (map
-    (packageName: {
+  selectedOverlapBackends = builtins.listToAttrs (
+    map (packageName: {
       name = packageName;
       value = resolveBackend packageName;
-    })
-    overlapPackageNames);
+    }) overlapPackageNames
+  );
 
   # Validation list: overlap packages routed to nixpkgs but absent from the
   # current pkgs attrset (e.g. a package unavailable on this platform).
   # Non-empty causes an `assertions` failure at eval time via the config block.
-  missingNixAttrs = lib.optionals pkgs.stdenv.isDarwin (builtins.filter
-    (packageName:
+  missingNixAttrs = lib.optionals pkgs.stdenv.isDarwin (
+    builtins.filter (
+      packageName:
       selectedOverlapBackends.${packageName} == "nixpkgs"
-      && !(builtins.hasAttr overlappingPackages.${packageName}.nixpkgsAttr pkgs))
-    overlapPackageNames);
+      && !(builtins.hasAttr overlappingPackages.${packageName}.nixpkgsAttr pkgs)
+    ) overlapPackageNames
+  );
 
   # Nix derivations for overlap packages resolved to the nixpkgs backend.
   # Empty list on non-Darwin hosts because the overlap policy is macOS-only.
-  overlapNixPackages = lib.optionals pkgs.stdenv.isDarwin (lib.concatMap
-    (packageName:
+  overlapNixPackages = lib.optionals pkgs.stdenv.isDarwin (
+    lib.concatMap (
+      packageName:
       let
         meta = overlappingPackages.${packageName};
       in
       if selectedOverlapBackends.${packageName} == "nixpkgs" then
         [ (builtins.getAttr meta.nixpkgsAttr pkgs) ]
       else
-        [ ])
-    overlapPackageNames);
+        [ ]
+    ) overlapPackageNames
+  );
 
   # Homebrew formula names (kind = "brew") for overlap packages on the homebrew
   # backend.  Passed to homebrew.nix via the generated module option so the
   # host does not need to list them manually.
-  overlapHomebrewBrews = lib.optionals pkgs.stdenv.isDarwin (builtins.filter
-    (name: name != null)
-    (map
-      (packageName:
+  overlapHomebrewBrews = lib.optionals pkgs.stdenv.isDarwin (
+    builtins.filter (name: name != null) (
+      map (
+        packageName:
         let
           meta = overlappingPackages.${packageName};
         in
         if selectedOverlapBackends.${packageName} == "homebrew" && meta.homebrew.kind == "brew" then
           meta.homebrew.name
         else
-          null)
-      overlapPackageNames));
+          null
+      ) overlapPackageNames
+    )
+  );
 
   # Homebrew cask names (kind = "cask") for overlap packages on the homebrew
   # backend.  Passed to homebrew.nix via the generated module option so the
   # host does not need to list them manually.
-  overlapHomebrewCasks = lib.optionals pkgs.stdenv.isDarwin (builtins.filter
-    (name: name != null)
-    (map
-      (packageName:
+  overlapHomebrewCasks = lib.optionals pkgs.stdenv.isDarwin (
+    builtins.filter (name: name != null) (
+      map (
+        packageName:
         let
           meta = overlappingPackages.${packageName};
         in
         if selectedOverlapBackends.${packageName} == "homebrew" && meta.homebrew.kind == "cask" then
           meta.homebrew.name
         else
-          null)
-      overlapPackageNames));
+          null
+      ) overlapPackageNames
+    )
+  );
 
   # Final merged package list installed on every host: shared base + Darwin
   # extras + any overlap packages resolved to the nixpkgs backend on Darwin.
@@ -369,7 +383,11 @@ in
 {
   options.nucleus.macos.packageSelection = {
     overlapBackend = lib.mkOption {
-      type = lib.types.enum [ "homebrew" "nixpkgs" "policy" ];
+      type = lib.types.enum [
+        "homebrew"
+        "nixpkgs"
+        "policy"
+      ];
       default = "policy";
       description = ''
         Backend used for macOS packages that exist in both nixpkgs and
@@ -379,7 +397,12 @@ in
     };
 
     overrides = lib.mkOption {
-      type = lib.types.attrsOf (lib.types.enum [ "homebrew" "nixpkgs" ]);
+      type = lib.types.attrsOf (
+        lib.types.enum [
+          "homebrew"
+          "nixpkgs"
+        ]
+      );
       default = { };
       example = {
         "google-chrome" = "nixpkgs";
@@ -423,12 +446,12 @@ in
     })
 
     (lib.mkIf pkgs.stdenv.isDarwin {
-      assertions = map
-        (packageName: {
-          assertion = false;
-          message = "core.nix: packageSelection requests nixpkgs for `${packageName}`, but pkgs.${overlappingPackages.${packageName}.nixpkgsAttr} is unavailable on this platform.";
-        })
-        missingNixAttrs;
+      assertions = map (packageName: {
+        assertion = false;
+        message = "core.nix: packageSelection requests nixpkgs for `${packageName}`, but pkgs.${
+          overlappingPackages.${packageName}.nixpkgsAttr
+        } is unavailable on this platform.";
+      }) missingNixAttrs;
 
       nucleus.macos.generatedHomebrew.brews = overlapHomebrewBrews;
       nucleus.macos.generatedHomebrew.casks = overlapHomebrewCasks;

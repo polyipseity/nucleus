@@ -6,9 +6,19 @@
 #
 # Run with: nix-instantiate --eval tests/nix/option-conflict-tests.nix
 
-{ lib ? import <nixpkgs/lib> }:
+{
+  lib ? import <nixpkgs/lib>,
+}:
 let
-  inherit (lib) mkOption mkIf mkDefault mkMerge types optional optionalAttrs;
+  inherit (lib)
+    mkOption
+    mkIf
+    mkDefault
+    mkMerge
+    types
+    optional
+    optionalAttrs
+    ;
 
   # Assertion helper with descriptive errors.
   assert' = cond: msg: if !cond then builtins.throw msg else null;
@@ -21,7 +31,7 @@ let
         config = mkIf true { home.packages = [ "git" ]; };
       };
       module2 = {
-        config = mkIf false { home.packages = [ "hg" ]; };  # Won't merge
+        config = mkIf false { home.packages = [ "hg" ]; }; # Won't merge
       };
       # Merging these should not conflict because second is conditional-false.
       merged = mkMerge [
@@ -29,8 +39,7 @@ let
         module2.config
       ];
     in
-    assert'
-      (true)  # mkMerge should succeed without throwing
+    assert' (true) # mkMerge should succeed without throwing
       "mkIf conditional options should not conflict";
 
   # === TEST: mkDefault allows later overrides ===
@@ -41,10 +50,12 @@ let
       # Override value (higher priority than mkDefault)
       option2 = "/override/path";
       # When merged, option2 should win
-      merged = mkMerge [ option1 option2 ];
+      merged = mkMerge [
+        option1
+        option2
+      ];
     in
-    assert'
-      (true)  # mkMerge respects priority
+    assert' (true) # mkMerge respects priority
       "mkDefault should allow later overrides";
 
   # === TEST: Option type consistency across modules ===
@@ -61,20 +72,22 @@ let
         default = [ "git" ];
       };
     in
-    assert'
-      ((optionDef1.type == optionDef2.type))
-      "Option types should match across modules";
+    assert' ((optionDef1.type == optionDef2.type)) "Option types should match across modules";
 
   # === TEST: Home Manager state version doesn't conflict ===
   test_home_stateversion_no_conflict =
     let
       # Multiple modules setting stateVersion (should not conflict if merged with mkMerge)
-      config1 = { home.stateVersion = "23.05"; };
-      config2 = { home.stateVersion = "23.05"; };
+      config1 = {
+        home.stateVersion = "23.05";
+      };
+      config2 = {
+        home.stateVersion = "23.05";
+      };
     in
-    assert'
-      ((config1.home.stateVersion == config2.home.stateVersion))
-      "State version should be identical across modules";
+    assert' (
+      (config1.home.stateVersion == config2.home.stateVersion)
+    ) "State version should be identical across modules";
 
   # === TEST: Security options don't conflict across platforms ===
   test_security_options_parity =
@@ -90,9 +103,9 @@ let
         security.screensaver.enabled = true;
       };
     in
-    assert'
-      ((macosSecurity.security.lockTimeout == nixosSecurity.security.lockTimeout))
-      "Security options should have same structure across platforms";
+    assert' (
+      (macosSecurity.security.lockTimeout == nixosSecurity.security.lockTimeout)
+    ) "Security options should have same structure across platforms";
 
   # === TEST: Shell configuration merges cleanly ===
   test_shell_config_merge =
@@ -100,29 +113,43 @@ let
       # Base shell config
       baseShell = {
         programs.zsh.enable = true;
-        programs.zsh.aliases = { ls = "ls -la"; };
+        programs.zsh.aliases = {
+          ls = "ls -la";
+        };
       };
       # Additional shell config
       extraShell = {
-        programs.zsh.aliases = { cd = "cd && ls"; };
+        programs.zsh.aliases = {
+          cd = "cd && ls";
+        };
       };
       # Merge: aliases should combine
-      merged = mkMerge [ baseShell extraShell ];
+      merged = mkMerge [
+        baseShell
+        extraShell
+      ];
     in
-    assert'
-      (true)  # Should merge without conflict
+    assert' (true) # Should merge without conflict
       "Shell configuration should merge cleanly";
 
   # === TEST: Package lists can be concatenated ===
   test_package_list_concatenation =
     let
-      packages1 = [ "git" "zsh" ];
-      packages2 = [ "direnv" "fzf" ];
+      packages1 = [
+        "git"
+        "zsh"
+      ];
+      packages2 = [
+        "direnv"
+        "fzf"
+      ];
       combined = packages1 ++ packages2;
     in
-    assert'
-      ((builtins.length combined == 4) && (builtins.elem "git" combined) && (builtins.elem "direnv" combined))
-      "Package lists should concatenate without conflict";
+    assert' (
+      (builtins.length combined == 4)
+      && (builtins.elem "git" combined)
+      && (builtins.elem "direnv" combined)
+    ) "Package lists should concatenate without conflict";
 
   # === TEST: Activation hooks don't redefine the same step ===
   test_activation_hooks_unique =
@@ -140,9 +167,9 @@ let
       # Verify each activation step is unique
       stepNames = builtins.attrNames activation;
     in
-    assert'
-      ((builtins.length stepNames == builtins.length (lib.unique stepNames)))
-      "Activation hook names should be unique";
+    assert' (
+      (builtins.length stepNames == builtins.length (lib.unique stepNames))
+    ) "Activation hook names should be unique";
 
   # === TEST: Option descriptions don't conflict ===
   test_option_descriptions_unique =
@@ -154,9 +181,7 @@ let
       };
       uniqueDescs = builtins.attrValues descriptions;
     in
-    assert'
-      (builtins.length uniqueDescs == 3)
-      "Option descriptions should be unique";
+    assert' (builtins.length uniqueDescs == 3) "Option descriptions should be unique";
 
   # === TEST: Platform-specific options gate correctly ===
   test_platform_gating =
@@ -166,25 +191,23 @@ let
         nucleus.macos.homebrew.enable = true;
       };
     in
-    assert'
-      ((isDarwin -> (builtins.hasAttr "nucleus" config)))
-      "Platform-specific options should gate correctly";
+    assert' (
+      (isDarwin -> (builtins.hasAttr "nucleus" config))
+    ) "Platform-specific options should gate correctly";
 
   # === TEST: Module import order doesn't cause circular deps ===
   test_import_order_acyclic =
     let
       # Represent module import edges (simplified)
       edges = {
-        core = [ ];  # No dependencies
+        core = [ ]; # No dependencies
         home = [ "core" ];
         posix-shell = [ "home" ];
       };
       # Check for cycles (simplified: just verify no self-loops)
       hasCycles = builtins.any (name: builtins.elem name edges.${name}) (builtins.attrNames edges);
     in
-    assert'
-      (!hasCycles)
-      "Module import graph should be acyclic";
+    assert' (!hasCycles) "Module import graph should be acyclic";
 
   # Collect all tests.
   allTests = [
