@@ -104,10 +104,17 @@ MobileBackups.trash
 tmbootpicker.efi
 # }
 
-# self {
-# }
-
-# Nix build result symlinks created by `nix build` or `darwin-rebuild switch`.
-# These point into /nix/store and must never be committed.
+# https://github.com/github/gitignore/blob/1046d8fba6b42d367da6314c934cddb6bfe5662e/Nix.gitignore {
+# Ignore build outputs from performing a nix-build or `nix build` command
 result
 result-*
+
+# Ignore automatically generated direnv output
+.direnv
+
+# Ignore NixOS interactive test driver history
+**/.nixos-test-history
+# }
+
+# self {
+# }
