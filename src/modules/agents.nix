@@ -15,8 +15,20 @@
 # Both paths mirror the pattern used by vscodeSymlinks in editors.nix.
 #
 # agentsSkills (below) manages ~/.agents/skills/ independently.
-{ lib, ... }:
+{ config, lib, ... }:
+let
+  # The canonical live checkout path is ~/dev/nucleus.  Use out-of-store
+  # symlinks so user-level OpenCode config stays pointed at the mutable working
+  # tree rather than a read-only Nix store snapshot.
+  liveRepoRoot = "${config.home.homeDirectory}/dev/nucleus";
+in
 {
+  home.file = {
+    ".config/opencode/agents".source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/agents";
+    ".config/opencode/commands".source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
+    ".config/opencode/opencode.jsonc".source = config.lib.file.mkOutOfStoreSymlink "${liveRepoRoot}/src/modules/configs/agents/opencode.user.jsonc";
+  };
+
   home.activation = {
     # -------------------------------------------------------------------------
     # agentsSymlink
@@ -110,82 +122,6 @@
         fi
       done < "$_as_source_list"
       rm -f "$_as_source_list"
-    '';
-
-    # -------------------------------------------------------------------------
-    # opencodeSymlinks
-    # Converges OpenCode's user-level config at ~/.config/opencode/.
-    # OpenCode reads:
-    #   ~/.config/opencode/opencode.jsonc
-    #   ~/.config/opencode/*
-    # so wire those paths to the repo-backed sources and the managed ~/.agents
-    # tree.  Mirrors the repo-local .opencode topology:
-    #   agents   -> .agents/agents
-    #   commands -> .agents/prompts
-    # -------------------------------------------------------------------------
-    opencodeSymlinks = lib.hm.dag.entryAfter [ "agentsSymlink" ] ''
-      set -eu
-
-      # Resolve the repo root (same mechanism as agentsSymlink above).
-      _ocs_repo_root_file="$HOME/.config/nucleus/repo-root"
-      if [ -n "''${NUCLEUS_REPO:-}" ]; then
-        _ocs_repo_root="$NUCLEUS_REPO"
-      elif [ -f "$_ocs_repo_root_file" ]; then
-        _ocs_repo_root="$(cat "$_ocs_repo_root_file")"
-      else
-        echo "opencode: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
-        exit 1
-      fi
-
-      _ocs_opencode_source="$_ocs_repo_root/.opencode"
-      _ocs_opencode_json="$_ocs_repo_root/src/modules/configs/agents/opencode.user.jsonc"
-      if [ ! -d "$_ocs_opencode_source" ]; then
-        echo "opencode: source directory not found: $_ocs_opencode_source" >&2
-        exit 1
-      fi
-      if [ ! -f "$_ocs_opencode_json" ]; then
-        echo "opencode: config file not found: $_ocs_opencode_json" >&2
-        exit 1
-      fi
-
-      _ocs_config_dir="$HOME/.config/opencode"
-
-      # Migrate old whole-dir symlink layouts to a real directory so individual
-      # entries can be managed as explicit symlinks.
-      if [ -L "$_ocs_config_dir" ]; then
-        rm "$_ocs_config_dir"
-      fi
-      if [ ! -d "$_ocs_config_dir" ]; then
-        mkdir -p "$_ocs_config_dir"
-      elif [ -e "$_ocs_config_dir" ] && [ ! -d "$_ocs_config_dir" ]; then
-        echo "opencode: $_ocs_config_dir exists but is not a directory — remove it and re-run apply." >&2
-        exit 1
-      fi
-
-      ensure_symlink() {
-        _osl_target="$1"
-        _osl_link="$2"
-
-        if [ -L "$_osl_link" ]; then
-          if [ "$(readlink "$_osl_link")" = "$_osl_target" ]; then
-            return 0
-          fi
-          rm "$_osl_link"
-        elif [ -e "$_osl_link" ]; then
-          echo "opencode: $_osl_link exists and is not a managed symlink — remove or migrate it, then re-run apply." >&2
-          exit 1
-        fi
-
-        ln -s "$_osl_target" "$_osl_link"
-      }
-
-      # Keep these links relative so the managed home config remains portable
-      # across machines where $HOME may differ.
-      ensure_symlink "../../.agents/agents" "$_ocs_config_dir/agents"
-      ensure_symlink "../../.agents/prompts" "$_ocs_config_dir/commands"
-
-      # Link the canonical project OpenCode config file.
-      ensure_symlink "$_ocs_opencode_json" "$_ocs_config_dir/opencode.jsonc"
     '';
 
     # -------------------------------------------------------------------------

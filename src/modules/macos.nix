@@ -9,7 +9,6 @@
 #     → preflightPrivacyPermissions
 #       → configureSafariDefaults, configureUniversalAccessDefaults
 #       → reloadUserPreferenceState
-#       → syncDownloadsToICloud
 #     → configureLaunchServices, configureNightlight
 #       → ensureHeadlessDisplay
 #         → configureDisplayResolutions
@@ -23,6 +22,13 @@
 #     reloads a fast no-op when the DB was updated within the past 6 days.
 { config, lib, pkgs, ... }:
 let
+  # The canonical live checkout path is ~/dev/nucleus.  Use out-of-store
+  # symlinks so app-managed config writes land in the mutable working tree
+  # instead of a read-only Nix store snapshot.
+  liveRepoRoot = "${config.home.homeDirectory}/dev/nucleus";
+  liveICloudDownloads = "${config.home.homeDirectory}/Library/Mobile Documents/com~apple~CloudDocs/Downloads";
+  liveLinearmouseConfig = "${liveRepoRoot}/src/modules/configs/linearmouse/linearmouse.json";
+
   # Domains intentionally reset before each Home Manager write pass so stale
   # manual overrides do not survive forever in ~/Library/Preferences.
   #
@@ -288,9 +294,7 @@ let
     "installBunPackages"
     "installPackages"
     "installPwshScriptAnalyzer"
-    "linearmouseSymlinks"
     "linkGeneration"
-    "opencodeSymlinks"
     "onFilesChange"
     "preflightPrivacyPermissions"
     "refreshFinderServices"
@@ -301,7 +305,6 @@ let
     # Keep exact activation name casing aligned with agents.nix
     # (`syncClawHubSkills`) so manual instructions remain the terminal node.
     "syncClawHubSkills"
-    "syncDownloadsToICloud"
     "verifyArchivingStack"
     "verifySecretDecryption"
     "vscodeExtensionBridge"
@@ -322,11 +325,22 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
   home.packages = [ managedPreferencesPurgeScript ];
 
-  # Place the pinned iTerm2 zsh shell integration script at the well-known
-  # path that the sourcing guard in programs.zsh.initContent expects.
-  # home.file replaces the symlink atomically on each home-manager switch so
-  # the script version tracks the pinned hash in iterm2ZshIntegration above.
-  home.file.".iterm2_shell_integration.zsh".source = iterm2ZshIntegration;
+  home.file = {
+    # Place the pinned iTerm2 zsh shell integration script at the well-known
+    # path that the sourcing guard in programs.zsh.initContent expects.
+    # home.file replaces the symlink atomically on each home-manager switch so
+    # the script version tracks the pinned hash in iterm2ZshIntegration above.
+    ".iterm2_shell_integration.zsh".source = iterm2ZshIntegration;
+
+    # Keep both LinearMouse runtime config paths pointed at the canonical
+    # repo-backed JSON so app writes appear immediately as working-tree diffs.
+    ".config/linearmouse/linearmouse.json".source = config.lib.file.mkOutOfStoreSymlink liveLinearmouseConfig;
+    "Library/Application Support/linearmouse/linearmouse.json".source = config.lib.file.mkOutOfStoreSymlink liveLinearmouseConfig;
+
+    # Keep iCloud Downloads reachable from a short stable path without
+    # replacing ~/Downloads itself.
+    "Downloads/iCloud".source = config.lib.file.mkOutOfStoreSymlink liveICloudDownloads;
+  };
 
   # Source iTerm2 shell integration when the script is present.  The test-e
   # guard makes this a no-op in non-iTerm2 terminals (VS Code terminal, SSH,
@@ -337,62 +351,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   '';
 
   home.activation = {
-    # -------------------------------------------------------------------------
-    # linearmouseSymlinks
-    # VS Code-style bidirectional sync for LinearMouse config:
-    # symlink both runtime config paths directly to the repo file so edits made
-    # by the app are reflected immediately as git changes.
-    #
-    # Managed runtime paths:
-    #   1) ~/.config/linearmouse/linearmouse.json
-    #   2) ~/Library/Application Support/linearmouse/linearmouse.json
-    #
-    # Migration safety mirrors vscodeSymlinks behavior:
-    #   - Correct symlink      -> no-op
-    #   - Wrong symlink        -> replace
-    #   - Real file            -> copy to repo only if repo target is empty,
-    #                             then replace with symlink
-    # -------------------------------------------------------------------------
-    linearmouseSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      set -eu
-
-      _lms_repo_root_file="$HOME/.config/nucleus/repo-root"
-      if [ -n "''${NUCLEUS_REPO:-}" ]; then
-        _lms_repo_root="$NUCLEUS_REPO"
-      elif [ -f "$_lms_repo_root_file" ]; then
-        _lms_repo_root="$(cat "$_lms_repo_root_file")"
-      else
-        echo "linearmouse: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
-        exit 1
-      fi
-
-      _lms_repo_file="$_lms_repo_root/src/modules/configs/linearmouse/linearmouse.json"
-      if [ ! -f "$_lms_repo_file" ]; then
-        echo "linearmouse: repo config file not found: $_lms_repo_file" >&2
-        exit 1
-      fi
-
-      ensure_linearmouse_symlink() {
-        _lms_target="$1"
-
-        if [ -L "$_lms_target" ]; then
-          [ "$(readlink "$_lms_target")" = "$_lms_repo_file" ] && return 0
-          rm "$_lms_target"
-        elif [ -f "$_lms_target" ]; then
-          if [ ! -s "$_lms_repo_file" ]; then
-            cp "$_lms_target" "$_lms_repo_file"
-          fi
-          rm "$_lms_target"
-        fi
-
-        mkdir -p "$(dirname "$_lms_target")"
-        ln -s "$_lms_repo_file" "$_lms_target"
-      }
-
-      ensure_linearmouse_symlink "$HOME/.config/linearmouse/linearmouse.json"
-      ensure_linearmouse_symlink "$HOME/Library/Application Support/linearmouse/linearmouse.json"
-    '';
-
     # -------------------------------------------------------------------------
     # clearDesktop
     # Restarts the three system UI processes that cache defaults values so that
@@ -902,55 +860,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # syncDownloadsToICloud
-    # Creates a symlink ~/Downloads/iCloud that points to
-    # ~/Library/Mobile Documents/com~apple~CloudDocs/Downloads for convenient
-    # access to iCloud-backed files without replacing ~/Downloads itself.
-    #
-    # Algorithm (idempotent, non-destructive):
-    #   1. Ensure both ~/Downloads and iCloud Downloads directory exist.
-    #   2. If ~/Downloads/iCloud already exists as a file or directory,
-    #      rename it to iCloud-old (or iCloud-<n> if iCloud-old exists).
-    #   3. If ~/Downloads/iCloud is a symlink to the correct target, exit.
-    #   4. Create symlink ~/Downloads/iCloud → iCloud Downloads.
-    #
-    # WHY: Non-destructive approach lets users keep local downloads in ~/Downloads
-    # while having convenient access to iCloud-backed Downloads via symlink.
-    # -------------------------------------------------------------------------
-    syncDownloadsToICloud = lib.hm.dag.entryAfter [ "reloadUserPreferenceState" ] ''
-      set -eu
-
-      _local_downloads="$HOME/Downloads"
-      _icloud_root="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
-      _icloud_downloads="$_icloud_root/Downloads"
-      _icloud_symlink="$_local_downloads/iCloud"
-
-      mkdir -p "$_local_downloads" "$_icloud_downloads"
-
-      # If symlink already exists and points to the correct target, do nothing.
-      # IMPORTANT: never `exit` here — that would terminate the whole Home
-      # Manager activation script and skip subsequent activation hooks.
-      if [ ! -L "$_icloud_symlink" ] || [ "$(readlink "$_icloud_symlink")" != "$_icloud_downloads" ]; then
-        # If something already exists at the symlink path, rename it to avoid clobbering.
-        if [ -e "$_icloud_symlink" ] || [ -L "$_icloud_symlink" ]; then
-          _suffix=0
-          _backup_path="$_local_downloads/iCloud-old"
-          while [ -e "$_backup_path" ] || [ -L "$_backup_path" ]; do
-            _suffix=$((_suffix + 1))
-            _backup_path="$_local_downloads/iCloud-$_suffix"
-          done
-
-          if ! mv "$_icloud_symlink" "$_backup_path"; then
-            echo "macos: failed to backup existing $_icloud_symlink to $_backup_path." >&2
-            exit 1
-          fi
-        fi
-
-        ln -s "$_icloud_downloads" "$_icloud_symlink"
-      fi
-    '';
-
-    # -------------------------------------------------------------------------
     # ensureICloudFilesLocal
     # Forces all iCloud-synced files to be downloaded and cached locally so they
     # remain available offline. Includes the main iCloud Drive (com~apple~CloudDocs)
@@ -967,7 +876,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #
     # No-op if iCloud is not configured / the path does not exist.
     # -------------------------------------------------------------------------
-    ensureICloudFilesLocal = lib.hm.dag.entryAfter [ "syncDownloadsToICloud" ] ''
+    ensureICloudFilesLocal = lib.hm.dag.entryAfter [ "reloadUserPreferenceState" ] ''
       set +e  # soft-fail: iCloud may not be configured on all machines
 
       ICLOUD_BASE="$HOME/Library/Mobile Documents"
