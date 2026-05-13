@@ -5,7 +5,7 @@
 # remote-desktop use cases).  The Home Manager module modules/ai/default.nix
 # provides the ollama CLI binary and OLLAMA_HOST session variable on all
 # POSIX hosts including this one.
-{ ... }:
+{ pkgs, ... }:
 {
   services.ollama = {
     enable = true;
@@ -18,8 +18,8 @@
     port = 11434;
     # Enable GPU inference explicitly for this host class.  The repository's
     # planning assumption for nixos/windows is a 6 GB discrete GPU tier, and
-    # Ollama should use CUDA acceleration on compatible NVIDIA setups.
-    acceleration = "cuda";
+    # Ollama should use a CUDA-capable package on compatible NVIDIA setups.
+    package = pkgs.ollama-cuda;
 
     # Compress the KV cache with 4-bit quantisation to halve KV-cache RAM
     # footprint, enable flash attention to reduce attention memory overhead,
