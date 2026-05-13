@@ -302,6 +302,22 @@ let
     else
       { };
 
+  # Utility: resolve app-scoped per-user settings overrides consistently.
+  # This keeps the common `defaults // user.settings` pattern centralized.
+  userAppSettings =
+    appName:
+    if
+      builtins.hasAttr appName effectiveUser
+      && builtins.isAttrs effectiveUser.${appName}
+      && builtins.hasAttr "settings" effectiveUser.${appName}
+      && builtins.isAttrs effectiveUser.${appName}.settings
+    then
+      effectiveUser.${appName}.settings
+    else
+      { };
+
+  managedAppSettings = appName: defaults: defaults // (userAppSettings appName);
+
   # Neovim startup config is native init.lua (not a generated JSON/YAML format).
   # This default enables a targeted workaround for the upstream nvim/xterm.js
   # shifted-number regression in VS Code-family terminals.
@@ -313,13 +329,7 @@ let
     ];
   };
 
-  neovimUserSettings =
-    if effectiveUser ? neovim && effectiveUser.neovim ? settings then
-      effectiveUser.neovim.settings
-    else
-      { };
-
-  neovimManagedSettings = neovimDefaultSettings // neovimUserSettings;
+  neovimManagedSettings = managedAppSettings "neovim" neovimDefaultSettings;
 
   # Keep this map small and explicit; it targets US layout symbols produced by
   # shifted digits and only activates inside selected terminal hosts.

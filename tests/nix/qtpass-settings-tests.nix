@@ -56,5 +56,5 @@ assert containsRegex "vscode =" flakeText;
 assert containsRegex "neovim =" flakeText;
 # Verify Neovim workaround remains in native init.lua management and override path
 assert containsRegex "xdg\.configFile\.\"nvim/init\.lua\"\.text" editorsText;
-assert containsRegex "effectiveUser\.neovim\.settings" editorsText;
+assert containsRegex "managedAppSettings \"neovim\" neovimDefaultSettings" editorsText;
 true
