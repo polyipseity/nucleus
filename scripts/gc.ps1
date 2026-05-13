@@ -172,7 +172,7 @@ if (-not $SkipOllamaPrune) {
   if ($null -eq $ollamaCmd) {
     Write-Output "gc: ollama not installed; skipping ollama model prune"
   } else {
-    Invoke-AISync -PruneOnly -RepoRoot $resolvedRepoRoot
+    Invoke-AISync -PruneOnly -RepoRoot $resolvedRepoRoot -ServerReadyTimeoutSeconds 0
   }
 }
 

@@ -17,6 +17,10 @@
 #   OLLAMA_PROFILE  override profile selection (macbook|nixos|windows); detected
 #                   automatically when unset (Darwin → macbook, Linux → nixos)
 #   OLLAMA_HOST     Ollama server address; defaults to 127.0.0.1:11434
+#   OLLAMA_READY_TIMEOUT_SECONDS  bounded wait for server readiness before a
+#                   benign skip (default: 60; set to 0 to disable waiting)
+#   OLLAMA_READY_POLL_SECONDS     poll interval while waiting for readiness
+#                   (default: 2)
 #
 # Exit conditions:
 #   0 on success or when ollama is unavailable (benign skip).
@@ -28,16 +32,36 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 MANIFEST="$REPO_ROOT/src/modules/ai/models.json"
 
-dry_run=
-prune_only=
+dry_run=false
+prune_only=false
+ready_timeout_seconds="${OLLAMA_READY_TIMEOUT_SECONDS:-60}"
+ready_poll_seconds="${OLLAMA_READY_POLL_SECONDS:-2}"
+
+case "$ready_timeout_seconds" in
+  ''|*[!0-9]*)
+    printf '%s\n' "AI-sync: OLLAMA_READY_TIMEOUT_SECONDS must be a non-negative integer" >&2
+    exit 1
+    ;;
+esac
+
+case "$ready_poll_seconds" in
+  ''|*[!0-9]*)
+    printf '%s\n' "AI-sync: OLLAMA_READY_POLL_SECONDS must be a positive integer" >&2
+    exit 1
+    ;;
+  0)
+    printf '%s\n' "AI-sync: OLLAMA_READY_POLL_SECONDS must be greater than zero" >&2
+    exit 1
+    ;;
+esac
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dry-run)
-      dry_run=1
+      dry_run=true
       ;;
     --prune-only)
-      prune_only=1
+      prune_only=true
       ;;
     *)
       printf '%s\n' "AI-sync: unsupported argument '$1'" >&2
@@ -58,6 +82,31 @@ else
   esac
 fi
 
+# Wait briefly for the Ollama daemon to become responsive after a fresh apply.
+# The service process may be installed/registered before the HTTP API is ready,
+# so an immediate `ollama list` can race the daemon startup on all POSIX hosts.
+wait_for_ollama_server() {
+  if ollama list >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if [ "$ready_timeout_seconds" -eq 0 ]; then
+    return 1
+  fi
+
+  printf '%s\n' "AI-sync: waiting up to ${ready_timeout_seconds}s for ollama server readiness..."
+  _waited=0
+  while [ "$_waited" -lt "$ready_timeout_seconds" ]; do
+    sleep "$ready_poll_seconds"
+    _waited=$((_waited + ready_poll_seconds))
+    if ollama list >/dev/null 2>&1; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 # Fail fast if jq is unavailable: the manifest is JSON and the rest of the
 # script depends on jq for reliable parsing.
 if ! command -v jq >/dev/null 2>&1; then
@@ -76,9 +125,10 @@ if ! command -v ollama >/dev/null 2>&1; then
   exit 0
 fi
 # Test probe: `ollama list` exits non-zero when the server is unreachable.
-# The failure is benign (server not yet running); exit 0 with a message.
-if ! ollama list >/dev/null 2>&1; then
-  printf '%s\n' "AI-sync: ollama server unavailable; skipping sync"
+# Wait for a bounded period after apply so first-run daemon startup races do
+# not silently skip model pulls on otherwise healthy hosts.
+if ! wait_for_ollama_server; then
+  printf '%s\n' "AI-sync: ollama server unavailable after waiting ${ready_timeout_seconds}s; skipping sync"
   exit 0
 fi
 
@@ -126,4 +176,12 @@ printf '%s\n' "$installed_models" | while IFS= read -r model; do
   fi
 done
 
-printf '%s\n' "AI-sync: sync completed (profile=$profile${dry_run:+, not actually running due to --dry-run}${prune_only:+, prune-only mode (no pulls)})"
+_summary_flags=""
+if [ "$dry_run" = true ]; then
+  _summary_flags=", not actually running due to --dry-run"
+fi
+if [ "$prune_only" = true ]; then
+  _summary_flags="${_summary_flags}, prune-only mode (no pulls)"
+fi
+
+printf '%s\n' "AI-sync: sync completed (profile=$profile${_summary_flags})"

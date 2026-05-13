@@ -16,6 +16,10 @@
 .PARAMETER PruneOnly
   Skip model pulls; only remove local models absent from the manifest.
 
+.PARAMETER ServerReadyTimeoutSeconds
+  Bounded wait time for the Ollama server to become responsive before sync
+  exits with a benign skip. Use 0 to disable waiting.
+
 
 .EXAMPLE
   .\scripts\AI-sync.ps1
@@ -25,11 +29,15 @@
 
 .EXAMPLE
   .\scripts\AI-sync.ps1 -PruneOnly
+
+.EXAMPLE
+  .\scripts\AI-sync.ps1 -ServerReadyTimeoutSeconds 60
 #>
 [CmdletBinding()]
 param(
   [switch]$DryRun,
-  [switch]$PruneOnly
+  [switch]$PruneOnly,
+  [int]$ServerReadyTimeoutSeconds = 60
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,4 +51,4 @@ if (-not (Test-Path -LiteralPath $modulePath)) {
 
 . $modulePath
 
-Invoke-AISync -RepoRoot $repoRoot -DryRun:$DryRun -PruneOnly:$PruneOnly
+Invoke-AISync -RepoRoot $repoRoot -DryRun:$DryRun -PruneOnly:$PruneOnly -ServerReadyTimeoutSeconds $ServerReadyTimeoutSeconds

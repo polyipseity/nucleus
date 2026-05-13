@@ -267,11 +267,12 @@
       vscodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
       # Build the `nix run .#apply` app for a given package set.
-      # Wraps scripts/apply.sh in a shell application that has git, openssh,
-      # prek, sops, and ssh-to-age on PATH so the machine age key
+      # Wraps scripts/apply.sh in a shell application that has git, jq,
+      # openssh, prek, sops, and ssh-to-age on PATH so the machine age key
       # auto-registration step can derive the age public key and rewrap all
-      # SOPS-encrypted files, and the apply flow can install repository-local
-      # prek hooks on the first successful run.
+      # SOPS-encrypted files, the post-apply AI sync can parse models.json,
+      # and the apply flow can install repository-local prek hooks on the
+      # first successful run.
       # openssh provides ssh-keygen for the generate_ssh_host_key_if_needed step
       # that creates /etc/ssh/ssh_host_ed25519_key on first-provision machines.
 
@@ -282,6 +283,7 @@
             name = "nucleus-apply";
             runtimeInputs = [
               pkgs.git
+              pkgs.jq
               pkgs.openssh
               pkgs.prek
               pkgs.sops
@@ -372,13 +374,15 @@
       # Build garbage-collection app for POSIX hosts.
       # This combines Nix store GC and stale wallpaper cleanup in one bounded
       # operation without touching unmanaged user content outside declarative
-      # scopes.
+      # scopes. jq is included so the Ollama prune step can parse models.json
+      # even when the host shell PATH does not already contain jq.
       mkGcApp = pkgs: {
         type = "app";
         program = "${
           pkgs.writeShellApplication {
             name = "nucleus-gc";
             runtimeInputs = [
+              pkgs.jq
               pkgs.gnugrep
               pkgs.home-manager
             ];

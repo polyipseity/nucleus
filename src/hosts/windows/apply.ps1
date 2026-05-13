@@ -531,6 +531,6 @@ if ($SkipAISync) {
     Write-Output "AI-sync: ollama not found in PATH; skipping post-apply model sync"
   } else {
     Write-Output "AI-sync: running post-apply AI model sync..."
-    Invoke-AISync -RepoRoot $repoRoot
+    Invoke-AISync -RepoRoot $repoRoot -ServerReadyTimeoutSeconds 60
   }
 }

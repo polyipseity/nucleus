@@ -30,12 +30,16 @@
   manifest.  Used by scripts/gc.ps1 for space reclamation without
   downloading new models.
 
+.PARAMETER ServerReadyTimeoutSeconds
+  Bounded wait time for the Ollama server to become responsive before sync
+  exits with a benign skip. Pass 0 to disable waiting.
+
 
 .EXAMPLE
   . .\src\hosts\windows\modules\Invoke-AISync.ps1
-  Invoke-AISync
-  Invoke-AISync -PruneOnly
-  Invoke-AISync -DryRun
+  Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -ServerReadyTimeoutSeconds 60
+  Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -PruneOnly -ServerReadyTimeoutSeconds 0
+  Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -DryRun -ServerReadyTimeoutSeconds 60
 #>
 
 function Invoke-AISync {
@@ -59,20 +63,26 @@ function Invoke-AISync {
   .PARAMETER PruneOnly
     Skip pulls; remove only locally installed models absent from the manifest.
 
+  .PARAMETER ServerReadyTimeoutSeconds
+    Bounded wait time for the Ollama server to become responsive before sync
+    exits with a benign skip. Pass 0 to disable waiting.
+
   .OUTPUTS
     None.  Progress and skip messages are written to the host.
 
   .EXAMPLE
-    Invoke-AISync -RepoRoot "C:\Users\admin\nucleus"
-    Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -PruneOnly
-    Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -DryRun
+    Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -ServerReadyTimeoutSeconds 60
+    Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -PruneOnly -ServerReadyTimeoutSeconds 0
+    Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -DryRun -ServerReadyTimeoutSeconds 60
   #>
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]
     [string]$RepoRoot,
     [switch]$DryRun,
-    [switch]$PruneOnly
+    [switch]$PruneOnly,
+    [Parameter(Mandatory)]
+    [int]$ServerReadyTimeoutSeconds
   )
 
   $ErrorActionPreference = "Stop"
@@ -93,14 +103,42 @@ function Invoke-AISync {
     return
   }
 
-  # Probe the server with `ollama list`.  A non-zero exit means the server
-  # is not yet running; this is expected and benign immediately after WinGet
-  # installs the service before the first user login or service start.
-  # The failure is intentionally expected in this context; the exit code is
-  # checked (LASTEXITCODE) so unexpected failures still surface.
-  $listOutput = & $ollamaCmd.Source list 2>&1
-  if ($LASTEXITCODE -ne 0) {
-    Write-Output "AI-sync: ollama server unavailable; skipping sync"
+  if ($ServerReadyTimeoutSeconds -lt 0) {
+    throw "AI-sync: ServerReadyTimeoutSeconds must be zero or greater."
+  }
+
+  # Probe the server with `ollama list`.  A non-zero exit means the server is
+  # not yet running; after a fresh apply the service can still be starting even
+  # though the binary is already installed, so wait for a bounded period before
+  # giving up with a benign skip.
+  function Invoke-OllamaList {
+    $output = @(& $ollamaCmd.Source list 2>&1)
+    return @{
+      ExitCode = $LASTEXITCODE
+      Output   = $output
+    }
+  }
+
+  $probeResult = Invoke-OllamaList
+  $listExitCode = [int]$probeResult.ExitCode
+  $listOutput = @($probeResult.Output)
+
+  if ($listExitCode -ne 0 -and $ServerReadyTimeoutSeconds -gt 0) {
+    Write-Output "AI-sync: waiting up to ${ServerReadyTimeoutSeconds}s for ollama server readiness..."
+    $deadline = (Get-Date).AddSeconds($ServerReadyTimeoutSeconds)
+    do {
+      Start-Sleep -Seconds 2
+      $probeResult = Invoke-OllamaList
+      $listExitCode = [int]$probeResult.ExitCode
+      $listOutput = @($probeResult.Output)
+      if ($listExitCode -eq 0) {
+        break
+      }
+    } while ((Get-Date) -lt $deadline)
+  }
+
+  if ($listExitCode -ne 0) {
+    Write-Output "AI-sync: ollama server unavailable after waiting ${ServerReadyTimeoutSeconds}s; skipping sync"
     return
   }
 

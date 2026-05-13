@@ -241,7 +241,9 @@ prune_ollama_models_if_available() {
     return 0
   fi
 
-  "$REPO_ROOT/scripts/AI-sync.sh" --prune-only
+  # GC must stay space-reclaim only; do not wait for a cold Ollama daemon to
+  # start because that would stall GC on hosts where the AI service is idle.
+  OLLAMA_READY_TIMEOUT_SECONDS=0 "$REPO_ROOT/scripts/AI-sync.sh" --prune-only
 }
 
 # Step 1: expire HM generations before Nix store GC so the store can reclaim
