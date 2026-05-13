@@ -13,7 +13,7 @@
 # Windows) to suppress the sync step in CI or on low-bandwidth connections.
 #
 # Model manifest: src/modules/ai/models.json
-#   macbook: devstral:24b, magistral:24b  — re-test tool-calling curl on macbook
+#   macbook: devstral-small-2:24b, magistral:24b  — re-test tool-calling curl on macbook
 #                                             after model swap before relying on tools
 #   nixos:   qwen3:8b               — tool-calling NOT yet curl-tested on nixos;
 #                                     verify with the same curl test before relying

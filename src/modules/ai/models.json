@@ -1,7 +1,7 @@
 {
   "models": {
     "macbook": [
-      "devstral:24b",
+      "devstral-small-2:24b",
       "magistral:24b"
     ],
     "nixos": [

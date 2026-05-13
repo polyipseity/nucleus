@@ -2,10 +2,10 @@
 	{
 		"models": [
 			{
-				"id": "devstral:24b",
+				"id": "devstral-small-2:24b",
 				"maxInputTokens": 32768,
 				"maxOutputTokens": 8192,
-				"name": "Devstral 24B",
+				"name": "Devstral Small 2 24B",
 				"toolCalling": true,
 				"url": "http://localhost:11434/v1",
 				"vision": false
