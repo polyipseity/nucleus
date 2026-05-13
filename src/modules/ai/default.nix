@@ -1,7 +1,7 @@
 # modules/ai/default.nix — Local AI inference baseline for all POSIX hosts.
 #
 # Provides:
-#   • pkgs.ollama — inference server and CLI (CPU-only; no GPU driver deps)
+#   • pkgs.ollama — inference server and CLI (GPU-enabled where host runtime supports it)
 #   • pkgs.oterm  — terminal chat client for interactive LLM sessions
 #   • OLLAMA_HOST session variable that binds client tools to the loopback address
 #   • macOS: launchd user agent that keeps the Ollama server running persistently
@@ -13,11 +13,11 @@
 # Windows) to suppress the sync step in CI or on low-bandwidth connections.
 #
 # Model manifest: src/modules/ai/models.json
-#   macbook: gemma4:e4b, qwen3:14b  — tool-calling curl-tested on macbook: both PASS
+#   macbook: devstral:24b, magistral:24b  — re-test tool-calling curl on macbook
+#                                             after model swap before relying on tools
 #   nixos:   qwen3:8b               — tool-calling NOT yet curl-tested on nixos;
-#                                     same family as qwen3:14b (passes on macbook)
-#                                     but verify with the same curl test before
-#                                     relying on tool-calling on the nixos host.
+#                                     verify with the same curl test before relying
+#                                     on tool-calling on the nixos host.
 #   windows: qwen3:8b               — same as nixos; tool-calling NOT yet
 #                                     curl-tested on windows.
 {

@@ -2,19 +2,19 @@
 	{
 		"models": [
 			{
-				"id": "gemma4:e4b",
+				"id": "devstral:24b",
 				"maxInputTokens": 32768,
 				"maxOutputTokens": 8192,
-				"name": "Gemma 4 E4B",
+				"name": "Devstral 24B",
 				"toolCalling": true,
 				"url": "http://localhost:11434/v1",
-				"vision": true
+				"vision": false
 			},
 			{
-				"id": "qwen3:14b",
+				"id": "magistral:24b",
 				"maxInputTokens": 32768,
 				"maxOutputTokens": 8192,
-				"name": "Qwen3 14B",
+				"name": "Magistral 24B",
 				"toolCalling": true,
 				"url": "http://localhost:11434/v1",
 				"vision": false

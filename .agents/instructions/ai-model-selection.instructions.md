@@ -1,7 +1,7 @@
 ---
-description: "Use when adding, updating, or reviewing AI model selections in src/modules/ai/models.json, scripts/ai-sync.sh, src/hosts/windows/modules/Invoke-AiSync.ps1, or src/modules/ai/default.nix. Covers host-name key convention, hardware constraints per host, quantization guidance, and tool-calling verification requirements."
+description: "Use when adding, updating, or reviewing AI model selections in src/modules/ai/models.json, VS Code chatLanguageModels host files, scripts/ai-sync.sh, src/hosts/windows/modules/Invoke-AiSync.ps1, or src/modules/ai/default.nix. Covers host-name key convention, hardware constraints per host, quantization guidance, required cross-file sync steps, and tool-calling verification requirements."
 name: "AI Model Selection"
-applyTo: "src/modules/ai/**, scripts/ai-sync.sh, scripts/ai-sync.ps1, src/hosts/windows/modules/Invoke-AiSync.ps1"
+applyTo: "src/modules/ai/**, src/modules/configs/vscode/chatLanguageModels.*.json, scripts/ai-sync.sh, scripts/ai-sync.ps1, src/hosts/windows/modules/Invoke-AiSync.ps1"
 ---
 
 # AI Model Selection
@@ -30,8 +30,23 @@ this table whenever hardware changes.
 | Host      | Memory budget                                      | Notes                                                                               |
 | --------- | -------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `macbook` | ≤ 16 GB GPU (slight excess ~17–18 GB is OK)        | 24 GB unified RAM; Apple Silicon Metal; flash attention + q4_0 KV cache enabled     |
-| `nixos`   | ≤ 6 GB discrete VRAM (model file ≤ ~5 GB target)  | GPU acceleration currently disabled (CPU-only); budget applies if GPU is ever enabled; `MemoryMax = "16G"` systemd cap regardless |
+| `nixos`   | ≤ 6 GB discrete VRAM (model file ≤ ~5 GB target)  | GPU acceleration enabled via `services.ollama.acceleration = "cuda"`; `MemoryMax = "16G"` systemd cap remains in effect |
 | `windows` | ≤ 6 GB discrete VRAM (same assumption as `nixos`)  | Same hardware class as nixos PC; update if specs differ                             |
+
+## Required cross-file sync (do not forget)
+
+When changing model selections, update all of the following in the **same
+change** so editor/runtime behavior stays aligned:
+
+1. `src/modules/ai/models.json` host model lists.
+2. `src/modules/configs/vscode/chatLanguageModels.mac.json`
+3. `src/modules/configs/vscode/chatLanguageModels.nixos.json`
+4. `src/modules/configs/vscode/chatLanguageModels.windows.json`
+5. Manifest comment block in `src/modules/ai/default.nix`.
+
+Rule: each host's `chatLanguageModels.<host>.json` IDs must be a subset of
+that host key in `models.json` (or exactly match).  Never leave stale editor
+entries for models no longer present in the host manifest.
 
 ## Quantization guidance
 

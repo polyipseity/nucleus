@@ -16,10 +16,10 @@
     #
     host = "127.0.0.1";
     port = 11434;
-    # GPU acceleration intentionally unset to use the safe CPU-only default.
-    # Enable NVIDIA or AMD acceleration by setting:
-    #   acceleration = "cuda";  # NVIDIA
-    #   acceleration = "rocm";  # AMD (also requires compatible hardware modules)
+    # Enable GPU inference explicitly for this host class.  The repository's
+    # planning assumption for nixos/windows is a 6 GB discrete GPU tier, and
+    # Ollama should use CUDA acceleration on compatible NVIDIA setups.
+    acceleration = "cuda";
 
     # Compress the KV cache with 4-bit quantisation to halve KV-cache RAM
     # footprint, enable flash attention to reduce attention memory overhead,

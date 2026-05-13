@@ -1,8 +1,8 @@
 {
   "models": {
     "macbook": [
-      "gemma4:e4b",
-      "qwen3:14b"
+      "devstral:24b",
+      "magistral:24b"
     ],
     "nixos": [
       "qwen3:8b"
