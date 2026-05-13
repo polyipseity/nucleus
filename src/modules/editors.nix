@@ -320,12 +320,14 @@ let
 
   # Neovim startup config is native init.lua (not a generated JSON/YAML format).
   # This default enables a targeted workaround for the upstream nvim/xterm.js
-  # shifted-number regression in VS Code-family terminals.
+  # shifted-number regression in VS Code-family terminals and kitty-protocol
+  # terminals where shifted digits can arrive as <S-1>…<S-0> keycodes.
   neovimDefaultSettings = {
     enableShiftNumberSymbolsWorkaround = true;
     shiftNumberTerminalPrograms = [
-      "vscode"
       "cursor"
+      "kitty"
+      "vscode"
     ];
   };
 
@@ -334,16 +336,16 @@ let
   # Keep this map small and explicit; it targets US layout symbols produced by
   # shifted digits and only activates inside selected terminal hosts.
   shiftNumberMap = {
-    "!" = "1";
-    "@" = "2";
-    "#" = "3";
-    "$" = "4";
-    "%" = "5";
-    "^" = "6";
-    "&" = "7";
-    "*" = "8";
-    "(" = "9";
-    ")" = "0";
+    "1" = "!";
+    "2" = "@";
+    "3" = "#";
+    "4" = "$";
+    "5" = "%";
+    "6" = "^";
+    "7" = "&";
+    "8" = "*";
+    "9" = "(";
+    "0" = ")";
   };
 
   shiftNumberLuaTable = builtins.concatStringsSep "\n" (
@@ -366,7 +368,11 @@ let
 
         if managed.enable_shift_number_symbols_workaround then
           local terminal_program = (vim.env.TERM_PROGRAM or ""):lower()
-          local should_apply = false
+          local term_value = (vim.env.TERM or ""):lower()
+          local kitty_window_id = vim.env.KITTY_WINDOW_ID or ""
+          local has_kitty_protocol =
+            kitty_window_id ~= "" or term_value:find("kitty", 1, true) ~= nil
+          local should_apply = has_kitty_protocol
 
           for _, candidate in ipairs(managed.shift_number_terminal_programs or {}) do
             if terminal_program == tostring(candidate):lower() then
@@ -380,14 +386,15 @@ let
     ${shiftNumberLuaTable}
             }
 
-            for lhs, rhs in pairs(shifted_digits) do
-              vim.keymap.set({ "i", "n", "x" }, lhs, rhs, {
-                desc = "workaround: xterm shifted-number regression",
+            for digit, symbol in pairs(shifted_digits) do
+              local shifted_key = "<S-" .. digit .. ">"
+              vim.keymap.set({ "i", "n", "x" }, shifted_key, symbol, {
+                desc = "workaround: shifted-number terminal protocol regression",
                 noremap = true,
                 silent = true,
               })
-              vim.keymap.set("c", lhs, function()
-                return rhs
+              vim.keymap.set("c", shifted_key, function()
+                return symbol
               end, {
                 expr = true,
                 noremap = true,

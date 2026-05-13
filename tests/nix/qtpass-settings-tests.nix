@@ -59,4 +59,9 @@ assert containsRegex "\"neovim\"" usersRegistryText;
 # Verify Neovim workaround remains in native init.lua management and override path
 assert containsRegex "xdg\.configFile\.\"nvim/init\.lua\"\.text" editorsText;
 assert containsRegex "managedAppSettings \"neovim\" neovimDefaultSettings" editorsText;
+assert containsRegex "shiftNumberTerminalPrograms = " editorsText;
+assert containsRegex "\"kitty\"" editorsText;
+assert containsRegex "\"1\" = \"!\"" editorsText;
+assert containsRegex "local shifted_key = " editorsText;
+assert containsRegex "KITTY_WINDOW_ID" editorsText;
 true
