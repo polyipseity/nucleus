@@ -2,7 +2,10 @@
 
 ## Overview
 
-This document tracks test coverage across all **nucleus** platforms (macOS, NixOS, Windows) and layers (Nix, PowerShell, Shell). As of the latest commit, **100+ tests** provide comprehensive validation of configuration logic, module composition, package parity, and deployment scripts.
+This document tracks test coverage across all **nucleus** platforms (macOS,
+NixOS, Windows) and layers (Nix, PowerShell, Shell). The suite validates
+configuration logic, module composition, package parity, and deployment
+scripts.
 
 ---
 
@@ -91,7 +94,7 @@ Located in `tests/nix/`, run via `nix-instantiate --eval` in CI.
 - **Status**: All 2 tests passing
 - **Coverage**: VS Code extension provisioning cleanup across POSIX and Windows
 
-**Nix Test Totals**: **91 tests** across 9 files (was 53 tests in 5 files)
+**Nix Test Totals**: 16 focused test files under `tests/nix/`
 
 ---
 
@@ -153,7 +156,7 @@ Located in `tests/scripts/script-validation-tests.sh`, run via bash in CI.
 All tests are automatically run on every commit:
 
 1. **Nix Parse** (`nix flake check`): Verify all `.nix` files parse
-2. **Nix Unit Tests** (5 files): Run all 53 Nix tests via `nix-instantiate --eval`
+2. **Nix Unit Tests**: Run `tests/nix/*.nix` via `nix-instantiate --eval`
 3. **Shell Script Validation**: Run 8 test categories on deployment scripts
 4. **PowerShell Syntax**: Validate all `.ps1` files via PSScriptAnalyzer
 5. **Shell Linting**: Validate all `.sh` files via `shellcheck`
@@ -310,13 +313,7 @@ act push --job test  # Requires 'act' (https://github.com/nektos/act)
 
 ---
 
-**Last Updated**: [Commit d394493]
-**Total Test Count**: 140+ (Nix: 89, Windows: 30+, Shell: 8)
-**Gap Coverage**: 4/5 known gaps now addressed via unit tests
-  - ✅ Backend selection logic (6 new tests in core-tests.nix)
-  - ✅ Configuration conflict detection (11 new tests in option-conflict-tests.nix)
-  - ✅ Dependency ordering validation (12 new tests in activation-deps-tests.nix)
-  - ✅ Secret configuration structure (15 new tests in sops-mock-tests.nix)
-  - ⚠️ Live activation hooks (architectural: requires system state)
-**CI Status**: All 8 Nix test files running on every commit
-**Atomic Commits**: 5 commits for gap-addressing tests (202c7f5, 829dde0, 8bc0bab, 36d46d7, d394493)
+**Last Updated**: Continuous (update this file whenever suite structure changes)
+**Nix Suite Status**: 16 `tests/nix/*.nix` files tracked in-repo
+**Windows Suite Status**: hierarchical Pester suites under `tests/windows/**`
+**Shell Suite Status**: script validation checks in `tests/scripts/`

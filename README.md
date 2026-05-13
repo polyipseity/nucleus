@@ -225,4 +225,5 @@ recipient.
   `src/hosts/<name>/`.
 - `scripts/bootstrap-versions.env` pins all bootstrap tool versions. Update it
   when bumping bootstrap dependencies.
-- `tests/` is a placeholder; test infrastructure has not been added yet.
+- `tests/` is active and split by runtime (`tests/nix/`, `tests/windows/`,
+  and `tests/scripts/`). See `tests/COVERAGE.md` for the current suite map.

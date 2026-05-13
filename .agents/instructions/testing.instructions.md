@@ -57,6 +57,7 @@ nix-instantiate --eval tests/nix/*.nix  # Nix unit tests
 ### Layer 1: Static Evaluation (Flake Check)
 
 `nix flake check` evaluates all host configurations without building them, catching:
+
 - Syntax errors in `.nix` files
 - Unresolved module imports
 - Missing or mistyped options
@@ -82,23 +83,25 @@ nix-instantiate --eval tests/nix/*.nix  # Nix unit tests
 **Example:**
 
 ```nix
-# tests/nix/package-logic.nix
-{ lib ? import <nixpkgs/lib> }:
+# tests/nix/package-parity-tests.nix (excerpt)
+{
+  lib ? import <nixpkgs/lib>,
+}:
 let
   assert' = cond: msg: if !cond then builtins.throw msg else null;
 
-  # Test: package backend selection
-  test_backend_selection = assert'
-    (lib.attrNames { cli = true; gui = true; } == [ "cli" "gui" ] || true)
-    "Backend categorization failed";
+  # Test: cross-platform package ID parity.
+  test_ripgrep_parity = assert' (
+    builtins.elem "ripgrep" [ "git" "ripgrep" "zsh" ]
+  ) "ripgrep parity mapping missing";
 in
 {
   success = true;
-  message = "All package logic tests passed";
+  message = "Package parity checks passed";
 }
 ```
 
-**Run:** `nix-instantiate --eval tests/nix/package-logic.nix`
+**Run:** `nix-instantiate --eval tests/nix/package-parity-tests.nix`
 
 ### Layer 3: Module Import Validation
 
@@ -190,10 +193,12 @@ winget configure --what-if .\src\hosts\windows\user.dsc.yml
 ### Naming Conventions
 
 **Nix tests:**
+
 - `tests/nix/<module>-tests.nix` — logic tests for a specific module
 - Example: `tests/nix/core-tests.nix` for core.nix logic
 
 **Pester tests:**
+
 - `tests/windows/<area>/<feature>.Tests.ps1` — tests for a feature or DSC resource group
 - Example: `tests/windows/system/system-policy.Tests.ps1` for machine-scoped DSC invariants
 
@@ -201,13 +206,13 @@ winget configure --what-if .\src\hosts\windows\user.dsc.yml
 
 **Scenario:** You're adding a new CLI tool `ripgrep` to the overlappingPackages table in core.nix.
 
-**Step 1: Write the Pester test** (on Windows)
+**Step 1: Add the Pester assertion** (on Windows)
 
 ```powershell
-# tests/windows/cli-tools.Tests.ps1
-Describe "CLI Tools" {
-    It "Should have ripgrep installed" {
-        $pkg = winget list --exact -q "BurntSushi.ripgrep.MSVC"
+# tests/windows/packages/package-installation.Tests.ps1 (excerpt)
+Describe "Windows Package Installation" {
+  It "Should have ripgrep installed" {
+    $pkg = winget list --exact -q "BurntSushi.ripgrep"
         $pkg | Should -Not -BeNullOrEmpty
     }
 }
@@ -216,7 +221,7 @@ Describe "CLI Tools" {
 **Step 2: Run the test and watch it fail**
 
 ```powershell
-Invoke-Pester tests/windows/cli-tools.Tests.ps1
+Invoke-Pester tests/windows/packages/package-installation.Tests.ps1
 # Test fails: ripgrep not found
 ```
 
@@ -234,14 +239,14 @@ Invoke-Pester tests/windows/cli-tools.Tests.ps1
 **Step 4: Run the test again (should pass after `apply.ps1`)**
 
 ```powershell
-Invoke-Pester tests/windows/cli-tools.Tests.ps1
+Invoke-Pester tests/windows/packages/package-installation.Tests.ps1
 # Test passes: ripgrep found
 ```
 
 **Step 5: Commit atomically**
 
 ```bash
-git add tests/windows/cli-tools.Tests.ps1 src/hosts/windows/system.dsc.yml
+git add tests/windows/packages/package-installation.Tests.ps1 src/hosts/windows/system.dsc.yml
 git commit -S -m "feat(windows): add ripgrep for fast text search
 
 - Add ripgrep to system.dsc.yml for cross-host CLI parity
@@ -256,6 +261,7 @@ git commit -S -m "feat(windows): add ripgrep for fast text search
 ### GitHub Actions Workflow
 
 Tests run automatically on:
+
 - Every push to any branch
 - Every pull request
 - Manual workflow dispatch
@@ -293,6 +299,7 @@ Tests run automatically on:
 **Cause:** Test ran before `apply.ps1` finished, or package wasn't installed correctly.
 
 **Fix:**
+
 1. Verify DSC syntax: `winget configure --what-if .\src\hosts\windows\*.dsc.yml`
 2. Run apply manually: `.\src\scripts\bootstrap.ps1`
 3. Wait for package manager to finish installing
@@ -309,6 +316,7 @@ Tests run automatically on:
 **Cause:** A module evaluation is infinite-looping or fetching large derivations.
 
 **Fix:**
+
 1. Interrupt the check: `Ctrl+C`
 2. Check recent `.nix` changes for recursive imports or infinite loops
 3. Use `nix-instantiate --parse` to do a syntax-only check (no evaluation)
