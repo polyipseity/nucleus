@@ -15,7 +15,7 @@ let
   ciWorkflowText = builtins.readFile ../../.github/workflows/ci.yml;
   posixPwshText = builtins.readFile ../../src/modules/pwsh.nix;
   posixShellText = builtins.readFile ../../src/modules/shell.nix;
-  windowsShellProfileText = builtins.readFile ../../src/hosts/windows/modules/Sync-ShellProfile.ps1;
+  windowsShellProfileText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-ShellProfile.ps1;
 
   # Simple assertion helper with descriptive errors.
   assert' = cond: msg: if !cond then throw msg else null;

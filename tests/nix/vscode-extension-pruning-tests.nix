@@ -13,7 +13,7 @@ let
   assert' = cond: msg: if !cond then builtins.throw "ASSERTION FAILED: ${msg}" else null;
 
   posixEditors = builtins.readFile ../../src/modules/editors.nix;
-  windowsExtensions = builtins.readFile ../../src/hosts/windows/modules/Sync-VSCodeExtension.ps1;
+  windowsExtensions = builtins.readFile ../../src/hosts/windows/modules/editors/Sync-VSCodeExtension.ps1;
 
   test_posix_prunes_all_unmanaged_entries = assert' (
     lib.hasInfix ''rm -rf "$_sed_existing"'' posixEditors

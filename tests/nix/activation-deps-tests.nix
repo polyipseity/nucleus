@@ -20,7 +20,7 @@ let
   agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
   macbookActivationText = builtins.readFile ../../src/hosts/macbook/activation.nix;
-  windowsGitSshModuleText = builtins.readFile ../../src/hosts/windows/modules/Sync-GitAndSshConfig.ps1;
+  windowsGitSshModuleText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-GitAndSshConfig.ps1;
   sharedGitModuleText = builtins.readFile ../../src/modules/git.nix;
 
   # Assertion helper.

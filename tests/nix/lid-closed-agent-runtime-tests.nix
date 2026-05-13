@@ -15,7 +15,7 @@ let
   macbookActivationText = builtins.readFile ../../src/hosts/macbook/activation.nix;
   nixosDesktopText = builtins.readFile ../../src/hosts/nixos/desktop.nix;
   windowsApplyText = builtins.readFile ../../src/hosts/windows/apply.ps1;
-  windowsPowerPolicyText = builtins.readFile ../../src/hosts/windows/modules/Sync-PowerPolicy.ps1;
+  windowsPowerPolicyText = builtins.readFile ../../src/hosts/windows/modules/system/Sync-PowerPolicy.ps1;
 
   assert' = cond: msg: if !cond then throw msg else null;
 
