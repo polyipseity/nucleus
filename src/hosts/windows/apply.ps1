@@ -256,10 +256,10 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-QtPassConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ShellProfile.ps1")
 # editors/: VS Code configuration and workspace management.
-. (Join-Path -Path $editorsModuleDir -ChildPath "Set-VscodeWorkspaceTrust.ps1")
+. (Join-Path -Path $editorsModuleDir -ChildPath "Set-VSCodeWorkspaceTrust.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeExtension.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeSetting.ps1")
-. (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VscodeConfig.ps1")
+. (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeConfig.ps1")
 # wallpapers/: wallpaper materialization and stale-file cleanup.
 . (Join-Path -Path $wallpapersModuleDir -ChildPath "Remove-StaleWallpaper.ps1")
 . (Join-Path -Path $wallpapersModuleDir -ChildPath "Sync-Wallpaper.ps1")
@@ -495,10 +495,10 @@ if ($userDevRepos -and $userDevRepos.repositories) {
 Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
 Sync-AgentsSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
 Sync-AgentsClawHubSkill -RepoRoot $repoRoot -Enabled:$EnableAgentsClawHubSkillsParity
-Sync-VscodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $Users[0]
+Sync-VSCodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $Users[0]
 Sync-VSCodeExtension -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
-Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
+Set-VSCodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords
 Sync-QtPassConfig -Enabled:$EnableQtPassParity -SettingsPath $qtPassSettingsPath -Users $selectedUserRecords

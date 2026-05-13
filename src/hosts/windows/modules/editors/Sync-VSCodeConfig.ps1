@@ -1,4 +1,4 @@
-# hosts/windows/modules/Sync-VscodeConfig.ps1 — VS Code git-backed config symlinks.
+# hosts/windows/modules/Sync-VSCodeConfig.ps1 — VS Code git-backed config symlinks.
 #
 # Replaces VS Code's per-channel config files and directories with symlinks
 # into the live repo tree (src/modules/configs/vscode/) so every VS Code write
@@ -10,7 +10,7 @@
 # symlink approach gives the repo complete, transparent ownership of all VS
 # Code config while still allowing VS Code to write through the link freely.
 
-function Sync-VscodeConfig {
+function Sync-VSCodeConfig {
   <#
   .SYNOPSIS
     Symlinks VS Code config files and directories to the live repo tree.
@@ -69,10 +69,10 @@ function Sync-VscodeConfig {
     None.  Writes informational messages to the host output stream.
 
   .EXAMPLE
-    Sync-VscodeConfig -RepoRoot "C:\Users\admin\nucleus" -Enabled:$true -Username 'admin'
+    Sync-VSCodeConfig -RepoRoot "C:\Users\admin\nucleus" -Enabled:$true -Username 'admin'
 
   .EXAMPLE
-    Sync-VscodeConfig -RepoRoot "C:\Users\admin\nucleus" -Enabled:$false -Username 'guest'
+    Sync-VSCodeConfig -RepoRoot "C:\Users\admin\nucleus" -Enabled:$false -Username 'guest'
   #>
   param(
     [Parameter(Mandatory)]
@@ -96,7 +96,7 @@ function Sync-VscodeConfig {
     $devModeProp = Get-ItemProperty -Path $devModeKey -Name "AllowDevelopmentWithoutDevLicense" -ErrorAction SilentlyContinue
     $devModeEnabled = $null -ne $devModeProp -and $devModeProp.AllowDevelopmentWithoutDevLicense -eq 1
     if (-not $isAdmin -and -not $devModeEnabled) {
-      throw "Sync-VscodeConfig requires Developer Mode or an elevated session to create symlinks.  Enable Developer Mode in Settings -> System -> For Developers."
+      throw "Sync-VSCodeConfig requires Developer Mode or an elevated session to create symlinks.  Enable Developer Mode in Settings -> System -> For Developers."
     }
   }
 

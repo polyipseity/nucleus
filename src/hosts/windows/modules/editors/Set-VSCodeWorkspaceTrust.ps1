@@ -1,10 +1,10 @@
-# modules/windows/Set-VscodeWorkspaceTrust.ps1 — Pre-trust %USERPROFILE%\dev in VS Code workspace trust DB.
+# modules/windows/Set-VSCodeWorkspaceTrust.ps1 — Pre-trust %USERPROFILE%\dev in VS Code workspace trust DB.
 # Writes a trust entry for %USERPROFILE%\dev to the SQLite state.vscdb for
 # both stable and insiders channels using Bun's built-in bun:sqlite module.
 # Non-fatal when the DB is absent (VS Code not yet launched once) or locked
 # (VS Code is currently running); warns to stderr so the operator is informed.
 
-function Set-VscodeWorkspaceTrust {
+function Set-VSCodeWorkspaceTrust {
 <#
 .SYNOPSIS
   Pre-trust %USERPROFILE%\dev in VS Code workspace trust for both stable and insiders channels.
@@ -31,11 +31,11 @@ function Set-VscodeWorkspaceTrust {
   simply stops updating the DB on future applies.
 
 .EXAMPLE
-  Set-VscodeWorkspaceTrust
+    Set-VSCodeWorkspaceTrust
   # Pre-trusts %USERPROFILE%\dev in both Code and Code - Insiders channels.
 
 .EXAMPLE
-  Set-VscodeWorkspaceTrust -Enabled:$false
+    Set-VSCodeWorkspaceTrust -Enabled:$false
   # No-op; skips all trust DB writes.
 #>
     [CmdletBinding(SupportsShouldProcess = $true)]
@@ -44,7 +44,7 @@ function Set-VscodeWorkspaceTrust {
     )
 
     if (-not $Enabled) {
-        Write-Output "vscode-workspace-trust: Set-VscodeWorkspaceTrust: disabled; skipping"
+        Write-Output "vscode-workspace-trust: Set-VSCodeWorkspaceTrust: disabled; skipping"
         return
     }
 
@@ -109,11 +109,11 @@ for (const dbPath of dbPaths) {
             "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)",
             [TRUST_KEY, JSON.stringify(data)]
         );
-        console.error("vscode-workspace-trust: Set-VscodeWorkspaceTrust: trusted", uriPath, "in", dbPath);
+        console.error("vscode-workspace-trust: Set-VSCodeWorkspaceTrust: trusted", uriPath, "in", dbPath);
     } catch (e) {
         // Non-fatal: DB may be locked by a running VS Code instance.
         // Writing a warning so the operator knows to re-run apply after closing VS Code.
-        console.error("vscode-workspace-trust: Set-VscodeWorkspaceTrust: warning:", dbPath, "-", e.message);
+        console.error("vscode-workspace-trust: Set-VSCodeWorkspaceTrust: warning:", dbPath, "-", e.message);
     } finally {
         if (db) db.close();
     }
@@ -130,7 +130,7 @@ for (const dbPath of dbPaths) {
 
         $bunCmd = Get-Command -Name "bun" -ErrorAction SilentlyContinue
         if ($null -eq $bunCmd) {
-            Write-Warning "vscode-workspace-trust: Set-VscodeWorkspaceTrust: bun not found in PATH; skipping workspace trust write"
+            Write-Warning "vscode-workspace-trust: Set-VSCodeWorkspaceTrust: bun not found in PATH; skipping workspace trust write"
             return
         }
 
@@ -139,7 +139,7 @@ for (const dbPath of dbPaths) {
         if ($PSCmdlet.ShouldProcess("VS Code workspace trust database", "Set")) {
             & $bunCmd.Source $tempScript $uriPath @dbPaths
             if ($LASTEXITCODE -ne 0) {
-                Write-Warning "vscode-workspace-trust: Set-VscodeWorkspaceTrust: bun script exited with code $LASTEXITCODE"
+                Write-Warning "vscode-workspace-trust: Set-VSCodeWorkspaceTrust: bun script exited with code $LASTEXITCODE"
             }
         }
     }
