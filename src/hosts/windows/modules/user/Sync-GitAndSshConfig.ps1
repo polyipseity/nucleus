@@ -197,6 +197,7 @@ function Sync-GitAndSshConfig {
         'init.defaultBranch' = 'main'
         'tag.gpgsign' = 'true'
         'url.git@github.com:.insteadOf' = 'https://github.com/'
+        'user.useConfigOnly' = 'true'
       }
 
       if ($hasCompleteIdentity) {
@@ -231,6 +232,7 @@ function Sync-GitAndSshConfig {
           'user.email' = $null
           'user.name' = $null
           'user.signingkey' = $null
+          'user.useConfigOnly' = $null
         }
 
         foreach ($settingKey in $managedGitSettings.Keys) {

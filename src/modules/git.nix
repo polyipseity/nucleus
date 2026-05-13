@@ -54,7 +54,13 @@ in
     };
     settings = {
       commit.gpgsign = true;
+      # Disable line-ending conversion on all POSIX hosts; autocrlf is set to
+      # true on Windows to normalise CRLF → LF on commit there.
+      core.autocrlf = false;
       core.excludesFile = "~/.config/git/ignore";
+      # Enable symlink support explicitly; matches the Windows baseline where
+      # Developer Mode is required for unprivileged symlink creation.
+      core.symlinks = true;
       init.defaultBranch = "main";
       # Pull in name/email/signingkey written by the gitIdentityFromSops activation
       # hook at ~/.config/git/identity.  Using an include file lets the hook write
