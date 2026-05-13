@@ -1,0 +1,63 @@
+{
+  "polyipseity": {
+    "homeDirectory": "/Users/polyipseity",
+    "isPrimary": true,
+    "passwordStore": {
+      "path": "~/dev/monorepo-private/self/passwords"
+    },
+    "qtpass": {
+      "settings": {}
+    },
+    "linearmouse": {
+      "settings": {}
+    },
+    "vsCode": {
+      "settings": {}
+    },
+    "neovim": {
+      "settings": {}
+    },
+    "obsidian": {
+      "settings": {}
+    },
+    "devRepos": {
+      "enable": true,
+      "gitHubUsername": "polyipseity",
+      "repositories": [
+        {
+          "name": "nucleus",
+          "symlinkFromRepoRoot": true,
+          "target": "dev/nucleus"
+        },
+        {
+          "name": "monorepo",
+          "url": "git@github.com:polyipseity/monorepo.git",
+          "target": "dev/monorepo"
+        },
+        {
+          "name": "monorepo-private",
+          "url": "git@github.com:polyipseity/monorepo-private.git",
+          "target": "dev/monorepo-private"
+        }
+      ],
+      "submoduleDirectories": [
+        {
+          "path": "dev/monorepo",
+          "recursive": false
+        },
+        {
+          "path": "dev/monorepo-private",
+          "recursive": false
+        },
+        {
+          "path": "dev/monorepo/self/obsidian-monorepo",
+          "recursive": false
+        },
+        {
+          "path": "dev/monorepo-private/orgs/*",
+          "recursive": false
+        }
+      ]
+    }
+  }
+}

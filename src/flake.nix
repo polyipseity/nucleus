@@ -45,94 +45,9 @@
       ...
     }:
     let
-      # User registry — defines all users managed by this configuration.
-      # Each user has homeDirectory, shell (as string path), isPrimary flag, and optional
-      # devRepos configuration.
-      # The primary user receives secret materialization.
-      # Shell paths are deferred to activation time via posix-user-shell.nix.
-      users = {
-        polyipseity = {
-          homeDirectory = "/Users/polyipseity";
-          isPrimary = true;
-          # Per-user password-store root used by pass / QtPass / gopass.
-          # `~` is expanded in modules/home.nix to the user's homeDirectory.
-          passwordStore = {
-            path = "~/dev/monorepo-private/self/passwords";
-          };
-          # Per-user QtPass overrides merge on top of the repository-wide
-          # screenshot-backed defaults defined in src/modules/home.nix.
-          qtpass = {
-            settings = { };
-          };
-          # Per-user LinearMouse overrides: leave empty to use defaults from
-          # src/modules/configs/linearmouse/linearmouse.json (macOS only).
-          # For platform-specific config merging patterns, see AGENTS.md.
-          linearmouse = {
-            settings = { };
-          };
-          # Per-user VS Code settings overrides (if needed). See
-          # src/modules/editors.nix for settings storage and merge patterns.
-          vsCode = {
-            settings = { };
-          };
-          # Per-user Neovim settings overrides. Keep this as a small attrset
-          # consumed by src/modules/editors.nix to generate managed init.lua.
-          neovim = {
-            settings = { };
-          };
-          # Per-user Obsidian overrides merge onto managed defaults from
-          # src/modules/home.nix during activation.
-          obsidian = {
-            settings = { };
-          };
-          # Dev repository provisioning for this user.
-          devRepos = {
-            enable = true;
-            gitHubUsername = "polyipseity";
-            # Repository list: each entry specifies either a symlink or git URL.
-            repositories = [
-              {
-                name = "nucleus";
-                # Resolve this symlink from the live checkout path recorded by
-                # apply.sh so ~/dev/nucleus points at the working tree rather
-                # than an immutable Nix store snapshot.
-                symlinkFromRepoRoot = true;
-                target = "dev/nucleus";
-              }
-              {
-                name = "monorepo";
-                url = "git@github.com:polyipseity/monorepo.git";
-                target = "dev/monorepo";
-              }
-              {
-                name = "monorepo-private";
-                url = "git@github.com:polyipseity/monorepo-private.git";
-                target = "dev/monorepo-private";
-              }
-            ];
-            # Submodule directory provisioning: clone direct submodules from these
-            # folders sequentially. Later directories can depend on earlier submodule clones.
-            submoduleDirectories = [
-              {
-                path = "dev/monorepo";
-                recursive = false;
-              }
-              {
-                path = "dev/monorepo-private";
-                recursive = false;
-              }
-              {
-                path = "dev/monorepo/self/obsidian-monorepo";
-                recursive = false;
-              }
-              {
-                path = "dev/monorepo-private/orgs/*";
-                recursive = false;
-              }
-            ];
-          };
-        };
-      };
+      # User registry is loaded from src/modules/users.json so the data stays
+      # separate from flake wiring, mirroring the Windows users.json pattern.
+      users = builtins.fromJSON (builtins.readFile ./modules/users.json);
 
       # Derive the primary username from the registry.
       # Filter users by isPrimary=true and extract the name (the attr key).

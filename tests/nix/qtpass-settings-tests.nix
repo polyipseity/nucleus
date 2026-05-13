@@ -9,6 +9,7 @@ let
   homeText = builtins.readFile ../../src/modules/home.nix;
   loadUserRegistryText = builtins.readFile ../../src/hosts/windows/modules/Load-UserRegistry.ps1;
   syncQtPassText = builtins.readFile ../../src/hosts/windows/modules/Sync-QtPassConfig.ps1;
+  usersRegistryText = builtins.readFile ../../src/modules/users.json;
   windowsUsers = builtins.fromJSON (builtins.readFile ../../src/hosts/windows/users.json);
 in
 # Verify QtPass settings are now stored in home.nix (not separate JSON)
@@ -42,8 +43,8 @@ assert builtins.hasAttr "qtpass" windowsUsers.users.polyipseity;
 assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.qtpass;
 assert builtins.hasAttr "linearmouse" windowsUsers.users.polyipseity;
 assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.linearmouse;
-assert builtins.hasAttr "vscode" windowsUsers.users.polyipseity;
-assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.vscode;
+assert builtins.hasAttr "vsCode" windowsUsers.users.polyipseity;
+assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.vsCode;
 assert builtins.hasAttr "neovim" windowsUsers.users.polyipseity;
 assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.neovim;
 assert containsRegex "ConvertTo-PlainObject -InputObject" loadUserRegistryText;
@@ -52,7 +53,8 @@ assert containsRegex "function Sync-QtPassConfig" syncQtPassText;
 # Verify flake.nix has all app overrides defined
 assert containsRegex "qtpass =" flakeText;
 assert containsRegex "linearmouse =" flakeText;
-assert containsRegex "vscode =" flakeText;
+assert containsRegex "readFile ./modules/users.json" flakeText;
+assert containsRegex "vsCode =" usersRegistryText;
 assert containsRegex "neovim =" flakeText;
 # Verify Neovim workaround remains in native init.lua management and override path
 assert containsRegex "xdg\.configFile\.\"nvim/init\.lua\"\.text" editorsText;
