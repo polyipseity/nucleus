@@ -61,11 +61,19 @@ in
       # Enable symlink support explicitly; matches the Windows baseline where
       # Developer Mode is required for unprivileged symlink creation.
       core.symlinks = true;
+      # Prune deleted remote-tracking branches and tags on every fetch so stale
+      # refs do not linger indefinitely across long-lived machines.
+      fetch.prune = true;
+      fetch.pruneTags = true;
       init.defaultBranch = "main";
       # Pull in name/email/signingkey written by the gitIdentityFromSops activation
       # hook at ~/.config/git/identity.  Using an include file lets the hook write
       # to a path it owns without touching the HM-managed (read-only) config symlink.
       include.path = "~/.config/git/identity";
+      # `push.followTags` is Git's built-in "push the tags that belong with the
+      # commits I just pushed" toggle; it avoids a custom alias while keeping
+      # release/signing tags in sync with ordinary branch pushes.
+      push.followTags = true;
       tag.gpgsign = true;
       # Rewrite GitHub HTTPS remotes to SSH globally for this user so clones and
       # future remotes authenticate with the managed SSH identity automatically.

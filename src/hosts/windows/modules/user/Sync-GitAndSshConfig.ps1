@@ -13,6 +13,9 @@ function Sync-GitAndSshConfig {
     user in $Users:
       - commit.gpgsign=true
       - tag.gpgsign=true
+      - fetch.prune=true
+      - fetch.pruneTags=true
+      - push.followTags=true
       - gpg.format=openpgp
       - user.name / user.email / user.signingkey (from SOPS-managed identity)
       - url.git@github.com:.insteadOf=https://github.com/
@@ -193,8 +196,11 @@ function Sync-GitAndSshConfig {
         'core.autocrlf' = 'true'
         'core.excludesFile' = $effectiveIgnorePath
         'core.symlinks' = 'true'
+        'fetch.prune' = 'true'
+        'fetch.pruneTags' = 'true'
         'gpg.format' = 'openpgp'
         'init.defaultBranch' = 'main'
+        'push.followTags' = 'true'
         'tag.gpgsign' = 'true'
         'url.git@github.com:.insteadOf' = 'https://github.com/'
         'user.useConfigOnly' = 'true'
@@ -225,8 +231,11 @@ function Sync-GitAndSshConfig {
           'core.autocrlf' = 'true'
           'core.excludesFile' = $null
           'core.symlinks' = 'true'
+          'fetch.prune' = 'true'
+          'fetch.pruneTags' = 'true'
           'gpg.format' = 'openpgp'
           'init.defaultBranch' = 'main'
+          'push.followTags' = 'true'
           'tag.gpgsign' = 'true'
           'url.git@github.com:.insteadOf' = 'https://github.com/'
           'user.email' = $null
