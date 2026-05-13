@@ -350,6 +350,8 @@ let
     lib.mapAttrsToList (lhs: rhs: "  [${builtins.toJSON lhs}] = ${builtins.toJSON rhs},") shiftNumberMap
   );
 
+  neovimTerminalProgramsLua = "{ ${builtins.concatStringsSep ", " (map builtins.toJSON neovimManagedSettings.shiftNumberTerminalPrograms)} }";
+
   neovimInitLua = ''
         -- Managed by Home Manager (nucleus): src/modules/editors.nix
         -- Neovim supports native Lua config in init.lua (or Vimscript init.vim).
@@ -359,7 +361,7 @@ let
           enable_shift_number_symbols_workaround = ${
             if neovimManagedSettings.enableShiftNumberSymbolsWorkaround then "true" else "false"
           },
-          shift_number_terminal_programs = ${builtins.toJSON neovimManagedSettings.shiftNumberTerminalPrograms},
+          shift_number_terminal_programs = ${neovimTerminalProgramsLua},
         }
 
         if managed.enable_shift_number_symbols_workaround then
