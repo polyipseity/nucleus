@@ -12,13 +12,13 @@
 # Standalone Linux (plain Linux / WSL) runs home-manager without sudo and
 # skips the keepalive entirely.
 #
-# After the main apply command succeeds, scripts/ai-sync.sh is called to
+# After the main apply command succeeds, scripts/AI-sync.sh is called to
 # converge locally installed Ollama models with the declarative manifest.
-# Pass --skip-ai-sync to suppress the model sync step — useful in CI or on
+# Pass --skip-AI-sync to suppress the model sync step — useful in CI or on
 # low-bandwidth connections where model pulls (2–20 GB each) are undesirable.
 #
 # Arguments:
-#   --skip-ai-sync  skip the post-apply Ollama model sync step
+#   --skip-AI-sync  skip the post-apply Ollama model sync step
 #   --target-user   select the Home Manager flake profile key on standalone
 #                   Linux hosts (ignored on Darwin and NixOS system rebuilds)
 #
@@ -51,7 +51,7 @@ for _arg in "$@"; do
   fi
 
   case "$_arg" in
-    --skip-ai-sync)
+    --skip-AI-sync)
       # Model pulls are 2–20 GB and may be undesirable in CI or on
       # low-bandwidth connections; this flag opts out of the post-apply sync.
       skip_ai_sync=true
@@ -201,7 +201,7 @@ start_sudo_keepalive() {
 }
 
 run_ai_sync() {
-  # Call scripts/ai-sync.sh to converge locally installed Ollama models with
+  # Call scripts/AI-sync.sh to converge locally installed Ollama models with
   # the declarative manifest after the system configuration has been applied.
   #
   # Why post-apply rather than pre-apply:
@@ -216,7 +216,7 @@ run_ai_sync() {
   #
   # Why resolve from REPO_ROOT rather than $SCRIPT_DIR:
   #   When running via `nix run .#apply`, $SCRIPT_DIR points into the Nix
-  #   store where scripts/ai-sync.sh does not exist.  REPO_ROOT is derived
+  #   store where scripts/AI-sync.sh does not exist.  REPO_ROOT is derived
   #   from `git rev-parse --show-toplevel` and always refers to the live
   #   working tree.
   #
@@ -227,24 +227,24 @@ run_ai_sync() {
   #   that could mismatch the running server's version.  PATH detection keeps
   #   the sync aligned with the actual runtime binary.
   if [ "$skip_ai_sync" = true ]; then
-    printf '%s\n' "ai-sync: --skip-ai-sync set; skipping post-apply model sync"
+    printf '%s\n' "AI-sync: --skip-AI-sync set; skipping post-apply model sync"
     return
   fi
 
-  _ras_script="$REPO_ROOT/scripts/ai-sync.sh"
+  _ras_script="$REPO_ROOT/scripts/AI-sync.sh"
   if [ ! -f "$_ras_script" ]; then
-    printf '%s\n' "ai-sync: scripts/ai-sync.sh not found at $_ras_script; skipping model sync"
+    printf '%s\n' "AI-sync: scripts/AI-sync.sh not found at $_ras_script; skipping model sync"
     return
   fi
 
   if ! command -v ollama >/dev/null 2>&1; then
-    printf '%s\n' "ai-sync: ollama not found in PATH; skipping post-apply model sync"
+    printf '%s\n' "AI-sync: ollama not found in PATH; skipping post-apply model sync"
     return
   fi
 
-  printf '%s\n' "ai-sync: running post-apply AI model sync..."
+  printf '%s\n' "AI-sync: running post-apply AI model sync..."
   if ! sh "$_ras_script"; then
-    printf '%s\n' "ai-sync: ai-sync.sh exited with an error; model sync incomplete (system apply succeeded)" >&2
+    printf '%s\n' "AI-sync: AI-sync.sh exited with an error; model sync incomplete (system apply succeeded)" >&2
   fi
 }
 

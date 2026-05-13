@@ -40,7 +40,7 @@ while [ "$#" -gt 0 ]; do
       prune_only=1
       ;;
     *)
-      printf '%s\n' "ai-sync: unsupported argument '$1'" >&2
+      printf '%s\n' "AI-sync: unsupported argument '$1'" >&2
       exit 1
       ;;
   esac
@@ -61,7 +61,7 @@ fi
 # Fail fast if jq is unavailable: the manifest is JSON and the rest of the
 # script depends on jq for reliable parsing.
 if ! command -v jq >/dev/null 2>&1; then
-  printf '%s\n' "ai-sync: jq not found; cannot parse manifest" >&2
+  printf '%s\n' "AI-sync: jq not found; cannot parse manifest" >&2
   exit 1
 fi
 
@@ -72,13 +72,13 @@ fi
 # any unexpected `ollama list` failure — such as a crashed server — still
 # surfaces as an error.
 if ! command -v ollama >/dev/null 2>&1; then
-  printf '%s\n' "ai-sync: ollama not found; skipping sync"
+  printf '%s\n' "AI-sync: ollama not found; skipping sync"
   exit 0
 fi
 # Test probe: `ollama list` exits non-zero when the server is unreachable.
 # The failure is benign (server not yet running); exit 0 with a message.
 if ! ollama list >/dev/null 2>&1; then
-  printf '%s\n' "ai-sync: ollama server unavailable; skipping sync"
+  printf '%s\n' "AI-sync: ollama server unavailable; skipping sync"
   exit 0
 fi
 
@@ -100,9 +100,9 @@ if [ "$prune_only" = false ]; then
       continue
     fi
     if [ "$dry_run" = true ]; then
-      printf '%s\n' "ai-sync: would pull $model"
+      printf '%s\n' "AI-sync: would pull $model"
     else
-      printf '%s\n' "ai-sync: pulling $model"
+      printf '%s\n' "AI-sync: pulling $model"
       ollama pull "$model"
     fi
   done
@@ -119,11 +119,11 @@ printf '%s\n' "$installed_models" | while IFS= read -r model; do
     continue
   fi
   if [ "$dry_run" = true ]; then
-    printf '%s\n' "ai-sync: would remove $model"
+    printf '%s\n' "AI-sync: would remove $model"
   else
-    printf '%s\n' "ai-sync: removing $model"
+    printf '%s\n' "AI-sync: removing $model"
     ollama rm "$model"
   fi
 done
 
-printf '%s\n' "ai-sync: sync completed (profile=$profile${dry_run:+, not actually running due to --dry-run}${prune_only:+, prune-only mode (no pulls)})"
+printf '%s\n' "AI-sync: sync completed (profile=$profile${dry_run:+, not actually running due to --dry-run}${prune_only:+, prune-only mode (no pulls)})"

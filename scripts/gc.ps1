@@ -16,7 +16,7 @@
         Guarded by a Scoop presence check so the step is a no-op when Scoop is
         not yet installed (e.g. before the first apply.ps1 run).
      4. Remove locally installed Ollama models absent from the declarative manifest
-        at src/modules/ai/models.json.  Uses Invoke-AiSync -PruneOnly so no new
+        at src/modules/ai/models.json.  Uses Invoke-AISync -PruneOnly so no new
         model pulls are triggered — GC only reclaims space.  Guarded by an ollama
         presence check so the step is a no-op when Ollama is not installed.
 
@@ -68,7 +68,7 @@ $resolvedRepoRoot  = (Resolve-Path -Path $RepoRoot).Path
 
 # Load only the modules required by this script.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "invoke-aisync.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
 
 # ---- Step 1: stale wallpaper cleanup ----------------------------------------
 # Keeps the decrypted gallery in sync with declarative source blobs.  Without
@@ -172,7 +172,7 @@ if (-not $SkipOllamaPrune) {
   if ($null -eq $ollamaCmd) {
     Write-Output "gc: ollama not installed; skipping ollama model prune"
   } else {
-    Invoke-AiSync -PruneOnly -RepoRoot $resolvedRepoRoot
+    Invoke-AISync -PruneOnly -RepoRoot $resolvedRepoRoot
   }
 }
 

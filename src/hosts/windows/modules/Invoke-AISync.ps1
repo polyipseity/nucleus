@@ -2,8 +2,9 @@
 .SYNOPSIS
   Synchronise locally installed Ollama models with the declarative manifest.
 
+
 .DESCRIPTION
-  Windows counterpart to scripts/ai-sync.sh.  Reads the model manifest at
+  Windows counterpart to scripts/AI-sync.sh.  Reads the model manifest at
   src/modules/ai/models.json, selects the `windows` profile (always used on
   Windows), and converges the locally installed Ollama model set:
 
@@ -29,14 +30,15 @@
   manifest.  Used by scripts/gc.ps1 for space reclamation without
   downloading new models.
 
+
 .EXAMPLE
-  . .\src\hosts\windows\modules\invoke-aisync.ps1
-  Invoke-AiSync
-  Invoke-AiSync -PruneOnly
-  Invoke-AiSync -DryRun
+  . .\src\hosts\windows\modules\Invoke-AISync.ps1
+  Invoke-AISync
+  Invoke-AISync -PruneOnly
+  Invoke-AISync -DryRun
 #>
 
-function Invoke-AiSync {
+function Invoke-AISync {
   <#
   .SYNOPSIS
     Converge locally installed Ollama models with the declarative manifest.
@@ -61,9 +63,9 @@ function Invoke-AiSync {
     None.  Progress and skip messages are written to the host.
 
   .EXAMPLE
-    Invoke-AiSync -RepoRoot "C:\Users\admin\nucleus"
-    Invoke-AiSync -RepoRoot "C:\Users\admin\nucleus" -PruneOnly
-    Invoke-AiSync -RepoRoot "C:\Users\admin\nucleus" -DryRun
+    Invoke-AISync -RepoRoot "C:\Users\admin\nucleus"
+    Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -PruneOnly
+    Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -DryRun
   #>
   [CmdletBinding()]
   param(
@@ -87,7 +89,7 @@ function Invoke-AiSync {
   # has been installed by WinGet (system.dsc.yml).
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
-    Write-Output "ai-sync: ollama not found; skipping sync"
+    Write-Output "AI-sync: ollama not found; skipping sync"
     return
   }
 
@@ -98,7 +100,7 @@ function Invoke-AiSync {
   # checked (LASTEXITCODE) so unexpected failures still surface.
   $listOutput = & $ollamaCmd.Source list 2>&1
   if ($LASTEXITCODE -ne 0) {
-    Write-Output "ai-sync: ollama server unavailable; skipping sync"
+    Write-Output "AI-sync: ollama server unavailable; skipping sync"
     return
   }
 
@@ -123,12 +125,12 @@ function Invoke-AiSync {
         continue
       }
       if ($DryRun) {
-        Write-Output "ai-sync: would pull $model"
+        Write-Output "AI-sync: would pull $model"
       } else {
-        Write-Output "ai-sync: pulling $model"
+        Write-Output "AI-sync: pulling $model"
         & $ollamaCmd.Source pull $model
         if ($LASTEXITCODE -ne 0) {
-          Write-Error "ai-sync: ollama pull $model failed with exit code $LASTEXITCODE"
+          Write-Error "AI-sync: ollama pull $model failed with exit code $LASTEXITCODE"
         }
       }
     }
@@ -142,12 +144,12 @@ function Invoke-AiSync {
       continue
     }
     if ($DryRun) {
-        Write-Output "ai-sync: would remove $model"
+        Write-Output "AI-sync: would remove $model"
     } else {
-        Write-Output "ai-sync: removing $model"
+        Write-Output "AI-sync: removing $model"
       & $ollamaCmd.Source rm $model
       if ($LASTEXITCODE -ne 0) {
-        Write-Error "ai-sync: ollama rm $model failed with exit code $LASTEXITCODE"
+        Write-Error "AI-sync: ollama rm $model failed with exit code $LASTEXITCODE"
       }
     }
   }
@@ -156,5 +158,5 @@ function Invoke-AiSync {
   if ($DryRun)    { $flags += "dry-run" }
   if ($PruneOnly) { $flags += "prune-only" }
   $flagStr = if ($flags.Count -gt 0) { " ($($flags -join ', '))" } else { "" }
-  Write-Output "ai-sync: sync completed (profile=$profileName$flagStr)"
+  Write-Output "AI-sync: sync completed (profile=$profileName$flagStr)"
 }

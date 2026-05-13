@@ -1,7 +1,7 @@
 ---
-description: "Use when adding, updating, or reviewing AI model selections in src/modules/ai/models.json, VS Code chatLanguageModels host files, scripts/ai-sync.sh, src/hosts/windows/modules/Invoke-AiSync.ps1, or src/modules/ai/default.nix. Covers host-name key convention, hardware constraints per host, quantization guidance, required cross-file sync steps, and tool-calling verification requirements."
+description: "Use when adding, updating, or reviewing AI model selections in src/modules/ai/models.json, VS Code chatLanguageModels host files, scripts/AI-sync.sh, src/hosts/windows/modules/Invoke-AISync.ps1, or src/modules/ai/default.nix. Covers host-name key convention, hardware constraints per host, quantization guidance, required cross-file sync steps, and tool-calling verification requirements."
 name: "AI Model Selection"
-applyTo: "src/modules/ai/**, src/modules/configs/vscode/chatLanguageModels.*.json, scripts/ai-sync.sh, scripts/ai-sync.ps1, src/hosts/windows/modules/Invoke-AiSync.ps1"
+applyTo: "src/modules/ai/**, src/modules/configs/vscode/chatLanguageModels.*.json, scripts/AI-sync.sh, scripts/AI-sync.ps1, src/hosts/windows/modules/Invoke-AISync.ps1"
 ---
 
 # AI Model Selection
@@ -13,14 +13,14 @@ platform nickname.  Use the exact host names as keys:
 
 | Key        | Host           | Resolved by                             |
 | ---------- | -------------- | --------------------------------------- |
-| `macbook`  | macOS          | `ai-sync.sh` Darwin branch              |
-| `nixos`    | NixOS (Linux)  | `ai-sync.sh` wildcard branch            |
-| `windows`  | Windows        | `Invoke-AiSync.ps1` (always `windows`)  |
+| `macbook`  | macOS          | `AI-sync.sh` Darwin branch              |
+| `nixos`    | NixOS (Linux)  | `AI-sync.sh` wildcard branch            |
+| `windows`  | Windows        | `Invoke-AISync.ps1` (always `windows`)  |
 
 Do **not** use generic names like `"mac"` or `"pc"` — they break when a
 second host of the same OS type is added and make the manifest ambiguous.
 When adding a new host, add a new key matching its host name and update the
-profile detection logic in both `ai-sync.sh` and `Invoke-AiSync.ps1`.
+profile detection logic in both `AI-sync.sh` and `Invoke-AISync.ps1`.
 
 ## Hardware constraints per host
 

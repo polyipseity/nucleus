@@ -222,11 +222,11 @@ prune_tool_caches_if_available() {
 
 prune_ollama_models_if_available() {
   # Remove locally installed Ollama models that are absent from the declarative
-  # manifest at src/modules/ai/models.json.  Delegates to ai-sync.sh with
+  # manifest at src/modules/ai/models.json.  Delegates to AI-sync.sh with
   # --prune-only so no new pulls are attempted during GC — a GC run should only
   # reclaim space, not trigger multi-GB model downloads.
   #
-  # The probe below checks for both ollama and jq before delegating; ai-sync.sh
+  # The probe below checks for both ollama and jq before delegating; AI-sync.sh
   # performs the same checks internally but printing a single skip message here
   # avoids noise from two separate absence warnings.
   if ! command -v ollama >/dev/null 2>&1; then
@@ -236,12 +236,12 @@ prune_ollama_models_if_available() {
     return 0
   fi
   if ! command -v jq >/dev/null 2>&1; then
-    # jq is required by ai-sync.sh to parse the JSON manifest.
+    # jq is required by AI-sync.sh to parse the JSON manifest.
     printf '%s\n' "gc: jq unavailable; skipping ollama model prune"
     return 0
   fi
 
-  "$REPO_ROOT/scripts/ai-sync.sh" --prune-only
+  "$REPO_ROOT/scripts/AI-sync.sh" --prune-only
 }
 
 # Step 1: expire HM generations before Nix store GC so the store can reclaim

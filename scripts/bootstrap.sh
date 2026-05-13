@@ -7,7 +7,7 @@
 #   apply         Install bootstrap dependencies, then run the src apply flow
 #
 # Options:
-#   --skip-ai-sync  Pass through to nix run .#apply; suppresses the post-apply
+#   --skip-AI-sync  Pass through to nix run .#apply; suppresses the post-apply
 #                   Ollama model sync step.  Useful in CI or on low-bandwidth
 #                   connections where model pulls (2–20 GB) are undesirable.
 #   --target-user   Pass through to src/scripts/apply.sh; selects the Home
@@ -45,7 +45,7 @@ for _bsh_arg in "$@"; do
   fi
 
   case "$_bsh_arg" in
-    --skip-ai-sync)
+    --skip-AI-sync)
       # Model pulls are 2–20 GB; suppress post-apply sync in CI or on
       # low-bandwidth connections.
       skip_ai_sync=true
@@ -90,7 +90,7 @@ run_nix() {
 
 if [ "$COMMAND" = "-h" ] || [ "$COMMAND" = "--help" ] || [ "$COMMAND" = "help" ]; then
   cat <<'EOF'
-Usage: bootstrap.sh [install-deps|apply] [--skip-ai-sync] [--target-user=<name>]
+Usage: bootstrap.sh [install-deps|apply] [--skip-AI-sync] [--target-user=<name>]
 
 Installs Nix (if absent) and the Nix-managed bootstrap dependencies
 (gnupg, sops, ssh-to-age) for this host.
@@ -100,7 +100,7 @@ Commands:
   apply         Install bootstrap dependencies, then run src apply flow
 
 Options:
-  --skip-ai-sync  Suppress the post-apply Ollama model sync step.  Useful in
+  --skip-AI-sync  Suppress the post-apply Ollama model sync step.  Useful in
                   CI or on low-bandwidth connections where model pulls
                   (2–20 GB each) are undesirable.
   --target-user   Select the Home Manager flake profile key for standalone
@@ -314,9 +314,9 @@ if [ "$COMMAND" = "apply" ]; then
   # here too would print "health checks passed" twice and slow bootstrap down.
   if [ "$skip_ai_sync" = true ]; then
     if [ -n "$target_user" ]; then
-      run_nix run "$REPO_ROOT/src#apply" -- --skip-ai-sync --target-user "$target_user"
+      run_nix run "$REPO_ROOT/src#apply" -- --skip-AI-sync --target-user "$target_user"
     else
-      run_nix run "$REPO_ROOT/src#apply" -- --skip-ai-sync
+      run_nix run "$REPO_ROOT/src#apply" -- --skip-AI-sync
     fi
   else
     if [ -n "$target_user" ]; then

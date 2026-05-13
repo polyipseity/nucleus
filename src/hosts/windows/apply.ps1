@@ -131,7 +131,7 @@
   the folder opens without a trust prompt.  False skips the write; no cleanup
   is needed because VS Code manages its own trust DB state.
 
-.PARAMETER SkipAiSync
+.PARAMETER SkipAISync
   When specified, suppresses the post-apply Ollama model sync step.  Useful in
   CI or on low-bandwidth connections where model pulls (2-20 GB each) are
   undesirable.
@@ -156,7 +156,7 @@
 
 .EXAMPLE
   # Apply while skipping the post-apply Ollama model sync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -SkipAiSync
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -SkipAISync
 
 .EXAMPLE
   # Apply while disabling machine age key auto-registration in .sops.yaml:
@@ -198,14 +198,14 @@ param(
   [bool]$EnableVsCodeSettingsParity = $true,
   [bool]$EnableVsCodeWorkspaceTrustParity = $true,
   [int]$MinFreeDiskGB = 10,
-  [switch]$SkipAiSync
+  [switch]$SkipAISync
 )
 
 $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AiSync.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-BunSetup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-CargoBinstallSetup.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ConvertFrom-SshEd25519PublicKeyToAgePubKey.ps1")
@@ -523,14 +523,14 @@ Write-Output "-------------------------------------------"
 # avoid blocking earlier configuration steps.  The sync is best-effort: a
 # missing or unreachable ollama binary is informational, not a hard failure,
 # because the system configuration has already been applied successfully.
-if ($SkipAiSync) {
-  Write-Output "ai-sync: -SkipAiSync set; skipping post-apply model sync"
+if ($SkipAISync) {
+  Write-Output "AI-sync: -SkipAISync set; skipping post-apply model sync"
 } else {
   $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaOnPath) {
-    Write-Output "ai-sync: ollama not found in PATH; skipping post-apply model sync"
+    Write-Output "AI-sync: ollama not found in PATH; skipping post-apply model sync"
   } else {
-    Write-Output "ai-sync: running post-apply AI model sync..."
-    Invoke-AiSync -RepoRoot $repoRoot
+    Write-Output "AI-sync: running post-apply AI model sync..."
+    Invoke-AISync -RepoRoot $repoRoot
   }
 }
