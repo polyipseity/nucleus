@@ -5,6 +5,7 @@ let
 
   applyText = builtins.readFile ../../src/hosts/windows/apply.ps1;
   flakeText = builtins.readFile ../../src/flake.nix;
+  editorsText = builtins.readFile ../../src/modules/editors.nix;
   homeText = builtins.readFile ../../src/modules/home.nix;
   loadUserRegistryText = builtins.readFile ../../src/hosts/windows/modules/Load-UserRegistry.ps1;
   syncQtPassText = builtins.readFile ../../src/hosts/windows/modules/Sync-QtPassConfig.ps1;
@@ -43,6 +44,8 @@ assert builtins.hasAttr "linearmouse" windowsUsers.users.polyipseity;
 assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.linearmouse;
 assert builtins.hasAttr "vscode" windowsUsers.users.polyipseity;
 assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.vscode;
+assert builtins.hasAttr "neovim" windowsUsers.users.polyipseity;
+assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.neovim;
 assert containsRegex "ConvertTo-PlainObject -InputObject" loadUserRegistryText;
 assert containsRegex "qtpass" loadUserRegistryText;
 assert containsRegex "function Sync-QtPassConfig" syncQtPassText;
@@ -50,4 +53,8 @@ assert containsRegex "function Sync-QtPassConfig" syncQtPassText;
 assert containsRegex "qtpass =" flakeText;
 assert containsRegex "linearmouse =" flakeText;
 assert containsRegex "vscode =" flakeText;
+assert containsRegex "neovim =" flakeText;
+# Verify Neovim workaround remains in native init.lua management and override path
+assert containsRegex "xdg\.configFile\.\"nvim/init\.lua\"\.text" editorsText;
+assert containsRegex "effectiveUser\.neovim\.settings" editorsText;
 true

@@ -35,6 +35,9 @@
       "qtpass": {
         "settings": {}
       },
+      "neovim": {
+        "settings": {}
+      },
       "vscode": {
         "settings": {}
       }

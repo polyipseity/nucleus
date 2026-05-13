@@ -18,7 +18,11 @@
 # the per-channel User/ directories to those repo files at apply time.
 {
   lib,
+  managedUser ? null,
+  managedUsername ? null,
   pkgs,
+  username ? null,
+  users ? null,
   vscodeMarketplace,
   ...
 }:
@@ -279,6 +283,107 @@ let
             # absent on a fresh install before VS Code has been launched once.
             print("vscode-trust: warning:", db_path, "-", e, file=sys.stderr)
   '';
+
+  # Resolve the active managed user record so Neovim settings can follow the
+  # same per-user override model used by other application configs.
+  effectiveUsername =
+    if managedUsername != null then
+      managedUsername
+    else if username != null then
+      username
+    else
+      "";
+
+  effectiveUser =
+    if managedUser != null then
+      managedUser
+    else if users != null && effectiveUsername != "" && builtins.hasAttr effectiveUsername users then
+      users.${effectiveUsername}
+    else
+      { };
+
+  # Neovim startup config is native init.lua (not a generated JSON/YAML format).
+  # This default enables a targeted workaround for the upstream nvim/xterm.js
+  # shifted-number regression in VS Code-family terminals.
+  neovimDefaultSettings = {
+    enableShiftNumberSymbolsWorkaround = true;
+    shiftNumberTerminalPrograms = [
+      "vscode"
+      "cursor"
+    ];
+  };
+
+  neovimUserSettings =
+    if effectiveUser ? neovim && effectiveUser.neovim ? settings then
+      effectiveUser.neovim.settings
+    else
+      { };
+
+  neovimManagedSettings = neovimDefaultSettings // neovimUserSettings;
+
+  # Keep this map small and explicit; it targets US layout symbols produced by
+  # shifted digits and only activates inside selected terminal hosts.
+  shiftNumberMap = {
+    "!" = "1";
+    "@" = "2";
+    "#" = "3";
+    "$" = "4";
+    "%" = "5";
+    "^" = "6";
+    "&" = "7";
+    "*" = "8";
+    "(" = "9";
+    ")" = "0";
+  };
+
+  shiftNumberLuaTable = builtins.concatStringsSep "\n" (
+    lib.mapAttrsToList (lhs: rhs: "  [${builtins.toJSON lhs}] = ${builtins.toJSON rhs},") shiftNumberMap
+  );
+
+  neovimInitLua = ''
+        -- Managed by Home Manager (nucleus): src/modules/editors.nix
+        -- Neovim supports native Lua config in init.lua (or Vimscript init.vim).
+        -- Keep init.lua as the canonical managed format here.
+
+        local managed = {
+          enable_shift_number_symbols_workaround = ${
+            if neovimManagedSettings.enableShiftNumberSymbolsWorkaround then "true" else "false"
+          },
+          shift_number_terminal_programs = ${builtins.toJSON neovimManagedSettings.shiftNumberTerminalPrograms},
+        }
+
+        if managed.enable_shift_number_symbols_workaround then
+          local terminal_program = (vim.env.TERM_PROGRAM or ""):lower()
+          local should_apply = false
+
+          for _, candidate in ipairs(managed.shift_number_terminal_programs or {}) do
+            if terminal_program == tostring(candidate):lower() then
+              should_apply = true
+              break
+            end
+          end
+
+          if should_apply then
+            local shifted_digits = {
+    ${shiftNumberLuaTable}
+            }
+
+            for lhs, rhs in pairs(shifted_digits) do
+              vim.keymap.set({ "i", "n", "x" }, lhs, rhs, {
+                desc = "workaround: xterm shifted-number regression",
+                noremap = true,
+                silent = true,
+              })
+              vim.keymap.set("c", lhs, function()
+                return rhs
+              end, {
+                expr = true,
+                noremap = true,
+              })
+            end
+          end
+        end
+  '';
 in
 {
   programs.neovim = {
@@ -289,6 +394,10 @@ in
     withPython3 = false;
     withRuby = false;
   };
+
+  # Keep Neovim in native init.lua format and route managed defaults through a
+  # single generated file so per-user overrides remain declarative.
+  xdg.configFile."nvim/init.lua".text = neovimInitLua;
 
   # Keep VS Code binaries in nixpkgs on non-Darwin systems. On Darwin, package
   # installation backend is selected in core.nix and must not be duplicated

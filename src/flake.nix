@@ -75,6 +75,11 @@
           vscode = {
             settings = { };
           };
+          # Per-user Neovim settings overrides. Keep this as a small attrset
+          # consumed by src/modules/editors.nix to generate managed init.lua.
+          neovim = {
+            settings = { };
+          };
           # Dev repository provisioning for this user.
           devRepos = {
             enable = true;
