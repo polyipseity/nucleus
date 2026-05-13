@@ -80,6 +80,11 @@
           neovim = {
             settings = { };
           };
+          # Per-user Obsidian overrides merge onto managed defaults from
+          # src/modules/home.nix during activation.
+          obsidian = {
+            settings = { };
+          };
           # Dev repository provisioning for this user.
           devRepos = {
             enable = true;

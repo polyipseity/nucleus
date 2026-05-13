@@ -280,6 +280,24 @@ Describe "Windows QtPass Settings Parity" {
     }
 }
 
+Describe "Windows Obsidian Settings Parity" {
+    <#
+    .DESCRIPTION
+    Validate the managed Obsidian advanced settings while preserving the
+    dynamic vault list that Obsidian stores in the same JSON file.
+    #>
+
+    It "Should disable Obsidian auto-updates and enable advanced settings" {
+        $configPath = Join-Path $env:APPDATA "obsidian\obsidian.json"
+        Test-Path -Path $configPath | Should -Be $true
+
+        $obsidian = Get-Content -Path $configPath -Raw | ConvertFrom-Json
+        $obsidian.updateDisabled | Should -Be $true
+        $obsidian.cli | Should -Be $true
+        $obsidian.checkSlowStartup | Should -Be $true
+    }
+}
+
 Describe "Test-Driven Development Scaffolding" {
     <#
     .DESCRIPTION

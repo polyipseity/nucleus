@@ -287,6 +287,7 @@ let
     "configureInputAndSiri"
     "configureLaunchServices"
     "configureNightlight"
+    "configureObsidianSettings"
     "configureSafariDefaults"
     "configureSystemHardening"
     "configureUniversalAccessDefaults"

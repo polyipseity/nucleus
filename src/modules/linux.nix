@@ -205,6 +205,7 @@ lib.mkIf pkgs.stdenv.isLinux {
           "agentsSkills"
           "agentsSymlink"
           "buildNixIndex"
+          "configureObsidianSettings"
           # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
           # are defined in secrets.nix (shared module) but run as Home Manager
           # activations on this host; include them here so manual instructions

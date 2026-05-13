@@ -92,6 +92,10 @@
 .PARAMETER EnablePowerParity
   Enable managed Windows power policy parity convergence and cleanup fallback.
 
+.PARAMETER EnableObsidianParity
+  Enable managed Obsidian advanced-settings parity convergence and cleanup
+  fallback while preserving unmanaged vault metadata in the live app config.
+
 .PARAMETER EnableQtPassParity
   Enable managed QtPass Settings/Template tab parity convergence and cleanup fallback.
 
@@ -188,6 +192,7 @@ param(
   [bool]$EnableGitSshParity = $true,
   [bool]$EnableHostAgeKeyRegistration = $true,
   [bool]$EnablePowerParity = $true,
+  [bool]$EnableObsidianParity = $true,
   [bool]$EnableQtPassParity = $true,
   [bool]$EnableRdpParity = $true,
   [bool]$EnableRemoteAccessParity = $true,
@@ -217,6 +222,7 @@ $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-SecretVerification.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-ObsidianConfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-PowerPolicy.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Sync-QtPassConfig.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Initialize-DevDirectory.ps1")
@@ -480,6 +486,7 @@ Sync-VSCodeExtension -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VscodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
+Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords
 Sync-QtPassConfig -Enabled:$EnableQtPassParity -SettingsPath $qtPassSettingsPath -Users $selectedUserRecords
 # Default to false if devReposEnabled not yet set (user not in registry or no repos configured).
 if ($null -eq $EnableDevReposParity) {
