@@ -210,45 +210,59 @@ $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
-$syncModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "sync"
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-BunSetup.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-CargoBinstallSetup.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "ConvertFrom-SshEd25519PublicKeyToAgePubKey.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Get-DecryptedBlob.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Get-Secret.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-GitAndSshConfig.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Initialize-SSHHostKey.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-JITSecretMaterialization.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-SecretVerification.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
+$secretsModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "secrets"
+$systemModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "system"
+$setupModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "setup"
+$userModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "user"
+$editorsModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "editors"
+$wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers"
+# Root utilities: shared helpers with no single domain affinity.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-ObsidianConfig.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-PowerPolicy.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-QtPassConfig.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Initialize-DevDirectory.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-WindowsRdp.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Install-PrekHook.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Register-HostAgeKey.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-OpenSshServer.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Remove-ManagedSecret.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Remove-StaleWallpaper.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Resolve-Executable.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-ScoopSetup.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Set-VscodeWorkspaceTrust.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-ShellProfile.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-AgentsConfig.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-AgentsSkill.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-AgentsClawHubSkill.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-DevRepo.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-SecretFile.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-Secret.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-VSCodeExtension.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-VSCodeSetting.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-Wallpaper.ps1")
-. (Join-Path -Path $syncModuleDir -ChildPath "Sync-VscodeConfig.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Test-PrimaryUser.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Test-ArchivingStack.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Test-PrimaryUser.ps1")
+# secrets/: decryption, SOPS age key management, and secret materialization.
+# ConvertFrom-SshEd25519PublicKeyToAgePubKey must be loaded before any file that
+# calls it (Register-HostAgeKey, Invoke-SecretVerification).
+. (Join-Path -Path $secretsModuleDir -ChildPath "ConvertFrom-SshEd25519PublicKeyToAgePubKey.ps1")
+. (Join-Path -Path $secretsModuleDir -ChildPath "Get-DecryptedBlob.ps1")
+. (Join-Path -Path $secretsModuleDir -ChildPath "Get-Secret.ps1")
+. (Join-Path -Path $secretsModuleDir -ChildPath "Invoke-JITSecretMaterialization.ps1")
+. (Join-Path -Path $secretsModuleDir -ChildPath "Invoke-SecretVerification.ps1")
+. (Join-Path -Path $secretsModuleDir -ChildPath "Register-HostAgeKey.ps1")
+. (Join-Path -Path $secretsModuleDir -ChildPath "Remove-ManagedSecret.ps1")
+. (Join-Path -Path $secretsModuleDir -ChildPath "Sync-Secret.ps1")
+. (Join-Path -Path $secretsModuleDir -ChildPath "Sync-SecretFile.ps1")
+# system/: machine-level services and infrastructure (WinGet, SSH host, RDP, power, AI).
+. (Join-Path -Path $systemModuleDir -ChildPath "Initialize-SSHHostKey.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AISync.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSshServer.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-PowerPolicy.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-WindowsRdp.ps1")
+# setup/: one-time or infrequent toolchain provisioning (Scoop, Bun, Cargo, prek).
+. (Join-Path -Path $setupModuleDir -ChildPath "Initialize-DevDirectory.ps1")
+. (Join-Path -Path $setupModuleDir -ChildPath "Install-PrekHook.ps1")
+. (Join-Path -Path $setupModuleDir -ChildPath "Invoke-BunSetup.ps1")
+. (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CargoBinstallSetup.ps1")
+. (Join-Path -Path $setupModuleDir -ChildPath "Invoke-ScoopSetup.ps1")
+# user/: per-user home convergence (git/SSH, shell, agents, dev repos, apps).
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsClawHubSkill.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsSkill.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-DevRepo.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-GitAndSshConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-ObsidianConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-QtPassConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-ShellProfile.ps1")
+# editors/: VS Code configuration and workspace management.
+. (Join-Path -Path $editorsModuleDir -ChildPath "Set-VscodeWorkspaceTrust.ps1")
+. (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeExtension.ps1")
+. (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeSetting.ps1")
+. (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VscodeConfig.ps1")
+# wallpapers/: wallpaper materialization and stale-file cleanup.
+. (Join-Path -Path $wallpapersModuleDir -ChildPath "Remove-StaleWallpaper.ps1")
+. (Join-Path -Path $wallpapersModuleDir -ChildPath "Sync-Wallpaper.ps1")
 $healthCheckScript = Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\scripts\health-check.ps1"
 if (Test-Path -Path $healthCheckScript) {
   & $healthCheckScript -MinFreeGB $MinFreeDiskGB -SkipSecretTooling

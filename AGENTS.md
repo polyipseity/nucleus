@@ -141,9 +141,13 @@ quick-start commands, and troubleshooting.
   Files in `scripts/` are the exception: they keep the paired shell basename so
   the `.sh` and `.ps1` entry points stay aligned; `check-pwsh.ps1` is the
   intentional runtime-specific exception to `check-sh.sh`.
-- **Windows module path**: keep reusable PowerShell functions under
-  `src/hosts/windows/modules/*.ps1` with filenames that match the exported
-  function name; keep `src/hosts/windows/apply.ps1` as a thin
+- **Windows module path**: organize reusable PowerShell functions under
+  `src/hosts/windows/modules/` in domain-based subdirectories — `secrets/`
+  (decryption and SOPS lifecycle), `system/` (machine-level services),
+  `setup/` (toolchain provisioning), `user/` (per-user home convergence),
+  `editors/` (VS Code), `wallpapers/` (wallpaper management) — and keep pure
+  utility helpers with no single domain at the root; filenames must match the
+  exported function name; keep `src/hosts/windows/apply.ps1` as a thin
   trigger/orchestrator.
 - **Windows function isolation**: keep one reusable PowerShell function per
   file under `src/hosts/windows/modules/`; orchestrators (for example
