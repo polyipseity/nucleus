@@ -12,7 +12,7 @@
 # Activation reads the repo root from:
 #   1. $NUCLEUS_REPO  (set by apply.sh before the rebuild call)
 #   2. ~/.config/nucleus/repo-root  (written by apply.sh, survives the sudo boundary)
-# Both paths mirror the pattern used by vscodeSymlinks in editors.nix.
+# Both paths mirror the pattern used by vsCodeSymlinks in editors.nix.
 #
 # agentsSkills (below) manages ~/.agents/skills/ independently.
 { config, lib, ... }:

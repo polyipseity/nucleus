@@ -219,9 +219,9 @@ lib.mkIf pkgs.stdenv.isLinux {
           "sshKeyAdopt"
           "syncClawHubSkills"
           "verifySecretDecryption"
-          "vscodeExtensionBridge"
-          "vscodeSymlinks"
-          "vscodeWorkspaceTrust"
+          "vsCodeExtensionBridge"
+          "vsCodeSymlinks"
+          "vsCodeWorkspaceTrust"
           "waitForSopsSecrets"
           "wallpaperProvision"
         ]

@@ -2,19 +2,19 @@
 #
 # Source of truth for VS Code extensions and config wiring lives here.
 # Installation backend intentionally pivots by platform:
-#   • Linux/NixOS: nixpkgs binaries; extensions managed by vscodeExtensionBridge.
+#   • Linux/NixOS: nixpkgs binaries; extensions managed by vsCodeExtensionBridge.
 #   • macOS: backend selected in modules/core.nix (Homebrew or nixpkgs);
-#     extensions managed by vscodeExtensionBridge on all backends.
+#     extensions managed by vsCodeExtensionBridge on all backends.
 #
 # The full 65-extension baseline is built entirely from Nix derivations:
 #   • 43 extensions packaged directly in nixpkgs (pkgs.vscode-extensions).
 #   • 22 extensions sourced from the VS Code Marketplace via the
-#     nix-vscode-extensions flake input (vscodeMarketplace extraSpecialArg).
+#     nix-vscode-extensions flake input (vsCodeMarketplace extraSpecialArg).
 #
 # VS Code config files (settings, per-host keybindings, MCP, tasks, snippets,
 # prompts, profiles, and Copilot Chat memory) are kept as live repo files under
 # src/modules/configs/vscode/ so that every VS Code write appears as an
-# unstaged git change.  The vscodeSymlinks activation creates symlinks from
+# unstaged git change.  The vsCodeSymlinks activation creates symlinks from
 # the per-channel User/ directories to those repo files at apply time.
 {
   lib,
@@ -23,7 +23,7 @@
   pkgs,
   username ? null,
   users ? null,
-  vscodeMarketplace,
+  vsCodeMarketplace,
   ...
 }:
 let
@@ -39,18 +39,18 @@ let
   mkMktx =
     pub: name:
     let
-      pubAttrs = vscodeMarketplace.${pub} or { };
+      pubAttrs = vsCodeMarketplace.${pub} or { };
     in
     if pubAttrs ? ${name} then
       [ pubAttrs.${name} ]
     else
-      builtins.trace "vscode: ${pub}.${name} not in marketplace index — skipping" [ ];
+      builtins.trace "VS Code: ${pub}.${name} not in marketplace index — skipping" [ ];
 
   # Canonical extension set shared by both platforms, sorted alphabetically by
   # publisher.name.  44 extensions come from nixpkgs; 22 come from the VS Code
   # Marketplace via nix-vscode-extensions (via mkMktx).  A missing marketplace
   # entry degrades gracefully to an empty contribution rather than failing eval.
-  # On all platforms, vscodeExtensionBridge symlinks each extension into the
+  # On all platforms, vsCodeExtensionBridge symlinks each extension into the
   # writable ~/.vscode/extensions and ~/.vscode-insiders/extensions directories
   # so both stable and insiders channels share an identical extension payload.
   sharedExtensions = builtins.concatLists [
@@ -163,13 +163,13 @@ let
   # Materialize the extension list under a deterministic Nix-store directory so
   # all VS Code app bundles (both stable and insiders, Homebrew or nixpkgs) can
   # consume the exact same extension payload via per-extension symlinks in the
-  # vscodeExtensionBridge activation.
+  # vsCodeExtensionBridge activation.
   extensionStore = pkgs.symlinkJoin {
     name = "nucleus-vscode-extensions";
     paths = sharedExtensions;
   };
 
-  # Per-channel User data directories referenced by the vscodeSymlinks activation.
+  # Per-channel User data directories referenced by the vsCodeSymlinks activation.
   # These are shell strings whose $HOME is intentionally left unexpanded so the
   # activation script evaluates them at runtime with the actual home directory.
   stableBaseDir =
@@ -184,13 +184,13 @@ let
   # Select the per-host keybindings source file so that platform-specific
   # shortcuts (Cmd on macOS vs Ctrl on NixOS/Linux) are tracked independently
   # without cross-host pollution in a shared repo file.
-  vscodeKeybindingsFile = if isDarwin then "keybindings.mac.json" else "keybindings.nixos.json";
+  vsCodeKeybindingsFile = if isDarwin then "keybindings.mac.json" else "keybindings.nixos.json";
 
   # Select the per-host Copilot chat model list so that each machine only
   # surfaces the Ollama models that fit within its VRAM budget.
   # mac: gemma4:e4b + qwen3:14b (24 GB unified memory allows both).
   # nixos/other: qwen3:8b only (discrete GPU capped at 6 GB VRAM).
-  vscodeChatLanguageModelsFile =
+  vsCodeChatLanguageModelsFile =
     if isDarwin then "chatLanguageModels.mac.json" else "chatLanguageModels.nixos.json";
 
   # Python script that inserts a workspace trust entry for ~/dev into VS Code's
@@ -206,7 +206,7 @@ let
   #
   # The script exits immediately when ~/dev does not yet exist (no-op for
   # edge cases such as a first-run race before provisionDevDirectory completes).
-  vscodeWorkspaceTrustPy = pkgs.writeText "vscode-workspace-trust.py" ''
+  vsCodeWorkspaceTrustPy = pkgs.writeText "vscode-workspace-trust.py" ''
     import json
     import os
     import sqlite3
@@ -420,7 +420,7 @@ in
     # Enable native Home Manager integration on non-Darwin hosts so the VS Code
     # binary is registered via the HM module.  On Darwin the backend is selected
     # in core.nix (Homebrew or nixpkgs) and must not be duplicated here.
-    # Extension management is handled exclusively by vscodeExtensionBridge on all
+    # Extension management is handled exclusively by vsCodeExtensionBridge on all
     # platforms; do not add extensions here to avoid a dual-manager conflict where
     # both HM and the bridge simultaneously write to ~/.vscode/extensions.
     enable = !isDarwin;
@@ -429,7 +429,7 @@ in
 
   home.activation = {
     # -------------------------------------------------------------------------
-    # vscodeSymlinks
+    # vsCodeSymlinks
     # Replaces VS Code's per-channel config files with symlinks into the live
     # repo tree (src/modules/configs/vscode/) so that every VS Code write
     # (settings change, keybinding edit, MCP server addition, Copilot memory)
@@ -461,7 +461,7 @@ in
     # before invoking darwin-rebuild / nixos-rebuild), with $NUCLEUS_REPO as
     # an optional override for manual runs outside of apply.sh.
     # -------------------------------------------------------------------------
-    vscodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
 
       # Locate the live repo checkout so the activation can resolve the
@@ -475,13 +475,13 @@ in
       elif [ -f "$_vsym_repo_root_file" ]; then
         _vsym_repo_root="$(cat "$_vsym_repo_root_file")"
       else
-        echo "vscode: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
+        echo "VS Code: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
         exit 1
       fi
 
       _vsym_config_dir="$_vsym_repo_root/src/modules/configs/vscode"
       if [ ! -d "$_vsym_config_dir" ]; then
-        echo "vscode: config dir not found: $_vsym_config_dir" >&2
+        echo "VS Code: config dir not found: $_vsym_config_dir" >&2
         exit 1
       fi
 
@@ -537,8 +537,8 @@ in
 
       for _vsym_base_dir in "${stableBaseDir}" "${insidersBaseDir}"; do
         ensure_file_symlink "$_vsym_config_dir/settings.json"    "$_vsym_base_dir/settings.json"
-        ensure_file_symlink "$_vsym_config_dir/${vscodeKeybindingsFile}" "$_vsym_base_dir/keybindings.json"
-        ensure_file_symlink "$_vsym_config_dir/${vscodeChatLanguageModelsFile}" "$_vsym_base_dir/chatLanguageModels.json"
+        ensure_file_symlink "$_vsym_config_dir/${vsCodeKeybindingsFile}" "$_vsym_base_dir/keybindings.json"
+        ensure_file_symlink "$_vsym_config_dir/${vsCodeChatLanguageModelsFile}" "$_vsym_base_dir/chatLanguageModels.json"
         ensure_file_symlink "$_vsym_config_dir/mcp.json"         "$_vsym_base_dir/mcp.json"
         ensure_file_symlink "$_vsym_config_dir/tasks.json"       "$_vsym_base_dir/tasks.json"
         ensure_dir_symlink  "$_vsym_config_dir/snippets"         "$_vsym_base_dir/snippets"
@@ -552,7 +552,7 @@ in
     '';
 
     # -----------------------------------------------------------------------
-    # vscodeExtensionBridge
+    # vsCodeExtensionBridge
     # Populates both ~/.vscode/extensions and ~/.vscode-insiders/extensions
     # with per-extension symlinks into the Nix-managed extension store.  This
     # bridge runs unconditionally on ALL platforms (macOS and Linux) and for
@@ -564,7 +564,7 @@ in
     # a whole-directory store symlink would cause EACCES.  Instead, keep a real
     # writable directory and populate it with per-extension symlinks.
     # -----------------------------------------------------------------------
-    vscodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
 
       source_extensions='${extensionStore}/share/vscode/extensions'
@@ -654,7 +654,7 @@ in
     '';
 
     # -----------------------------------------------------------------------
-    # vscodeWorkspaceTrust
+    # vsCodeWorkspaceTrust
     # Inserts a workspace trust entry for ~/dev into VS Code's SQLite state
     # database (globalStorage/state.vscdb) for both stable and insiders
     # channels so that the repository workspace opens without a trust prompt.
@@ -673,9 +673,9 @@ in
     # The Python script exits immediately when ~/dev is absent (edge case:
     # first-run race before provisionDevDirectory completes).
     # -----------------------------------------------------------------------
-    vscodeWorkspaceTrust = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    vsCodeWorkspaceTrust = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       set -eu
-      ${pkgs.python3}/bin/python3 '${vscodeWorkspaceTrustPy}'
+      ${pkgs.python3}/bin/python3 '${vsCodeWorkspaceTrustPy}'
     '';
   };
 }

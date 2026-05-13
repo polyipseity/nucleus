@@ -72,7 +72,7 @@
           };
           # Per-user VS Code settings overrides (if needed). See
           # src/modules/editors.nix for settings storage and merge patterns.
-          vscode = {
+          vsCode = {
             settings = { };
           };
           # Per-user Neovim settings overrides. Keep this as a small attrset
@@ -268,8 +268,8 @@
       # Used by editors.nix to build Nix derivations for the ~20 extensions that
       # are not yet packaged in nixpkgs, replacing CLI-based activation with
       # fully declarative Nix store derivations.
-      vscodeMarketplaceMac = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
-      vscodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
+      vsCodeMarketplaceMac = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
+      vsCodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
       # Build the `nix run .#apply` app for a given package set.
       # Wraps scripts/apply.sh in a shell application that has git, jq,
@@ -463,7 +463,7 @@
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
               inherit nixpkgs username users;
-              vscodeMarketplace = vscodeMarketplaceMac;
+              vsCodeMarketplace = vsCodeMarketplaceMac;
             };
             home-manager.users = mkHomeManagerUsers ./modules/home.nix;
           }
@@ -493,7 +493,7 @@
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
               inherit nixpkgs username users;
-              vscodeMarketplace = vscodeMarketplaceLinux;
+              vsCodeMarketplace = vsCodeMarketplaceLinux;
             };
             home-manager.users = mkHomeManagerUsers ./modules/home.nix;
           }
@@ -584,7 +584,7 @@
         extraSpecialArgs = {
           hostManualFile = "src/hosts/nixos/MANUAL.md";
           inherit nixpkgs username users;
-          vscodeMarketplace = vscodeMarketplaceLinux;
+          vsCodeMarketplace = vsCodeMarketplaceLinux;
         };
         modules = [
           {
