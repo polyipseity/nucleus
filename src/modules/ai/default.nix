@@ -13,11 +13,13 @@
 # Windows) to suppress the sync step in CI or on low-bandwidth connections.
 #
 # Model manifest: src/modules/ai/models.json
-#   mac: gemma4:e4b, qwen3:14b  — tool-calling curl-tested on Mac: both PASS
-#   pc:  qwen3:8b               — tool-calling NOT yet curl-tested on PC;
-#                                  same family as qwen3:14b (passes on Mac)
-#                                  but verify with the same curl test before
-#                                  relying on tool-calling on the PC host.
+#   macbook: gemma4:e4b, qwen3:14b  — tool-calling curl-tested on macbook: both PASS
+#   nixos:   qwen3:8b               — tool-calling NOT yet curl-tested on nixos;
+#                                     same family as qwen3:14b (passes on macbook)
+#                                     but verify with the same curl test before
+#                                     relying on tool-calling on the nixos host.
+#   windows: qwen3:8b               — same as nixos; tool-calling NOT yet
+#                                     curl-tested on windows.
 {
   lib,
   nixpkgs,

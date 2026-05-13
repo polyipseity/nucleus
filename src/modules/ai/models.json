@@ -1,10 +1,13 @@
 {
   "models": {
-    "mac": [
+    "macbook": [
       "gemma4:e4b",
       "qwen3:14b"
     ],
-    "pc": [
+    "nixos": [
+      "qwen3:8b"
+    ],
+    "windows": [
       "qwen3:8b"
     ]
   }

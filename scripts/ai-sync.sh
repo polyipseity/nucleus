@@ -14,8 +14,8 @@
 #   --prune-only   skip pulls; only remove unlisted models
 #
 # Environment variables:
-#   OLLAMA_PROFILE  override profile selection (mac|pc); detected automatically
-#                   when unset (Darwin → mac, Linux → pc)
+#   OLLAMA_PROFILE  override profile selection (macbook|nixos|windows); detected
+#                   automatically when unset (Darwin → macbook, Linux → nixos)
 #   OLLAMA_HOST     Ollama server address; defaults to 127.0.0.1:11434
 #
 # Exit conditions:
@@ -53,8 +53,8 @@ if [ -n "${OLLAMA_PROFILE:-}" ]; then
   profile="$OLLAMA_PROFILE"
 else
   case "$(uname)" in
-    Darwin) profile="mac" ;;
-    *)      profile="pc"  ;;
+    Darwin) profile="macbook" ;;
+    *)      profile="nixos"   ;;
   esac
 fi
 
