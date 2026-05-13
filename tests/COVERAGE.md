@@ -97,32 +97,31 @@ Located in `tests/nix/`, run via `nix-instantiate --eval` in CI.
 
 ### Windows Tests (PowerShell + DSC Layer)
 
-Located in `tests/windows/nucleus-dsc.Tests.ps1`, run via Pester in CI.
+Located in `tests/windows/`, organised by concern (`apps/`, `configuration/`,
+`packages/`, `smoke/`, `system/`) and run via Pester locally on Windows.
 
-#### ✅ **nucleus-dsc.Tests.ps1** (30+ tests)
+#### ✅ **Windows Pester suites**
 
-##### Package Installation Tests (15 tests)
-- **CLI Tools** (5 tests): zoxide, uv, 7-Zip, ripgrep, fzf
-- **Development Tools** (5 tests): Python 3.12, Git, Node.js, Rust
-- **GUI Applications** (3 tests): Blender, VS Code Insiders, Discord Canary
-- **Utilities** (2 tests): bat, eza, jq
+##### Package Installation Tests
+- Cross-host CLI tooling: 7-Zip, zoxide, uv, Ruff, ty, ripgrep, direnv,
+  GitHub CLI, prek, jq, fzf, bat, fd, ShellCheck, Typst
+- Developer runtimes/editors: Git, PowerShell, VS Code stable + Insiders,
+  Windows Terminal Preview, Neovim, Ollama, Bun, rustup, SOPS
+- GUI applications: Blender, Discord Canary, Chrome Canary, QtPass,
+  Obsidian, Telegram Desktop Beta
 
 All tests validate cross-platform parity with nixpkgs/Homebrew equivalents.
 
-##### Registry & Configuration Tests (15+ tests)
-- **Screen Saver Security** (4 tests):
-  - Enabled, password-protected, 60-second idle timeout
-  - Blank screen saver (no login hint leakage)
-- **Wallpaper & Desktop** (4 tests):
-  - Folder creation, registry configuration, style settings
-- **Keyboard & Input** (2 tests):
-  - Repeat rate, speed maximization
-- **File Explorer** (3 tests):
-  - Hidden files, file extensions, full paths
-- **Accessibility** (1 test):
-  - Mouse pointer speed
+##### Registry, Environment, and Policy Tests
+- User-scoped DSC state: screen saver posture, managed wallpaper path,
+  Explorer visibility/taskbar chrome settings, and managed environment vars
+- System-scoped invariants: long paths, RDP enablement + NLA, firewall,
+  TCP keepalive posture, lid-close power policy, and font substitutions
+- App parity: QtPass registry values and Obsidian advanced-settings JSON
+- Smoke coverage: Windows platform + PowerShell runtime validation
 
-**Windows Test Totals**: **30+ tests** covering installation parity and security invariants
+**Windows Test Totals**: multiple focused suites covering package parity,
+user configuration, system invariants, app-specific parity, and smoke checks
 
 ---
 
@@ -264,7 +263,7 @@ nix-instantiate --eval tests/nix/*.nix
 
 **Run Windows Pester tests:**
 ```powershell
-pwsh -Command "Invoke-Pester tests/windows/nucleus-dsc.Tests.ps1"
+pwsh -Command "Invoke-Pester tests/windows/"
 ```
 
 **Run shell script validation:**

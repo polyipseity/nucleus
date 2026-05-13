@@ -92,7 +92,7 @@ additions and breaking changes.
 
 ### Windows Testing (Pester)
 
-- **DSC validation** (`tests/windows/*.Tests.ps1`): Pester tests verify that
+- **DSC validation** (`tests/windows/**/*.Tests.ps1`): Pester tests verify that
   WinGet packages are installed, registry settings are correct, and security
   invariants are enforced. Run locally on Windows before commit; not run in CI
   (CI uses Linux runners).

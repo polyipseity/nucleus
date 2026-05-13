@@ -37,7 +37,7 @@ cd src && nix flake check
 
 ```powershell
 # Run Pester tests for DSC validation
-Invoke-Pester -Path tests/windows/nucleus-dsc.Tests.ps1 -Verbose
+Invoke-Pester -Path tests/windows/ -Verbose
 ```
 
 **CI validation:**
@@ -118,7 +118,7 @@ in
 
 ### Pester Test Structure
 
-**File location:** `tests/windows/*.Tests.ps1`
+**File location:** `tests/windows/**/*.Tests.ps1`
 
 **Test categories:**
 
@@ -153,7 +153,7 @@ Describe "Security Settings" {
 Invoke-Pester -Path tests/windows/ -Verbose
 
 # Run a single test file
-Invoke-Pester -Path tests/windows/nucleus-dsc.Tests.ps1
+Invoke-Pester -Path tests/windows/packages/package-installation.Tests.ps1
 ```
 
 ### DSC Dry-Run Validation
@@ -194,8 +194,8 @@ winget configure --what-if .\src\hosts\windows\user.dsc.yml
 - Example: `tests/nix/core-tests.nix` for core.nix logic
 
 **Pester tests:**
-- `tests/windows/<feature>.Tests.ps1` — tests for a feature or DSC resource group
-- Example: `tests/windows/nucleus-dsc.Tests.ps1` for DSC baseline
+- `tests/windows/<area>/<feature>.Tests.ps1` — tests for a feature or DSC resource group
+- Example: `tests/windows/system/system-policy.Tests.ps1` for machine-scoped DSC invariants
 
 ### Example: Add a Test for a New Package
 
@@ -296,7 +296,7 @@ Tests run automatically on:
 1. Verify DSC syntax: `winget configure --what-if .\src\hosts\windows\*.dsc.yml`
 2. Run apply manually: `.\src\scripts\bootstrap.ps1`
 3. Wait for package manager to finish installing
-4. Re-run Pester: `Invoke-Pester tests/windows/*.Tests.ps1`
+4. Re-run Pester: `Invoke-Pester tests/windows/`
 
 ### Test Failure: "Permission denied" (Pester)
 

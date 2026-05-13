@@ -205,7 +205,7 @@ All app configs must have corresponding tests:
    - Assert user override fields exist in flake.nix and users.json.
    - Assert platform overrides are correctly wired.
 
-2. **Windows tests** (`tests/windows/nucleus-dsc.Tests.ps1` or dedicated module):
+2. **Windows tests** (`tests/windows/**/*.Tests.ps1` or a dedicated module):
    - Assert registry values are correctly written post-sync.
    - Assert user-specific overrides take precedence over defaults.
 
