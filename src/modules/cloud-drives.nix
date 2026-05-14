@@ -4,18 +4,10 @@
 #
 #   Mounts — persistent rclone mount processes providing on-demand access via
 #             FUSE (requires macFUSE on macOS, fuse3 on NixOS). Files are read
-#             from the remote on access; no full local copy is kept. On macOS,
-#             an iCloud mount is a stable symlink to the native CloudDocs path
-#             (~/Library/Mobile Documents/com~apple~CloudDocs) — no rclone
-#             process is needed because the OS already provides live access.
+#             from the remote on access; no full local copy is kept.
 #
 #   Replicas — full local copies of remote data, kept in sync by rclone
-#              bisync / rclone sync. The macOS iCloud replica is special: it
-#              uses the native `brctl download` command (CloudDocs mechanism)
-#              rather than rclone, because macOS already manages iCloud Drive
-#              synchronisation and `brctl` is the correct way to force local
-#              availability. This activation replaces the former
-#              ensureICloudFilesLocal hook that lived in macos.nix.
+#              bisync / rclone sync.
 #
 # Configuration: per-user settings come from src/modules/users.json under the
 # "cloudDrives" key. Multiple mounts and replicas may be declared per user,
@@ -106,7 +98,7 @@ let
           "iCloud"
           "OneDrive"
         ];
-        description = "Cloud storage provider. 'iCloud' on macOS uses a native CloudDocs symlink; on NixOS it falls back to rclone and requires remoteName.";
+        description = "Cloud storage provider. All providers use rclone remotes and require remoteName for active mounts.";
       };
       readWrite = lib.mkOption {
         type = lib.types.bool;
@@ -116,7 +108,7 @@ let
       remoteName = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
-        description = "rclone remote name as configured via 'rclone config'. Null is valid for iCloud on macOS where the native CloudDocs path is used instead.";
+        description = "rclone remote name as configured via 'rclone config'.";
       };
       remotePath = lib.mkOption {
         type = lib.types.str;
@@ -166,7 +158,7 @@ let
           "iCloud"
           "OneDrive"
         ];
-        description = "Cloud storage provider. 'iCloud' on macOS uses native brctl; on NixOS it requires remoteName.";
+        description = "Cloud storage provider. rclone-backed replica scheduling is configured per entry.";
       };
       realtime = lib.mkOption {
         type = replicaRealtimeSubmodule;
@@ -176,7 +168,7 @@ let
       remoteName = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
-        description = "rclone remote name. Null is valid for iCloud on macOS where brctl is used instead.";
+        description = "rclone remote name.";
       };
       remotePath = lib.mkOption {
         type = lib.types.str;
@@ -250,29 +242,12 @@ in
       enabledMounts = builtins.filter (m: m.enable) config.nucleus.cloudDrives.mounts;
       enabledReplicas = builtins.filter (r: r.enable) config.nucleus.cloudDrives.replicas;
 
-      # Mounts that need an rclone process:
-      #   - non-iCloud providers always use rclone (needs remoteName set)
-      #   - iCloud on macOS uses a native CloudDocs symlink (no rclone process)
-      #   - iCloud on NixOS would need rclone but is unsupported for now
-      rcloneMounts = builtins.filter (
-        m: m.enable && m.remoteName != null && !(m.provider == "iCloud" && pkgs.stdenv.isDarwin)
-      ) config.nucleus.cloudDrives.mounts;
-
-      # iCloud mounts on macOS (symlink path, no rclone process).
-      iCloudMountsMacOS = builtins.filter (
-        m: m.enable && m.provider == "iCloud" && pkgs.stdenv.isDarwin
-      ) config.nucleus.cloudDrives.mounts;
-
-      # iCloud replicas on macOS (use native brctl, not rclone).
-      iCloudReplicasMacOS = builtins.filter (
-        r: r.enable && r.provider == "iCloud" && pkgs.stdenv.isDarwin
-      ) config.nucleus.cloudDrives.replicas;
+      # Mounts require rclone plus an explicit configured remote.
+      rcloneMounts = builtins.filter (m: m.enable && m.remoteName != null) config.nucleus.cloudDrives.mounts;
 
       hasRcloneProvider =
         rcloneMounts != [ ]
-        || builtins.any (
-          r: r.enable && r.remoteName != null && !(r.provider == "iCloud" && pkgs.stdenv.isDarwin)
-        ) config.nucleus.cloudDrives.replicas;
+        || builtins.any (r: r.enable && r.remoteName != null) config.nucleus.cloudDrives.replicas;
     in
     lib.mkMerge [
       # -----------------------------------------------------------------------
@@ -283,34 +258,19 @@ in
       })
 
       # -----------------------------------------------------------------------
-      # Shared: directory structure and iCloud symlinks
-      # cloudDrivesSetup: creates ~/clouds/, per-entry subdirectories, and the
-      # macOS iCloud CloudDocs symlinks for mount and replica paths.
+      # Shared: directory structure
+      # cloudDrivesSetup: creates ~/clouds/ and per-entry subdirectories.
       # -----------------------------------------------------------------------
       {
         home.activation.cloudDrivesSetup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           set -eu
-
-          protect_cloud_symlink() {
-            _cloud_symlink_path="$1"
-            if ! /usr/bin/chflags -h uchg "$_cloud_symlink_path"; then
-              echo "cloud-drives: warning — could not protect symlink $_cloud_symlink_path with uchg." >&2
-            fi
-          }
-
-          unprotect_cloud_symlink() {
-            _cloud_symlink_path="$1"
-            if ! /usr/bin/chflags -h nouchg "$_cloud_symlink_path"; then
-              echo "cloud-drives: warning — could not clear uchg from symlink $_cloud_symlink_path before update." >&2
-            fi
-          }
 
           # Create the top-level clouds/ directory tree.
           mkdir -p "$HOME/clouds"
 
           ${lib.concatStringsSep "\n" (
             map (m: ''
-              if [ ! -L "$HOME/${m.localPath}" ] && [ "${m.provider}" != "iCloud" ]; then
+              if [ ! -L "$HOME/${m.localPath}" ]; then
                 mkdir -p "$HOME/${m.localPath}"
               fi
             '') enabledMounts
@@ -318,108 +278,13 @@ in
 
           ${lib.concatStringsSep "\n" (
             map (r: ''
-              if [ ! -L "$HOME/${r.localPath}" ] && [ "${r.provider}" != "iCloud" ]; then
+              if [ ! -L "$HOME/${r.localPath}" ]; then
                 mkdir -p "$HOME/${r.localPath}"
               fi
             '') enabledReplicas
           )}
-
-          ${lib.optionalString (iCloudMountsMacOS != [ ]) (
-            lib.concatStringsSep "\n" (
-              map (m: ''
-                # iCloud mount on macOS: stable symlink to the native CloudDocs root.
-                # The OS manages live access; no rclone process is needed here.
-                _icloud_native="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
-                _icloud_link="$HOME/${m.localPath}"
-                if [ -d "$_icloud_native" ]; then
-                  if [ -L "$_icloud_link" ] && [ "$(readlink "$_icloud_link")" = "$_icloud_native" ]; then
-                    protect_cloud_symlink "$_icloud_link"
-                    : # Correct symlink already in place; no-op.
-                  elif [ -e "$_icloud_link" ] && [ ! -L "$_icloud_link" ]; then
-                    echo "cloud-drives: $HOME/${m.localPath} is not a symlink — merge any wanted content and remove it, then re-run apply." >&2
-                    exit 1
-                  else
-                    if [ -L "$_icloud_link" ]; then
-                      unprotect_cloud_symlink "$_icloud_link"
-                    fi
-                    ln -sf "$_icloud_native" "$_icloud_link"
-                    protect_cloud_symlink "$_icloud_link"
-                    echo "cloud-drives: linked $HOME/${m.localPath} -> $_icloud_native" >&2
-                  fi
-                else
-                  echo "cloud-drives: iCloud Drive not found at $_icloud_native; skipping ${m.id} mount symlink." >&2
-                fi
-              '') iCloudMountsMacOS
-            )
-          )}
-
-          ${lib.optionalString (iCloudReplicasMacOS != [ ]) (
-            lib.concatStringsSep "\n" (
-              map (r: ''
-                # iCloud replica on macOS: stable symlink to the native Mobile Documents root.
-                # WHY: this keeps replica paths under ~/clouds while exposing the full
-                # iCloud-managed directory tree exactly as requested.
-                _icloud_native="$HOME/Library/Mobile Documents"
-                _icloud_link="$HOME/${r.localPath}"
-                if [ -d "$_icloud_native" ]; then
-                  if [ -L "$_icloud_link" ] && [ "$(readlink "$_icloud_link")" = "$_icloud_native" ]; then
-                    protect_cloud_symlink "$_icloud_link"
-                    : # Correct symlink already in place; no-op.
-                  elif [ -e "$_icloud_link" ] && [ ! -L "$_icloud_link" ]; then
-                    echo "cloud-drives: $HOME/${r.localPath} is not a symlink — merge any wanted content and remove it, then re-run apply." >&2
-                    exit 1
-                  else
-                    if [ -L "$_icloud_link" ]; then
-                      unprotect_cloud_symlink "$_icloud_link"
-                    fi
-                    ln -sf "$_icloud_native" "$_icloud_link"
-                    protect_cloud_symlink "$_icloud_link"
-                    echo "cloud-drives: linked $HOME/${r.localPath} -> $_icloud_native" >&2
-                  fi
-                else
-                  echo "cloud-drives: iCloud Drive not found at $_icloud_native; skipping ${r.id} replica symlink." >&2
-                fi
-              '') iCloudReplicasMacOS
-            )
-          )}
         '';
       }
-
-      # -----------------------------------------------------------------------
-      # macOS: brctl iCloud replica refresh
-      # cloudDrivesICloudRefresh: forces all iCloud-synced files to download
-      # locally. Replaces the former ensureICloudFilesLocal hook in macos.nix.
-      # Only runs when at least one iCloud replica is enabled.
-      # -----------------------------------------------------------------------
-      (lib.mkIf (iCloudReplicasMacOS != [ ]) {
-        home.activation.cloudDrivesICloudRefresh = lib.hm.dag.entryAfter [ "reloadUserPreferenceState" ] ''
-          set +e  # soft-fail: iCloud may not be configured on all machines
-
-          ICLOUD_BASE="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
-
-          if [ ! -d "$ICLOUD_BASE" ]; then
-            set -e
-            exit 0  # iCloud not initialised on this machine; nothing to do.
-          fi
-
-          echo "cloud-drives: forcing iCloud files to download locally..." >&2
-
-          # brctl download is the official macOS command for forcing CloudKit
-          # file state to download-complete.  It is part of /usr/bin/brctl
-          # (available on all modern macOS releases) and targets the main
-          # iCloud Drive root (excluding app-specific iCloud containers).
-          # WHY 2>/dev/null on the glob expansion: the glob may expand to
-          # paths that brctl cannot process (e.g. lock files); errors on
-          # individual paths are benign and should not abort the activation.
-          if ! /usr/bin/brctl download "$ICLOUD_BASE"/* 2>/dev/null; then
-            echo "cloud-drives: warning — brctl download did not complete; files may download on first access." >&2
-          else
-            echo "cloud-drives: iCloud files forced to local cache." >&2
-          fi
-
-          set -e
-        '';
-      })
 
       # -----------------------------------------------------------------------
       # macOS: LaunchAgents for rclone-backed mounts

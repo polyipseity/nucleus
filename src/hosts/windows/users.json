@@ -16,15 +16,14 @@
             "remotePath": "/"
           },
           {
-            "enable": false,
+            "enable": true,
             "extraArgs": [],
             "id": "iCloud",
             "localPath": "clouds\\iCloud",
             "provider": "iCloud",
             "readWrite": false,
-            "remoteName": null,
-            "remotePath": "/",
-            "_why_disabled": "iCloud Drive does not have a supported rclone backend on Windows; use native OneDrive/Google Drive instead."
+            "remoteName": "iCloud",
+            "remotePath": "/"
           },
           {
             "enable": true,
@@ -40,7 +39,7 @@
         "replicas": [
           {
             "direction": "bidirectional",
-            "enable": false,
+            "enable": true,
             "fallbackTimer": {
               "enable": true,
               "interval": "daily"
@@ -69,13 +68,12 @@
               "debounceSeconds": 5,
               "enable": true
             },
-            "remoteName": null,
-            "remotePath": "/",
-            "_why_disabled": "iCloud Drive is not accessible via rclone on Windows."
+            "remoteName": "iCloud",
+            "remotePath": "/"
           },
           {
             "direction": "bidirectional",
-            "enable": false,
+            "enable": true,
             "fallbackTimer": {
               "enable": true,
               "interval": "daily"

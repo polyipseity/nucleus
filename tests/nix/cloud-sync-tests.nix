@@ -45,8 +45,8 @@ let
   # Test 7: Module reads user config from the users registry
   test_reads_user_config = assert' (containsRegex "users\.\\\$\{currentUsername\}\.cloudDrives" moduleText) "module must read per-user config from users.\${currentUsername}.cloudDrives";
 
-  # Test 8: macOS iCloud replica uses brctl (not rclone)
-  test_icloud_uses_brctl = assert' (containsRegex "brctl download" moduleText) "iCloud replica on macOS must use brctl download (native CloudDocs mechanism)";
+  # Test 8: iCloud does not rely on native brctl-only logic
+  test_icloud_not_brctl_only = assert' (!containsRegex "brctl download" moduleText) "cloud-drives module should not require native brctl iCloud-only behavior";
 
   # Test 9: rclone is conditionally added to home packages
   test_rclone_package_conditional = assert' (
@@ -56,8 +56,8 @@ let
   # Test 10: cloudDrivesSetup activation is defined
   test_setup_activation_exists = assert' (containsRegex "cloudDrivesSetup" moduleText) "cloudDrivesSetup activation must be defined for directory creation";
 
-  # Test 11: cloudDrivesICloudRefresh activation is defined
-  test_icloud_refresh_activation_exists = assert' (containsRegex "cloudDrivesICloudRefresh" moduleText) "cloudDrivesICloudRefresh activation must be defined for macOS iCloud replica";
+  # Test 11: cloudDrivesICloudRefresh activation is not required in rclone-first design
+  test_no_icloud_refresh_activation = assert' (!containsRegex "cloudDrivesICloudRefresh" moduleText) "cloudDrivesICloudRefresh activation should not exist in rclone-first cloud-drives module";
 
   # Test 12: macOS LaunchAgents are defined for rclone mounts
   test_macos_launchd_agents = assert' (containsRegex "launchd\.agents" moduleText) "module must define macOS LaunchAgents for rclone-backed mounts";
@@ -79,10 +79,10 @@ let
     test_mount_enable_defaults_true
     test_provider_enum_values
     test_reads_user_config
-    test_icloud_uses_brctl
+    test_icloud_not_brctl_only
     test_rclone_package_conditional
     test_setup_activation_exists
-    test_icloud_refresh_activation_exists
+    test_no_icloud_refresh_activation
     test_macos_launchd_agents
     test_nixos_systemd_services
     test_list_schema_allows_multiple

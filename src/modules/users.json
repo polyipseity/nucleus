@@ -39,7 +39,7 @@
           "localPath": "clouds/iCloud",
           "provider": "iCloud",
           "readWrite": false,
-          "remoteName": null,
+          "remoteName": "iCloud",
           "remotePath": "/"
         },
         {
@@ -85,12 +85,12 @@
             "debounceSeconds": 5,
             "enable": true
           },
-          "remoteName": null,
+          "remoteName": "iCloud",
           "remotePath": "/"
         },
         {
           "direction": "bidirectional",
-          "enable": false,
+          "enable": true,
           "fallbackTimer": {
             "enable": true,
             "interval": "daily"

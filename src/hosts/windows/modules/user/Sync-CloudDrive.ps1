@@ -7,8 +7,8 @@
 #   Replicas — rclone sync/bisync for full local copies. All replicas default
 #              to disabled; each entry must set "enable": true.
 #
-# iCloud on Windows: not supported (no rclone backend). Entries with
-# provider="iCloud" are skipped with a warning.
+# iCloud on Windows: handled through the rclone iclouddrive backend when the
+# user config provides a configured remoteName (for example "iCloud").
 #
 # Prerequisites (one-time manual steps):
 #   1. WinFsp installed (WinFsp.WinFsp via WinGet — declared in system.dsc.yml)
@@ -44,17 +44,6 @@ function Sync-CloudDrive {
     # ------------------------------------------------------------------
     $enabledMounts = $mounts | Where-Object { $_.enable -eq $true }
     foreach ($mount in $enabledMounts) {
-        $provider = $mount.provider
-
-        # iCloud Drive has no supported rclone backend on Windows.
-        # WHY skipped: no rclone remote type maps to iCloud Drive on Windows;
-        # native OneDrive sync covers the Microsoft ecosystem and Google Drive
-        # covers Google; iCloud on Windows is documented as unsupported.
-        if ($provider -eq 'iCloud') {
-            Write-Warning "cloud-drives: iCloud mount '$($mount.id)' is not supported on Windows; skipping."
-            continue
-        }
-
         $localPath = Join-Path $HomeDirectory $mount.localPath
         if (-not (Test-Path $localPath)) {
             New-Item -ItemType Directory -Path $localPath -Force | Out-Null
@@ -179,11 +168,6 @@ function Sync-CloudDrive {
     # ------------------------------------------------------------------
     $enabledReplicas = $replicas | Where-Object { $_.enable -eq $true }
     foreach ($replica in $enabledReplicas) {
-        if ($replica.provider -eq 'iCloud') {
-            Write-Warning "cloud-drives: iCloud replica '$($replica.id)' is not supported on Windows; skipping."
-            continue
-        }
-
         $localPath = Join-Path $HomeDirectory $replica.localPath
         if (-not (Test-Path $localPath)) {
             New-Item -ItemType Directory -Path $localPath -Force | Out-Null
