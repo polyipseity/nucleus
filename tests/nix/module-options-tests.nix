@@ -15,6 +15,7 @@ let
   shellModuleText = builtins.readFile ../../src/modules/shell.nix;
   secretsModuleText = builtins.readFile ../../src/modules/secrets.nix;
   flakeText = builtins.readFile ../../src/flake.nix;
+  cloudDrivesModuleText = builtins.readFile ../../src/modules/cloud-drives.nix;
 
   # Assertion helper with detailed error messages.
   assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
@@ -99,7 +100,14 @@ let
       && containsRegex "lib\.optionalAttrs \(options \? environment" coreModuleText
       && containsRegex "mkHomeManagerUsers" flakeText)
       "Conditional options should use mkIf, not implicit conditionals";
-
+  # Test 13: Verify cloud-drives module defines mounts and replicas options
+  test_cloud_drives_options =
+    assert'
+      (containsRegex "options\.nucleus\.cloudDrives\.mounts = lib\.mkOption" cloudDrivesModuleText
+      && containsRegex "options\.nucleus\.cloudDrives\.replicas = lib\.mkOption" cloudDrivesModuleText
+      && containsRegex "type = lib\.types\.listOf mountSubmodule;" cloudDrivesModuleText
+      && containsRegex "type = lib\.types\.listOf replicaSubmodule;" cloudDrivesModuleText)
+      "cloud-drives module must define nucleus.cloudDrives.mounts and nucleus.cloudDrives.replicas options as lists";
   allTests = [
     test_home_username_type
     test_home_directory_linux
@@ -113,6 +121,7 @@ let
     test_no_conflicting_options
     test_option_defaults_meaningful
     test_conditional_options_structure
+    test_cloud_drives_options
   ];
 in
 {
@@ -132,5 +141,6 @@ in
     "no conflicting option definitions"
     "option defaults are meaningful"
     "conditional options use mkIf"
+    "cloud-drives module defines mounts and replicas options"
   ];
 }

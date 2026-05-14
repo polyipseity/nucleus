@@ -3,6 +3,95 @@
   "users": {
     "polyipseity": {
       "description": "Primary user receiving secret materialization and full configuration",
+      "cloudDrives": {
+        "mounts": [
+          {
+            "enable": true,
+            "extraArgs": [],
+            "id": "googledrive",
+            "localPath": "clouds\\GoogleDrive",
+            "provider": "GoogleDrive",
+            "readWrite": true,
+            "remoteName": "GoogleDrive",
+            "remotePath": "/"
+          },
+          {
+            "enable": false,
+            "extraArgs": [],
+            "id": "icloud",
+            "localPath": "clouds\\iCloud",
+            "provider": "iCloud",
+            "readWrite": false,
+            "remoteName": null,
+            "remotePath": "/",
+            "_why_disabled": "iCloud Drive does not have a supported rclone backend on Windows; use native OneDrive/Google Drive instead."
+          },
+          {
+            "enable": true,
+            "extraArgs": [],
+            "id": "onedrive",
+            "localPath": "clouds\\OneDrive",
+            "provider": "OneDrive",
+            "readWrite": true,
+            "remoteName": "OneDrive",
+            "remotePath": "/"
+          }
+        ],
+        "replicas": [
+          {
+            "direction": "bidirectional",
+            "enable": false,
+            "fallbackTimer": {
+              "enable": true,
+              "interval": "daily"
+            },
+            "id": "googledrive",
+            "localPath": "clouds\\GoogleDriveReplica",
+            "provider": "GoogleDrive",
+            "realtime": {
+              "debounceSeconds": 5,
+              "enable": true
+            },
+            "remoteName": "GoogleDrive",
+            "remotePath": "/"
+          },
+          {
+            "direction": "bidirectional",
+            "enable": false,
+            "fallbackTimer": {
+              "enable": true,
+              "interval": "daily"
+            },
+            "id": "icloud",
+            "localPath": "clouds\\iCloudReplica",
+            "provider": "iCloud",
+            "realtime": {
+              "debounceSeconds": 5,
+              "enable": true
+            },
+            "remoteName": null,
+            "remotePath": "/",
+            "_why_disabled": "iCloud Drive is not accessible via rclone on Windows."
+          },
+          {
+            "direction": "bidirectional",
+            "enable": false,
+            "fallbackTimer": {
+              "enable": true,
+              "interval": "daily"
+            },
+            "id": "onedrive",
+            "localPath": "clouds\\OneDriveReplica",
+            "provider": "OneDrive",
+            "realtime": {
+              "debounceSeconds": 5,
+              "enable": true
+            },
+            "remoteName": "OneDrive",
+            "remotePath": "/"
+          }
+        ]
+      },
       "devRepos": {
         "enable": true,
         "gitHubUsername": "polyipseity",

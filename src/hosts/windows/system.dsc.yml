@@ -315,6 +315,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure NSSM is installed to run persistent rclone mount services for managed cloud drive mounts on Windows
+      settings:
+        id: NSSM.NSSM
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Obsidian is installed to mirror the macOS GUI package declaration
       settings:
         id: Obsidian.Obsidian
@@ -350,6 +357,13 @@ properties:
         description: Ensure Parsec is installed to mirror the macOS low-latency remote-desktop package declaration
       settings:
         id: Parsec.Parsec
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure rclone is installed as the cross-platform cloud storage sync and mount tool for cloud drive parity with macOS and NixOS
+      settings:
+        id: Rclone.Rclone
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -440,6 +454,13 @@ properties:
         description: Ensure VLC media player is installed to mirror the macOS GUI package declaration
       settings:
         id: VideoLAN.VLC
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure WinFsp (FUSE for Windows) is installed as a prerequisite for rclone mount on Windows; required for any cloud drive mount operation
+      settings:
+        id: WinFsp.WinFsp
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package

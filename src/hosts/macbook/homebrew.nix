@@ -43,6 +43,7 @@ let
     "keka" # Graphical archiver with 7-Zip backend support
     "linearmouse" # Per-device mouse/trackpad scrolling behavior and sensitivity
     "lulu" # Outbound network firewall
+    "macfuse" # FUSE kernel extension for rclone cloud drive mounts
     "orbstack" # Docker/Linux VM runtime (faster than Docker Desktop)
     "parsec" # Low-latency remote gaming / desktop streaming
     "raycast" # Spotlight replacement and launcher

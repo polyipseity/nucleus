@@ -20,6 +20,93 @@
     "obsidian": {
       "settings": {}
     },
+    "cloudDrives": {
+      "mounts": [
+        {
+          "enable": true,
+          "extraArgs": [],
+          "id": "googledrive",
+          "localPath": "clouds/GoogleDrive",
+          "provider": "GoogleDrive",
+          "readWrite": true,
+          "remoteName": "GoogleDrive",
+          "remotePath": "/"
+        },
+        {
+          "enable": true,
+          "extraArgs": [],
+          "id": "icloud",
+          "localPath": "clouds/iCloud",
+          "provider": "iCloud",
+          "readWrite": false,
+          "remoteName": null,
+          "remotePath": "/"
+        },
+        {
+          "enable": true,
+          "extraArgs": [],
+          "id": "onedrive",
+          "localPath": "clouds/OneDrive",
+          "provider": "OneDrive",
+          "readWrite": true,
+          "remoteName": "OneDrive",
+          "remotePath": "/"
+        }
+      ],
+      "replicas": [
+        {
+          "direction": "bidirectional",
+          "enable": false,
+          "fallbackTimer": {
+            "enable": true,
+            "interval": "daily"
+          },
+          "id": "googledrive",
+          "localPath": "clouds/GoogleDriveReplica",
+          "provider": "GoogleDrive",
+          "realtime": {
+            "debounceSeconds": 5,
+            "enable": true
+          },
+          "remoteName": "GoogleDrive",
+          "remotePath": "/"
+        },
+        {
+          "direction": "pull",
+          "enable": true,
+          "fallbackTimer": {
+            "enable": true,
+            "interval": "daily"
+          },
+          "id": "icloud",
+          "localPath": "clouds/iCloudReplica",
+          "provider": "iCloud",
+          "realtime": {
+            "debounceSeconds": 5,
+            "enable": true
+          },
+          "remoteName": null,
+          "remotePath": "/"
+        },
+        {
+          "direction": "bidirectional",
+          "enable": false,
+          "fallbackTimer": {
+            "enable": true,
+            "interval": "daily"
+          },
+          "id": "onedrive",
+          "localPath": "clouds/OneDriveReplica",
+          "provider": "OneDrive",
+          "realtime": {
+            "debounceSeconds": 5,
+            "enable": true
+          },
+          "remoteName": "OneDrive",
+          "remotePath": "/"
+        }
+      ]
+    },
     "devRepos": {
       "enable": true,
       "gitHubUsername": "polyipseity",

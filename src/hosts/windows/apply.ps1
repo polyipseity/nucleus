@@ -80,6 +80,11 @@
 .PARAMETER EnableBunParity
   Enable managed bun global package provisioning (pi-coding-agent and future bun-only tools).
 
+.PARAMETER EnableCloudDrivesParity
+  Enable managed cloud drive mount directory provisioning and rclone remote verification
+  for each configured user. iCloud entries are skipped with a warning (no rclone backend
+  on Windows). False skips provisioning without error.
+
 .PARAMETER EnableGitSshParity
   Enable managed user-level Git/SSH parity convergence and block cleanup logic.
 
@@ -189,6 +194,7 @@ param(
   [bool]$EnableAgentsClawHubSkillsParity = $true,
   [bool]$EnableSecretsParity = $true,
   [bool]$EnableBunParity = $true,
+  [bool]$EnableCloudDrivesParity = $true,
   [bool]$EnableGitSshParity = $true,
   [bool]$EnableHostAgeKeyRegistration = $true,
   [bool]$EnablePowerParity = $true,
@@ -247,6 +253,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CargoBinstallSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-ScoopSetup.ps1")
 # user/: per-user home convergence (git/SSH, shell, agents, dev repos, apps).
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-CloudDrive.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsClawHubSkill.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsSkill.ps1")
@@ -511,6 +518,11 @@ if ($null -eq $EnableDevReposParity) {
 # secret/key ordering across macOS, NixOS, and Windows.
 Sync-DevRepo -Enabled:$EnableDevReposParity -Repositories $devRepositories
 Sync-ShellProfile -Enabled:$EnableShellParity
+if ($EnableCloudDrivesParity) {
+  foreach ($userRecord in $selectedUserRecords) {
+    Sync-CloudDrive -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
+  }
+}
 Sync-OpenSshServer -Enabled:$EnableRemoteAccessParity
 # Re-run host age key registration after Sync-OpenSshServer has started
 # the sshd service (which generates host keys on a fresh machine).  This second

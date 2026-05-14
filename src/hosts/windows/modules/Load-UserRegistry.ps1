@@ -107,6 +107,7 @@ foreach ($userName in $rawRegistry.users.PSObject.Properties.Name) {
     else {
       @()
     }
+    cloudDrives    = ConvertTo-PlainObject -InputObject $userConfig.cloudDrives
     devRepos       = ConvertTo-PlainObject -InputObject $userConfig.devRepos
     homeDirectory  = $userConfig.homeDirectory
     isPrimary      = if ($userConfig.isPrimary) { $true } else { $false }

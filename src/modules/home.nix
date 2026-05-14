@@ -193,6 +193,7 @@ in
   imports = [
     ./agents.nix
     ./ai
+    ./cloud-drives.nix
     ./core.nix
     ./dev-repos.nix
     ./editors.nix
