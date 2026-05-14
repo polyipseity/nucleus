@@ -51,7 +51,7 @@
         },
         {
           "path": "dev/monorepo/self/obsidian-monorepo",
-          "recursive": false
+          "recursive": true
         },
         {
           "path": "dev/monorepo-private/orgs/*",
