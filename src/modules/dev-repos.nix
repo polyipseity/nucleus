@@ -194,7 +194,7 @@ in
             _pms_path="$1"
             case "$(uname -s)" in
               Darwin)
-                if ! chflags -h uchg "$_pms_path"; then
+                if ! /usr/bin/chflags -h uchg "$_pms_path"; then
                   echo "devReposProvision: warning — could not protect symlink $_pms_path with uchg." >&2
                 fi
                 ;;
@@ -212,7 +212,7 @@ in
             _ums_path="$1"
             case "$(uname -s)" in
               Darwin)
-                if ! chflags -h nouchg "$_ums_path"; then
+                if ! /usr/bin/chflags -h nouchg "$_ums_path"; then
                   echo "devReposProvision: warning — could not clear uchg from symlink $_ums_path before update." >&2
                 fi
                 ;;

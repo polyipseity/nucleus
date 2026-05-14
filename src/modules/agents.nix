@@ -47,7 +47,7 @@ in
         _nps_path="$1"
         case "$(uname -s)" in
           Darwin)
-            if ! chflags -h uchg "$_nps_path"; then
+            if ! /usr/bin/chflags -h uchg "$_nps_path"; then
               echo "agents-config: warning — could not protect symlink $_nps_path with uchg." >&2
             fi
             ;;
@@ -65,7 +65,7 @@ in
         _nus_path="$1"
         case "$(uname -s)" in
           Darwin)
-            if ! chflags -h nouchg "$_nus_path"; then
+            if ! /usr/bin/chflags -h nouchg "$_nus_path"; then
               echo "agents-config: warning — could not clear uchg from symlink $_nus_path before update." >&2
             fi
             ;;
@@ -194,7 +194,7 @@ in
         _nps_path="$1"
         case "$(uname -s)" in
           Darwin)
-            if ! chflags -h uchg "$_nps_path"; then
+            if ! /usr/bin/chflags -h uchg "$_nps_path"; then
               echo "agents-skills: warning — could not protect symlink $_nps_path with uchg." >&2
             fi
             ;;
@@ -212,7 +212,7 @@ in
         _nus_path="$1"
         case "$(uname -s)" in
           Darwin)
-            if ! chflags -h nouchg "$_nus_path"; then
+            if ! /usr/bin/chflags -h nouchg "$_nus_path"; then
               echo "agents-skills: warning — could not clear uchg from symlink $_nus_path before update." >&2
             fi
             ;;

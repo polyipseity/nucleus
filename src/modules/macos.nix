@@ -594,14 +594,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       protect_alias_symlink() {
         _ray_alias_path="$1"
-        if ! chflags -h uchg "$_ray_alias_path"; then
+        if ! /usr/bin/chflags -h uchg "$_ray_alias_path"; then
           echo "raycast: warning — could not protect alias symlink $_ray_alias_path with uchg." >&2
         fi
       }
 
       unprotect_alias_symlink() {
         _ray_alias_path="$1"
-        if ! chflags -h nouchg "$_ray_alias_path"; then
+        if ! /usr/bin/chflags -h nouchg "$_ray_alias_path"; then
           echo "raycast: warning — could not clear uchg from alias symlink $_ray_alias_path before update." >&2
         fi
       }
