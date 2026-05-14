@@ -6,7 +6,7 @@
 - Run `nucleus-cloud-setup` and complete `rclone config` for `GoogleDrive` and `OneDrive` when prompted.
 - `~/clouds/iCloudReplica` is a managed symlink to `~/Library/Mobile Documents`.
 
-## shell aliases (minimal)
+## shell aliases
 
 - `g` — run `git`.
 - `gst` — run `git status`.

@@ -3,7 +3,7 @@
 - Run `nucleus-cloud-setup` in PowerShell and complete `rclone config` for `GoogleDrive` and `OneDrive` when prompted.
 - iCloud is not mounted with rclone on Windows; use the native iCloud for Windows app.
 
-## shell aliases (minimal)
+## shell aliases
 
 - `g` — run `git`.
 - `gst` — run `git status`.
