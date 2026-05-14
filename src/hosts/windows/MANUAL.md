@@ -2,7 +2,7 @@
 
 - Run `nucleus-cloud-setup` in PowerShell and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
 
-## shell aliases
+## command shortcuts
 
 - `g` — run `git`.
 - `ga` — run `git add`.
@@ -22,6 +22,10 @@
 - `la` — run `eza -la`.
 - `ll` — run `eza -la`.
 - `ni` — run `bun install`.
+- `nucleus-cloud-setup` — configure required cloud remotes and re-run apply.
+- `nucleus-gc` — run the managed Nix garbage-collection flow.
+- `nucleus-health-check` — run the managed repository health checks.
+- `nucleus-update` — run the managed repository update flow.
 - `nr` — run `bun run`.
 - `nx` — run `bun x`.
 - `v` — open `nvim`.
