@@ -311,6 +311,24 @@
         }/bin/nucleus-gc";
       };
 
+      # Build cloud setup helper app for POSIX hosts.
+      # Guides one-time rclone remote bootstrap and then runs apply so mount
+      # services/units converge immediately after credentials are configured.
+      mkCloudSetupApp = pkgs: {
+        type = "app";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-cloud-setup";
+            runtimeInputs = [
+              pkgs.git
+              pkgs.nix
+              pkgs.rclone
+            ];
+            text = builtins.readFile ../scripts/cloud-setup.sh;
+          }
+        }/bin/nucleus-cloud-setup";
+      };
+
     in
     {
       # -----------------------------------------------------------------------
@@ -330,6 +348,7 @@
           };
           check-sh = mkCheckShApp pkgsMac;
           check-pwsh = mkCheckPwshApp pkgsMac;
+          cloud-setup = mkCloudSetupApp pkgsMac;
           gc = mkGcApp pkgsMac;
           health-check = mkHealthCheckApp pkgsMac;
           update = mkUpdateApp pkgsMac;
@@ -346,6 +365,7 @@
           };
           check-sh = mkCheckShApp pkgsLinux;
           check-pwsh = mkCheckPwshApp pkgsLinux;
+          cloud-setup = mkCloudSetupApp pkgsLinux;
           gc = mkGcApp pkgsLinux;
           health-check = mkHealthCheckApp pkgsLinux;
           update = mkUpdateApp pkgsLinux;

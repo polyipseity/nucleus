@@ -1,9 +1,9 @@
 # Sync-CloudDrive.ps1 — Provision cloud drive mounts and replicas on Windows.
 #
 # Reads per-user cloud drive configuration from users.json and provisions:
-#   Mounts  — rclone mount processes managed as persistent NSSM services.
-#             Requires WinFsp (WinFsp.WinFsp in WinGet), NSSM (NSSM.NSSM), and
-#             rclone configured via `rclone config`.
+#   Mounts  — rclone mount processes managed as persistent Servy services.
+#             Requires WinFsp (WinFsp.WinFsp in WinGet), Servy
+#             (aelassas.Servy), and rclone configured via `rclone config`.
 #   Replicas — rclone sync/bisync for full local copies. All replicas default
 #              to disabled; each entry must set "enable": true.
 #
@@ -13,11 +13,12 @@
 # Prerequisites (one-time manual steps):
 #   1. WinFsp installed (WinFsp.WinFsp via WinGet — declared in system.dsc.yml)
 #   2. rclone installed (Rclone.Rclone via WinGet — declared in system.dsc.yml)
-#   3. NSSM installed (NSSM.NSSM via WinGet — declared in system.dsc.yml)
+#   3. Servy installed (aelassas.Servy via WinGet — declared in system.dsc.yml)
 #   4. rclone remotes configured: run `rclone config` for each provider
 #
-# Idempotency: mount directories are created if absent; existing mounts are
-# converged to the desired NSSM service command and restarted only when running.
+# Idempotency: mount directories are created if absent; existing mount services
+# are converged by reinstalling the Servy definition to match the desired
+# rclone command.
 
 function Sync-CloudDrive {
     [CmdletBinding()]
@@ -94,12 +95,12 @@ function Sync-CloudDrive {
             continue
         }
 
-        # Probe NSSM availability without failing the entire converge.
-        # WHY benign probe: if NSSM is absent we skip mount automation and keep
+        # Probe Servy CLI availability without failing the entire converge.
+        # WHY benign probe: if Servy is absent we skip mount automation and keep
         # other cloud-drive entries converging.
-        $nssmExe = (Get-Command nssm -ErrorAction SilentlyContinue)?.Source
-        if (-not $nssmExe) {
-            Write-Warning "cloud-drives: NSSM not found on PATH; install via 'winget install NSSM.NSSM' for mount '$($mount.id)'."
+        $servyCliExe = (Get-Command servy-cli -ErrorAction SilentlyContinue)?.Source
+        if (-not $servyCliExe) {
+            Write-Warning "cloud-drives: servy-cli not found on PATH; install via 'winget install aelassas.Servy' for mount '$($mount.id)'."
             continue
         }
 
@@ -126,48 +127,40 @@ function Sync-CloudDrive {
             $mountArgs += @($mount.extraArgs | Where-Object { $_ })
         }
 
-        # Quote all parameters so NSSM preserves spaces/special characters in
+        # Quote all parameters so Servy preserves spaces/special characters in
         # remotes, paths, and user-provided extra arguments.
         $appParameters = ($mountArgs | ForEach-Object {
             '"{0}"' -f ($_.ToString().Replace('"', '\"'))
         }) -join ' '
 
         $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-        if (-not $existingService) {
-            & $nssmExe install $serviceName $rcloneExe
+        if ($existingService) {
+            if ($existingService.Status -eq 'Running') {
+                try {
+                    Stop-Service -Name $serviceName -ErrorAction Stop
+                }
+                catch {
+                    Write-Warning "cloud-drives: failed to stop existing service '$serviceName' before Servy reconfigure; skipping mount '$($mount.id)'."
+                    continue
+                }
+            }
+
+            & $servyCliExe uninstall "--name=$serviceName"
             if ($LASTEXITCODE -ne 0) {
-                Write-Warning "cloud-drives: failed to create NSSM service '$serviceName' for mount '$($mount.id)'; skipping."
+                Write-Warning "cloud-drives: failed to uninstall existing Servy service '$serviceName'; skipping mount '$($mount.id)'."
                 continue
             }
         }
 
-        & $nssmExe set $serviceName Application $rcloneExe
+        & $servyCliExe install "--name=$serviceName" "--displayName=$serviceName" "--description=Managed rclone mount for nucleus cloud drive '$($mount.id)'" "--path=$rcloneExe" "--startupDir=$(Split-Path -Parent $rcloneExe)" "--params=$appParameters" "--startupType=Automatic"
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning "cloud-drives: failed to set NSSM Application for service '$serviceName'; skipping."
-            continue
-        }
-
-        & $nssmExe set $serviceName AppDirectory (Split-Path -Parent $rcloneExe)
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "cloud-drives: failed to set NSSM AppDirectory for service '$serviceName'; skipping."
-            continue
-        }
-
-        & $nssmExe set $serviceName AppParameters $appParameters
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "cloud-drives: failed to set NSSM AppParameters for service '$serviceName'; skipping."
-            continue
-        }
-
-        & $nssmExe set $serviceName Start SERVICE_AUTO_START
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "cloud-drives: failed to set NSSM start mode for service '$serviceName'; skipping."
+            Write-Warning "cloud-drives: failed to install Servy service '$serviceName' for mount '$($mount.id)'; skipping."
             continue
         }
 
         $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
         if (-not $service) {
-            Write-Warning "cloud-drives: service '$serviceName' not found after NSSM configuration; skipping start."
+            Write-Warning "cloud-drives: service '$serviceName' not found after Servy install; skipping start."
             continue
         }
 

@@ -8,7 +8,7 @@
           {
             "enable": true,
             "extraArgs": [],
-            "id": "googledrive",
+            "id": "GoogleDrive",
             "localPath": "clouds\\GoogleDrive",
             "provider": "GoogleDrive",
             "readWrite": true,
@@ -18,7 +18,7 @@
           {
             "enable": false,
             "extraArgs": [],
-            "id": "icloud",
+            "id": "iCloud",
             "localPath": "clouds\\iCloud",
             "provider": "iCloud",
             "readWrite": false,
@@ -29,7 +29,7 @@
           {
             "enable": true,
             "extraArgs": [],
-            "id": "onedrive",
+            "id": "OneDrive",
             "localPath": "clouds\\OneDrive",
             "provider": "OneDrive",
             "readWrite": true,
@@ -45,7 +45,7 @@
               "enable": true,
               "interval": "daily"
             },
-            "id": "googledrive",
+            "id": "GoogleDrive",
             "localPath": "clouds\\GoogleDriveReplica",
             "provider": "GoogleDrive",
             "realtime": {
@@ -62,7 +62,7 @@
               "enable": true,
               "interval": "daily"
             },
-            "id": "icloud",
+            "id": "iCloud",
             "localPath": "clouds\\iCloudReplica",
             "provider": "iCloud",
             "realtime": {
@@ -80,7 +80,7 @@
               "enable": true,
               "interval": "daily"
             },
-            "id": "onedrive",
+            "id": "OneDrive",
             "localPath": "clouds\\OneDriveReplica",
             "provider": "OneDrive",
             "realtime": {

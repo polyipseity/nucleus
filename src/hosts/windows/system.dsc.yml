@@ -315,9 +315,9 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure NSSM is installed to run persistent rclone mount services for managed cloud drive mounts on Windows
+        description: Ensure Servy is installed to run persistent rclone mount services for managed cloud drive mounts on Windows
       settings:
-        id: NSSM.NSSM
+        id: aelassas.Servy
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package

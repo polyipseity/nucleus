@@ -40,10 +40,11 @@ let
   currentUsername = config.home.username;
   currentUserHome = config.home.homeDirectory;
 
-  userConfig = users.${currentUsername}.cloudDrives or {
-    mounts = [ ];
-    replicas = [ ];
-  };
+  userConfig =
+    users.${currentUsername}.cloudDrives or {
+      mounts = [ ];
+      replicas = [ ];
+    };
 
   # ---------------------------------------------------------------------------
   # Option type definitions
@@ -254,10 +255,7 @@ in
       #   - iCloud on macOS uses a native CloudDocs symlink (no rclone process)
       #   - iCloud on NixOS would need rclone but is unsupported for now
       rcloneMounts = builtins.filter (
-        m:
-        m.enable
-        && m.remoteName != null
-        && !(m.provider == "iCloud" && pkgs.stdenv.isDarwin)
+        m: m.enable && m.remoteName != null && !(m.provider == "iCloud" && pkgs.stdenv.isDarwin)
       ) config.nucleus.cloudDrives.mounts;
 
       # iCloud mounts on macOS (symlink path, no rclone process).
@@ -358,10 +356,10 @@ in
           ${lib.optionalString (iCloudReplicasMacOS != [ ]) (
             lib.concatStringsSep "\n" (
               map (r: ''
-                # iCloud replica on macOS: stable symlink to the native CloudDocs root.
-                # WHY: this keeps replica paths under ~/clouds while still pointing to
-                # the canonical iCloud Drive root that excludes app container folders.
-                _icloud_native="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
+                # iCloud replica on macOS: stable symlink to the native Mobile Documents root.
+                # WHY: this keeps replica paths under ~/clouds while exposing the full
+                # iCloud-managed directory tree exactly as requested.
+                _icloud_native="$HOME/Library/Mobile Documents"
                 _icloud_link="$HOME/${r.localPath}"
                 if [ -d "$_icloud_native" ]; then
                   if [ -L "$_icloud_link" ] && [ "$(readlink "$_icloud_link")" = "$_icloud_native" ]; then
@@ -394,35 +392,33 @@ in
       # Only runs when at least one iCloud replica is enabled.
       # -----------------------------------------------------------------------
       (lib.mkIf (iCloudReplicasMacOS != [ ]) {
-        home.activation.cloudDrivesICloudRefresh =
-          lib.hm.dag.entryAfter [ "reloadUserPreferenceState" ]
-            ''
-              set +e  # soft-fail: iCloud may not be configured on all machines
+        home.activation.cloudDrivesICloudRefresh = lib.hm.dag.entryAfter [ "reloadUserPreferenceState" ] ''
+          set +e  # soft-fail: iCloud may not be configured on all machines
 
-              ICLOUD_BASE="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
+          ICLOUD_BASE="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
 
-              if [ ! -d "$ICLOUD_BASE" ]; then
-                set -e
-                exit 0  # iCloud not initialised on this machine; nothing to do.
-              fi
+          if [ ! -d "$ICLOUD_BASE" ]; then
+            set -e
+            exit 0  # iCloud not initialised on this machine; nothing to do.
+          fi
 
-              echo "cloud-drives: forcing iCloud files to download locally..." >&2
+          echo "cloud-drives: forcing iCloud files to download locally..." >&2
 
-              # brctl download is the official macOS command for forcing CloudKit
-              # file state to download-complete.  It is part of /usr/bin/brctl
-              # (available on all modern macOS releases) and targets the main
-              # iCloud Drive root (excluding app-specific iCloud containers).
-              # WHY 2>/dev/null on the glob expansion: the glob may expand to
-              # paths that brctl cannot process (e.g. lock files); errors on
-              # individual paths are benign and should not abort the activation.
-              if ! /usr/bin/brctl download "$ICLOUD_BASE"/* 2>/dev/null; then
-                echo "cloud-drives: warning — brctl download did not complete; files may download on first access." >&2
-              else
-                echo "cloud-drives: iCloud files forced to local cache." >&2
-              fi
+          # brctl download is the official macOS command for forcing CloudKit
+          # file state to download-complete.  It is part of /usr/bin/brctl
+          # (available on all modern macOS releases) and targets the main
+          # iCloud Drive root (excluding app-specific iCloud containers).
+          # WHY 2>/dev/null on the glob expansion: the glob may expand to
+          # paths that brctl cannot process (e.g. lock files); errors on
+          # individual paths are benign and should not abort the activation.
+          if ! /usr/bin/brctl download "$ICLOUD_BASE"/* 2>/dev/null; then
+            echo "cloud-drives: warning — brctl download did not complete; files may download on first access." >&2
+          else
+            echo "cloud-drives: iCloud files forced to local cache." >&2
+          fi
 
-              set -e
-            '';
+          set -e
+        '';
       })
 
       # -----------------------------------------------------------------------

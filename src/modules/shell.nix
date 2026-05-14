@@ -44,6 +44,7 @@ let
 in
 {
   home.packages = [
+    (mkNucleusCommand "nucleus-cloud-setup" "cloud-setup")
     (mkNucleusCommand "nucleus-gc" "gc")
     (mkNucleusCommand "nucleus-health-check" "health-check")
     (mkNucleusCommand "nucleus-update" "update")
