@@ -117,9 +117,20 @@ in
               return 127
             }
 
+            # Python/pip are only allowed when a scoped environment is active.
+            # This keeps system Python protected while preserving normal venv/
+            # conda workflows.
+            __nucleus_python_scope_active() {
+              [[ -n "''${VIRTUAL_ENV:-}" || -n "''${CONDA_PREFIX:-}" ]]
+            }
+
             # Intercept python/python3 invocations and warn about system-wide Python ban.
             # These are functions, not aliases, so they can provide helpful context.
             python() {
+              if __nucleus_python_scope_active; then
+                command python "$@"
+                return $?
+              fi
               cat >&2 << 'EOF'
       shell: system-wide Python is banned to prevent accidental modifications.
                Use one of these approaches instead:
@@ -132,12 +143,20 @@ in
             }
 
             python3() {
+              if __nucleus_python_scope_active; then
+                command python3 "$@"
+                return $?
+              fi
               python "$@"
             }
 
             # Intercept pip/pip3 invocations and warn about system-wide pip ban.
             # Remind users that modifying system Python breaks system dependencies.
             pip() {
+              if __nucleus_python_scope_active; then
+                command pip "$@"
+                return $?
+              fi
               cat >&2 << 'EOF'
       shell: system-wide pip is banned to prevent breaking system dependencies.
                Use one of these approaches instead:
@@ -150,6 +169,10 @@ in
             }
 
             pip3() {
+              if __nucleus_python_scope_active; then
+                command pip3 "$@"
+                return $?
+              fi
               pip "$@"
             }
 

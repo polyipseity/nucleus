@@ -229,9 +229,38 @@ let
 
     function v { & nvim @Args }
 
+    function Test-NucleusPythonScopeActive {
+      return (-not [string]::IsNullOrWhiteSpace($env:VIRTUAL_ENV)) -or (-not [string]::IsNullOrWhiteSpace($env:CONDA_PREFIX))
+    }
+
+    function Invoke-NucleusPythonScopedTool {
+      param(
+        [Parameter(Mandatory = $true)]
+        [string]$ToolName,
+
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [object[]]$ToolArguments
+      )
+
+      if (-not (Test-NucleusPythonScopeActive)) {
+        return $false
+      }
+
+      $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+      if ($null -eq $application) {
+        return $false
+      }
+
+      & $application.Source @ToolArguments
+      return $true
+    }
+
     # System-wide Python ban: redirect python/pip to warnings so users are
     # guided to scoped alternatives instead of modifying the system environment.
     function python {
+      if (Invoke-NucleusPythonScopedTool -ToolName "python" @Args) {
+        return
+      }
       Write-Host "shell: system-wide Python is banned to prevent accidental modifications." -ForegroundColor Yellow
       Write-Host "         Use one of these approaches instead:" -ForegroundColor Yellow
       Write-Host "         - nix develop     (activate project devShell with scoped Python)" -ForegroundColor Yellow
@@ -241,9 +270,15 @@ let
       return 1
     }
     function python3 {
+      if (Invoke-NucleusPythonScopedTool -ToolName "python3" @Args) {
+        return
+      }
       python @Args
     }
     function pip {
+      if (Invoke-NucleusPythonScopedTool -ToolName "pip" @Args) {
+        return
+      }
       Write-Host "shell: system-wide pip is banned to prevent breaking system dependencies." -ForegroundColor Yellow
       Write-Host "         Use one of these approaches instead:" -ForegroundColor Yellow
       Write-Host "         - nix develop     (activate project devShell with scoped Python+pip)" -ForegroundColor Yellow
@@ -253,6 +288,9 @@ let
       return 1
     }
     function pip3 {
+      if (Invoke-NucleusPythonScopedTool -ToolName "pip3" @Args) {
+        return
+      }
       pip @Args
     }
 
