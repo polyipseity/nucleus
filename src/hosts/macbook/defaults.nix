@@ -557,6 +557,11 @@ in
     screencapture = {
       disable-shadow = true; # omit window drop-shadow from screenshots
       location = "~/Desktop"; # default save location
+      # WHY target is explicitly set: macOS stores target = "preview" from prior
+      # manual Screenshot.app usage, which causes CMD+SHIFT+3/4 screenshots to open
+      # in Preview instead of auto-saving to the configured location.  Declaring
+      # target = "file" ensures nix-darwin overwrites that preference on every apply.
+      target = "file"; # save screenshots directly to location, not via Preview
       type = "png"; # default file format
     };
 
