@@ -134,8 +134,7 @@ function Sync-ObsidianConfig {
     )
 
     $defaultSettings = @{
-      checkSlowStartup = $true
-      cli = $true
+      nativeMenus = $false
       updateDisabled = $true
     }
 

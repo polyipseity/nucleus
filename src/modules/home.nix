@@ -116,8 +116,8 @@ let
   # the managed subset here in code instead of as a standalone repo JSON so we
   # do not imply repository ownership of the full live app-state file.
   obsidianDefaultSettings = {
-    checkSlowStartup = true;
-    cli = true;
+    # Disable Electron-native menus for consistent app command handling.
+    nativeMenus = false;
     updateDisabled = true;
   };
 

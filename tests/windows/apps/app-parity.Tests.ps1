@@ -48,13 +48,12 @@ Describe "Windows Application Parity" {
             Test-Path -Path $configPath | Should -Be $true
         }
 
-        It "Should disable Obsidian auto-updates and enable the managed advanced settings" {
+        It "Should disable Obsidian auto-updates and disable native menus" {
             $configPath = Join-Path $env:APPDATA 'obsidian\obsidian.json'
             $obsidian = Get-Content -Path $configPath -Raw | ConvertFrom-Json
 
             $obsidian.updateDisabled | Should -Be $true
-            $obsidian.cli | Should -Be $true
-            $obsidian.checkSlowStartup | Should -Be $true
+            $obsidian.nativeMenus | Should -Be $false
         }
     }
 }
