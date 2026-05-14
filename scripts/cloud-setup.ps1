@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Performs a bounded cloud-drive setup workflow:
-    1. verifies required rclone remotes exist (GoogleDrive, OneDrive)
+    1. verifies required rclone remotes exist (GoogleDrive, iCloud, OneDrive)
     2. launches interactive `rclone config` if remotes are missing
     3. runs `nix run <repo>/src#apply` so cloud mount services converge
 
@@ -70,7 +70,7 @@ if (-not (Get-Command rclone -ErrorAction SilentlyContinue)) {
   throw 'cloud-setup: rclone not found on PATH. Run apply/bootstrap first, then retry.'
 }
 
-$requiredRemotes = @('GoogleDrive', 'OneDrive')
+$requiredRemotes = @('GoogleDrive', 'iCloud', 'OneDrive')
 $missingRemotes = Get-RcloneMissingRemote -RequiredRemotes $requiredRemotes
 if ($null -eq $missingRemotes) {
   throw "cloud-setup: failed to read rclone remotes. Run 'rclone config' manually and retry."

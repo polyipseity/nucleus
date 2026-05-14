@@ -2,7 +2,7 @@
 # Guides one-time cloud remote setup and converges cloud mount automation.
 #
 # Operations:
-#   1. verify required rclone remotes exist (GoogleDrive, OneDrive)
+#   1. verify required rclone remotes exist (GoogleDrive, iCloud, OneDrive)
 #   2. if missing, open interactive rclone config once
 #   3. run nucleus apply so cloud mount services/units converge immediately
 #
@@ -75,7 +75,7 @@ if ! command -v rclone >/dev/null 2>&1; then
   exit 1
 fi
 
-required_remotes="GoogleDrive OneDrive"
+required_remotes="GoogleDrive iCloud OneDrive"
 missing_remotes="$(collect_missing_remotes "$required_remotes")" || {
   printf '%s\n' "cloud-setup: failed to read rclone remotes. Run 'rclone config' manually and retry." >&2
   exit 1
