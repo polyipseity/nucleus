@@ -15,7 +15,7 @@ applyTo: "src/hosts/**/MANUAL.md"
 
 - Keep formatting minimal: one title plus short bullet lists.
 - Keep text minimal and high signal; remove long explanations, background essays, and full alias reference tables.
-- Include the complete shell-alias list (not a subset) with short descriptions in bullets (no markdown tables).
+- Include one combined command-shortcuts section that lists the complete shell-alias set (not a subset) and all built-in `nucleus-*` commands with short descriptions in bullets (no markdown tables).
 - Prefer direct actions with concrete command/file names in backticks.
 - Prefer one step per bullet.
 - If a setup command exists (for example `nucleus-cloud-setup`), point to that command instead of expanding internal implementation details.
