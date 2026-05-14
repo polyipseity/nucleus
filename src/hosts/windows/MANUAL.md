@@ -31,3 +31,21 @@ These aliases are managed declaratively and are available in both zsh and PowerS
 | `nucleus-update`       | `nix run ./src#update`                 | Run repository update workflow.                    |
 | `nx`                   | `bun x`                                | Run one-off Bun package executables (`npx`-style). |
 | `v`                    | `nvim`                                 | Open Neovim.                                       |
+
+## Cloud Drives (rclone)
+
+rclone mounts are automated on Windows via NSSM services created by `apply.ps1` after one-time remote setup.
+
+### rclone Remote Configuration
+
+Run `rclone config` and create the following remotes:
+
+- **GoogleDrive** — select "Google Drive", follow the OAuth flow
+- **OneDrive** — select "Microsoft OneDrive", follow the OAuth flow
+
+iCloud is not mounted with rclone on Windows; use the native iCloud for Windows app.
+
+After configuring remotes, the NSSM services created by `apply.ps1` automatically maintain:
+
+- `~/clouds/GoogleDrive`
+- `~/clouds/OneDrive`

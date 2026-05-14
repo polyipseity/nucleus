@@ -37,3 +37,21 @@ These aliases are managed declaratively and are available in both zsh and PowerS
 | `nucleus-update`       | `nix run ./src#update`                 | Run repository update workflow.                    |
 | `nx`                   | `bun x`                                | Run one-off Bun package executables (`npx`-style). |
 | `v`                    | `nvim`                                 | Open Neovim.                                       |
+
+## Cloud Drives (rclone)
+
+rclone mounts are automated on macOS via LaunchAgents after one-time remote setup.
+
+### rclone Remote Configuration
+
+Run `rclone config` and create the following remotes:
+
+- **GoogleDrive** — select "Google Drive", follow the OAuth flow
+- **OneDrive** — select "Microsoft OneDrive", follow the OAuth flow
+
+After configuring remotes, LaunchAgents automatically maintain these paths:
+
+- `~/clouds/GoogleDrive`
+- `~/clouds/OneDrive`
+
+The iCloud replica path is `~/clouds/iCloudReplica`, a symlink to the iCloud Drive root (excluding app container folders).
