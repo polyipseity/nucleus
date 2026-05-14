@@ -72,6 +72,38 @@ function Sync-DevRepo {
     return
   }
 
+  function Set-ManagedSymlinkDeleteProtection {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+      [Parameter(Mandatory = $true)]
+      [string]$Path
+    )
+
+    $principal = "$env:USERDOMAIN\$env:USERNAME"
+    if ($PSCmdlet.ShouldProcess($Path, "Apply symlink delete-protection ACL")) {
+      $grantResult = (& icacls $Path /L /deny "${principal}:(D)" 2>&1) | Out-String
+      if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Sync-DevRepo: could not apply delete-protection ACL to ${Path} : $grantResult"
+      }
+    }
+  }
+
+  function Remove-ManagedSymlinkDeleteProtection {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+      [Parameter(Mandatory = $true)]
+      [string]$Path
+    )
+
+    $principal = "$env:USERDOMAIN\$env:USERNAME"
+    if ($PSCmdlet.ShouldProcess($Path, "Remove symlink delete-protection ACL")) {
+      $removeResult = (& icacls $Path /L /remove:d $principal 2>&1) | Out-String
+      if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Sync-DevRepo: could not clear delete-protection ACL from $Path before update : $removeResult"
+      }
+    }
+  }
+
   $userHome = [Environment]::GetFolderPath('UserProfile')
   $devDir = Join-Path -Path $userHome -ChildPath 'dev'
 
@@ -107,6 +139,7 @@ function Sync-DevRepo {
         # Requires admin or developer mode on Windows 10+.
         if ($PSCmdlet.ShouldProcess($SymlinkPath, "Create symlink to $SymlinkTarget")) {
           New-Item -ItemType SymbolicLink -Path $SymlinkPath -Target $SymlinkTarget -Force -ErrorAction Stop | Out-Null
+          Set-ManagedSymlinkDeleteProtection -Path $SymlinkPath
           Write-Verbose "Sync-DevRepo: created symlink $SymlinkPath -> $SymlinkTarget"
         }
       }

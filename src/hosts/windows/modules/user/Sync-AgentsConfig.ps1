@@ -64,6 +64,38 @@ function Sync-AgentsConfig {
   $agentsSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\agents"
   $agentsDir    = Join-Path -Path $HOME     -ChildPath ".agents"
 
+  function Set-ManagedSymlinkDeleteProtection {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+      [Parameter(Mandatory)]
+      [string]$Path
+    )
+
+    $principal = "$env:USERDOMAIN\$env:USERNAME"
+    if ($PSCmdlet.ShouldProcess($Path, "Apply symlink delete-protection ACL")) {
+      $grantResult = (& icacls $Path /L /deny "${principal}:(D)" 2>&1) | Out-String
+      if ($LASTEXITCODE -ne 0) {
+        Write-Warning "agents-config: could not apply delete-protection ACL to ${Path} : $grantResult"
+      }
+    }
+  }
+
+  function Remove-ManagedSymlinkDeleteProtection {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+      [Parameter(Mandatory)]
+      [string]$Path
+    )
+
+    $principal = "$env:USERDOMAIN\$env:USERNAME"
+    if ($PSCmdlet.ShouldProcess($Path, "Remove symlink delete-protection ACL")) {
+      $removeResult = (& icacls $Path /L /remove:d $principal 2>&1) | Out-String
+      if ($LASTEXITCODE -ne 0) {
+        Write-Warning "agents-config: could not clear delete-protection ACL from $Path before update : $removeResult"
+      }
+    }
+  }
+
   # Directory symlinks require Developer Mode or an elevated session.  Check
   # once upfront so any failure message is actionable rather than cryptic.
   if ($Enabled) {
@@ -89,6 +121,7 @@ function Sync-AgentsConfig {
         if ($isSymlink) {
           $targetPath = Join-Path -Path $agentsSource -ChildPath $child.Name
           if ([string]::Equals($child.Target, $targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Remove-ManagedSymlinkDeleteProtection -Path $child.FullName
             Remove-Item -LiteralPath $child.FullName -Force
             Write-Output "agents-config: removed managed agents subdir symlink: $($child.FullName)"
           }
@@ -134,6 +167,7 @@ function Sync-AgentsConfig {
       if ([string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
         # Managed symlink: remove if the source entry no longer exists.
         if (-not (Test-Path -LiteralPath $expectedSource)) {
+          Remove-ManagedSymlinkDeleteProtection -Path $child.FullName
           Remove-Item -LiteralPath $child.FullName -Force
           Write-Output "agents-config: Sync-AgentsConfig: removed stale link for $($child.Name) (source removed)"
         }
@@ -156,6 +190,7 @@ function Sync-AgentsConfig {
           continue  # Correct symlink — no-op.
         }
         # Wrong target (e.g. leftover from a previous checkout path): replace.
+        Remove-ManagedSymlinkDeleteProtection -Path $linkPath
         Remove-Item -LiteralPath $linkPath -Force
       } else {
         # Real file or directory: fail fast to prevent silent data loss.
@@ -164,6 +199,7 @@ function Sync-AgentsConfig {
       }
     }
     New-Item -ItemType SymbolicLink -Path $linkPath -Target $entry.FullName | Out-Null
+    Set-ManagedSymlinkDeleteProtection -Path $linkPath
     Write-Output "agents-config: Sync-AgentsConfig: linked $linkPath -> $($entry.FullName)"
   }
 }

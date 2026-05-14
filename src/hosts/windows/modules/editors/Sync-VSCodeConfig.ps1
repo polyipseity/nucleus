@@ -88,6 +88,38 @@ function Sync-VSCodeConfig {
     throw "VS Code config directory not found: $vsConfigDir"
   }
 
+  function Set-ManagedSymlinkDeleteProtection {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+      [Parameter(Mandatory)]
+      [string]$Path
+    )
+
+    $principal = "$env:USERDOMAIN\$env:USERNAME"
+    if ($PSCmdlet.ShouldProcess($Path, "Apply symlink delete-protection ACL")) {
+      $grantResult = (& icacls $Path /L /deny "${principal}:(D)" 2>&1) | Out-String
+      if ($LASTEXITCODE -ne 0) {
+        Write-Warning "vscode-config: could not apply delete-protection ACL to ${Path} : $grantResult"
+      }
+    }
+  }
+
+  function Remove-ManagedSymlinkDeleteProtection {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+      [Parameter(Mandatory)]
+      [string]$Path
+    )
+
+    $principal = "$env:USERDOMAIN\$env:USERNAME"
+    if ($PSCmdlet.ShouldProcess($Path, "Remove symlink delete-protection ACL")) {
+      $removeResult = (& icacls $Path /L /remove:d $principal 2>&1) | Out-String
+      if ($LASTEXITCODE -ne 0) {
+        Write-Warning "vscode-config: could not clear delete-protection ACL from $Path before update : $removeResult"
+      }
+    }
+  }
+
   # Symlinks on Windows require Developer Mode or an elevated session.  Check
   # once upfront so the failure message is actionable rather than cryptic.
   if ($Enabled) {
@@ -152,6 +184,7 @@ function Sync-VSCodeConfig {
           $item = Get-Item -LiteralPath $linkPath
           $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
           if ($isSymlink -and [string]::Equals($item.Target, $repoTarget, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Remove-ManagedSymlinkDeleteProtection -Path $linkPath
             Remove-Item -LiteralPath $linkPath -Force
             Write-Output "vscode-config: removed VS Code config symlink: $linkPath"
           }
@@ -170,6 +203,7 @@ function Sync-VSCodeConfig {
         if ($isSymlink) {
           # Wrong symlink target (e.g. leftover from old managed-key approach).
           # Remove and recreate pointing to the repo.
+          Remove-ManagedSymlinkDeleteProtection -Path $linkPath
           Remove-Item -LiteralPath $linkPath -Force
         } else {
           # Real file: migrate content to repo target when the repo target does
@@ -191,6 +225,7 @@ function Sync-VSCodeConfig {
         New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
       }
       New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget | Out-Null
+      Set-ManagedSymlinkDeleteProtection -Path $linkPath
       Write-Output "vscode-config: linked VS Code config file: $linkPath -> $repoTarget"
     }
 
@@ -204,6 +239,7 @@ function Sync-VSCodeConfig {
           $item = Get-Item -LiteralPath $linkPath
           $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
           if ($isSymlink -and [string]::Equals($item.Target, $repoTarget, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Remove-ManagedSymlinkDeleteProtection -Path $linkPath
             Remove-Item -LiteralPath $linkPath -Force
             Write-Output "vscode-config: removed VS Code config dir symlink: $linkPath"
           }
@@ -220,6 +256,7 @@ function Sync-VSCodeConfig {
         }
 
         if ($isSymlink) {
+          Remove-ManagedSymlinkDeleteProtection -Path $linkPath
           Remove-Item -LiteralPath $linkPath -Force
         } else {
           # Real directory: copy each top-level file to the repo dir without
@@ -239,6 +276,7 @@ function Sync-VSCodeConfig {
         New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
       }
       New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget | Out-Null
+      Set-ManagedSymlinkDeleteProtection -Path $linkPath
       Write-Output "vscode-config: linked VS Code config dir: $linkPath -> $repoTarget"
     }
   }

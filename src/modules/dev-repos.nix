@@ -190,6 +190,42 @@ in
             printf '%s\n' "$repoRoot"
           }
 
+          protect_managed_symlink() {
+            _pms_path="$1"
+            case "$(uname -s)" in
+              Darwin)
+                if ! chflags -h uchg "$_pms_path"; then
+                  echo "devReposProvision: warning — could not protect symlink $_pms_path with uchg." >&2
+                fi
+                ;;
+              Linux)
+                if command -v chattr >/dev/null; then
+                  if ! chattr -h +i "$_pms_path"; then
+                    echo "devReposProvision: warning — could not protect symlink $_pms_path with chattr +i." >&2
+                  fi
+                fi
+                ;;
+            esac
+          }
+
+          unprotect_managed_symlink() {
+            _ums_path="$1"
+            case "$(uname -s)" in
+              Darwin)
+                if ! chflags -h nouchg "$_ums_path"; then
+                  echo "devReposProvision: warning — could not clear uchg from symlink $_ums_path before update." >&2
+                fi
+                ;;
+              Linux)
+                if command -v chattr >/dev/null; then
+                  if ! chattr -h -i "$_ums_path"; then
+                    echo "devReposProvision: warning — could not clear chattr +i from symlink $_ums_path before update." >&2
+                  fi
+                fi
+                ;;
+            esac
+          }
+
           # Expand glob pattern and return matching paths. If no matches, return empty.
           expand_glob_paths() {
             baseDir="$1"
@@ -235,6 +271,7 @@ in
                 return 0
               fi
 
+              unprotect_managed_symlink "$symlinkPath"
               if ! rm "$symlinkPath"; then
                 echo "devReposProvision: failed to replace stale symlink for $repoName" >&2
                 return 0
@@ -245,6 +282,7 @@ in
             fi
 
             if ln -s "$symlinkTarget" "$symlinkPath"; then
+              protect_managed_symlink "$symlinkPath"
               echo "devReposProvision: linked $symlinkPath -> $symlinkTarget"
             else
               echo "devReposProvision: failed to create symlink for $repoName (soft fail)" >&2

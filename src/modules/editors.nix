@@ -494,6 +494,45 @@ in
         exit 1
       fi
 
+      # Best-effort managed-symlink protection.  Absolute undeletability is not
+      # portable across all filesystems, so we use host-native immutable flags
+      # where available and gracefully continue when unsupported.
+      _nucleus_protect_symlink() {
+        _nps_path="$1"
+        case "$(uname -s)" in
+          Darwin)
+            if ! chflags -h uchg "$_nps_path"; then
+              echo "VS Code: warning — could not protect symlink $_nps_path with uchg." >&2
+            fi
+            ;;
+          Linux)
+            if command -v chattr >/dev/null; then
+              if ! chattr -h +i "$_nps_path"; then
+                echo "VS Code: warning — could not protect symlink $_nps_path with chattr +i." >&2
+              fi
+            fi
+            ;;
+        esac
+      }
+
+      _nucleus_unprotect_symlink() {
+        _nus_path="$1"
+        case "$(uname -s)" in
+          Darwin)
+            if ! chflags -h nouchg "$_nus_path"; then
+              echo "VS Code: warning — could not clear uchg from symlink $_nus_path before update." >&2
+            fi
+            ;;
+          Linux)
+            if command -v chattr >/dev/null; then
+              if ! chattr -h -i "$_nus_path"; then
+                echo "VS Code: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
+              fi
+            fi
+            ;;
+        esac
+      }
+
       # ensure_file_symlink TARGET LINK
       # Creates LINK as a symlink pointing to TARGET (a file).
       ensure_file_symlink() {
@@ -504,6 +543,7 @@ in
           # Already a symlink: skip when correct, remove when wrong (e.g. old
           # Nix-store path left over after removing home.file entry).
           [ "$(readlink "$_efs_link")" = "$_efs_target" ] && return 0
+          _nucleus_unprotect_symlink "$_efs_link"
           rm "$_efs_link"
         elif [ -f "$_efs_link" ]; then
           # Real file: migrate content to repo target only when the repo does
@@ -517,6 +557,7 @@ in
 
         mkdir -p "$(dirname "$_efs_link")"
         ln -s "$_efs_target" "$_efs_link"
+        _nucleus_protect_symlink "$_efs_link"
       }
 
       # ensure_dir_symlink TARGET LINK
@@ -527,6 +568,7 @@ in
 
         if [ -L "$_eds_link" ]; then
           [ "$(readlink "$_eds_link")" = "$_eds_target" ] && return 0
+          _nucleus_unprotect_symlink "$_eds_link"
           rm "$_eds_link"
         elif [ -d "$_eds_link" ]; then
           # Real directory: copy each top-level file to the repo dir without
@@ -542,6 +584,7 @@ in
 
         mkdir -p "$(dirname "$_eds_link")"
         ln -s "$_eds_target" "$_eds_link"
+        _nucleus_protect_symlink "$_eds_link"
       }
 
       for _vsym_base_dir in "${stableBaseDir}" "${insidersBaseDir}"; do
@@ -576,6 +619,42 @@ in
     vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
 
+      _nucleus_protect_symlink() {
+        _nps_path="$1"
+        case "$(uname -s)" in
+          Darwin)
+            if ! chflags -h uchg "$_nps_path"; then
+              echo "VS Code: warning — could not protect symlink $_nps_path with uchg." >&2
+            fi
+            ;;
+          Linux)
+            if command -v chattr >/dev/null; then
+              if ! chattr -h +i "$_nps_path"; then
+                echo "VS Code: warning — could not protect symlink $_nps_path with chattr +i." >&2
+              fi
+            fi
+            ;;
+        esac
+      }
+
+      _nucleus_unprotect_symlink() {
+        _nus_path="$1"
+        case "$(uname -s)" in
+          Darwin)
+            if ! chflags -h nouchg "$_nus_path"; then
+              echo "VS Code: warning — could not clear uchg from symlink $_nus_path before update." >&2
+            fi
+            ;;
+          Linux)
+            if command -v chattr >/dev/null; then
+              if ! chattr -h -i "$_nus_path"; then
+                echo "VS Code: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
+              fi
+            fi
+            ;;
+        esac
+      }
+
       source_extensions='${extensionStore}/share/vscode/extensions'
       stable_extensions="$HOME/.vscode/extensions"
       insiders_extensions="$HOME/.vscode-insiders/extensions"
@@ -605,6 +684,7 @@ in
         # The previous approach linked the entire extensions/ dir to the Nix store,
         # which made VS Code's extensions.json writes fail with EACCES.
         if [ -L "$_sed_dir" ]; then
+          _nucleus_unprotect_symlink "$_sed_dir"
           rm "$_sed_dir"
         fi
         mkdir -p "$_sed_dir"
@@ -621,6 +701,7 @@ in
           if [ -L "$_sed_link" ]; then
             # Correct symlink → no-op; wrong target (e.g. after store upgrade) → replace.
             [ "$(readlink "$_sed_link")" = "$_sed_src" ] && continue
+            _nucleus_unprotect_symlink "$_sed_link"
             rm "$_sed_link"
           elif [ -e "$_sed_link" ]; then
             # Non-symlink entry (user-installed extension): leave untouched.
@@ -628,6 +709,7 @@ in
           fi
 
           ln -s "$_sed_src" "$_sed_link"
+          _nucleus_protect_symlink "$_sed_link"
         done
 
         # Step 3: prune all entries not in the Nix-managed extension set.
@@ -638,6 +720,9 @@ in
           [ -e "$_sed_existing" ] || [ -L "$_sed_existing" ] || continue
           _sed_ext_name="''${_sed_existing##*/}"
           [ -e "$source_extensions/$_sed_ext_name" ] && continue
+          if [ -L "$_sed_existing" ]; then
+            _nucleus_unprotect_symlink "$_sed_existing"
+          fi
           rm -rf "$_sed_existing"
         done
         # .obsolete is a VS Code deferred-deletion marker written as a dotfile

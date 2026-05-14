@@ -62,6 +62,38 @@ function Sync-AgentsSkill {
   $skillsSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\agents\skills"
   $skillsDir    = Join-Path -Path $HOME     -ChildPath ".agents\skills"
 
+  function Set-ManagedSymlinkDeleteProtection {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+      [Parameter(Mandatory)]
+      [string]$Path
+    )
+
+    $principal = "$env:USERDOMAIN\$env:USERNAME"
+    if ($PSCmdlet.ShouldProcess($Path, "Apply symlink delete-protection ACL")) {
+      $grantResult = (& icacls $Path /L /deny "${principal}:(D)" 2>&1) | Out-String
+      if ($LASTEXITCODE -ne 0) {
+        Write-Warning "agents-skills: could not apply delete-protection ACL to ${Path} : $grantResult"
+      }
+    }
+  }
+
+  function Remove-ManagedSymlinkDeleteProtection {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+      [Parameter(Mandatory)]
+      [string]$Path
+    )
+
+    $principal = "$env:USERDOMAIN\$env:USERNAME"
+    if ($PSCmdlet.ShouldProcess($Path, "Remove symlink delete-protection ACL")) {
+      $removeResult = (& icacls $Path /L /remove:d $principal 2>&1) | Out-String
+      if ($LASTEXITCODE -ne 0) {
+        Write-Warning "agents-skills: could not clear delete-protection ACL from $Path before update : $removeResult"
+      }
+    }
+  }
+
   # Directory symlinks require Developer Mode or an elevated session.  Check
   # once upfront so any failure message is actionable rather than cryptic.
   if ($Enabled) {
@@ -86,6 +118,7 @@ function Sync-AgentsSkill {
         if ($isSymlink) {
           $expectedSource = Join-Path -Path $skillsSource -ChildPath $child.Name
           if ([string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Remove-ManagedSymlinkDeleteProtection -Path $child.FullName
             Remove-Item -LiteralPath $child.FullName -Force
             Write-Output "agents-skills: removed managed skill symlink: $($child.FullName)"
           }
@@ -130,6 +163,7 @@ function Sync-AgentsSkill {
       if ([string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
         # Managed per-skill symlink: remove if its source no longer exists.
         if (-not (Test-Path -LiteralPath $expectedSource)) {
+          Remove-ManagedSymlinkDeleteProtection -Path $child.FullName
           Remove-Item -LiteralPath $child.FullName -Force
           Write-Output "agents-skills: Sync-AgentsSkills: removed stale skill link for $($child.Name) (source removed)"
         }
@@ -152,6 +186,7 @@ function Sync-AgentsSkill {
           continue  # Correct symlink — no-op.
         }
         # Wrong target: replace symlink.
+        Remove-ManagedSymlinkDeleteProtection -Path $linkPath
         Remove-Item -LiteralPath $linkPath -Force
       } else {
         # Real directory in place of a committed skill — could be a fetched
@@ -162,6 +197,7 @@ function Sync-AgentsSkill {
       }
     }
     New-Item -ItemType SymbolicLink -Path $linkPath -Target $skillEntry.FullName | Out-Null
+    Set-ManagedSymlinkDeleteProtection -Path $linkPath
     Write-Output "agents-skills: Sync-AgentsSkills: linked $linkPath -> $($skillEntry.FullName)"
   }
 }

@@ -43,6 +43,42 @@ in
     agentsSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
 
+      _nucleus_protect_symlink() {
+        _nps_path="$1"
+        case "$(uname -s)" in
+          Darwin)
+            if ! chflags -h uchg "$_nps_path"; then
+              echo "agents-config: warning — could not protect symlink $_nps_path with uchg." >&2
+            fi
+            ;;
+          Linux)
+            if command -v chattr >/dev/null; then
+              if ! chattr -h +i "$_nps_path"; then
+                echo "agents-config: warning — could not protect symlink $_nps_path with chattr +i." >&2
+              fi
+            fi
+            ;;
+        esac
+      }
+
+      _nucleus_unprotect_symlink() {
+        _nus_path="$1"
+        case "$(uname -s)" in
+          Darwin)
+            if ! chflags -h nouchg "$_nus_path"; then
+              echo "agents-config: warning — could not clear uchg from symlink $_nus_path before update." >&2
+            fi
+            ;;
+          Linux)
+            if command -v chattr >/dev/null; then
+              if ! chattr -h -i "$_nus_path"; then
+                echo "agents-config: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
+              fi
+            fi
+            ;;
+        esac
+      }
+
       # Resolve the repo root so the activation can construct an absolute path
       # to src/modules/configs/agents/ regardless of where the repo is checked
       # out.  $NUCLEUS_REPO is set by apply.sh; the file fallback survives the
@@ -89,6 +125,7 @@ in
           "$_as_agents_source"/*)
             # Managed per-subdir symlink: remove if its source no longer exists.
             if [ ! -e "$_as_ctarget" ] && [ ! -L "$_as_ctarget" ]; then
+              _nucleus_unprotect_symlink "$_as_candidate"
               rm "$_as_candidate"
               echo "agents-config: removed stale link for $_as_cname (source removed)"
             fi
@@ -112,8 +149,10 @@ in
             continue  # Correct symlink — no-op.
           fi
           # Wrong target (e.g. leftover from a previous checkout path): replace.
+          _nucleus_unprotect_symlink "$_as_link"
           rm "$_as_link"
           ln -s "$_as_entry" "$_as_link"
+          _nucleus_protect_symlink "$_as_link"
           echo "agents-config: updated $HOME/.agents/$_as_name -> $_as_entry"
         elif [ -e "$_as_link" ]; then
           # Real file or directory: fail fast to prevent silent data loss.
@@ -121,6 +160,7 @@ in
           exit 1
         else
           ln -s "$_as_entry" "$_as_link"
+          _nucleus_protect_symlink "$_as_link"
           echo "agents-config: linked $HOME/.agents/$_as_name -> $_as_entry"
         fi
       done < "$_as_source_list"
@@ -149,6 +189,42 @@ in
     # -------------------------------------------------------------------------
     agentsSkills = lib.hm.dag.entryAfter [ "agentsSymlink" ] ''
       set -eu
+
+      _nucleus_protect_symlink() {
+        _nps_path="$1"
+        case "$(uname -s)" in
+          Darwin)
+            if ! chflags -h uchg "$_nps_path"; then
+              echo "agents-skills: warning — could not protect symlink $_nps_path with uchg." >&2
+            fi
+            ;;
+          Linux)
+            if command -v chattr >/dev/null; then
+              if ! chattr -h +i "$_nps_path"; then
+                echo "agents-skills: warning — could not protect symlink $_nps_path with chattr +i." >&2
+              fi
+            fi
+            ;;
+        esac
+      }
+
+      _nucleus_unprotect_symlink() {
+        _nus_path="$1"
+        case "$(uname -s)" in
+          Darwin)
+            if ! chflags -h nouchg "$_nus_path"; then
+              echo "agents-skills: warning — could not clear uchg from symlink $_nus_path before update." >&2
+            fi
+            ;;
+          Linux)
+            if command -v chattr >/dev/null; then
+              if ! chattr -h -i "$_nus_path"; then
+                echo "agents-skills: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
+              fi
+            fi
+            ;;
+        esac
+      }
 
       # Resolve the repo root (same mechanism as agentsSymlink above).
       _ask_repo_root_file="$HOME/.config/nucleus/repo-root"
@@ -187,6 +263,7 @@ in
           "$_ask_skills_source"/*)
             # Managed per-skill symlink: remove if its source no longer exists.
             if [ ! -e "$_ask_ctarget" ] && [ ! -L "$_ask_ctarget" ]; then
+              _nucleus_unprotect_symlink "$_ask_candidate"
               rm "$_ask_candidate"
               echo "agents-skills: removed stale skill link for $_ask_cname (source removed)"
             fi
@@ -208,8 +285,10 @@ in
             continue  # Correct symlink — no-op.
           fi
           # Wrong target: replace symlink.
+          _nucleus_unprotect_symlink "$_ask_link"
           rm "$_ask_link"
           ln -s "$_ask_skill_dir" "$_ask_link"
+          _nucleus_protect_symlink "$_ask_link"
           echo "agents-skills: updated $HOME/.agents/skills/$_ask_skill_name -> $_ask_skill_dir"
         elif [ -d "$_ask_link" ]; then
           # Real directory in place of a committed skill — could be a fetched
@@ -219,6 +298,7 @@ in
           exit 1
         else
           ln -s "$_ask_skill_dir" "$_ask_link"
+          _nucleus_protect_symlink "$_ask_link"
           echo "agents-skills: linked $HOME/.agents/skills/$_ask_skill_name -> $_ask_skill_dir"
         fi
       done < "$_ask_source_list"
