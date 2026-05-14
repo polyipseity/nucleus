@@ -4,7 +4,6 @@
 - Open `battery.app` once so `/usr/local/bin/battery` is installed.
 - Sign in to the App Store once so `mas` installs can provision Xcode.
 - Run `nucleus-cloud-setup` and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
-- For `iCloud`, use your regular Apple ID password (not an app-specific password), complete 2FA, and re-authenticate with `rclone config reconnect iCloud:` when the trust token expires.
 
 ## shell aliases
 

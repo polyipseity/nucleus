@@ -1,7 +1,6 @@
 # windows manual steps
 
 - Run `nucleus-cloud-setup` in PowerShell and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
-- For `iCloud`, use your regular Apple ID password (not an app-specific password), complete 2FA, and re-authenticate with `rclone config reconnect iCloud:` when the trust token expires.
 
 ## shell aliases
 
