@@ -13,6 +13,11 @@ let
     # Ignore NixOS interactive test driver history
     **/.nixos-test-history
     # }
+
+    # self {
+    # Suppress macOS Spotlight "never index" marker files from being tracked.
+    .metadata_never_index
+    # }
   '';
 in
 {
