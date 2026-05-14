@@ -133,8 +133,17 @@ function Sync-ObsidianConfig {
       [object]$UserRecord
     )
 
+    # Load default settings from repository obsidian.json configuration.
+    # WHY nativeMenus is not configured: nativeMenus is stored per-vault in the
+    # .obsidian/appearance.json file inside each vault, not in obsidian.json. We
+    # cannot manage vault-specific files without hardcoding vault paths, which is
+    # not declaratively manageable.
+    #
+    # WHY checkSlowStartup is not configured: checkSlowStartup is stored in
+    # localStorage and is also vault-specific. It cannot be declaratively managed
+    # via obsidian.json.
     $defaultSettings = @{
-      nativeMenus = $false
+      cli = $true
       updateDisabled = $true
     }
 

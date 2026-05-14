@@ -112,14 +112,18 @@ let
   };
 
   # Obsidian reads its global app settings directly from obsidian.json, but the
-  # file also contains dynamic vault metadata written by the app itself. Keep
-  # the managed subset here in code instead of as a standalone repo JSON so we
-  # do not imply repository ownership of the full live app-state file.
-  obsidianDefaultSettings = {
-    # Disable Electron-native menus for consistent app command handling.
-    nativeMenus = false;
-    updateDisabled = true;
-  };
+  # file also contains dynamic vault metadata written by the app itself. Load
+  # the managed settings from a declarative config file so they are versioned
+  # and merge them into the live file without clobbering vault data.
+  #
+  # WHY nativeMenus is not configured: nativeMenus is stored per-vault in
+  # appearance.json (.obsidian/appearance.json), not in obsidian.json. We cannot
+  # manage vault-specific files without reading the vault path from obsidian.json,
+  # which is app-owned state that changes at runtime.
+  #
+  # WHY checkSlowStartup is not configured: checkSlowStartup is localStorage-backed
+  # and vault-specific. It cannot be declaratively managed via obsidian.json.
+  obsidianDefaultSettings = builtins.fromJSON (builtins.readFile ./configs/obsidian.json);
 
   obsidianManagedSettings = managedAppSettings "obsidian" obsidianDefaultSettings;
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;
