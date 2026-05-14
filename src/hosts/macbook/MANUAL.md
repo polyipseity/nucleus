@@ -4,6 +4,7 @@
 - Closed-lid agent work: keep the Mac on AC power when you expect long-running agents or remote sessions to stay alive with the lid shut.
 - Closed-lid agent work: Apple documents that closing a Mac laptop display puts it to sleep, and "wake for network access" only wakes a sleeping Mac for sharing traffic; it does not keep existing AI jobs executing. Nucleus mitigates this with BetterDisplay's managed `HeadlessDisplay` virtual display, so if closed-lid work stops, reopen BetterDisplay once and re-run apply.
 - Battery: open battery.app once and complete setup so `/usr/local/bin/battery` is installed.
+- App Store: sign in once with your Apple ID so declarative `mas` installs can provision Xcode automatically.
 - Chrome Remote Desktop: visit <https://remotedesktop.google.com/access> to name this Mac and set a PIN.
 - Chrome Remote Desktop: grant Screen Recording + Accessibility to `ChromeRemoteDesktopHost`.
 - Gemini app: intentionally not managed declaratively on macOS because Raycast is the only allowed owner of `Option+Space` on this host.

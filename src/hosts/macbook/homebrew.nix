@@ -103,5 +103,11 @@ in
     taps = allTaps;
     brews = managedBrews;
     casks = managedCasks;
+
+    # Provision full Xcode from the Mac App Store via brew bundle's `mas` stanza.
+    # Requires the managed user to be signed in to the App Store.
+    masApps = {
+      Xcode = 497799835;
+    };
   };
 }
