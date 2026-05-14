@@ -336,13 +336,6 @@ in
         ShowSeconds = true;
       };
 
-      # Screenshot: save to clipboard by default; format is set to PNG via
-      # system.defaults.screencapture.type. The `target` key is not exposed as a
-      # typed nix-darwin option so it is declared here.
-      "com.apple.screencapture" = {
-        target = "clipboard"; # default destination: clipboard instead of Desktop file
-      };
-
       # Screensaver: require password immediately after the screensaver engages.
       "com.apple.screensaver" = {
         askForPassword = true;
