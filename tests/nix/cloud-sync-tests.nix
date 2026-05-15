@@ -237,13 +237,16 @@ let
     && containsRegex "scripts/replica-bisync\\.sh" applyScriptText
   ) "apply flow must include post-apply replica bisync hook for automatic OneDrive bisync";
 
-  # Test 36: Finder sidebar writes explicit custom item names to avoid '?' labels
-  test_finder_sidebar_custom_names = assert' (
-    containsRegex "CustomItemProperties" macosText
-    && containsRegex "setObject:forKey:" macosText
-    && containsRegex "'Name'" macosText
-    && containsRegex "Google Drive" macosText
-  ) "Finder sidebar rewrite must set CustomItemProperties.Name and include Google Drive label";
+  # Test 36: macOS Finder sidebar path setup creates required directories
+  # (Finder sidebar auto-customization disabled due to macOS archive format incompatibility;
+  #  users add items manually via Finder UI; directories pre-created for convenience)
+  test_finder_sidebar_paths_created = assert' (
+    containsRegex "mkdir -p" macosText
+    && containsRegex "clouds" macosText
+    && containsRegex "GoogleDrive" macosText
+    && containsRegex "iCloud" macosText
+    && containsRegex "OneDrive" macosText
+  ) "macOS setup must create Finder sidebar path directories";
 
   # Test 37: macOS replica runner must skip the iCloud replica entry to avoid native-path permission churn
   test_macos_skips_icloud_replica = assert' (

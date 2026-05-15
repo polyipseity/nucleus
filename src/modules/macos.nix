@@ -878,151 +878,39 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # configureFinderSidebar
-    # Enforce an exact Finder sidebar Favourites list by rewriting the
-    # FavoriteItems shared-file-list archive with the canonical set in declared
-    # order.
+    # TODO: Rebuild Finder sidebar customization with proper macOS NSKeyedArchiver format.
     #
-    # WHY this path: newer macOS builds expose only list inspection/reset via
-    # sfltool, so the reliable cross-version approach is to rebuild the archive
-    # directly with Finder bookmark data instead of trying to drive unsupported
-    # add/remove subcommands.
+    # KNOWN ISSUE: Current implementation generates "?" entries in Finder sidebar.
+    # Root cause: NSKeyedArchiver archive structure is incompatible with modern macOS
+    # (Ventura, Sonoma+). FavoriteItems.sfl4 format changed but Apple provides no public
+    # specification. Manual archive manipulation approach has not been successful.
     #
-    # System-managed entries such as AirDrop and Recents live outside this list
-    # and are unaffected.
-    # -------------------------------------------------------------------------
+    # Workaround: Disabled automatic customization to prevent broken "?" entries.
+    # Users can manually add sidebar items via Finder UI as needed.
+    #
+    # Future fix requires either:
+    # - Reverse-engineering current Finder archive format from system-generated files
+    # - Using undocumented macOS APIs for sidebar manipulation
+    # - Waiting for Apple to provide public LSSharedFileList successor API
     configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       mkdir -p "$HOME/dev" "$HOME/clouds"
 
-      # First, verify that all sidebar paths exist before attempting archive manipulation.
-      # This prevents Finder from showing "?" for missing or inaccessible items.
-      PATHS_TO_VERIFY=(
+      # Create sidebar paths so they're available for manual Finder sidebar addition
+      SIDEBAR_PATHS=(
         "$HOME/dev"
         "$HOME/clouds"
         "$HOME/clouds/GoogleDrive"
         "$HOME/clouds/iCloud"
         "$HOME/clouds/OneDrive"
-        "/Applications"
-        "$HOME/Desktop"
-        "$HOME/Documents"
-        "$HOME/Downloads"
-        "$HOME/Music"
-        "$HOME/Movies"
-        "$HOME/Pictures"
-        "$HOME/.Trash"
       )
 
-      for path in "''${PATHS_TO_VERIFY[@]}"; do
-        if [ ! -e "$path" ]; then
-          echo "macos: warning — Finder sidebar path does not exist: $path" >&2
-        fi
+      for path in "''${SIDEBAR_PATHS[@]}"; do
+        mkdir -p "$path"
       done
 
-      # Rebuild the Finder favorites archive directly. This avoids unsupported
-      # sfltool subcommands on newer macOS builds while keeping the same
-      # canonical order and bookmark-backed entries Finder expects.
-      SIDEBAR_LIST_PATH="$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.FavoriteItems.sfl4" \
-        /usr/bin/osascript -l JavaScript <<'JXA'
-      ObjC.import('Foundation');
-
-      var env = $.NSProcessInfo.processInfo.environment;
-      var home = ObjC.unwrap(env.objectForKey('HOME'));
-      var sidebarListPath = ObjC.unwrap(env.objectForKey('SIDEBAR_LIST_PATH'));
-
-      var data = $.NSData.dataWithContentsOfFile(sidebarListPath);
-      if (!data) {
-        throw new Error('macos: Finder sidebar archive not found at ' + sidebarListPath);
-      }
-
-      var decodeError = Ref();
-      var rootObject = $.NSKeyedUnarchiver.unarchiveTopLevelObjectWithDataError(data, decodeError);
-      if (!rootObject) {
-        throw new Error('macos: failed to decode Finder sidebar archive: ' + ObjC.unwrap(decodeError[0]));
-      }
-
-      var favoriteEntries = [
-        { path: '/', name: 'Computer' },
-        { path: home, name: home.split('/').pop() },
-        { path: home + '/dev', name: 'dev' },
-        { path: home + '/clouds', name: 'Clouds' },
-        { path: home + '/clouds/GoogleDrive', name: 'Google Drive' },
-        { path: home + '/clouds/iCloud', name: 'iCloud' },
-        { path: home + '/clouds/OneDrive', name: 'OneDrive' },
-        { path: '/Applications', name: 'Applications' },
-        { path: home + '/Desktop', name: 'Desktop' },
-        { path: home + '/Documents', name: 'Documents' },
-        { path: home + '/Downloads', name: 'Downloads' },
-        { path: home + '/Music', name: 'Music' },
-        { path: home + '/Movies', name: 'Movies' },
-        { path: home + '/Pictures', name: 'Pictures' },
-        { path: home + '/.Trash', name: 'Trash' }
-      ];
-
-      var items = $.NSMutableArray.alloc.init;
-      for (var i = 0; i < favoriteEntries.length; i += 1) {
-        var favoritePath = favoriteEntries[i].path;
-        var favoriteName = favoriteEntries[i].name;
-        var favoriteNSString = $(favoritePath);
-
-        // Verify path exists; skip if missing to prevent Finder from showing "?"
-        var fileManager = $.NSFileManager.defaultManager;
-        if (!fileManager.fileExistsAtPath(favoriteNSString)) {
-          continue;
-        }
-
-        var bookmarkError = Ref();
-        var bookmarkURL = $.NSURL.fileURLWithPath(favoriteNSString);
-        // WHY plain bookmark options: Finder favorites only need a stable file
-        // bookmark for local paths. Security-scoped bookmark creation can bridge
-        // back into JXA as an Objective-C nil proxy, which then crashes when the
-        // item dictionary is populated with a nil Bookmark value.
-        var bookmark = bookmarkURL
-          ['bookmarkDataWithOptions:includingResourceValuesForKeys:relativeToURL:error:']
-          .call(
-            bookmarkURL,
-            0,
-            undefined,
-            undefined,
-            bookmarkError
-          );
-        if (bookmark === undefined || bookmark === null || (bookmark.isNil && bookmark.isNil())) {
-          var bookmarkFailure = bookmarkError[0] ? ObjC.unwrap(bookmarkError[0]) : 'unknown bookmark error';
-          $.NSLog('macos: warning — skipping Finder sidebar item %s because bookmark creation failed: %@', favoritePath, bookmarkFailure);
-          continue;
-        }
-
-        var item = $.NSMutableDictionary.alloc.init;
-        var setObject = item['setObject:forKey:'];
-        var customItemProperties = $.NSMutableDictionary.alloc.init;
-
-        // WHY visibility=1: Set to 1 (visible) instead of 0. Finder requires this for items to display correctly.
-        setObject.call(item, 1, 'visibility');
-
-        // WHY CustomItemProperties.Name: Sets the display name for mounted volumes and custom sidebar items.
-        // This overrides the folder name for display purposes (e.g., 'Google Drive' instead of 'GoogleDrive').
-        customItemProperties['setObject:forKey:'].call(customItemProperties, favoriteName, 'Name');
-        setObject.call(item, customItemProperties, 'CustomItemProperties');
-
-        // WHY Bookmark: Encodes the file path and permissions for Finder to locate and open items.
-        setObject.call(item, bookmark, 'Bookmark');
-
-        // WHY uuid: Unique identifier for this sidebar entry. Required by Finder for state persistence.
-        setObject.call(item, ObjC.unwrap($.NSUUID.UUID.UUIDString), 'uuid');
-
-        items['addObject:'].call(items, item);
-      }
-
-      rootObject['setObject:forKey:'].call(rootObject, items, 'items');
-
-      var encodeError = Ref();
-      var archived = $.NSKeyedArchiver.archivedDataWithRootObjectRequiringSecureCodingError(rootObject, false, encodeError);
-      if (!archived) {
-        throw new Error('macos: failed to encode Finder sidebar archive: ' + ObjC.unwrap(encodeError[0]));
-      }
-
-      if (!archived.writeToFileAtomically(sidebarListPath, true)) {
-        throw new Error('macos: failed to write Finder sidebar archive to ' + sidebarListPath);
-      }
-      JXA
+      # TODO: Re-enable once Finder sidebar archive format is properly understood.
+      # For now, let Finder manage its own sidebar state and users add items manually.
+      # This prevents "?" entries from appearing in the sidebar.
     '';
 
     # -------------------------------------------------------------------------
