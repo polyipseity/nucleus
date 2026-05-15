@@ -73,7 +73,8 @@ fi
 # in non-interactive contexts.
 rclone_pass_path="$HOME/.config/nucleus/secrets/rclone-config-pass"
 if [ -s "$rclone_pass_path" ]; then
-  export RCLONE_CONFIG_PASS="$(cat "$rclone_pass_path")"
+  rclone_config_pass_value="$(cat "$rclone_pass_path")"
+  export RCLONE_CONFIG_PASS="$rclone_config_pass_value"
 fi
 
 username="$(id -un)"
@@ -136,7 +137,7 @@ replica_lines_file="$(mktemp)"
 printf '%s\n' "$replica_lines" > "$replica_lines_file"
 
 # shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
-while IFS='\t' read id direction local_path remote_name remote_path provider icloud_service filters_file; do
+while IFS="$(printf '\t')" read id direction local_path remote_name remote_path provider icloud_service filters_file; do
   if [ -n "$replica_id_filter" ] && [ "$id" != "$replica_id_filter" ]; then
     continue
   fi
