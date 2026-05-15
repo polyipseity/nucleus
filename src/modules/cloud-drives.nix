@@ -15,7 +15,9 @@
 # needs a unique "id" string).
 #
 # macOS prerequisites:
-#   - macFUSE (Homebrew cask macfuse) for rclone FUSE mounts
+#   - macFUSE (Homebrew cask macfuse) for rclone FUSE mounts. macOS mounts
+#     use the FSKit backend and therefore live under /Volumes, with the legacy
+#     home-directory paths symlinked back to those mountpoints for convenience.
 #   - rclone remote configured via `rclone config` before the LaunchAgent fires
 #
 # NixOS prerequisites:
@@ -201,10 +203,18 @@ let
 
   # Build a rclone mount wrapper script for macOS LaunchAgents.
   # Uses the full Nix store path to rclone so the agent is not PATH-dependent.
+  mkMountPoint = mount:
+    if pkgs.stdenv.isDarwin then
+      "/Volumes/nucleus-cloud-${mount.id}"
+    else
+      "${currentUserHome}/${mount.localPath}";
+
+  mkMountLink = mount: "${currentUserHome}/${mount.localPath}";
+
   mkRcloneMountScript =
     mount:
     let
-      mountPoint = "${currentUserHome}/${mount.localPath}";
+      mountPoint = mkMountPoint mount;
       rcloneRemote = "${mount.remoteName}:${mount.remotePath}";
       # Always pass the configured iCloud service explicitly so mount behavior
       # follows the per-entry setting even if the shared remote was created
@@ -212,6 +222,10 @@ let
       iCloudServiceArgs = lib.optionals (mount.provider == "iCloud") [
         "--iclouddrive-service"
         mount.iCloudService
+      ];
+      fsKitBackendArgs = lib.optionals pkgs.stdenv.isDarwin [
+        "--option"
+        "backend=fskit"
       ];
       readOnlyFlag = lib.optional (!mount.readWrite) "--read-only";
       # Pass the managed config passphrase command when the feature is enabled
@@ -222,7 +236,7 @@ let
         "--password-command"
         "cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath}"
       ];
-      extraArgsList = iCloudServiceArgs ++ rclonePasswordArgs ++ mount.extraArgs;
+      extraArgsList = iCloudServiceArgs ++ fsKitBackendArgs ++ rclonePasswordArgs ++ mount.extraArgs;
     in
     pkgs.writeShellScript "cloud-mount-${mount.id}" ''
       set -eu
@@ -296,14 +310,45 @@ in
         home.activation.cloudDrivesSetup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           set -eu
 
-          # Create the top-level clouds/ directory tree.
+          # Create the top-level clouds/ directory tree. macOS mounts live under
+          # /Volumes for FSKit compatibility, so we symlink the legacy home
+          # paths back to those mountpoints.
           mkdir -p "$HOME/clouds"
+
+          ensure_cloud_mount_link() {
+            _target="$1"
+            _link="$2"
+
+            mkdir -p "$(/usr/bin/dirname "$_link")"
+            mkdir -p "$_target"
+
+            if [ -L "$_link" ]; then
+              _current_target="$(/usr/bin/readlink "$_link")"
+              if [ "$_current_target" = "$_target" ]; then
+                return 0
+              fi
+              /bin/rm "$_link"
+            elif [ -e "$_link" ]; then
+              # WHY: the legacy home path is only a mountpoint, so replacing an
+              # old directory with a symlink is safe once the old mount is gone.
+              if /sbin/mount | /usr/bin/grep -F " on $_link (" >/dev/null 2>&1; then
+                echo "macos: cloud mount path '$_link' is still mounted; unmount it before rerunning activation." >&2
+                return 0
+              fi
+              /bin/rm -rf "$_link"
+            fi
+
+            /bin/ln -s "$_target" "$_link"
+          }
 
           ${lib.concatStringsSep "\n" (
             map (m: ''
-              if [ ! -L "$HOME/${m.localPath}" ]; then
-                mkdir -p "$HOME/${m.localPath}"
-              fi
+              ${lib.optionalString pkgs.stdenv.isDarwin ''
+              ensure_cloud_mount_link ${lib.escapeShellArg (mkMountPoint m)} ${lib.escapeShellArg (mkMountLink m)}
+              ''}
+              ${lib.optionalString (!pkgs.stdenv.isDarwin) ''
+              mkdir -p ${lib.escapeShellArg (mkMountLink m)}
+              ''}
             '') enabledMounts
           )}
 
