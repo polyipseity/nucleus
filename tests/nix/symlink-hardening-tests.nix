@@ -13,7 +13,8 @@ in
   # =========================================================================
   # Assertion 1: VS Code symlink protection in editors.nix
   # =========================================================================
-  vsCodeProtection = assert containsRegex "_nucleus_protect_symlink" editorsText;
+  vsCodeProtection =
+    assert containsRegex "_nucleus_protect_symlink" editorsText;
     assert containsRegex "_nucleus_unprotect_symlink" editorsText;
     assert containsRegex "chflags -h uchg" editorsText;
     assert containsRegex "chattr -h \\+i" editorsText;
@@ -23,7 +24,8 @@ in
   # =========================================================================
   # Assertion 2: Agents config symlink protection in agents.nix
   # =========================================================================
-  agentsConfigProtection = assert containsRegex "_nucleus_protect_symlink" agentsText;
+  agentsConfigProtection =
+    assert containsRegex "_nucleus_protect_symlink" agentsText;
     assert containsRegex "agents-config" agentsText;
     assert containsRegex "chflags -h uchg" agentsText;
     true;
@@ -31,7 +33,8 @@ in
   # =========================================================================
   # Assertion 3: Agents skills symlink protection in agents.nix
   # =========================================================================
-  agentsSkillsProtection = assert containsRegex "agents-skills" agentsText;
+  agentsSkillsProtection =
+    assert containsRegex "agents-skills" agentsText;
     assert containsRegex "_nucleus_protect_symlink" agentsText;
     assert containsRegex "_nucleus_unprotect_symlink" agentsText;
     true;
@@ -39,7 +42,8 @@ in
   # =========================================================================
   # Assertion 4: Dev repos symlink protection in dev-repos.nix
   # =========================================================================
-  devReposProtection = assert containsRegex "protect_managed_symlink" devReposText;
+  devReposProtection =
+    assert containsRegex "protect_managed_symlink" devReposText;
     assert containsRegex "unprotect_managed_symlink" devReposText;
     assert containsRegex "devReposProvision" devReposText;
     assert containsRegex "chflags -h" devReposText;
@@ -48,13 +52,26 @@ in
   # =========================================================================
   # Assertion 5: Raycast alias symlink protection in macos.nix
   # =========================================================================
-  raycastAliasProtection = assert containsRegex "protect_alias_symlink" macosText;
+  raycastAliasProtection =
+    assert containsRegex "protect_alias_symlink" macosText;
     assert containsRegex "unprotect_alias_symlink" macosText;
     assert containsRegex "raycast" macosText;
     true;
 
   # =========================================================================
-  # Assertion 6: ShouldProcess compliance for all helpers
+  # Assertion 6: Finder sidebar rewrite in macos.nix
+  # =========================================================================
+  finderSidebarRewrite =
+    assert containsRegex "osascript -l JavaScript" macosText;
+    assert containsRegex "NSKeyedUnarchiver" macosText;
+    assert containsRegex "NSKeyedArchiver" macosText;
+    assert containsRegex "FavoriteItems\\.sfl4" macosText;
+    assert !containsRegex "sfltool add-item" macosText;
+    assert !containsRegex "sfltool remove-item" macosText;
+    true;
+
+  # =========================================================================
+  # Assertion 7: ShouldProcess compliance for all helpers
   # =========================================================================
   shouldProcessCompliance =
     let
@@ -65,17 +82,35 @@ in
       devRepoPs1Path = ../../src/hosts/windows/modules/user/Sync-DevRepo.ps1;
     in
     assert builtins.pathExists vsCodePs1Path;
-      assert builtins.pathExists agentsConfigPs1Path;
-        assert builtins.pathExists agentsSkillPs1Path;
-          assert builtins.pathExists devRepoPs1Path;
-            true;
+    assert builtins.pathExists agentsConfigPs1Path;
+    assert builtins.pathExists agentsSkillPs1Path;
+    assert builtins.pathExists devRepoPs1Path;
+    true;
+
+  # =========================================================================
+  # Assertion 8: Dev repos logging keeps errors visible and no-op skips quiet
+  # =========================================================================
+  devReposLoggingPolicy =
+    assert containsRegex "report_error\(\)" devReposText;
+    assert containsRegex "completed with .*non-fatal error" devReposText;
+    assert !containsRegex "devReposProvision: .*\(skipping\)" devReposText;
+    true;
 
   # =========================================================================
   # All tests passed
   # =========================================================================
   summary = {
     testSuiteName = "Symlink Hardening Regression Tests";
-    totalAssertions = 6;
-    coverage = [ "VS Code" "Agents Config" "Agents Skills" "Dev Repos" "Raycast Aliases" "Windows ShouldProcess" ];
+    totalAssertions = 8;
+    coverage = [
+      "VS Code"
+      "Agents Config"
+      "Agents Skills"
+      "Dev Repos"
+      "Dev Repos Logging"
+      "Raycast Aliases"
+      "Finder Sidebar"
+      "Windows ShouldProcess"
+    ];
   };
 }

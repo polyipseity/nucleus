@@ -139,6 +139,16 @@ in
           export PATH="${pkgs.git}/bin:$PATH"
           export GIT_SSH_COMMAND="${sshClient}"
 
+          # Track non-fatal provisioning errors so activation output is quiet on
+          # expected no-op paths but still explicit when actionable failures
+          # occur.
+          devReposErrors=0
+
+          report_error() {
+            devReposErrors=$((devReposErrors + 1))
+            echo "devReposProvision: $1" >&2
+          }
+
           # Resolve the live checkout root written by apply.sh before the rebuild.
           # Repo-root symlinks must target the mutable working tree rather than the
           # Nix store copy of flake inputs, or ~/dev/nucleus drifts away from the
@@ -183,7 +193,7 @@ in
           # to an empty string or a stale store path.
           resolve_repo_root_target() {
             if [ -z "$repoRoot" ]; then
-              echo "devReposProvision: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
+              report_error "repo root not set; run via apply.sh or export NUCLEUS_REPO."
               return 1
             fi
 
@@ -260,32 +270,32 @@ in
 
             symlinkParent=$(dirname "$symlinkPath")
             if ! mkdir -p "$symlinkParent"; then
-              echo "devReposProvision: failed to create parent directory $symlinkParent for $repoName" >&2
+              report_error "failed to create parent directory $symlinkParent for $repoName"
               return 0
             fi
 
             if [ -L "$symlinkPath" ]; then
               currentTarget=$(readlink "$symlinkPath")
               if [ "$currentTarget" = "$symlinkTarget" ]; then
-                echo "devReposProvision: symlink for $repoName already points to $symlinkTarget"
+                # Symlink already correct; skip silently (idempotent)
                 return 0
               fi
 
               unprotect_managed_symlink "$symlinkPath"
               if ! rm "$symlinkPath"; then
-                echo "devReposProvision: failed to replace stale symlink for $repoName" >&2
+                report_error "failed to replace stale symlink for $repoName"
                 return 0
               fi
             elif [ -e "$symlinkPath" ]; then
-              echo "devReposProvision: $symlinkPath exists and is not a symlink for $repoName (soft fail)" >&2
+              report_error "$symlinkPath exists and is not a symlink for $repoName"
               return 0
             fi
 
             if ln -s "$symlinkTarget" "$symlinkPath"; then
               protect_managed_symlink "$symlinkPath"
-              echo "devReposProvision: linked $symlinkPath -> $symlinkTarget"
+              # Symlink created successfully (idempotent)
             else
-              echo "devReposProvision: failed to create symlink for $repoName (soft fail)" >&2
+              report_error "failed to create symlink for $repoName"
             fi
           }
 
@@ -301,7 +311,7 @@ in
 
             parentDir=$(dirname "$repoTarget")
             if ! mkdir -p "$parentDir"; then
-              echo "devReposProvision: failed to create parent directory $parentDir for $repoName" >&2
+              report_error "failed to create parent directory $parentDir for $repoName"
               return 0
             fi
 
@@ -310,15 +320,16 @@ in
               # Repo already initialized; verify/update remote.
               if [ -d "$repoTarget" ]; then
                 if ! currentRemote=$(cd "$repoTarget" && "$gitBin" config --get remote.origin.url 2>&1); then
-                  echo "devReposProvision: failed to read remote for $repoName ($currentRemote)" >&2
+                  report_error "failed to read remote for $repoName ($currentRemote)"
                   currentRemote=""
                 fi
 
                 if [ "$currentRemote" != "$repoUrl" ]; then
                   if remoteErr=$(cd "$repoTarget" && "$gitBin" remote set-url origin "$repoUrl" 2>&1); then
-                    echo "devReposProvision: updated remote for $repoName to $repoUrl"
+                    # Remote updated successfully (idempotent)
+                    :
                   else
-                    echo "devReposProvision: failed to update remote for $repoName ($remoteErr)" >&2
+                    report_error "failed to update remote for $repoName ($remoteErr)"
                   fi
                 fi
               fi
@@ -328,20 +339,20 @@ in
 
             # Repo not initialized; clone it.
             if [ -e "$repoTarget" ] && [ ! -d "$repoTarget" ]; then
-              echo "devReposProvision: $repoTarget exists and is not a directory (soft fail)" >&2
+              report_error "$repoTarget exists and is not a directory"
               return 0
             fi
 
             if [ -d "$repoTarget" ] && [ "$(ls -A "$repoTarget" 2>/dev/null)" != "" ]; then
-              echo "devReposProvision: $repoTarget exists but is not a git repo (soft fail)" >&2
+              report_error "$repoTarget exists but is not a git repo"
               return 0
             fi
 
             if cloneErr=$("$gitBin" clone "$repoUrl" "$repoTarget" 2>&1); then
-              echo "devReposProvision: cloned $repoName to $repoTarget"
+              # Repository cloned successfully (idempotent)
               return 0
             else
-              echo "devReposProvision: failed to clone $repoName from $repoUrl ($cloneErr)" >&2
+              report_error "failed to clone $repoName from $repoUrl ($cloneErr)"
               return 0
             fi
           }
@@ -400,7 +411,7 @@ in
             fi
 
             if ! branchName=$(resolve_submodule_branch "$repoPath" "$submodulePath"); then
-              echo "devReposProvision: could not resolve branch for freshly initialized submodule $submodulePath in $dirLabel (leaving detached)" >&2
+              report_error "could not resolve branch for freshly initialized submodule $submodulePath in $dirLabel (leaving detached)"
               return 0
             fi
 
@@ -412,7 +423,7 @@ in
             if branchErr=$(cd "$submoduleTarget" && "$gitBin" checkout -b "$branchName" --track "origin/$branchName" 2>&1); then
               echo "devReposProvision: created+checked out branch '$branchName' for freshly initialized submodule $submodulePath in $dirLabel"
             else
-              echo "devReposProvision: failed to switch freshly initialized submodule $submodulePath to branch '$branchName' in $dirLabel ($branchErr)" >&2
+              report_error "failed to switch freshly initialized submodule $submodulePath to branch '$branchName' in $dirLabel ($branchErr)"
             fi
           }
 
@@ -427,12 +438,12 @@ in
 
             # Directory must exist and have a .gitmodules file
             if [ ! -f "$dirPath/.gitmodules" ]; then
-              echo "devReposProvision: $dirLabel has no .gitmodules (skipping)" >&2
+              # No submodules configured in this directory; benign no-op.
               return 0
             fi
 
             if ! directSubmodules=$(list_direct_submodules "$dirPath"); then
-              echo "devReposProvision: failed to list submodules in $dirLabel (skipping)" >&2
+              report_error "failed to list submodules in $dirLabel"
               return 0
             fi
 
@@ -441,7 +452,7 @@ in
               submoduleTarget="$dirPath/$submodulePath"
 
               if [ -e "$submoduleTarget/.git" ]; then
-                echo "devReposProvision: submodule $submodulePath already initialized in $dirLabel (skipping)"
+                # Already initialized; idempotent no-op.
                 continue
               fi
 
@@ -450,14 +461,14 @@ in
                   echo "devReposProvision: initialized submodule $submodulePath (recursive) in $dirLabel"
                   ensure_fresh_submodule_on_branch "$dirPath" "$submodulePath" "$dirLabel"
                 else
-                  echo "devReposProvision: failed to initialize submodule $submodulePath (recursive) in $dirLabel ($submoduleErr)" >&2
+                  report_error "failed to initialize submodule $submodulePath (recursive) in $dirLabel ($submoduleErr)"
                 fi
               else
                 if submoduleErr=$(cd "$dirPath" && "$gitBin" submodule update --init "$submodulePath" 2>&1); then
                   echo "devReposProvision: initialized submodule $submodulePath in $dirLabel"
                   ensure_fresh_submodule_on_branch "$dirPath" "$submodulePath" "$dirLabel"
                 else
-                  echo "devReposProvision: failed to initialize submodule $submodulePath in $dirLabel ($submoduleErr)" >&2
+                  report_error "failed to initialize submodule $submodulePath in $dirLabel ($submoduleErr)"
                 fi
               fi
             done
@@ -472,7 +483,7 @@ in
                 if repoSymlinkTarget="$(resolve_repo_root_target)"; then
                   ensure_symlink "$repoSymlinkTarget" "$repoTargetPath" "${repo.name}"
                 else
-                  echo "devReposProvision: repo-root symlink target unavailable for ${repo.name} (skipping)" >&2
+                  report_error "repo-root symlink target unavailable for ${repo.name}"
                 fi
               ''
             else if repo.symlink != null then
@@ -480,7 +491,7 @@ in
             else if repo.url != null then
               ''ensure_repo "${repo.url}" "$(resolve_repo_path "${repo.target}")" "${repo.name}"''
             else
-              ''echo "devReposProvision: repository '${repo.name}' has neither symlink nor url configured (skipping)" >&2''
+              ''report_error "repository '${repo.name}' has neither symlink nor url configured"''
           ) config.nucleus.devRepos.repositories}
 
           # Step 2: Clone submodules from specified directories (sequential processing)
@@ -502,14 +513,15 @@ in
                   if [ -d "$baseDir" ]; then
                     expandedPaths=$(expand_glob_paths "$baseDir" "$pattern")
                     if [ -z "$expandedPaths" ]; then
-                      echo "devReposProvision: no matches for glob pattern '${submoduleDir.path}' (skipping)" >&2
+                      # No matches for configured glob; benign no-op.
+                      :
                     else
                       while IFS= read -r matchedPath; do
                         clone_directory_submodules "$matchedPath" "${recursive}" "''${matchedPath#$HOME/}"
                       done <<< "$expandedPaths"
                     fi
                   else
-                    echo "devReposProvision: base directory $baseDir does not exist for glob pattern '${submoduleDir.path}' (skipping)" >&2
+                    report_error "base directory $baseDir does not exist for glob pattern '${submoduleDir.path}'"
                   fi
                   ;;
                 *)
@@ -517,7 +529,7 @@ in
                   if [ -d "$resolvedPath" ]; then
                     clone_directory_submodules "$resolvedPath" "${recursive}" "${submoduleDir.path}"
                   else
-                    echo "devReposProvision: directory '${submoduleDir.path}' does not exist (skipping)" >&2
+                    report_error "directory '${submoduleDir.path}' does not exist"
                   fi
                   ;;
               esac
@@ -525,6 +537,9 @@ in
           ) config.nucleus.devRepos.submoduleDirectories}
 
           echo "devReposProvision: completed provisioning dev repositories and submodules"
+          if [ "$devReposErrors" -gt 0 ]; then
+            echo "devReposProvision: completed with $devReposErrors non-fatal error(s); see messages above." >&2
+          fi
         '';
   };
 }
