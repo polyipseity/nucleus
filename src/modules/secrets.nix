@@ -97,6 +97,15 @@ let
   # signing key follow the same SOPS lifecycle as SSH/GPG material.
   gitIdentitySecretName = "git_identity_${primaryUsername}";
 
+  # Per-user secrets file: src/secrets/<username>.yml.
+  # May not exist until the user manually runs `sops edit src/secrets/<username>.yml`.
+  # All downstream consumers guard on hasUserSecretFile / configPassEnabled so
+  # activation succeeds even when the file has not been created yet.
+  rcloneConfigPassSecretName = "rclone_config_pass_${primaryUsername}";
+  rcloneConfigPassPath = "${config.home.homeDirectory}/.config/nucleus/secrets/rclone-config-pass";
+  userSecretFilePath = ../secrets + "/${primaryUsername}.yml";
+  hasUserSecretFile = builtins.pathExists userSecretFilePath;
+
 in
 lib.mkIf isPrimaryUser {
   # Register the machine-identity decryption backend for the HM sops-nix module.
@@ -115,6 +124,24 @@ lib.mkIf isPrimaryUser {
   # --------------------------------------------------------------------------
   # SSH private key — sops-nix owns decryption, file write, and chmod 600.
   # --------------------------------------------------------------------------
+
+  # Propagate rclone config passphrase availability to shell.nix and
+  # cloud-drives.nix via nucleus.rclone options so those modules do not need
+  # to re-check the filesystem themselves.
+  nucleus.rclone.configPassEnabled = hasUserSecretFile;
+  nucleus.rclone.configPassSecretPath = lib.mkIf hasUserSecretFile rcloneConfigPassPath;
+
+  # --------------------------------------------------------------------------
+  # Per-user secret: rclone config passphrase.
+  # Encrypts the entire rclone.conf so stored cloud credentials are protected.
+  # WHY 0400: only the owner needs read access; rclone never modifies this file.
+  # --------------------------------------------------------------------------
+  sops.secrets."${rcloneConfigPassSecretName}" = lib.mkIf hasUserSecretFile {
+    sopsFile = userSecretFilePath;
+    path = rcloneConfigPassPath;
+    mode = "0400";
+  };
+
   sops.secrets."${sshSecretName}" = {
     sopsFile = ../secrets/ssh-personal.yml;
     path = sshPrivateKeyPath;
@@ -518,7 +545,11 @@ lib.mkIf isPrimaryUser {
       ++ map (n: {
         path = wallpaperDir + "/${n}";
         displayName = n;
-      }) wallpaperSopsNames;
+      }) wallpaperSopsNames
+      ++ lib.optional hasUserSecretFile {
+        path = userSecretFilePath;
+        displayName = "${primaryUsername}.yml";
+      };
     in
     lib.hm.dag.entryAfter [ "gitIdentityFromSops" "gpgImport" "sshKeyAdopt" ] ''
       # --- 1. Materialization sanity check ---

@@ -1,5 +1,6 @@
 # windows manual steps
 
+- Create the per-user rclone passphrase: run `sops edit src/secrets/polyipseity.yml` from the repo root, add `rclone_config_pass_polyipseity: <output of openssl rand -hex 32>`, save (sops encrypts automatically), commit the file, then re-run `nucleus apply`. If you already configured rclone remotes without this passphrase, delete `%USERPROFILE%\.config\rclone\rclone.conf` first so the remotes are re-created with encryption.
 - Run `nucleus-cloud-setup` in PowerShell and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
 
 ## command shortcuts

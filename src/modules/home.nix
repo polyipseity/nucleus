@@ -184,6 +184,19 @@ let
   dotfilesRoot = ../dotfiles;
 in
 {
+  options.nucleus.rclone = {
+    configPassEnabled = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Whether a managed rclone config passphrase secret exists for this user. Set to true by secrets.nix when src/secrets/<username>.yml is present and contains the rclone passphrase key.";
+    };
+    configPassSecretPath = lib.mkOption {
+      type = lib.types.str;
+      default = "";
+      description = "Absolute path where sops-nix materializes the rclone config passphrase secret. Non-empty only when configPassEnabled is true.";
+    };
+  };
+
   options.nucleus.hostManualFile = lib.mkOption {
     type = lib.types.nullOr lib.types.str;
     default = null;

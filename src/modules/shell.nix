@@ -2,7 +2,7 @@
 #
 # Keeps shell aliases and environment variables in dedicated fragments to make
 # ordering checks and targeted reviews straightforward.
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
   # Dedicated alias/env fragments keep list-like attrsets isolated so sort order
   # can be audited without scanning unrelated shell options.
@@ -40,6 +40,18 @@ let
     pkgs.writeShellScriptBin name ''
       set -eu
       exec nix run ${config.home.homeDirectory}/dev/nucleus/src#${app} -- "$@"
+    ''
+    + lib.optionalString config.nucleus.rclone.configPassEnabled ''
+
+      # Export rclone config passphrase from SOPS-managed secret so rclone
+      # transparently uses config file encryption in all interactive and
+      # scripted invocations.
+      # WHY conditional: sops-nix materializes the file asynchronously (macOS
+      # LaunchAgent) or inline (NixOS); skip silently if the secret file is
+      # absent during early bootstrap before decryption completes.
+      if [ -s "${config.nucleus.rclone.configPassSecretPath}" ]; then
+        export RCLONE_CONFIG_PASS="$(cat "${config.nucleus.rclone.configPassSecretPath}")"
+      fi
     '';
 in
 {

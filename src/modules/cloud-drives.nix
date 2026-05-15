@@ -214,7 +214,15 @@ let
         mount.iCloudService
       ];
       readOnlyFlag = lib.optional (!mount.readWrite) "--read-only";
-      extraArgsList = iCloudServiceArgs ++ mount.extraArgs;
+      # Pass the managed config passphrase command when the feature is enabled
+      # so the LaunchAgent can decrypt an encrypted rclone.conf on every start.
+      # WHY --password-command not env var: LaunchAgents run outside user shell
+      # sessions and do not inherit RCLONE_CONFIG_PASS from the login environment.
+      rclonePasswordArgs = lib.optionals config.nucleus.rclone.configPassEnabled [
+        "--password-command"
+        "cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath}"
+      ];
+      extraArgsList = iCloudServiceArgs ++ rclonePasswordArgs ++ mount.extraArgs;
     in
     pkgs.writeShellScript "cloud-mount-${mount.id}" ''
       set -eu
@@ -360,6 +368,13 @@ in
                   mount.iCloudService
                 ];
                 readOnlyFlag = lib.optional (!mount.readWrite) "--read-only";
+                # Same password-command logic as the macOS LaunchAgent script.
+                # WHY --password-command not env var: systemd user services do not
+                # inherit session environment variables set in shell profiles.
+                rclonePasswordArgs = lib.optionals config.nucleus.rclone.configPassEnabled [
+                  "--password-command"
+                  "cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath}"
+                ];
               in
               {
                 Unit = {
@@ -387,7 +402,7 @@ in
                       "--log-level"
                       "ERROR"
                     ]
-                    ++ map lib.escapeShellArg (readOnlyFlag ++ iCloudServiceArgs ++ mount.extraArgs)
+                    ++ map lib.escapeShellArg (readOnlyFlag ++ iCloudServiceArgs ++ rclonePasswordArgs ++ mount.extraArgs)
                   );
                   ExecStop = mkFusermountUnmount mountPoint;
                   Restart = "on-failure";

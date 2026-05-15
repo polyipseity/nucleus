@@ -16,6 +16,8 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   shellScriptText = builtins.readFile ../../scripts/cloud-setup.sh;
   pwshScriptText = builtins.readFile ../../scripts/cloud-setup.ps1;
+  homeNixText = builtins.readFile ../../src/modules/home.nix;
+  shellNixText = builtins.readFile ../../src/modules/shell.nix;
 
   assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
 
@@ -109,6 +111,33 @@ let
     && containsRegex "@\('service', \\$iCloudService, '--all'\)" pwshScriptText
   ) "cloud-setup scripts must preselect the configured iCloud service during remote creation";
 
+  # Test 20: home.nix declares nucleus.rclone options for configPassEnabled and configPassSecretPath
+  test_rclone_options_in_home_nix = assert' (
+    containsRegex "nucleus\.rclone" homeNixText
+    && containsRegex "configPassEnabled" homeNixText
+    && containsRegex "configPassSecretPath" homeNixText
+  ) "home.nix must declare nucleus.rclone.configPassEnabled and nucleus.rclone.configPassSecretPath options";
+
+  # Test 21: cloud-drives.nix emits --password-command when configPassEnabled is set
+  test_cloud_drives_password_command = assert' (
+    containsRegex "password-command" moduleText
+    && containsRegex "configPassEnabled" moduleText
+  ) "cloud-drives.nix must add --password-command to mount args when nucleus.rclone.configPassEnabled is true";
+
+  # Test 22: shell.nix exports RCLONE_CONFIG_PASS guarded by configPassEnabled
+  test_shell_exports_rclone_pass = assert' (
+    containsRegex "RCLONE_CONFIG_PASS" shellNixText
+    && containsRegex "configPassEnabled" shellNixText
+  ) "shell.nix must export RCLONE_CONFIG_PASS conditional on nucleus.rclone.configPassEnabled";
+
+  # Test 23: Both cloud-setup scripts export RCLONE_CONFIG_PASS before remote creation
+  test_cloud_setup_exports_rclone_pass = assert' (
+    containsRegex "RCLONE_CONFIG_PASS" shellScriptText
+    && containsRegex "rclone-config-pass" shellScriptText
+    && containsRegex "RCLONE_CONFIG_PASS" pwshScriptText
+    && containsRegex "rclone-config-pass" pwshScriptText
+  ) "cloud-setup scripts must export RCLONE_CONFIG_PASS from the materialized secret before rclone config create";
+
   allTests = [
     test_options_exist
     test_mounts_are_list
@@ -129,6 +158,10 @@ let
     test_user_registries_define_icloud_service
     test_cloud_setup_runtime_has_jq
     test_cloud_setup_passes_icloud_service
+    test_rclone_options_in_home_nix
+    test_cloud_drives_password_command
+    test_shell_exports_rclone_pass
+    test_cloud_setup_exports_rclone_pass
   ];
 in
 {
