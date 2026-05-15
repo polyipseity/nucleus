@@ -120,6 +120,17 @@ function Sync-CloudDrive {
             $mountArgs += '--iclouddrive-service', $iCloudService
         }
 
+                # Pass the managed rclone config passphrase command when the secret file
+                # is present so Servy services can decrypt the config on every start.
+                # WHY --password-command not env var: Servy services run outside user
+                # shell sessions and cannot inherit $env:RCLONE_CONFIG_PASS from a
+                # profile.
+                $rclonePassFile = Join-Path $HomeDirectory '.config\nucleus\secrets\rclone-config-pass'
+                if (Test-Path -Path $rclonePassFile -PathType Leaf) {
+                    $escapedPassFile = $rclonePassFile.Replace('"', '""')
+                    $mountArgs += '--password-command', "cmd /c type `"$escapedPassFile`""
+                }
+
         if (-not $readWrite) {
             $mountArgs += '--read-only'
         }

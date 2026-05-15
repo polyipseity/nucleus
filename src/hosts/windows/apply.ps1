@@ -239,6 +239,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $secretsModuleDir -ChildPath "Remove-ManagedSecret.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Sync-Secret.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Sync-SecretFile.ps1")
+. (Join-Path -Path $secretsModuleDir -ChildPath "Sync-UserSecret.ps1")
 # system/: machine-level services and infrastructure (WinGet, SSH host, RDP, power, AI).
 . (Join-Path -Path $systemModuleDir -ChildPath "Initialize-SSHHostKey.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AISync.ps1")
@@ -421,6 +422,15 @@ foreach ($secretFile in $secretPreflightFiles) {
 
 if ($EnableSecretsParity) {
   Sync-Secret -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
+  # Materialize per-user secrets from src/secrets/<username>.yml when present.
+  # No-op when the file does not exist so bootstrap runs continue uninterrupted.
+  Sync-UserSecret `
+    -RepoRoot $repoRoot `
+    -GpgExe $gpgExe `
+    -HostKeyPath $machineSshHostKeyPath `
+    -PrimarySshKeyPath $primarySshKeyPath `
+    -SopsExe $sopsExe `
+    -PrimaryUsername $PrimaryUsername
 }
 else {
   Remove-ManagedSecret -Users $Users

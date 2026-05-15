@@ -62,6 +62,14 @@ function Sync-ShellProfile {
     '# path here, so the fallback reuses the managed user PATH entries applied by'
     '# WinGet/bootstrap while still gating invocation through this profile layer.'
     '$env:NUCLEUS_DEFAULT_DEV_ENV = "1"'
+    # Load rclone config passphrase from materialized secret for automatic config
+    # file encryption in interactive and scripted rclone invocations.
+    # WHY conditional: secret file may be absent before apply has materialized it.
+    '$_rclonePassFile = Join-Path $HOME ".config\nucleus\secrets\rclone-config-pass"'
+    'if (Test-Path -Path $_rclonePassFile -PathType Leaf) {'
+    '  $env:RCLONE_CONFIG_PASS = (Get-Content -Path $_rclonePassFile -Raw -ErrorAction SilentlyContinue).Trim()'
+    '  Remove-Variable -Name _rclonePassFile -ErrorAction SilentlyContinue'
+    '}'
     # PSReadLine: predictive history completion + menu-style tab expansion.
     # Guards with module availability probe so the profile is safe on older hosts.
     'if (Get-Module -ListAvailable -Name PSReadLine) {'
