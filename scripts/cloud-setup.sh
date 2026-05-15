@@ -3,7 +3,8 @@
 #
 # Operations:
 #   1. verify required rclone remotes exist (GoogleDrive, iCloud, OneDrive)
-#   2. if missing, open interactive rclone config once
+#   2. if any are missing, create each with the correct provider type and
+#      prompt for authentication (no manual menu navigation required)
 #   3. run nucleus apply so cloud mount services/units converge immediately
 #
 # Arguments:
@@ -70,6 +71,16 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+# Maps a known remote name to its rclone provider type string.
+remote_provider_type() {
+  case "$1" in
+    GoogleDrive) printf 'drive' ;;
+    iCloud)      printf 'iclouddrive' ;;
+    OneDrive)    printf 'onedrive' ;;
+    *)           printf '' ;;
+  esac
+}
+
 if ! command -v rclone >/dev/null 2>&1; then
   printf '%s\n' "cloud-setup: rclone not found on PATH. Run apply/bootstrap first, then retry." >&2
   exit 1
@@ -83,11 +94,19 @@ missing_remotes="$(collect_missing_remotes "$required_remotes")" || {
 
 if [ -n "$missing_remotes" ]; then
   printf '%s\n' "cloud-setup: missing rclone remotes: $missing_remotes"
-  printf '%s\n' "cloud-setup: launching interactive rclone configuration..."
-  rclone config
+  printf '%s\n' "cloud-setup: creating and authenticating each missing remote..."
+  for _remote in $missing_remotes; do
+    _type="$(remote_provider_type "$_remote")"
+    if [ -z "$_type" ]; then
+      printf '%s\n' "cloud-setup: unknown remote '$_remote'; add it manually with 'rclone config'." >&2
+      continue
+    fi
+    printf '%s\n' "cloud-setup: setting up remote '$_remote' (provider: $_type)..."
+    rclone config create "$_remote" "$_type"
+  done
 
   missing_remotes="$(collect_missing_remotes "$required_remotes")" || {
-    printf '%s\n' "cloud-setup: failed to re-read rclone remotes after configuration." >&2
+    printf '%s\n' "cloud-setup: failed to re-read rclone remotes after setup." >&2
     exit 1
   }
 fi

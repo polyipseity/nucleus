@@ -5,7 +5,8 @@
 .DESCRIPTION
   Performs a bounded cloud-drive setup workflow:
     1. verifies required rclone remotes exist (GoogleDrive, iCloud, OneDrive)
-    2. launches interactive `rclone config` if remotes are missing
+    2. creates each missing remote with the correct provider type and prompts
+       for authentication (no manual menu navigation required)
     3. runs `nix run <repo>/src#apply` so cloud mount services converge
 
 .PARAMETER SkipApply
@@ -66,6 +67,16 @@ function Get-RcloneMissingRemote {
   return $missing
 }
 
+function Get-ProviderType {
+  param([Parameter(Mandatory)][string]$RemoteName)
+  switch ($RemoteName) {
+    'GoogleDrive' { return 'drive' }
+    'iCloud'      { return 'iclouddrive' }
+    'OneDrive'    { return 'onedrive' }
+    default       { return $null }
+  }
+}
+
 if (-not (Get-Command rclone -ErrorAction SilentlyContinue)) {
   throw 'cloud-setup: rclone not found on PATH. Run apply/bootstrap first, then retry.'
 }
@@ -78,12 +89,23 @@ if ($null -eq $missingRemotes) {
 
 if ($missingRemotes.Count -gt 0) {
   Write-Output "cloud-setup: missing rclone remotes: $($missingRemotes -join ', ')"
-  Write-Output 'cloud-setup: launching interactive rclone configuration...'
-  & rclone config
+  Write-Output 'cloud-setup: creating and authenticating each missing remote...'
+  foreach ($remote in $missingRemotes) {
+    $providerType = Get-ProviderType -RemoteName $remote
+    if ($null -eq $providerType) {
+      Write-Error "cloud-setup: unknown remote '$remote'; add it manually with 'rclone config'."
+      continue
+    }
+    Write-Output "cloud-setup: setting up remote '$remote' (provider: $providerType)..."
+    & rclone config create $remote $providerType
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "cloud-setup: remote '$remote' setup exited with code $LASTEXITCODE."
+    }
+  }
 
   $missingRemotes = Get-RcloneMissingRemote -RequiredRemotes $requiredRemotes
   if ($null -eq $missingRemotes) {
-    throw 'cloud-setup: failed to re-read rclone remotes after configuration.'
+    throw 'cloud-setup: failed to re-read rclone remotes after setup.'
   }
 }
 
