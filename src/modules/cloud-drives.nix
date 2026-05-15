@@ -203,7 +203,8 @@ let
 
   # Build a rclone mount wrapper script for macOS LaunchAgents.
   # Uses the full Nix store path to rclone so the agent is not PATH-dependent.
-  mkMountPoint = mount:
+  mkMountPoint =
+    mount:
     if pkgs.stdenv.isDarwin then
       "/Volumes/nucleus-cloud-${mount.id}"
     else
@@ -241,9 +242,6 @@ let
     pkgs.writeShellScript "cloud-mount-${mount.id}" ''
       set -eu
 
-      # Ensure mount directory exists before rclone tries to use it.
-      mkdir -p ${lib.escapeShellArg mountPoint}
-
       # Verify the rclone remote is configured; exit 0 (no restart) if not.
       if ! ${pkgs.rclone}/bin/rclone listremotes 2>/dev/null | grep -qF ${lib.escapeShellArg "${mount.remoteName}:"}; then
         echo "cloud-drives: rclone remote '${mount.remoteName}' not configured; mount skipped." >&2
@@ -251,6 +249,7 @@ let
         exit 0
       fi
 
+      # macFUSE/FSKit creates the volume mountpoint itself under /Volumes.
       exec ${pkgs.rclone}/bin/rclone mount \
         ${lib.escapeShellArg rcloneRemote} \
         ${lib.escapeShellArg mountPoint} \
@@ -288,7 +287,9 @@ in
       enabledReplicas = builtins.filter (r: r.enable) config.nucleus.cloudDrives.replicas;
 
       # Mounts require rclone plus an explicit configured remote.
-      rcloneMounts = builtins.filter (m: m.enable && m.remoteName != null) config.nucleus.cloudDrives.mounts;
+      rcloneMounts = builtins.filter (
+        m: m.enable && m.remoteName != null
+      ) config.nucleus.cloudDrives.mounts;
 
       hasRcloneProvider =
         rcloneMounts != [ ]
@@ -320,7 +321,6 @@ in
             _link="$2"
 
             mkdir -p "$(/usr/bin/dirname "$_link")"
-            mkdir -p "$_target"
 
             if [ -L "$_link" ]; then
               _current_target="$(/usr/bin/readlink "$_link")"
@@ -344,10 +344,10 @@ in
           ${lib.concatStringsSep "\n" (
             map (m: ''
               ${lib.optionalString pkgs.stdenv.isDarwin ''
-              ensure_cloud_mount_link ${lib.escapeShellArg (mkMountPoint m)} ${lib.escapeShellArg (mkMountLink m)}
+                ensure_cloud_mount_link ${lib.escapeShellArg (mkMountPoint m)} ${lib.escapeShellArg (mkMountLink m)}
               ''}
               ${lib.optionalString (!pkgs.stdenv.isDarwin) ''
-              mkdir -p ${lib.escapeShellArg (mkMountLink m)}
+                mkdir -p ${lib.escapeShellArg (mkMountLink m)}
               ''}
             '') enabledMounts
           )}
@@ -447,7 +447,9 @@ in
                       "--log-level"
                       "ERROR"
                     ]
-                    ++ map lib.escapeShellArg (readOnlyFlag ++ iCloudServiceArgs ++ rclonePasswordArgs ++ mount.extraArgs)
+                    ++ map lib.escapeShellArg (
+                      readOnlyFlag ++ iCloudServiceArgs ++ rclonePasswordArgs ++ mount.extraArgs
+                    )
                   );
                   ExecStop = mkFusermountUnmount mountPoint;
                   Restart = "on-failure";

@@ -39,9 +39,6 @@ let
     name: app:
     pkgs.writeShellScriptBin name ''
       set -eu
-      exec nix run ${config.home.homeDirectory}/dev/nucleus/src#${app} -- "$@"
-    ''
-    + lib.optionalString config.nucleus.rclone.configPassEnabled ''
 
       # Export rclone config passphrase from SOPS-managed secret so rclone
       # transparently uses config file encryption in all interactive and
@@ -49,9 +46,13 @@ let
       # WHY conditional: sops-nix materializes the file asynchronously (macOS
       # LaunchAgent) or inline (NixOS); skip silently if the secret file is
       # absent during early bootstrap before decryption completes.
+      ${lib.optionalString config.nucleus.rclone.configPassEnabled ''
       if [ -s "${config.nucleus.rclone.configPassSecretPath}" ]; then
         export RCLONE_CONFIG_PASS="$(cat "${config.nucleus.rclone.configPassSecretPath}")"
       fi
+      ''}
+
+      exec nix run ${config.home.homeDirectory}/dev/nucleus/src#${app} -- "$@"
     '';
 in
 {

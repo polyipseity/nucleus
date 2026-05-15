@@ -217,7 +217,6 @@
         fi
       fi
     fi
-
     # ---- configureGimpScrollSensitivity ---------------------------------------
     # Reduce GIMP zoom sensitivity to 25% of upstream default by setting the
     # drag-zoom-speed token in the active user gimprc to 25.0 (default 100.0).
