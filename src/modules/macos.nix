@@ -286,6 +286,7 @@ let
     "cloudDrivesICloudRefresh"
     "cloudDrivesSetup"
     "configureDisplayResolutions"
+    "configureFinderSidebar"
     "configureInputAndSiri"
     "configureLaunchServices"
     "configureRaycastApplicationAliases"
@@ -881,12 +882,63 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
+    # configureFinderSidebar
+    # Enforce an exact Finder sidebar Favourites list by removing all current
+    # user-managed entries and re-adding the canonical set in declared order.
+    #
+    # Uses sfltool (macOS built-in) against the FavoriteItems shared file list.
+    # System-managed entries such as AirDrop and Recents live outside this list
+    # and are unaffected.
+    #
+    # WHY remove-all then add: sfltool has no reorder command; the only way to
+    # guarantee both the exact set and the exact order is a full replace on
+    # every activation.
+    # -------------------------------------------------------------------------
+    configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      _sflt_list="com.apple.LSSharedFileList.FavoriteItems"
+
+      # Remove all current user-managed sidebar items.
+      # sfltool list outputs TAB-separated "Name<TAB>file://URL" lines.
+      # remove-item on system entries (AirDrop, Recents) is expected to fail
+      # and benign; 2>/dev/null suppresses the noise and || true keeps the
+      # loop running.
+      /usr/bin/sfltool list "$_sflt_list" 2>/dev/null \
+        | /usr/bin/awk -F'\t' 'NF>=2{print $2}' \
+        | while IFS= read -r _url; do
+            if [ -n "$_url" ]; then
+              /usr/bin/sfltool remove-item "$_sflt_list" "$_url" 2>/dev/null || true
+            fi
+          done
+
+      # Helper: add a Finder sidebar favorite by absolute path.
+      _add_finder_fav() {
+        /usr/bin/sfltool add-item "$_sflt_list" "file://$1" || {
+          echo "macos: failed to add Finder favorite: $1" >&2
+        }
+      }
+
+      # Add canonical favorites in declared order.
+      _add_finder_fav /Applications
+      _add_finder_fav "$HOME/Desktop"
+      _add_finder_fav "$HOME/Documents"
+      _add_finder_fav "$HOME/Downloads"
+      _add_finder_fav "$HOME/Music"
+      _add_finder_fav "$HOME/Movies"         # "Video" maps to ~/Movies on macOS
+      _add_finder_fav "$HOME/Pictures"
+      _add_finder_fav "$HOME/.Trash"         # shown as "Trash Bin" in Finder
+      _add_finder_fav /                      # root "/"
+      _add_finder_fav "$HOME"                # user home "~/"
+      _add_finder_fav "$HOME/dev"
+      _add_finder_fav "$HOME/clouds"
+    '';
+
+    # -------------------------------------------------------------------------
     # refreshFinderServices
     # Restart Finder to refresh available Services in context menu after
     # installation and preference changes. This ensures "Open in Terminal",
     # "Open in iTerm", and other services are visible without a manual restart.
     # -------------------------------------------------------------------------
-    refreshFinderServices = lib.hm.dag.entryAfter [ "installPackages" "configureLaunchServices" ] ''
+    refreshFinderServices = lib.hm.dag.entryAfter [ "configureFinderSidebar" "installPackages" "configureLaunchServices" ] ''
       # Restart Finder to refresh Services. This ensures services registered for
       # both file and directory contexts are loaded (e.g., "Open in Terminal").
       if ! /usr/bin/killall Finder; then
