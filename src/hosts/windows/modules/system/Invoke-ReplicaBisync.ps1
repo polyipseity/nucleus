@@ -4,6 +4,14 @@
 
 .DESCRIPTION
   Windows counterpart to scripts/replica-bisync.sh. Reads the per-user replica
+
+  # WHY early acknowledgement: PSScriptAnalyzer flags unused parameters at the
+  # function scope even when they are forwarded later to helpers. Emitting a
+  # dry-run banner here keeps lint strict while also making manual invocations
+  # self-describing.
+  if ($DryRun) {
+    Write-Output "replica-bisync: running in dry-run mode"
+  }
   definitions from src/modules/users.json and runs rclone sync/bisync for each
   enabled entry that has a remoteName.
 
@@ -169,6 +177,12 @@ function Invoke-ReplicaBisync {
     $commonArgs = @("--log-level", "ERROR")
     if ($provider -eq "iCloud") {
       $commonArgs += @("--iclouddrive-service", $iCloudService)
+    }
+    if ($provider -eq "OneDrive") {
+      # Microsoft exposes Personal Vault in the root listing even when the API
+      # later rejects traversal. Exclude it proactively so post-apply bisync
+      # stays reliable instead of failing every run on invalidResourceId.
+      $commonArgs += @("--exclude", "Personal Vault", "--exclude", "Personal Vault/**")
     }
     if ($null -ne $resolvedFilterPath) {
       $commonArgs += @("--filter-from", $resolvedFilterPath)

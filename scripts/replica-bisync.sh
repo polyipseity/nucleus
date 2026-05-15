@@ -165,84 +165,40 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
     fi
   fi
 
+  # Build shared rclone arguments once per replica so provider-specific safety
+  # filters stay identical across pull/push/bisync code paths.
+  set -- --log-level ERROR
+  if [ "$provider" = "iCloud" ]; then
+    set -- "$@" --iclouddrive-service "$icloud_service"
+  fi
+  if [ "$provider" = "OneDrive" ]; then
+    # Microsoft exposes Personal Vault through the root listing even when the
+    # API later rejects traversal. Exclude it proactively so post-apply bisync
+    # stays reliable instead of failing every run on invalidResourceId.
+    set -- "$@" --exclude "Personal Vault" --exclude "Personal Vault/**"
+  fi
+  if [ -n "$resolved_filters" ]; then
+    set -- "$@" --filter-from "$resolved_filters"
+  fi
+
   case "$direction" in
     pull)
       printf '%s\n' "replica-bisync: [$id] pull $remote_ref -> $local_dir"
-      if [ "$provider" = "iCloud" ]; then
-        if [ -n "$resolved_filters" ]; then
-          if ! run_cmd rclone sync "$remote_ref" "$local_dir" --log-level ERROR --iclouddrive-service "$icloud_service" --filter-from "$resolved_filters"; then
-            failures=$((failures + 1))
-          fi
-        else
-          if ! run_cmd rclone sync "$remote_ref" "$local_dir" --log-level ERROR --iclouddrive-service "$icloud_service"; then
-            failures=$((failures + 1))
-          fi
-        fi
-      else
-        if [ -n "$resolved_filters" ]; then
-          if ! run_cmd rclone sync "$remote_ref" "$local_dir" --log-level ERROR --filter-from "$resolved_filters"; then
-            failures=$((failures + 1))
-          fi
-        else
-          if ! run_cmd rclone sync "$remote_ref" "$local_dir" --log-level ERROR; then
-            failures=$((failures + 1))
-          fi
-        fi
+      if ! run_cmd rclone sync "$remote_ref" "$local_dir" "$@"; then
+        failures=$((failures + 1))
       fi
       ;;
     push)
       printf '%s\n' "replica-bisync: [$id] push $local_dir -> $remote_ref"
-      if [ "$provider" = "iCloud" ]; then
-        if [ -n "$resolved_filters" ]; then
-          if ! run_cmd rclone sync "$local_dir" "$remote_ref" --log-level ERROR --iclouddrive-service "$icloud_service" --filter-from "$resolved_filters"; then
-            failures=$((failures + 1))
-          fi
-        else
-          if ! run_cmd rclone sync "$local_dir" "$remote_ref" --log-level ERROR --iclouddrive-service "$icloud_service"; then
-            failures=$((failures + 1))
-          fi
-        fi
-      else
-        if [ -n "$resolved_filters" ]; then
-          if ! run_cmd rclone sync "$local_dir" "$remote_ref" --log-level ERROR --filter-from "$resolved_filters"; then
-            failures=$((failures + 1))
-          fi
-        else
-          if ! run_cmd rclone sync "$local_dir" "$remote_ref" --log-level ERROR; then
-            failures=$((failures + 1))
-          fi
-        fi
+      if ! run_cmd rclone sync "$local_dir" "$remote_ref" "$@"; then
+        failures=$((failures + 1))
       fi
       ;;
     bidirectional)
       printf '%s\n' "replica-bisync: [$id] bisync $local_dir <-> $remote_ref"
-      if [ "$provider" = "iCloud" ]; then
-        if [ -n "$resolved_filters" ]; then
-          if ! run_cmd rclone bisync "$local_dir" "$remote_ref" --log-level ERROR --check-access --iclouddrive-service "$icloud_service" --filter-from "$resolved_filters"; then
-            if ! run_cmd rclone bisync "$local_dir" "$remote_ref" --log-level ERROR --check-access --resync --iclouddrive-service "$icloud_service" --filter-from "$resolved_filters"; then
-              failures=$((failures + 1))
-            fi
-          fi
-        else
-          if ! run_cmd rclone bisync "$local_dir" "$remote_ref" --log-level ERROR --check-access --iclouddrive-service "$icloud_service"; then
-            if ! run_cmd rclone bisync "$local_dir" "$remote_ref" --log-level ERROR --check-access --resync --iclouddrive-service "$icloud_service"; then
-              failures=$((failures + 1))
-            fi
-          fi
-        fi
-      else
-        if [ -n "$resolved_filters" ]; then
-          if ! run_cmd rclone bisync "$local_dir" "$remote_ref" --log-level ERROR --check-access --filter-from "$resolved_filters"; then
-            if ! run_cmd rclone bisync "$local_dir" "$remote_ref" --log-level ERROR --check-access --resync --filter-from "$resolved_filters"; then
-              failures=$((failures + 1))
-            fi
-          fi
-        else
-          if ! run_cmd rclone bisync "$local_dir" "$remote_ref" --log-level ERROR --check-access; then
-            if ! run_cmd rclone bisync "$local_dir" "$remote_ref" --log-level ERROR --check-access --resync; then
-              failures=$((failures + 1))
-            fi
-          fi
+      if ! run_cmd rclone bisync "$local_dir" "$remote_ref" --check-access "$@"; then
+        if ! run_cmd rclone bisync "$local_dir" "$remote_ref" --check-access --resync "$@"; then
+          failures=$((failures + 1))
         fi
       fi
       ;;

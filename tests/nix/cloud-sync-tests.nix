@@ -274,6 +274,14 @@ let
     && containsRegex ''scripts\\replica-bisync\.ps1'' windowsShellProfileText
   ) "Windows shell profile must expose nucleus-replica-bisync";
 
+  # Test 41: OneDrive replica runners must exclude Personal Vault on both platforms
+  test_onedrive_personal_vault_excluded = assert' (
+    containsRegex ''Personal Vault/\*\*'' replicaBisyncShellText
+    && containsRegex ''Personal Vault'' replicaBisyncShellText
+    && containsRegex ''Personal Vault/\*\*'' windowsReplicaModuleText
+    && containsRegex ''Personal Vault'' windowsReplicaModuleText
+  ) "Replica bisync runners must exclude OneDrive Personal Vault to avoid invalidResourceId failures";
+
   allTests = [
     test_options_exist
     test_mounts_are_list
@@ -315,6 +323,7 @@ let
     test_windows_replica_bisync_entrypoints
     test_windows_apply_replica_hook
     test_windows_shell_replica_command
+    test_onedrive_personal_vault_excluded
   ];
 in
 {
