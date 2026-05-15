@@ -145,6 +145,9 @@
   CI or on low-bandwidth connections where model pulls (2-20 GB each) are
   undesirable.
 
+.PARAMETER SkipReplicaBisync
+  When specified, suppresses the post-apply cloud replica sync step.
+
 .PARAMETER MinFreeDiskGB
   Minimum free space threshold (GiB) used by the pre-flight health check.
 
@@ -166,6 +169,10 @@
 .EXAMPLE
   # Apply while skipping the post-apply Ollama model sync:
   .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -SkipAISync
+
+.EXAMPLE
+  # Apply while skipping the post-apply replica bisync:
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -SkipReplicaBisync
 
 .EXAMPLE
   # Apply while disabling machine age key auto-registration in .sops.yaml:
@@ -209,7 +216,8 @@ param(
   [bool]$EnableVsCodeSettingsParity = $true,
   [bool]$EnableVsCodeWorkspaceTrustParity = $true,
   [int]$MinFreeDiskGB = 10,
-  [switch]$SkipAISync
+  [switch]$SkipAISync,
+  [switch]$SkipReplicaBisync
 )
 
 $ErrorActionPreference = "Stop"
@@ -243,6 +251,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 # system/: machine-level services and infrastructure (WinGet, SSH host, RDP, power, AI).
 . (Join-Path -Path $systemModuleDir -ChildPath "Initialize-SSHHostKey.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AISync.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Invoke-ReplicaBisync.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSshServer.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-PowerPolicy.ps1")
@@ -575,5 +584,25 @@ if ($SkipAISync) {
   } else {
     Write-Output "AI-sync: running post-apply AI model sync..."
     Invoke-AISync -RepoRoot $repoRoot -ServerReadyTimeoutSeconds 60
+  }
+}
+
+# Converge enabled cloud replicas from users.json as the final post-apply step.
+# This is best-effort: replica sync can be long-running and should not
+# retroactively fail a completed configuration convergence.
+if ($SkipReplicaBisync) {
+  Write-Output "replica-bisync: -SkipReplicaBisync set; skipping post-apply replica sync"
+} else {
+  # Presence probe: rclone may be absent on first-provision hosts.
+  $rcloneOnPath = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
+  if ($null -eq $rcloneOnPath) {
+    Write-Output "replica-bisync: rclone not found in PATH; skipping post-apply replica sync"
+  } else {
+    Write-Output "replica-bisync: running post-apply replica sync..."
+    try {
+      Invoke-ReplicaBisync -RepoRoot $repoRoot
+    } catch {
+      Write-Warning "replica-bisync: replica sync incomplete (system apply succeeded): $($_.Exception.Message)"
+    }
   }
 }
