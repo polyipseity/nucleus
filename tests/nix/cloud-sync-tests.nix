@@ -19,6 +19,7 @@ let
   homeNixText = builtins.readFile ../../src/modules/home.nix;
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
+  macbookActivationText = builtins.readFile ../../src/hosts/macbook/activation.nix;
 
   assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
 
@@ -164,13 +165,18 @@ let
   ) "Finder sidebar favorites must be rewritten directly through the shared-file-list archive";
 
   # Test 26: macOS cloud mounts use FSKit under /Volumes and symlink the legacy home paths
+  test_cloud_mounts_prepare_volumes = assert' (
+    containsRegex "mkdir -p /Volumes/nucleus-cloud-" macbookActivationText
+  ) "macOS activation must create /Volumes mountpoints for FSKit cloud drives before Home Manager symlinks them";
+
+  # Test 27: macOS cloud mounts use FSKit under /Volumes and symlink the legacy home paths
   test_cloud_mounts_use_fskit_backend = assert' (
     containsRegex "backend=fskit" moduleText
     && containsRegex "ensure_cloud_mount_link" moduleText
     && containsRegex "/Volumes/nucleus-cloud-" moduleText
   ) "macOS cloud mounts must use the macFUSE FSKit backend and symlink the home path back to /Volumes";
 
-  # Test 27: Both cloud-setup scripts recreate remotes whose credentials are stale
+  # Test 28: Both cloud-setup scripts recreate remotes whose credentials are stale
   test_cloud_setup_recreates_stale_remotes = assert' (
     containsRegex "stale" shellScriptText
     && containsRegex "rclone config delete" shellScriptText
@@ -204,6 +210,7 @@ let
     test_cloud_setup_exports_rclone_pass
     test_cloud_setup_uses_root_only_listing
     test_finder_sidebar_rewrite_is_direct
+    test_cloud_mounts_prepare_volumes
     test_cloud_mounts_use_fskit_backend
     test_cloud_setup_recreates_stale_remotes
   ];

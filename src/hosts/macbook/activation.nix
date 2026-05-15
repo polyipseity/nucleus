@@ -12,7 +12,11 @@
 #   and postActivation (after homebrew, last before the gc-root symlink).
 #   lib.mkBefore ensures these fragments are prepended before home-manager's
 #   HM activation call, which is also appended to postActivation.text.
-{ lib, ... }:
+{ lib, users, username, ... }:
+let
+  currentUserCloudMounts = (users.${username}.cloudDrives or { }).mounts or [ ];
+  fsKitMountPoints = builtins.map (mount: "/Volumes/nucleus-cloud-${mount.id}") currentUserCloudMounts;
+in
 {
   # ---------------------------------------------------------------------------
   # Declarative power-management settings handled by nix-darwin's power module.
@@ -47,6 +51,11 @@
   #   clearFinderCache                 — purge stale Finder state for desktop visibility
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
+    # ---- prepareCloudFsKitMountPoints ----------------------------------------
+${lib.concatStringsSep "\n" (map (mountPoint: ''
+    mkdir -p ${lib.escapeShellArg mountPoint}
+'') fsKitMountPoints)}
+
     # ---- configureBatteryPolicy ------------------------------------------------
     # Enforce pmset values directly for AC and battery because newer macOS
     # releases can ignore or partially override higher-level power options.
