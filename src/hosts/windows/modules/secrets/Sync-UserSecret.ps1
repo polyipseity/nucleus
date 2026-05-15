@@ -5,7 +5,7 @@
 # $HOME\.config\nucleus\secrets\.
 #
 # Secrets materialized:
-#   rclone_config_pass_<username>
+#   rclone_config_pass
 #     Written to $HOME\.config\nucleus\secrets\rclone-config-pass.
 #     The rclone config passphrase encrypts the entire rclone.conf so stored
 #     cloud credentials are protected at rest.  shell profile and
@@ -80,7 +80,8 @@ function Sync-UserSecret {
   }
 
   # Materialize rclone config passphrase.
-  $rclonePassKey = "rclone_config_pass_$PrimaryUsername"
+  # WHY key name is unscoped: src/secrets/<username>.yml is already per-user.
+  $rclonePassKey = 'rclone_config_pass'
   $rclonePassValue = $secrets.$rclonePassKey
   if (-not [string]::IsNullOrWhiteSpace($rclonePassValue)) {
     $rclonePassFile = Join-Path $secretDir 'rclone-config-pass'

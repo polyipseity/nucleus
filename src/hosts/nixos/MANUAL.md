@@ -2,7 +2,7 @@
 
 - After first install, run `sudo nixos-generate-config --dir /tmp/nixos-generate-config`, compare the generated hardware values with `src/hosts/nixos/hardware/{cpu,gpu,disks}.nix`, and copy only host-specific hardware facts (filesystem UUIDs, swap, kernel modules, and device paths) into those managed files.
 - Rebuild once after updating hardware fragments to confirm there are no missing device references.
-- Create the per-user rclone passphrase: run `sops edit src/secrets/polyipseity.yml` from the repo root, add `rclone_config_pass_polyipseity: <output of openssl rand -hex 32>`, save (sops encrypts automatically), commit the file, then re-run `nucleus apply`. If you already configured rclone remotes without this passphrase, delete `~/.config/rclone/rclone.conf` first so the remotes are re-created with encryption.
+- Create the per-user rclone passphrase: from the repo root, run `sops edit src/secrets/<username>.yml`, add `rclone_config_pass: <output of openssl rand -hex 64>`, save (sops encrypts automatically), commit the file, then re-run `nucleus apply`. If you already configured rclone remotes without this passphrase, delete `~/.config/rclone/rclone.conf` first so the remotes are re-created with encryption.
 - Run `nucleus-cloud-setup` and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
 
 ## command shortcuts
