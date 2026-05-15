@@ -166,6 +166,16 @@ missing_remotes="$(collect_missing_remotes "$required_remotes")" || {
 }
 
 if [ -n "$missing_remotes" ]; then
+  # Inject rclone config passphrase from materialized SOPS secret so the remote
+  # creation flow inherits it and rclone encrypts the new config entry with the
+  # managed passphrase automatically.
+  # WHY conditional: secret file may be absent on first bootstrap before sops-nix
+  # has materialized it; benign absence — rclone uses an unencrypted config.
+  _rclone_pass_file="$HOME/.config/nucleus/secrets/rclone-config-pass"
+  if [ -s "$_rclone_pass_file" ]; then
+    RCLONE_CONFIG_PASS="$(cat "$_rclone_pass_file")"
+    export RCLONE_CONFIG_PASS
+  fi
   printf '%s\n' "cloud-setup: missing rclone remotes: $missing_remotes"
   printf '%s\n' "cloud-setup: creating and authenticating each missing remote..."
   for _remote in $missing_remotes; do

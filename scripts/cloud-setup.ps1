@@ -209,6 +209,14 @@ if ($null -eq $missingRemotes) {
 }
 
 if ($missingRemotes.Count -gt 0) {
+  # Inject rclone config passphrase from materialized secret so remote creation
+  # inherits it and rclone encrypts the new config with the managed passphrase.
+  # WHY conditional: secret file may be absent before Windows apply has
+  # materialized it; benign absence — rclone uses an unencrypted config.
+  $rclonePassFile = Join-Path $HOME '.config\nucleus\secrets\rclone-config-pass'
+  if (Test-Path -Path $rclonePassFile -PathType Leaf) {
+    $Env:RCLONE_CONFIG_PASS = (Get-Content -Path $rclonePassFile -Raw).Trim()
+  }
   Write-Output "cloud-setup: missing rclone remotes: $($missingRemotes -join ', ')"
   Write-Output 'cloud-setup: creating and authenticating each missing remote...'
   foreach ($remote in $missingRemotes) {
