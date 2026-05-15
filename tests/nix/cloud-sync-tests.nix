@@ -18,6 +18,7 @@ let
   pwshScriptText = builtins.readFile ../../scripts/cloud-setup.ps1;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
+  macosText = builtins.readFile ../../src/modules/macos.nix;
 
   assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
 
@@ -138,6 +139,31 @@ let
     && containsRegex "rclone-config-pass" pwshScriptText
   ) "cloud-setup scripts must export RCLONE_CONFIG_PASS from the materialized secret before rclone config create";
 
+  # Test 24: Both cloud-setup scripts validate credentials with root-only listings
+  test_cloud_setup_uses_root_only_listing = assert' (
+    containsRegex "rclone lsd" shellScriptText
+    && containsRegex "root-only listings" shellScriptText
+    && containsRegex "rclone lsd" pwshScriptText
+  ) "cloud-setup scripts must use root-only directory listings for credential validation";
+
+  # Test 25: Finder sidebar is rewritten via NSKeyedArchiver/JXA instead of unsupported sfltool add/remove commands
+  test_finder_sidebar_rewrite_is_direct = assert' (
+    containsRegex "osascript -l JavaScript" macosText
+    && containsRegex "NSKeyedUnarchiver" macosText
+    && containsRegex "NSKeyedArchiver" macosText
+    && containsRegex "FavoriteItems\\.sfl4" macosText
+    && !containsRegex "sfltool add-item" macosText
+    && !containsRegex "sfltool remove-item" macosText
+  ) "Finder sidebar favorites must be rewritten directly through the shared-file-list archive";
+
+  # Test 26: Both cloud-setup scripts recreate remotes whose credentials are stale
+  test_cloud_setup_recreates_stale_remotes = assert' (
+    containsRegex "stale" shellScriptText
+    && containsRegex "rclone config delete" shellScriptText
+    && containsRegex "stale" pwshScriptText
+    && containsRegex "rclone config delete" pwshScriptText
+  ) "cloud-setup scripts must recreate remotes with stale or invalid credentials";
+
   allTests = [
     test_options_exist
     test_mounts_are_list
@@ -162,6 +188,9 @@ let
     test_cloud_drives_password_command
     test_shell_exports_rclone_pass
     test_cloud_setup_exports_rclone_pass
+    test_cloud_setup_uses_root_only_listing
+    test_finder_sidebar_rewrite_is_direct
+    test_cloud_setup_recreates_stale_remotes
   ];
 in
 {

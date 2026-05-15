@@ -1,18 +1,21 @@
 #!/usr/bin/env sh
-# Guides one-time cloud remote setup and converges cloud mount automation.
+# Guides one-time cloud remote setup and validates cloud mount automation.
 #
 # Operations:
 #   1. verify required rclone remotes exist (GoogleDrive, iCloud, OneDrive)
 #   2. if any are missing, create each with the correct provider type and
 #      repo-configured backend defaults, then prompt for authentication
 #      (no manual menu navigation required)
-#   3. run nucleus apply so cloud mount services/units converge immediately
+#   3. validate each remote's credentials work (via rclone lsd)
+#   4. optionally run nucleus apply if --apply flag provided
 #
 # Arguments:
-#   --skip-apply  validate/setup remotes only; do not run apply
+#   --apply       run nucleus apply to converge cloud mount services
+#                 (default: setup/validate only; user can run nucleus apply later)
 #
 # Exit conditions:
-#   0 on success; non-zero when required remotes are still missing after setup.
+#   0 on success; non-zero when required remotes are still missing or credential
+#   validation fails after a recreation attempt.
 
 set -eu
 
@@ -106,11 +109,11 @@ collect_missing_remotes() {
   printf '%s\n' "$_missing"
 }
 
-skip_apply=false
+skip_apply=true
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --skip-apply)
-      skip_apply=true
+    --apply)
+      skip_apply=false
       ;;
     *)
       printf '%s\n' "cloud-setup: unsupported argument '$1'" >&2
@@ -209,6 +212,65 @@ if [ -n "$missing_remotes" ]; then
 fi
 
 printf '%s\n' "cloud-setup: required remotes are configured."
+
+# Validate each remote's credentials; recreate any remote that fails so stale
+# auth tokens can be refreshed without manually deleting and rebuilding the
+# config. WHY: cloud providers rotate tokens; the user should not need to
+# manually delete remotes to recover from expired credentials.
+printf '%s\n' "cloud-setup: validating remote credentials with root-only listings..."
+_stale_remotes=""
+for _remote in $required_remotes; do
+  # Suppressed: expected failure when credentials are stale; exit code drives branching.
+  if rclone lsd "$_remote:" >/dev/null 2>&1; then
+    printf '%s\n' "cloud-setup: ✓ $_remote credentials valid"
+  else
+    printf '%s\n' "cloud-setup: ✗ $_remote credentials stale or unreachable; will recreate..." >&2
+    _stale_remotes="${_stale_remotes:+$_stale_remotes }$_remote"
+  fi
+done
+
+if [ -n "$_stale_remotes" ]; then
+  _rclone_pass_file="$HOME/.config/nucleus/secrets/rclone-config-pass"
+  if [ -s "$_rclone_pass_file" ]; then
+    RCLONE_CONFIG_PASS="$(cat "$_rclone_pass_file")"
+    export RCLONE_CONFIG_PASS
+  fi
+  for _remote in $_stale_remotes; do
+    printf '%s\n' "cloud-setup: deleting and recreating remote '$_remote'..."
+    if ! rclone config delete "$_remote"; then
+      printf '%s\n' "cloud-setup: warning: could not delete '$_remote' config entry; continuing." >&2
+    fi
+    _type="$(remote_provider_type "$_remote")"
+    _create_args="$(remote_provider_create_args "$_type" "$_remote" "$repo_root")"
+    if [ -n "$_create_args" ]; then
+      # Word splitting is intentional here: helper output is a whitespace-
+      # separated flag list for rclone, not arbitrary user input.
+      # shellcheck disable=SC2086
+      rclone config create "$_remote" "$_type" $_create_args
+    else
+      rclone config create "$_remote" "$_type"
+    fi
+  done
+
+  printf '%s\n' "cloud-setup: re-validating credentials after recreation..."
+  _validation_failed=false
+  for _remote in $_stale_remotes; do
+    # Suppressed: expected failure when recreation did not resolve credentials; exit code drives branching.
+    if rclone lsd "$_remote:" >/dev/null 2>&1; then
+      printf '%s\n' "cloud-setup: ✓ $_remote credentials valid"
+    else
+      printf '%s\n' "cloud-setup: ✗ $_remote credentials still invalid after recreation" >&2
+      _validation_failed=true
+    fi
+  done
+
+  if [ "$_validation_failed" = true ]; then
+    printf '%s\n' "cloud-setup: credential validation failed after recreation; recheck in 'rclone config'." >&2
+    exit 1
+  fi
+fi
+
+printf '%s\n' "cloud-setup: all credentials valid."
 
 if [ "$skip_apply" = false ]; then
   printf '%s\n' "cloud-setup: running nucleus apply to converge cloud mount services..."

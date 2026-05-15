@@ -1,27 +1,30 @@
 <#
 .SYNOPSIS
-  Guides one-time cloud remote setup and converges cloud mount automation.
+  Guides one-time cloud remote setup and validates cloud mount automation.
 
 .DESCRIPTION
   Performs a bounded cloud-drive setup workflow:
     1. verifies required rclone remotes exist (GoogleDrive, iCloud, OneDrive)
-   2. creates each missing remote with the correct provider type and
-     repo-configured backend defaults, then prompts for authentication
-     (no manual menu navigation required)
-    3. runs `nix run <repo>/src#apply` so cloud mount services converge
+    2. creates each missing remote with the correct provider type and
+       repo-configured backend defaults, then prompts for authentication
+       (no manual menu navigation required)
+    3. validates each remote's credentials work (via rclone lsd); recreates any
+       remote with stale auth tokens to avoid manual config deletion
+    4. optionally runs `nix run <repo>/src#apply` if -Apply switch provided
 
-.PARAMETER SkipApply
-  Validate/setup remotes only; do not run apply.
+.PARAMETER Apply
+  Run nucleus apply to converge cloud mount services.
+  (default: setup/validate only; user can run nucleus apply later)
 
 .EXAMPLE
   .\cloud-setup.ps1
 
 .EXAMPLE
-  .\cloud-setup.ps1 -SkipApply
+  .\cloud-setup.ps1 -Apply
 #>
 [CmdletBinding()]
 param(
-  [switch]$SkipApply
+  [switch]$Apply
 )
 
 $ErrorActionPreference = 'Stop'
@@ -245,7 +248,60 @@ if ($missingRemotes.Count -gt 0) {
 
 Write-Output 'cloud-setup: required remotes are configured.'
 
-if (-not $SkipApply) {
+# Validate credentials; recreate remotes with stale auth so the user can refresh
+# tokens without manually deleting and rebuilding the config.
+# WHY: cloud providers rotate tokens; the user should not need to manually
+# delete remotes to recover from expired credentials.
+Write-Output 'cloud-setup: validating remote credentials with root-only listings...'
+$staleRemotes = [System.Collections.Generic.List[string]]::new()
+foreach ($remote in $requiredRemotes) {
+  # Suppressed: expected failure when credentials are stale; LASTEXITCODE drives branching.
+  & rclone lsd "$remote`:">$null 2>&1
+  if ($LASTEXITCODE -eq 0) {
+    Write-Output "cloud-setup: ✓ $remote credentials valid"
+  } else {
+    Write-Warning "cloud-setup: ✗ $remote credentials stale or unreachable; will recreate..."
+    $staleRemotes.Add($remote)
+  }
+}
+
+if ($staleRemotes.Count -gt 0) {
+  $rclonePassFile = Join-Path $HOME '.config\nucleus\secrets\rclone-config-pass'
+  if (Test-Path -Path $rclonePassFile -PathType Leaf) {
+    $Env:RCLONE_CONFIG_PASS = (Get-Content -Path $rclonePassFile -Raw).Trim()
+  }
+  foreach ($remote in $staleRemotes) {
+    Write-Output "cloud-setup: deleting and recreating remote '$remote'..."
+    & rclone config delete $remote
+    $providerType = Get-ProviderType -RemoteName $remote
+    $providerCreateArguments = Get-ProviderCreateArgument -ProviderType $providerType -RemoteName $remote -RepoRoot $repoRoot
+    & rclone config create $remote $providerType @providerCreateArguments
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "cloud-setup: remote '$remote' recreation exited with code $LASTEXITCODE."
+    }
+  }
+
+  Write-Output 'cloud-setup: re-validating credentials after recreation...'
+  $validationFailed = $false
+  foreach ($remote in $staleRemotes) {
+    # Suppressed: expected failure when recreation did not resolve credentials; LASTEXITCODE drives branching.
+    & rclone lsd "$remote`:">$null 2>&1
+    if ($LASTEXITCODE -eq 0) {
+      Write-Output "cloud-setup: ✓ $remote credentials valid"
+    } else {
+      Write-Warning "cloud-setup: ✗ $remote credentials still invalid after recreation"
+      $validationFailed = $true
+    }
+  }
+
+  if ($validationFailed) {
+    throw 'cloud-setup: credential validation failed after recreation; recheck in rclone config.'
+  }
+}
+
+Write-Output 'cloud-setup: all credentials valid.'
+
+if ($Apply) {
   Write-Output 'cloud-setup: running nucleus apply to converge cloud mount services...'
   & nix run "$repoRoot/src#apply"
   if ($LASTEXITCODE -ne 0) {
