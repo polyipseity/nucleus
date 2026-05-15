@@ -272,6 +272,52 @@ fi
 
 printf '%s\n' "cloud-setup: all credentials valid."
 
+# Sync display names from users.json to rclone config descriptions.
+# WHY: rclone description field drives Finder labels and desktop display names.
+# When users.json declares a displayName, propagate it to rclone config so
+# the mount shows correct labels in Finder and on desktop.
+if [ -f "$USERS_JSON" ] && command -v jq >/dev/null 2>&1; then
+  printf '%s\n' "cloud-setup: syncing display names from users.json to rclone config..."
+  _username="$(id -un)"
+  _display_names="$({
+    jq -r \
+      --arg username "$_username" \
+      '
+        [
+          ((.[$username].cloudDrives.mounts // [])[]?),
+          ((.[$username].cloudDrives.replicas // [])[]?)
+        ]
+        | unique_by(.remoteName)
+        | .[]
+        | select(.displayName != null and .remoteName != null)
+        | [.remoteName, .displayName]
+        | @tsv
+      ' \
+      "$USERS_JSON"
+  } 2>/dev/null || true)"
+
+  if [ -n "$_display_names" ]; then
+    # shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
+    while IFS="$(printf '\t')" read remote_name display_name; do
+      if [ -z "$remote_name" ] || [ -z "$display_name" ]; then
+        continue
+      fi
+
+      # Verify remote exists in rclone config before attempting update.
+      if ! rclone config dump "$remote_name" >/dev/null 2>&1; then
+        continue
+      fi
+
+      # Update rclone config description field with displayName value.
+      # WHY: rclone config update is idempotent and non-destructive; only
+      # updates the single 'description' field, leaving all other config intact.
+      rclone config update "$remote_name" description "$display_name"
+    done <<EOF
+$_display_names
+EOF
+  fi
+fi
+
 if [ "$skip_apply" = false ]; then
   printf '%s\n' "cloud-setup: running nucleus apply to converge cloud mount services..."
   nix run "$repo_root/src#apply"
