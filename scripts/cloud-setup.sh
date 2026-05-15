@@ -109,6 +109,109 @@ collect_missing_remotes() {
   printf '%s\n' "$_missing"
 }
 
+# Collect enabled mount service IDs from src/modules/users.json for this user.
+# Args: $1 — absolute users.json path.
+# Output: tab-separated rows: <mount id> <remoteName>
+collect_configured_mount_service_ids() {
+  _ccmsi_users_json="$1"
+
+  if [ ! -f "$_ccmsi_users_json" ] || ! command -v jq >/dev/null 2>&1; then
+    return 0
+  fi
+
+  _ccmsi_username="$(id -un)"
+  jq -r \
+    --arg username "$_ccmsi_username" \
+    '
+      ((.[$username].cloudDrives.mounts // [])[]?)
+      | select((.enable // true) == true and .id != null and .remoteName != null)
+      | [.id, .remoteName]
+      | @tsv
+    ' \
+    "$_ccmsi_users_json" 2>/dev/null || true
+}
+
+# Restart managed cloud mount services so refreshed remote descriptions and
+# credentials are reflected immediately in mounted volumes.
+# Args: $1 — absolute users.json path.
+restart_cloud_mount_services() {
+  _rcms_users_json="$1"
+  _rcms_mount_rows="$(collect_configured_mount_service_ids "$_rcms_users_json")"
+  if [ -z "$_rcms_mount_rows" ]; then
+    return 0
+  fi
+
+  case "$(uname)" in
+    Darwin)
+      _rcms_uid="$(id -u)"
+      printf '%s\n' "cloud-setup: restarting managed macOS cloud mount services..."
+
+      # shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
+      while IFS="$(printf '\t')" read mount_id remote_name; do
+        if [ -z "$mount_id" ]; then
+          continue
+        fi
+
+        # iCloud mount restart can block for an extended period while Apple
+        # auth/session state reconciles. Skip it here so cloud-setup remains
+        # responsive; users can still restart iCloud mounts via nucleus apply.
+        if [ "$remote_name" = "iCloud" ]; then
+          printf '%s\n' "cloud-setup: skipping launchctl restart for iCloud mount (${mount_id}); restart via nucleus apply if needed."
+          continue
+        fi
+
+        _rcms_label="local.cloud-mount.${mount_id}"
+        _rcms_target="gui/${_rcms_uid}/${_rcms_label}"
+
+        # Both missing-service and launchctl parse failures are benign here;
+        # if the service is absent we emit a targeted hint and continue.
+        if launchctl print "$_rcms_target" >/dev/null 2>&1; then
+          if launchctl kickstart -k "$_rcms_target"; then
+            printf '%s\n' "cloud-setup: restarted $_rcms_label (${remote_name})"
+          else
+            printf '%s\n' "cloud-setup: warning: failed to restart $_rcms_label (${remote_name}); run nucleus apply if mount content remains stale." >&2
+          fi
+        else
+          printf '%s\n' "cloud-setup: mount service $_rcms_label (${remote_name}) is not loaded; run nucleus apply to create/load it." >&2
+        fi
+      done <<EOF
+$_rcms_mount_rows
+EOF
+      ;;
+    Linux)
+      if ! command -v systemctl >/dev/null 2>&1; then
+        printf '%s\n' "cloud-setup: warning: systemctl not found; cannot restart user cloud mount services on Linux." >&2
+        return 0
+      fi
+
+      printf '%s\n' "cloud-setup: restarting managed Linux cloud mount services..."
+
+      # shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
+      while IFS="$(printf '\t')" read mount_id remote_name; do
+        if [ -z "$mount_id" ]; then
+          continue
+        fi
+
+        _rcms_service="cloud-mount-${mount_id}.service"
+        if systemctl --user is-active --quiet "$_rcms_service" || systemctl --user is-enabled --quiet "$_rcms_service"; then
+          if systemctl --user restart "$_rcms_service"; then
+            printf '%s\n' "cloud-setup: restarted $_rcms_service (${remote_name})"
+          else
+            printf '%s\n' "cloud-setup: warning: failed to restart $_rcms_service (${remote_name}); run nucleus apply if mount content remains stale." >&2
+          fi
+        else
+          printf '%s\n' "cloud-setup: mount service $_rcms_service (${remote_name}) is not installed/enabled; run nucleus apply to create/load it." >&2
+        fi
+      done <<EOF
+$_rcms_mount_rows
+EOF
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
 skip_apply=true
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -161,6 +264,7 @@ if ! command -v rclone >/dev/null 2>&1; then
 fi
 
 repo_root="$(resolve_nucleus_root)"
+USERS_JSON="$repo_root/src/modules/users.json"
 
 required_remotes="GoogleDrive iCloud OneDrive"
 missing_remotes="$(collect_missing_remotes "$required_remotes")" || {
@@ -304,18 +408,35 @@ if [ -f "$USERS_JSON" ] && command -v jq >/dev/null 2>&1; then
       fi
 
       # Verify remote exists in rclone config before attempting update.
-      if ! rclone config dump "$remote_name" >/dev/null 2>&1; then
+      if ! rclone listremotes | grep -Fxq "${remote_name}:"; then
+        continue
+      fi
+
+      # Skip no-op updates to avoid unnecessary provider re-auth prompts.
+      # WHY: some backends can launch OAuth/device auth flows on config update.
+      _current_description="$({
+        rclone config dump | jq -r --arg remote "$remote_name" '.[$remote].description // empty'
+      } 2>/dev/null || true)"
+      if [ "$_current_description" = "$display_name" ]; then
         continue
       fi
 
       # Update rclone config description field with displayName value.
       # WHY: rclone config update is idempotent and non-destructive; only
       # updates the single 'description' field, leaving all other config intact.
-      rclone config update "$remote_name" description "$display_name"
+      if rclone config update "$remote_name" description "$display_name"; then
+        printf '%s\n' "cloud-setup: updated $remote_name description to '$display_name'"
+      else
+        printf '%s\n' "cloud-setup: warning: failed to update $remote_name description; continuing with mount restart." >&2
+      fi
     done <<EOF
 $_display_names
 EOF
   fi
+fi
+
+if [ -f "$USERS_JSON" ]; then
+  restart_cloud_mount_services "$USERS_JSON"
 fi
 
 if [ "$skip_apply" = false ]; then
