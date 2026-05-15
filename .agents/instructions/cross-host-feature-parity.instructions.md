@@ -100,6 +100,20 @@ following in both configuration and deconfiguration paths:
   - Windows: `src/hosts/windows/modules/sync-wallpaper.ps1` + `user.dsc.yml`
 - Stale cleanup rules must be preserved on every host implementation.
 
+## Cloud-drive parity rules
+
+- Treat cloud-drive capabilities as parity-first across macOS, NixOS, and
+  Windows for both mounts and replicas.
+- Preserve stable provider identity keys (`id`, `remoteName`) while allowing
+  host-appropriate presentation labels.
+- Keep managed mount/replica local paths as real directories on every host
+  unless a documented platform exception applies.
+- The current documented exception is macOS-only: `~/clouds/iCloudReplica`
+  may be a symlink to `~/Library/Mobile Documents` to avoid duplicating native
+  iCloud storage.
+- When implementing or changing a cloud-drive exception, document WHY in code
+  and add/update tests proving the exception is scoped to the intended host.
+
 ## Allowed platform-specific exceptions
 
 Single-host implementation is allowed only when the feature depends on

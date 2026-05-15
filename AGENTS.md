@@ -445,6 +445,8 @@ a rotating gallery, never as a single static file.
 
 - `AGENTS.md` — workspace-wide defaults
 - `.agents/instructions/*.instructions.md` — focused authoring rules by file type
+- `.agents/instructions/cloud-drives-and-finder.instructions.md` — cloud-drive
+  mount/replica invariants, macOS Finder favorites policy, and related testing/doc coupling
 - `.agents/prompts/commit-staged.prompt.md` and
   `.opencode/commands/commit-staged.prompt.md` — mirrored commit workflow prompt
 - `opencode.jsonc` — instruction and skill discovery

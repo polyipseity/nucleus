@@ -36,6 +36,13 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
   - prompt files that tell agents how to run checks
 - Keep those files consistent so the repo does not describe one workflow while
   automating another.
+- When documenting test coverage or test inventory, derive counts and file
+  lists from the current `tests/` tree and CI workflow globs, not from stale
+  prose copied from older docs.
+- Do not leave placeholder statements that claim tests are absent when
+  test files or validation workflows already exist.
+- In instruction examples, prefer real in-repo file names over hypothetical
+  names unless the example is explicitly labeled as illustrative.
 
 ## Validation guidance
 

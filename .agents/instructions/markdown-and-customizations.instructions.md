@@ -85,3 +85,6 @@ applyTo: "AGENTS.md, README.md, .agents/**/*.md, .opencode/**/*.md, .github/**/*
   a different path.
 - When mentioning future manifests, task files, or tool configs, distinguish
   between "present now" and "expected after initialization."
+- Avoid broad cosmetic rename waves in docs/instructions unless you also update
+  every dependent path/reference in code, tests, and orchestration files in the
+  same atomic change.
