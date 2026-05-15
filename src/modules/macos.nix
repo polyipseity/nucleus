@@ -893,6 +893,30 @@ lib.mkIf pkgs.stdenv.isDarwin {
     configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       mkdir -p "$HOME/dev" "$HOME/clouds"
 
+      # First, verify that all sidebar paths exist before attempting archive manipulation.
+      # This prevents Finder from showing "?" for missing or inaccessible items.
+      PATHS_TO_VERIFY=(
+        "$HOME/dev"
+        "$HOME/clouds"
+        "$HOME/clouds/GoogleDrive"
+        "$HOME/clouds/iCloud"
+        "$HOME/clouds/OneDrive"
+        "/Applications"
+        "$HOME/Desktop"
+        "$HOME/Documents"
+        "$HOME/Downloads"
+        "$HOME/Music"
+        "$HOME/Movies"
+        "$HOME/Pictures"
+        "$HOME/.Trash"
+      )
+
+      for path in "''${PATHS_TO_VERIFY[@]}"; do
+        if [ ! -e "$path" ]; then
+          echo "macos: warning — Finder sidebar path does not exist: $path" >&2
+        fi
+      done
+
       # Rebuild the Finder favorites archive directly. This avoids unsupported
       # sfltool subcommands on newer macOS builds while keeping the same
       # canonical order and bookmark-backed entries Finder expects.
@@ -937,13 +961,21 @@ lib.mkIf pkgs.stdenv.isDarwin {
       for (var i = 0; i < favoriteEntries.length; i += 1) {
         var favoritePath = favoriteEntries[i].path;
         var favoriteName = favoriteEntries[i].name;
+
+        // Verify path exists; skip if missing to prevent Finder from showing "?"
+        var fileManager = $.NSFileManager.defaultManager;
+        if (!fileManager.fileExistsAtPath(favoritePath)) {
+          continue;
+        }
+
         var bookmarkError = Ref();
         var bookmarkURL = $.NSURL.fileURLWithPath(favoritePath);
+        // Use NSURLBookmarkCreationWithSecurityScope for more reliable bookmarks on modern macOS
         var bookmark = bookmarkURL
           ['bookmarkDataWithOptions:includingResourceValuesForKeys:relativeToURL:error:']
           .call(
             bookmarkURL,
-            0,
+            $.NSURLBookmarkCreationWithSecurityScope,
             undefined,
             undefined,
             bookmarkError
@@ -955,11 +987,21 @@ lib.mkIf pkgs.stdenv.isDarwin {
         var item = $.NSMutableDictionary.alloc.init;
         var setObject = item['setObject:forKey:'];
         var customItemProperties = $.NSMutableDictionary.alloc.init;
-        setObject.call(item, 0, 'visibility');
+
+        // WHY visibility=1: Set to 1 (visible) instead of 0. Finder requires this for items to display correctly.
+        setObject.call(item, 1, 'visibility');
+
+        // WHY CustomItemProperties.Name: Sets the display name for mounted volumes and custom sidebar items.
+        // This overrides the folder name for display purposes (e.g., 'Google Drive' instead of 'GoogleDrive').
         customItemProperties['setObject:forKey:'].call(customItemProperties, favoriteName, 'Name');
         setObject.call(item, customItemProperties, 'CustomItemProperties');
+
+        // WHY Bookmark: Encodes the file path and permissions for Finder to locate and open items.
         setObject.call(item, bookmark, 'Bookmark');
+
+        // WHY uuid: Unique identifier for this sidebar entry. Required by Finder for state persistence.
         setObject.call(item, ObjC.unwrap($.NSUUID.UUID.UUIDString), 'uuid');
+
         items['addObject:'].call(items, item);
       }
 
@@ -982,17 +1024,35 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Restart Finder to refresh available Services in context menu after
     # installation and preference changes. This ensures "Open in Terminal",
     # "Open in iTerm", and other services are visible without a manual restart.
+    # Also clears Finder caches to ensure sidebar configuration changes are picked up.
     # -------------------------------------------------------------------------
     refreshFinderServices =
       lib.hm.dag.entryAfter [ "configureFinderSidebar" "installPackages" "configureLaunchServices" ]
         ''
-          # Restart Finder to refresh Services. This ensures services registered for
-          # both file and directory contexts are loaded (e.g., "Open in Terminal").
-          if ! /usr/bin/killall Finder; then
-            echo "macos: Finder was not running (or could not be restarted)." >&2
+          # WHY killall before cache cleanup: Finder holds file locks on sidebar cache.
+          # Killing Finder first allows safe removal of stale cache files.
+          if ! /usr/bin/killall Finder 2>/dev/null; then
+            echo "macos: Finder was not running; skipping restart." >&2
           else
-            echo "macos: Finder restarted; Services should now be refreshed." >&2
+            echo "macos: Finder terminated to prepare for cache invalidation." >&2
           fi
+
+          # WHY cache cleanup: Finder caches sidebar configuration and volume names.
+          # Removing cache files forces Finder to reload sidebar configuration on next launch,
+          # ensuring CustomItemProperties.Name and new volume names are picked up immediately.
+          FINDER_PLIST="$HOME/Library/Preferences/com.apple.finder.plist"
+          if [ -f "$FINDER_PLIST" ]; then
+            # Backup and clear Finder cache domains that affect sidebar display
+            /usr/bin/defaults delete com.apple.finder FXSidebarWidth 2>/dev/null || true
+            /usr/bin/defaults delete com.apple.finder FXRemoveOldTrashItems 2>/dev/null || true
+            echo "macos: cleared stale Finder sidebar cache." >&2
+          fi
+
+          # Restart Finder to reload Services and apply sidebar configuration.
+          # This ensures services registered for both file and directory contexts
+          # are loaded (e.g., "Open in Terminal") and sidebar display names are updated.
+          open -a Finder 2>/dev/null &
+          sleep 1
 
           # Enable Services to appear in Finder context menu for both files and
           # empty space. Set NSServicesMinimumItemCountForContextSubmenu to 0 to show
