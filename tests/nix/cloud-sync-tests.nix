@@ -164,6 +164,12 @@ let
     && containsRegex "rclone config delete" pwshScriptText
   ) "cloud-setup scripts must recreate remotes with stale or invalid credentials";
 
+  # Test 27: iclouddrive password field is pre-supplied to skip interactive prompt
+  test_cloud_setup_iclouddrive_presupplies_password = assert' (
+    containsRegex "rclone obscure" shellScriptText
+    && containsRegex "rclone obscure" pwshScriptText
+  ) "cloud-setup scripts must pre-supply iclouddrive password via rclone obscure to skip the --all interactive prompt";
+
   allTests = [
     test_options_exist
     test_mounts_are_list
@@ -191,6 +197,7 @@ let
     test_cloud_setup_uses_root_only_listing
     test_finder_sidebar_rewrite_is_direct
     test_cloud_setup_recreates_stale_remotes
+    test_cloud_setup_iclouddrive_presupplies_password
   ];
 in
 {
