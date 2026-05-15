@@ -234,9 +234,8 @@ let
   test_apply_runs_replica_bisync = assert' (
     containsRegex "run_replica_bisync" applyScriptText
     && containsRegex "--skip-replica-bisync" applyScriptText
-    && containsRegex "--skip-resync-recovery" applyScriptText
-    && containsRegex "scripts/replica-bisync\.sh" applyScriptText
-  ) "apply flow must include post-apply replica bisync hook with skip flag";
+    && containsRegex "scripts/replica-bisync\\.sh" applyScriptText
+  ) "apply flow must include post-apply replica bisync hook for automatic OneDrive bisync";
 
   # Test 36: Finder sidebar writes explicit custom item names to avoid '?' labels
   test_finder_sidebar_custom_names = assert' (

@@ -24,10 +24,6 @@
 
 .PARAMETER ReplicaId
   Optional replica id filter; when provided only the matching replica runs.
-
-.PARAMETER SkipResyncRecovery
-  Skip automatic bisync state recovery; intended for post-apply runs where
-  large first-time resync work should stay manual.
 #>
 
 function Invoke-ReplicaBisync {
@@ -36,8 +32,7 @@ function Invoke-ReplicaBisync {
     [Parameter(Mandatory)]
     [string]$RepoRoot,
     [switch]$DryRun,
-    [string]$ReplicaId,
-    [switch]$SkipResyncRecovery
+    [string]$ReplicaId
   )
 
   $ErrorActionPreference = "Stop"
@@ -206,11 +201,6 @@ function Invoke-ReplicaBisync {
         }
       }
       "bidirectional" {
-        if ($SkipResyncRecovery -and -not (Test-Path -Path $stateMarker -PathType Leaf)) {
-          Write-Output "replica-bisync: [$id] skipping automatic bisync state recovery during apply; run nucleus-replica-bisync manually once to seed state"
-          continue
-        }
-
         Write-Output "replica-bisync: [$id] bisync $localDir <-> $remoteRef"
         $ok = Invoke-ReplicaRcloneCommand -Arguments (@("bisync", $localDir, $remoteRef, "--check-access") + $commonArgs) -IsDryRun:$DryRun
         if (-not $ok) {

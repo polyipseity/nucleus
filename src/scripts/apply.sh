@@ -280,7 +280,7 @@ run_replica_bisync() {
   fi
 
   printf '%s\n' "replica-bisync: running post-apply replica sync..."
-  if ! sh "$_rrb_script" --skip-resync-recovery; then
+  if ! sh "$_rrb_script"; then
     printf '%s\n' "replica-bisync: replica-bisync.sh exited with an error; replica sync incomplete (system apply succeeded)" >&2
   fi
 }
