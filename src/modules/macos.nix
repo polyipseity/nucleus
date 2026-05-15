@@ -961,27 +961,33 @@ lib.mkIf pkgs.stdenv.isDarwin {
       for (var i = 0; i < favoriteEntries.length; i += 1) {
         var favoritePath = favoriteEntries[i].path;
         var favoriteName = favoriteEntries[i].name;
+        var favoriteNSString = $(favoritePath);
 
         // Verify path exists; skip if missing to prevent Finder from showing "?"
         var fileManager = $.NSFileManager.defaultManager;
-        if (!fileManager.fileExistsAtPath(favoritePath)) {
+        if (!fileManager.fileExistsAtPath(favoriteNSString)) {
           continue;
         }
 
         var bookmarkError = Ref();
-        var bookmarkURL = $.NSURL.fileURLWithPath(favoritePath);
-        // Use NSURLBookmarkCreationWithSecurityScope for more reliable bookmarks on modern macOS
+        var bookmarkURL = $.NSURL.fileURLWithPath(favoriteNSString);
+        // WHY plain bookmark options: Finder favorites only need a stable file
+        // bookmark for local paths. Security-scoped bookmark creation can bridge
+        // back into JXA as an Objective-C nil proxy, which then crashes when the
+        // item dictionary is populated with a nil Bookmark value.
         var bookmark = bookmarkURL
           ['bookmarkDataWithOptions:includingResourceValuesForKeys:relativeToURL:error:']
           .call(
             bookmarkURL,
-            $.NSURLBookmarkCreationWithSecurityScope,
+            0,
             undefined,
             undefined,
             bookmarkError
           );
-        if (!bookmark) {
-          throw new Error('macos: failed to create Finder bookmark for ' + favoritePath + ': ' + ObjC.unwrap(bookmarkError[0]));
+        if (bookmark === undefined || bookmark === null || (bookmark.isNil && bookmark.isNil())) {
+          var bookmarkFailure = bookmarkError[0] ? ObjC.unwrap(bookmarkError[0]) : 'unknown bookmark error';
+          $.NSLog('macos: warning — skipping Finder sidebar item %s because bookmark creation failed: %@', favoritePath, bookmarkFailure);
+          continue;
         }
 
         var item = $.NSMutableDictionary.alloc.init;
