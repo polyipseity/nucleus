@@ -15,7 +15,7 @@
 # Both paths mirror the pattern used by vsCodeSymlinks in editors.nix.
 #
 # agentsSkills (below) manages ~/.agents/skills/ independently.
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 let
   # The canonical live checkout path is ~/dev/nucleus.  Use out-of-store
   # symlinks so user-level OpenCode config stays pointed at the mutable working
@@ -324,6 +324,8 @@ in
     installBunPackages = lib.hm.dag.entryAfter [ "agentsSkills" ] ''
       set -eu
 
+      _ibp_jq_bin='${pkgs.jq}/bin/jq'
+
       # Prepend ~/.bun/bin so binaries installed by previous apply runs and
       # by this activation are discoverable in subsequent activation steps
       # without spawning a new shell session.  bun install -g places binaries
@@ -352,7 +354,7 @@ in
       # If bun is still not found, search the nix store for any bun binary
       # and add its parent directory to PATH.
       if ! command -v bun >/dev/null 2>&1; then
-        _bun_store_path="$(find /nix/store -name 'bun' -type f 2>/dev/null | head -1)"
+        _bun_store_path="$(find /nix/store -name 'bun' -type f -print -quit 2>/dev/null || true)"
         if [ -n "$_bun_store_path" ] && [ -x "$_bun_store_path" ]; then
           _bun_store_dir="$(dirname "$_bun_store_path")"
           PATH="$_bun_store_dir:$PATH"
@@ -387,7 +389,7 @@ in
       # set, which is safe (all desired packages install; nothing is removed).
       _ibp_previous="$(mktemp)"
       if [ -f "$_ibp_manifest" ]; then
-        jq -r '.[]?' "$_ibp_manifest" > "$_ibp_previous" || true
+        "$_ibp_jq_bin" -r '.[]?' "$_ibp_manifest" > "$_ibp_previous" || true
       fi
 
       # Packages no longer desired: present in the previous manifest but absent
@@ -449,7 +451,7 @@ in
       if [ ! -d "$_ibp_manifest_dir" ]; then
         mkdir -p "$_ibp_manifest_dir"
       fi
-      jq -Rn '[inputs | select(length > 0)]' "$_ibp_desired" > "$_ibp_manifest"
+      "$_ibp_jq_bin" -Rn '[inputs | select(length > 0)]' "$_ibp_desired" > "$_ibp_manifest"
 
       rm -f "$_ibp_desired" "$_ibp_previous" "$_ibp_to_remove" "$_ibp_to_install"
     '';
@@ -470,6 +472,8 @@ in
     # -------------------------------------------------------------------------
     syncClawHubSkills = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
       set -eu
+
+      _scs_jq_bin='${pkgs.jq}/bin/jq'
 
       _scs_skip_sync=false
 
@@ -501,16 +505,9 @@ in
         _scs_skip_sync=true
       fi
 
-      # Parse skill slugs from the manifest using jq.  jq is available via
-      # home.packages in core.nix on all POSIX hosts.
-      if ! command -v jq >/dev/null 2>&1; then
-        echo "clawhub: jq not found in PATH; cannot parse fetched-skill manifest" >&2
-        exit 1
-      fi
-
       _scs_slugs_file="$(mktemp)"
       if [ "$_scs_skip_sync" = false ]; then
-        jq -r '.skills[]?' "$_scs_manifest" > "$_scs_slugs_file"
+        "$_scs_jq_bin" -r '.skills[]?' "$_scs_manifest" > "$_scs_slugs_file"
 
         if [ ! -s "$_scs_slugs_file" ]; then
           echo "clawhub: no fetched skills in manifest; skipping"
