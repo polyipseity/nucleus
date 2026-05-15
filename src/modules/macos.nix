@@ -858,20 +858,15 @@ lib.mkIf pkgs.stdenv.isDarwin {
     configureSystemHardening = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       DEV_ROOT="$HOME/dev"
       if [ -d "$DEV_ROOT" ]; then
-        # Place a .metadata_never_index sentinel inside every well-known build
-        # artifact directory found under ~/dev so Spotlight skips them.
-        for dir_name in ".gradle" ".next" ".turbo" ".venv" "__pycache__" "bin" "build" "dist" "incremental" "node_modules" "obj" "target" "venv" "vendor"; do
-          if ! /usr/bin/find "$DEV_ROOT" -name "$dir_name" -type d -prune -exec touch "{}/.metadata_never_index" \;; then
-            echo "macos: failed to mark one or more '$dir_name' directories as metadata_never_index." >&2
-          fi
-        done
+        # WHY single find pass: marking Spotlight-excluded directories is O(n * 16)
+        # when done with separate find calls; combine patterns with -o for a single
+        # tree traversal. Only create .metadata_never_index if absent (check first).
+        /usr/bin/find "$DEV_ROOT" \( -name ".gradle" -o -name ".next" -o -name ".turbo" -o -name ".venv" -o -name "__pycache__" -o -name "bin" -o -name "build" -o -name "dist" -o -name "incremental" -o -name "node_modules" -o -name "obj" -o -name "target" -o -name "venv" -o -name "vendor" \) -type d ! -exec test -f "{}/.metadata_never_index" \; -exec touch "{}/.metadata_never_index" \; 2>/dev/null || true
 
         # Remove Finder metadata files from development trees to reduce
         # repository noise. This is safe/idempotent because Finder recreates
         # files on demand when folder-view state changes.
-        if ! /usr/bin/find "$DEV_ROOT" -name ".DS_Store" -type f -delete; then
-          echo "macos: failed to remove one or more .DS_Store files under ~/dev." >&2
-        fi
+        /usr/bin/find "$DEV_ROOT" -name ".DS_Store" -type f -delete 2>/dev/null || true
       else
         mkdir -p "$DEV_ROOT"
       fi
@@ -883,53 +878,94 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # configureFinderSidebar
-    # Enforce an exact Finder sidebar Favourites list by removing all current
-    # user-managed entries and re-adding the canonical set in declared order.
+    # Enforce an exact Finder sidebar Favourites list by rewriting the
+    # FavoriteItems shared-file-list archive with the canonical set in declared
+    # order.
     #
-    # Uses sfltool (macOS built-in) against the FavoriteItems shared file list.
+    # WHY this path: newer macOS builds expose only list inspection/reset via
+    # sfltool, so the reliable cross-version approach is to rebuild the archive
+    # directly with Finder bookmark data instead of trying to drive unsupported
+    # add/remove subcommands.
+    #
     # System-managed entries such as AirDrop and Recents live outside this list
     # and are unaffected.
-    #
-    # WHY remove-all then add: sfltool has no reorder command; the only way to
-    # guarantee both the exact set and the exact order is a full replace on
-    # every activation.
     # -------------------------------------------------------------------------
     configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      _sflt_list="com.apple.LSSharedFileList.FavoriteItems"
+      mkdir -p "$HOME/dev" "$HOME/clouds"
 
-      # Remove all current user-managed sidebar items.
-      # sfltool list outputs TAB-separated "Name<TAB>file://URL" lines.
-      # remove-item on system entries (AirDrop, Recents) is expected to fail
-      # and benign; 2>/dev/null suppresses the noise and || true keeps the
-      # loop running.
-      /usr/bin/sfltool list "$_sflt_list" 2>/dev/null \
-        | /usr/bin/awk -F'\t' 'NF>=2{print $2}' \
-        | while IFS= read -r _url; do
-            if [ -n "$_url" ]; then
-              /usr/bin/sfltool remove-item "$_sflt_list" "$_url" 2>/dev/null || true
-            fi
-          done
+      # Rebuild the Finder favorites archive directly. This avoids unsupported
+      # sfltool subcommands on newer macOS builds while keeping the same
+      # canonical order and bookmark-backed entries Finder expects.
+      SIDEBAR_LIST_PATH="$HOME/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.FavoriteItems.sfl4" \
+        /usr/bin/osascript -l JavaScript <<'JXA'
+      ObjC.import('Foundation');
 
-      # Helper: add a Finder sidebar favorite by absolute path.
-      _add_finder_fav() {
-        /usr/bin/sfltool add-item "$_sflt_list" "file://$1" || {
-          echo "macos: failed to add Finder favorite: $1" >&2
-        }
+      var env = $.NSProcessInfo.processInfo.environment;
+      var home = ObjC.unwrap(env.objectForKey('HOME'));
+      var sidebarListPath = ObjC.unwrap(env.objectForKey('SIDEBAR_LIST_PATH'));
+
+      var data = $.NSData.dataWithContentsOfFile(sidebarListPath);
+      if (!data) {
+        throw new Error('macos: Finder sidebar archive not found at ' + sidebarListPath);
       }
 
-      # Add canonical favorites in declared order.
-      _add_finder_fav /Applications
-      _add_finder_fav "$HOME/Desktop"
-      _add_finder_fav "$HOME/Documents"
-      _add_finder_fav "$HOME/Downloads"
-      _add_finder_fav "$HOME/Music"
-      _add_finder_fav "$HOME/Movies"         # "Video" maps to ~/Movies on macOS
-      _add_finder_fav "$HOME/Pictures"
-      _add_finder_fav "$HOME/.Trash"         # shown as "Trash Bin" in Finder
-      _add_finder_fav /                      # root "/"
-      _add_finder_fav "$HOME"                # user home "~/"
-      _add_finder_fav "$HOME/dev"
-      _add_finder_fav "$HOME/clouds"
+      var decodeError = Ref();
+      var rootObject = $.NSKeyedUnarchiver.unarchiveTopLevelObjectWithDataError(data, decodeError);
+      if (!rootObject) {
+        throw new Error('macos: failed to decode Finder sidebar archive: ' + ObjC.unwrap(decodeError[0]));
+      }
+
+      var root = ObjC.deepUnwrap(rootObject);
+      var favoritePaths = [
+        '/',
+        home,
+        home + '/dev',
+        home + '/clouds',
+        '/Applications',
+        home + '/Desktop',
+        home + '/Documents',
+        home + '/Downloads',
+        home + '/Music',
+        home + '/Movies',
+        home + '/Pictures',
+        home + '/.Trash'
+      ];
+
+      var items = [];
+      for (var i = 0; i < favoritePaths.length; i += 1) {
+        var favoritePath = favoritePaths[i];
+        var bookmarkError = Ref();
+        var bookmark = $.NSURL.fileURLWithPath(favoritePath)
+          .bookmarkDataWithOptionsIncludingResourceValuesForKeysRelativeToURLError(
+            0,
+            undefined,
+            undefined,
+            bookmarkError
+          );
+        if (!bookmark) {
+          throw new Error('macos: failed to create Finder bookmark for ' + favoritePath + ': ' + ObjC.unwrap(bookmarkError[0]));
+        }
+
+        items.push({
+          visibility: 0,
+          CustomItemProperties: {},
+          Bookmark: bookmark,
+          uuid: String($.NSUUID.UUID.UUIDString)
+        });
+      }
+
+      root.items = items;
+
+      var encodeError = Ref();
+      var archived = $.NSKeyedArchiver.archivedDataWithRootObjectRequiringSecureCodingError(root, false, encodeError);
+      if (!archived) {
+        throw new Error('macos: failed to encode Finder sidebar archive: ' + ObjC.unwrap(encodeError[0]));
+      }
+
+      if (!archived.writeToFileAtomically(sidebarListPath, true)) {
+        throw new Error('macos: failed to write Finder sidebar archive to ' + sidebarListPath);
+      }
+      JXA
     '';
 
     # -------------------------------------------------------------------------
@@ -938,39 +974,41 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # installation and preference changes. This ensures "Open in Terminal",
     # "Open in iTerm", and other services are visible without a manual restart.
     # -------------------------------------------------------------------------
-    refreshFinderServices = lib.hm.dag.entryAfter [ "configureFinderSidebar" "installPackages" "configureLaunchServices" ] ''
-      # Restart Finder to refresh Services. This ensures services registered for
-      # both file and directory contexts are loaded (e.g., "Open in Terminal").
-      if ! /usr/bin/killall Finder; then
-        echo "macos: Finder was not running (or could not be restarted)." >&2
-      else
-        echo "macos: Finder restarted; Services should now be refreshed." >&2
-      fi
-
-      # Enable Services to appear in Finder context menu for both files and
-      # empty space. Set NSServicesMinimumItemCountForContextSubmenu to 0 to show
-      # all services regardless of count (already set in defaults, but ensure
-      # it takes effect during this activation).
-      /usr/bin/defaults write NSGlobalDomain NSServicesMinimumItemCountForContextSubmenu -int 0
-
-      # Explicitly register the Automator Quick Action workflows (Services) so
-      # they are discoverable by LaunchServices and appear in Finder context menus.
-      SERVICES_DIR="$HOME/Library/Services"
-      if [ -d "$SERVICES_DIR" ]; then
-        # Use the correct lsregister path for registering services
-        LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
-        if [ -x "$LSREGISTER" ]; then
-          if ! $LSREGISTER -r -domain local -domain system -domain user; then
-            echo "macos: lsregister failed; Finder Services may not appear in context menus until the next login." >&2
+    refreshFinderServices =
+      lib.hm.dag.entryAfter [ "configureFinderSidebar" "installPackages" "configureLaunchServices" ]
+        ''
+          # Restart Finder to refresh Services. This ensures services registered for
+          # both file and directory contexts are loaded (e.g., "Open in Terminal").
+          if ! /usr/bin/killall Finder; then
+            echo "macos: Finder was not running (or could not be restarted)." >&2
+          else
+            echo "macos: Finder restarted; Services should now be refreshed." >&2
           fi
-        fi
-      fi
 
-      # Reload Finder Services to pick up the changes immediately.
-      if ! /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
-        echo "macos: launchctl Finder restart failed; restart Finder manually if Services do not appear in context menus." >&2
-      fi
-    '';
+          # Enable Services to appear in Finder context menu for both files and
+          # empty space. Set NSServicesMinimumItemCountForContextSubmenu to 0 to show
+          # all services regardless of count (already set in defaults, but ensure
+          # it takes effect during this activation).
+          /usr/bin/defaults write NSGlobalDomain NSServicesMinimumItemCountForContextSubmenu -int 0
+
+          # Explicitly register the Automator Quick Action workflows (Services) so
+          # they are discoverable by LaunchServices and appear in Finder context menus.
+          SERVICES_DIR="$HOME/Library/Services"
+          if [ -d "$SERVICES_DIR" ]; then
+            # Use the correct lsregister path for registering services
+            LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
+            if [ -x "$LSREGISTER" ]; then
+              if ! $LSREGISTER -r -domain local -domain system -domain user; then
+                echo "macos: lsregister failed; Finder Services may not appear in context menus until the next login." >&2
+              fi
+            fi
+          fi
+
+          # Reload Finder Services to pick up the changes immediately.
+          if ! /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
+            echo "macos: launchctl Finder restart failed; restart Finder manually if Services do not appear in context menus." >&2
+          fi
+        '';
 
     # -------------------------------------------------------------------------
     # verifyArchivingStack
