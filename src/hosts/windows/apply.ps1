@@ -600,7 +600,7 @@ if ($SkipReplicaBisync) {
   } else {
     Write-Output "replica-bisync: running post-apply replica sync..."
     try {
-      Invoke-ReplicaBisync -RepoRoot $repoRoot
+      Invoke-ReplicaBisync -RepoRoot $repoRoot -SkipResyncRecovery
     } catch {
       Write-Warning "replica-bisync: replica sync incomplete (system apply succeeded): $($_.Exception.Message)"
     }

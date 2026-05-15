@@ -4,14 +4,6 @@
 
 .DESCRIPTION
   Windows counterpart to scripts/replica-bisync.sh. Reads the per-user replica
-
-  # WHY early acknowledgement: PSScriptAnalyzer flags unused parameters at the
-  # function scope even when they are forwarded later to helpers. Emitting a
-  # dry-run banner here keeps lint strict while also making manual invocations
-  # self-describing.
-  if ($DryRun) {
-    Write-Output "replica-bisync: running in dry-run mode"
-  }
   definitions from src/modules/users.json and runs rclone sync/bisync for each
   enabled entry that has a remoteName.
 
@@ -32,6 +24,10 @@
 
 .PARAMETER ReplicaId
   Optional replica id filter; when provided only the matching replica runs.
+
+.PARAMETER SkipResyncRecovery
+  Skip automatic bisync state recovery; intended for post-apply runs where
+  large first-time resync work should stay manual.
 #>
 
 function Invoke-ReplicaBisync {
@@ -40,12 +36,16 @@ function Invoke-ReplicaBisync {
     [Parameter(Mandatory)]
     [string]$RepoRoot,
     [switch]$DryRun,
-    [string]$ReplicaId
+    [string]$ReplicaId,
+    [switch]$SkipResyncRecovery
   )
 
   $ErrorActionPreference = "Stop"
 
-  # Ensure DryRun flag is acknowledged early to satisfy linter usage requirements.
+  # WHY early acknowledgement: PSScriptAnalyzer flags unused parameters at the
+  # function scope even when they are forwarded later to helpers. Emitting a
+  # dry-run banner here keeps lint strict while also making manual invocations
+  # self-describing.
   if ($DryRun) {
     Write-Output "replica-bisync: running in dry-run mode (no changes will be made)"
   }
@@ -140,6 +140,7 @@ function Invoke-ReplicaBisync {
   }
 
   $failureCount = 0
+  $replicaStateDir = Join-Path -Path $HOME -ChildPath ".config\nucleus\state\replica-bisync"
 
   foreach ($replica in $replicas) {
     $id = [string]$replica.id
@@ -162,6 +163,7 @@ function Invoke-ReplicaBisync {
     }
 
     $localDir = Join-Path -Path $HOME -ChildPath $localPath
+    $stateMarker = Join-Path -Path $replicaStateDir -ChildPath "$id.seeded"
     if (-not (Test-Path -Path $localDir -PathType Container)) {
       New-Item -ItemType Directory -Path $localDir -Force | Out-Null
     }
@@ -204,6 +206,11 @@ function Invoke-ReplicaBisync {
         }
       }
       "bidirectional" {
+        if ($SkipResyncRecovery -and -not (Test-Path -Path $stateMarker -PathType Leaf)) {
+          Write-Output "replica-bisync: [$id] skipping automatic bisync state recovery during apply; run nucleus-replica-bisync manually once to seed state"
+          continue
+        }
+
         Write-Output "replica-bisync: [$id] bisync $localDir <-> $remoteRef"
         $ok = Invoke-ReplicaRcloneCommand -Arguments (@("bisync", $localDir, $remoteRef, "--check-access") + $commonArgs) -IsDryRun:$DryRun
         if (-not $ok) {
@@ -211,7 +218,13 @@ function Invoke-ReplicaBisync {
           $ok = Invoke-ReplicaRcloneCommand -Arguments (@("bisync", $localDir, $remoteRef, "--check-access", "--resync") + $commonArgs) -IsDryRun:$DryRun
           if (-not $ok) {
             $failureCount += 1
+          } elseif (-not $DryRun) {
+            New-Item -ItemType Directory -Path $replicaStateDir -Force | Out-Null
+            New-Item -ItemType File -Path $stateMarker -Force | Out-Null
           }
+        } elseif (-not $DryRun) {
+          New-Item -ItemType Directory -Path $replicaStateDir -Force | Out-Null
+          New-Item -ItemType File -Path $stateMarker -Force | Out-Null
         }
       }
       default {

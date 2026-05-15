@@ -18,15 +18,19 @@ USERS_JSON="$REPO_ROOT/src/modules/users.json"
 
 usage() {
   cat <<'EOF'
-usage: replica-bisync.sh [--dry-run] [--replica-id ID]
+usage: replica-bisync.sh [--dry-run] [--replica-id ID] [--skip-resync-recovery]
 
   --dry-run         Print planned rclone commands without executing them.
   --replica-id ID   Restrict execution to a single replica id.
+  --skip-resync-recovery
+                    Skip automatic bisync state recovery; intended for post-apply
+                    runs where large first-time resync work should stay manual.
 EOF
 }
 
 dry_run=false
 replica_id_filter=""
+skip_resync_recovery=false
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -40,6 +44,9 @@ while [ "$#" -gt 0 ]; do
         exit 1
       fi
       replica_id_filter="$1"
+      ;;
+    --skip-resync-recovery)
+      skip_resync_recovery=true
       ;;
     -h|--help)
       usage
@@ -133,6 +140,7 @@ resolve_filter_path() {
 }
 
 failures=0
+replica_state_dir="$HOME/.config/nucleus/state/replica-bisync"
 
 replica_lines_file="$(mktemp)"
 printf '%s\n' "$replica_lines" > "$replica_lines_file"
@@ -154,6 +162,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
   local_dir="$HOME/$local_path"
   remote_ref="$remote_name:$remote_path"
   resolved_filters="$(resolve_filter_path "$filters_file")"
+  state_marker="$replica_state_dir/$id.seeded"
 
   mkdir -p "$local_dir"
 
@@ -195,11 +204,22 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
       fi
       ;;
     bidirectional)
+      if [ "$skip_resync_recovery" = true ] && [ ! -f "$state_marker" ]; then
+        printf '%s\n' "replica-bisync: [$id] skipping automatic bisync state recovery during apply; run nucleus-replica-bisync manually once to seed state"
+        continue
+      fi
+
       printf '%s\n' "replica-bisync: [$id] bisync $local_dir <-> $remote_ref"
       if ! run_cmd rclone bisync "$local_dir" "$remote_ref" --check-access "$@"; then
         if ! run_cmd rclone bisync "$local_dir" "$remote_ref" --check-access --resync "$@"; then
           failures=$((failures + 1))
+        else
+          mkdir -p "$replica_state_dir"
+          : > "$state_marker"
         fi
+      else
+        mkdir -p "$replica_state_dir"
+        : > "$state_marker"
       fi
       ;;
     *)

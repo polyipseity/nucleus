@@ -234,6 +234,7 @@ let
   test_apply_runs_replica_bisync = assert' (
     containsRegex "run_replica_bisync" applyScriptText
     && containsRegex "--skip-replica-bisync" applyScriptText
+    && containsRegex "--skip-resync-recovery" applyScriptText
     && containsRegex "scripts/replica-bisync\.sh" applyScriptText
   ) "apply flow must include post-apply replica bisync hook with skip flag";
 
@@ -256,31 +257,40 @@ let
 
   # Test 38: Windows parity includes a replica bisync module and scripts entrypoint
   test_windows_replica_bisync_entrypoints = assert' (
-    containsRegex ''function Invoke-ReplicaBisync'' windowsReplicaModuleText
+    containsRegex "function Invoke-ReplicaBisync" windowsReplicaModuleText
     && containsRegex ''src\\modules\\users\.json'' windowsReplicaModuleText
-    && containsRegex ''Invoke-ReplicaBisync'' replicaBisyncPwshText
+    && containsRegex "Invoke-ReplicaBisync" replicaBisyncPwshText
   ) "Windows must include Invoke-ReplicaBisync module and scripts/replica-bisync.ps1 wrapper";
 
   # Test 39: Windows apply flow has post-apply replica bisync hook with skip flag
   test_windows_apply_replica_hook = assert' (
-    containsRegex ''SkipReplicaBisync'' windowsApplyText
-    && containsRegex ''Invoke-ReplicaBisync'' windowsApplyText
-    && containsRegex ''post-apply replica sync'' windowsApplyText
+    containsRegex "SkipReplicaBisync" windowsApplyText
+    && containsRegex "SkipResyncRecovery" windowsApplyText
+    && containsRegex "Invoke-ReplicaBisync" windowsApplyText
+    && containsRegex "post-apply replica sync" windowsApplyText
   ) "Windows apply flow must include replica bisync post-step with skip flag";
 
   # Test 40: Windows shell profile exports nucleus-replica-bisync command parity
   test_windows_shell_replica_command = assert' (
-    containsRegex ''function nucleus-replica-bisync'' windowsShellProfileText
+    containsRegex "function nucleus-replica-bisync" windowsShellProfileText
     && containsRegex ''scripts\\replica-bisync\.ps1'' windowsShellProfileText
   ) "Windows shell profile must expose nucleus-replica-bisync";
 
   # Test 41: OneDrive replica runners must exclude Personal Vault on both platforms
   test_onedrive_personal_vault_excluded = assert' (
     containsRegex ''Personal Vault/\*\*'' replicaBisyncShellText
-    && containsRegex ''Personal Vault'' replicaBisyncShellText
+    && containsRegex "Personal Vault" replicaBisyncShellText
     && containsRegex ''Personal Vault/\*\*'' windowsReplicaModuleText
-    && containsRegex ''Personal Vault'' windowsReplicaModuleText
+    && containsRegex "Personal Vault" windowsReplicaModuleText
   ) "Replica bisync runners must exclude OneDrive Personal Vault to avoid invalidResourceId failures";
+
+  # Test 42: apply-time replica sync must skip automatic bisync state recovery
+  test_apply_skips_resync_recovery = assert' (
+    containsRegex "skip_resync_recovery=true" replicaBisyncShellText
+    && containsRegex "state recovery during apply" replicaBisyncShellText
+    && containsRegex "SkipResyncRecovery" windowsReplicaModuleText
+    && containsRegex "state recovery during apply" windowsReplicaModuleText
+  ) "Apply-time replica sync must skip automatic bisync state recovery until a manual seed run succeeds";
 
   allTests = [
     test_options_exist
@@ -324,6 +334,7 @@ let
     test_windows_apply_replica_hook
     test_windows_shell_replica_command
     test_onedrive_personal_vault_excluded
+    test_apply_skips_resync_recovery
   ];
 in
 {
