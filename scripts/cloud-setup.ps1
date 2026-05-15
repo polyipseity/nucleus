@@ -77,6 +77,33 @@ function Get-ProviderType {
   }
 }
 
+function Get-ProviderCreateArgument {
+  <#
+  .SYNOPSIS
+    Returns backend-specific arguments for `rclone config create`.
+
+  .DESCRIPTION
+    `rclone config create` takes defaults for unanswered options. The iCloud
+    backend requires interactive answers for Apple ID, password, and 2FA, so
+    this function adds `--all` to force the full question flow.
+
+  .PARAMETER ProviderType
+    The rclone backend type string.
+
+  .EXAMPLE
+    Get-ProviderCreateArgument -ProviderType 'iclouddrive'
+  #>
+  param(
+    [Parameter(Mandatory)]
+    [string]$ProviderType
+  )
+
+  switch ($ProviderType) {
+    'iclouddrive' { return @('--all') }
+    default { return @() }
+  }
+}
+
 if (-not (Get-Command rclone -ErrorAction SilentlyContinue)) {
   throw 'cloud-setup: rclone not found on PATH. Run apply/bootstrap first, then retry.'
 }
@@ -96,8 +123,9 @@ if ($missingRemotes.Count -gt 0) {
       Write-Error "cloud-setup: unknown remote '$remote'; add it manually with 'rclone config'."
       continue
     }
+    $providerCreateArguments = Get-ProviderCreateArgument -ProviderType $providerType
     Write-Output "cloud-setup: setting up remote '$remote' (provider: $providerType)..."
-    & rclone config create $remote $providerType
+    & rclone config create $remote $providerType @providerCreateArguments
     if ($LASTEXITCODE -ne 0) {
       Write-Warning "cloud-setup: remote '$remote' setup exited with code $LASTEXITCODE."
     }

@@ -81,6 +81,19 @@ remote_provider_type() {
   esac
 }
 
+# Selects backend-specific create flags.
+# Args: $1 — rclone provider type.
+# Output: zero or more CLI flags to append to `rclone config create`.
+# WHY: `rclone config create` silently takes defaults for unanswered options.
+# The iCloud backend has required fields like `apple_id` with no safe default,
+# so `--all` is required there to force the interactive question flow.
+remote_provider_create_flags() {
+  case "$1" in
+    iclouddrive) printf '%s\n' '--all' ;;
+    *)           return 0 ;;
+  esac
+}
+
 if ! command -v rclone >/dev/null 2>&1; then
   printf '%s\n' "cloud-setup: rclone not found on PATH. Run apply/bootstrap first, then retry." >&2
   exit 1
@@ -101,8 +114,16 @@ if [ -n "$missing_remotes" ]; then
       printf '%s\n' "cloud-setup: unknown remote '$_remote'; add it manually with 'rclone config'." >&2
       continue
     fi
+    _create_flags="$(remote_provider_create_flags "$_type")"
     printf '%s\n' "cloud-setup: setting up remote '$_remote' (provider: $_type)..."
-    rclone config create "$_remote" "$_type"
+    if [ -n "$_create_flags" ]; then
+      # Word splitting is intentional here: helper output is a whitespace-
+      # separated flag list for rclone, not arbitrary user input.
+      # shellcheck disable=SC2086
+      rclone config create "$_remote" "$_type" $_create_flags
+    else
+      rclone config create "$_remote" "$_type"
+    fi
   done
 
   missing_remotes="$(collect_missing_remotes "$required_remotes")" || {
