@@ -437,6 +437,18 @@ in
         ];
       };
 
+
+      # Raycast: bind Clipboard History to a deterministic app shortcut so paste
+      # workflows have a stable keyboard entry point even when Raycast command
+      # internals change across releases.
+      "com.raycast.macos" = {
+        NSUserKeyEquivalents = {
+          # Command+Option+V: open Raycast Clipboard History command.
+          # WHY app shortcut path: Raycast command hotkeys are stored in app
+          # internals, while NSUserKeyEquivalents remains stable and declarative.
+          "Clipboard History" = "@~v";
+        };
+      };
       # Terminal: focus follows mouse pointer (hover to focus without clicking).
       "com.apple.terminal" = {
         FocusFollowsMouse = "YES";

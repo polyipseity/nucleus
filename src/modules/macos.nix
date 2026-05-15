@@ -84,6 +84,7 @@ let
     "com.apple.universalcontrol"
     "com.betterdisplay"
     "com.googlecode.iterm2"
+    "com.raycast.macos"
   ];
 
   # UTI list for Chrome: set as the default handler for HTML and XHTML documents.
