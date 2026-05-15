@@ -915,7 +915,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
         throw new Error('macos: failed to decode Finder sidebar archive: ' + ObjC.unwrap(decodeError[0]));
       }
 
-      var root = ObjC.deepUnwrap(rootObject);
       var favoritePaths = [
         '/',
         home,
@@ -931,12 +930,15 @@ lib.mkIf pkgs.stdenv.isDarwin {
         home + '/.Trash'
       ];
 
-      var items = [];
+      var items = $.NSMutableArray.alloc.init;
       for (var i = 0; i < favoritePaths.length; i += 1) {
         var favoritePath = favoritePaths[i];
         var bookmarkError = Ref();
-        var bookmark = $.NSURL.fileURLWithPath(favoritePath)
-          .bookmarkDataWithOptionsIncludingResourceValuesForKeysRelativeToURLError(
+        var bookmarkURL = $.NSURL.fileURLWithPath(favoritePath);
+        var bookmark = bookmarkURL
+          ['bookmarkDataWithOptions:includingResourceValuesForKeys:relativeToURL:error:']
+          .call(
+            bookmarkURL,
             0,
             undefined,
             undefined,
@@ -946,18 +948,19 @@ lib.mkIf pkgs.stdenv.isDarwin {
           throw new Error('macos: failed to create Finder bookmark for ' + favoritePath + ': ' + ObjC.unwrap(bookmarkError[0]));
         }
 
-        items.push({
-          visibility: 0,
-          CustomItemProperties: {},
-          Bookmark: bookmark,
-          uuid: String($.NSUUID.UUID.UUIDString)
-        });
+        var item = $.NSMutableDictionary.alloc.init;
+        var setObject = item['setObject:forKey:'];
+        setObject.call(item, 0, 'visibility');
+        setObject.call(item, $.NSMutableDictionary.alloc.init, 'CustomItemProperties');
+        setObject.call(item, bookmark, 'Bookmark');
+        setObject.call(item, ObjC.unwrap($.NSUUID.UUID.UUIDString), 'uuid');
+        items['addObject:'].call(items, item);
       }
 
-      root.items = items;
+      rootObject['setObject:forKey:'].call(rootObject, items, 'items');
 
       var encodeError = Ref();
-      var archived = $.NSKeyedArchiver.archivedDataWithRootObjectRequiringSecureCodingError(root, false, encodeError);
+      var archived = $.NSKeyedArchiver.archivedDataWithRootObjectRequiringSecureCodingError(rootObject, false, encodeError);
       if (!archived) {
         throw new Error('macos: failed to encode Finder sidebar archive: ' + ObjC.unwrap(encodeError[0]));
       }
