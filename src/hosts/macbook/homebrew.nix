@@ -19,7 +19,6 @@ let
   # preferred (e.g. tightly coupled to macOS internals).
   staticManagedBrews = [
     "displayplacer" # CLI display arrangement tool
-    "fuse-t" # FSKit-capable FUSE userspace driver for rclone mounts
     "smudge/smudge/nightlight" # Night Shift schedule & temperature control
     "zackelia/formulae/bclm" # Battery charge limit management
   ];
@@ -39,6 +38,7 @@ let
     "betterdisplay" # Advanced display management and virtual screens
     "chrome-remote-desktop-host" # Headless remote-desktop receiver
     "coolterm" # Serial terminal
+    "fuse-t" # FSKit-capable FUSE userspace driver for rclone mounts
     "gimp" # Raster image editor; macOS-only cask (nixpkgs gimp is Linux-only)
     "google-chrome@canary" # Chrome dev channel for web testing
     "keka" # Graphical archiver with 7-Zip backend support
