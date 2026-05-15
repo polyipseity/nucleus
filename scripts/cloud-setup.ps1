@@ -5,8 +5,9 @@
 .DESCRIPTION
   Performs a bounded cloud-drive setup workflow:
     1. verifies required rclone remotes exist (GoogleDrive, iCloud, OneDrive)
-    2. creates each missing remote with the correct provider type and prompts
-       for authentication (no manual menu navigation required)
+   2. creates each missing remote with the correct provider type and
+     repo-configured backend defaults, then prompts for authentication
+     (no manual menu navigation required)
     3. runs `nix run <repo>/src#apply` so cloud mount services converge
 
 .PARAMETER SkipApply
@@ -77,6 +78,82 @@ function Get-ProviderType {
   }
 }
 
+function Resolve-ICloudServiceForRemote {
+  <#
+  .SYNOPSIS
+    Resolves the configured iCloud service for a remote from the user registry.
+
+  .DESCRIPTION
+    Reads src/hosts/windows/users.json and returns the single configured
+    iCloud service (`drive` or `photos`) for the current user's matching remote.
+    If there is no explicit entry, or multiple entries disagree, the function
+    defaults the remote config to `drive` and lets mount commands override per
+    entry with `--iclouddrive-service`.
+
+  .PARAMETER RepoRoot
+    Absolute path to the repository root.
+
+  .PARAMETER RemoteName
+    rclone remote name being configured.
+
+  .EXAMPLE
+    Resolve-ICloudServiceForRemote -RepoRoot 'C:\dev\nucleus' -RemoteName 'iCloud'
+  #>
+  param(
+    [Parameter(Mandatory)]
+    [string]$RepoRoot,
+
+    [Parameter(Mandatory)]
+    [string]$RemoteName
+  )
+
+  $registryPath = Join-Path $RepoRoot 'src\hosts\windows\users.json'
+  if (-not (Test-Path -Path $registryPath -PathType Leaf)) {
+    return 'drive'
+  }
+
+  $registry = Get-Content -Path $registryPath -Raw | ConvertFrom-Json -AsHashtable
+  $users = $registry.users
+  if (-not $users) {
+    return 'drive'
+  }
+
+  $currentUsername = $env:USERNAME
+  if (-not $users.ContainsKey($currentUsername)) {
+    $primaryEntry = $users.GetEnumerator() | Where-Object { $_.Value.isPrimary -eq $true } | Select-Object -First 1
+    if ($null -eq $primaryEntry) {
+      return 'drive'
+    }
+    $currentUsername = $primaryEntry.Key
+  }
+
+  $userCloudDrives = $users[$currentUsername].cloudDrives
+  if ($null -eq $userCloudDrives) {
+    return 'drive'
+  }
+
+  $matchingServices = @(
+    @($userCloudDrives.mounts) + @($userCloudDrives.replicas) |
+      Where-Object {
+        $_ -and $_.provider -eq 'iCloud' -and $_.remoteName -eq $RemoteName
+      } |
+      ForEach-Object {
+        if ($_.iCloudService) { [string]$_.iCloudService } else { 'drive' }
+      } |
+      Select-Object -Unique
+  )
+
+  if ($matchingServices.Count -eq 1) {
+    return $matchingServices[0]
+  }
+
+  if ($matchingServices.Count -gt 1) {
+    Write-Warning "cloud-setup: multiple iCloud services are configured for remote '$RemoteName'; defaulting remote setup to 'drive' and letting mount commands override per entry."
+  }
+
+  return 'drive'
+}
+
 function Get-ProviderCreateArgument {
   <#
   .SYNOPSIS
@@ -90,16 +167,31 @@ function Get-ProviderCreateArgument {
   .PARAMETER ProviderType
     The rclone backend type string.
 
+  .PARAMETER RemoteName
+    The rclone remote name being created.
+
+  .PARAMETER RepoRoot
+    Absolute path to the repository root.
+
   .EXAMPLE
-    Get-ProviderCreateArgument -ProviderType 'iclouddrive'
+    Get-ProviderCreateArgument -ProviderType 'iclouddrive' -RemoteName 'iCloud' -RepoRoot 'C:\dev\nucleus'
   #>
   param(
     [Parameter(Mandatory)]
-    [string]$ProviderType
+    [string]$ProviderType,
+
+    [Parameter(Mandatory)]
+    [string]$RemoteName,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot
   )
 
   switch ($ProviderType) {
-    'iclouddrive' { return @('--all') }
+    'iclouddrive' {
+      $iCloudService = Resolve-ICloudServiceForRemote -RepoRoot $RepoRoot -RemoteName $RemoteName
+      return @('service', $iCloudService, '--all')
+    }
     default { return @() }
   }
 }
@@ -107,6 +199,8 @@ function Get-ProviderCreateArgument {
 if (-not (Get-Command rclone -ErrorAction SilentlyContinue)) {
   throw 'cloud-setup: rclone not found on PATH. Run apply/bootstrap first, then retry.'
 }
+
+$repoRoot = Resolve-NucleusRoot
 
 $requiredRemotes = @('GoogleDrive', 'iCloud', 'OneDrive')
 $missingRemotes = Get-RcloneMissingRemote -RequiredRemotes $requiredRemotes
@@ -123,7 +217,7 @@ if ($missingRemotes.Count -gt 0) {
       Write-Error "cloud-setup: unknown remote '$remote'; add it manually with 'rclone config'."
       continue
     }
-    $providerCreateArguments = Get-ProviderCreateArgument -ProviderType $providerType
+    $providerCreateArguments = Get-ProviderCreateArgument -ProviderType $providerType -RemoteName $remote -RepoRoot $repoRoot
     Write-Output "cloud-setup: setting up remote '$remote' (provider: $providerType)..."
     & rclone config create $remote $providerType @providerCreateArguments
     if ($LASTEXITCODE -ne 0) {
@@ -144,7 +238,6 @@ if ($missingRemotes.Count -gt 0) {
 Write-Output 'cloud-setup: required remotes are configured.'
 
 if (-not $SkipApply) {
-  $repoRoot = Resolve-NucleusRoot
   Write-Output 'cloud-setup: running nucleus apply to converge cloud mount services...'
   & nix run "$repoRoot/src#apply"
   if ($LASTEXITCODE -ne 0) {

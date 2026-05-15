@@ -95,6 +95,14 @@ function Sync-CloudDrive {
 
         $serviceName = "nucleus-cloud-mount-$($mount.id)"
         $remoteSpec = "${remoteName}:${remotePath}"
+        # Pass the iCloud service explicitly on every mount so entry behavior
+        # follows users.json even if the shared remote default is different.
+        $iCloudService = if ($mount.provider -eq 'iCloud' -and $mount.iCloudService) {
+            [string]$mount.iCloudService
+        }
+        else {
+            'drive'
+        }
         $readWrite = if ($null -ne $mount.readWrite) { [bool]$mount.readWrite } else { $true }
 
         $mountArgs = @(
@@ -107,6 +115,10 @@ function Sync-CloudDrive {
             '--poll-interval', '1m'
             '--log-level', 'ERROR'
         )
+
+        if ($mount.provider -eq 'iCloud') {
+            $mountArgs += '--iclouddrive-service', $iCloudService
+        }
 
         if (-not $readWrite) {
             $mountArgs += '--read-only'

@@ -88,6 +88,14 @@ let
         type = lib.types.str;
         description = "Unique identifier for this mount entry. Used as part of the launchd / systemd service label.";
       };
+      iCloudService = lib.mkOption {
+        type = lib.types.enum [
+          "drive"
+          "photos"
+        ];
+        default = "drive";
+        description = "Which Apple service to expose for iCloud entries. Mount commands always pass this explicitly so entry behavior stays aligned with user config even if the shared remote was initially created with a different default service.";
+      };
       localPath = lib.mkOption {
         type = lib.types.str;
         description = "Mount target path relative to the user's home directory (e.g. 'clouds/iCloud').";
@@ -148,6 +156,14 @@ let
         type = lib.types.str;
         description = "Unique identifier for this replica entry. Used as part of service labels.";
       };
+      iCloudService = lib.mkOption {
+        type = lib.types.enum [
+          "drive"
+          "photos"
+        ];
+        default = "drive";
+        description = "Which Apple service this replica should target for iCloud entries. Keeping it in the shared schema preserves per-user intent even before all replica backends consume the value directly.";
+      };
       localPath = lib.mkOption {
         type = lib.types.str;
         description = "Local replica root path relative to the user's home directory. For iCloud on macOS this documents the native CloudDocs area managed by brctl; for rclone replicas it is the directory rclone syncs into.";
@@ -190,8 +206,15 @@ let
     let
       mountPoint = "${currentUserHome}/${mount.localPath}";
       rcloneRemote = "${mount.remoteName}:${mount.remotePath}";
+      # Always pass the configured iCloud service explicitly so mount behavior
+      # follows the per-entry setting even if the shared remote was created
+      # with a different default service.
+      iCloudServiceArgs = lib.optionals (mount.provider == "iCloud") [
+        "--iclouddrive-service"
+        mount.iCloudService
+      ];
       readOnlyFlag = lib.optional (!mount.readWrite) "--read-only";
-      extraArgsList = mount.extraArgs;
+      extraArgsList = iCloudServiceArgs ++ mount.extraArgs;
     in
     pkgs.writeShellScript "cloud-mount-${mount.id}" ''
       set -eu
@@ -332,6 +355,10 @@ in
               let
                 mountPoint = "${currentUserHome}/${mount.localPath}";
                 rcloneRemote = "${mount.remoteName}:${mount.remotePath}";
+                iCloudServiceArgs = lib.optionals (mount.provider == "iCloud") [
+                  "--iclouddrive-service"
+                  mount.iCloudService
+                ];
                 readOnlyFlag = lib.optional (!mount.readWrite) "--read-only";
               in
               {
@@ -360,7 +387,7 @@ in
                       "--log-level"
                       "ERROR"
                     ]
-                    ++ map lib.escapeShellArg (readOnlyFlag ++ mount.extraArgs)
+                    ++ map lib.escapeShellArg (readOnlyFlag ++ iCloudServiceArgs ++ mount.extraArgs)
                   );
                   ExecStop = mkFusermountUnmount mountPoint;
                   Restart = "on-failure";

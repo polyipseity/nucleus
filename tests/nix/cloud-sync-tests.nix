@@ -11,6 +11,11 @@ let
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
 
   moduleText = builtins.readFile ../../src/modules/cloud-drives.nix;
+  posixUsersText = builtins.readFile ../../src/modules/users.json;
+  windowsUsersText = builtins.readFile ../../src/hosts/windows/users.json;
+  flakeText = builtins.readFile ../../src/flake.nix;
+  shellScriptText = builtins.readFile ../../scripts/cloud-setup.sh;
+  pwshScriptText = builtins.readFile ../../scripts/cloud-setup.ps1;
 
   assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
 
@@ -71,6 +76,39 @@ let
     && containsRegex "listOf replicaSubmodule" moduleText
   ) "schema must be list-based to allow multiple mounts/replicas per provider";
 
+  # Test 15: iCloud service choice is first-class config in the shared schema
+  test_icloud_service_option_exists = assert' (
+    containsRegex "iCloudService = lib\\.mkOption" moduleText
+    && containsRegex ''"drive"'' moduleText
+    && containsRegex ''"photos"'' moduleText
+  ) "cloud-drives module must expose an iCloud service option with drive/photos values";
+
+  # Test 16: iCloud mounts pass the selected service explicitly to rclone
+  test_icloud_mounts_pass_service = assert' (
+    containsRegex "--iclouddrive-service" moduleText
+    && containsRegex "mount\\.iCloudService" moduleText
+  ) "cloud-drives mounts must pass --iclouddrive-service from user config";
+
+  # Test 17: Both user registries pin the current iCloud entries to drive
+  test_user_registries_define_icloud_service = assert' (
+    containsRegex ''"iCloudService": "drive"'' posixUsersText
+    && containsRegex ''"iCloudService": "drive"'' windowsUsersText
+  ) "POSIX and Windows user registries must define the current iCloud service explicitly";
+
+  # Test 18: cloud-setup app ships jq so the shell helper can read users.json
+  test_cloud_setup_runtime_has_jq = assert' (
+    containsRegex "mkCloudSetupApp" flakeText
+    && containsRegex "pkgs\\.jq" flakeText
+  ) "cloud-setup app runtime must include jq for user-config lookup";
+
+  # Test 19: cloud-setup scripts pass the configured iCloud service to create
+  test_cloud_setup_passes_icloud_service = assert' (
+    containsRegex "resolve_icloud_service_for_remote" shellScriptText
+    && containsRegex "service" shellScriptText
+    && containsRegex "Resolve-ICloudServiceForRemote" pwshScriptText
+    && containsRegex "@\('service', \\$iCloudService, '--all'\)" pwshScriptText
+  ) "cloud-setup scripts must preselect the configured iCloud service during remote creation";
+
   allTests = [
     test_options_exist
     test_mounts_are_list
@@ -86,6 +124,11 @@ let
     test_macos_launchd_agents
     test_nixos_systemd_services
     test_list_schema_allows_multiple
+    test_icloud_service_option_exists
+    test_icloud_mounts_pass_service
+    test_user_registries_define_icloud_service
+    test_cloud_setup_runtime_has_jq
+    test_cloud_setup_passes_icloud_service
   ];
 in
 {

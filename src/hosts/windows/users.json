@@ -19,6 +19,7 @@
             "enable": true,
             "extraArgs": [],
             "id": "iCloud",
+            "iCloudService": "drive",
             "localPath": "clouds\\iCloud",
             "provider": "iCloud",
             "readWrite": false,
@@ -62,6 +63,7 @@
               "interval": "daily"
             },
             "id": "iCloud",
+            "iCloudService": "drive",
             "localPath": "clouds\\iCloudReplica",
             "provider": "iCloud",
             "realtime": {

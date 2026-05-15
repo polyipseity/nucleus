@@ -321,6 +321,7 @@
             name = "nucleus-cloud-setup";
             runtimeInputs = [
               pkgs.git
+              pkgs.jq
               pkgs.nix
               pkgs.rclone
             ];
