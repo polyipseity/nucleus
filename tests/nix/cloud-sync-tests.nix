@@ -184,6 +184,12 @@ let
     && containsRegex "rclone config delete" pwshScriptText
   ) "cloud-setup scripts must recreate remotes with stale or invalid credentials";
 
+  # Test 29: macOS LaunchAgents export the config passphrase before listing remotes
+  test_cloud_mounts_export_config_pass = assert' (
+    containsRegex "export RCLONE_CONFIG_PASS" moduleText
+    && containsRegex "rclone listremotes" moduleText
+  ) "macOS cloud mount LaunchAgents must export RCLONE_CONFIG_PASS before validating remotes";
+
   allTests = [
     test_options_exist
     test_mounts_are_list
@@ -213,6 +219,7 @@ let
     test_cloud_mounts_prepare_volumes
     test_cloud_mounts_use_fskit_backend
     test_cloud_setup_recreates_stale_remotes
+    test_cloud_mounts_export_config_pass
   ];
 in
 {

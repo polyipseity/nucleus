@@ -217,6 +217,9 @@ let
     let
       mountPoint = mkMountPoint mount;
       rcloneRemote = "${mount.remoteName}:${mount.remotePath}";
+      rcloneConfigPassExport = lib.optionalString config.nucleus.rclone.configPassEnabled ''
+      export RCLONE_CONFIG_PASS="$(cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath})"
+      '';
       # Always pass the configured iCloud service explicitly so mount behavior
       # follows the per-entry setting even if the shared remote was created
       # with a different default service.
@@ -242,12 +245,23 @@ let
     pkgs.writeShellScript "cloud-mount-${mount.id}" ''
       set -eu
 
+      ${rcloneConfigPassExport}
+
       # Verify the rclone remote is configured; exit 0 (no restart) if not.
-      if ! ${pkgs.rclone}/bin/rclone listremotes 2>/dev/null | grep -qF ${lib.escapeShellArg "${mount.remoteName}:"}; then
+      if ! rclone_remotes="$(${pkgs.rclone}/bin/rclone listremotes)"; then
+        echo "cloud-drives: failed to list rclone remotes for '${mount.remoteName}' mount; check the config passphrase and remote configuration." >&2
+        exit 1
+      fi
+
+      case "$rclone_remotes" in
+        *${lib.escapeShellArg "${mount.remoteName}:"}*)
+          ;;
+        *)
         echo "cloud-drives: rclone remote '${mount.remoteName}' not configured; mount skipped." >&2
         echo "cloud-drives: run 'rclone config' to set up the remote, then re-run 'home-manager switch'." >&2
         exit 0
-      fi
+          ;;
+      esac
 
       # macFUSE/FSKit creates the volume mountpoint itself under /Volumes.
       exec ${pkgs.rclone}/bin/rclone mount \
