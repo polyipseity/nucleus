@@ -78,6 +78,7 @@ if [ -s "$rclone_pass_path" ]; then
 fi
 
 username="$(id -un)"
+current_os="$(uname -s)"
 
 replica_lines="$({
   jq -r --arg username "$username" '
@@ -139,6 +140,14 @@ printf '%s\n' "$replica_lines" > "$replica_lines_file"
 # shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
 while IFS="$(printf '\t')" read id direction local_path remote_name remote_path provider icloud_service filters_file; do
   if [ -n "$replica_id_filter" ] && [ "$id" != "$replica_id_filter" ]; then
+    continue
+  fi
+
+  # macOS iCloudReplica maps to native iCloud-managed storage semantics.
+  # Skip the explicit rclone replica pass for this one entry to avoid
+  # permission-denied churn while still allowing other replicas to converge.
+  if [ "$current_os" = "Darwin" ] && [ "$provider" = "iCloud" ] && [ "$id" = "iCloud" ]; then
+    printf '%s\n' "replica-bisync: [$id] skipping on macOS (native iCloud handles sync)"
     continue
   fi
 

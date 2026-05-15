@@ -16,7 +16,12 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   shellScriptText = builtins.readFile ../../scripts/cloud-setup.sh;
   pwshScriptText = builtins.readFile ../../scripts/cloud-setup.ps1;
+  replicaBisyncShellText = builtins.readFile ../../scripts/replica-bisync.sh;
+  replicaBisyncPwshText = builtins.readFile ../../scripts/replica-bisync.ps1;
   applyScriptText = builtins.readFile ../../src/scripts/apply.sh;
+  windowsApplyText = builtins.readFile ../../src/hosts/windows/apply.ps1;
+  windowsShellProfileText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-ShellProfile.ps1;
+  windowsReplicaModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Invoke-ReplicaBisync.ps1;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
@@ -194,8 +199,7 @@ let
 
   # Test 30: macOS host package selection uses fuse-t and no longer pins macfuse
   test_macos_uses_fuse_t = assert' (
-    containsRegex ''"fuse-t"'' macbookHomebrewText
-    && !containsRegex ''"macfuse"'' macbookHomebrewText
+    containsRegex ''"fuse-t"'' macbookHomebrewText && !containsRegex ''"macfuse"'' macbookHomebrewText
   ) "macOS Homebrew packages must use fuse-t instead of macfuse for cloud mounts";
 
   # Test 31: users.json preserves GoogleDrive remote id while exposing a human-readable display name
@@ -241,6 +245,35 @@ let
     && containsRegex "Google Drive" macosText
   ) "Finder sidebar rewrite must set CustomItemProperties.Name and include Google Drive label";
 
+  # Test 37: macOS replica runner must skip the iCloud replica entry to avoid native-path permission churn
+  test_macos_skips_icloud_replica = assert' (
+    containsRegex ''"current_os"'' replicaBisyncShellText
+    && containsRegex ''"Darwin"'' replicaBisyncShellText
+    && containsRegex ''"provider" = "iCloud"'' replicaBisyncShellText
+    && containsRegex ''"id" = "iCloud"'' replicaBisyncShellText
+    && containsRegex ''"native iCloud handles sync"'' replicaBisyncShellText
+  ) "replica-bisync.sh must skip iCloud replica on macOS";
+
+  # Test 38: Windows parity includes a replica bisync module and scripts entrypoint
+  test_windows_replica_bisync_entrypoints = assert' (
+    containsRegex ''function Invoke-ReplicaBisync'' windowsReplicaModuleText
+    && containsRegex ''src\\modules\\users\.json'' windowsReplicaModuleText
+    && containsRegex ''Invoke-ReplicaBisync'' replicaBisyncPwshText
+  ) "Windows must include Invoke-ReplicaBisync module and scripts/replica-bisync.ps1 wrapper";
+
+  # Test 39: Windows apply flow has post-apply replica bisync hook with skip flag
+  test_windows_apply_replica_hook = assert' (
+    containsRegex ''SkipReplicaBisync'' windowsApplyText
+    && containsRegex ''Invoke-ReplicaBisync'' windowsApplyText
+    && containsRegex ''post-apply replica sync'' windowsApplyText
+  ) "Windows apply flow must include replica bisync post-step with skip flag";
+
+  # Test 40: Windows shell profile exports nucleus-replica-bisync command parity
+  test_windows_shell_replica_command = assert' (
+    containsRegex ''function nucleus-replica-bisync'' windowsShellProfileText
+    && containsRegex ''scripts\\replica-bisync\.ps1'' windowsShellProfileText
+  ) "Windows shell profile must expose nucleus-replica-bisync";
+
   allTests = [
     test_options_exist
     test_mounts_are_list
@@ -278,6 +311,10 @@ let
     test_flake_has_replica_app
     test_apply_runs_replica_bisync
     test_finder_sidebar_custom_names
+    test_macos_skips_icloud_replica
+    test_windows_replica_bisync_entrypoints
+    test_windows_apply_replica_hook
+    test_windows_shell_replica_command
   ];
 in
 {
