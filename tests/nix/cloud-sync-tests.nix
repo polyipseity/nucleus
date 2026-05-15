@@ -16,6 +16,7 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   shellScriptText = builtins.readFile ../../scripts/cloud-setup.sh;
   pwshScriptText = builtins.readFile ../../scripts/cloud-setup.ps1;
+  applyScriptText = builtins.readFile ../../src/scripts/apply.sh;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
@@ -197,6 +198,49 @@ let
     && !containsRegex ''"macfuse"'' macbookHomebrewText
   ) "macOS Homebrew packages must use fuse-t instead of macfuse for cloud mounts";
 
+  # Test 31: users.json preserves GoogleDrive remote id while exposing a human-readable display name
+  test_google_drive_display_name = assert' (
+    containsRegex ''"id": "GoogleDrive"'' posixUsersText
+    && containsRegex ''"remoteName": "GoogleDrive"'' posixUsersText
+    && containsRegex ''"displayName": "Google Drive"'' posixUsersText
+  ) "GoogleDrive mount must keep remoteName=GoogleDrive while setting displayName=Google Drive";
+
+  # Test 32: users.json keeps iCloud replica explicitly enabled
+  test_icloud_replica_enabled = assert' (
+    containsRegex ''"id": "iCloud"'' posixUsersText
+    && containsRegex ''"localPath": "clouds/iCloudReplica"'' posixUsersText
+    && containsRegex ''"direction": "pull"'' posixUsersText
+    && containsRegex ''"enable": true'' posixUsersText
+  ) "iCloud replica entry must remain enabled for local replica convergence";
+
+  # Test 33: shell exports nucleus-replica-bisync command wrapper
+  test_shell_has_replica_command = assert' (
+    containsRegex ''"nucleus-replica-bisync"'' shellNixText
+    && containsRegex ''"replica-bisync"'' shellNixText
+  ) "shell module must expose nucleus-replica-bisync command";
+
+  # Test 34: flake exposes replica-bisync app wired to scripts/replica-bisync.sh
+  test_flake_has_replica_app = assert' (
+    containsRegex "mkReplicaBisyncApp" flakeText
+    && containsRegex "scripts/replica-bisync\.sh" flakeText
+    && containsRegex "replica-bisync" flakeText
+  ) "flake apps must include replica-bisync on supported systems";
+
+  # Test 35: apply script runs replica bisync as a post-apply best-effort step
+  test_apply_runs_replica_bisync = assert' (
+    containsRegex "run_replica_bisync" applyScriptText
+    && containsRegex "--skip-replica-bisync" applyScriptText
+    && containsRegex "scripts/replica-bisync\.sh" applyScriptText
+  ) "apply flow must include post-apply replica bisync hook with skip flag";
+
+  # Test 36: Finder sidebar writes explicit custom item names to avoid '?' labels
+  test_finder_sidebar_custom_names = assert' (
+    containsRegex "CustomItemProperties" macosText
+    && containsRegex "setObject:forKey:" macosText
+    && containsRegex "'Name'" macosText
+    && containsRegex "Google Drive" macosText
+  ) "Finder sidebar rewrite must set CustomItemProperties.Name and include Google Drive label";
+
   allTests = [
     test_options_exist
     test_mounts_are_list
@@ -228,6 +272,12 @@ let
     test_cloud_setup_recreates_stale_remotes
     test_cloud_mounts_export_config_pass
     test_macos_uses_fuse_t
+    test_google_drive_display_name
+    test_icloud_replica_enabled
+    test_shell_has_replica_command
+    test_flake_has_replica_app
+    test_apply_runs_replica_bisync
+    test_finder_sidebar_custom_names
   ];
 in
 {
