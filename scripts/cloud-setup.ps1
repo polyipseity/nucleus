@@ -164,12 +164,10 @@ function Get-ProviderCreateArgument {
 
   .DESCRIPTION
     `rclone config create` takes defaults for unanswered options. The iCloud
-    backend requires interactive answers for Apple ID and 2FA, so this function
-    adds `--all` to force the full question flow. The optional per-remote
-    encryption password is pre-supplied to skip its interactive prompt — it
-    duplicates the protection already provided by RCLONE_CONFIG_PASS, so that
-    value is used when set, otherwise an empty obscured value leaves the field
-    blank without prompting.
+    backend requires interactive answers for Apple ID, password (the Apple
+    account password), and 2FA, so this function adds `--all` to force the
+    full question flow. The iCloud service choice is passed explicitly so
+    rclone skips the drive-vs-photos question.
 
   .PARAMETER ProviderType
     The rclone backend type string.
@@ -197,13 +195,7 @@ function Get-ProviderCreateArgument {
   switch ($ProviderType) {
     'iclouddrive' {
       $iCloudService = Resolve-ICloudServiceForRemote -RepoRoot $RepoRoot -RemoteName $RemoteName
-      # Pre-supply the optional per-remote encryption password to skip the
-      # interactive prompt that --all exposes. WHY: this field duplicates the
-      # protection already provided by RCLONE_CONFIG_PASS; use that value when
-      # set, or an empty obscured value to leave the field blank.
-      $passRaw = if ($Env:RCLONE_CONFIG_PASS) { $Env:RCLONE_CONFIG_PASS } else { '' }
-      $passObscured = (& rclone obscure $passRaw)
-      return @('service', $iCloudService, 'password', $passObscured, '--all')
+      return @('service', $iCloudService, '--all')
     }
     default { return @() }
   }

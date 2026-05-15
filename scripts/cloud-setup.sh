@@ -137,13 +137,10 @@ remote_provider_type() {
 # Args: $1 — rclone provider type; $2 — remote name; $3 — repo root.
 # Output: zero or more CLI args to append to `rclone config create`.
 # WHY: `rclone config create` silently takes defaults for unanswered options.
-# The iCloud backend has required fields like `apple_id` with no safe default,
-# so `--all` is required there to force the interactive question flow. The
-# iCloud service choice is passed explicitly so rclone skips the
-# drive-vs-photos question. The optional per-remote encryption password is
-# pre-supplied to skip its interactive prompt (it duplicates the protection
-# already provided by RCLONE_CONFIG_PASS; use that value when set, else supply
-# an empty obscured value to leave the field blank without prompting).
+# The iCloud backend has required fields like `apple_id` and `password` (the
+# Apple account password) with no safe default, so `--all` is required to
+# force the full interactive question flow. The iCloud service choice is
+# passed explicitly so rclone skips the drive-vs-photos question.
 remote_provider_create_args() {
   _rpca_provider_type="$1"
   _rpca_remote_name="$2"
@@ -152,8 +149,7 @@ remote_provider_create_args() {
   case "$_rpca_provider_type" in
     iclouddrive)
       _rpca_service="$(resolve_icloud_service_for_remote "$_rpca_repo_root" "$_rpca_remote_name")"
-      _rpca_pass_obscured="$(rclone obscure "${RCLONE_CONFIG_PASS:-}")"
-      printf '%s\n' 'service' "$_rpca_service" 'password' "$_rpca_pass_obscured" '--all'
+      printf '%s\n' 'service' "$_rpca_service" '--all'
       ;;
     *)           return 0 ;;
   esac

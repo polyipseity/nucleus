@@ -54,7 +54,9 @@ let
   test_reads_user_config = assert' (containsRegex "users\.\\\$\{currentUsername\}\.cloudDrives" moduleText) "module must read per-user config from users.\${currentUsername}.cloudDrives";
 
   # Test 8: iCloud does not rely on native brctl-only logic
-  test_icloud_not_brctl_only = assert' (!containsRegex "brctl download" moduleText) "cloud-drives module should not require native brctl iCloud-only behavior";
+  test_icloud_not_brctl_only = assert' (
+    !containsRegex "brctl download" moduleText
+  ) "cloud-drives module should not require native brctl iCloud-only behavior";
 
   # Test 9: rclone is conditionally added to home packages
   test_rclone_package_conditional = assert' (
@@ -65,7 +67,9 @@ let
   test_setup_activation_exists = assert' (containsRegex "cloudDrivesSetup" moduleText) "cloudDrivesSetup activation must be defined for directory creation";
 
   # Test 11: cloudDrivesICloudRefresh activation is not required in rclone-first design
-  test_no_icloud_refresh_activation = assert' (!containsRegex "cloudDrivesICloudRefresh" moduleText) "cloudDrivesICloudRefresh activation should not exist in rclone-first cloud-drives module";
+  test_no_icloud_refresh_activation = assert' (
+    !containsRegex "cloudDrivesICloudRefresh" moduleText
+  ) "cloudDrivesICloudRefresh activation should not exist in rclone-first cloud-drives module";
 
   # Test 12: macOS LaunchAgents are defined for rclone mounts
   test_macos_launchd_agents = assert' (containsRegex "launchd\.agents" moduleText) "module must define macOS LaunchAgents for rclone-backed mounts";
@@ -88,8 +92,7 @@ let
 
   # Test 16: iCloud mounts pass the selected service explicitly to rclone
   test_icloud_mounts_pass_service = assert' (
-    containsRegex "--iclouddrive-service" moduleText
-    && containsRegex "mount\\.iCloudService" moduleText
+    containsRegex "--iclouddrive-service" moduleText && containsRegex "mount\\.iCloudService" moduleText
   ) "cloud-drives mounts must pass --iclouddrive-service from user config";
 
   # Test 17: Both user registries pin the current iCloud entries to drive
@@ -100,8 +103,7 @@ let
 
   # Test 18: cloud-setup app ships jq so the shell helper can read users.json
   test_cloud_setup_runtime_has_jq = assert' (
-    containsRegex "mkCloudSetupApp" flakeText
-    && containsRegex "pkgs\\.jq" flakeText
+    containsRegex "mkCloudSetupApp" flakeText && containsRegex "pkgs\\.jq" flakeText
   ) "cloud-setup app runtime must include jq for user-config lookup";
 
   # Test 19: cloud-setup scripts pass the configured iCloud service to create
@@ -113,31 +115,36 @@ let
   ) "cloud-setup scripts must preselect the configured iCloud service during remote creation";
 
   # Test 20: home.nix declares nucleus.rclone options for configPassEnabled and configPassSecretPath
-  test_rclone_options_in_home_nix = assert' (
-    containsRegex "nucleus\.rclone" homeNixText
-    && containsRegex "configPassEnabled" homeNixText
-    && containsRegex "configPassSecretPath" homeNixText
-  ) "home.nix must declare nucleus.rclone.configPassEnabled and nucleus.rclone.configPassSecretPath options";
+  test_rclone_options_in_home_nix =
+    assert'
+      (
+        containsRegex "nucleus\.rclone" homeNixText
+        && containsRegex "configPassEnabled" homeNixText
+        && containsRegex "configPassSecretPath" homeNixText
+      )
+      "home.nix must declare nucleus.rclone.configPassEnabled and nucleus.rclone.configPassSecretPath options";
 
   # Test 21: cloud-drives.nix emits --password-command when configPassEnabled is set
-  test_cloud_drives_password_command = assert' (
-    containsRegex "password-command" moduleText
-    && containsRegex "configPassEnabled" moduleText
-  ) "cloud-drives.nix must add --password-command to mount args when nucleus.rclone.configPassEnabled is true";
+  test_cloud_drives_password_command =
+    assert'
+      (containsRegex "password-command" moduleText && containsRegex "configPassEnabled" moduleText)
+      "cloud-drives.nix must add --password-command to mount args when nucleus.rclone.configPassEnabled is true";
 
   # Test 22: shell.nix exports RCLONE_CONFIG_PASS guarded by configPassEnabled
   test_shell_exports_rclone_pass = assert' (
-    containsRegex "RCLONE_CONFIG_PASS" shellNixText
-    && containsRegex "configPassEnabled" shellNixText
+    containsRegex "RCLONE_CONFIG_PASS" shellNixText && containsRegex "configPassEnabled" shellNixText
   ) "shell.nix must export RCLONE_CONFIG_PASS conditional on nucleus.rclone.configPassEnabled";
 
   # Test 23: Both cloud-setup scripts export RCLONE_CONFIG_PASS before remote creation
-  test_cloud_setup_exports_rclone_pass = assert' (
-    containsRegex "RCLONE_CONFIG_PASS" shellScriptText
-    && containsRegex "rclone-config-pass" shellScriptText
-    && containsRegex "RCLONE_CONFIG_PASS" pwshScriptText
-    && containsRegex "rclone-config-pass" pwshScriptText
-  ) "cloud-setup scripts must export RCLONE_CONFIG_PASS from the materialized secret before rclone config create";
+  test_cloud_setup_exports_rclone_pass =
+    assert'
+      (
+        containsRegex "RCLONE_CONFIG_PASS" shellScriptText
+        && containsRegex "rclone-config-pass" shellScriptText
+        && containsRegex "RCLONE_CONFIG_PASS" pwshScriptText
+        && containsRegex "rclone-config-pass" pwshScriptText
+      )
+      "cloud-setup scripts must export RCLONE_CONFIG_PASS from the materialized secret before rclone config create";
 
   # Test 24: Both cloud-setup scripts validate credentials with root-only listings
   test_cloud_setup_uses_root_only_listing = assert' (
@@ -163,12 +170,6 @@ let
     && containsRegex "stale" pwshScriptText
     && containsRegex "rclone config delete" pwshScriptText
   ) "cloud-setup scripts must recreate remotes with stale or invalid credentials";
-
-  # Test 27: iclouddrive password field is pre-supplied to skip interactive prompt
-  test_cloud_setup_iclouddrive_presupplies_password = assert' (
-    containsRegex "rclone obscure" shellScriptText
-    && containsRegex "rclone obscure" pwshScriptText
-  ) "cloud-setup scripts must pre-supply iclouddrive password via rclone obscure to skip the --all interactive prompt";
 
   allTests = [
     test_options_exist
@@ -197,7 +198,6 @@ let
     test_cloud_setup_uses_root_only_listing
     test_finder_sidebar_rewrite_is_direct
     test_cloud_setup_recreates_stale_remotes
-    test_cloud_setup_iclouddrive_presupplies_password
   ];
 in
 {
