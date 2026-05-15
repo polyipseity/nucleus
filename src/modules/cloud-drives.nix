@@ -331,7 +331,15 @@ in
 
           ${lib.concatStringsSep "\n" (
             map (m: ''
-              if [ ! -L "$HOME/${m.localPath}" ]; then
+              # Enforce real-directory mountpoints. Symlinked paths (for example
+              # old /Volumes indirections) can leave mounts looking empty because
+              # modern FSKit/direct-path mounts expect a writable directory target.
+              if [ -L "$HOME/${m.localPath}" ]; then
+                _legacy_target="$(readlink "$HOME/${m.localPath}")"
+                rm "$HOME/${m.localPath}"
+                mkdir -p "$HOME/${m.localPath}"
+                printf '%s\n' "cloud-drives: replaced legacy symlink $HOME/${m.localPath} -> $_legacy_target with a managed directory."
+              else
                 mkdir -p "$HOME/${m.localPath}"
               fi
             '') enabledMounts
@@ -339,7 +347,14 @@ in
 
           ${lib.concatStringsSep "\n" (
             map (r: ''
-              if [ ! -L "$HOME/${r.localPath}" ]; then
+              # Same invariant for replica roots: they must be real directories
+              # so rclone sync/bisync writes into managed paths directly.
+              if [ -L "$HOME/${r.localPath}" ]; then
+                _legacy_target="$(readlink "$HOME/${r.localPath}")"
+                rm "$HOME/${r.localPath}"
+                mkdir -p "$HOME/${r.localPath}"
+                printf '%s\n' "cloud-drives: replaced legacy symlink $HOME/${r.localPath} -> $_legacy_target with a managed directory."
+              else
                 mkdir -p "$HOME/${r.localPath}"
               fi
             '') enabledReplicas
