@@ -1,6 +1,7 @@
 # macbook manual steps
 
 - Grant Accessibility + Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
+- Open `fuse-t.app` once, then enable the `fuse-t` File System Extension in `System Settings > General > Login Items & Extensions > Extensions`.
 - Open `battery.app` once so `/usr/local/bin/battery` is installed.
 - Sign in to the App Store once so `mas` installs can provision Xcode.
 - Create the per-user rclone passphrase: from the repo root, run `sops edit src/secrets/<username>.yml`, add `rclone_config_pass: <output of openssl rand -hex 64>`, save (sops encrypts automatically), commit the file, then re-run `nucleus apply`. If you already configured rclone remotes without this passphrase, delete `~/.config/rclone/rclone.conf` first so the remotes are re-created with encryption.
