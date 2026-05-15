@@ -45,7 +45,19 @@ function Sync-CloudDrive {
     $enabledMounts = $mounts | Where-Object { $_.enable -eq $true }
     foreach ($mount in $enabledMounts) {
         $localPath = Join-Path $HomeDirectory $mount.localPath
-        if (-not (Test-Path $localPath)) {
+        if (Test-Path -LiteralPath $localPath) {
+            $existingMountPath = Get-Item -LiteralPath $localPath -Force
+            $mountPathIsReparsePoint = ($existingMountPath.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+
+            # Enforce real directory mountpoints on Windows for parity with
+            # POSIX hosts and to avoid stale symlink/junction targets.
+            if ($mountPathIsReparsePoint -or -not $existingMountPath.PSIsContainer) {
+                Remove-Item -LiteralPath $localPath -Recurse -Force
+                New-Item -ItemType Directory -Path $localPath -Force | Out-Null
+                Write-Verbose "cloud-drives: replaced legacy mount reparse/non-directory path with managed directory $localPath"
+            }
+        }
+        else {
             New-Item -ItemType Directory -Path $localPath -Force | Out-Null
             Write-Verbose "cloud-drives: created mount directory $localPath"
         }
@@ -192,7 +204,19 @@ function Sync-CloudDrive {
     $enabledReplicas = $replicas | Where-Object { $_.enable -eq $true }
     foreach ($replica in $enabledReplicas) {
         $localPath = Join-Path $HomeDirectory $replica.localPath
-        if (-not (Test-Path $localPath)) {
+        if (Test-Path -LiteralPath $localPath) {
+            $existingReplicaPath = Get-Item -LiteralPath $localPath -Force
+            $replicaPathIsReparsePoint = ($existingReplicaPath.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+
+            # Keep Windows replica targets as managed directories. The macOS-only
+            # iCloudReplica symlink exception does not apply on Windows.
+            if ($replicaPathIsReparsePoint -or -not $existingReplicaPath.PSIsContainer) {
+                Remove-Item -LiteralPath $localPath -Recurse -Force
+                New-Item -ItemType Directory -Path $localPath -Force | Out-Null
+                Write-Verbose "cloud-drives: replaced legacy replica reparse/non-directory path with managed directory $localPath"
+            }
+        }
+        else {
             New-Item -ItemType Directory -Path $localPath -Force | Out-Null
             Write-Verbose "cloud-drives: created replica directory $localPath"
         }

@@ -6,6 +6,8 @@
 - Sign in to the App Store once so `mas` installs can provision Xcode.
 - Create the per-user rclone passphrase: from the repo root, run `sops edit src/secrets/<username>.yml`, add `rclone_config_pass: <output of openssl rand -hex 64>`, save (sops encrypts automatically), commit the file, then re-run `nucleus apply`. If you already configured rclone remotes without this passphrase, delete `~/.config/rclone/rclone.conf` first so the remotes are re-created with encryption.
 - Run `nucleus-cloud-setup` and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
+- After apply, open Finder and re-add Favorites manually (drag each folder into the Favorites section): `~/dev`, `~/clouds`, `~/clouds/GoogleDrive`, `~/clouds/iCloud`, and `~/clouds/OneDrive`.
+- Verify each Finder favorite opens correctly; if any item shows `?` or fails to open, remove it in Finder and add it again from the path above.
 
 ## command shortcuts
 

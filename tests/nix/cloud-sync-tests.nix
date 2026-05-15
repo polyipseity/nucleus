@@ -20,6 +20,7 @@ let
   replicaBisyncPwshText = builtins.readFile ../../scripts/replica-bisync.ps1;
   applyScriptText = builtins.readFile ../../src/scripts/apply.sh;
   windowsApplyText = builtins.readFile ../../src/hosts/windows/apply.ps1;
+  windowsCloudDriveModuleText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-CloudDrive.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-ShellProfile.ps1;
   windowsReplicaModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Invoke-ReplicaBisync.ps1;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
@@ -161,15 +162,14 @@ let
     && containsRegex "rclone lsd" pwshScriptText
   ) "cloud-setup scripts must use root-only directory listings for credential validation";
 
-  # Test 25: Finder sidebar is rewritten via NSKeyedArchiver/JXA instead of unsupported sfltool add/remove commands
-  test_finder_sidebar_rewrite_is_direct = assert' (
-    containsRegex "osascript -l JavaScript" macosText
-    && containsRegex "NSKeyedUnarchiver" macosText
-    && containsRegex "NSKeyedArchiver" macosText
+  # Test 25: Finder sidebar uses repair migration + manual-add strategy (no JXA archive rewrites)
+  test_finder_sidebar_repair_strategy = assert' (
+    containsRegex "finder-sidebar-repair-v1\\.done" macosText
     && containsRegex "FavoriteItems\\.sfl4" macosText
-    && !containsRegex "sfltool add-item" macosText
-    && !containsRegex "sfltool remove-item" macosText
-  ) "Finder sidebar favorites must be rewritten directly through the shared-file-list archive";
+    && containsRegex "add favorites manually" macosText
+    && !containsRegex "osascript -l JavaScript" macosText
+    && !containsRegex "NSKeyedUnarchiver" macosText
+  ) "Finder sidebar must use the one-time repair migration and manual-add strategy";
 
   # Test 26: macOS activation no longer pre-creates /Volumes cloud mountpoints
   test_cloud_mounts_prepare_volumes = assert' (
@@ -237,15 +237,14 @@ let
     && containsRegex "scripts/replica-bisync\\.sh" applyScriptText
   ) "apply flow must include post-apply replica bisync hook for automatic OneDrive bisync";
 
-  # Test 36: macOS Finder sidebar path setup creates required directories
-  # (Finder sidebar auto-customization disabled due to macOS archive format incompatibility;
-  #  users add items manually via Finder UI; directories pre-created for convenience)
+  # Test 36: macOS Finder sidebar setup creates required directories and persists migration marker
   test_finder_sidebar_paths_created = assert' (
     containsRegex "mkdir -p" macosText
     && containsRegex "clouds" macosText
     && containsRegex "GoogleDrive" macosText
     && containsRegex "iCloud" macosText
     && containsRegex "OneDrive" macosText
+    && containsRegex "finder-sidebar-repair-v1\\.done" macosText
   ) "macOS setup must create Finder sidebar path directories";
 
   # Test 37: macOS replica runner must skip the iCloud replica entry to avoid native-path permission churn
@@ -267,7 +266,6 @@ let
   # Test 39: Windows apply flow has post-apply replica bisync hook with skip flag
   test_windows_apply_replica_hook = assert' (
     containsRegex "SkipReplicaBisync" windowsApplyText
-    && containsRegex "SkipResyncRecovery" windowsApplyText
     && containsRegex "Invoke-ReplicaBisync" windowsApplyText
     && containsRegex "post-apply replica sync" windowsApplyText
   ) "Windows apply flow must include replica bisync post-step with skip flag";
@@ -286,13 +284,13 @@ let
     && containsRegex "Personal Vault" windowsReplicaModuleText
   ) "Replica bisync runners must exclude OneDrive Personal Vault to avoid invalidResourceId failures";
 
-  # Test 42: apply-time replica sync must skip automatic bisync state recovery
-  test_apply_skips_resync_recovery = assert' (
-    containsRegex "skip_resync_recovery=true" replicaBisyncShellText
-    && containsRegex "state recovery during apply" replicaBisyncShellText
-    && containsRegex "SkipResyncRecovery" windowsReplicaModuleText
-    && containsRegex "state recovery during apply" windowsReplicaModuleText
-  ) "Apply-time replica sync must skip automatic bisync state recovery until a manual seed run succeeds";
+  # Test 42: iCloudReplica exception is macOS-only; Windows keeps managed real directories
+  test_icloud_replica_platform_invariant = assert' (
+    containsRegex "Library/Mobile Documents" moduleText
+    && containsRegex "clouds/iCloudReplica" moduleText
+    && containsRegex "ReparsePoint" windowsCloudDriveModuleText
+    && containsRegex "macOS-only" windowsCloudDriveModuleText
+  ) "Only macOS may map iCloudReplica to native Mobile Documents; Windows must enforce managed directories";
 
   allTests = [
     test_options_exist
@@ -319,7 +317,7 @@ let
     test_shell_exports_rclone_pass
     test_cloud_setup_exports_rclone_pass
     test_cloud_setup_uses_root_only_listing
-    test_finder_sidebar_rewrite_is_direct
+    test_finder_sidebar_repair_strategy
     test_cloud_mounts_prepare_volumes
     test_cloud_mounts_use_fskit_backend
     test_cloud_setup_recreates_stale_remotes
@@ -330,13 +328,13 @@ let
     test_shell_has_replica_command
     test_flake_has_replica_app
     test_apply_runs_replica_bisync
-    test_finder_sidebar_custom_names
+    test_finder_sidebar_paths_created
     test_macos_skips_icloud_replica
     test_windows_replica_bisync_entrypoints
     test_windows_apply_replica_hook
     test_windows_shell_replica_command
     test_onedrive_personal_vault_excluded
-    test_apply_skips_resync_recovery
+    test_icloud_replica_platform_invariant
   ];
 in
 {
