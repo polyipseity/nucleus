@@ -214,7 +214,7 @@ let
       mountPoint = mkMountPoint mount;
       rcloneRemote = "${mount.remoteName}:${mount.remotePath}";
       rcloneConfigPassExport = lib.optionalString config.nucleus.rclone.configPassEnabled ''
-      export RCLONE_CONFIG_PASS="$(cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath})"
+        export RCLONE_CONFIG_PASS="$(cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath})"
       '';
       # Always pass the configured iCloud service explicitly so mount behavior
       # follows the per-entry setting even if the shared remote was created
@@ -241,7 +241,8 @@ let
         "--password-command"
         "cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath}"
       ];
-      extraArgsList = iCloudServiceArgs ++ fsKitBackendArgs ++ volumeNameArgs ++ rclonePasswordArgs ++ mount.extraArgs;
+      extraArgsList =
+        iCloudServiceArgs ++ fsKitBackendArgs ++ volumeNameArgs ++ rclonePasswordArgs ++ mount.extraArgs;
     in
     pkgs.writeShellScript "cloud-mount-${mount.id}" ''
       set -eu
