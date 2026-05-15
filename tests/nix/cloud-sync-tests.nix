@@ -20,6 +20,7 @@ let
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   macbookActivationText = builtins.readFile ../../src/hosts/macbook/activation.nix;
+  macbookHomebrewText = builtins.readFile ../../src/hosts/macbook/homebrew.nix;
 
   assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
 
@@ -164,17 +165,17 @@ let
     && !containsRegex "sfltool remove-item" macosText
   ) "Finder sidebar favorites must be rewritten directly through the shared-file-list archive";
 
-  # Test 26: macOS cloud mounts use FSKit under /Volumes and symlink the legacy home paths
+  # Test 26: macOS activation no longer pre-creates /Volumes cloud mountpoints
   test_cloud_mounts_prepare_volumes = assert' (
-    containsRegex "mkdir -p /Volumes/nucleus-cloud-" macbookActivationText
-  ) "macOS activation must create /Volumes mountpoints for FSKit cloud drives before Home Manager symlinks them";
+    !containsRegex "/Volumes/nucleus-cloud-" macbookActivationText
+  ) "macOS activation should not manage /Volumes cloud mountpoints for direct-path FSKit mounts";
 
-  # Test 27: macOS cloud mounts use FSKit under /Volumes and symlink the legacy home paths
+  # Test 27: macOS cloud mounts still force FSKit backend but no /Volumes symlink flow
   test_cloud_mounts_use_fskit_backend = assert' (
     containsRegex "backend=fskit" moduleText
-    && containsRegex "ensure_cloud_mount_link" moduleText
-    && containsRegex "/Volumes/nucleus-cloud-" moduleText
-  ) "macOS cloud mounts must use the macFUSE FSKit backend and symlink the home path back to /Volumes";
+    && !containsRegex "ensure_cloud_mount_link" moduleText
+    && !containsRegex "/Volumes/nucleus-cloud-" moduleText
+  ) "macOS cloud mounts must pass the FSKit mount-time option without the /Volumes symlink flow";
 
   # Test 28: Both cloud-setup scripts recreate remotes whose credentials are stale
   test_cloud_setup_recreates_stale_remotes = assert' (
@@ -189,6 +190,12 @@ let
     containsRegex "export RCLONE_CONFIG_PASS" moduleText
     && containsRegex "rclone listremotes" moduleText
   ) "macOS cloud mount LaunchAgents must export RCLONE_CONFIG_PASS before validating remotes";
+
+  # Test 30: macOS host package selection uses fuse-t and no longer pins macfuse
+  test_macos_uses_fuse_t = assert' (
+    containsRegex ''"fuse-t"'' macbookHomebrewText
+    && !containsRegex ''"macfuse"'' macbookHomebrewText
+  ) "macOS Homebrew packages must use fuse-t instead of macfuse for cloud mounts";
 
   allTests = [
     test_options_exist
@@ -220,6 +227,7 @@ let
     test_cloud_mounts_use_fskit_backend
     test_cloud_setup_recreates_stale_remotes
     test_cloud_mounts_export_config_pass
+    test_macos_uses_fuse_t
   ];
 in
 {

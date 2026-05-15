@@ -3,7 +3,7 @@
 # Manages two categories of cloud storage access per POSIX user:
 #
 #   Mounts — persistent rclone mount processes providing on-demand access via
-#             FUSE (requires macFUSE on macOS, fuse3 on NixOS). Files are read
+#             FUSE (requires FUSE-T on macOS, fuse3 on NixOS). Files are read
 #             from the remote on access; no full local copy is kept.
 #
 #   Replicas — full local copies of remote data, kept in sync by rclone
@@ -15,9 +15,7 @@
 # needs a unique "id" string).
 #
 # macOS prerequisites:
-#   - macFUSE (Homebrew cask macfuse) for rclone FUSE mounts. macOS mounts
-#     use the FSKit backend and therefore live under /Volumes, with the legacy
-#     home-directory paths symlinked back to those mountpoints for convenience.
+#   - FUSE-T (Homebrew formula fuse-t) with FSKit support enabled.
 #   - rclone remote configured via `rclone config` before the LaunchAgent fires
 #
 # NixOS prerequisites:
@@ -203,14 +201,7 @@ let
 
   # Build a rclone mount wrapper script for macOS LaunchAgents.
   # Uses the full Nix store path to rclone so the agent is not PATH-dependent.
-  mkMountPoint =
-    mount:
-    if pkgs.stdenv.isDarwin then
-      "/Volumes/nucleus-cloud-${mount.id}"
-    else
-      "${currentUserHome}/${mount.localPath}";
-
-  mkMountLink = mount: "${currentUserHome}/${mount.localPath}";
+  mkMountPoint = mount: "${currentUserHome}/${mount.localPath}";
 
   mkRcloneMountScript =
     mount:
@@ -263,7 +254,6 @@ let
           ;;
       esac
 
-      # macFUSE/FSKit creates the volume mountpoint itself under /Volumes.
       exec ${pkgs.rclone}/bin/rclone mount \
         ${lib.escapeShellArg rcloneRemote} \
         ${lib.escapeShellArg mountPoint} \
@@ -325,44 +315,14 @@ in
         home.activation.cloudDrivesSetup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           set -eu
 
-          # Create the top-level clouds/ directory tree. macOS mounts live under
-          # /Volumes for FSKit compatibility, so we symlink the legacy home
-          # paths back to those mountpoints.
+          # Create the top-level clouds/ directory tree.
           mkdir -p "$HOME/clouds"
-
-          ensure_cloud_mount_link() {
-            _target="$1"
-            _link="$2"
-
-            mkdir -p "$(/usr/bin/dirname "$_link")"
-
-            if [ -L "$_link" ]; then
-              _current_target="$(/usr/bin/readlink "$_link")"
-              if [ "$_current_target" = "$_target" ]; then
-                return 0
-              fi
-              /bin/rm "$_link"
-            elif [ -e "$_link" ]; then
-              # WHY: the legacy home path is only a mountpoint, so replacing an
-              # old directory with a symlink is safe once the old mount is gone.
-              if /sbin/mount | /usr/bin/grep -F " on $_link (" >/dev/null 2>&1; then
-                echo "macos: cloud mount path '$_link' is still mounted; unmount it before rerunning activation." >&2
-                return 0
-              fi
-              /bin/rm -rf "$_link"
-            fi
-
-            /bin/ln -s "$_target" "$_link"
-          }
 
           ${lib.concatStringsSep "\n" (
             map (m: ''
-              ${lib.optionalString pkgs.stdenv.isDarwin ''
-                ensure_cloud_mount_link ${lib.escapeShellArg (mkMountPoint m)} ${lib.escapeShellArg (mkMountLink m)}
-              ''}
-              ${lib.optionalString (!pkgs.stdenv.isDarwin) ''
-                mkdir -p ${lib.escapeShellArg (mkMountLink m)}
-              ''}
+              if [ ! -L "$HOME/${m.localPath}" ]; then
+                mkdir -p "$HOME/${m.localPath}"
+              fi
             '') enabledMounts
           )}
 
