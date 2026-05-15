@@ -23,6 +23,7 @@
     "cloudDrives": {
       "mounts": [
         {
+          "displayName": "Google Drive",
           "enable": true,
           "extraArgs": [],
           "id": "GoogleDrive",

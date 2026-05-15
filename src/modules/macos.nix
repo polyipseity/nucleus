@@ -915,24 +915,28 @@ lib.mkIf pkgs.stdenv.isDarwin {
         throw new Error('macos: failed to decode Finder sidebar archive: ' + ObjC.unwrap(decodeError[0]));
       }
 
-      var favoritePaths = [
-        '/',
-        home,
-        home + '/dev',
-        home + '/clouds',
-        '/Applications',
-        home + '/Desktop',
-        home + '/Documents',
-        home + '/Downloads',
-        home + '/Music',
-        home + '/Movies',
-        home + '/Pictures',
-        home + '/.Trash'
+      var favoriteEntries = [
+        { path: '/', name: 'Computer' },
+        { path: home, name: home.split('/').pop() },
+        { path: home + '/dev', name: 'dev' },
+        { path: home + '/clouds', name: 'Clouds' },
+        { path: home + '/clouds/GoogleDrive', name: 'Google Drive' },
+        { path: home + '/clouds/iCloud', name: 'iCloud' },
+        { path: home + '/clouds/OneDrive', name: 'OneDrive' },
+        { path: '/Applications', name: 'Applications' },
+        { path: home + '/Desktop', name: 'Desktop' },
+        { path: home + '/Documents', name: 'Documents' },
+        { path: home + '/Downloads', name: 'Downloads' },
+        { path: home + '/Music', name: 'Music' },
+        { path: home + '/Movies', name: 'Movies' },
+        { path: home + '/Pictures', name: 'Pictures' },
+        { path: home + '/.Trash', name: 'Trash' }
       ];
 
       var items = $.NSMutableArray.alloc.init;
-      for (var i = 0; i < favoritePaths.length; i += 1) {
-        var favoritePath = favoritePaths[i];
+      for (var i = 0; i < favoriteEntries.length; i += 1) {
+        var favoritePath = favoriteEntries[i].path;
+        var favoriteName = favoriteEntries[i].name;
         var bookmarkError = Ref();
         var bookmarkURL = $.NSURL.fileURLWithPath(favoritePath);
         var bookmark = bookmarkURL
@@ -950,8 +954,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
         var item = $.NSMutableDictionary.alloc.init;
         var setObject = item['setObject:forKey:'];
+        var customItemProperties = $.NSMutableDictionary.alloc.init;
         setObject.call(item, 0, 'visibility');
-        setObject.call(item, $.NSMutableDictionary.alloc.init, 'CustomItemProperties');
+        customItemProperties['setObject:forKey:'].call(customItemProperties, favoriteName, 'Name');
+        setObject.call(item, customItemProperties, 'CustomItemProperties');
         setObject.call(item, bookmark, 'Bookmark');
         setObject.call(item, ObjC.unwrap($.NSUUID.UUID.UUIDString), 'uuid');
         items['addObject:'].call(items, item);

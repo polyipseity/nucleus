@@ -84,6 +84,11 @@ let
         default = [ ];
         description = "Extra command-line arguments to pass to rclone mount (non-iCloud providers only).";
       };
+      displayName = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Optional human-readable display label for UI surfaces (for example Finder volume names on macOS).";
+      };
       id = lib.mkOption {
         type = lib.types.str;
         description = "Unique identifier for this mount entry. Used as part of the launchd / systemd service label.";
@@ -222,6 +227,11 @@ let
         "--option"
         "backend=fskit"
       ];
+      mountVolumeLabel = if mount.displayName != null then mount.displayName else mount.id;
+      volumeNameArgs = lib.optionals pkgs.stdenv.isDarwin [
+        "--volname"
+        mountVolumeLabel
+      ];
       readOnlyFlag = lib.optional (!mount.readWrite) "--read-only";
       # Pass the managed config passphrase command when the feature is enabled
       # so the LaunchAgent can decrypt an encrypted rclone.conf on every start.
@@ -231,7 +241,7 @@ let
         "--password-command"
         "cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath}"
       ];
-      extraArgsList = iCloudServiceArgs ++ fsKitBackendArgs ++ rclonePasswordArgs ++ mount.extraArgs;
+      extraArgsList = iCloudServiceArgs ++ fsKitBackendArgs ++ volumeNameArgs ++ rclonePasswordArgs ++ mount.extraArgs;
     in
     pkgs.writeShellScript "cloud-mount-${mount.id}" ''
       set -eu
