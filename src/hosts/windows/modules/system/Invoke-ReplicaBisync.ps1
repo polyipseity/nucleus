@@ -229,7 +229,18 @@ function Invoke-ReplicaBisync {
 
     @($macOSMetadataRemoteFilterGlobs | ForEach-Object { "- $_" }) | Set-Content -Path $filterFile -Encoding utf8
 
-    $remoteDirsArgs = @('lsf', $RemoteRef, '--max-depth', '1', '--dirs-only', '--disable', 'ListR', '--log-level', 'ERROR')
+    $remoteDirsArgs = @(
+      'lsf', $RemoteRef,
+      '--max-depth', '1',
+      '--dirs-only',
+      '--disable', 'ListR',
+      '--log-level', 'ERROR',
+      '--retries', '1',
+      '--low-level-retries', '1',
+      '--timeout', '30s',
+      '--contimeout', '10s',
+      '--max-duration', '1m'
+    )
     $remoteDirs = if ($IsDryRun) { @() } else { & $rcloneCmd.Source @remoteDirsArgs 2>$null }
     if ($LASTEXITCODE -eq 0 -and $null -ne $remoteDirs) {
       foreach ($remoteDir in @($remoteDirs)) {
@@ -252,7 +263,18 @@ function Invoke-ReplicaBisync {
       }
     }
 
-    $remoteFilesArgs = @('lsf', $RemoteRef, '--max-depth', '1', '--files-only', '--disable', 'ListR', '--log-level', 'ERROR')
+    $remoteFilesArgs = @(
+      'lsf', $RemoteRef,
+      '--max-depth', '1',
+      '--files-only',
+      '--disable', 'ListR',
+      '--log-level', 'ERROR',
+      '--retries', '1',
+      '--low-level-retries', '1',
+      '--timeout', '30s',
+      '--contimeout', '10s',
+      '--max-duration', '1m'
+    )
     $remoteFiles = if ($IsDryRun) { @() } else { & $rcloneCmd.Source @remoteFilesArgs 2>$null }
     if ($LASTEXITCODE -eq 0 -and $null -ne $remoteFiles) {
       foreach ($remoteFile in @($remoteFiles)) {

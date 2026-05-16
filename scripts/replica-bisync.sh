@@ -199,7 +199,14 @@ build_onedrive_root_filter_file() {
     printf -- '- %s\n' "$_pattern" >> "$_filter_file"
   done
 
-  _remote_dirs="$(rclone lsf "$_remote_ref" --max-depth 1 --dirs-only --disable ListR --log-level ERROR 2>/dev/null || true)"
+  if [ "$dry_run" = true ]; then
+    _remote_dirs=""
+  else
+    _remote_dirs="$(rclone lsf "$_remote_ref" \
+      --max-depth 1 --dirs-only --disable ListR --log-level ERROR \
+      --retries 1 --low-level-retries 1 --timeout 30s --contimeout 10s \
+      --max-duration 1m 2>/dev/null || true)"
+  fi
   if [ -n "$_remote_dirs" ]; then
     printf '%s\n' "$_remote_dirs" | while IFS= read -r _remote_dir; do
       _remote_dir="${_remote_dir%/}"
@@ -220,7 +227,14 @@ build_onedrive_root_filter_file() {
     done
   fi
 
-  _remote_files="$(rclone lsf "$_remote_ref" --max-depth 1 --files-only --disable ListR --log-level ERROR 2>/dev/null || true)"
+  if [ "$dry_run" = true ]; then
+    _remote_files=""
+  else
+    _remote_files="$(rclone lsf "$_remote_ref" \
+      --max-depth 1 --files-only --disable ListR --log-level ERROR \
+      --retries 1 --low-level-retries 1 --timeout 30s --contimeout 10s \
+      --max-duration 1m 2>/dev/null || true)"
+  fi
   if [ -n "$_remote_files" ]; then
     printf '%s\n' "$_remote_files" | while IFS= read -r _remote_file; do
       if should_skip_onedrive_root_entry "$_remote_file"; then

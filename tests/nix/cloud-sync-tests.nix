@@ -306,9 +306,15 @@ let
     containsRegex ''build_onedrive_root_filter_file'' replicaBisyncShellText
     && containsRegex ''skipping inaccessible OneDrive root entry'' replicaBisyncShellText
     && containsRegex "--disable ListR" replicaBisyncShellText
+    && containsRegex "--dirs-only --disable ListR --log-level ERROR" replicaBisyncShellText
+    && containsRegex "--timeout 30s --contimeout 10s" replicaBisyncShellText
+    && containsRegex "--max-duration 1m" replicaBisyncShellText
     && containsRegex ''Get-OneDriveRootFilterFile'' windowsReplicaModuleText
     && containsRegex ''skipping inaccessible OneDrive root entry'' windowsReplicaModuleText
     && containsRegex ''"--disable", "ListR"'' windowsReplicaModuleText
+    && containsRegex ''"--timeout", "30s"'' windowsReplicaModuleText
+    && containsRegex ''"--contimeout", "10s"'' windowsReplicaModuleText
+    && containsRegex ''"--max-duration", "1m"'' windowsReplicaModuleText
   ) "Replica bisync runners must exclude OneDrive Personal Vault to avoid invalidResourceId failures";
 
   # Test 42: iCloudReplica exception is macOS-only; Windows keeps managed real directories
