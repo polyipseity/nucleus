@@ -338,10 +338,13 @@ let
         && containsRegex "--contimeout 15s" replicaBisyncShellText
         && containsRegex "--max-duration 2h" replicaBisyncShellText
         && containsRegex "--retries 1" replicaBisyncShellText
-        && containsRegex "seeded bisync failed; retrying once with --resync" replicaBisyncShellText
+        && containsRegex "seeded bisync check failed; cleared seed marker and retrying with recovery --resync" replicaBisyncShellText
+        && containsRegex "recovery --resync is running; do not start another run" replicaBisyncShellText
         && containsRegex "prior lock file found:" replicaBisyncShellText
         && containsRegex "another bisync run is already active" replicaBisyncShellText
         && containsRegex "clearing stale bisync lock" replicaBisyncShellText
+        && containsRegex ''\$2 == "rclone" && \$3 == "bisync"'' replicaBisyncShellText
+        && containsRegex ''\$1 != self'' replicaBisyncShellText
         && containsRegex "rclone deletefile" replicaBisyncShellText
         && containsRegex "cleanup_remote_macos_artifacts" replicaBisyncShellText
         && containsRegex "--filter \\\"\\+ \\.DS_Store\\\"" replicaBisyncShellText
@@ -354,7 +357,8 @@ let
         && containsRegex "--contimeout" windowsReplicaModuleText
         && containsRegex "--max-duration" windowsReplicaModuleText
         && containsRegex "--retries" windowsReplicaModuleText
-        && containsRegex "seeded bisync failed; retrying once with --resync" windowsReplicaModuleText
+        && containsRegex "seeded bisync check failed; cleared seed marker and retrying with recovery --resync" windowsReplicaModuleText
+        && containsRegex "recovery --resync is running; do not start another run" windowsReplicaModuleText
         && containsRegex "prior lock file found:" windowsReplicaModuleText
         && containsRegex "another bisync run is already active" windowsReplicaModuleText
         && containsRegex "clearing stale bisync lock" windowsReplicaModuleText

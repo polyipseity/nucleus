@@ -507,7 +507,14 @@ function Invoke-ReplicaBisync {
       if (Invoke-BisyncWithLockRecovery -BisyncArgs $seededArgs) {
         return $true
       }
-      Write-Warning "replica-bisync: [$ReplicaId] seeded bisync failed; retrying once with --resync"
+      # Seed marker implies prior baseline state files should exist. Clear it
+      # before recovery so subsequent invocations do not keep retrying the stale
+      # seeded path after an interrupted/cache-pruned run.
+      if (-not $IsDryRun -and (Test-Path -Path $StateMarker -PathType Leaf)) {
+        Remove-Item -Path $StateMarker -Force
+      }
+      Write-Warning "replica-bisync: [$ReplicaId] seeded bisync check failed; cleared seed marker and retrying with recovery --resync"
+      Write-Warning "replica-bisync: [$ReplicaId] recovery --resync is running; do not start another run until this command completes"
     }
 
     # Seed run: --resync WITHOUT --check-access because RCLONE_TEST access

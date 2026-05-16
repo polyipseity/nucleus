@@ -380,7 +380,14 @@ run_bidirectional_sync() {
       return $?
     fi
 
-    _preflight_running_pid="$(ps -axo pid=,command= | awk -v needle="rclone bisync $_local_dir $_remote_ref" 'index($0, needle) > 0 { print $1; exit }' || true)"
+    _preflight_running_pid="$(ps -axo pid=,args= | awk -v local="$_local_dir" -v remote="$_remote_ref" -v self="$$" '
+      $1 != self && $2 == "rclone" && $3 == "bisync" {
+        if (index($0, local) > 0 && index($0, remote) > 0) {
+          print $1
+          exit
+        }
+      }
+    ' || true)"
     if [ -n "$_preflight_running_pid" ]; then
       printf '%s\n' "replica-bisync: [$_id] another bisync run is already active (PID $_preflight_running_pid); skipping this run without marking failure" >&2
       return 0
@@ -400,7 +407,14 @@ run_bidirectional_sync() {
       return 1
     fi
 
-    _running_pid="$(ps -axo pid=,command= | awk -v needle="rclone bisync $_local_dir $_remote_ref" 'index($0, needle) > 0 { print $1; exit }' || true)"
+    _running_pid="$(ps -axo pid=,args= | awk -v local="$_local_dir" -v remote="$_remote_ref" -v self="$$" '
+      $1 != self && $2 == "rclone" && $3 == "bisync" {
+        if (index($0, local) > 0 && index($0, remote) > 0) {
+          print $1
+          exit
+        }
+      }
+    ' || true)"
     if [ -n "$_running_pid" ]; then
       printf '%s\n' "replica-bisync: [$_id] another bisync run is already active (PID $_running_pid); skipping this run without marking failure" >&2
       rm -f "$_bisync_output_file"
@@ -441,7 +455,14 @@ run_bidirectional_sync() {
       return 0
     fi
 
-    printf '%s\n' "replica-bisync: [$_id] seeded bisync failed; retrying once with --resync" >&2
+    # Seed marker indicates prior baseline files should exist. If a seeded run
+    # fails, clear marker before recovery so subsequent invocations do not keep
+    # re-entering the stale seeded path.
+    if [ "$dry_run" = false ] && [ -f "$_state_marker" ]; then
+      rm -f "$_state_marker"
+    fi
+    printf '%s\n' "replica-bisync: [$_id] seeded bisync check failed; cleared seed marker and retrying with recovery --resync" >&2
+    printf '%s\n' "replica-bisync: [$_id] recovery --resync is running; do not start another run until this command completes" >&2
   fi
 
   # Seed run: --resync WITHOUT --check-access because rclone creates the
