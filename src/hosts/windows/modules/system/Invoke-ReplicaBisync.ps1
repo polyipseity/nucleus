@@ -134,6 +134,28 @@ function Invoke-ReplicaBisync {
     return $true
   }
 
+  function Invoke-ReplicaBisyncCommand {
+    param(
+      [Parameter(Mandatory)]
+      [string]$LocalDir,
+      [Parameter(Mandatory)]
+      [string]$RemoteRef,
+      [Parameter(Mandatory)]
+      [string[]]$BisyncArgs,
+      [switch]$IsDryRun
+    )
+
+    # Prefer strict access checks first. Some remotes fail this pre-check even
+    # when bisync itself can run successfully.
+    $ok = Invoke-ReplicaRcloneCommand -Arguments (@("bisync", $LocalDir, $RemoteRef, "--check-access") + $BisyncArgs) -IsDryRun:$IsDryRun
+    if ($ok) {
+      return $true
+    }
+
+    Write-Warning "replica-bisync: bisync failed with --check-access; retrying once without --check-access"
+    return (Invoke-ReplicaRcloneCommand -Arguments (@("bisync", $LocalDir, $RemoteRef) + $BisyncArgs) -IsDryRun:$IsDryRun)
+  }
+
   $failureCount = 0
   $replicaStateDir = Join-Path -Path $HOME -ChildPath ".config\nucleus\state\replica-bisync"
 
@@ -202,19 +224,25 @@ function Invoke-ReplicaBisync {
       }
       "bidirectional" {
         Write-Output "replica-bisync: [$id] bisync $localDir <-> $remoteRef"
-        $ok = Invoke-ReplicaRcloneCommand -Arguments (@("bisync", $localDir, $remoteRef, "--check-access") + $commonArgs) -IsDryRun:$DryRun
-        if (-not $ok) {
-          # First run commonly needs --resync; retry once with explicit resync.
-          $ok = Invoke-ReplicaRcloneCommand -Arguments (@("bisync", $localDir, $remoteRef, "--check-access", "--resync") + $commonArgs) -IsDryRun:$DryRun
+        # rclone bisync lifecycle: first successful run must include --resync
+        # to establish listing state. Subsequent runs omit --resync and keep
+        # robust recovery flags for scheduled operation.
+        $seeded = Test-Path -Path $stateMarker -PathType Leaf
+        if ($seeded) {
+          $ok = Invoke-ReplicaBisyncCommand -LocalDir $localDir -RemoteRef $remoteRef -BisyncArgs (@("--resilient", "--recover", "--max-lock", "2m", "--conflict-resolve", "newer") + $commonArgs) -IsDryRun:$DryRun
+          if (-not $ok) {
+            Write-Error "replica-bisync: [$id] bisync failed after seed; skipping automatic --resync (run a manual seed repair if needed)" -ErrorAction Continue
+            $failureCount += 1
+          }
+        }
+        else {
+           $ok = Invoke-ReplicaBisyncCommand -LocalDir $localDir -RemoteRef $remoteRef -BisyncArgs (@("--resilient", "--recover", "--max-lock", "2m", "--conflict-resolve", "newer", "--resync") + $commonArgs) -IsDryRun:$DryRun
           if (-not $ok) {
             $failureCount += 1
           } elseif (-not $DryRun) {
             New-Item -ItemType Directory -Path $replicaStateDir -Force | Out-Null
             New-Item -ItemType File -Path $stateMarker -Force | Out-Null
           }
-        } elseif (-not $DryRun) {
-          New-Item -ItemType Directory -Path $replicaStateDir -Force | Out-Null
-          New-Item -ItemType File -Path $stateMarker -Force | Out-Null
         }
       }
       default {
