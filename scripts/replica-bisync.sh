@@ -137,6 +137,56 @@ run_cmd() {
   "$@"
 }
 
+# Keep macOS iCloudReplica mapped to the native CloudDocs path. This makes
+# daily/scheduled replica-bisync runs self-healing even between full apply runs.
+# Args:
+#   $1 — iCloudReplica localPath relative to $HOME
+ensure_macos_icloud_replica_symlink() {
+  _relative_path="$1"
+  _native_target="$HOME/Library/Mobile Documents"
+  _replica_path="$HOME/$_relative_path"
+
+  if [ ! -d "$_native_target" ]; then
+    printf '%s\n' "replica-bisync: [iCloud] native target missing at $_native_target; cannot protect iCloudReplica symlink" >&2
+    return 1
+  fi
+
+  if [ -L "$_replica_path" ]; then
+    _current_target="$(readlink "$_replica_path")"
+    if [ "$_current_target" = "$_native_target" ]; then
+      return 0
+    fi
+    if [ "$dry_run" = true ]; then
+      printf '%s\n' "replica-bisync: [dry-run] would update iCloudReplica symlink $_replica_path -> $_native_target (was $_current_target)"
+      return 0
+    fi
+    rm "$_replica_path"
+    ln -s "$_native_target" "$_replica_path"
+    printf '%s\n' "replica-bisync: [iCloud] updated iCloudReplica symlink $_replica_path -> $_native_target (was $_current_target)"
+    return 0
+  fi
+
+  if [ -e "$_replica_path" ]; then
+    _backup_path="$_replica_path.pre-native-icloud.$(date +%Y%m%d%H%M%S)"
+    if [ "$dry_run" = true ]; then
+      printf '%s\n' "replica-bisync: [dry-run] would move $_replica_path to $_backup_path and create symlink -> $_native_target"
+      return 0
+    fi
+    mv "$_replica_path" "$_backup_path"
+    ln -s "$_native_target" "$_replica_path"
+    printf '%s\n' "replica-bisync: [iCloud] migrated $_replica_path to native iCloud symlink target $_native_target (backup: $_backup_path)"
+    return 0
+  fi
+
+  if [ "$dry_run" = true ]; then
+    printf '%s\n' "replica-bisync: [dry-run] would create iCloudReplica symlink $_replica_path -> $_native_target"
+    return 0
+  fi
+
+  ln -s "$_native_target" "$_replica_path"
+  printf '%s\n' "replica-bisync: [iCloud] linked $_replica_path -> $_native_target"
+}
+
 resolve_filter_path() {
   _candidate="$1"
   case "$_candidate" in
@@ -171,6 +221,9 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
   # Skip the explicit rclone replica pass for this one entry to avoid
   # permission-denied churn while still allowing other replicas to converge.
   if [ "$current_os" = "Darwin" ] && [ "$provider" = "iCloud" ] && [ "$id" = "iCloud" ]; then
+    if ! ensure_macos_icloud_replica_symlink "$local_path"; then
+      failures=$((failures + 1))
+    fi
     printf '%s\n' "replica-bisync: [$id] skipping on macOS (native iCloud handles sync)"
     continue
   fi
