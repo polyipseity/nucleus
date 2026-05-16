@@ -408,9 +408,13 @@ register_host_age_key_if_needed() {
   # them.  Requires the primary GPG key in the keyring for re-encryption.
   # The --yes flag skips the interactive "update recipients" confirmation.
   for _rak_secret in \
+      "$REPO_ROOT/src/secrets/users-"*.yml \
       "$REPO_ROOT/src/secrets/git-identities.yml" \
       "$REPO_ROOT/src/secrets/gpg-personal.yml" \
       "$REPO_ROOT/src/secrets/ssh-personal.yml"; do
+    if [ ! -f "$_rak_secret" ]; then
+      continue
+    fi
     if ! sops updatekeys --yes "$_rak_secret"; then
       printf 'sops: ERROR — sops updatekeys failed for %s.\n' "$_rak_secret" >&2
       printf 'sops: Ensure the primary GPG key is imported first:\n' >&2

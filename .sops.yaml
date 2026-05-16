@@ -14,6 +14,11 @@ creation_rules:
       - age: *age_devices
         pgp:
           - *primary_gpg
+  - path_regex: src[/\\]secrets[/\\]users-[^/\\]+\.yml$
+    key_groups:
+      - age: *age_devices
+        pgp:
+          - *primary_gpg
   - path_regex: src[/\\]secrets[/\\].*\.yml$
     key_groups:
       - age: *age_devices

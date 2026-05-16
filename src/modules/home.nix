@@ -188,7 +188,7 @@ in
     configPassEnabled = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Whether a managed rclone config passphrase secret exists for this user. Set to true by secrets.nix when src/secrets/<username>.yml is present and contains the rclone_config_pass key.";
+      description = "Whether a managed rclone config passphrase secret exists for this user. Set to true by secrets.nix when src/secrets/users-<username>.yml is present and contains the rclone_config_pass key.";
     };
     configPassSecretPath = lib.mkOption {
       type = lib.types.str;

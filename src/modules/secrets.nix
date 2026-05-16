@@ -97,16 +97,16 @@ let
   # signing key follow the same SOPS lifecycle as SSH/GPG material.
   gitIdentitySecretName = "git_identity_${primaryUsername}";
 
-  # Per-user secrets file: src/secrets/<username>.yml.
-  # May not exist until the user manually runs `sops edit src/secrets/<username>.yml`.
+  # Per-user secrets file: src/secrets/users-<username>.yml.
+  # May not exist until the user manually runs `sops edit src/secrets/users-<username>.yml`.
   # All downstream consumers guard on hasUserSecretFile / configPassEnabled so
   # activation succeeds even when the file has not been created yet.
   # WHY key name is unscoped: the file itself is already user-scoped
-  # (src/secrets/<username>.yml), so repeating the username in every key adds
-  # noise without improving isolation.
+  # (src/secrets/users-<username>.yml), so repeating the username in every
+  # key adds noise without improving isolation.
   rcloneConfigPassSecretName = "rclone_config_pass";
   rcloneConfigPassPath = "${config.home.homeDirectory}/.config/nucleus/secrets/rclone-config-pass";
-  userSecretFilePath = ../secrets + "/${primaryUsername}.yml";
+  userSecretFilePath = ../secrets + "/users-${primaryUsername}.yml";
   hasUserSecretFile = builtins.pathExists userSecretFilePath;
 
 in

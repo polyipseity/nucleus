@@ -432,7 +432,7 @@ foreach ($secretFile in $secretPreflightFiles) {
 
 if ($EnableSecretsParity) {
   Sync-Secret -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
-  # Materialize per-user secrets from src/secrets/<username>.yml when present.
+  # Materialize per-user secrets from src/secrets/users-<username>.yml when present.
   # No-op when the file does not exist so bootstrap runs continue uninterrupted.
   Sync-UserSecret `
     -RepoRoot $repoRoot `

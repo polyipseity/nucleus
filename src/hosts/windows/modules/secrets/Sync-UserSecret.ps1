@@ -1,6 +1,6 @@
 # modules/windows/secrets/Sync-UserSecret.ps1 — Per-user SOPS secret materialization.
 #
-# Reads src/secrets/<username>.yml (if present) and writes individual secret
+# Reads src/secrets/users-<username>.yml (if present) and writes individual secret
 # values to the user-scoped secret directory
 # $HOME\.config\nucleus\secrets\.
 #
@@ -20,13 +20,13 @@ function Sync-UserSecret {
     Materializes per-user SOPS secrets to the nucleus secrets directory.
 
   .DESCRIPTION
-    Decrypts src/secrets/<username>.yml (when present) and writes individual
+    Decrypts src/secrets/users-<username>.yml (when present) and writes individual
     secret values to $HOME\.config\nucleus\secrets\.  Called by apply.ps1 after
     Sync-Secret to handle user-scoped secrets that do not belong in the shared
     secret files.
 
   .PARAMETER RepoRoot
-    Absolute path to the repository root (for locating src\secrets\<user>.yml).
+    Absolute path to the repository root (for locating src\secrets\users-<user>.yml).
 
   .PARAMETER GpgExe
     Absolute path to the gpg executable.
@@ -64,7 +64,7 @@ function Sync-UserSecret {
     [string]$PrimaryUsername
   )
 
-  $userSecretFile = Join-Path $RepoRoot "src\secrets\$PrimaryUsername.yml"
+  $userSecretFile = Join-Path $RepoRoot "src\secrets\users-$PrimaryUsername.yml"
   if (-not (Test-Path -Path $userSecretFile -PathType Leaf)) {
     # WHY no warning: the file is optional and absent on first bootstrap; silence
     # keeps apply output clean for machines where the user has not yet created it.
@@ -80,7 +80,7 @@ function Sync-UserSecret {
   }
 
   # Materialize rclone config passphrase.
-  # WHY key name is unscoped: src/secrets/<username>.yml is already per-user.
+  # WHY key name is unscoped: src/secrets/users-<username>.yml is already per-user.
   $rclonePassKey = 'rclone_config_pass'
   $rclonePassValue = $secrets.$rclonePassKey
   if (-not [string]::IsNullOrWhiteSpace($rclonePassValue)) {
