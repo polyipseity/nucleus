@@ -374,6 +374,58 @@ run_bidirectional_sync() {
   _state_marker="$4"
   shift 4
 
+  run_bisync_with_lock_recovery() {
+    if [ "$dry_run" = true ]; then
+      run_cmd rclone bisync "$_local_dir" "$_remote_ref" "$@"
+      return $?
+    fi
+
+    _preflight_running_pid="$(ps -axo pid=,command= | awk -v needle="rclone bisync $_local_dir $_remote_ref" 'index($0, needle) > 0 { print $1; exit }' || true)"
+    if [ -n "$_preflight_running_pid" ]; then
+      printf '%s\n' "replica-bisync: [$_id] another bisync run is already active (PID $_preflight_running_pid); skipping this run without marking failure" >&2
+      return 0
+    fi
+
+    _bisync_output_file="$(mktemp)"
+    if rclone bisync "$_local_dir" "$_remote_ref" "$@" >"$_bisync_output_file" 2>&1; then
+      cat "$_bisync_output_file"
+      rm -f "$_bisync_output_file"
+      return 0
+    fi
+
+    cat "$_bisync_output_file"
+
+    if ! grep -Fq "prior lock file found:" "$_bisync_output_file"; then
+      rm -f "$_bisync_output_file"
+      return 1
+    fi
+
+    _running_pid="$(ps -axo pid=,command= | awk -v needle="rclone bisync $_local_dir $_remote_ref" 'index($0, needle) > 0 { print $1; exit }' || true)"
+    if [ -n "$_running_pid" ]; then
+      printf '%s\n' "replica-bisync: [$_id] another bisync run is already active (PID $_running_pid); skipping this run without marking failure" >&2
+      rm -f "$_bisync_output_file"
+      return 0
+    fi
+
+    _lock_path="$(sed -n 's/.*prior lock file found:[[:space:]]*//p' "$_bisync_output_file" | head -n 1)"
+    rm -f "$_bisync_output_file"
+
+    if [ -z "$_lock_path" ] || [ ! -f "$_lock_path" ]; then
+      printf '%s\n' "replica-bisync: [$_id] bisync lock contention detected but lock path is unavailable for stale-lock recovery" >&2
+      return 1
+    fi
+
+    printf '%s\n' "replica-bisync: [$_id] clearing stale bisync lock at $_lock_path and retrying once" >&2
+    if ! rclone deletefile "$_lock_path" \
+      --log-level ERROR --retries 1 --low-level-retries 1 \
+      --timeout 30s --contimeout 10s --max-duration 30s; then
+      printf '%s\n' "replica-bisync: [$_id] failed to clear stale bisync lock at $_lock_path" >&2
+      return 1
+    fi
+
+    rclone bisync "$_local_dir" "$_remote_ref" "$@"
+  }
+
   _seeded=false
   if [ -f "$_state_marker" ]; then
     _seeded=true
@@ -381,7 +433,7 @@ run_bidirectional_sync() {
 
   if [ "$_seeded" = true ]; then
     # Seeded: use --check-access for safety.
-    if run_cmd rclone bisync "$_local_dir" "$_remote_ref" \
+    if run_bisync_with_lock_recovery \
       --check-access --conflict-resolve newer --max-lock 2m \
       --timeout 60s --contimeout 15s --max-duration 2h \
       --retries 1 --low-level-retries 1 \
@@ -395,7 +447,7 @@ run_bidirectional_sync() {
   # Seed run: --resync WITHOUT --check-access because rclone creates the
   # RCLONE_TEST access marker files during --resync; checking for them first
   # would fail.
-  if run_cmd rclone bisync "$_local_dir" "$_remote_ref" \
+  if run_bisync_with_lock_recovery \
     --resync --conflict-resolve newer --max-lock 2m \
     --timeout 60s --contimeout 15s --max-duration 2h \
     --retries 1 --low-level-retries 1 \

@@ -424,6 +424,79 @@ function Invoke-ReplicaBisync {
       [switch]$IsDryRun
     )
 
+    function Invoke-BisyncWithLockRecovery {
+      param(
+        [Parameter(Mandatory)]
+        [string[]]$BisyncArgs
+      )
+
+      if ($IsDryRun) {
+        return (Invoke-ReplicaRcloneCommand -Arguments $BisyncArgs -IsDryRun:$IsDryRun)
+      }
+
+      $preflightRunningBisync = Get-CimInstance -ClassName Win32_Process -Filter "Name = 'rclone.exe'" -ErrorAction SilentlyContinue |
+        Where-Object {
+          $commandLine = [string]$_.CommandLine
+          $commandLine.Contains(' bisync ') -and $commandLine.Contains($LocalDir) -and $commandLine.Contains($RemoteRef)
+        } |
+        Select-Object -First 1
+
+      if ($null -ne $preflightRunningBisync) {
+        Write-Warning "replica-bisync: [$ReplicaId] another bisync run is already active (PID $($preflightRunningBisync.ProcessId)); skipping this run without marking failure"
+        return $true
+      }
+
+      $capturedOutput = @(& $rcloneCmd.Source @BisyncArgs 2>&1)
+      foreach ($line in $capturedOutput) {
+        Write-Output $line
+      }
+
+      if ($LASTEXITCODE -eq 0) {
+        return $true
+      }
+
+      $combinedOutput = ($capturedOutput | ForEach-Object { [string]$_ }) -join "`n"
+      if ($combinedOutput -notmatch 'prior lock file found:\s*(?<LockPath>[^\r\n]+\.lck)') {
+        return $false
+      }
+
+      $lockPath = $Matches['LockPath'].Trim()
+      $runningBisync = Get-CimInstance -ClassName Win32_Process -Filter "Name = 'rclone.exe'" -ErrorAction SilentlyContinue |
+        Where-Object {
+          $commandLine = [string]$_.CommandLine
+          $commandLine.Contains(' bisync ') -and $commandLine.Contains($LocalDir) -and $commandLine.Contains($RemoteRef)
+        } |
+        Select-Object -First 1
+
+      if ($null -ne $runningBisync) {
+        Write-Warning "replica-bisync: [$ReplicaId] another bisync run is already active (PID $($runningBisync.ProcessId)); skipping this run without marking failure"
+        return $true
+      }
+
+      if ([string]::IsNullOrWhiteSpace($lockPath) -or -not (Test-Path -LiteralPath $lockPath -PathType Leaf)) {
+        Write-Warning "replica-bisync: [$ReplicaId] bisync lock contention detected but lock path is unavailable for stale-lock recovery"
+        return $false
+      }
+
+      Write-Warning "replica-bisync: [$ReplicaId] clearing stale bisync lock at $lockPath and retrying once"
+      $unlockArgs = @(
+        'deletefile',
+        $lockPath,
+        '--log-level', 'ERROR',
+        '--retries', '1',
+        '--low-level-retries', '1',
+        '--timeout', '30s',
+        '--contimeout', '10s',
+        '--max-duration', '30s'
+      )
+      if (-not (Invoke-ReplicaRcloneCommand -Arguments $unlockArgs)) {
+        Write-Warning "replica-bisync: [$ReplicaId] failed to clear stale bisync lock at $lockPath"
+        return $false
+      }
+
+      return (Invoke-ReplicaRcloneCommand -Arguments $BisyncArgs)
+    }
+
     # --max-duration bounds full command runtime so stalled remotes fail
     # predictably instead of blocking daily fallback runs indefinitely.
     $bisyncArgs = @('--conflict-resolve', 'newer', '--max-lock', '2m', '--timeout', '60s', '--contimeout', '15s', '--max-duration', '2h', '--retries', '1', '--low-level-retries', '1', '--stats', '30s', '--stats-one-line', '--stats-log-level', 'NOTICE')
@@ -431,7 +504,7 @@ function Invoke-ReplicaBisync {
 
     if ($seeded) {
       $seededArgs = @('bisync', $LocalDir, $RemoteRef, '--check-access') + $bisyncArgs + $CommonArgs
-      if (Invoke-ReplicaRcloneCommand -Arguments $seededArgs -IsDryRun:$IsDryRun) {
+      if (Invoke-BisyncWithLockRecovery -BisyncArgs $seededArgs) {
         return $true
       }
       Write-Warning "replica-bisync: [$ReplicaId] seeded bisync failed; retrying once with --resync"
@@ -440,7 +513,7 @@ function Invoke-ReplicaBisync {
     # Seed run: --resync WITHOUT --check-access because RCLONE_TEST access
     # marker files are created by --resync.
     $resyncArgs = @('bisync', $LocalDir, $RemoteRef, '--resync') + $bisyncArgs + $CommonArgs
-    if (-not (Invoke-ReplicaRcloneCommand -Arguments $resyncArgs -IsDryRun:$IsDryRun)) {
+    if (-not (Invoke-BisyncWithLockRecovery -BisyncArgs $resyncArgs)) {
       return $false
     }
 
