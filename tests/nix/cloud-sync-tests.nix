@@ -18,11 +18,14 @@ let
   pwshScriptText = builtins.readFile ../../scripts/cloud-setup.ps1;
   replicaBisyncShellText = builtins.readFile ../../scripts/replica-bisync.sh;
   replicaBisyncPwshText = builtins.readFile ../../scripts/replica-bisync.ps1;
+  replicaResetShellText = builtins.readFile ../../scripts/replica-reset.sh;
+  replicaResetPwshText = builtins.readFile ../../scripts/replica-reset.ps1;
   applyScriptText = builtins.readFile ../../src/scripts/apply.sh;
   windowsApplyText = builtins.readFile ../../src/hosts/windows/apply.ps1;
   windowsCloudDriveModuleText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-CloudDrive.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-ShellProfile.ps1;
   windowsReplicaModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Invoke-ReplicaBisync.ps1;
+  windowsReplicaResetModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Invoke-ReplicaReset.ps1;
   windowsReplicaScheduleModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Sync-ReplicaBisyncScheduledTask.ps1;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
@@ -272,6 +275,8 @@ let
     && containsRegex ''"Darwin"'' replicaBisyncShellText
     && containsRegex ''"provider" = "iCloud"'' replicaBisyncShellText
     && containsRegex ''"id" = "iCloud"'' replicaBisyncShellText
+    && containsRegex ''ensure_macos_icloud_replica_symlink'' replicaBisyncShellText
+    && containsRegex ''Library/Mobile Documents'' replicaBisyncShellText
     && containsRegex ''"native iCloud handles sync"'' replicaBisyncShellText
   ) "replica-bisync.sh must skip iCloud replica on macOS";
 
@@ -354,6 +359,21 @@ let
     && containsRegex "-Daily" windowsReplicaScheduleModuleText
   ) "Replica fallbackTimer must materialize as daily scheduler wiring on macOS/NixOS/Windows";
 
+  # Test 46: replica-reset command is exposed on POSIX and Windows with dedicated scripts/modules
+  test_replica_reset_command_parity = assert' (
+    containsRegex "mkReplicaResetApp" flakeText
+    && containsRegex "scripts/replica-reset\.sh" flakeText
+    && containsRegex ''"nucleus-replica-reset"'' shellNixText
+    && containsRegex ''"replica-reset"'' shellNixText
+    && containsRegex "function nucleus-replica-reset" windowsShellProfileText
+    && containsRegex ''scripts\\replica-reset\.ps1'' windowsShellProfileText
+    && containsRegex "Resolve-NucleusRepoRoot" replicaResetPwshText
+    && containsRegex "Invoke-ReplicaReset" replicaResetPwshText
+    && containsRegex "resolve_nucleus_root" replicaResetShellText
+    && containsRegex "replica-bisync" replicaResetShellText
+    && containsRegex "function Invoke-ReplicaReset" windowsReplicaResetModuleText
+  ) "replica-reset command must exist with parity on POSIX and Windows";
+
   allTests = [
     test_options_exist
     test_mounts_are_list
@@ -400,6 +420,7 @@ let
     test_bisync_seeded_resync_guard
     test_replica_entrypoints_resolve_repo_root
     test_replica_fallback_timer_wiring
+    test_replica_reset_command_parity
   ];
 in
 {

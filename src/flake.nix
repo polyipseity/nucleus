@@ -348,6 +348,23 @@
         }/bin/nucleus-replica-bisync";
       };
 
+      # Build cloud replica state reset helper app for POSIX hosts.
+      # Clears local bisync seed/cache state so manual bisync validation can
+      # start from a deterministic baseline without modifying remotes.
+      mkReplicaResetApp = pkgs: {
+        type = "app";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-replica-reset";
+            runtimeInputs = [
+              pkgs.git
+              pkgs.jq
+            ];
+            text = builtins.readFile ../scripts/replica-reset.sh;
+          }
+        }/bin/nucleus-replica-reset";
+      };
+
     in
     {
       # -----------------------------------------------------------------------
@@ -371,6 +388,7 @@
           gc = mkGcApp pkgsMac;
           health-check = mkHealthCheckApp pkgsMac;
           replica-bisync = mkReplicaBisyncApp pkgsMac;
+          replica-reset = mkReplicaResetApp pkgsMac;
           update = mkUpdateApp pkgsMac;
         };
         "${systems.linux}" = {
@@ -389,6 +407,7 @@
           gc = mkGcApp pkgsLinux;
           health-check = mkHealthCheckApp pkgsLinux;
           replica-bisync = mkReplicaBisyncApp pkgsLinux;
+          replica-reset = mkReplicaResetApp pkgsLinux;
           update = mkUpdateApp pkgsLinux;
         };
       };

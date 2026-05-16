@@ -61,6 +61,7 @@ in
     (mkNucleusCommand "nucleus-gc" "gc")
     (mkNucleusCommand "nucleus-health-check" "health-check")
     (mkNucleusCommand "nucleus-replica-bisync" "replica-bisync")
+    (mkNucleusCommand "nucleus-replica-reset" "replica-reset")
     (mkNucleusCommand "nucleus-update" "update")
   ];
 
