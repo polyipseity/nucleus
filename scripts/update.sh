@@ -86,7 +86,7 @@ merge_nix_config() {
 }
 
 run_nix() {
-  NIX_CONFIG="$(merge_nix_config)" nix "$@"
+  NIX_CONFIG="$(merge_nix_config)" nix --option warn-dirty false "$@"
 }
 
 update_flake_inputs() {

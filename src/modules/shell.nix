@@ -52,7 +52,7 @@ let
       fi
       ''}
 
-      exec nix run ${config.home.homeDirectory}/dev/nucleus/src#${app} -- "$@"
+      exec nix --option warn-dirty false run ${config.home.homeDirectory}/dev/nucleus/src#${app} -- "$@"
     '';
 in
 {

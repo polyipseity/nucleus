@@ -19,7 +19,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
 
 if (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue) {
-  $flakeOutput = & nix.exe flake update --flake (Join-Path -Path $repoRoot -ChildPath 'src') 2>&1
+  $flakeOutput = & nix.exe --option warn-dirty false flake update --flake (Join-Path -Path $repoRoot -ChildPath 'src') 2>&1
   if ($LASTEXITCODE -ne 0) {
     $joined = ($flakeOutput | Out-String)
     if ($joined -match 'API rate limit exceeded|unable to download|HTTP error 403') {

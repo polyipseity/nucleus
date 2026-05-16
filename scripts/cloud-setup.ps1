@@ -305,7 +305,7 @@ Write-Output 'cloud-setup: all credentials valid.'
 
 if ($Apply) {
   Write-Output 'cloud-setup: running nucleus apply to converge cloud mount services...'
-  & nix run "$repoRoot/src#apply"
+  & nix --option warn-dirty false run "$repoRoot/src#apply"
   if ($LASTEXITCODE -ne 0) {
     throw "cloud-setup: apply failed with exit code $LASTEXITCODE"
   }

@@ -111,14 +111,16 @@ merge_nix_config() {
 
 run_nix() {
   # Execute nix with the merged config for non-root operations.
-  NIX_CONFIG="$(merge_nix_config)" nix "$@"
+  # Suppress repeated dirty-tree warnings so apply logs highlight actionable
+  # warnings/errors instead of repeating VCS status lines.
+  NIX_CONFIG="$(merge_nix_config)" nix --option warn-dirty false "$@"
 }
 
 run_nix_as_root() {
   # Execute nix as root while injecting the merged config explicitly so sudo's
   # default environment filtering cannot drop required flake settings.
   NIX_CONFIG_VALUE="$(merge_nix_config)"
-  sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" nix "$@"
+  sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" nix --option warn-dirty false "$@"
 }
 
 ensure_prek_hooks_installed() {

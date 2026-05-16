@@ -85,7 +85,9 @@ merge_nix_config() {
 
 run_nix() {
   # Execute nix with the merged config for this script invocation.
-  NIX_CONFIG="$(merge_nix_config)" nix "$@"
+  # Suppress the repeated dirty-tree warning so bootstrap/apply logs surface
+  # actionable failures instead of identical VCS status noise.
+  NIX_CONFIG="$(merge_nix_config)" nix --option warn-dirty false "$@"
 }
 
 if [ "$COMMAND" = "-h" ] || [ "$COMMAND" = "--help" ] || [ "$COMMAND" = "help" ]; then

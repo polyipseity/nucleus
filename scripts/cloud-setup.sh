@@ -441,7 +441,7 @@ fi
 
 if [ "$skip_apply" = false ]; then
   printf '%s\n' "cloud-setup: running nucleus apply to converge cloud mount services..."
-  nix run "$repo_root/src#apply"
+  nix --option warn-dirty false run "$repo_root/src#apply"
 fi
 
 printf '%s\n' "cloud-setup: setup complete"
