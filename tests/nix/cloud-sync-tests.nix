@@ -304,11 +304,15 @@ let
   # Test 41: OneDrive replica runners must exclude Personal Vault on both platforms
   test_onedrive_personal_vault_excluded = assert' (
     containsRegex "build_onedrive_root_filter_file" replicaSyncShellText
+    && containsRegex "blockedRoots" replicaCleanupConfigText
     && containsRegex "skipping inaccessible OneDrive root entry" replicaSyncShellText
     && containsRegex "--disable ListR" replicaSyncShellText
     && containsRegex "--dirs-only --disable ListR --log-level ERROR" replicaSyncShellText
     && containsRegex "--timeout 30s --contimeout 10s" replicaSyncShellText
     && containsRegex "--max-duration 1m" replicaSyncShellText
+    && containsRegex "Get-ReplicaCleanupConfig" windowsReplicaModuleText
+    && containsRegex "remoteExcludes" windowsReplicaModuleText
+    && containsRegex "BlockedRoots" windowsReplicaModuleText
     && containsRegex "Get-OneDriveRootFilterFile" windowsReplicaModuleText
     && containsRegex "skipping inaccessible OneDrive root entry" windowsReplicaModuleText
     && containsRegex ''"--disable", "ListR"'' windowsReplicaModuleText
@@ -334,6 +338,12 @@ let
       (
         containsRegex "unsupported direction" replicaSyncShellText
         && containsRegex "pull-only by policy" replicaSyncShellText
+        && containsRegex ''"direction": "pull"'' posixUsersText
+        && containsRegex ''"direction": "pull"'' windowsUsersText
+        && !containsRegex ''"direction": "bidirectional"'' posixUsersText
+        && !containsRegex ''"direction": "bidirectional"'' windowsUsersText
+        && !containsRegex ''"direction": "push"'' posixUsersText
+        && !containsRegex ''"direction": "push"'' windowsUsersText
         && !(containsRegex "rclone bisync" replicaSyncShellText)
         && !(containsRegex "--resync" replicaSyncShellText)
         && !(containsRegex "--check-access" replicaSyncShellText)
@@ -389,13 +399,19 @@ let
 
   # Test 47: Shared cleanup config must drive replica metadata cleanup behavior
   test_replica_cleanup_config_centralized = assert' (
-    containsRegex ''"macOSMetadata"'' replicaCleanupConfigText
-    && containsRegex ''"remoteFilterGlobs"'' replicaCleanupConfigText
-    && containsRegex ''"oneDrive"'' replicaCleanupConfigText
+    containsRegex ''"GoogleDrive"'' replicaCleanupConfigText
+    && containsRegex ''"iCloud"'' replicaCleanupConfigText
+    && containsRegex ''"OneDrive"'' replicaCleanupConfigText
+    && containsRegex ''"files"'' replicaCleanupConfigText
+    && containsRegex ''"dirs"'' replicaCleanupConfigText
+    && containsRegex ''"remoteExcludes"'' replicaCleanupConfigText
+    && containsRegex ''"blockedRoots"'' replicaCleanupConfigText
+    && !containsRegex ''"macOSMetadata"'' replicaCleanupConfigText
+    && !containsRegex ''"oneDrive"'' replicaCleanupConfigText
     && containsRegex ''replica-cleanup\.json'' replicaSyncShellText
-    && containsRegex "macos_metadata_remote_filters" replicaSyncShellText
+    && containsRegex "load_provider_cleanup_entries" replicaSyncShellText
     && containsRegex ''replica-cleanup\.json'' windowsReplicaModuleText
-    && containsRegex ''\$macOSMetadataRemoteFilterGlobs'' windowsReplicaModuleText
+    && containsRegex "Get-ReplicaCleanupValues" windowsReplicaModuleText
   ) "replica metadata exclusion and cleanup patterns must be centralized in one shared config";
 
   allTests = [

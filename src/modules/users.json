@@ -57,7 +57,7 @@
       ],
       "replicas": [
         {
-          "direction": "bidirectional",
+          "direction": "pull",
           "enable": false,
           "fallbackTimer": {
             "enable": true,
@@ -92,7 +92,7 @@
           "remotePath": "/"
         },
         {
-          "direction": "bidirectional",
+          "direction": "pull",
           "enable": true,
           "fallbackTimer": {
             "enable": true,

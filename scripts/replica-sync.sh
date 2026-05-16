@@ -97,12 +97,15 @@ if [ -s "$rclone_pass_path" ]; then
   export RCLONE_CONFIG_PASS="$rclone_config_pass_value"
 fi
 
+load_provider_cleanup_entries() {
+  _provider="$1"
+  _field="$2"
+
+  jq -r --arg provider "$_provider" --arg field "$_field" '((.[$provider] // {})[$field] // [])[]' "$REPLICA_CLEANUP_CONFIG_JSON"
+}
+
 username="$(id -un)"
 current_os="$(uname -s)"
-macos_metadata_file_globs="$(jq -r '.macOSMetadata.fileGlobs[]' "$REPLICA_CLEANUP_CONFIG_JSON")"
-macos_metadata_dir_names="$(jq -r '.macOSMetadata.directoryNames[]' "$REPLICA_CLEANUP_CONFIG_JSON")"
-macos_metadata_remote_filters="$(jq -r '.macOSMetadata.remoteFilterGlobs[]' "$REPLICA_CLEANUP_CONFIG_JSON")"
-onedrive_inaccessible_entries_lc="$(jq -r '.oneDrive.inaccessibleRootEntries[] | ascii_downcase' "$REPLICA_CLEANUP_CONFIG_JSON")"
 
 replica_lines="$({
   jq -r --arg username "$username" '
@@ -165,26 +168,29 @@ remote_top_level_path_accessible() {
 
 should_skip_onedrive_root_entry() {
   _entry_name="$1"
+  _blocked_root_entries="$2"
   _entry_lc="$(printf '%s' "$_entry_name" | tr '[:upper:]' '[:lower:]')"
 
-  if [ -z "$onedrive_inaccessible_entries_lc" ]; then
+  if [ -z "$_blocked_root_entries" ]; then
     return 1
   fi
 
-  printf '%s\n' "$onedrive_inaccessible_entries_lc" | grep -Fxq "$_entry_lc"
+  printf '%s\n' "$_blocked_root_entries" | grep -Fxq "$_entry_lc"
 }
 
 build_onedrive_root_filter_file() {
   _id="$1"
   _local_dir="$2"
   _remote_ref="$3"
+  _remote_excludes="$4"
+  _blocked_root_entries="$5"
 
   _filter_file="$(mktemp)"
   _dir_entries_file="$(mktemp)"
   _file_entries_file="$(mktemp)"
 
   : > "$_filter_file"
-  for _pattern in $macos_metadata_remote_filters; do
+  for _pattern in $_remote_excludes; do
     printf -- '- %s\n' "$_pattern" >> "$_filter_file"
   done
 
@@ -203,7 +209,7 @@ build_onedrive_root_filter_file() {
         continue
       fi
 
-      if should_skip_onedrive_root_entry "$_remote_dir"; then
+      if should_skip_onedrive_root_entry "$_remote_dir" "$_blocked_root_entries"; then
         printf '%s\n' "replica-sync: [$_id] skipping inaccessible OneDrive root entry '$_remote_dir'" >&2
         continue
       fi
@@ -226,7 +232,7 @@ build_onedrive_root_filter_file() {
   fi
   if [ -n "$_remote_files" ]; then
     printf '%s\n' "$_remote_files" | while IFS= read -r _remote_file; do
-      if should_skip_onedrive_root_entry "$_remote_file"; then
+      if should_skip_onedrive_root_entry "$_remote_file" "$_blocked_root_entries"; then
         printf '%s\n' "replica-sync: [$_id] skipping inaccessible OneDrive root entry '$_remote_file'" >&2
         continue
       fi
@@ -240,7 +246,7 @@ build_onedrive_root_filter_file() {
     fi
 
     _local_name="$(basename "$_local_entry")"
-    if should_skip_onedrive_root_entry "$_local_name"; then
+    if should_skip_onedrive_root_entry "$_local_name" "$provider_blocked_roots"; then
       printf '%s\n' "replica-sync: [$_id] skipping inaccessible OneDrive root entry '$_local_name'" >&2
       continue
     fi
@@ -278,6 +284,8 @@ build_onedrive_root_filter_file() {
 
 cleanup_local_macos_artifacts() {
   _target_dir="$1"
+  _file_globs="$2"
+  _dir_names="$3"
 
   if [ ! -d "$_target_dir" ]; then
     return 0
@@ -288,11 +296,11 @@ cleanup_local_macos_artifacts() {
     return 0
   fi
 
-  for _pattern in $macos_metadata_file_globs; do
+  for _pattern in $_file_globs; do
     find "$_target_dir" -type f -name "$_pattern" -delete
   done
 
-  for _dir_name in $macos_metadata_dir_names; do
+  for _dir_name in $_dir_names; do
     find "$_target_dir" -type d -name "$_dir_name" -prune -exec rm -rf {} +
   done
 }
@@ -380,6 +388,11 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
     continue
   fi
 
+  provider_file_globs="$(load_provider_cleanup_entries "$provider" "files")"
+  provider_dir_names="$(load_provider_cleanup_entries "$provider" "dirs")"
+  provider_remote_excludes="$(load_provider_cleanup_entries "$provider" "remoteExcludes")"
+  provider_blocked_roots="$(load_provider_cleanup_entries "$provider" "blockedRoots")"
+
   if [ "$direction" != "pull" ]; then
     printf '%s\n' "replica-sync: [$id] unsupported direction '$direction'; replicas are pull-only by policy" >&2
     failures=$((failures + 1))
@@ -399,7 +412,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
     continue
   fi
 
-  cleanup_local_macos_artifacts "$local_dir"
+  cleanup_local_macos_artifacts "$local_dir" "$provider_file_globs" "$provider_dir_names"
 
   set -- --log-level ERROR
   if [ "$provider" = "iCloud" ]; then
@@ -408,7 +421,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
   if [ "$provider" = "OneDrive" ]; then
     set -- "$@" --disable ListR
     if [ "$remote_path" = "/" ]; then
-      runtime_filter_file="$(build_onedrive_root_filter_file "$id" "$local_dir" "$remote_ref")"
+      runtime_filter_file="$(build_onedrive_root_filter_file "$id" "$local_dir" "$remote_ref" "$provider_remote_excludes" "$provider_blocked_roots")"
       if [ -n "$resolved_filters" ]; then
         set -- "$@" --filter-from "$resolved_filters"
       fi
@@ -417,7 +430,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
       set -- "$@" --filter-from "$resolved_filters"
     fi
   else
-    for _pattern in $macos_metadata_remote_filters; do
+    for _pattern in $provider_remote_excludes; do
       set -- "$@" --exclude "$_pattern"
     done
     if [ -n "$resolved_filters" ]; then

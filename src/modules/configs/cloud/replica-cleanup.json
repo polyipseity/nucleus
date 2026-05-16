@@ -1,17 +1,18 @@
 {
-  "macOSMetadata": {
-    "directoryNames": [
+  "GoogleDrive": {
+    "blockedRoots": [],
+    "dirs": [
       ".fseventsd",
       ".Spotlight-V100",
       ".TemporaryItems",
       ".Trashes"
     ],
-    "fileGlobs": [
+    "files": [
       ".DS_Store",
       "._*",
       ".apdisk"
     ],
-    "remoteFilterGlobs": [
+    "remoteExcludes": [
       ".DS_Store",
       "._*",
       ".apdisk",
@@ -21,9 +22,52 @@
       ".Trashes/**"
     ]
   },
-  "oneDrive": {
-    "inaccessibleRootEntries": [
+  "iCloud": {
+    "blockedRoots": [],
+    "dirs": [
+      ".fseventsd",
+      ".Spotlight-V100",
+      ".TemporaryItems",
+      ".Trashes"
+    ],
+    "files": [
+      ".DS_Store",
+      "._*",
+      ".apdisk"
+    ],
+    "remoteExcludes": [
+      ".DS_Store",
+      "._*",
+      ".apdisk",
+      ".fseventsd/**",
+      ".Spotlight-V100/**",
+      ".TemporaryItems/**",
+      ".Trashes/**"
+    ]
+  },
+  "OneDrive": {
+    "blockedRoots": [
       "Personal Vault"
+    ],
+    "dirs": [
+      ".fseventsd",
+      ".Spotlight-V100",
+      ".TemporaryItems",
+      ".Trashes"
+    ],
+    "files": [
+      ".DS_Store",
+      "._*",
+      ".apdisk"
+    ],
+    "remoteExcludes": [
+      ".DS_Store",
+      "._*",
+      ".apdisk",
+      ".fseventsd/**",
+      ".Spotlight-V100/**",
+      ".TemporaryItems/**",
+      ".Trashes/**"
     ]
   }
 }

@@ -63,13 +63,6 @@ function Invoke-ReplicaSync {
 
   $usersConfig = Get-Content -Raw -Path $usersJsonPath | ConvertFrom-Json
   $cleanupConfig = Get-Content -Raw -Path $cleanupConfigPath | ConvertFrom-Json
-  $macOSMetadataFileGlobs = @($cleanupConfig.macOSMetadata.fileGlobs | ForEach-Object { [string]$_ })
-  $macOSMetadataDirectoryNames = @($cleanupConfig.macOSMetadata.directoryNames | ForEach-Object { [string]$_ })
-  $macOSMetadataRemoteFilterGlobs = @($cleanupConfig.macOSMetadata.remoteFilterGlobs | ForEach-Object { [string]$_ })
-  $oneDriveInaccessibleRootEntries = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-  foreach ($entry in @($cleanupConfig.oneDrive.inaccessibleRootEntries)) {
-    [void]$oneDriveInaccessibleRootEntries.Add([string]$entry)
-  }
 
   $username = [System.Environment]::UserName
   $userConfigProperty = $usersConfig.PSObject.Properties | Where-Object { $_.Name -eq $username } | Select-Object -First 1
@@ -110,6 +103,28 @@ function Invoke-ReplicaSync {
     return (Join-Path -Path $HOME -ChildPath $Candidate)
   }
 
+  function Get-ReplicaCleanupConfig {
+    param([Parameter(Mandatory)][string]$Provider)
+
+    $providerProperty = $cleanupConfig.PSObject.Properties | Where-Object { $_.Name -eq $Provider } | Select-Object -First 1
+    if ($null -eq $providerProperty) {
+      return [pscustomobject]@{
+        Files = @()
+        Directories = @()
+        RemoteExcludes = @()
+        BlockedRoots = @()
+      }
+    }
+
+    $providerValue = $providerProperty.Value
+    return [pscustomobject]@{
+      Files = @($providerValue.files | ForEach-Object { [string]$_ })
+      Directories = @($providerValue.dirs | ForEach-Object { [string]$_ })
+      RemoteExcludes = @($providerValue.remoteExcludes | ForEach-Object { [string]$_ })
+      BlockedRoots = @($providerValue.blockedRoots | ForEach-Object { [string]$_ })
+    }
+  }
+
   function Invoke-ReplicaRcloneCommand {
     param(
       [Parameter(Mandatory)]
@@ -140,7 +155,7 @@ function Invoke-ReplicaSync {
   function Add-UniqueReplicaEntry {
     param(
       [Parameter(Mandatory)]
-      [System.Collections.Generic.HashSet[string]]$Set,
+      [object]$Set,
       [string]$Value
     )
 
@@ -148,7 +163,9 @@ function Invoke-ReplicaSync {
       return
     }
 
-    [void]$Set.Add($Value)
+    if ($null -ne $Set -and $Set.PSObject.Methods.Name -contains 'Add') {
+      [void]$Set.Add($Value)
+    }
   }
 
   function Test-RemoteTopLevelPathAccessible {
@@ -181,13 +198,16 @@ function Invoke-ReplicaSync {
   }
 
   function Test-IsOneDriveInaccessibleRootEntry {
-    param([string]$EntryName)
+    param(
+      [string]$EntryName,
+      [string[]]$BlockedRoots
+    )
 
     if ([string]::IsNullOrWhiteSpace($EntryName)) {
       return $false
     }
 
-    return $oneDriveInaccessibleRootEntries.Contains($EntryName.TrimEnd('/'))
+    return $BlockedRoots -contains $EntryName.TrimEnd('/')
   }
 
   function Get-OneDriveRootFilterFile {
@@ -198,6 +218,8 @@ function Invoke-ReplicaSync {
       [string]$LocalDir,
       [Parameter(Mandatory)]
       [string]$RemoteRef,
+      [string[]]$RemoteExcludes,
+      [string[]]$BlockedRoots,
       [switch]$IsDryRun
     )
 
@@ -205,7 +227,7 @@ function Invoke-ReplicaSync {
     $dirEntries = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     $fileEntries = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 
-    @($macOSMetadataRemoteFilterGlobs | ForEach-Object { "- $_" }) | Set-Content -Path $filterFile -Encoding utf8
+    @($RemoteExcludes | ForEach-Object { "- $_" }) | Set-Content -Path $filterFile -Encoding utf8
 
     $remoteDirsArgs = @(
       'lsf', $RemoteRef,
@@ -226,7 +248,7 @@ function Invoke-ReplicaSync {
         if ([string]::IsNullOrWhiteSpace($trimmedDir)) {
           continue
         }
-        if (Test-IsOneDriveInaccessibleRootEntry -EntryName $trimmedDir) {
+        if (Test-IsOneDriveInaccessibleRootEntry -EntryName $trimmedDir -BlockedRoots $BlockedRoots) {
           Write-Warning "replica-sync: [$ReplicaId] skipping inaccessible OneDrive root entry '$trimmedDir'"
           continue
         }
@@ -253,7 +275,7 @@ function Invoke-ReplicaSync {
     $remoteFiles = if ($IsDryRun) { @() } else { & $rcloneCmd.Source @remoteFilesArgs 2>$null }
     if ($LASTEXITCODE -eq 0 -and $null -ne $remoteFiles) {
       foreach ($remoteFile in @($remoteFiles)) {
-        if (Test-IsOneDriveInaccessibleRootEntry -EntryName ([string]$remoteFile)) {
+        if (Test-IsOneDriveInaccessibleRootEntry -EntryName ([string]$remoteFile) -BlockedRoots $BlockedRoots) {
           Write-Warning "replica-sync: [$ReplicaId] skipping inaccessible OneDrive root entry '$remoteFile'"
           continue
         }
@@ -263,7 +285,7 @@ function Invoke-ReplicaSync {
 
     if (Test-Path -Path $LocalDir -PathType Container) {
       foreach ($localEntry in Get-ChildItem -Path $LocalDir -Force -ErrorAction SilentlyContinue) {
-        if (Test-IsOneDriveInaccessibleRootEntry -EntryName $localEntry.Name) {
+        if (Test-IsOneDriveInaccessibleRootEntry -EntryName $localEntry.Name -BlockedRoots $BlockedRoots) {
           Write-Warning "replica-sync: [$ReplicaId] skipping inaccessible OneDrive root entry '$($localEntry.Name)'"
           continue
         }
@@ -291,6 +313,8 @@ function Invoke-ReplicaSync {
     param(
       [Parameter(Mandatory)]
       [string]$TargetDir,
+      [string[]]$FileGlobs,
+      [string[]]$DirectoryNames,
       [switch]$IsDryRun
     )
 
@@ -303,12 +327,12 @@ function Invoke-ReplicaSync {
       return
     }
 
-    foreach ($pattern in $macOSMetadataFileGlobs) {
+    foreach ($pattern in $FileGlobs) {
       Get-ChildItem -Path $TargetDir -Recurse -Force -File -Filter $pattern -ErrorAction SilentlyContinue |
         Remove-Item -Force -ErrorAction SilentlyContinue
     }
 
-    foreach ($directoryName in $macOSMetadataDirectoryNames) {
+    foreach ($directoryName in $DirectoryNames) {
       Get-ChildItem -Path $TargetDir -Recurse -Force -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -eq $directoryName } |
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
@@ -342,6 +366,8 @@ function Invoke-ReplicaSync {
       $iCloudService = 'drive'
     }
 
+    $cleanupValues = Get-ReplicaCleanupConfig -Provider $provider
+
     $localDir = Join-Path -Path $HOME -ChildPath $localPath
     if (-not (Test-Path -Path $localDir -PathType Container)) {
       New-Item -ItemType Directory -Path $localDir -Force | Out-Null
@@ -356,7 +382,7 @@ function Invoke-ReplicaSync {
       continue
     }
 
-    Clear-LocalMacOSMetadataArtifact -TargetDir $localDir -IsDryRun:$DryRun
+    Clear-LocalMacOSMetadataArtifact -TargetDir $localDir -FileGlobs $cleanupValues.Files -DirectoryNames $cleanupValues.Directories -IsDryRun:$DryRun
 
     $commonArgs = @('--log-level', 'ERROR')
     if ($provider -eq 'iCloud') {
@@ -365,7 +391,7 @@ function Invoke-ReplicaSync {
     if ($provider -eq 'OneDrive') {
       $commonArgs += @('--disable', 'ListR')
       if ($remotePath -eq '/') {
-        $runtimeFilterPath = Get-OneDriveRootFilterFile -ReplicaId $id -LocalDir $localDir -RemoteRef $remoteRef -IsDryRun:$DryRun
+        $runtimeFilterPath = Get-OneDriveRootFilterFile -ReplicaId $id -LocalDir $localDir -RemoteRef $remoteRef -RemoteExcludes $cleanupValues.RemoteExcludes -BlockedRoots $cleanupValues.BlockedRoots -IsDryRun:$DryRun
         if ($null -ne $resolvedFilterPath) {
           $commonArgs += @('--filter-from', $resolvedFilterPath)
         }
@@ -374,7 +400,7 @@ function Invoke-ReplicaSync {
         $commonArgs += @('--filter-from', $resolvedFilterPath)
       }
     } else {
-      foreach ($pattern in $macOSMetadataRemoteFilterGlobs) {
+      foreach ($pattern in $cleanupValues.RemoteExcludes) {
         $commonArgs += @('--exclude', $pattern)
       }
       if ($null -ne $resolvedFilterPath) {
