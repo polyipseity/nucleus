@@ -171,10 +171,6 @@ while IFS="$(printf '\t')" read id local_path provider icloud_service; do
     fi
   fi
 
-  if ! run_local_cmd mkdir -p "$local_root"; then
-    local_failures=$((local_failures + 1))
-    continue
-  fi
 done < "$replica_lines_file"
 
 rm -f "$replica_lines_file"

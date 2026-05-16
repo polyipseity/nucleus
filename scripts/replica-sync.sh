@@ -246,7 +246,7 @@ build_onedrive_root_filter_file() {
     fi
 
     _local_name="$(basename "$_local_entry")"
-    if should_skip_onedrive_root_entry "$_local_name" "$provider_blocked_roots"; then
+    if should_skip_onedrive_root_entry "$_local_name" "$_blocked_root_entries"; then
       printf '%s\n' "replica-sync: [$_id] skipping inaccessible OneDrive root entry '$_local_name'" >&2
       continue
     fi
@@ -369,6 +369,41 @@ resolve_filter_path() {
   esac
 }
 
+# Replica directories are treated as read-only snapshots outside sync runs.
+# Temporarily grant owner write access for convergence, then remove write bits
+# to prevent create/modify/delete operations between runs.
+set_replica_tree_writable() {
+  _target_dir="$1"
+
+  if [ ! -d "$_target_dir" ]; then
+    return 0
+  fi
+
+  if [ "$dry_run" = true ]; then
+    printf '%s\n' "replica-sync: [dry-run] unlock replica tree $_target_dir (owner write for sync run)"
+    return 0
+  fi
+
+  chmod u+w "$_target_dir"
+  find "$_target_dir" -type d -exec chmod u+rwx {} +
+  find "$_target_dir" -type f -exec chmod u+rw {} +
+}
+
+set_replica_tree_read_only() {
+  _target_dir="$1"
+
+  if [ ! -d "$_target_dir" ]; then
+    return 0
+  fi
+
+  if [ "$dry_run" = true ]; then
+    printf '%s\n' "replica-sync: [dry-run] lock replica tree $_target_dir (remove write perms)"
+    return 0
+  fi
+
+  chmod -R a-w "$_target_dir"
+}
+
 failures=0
 
 replica_lines_file="$(mktemp)"
@@ -406,8 +441,18 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
 
   mkdir -p "$local_dir"
 
+  if ! set_replica_tree_writable "$local_dir"; then
+    printf '%s\n' "replica-sync: [$id] failed to unlock replica tree '$local_dir'" >&2
+    failures=$((failures + 1))
+    continue
+  fi
+
   if [ -n "$resolved_filters" ] && [ ! -f "$resolved_filters" ]; then
     printf '%s\n' "replica-sync: filters file '$resolved_filters' not found for replica '$id'" >&2
+    if ! set_replica_tree_read_only "$local_dir"; then
+      printf '%s\n' "replica-sync: [$id] failed to re-lock replica tree '$local_dir' after filter validation failure" >&2
+      failures=$((failures + 1))
+    fi
     failures=$((failures + 1))
     continue
   fi
@@ -445,6 +490,11 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
 
   if [ -n "$runtime_filter_file" ] && [ -f "$runtime_filter_file" ]; then
     rm -f "$runtime_filter_file"
+  fi
+
+  if ! set_replica_tree_read_only "$local_dir"; then
+    printf '%s\n' "replica-sync: [$id] failed to lock replica tree '$local_dir'" >&2
+    failures=$((failures + 1))
   fi
 done < "$replica_lines_file"
 

@@ -392,8 +392,10 @@ let
     && containsRegex "legacy" replicaResetShellText
     && containsRegex "clearing local replica data" replicaResetShellText
     && containsRegex "expected iCloud drive symlink" replicaResetShellText
+    && !containsRegex ''mkdir -p "\\$local_root"'' replicaResetShellText
     && containsRegex "clears local replica data" windowsReplicaResetModuleText
     && containsRegex "expected iCloud drive symlink" windowsReplicaResetModuleText
+    && !containsRegex ''New-Item -ItemType Directory -Path \\$localRoot'' windowsReplicaResetModuleText
     && containsRegex "function Invoke-ReplicaReset" windowsReplicaResetModuleText
   ) "replica-reset command must exist with parity on POSIX and Windows";
 
@@ -411,8 +413,19 @@ let
     && containsRegex ''replica-cleanup\.json'' replicaSyncShellText
     && containsRegex "load_provider_cleanup_entries" replicaSyncShellText
     && containsRegex ''replica-cleanup\.json'' windowsReplicaModuleText
-    && containsRegex "Get-ReplicaCleanupValues" windowsReplicaModuleText
+    && containsRegex "Get-ReplicaCleanupConfig" windowsReplicaModuleText
   ) "replica metadata exclusion and cleanup patterns must be centralized in one shared config";
+
+  # Test 48: Replica runners lock local replica trees as read-only between sync runs
+  test_replica_read_only_permissions = assert' (
+    containsRegex "set_replica_tree_writable" replicaSyncShellText
+    && containsRegex "set_replica_tree_read_only" replicaSyncShellText
+    && containsRegex "chmod -R a-w" replicaSyncShellText
+    && containsRegex "Invoke-ReplicaTreeWritable" windowsReplicaModuleText
+    && containsRegex "Invoke-ReplicaTreeReadOnly" windowsReplicaModuleText
+    && containsRegex "icacls" windowsReplicaModuleText
+    && containsRegex "deny write/create/delete" windowsReplicaModuleText
+  ) "Replica sync runners must enforce read-only local replica permissions on POSIX and Windows";
 
   allTests = [
     test_options_exist
@@ -462,6 +475,7 @@ let
     test_replica_fallback_timer_wiring
     test_replica_reset_command_parity
     test_replica_cleanup_config_centralized
+    test_replica_read_only_permissions
   ];
 in
 {

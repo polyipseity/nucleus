@@ -124,30 +124,39 @@ function Invoke-ReplicaReset {
       }
     }
 
-    if ($DryRun) {
-      Write-Output "replica-reset: [dry-run] New-Item -ItemType Directory -Path '$localRoot' -Force"
-    }
-    else {
-      New-Item -ItemType Directory -Path $localRoot -Force | Out-Null
-    }
   }
 
   # Global rclone cache reset: paths vary by runtime (native Windows,
   # MSYS/WSL-like shells), so clear common local cache roots.
-  $cacheDirs = @(
-    (Join-Path -Path $HOME -ChildPath ".cache\rclone\bisync"),
-    (Join-Path -Path $HOME -ChildPath ".cache\rclone\bisync-lock"),
-    (Join-Path -Path $HOME -ChildPath ".cache\rclone\sync"),
-    (Join-Path -Path $HOME -ChildPath ".cache\rclone\sync-lock"),
-    (Join-Path -Path $env:LOCALAPPDATA -ChildPath "rclone\bisync"),
-    (Join-Path -Path $env:LOCALAPPDATA -ChildPath "rclone\bisync-lock"),
-    (Join-Path -Path $env:LOCALAPPDATA -ChildPath "rclone\sync"),
-    (Join-Path -Path $env:LOCALAPPDATA -ChildPath "rclone\sync-lock"),
-    (Join-Path -Path $env:APPDATA -ChildPath "rclone\bisync"),
-    (Join-Path -Path $env:APPDATA -ChildPath "rclone\bisync-lock"),
-    (Join-Path -Path $env:APPDATA -ChildPath "rclone\sync"),
-    (Join-Path -Path $env:APPDATA -ChildPath "rclone\sync-lock")
-  ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+  $cacheDirs = [System.Collections.Generic.List[string]]::new()
+
+  if (-not [string]::IsNullOrWhiteSpace($HOME)) {
+    foreach ($cacheSuffix in @(
+        ".cache\rclone\bisync",
+        ".cache\rclone\bisync-lock",
+        ".cache\rclone\sync",
+        ".cache\rclone\sync-lock"
+      )) {
+      $candidate = Join-Path -Path $HOME -ChildPath $cacheSuffix
+      if (-not $cacheDirs.Contains($candidate)) {
+        [void]$cacheDirs.Add($candidate)
+      }
+    }
+  }
+
+  foreach ($cacheBase in @($env:LOCALAPPDATA, $env:APPDATA) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) {
+    foreach ($cacheSuffix in @(
+        "rclone\bisync",
+        "rclone\bisync-lock",
+        "rclone\sync",
+        "rclone\sync-lock"
+      )) {
+      $candidate = Join-Path -Path $cacheBase -ChildPath $cacheSuffix
+      if (-not $cacheDirs.Contains($candidate)) {
+        [void]$cacheDirs.Add($candidate)
+      }
+    }
+  }
 
   foreach ($cacheDir in $cacheDirs) {
     if (-not (Test-Path -Path $cacheDir -PathType Container)) {

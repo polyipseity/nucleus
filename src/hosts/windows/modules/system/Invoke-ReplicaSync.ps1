@@ -63,6 +63,22 @@ function Invoke-ReplicaSync {
 
   $usersConfig = Get-Content -Raw -Path $usersJsonPath | ConvertFrom-Json
   $cleanupConfig = Get-Content -Raw -Path $cleanupConfigPath | ConvertFrom-Json
+  $isWindowsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)
+  $icaclsCmd = Get-Command -Name "icacls" -ErrorAction SilentlyContinue
+  $attribCmd = Get-Command -Name "attrib" -ErrorAction SilentlyContinue
+  $currentUserPrincipal = [System.Environment]::UserName
+  try {
+    $resolvedPrincipal = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    if (-not [string]::IsNullOrWhiteSpace($resolvedPrincipal)) {
+      $currentUserPrincipal = $resolvedPrincipal
+    }
+  }
+  catch {
+    # Non-Windows PowerShell hosts (for example CI/parser checks on macOS)
+    # do not implement WindowsIdentity. Keep a username fallback so dry-runs
+    # and syntax validations remain cross-platform friendly.
+    Write-Verbose "replica-sync: WindowsIdentity unavailable; using username fallback '$currentUserPrincipal'"
+  }
 
   $username = [System.Environment]::UserName
   $userConfigProperty = $usersConfig.PSObject.Properties | Where-Object { $_.Name -eq $username } | Select-Object -First 1
@@ -339,6 +355,85 @@ function Invoke-ReplicaSync {
     }
   }
 
+  function Invoke-ReplicaTreeWritable {
+    param(
+      [Parameter(Mandatory)]
+      [string]$TargetDir,
+      [switch]$IsDryRun
+    )
+
+    if (-not (Test-Path -Path $TargetDir -PathType Container)) {
+      return $true
+    }
+
+    if ($null -eq $icaclsCmd) {
+      if ($isWindowsHost) {
+        Write-Warning "replica-sync: icacls unavailable; cannot unlock '$TargetDir' for sync"
+        return $false
+      }
+      Write-Output "replica-sync: non-Windows host without icacls; skipping unlock for '$TargetDir'"
+      return $true
+    }
+
+    if ($IsDryRun) {
+      Write-Output "replica-sync: [dry-run] unlock replica tree '$TargetDir' (remove deny + clear read-only attributes)"
+      return $true
+    }
+
+    & $icaclsCmd.Source $TargetDir '/remove:d' $currentUserPrincipal '/T' '/C' | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      return $false
+    }
+
+    if ($null -ne $attribCmd) {
+      & $attribCmd.Source '-R' "$TargetDir\*" '/S' '/D' | Out-Null
+    }
+
+    return $true
+  }
+
+  function Invoke-ReplicaTreeReadOnly {
+    param(
+      [Parameter(Mandatory)]
+      [string]$TargetDir,
+      [switch]$IsDryRun
+    )
+
+    if (-not (Test-Path -Path $TargetDir -PathType Container)) {
+      return $true
+    }
+
+    if ($null -eq $icaclsCmd) {
+      if ($isWindowsHost) {
+        Write-Warning "replica-sync: icacls unavailable; cannot lock '$TargetDir' as read-only"
+        return $false
+      }
+      Write-Output "replica-sync: non-Windows host without icacls; skipping read-only lock for '$TargetDir'"
+      return $true
+    }
+
+    if ($IsDryRun) {
+      Write-Output "replica-sync: [dry-run] lock replica tree '$TargetDir' (deny write/create/delete)"
+      return $true
+    }
+
+    & $icaclsCmd.Source $TargetDir '/remove:d' $currentUserPrincipal '/T' '/C' | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      return $false
+    }
+
+    & $icaclsCmd.Source $TargetDir '/deny' "${currentUserPrincipal}:(WD,AD,DC,D,WA,WEA)" '/T' '/C' | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      return $false
+    }
+
+    if ($null -ne $attribCmd) {
+      & $attribCmd.Source '+R' "$TargetDir\*" '/S' '/D' | Out-Null
+    }
+
+    return $true
+  }
+
   $failureCount = 0
 
   foreach ($replica in $replicas) {
@@ -373,11 +468,23 @@ function Invoke-ReplicaSync {
       New-Item -ItemType Directory -Path $localDir -Force | Out-Null
     }
 
+    $unlocked = Invoke-ReplicaTreeWritable -TargetDir $localDir -IsDryRun:$DryRun
+    if (-not $unlocked) {
+      Write-Error "replica-sync: [$id] failed to unlock replica tree '$localDir'" -ErrorAction Continue
+      $failureCount += 1
+      continue
+    }
+
     $remoteRef = "${remoteName}:${remotePath}"
     $resolvedFilterPath = Resolve-ReplicaFilterPath -Candidate ([string]$replica.filtersFile)
     $runtimeFilterPath = $null
     if ($null -ne $resolvedFilterPath -and -not (Test-Path -Path $resolvedFilterPath -PathType Leaf)) {
       Write-Error "replica-sync: filters file '$resolvedFilterPath' not found for replica '$id'" -ErrorAction Continue
+      $lockedAfterFilterFailure = Invoke-ReplicaTreeReadOnly -TargetDir $localDir -IsDryRun:$DryRun
+      if (-not $lockedAfterFilterFailure) {
+        Write-Error "replica-sync: [$id] failed to re-lock replica tree '$localDir' after filter validation failure" -ErrorAction Continue
+        $failureCount += 1
+      }
       $failureCount += 1
       continue
     }
@@ -416,6 +523,12 @@ function Invoke-ReplicaSync {
 
     if (-not [string]::IsNullOrWhiteSpace($runtimeFilterPath) -and (Test-Path -Path $runtimeFilterPath -PathType Leaf)) {
       Remove-Item -Path $runtimeFilterPath -Force
+    }
+
+    $locked = Invoke-ReplicaTreeReadOnly -TargetDir $localDir -IsDryRun:$DryRun
+    if (-not $locked) {
+      Write-Error "replica-sync: [$id] failed to lock replica tree '$localDir'" -ErrorAction Continue
+      $failureCount += 1
     }
   }
 
