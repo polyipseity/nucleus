@@ -169,13 +169,16 @@ let
     && containsRegex "add_favorite" macosText
     && containsRegex "\\$MYSIDES_BIN add \"Applications\" \"file:///Applications\"" macosText
     && containsRegex "\\$MYSIDES_BIN add \"Downloads\" \"file://\\$HOME/Downloads\"" macosText
-    && containsRegex "\\$MYSIDES_BIN add \"~/clouds\" \"file://\\$HOME/clouds\"" macosText
-    && containsRegex "\\$MYSIDES_BIN add \"~/dev\" \"file://\\$HOME/dev\"" macosText
+    && containsRegex "\\$MYSIDES_BIN add \"clouds\" \"file://\\$HOME/clouds\"" macosText
+    && containsRegex "\\$MYSIDES_BIN add \"dev\" \"file://\\$HOME/dev\"" macosText
     && containsRegex "\\$MYSIDES_BIN add \"Desktop\" \"file://\\$HOME/Desktop\"" macosText
     && containsRegex "\\$MYSIDES_BIN add \"Documents\" \"file://\\$HOME/Documents\"" macosText
     && containsRegex "\\$MYSIDES_BIN add \"Music\" \"file://\\$HOME/Music\"" macosText
-    && containsRegex "\\$MYSIDES_BIN add \"Video\" \"file://\\$HOME/Movies\"" macosText
+    && containsRegex "\\$MYSIDES_BIN add \"Movies\" \"file://\\$HOME/Movies\"" macosText
     && containsRegex "\\$MYSIDES_BIN add \"Pictures\" \"file://\\$HOME/Pictures\"" macosText
+    && containsRegex "\\$MYSIDES_BIN remove \"/\"" macosText
+    && containsRegex "\\$MYSIDES_BIN remove \"\\$\\(id -un\\)\"" macosText
+    && containsRegex "\\$MYSIDES_BIN remove \\\"\\.Trash\\\"" macosText
     && !containsRegex "finder-sidebar-repair-v2\\.done" macosText
     && !containsRegex "add favorites manually" macosText
     && !containsRegex "FavoriteItems\\.sfl4" macosText

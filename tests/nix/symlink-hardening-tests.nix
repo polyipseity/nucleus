@@ -66,8 +66,8 @@ in
     assert containsRegex "\\$MYSIDES_BIN list" macosText;
     assert containsRegex "add_favorite" macosText;
     assert containsRegex "\\$MYSIDES_BIN add \"Applications\"" macosText;
-    assert containsRegex "\\$MYSIDES_BIN add \"~/clouds\"" macosText;
-    assert containsRegex "\\$MYSIDES_BIN add \"~/dev\"" macosText;
+    assert containsRegex "\\$MYSIDES_BIN add \"clouds\"" macosText;
+    assert containsRegex "\\$MYSIDES_BIN add \"dev\"" macosText;
     assert !containsRegex "sfltool add-item" macosText;
     assert !containsRegex "sfltool remove-item" macosText;
     true;
