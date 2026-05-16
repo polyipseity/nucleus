@@ -14,4 +14,6 @@ assert containsRegex "Weather \\(English\\)\\.app" macosText;
 assert containsRegex ''"com\.raycast\.macos"'' macbookDefaultsText;
 assert containsRegex "NSUserKeyEquivalents" macbookDefaultsText;
 assert containsRegex "Clipboard History" macbookDefaultsText;
+assert containsRegex "DesktopViewSettings" macbookDefaultsText;
+assert containsRegex ''arrangeBy = "grid"'' macbookDefaultsText;
 true

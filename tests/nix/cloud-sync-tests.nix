@@ -162,14 +162,25 @@ let
     && containsRegex "rclone lsd" pwshScriptText
   ) "cloud-setup scripts must use root-only directory listings for credential validation";
 
-  # Test 25: Finder sidebar uses repair migration + manual-add strategy (no JXA archive rewrites)
-  test_finder_sidebar_repair_strategy = assert' (
-    containsRegex "finder-sidebar-repair-v1\\.done" macosText
-    && containsRegex "FavoriteItems\\.sfl4" macosText
-    && containsRegex "add favorites manually" macosText
+  # Test 25: Finder sidebar is managed automatically via mysides with deterministic ordering
+  test_finder_sidebar_automatic_strategy = assert' (
+    containsRegex "pkgs\\.mysides" macosText
+    && containsRegex "\\$MYSIDES_BIN list" macosText
+    && containsRegex "add_favorite" macosText
+    && containsRegex "\\$MYSIDES_BIN add \"Applications\" \"file:///Applications\"" macosText
+    && containsRegex "\\$MYSIDES_BIN add \"Downloads\" \"file://\\$HOME/Downloads\"" macosText
+    && containsRegex "\\$MYSIDES_BIN add \"~/clouds\" \"file://\\$HOME/clouds\"" macosText
+    && containsRegex "\\$MYSIDES_BIN add \"~/dev\" \"file://\\$HOME/dev\"" macosText
+    && containsRegex "\\$MYSIDES_BIN add \"Desktop\" \"file://\\$HOME/Desktop\"" macosText
+    && containsRegex "\\$MYSIDES_BIN add \"Documents\" \"file://\\$HOME/Documents\"" macosText
+    && containsRegex "\\$MYSIDES_BIN add \"Music\" \"file://\\$HOME/Music\"" macosText
+    && containsRegex "\\$MYSIDES_BIN add \"Video\" \"file://\\$HOME/Movies\"" macosText
+    && containsRegex "\\$MYSIDES_BIN add \"Pictures\" \"file://\\$HOME/Pictures\"" macosText
+    && !containsRegex "finder-sidebar-repair-v2\\.done" macosText
+    && !containsRegex "add favorites manually" macosText
+    && !containsRegex "FavoriteItems\\.sfl4" macosText
     && !containsRegex "osascript -l JavaScript" macosText
-    && !containsRegex "NSKeyedUnarchiver" macosText
-  ) "Finder sidebar must use the one-time repair migration and manual-add strategy";
+  ) "Finder sidebar must be configured automatically via mysides with the exact managed favorites order";
 
   # Test 26: macOS activation no longer pre-creates /Volumes cloud mountpoints
   test_cloud_mounts_prepare_volumes = assert' (
@@ -237,14 +248,15 @@ let
     && containsRegex "scripts/replica-bisync\\.sh" applyScriptText
   ) "apply flow must include post-apply replica bisync hook for automatic OneDrive bisync";
 
-  # Test 36: macOS Finder sidebar setup creates required directories and persists migration marker
+  # Test 36: macOS Finder sidebar setup creates only canonical local directories and excludes cloud mount subpaths
   test_finder_sidebar_paths_created = assert' (
     containsRegex "mkdir -p" macosText
-    && containsRegex "clouds" macosText
-    && containsRegex "GoogleDrive" macosText
-    && containsRegex "iCloud" macosText
-    && containsRegex "OneDrive" macosText
-    && containsRegex "finder-sidebar-repair-v1\\.done" macosText
+    && containsRegex "\\$HOME/dev" macosText
+    && containsRegex "\\$HOME/clouds" macosText
+    && !containsRegex "\\$HOME/clouds/GoogleDrive" macosText
+    && !containsRegex "\\$HOME/clouds/iCloud" macosText
+    && !containsRegex "\\$HOME/clouds/OneDrive" macosText
+    && !containsRegex "finder-sidebar-repair-v2\\.done" macosText
   ) "macOS setup must create Finder sidebar path directories";
 
   # Test 37: macOS replica runner must skip the iCloud replica entry to avoid native-path permission churn
@@ -285,12 +297,31 @@ let
   ) "Replica bisync runners must exclude OneDrive Personal Vault to avoid invalidResourceId failures";
 
   # Test 42: iCloudReplica exception is macOS-only; Windows keeps managed real directories
-  test_icloud_replica_platform_invariant = assert' (
-    containsRegex "Library/Mobile Documents" moduleText
-    && containsRegex "clouds/iCloudReplica" moduleText
-    && containsRegex "ReparsePoint" windowsCloudDriveModuleText
-    && containsRegex "macOS-only" windowsCloudDriveModuleText
-  ) "Only macOS may map iCloudReplica to native Mobile Documents; Windows must enforce managed directories";
+  test_icloud_replica_platform_invariant =
+    assert'
+      (
+        containsRegex "Library/Mobile Documents" moduleText
+        && containsRegex "clouds/iCloudReplica" moduleText
+        && containsRegex "ReparsePoint" windowsCloudDriveModuleText
+        && containsRegex "macOS-only" windowsCloudDriveModuleText
+      )
+      "Only macOS may map iCloudReplica to native Mobile Documents; Windows must enforce managed directories";
+
+  # Test 43: Bidirectional replicas run with robust flags and only use --resync during first seed
+  test_bisync_seeded_resync_guard = assert' (
+    containsRegex "state_marker" replicaBisyncShellText
+    && containsRegex "--resilient" replicaBisyncShellText
+    && containsRegex "--recover" replicaBisyncShellText
+    && containsRegex "--max-lock 2m" replicaBisyncShellText
+    && containsRegex "--conflict-resolve newer" replicaBisyncShellText
+    && containsRegex "skipping automatic --resync" replicaBisyncShellText
+    && containsRegex "Test-Path -Path \$stateMarker" windowsReplicaModuleText
+    && containsRegex "--resilient" windowsReplicaModuleText
+    && containsRegex "--recover" windowsReplicaModuleText
+    && containsRegex "--max-lock" windowsReplicaModuleText
+    && containsRegex "--conflict-resolve" windowsReplicaModuleText
+    && containsRegex "skipping automatic --resync" windowsReplicaModuleText
+  ) "Replica bisync runners must avoid automatic --resync once seeded markers exist";
 
   allTests = [
     test_options_exist
@@ -317,7 +348,7 @@ let
     test_shell_exports_rclone_pass
     test_cloud_setup_exports_rclone_pass
     test_cloud_setup_uses_root_only_listing
-    test_finder_sidebar_repair_strategy
+    test_finder_sidebar_automatic_strategy
     test_cloud_mounts_prepare_volumes
     test_cloud_mounts_use_fskit_backend
     test_cloud_setup_recreates_stale_remotes
@@ -335,6 +366,7 @@ let
     test_windows_shell_replica_command
     test_onedrive_personal_vault_excluded
     test_icloud_replica_platform_invariant
+    test_bisync_seeded_resync_guard
   ];
 in
 {

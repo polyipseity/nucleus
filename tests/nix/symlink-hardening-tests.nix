@@ -59,13 +59,15 @@ in
     true;
 
   # =========================================================================
-  # Assertion 6: Finder sidebar rewrite in macos.nix
+  # Assertion 6: Finder sidebar automation in macos.nix
   # =========================================================================
   finderSidebarRewrite =
-    assert containsRegex "osascript -l JavaScript" macosText;
-    assert containsRegex "NSKeyedUnarchiver" macosText;
-    assert containsRegex "NSKeyedArchiver" macosText;
-    assert containsRegex "FavoriteItems\\.sfl4" macosText;
+    assert containsRegex "pkgs\\.mysides" macosText;
+    assert containsRegex "\\$MYSIDES_BIN list" macosText;
+    assert containsRegex "add_favorite" macosText;
+    assert containsRegex "\\$MYSIDES_BIN add \"Applications\"" macosText;
+    assert containsRegex "\\$MYSIDES_BIN add \"~/clouds\"" macosText;
+    assert containsRegex "\\$MYSIDES_BIN add \"~/dev\"" macosText;
     assert !containsRegex "sfltool add-item" macosText;
     assert !containsRegex "sfltool remove-item" macosText;
     true;

@@ -8,8 +8,8 @@ applyTo: "src/modules/cloud-drives.nix, src/modules/macos.nix, src/hosts/windows
 
 ## Scope
 
-Use this guidance for cloud-drive convergence (mounts + replicas), related host
-manual steps, and Finder favorites behavior on macOS.
+Use this guidance for cloud-drive convergence (mounts + replicas) and Finder
+favorites behavior on macOS.
 
 ## Canonical terminology (required)
 
@@ -40,14 +40,13 @@ manual steps, and Finder favorites behavior on macOS.
 
 - Do **not** manage Finder favorites by writing `FavoriteItems.sfl*` archives
   directly via NSKeyedArchiver/JXA.
-- Do **not** rely on deprecated/unsupported approaches (`sfltool`, abandoned
-  `mysides`) as declarative guarantees.
+- Do **not** rely on `sfltool` for favorites management.
 - Preferred strategy:
-  1. Ensure canonical directories exist (`~/dev`, `~/clouds`, cloud subpaths).
-  2. Run one-time repair migration only when needed (marker-gated), backing up
-     and removing known-bad legacy sidebar state payloads.
-  3. Keep final favorite-item curation as a manual Finder UI step documented in
-     `src/hosts/macbook/MANUAL.md`.
+  1. Ensure canonical directories exist (`~/dev`, `~/clouds`, and standard user
+     folders referenced by favorites).
+  2. Use `mysides` in activation to enforce an exact ordered favorites list.
+  3. Restart Finder/sharedfilelistd/cfprefsd in-session after updates; if
+     sidebar cache remains stale, emit a one-line logout/login hint in logs.
 
 ## Cloud setup/update behavior
 
@@ -73,8 +72,6 @@ When changing cloud-drive/Finder behavior, update all of the following in the
 same change:
 
 - `tests/nix/cloud-sync-tests.nix` expectations and test names.
-- Host manual instructions (`src/hosts/macbook/MANUAL.md`) for manual Finder
-  favorites steps.
 - Inline WHY comments for every platform-specific exception.
 
 Avoid stale assertions that refer to removed flags or deprecated implementation

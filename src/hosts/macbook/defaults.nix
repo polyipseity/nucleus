@@ -325,6 +325,19 @@ in
         # typed nix-darwin finder option, so we set it as a custom default.
         WarnOnEmptyTrash = true;
 
+        # Desktop icon layout: keep deterministic icon geometry and snap every
+        # icon to Finder's grid so drag/reorder actions remain tidy by default.
+        DesktopViewSettings = {
+          IconViewSettings = {
+            arrangeBy = "grid";
+            gridSpacing = 54;
+            iconSize = 64;
+            labelOnBottom = true;
+            showItemInfo = false;
+            textSize = 12;
+          };
+        };
+
         QLEnableTextSelection = true;
       };
 
@@ -340,11 +353,6 @@ in
       "com.apple.screensaver" = {
         askForPassword = true;
         askForPasswordDelay = 0; # seconds before password is required (0 = immediately)
-      };
-
-      # Sidebar: show iCloud Drive entries in Finder sidebar.
-      "com.apple.sidebarlists" = {
-        showicloud = true;
       };
 
       # Dictation shortcut: double-press Right Command key (value 2).

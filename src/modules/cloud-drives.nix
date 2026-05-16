@@ -347,44 +347,51 @@ in
 
           ${lib.concatStringsSep "\n" (
             map (r: ''
-              ${if pkgs.stdenv.isDarwin && r.provider == "iCloud" && r.id == "iCloud" && r.localPath == "clouds/iCloudReplica" then
-                ''
-                  # macOS-only exception: iCloudReplica must point to native
-                  # CloudDocs storage so we do not duplicate Apple's iCloud
-                  # integration with a second managed tree.
-                  _icloud_native_target="$HOME/Library/Mobile Documents"
-                  _icloud_replica_path="$HOME/${r.localPath}"
+              ${
+                if
+                  pkgs.stdenv.isDarwin
+                  && r.provider == "iCloud"
+                  && r.id == "iCloud"
+                  && r.localPath == "clouds/iCloudReplica"
+                then
+                  ''
+                    # macOS-only exception: iCloudReplica must point to native
+                    # CloudDocs storage so we do not duplicate Apple's iCloud
+                    # integration with a second managed tree.
+                    _icloud_native_target="$HOME/Library/Mobile Documents"
+                    _icloud_replica_path="$HOME/${r.localPath}"
 
-                  if [ -L "$_icloud_replica_path" ]; then
-                    if [ "$(readlink "$_icloud_replica_path")" != "$_icloud_native_target" ]; then
-                      _legacy_target="$(readlink "$_icloud_replica_path")"
-                      rm "$_icloud_replica_path"
+                    if [ -L "$_icloud_replica_path" ]; then
+                      if [ "$(readlink "$_icloud_replica_path")" != "$_icloud_native_target" ]; then
+                        _legacy_target="$(readlink "$_icloud_replica_path")"
+                        rm "$_icloud_replica_path"
+                        ln -s "$_icloud_native_target" "$_icloud_replica_path"
+                        printf '%s\n' "cloud-drives: updated iCloudReplica symlink $_icloud_replica_path -> $_icloud_native_target (was $_legacy_target)."
+                      fi
+                    elif [ -e "$_icloud_replica_path" ]; then
+                      _migration_backup="$_icloud_replica_path.pre-native-icloud.$(date +%Y%m%d%H%M%S)"
+                      mv "$_icloud_replica_path" "$_migration_backup"
                       ln -s "$_icloud_native_target" "$_icloud_replica_path"
-                      printf '%s\n' "cloud-drives: updated iCloudReplica symlink $_icloud_replica_path -> $_icloud_native_target (was $_legacy_target)."
+                      printf '%s\n' "cloud-drives: migrated $_icloud_replica_path to native iCloud symlink target $_icloud_native_target (backup: $_migration_backup)."
+                    else
+                      ln -s "$_icloud_native_target" "$_icloud_replica_path"
+                      printf '%s\n' "cloud-drives: linked $_icloud_replica_path -> $_icloud_native_target (native iCloud replica path)."
                     fi
-                  elif [ -e "$_icloud_replica_path" ]; then
-                    _migration_backup="$_icloud_replica_path.pre-native-icloud.$(date +%Y%m%d%H%M%S)"
-                    mv "$_icloud_replica_path" "$_migration_backup"
-                    ln -s "$_icloud_native_target" "$_icloud_replica_path"
-                    printf '%s\n' "cloud-drives: migrated $_icloud_replica_path to native iCloud symlink target $_icloud_native_target (backup: $_migration_backup)."
-                  else
-                    ln -s "$_icloud_native_target" "$_icloud_replica_path"
-                    printf '%s\n' "cloud-drives: linked $_icloud_replica_path -> $_icloud_native_target (native iCloud replica path)."
-                  fi
-                ''
-              else
-                ''
-                  # Default invariant for replica roots: real directories so
-                  # rclone sync/bisync writes into managed paths directly.
-                  if [ -L "$HOME/${r.localPath}" ]; then
-                    _legacy_target="$(readlink "$HOME/${r.localPath}")"
-                    rm "$HOME/${r.localPath}"
-                    mkdir -p "$HOME/${r.localPath}"
-                    printf '%s\n' "cloud-drives: replaced legacy symlink $HOME/${r.localPath} -> $_legacy_target with a managed directory."
-                  else
-                    mkdir -p "$HOME/${r.localPath}"
-                  fi
-                ''}
+                  ''
+                else
+                  ''
+                    # Default invariant for replica roots: real directories so
+                    # rclone sync/bisync writes into managed paths directly.
+                    if [ -L "$HOME/${r.localPath}" ]; then
+                      _legacy_target="$(readlink "$HOME/${r.localPath}")"
+                      rm "$HOME/${r.localPath}"
+                      mkdir -p "$HOME/${r.localPath}"
+                      printf '%s\n' "cloud-drives: replaced legacy symlink $HOME/${r.localPath} -> $_legacy_target with a managed directory."
+                    else
+                      mkdir -p "$HOME/${r.localPath}"
+                    fi
+                  ''
+              }
             '') enabledReplicas
           )}
         '';
