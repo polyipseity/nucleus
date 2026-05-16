@@ -114,21 +114,6 @@ run_cmd() {
   "$@"
 }
 
-run_bisync_with_access_fallback() {
-  _local_dir="$1"
-  _remote_ref="$2"
-  shift 2
-
-  # Prefer strict access checks first. Some remotes fail this probe despite
-  # otherwise-valid bisync capability (for example missing check marker file).
-  if run_cmd rclone bisync "$_local_dir" "$_remote_ref" --check-access "$@"; then
-    return 0
-  fi
-
-  printf '%s\n' "replica-bisync: bisync failed with --check-access; retrying once without --check-access." >&2
-  run_cmd rclone bisync "$_local_dir" "$_remote_ref" "$@"
-}
-
 resolve_filter_path() {
   _candidate="$1"
   case "$_candidate" in
@@ -213,16 +198,25 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
       ;;
     bidirectional)
       printf '%s\n' "replica-bisync: [$id] bisync $local_dir <-> $remote_ref"
-      # rclone bisync lifecycle: first successful run must include --resync to
-      # establish listing state. Subsequent runs omit --resync and use robust
-      # recovery flags for scheduled operation.
       if [ -f "$state_marker" ]; then
-        if ! run_bisync_with_access_fallback "$local_dir" "$remote_ref" --resilient --recover --max-lock 2m --conflict-resolve newer "$@"; then
-          printf '%s\n' "replica-bisync: [$id] bisync failed after seed; skipping automatic --resync (run a manual seed repair if needed)." >&2
+        # Seeded: use --check-access for safety; RCLONE_TEST files already exist.
+        # WHY no --resilient/--recover: they cause rclone to continue indefinitely
+        # on persistent errors instead of failing fast. --timeout/--contimeout
+        # bound each operation to prevent hangs.
+        if ! run_cmd rclone bisync "$local_dir" "$remote_ref" \
+            --check-access --conflict-resolve newer --max-lock 2m \
+            --timeout 60s --contimeout 15s "$@"; then
+          printf '%s\n' "replica-bisync: [$id] bisync failed" >&2
           failures=$((failures + 1))
         fi
       else
-        if ! run_bisync_with_access_fallback "$local_dir" "$remote_ref" --resilient --recover --max-lock 2m --conflict-resolve newer --resync "$@"; then
+        # Seed run: --resync WITHOUT --check-access because rclone creates the
+        # RCLONE_TEST access marker files during --resync; checking for them
+        # first would always fail (chicken-and-egg). Subsequent runs enforce
+        # --check-access.
+        if ! run_cmd rclone bisync "$local_dir" "$remote_ref" \
+            --resync --conflict-resolve newer --max-lock 2m \
+            --timeout 60s --contimeout 15s "$@"; then
           failures=$((failures + 1))
         else
           mkdir -p "$replica_state_dir"

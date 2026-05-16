@@ -310,21 +310,21 @@ let
       )
       "Only macOS may map iCloudReplica to native Mobile Documents; Windows must enforce managed directories";
 
-  # Test 43: Bidirectional replicas run with robust flags and only use --resync during first seed
+  # Test 43: Bisync seed uses --resync without --check-access; seeded runs always enforce --check-access
   test_bisync_seeded_resync_guard = assert' (
     containsRegex "state_marker" replicaBisyncShellText
-    && containsRegex "--resilient" replicaBisyncShellText
-    && containsRegex "--recover" replicaBisyncShellText
-    && containsRegex "--max-lock 2m" replicaBisyncShellText
-    && containsRegex "--conflict-resolve newer" replicaBisyncShellText
-    && containsRegex "skipping automatic --resync" replicaBisyncShellText
-    && containsRegex "Test-Path -Path \$stateMarker" windowsReplicaModuleText
-    && containsRegex "--resilient" windowsReplicaModuleText
-    && containsRegex "--recover" windowsReplicaModuleText
-    && containsRegex "--max-lock" windowsReplicaModuleText
-    && containsRegex "--conflict-resolve" windowsReplicaModuleText
-    && containsRegex "skipping automatic --resync" windowsReplicaModuleText
-  ) "Replica bisync runners must avoid automatic --resync once seeded markers exist";
+    && containsRegex "--check-access" replicaBisyncShellText
+    && containsRegex "--timeout 60s" replicaBisyncShellText
+    && containsRegex "--contimeout 15s" replicaBisyncShellText
+    && !(containsRegex "--resilient" replicaBisyncShellText)
+    && !(containsRegex "--recover" replicaBisyncShellText)
+    && containsRegex "Test-Path -Path \\$stateMarker" windowsReplicaModuleText
+    && containsRegex "--check-access" windowsReplicaModuleText
+    && containsRegex "--timeout" windowsReplicaModuleText
+    && containsRegex "--contimeout" windowsReplicaModuleText
+    && !(containsRegex "--resilient" windowsReplicaModuleText)
+    && !(containsRegex "--recover" windowsReplicaModuleText)
+  ) "Bisync: seed uses --resync without --check-access; seeded runs enforce --check-access; no indefinite-hang flags";
 
   allTests = [
     test_options_exist
