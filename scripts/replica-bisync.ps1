@@ -20,7 +20,26 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
+function Resolve-NucleusRepoRoot {
+  $configPath = Join-Path -Path $HOME -ChildPath '.config\nucleus\repo-root'
+  if (Test-Path -Path $configPath -PathType Leaf) {
+    $configuredRoot = (Get-Content -Path $configPath -Raw).Trim()
+    if (-not [string]::IsNullOrWhiteSpace($configuredRoot) -and (Test-Path -Path $configuredRoot -PathType Container)) {
+      return $configuredRoot
+    }
+  }
+
+  # git rev-parse stderr is suppressed because non-repo CWD is expected and
+  # benign here; the result is validated before use.
+  $gitRoot = (& git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Out-String).Trim()
+  if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and (Test-Path -Path $gitRoot -PathType Container)) {
+    return $gitRoot
+  }
+
+  return (Join-Path -Path $HOME -ChildPath 'dev\nucleus')
+}
+
+$repoRoot = Resolve-NucleusRepoRoot
 $modulePath = Join-Path -Path $repoRoot -ChildPath 'src\hosts\windows\modules\system\Invoke-ReplicaBisync.ps1'
 
 if (-not (Test-Path -LiteralPath $modulePath)) {
