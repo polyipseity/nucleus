@@ -337,7 +337,14 @@ let
         && containsRegex "--timeout 60s" replicaBisyncShellText
         && containsRegex "--contimeout 15s" replicaBisyncShellText
         && containsRegex "--max-duration 2h" replicaBisyncShellText
-        && containsRegex "--retries 1" replicaBisyncShellText
+        && containsRegex "--disable-http2" replicaBisyncShellText
+        && containsRegex "--retries 3" replicaBisyncShellText
+        && containsRegex "--low-level-retries 10" replicaBisyncShellText
+        && containsRegex "--retries-sleep 10s" replicaBisyncShellText
+        && containsRegex "--transfers 2" replicaBisyncShellText
+        && containsRegex "--checkers 4" replicaBisyncShellText
+        && containsRegex "--tpslimit 8" replicaBisyncShellText
+        && containsRegex "--tpslimit-burst 8" replicaBisyncShellText
         && containsRegex "seeded bisync check failed; cleared seed marker and retrying with recovery --resync" replicaBisyncShellText
         && containsRegex "recovery --resync is running; do not start another run" replicaBisyncShellText
         && containsRegex "prior lock file found:" replicaBisyncShellText
@@ -357,6 +364,12 @@ let
         && containsRegex "--contimeout" windowsReplicaModuleText
         && containsRegex "--max-duration" windowsReplicaModuleText
         && containsRegex "--retries" windowsReplicaModuleText
+        && containsRegex "--disable-http2" windowsReplicaModuleText
+        && containsRegex "--retries-sleep" windowsReplicaModuleText
+        && containsRegex "--transfers" windowsReplicaModuleText
+        && containsRegex "--checkers" windowsReplicaModuleText
+        && containsRegex "--tpslimit" windowsReplicaModuleText
+        && containsRegex "--tpslimit-burst" windowsReplicaModuleText
         && containsRegex "seeded bisync check failed; cleared seed marker and retrying with recovery --resync" windowsReplicaModuleText
         && containsRegex "recovery --resync is running; do not start another run" windowsReplicaModuleText
         && containsRegex "prior lock file found:" windowsReplicaModuleText

@@ -499,7 +499,10 @@ function Invoke-ReplicaBisync {
 
     # --max-duration bounds full command runtime so stalled remotes fail
     # predictably instead of blocking daily fallback runs indefinitely.
-    $bisyncArgs = @('--conflict-resolve', 'newer', '--max-lock', '2m', '--timeout', '60s', '--contimeout', '15s', '--max-duration', '2h', '--retries', '1', '--low-level-retries', '1', '--stats', '30s', '--stats-one-line', '--stats-log-level', 'NOTICE')
+    # WHY: OneDrive API sessions can intermittently fail with HTTP/2 header
+    # timeouts/stream cancels under high parallelism; keep retries bounded while
+    # reducing transport pressure to avoid brittle failures.
+    $bisyncArgs = @('--conflict-resolve', 'newer', '--max-lock', '2m', '--timeout', '60s', '--contimeout', '15s', '--max-duration', '2h', '--disable-http2', '--retries', '3', '--low-level-retries', '10', '--retries-sleep', '10s', '--transfers', '2', '--checkers', '4', '--tpslimit', '8', '--tpslimit-burst', '8', '--stats', '30s', '--stats-one-line', '--stats-log-level', 'NOTICE')
     $seeded = Test-Path -Path $StateMarker -PathType Leaf
 
     if ($seeded) {

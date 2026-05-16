@@ -447,10 +447,14 @@ run_bidirectional_sync() {
 
   if [ "$_seeded" = true ]; then
     # Seeded: use --check-access for safety.
+    # WHY: OneDrive API sessions can intermittently fail with HTTP/2 header
+    # timeouts/stream cancels under high parallelism; keep retries bounded while
+    # reducing transport pressure to avoid false hard failures.
     if run_bisync_with_lock_recovery \
       --check-access --conflict-resolve newer --max-lock 2m \
       --timeout 60s --contimeout 15s --max-duration 2h \
-      --retries 1 --low-level-retries 1 \
+      --disable-http2 --retries 3 --low-level-retries 10 --retries-sleep 10s \
+      --transfers 2 --checkers 4 --tpslimit 8 --tpslimit-burst 8 \
       --stats 30s --stats-one-line --stats-log-level NOTICE "$@"; then
       return 0
     fi
@@ -471,7 +475,8 @@ run_bidirectional_sync() {
   if run_bisync_with_lock_recovery \
     --resync --conflict-resolve newer --max-lock 2m \
     --timeout 60s --contimeout 15s --max-duration 2h \
-    --retries 1 --low-level-retries 1 \
+    --disable-http2 --retries 3 --low-level-retries 10 --retries-sleep 10s \
+    --transfers 2 --checkers 4 --tpslimit 8 --tpslimit-burst 8 \
     --stats 30s --stats-one-line --stats-log-level NOTICE "$@"; then
     mkdir -p "$replica_state_dir"
     : > "$_state_marker"
