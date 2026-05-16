@@ -1047,15 +1047,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
             echo "macos: warning — 7z binary not found at $seven_z_exe; archive extraction may fail." >&2
           elif ! "$seven_z_exe" --help >/dev/null 2>&1; then
             echo "macos: warning — 7z exists but --help failed; archive handling may be broken." >&2
-          else
-            echo "macos: archiving stack healthy — 7z CLI available." >&2
           fi
 
           # Verify Keka application is installed and registered.
           if [ ! -d "/Applications/Keka.app" ]; then
             echo "macos: warning — Keka.app not found in /Applications; GUI archiving unavailable." >&2
-          else
-            echo "macos: archiving stack healthy — Keka installed." >&2
           fi
         '';
 
