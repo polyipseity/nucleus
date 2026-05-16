@@ -253,6 +253,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AISync.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-ReplicaBisync.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-ReplicaBisyncScheduledTask.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSshServer.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-PowerPolicy.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-WindowsRdp.ps1")
@@ -542,6 +543,7 @@ if ($EnableCloudDrivesParity) {
     Sync-CloudDrive -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
   }
 }
+Sync-ReplicaBisyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
 Sync-OpenSshServer -Enabled:$EnableRemoteAccessParity
 # Re-run host age key registration after Sync-OpenSshServer has started
 # the sshd service (which generates host keys on a fresh machine).  This second

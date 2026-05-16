@@ -23,6 +23,7 @@ let
   windowsCloudDriveModuleText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-CloudDrive.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-ShellProfile.ps1;
   windowsReplicaModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Invoke-ReplicaBisync.ps1;
+  windowsReplicaScheduleModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Sync-ReplicaBisyncScheduledTask.ps1;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
@@ -163,27 +164,30 @@ let
   ) "cloud-setup scripts must use root-only directory listings for credential validation";
 
   # Test 25: Finder sidebar is managed automatically via mysides with deterministic ordering
-  test_finder_sidebar_automatic_strategy = assert' (
-    containsRegex "pkgs\\.mysides" macosText
-    && containsRegex "\\$MYSIDES_BIN list" macosText
-    && containsRegex "add_favorite" macosText
-    && containsRegex "\\$MYSIDES_BIN add \"Applications\" \"file:///Applications\"" macosText
-    && containsRegex "\\$MYSIDES_BIN add \"Downloads\" \"file://\\$HOME/Downloads\"" macosText
-    && containsRegex "\\$MYSIDES_BIN add \"clouds\" \"file://\\$HOME/clouds\"" macosText
-    && containsRegex "\\$MYSIDES_BIN add \"dev\" \"file://\\$HOME/dev\"" macosText
-    && containsRegex "\\$MYSIDES_BIN add \"Desktop\" \"file://\\$HOME/Desktop\"" macosText
-    && containsRegex "\\$MYSIDES_BIN add \"Documents\" \"file://\\$HOME/Documents\"" macosText
-    && containsRegex "\\$MYSIDES_BIN add \"Music\" \"file://\\$HOME/Music\"" macosText
-    && containsRegex "\\$MYSIDES_BIN add \"Movies\" \"file://\\$HOME/Movies\"" macosText
-    && containsRegex "\\$MYSIDES_BIN add \"Pictures\" \"file://\\$HOME/Pictures\"" macosText
-    && containsRegex "\\$MYSIDES_BIN remove \"/\"" macosText
-    && containsRegex "\\$MYSIDES_BIN remove \"\\$\\(id -un\\)\"" macosText
-    && containsRegex "\\$MYSIDES_BIN remove \\\"\\.Trash\\\"" macosText
-    && !containsRegex "finder-sidebar-repair-v2\\.done" macosText
-    && !containsRegex "add favorites manually" macosText
-    && !containsRegex "FavoriteItems\\.sfl4" macosText
-    && !containsRegex "osascript -l JavaScript" macosText
-  ) "Finder sidebar must be configured automatically via mysides with the exact managed favorites order";
+  test_finder_sidebar_automatic_strategy =
+    assert'
+      (
+        containsRegex "pkgs\\.mysides" macosText
+        && containsRegex "\\$MYSIDES_BIN list" macosText
+        && containsRegex "add_favorite" macosText
+        && containsRegex "\\$MYSIDES_BIN add \"Applications\" \"file:///Applications\"" macosText
+        && containsRegex "\\$MYSIDES_BIN add \"Downloads\" \"file://\\$HOME/Downloads\"" macosText
+        && containsRegex "\\$MYSIDES_BIN add \"clouds\" \"file://\\$HOME/clouds\"" macosText
+        && containsRegex "\\$MYSIDES_BIN add \"dev\" \"file://\\$HOME/dev\"" macosText
+        && containsRegex "\\$MYSIDES_BIN add \"Desktop\" \"file://\\$HOME/Desktop\"" macosText
+        && containsRegex "\\$MYSIDES_BIN add \"Documents\" \"file://\\$HOME/Documents\"" macosText
+        && containsRegex "\\$MYSIDES_BIN add \"Music\" \"file://\\$HOME/Music\"" macosText
+        && containsRegex "\\$MYSIDES_BIN add \"Movies\" \"file://\\$HOME/Movies\"" macosText
+        && containsRegex "\\$MYSIDES_BIN add \"Pictures\" \"file://\\$HOME/Pictures\"" macosText
+        && containsRegex "\\$MYSIDES_BIN remove \"/\"" macosText
+        && containsRegex "\\$MYSIDES_BIN remove \"\\$\\(id -un\\)\"" macosText
+        && containsRegex "\\$MYSIDES_BIN remove \\\"\\.Trash\\\"" macosText
+        && !containsRegex "finder-sidebar-repair-v2\\.done" macosText
+        && !containsRegex "add favorites manually" macosText
+        && !containsRegex "FavoriteItems\\.sfl4" macosText
+        && !containsRegex "osascript -l JavaScript" macosText
+      )
+      "Finder sidebar must be configured automatically via mysides with the exact managed favorites order";
 
   # Test 26: macOS activation no longer pre-creates /Volumes cloud mountpoints
   test_cloud_mounts_prepare_volumes = assert' (
@@ -311,20 +315,44 @@ let
       "Only macOS may map iCloudReplica to native Mobile Documents; Windows must enforce managed directories";
 
   # Test 43: Bisync seed uses --resync without --check-access; seeded runs always enforce --check-access
-  test_bisync_seeded_resync_guard = assert' (
-    containsRegex "state_marker" replicaBisyncShellText
-    && containsRegex "--check-access" replicaBisyncShellText
-    && containsRegex "--timeout 60s" replicaBisyncShellText
-    && containsRegex "--contimeout 15s" replicaBisyncShellText
-    && !(containsRegex "--resilient" replicaBisyncShellText)
-    && !(containsRegex "--recover" replicaBisyncShellText)
-    && containsRegex "Test-Path -Path \\$stateMarker" windowsReplicaModuleText
-    && containsRegex "--check-access" windowsReplicaModuleText
-    && containsRegex "--timeout" windowsReplicaModuleText
-    && containsRegex "--contimeout" windowsReplicaModuleText
-    && !(containsRegex "--resilient" windowsReplicaModuleText)
-    && !(containsRegex "--recover" windowsReplicaModuleText)
-  ) "Bisync: seed uses --resync without --check-access; seeded runs enforce --check-access; no indefinite-hang flags";
+  test_bisync_seeded_resync_guard =
+    assert'
+      (
+        containsRegex "state_marker" replicaBisyncShellText
+        && containsRegex "--check-access" replicaBisyncShellText
+        && containsRegex "--timeout 60s" replicaBisyncShellText
+        && containsRegex "--contimeout 15s" replicaBisyncShellText
+        && !(containsRegex "--resilient" replicaBisyncShellText)
+        && !(containsRegex "--recover" replicaBisyncShellText)
+        && containsRegex "Test-Path -Path \\$stateMarker" windowsReplicaModuleText
+        && containsRegex "--check-access" windowsReplicaModuleText
+        && containsRegex "--timeout" windowsReplicaModuleText
+        && containsRegex "--contimeout" windowsReplicaModuleText
+        && !(containsRegex "--resilient" windowsReplicaModuleText)
+        && !(containsRegex "--recover" windowsReplicaModuleText)
+      )
+      "Bisync: seed uses --resync without --check-access; seeded runs enforce --check-access; no indefinite-hang flags";
+
+  # Test 44: replica-bisync entrypoints resolve repository root outside checkout CWD
+  test_replica_entrypoints_resolve_repo_root = assert' (
+    containsRegex "resolve_nucleus_root" replicaBisyncShellText
+    && containsRegex "\.config/nucleus/repo-root" replicaBisyncShellText
+    && containsRegex "Resolve-NucleusRepoRoot" replicaBisyncPwshText
+    && containsRegex "\.config\\nucleus\\repo-root" replicaBisyncPwshText
+  ) "Replica entrypoint scripts must resolve repo root via managed config/git/CWD fallback";
+
+  # Test 45: fallbackTimer settings are wired to real scheduled runners on all hosts
+  test_replica_fallback_timer_wiring = assert' (
+    containsRegex "fallbackTimerReplicas" moduleText
+    && containsRegex "mkReplicaFallbackScript" moduleText
+    && containsRegex "cloud-replica-fallback" moduleText
+    && containsRegex "StartCalendarInterval" moduleText
+    && containsRegex "systemd\.user\.timers" moduleText
+    && containsRegex "OnCalendar" moduleText
+    && containsRegex "Sync-ReplicaBisyncScheduledTask" windowsApplyText
+    && containsRegex "New-ScheduledTaskTrigger" windowsReplicaScheduleModuleText
+    && containsRegex "-Daily" windowsReplicaScheduleModuleText
+  ) "Replica fallbackTimer must materialize as daily scheduler wiring on macOS/NixOS/Windows";
 
   allTests = [
     test_options_exist
@@ -370,6 +398,8 @@ let
     test_onedrive_personal_vault_excluded
     test_icloud_replica_platform_invariant
     test_bisync_seeded_resync_guard
+    test_replica_entrypoints_resolve_repo_root
+    test_replica_fallback_timer_wiring
   ];
 in
 {

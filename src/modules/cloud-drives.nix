@@ -280,6 +280,72 @@ let
   mkFusermountUnmount =
     mountPoint: "/bin/sh -c 'fusermount3 -u ${lib.escapeShellArg mountPoint} || true'";
 
+  # Build a replica fallback runner that resolves the repository root at
+  # runtime and invokes scripts/replica-bisync.sh for one replica id.
+  mkReplicaFallbackScript =
+    replica:
+    pkgs.writeShellScript "cloud-replica-fallback-${replica.id}" ''
+      set -eu
+
+      resolve_nucleus_root() {
+        _rnr_config_file="$HOME/.config/nucleus/repo-root"
+        if [ -f "$_rnr_config_file" ]; then
+          _rnr_root="$(cat "$_rnr_config_file")"
+          if [ -n "$_rnr_root" ] && [ -d "$_rnr_root" ]; then
+            printf '%s\n' "$_rnr_root"
+            return 0
+          fi
+        fi
+        if _rnr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+          if [ -n "$_rnr_git_root" ] && [ -d "$_rnr_git_root" ]; then
+            printf '%s\n' "$_rnr_git_root"
+            return 0
+          fi
+        fi
+        printf '%s\n' "$HOME/dev/nucleus"
+      }
+
+      _repo_root="$(resolve_nucleus_root)"
+      _replica_script="$_repo_root/scripts/replica-bisync.sh"
+      if [ ! -f "$_replica_script" ]; then
+        echo "cloud-drives: replica fallback script not found at $_replica_script" >&2
+        exit 1
+      fi
+
+      exec /bin/sh "$_replica_script" --replica-id ${lib.escapeShellArg replica.id}
+    '';
+
+  # Canonical fallback timer mapping. Repository policy mandates 00:00 slots.
+  mkFallbackLaunchdCalendar =
+    interval:
+    if interval == "weekly" then
+      [
+        {
+          Hour = 0;
+          Minute = 0;
+          Weekday = 0;
+        }
+      ]
+    else if interval == "monthly" then
+      [
+        {
+          Hour = 0;
+          Minute = 0;
+          Day = 1;
+        }
+      ]
+    else
+      [
+        {
+          Hour = 0;
+          Minute = 0;
+        }
+      ];
+
+  mkFallbackSystemdCalendar =
+    interval:
+    if interval == "weekly" then "Sun 00:00:00" else if interval == "monthly" then "*-*-01 00:00:00" else "daily";
+
 in
 {
   options.nucleus.cloudDrives = {
@@ -300,6 +366,9 @@ in
     let
       enabledMounts = builtins.filter (m: m.enable) config.nucleus.cloudDrives.mounts;
       enabledReplicas = builtins.filter (r: r.enable) config.nucleus.cloudDrives.replicas;
+      fallbackTimerReplicas = builtins.filter (
+        r: r.enable && r.remoteName != null && (r.fallbackTimer.enable or true)
+      ) config.nucleus.cloudDrives.replicas;
 
       # Mounts require rclone plus an explicit configured remote.
       rcloneMounts = builtins.filter (
@@ -495,6 +564,73 @@ in
                 };
               };
           }) rcloneMounts
+        );
+      })
+
+      # -----------------------------------------------------------------------
+      # macOS: LaunchAgents for per-replica fallback bisync timers
+      # -----------------------------------------------------------------------
+      (lib.mkIf (pkgs.stdenv.isDarwin && fallbackTimerReplicas != [ ]) {
+        launchd.agents = builtins.listToAttrs (
+          map (replica: {
+            name = "cloud-replica-fallback-${replica.id}";
+            value = {
+              enable = true;
+              config = {
+                Label = "local.cloud-replica-fallback.${replica.id}";
+                ProgramArguments = [ "${mkReplicaFallbackScript replica}" ];
+                StartCalendarInterval = mkFallbackLaunchdCalendar replica.fallbackTimer.interval;
+                # Keep fallback runs on schedule boundaries only.
+                RunAtLoad = false;
+                StandardOutPath = "/dev/null";
+                StandardErrorPath = "${currentUserHome}/Library/Logs/cloud-replica-fallback-${replica.id}.log";
+              };
+            };
+          }) fallbackTimerReplicas
+        );
+      })
+
+      # -----------------------------------------------------------------------
+      # NixOS: systemd services/timers for per-replica fallback bisync
+      # -----------------------------------------------------------------------
+      (lib.mkIf (pkgs.stdenv.isLinux && fallbackTimerReplicas != [ ]) {
+        systemd.user.services = builtins.listToAttrs (
+          map (replica: {
+            name = "cloud-replica-fallback-${replica.id}";
+            value = {
+              Unit = {
+                Description = "Fallback replica bisync run: ${replica.id}";
+                After = "network-online.target";
+                Wants = "network-online.target";
+              };
+              Service = {
+                Type = "oneshot";
+                ExecStart = "${mkReplicaFallbackScript replica}";
+              };
+              Install = {
+                WantedBy = [ "default.target" ];
+              };
+            };
+          }) fallbackTimerReplicas
+        );
+
+        systemd.user.timers = builtins.listToAttrs (
+          map (replica: {
+            name = "cloud-replica-fallback-${replica.id}";
+            value = {
+              Unit = {
+                Description = "Fallback replica bisync timer: ${replica.id}";
+              };
+              Timer = {
+                OnCalendar = mkFallbackSystemdCalendar replica.fallbackTimer.interval;
+                Persistent = true;
+                Unit = "cloud-replica-fallback-${replica.id}.service";
+              };
+              Install = {
+                WantedBy = [ "timers.target" ];
+              };
+            };
+          }) fallbackTimerReplicas
         );
       })
     ];
