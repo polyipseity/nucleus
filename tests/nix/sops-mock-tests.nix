@@ -17,12 +17,11 @@ let
     hasAttr
     isList
     isString
-    isAttrs
     all
     ;
 
   # Assertion helper.
-  assert' = cond: msg: if !cond then builtins.throw msg else null;
+  assert' = cond: msg: if !cond then throw msg else null;
 
   # Mock SOPS configuration matching .sops.yaml structure.
   mockSopsConfig = {
@@ -35,6 +34,10 @@ let
       primary_gpg = [ "0x1234ABCD" ];
     };
     creation_rules = [
+      {
+        path_regex = "src/secrets/users-.*\\.yml$";
+        key_groups = [ { age = "age_devices"; } ];
+      }
       {
         path_regex = "src/secrets/.*";
         key_groups = [ { age = "age_devices"; } ];
@@ -62,7 +65,7 @@ let
       ageKeys = mockSopsConfig.keys.age_devices;
       allStrings = all isString ageKeys;
     in
-    assert' (allStrings) "All age device keys must be strings";
+    assert' allStrings "All age device keys must be strings";
 
   # === TEST: Age key format validation (mock) ===
   test_age_key_format =
@@ -71,7 +74,7 @@ let
       # In real SOPS, keys start with "age1"; this test validates the pattern exists
       validFormats = all (key: builtins.match "^age1.*" key != null) ageKeys;
     in
-    assert' (validFormats) "Age device keys should match age1... format";
+    assert' validFormats "Age device keys should match age1... format";
 
   # === TEST: Creation rules are defined ===
   test_creation_rules_present = assert' (
@@ -84,7 +87,7 @@ let
       rules = mockSopsConfig.creation_rules;
       allValid = all (rule: (hasAttr "path_regex" rule) && (hasAttr "key_groups" rule)) rules;
     in
-    assert' (allValid) "All creation rules must have path_regex and key_groups";
+    assert' allValid "All creation rules must have path_regex and key_groups";
 
   # === TEST: Secrets directory covered by creation rules ===
   test_secrets_dir_covered =
@@ -92,7 +95,17 @@ let
       rules = mockSopsConfig.creation_rules;
       hasSecretsPath = any (rule: builtins.match ".*src/secrets.*" rule.path_regex != null) rules;
     in
-    assert' (hasSecretsPath) "Creation rules must cover src/secrets/ directory";
+    assert' hasSecretsPath "Creation rules must cover src/secrets/ directory";
+
+  # === TEST: Per-user secret files are covered by creation rules ===
+  test_user_secrets_covered =
+    let
+      rules = mockSopsConfig.creation_rules;
+      hasUserSecretsPath = any (
+        rule: builtins.match ".*src/secrets/users-.*\\.yml.*" rule.path_regex != null
+      ) rules;
+    in
+    assert' hasUserSecretsPath "Creation rules must cover src/secrets/users-*.yml files";
 
   # === TEST: Wallpapers directory covered by creation rules ===
   test_wallpapers_dir_covered =
@@ -102,7 +115,7 @@ let
         rule: builtins.match ".*src/assets/wallpapers.*" rule.path_regex != null
       ) rules;
     in
-    assert' (hasWallpapersPath) "Creation rules must cover src/assets/wallpapers/ directory";
+    assert' hasWallpapersPath "Creation rules must cover src/assets/wallpapers/ directory";
 
   # === TEST: Mock secret file structure ===
   test_mock_secret_structure =
@@ -121,7 +134,7 @@ let
       };
     in
     assert' (
-      (hasAttr "sops" mockSecret) && (hasAttr "git_identity" mockSecret)
+      hasAttr "sops" mockSecret && hasAttr "git_identity" mockSecret
     ) "Secret file structure should have sops metadata and payload";
 
   # === TEST: Secret payload is present ===
@@ -140,7 +153,7 @@ let
         && (hasAttr "name" mockSecret.git_identity)
         && (hasAttr "email" mockSecret.git_identity);
     in
-    assert' (hasPayload) "Encrypted secret should contain expected payload fields";
+    assert' hasPayload "Encrypted secret should contain expected payload fields";
 
   # === TEST: Age key count is sufficient ===
   test_age_key_count_sufficient =
@@ -149,7 +162,7 @@ let
       # Need at least 1 key (preferably multiple for redundancy)
       sufficient = (builtins.length ageKeys) >= 1;
     in
-    assert' (sufficient) "SOPS config must have at least one age device key";
+    assert' sufficient "SOPS config must have at least one age device key";
 
   # === TEST: GPG key is not empty ===
   test_gpg_key_not_empty =
@@ -157,7 +170,7 @@ let
       gpgKeys = mockSopsConfig.keys.primary_gpg;
       notEmpty = (builtins.length gpgKeys) > 0;
     in
-    assert' (notEmpty) "SOPS config must have at least one primary GPG key";
+    assert' notEmpty "SOPS config must have at least one primary GPG key";
 
   # === TEST: Mock secret recipient list structure ===
   test_secret_recipients_structure =
@@ -191,7 +204,7 @@ let
         builtins.attrValues materializedPaths
       );
     in
-    assert' (allAbsolute) "Secret materialization paths must be absolute or use environment vars";
+    assert' allAbsolute "Secret materialization paths must be absolute or use environment vars";
 
   # === TEST: SOPS updatekeys frequency is reasonable ===
   test_sops_updatekeys_frequency =
@@ -213,6 +226,7 @@ let
     test_creation_rules_present
     test_creation_rules_structure
     test_secrets_dir_covered
+    test_user_secrets_covered
     test_wallpapers_dir_covered
     test_mock_secret_structure
     test_secret_payload_present
@@ -226,7 +240,7 @@ in
 {
   success = true;
   testCount = builtins.length allTests;
-  message = "All ${builtins.toString (builtins.length allTests)} SOPS mock validation tests passed";
+  message = "All ${builtins.length allTests} SOPS mock validation tests passed";
   testNames = [
     "1: SOPS keys.age_devices is present"
     "2: Primary GPG key configured"
@@ -235,13 +249,14 @@ in
     "5: Creation rules are defined"
     "6: Creation rules have correct structure"
     "7: src/secrets/ directory is covered"
-    "8: src/assets/wallpapers/ directory is covered"
-    "9: Mock secret file has sops metadata and payload"
-    "10: Secret payload contains expected fields"
-    "11: Age key count is sufficient (≥1)"
-    "12: Primary GPG key is not empty"
-    "13: Secret recipient structure is valid"
-    "14: Materialization paths are absolute"
-    "15: SOPS updatekeys policy is documented"
+    "8: Per-user src/secrets/users-*.yml files are covered"
+    "9: src/assets/wallpapers/ directory is covered"
+    "10: Mock secret file has sops metadata and payload"
+    "11: Secret payload contains expected fields"
+    "12: Age key count is sufficient (≥1)"
+    "13: Primary GPG key is not empty"
+    "14: Secret recipient structure is valid"
+    "15: Materialization paths are absolute"
+    "16: SOPS updatekeys policy is documented"
   ];
 }
