@@ -16,17 +16,17 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   shellScriptText = builtins.readFile ../../scripts/cloud-setup.sh;
   pwshScriptText = builtins.readFile ../../scripts/cloud-setup.ps1;
-  replicaBisyncShellText = builtins.readFile ../../scripts/replica-bisync.sh;
-  replicaBisyncPwshText = builtins.readFile ../../scripts/replica-bisync.ps1;
+  replicaSyncShellText = builtins.readFile ../../scripts/replica-sync.sh;
+  replicaSyncPwshText = builtins.readFile ../../scripts/replica-sync.ps1;
   replicaResetShellText = builtins.readFile ../../scripts/replica-reset.sh;
   replicaResetPwshText = builtins.readFile ../../scripts/replica-reset.ps1;
   applyScriptText = builtins.readFile ../../src/scripts/apply.sh;
   windowsApplyText = builtins.readFile ../../src/hosts/windows/apply.ps1;
   windowsCloudDriveModuleText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-CloudDrive.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-ShellProfile.ps1;
-  windowsReplicaModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Invoke-ReplicaBisync.ps1;
+  windowsReplicaModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Invoke-ReplicaSync.ps1;
   windowsReplicaResetModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Invoke-ReplicaReset.ps1;
-  windowsReplicaScheduleModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Sync-ReplicaBisyncScheduledTask.ps1;
+  windowsReplicaScheduleModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Sync-ReplicaSyncScheduledTask.ps1;
   replicaCleanupConfigText = builtins.readFile ../../src/modules/configs/cloud/replica-cleanup.json;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
@@ -239,25 +239,25 @@ let
     && containsRegex ''"enable": true'' posixUsersText
   ) "iCloud replica entry must remain enabled for local replica convergence";
 
-  # Test 33: shell exports nucleus-replica-bisync command wrapper
+  # Test 33: shell exports nucleus-replica-sync command wrapper
   test_shell_has_replica_command = assert' (
-    containsRegex ''"nucleus-replica-bisync"'' shellNixText
-    && containsRegex ''"replica-bisync"'' shellNixText
-  ) "shell module must expose nucleus-replica-bisync command";
+    containsRegex ''"nucleus-replica-sync"'' shellNixText
+    && containsRegex ''"replica-sync"'' shellNixText
+  ) "shell module must expose nucleus-replica-sync command";
 
-  # Test 34: flake exposes replica-bisync app wired to scripts/replica-bisync.sh
+  # Test 34: flake exposes replica-sync app wired to scripts/replica-sync.sh
   test_flake_has_replica_app = assert' (
-    containsRegex "mkReplicaBisyncApp" flakeText
-    && containsRegex "scripts/replica-bisync\.sh" flakeText
-    && containsRegex "replica-bisync" flakeText
-  ) "flake apps must include replica-bisync on supported systems";
+    containsRegex "mkReplicaSyncApp" flakeText
+    && containsRegex "scripts/replica-sync\.sh" flakeText
+    && containsRegex "replica-sync" flakeText
+  ) "flake apps must include replica-sync on supported systems";
 
-  # Test 35: apply script runs replica bisync as a post-apply best-effort step
-  test_apply_runs_replica_bisync = assert' (
-    containsRegex "run_replica_bisync" applyScriptText
-    && containsRegex "--skip-replica-bisync" applyScriptText
-    && containsRegex "scripts/replica-bisync\\.sh" applyScriptText
-  ) "apply flow must include post-apply replica bisync hook for automatic OneDrive bisync";
+  # Test 35: apply script runs replica sync as a post-apply best-effort step
+  test_apply_runs_replica_sync = assert' (
+    containsRegex "run_replica_sync" applyScriptText
+    && containsRegex "--skip-replica-sync" applyScriptText
+    && containsRegex "scripts/replica-sync\\.sh" applyScriptText
+  ) "apply flow must include post-apply replica sync hook";
 
   # Test 36: macOS Finder sidebar setup creates only canonical local directories and excludes cloud mount subpaths
   test_finder_sidebar_paths_created = assert' (
@@ -272,50 +272,50 @@ let
 
   # Test 37: macOS replica runner must skip the iCloud replica entry to avoid native-path permission churn
   test_macos_skips_icloud_replica = assert' (
-    containsRegex ''"current_os"'' replicaBisyncShellText
-    && containsRegex ''"Darwin"'' replicaBisyncShellText
-    && containsRegex ''"provider" = "iCloud"'' replicaBisyncShellText
-    && containsRegex ''"id" = "iCloud"'' replicaBisyncShellText
-    && containsRegex "ensure_macos_icloud_replica_symlink" replicaBisyncShellText
-    && containsRegex "Library/Mobile Documents" replicaBisyncShellText
-    && containsRegex ''"native iCloud handles sync"'' replicaBisyncShellText
-  ) "replica-bisync.sh must skip iCloud replica on macOS";
+    containsRegex ''"current_os"'' replicaSyncShellText
+    && containsRegex ''"Darwin"'' replicaSyncShellText
+    && containsRegex ''"provider" = "iCloud"'' replicaSyncShellText
+    && containsRegex ''"id" = "iCloud"'' replicaSyncShellText
+    && containsRegex "ensure_macos_icloud_replica_symlink" replicaSyncShellText
+    && containsRegex "Library/Mobile Documents" replicaSyncShellText
+    && containsRegex ''"native iCloud handles sync"'' replicaSyncShellText
+  ) "replica-sync.sh must skip iCloud replica on macOS";
 
-  # Test 38: Windows parity includes a replica bisync module and scripts entrypoint
-  test_windows_replica_bisync_entrypoints = assert' (
-    containsRegex "function Invoke-ReplicaBisync" windowsReplicaModuleText
+  # Test 38: Windows parity includes a replica sync module and scripts entrypoint
+  test_windows_replica_sync_entrypoints = assert' (
+    containsRegex "function Invoke-ReplicaSync" windowsReplicaModuleText
     && containsRegex ''src\\modules\\users\.json'' windowsReplicaModuleText
-    && containsRegex "Invoke-ReplicaBisync" replicaBisyncPwshText
-  ) "Windows must include Invoke-ReplicaBisync module and scripts/replica-bisync.ps1 wrapper";
+    && containsRegex "Invoke-ReplicaSync" replicaSyncPwshText
+  ) "Windows must include Invoke-ReplicaSync module and scripts/replica-sync.ps1 wrapper";
 
-  # Test 39: Windows apply flow has post-apply replica bisync hook with skip flag
+  # Test 39: Windows apply flow has post-apply replica sync hook with skip flag
   test_windows_apply_replica_hook = assert' (
-    containsRegex "SkipReplicaBisync" windowsApplyText
-    && containsRegex "Invoke-ReplicaBisync" windowsApplyText
+    containsRegex "SkipReplicaSync" windowsApplyText
+    && containsRegex "Invoke-ReplicaSync" windowsApplyText
     && containsRegex "post-apply replica sync" windowsApplyText
-  ) "Windows apply flow must include replica bisync post-step with skip flag";
+  ) "Windows apply flow must include replica sync post-step with skip flag";
 
-  # Test 40: Windows shell profile exports nucleus-replica-bisync command parity
+  # Test 40: Windows shell profile exports nucleus-replica-sync command parity
   test_windows_shell_replica_command = assert' (
-    containsRegex "function nucleus-replica-bisync" windowsShellProfileText
-    && containsRegex ''scripts\\replica-bisync\.ps1'' windowsShellProfileText
-  ) "Windows shell profile must expose nucleus-replica-bisync";
+    containsRegex "function nucleus-replica-sync" windowsShellProfileText
+    && containsRegex ''scripts\\replica-sync\.ps1'' windowsShellProfileText
+  ) "Windows shell profile must expose nucleus-replica-sync";
 
   # Test 41: OneDrive replica runners must exclude Personal Vault on both platforms
   test_onedrive_personal_vault_excluded = assert' (
-    containsRegex ''build_onedrive_root_filter_file'' replicaBisyncShellText
-    && containsRegex ''skipping inaccessible OneDrive root entry'' replicaBisyncShellText
-    && containsRegex "--disable ListR" replicaBisyncShellText
-    && containsRegex "--dirs-only --disable ListR --log-level ERROR" replicaBisyncShellText
-    && containsRegex "--timeout 30s --contimeout 10s" replicaBisyncShellText
-    && containsRegex "--max-duration 1m" replicaBisyncShellText
-    && containsRegex ''Get-OneDriveRootFilterFile'' windowsReplicaModuleText
-    && containsRegex ''skipping inaccessible OneDrive root entry'' windowsReplicaModuleText
+    containsRegex "build_onedrive_root_filter_file" replicaSyncShellText
+    && containsRegex "skipping inaccessible OneDrive root entry" replicaSyncShellText
+    && containsRegex "--disable ListR" replicaSyncShellText
+    && containsRegex "--dirs-only --disable ListR --log-level ERROR" replicaSyncShellText
+    && containsRegex "--timeout 30s --contimeout 10s" replicaSyncShellText
+    && containsRegex "--max-duration 1m" replicaSyncShellText
+    && containsRegex "Get-OneDriveRootFilterFile" windowsReplicaModuleText
+    && containsRegex "skipping inaccessible OneDrive root entry" windowsReplicaModuleText
     && containsRegex ''"--disable", "ListR"'' windowsReplicaModuleText
     && containsRegex ''"--timeout", "30s"'' windowsReplicaModuleText
     && containsRegex ''"--contimeout", "10s"'' windowsReplicaModuleText
     && containsRegex ''"--max-duration", "1m"'' windowsReplicaModuleText
-  ) "Replica bisync runners must exclude OneDrive Personal Vault to avoid invalidResourceId failures";
+  ) "Replica sync runners must exclude OneDrive Personal Vault to avoid invalidResourceId failures";
 
   # Test 42: iCloudReplica exception is macOS-only; Windows keeps managed real directories
   test_icloud_replica_platform_invariant =
@@ -328,69 +328,29 @@ let
       )
       "Only macOS may map iCloudReplica to native Mobile Documents; Windows must enforce managed directories";
 
-  # Test 43: Bisync seed uses --resync without --check-access; seeded runs always enforce --check-access
-  test_bisync_seeded_resync_guard =
+  # Test 43: replica-sync runners enforce pull-only policy and avoid bisync execution paths
+  test_replica_pull_only_policy =
     assert'
       (
-        containsRegex "state_marker" replicaBisyncShellText
-        && containsRegex "--check-access" replicaBisyncShellText
-        && containsRegex "--timeout 60s" replicaBisyncShellText
-        && containsRegex "--contimeout 15s" replicaBisyncShellText
-        && containsRegex "--max-duration 2h" replicaBisyncShellText
-        && containsRegex "--disable-http2" replicaBisyncShellText
-        && containsRegex "--retries 3" replicaBisyncShellText
-        && containsRegex "--low-level-retries 10" replicaBisyncShellText
-        && containsRegex "--retries-sleep 10s" replicaBisyncShellText
-        && containsRegex "--transfers 2" replicaBisyncShellText
-        && containsRegex "--checkers 4" replicaBisyncShellText
-        && containsRegex "--tpslimit 8" replicaBisyncShellText
-        && containsRegex "--tpslimit-burst 8" replicaBisyncShellText
-        && containsRegex "seeded bisync check failed; cleared seed marker and retrying with recovery --resync" replicaBisyncShellText
-        && containsRegex "recovery --resync is running; do not start another run" replicaBisyncShellText
-        && containsRegex "prior lock file found:" replicaBisyncShellText
-        && containsRegex "another bisync run is already active" replicaBisyncShellText
-        && containsRegex "clearing stale bisync lock" replicaBisyncShellText
-        && containsRegex ''\$2 == "rclone" && \$3 == "bisync"'' replicaBisyncShellText
-        && containsRegex ''\$1 != self'' replicaBisyncShellText
-        && containsRegex "rclone deletefile" replicaBisyncShellText
-        && containsRegex "cleanup_remote_macos_artifacts" replicaBisyncShellText
-        && containsRegex "--filter \\\"\\+ \\.DS_Store\\\"" replicaBisyncShellText
-        && containsRegex ''runtime_filter_file'' replicaBisyncShellText
-        && !(containsRegex "--resilient" replicaBisyncShellText)
-        && !(containsRegex "--recover" replicaBisyncShellText)
-        && containsRegex "Test-Path -Path \\$stateMarker" windowsReplicaModuleText
-        && containsRegex "--check-access" windowsReplicaModuleText
-        && containsRegex "--timeout" windowsReplicaModuleText
-        && containsRegex "--contimeout" windowsReplicaModuleText
-        && containsRegex "--max-duration" windowsReplicaModuleText
-        && containsRegex "--retries" windowsReplicaModuleText
-        && containsRegex "--disable-http2" windowsReplicaModuleText
-        && containsRegex "--retries-sleep" windowsReplicaModuleText
-        && containsRegex "--transfers" windowsReplicaModuleText
-        && containsRegex "--checkers" windowsReplicaModuleText
-        && containsRegex "--tpslimit" windowsReplicaModuleText
-        && containsRegex "--tpslimit-burst" windowsReplicaModuleText
-        && containsRegex "seeded bisync check failed; cleared seed marker and retrying with recovery --resync" windowsReplicaModuleText
-        && containsRegex "recovery --resync is running; do not start another run" windowsReplicaModuleText
-        && containsRegex "prior lock file found:" windowsReplicaModuleText
-        && containsRegex "another bisync run is already active" windowsReplicaModuleText
-        && containsRegex "clearing stale bisync lock" windowsReplicaModuleText
-        && containsRegex "'deletefile'" windowsReplicaModuleText
-        && containsRegex "Clear-RemoteMacOSMetadataArtifact" windowsReplicaModuleText
-        && containsRegex "--filter', '\\+ \\.DS_Store'" windowsReplicaModuleText
-        && containsRegex "\\[string\\]\\$Provider" windowsReplicaModuleText
-        && containsRegex ''RuntimeFilterPath'' windowsReplicaModuleText
-        && !(containsRegex "--resilient" windowsReplicaModuleText)
-        && !(containsRegex "--recover" windowsReplicaModuleText)
+        containsRegex "unsupported direction" replicaSyncShellText
+        && containsRegex "pull-only by policy" replicaSyncShellText
+        && !(containsRegex "rclone bisync" replicaSyncShellText)
+        && !(containsRegex "--resync" replicaSyncShellText)
+        && !(containsRegex "--check-access" replicaSyncShellText)
+        && containsRegex "unsupported direction" windowsReplicaModuleText
+        && containsRegex "pull-only by policy" windowsReplicaModuleText
+        && !(containsRegex " bisync " windowsReplicaModuleText)
+        && !(containsRegex "--resync" windowsReplicaModuleText)
+        && !(containsRegex "--check-access" windowsReplicaModuleText)
       )
-      "Bisync: seed uses --resync without --check-access; seeded runs enforce --check-access; no indefinite-hang flags";
+      "Replica sync runners must enforce pull-only policy and avoid bisync state machinery";
 
-  # Test 44: replica-bisync entrypoints resolve repository root outside checkout CWD
+  # Test 44: replica-sync entrypoints resolve repository root outside checkout CWD
   test_replica_entrypoints_resolve_repo_root = assert' (
-    containsRegex "resolve_nucleus_root" replicaBisyncShellText
-    && containsRegex "\.config/nucleus/repo-root" replicaBisyncShellText
-    && containsRegex "Resolve-NucleusRepoRoot" replicaBisyncPwshText
-    && containsRegex "\.config\\nucleus\\repo-root" replicaBisyncPwshText
+    containsRegex "resolve_nucleus_root" replicaSyncShellText
+    && containsRegex "\.config/nucleus/repo-root" replicaSyncShellText
+    && containsRegex "Resolve-NucleusRepoRoot" replicaSyncPwshText
+    && containsRegex "\.config\\nucleus\\repo-root" replicaSyncPwshText
   ) "Replica entrypoint scripts must resolve repo root via managed config/git/CWD fallback";
 
   # Test 45: fallbackTimer settings are wired to real scheduled runners on all hosts
@@ -398,14 +358,14 @@ let
     containsRegex "fallbackTimerReplicas" moduleText
     && containsRegex "mkReplicaFallbackScript" moduleText
     && containsRegex "cloud-replica-fallback" moduleText
-    && containsRegex "nucleus-replica-bisync" moduleText
+    && containsRegex "nucleus-replica-sync" moduleText
     && containsRegex "StartCalendarInterval" moduleText
     && containsRegex "systemd\.user\.timers" moduleText
     && containsRegex "OnCalendar" moduleText
-    && containsRegex "Sync-ReplicaBisyncScheduledTask" windowsApplyText
+    && containsRegex "Sync-ReplicaSyncScheduledTask" windowsApplyText
     && containsRegex "New-ScheduledTaskTrigger" windowsReplicaScheduleModuleText
     && containsRegex "-Daily" windowsReplicaScheduleModuleText
-    && containsRegex "nucleus-replica-bisync" windowsReplicaScheduleModuleText
+    && containsRegex "nucleus-replica-sync" windowsReplicaScheduleModuleText
   ) "Replica fallbackTimer must materialize as daily scheduler wiring on macOS/NixOS/Windows";
 
   # Test 46: replica-reset command is exposed on POSIX and Windows with dedicated scripts/modules
@@ -419,7 +379,7 @@ let
     && containsRegex "Resolve-NucleusRepoRoot" replicaResetPwshText
     && containsRegex "Invoke-ReplicaReset" replicaResetPwshText
     && containsRegex "resolve_nucleus_root" replicaResetShellText
-    && containsRegex "replica-bisync" replicaResetShellText
+    && containsRegex "legacy" replicaResetShellText
     && containsRegex "clearing local replica data" replicaResetShellText
     && containsRegex "expected iCloud drive symlink" replicaResetShellText
     && containsRegex "clears local replica data" windowsReplicaResetModuleText
@@ -432,8 +392,8 @@ let
     containsRegex ''"macOSMetadata"'' replicaCleanupConfigText
     && containsRegex ''"remoteFilterGlobs"'' replicaCleanupConfigText
     && containsRegex ''"oneDrive"'' replicaCleanupConfigText
-    && containsRegex ''replica-cleanup\.json'' replicaBisyncShellText
-    && containsRegex ''macos_metadata_remote_filters'' replicaBisyncShellText
+    && containsRegex ''replica-cleanup\.json'' replicaSyncShellText
+    && containsRegex "macos_metadata_remote_filters" replicaSyncShellText
     && containsRegex ''replica-cleanup\.json'' windowsReplicaModuleText
     && containsRegex ''\$macOSMetadataRemoteFilterGlobs'' windowsReplicaModuleText
   ) "replica metadata exclusion and cleanup patterns must be centralized in one shared config";
@@ -473,15 +433,15 @@ let
     test_icloud_replica_enabled
     test_shell_has_replica_command
     test_flake_has_replica_app
-    test_apply_runs_replica_bisync
+    test_apply_runs_replica_sync
     test_finder_sidebar_paths_created
     test_macos_skips_icloud_replica
-    test_windows_replica_bisync_entrypoints
+    test_windows_replica_sync_entrypoints
     test_windows_apply_replica_hook
     test_windows_shell_replica_command
     test_onedrive_personal_vault_excluded
     test_icloud_replica_platform_invariant
-    test_bisync_seeded_resync_guard
+    test_replica_pull_only_policy
     test_replica_entrypoints_resolve_repo_root
     test_replica_fallback_timer_wiring
     test_replica_reset_command_parity

@@ -1,14 +1,13 @@
 #!/usr/bin/env sh
-# Reset local cloud replica bisync state for manual troubleshooting.
+# Reset local cloud replica sync state for manual troubleshooting.
 #
 # This command is intentionally local-only: it never modifies remote data.
-# It removes per-replica seed markers, local RCLONE_TEST files, and local
-# rclone bisync cache directories so the next replica-bisync run starts from a
-# clean local state.
+# It removes legacy per-replica state markers and local rclone cache
+# directories so the next replica-sync run starts from a clean local state.
 #
 # Intended usage:
 #   - Manual troubleshooting via `nucleus-replica-reset`
-#   - Repro steps before validating `nucleus-replica-bisync`
+#   - Repro steps before validating `nucleus-replica-sync`
 
 set -eu
 
@@ -47,8 +46,8 @@ usage: replica-reset.sh [--dry-run] [--replica-id ID]
   --replica-id ID   Restrict marker/RCLONE_TEST cleanup to one replica id.
 
 Notes:
-  - This command resets LOCAL bisync state only; remotes are never modified.
-  - The rclone bisync cache directory is always cleared because state files are
+  - This command resets LOCAL replica state only; remotes are never modified.
+  - Legacy marker/cache cleanup is global because old rclone state files are
     not reliably attributable to a single replica id.
 EOF
 }
@@ -124,7 +123,10 @@ run_local_cmd() {
   "$@"
 }
 
-replica_state_dir="$HOME/.config/nucleus/state/replica-bisync"
+legacy_replica_state_dirs="
+$HOME/.config/nucleus/state/replica-bisync
+$HOME/.config/nucleus/state/replica-sync
+"
 local_failures=0
 
 replica_lines_file="$(mktemp)"
@@ -136,12 +138,14 @@ while IFS="$(printf '\t')" read id local_path provider icloud_service; do
     continue
   fi
 
-  state_marker="$replica_state_dir/$id.seeded"
-  if [ -f "$state_marker" ]; then
-    if ! run_local_cmd rm -f "$state_marker"; then
-      local_failures=$((local_failures + 1))
+  for state_dir in $legacy_replica_state_dirs; do
+    state_marker="$state_dir/$id.seeded"
+    if [ -f "$state_marker" ]; then
+      if ! run_local_cmd rm -f "$state_marker"; then
+        local_failures=$((local_failures + 1))
+      fi
     fi
-  fi
+  done
 
   local_root="$HOME/$local_path"
 
@@ -175,15 +179,19 @@ done < "$replica_lines_file"
 
 rm -f "$replica_lines_file"
 
-# Reset rclone's local bisync cache to clear lock/listing state.
+# Reset rclone's local cache directories to clear stale sync state.
 # rclone cache roots vary by platform/runtime:
 # - Linux/most POSIX shells: ~/.cache/rclone
 # - macOS native builds: ~/Library/Caches/rclone
 for cache_dir in \
   "$HOME/.cache/rclone/bisync" \
   "$HOME/.cache/rclone/bisync-lock" \
+  "$HOME/.cache/rclone/sync" \
+  "$HOME/.cache/rclone/sync-lock" \
   "$HOME/Library/Caches/rclone/bisync" \
-  "$HOME/Library/Caches/rclone/bisync-lock"; do
+  "$HOME/Library/Caches/rclone/bisync-lock" \
+  "$HOME/Library/Caches/rclone/sync" \
+  "$HOME/Library/Caches/rclone/sync-lock"; do
   if [ -d "$cache_dir" ]; then
     if ! run_local_cmd rm -rf "$cache_dir"; then
       local_failures=$((local_failures + 1))

@@ -60,7 +60,7 @@ in
     (mkNucleusCommand "nucleus-cloud-setup" "cloud-setup")
     (mkNucleusCommand "nucleus-gc" "gc")
     (mkNucleusCommand "nucleus-health-check" "health-check")
-    (mkNucleusCommand "nucleus-replica-bisync" "replica-bisync")
+    (mkNucleusCommand "nucleus-replica-sync" "replica-sync")
     (mkNucleusCommand "nucleus-replica-reset" "replica-reset")
     (mkNucleusCommand "nucleus-update" "update")
   ];

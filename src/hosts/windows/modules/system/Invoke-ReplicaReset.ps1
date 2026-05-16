@@ -1,12 +1,12 @@
 <#
 .SYNOPSIS
-  Reset local replica bisync state for manual troubleshooting.
+  Reset local replica sync state for manual troubleshooting.
 
 .DESCRIPTION
   Clears only local state for enabled replicas declared in src/modules/users.json:
-    - %USERPROFILE%\.config\nucleus\state\replica-bisync\<id>.seeded markers
-    - Local RCLONE_TEST files under each replica localPath
-    - Local rclone bisync cache directories
+    - Legacy marker files under %USERPROFILE%\.config\nucleus\state\replica-*\<id>.seeded
+    - Local replica data under each replica localPath
+    - Local rclone cache directories related to sync/bisync
 
   This function never modifies remote data.
 
@@ -18,8 +18,8 @@
 
 .PARAMETER ReplicaId
   Optional replica id filter; when provided only matching marker and local
-  RCLONE_TEST cleanup is applied. Cache reset remains global because rclone
-  bisync cache files are not reliably attributable to one replica id.
+  replica cleanup is applied. Cache reset remains global because old rclone
+  cache files are not reliably attributable to one replica id.
 #>
 function Invoke-ReplicaReset {
   [CmdletBinding()]
@@ -65,7 +65,10 @@ function Invoke-ReplicaReset {
     }
   }
 
-  $replicaStateDir = Join-Path -Path $HOME -ChildPath ".config\nucleus\state\replica-bisync"
+  $legacyReplicaStateDirs = @(
+    (Join-Path -Path $HOME -ChildPath ".config\nucleus\state\replica-bisync"),
+    (Join-Path -Path $HOME -ChildPath ".config\nucleus\state\replica-sync")
+  )
 
   foreach ($replica in $replicas) {
     $id = [string]$replica.id
@@ -77,14 +80,15 @@ function Invoke-ReplicaReset {
     }
 
     $localRoot = Join-Path -Path $HOME -ChildPath $localPath
-    $stateMarker = Join-Path -Path $replicaStateDir -ChildPath "$id.seeded"
-
-    if (Test-Path -Path $stateMarker -PathType Leaf) {
-      if ($DryRun) {
-        Write-Output "replica-reset: [dry-run] Remove-Item -Path '$stateMarker' -Force"
-      }
-      else {
-        Remove-Item -Path $stateMarker -Force
+    foreach ($stateDir in $legacyReplicaStateDirs) {
+      $stateMarker = Join-Path -Path $stateDir -ChildPath "$id.seeded"
+      if (Test-Path -Path $stateMarker -PathType Leaf) {
+        if ($DryRun) {
+          Write-Output "replica-reset: [dry-run] Remove-Item -Path '$stateMarker' -Force"
+        }
+        else {
+          Remove-Item -Path $stateMarker -Force
+        }
       }
     }
 
@@ -128,15 +132,21 @@ function Invoke-ReplicaReset {
     }
   }
 
-  # Global rclone bisync cache reset: paths vary by runtime (native Windows,
+  # Global rclone cache reset: paths vary by runtime (native Windows,
   # MSYS/WSL-like shells), so clear common local cache roots.
   $cacheDirs = @(
     (Join-Path -Path $HOME -ChildPath ".cache\rclone\bisync"),
     (Join-Path -Path $HOME -ChildPath ".cache\rclone\bisync-lock"),
+    (Join-Path -Path $HOME -ChildPath ".cache\rclone\sync"),
+    (Join-Path -Path $HOME -ChildPath ".cache\rclone\sync-lock"),
     (Join-Path -Path $env:LOCALAPPDATA -ChildPath "rclone\bisync"),
     (Join-Path -Path $env:LOCALAPPDATA -ChildPath "rclone\bisync-lock"),
+    (Join-Path -Path $env:LOCALAPPDATA -ChildPath "rclone\sync"),
+    (Join-Path -Path $env:LOCALAPPDATA -ChildPath "rclone\sync-lock"),
     (Join-Path -Path $env:APPDATA -ChildPath "rclone\bisync"),
-    (Join-Path -Path $env:APPDATA -ChildPath "rclone\bisync-lock")
+    (Join-Path -Path $env:APPDATA -ChildPath "rclone\bisync-lock"),
+    (Join-Path -Path $env:APPDATA -ChildPath "rclone\sync"),
+    (Join-Path -Path $env:APPDATA -ChildPath "rclone\sync-lock")
   ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 
   foreach ($cacheDir in $cacheDirs) {

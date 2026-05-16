@@ -6,8 +6,8 @@
 #             FUSE (requires FUSE-T on macOS, fuse3 on NixOS). Files are read
 #             from the remote on access; no full local copy is kept.
 #
-#   Replicas — full local copies of remote data, kept in sync by rclone
-#              bisync / rclone sync.
+#   Replicas — full local copies of remote data, kept in sync by pull-only
+#              rclone sync (remote -> local).
 #
 # Configuration: per-user settings come from src/modules/users.json under the
 # "cloudDrives" key. Multiple mounts and replicas may be declared per user,
@@ -139,8 +139,8 @@ let
           "pull"
           "push"
         ];
-        default = "bidirectional";
-        description = "Sync direction: pull copies remote to local, push copies local to remote, bidirectional uses rclone bisync.";
+        default = "pull";
+        description = "Replica direction. Pull is the supported policy (remote -> local); non-pull values are rejected by replica-sync runners.";
       };
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -281,7 +281,7 @@ let
     mountPoint: "/bin/sh -c 'fusermount3 -u ${lib.escapeShellArg mountPoint} || true'";
 
   # Build a replica fallback runner that resolves the repository root at
-  # runtime and invokes scripts/replica-bisync.sh for one replica id.
+  # runtime and invokes scripts/replica-sync.sh for one replica id.
   mkReplicaFallbackScript =
     replica:
     pkgs.writeShellScript "cloud-replica-fallback-${replica.id}" ''
@@ -306,10 +306,10 @@ let
       }
 
       _repo_root="$(resolve_nucleus_root)"
-      _nucleus_replica_cmd="${currentUserHome}/.nix-profile/bin/nucleus-replica-bisync"
+      _nucleus_replica_cmd="${currentUserHome}/.nix-profile/bin/nucleus-replica-sync"
       if [ ! -x "$_nucleus_replica_cmd" ]; then
         echo "cloud-drives: nucleus replica command not found at $_nucleus_replica_cmd" >&2
-        echo "cloud-drives: run home-manager switch/apply to install nucleus-replica-bisync before fallback timers run." >&2
+        echo "cloud-drives: run home-manager switch/apply to install nucleus-replica-sync before fallback timers run." >&2
         exit 1
       fi
 
@@ -451,7 +451,7 @@ in
                 else
                   ''
                     # Default invariant for replica roots: real directories so
-                    # rclone sync/bisync writes into managed paths directly.
+                    # rclone sync writes into managed paths directly.
                     if [ -L "$HOME/${r.localPath}" ]; then
                       _legacy_target="$(readlink "$HOME/${r.localPath}")"
                       rm "$HOME/${r.localPath}"
@@ -569,7 +569,7 @@ in
       })
 
       # -----------------------------------------------------------------------
-      # macOS: LaunchAgents for per-replica fallback bisync timers
+      # macOS: LaunchAgents for per-replica fallback replica-sync timers
       # -----------------------------------------------------------------------
       (lib.mkIf (pkgs.stdenv.isDarwin && fallbackTimerReplicas != [ ]) {
         launchd.agents = builtins.listToAttrs (
@@ -592,7 +592,7 @@ in
       })
 
       # -----------------------------------------------------------------------
-      # NixOS: systemd services/timers for per-replica fallback bisync
+      # NixOS: systemd services/timers for per-replica fallback replica-sync
       # -----------------------------------------------------------------------
       (lib.mkIf (pkgs.stdenv.isLinux && fallbackTimerReplicas != [ ]) {
         systemd.user.services = builtins.listToAttrs (
@@ -600,7 +600,7 @@ in
             name = "cloud-replica-fallback-${replica.id}";
             value = {
               Unit = {
-                Description = "Fallback replica bisync run: ${replica.id}";
+                Description = "Fallback replica sync run: ${replica.id}";
                 After = "network-online.target";
                 Wants = "network-online.target";
               };
@@ -620,7 +620,7 @@ in
             name = "cloud-replica-fallback-${replica.id}";
             value = {
               Unit = {
-                Description = "Fallback replica bisync timer: ${replica.id}";
+                Description = "Fallback replica sync timer: ${replica.id}";
               };
               Timer = {
                 OnCalendar = mkFallbackSystemdCalendar replica.fallbackTimer.interval;

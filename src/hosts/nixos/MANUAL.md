@@ -28,7 +28,7 @@
 - `nucleus-cloud-setup` — configure required cloud remotes and re-run apply.
 - `nucleus-gc` — run the managed Nix garbage-collection flow.
 - `nucleus-health-check` — run the managed repository health checks.
-- `nucleus-replica-bisync` — run one-shot sync for enabled cloud replicas.
+- `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
 - `nr` — run `bun run`.

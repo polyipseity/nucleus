@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Reset local cloud replica bisync state on Windows.
+  Reset local cloud replica sync state on Windows.
 
 .DESCRIPTION
   Thin scripts/ entrypoint wrapper around `Invoke-ReplicaReset` from

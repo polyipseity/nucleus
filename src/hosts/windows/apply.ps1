@@ -145,7 +145,7 @@
   CI or on low-bandwidth connections where model pulls (2-20 GB each) are
   undesirable.
 
-.PARAMETER SkipReplicaBisync
+.PARAMETER SkipReplicaSync
   When specified, suppresses the post-apply cloud replica sync step.
 
 .PARAMETER MinFreeDiskGB
@@ -171,8 +171,8 @@
   .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -SkipAISync
 
 .EXAMPLE
-  # Apply while skipping the post-apply replica bisync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -SkipReplicaBisync
+  # Apply while skipping the post-apply replica sync:
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -SkipReplicaSync
 
 .EXAMPLE
   # Apply while disabling machine age key auto-registration in .sops.yaml:
@@ -217,7 +217,7 @@ param(
   [bool]$EnableVsCodeWorkspaceTrustParity = $true,
   [int]$MinFreeDiskGB = 10,
   [switch]$SkipAISync,
-  [switch]$SkipReplicaBisync
+  [switch]$SkipReplicaSync
 )
 
 $ErrorActionPreference = "Stop"
@@ -251,9 +251,9 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 # system/: machine-level services and infrastructure (WinGet, SSH host, RDP, power, AI).
 . (Join-Path -Path $systemModuleDir -ChildPath "Initialize-SSHHostKey.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AISync.ps1")
-. (Join-Path -Path $systemModuleDir -ChildPath "Invoke-ReplicaBisync.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Invoke-ReplicaSync.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
-. (Join-Path -Path $systemModuleDir -ChildPath "Sync-ReplicaBisyncScheduledTask.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-ReplicaSyncScheduledTask.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSshServer.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-PowerPolicy.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-WindowsRdp.ps1")
@@ -543,7 +543,7 @@ if ($EnableCloudDrivesParity) {
     Sync-CloudDrive -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
   }
 }
-Sync-ReplicaBisyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
+Sync-ReplicaSyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
 Sync-OpenSshServer -Enabled:$EnableRemoteAccessParity
 # Re-run host age key registration after Sync-OpenSshServer has started
 # the sshd service (which generates host keys on a fresh machine).  This second
@@ -592,19 +592,19 @@ if ($SkipAISync) {
 # Converge enabled cloud replicas from users.json as the final post-apply step.
 # This is best-effort: replica sync can be long-running and should not
 # retroactively fail a completed configuration convergence.
-if ($SkipReplicaBisync) {
-  Write-Output "replica-bisync: -SkipReplicaBisync set; skipping post-apply replica sync"
+if ($SkipReplicaSync) {
+  Write-Output "replica-sync: -SkipReplicaSync set; skipping post-apply replica sync"
 } else {
   # Presence probe: rclone may be absent on first-provision hosts.
   $rcloneOnPath = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
   if ($null -eq $rcloneOnPath) {
-    Write-Output "replica-bisync: rclone not found in PATH; skipping post-apply replica sync"
+    Write-Output "replica-sync: rclone not found in PATH; skipping post-apply replica sync"
   } else {
-    Write-Output "replica-bisync: running post-apply replica sync..."
+    Write-Output "replica-sync: running post-apply replica sync..."
     try {
-      Invoke-ReplicaBisync -RepoRoot $repoRoot
+      Invoke-ReplicaSync -RepoRoot $repoRoot
     } catch {
-      Write-Warning "replica-bisync: replica sync incomplete (system apply succeeded): $($_.Exception.Message)"
+      Write-Warning "replica-sync: replica sync incomplete (system apply succeeded): $($_.Exception.Message)"
     }
   }
 }

@@ -19,7 +19,7 @@
 #
 # Arguments:
 #   --skip-AI-sync  skip the post-apply Ollama model sync step
-#   --skip-replica-bisync  skip the post-apply cloud replica sync step
+#   --skip-replica-sync  skip the post-apply cloud replica sync step
 #   --target-user   select the Home Manager flake profile key on standalone
 #                   Linux hosts (ignored on Darwin and NixOS system rebuilds)
 #
@@ -37,7 +37,7 @@ set -eu
 # Flag parsing
 # ---------------------------------------------------------------------------
 skip_ai_sync=false
-skip_replica_bisync=false
+skip_replica_sync=false
 target_user=""
 _aas_expect_target_user=false
 
@@ -58,10 +58,10 @@ for _arg in "$@"; do
       # low-bandwidth connections; this flag opts out of the post-apply sync.
       skip_ai_sync=true
       ;;
-    --skip-replica-bisync)
+    --skip-replica-sync)
       # Replica sync can be time-consuming for large datasets; this flag opts
       # out of the post-apply replica convergence step.
-      skip_replica_bisync=true
+      skip_replica_sync=true
       ;;
     --target-user)
       _aas_expect_target_user=true
@@ -257,33 +257,33 @@ run_ai_sync() {
   fi
 }
 
-run_replica_bisync() {
-  # Call scripts/replica-bisync.sh so enabled replicas in users.json are
+run_replica_sync() {
+  # Call scripts/replica-sync.sh so enabled replicas in users.json are
   # synchronized after a successful apply. This keeps local replica trees
   # (for example iCloudReplica) populated without requiring a separate manual run.
   #
   # Why best-effort: replica convergence is additive and may involve large
   # transfers. A replica error should not retroactively fail a completed
   # system apply.
-  if [ "$skip_replica_bisync" = true ]; then
-    printf '%s\n' "replica-bisync: --skip-replica-bisync set; skipping post-apply replica sync"
+  if [ "$skip_replica_sync" = true ]; then
+    printf '%s\n' "replica-sync: --skip-replica-sync set; skipping post-apply replica sync"
     return
   fi
 
-  _rrb_script="$REPO_ROOT/scripts/replica-bisync.sh"
+  _rrb_script="$REPO_ROOT/scripts/replica-sync.sh"
   if [ ! -f "$_rrb_script" ]; then
-    printf '%s\n' "replica-bisync: scripts/replica-bisync.sh not found at $_rrb_script; skipping replica sync"
+    printf '%s\n' "replica-sync: scripts/replica-sync.sh not found at $_rrb_script; skipping replica sync"
     return
   fi
 
   if ! command -v rclone >/dev/null 2>&1; then
-    printf '%s\n' "replica-bisync: rclone not found in PATH; skipping post-apply replica sync"
+    printf '%s\n' "replica-sync: rclone not found in PATH; skipping post-apply replica sync"
     return
   fi
 
-  printf '%s\n' "replica-bisync: running post-apply replica sync..."
+  printf '%s\n' "replica-sync: running post-apply replica sync..."
   if ! sh "$_rrb_script"; then
-    printf '%s\n' "replica-bisync: replica-bisync.sh exited with an error; replica sync incomplete (system apply succeeded)" >&2
+    printf '%s\n' "replica-sync: replica-sync.sh exited with an error; replica sync incomplete (system apply succeeded)" >&2
   fi
 }
 
@@ -468,7 +468,7 @@ case "$(uname -s)" in
     run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
     ensure_prek_hooks_installed "$REPO_ROOT"
     run_ai_sync
-    run_replica_bisync
+    run_replica_sync
     ;;
   Linux)
     if [ -f /etc/NIXOS ]; then
@@ -485,7 +485,7 @@ case "$(uname -s)" in
       run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
       ensure_prek_hooks_installed "$REPO_ROOT"
       run_ai_sync
-      run_replica_bisync
+      run_replica_sync
     else
       # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
       # no sudo required — keepalive is not started.
@@ -495,7 +495,7 @@ case "$(uname -s)" in
       run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
       ensure_prek_hooks_installed "$REPO_ROOT"
       run_ai_sync
-      run_replica_bisync
+      run_replica_sync
     fi
     ;;
   *)

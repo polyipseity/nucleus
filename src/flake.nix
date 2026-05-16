@@ -331,21 +331,21 @@
       };
 
       # Build cloud replica sync helper app for POSIX hosts.
-      # Runs declarative replica pull/push/bisync actions declared in users.json
-      # for the current user.
-      mkReplicaBisyncApp = pkgs: {
+      # Runs declarative replica pull actions declared in users.json for the
+      # current user.
+      mkReplicaSyncApp = pkgs: {
         type = "app";
         program = "${
           pkgs.writeShellApplication {
-            name = "nucleus-replica-bisync";
+            name = "nucleus-replica-sync";
             runtimeInputs = [
               pkgs.git
               pkgs.jq
               pkgs.rclone
             ];
-            text = builtins.readFile ../scripts/replica-bisync.sh;
+            text = builtins.readFile ../scripts/replica-sync.sh;
           }
-        }/bin/nucleus-replica-bisync";
+        }/bin/nucleus-replica-sync";
       };
 
       # Build cloud replica state reset helper app for POSIX hosts.
@@ -387,7 +387,7 @@
           cloud-setup = mkCloudSetupApp pkgsMac;
           gc = mkGcApp pkgsMac;
           health-check = mkHealthCheckApp pkgsMac;
-          replica-bisync = mkReplicaBisyncApp pkgsMac;
+          replica-sync = mkReplicaSyncApp pkgsMac;
           replica-reset = mkReplicaResetApp pkgsMac;
           update = mkUpdateApp pkgsMac;
         };
@@ -406,7 +406,7 @@
           cloud-setup = mkCloudSetupApp pkgsLinux;
           gc = mkGcApp pkgsLinux;
           health-check = mkHealthCheckApp pkgsLinux;
-          replica-bisync = mkReplicaBisyncApp pkgsLinux;
+          replica-sync = mkReplicaSyncApp pkgsLinux;
           replica-reset = mkReplicaResetApp pkgsLinux;
           update = mkUpdateApp pkgsLinux;
         };

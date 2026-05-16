@@ -104,6 +104,10 @@ following in both configuration and deconfiguration paths:
 
 - Treat cloud-drive capabilities as parity-first across macOS, NixOS, and
   Windows for both mounts and replicas.
+- Directionality invariant: mounts are live/bidirectional access surfaces;
+  replicas are pull-only read-only mirrors (remote -> local) for automation.
+- Do not add push/bisync execution paths for replicas in any host unless a
+  new repository policy explicitly changes this invariant.
 - Preserve stable provider identity keys (`id`, `remoteName`) while allowing
   host-appropriate presentation labels.
 - Keep managed mount/replica local paths as real directories on every host
