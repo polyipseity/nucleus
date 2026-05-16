@@ -1,0 +1,29 @@
+{
+  "macOSMetadata": {
+    "directoryNames": [
+      ".fseventsd",
+      ".Spotlight-V100",
+      ".TemporaryItems",
+      ".Trashes"
+    ],
+    "fileGlobs": [
+      ".DS_Store",
+      "._*",
+      ".apdisk"
+    ],
+    "remoteFilterGlobs": [
+      ".DS_Store",
+      "._*",
+      ".apdisk",
+      ".fseventsd/**",
+      ".Spotlight-V100/**",
+      ".TemporaryItems/**",
+      ".Trashes/**"
+    ]
+  },
+  "oneDrive": {
+    "inaccessibleRootEntries": [
+      "Personal Vault"
+    ]
+  }
+}

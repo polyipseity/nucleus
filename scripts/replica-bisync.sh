@@ -38,6 +38,7 @@ resolve_nucleus_root() {
 
 REPO_ROOT="$(resolve_nucleus_root)"
 USERS_JSON="$REPO_ROOT/src/modules/users.json"
+REPLICA_CLEANUP_CONFIG_JSON="$REPO_ROOT/src/modules/configs/cloud/replica-cleanup.json"
 
 usage() {
   cat <<'EOF'
@@ -82,6 +83,11 @@ if [ ! -f "$USERS_JSON" ]; then
   exit 1
 fi
 
+if [ ! -f "$REPLICA_CLEANUP_CONFIG_JSON" ]; then
+  printf '%s\n' "replica-bisync: cleanup config not found at $REPLICA_CLEANUP_CONFIG_JSON" >&2
+  exit 1
+fi
+
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "replica-bisync: jq not found; cannot parse users.json" >&2
   exit 1
@@ -102,6 +108,10 @@ fi
 
 username="$(id -un)"
 current_os="$(uname -s)"
+macos_metadata_file_globs="$(jq -r '.macOSMetadata.fileGlobs[]' "$REPLICA_CLEANUP_CONFIG_JSON")"
+macos_metadata_dir_names="$(jq -r '.macOSMetadata.directoryNames[]' "$REPLICA_CLEANUP_CONFIG_JSON")"
+macos_metadata_remote_filters="$(jq -r '.macOSMetadata.remoteFilterGlobs[]' "$REPLICA_CLEANUP_CONFIG_JSON")"
+onedrive_inaccessible_entries_lc="$(jq -r '.oneDrive.inaccessibleRootEntries[] | ascii_downcase' "$REPLICA_CLEANUP_CONFIG_JSON")"
 
 replica_lines="$({
   jq -r --arg username "$username" '
@@ -135,6 +145,253 @@ run_cmd() {
     return 0
   fi
   "$@"
+}
+
+record_unique_name() {
+  _list_file="$1"
+  _name="$2"
+
+  if [ -z "$_name" ]; then
+    return 0
+  fi
+
+  if [ ! -f "$_list_file" ] || ! grep -Fxq "$_name" "$_list_file"; then
+    printf '%s\n' "$_name" >> "$_list_file"
+  fi
+}
+
+remote_top_level_path_accessible() {
+  _remote_ref="$1"
+  _entry_name="$2"
+
+  _probe_remote_ref="${_remote_ref%/}/$_entry_name"
+
+  rclone lsf "$_probe_remote_ref" \
+    --max-depth 1 --disable ListR --log-level ERROR \
+    --retries 1 --low-level-retries 1 --timeout 30s --contimeout 10s \
+    --max-duration 1m >/dev/null 2>&1
+}
+
+should_skip_onedrive_root_entry() {
+  _entry_name="$1"
+  _entry_lc="$(printf '%s' "$_entry_name" | tr '[:upper:]' '[:lower:]')"
+
+  if [ -z "$onedrive_inaccessible_entries_lc" ]; then
+    return 1
+  fi
+
+  printf '%s\n' "$onedrive_inaccessible_entries_lc" | grep -Fxq "$_entry_lc"
+}
+
+build_onedrive_root_filter_file() {
+  _id="$1"
+  _local_dir="$2"
+  _remote_ref="$3"
+
+  _filter_file="$(mktemp)"
+  _dir_entries_file="$(mktemp)"
+  _file_entries_file="$(mktemp)"
+
+  # Exclude shared metadata patterns first so they never enter allowlisted
+  # replica traversals regardless of which host created them.
+  : > "$_filter_file"
+  for _pattern in $macos_metadata_remote_filters; do
+    printf -- '- %s\n' "$_pattern" >> "$_filter_file"
+  done
+
+  _remote_dirs="$(rclone lsf "$_remote_ref" --max-depth 1 --dirs-only --disable ListR --log-level ERROR 2>/dev/null || true)"
+  if [ -n "$_remote_dirs" ]; then
+    printf '%s\n' "$_remote_dirs" | while IFS= read -r _remote_dir; do
+      _remote_dir="${_remote_dir%/}"
+      if [ -z "$_remote_dir" ]; then
+        continue
+      fi
+
+      if should_skip_onedrive_root_entry "$_remote_dir"; then
+        printf '%s\n' "replica-bisync: [$_id] skipping inaccessible OneDrive root entry '$_remote_dir'" >&2
+        continue
+      fi
+
+      if remote_top_level_path_accessible "$_remote_ref" "$_remote_dir"; then
+        record_unique_name "$_dir_entries_file" "$_remote_dir"
+      else
+        printf '%s\n' "replica-bisync: [$_id] skipping inaccessible OneDrive root entry '$_remote_dir'" >&2
+      fi
+    done
+  fi
+
+  _remote_files="$(rclone lsf "$_remote_ref" --max-depth 1 --files-only --disable ListR --log-level ERROR 2>/dev/null || true)"
+  if [ -n "$_remote_files" ]; then
+    printf '%s\n' "$_remote_files" | while IFS= read -r _remote_file; do
+      if should_skip_onedrive_root_entry "$_remote_file"; then
+        printf '%s\n' "replica-bisync: [$_id] skipping inaccessible OneDrive root entry '$_remote_file'" >&2
+        continue
+      fi
+      record_unique_name "$_file_entries_file" "$_remote_file"
+    done
+  fi
+
+  for _local_entry in "$_local_dir"/* "$_local_dir"/.[!.]* "$_local_dir"/..?*; do
+    if [ ! -e "$_local_entry" ]; then
+      continue
+    fi
+
+    _local_name="$(basename "$_local_entry")"
+    if should_skip_onedrive_root_entry "$_local_name"; then
+      printf '%s\n' "replica-bisync: [$_id] skipping inaccessible OneDrive root entry '$_local_name'" >&2
+      continue
+    fi
+    if [ -d "$_local_entry" ]; then
+      record_unique_name "$_dir_entries_file" "$_local_name"
+    else
+      record_unique_name "$_file_entries_file" "$_local_name"
+    fi
+  done
+
+  if [ -f "$_dir_entries_file" ]; then
+    while IFS= read -r _dir_name; do
+      if [ -z "$_dir_name" ]; then
+        continue
+      fi
+      printf '+ /%s/\n' "$_dir_name" >> "$_filter_file"
+      printf '+ /%s/**\n' "$_dir_name" >> "$_filter_file"
+    done < "$_dir_entries_file"
+  fi
+
+  if [ -f "$_file_entries_file" ]; then
+    while IFS= read -r _file_name; do
+      if [ -z "$_file_name" ]; then
+        continue
+      fi
+      printf '+ /%s\n' "$_file_name" >> "$_filter_file"
+    done < "$_file_entries_file"
+  fi
+
+  {
+    printf '+ /RCLONE_TEST/\n'
+    printf '+ /RCLONE_TEST/**\n'
+    printf '%s\n' '- **'
+  } >> "$_filter_file"
+
+  rm -f "$_dir_entries_file" "$_file_entries_file"
+  printf '%s\n' "$_filter_file"
+}
+
+# Remove macOS metadata artefacts from local replica roots so all hosts keep
+# cloud trees clean even when files were introduced by a macOS client.
+cleanup_local_macos_artifacts() {
+  _target_dir="$1"
+
+  if [ ! -d "$_target_dir" ]; then
+    return 0
+  fi
+
+  if [ "$dry_run" = true ]; then
+    printf '%s\n' "replica-bisync: [dry-run] local metadata cleanup in $_target_dir"
+    return 0
+  fi
+
+  for _pattern in $macos_metadata_file_globs; do
+    find "$_target_dir" -type f -name "$_pattern" -delete
+  done
+
+  for _dir_name in $macos_metadata_dir_names; do
+    find "$_target_dir" -type d -name "$_dir_name" -prune -exec rm -rf {} +
+  done
+}
+
+# Remove macOS metadata artefacts from remotes to prevent cross-host churn.
+# This runs before sync/bisync so stale metadata does not immediately get
+# mirrored back to local replicas.
+cleanup_remote_macos_artifacts() {
+  _id="$1"
+  _remote_ref="$2"
+  _remote_path="$3"
+  _provider="$4"
+  _icloud_service="$5"
+  _resolved_filters="$6"
+  _runtime_filter_file="$7"
+
+  shift 7
+
+  if [ "$_provider" = "OneDrive" ] && [ "$_remote_path" = "/" ]; then
+    # Upstream OneDrive API may expose Personal Vault in root listing and fail
+    # all recursive traversals before filters are applied. Root cleanup here is
+    # best-effort only, so skip it and rely on allowlist bisync filters to
+    # prevent macOS metadata churn for reachable trees.
+    printf '%s\n' "replica-bisync: [$_id] skipping remote macOS metadata cleanup at OneDrive root due to API invalidResourceId limitation" >&2
+    return 0
+  fi
+
+  set -- --log-level ERROR --retries 1 --low-level-retries 1 --timeout 30s --contimeout 10s --max-duration 2m
+  if [ "$_provider" = "iCloud" ]; then
+    set -- "$@" --iclouddrive-service "$_icloud_service"
+  fi
+  if [ "$_provider" = "OneDrive" ]; then
+    set -- "$@" --disable ListR
+    set -- "$@" --filter "- Personal Vault" --filter "- Personal Vault/**"
+    set -- "$@" --filter "- /Personal Vault" --filter "- /Personal Vault/**"
+  fi
+  if [ -n "$_resolved_filters" ]; then
+    set -- "$@" --filter-from "$_resolved_filters"
+  fi
+  if [ -n "$_runtime_filter_file" ]; then
+    set -- "$@" --filter-from "$_runtime_filter_file"
+  fi
+
+  set -- rclone delete "$_remote_ref" --rmdirs "$@"
+  for _pattern in $macos_metadata_remote_filters; do
+    set -- "$@" --filter "+ $_pattern"
+  done
+  set -- "$@" --filter "- **"
+
+  if ! run_cmd "$@"; then
+    printf '%s\n' "replica-bisync: [$_id] warning: failed to clean remote macOS metadata artefacts" >&2
+    return 1
+  fi
+
+  return 0
+}
+
+run_bidirectional_sync() {
+  _id="$1"
+  _local_dir="$2"
+  _remote_ref="$3"
+  _state_marker="$4"
+  shift 4
+
+  _seeded=false
+  if [ -f "$_state_marker" ]; then
+    _seeded=true
+  fi
+
+  if [ "$_seeded" = true ]; then
+    # Seeded: use --check-access for safety.
+    if run_cmd rclone bisync "$_local_dir" "$_remote_ref" \
+      --check-access --conflict-resolve newer --max-lock 2m \
+      --timeout 60s --contimeout 15s --max-duration 2h \
+      --retries 1 --low-level-retries 1 \
+      --stats 30s --stats-one-line --stats-log-level NOTICE "$@"; then
+      return 0
+    fi
+
+    printf '%s\n' "replica-bisync: [$_id] seeded bisync failed; retrying once with --resync" >&2
+  fi
+
+  # Seed run: --resync WITHOUT --check-access because rclone creates the
+  # RCLONE_TEST access marker files during --resync; checking for them first
+  # would fail.
+  if run_cmd rclone bisync "$_local_dir" "$_remote_ref" \
+    --resync --conflict-resolve newer --max-lock 2m \
+    --timeout 60s --contimeout 15s --max-duration 2h \
+    --retries 1 --low-level-retries 1 \
+    --stats 30s --stats-one-line --stats-log-level NOTICE "$@"; then
+    mkdir -p "$replica_state_dir"
+    : > "$_state_marker"
+    return 0
+  fi
+
+  return 1
 }
 
 # Keep macOS iCloudReplica mapped to the native CloudDocs path. This makes
@@ -231,6 +488,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
   local_dir="$HOME/$local_path"
   remote_ref="$remote_name:$remote_path"
   resolved_filters="$(resolve_filter_path "$filters_file")"
+  runtime_filter_file=""
   state_marker="$replica_state_dir/$id.seeded"
 
   mkdir -p "$local_dir"
@@ -243,6 +501,8 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
     fi
   fi
 
+  cleanup_local_macos_artifacts "$local_dir"
+
   # Build shared rclone arguments once per replica so provider-specific safety
   # filters stay identical across pull/push/bisync code paths.
   set -- --log-level ERROR
@@ -250,13 +510,36 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
     set -- "$@" --iclouddrive-service "$icloud_service"
   fi
   if [ "$provider" = "OneDrive" ]; then
-    # Microsoft exposes Personal Vault through the root listing even when the
-    # API later rejects traversal. Exclude it proactively so post-apply bisync
-    # stays reliable instead of failing every run on invalidResourceId.
-    set -- "$@" --exclude "Personal Vault" --exclude "Personal Vault/**"
+    # Microsoft currently exposes an inaccessible Personal Vault entry in some
+    # root listings. Exclude rules alone are not reliable upstream, so for
+    # root-level OneDrive replicas build an allowlist from accessible top-level
+    # entries and sync only those.
+    set -- "$@" --disable ListR
+    if [ "$remote_path" = "/" ]; then
+      runtime_filter_file="$(build_onedrive_root_filter_file "$id" "$local_dir" "$remote_ref")"
+      if [ -n "$resolved_filters" ]; then
+        set -- "$@" --filter-from "$resolved_filters"
+      fi
+      set -- "$@" --filter-from "$runtime_filter_file"
+    elif [ -n "$resolved_filters" ]; then
+      set -- "$@" --filter-from "$resolved_filters"
+    fi
+  else
+    set -- "$@" --exclude ".DS_Store" --exclude ".DS_Store/**"
+    set -- "$@" --exclude "._*" --exclude ".apdisk"
+    set -- "$@" --exclude ".fseventsd/**" --exclude ".Spotlight-V100/**"
+    set -- "$@" --exclude ".TemporaryItems/**" --exclude ".Trashes/**"
+    if [ -n "$resolved_filters" ]; then
+      set -- "$@" --filter-from "$resolved_filters"
+    fi
   fi
-  if [ -n "$resolved_filters" ]; then
-    set -- "$@" --filter-from "$resolved_filters"
+
+  # Remote metadata cleanup is best-effort: some providers can reject specific
+  # housekeeping traversals (for example protected OneDrive subtrees). Reuse
+  # the same provider-aware filter inputs as the real sync path so cleanup does
+  # not walk paths that the replica itself intentionally excludes.
+  if ! cleanup_remote_macos_artifacts "$id" "$remote_ref" "$remote_path" "$provider" "$icloud_service" "$resolved_filters" "$runtime_filter_file"; then
+    :
   fi
 
   case "$direction" in
@@ -274,30 +557,12 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
       ;;
     bidirectional)
       printf '%s\n' "replica-bisync: [$id] bisync $local_dir <-> $remote_ref"
-      if [ -f "$state_marker" ]; then
-        # Seeded: use --check-access for safety; RCLONE_TEST files already exist.
-        # WHY no --resilient/--recover: they cause rclone to continue indefinitely
-        # on persistent errors instead of failing fast. --timeout/--contimeout
-        # bound each operation to prevent hangs.
-        if ! run_cmd rclone bisync "$local_dir" "$remote_ref" \
-            --check-access --conflict-resolve newer --max-lock 2m \
-            --timeout 60s --contimeout 15s "$@"; then
-          printf '%s\n' "replica-bisync: [$id] bisync failed" >&2
-          failures=$((failures + 1))
-        fi
-      else
-        # Seed run: --resync WITHOUT --check-access because rclone creates the
-        # RCLONE_TEST access marker files during --resync; checking for them
-        # first would always fail (chicken-and-egg). Subsequent runs enforce
-        # --check-access.
-        if ! run_cmd rclone bisync "$local_dir" "$remote_ref" \
-            --resync --conflict-resolve newer --max-lock 2m \
-            --timeout 60s --contimeout 15s "$@"; then
-          failures=$((failures + 1))
-        else
-          mkdir -p "$replica_state_dir"
-          : > "$state_marker"
-        fi
+      # Seeded runs use --check-access and auto-fallback to one --resync
+      # retry on failure. This keeps day-2 operations safe while still
+      # self-healing stale bisync state after local resets/interrupted runs.
+      if ! run_bidirectional_sync "$id" "$local_dir" "$remote_ref" "$state_marker" "$@"; then
+        printf '%s\n' "replica-bisync: [$id] bisync failed" >&2
+        failures=$((failures + 1))
       fi
       ;;
     *)
@@ -305,6 +570,10 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
       failures=$((failures + 1))
       ;;
   esac
+
+  if [ -n "$runtime_filter_file" ] && [ -f "$runtime_filter_file" ]; then
+    rm -f "$runtime_filter_file"
+  fi
 done < "$replica_lines_file"
 
 rm -f "$replica_lines_file"

@@ -59,7 +59,25 @@ function Sync-ReplicaBisyncScheduledTask {
   # WHY interactive token: replica sync depends on user-scoped rclone config
   # and home-directory paths, so running in the logged-in user session avoids
   # machine-context path/credential mismatches.
-  $action = New-ScheduledTaskAction -Execute $pwshPath -Argument "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+  # WHY command wrapper first: daily fallback should follow the same user-facing
+  # nucleus-replica-bisync entrypoint as manual runs. If managed profile blocks
+  # are not loaded yet, fall back to the scripts/replica-bisync.ps1 wrapper.
+  $actionCommand = @"
+& {
+  if (Test-Path -Path `$PROFILE.CurrentUserAllHosts -PathType Leaf) { . `$PROFILE.CurrentUserAllHosts }
+  if (Test-Path -Path `$PROFILE.CurrentUserCurrentHost -PathType Leaf) { . `$PROFILE.CurrentUserCurrentHost }
+
+  `$nucleusCommand = Get-Command -Name "nucleus-replica-bisync" -ErrorAction SilentlyContinue
+  if (`$null -ne `$nucleusCommand) {
+    nucleus-replica-bisync
+    exit `$LASTEXITCODE
+  }
+
+  & "$scriptPath"
+  exit `$LASTEXITCODE
+}
+"@
+  $action = New-ScheduledTaskAction -Execute $pwshPath -Argument "-NoLogo -ExecutionPolicy Bypass -Command `"$actionCommand`""
   $trigger = New-ScheduledTaskTrigger -Daily -At "00:00"
   $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType InteractiveToken -RunLevel Limited
   $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 6)

@@ -31,6 +31,7 @@ function Invoke-ReplicaReset {
   )
 
   $ErrorActionPreference = "Stop"
+  $isMacOSHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)
 
   $resolvedRepoRoot = (Resolve-Path -Path $RepoRoot).Path
   $usersJsonPath = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\users.json"
@@ -69,6 +70,13 @@ function Invoke-ReplicaReset {
   foreach ($replica in $replicas) {
     $id = [string]$replica.id
     $localPath = [string]$replica.localPath
+    $provider = [string]$replica.provider
+    $iCloudService = [string]$replica.iCloudService
+    if ([string]::IsNullOrWhiteSpace($iCloudService)) {
+      $iCloudService = 'drive'
+    }
+
+    $localRoot = Join-Path -Path $HOME -ChildPath $localPath
     $stateMarker = Join-Path -Path $replicaStateDir -ChildPath "$id.seeded"
 
     if (Test-Path -Path $stateMarker -PathType Leaf) {
@@ -80,16 +88,43 @@ function Invoke-ReplicaReset {
       }
     }
 
-    # rclone bisync check-access may create local RCLONE_TEST in replica roots.
-    $localRoot = Join-Path -Path $HOME -ChildPath $localPath
-    $localCheckMarker = Join-Path -Path $localRoot -ChildPath "RCLONE_TEST"
-    if (Test-Path -Path $localCheckMarker -PathType Leaf) {
+    # macOS iCloud Drive replicas are represented as symlinks to CloudDocs.
+    # Never recurse into the symlink target during reset; remove only link.
+    if ($isMacOSHost -and $provider -eq 'iCloud' -and $iCloudService -eq 'drive') {
+      if (Test-Path -Path $localRoot) {
+        $localItem = Get-Item -Path $localRoot -Force -ErrorAction SilentlyContinue
+        $isSymlink = $null -ne $localItem -and ($localItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint)
+        if ($isSymlink) {
+          if ($DryRun) {
+            Write-Output "replica-reset: [dry-run] Remove-Item -Path '$localRoot' -Force"
+          }
+          else {
+            Remove-Item -Path $localRoot -Force
+          }
+        }
+        else {
+          Write-Warning "replica-reset: [$id] expected iCloud drive symlink at '$localRoot'; leaving non-symlink path untouched"
+        }
+      }
+
+      continue
+    }
+
+    # For non-exception replicas, reset clears local replica data only.
+    if (Test-Path -Path $localRoot) {
       if ($DryRun) {
-        Write-Output "replica-reset: [dry-run] Remove-Item -Path '$localCheckMarker' -Force"
+        Write-Output "replica-reset: [dry-run] Remove-Item -Path '$localRoot' -Recurse -Force"
       }
       else {
-        Remove-Item -Path $localCheckMarker -Force
+        Remove-Item -Path $localRoot -Recurse -Force
       }
+    }
+
+    if ($DryRun) {
+      Write-Output "replica-reset: [dry-run] New-Item -ItemType Directory -Path '$localRoot' -Force"
+    }
+    else {
+      New-Item -ItemType Directory -Path $localRoot -Force | Out-Null
     }
   }
 
@@ -99,7 +134,9 @@ function Invoke-ReplicaReset {
     (Join-Path -Path $HOME -ChildPath ".cache\rclone\bisync"),
     (Join-Path -Path $HOME -ChildPath ".cache\rclone\bisync-lock"),
     (Join-Path -Path $env:LOCALAPPDATA -ChildPath "rclone\bisync"),
-    (Join-Path -Path $env:APPDATA -ChildPath "rclone\bisync")
+    (Join-Path -Path $env:LOCALAPPDATA -ChildPath "rclone\bisync-lock"),
+    (Join-Path -Path $env:APPDATA -ChildPath "rclone\bisync"),
+    (Join-Path -Path $env:APPDATA -ChildPath "rclone\bisync-lock")
   ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 
   foreach ($cacheDir in $cacheDirs) {

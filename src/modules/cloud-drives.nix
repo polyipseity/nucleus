@@ -306,13 +306,14 @@ let
       }
 
       _repo_root="$(resolve_nucleus_root)"
-      _replica_script="$_repo_root/scripts/replica-bisync.sh"
-      if [ ! -f "$_replica_script" ]; then
-        echo "cloud-drives: replica fallback script not found at $_replica_script" >&2
+      _nucleus_replica_cmd="${currentUserHome}/.nix-profile/bin/nucleus-replica-bisync"
+      if [ ! -x "$_nucleus_replica_cmd" ]; then
+        echo "cloud-drives: nucleus replica command not found at $_nucleus_replica_cmd" >&2
+        echo "cloud-drives: run home-manager switch/apply to install nucleus-replica-bisync before fallback timers run." >&2
         exit 1
       fi
 
-      exec /bin/sh "$_replica_script" --replica-id ${lib.escapeShellArg replica.id}
+      exec "$_nucleus_replica_cmd" --replica-id ${lib.escapeShellArg replica.id}
     '';
 
   # Canonical fallback timer mapping. Repository policy mandates 00:00 slots.

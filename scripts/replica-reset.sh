@@ -93,6 +93,7 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 username="$(id -un)"
+current_os="$(uname -s)"
 replica_lines="$({
   jq -r --arg username "$username" '
     .[$username].cloudDrives.replicas // []
@@ -100,7 +101,9 @@ replica_lines="$({
     | .[]
     | [
         (.id // ""),
-        (.localPath // "")
+        (.localPath // ""),
+        (.provider // ""),
+        (.iCloudService // "drive")
       ]
     | @tsv
   ' "$USERS_JSON"
@@ -128,7 +131,7 @@ replica_lines_file="$(mktemp)"
 printf '%s\n' "$replica_lines" > "$replica_lines_file"
 
 # shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
-while IFS="$(printf '\t')" read id local_path; do
+while IFS="$(printf '\t')" read id local_path provider icloud_service; do
   if [ -n "$replica_id_filter" ] && [ "$id" != "$replica_id_filter" ]; then
     continue
   fi
@@ -140,21 +143,47 @@ while IFS="$(printf '\t')" read id local_path; do
     fi
   fi
 
-  # rclone bisync check-access may create a local RCLONE_TEST file. Removing it
-  # keeps manual seed validation deterministic after reset.
   local_root="$HOME/$local_path"
-  local_check_marker="$local_root/RCLONE_TEST"
-  if [ -f "$local_check_marker" ]; then
-    if ! run_local_cmd rm -f "$local_check_marker"; then
-      local_failures=$((local_failures + 1))
+
+  # macOS iCloud Drive replicas are represented as symlinks to the native
+  # CloudDocs path. Never recurse into that target during reset; only remove
+  # the symlink itself so remotes and native-managed content remain untouched.
+  if [ "$current_os" = "Darwin" ] && [ "$provider" = "iCloud" ] && [ "$icloud_service" = "drive" ]; then
+    if [ -L "$local_root" ]; then
+      if ! run_local_cmd rm -f "$local_root"; then
+        local_failures=$((local_failures + 1))
+      fi
+    elif [ -e "$local_root" ]; then
+      printf '%s\n' "replica-reset: [$id] warning: expected iCloud drive symlink at '$local_root'; leaving non-symlink path untouched" >&2
     fi
+    continue
+  fi
+
+  # For non-exception replicas, reset means clearing local replica data only.
+  if [ -e "$local_root" ] || [ -L "$local_root" ]; then
+    if ! run_local_cmd rm -rf "$local_root"; then
+      local_failures=$((local_failures + 1))
+      continue
+    fi
+  fi
+
+  if ! run_local_cmd mkdir -p "$local_root"; then
+    local_failures=$((local_failures + 1))
+    continue
   fi
 done < "$replica_lines_file"
 
 rm -f "$replica_lines_file"
 
 # Reset rclone's local bisync cache to clear lock/listing state.
-for cache_dir in "$HOME/.cache/rclone/bisync" "$HOME/.cache/rclone/bisync-lock"; do
+# rclone cache roots vary by platform/runtime:
+# - Linux/most POSIX shells: ~/.cache/rclone
+# - macOS native builds: ~/Library/Caches/rclone
+for cache_dir in \
+  "$HOME/.cache/rclone/bisync" \
+  "$HOME/.cache/rclone/bisync-lock" \
+  "$HOME/Library/Caches/rclone/bisync" \
+  "$HOME/Library/Caches/rclone/bisync-lock"; do
   if [ -d "$cache_dir" ]; then
     if ! run_local_cmd rm -rf "$cache_dir"; then
       local_failures=$((local_failures + 1))

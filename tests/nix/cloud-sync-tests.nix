@@ -27,6 +27,7 @@ let
   windowsReplicaModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Invoke-ReplicaBisync.ps1;
   windowsReplicaResetModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Invoke-ReplicaReset.ps1;
   windowsReplicaScheduleModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Sync-ReplicaBisyncScheduledTask.ps1;
+  replicaCleanupConfigText = builtins.readFile ../../src/modules/configs/cloud/replica-cleanup.json;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
@@ -275,8 +276,8 @@ let
     && containsRegex ''"Darwin"'' replicaBisyncShellText
     && containsRegex ''"provider" = "iCloud"'' replicaBisyncShellText
     && containsRegex ''"id" = "iCloud"'' replicaBisyncShellText
-    && containsRegex ''ensure_macos_icloud_replica_symlink'' replicaBisyncShellText
-    && containsRegex ''Library/Mobile Documents'' replicaBisyncShellText
+    && containsRegex "ensure_macos_icloud_replica_symlink" replicaBisyncShellText
+    && containsRegex "Library/Mobile Documents" replicaBisyncShellText
     && containsRegex ''"native iCloud handles sync"'' replicaBisyncShellText
   ) "replica-bisync.sh must skip iCloud replica on macOS";
 
@@ -302,10 +303,12 @@ let
 
   # Test 41: OneDrive replica runners must exclude Personal Vault on both platforms
   test_onedrive_personal_vault_excluded = assert' (
-    containsRegex ''Personal Vault/\*\*'' replicaBisyncShellText
-    && containsRegex "Personal Vault" replicaBisyncShellText
-    && containsRegex ''Personal Vault/\*\*'' windowsReplicaModuleText
-    && containsRegex "Personal Vault" windowsReplicaModuleText
+    containsRegex ''build_onedrive_root_filter_file'' replicaBisyncShellText
+    && containsRegex ''skipping inaccessible OneDrive root entry'' replicaBisyncShellText
+    && containsRegex "--disable ListR" replicaBisyncShellText
+    && containsRegex ''Get-OneDriveRootFilterFile'' windowsReplicaModuleText
+    && containsRegex ''skipping inaccessible OneDrive root entry'' windowsReplicaModuleText
+    && containsRegex ''"--disable", "ListR"'' windowsReplicaModuleText
   ) "Replica bisync runners must exclude OneDrive Personal Vault to avoid invalidResourceId failures";
 
   # Test 42: iCloudReplica exception is macOS-only; Windows keeps managed real directories
@@ -327,12 +330,25 @@ let
         && containsRegex "--check-access" replicaBisyncShellText
         && containsRegex "--timeout 60s" replicaBisyncShellText
         && containsRegex "--contimeout 15s" replicaBisyncShellText
+        && containsRegex "--max-duration 2h" replicaBisyncShellText
+        && containsRegex "--retries 1" replicaBisyncShellText
+        && containsRegex "seeded bisync failed; retrying once with --resync" replicaBisyncShellText
+        && containsRegex "cleanup_remote_macos_artifacts" replicaBisyncShellText
+        && containsRegex "--filter \\\"\\+ \\.DS_Store\\\"" replicaBisyncShellText
+        && containsRegex ''runtime_filter_file'' replicaBisyncShellText
         && !(containsRegex "--resilient" replicaBisyncShellText)
         && !(containsRegex "--recover" replicaBisyncShellText)
         && containsRegex "Test-Path -Path \\$stateMarker" windowsReplicaModuleText
         && containsRegex "--check-access" windowsReplicaModuleText
         && containsRegex "--timeout" windowsReplicaModuleText
         && containsRegex "--contimeout" windowsReplicaModuleText
+        && containsRegex "--max-duration" windowsReplicaModuleText
+        && containsRegex "--retries" windowsReplicaModuleText
+        && containsRegex "seeded bisync failed; retrying once with --resync" windowsReplicaModuleText
+        && containsRegex "Clear-RemoteMacOSMetadataArtifact" windowsReplicaModuleText
+        && containsRegex "--filter', '\\+ \\.DS_Store'" windowsReplicaModuleText
+        && containsRegex "\\[string\\]\\$Provider" windowsReplicaModuleText
+        && containsRegex ''RuntimeFilterPath'' windowsReplicaModuleText
         && !(containsRegex "--resilient" windowsReplicaModuleText)
         && !(containsRegex "--recover" windowsReplicaModuleText)
       )
@@ -351,12 +367,14 @@ let
     containsRegex "fallbackTimerReplicas" moduleText
     && containsRegex "mkReplicaFallbackScript" moduleText
     && containsRegex "cloud-replica-fallback" moduleText
+    && containsRegex "nucleus-replica-bisync" moduleText
     && containsRegex "StartCalendarInterval" moduleText
     && containsRegex "systemd\.user\.timers" moduleText
     && containsRegex "OnCalendar" moduleText
     && containsRegex "Sync-ReplicaBisyncScheduledTask" windowsApplyText
     && containsRegex "New-ScheduledTaskTrigger" windowsReplicaScheduleModuleText
     && containsRegex "-Daily" windowsReplicaScheduleModuleText
+    && containsRegex "nucleus-replica-bisync" windowsReplicaScheduleModuleText
   ) "Replica fallbackTimer must materialize as daily scheduler wiring on macOS/NixOS/Windows";
 
   # Test 46: replica-reset command is exposed on POSIX and Windows with dedicated scripts/modules
@@ -371,8 +389,23 @@ let
     && containsRegex "Invoke-ReplicaReset" replicaResetPwshText
     && containsRegex "resolve_nucleus_root" replicaResetShellText
     && containsRegex "replica-bisync" replicaResetShellText
+    && containsRegex "clearing local replica data" replicaResetShellText
+    && containsRegex "expected iCloud drive symlink" replicaResetShellText
+    && containsRegex "clears local replica data" windowsReplicaResetModuleText
+    && containsRegex "expected iCloud drive symlink" windowsReplicaResetModuleText
     && containsRegex "function Invoke-ReplicaReset" windowsReplicaResetModuleText
   ) "replica-reset command must exist with parity on POSIX and Windows";
+
+  # Test 47: Shared cleanup config must drive replica metadata cleanup behavior
+  test_replica_cleanup_config_centralized = assert' (
+    containsRegex ''"macOSMetadata"'' replicaCleanupConfigText
+    && containsRegex ''"remoteFilterGlobs"'' replicaCleanupConfigText
+    && containsRegex ''"oneDrive"'' replicaCleanupConfigText
+    && containsRegex ''replica-cleanup\.json'' replicaBisyncShellText
+    && containsRegex ''macos_metadata_remote_filters'' replicaBisyncShellText
+    && containsRegex ''replica-cleanup\.json'' windowsReplicaModuleText
+    && containsRegex ''\$macOSMetadataRemoteFilterGlobs'' windowsReplicaModuleText
+  ) "replica metadata exclusion and cleanup patterns must be centralized in one shared config";
 
   allTests = [
     test_options_exist
@@ -421,6 +454,7 @@ let
     test_replica_entrypoints_resolve_repo_root
     test_replica_fallback_timer_wiring
     test_replica_reset_command_parity
+    test_replica_cleanup_config_centralized
   ];
 in
 {
