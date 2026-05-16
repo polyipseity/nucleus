@@ -4,7 +4,7 @@
 - Open `fuse-t.app` once, then enable the `fuse-t` File System Extension in `System Settings > General > Login Items & Extensions > Extensions`.
 - Open `battery.app` once so `/usr/local/bin/battery` is installed.
 - Sign in to the App Store once so `mas` installs can provision Xcode.
-- Create the per-user rclone passphrase: from the repo root, run `sops edit src/secrets/<username>.yml`, add `rclone_config_pass: <output of openssl rand -hex 64>`, save (sops encrypts automatically), commit the file, then re-run `nucleus apply`. If you already configured rclone remotes without this passphrase, delete `~/.config/rclone/rclone.conf` first so the remotes are re-created with encryption.
+- Create the per-user rclone passphrase: from the repo root, run `sops edit src/secrets/users-<username>.yml`, add `rclone_config_pass: <output of openssl rand -hex 64>`, save (sops encrypts automatically), commit the file, then re-run `nucleus apply`. If you already configured rclone remotes without this passphrase, delete `~/.config/rclone/rclone.conf` first so the remotes are re-created with encryption.
 - Run `nucleus-cloud-setup` and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
 - Finder sidebar favorites set by `nucleus apply` are visible only after restarting macOS (log out and back in, or reboot).
 
@@ -32,6 +32,7 @@
 - `nucleus-gc` — run the managed Nix garbage-collection flow.
 - `nucleus-health-check` — run the managed repository health checks.
 - `nucleus-replica-bisync` — run one-shot sync for enabled cloud replicas.
+- `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
 - `nr` — run `bun run`.
 - `nx` — run `bun x`.

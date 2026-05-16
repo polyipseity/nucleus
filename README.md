@@ -85,7 +85,8 @@ nucleus/
 - `src/hosts/windows/apply.ps1`: Windows apply orchestrator; invokes WinGet DSC and helper modules.
 - `src/assets/wallpapers/*.sops`: encrypted wallpaper blobs.
 - `.sops.yaml`: recipient policy (shared age recipients + global GPG backup recipient).
-- `src/secrets/*.yml`: SOPS-encrypted identities (GPG keys and SSH keys).
+- `src/secrets/*.yml`: shared SOPS-encrypted identities (GPG keys and SSH keys).
+- `src/secrets/users-*.yml`: per-user SOPS secrets such as the rclone config passphrase.
 
 ## Apply commands
 
@@ -187,9 +188,9 @@ recipient.
    - Unix: `./scripts/bootstrap.sh apply` (or `nix run ./src#apply`)
    - Windows (Admin): `.\src\hosts\windows\apply.ps1`
 
-   `apply` derives the machine age public key from the SSH host key, inserts it
-   into `.sops.yaml`, and rewraps every encrypted file in one step. It prints
-   the git commands to run afterward but does not commit automatically.
+    `apply` derives the machine age public key from the SSH host key, inserts it
+    into `.sops.yaml`, and rewraps every encrypted file in one step. It prints
+    the git commands to run afterward but does not commit automatically.
 
 4. Commit and push the updated `.sops.yaml` and rewrapped secrets so other
    machines can verify the new recipient:
@@ -203,19 +204,22 @@ recipient.
 ### Remove a machine
 
 1. Delete the machine's recipient from `.sops.yaml` `keys.age_devices`.
-2. Rewrap all encrypted files so removed recipients lose access:
+1. Rewrap all encrypted files so removed recipients lose access.
 
-   ```bash
-   sops updatekeys src/secrets/git-identities.yml
-   sops updatekeys src/secrets/gpg-personal.yml
-   sops updatekeys src/secrets/ssh-personal.yml
-   for f in src/assets/wallpapers/*.sops; do
-     [ -e "$f" ] || continue
-     sops updatekeys "$f"
-   done
-   ```
+  Run these commands:
 
-3. Commit and push.
+  ```bash
+  sops updatekeys src/secrets/users-*.yml
+  sops updatekeys src/secrets/git-identities.yml
+  sops updatekeys src/secrets/gpg-personal.yml
+  sops updatekeys src/secrets/ssh-personal.yml
+  for f in src/assets/wallpapers/*.sops; do
+    [ -e "$f" ] || continue
+    sops updatekeys "$f"
+  done
+  ```
+
+1. Commit and push.
 
 ## Notes
 
