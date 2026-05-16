@@ -884,6 +884,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Configure Finder favorites automatically with mysides using a deterministic
     # ordered list. This avoids legacy archive rewrite workarounds and keeps the
     # sidebar convergeable from declarative activation.
+    # NOTE: mysides writes to the SFLSharedFileList via com.apple.sharedfilelistd.
+    # The daemon caches sidebar state; changes are fully visible in Finder only
+    # after a macOS logout/reboot. The daemon restarts below provide a partial
+    # in-session flush but a full restart is required for order to appear correctly.
     configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       set -eu
 
