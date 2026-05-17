@@ -6,6 +6,7 @@
   config,
   lib,
   pkgs,
+  users ? null,
   ...
 }:
 let
@@ -46,12 +47,14 @@ let
   _iCloudCfg =
     let
       allUsers = builtins.fromJSON (builtins.readFile ./users.json);
+      effectiveUsers = if users != null then users else allUsers;
       currentUser = config.home.username;
       perUser =
         if
-          builtins.hasAttr currentUser allUsers && builtins.hasAttr "iCloudExclusions" allUsers.${currentUser}
+          builtins.hasAttr currentUser effectiveUsers
+          && builtins.hasAttr "iCloudExclusions" effectiveUsers.${currentUser}
         then
-          allUsers.${currentUser}.iCloudExclusions
+          effectiveUsers.${currentUser}.iCloudExclusions
         else
           { };
       normalizeRoot = root: lib.removeSuffix "/." root;
@@ -337,12 +340,27 @@ in
 
             __nucleus_check_icloud_exclusion() {
               local target_path="$1"
+              local normalized_path
               local target_name
-              target_name=$(basename "$target_path")
+
+              if [[ "$target_path" == /* ]]; then
+                normalized_path="$target_path"
+              else
+                normalized_path="$PWD/$target_path"
+              fi
+              normalized_path="''${normalized_path%/}"
+
+              __nucleus_is_icloud_managed_path "$normalized_path" || return 0
+
+              target_name=$(basename "$normalized_path")
 
               for excluded in "''${__nucleus_icloud_excluded_names[@]}"; do
                 if [[ "$target_name" == "$excluded" ]]; then
-                  /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 "$target_path" >/dev/null 2>&1 || true
+                  if /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 "$normalized_path"; then
+                    echo "shell: iCloud exclusion marked $normalized_path" >&2
+                  else
+                    echo "shell: failed to mark iCloud exclusion for $normalized_path" >&2
+                  fi
                   return 0
                 fi
               done
