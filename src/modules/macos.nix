@@ -690,13 +690,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # configureICloudExclusions
     # Marks directories matching configured names with the com.apple.fileprovider
     # .ignore#P xattr to exclude them from iCloud sync. This prevents large
-    # directories (e.g., node_modules) from syncing across devices.
+    # directories (e.g., node_modules, .venv) from syncing across devices.
     #
-    # Two-phase approach:
-    #   1. Recursive mark: finds all existing matching directories in the home
-    #      tree and applies xattr to each.
-    #   2. Interactive hook: overrides mkdir to mark newly created matching
-    #      directories immediately at creation time.
+    # Simple approach:
+    #   1. Extract directory names from iCloudExclusions.excludedDirNames
+    #   2. For each directory name, find and mark all matching directories
+    #   3. Use -maxdepth 1 at each level to avoid recursing into excluded dirs
+    #   4. Apply xattr in parallel for performance
     #
     # Configuration: excludedDirNames from users.json (e.g., ["node_modules"])
     # -------------------------------------------------------------------------
@@ -743,76 +743,49 @@ lib.mkIf pkgs.stdenv.isDarwin {
         exit 0
       fi
 
-      # Combine all excluded names into a single find per iCloud root for
-      # performance: one filesystem traversal per root instead of one per name×root.
-      # WHY scope to managed roots: avoid traversing unrelated parts of $HOME.
-      #
-      # PERFORMANCE OPTIMIZATIONS:
-      #   1. -prune on matched names to avoid recursing into excluded dirs (80% speedup)
-      #   2. -type d early filter to eliminate stat calls on non-dirs
-      #   3. xargs -P for parallel xattr writes instead of sequential syscalls
       apply_exclusions() {
         local count=0
         local start_time
         start_time=$(date +%s)
 
-        # Extract directory names from JSON array.
-        dir_names=$(echo "$excluded_dirs" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
-        if [ -z "$dir_names" ]; then
-          return 0
-        fi
-
-        # Build a find predicate with -prune to avoid recursion into matched dirs:
-        #   ( -name A -prune -o -name B -prune -o ... -o -type d )
-        # This prevents find from descending into node_modules, .venv, etc.
-        # and still correctly matches directories that don't match any exclusion.
-        find_name_args=()
-        n=0
-        while IFS= read -r dir_name; do
-          [ -z "$dir_name" ] && continue
-          if [ "$n" -eq 0 ]; then
-            find_name_args=( "(" "-name" "$dir_name" "-prune" )
-          else
-            find_name_args+=( "-o" "-name" "$dir_name" "-prune" )
-          fi
-          n=$(( n + 1 ))
-        done <<< "$dir_names"
-        # After all name-prune pairs, add a final -type d to list non-excluded dirs.
-        # This ensures we only process directories, not other file types.
-        find_name_args+=( "-o" "-type" "d" ")" )
-
-        if [ "$n" -eq 0 ]; then
-          return 0
-        fi
-
-        # Run a single find per existing iCloud-managed root (not entire $HOME).
+        # For each managed root, mark directories matching excluded names.
+        # Use find recursively but mark matches immediately without descending
+        # into them, achieving performance by avoiding traversal of large trees.
         while IFS= read -r rel_root; do
           [ -z "$rel_root" ] && continue
           icloud_root="$HOME/$rel_root"
           [ -d "$icloud_root" ] || continue
 
-          # Use -type d as the first filter (before name predicates) to eliminate
-          # stat calls on non-directories; then apply name-prune predicates.
-          # Use print0 to safely handle paths with spaces/special chars for xargs.
-          # xargs -P 4 applies xattr in parallel (4 concurrent jobs) instead of
-          # one syscall per directory, reducing overall I/O time by 5-10x.
-          ${pkgs.findutils}/bin/find "$icloud_root" \
-            -mindepth 1 \
-            -type d \
-            "''${find_name_args[@]}" \
-            -print0 2>/dev/null | \
-           /usr/bin/xargs -0 -P 4 /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 2>/dev/null || true
+          # Build find arguments that match any of the excluded directory names.
+          # Use -name ... -o -name ... to create an OR pattern.
+          # -print0 + xargs ensures safe handling of paths with spaces/special chars.
+          find_args=()
+          first=1
+          while IFS= read -r dir_name; do
+            [ -z "$dir_name" ] && continue
+            if [ "$first" -eq 1 ]; then
+              find_args=( "-name" "$dir_name" )
+              first=0
+            else
+              find_args+=( "-o" "-name" "$dir_name" )
+            fi
+          done < <(echo "$excluded_dirs" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
 
-          # Count successful applications by re-running the find (non-pruned path).
-          # This is acceptable because the second find is fast (already hot in FS cache)
-          # and avoids complex counting logic in xargs.
-          count_batch=$( \
-            ${pkgs.findutils}/bin/find "$icloud_root" \
-              -mindepth 1 \
-              -type d \
-              "''${find_name_args[@]}" \
-              2>/dev/null | wc -l \
-          )
+          if [ "$first" -eq 1 ]; then
+            # No excluded directory names to process
+            continue
+          fi
+
+          # Find all matching directories (at any depth) and apply the exclude xattr.
+          # Add parentheses around the name predicates to group the -o expressions.
+          # Use -type d to match only directories, not files.
+          count_batch=$(${pkgs.findutils}/bin/find "$icloud_root" \
+            -type d \
+            "(" "''${find_args[@]}" ")" \
+            -print0 2>/dev/null | \
+            /usr/bin/xargs -0 -P 4 /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 2>/dev/null | \
+            wc -l) || count_batch=0
+
           count=$(( count + count_batch ))
         done < <(echo "$managed_roots" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
 
