@@ -37,22 +37,33 @@ let
     NUCLEUS_DEFAULT_DEV_ENV = "1";
   };
 
-  # Keep iCloud exclusion names in one declarative source (users.json) so both
-  # activation-time recursive marking and interactive shell hooks converge on
-  # the same directory-name policy.
-  iCloudExcludedDirNames =
+  # Keep iCloud exclusion names and managed root paths in one declarative source
+  # (users.json) so activation-time recursive marking and interactive shell hooks
+  # converge on the same directory-name and managed-root policy.
+  _iCloudCfg =
     let
-      users = builtins.fromJSON (builtins.readFile ./users.json);
+      allUsers = builtins.fromJSON (builtins.readFile ./users.json);
       currentUser = config.home.username;
+      perUser =
+        if
+          builtins.hasAttr currentUser allUsers && builtins.hasAttr "iCloudExclusions" allUsers.${currentUser}
+        then
+          allUsers.${currentUser}.iCloudExclusions
+        else
+          { };
     in
-    if
-      builtins.hasAttr currentUser users
-      && builtins.hasAttr "iCloudExclusions" users.${currentUser}
-      && builtins.hasAttr "excludedDirNames" users.${currentUser}.iCloudExclusions
-    then
-      users.${currentUser}.iCloudExclusions.excludedDirNames
-    else
-      [ ];
+    {
+      excludedDirNames = perUser.excludedDirNames or [ ];
+      managedRoots =
+        perUser.managedRoots or [
+          "Library/Mobile Documents"
+          "Downloads/iCloud"
+          "clouds/iCloud"
+        ];
+    };
+
+  iCloudExcludedDirNames = _iCloudCfg.excludedDirNames;
+  iCloudManagedRoots = _iCloudCfg.managedRoots;
 
   # Build wrapper commands that always target the canonical nucleus flake path,
   # making nucleus-* commands runnable from any working directory and any shell
@@ -286,90 +297,107 @@ in
             }
     ''
     + lib.optionalString pkgs.stdenv.isDarwin ''
-      # macOS-only iCloud exclusion hooks.
-      # WHY macOS-only: com.apple.fileprovider.ignore#P is a macOS FileProvider
-      # xattr with no equivalent on NixOS/Windows.
-      #
-      # Trigger paths:
-      #   1) chpwd hook: entering directories performs a best-effort recursive
-      #      pass under iCloud-managed roots.
-      #   2) mkdir wrapper: newly created matching directories are marked
-      #      immediately.
-      #
-      # Existing directories are also covered by the activation-time recursive
-      # pass in modules/macos.nix.
-      typeset -ga __nucleus_icloud_excluded_names=(
-${lib.concatMapStringsSep "\n" (name: "        ${lib.escapeShellArg name}") iCloudExcludedDirNames}
-      )
+            # macOS-only iCloud exclusion hooks.
+            # WHY macOS-only: com.apple.fileprovider.ignore#P is a macOS FileProvider
+            # xattr with no equivalent on NixOS/Windows.
+            #
+            # Trigger paths:
+            #   1) chpwd hook: entering directories performs a best-effort recursive
+            #      pass under iCloud-managed roots.
+            #   2) mkdir wrapper: newly created matching directories are marked
+            #      immediately.
+            #
+            # Existing directories are also covered by the activation-time recursive
+            # pass in modules/macos.nix.
+            typeset -ga __nucleus_icloud_excluded_names=(
+      ${lib.concatMapStringsSep "\n" (name: "        ${lib.escapeShellArg name}") iCloudExcludedDirNames}
+            )
 
-      __nucleus_is_icloud_managed_path() {
-        local candidate_path="$1"
-        case "$candidate_path" in
-          "$HOME/Library/Mobile Documents"|"$HOME/Library/Mobile Documents/"*|"$HOME/Downloads/iCloud"|"$HOME/Downloads/iCloud/"*|"$HOME/clouds/iCloud"|"$HOME/clouds/iCloud/"*)
-            return 0
-            ;;
-        esac
-        return 1
-      }
+            __nucleus_is_icloud_managed_path() {
+              local candidate_path="$1"
+              case "$candidate_path" in
+                ${
+                  lib.concatMapStringsSep "|" (root: "\"$HOME/${root}\"|\"$HOME/${root}/\"*") iCloudManagedRoots
+                })
+                  return 0
+                  ;;
+              esac
+              return 1
+            }
 
-      __nucleus_check_icloud_exclusion() {
-        local target_path="$1"
-        local target_name
-        target_name=$(basename "$target_path")
+            __nucleus_check_icloud_exclusion() {
+              local target_path="$1"
+              local target_name
+              target_name=$(basename "$target_path")
 
-        for excluded in "''${__nucleus_icloud_excluded_names[@]}"; do
-          if [[ "$target_name" == "$excluded" ]]; then
-            /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 "$target_path" >/dev/null 2>&1 || true
-            return 0
-          fi
-        done
-        return 0
-      }
+              for excluded in "''${__nucleus_icloud_excluded_names[@]}"; do
+                if [[ "$target_name" == "$excluded" ]]; then
+                  /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 "$target_path" >/dev/null 2>&1 || true
+                  return 0
+                fi
+              done
+              return 0
+            }
 
-      __nucleus_mark_icloud_exclusions_under() {
-        local root_path="$1"
-        local excluded_name
+            __nucleus_mark_icloud_exclusions_under() {
+              local root_path="$1"
 
-        __nucleus_is_icloud_managed_path "$root_path" || return 0
+              __nucleus_is_icloud_managed_path "$root_path" || return 0
+              [[ "''${#__nucleus_icloud_excluded_names[@]}" -gt 0 ]] || return 0
 
-        for excluded_name in "''${__nucleus_icloud_excluded_names[@]}"; do
-          /usr/bin/find "$root_path" -type d -name "$excluded_name" | while IFS= read -r candidate; do
-            __nucleus_check_icloud_exclusion "$candidate"
-          done
-        done
+              # Build a single find with OR'd -name predicates for one-pass traversal
+              # instead of one find invocation per excluded name.
+              local -a __icloud_find_args
+              __icloud_find_args=()
+              local __icloud_n=0
+              local __icloud_name
+              for __icloud_name in "''${__nucleus_icloud_excluded_names[@]}"; do
+                if [[ $__icloud_n -eq 0 ]]; then
+                  __icloud_find_args+=( "(" "-name" "$__icloud_name" )
+                else
+                  __icloud_find_args+=( "-o" "-name" "$__icloud_name" )
+                fi
+                __icloud_n=$(( __icloud_n + 1 ))
+              done
+              __icloud_find_args+=( ")" )
 
-        return 0
-      }
+              local __candidate
+              while IFS= read -r __candidate; do
+                __nucleus_check_icloud_exclusion "$__candidate"
+              done < <(/usr/bin/find "$root_path" "''${__icloud_find_args[@]}" -type d 2>/dev/null)
 
-      __nucleus_check_icloud_exclusions_on_pwd_change() {
-        [[ "''${#__nucleus_icloud_excluded_names[@]}" -gt 0 ]] || return 0
-        __nucleus_mark_icloud_exclusions_under "$PWD"
-      }
+              return 0
+            }
 
-      autoload -Uz add-zsh-hook
-      add-zsh-hook chpwd __nucleus_check_icloud_exclusions_on_pwd_change
-      __nucleus_check_icloud_exclusions_on_pwd_change
+            __nucleus_check_icloud_exclusions_on_pwd_change() {
+              [[ "''${#__nucleus_icloud_excluded_names[@]}" -gt 0 ]] || return 0
+              __nucleus_mark_icloud_exclusions_under "$PWD"
+            }
 
-      # Override mkdir to check for excluded directories after creation.
-      mkdir() {
-        /bin/mkdir "$@"
-        local _mkdir_status=$?
+            autoload -Uz add-zsh-hook
+            add-zsh-hook chpwd __nucleus_check_icloud_exclusions_on_pwd_change
+            __nucleus_check_icloud_exclusions_on_pwd_change
 
-        # Only process if mkdir succeeded and we're not in dry-run mode.
-        if [[ $_mkdir_status -eq 0 ]]; then
-          for arg in "$@"; do
-            # Skip option flags (starting with -)
-            if [[ ! "$arg" =~ ^- ]]; then
-              # Check if the path exists (was created successfully)
-              if [[ -d "$arg" ]]; then
-                __nucleus_check_icloud_exclusion "$arg"
+            # Override mkdir to check for excluded directories after creation.
+            mkdir() {
+              /bin/mkdir "$@"
+              local _mkdir_status=$?
+
+              # Only process if mkdir succeeded and we're not in dry-run mode.
+              if [[ $_mkdir_status -eq 0 ]]; then
+                for arg in "$@"; do
+                  # Skip option flags (starting with -)
+                  if [[ ! "$arg" =~ ^- ]]; then
+                    # Check if the path exists (was created successfully)
+                    if [[ -d "$arg" ]]; then
+                      __nucleus_check_icloud_exclusion "$arg"
+                    fi
+                  fi
+                done
               fi
-            fi
-          done
-        fi
 
-        return $_mkdir_status
-      }
+              return $_mkdir_status
+            }
     '';
   };
 

@@ -111,6 +111,11 @@
       ]
     },
     "iCloudExclusions": {
+      "managedRoots": [
+        "Library/Mobile Documents",
+        "Downloads/iCloud",
+        "clouds/iCloud"
+      ],
       "excludedDirNames": [
         ".hypothesis",
         ".mypy_cache",

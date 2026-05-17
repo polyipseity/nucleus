@@ -538,11 +538,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     reloadUserPreferenceState =
       lib.hm.dag.entryAfter
-        [
-          "configureInputAndSiri"
-          "configureSafariDefaults"
-          "configureUniversalAccessDefaults"
-        ]
+        [ "configureInputAndSiri" "configureSafariDefaults" "configureUniversalAccessDefaults" ]
         ''
           if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
             echo "macos: activateSettings -u failed; some preference updates may require relogin." >&2
@@ -720,43 +716,81 @@ lib.mkIf pkgs.stdenv.isDarwin {
             [ ]
         )
       }'
+      managed_roots='${
+        builtins.toJSON (
+          let
+            effectiveUsers = if users != null then users else { };
+            currentUser = config.home.username;
+          in
+          if
+            builtins.hasAttr currentUser effectiveUsers
+            && builtins.hasAttr "iCloudExclusions" effectiveUsers.${currentUser}
+            && builtins.hasAttr "managedRoots" effectiveUsers.${currentUser}.iCloudExclusions
+          then
+            effectiveUsers.${currentUser}.iCloudExclusions.managedRoots
+          else
+            [
+              "Library/Mobile Documents"
+              "Downloads/iCloud"
+              "clouds/iCloud"
+            ]
+        )
+      }'
 
       if [ "$excluded_dirs" = "[]" ]; then
+        echo "macos: iCloud exclusions skipped (no excluded directory names configured)." >&2
         exit 0
       fi
 
-      # Parse JSON array and apply xattr to matching directories.
-      # Use jq if available; fall back to awk for basic parsing.
+      # Combine all excluded names into a single find per iCloud root for
+      # performance: one filesystem traversal per root instead of one per name×root.
+      # WHY scope to managed roots: avoid traversing unrelated parts of $HOME.
       apply_exclusions() {
         local count=0
         local start_time
         start_time=$(date +%s)
 
         # Extract directory names from JSON array.
-        # Input: ["node_modules", "target"]
-        # Output: node_modules\ntarget
-        dir_names=$(echo "$excluded_dirs" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null || echo "$excluded_dirs" | /usr/bin/sed -E 's/\["([^"]*)"[^]]*\]/\1/g; s/"//g; s/,/\n/g')
-
+        dir_names=$(echo "$excluded_dirs" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
         if [ -z "$dir_names" ]; then
-          exit 0
+          return 0
         fi
 
-        # Find and mark each matching directory.
-        while read -r dir_name; do
+        # Build a single find predicate: ( -name A -o -name B -o ... )
+        find_name_args=()
+        n=0
+        while IFS= read -r dir_name; do
           [ -z "$dir_name" ] && continue
+          if [ "$n" -eq 0 ]; then
+            find_name_args=( "(" "-name" "$dir_name" )
+          else
+            find_name_args+=( "-o" "-name" "$dir_name" )
+          fi
+          n=$(( n + 1 ))
+        done <<< "$dir_names"
+        find_name_args+=( ")" )
 
-          # Recursive find for directories matching the name.
+        if [ "$n" -eq 0 ]; then
+          return 0
+        fi
+
+        # Run a single find per existing iCloud-managed root (not entire $HOME).
+        while IFS= read -r rel_root; do
+          [ -z "$rel_root" ] && continue
+          icloud_root="$HOME/$rel_root"
+          [ -d "$icloud_root" ] || continue
+
           while IFS= read -r dir_path; do
             if /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 "$dir_path" 2>/dev/null; then
-              count=$((count + 1))
+              count=$(( count + 1 ))
             else
               echo "macos: failed to apply xattr to $dir_path" >&2
             fi
-          done < <(/usr/bin/find "$HOME" -name "$dir_name" -type d 2>/dev/null)
-        done <<< "$dir_names"
+          done < <(/usr/bin/find "$icloud_root" "''${find_name_args[@]}" -type d 2>/dev/null)
+        done < <(echo "$managed_roots" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
 
         end_time=$(date +%s)
-        elapsed=$((end_time - start_time))
+        elapsed=$(( end_time - start_time ))
 
         if [ "$count" -gt 0 ]; then
           echo "macos: iCloud exclusion applied to $count directories in ''${elapsed}s" >&2

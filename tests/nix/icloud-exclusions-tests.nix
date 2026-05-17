@@ -17,10 +17,16 @@ let
 
   user = users.polyipseity;
   excludedDirNames = user.iCloudExclusions.excludedDirNames;
+  managedRoots = user.iCloudExclusions.managedRoots;
 
   test_exclusion_list_exists = assert' (
     (builtins.length excludedDirNames) > 0
   ) "users.json must define a non-empty iCloudExclusions.excludedDirNames list";
+
+  test_managed_roots_centralized =
+    assert'
+      ((builtins.length managedRoots) > 0 && (builtins.elem "Library/Mobile Documents" managedRoots))
+      "users.json must define iCloudExclusions.managedRoots with at least the Library/Mobile Documents path";
 
   test_required_python_dirs_present = assert' (
     (builtins.elem ".venv" excludedDirNames)
@@ -31,8 +37,7 @@ let
   ) "users.json iCloudExclusions list must include expected Python cache/venv directories";
 
   test_required_node_dirs_present = assert' (
-    (builtins.elem "node_modules" excludedDirNames)
-    && (builtins.elem ".pnpm-store" excludedDirNames)
+    (builtins.elem "node_modules" excludedDirNames) && (builtins.elem ".pnpm-store" excludedDirNames)
   ) "users.json iCloudExclusions list must include expected Node cache/dependency directories";
 
   test_shell_uses_chpwd_hook = assert' (
@@ -52,6 +57,7 @@ let
 
   allTests = [
     test_exclusion_list_exists
+    test_managed_roots_centralized
     test_required_python_dirs_present
     test_required_node_dirs_present
     test_shell_uses_chpwd_hook
