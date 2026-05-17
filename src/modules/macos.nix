@@ -385,7 +385,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
       done
     '';
 
-
     # -------------------------------------------------------------------------
     # configureDisplayResolutions
     # Uses displayplacer to match all external monitors to the MacBook's built-in

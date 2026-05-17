@@ -107,9 +107,11 @@ let
     hideOnClose = false;
   };
 
-  qtPassManagedSettings = (qtPassDefaultSettings // qtPassPlatformSettings // (userAppSettings "qtpass")) // {
-    passStore = "${lib.removeSuffix "/" passwordStoreDir}/";
-  };
+  qtPassManagedSettings =
+    (qtPassDefaultSettings // qtPassPlatformSettings // (userAppSettings "qtpass"))
+    // {
+      passStore = "${lib.removeSuffix "/" passwordStoreDir}/";
+    };
 
   # Obsidian reads its global app settings directly from obsidian.json, but the
   # file also contains dynamic vault metadata written by the app itself. Load
@@ -342,42 +344,42 @@ in
     # file so the declarative defaults converge without clobbering vault lists
     # or other app-owned state.
     home.activation.configureObsidianSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      set -eu
+            set -eu
 
-      case "$(uname -s)" in
-        Darwin)
-          _obsidian_settings_path="$HOME/Library/Application Support/obsidian/obsidian.json"
-          ;;
-        Linux)
-          _obsidian_settings_path="''${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json"
-          ;;
-        *)
-          exit 0
-          ;;
-      esac
+            case "$(uname -s)" in
+              Darwin)
+                _obsidian_settings_path="$HOME/Library/Application Support/obsidian/obsidian.json"
+                ;;
+              Linux)
+                _obsidian_settings_path="''${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json"
+                ;;
+              *)
+                exit 0
+                ;;
+            esac
 
-      mkdir -p "$(dirname "$_obsidian_settings_path")"
-      ${pkgs.python3}/bin/python3 - "$_obsidian_settings_path" ${lib.escapeShellArg obsidianManagedSettingsJson} <<'PY'
-import json
-import sys
-from pathlib import Path
+            mkdir -p "$(dirname "$_obsidian_settings_path")"
+            ${pkgs.python3}/bin/python3 - "$_obsidian_settings_path" ${lib.escapeShellArg obsidianManagedSettingsJson} <<'PY'
+      import json
+      import sys
+      from pathlib import Path
 
-config_path = Path(sys.argv[1])
-managed = json.loads(sys.argv[2])
+      config_path = Path(sys.argv[1])
+      managed = json.loads(sys.argv[2])
 
-if config_path.exists():
-    raw = config_path.read_text(encoding="utf-8")
-    existing = json.loads(raw) if raw.strip() else {}
-else:
-    existing = {}
+      if config_path.exists():
+          raw = config_path.read_text(encoding="utf-8")
+          existing = json.loads(raw) if raw.strip() else {}
+      else:
+          existing = {}
 
-if not isinstance(existing, dict):
-    print(f"obsidian: expected top-level JSON object in {config_path}", file=sys.stderr)
-    sys.exit(1)
+      if not isinstance(existing, dict):
+          print(f"obsidian: expected top-level JSON object in {config_path}", file=sys.stderr)
+          sys.exit(1)
 
-existing.update(managed)
-config_path.write_text(json.dumps(existing, separators=(",", ":")), encoding="utf-8")
-PY
+      existing.update(managed)
+      config_path.write_text(json.dumps(existing, separators=(",", ":")), encoding="utf-8")
+      PY
     '';
 
     # Allow Home Manager to manage its own activation and generation GC.

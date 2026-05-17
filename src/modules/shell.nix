@@ -2,7 +2,12 @@
 #
 # Keeps shell aliases and environment variables in dedicated fragments to make
 # ordering checks and targeted reviews straightforward.
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   # Dedicated alias/env fragments keep list-like attrsets isolated so sort order
   # can be audited without scanning unrelated shell options.
@@ -47,9 +52,9 @@ let
       # LaunchAgent) or inline (NixOS); skip silently if the secret file is
       # absent during early bootstrap before decryption completes.
       ${lib.optionalString config.nucleus.rclone.configPassEnabled ''
-      if [ -s "${config.nucleus.rclone.configPassSecretPath}" ]; then
-        export RCLONE_CONFIG_PASS="$(cat "${config.nucleus.rclone.configPassSecretPath}")"
-      fi
+        if [ -s "${config.nucleus.rclone.configPassSecretPath}" ]; then
+          export RCLONE_CONFIG_PASS="$(cat "${config.nucleus.rclone.configPassSecretPath}")"
+        fi
       ''}
 
       exec nix --option warn-dirty false run ${config.home.homeDirectory}/dev/nucleus/src#${app} -- "$@"

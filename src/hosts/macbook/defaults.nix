@@ -234,7 +234,7 @@ in
       #   2. Disable hotkey 61 (in macos.nix activation: disableSpotlightHotkey)
       #   3. Stop indexing + clear cache (in macos.nix activation: disableSpotlightHotkey)
       "com.apple.Spotlight" = {
-        MenuItemHidden = 1;              # Hide menu-bar button
+        MenuItemHidden = 1; # Hide menu-bar button
         FederatedSearchMaximumCount = 0; # Disable web search/suggestions
       };
 
@@ -382,7 +382,6 @@ in
         "spans-displays" = true;
       };
 
-
       # Raycast: comprehensive declarative configuration of all plist-settable options.
       # WHY: Most Raycast settings live in SQLite database (Raycast internals), not
       # plist. We configure only documented/stable plist keys here. Advanced settings
@@ -390,26 +389,26 @@ in
       # Sensitivity require manual configuration in Raycast UI → Settings → Advanced.
       "com.raycast.macos" = {
         # --- Startup & Window Behavior ---
-        LaunchAtLogin = true;                    # Launch Raycast at login
-        Appearance = "system";                    # Auto Dark/Light based on time of day
-        WindowMode = "default";                  # Use default window (not compact)
-        ShowMenuBarIcon = false;                 # Hide Raycast icon from menu bar
-        ShowFavoritesInCompactMode = true;       # Show favorites in compact mode
+        LaunchAtLogin = true; # Launch Raycast at login
+        Appearance = "system"; # Auto Dark/Light based on time of day
+        WindowMode = "default"; # Use default window (not compact)
+        ShowMenuBarIcon = false; # Hide Raycast icon from menu bar
+        ShowFavoritesInCompactMode = true; # Show favorites in compact mode
 
         # --- Appearance & Text ---
         # Text size: default/medium (Raycast's baseline; plist key unclear, may be UI-only)
         # Menu Bar: explicitly disabled above to reduce persistent chrome
 
         # --- Network & Security ---
-        UseSystemNetworkSettings = true;         # Web proxy from macOS System Settings
-        CertificatesProvider = "Keychain";      # Use Keychain for certificate validation
+        UseSystemNetworkSettings = true; # Web proxy from macOS System Settings
+        CertificatesProvider = "Keychain"; # Use Keychain for certificate validation
 
         # --- Extensions & Providers ---
-        FaviconProvider = "Raycast";            # Raycast's built-in favicon resolver
+        FaviconProvider = "Raycast"; # Raycast's built-in favicon resolver
 
         # --- Developer Tools ---
-        DeveloperMode = true;                    # Enable development mode
-        AutoReloadOnSave = true;                 # Auto-reload on script save
+        DeveloperMode = true; # Enable development mode
+        AutoReloadOnSave = true; # Auto-reload on script save
         # Note: Additional dev settings (Use Node production, logging, disable pop to root)
         # are database-only; configure manually in Settings → Advanced → Developer Tools
 

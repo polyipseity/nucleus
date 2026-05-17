@@ -15,7 +15,12 @@
 # Both paths mirror the pattern used by vsCodeSymlinks in editors.nix.
 #
 # agentsSkills (below) manages ~/.agents/skills/ independently.
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   # The canonical live checkout path is ~/dev/nucleus.  Use out-of-store
   # symlinks so user-level OpenCode config stays pointed at the mutable working

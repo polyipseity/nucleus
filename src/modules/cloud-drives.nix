@@ -340,7 +340,12 @@ let
 
   mkFallbackSystemdCalendar =
     interval:
-    if interval == "weekly" then "Sun 12:00:00" else if interval == "monthly" then "*-*-01 12:00:00" else "12:00:00";
+    if interval == "weekly" then
+      "Sun 12:00:00"
+    else if interval == "monthly" then
+      "*-*-01 12:00:00"
+    else
+      "12:00:00";
 
 in
 {

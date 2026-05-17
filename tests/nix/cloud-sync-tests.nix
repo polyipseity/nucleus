@@ -293,8 +293,7 @@ let
 
   # Test 39: Windows apply flow has opt-in post-apply replica sync hook
   test_windows_apply_replica_hook = assert' (
-    containsRegex "ReplicaSync" windowsApplyText
-    containsRegex "SkipReplicaSync" windowsApplyText
+    containsRegex "ReplicaSync" windowsApplyText containsRegex "SkipReplicaSync" windowsApplyText
     && containsRegex "runReplicaSync" windowsApplyText
     && containsRegex "Invoke-ReplicaSync" windowsApplyText
     && containsRegex "default; pass -ReplicaSync" windowsApplyText
