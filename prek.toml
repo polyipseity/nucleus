@@ -54,10 +54,12 @@ repo = "https://github.com/python-jsonschema/check-jsonschema.git"
 rev = "4cec9aea9b0dd197127811e7d29bd48d761a9370"
 hooks = [{ id = "check-dependabot" }, { id = "check-github-workflows" }]
 
-# PowerShell parse-only syntax validation using the built-in parser.
 [[repos]]
 repo = "local"
 hooks = [
   { id = "check-sh", name = "check shell scripts", language = "system", files = "\\.sh$", entry = "env NIX_CONFIG=experimental-features\\ =\\ nix-command\\ flakes nix run ./src#check-sh --" },
+  # PowerShell parse-only syntax validation using the built-in parser.
   { id = "check-pwsh", name = "check PowerShell scripts", language = "system", files = "\\.ps1$", entry = "env NIX_CONFIG=experimental-features\\ =\\ nix-command\\ flakes nix run ./src#check-pwsh --" },
+  # Nix file formatting using nixfmt for consistent code style.
+  { id = "format-nix", name = "format Nix files", language = "system", files = "\\.nix$", entry = "env NIX_CONFIG=experimental-features\\ =\\ nix-command\\ flakes nix run nixpkgs#nixfmt --" },
 ]
