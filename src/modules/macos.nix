@@ -1363,12 +1363,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
   };
 
   # --------------------------------------------------------------------------
-  # LinearMouse autostart LaunchAgent
-  # Starts LinearMouse at user login so per-device scroll behavior is active
-  # without manual app launch.
+  # LinearMouse autostart LaunchAgent — DISABLED
+  # LinearMouse now includes built-in launch-at-login setting, so this agent
+  # is no longer needed. The app auto-launches via its own internal mechanism.
+  # Disabled but retained in code for historical reference.
   # --------------------------------------------------------------------------
   launchd.agents."linearmouse-autostart" = {
-    enable = true;
+    enable = false;
     config = {
       Label = "local.linearmouse-autostart";
       ProgramArguments = [
