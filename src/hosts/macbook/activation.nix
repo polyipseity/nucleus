@@ -355,38 +355,59 @@
       # becomes the exclusive launcher. This requires system-level activation since
       # keyboard hotkey disabling needs root privileges.
       #
-      # Three-layer disabling strategy:
-      #   1. Hotkey 61 (cmd+space) — disabled at system level via defaults write
-      #   2. Indexing daemon — stopped via mdutil (requires sudo even for root)
-      #   3. Launchd service — disabled so Spotlight doesn't auto-restart
+      # Four-layer disabling strategy:
+      #   1. Hotkey 61 (cmd+space) — written to the user's prefs domain via
+      #      launchctl asuser + sudo; applied immediately with activateSettings.
+      #   2. Indexing daemon — stopped via mdutil (may need Full Disk Access)
+      #   3. Launchd service — disabled for the user's GUI session (gui/$UID)
       #   4. Index cache — cleared to reclaim disk space
       #
-      # WHY system-level activation: User-level activation (Home Manager) cannot
-      # properly disable system keyboard hotkeys or stop system services. This
-      # script runs as root during `darwin-rebuild switch`, providing proper
-      # privilege for all operations.
-      #
-      # NOTE: Some changes require a system reboot to take full effect. See
-      # src/hosts/macbook/MANUAL.md for details.
+      # WHY launchctl asuser for defaults write: the activation runs as root;
+      # writing defaults without the asuser wrapper targets root's prefs domain
+      # (/var/root/Library/Preferences/) instead of the user's domain, so the
+      # hotkey change has no effect on the GUI session.
+      # WHY activateSettings: applies keyboard shortcut changes immediately
+      # without a restart or logout.
+      # WHY gui/$console_uid_spotlight: Spotlight runs in the user's GUI session;
+      # gui/0 targets root's GUI session which is never the correct target.
 
       echo "spotlight: disabling Spotlight (system launcher) to use Raycast exclusively..."
 
-      # Disable cmd+space hotkey (hotkey 61) at system level
-      if ! /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 61 "<dict><key>enabled</key><false/></dict>" 2>/dev/null; then
-        echo "spotlight: warning — failed to disable cmd+space hotkey (may require a reboot)." >&2
+      # Write cmd+space hotkey disable as the GUI user so it lands in the correct
+      # user-scoped preferences domain, then apply immediately with activateSettings.
+      console_uid_spotlight="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
+      if [ -n "$console_user" ] && [ "$console_user" != "root" ] && [ -n "$console_uid_spotlight" ]; then
+        if ! /bin/launchctl asuser "$console_uid_spotlight" /usr/bin/sudo -H -u "$console_user" \
+          /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 61 \
+          "<dict><key>enabled</key><false/></dict>" 2>/dev/null; then
+          echo "spotlight: warning — failed to write cmd+space hotkey disable for user '$console_user' (may require Full Disk Access)." >&2
+        else
+          # Apply keyboard shortcut changes immediately for the current GUI session.
+          # WHY 2>/dev/null: activateSettings may print a harmless warning on some macOS versions.
+          /bin/launchctl asuser "$console_uid_spotlight" /usr/bin/sudo -H -u "$console_user" \
+            /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u 2>/dev/null || \
+            echo "spotlight: note — keyboard shortcut changes will take effect after next login." >&2
+        fi
+      else
+        echo "spotlight: skipped hotkey disable (no active non-root GUI session detected)." >&2
       fi
 
-      # Disable Spotlight indexing via mdutil (requires sudo even for root on modern macOS)
+      # Disable Spotlight indexing via mdutil (may require Full Disk Access on modern macOS).
+      # WHY sudo -n: prevents blocking on a password prompt if sudo re-prompts unexpectedly.
       if ! sudo -n mdutil -i off / 2>/dev/null; then
-        echo "spotlight: warning — failed to disable Spotlight indexing (mdutil requires sudo; may require Full Disk Access)." >&2
+        echo "spotlight: warning — failed to disable Spotlight indexing (mdutil may require Full Disk Access)." >&2
       fi
 
-      # Disable Spotlight launchd service so it doesn't auto-restart
-      if ! sudo -n launchctl disable gui/0/com.apple.Spotlight 2>/dev/null; then
-        echo "spotlight: note — Spotlight launchd disable may require Full Disk Access; continuing." >&2
+      # Disable Spotlight launchd service using the correct user GUI session target.
+      if [ -n "$console_uid_spotlight" ]; then
+        if ! launchctl disable gui/"$console_uid_spotlight"/com.apple.Spotlight 2>/dev/null; then
+          echo "spotlight: note — Spotlight launchd disable may require Full Disk Access; continuing." >&2
+        fi
+      else
+        echo "spotlight: skipped launchd disable (could not determine user UID)." >&2
       fi
 
-      # Clear Spotlight index cache to reclaim disk space
+      # Clear Spotlight index cache to reclaim disk space.
       if [ -d "/.Spotlight-V100" ]; then
         if ! sudo -n rm -rf "/.Spotlight-V100" 2>/dev/null; then
           echo "spotlight: note — Spotlight cache removal skipped (would require elevated privileges)." >&2
