@@ -5,7 +5,9 @@
 #
 # Activation order (Home Manager DAG):
 #   writeBoundary / linkGeneration
-#     → clearDesktop, configureInputAndSiri, configureSystemHardening
+#     → clearDesktop, configureInputAndSiri, provisionDevDirectory,
+#       configureDevSpotlightExclusions, cleanDevDsStore,
+#       reloadDockPreferenceState
 #     → preflightPrivacyPermissions
 #       → configureSafariDefaults, configureUniversalAccessDefaults
 #       → reloadUserPreferenceState
@@ -305,6 +307,8 @@ let
     "clearDesktop"
     "cloudDrivesICloudRefresh"
     "cloudDrivesSetup"
+    "cleanDevDsStore"
+    "configureDevSpotlightExclusions"
     "configureDisplayResolutions"
     "configureFinderSidebar"
     "configureICloudExclusions"
@@ -314,7 +318,6 @@ let
     "configureNightlight"
     "configureObsidianSettings"
     "configureSafariDefaults"
-    "configureSystemHardening"
     "configureUniversalAccessDefaults"
     "ensureHeadlessDisplay"
     # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
@@ -331,7 +334,9 @@ let
     "linkGeneration"
     "onFilesChange"
     "preflightPrivacyPermissions"
+    "provisionDevDirectory"
     "refreshFinderServices"
+    "reloadDockPreferenceState"
     "reloadUserPreferenceState"
     "setupLaunchAgents"
     "sops-nix"
@@ -954,43 +959,55 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # configureSystemHardening
-    # Applies Spotlight indexing suppression and dev-tree metadata cleanup;
-    # requires a running user session (not available to system-level scripts).
-    #
-    #   .metadata_never_index files: tells Spotlight not to index well-known
-    #   build artifact directories under ~/dev (node_modules, target, build,
-    #   dist, etc.), reducing indexing CPU/disk overhead and avoiding Spotlight
-    #   surfacing compiled binaries or cache files.
-    #
-    #   .DS_Store cleanup: removes Finder metadata files under ~/dev after each
-    #   activation to keep Git worktrees cleaner. macOS cannot fully disable
-    #   .DS_Store creation on local APFS/HFS+ volumes, so this is a compensating
-    #   control for development paths.
-    #
-    #   Dock restart: applies any pending Dock pref changes (e.g. hot corners
-    #   written declaratively via CustomUserPreferences."com.apple.dock") without
-    #   requiring a full logout.
-    #
-    # Dock hot-corner disable (wdev-tl/tr/bl/br = 0) is now handled declaratively
-    # in defaults.nix via system.defaults.CustomUserPreferences."com.apple.dock".
     # -------------------------------------------------------------------------
-    configureSystemHardening = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    # provisionDevDirectory
+    # Ensures ~/dev exists before any dev-tree maintenance runs.
+    #
+    # WHY separate activation: the directory itself is cross-host provisioning
+    # state, while the macOS-only cleanup/indexing steps below are session-side
+    # maintenance concerns.
+    # -------------------------------------------------------------------------
+    provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      mkdir -p "$HOME/dev"
+    '';
+
+    # -------------------------------------------------------------------------
+    # configureDevSpotlightExclusions
+    # Marks build/cache directories under ~/dev with .metadata_never_index so
+    # Spotlight skips low-signal artifacts and reduces indexing churn.
+    #
+    # WHY separate activation: this is the actual dev-tree hardening/perf work;
+    # keeping it isolated makes it easier to reason about than bundling it with
+    # Finder metadata cleanup and Dock restarts.
+    # -------------------------------------------------------------------------
+    configureDevSpotlightExclusions = lib.hm.dag.entryAfter [ "provisionDevDirectory" ] ''
       DEV_ROOT="$HOME/dev"
-      if [ -d "$DEV_ROOT" ]; then
-        # WHY single find pass: marking Spotlight-excluded directories is O(n * 16)
-        # when done with separate find calls; combine patterns with -o for a single
-        # tree traversal. Only create .metadata_never_index if absent (check first).
-        /usr/bin/find "$DEV_ROOT" \( -name ".gradle" -o -name ".next" -o -name ".turbo" -o -name ".venv" -o -name "__pycache__" -o -name "bin" -o -name "build" -o -name "dist" -o -name "incremental" -o -name "node_modules" -o -name "obj" -o -name "target" -o -name "venv" -o -name "vendor" \) -type d ! -exec test -f "{}/.metadata_never_index" \; -exec touch "{}/.metadata_never_index" \; 2>/dev/null || true
+      # WHY single find pass: marking Spotlight-excluded directories is O(n * 16)
+      # when done with separate find calls; combine patterns with -o for a single
+      # tree traversal. Only create .metadata_never_index if absent (check first).
+      /usr/bin/find "$DEV_ROOT" \( -name ".gradle" -o -name ".next" -o -name ".turbo" -o -name ".venv" -o -name "__pycache__" -o -name "bin" -o -name "build" -o -name "dist" -o -name "incremental" -o -name "node_modules" -o -name "obj" -o -name "target" -o -name "venv" -o -name "vendor" \) -type d ! -exec test -f "{}/.metadata_never_index" \; -exec touch "{}/.metadata_never_index" \; 2>/dev/null || true
+    '';
 
-        # Remove Finder metadata files from development trees to reduce
-        # repository noise. This is safe/idempotent because Finder recreates
-        # files on demand when folder-view state changes.
-        /usr/bin/find "$DEV_ROOT" -name ".DS_Store" -type f -delete 2>/dev/null || true
-      else
-        mkdir -p "$DEV_ROOT"
-      fi
+    # -------------------------------------------------------------------------
+    # cleanDevDsStore
+    # Removes Finder metadata files from ~/dev so Git worktrees stay cleaner.
+    #
+    # WHY separate activation: .DS_Store cleanup is repository hygiene, not the
+    # same concern as Spotlight exclusion markers.
+    # -------------------------------------------------------------------------
+    cleanDevDsStore = lib.hm.dag.entryAfter [ "provisionDevDirectory" ] ''
+      DEV_ROOT="$HOME/dev"
+      /usr/bin/find "$DEV_ROOT" -name ".DS_Store" -type f -delete 2>/dev/null || true
+    '';
 
+    # -------------------------------------------------------------------------
+    # reloadDockPreferenceState
+    # Restarts Dock so declarative Dock defaults take effect immediately.
+    #
+    # WHY separate activation: Dock refresh is a UI cache reload, not dev-tree
+    # maintenance. Keeping it independent avoids fake coupling with ~/dev work.
+    # -------------------------------------------------------------------------
+    reloadDockPreferenceState = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       if ! /usr/bin/killall Dock; then
         echo "macos: Dock was not running (or could not be restarted)." >&2
       fi
@@ -1157,8 +1174,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # and archive handler associations are functional after activation.
     # -------------------------------------------------------------------------
     verifyArchivingStack =
-      lib.hm.dag.entryAfter
-        [ "configureSystemHardening" "configureLaunchServices" "installPackages" "refreshFinderServices" ]
+      lib.hm.dag.entryAfter [ "configureLaunchServices" "installPackages" "refreshFinderServices" ]
         ''
           # Verify 7z CLI is available and functional using direct Nix store path.
           # Do not rely on PATH lookup since Home Manager activation runs in a minimal
