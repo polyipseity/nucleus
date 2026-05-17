@@ -13,7 +13,7 @@ let
   shellModuleText = builtins.readFile ../../src/modules/shell.nix;
   users = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
 
-  assert' = cond: msg: if !cond then builtins.throw msg else null;
+  assert' = cond: msg: if !cond then throw msg else null;
 
   user = users.polyipseity;
   excludedDirNames = user.iCloudExclusions.excludedDirNames;
@@ -23,10 +23,17 @@ let
     (builtins.length excludedDirNames) > 0
   ) "users.json must define a non-empty iCloudExclusions.excludedDirNames list";
 
-  test_managed_roots_centralized =
-    assert'
-      ((builtins.length managedRoots) > 0 && (builtins.elem "Library/Mobile Documents" managedRoots))
-      "users.json must define iCloudExclusions.managedRoots with at least the Library/Mobile Documents path";
+  test_managed_roots_centralized = assert' (
+    managedRoots == [
+      "Library/Mobile Documents/com~apple~CloudDocs"
+      "Library/Mobile Documents/iCloud~md~obsidian/."
+    ]
+  ) "users.json must define the exact centralized iCloudExclusions.managedRoots list for polyipseity";
+
+  test_managed_roots_are_mobile_documents_only = assert' (builtins.all
+    (root: lib.hasPrefix "Library/Mobile Documents/" root)
+    managedRoots
+  ) "users.json iCloudExclusions.managedRoots must stay inside Library/Mobile Documents only";
 
   test_required_python_dirs_present = assert' (
     (builtins.elem ".venv" excludedDirNames)
@@ -53,20 +60,28 @@ let
   test_macos_activation_recursive_pass = assert' (
     (lib.hasInfix "configureICloudExclusions" macosModuleText)
     && (lib.hasInfix "com.apple.fileprovider.ignore#P" macosModuleText)
+    && (lib.hasInfix "sanitizeICloudManagedRoots" macosModuleText)
   ) "macos.nix must retain activation-time recursive iCloud exclusion pass";
+
+  test_shell_restricts_roots_to_mobile_documents = assert' (
+    (lib.hasInfix "Library/Mobile Documents/com~apple~CloudDocs" shellModuleText)
+    && (lib.hasInfix "lib.hasPrefix \"Library/Mobile Documents/\"" shellModuleText)
+  ) "shell.nix must sanitize managed roots to Library/Mobile Documents subpaths only";
 
   allTests = [
     test_exclusion_list_exists
     test_managed_roots_centralized
+    test_managed_roots_are_mobile_documents_only
     test_required_python_dirs_present
     test_required_node_dirs_present
     test_shell_uses_chpwd_hook
     test_shell_keeps_mkdir_hook
     test_macos_activation_recursive_pass
+    test_shell_restricts_roots_to_mobile_documents
   ];
 in
 {
   success = true;
   testCount = builtins.length allTests;
-  message = "All ${builtins.toString (builtins.length allTests)} iCloud exclusion tests passed";
+  message = "All ${toString (builtins.length allTests)} iCloud exclusion tests passed";
 }

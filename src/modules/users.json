@@ -112,9 +112,8 @@
     },
     "iCloudExclusions": {
       "managedRoots": [
-        "Library/Mobile Documents",
-        "Downloads/iCloud",
-        "clouds/iCloud"
+        "Library/Mobile Documents/com~apple~CloudDocs",
+        "Library/Mobile Documents/iCloud~md~obsidian"
       ],
       "excludedDirNames": [
         ".direnv",

@@ -40,6 +40,9 @@ let
   # Keep iCloud exclusion names and managed root paths in one declarative source
   # (users.json) so activation-time recursive marking and interactive shell hooks
   # converge on the same directory-name and managed-root policy.
+  # Only Mobile Documents subpaths are valid managed roots here: the ignore xattr
+  # is a native iCloud File Provider mechanism and must not be applied to legacy
+  # convenience aliases like ~/Downloads/iCloud or ~/clouds/iCloud.
   _iCloudCfg =
     let
       allUsers = builtins.fromJSON (builtins.readFile ./users.json);
@@ -51,15 +54,22 @@ let
           allUsers.${currentUser}.iCloudExclusions
         else
           { };
+      normalizeRoot = root: lib.removeSuffix "/." root;
+      sanitizedManagedRoots =
+        let
+          candidateRoots = map normalizeRoot (perUser.managedRoots or [ ]);
+          mobileDocumentsRoots = builtins.filter (
+            root: lib.hasPrefix "Library/Mobile Documents/" root
+          ) candidateRoots;
+        in
+        if mobileDocumentsRoots != [ ] then
+          mobileDocumentsRoots
+        else
+          [ "Library/Mobile Documents/com~apple~CloudDocs" ];
     in
     {
       excludedDirNames = perUser.excludedDirNames or [ ];
-      managedRoots =
-        perUser.managedRoots or [
-          "Library/Mobile Documents"
-          "Downloads/iCloud"
-          "clouds/iCloud"
-        ];
+      managedRoots = sanitizedManagedRoots;
     };
 
   iCloudExcludedDirNames = _iCloudCfg.excludedDirNames;

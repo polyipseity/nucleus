@@ -147,6 +147,25 @@ let
   # across home-manager generations without a home.file symlink.
   # set +e at the top makes all operations fully soft-fail so launchd never
   # marks the agent as failed and throttles future invocations.
+  #
+  # iCloud exclusion roots are constrained to subpaths under
+  # ~/Library/Mobile Documents. This keeps the File Provider ignore xattr scoped
+  # to native iCloud storage only; legacy aliases like ~/Downloads/iCloud and
+  # ~/clouds/iCloud must never be traversed by this hook.
+  sanitizeICloudManagedRoots =
+    roots:
+    let
+      normalizeRoot = root: lib.removeSuffix "/." root;
+      normalizedRoots = map normalizeRoot roots;
+      mobileDocumentsRoots = builtins.filter (
+        root: lib.hasPrefix "Library/Mobile Documents/" root
+      ) normalizedRoots;
+    in
+    if mobileDocumentsRoots != [ ] then
+      mobileDocumentsRoots
+    else
+      [ "Library/Mobile Documents/com~apple~CloudDocs" ];
+
   betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" ''
     set +e  # heartbeat is fully soft-fail; never abort on individual check failure
 
@@ -692,11 +711,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # .ignore#P xattr to exclude them from iCloud sync. This prevents large
     # directories (e.g., node_modules, .venv) from syncing across devices.
     #
-    # Simple approach:
-    #   1. Extract directory names from iCloudExclusions.excludedDirNames
-    #   2. For each directory name, find and mark all matching directories
-    #   3. Use -maxdepth 1 at each level to avoid recursing into excluded dirs
-    #   4. Apply xattr in parallel for performance
+    # Scope guard:
+    #   1. Managed roots come from the centralized users.json registry.
+    #   2. At evaluation time we discard any root outside Library/Mobile Documents.
+    #   3. At runtime we recurse only inside those native iCloud directories.
+    #   4. find -prune stops descent into excluded directories, keeping scans fast.
     #
     # Configuration: excludedDirNames from users.json (e.g., ["node_modules"])
     # -------------------------------------------------------------------------
@@ -728,13 +747,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
             && builtins.hasAttr "iCloudExclusions" effectiveUsers.${currentUser}
             && builtins.hasAttr "managedRoots" effectiveUsers.${currentUser}.iCloudExclusions
           then
-            effectiveUsers.${currentUser}.iCloudExclusions.managedRoots
+            sanitizeICloudManagedRoots effectiveUsers.${currentUser}.iCloudExclusions.managedRoots
           else
-            [
-              "Library/Mobile Documents"
-              "Downloads/iCloud"
-              "clouds/iCloud"
-            ]
+            sanitizeICloudManagedRoots [ ]
         )
       }'
 
@@ -748,43 +763,32 @@ lib.mkIf pkgs.stdenv.isDarwin {
         local start_time
         start_time=$(date +%s)
 
-        # For each managed root, mark directories matching excluded names.
-        # Use find recursively but mark matches immediately without descending
-        # into them, achieving performance by avoiding traversal of large trees.
         while IFS= read -r rel_root; do
           [ -z "$rel_root" ] && continue
           icloud_root="$HOME/$rel_root"
           [ -d "$icloud_root" ] || continue
 
-          # Build find arguments that match any of the excluded directory names.
-          # Use -name ... -o -name ... to create an OR pattern.
-          # -print0 + xargs ensures safe handling of paths with spaces/special chars.
+          # Build a find expression that marks matches and prunes them from
+          # traversal so large dependency/cache trees are never descended into.
           find_args=()
           first=1
           while IFS= read -r dir_name; do
             [ -z "$dir_name" ] && continue
             if [ "$first" -eq 1 ]; then
-              find_args=( "-name" "$dir_name" )
+              find_args=( "(" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
               first=0
             else
-              find_args+=( "-o" "-name" "$dir_name" )
+              find_args+=( "-o" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
             fi
           done < <(echo "$excluded_dirs" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
 
           if [ "$first" -eq 1 ]; then
-            # No excluded directory names to process
             continue
           fi
 
-          # Find all matching directories (at any depth) and apply the exclude xattr.
-          # Add parentheses around the name predicates to group the -o expressions.
-          # Use -type d to match only directories, not files.
-          count_batch=$(${pkgs.findutils}/bin/find "$icloud_root" \
-            -type d \
-            "(" "''${find_args[@]}" ")" \
-            -print0 2>/dev/null | \
-            /usr/bin/xargs -0 -P 4 /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 2>/dev/null | \
-            wc -l) || count_batch=0
+          find_args+=( ")" )
+
+          count_batch=$(${pkgs.findutils}/bin/find "$icloud_root" -type d "''${find_args[@]}" -print 2>/dev/null | /usr/bin/wc -l | /usr/bin/tr -d ' ') || count_batch=0
 
           count=$(( count + count_batch ))
         done < <(echo "$managed_roots" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
