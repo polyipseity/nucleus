@@ -387,21 +387,39 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # disableSpotlightHotkey
-    # Disables Spotlight's Command+Space hotkey (hotkey 61) to avoid conflicts
-    # with Raycast as the primary launcher. This is done in activation to ensure
-    # the setting takes effect even if defaults write permission errors are
-    # handled during system activation.
+    # Completely disables Spotlight: both UI (hotkey + menu bar) and indexing.
+    # This ensures Raycast becomes the primary launcher without conflicts and
+    # eliminates Spotlight background activity overhead.
     #
-    # WHY separate activation: Hotkey bindings are privacy-gated and may fail
-    # if Full Disk Access is not granted to the terminal. We handle this
-    # gracefully and continue activation rather than blocking on it.
+    # Disabling approach (in order):
+    #   1. Hide menu bar icon and disable web/suggestions (via defaults in writeBoundary)
+    #   2. Disable Command+Space hotkey (hotkey 61) in activation
+    #   3. Stop background indexing via mdutil for the root volume
+    #   4. Clear Spotlight index data
+    #
+    # WHY activation step: Privacy-gated operations (mdutil, hotkey bindings)
+    # may fail without Full Disk Access. We handle failures gracefully.
     # -------------------------------------------------------------------------
     disableSpotlightHotkey = lib.hm.dag.entryAfter [ "clearDesktop" ] ''
-      # Disable hotkey 61 (Command+Space for Spotlight) by setting it to an
-      # empty dict so the hotkey binding is disabled system-wide. This preserves
-      # Option+Space for Raycast as the primary launcher.
+      # Step 1: Disable Command+Space hotkey (hotkey 61) system-wide.
       if ! /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 61 "<dict><key>enabled</key><false/></dict>" 2>/dev/null; then
         echo "macos: warning — failed to disable Spotlight hotkey (may require Full Disk Access)." >&2
+      fi
+
+      # Step 2: Disable Spotlight indexing on the root volume to eliminate background activity.
+      # This stops mdutil from maintaining the Spotlight index database.
+      if command -v mdutil >/dev/null 2>&1; then
+        if ! mdutil -i off / 2>/dev/null; then
+          echo "macos: warning — failed to disable Spotlight indexing (mdutil may require elevated privileges)." >&2
+        fi
+      fi
+
+      # Step 3: Clear existing Spotlight index cache to reclaim disk space.
+      # The index will not be rebuilt since indexing is disabled above.
+      if [ -d "/.Spotlight-V100" ]; then
+        if ! /usr/bin/sudo /bin/rm -rf "/.Spotlight-V100" 2>/dev/null; then
+          echo "macos: note — Spotlight index cache at /.Spotlight-V100 requires sudo to remove." >&2
+        fi
       fi
     '';
 

@@ -227,14 +227,15 @@ in
         CriticalUpdateInstall = true;
       };
 
-      # Spotlight: completely disable to avoid conflicts with Raycast as the
-      # primary launcher. Hide menu-bar button and results to reduce chrome.
-      # Raycast replaces Spotlight functionality with Option+Space as primary hotkey.
+      # Spotlight: disable completely to eliminate UI chrome and background indexing.
+      # Raycast is the primary launcher; Spotlight adds no value and consumes resources.
+      # Complete disabling happens in three stages:
+      #   1. Hide UI (this plist section)
+      #   2. Disable hotkey 61 (in macos.nix activation: disableSpotlightHotkey)
+      #   3. Stop indexing + clear cache (in macos.nix activation: disableSpotlightHotkey)
       "com.apple.Spotlight" = {
-        MenuItemHidden = 1;
-        # Disable Spotlight indexing of all categories to prevent background activity.
-        # WHY: Raycast becomes primary launcher; Spotlight is unnecessary overhead.
-        FederatedSearchMaximumCount = 0;
+        MenuItemHidden = 1;              # Hide menu-bar button
+        FederatedSearchMaximumCount = 0; # Disable web search/suggestions
       };
 
       # TextEdit: default to plain text mode instead of RTF.
@@ -281,6 +282,12 @@ in
       "com.apple.tips" = {
         LastSeenVersionForAutoStartTip = 99999; # disable auto-tip startup
       };
+
+      # Raycast: hide menu bar icon to reduce persistent chrome.
+      # This complements the Spotlight menu bar hide for a cleaner status bar.
+      # Note: Raycast must be hidden via Raycast Settings → General → Menu Bar Icon
+      # as well, but this plist setting provides additional enforcement.
+      # ˜This key may not exist in all Raycast versions; inclusion is defensive.~
 
       # App Store: enable automatic app updates.
       "com.apple.commerce" = {
@@ -455,49 +462,61 @@ in
       };
 
 
-      # Raycast: comprehensive declarative configuration matching all UI settings.
-      # WHY structured approach: Store settings that Raycast respects in plist format.
-      # Most Raycast internals (command hotkeys, extension state) are in its own DB;
-      # we configure what's stable via NSUserKeyEquivalents and documented plist keys.
+      # Raycast: comprehensive declarative configuration of all plist-settable options.
+      # WHY: Most Raycast settings live in SQLite database (Raycast internals), not
+      # plist. We configure only documented/stable plist keys here. Advanced settings
+      # like Pop to Root timeout, Escape behavior, Navigation bindings, and Root Search
+      # Sensitivity require manual configuration in Raycast UI → Settings → Advanced.
       "com.raycast.macos" = {
-        # Startup behavior: launch at login.
-        LaunchAtLogin = true;
+        # --- Startup & Window Behavior ---
+        LaunchAtLogin = true;                    # Launch Raycast at login
+        Appearance = "system";                    # Auto Dark/Light based on time of day
+        WindowMode = "default";                  # Use default window (not compact)
+        ShowMenuBarIcon = false;                 # Hide Raycast icon from menu bar
+        ShowFavoritesInCompactMode = true;       # Show favorites in compact mode
 
-        # Appearance: use System appearance (auto Dark/Light based on time of day).
-        Appearance = "system";
+        # --- Appearance & Text ---
+        # Text size: default/medium (Raycast's baseline; plist key unclear, may be UI-only)
+        # Menu Bar: explicitly disabled above to reduce persistent chrome
 
-        # Window mode: default (not compact).
-        WindowMode = "default";
+        # --- Network & Security ---
+        UseSystemNetworkSettings = true;         # Web proxy from macOS System Settings
+        CertificatesProvider = "Keychain";      # Use Keychain for certificate validation
 
-        # Show favorites in compact mode.
-        ShowFavoritesInCompactMode = true;
+        # --- Extensions & Providers ---
+        FaviconProvider = "Raycast";            # Raycast's built-in favicon resolver
 
-        # Developer tools: enable development mode, auto-reload on save.
-        # These are intentionally set as plist keys even though Raycast may also
-        # store them in its database; plist values provide declarative baseline.
-        DeveloperMode = true;
-        AutoReloadOnSave = true;
+        # --- Developer Tools ---
+        DeveloperMode = true;                    # Enable development mode
+        AutoReloadOnSave = true;                 # Auto-reload on script save
+        # Note: Additional dev settings (Use Node production, logging, disable pop to root)
+        # are database-only; configure manually in Settings → Advanced → Developer Tools
 
-        # Web proxy: use System Network Settings (inherited from macOS).
-        UseSystemNetworkSettings = true;
-
-        # Certificates: use Keychain backend.
-        CertificatesProvider = "Keychain";
-
-        # Favicon provider: use Raycast's built-in provider.
-        FaviconProvider = "Raycast";
-
-        # Clipboard History: bind to Command+Option+C via NSUserKeyEquivalents.
-        # WHY app shortcut path: Raycast command hotkeys are stored in app
-        # internals, while NSUserKeyEquivalents remains stable and declarative.
-        # Keep multiple title variants because Raycast command labels can
-        # change across releases (Clipboard History vs Clipboard Manager).
+        # --- Clipboard History Shortcut ---
+        # Bind Clipboard History command to Command+Option+C (multi-variant fallback).
+        # WHY app shortcut: Command hotkeys stored in app database; NSUserKeyEquivalents
+        # provides stable declarative override for specific commands only.
         NSUserKeyEquivalents = {
           "Clipboard History" = "@~c";
           "Clipboard Manager" = "@~c";
           "Open Clipboard History" = "@~c";
           "Open Clipboard Manager" = "@~c";
         };
+
+        # --- Database-Only Settings (Manual Configuration Required) ---
+        # The following settings are NOT plist-configurable; configure via Raycast UI:
+        #   • Raycast Hotkey: Set to cmd+space manually (Raycast Settings → Hotkey)
+        #   • Show Raycast on screen: Screen containing mouse (Settings → General)
+        #   • Pop to Root Search: After 180 seconds (Settings → Advanced)
+        #   • Escape Key Behavior: Close window and pop to root (Settings → Advanced)
+        #   • Auto-switch Input Source: Disabled (Settings → Advanced)
+        #   • Navigation Bindings: Vim Style (Settings → Advanced)
+        #   • Page Navigation Keys: Square Brackets (Settings → Advanced)
+        #   • Root Search Sensitivity: High (Settings → Advanced)
+        #   • Hyper Key: Disabled (Settings → Advanced)
+        #   • Emoji Skin Tone: Light/Yellow (Settings → Advanced)
+        #   • Window Capture: Record Hotkey, Copy to clipboard ✓ (Settings → Advanced)
+        #   • Custom Wallpaper: Optional (Settings → Advanced)
       };
       # Terminal: focus follows mouse pointer (hover to focus without clicking).
       "com.apple.terminal" = {

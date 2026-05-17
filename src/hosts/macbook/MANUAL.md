@@ -1,5 +1,8 @@
 # macbook manual steps
 
+## One-Time Configuration
+
+- Configure Raycast database-only settings: see [raycast-manual-config.md](raycast-manual-config.md) for step-by-step guide. This includes setting the main hotkey to cmd+space, search sensitivity to high, vim keybindings, and other advanced options that cannot be declaratively managed.
 - Grant Accessibility + Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
 - Open `fuse-t.app` once, then enable the `fuse-t` File System Extension in `System Settings > General > Login Items & Extensions > Extensions`.
 - Open `battery.app` once so `/usr/local/bin/battery` is installed.
