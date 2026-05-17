@@ -67,7 +67,7 @@ let
       interval = lib.mkOption {
         type = lib.types.str;
         default = "daily";
-        description = "Launchd StartCalendarInterval expression (macOS) or systemd OnCalendar string (NixOS) for the fallback timer. Use 'daily' for daily 00:00 execution per repository convention.";
+        description = "Launchd StartCalendarInterval expression (macOS) or systemd OnCalendar string (NixOS) for the fallback timer. Use 'daily' for daily 12:00 execution per repository convention.";
       };
     };
   };
@@ -213,9 +213,6 @@ let
     let
       mountPoint = mkMountPoint mount;
       rcloneRemote = "${mount.remoteName}:${mount.remotePath}";
-      rcloneConfigPassExport = lib.optionalString config.nucleus.rclone.configPassEnabled ''
-        export RCLONE_CONFIG_PASS="$(cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath})"
-      '';
       # Always pass the configured iCloud service explicitly so mount behavior
       # follows the per-entry setting even if the shared remote was created
       # with a different default service.
@@ -246,8 +243,6 @@ let
     in
     pkgs.writeShellScript "cloud-mount-${mount.id}" ''
       set -eu
-
-      ${rcloneConfigPassExport}
 
       # Verify the rclone remote is configured; exit 0 (no restart) if not.
       if ! rclone_remotes="$(${pkgs.rclone}/bin/rclone listremotes)"; then
@@ -316,36 +311,39 @@ let
       exec "$_nucleus_replica_cmd" --replica-id ${lib.escapeShellArg replica.id}
     '';
 
-  # Canonical fallback timer mapping. Repository policy mandates 00:00 slots.
+  # Canonical fallback timer mapping. Repository policy mandates 12:00 slots.
   mkFallbackLaunchdCalendar =
     interval:
     if interval == "weekly" then
       [
         {
-          Hour = 0;
+          Hour = 12;
           Minute = 0;
+          Second = 0;
           Weekday = 0;
         }
       ]
     else if interval == "monthly" then
       [
         {
-          Hour = 0;
+          Hour = 12;
           Minute = 0;
+          Second = 0;
           Day = 1;
         }
       ]
     else
       [
         {
-          Hour = 0;
+          Hour = 12;
           Minute = 0;
+          Second = 0;
         }
       ];
 
   mkFallbackSystemdCalendar =
     interval:
-    if interval == "weekly" then "Sun 00:00:00" else if interval == "monthly" then "*-*-01 00:00:00" else "daily";
+    if interval == "weekly" then "Sun 12:00:00" else if interval == "monthly" then "*-*-01 12:00:00" else "12:00:00";
 
 in
 {

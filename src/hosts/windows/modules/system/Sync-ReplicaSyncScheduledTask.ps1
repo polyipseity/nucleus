@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Registers (or updates) a per-user Task Scheduler entry that runs the managed
-  `scripts\replica-sync.ps1` wrapper daily at 00:00 as a fallback backstop for
+  `scripts\replica-sync.ps1` wrapper daily at 12:00 as a fallback backstop for
   missed post-apply runs. The task executes in interactive-user context so it
   has the same HOME/profile semantics as manual replica sync invocation.
 
@@ -78,18 +78,18 @@ function Sync-ReplicaSyncScheduledTask {
 }
 "@
   $action = New-ScheduledTaskAction -Execute $pwshPath -Argument "-NoLogo -ExecutionPolicy Bypass -Command `"$actionCommand`""
-  $trigger = New-ScheduledTaskTrigger -Daily -At "00:00"
+  $trigger = New-ScheduledTaskTrigger -Daily -At "12:00"
   $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType InteractiveToken -RunLevel Limited
   $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 6)
 
   Register-ScheduledTask `
     -TaskName $taskName `
-    -Description "Run nucleus replica fallback sync daily at 00:00." `
+    -Description "Run nucleus replica fallback sync daily at 12:00." `
     -Action $action `
     -Trigger $trigger `
     -Principal $principal `
     -Settings $settings `
     -Force | Out-Null
 
-  Write-Output "replica-sync: ensured scheduled task '$taskName' (daily 00:00)"
+  Write-Output "replica-sync: ensured scheduled task '$taskName' (daily 12:00)"
 }
