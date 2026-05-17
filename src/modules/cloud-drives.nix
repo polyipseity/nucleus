@@ -275,11 +275,11 @@ let
   mkFusermountUnmount =
     mountPoint: "/bin/sh -c 'fusermount3 -u ${lib.escapeShellArg mountPoint} || true'";
 
-  # Build a replica fallback runner that resolves the repository root at
+  # Build a scheduled replica-sync runner that resolves the repository root at
   # runtime and invokes scripts/replica-sync.sh for one replica id.
-  mkReplicaFallbackScript =
+  mkReplicaScheduledSyncScript =
     replica:
-    pkgs.writeShellScript "cloud-replica-fallback-${replica.id}" ''
+    pkgs.writeShellScript "cloud-replica-scheduled-sync-${replica.id}" ''
       set -eu
 
       resolve_nucleus_root() {
@@ -304,15 +304,15 @@ let
       _nucleus_replica_cmd="${currentUserHome}/.nix-profile/bin/nucleus-replica-sync"
       if [ ! -x "$_nucleus_replica_cmd" ]; then
         echo "cloud-drives: nucleus replica command not found at $_nucleus_replica_cmd" >&2
-        echo "cloud-drives: run home-manager switch/apply to install nucleus-replica-sync before fallback timers run." >&2
+        echo "cloud-drives: run home-manager switch/apply to install nucleus-replica-sync before scheduled replica syncs run." >&2
         exit 1
       fi
 
       exec "$_nucleus_replica_cmd" --replica-id ${lib.escapeShellArg replica.id}
     '';
 
-  # Canonical fallback timer mapping. Repository policy mandates 12:00 slots.
-  mkFallbackLaunchdCalendar =
+  # Canonical scheduled-sync timer mapping. Repository policy mandates 12:00 slots.
+  mkScheduledSyncLaunchdCalendar =
     interval:
     if interval == "weekly" then
       [
@@ -338,7 +338,7 @@ let
         }
       ];
 
-  mkFallbackSystemdCalendar =
+  mkScheduledSyncSystemdCalendar =
     interval:
     if interval == "weekly" then
       "Sun 12:00:00"
@@ -367,8 +367,12 @@ in
     let
       enabledMounts = builtins.filter (m: m.enable) config.nucleus.cloudDrives.mounts;
       enabledReplicas = builtins.filter (r: r.enable) config.nucleus.cloudDrives.replicas;
-      fallbackTimerReplicas = builtins.filter (
+      scheduledSyncReplicas = builtins.filter (
         r: r.enable && r.remoteName != null && (r.fallbackTimer.enable or true)
+      ) config.nucleus.cloudDrives.replicas;
+      declaredMountAgents = builtins.filter (m: m.remoteName != null) config.nucleus.cloudDrives.mounts;
+      declaredScheduledSyncReplicas = builtins.filter (
+        r: r.remoteName != null && (r.fallbackTimer.enable or true)
       ) config.nucleus.cloudDrives.replicas;
 
       # Mounts require rclone plus an explicit configured remote.
@@ -384,9 +388,7 @@ in
       # -----------------------------------------------------------------------
       # Shared: rclone package installation
       # -----------------------------------------------------------------------
-      (lib.mkIf hasRcloneProvider {
-        home.packages = [ pkgs.rclone ];
-      })
+      (lib.mkIf hasRcloneProvider { home.packages = [ pkgs.rclone ]; })
 
       # -----------------------------------------------------------------------
       # Shared: directory structure
@@ -470,12 +472,12 @@ in
       # -----------------------------------------------------------------------
       # macOS: LaunchAgents for rclone-backed mounts
       # -----------------------------------------------------------------------
-      (lib.mkIf (pkgs.stdenv.isDarwin && rcloneMounts != [ ]) {
+      (lib.mkIf (pkgs.stdenv.isDarwin && declaredMountAgents != [ ]) {
         launchd.agents = builtins.listToAttrs (
           map (mount: {
             name = "cloud-mount-${mount.id}";
             value = {
-              enable = true;
+              enable = mount.enable;
               config = {
                 Label = "local.cloud-mount.${mount.id}";
                 ProgramArguments = [ "${mkRcloneMountScript mount}" ];
@@ -498,7 +500,7 @@ in
                 StandardErrorPath = "${currentUserHome}/Library/Logs/cloud-mount-${mount.id}.log";
               };
             };
-          }) rcloneMounts
+          }) declaredMountAgents
         );
       })
 
@@ -569,69 +571,69 @@ in
       })
 
       # -----------------------------------------------------------------------
-      # macOS: LaunchAgents for per-replica fallback replica-sync timers
+      # macOS: LaunchAgents for per-replica scheduled replica-sync timers
       # -----------------------------------------------------------------------
-      (lib.mkIf (pkgs.stdenv.isDarwin && fallbackTimerReplicas != [ ]) {
+      (lib.mkIf (pkgs.stdenv.isDarwin && declaredScheduledSyncReplicas != [ ]) {
         launchd.agents = builtins.listToAttrs (
           map (replica: {
-            name = "cloud-replica-fallback-${replica.id}";
+            name = "cloud-replica-scheduled-sync-${replica.id}";
             value = {
-              enable = true;
+              enable = replica.enable;
               config = {
-                Label = "local.cloud-replica-fallback.${replica.id}";
-                ProgramArguments = [ "${mkReplicaFallbackScript replica}" ];
-                StartCalendarInterval = mkFallbackLaunchdCalendar replica.fallbackTimer.interval;
-                # Keep fallback runs on schedule boundaries only.
+                Label = "local.cloud-replica-scheduled-sync.${replica.id}";
+                ProgramArguments = [ "${mkReplicaScheduledSyncScript replica}" ];
+                StartCalendarInterval = mkScheduledSyncLaunchdCalendar replica.fallbackTimer.interval;
+                # Keep scheduled sync runs on schedule boundaries only.
                 RunAtLoad = false;
                 StandardOutPath = "/dev/null";
-                StandardErrorPath = "${currentUserHome}/Library/Logs/cloud-replica-fallback-${replica.id}.log";
+                StandardErrorPath = "${currentUserHome}/Library/Logs/cloud-replica-scheduled-sync-${replica.id}.log";
               };
             };
-          }) fallbackTimerReplicas
+          }) declaredScheduledSyncReplicas
         );
       })
 
       # -----------------------------------------------------------------------
-      # NixOS: systemd services/timers for per-replica fallback replica-sync
+      # NixOS: systemd services/timers for per-replica scheduled replica-sync
       # -----------------------------------------------------------------------
-      (lib.mkIf (pkgs.stdenv.isLinux && fallbackTimerReplicas != [ ]) {
+      (lib.mkIf (pkgs.stdenv.isLinux && scheduledSyncReplicas != [ ]) {
         systemd.user.services = builtins.listToAttrs (
           map (replica: {
-            name = "cloud-replica-fallback-${replica.id}";
+            name = "cloud-replica-scheduled-sync-${replica.id}";
             value = {
               Unit = {
-                Description = "Fallback replica sync run: ${replica.id}";
+                Description = "Scheduled replica sync run: ${replica.id}";
                 After = "network-online.target";
                 Wants = "network-online.target";
               };
               Service = {
                 Type = "oneshot";
-                ExecStart = "${mkReplicaFallbackScript replica}";
+                ExecStart = "${mkReplicaScheduledSyncScript replica}";
               };
               Install = {
                 WantedBy = [ "default.target" ];
               };
             };
-          }) fallbackTimerReplicas
+          }) scheduledSyncReplicas
         );
 
         systemd.user.timers = builtins.listToAttrs (
           map (replica: {
-            name = "cloud-replica-fallback-${replica.id}";
+            name = "cloud-replica-scheduled-sync-${replica.id}";
             value = {
               Unit = {
-                Description = "Fallback replica sync timer: ${replica.id}";
+                Description = "Scheduled replica sync timer: ${replica.id}";
               };
               Timer = {
-                OnCalendar = mkFallbackSystemdCalendar replica.fallbackTimer.interval;
+                OnCalendar = mkScheduledSyncSystemdCalendar replica.fallbackTimer.interval;
                 Persistent = true;
-                Unit = "cloud-replica-fallback-${replica.id}.service";
+                Unit = "cloud-replica-scheduled-sync-${replica.id}.service";
               };
               Install = {
                 WantedBy = [ "timers.target" ];
               };
             };
-          }) fallbackTimerReplicas
+          }) scheduledSyncReplicas
         );
       })
     ];

@@ -365,11 +365,11 @@ let
     && containsRegex "\.config\\nucleus\\repo-root" replicaSyncPwshText
   ) "Replica entrypoint scripts must resolve repo root via managed config/git/CWD fallback";
 
-  # Test 45: fallbackTimer settings are wired to real scheduled runners on all hosts
+  # Test 45: fallbackTimer settings are wired to intended scheduled-sync runners on all hosts
   test_replica_fallback_timer_wiring = assert' (
-    containsRegex "fallbackTimerReplicas" moduleText
-    && containsRegex "mkReplicaFallbackScript" moduleText
-    && containsRegex "cloud-replica-fallback" moduleText
+    containsRegex "scheduledSyncReplicas" moduleText
+    && containsRegex "mkReplicaScheduledSyncScript" moduleText
+    && containsRegex "cloud-replica-scheduled-sync" moduleText
     && containsRegex "nucleus-replica-sync" moduleText
     && containsRegex "StartCalendarInterval" moduleText
     && containsRegex "systemd\.user\.timers" moduleText
@@ -378,9 +378,20 @@ let
     && containsRegex "New-ScheduledTaskTrigger" windowsReplicaScheduleModuleText
     && containsRegex "-Daily" windowsReplicaScheduleModuleText
     && containsRegex "nucleus-replica-sync" windowsReplicaScheduleModuleText
-  ) "Replica fallbackTimer must materialize as daily scheduler wiring on macOS/NixOS/Windows";
+  ) "Replica fallbackTimer must materialize as daily scheduled-sync wiring on macOS/NixOS/Windows";
 
-  # Test 46: replica-reset command is exposed on POSIX and Windows with dedicated scripts/modules
+  # Test 46: macOS launchd inventory declares every remote-backed mount/replica and uses per-entry enable flags
+  test_macos_launchd_inventory_is_declared =
+    assert'
+      (
+        containsRegex "declaredMountAgents" moduleText
+        && containsRegex "declaredScheduledSyncReplicas" moduleText
+        && containsRegex "enable = mount\.enable" moduleText
+        && containsRegex "enable = replica\.enable" moduleText
+      )
+      "macOS launchd inventory must declare all remote-backed mounts and scheduled replicas while respecting per-entry enable flags";
+
+  # Test 47: replica-reset command is exposed on POSIX and Windows with dedicated scripts/modules
   test_replica_reset_command_parity = assert' (
     containsRegex "mkReplicaResetApp" flakeText
     && containsRegex "scripts/replica-reset\.sh" flakeText
@@ -401,7 +412,7 @@ let
     && containsRegex "function Invoke-ReplicaReset" windowsReplicaResetModuleText
   ) "replica-reset command must exist with parity on POSIX and Windows";
 
-  # Test 47: Shared cleanup config must drive replica metadata cleanup behavior
+  # Test 48: Shared cleanup config must drive replica metadata cleanup behavior
   test_replica_cleanup_config_centralized = assert' (
     containsRegex ''"GoogleDrive"'' replicaCleanupConfigText
     && containsRegex ''"iCloud"'' replicaCleanupConfigText
@@ -418,7 +429,7 @@ let
     && containsRegex "Get-ReplicaCleanupConfig" windowsReplicaModuleText
   ) "replica metadata exclusion and cleanup patterns must be centralized in one shared config";
 
-  # Test 48: Replica runners lock local replica trees as read-only between sync runs
+  # Test 49: Replica runners lock local replica trees as read-only between sync runs
   test_replica_read_only_permissions = assert' (
     containsRegex "set_replica_tree_writable" replicaSyncShellText
     && containsRegex "set_replica_tree_read_only" replicaSyncShellText
@@ -475,6 +486,7 @@ let
     test_replica_pull_only_policy
     test_replica_entrypoints_resolve_repo_root
     test_replica_fallback_timer_wiring
+    test_macos_launchd_inventory_is_declared
     test_replica_reset_command_parity
     test_replica_cleanup_config_centralized
     test_replica_read_only_permissions
