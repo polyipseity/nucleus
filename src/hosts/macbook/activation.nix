@@ -349,5 +349,50 @@
       # Use killall to terminate the process; macOS will auto-relaunch it.
       /usr/bin/killall -9 Finder 2>/dev/null || true
     fi
+
+      # ---- disableSpotlight -------------------------------------------------------
+      # Completely disable Spotlight (command-palette/search engine) so Raycast
+      # becomes the exclusive launcher. This requires system-level activation since
+      # keyboard hotkey disabling needs root privileges.
+      #
+      # Three-layer disabling strategy:
+      #   1. Hotkey 61 (cmd+space) — disabled at system level via defaults write
+      #   2. Indexing daemon — stopped via mdutil (requires sudo even for root)
+      #   3. Launchd service — disabled so Spotlight doesn't auto-restart
+      #   4. Index cache — cleared to reclaim disk space
+      #
+      # WHY system-level activation: User-level activation (Home Manager) cannot
+      # properly disable system keyboard hotkeys or stop system services. This
+      # script runs as root during `darwin-rebuild switch`, providing proper
+      # privilege for all operations.
+      #
+      # NOTE: Some changes require a system reboot to take full effect. See
+      # src/hosts/macbook/MANUAL.md for details.
+
+      echo "spotlight: disabling Spotlight (system launcher) to use Raycast exclusively..."
+
+      # Disable cmd+space hotkey (hotkey 61) at system level
+      if ! /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 61 "<dict><key>enabled</key><false/></dict>" 2>/dev/null; then
+        echo "spotlight: warning — failed to disable cmd+space hotkey (may require a reboot)." >&2
+      fi
+
+      # Disable Spotlight indexing via mdutil (requires sudo even for root on modern macOS)
+      if ! sudo -n mdutil -i off / 2>/dev/null; then
+        echo "spotlight: warning — failed to disable Spotlight indexing (mdutil requires sudo; may require Full Disk Access)." >&2
+      fi
+
+      # Disable Spotlight launchd service so it doesn't auto-restart
+      if ! sudo -n launchctl disable gui/0/com.apple.Spotlight 2>/dev/null; then
+        echo "spotlight: note — Spotlight launchd disable may require Full Disk Access; continuing." >&2
+      fi
+
+      # Clear Spotlight index cache to reclaim disk space
+      if [ -d "/.Spotlight-V100" ]; then
+        if ! sudo -n rm -rf "/.Spotlight-V100" 2>/dev/null; then
+          echo "spotlight: note — Spotlight cache removal skipped (would require elevated privileges)." >&2
+        fi
+      fi
+
+      echo "spotlight: Spotlight disabling complete. Note: some changes take effect after reboot."
   '';
 }

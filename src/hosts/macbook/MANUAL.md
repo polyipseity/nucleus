@@ -2,12 +2,7 @@
 
 ## One-Time Configuration
 
-- Configure Raycast database-only settings: see [raycast-manual-config.md](raycast-manual-config.md) for step-by-step guide. This includes setting the main hotkey to cmd+space, search sensitivity to high, vim keybindings, and other advanced options that cannot be declaratively managed.
-- Grant Accessibility + Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
 - Open `fuse-t.app` once, then enable the `fuse-t` File System Extension in `System Settings > General > Login Items & Extensions > Extensions`.
-- Open `battery.app` once so `/usr/local/bin/battery` is installed.
-- Sign in to the App Store once so `mas` installs can provision Xcode.
-- Create the per-user rclone passphrase: from the repo root, run `sops edit src/secrets/users-<username>.yml`, add `rclone_config_pass: <output of openssl rand -hex 64>`, save (sops encrypts automatically), commit the file, then re-run `nucleus apply`. If you already configured rclone remotes without this passphrase, delete `~/.config/rclone/rclone.conf` first so the remotes are re-created with encryption.
 - Run `nucleus-cloud-setup` and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
 - Finder sidebar favorites set by `nucleus apply` are visible only after restarting macOS (log out and back in, or reboot).
 
