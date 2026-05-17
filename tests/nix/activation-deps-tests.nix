@@ -20,6 +20,7 @@ let
   agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
   macbookActivationText = builtins.readFile ../../src/hosts/macbook/activation.nix;
+  macbookDefaultText = builtins.readFile ../../src/hosts/macbook/default.nix;
   windowsGitSshModuleText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-GitAndSshConfig.ps1;
   sharedGitModuleText = builtins.readFile ../../src/modules/git.nix;
 
@@ -295,6 +296,19 @@ let
       )
       "POSIX Git defaults must keep commit.gpgsign and tag.gpgsign enabled for cross-host signing parity";
 
+  # === TEST: macOS MiddleClick startup uses native Login Items, not LaunchAgent ===
+  test_middleclick_native_login_item = assert' (
+    (lib.hasInfix "make login item at end with properties {name:\"MiddleClick\"" macbookActivationText)
+    && (lib.hasInfix "tell application \"System Events\"" macbookActivationText)
+    && !(lib.hasInfix "launchd.agents.\"art.ginzburg.MiddleClick\"" macbookDefaultText)
+  ) "MiddleClick startup on macOS must use native Login Items (no custom LaunchAgent)";
+
+  # === TEST: Spotlight disables all known launcher hotkey slots ===
+  test_spotlight_disables_all_hotkey_slots = assert' (
+    (lib.hasInfix "spotlight_hotkeys=\"61 64 65\"" macbookActivationText)
+    && (lib.hasInfix "for hotkey in $spotlight_hotkeys; do" macbookActivationText)
+  ) "Spotlight disable flow must cover symbolic hotkey IDs 61, 64, and 65";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -314,6 +328,8 @@ let
     test_gimp_sensitivity_version_tracking
     test_windows_git_identity_targets_user_gitconfig
     test_posix_git_signing_defaults_enabled
+    test_middleclick_native_login_item
+    test_spotlight_disables_all_hotkey_slots
   ];
 in
 {
@@ -338,5 +354,7 @@ in
     "15: GIMP sensitivity tracks installed app version"
     "16: Windows Git identity targets per-user .gitconfig"
     "17: POSIX Git defaults enforce signed commits and tags"
+    "18: MiddleClick startup uses native login-item path"
+    "19: Spotlight disables all known launcher hotkey slots"
   ];
 }
