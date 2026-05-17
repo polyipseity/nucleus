@@ -7,6 +7,19 @@
   home-manager.sharedModules = [
     {
       nucleus.hostManualFile = "src/hosts/macbook/MANUAL.md";
+      # MiddleClick: auto-start the menu bar gesture helper at login.
+      # WHY LaunchAgent: MiddleClick is a background helper that must run in the
+      # user session; RunAtLoad ensures it starts on every login without relying
+      # on the macOS Login Items UI.
+      launchd.agents."art.ginzburg.MiddleClick" = {
+        enable = true;
+        config = {
+          Label = "art.ginzburg.MiddleClick";
+          ProgramArguments = [ "/Applications/MiddleClick.app/Contents/MacOS/MiddleClick" ];
+          RunAtLoad = true;
+          KeepAlive = false;
+        };
+      };
     }
   ];
 

@@ -44,6 +44,7 @@ let
     "keka" # Graphical archiver with 7-Zip backend support
     "linearmouse" # Per-device mouse/trackpad scrolling behavior and sensitivity
     "lulu" # Outbound network firewall
+    "middleclick" # Three/four-finger middle-click gesture helper
     "orbstack" # Docker/Linux VM runtime (faster than Docker Desktop)
     "parsec" # Low-latency remote gaming / desktop streaming
     "raycast" # Spotlight replacement and launcher

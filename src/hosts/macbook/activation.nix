@@ -42,9 +42,11 @@
   #   configureChargeLimit             — 80 % charge cap via battery CLI / bclm
   #   configureGimpScrollSensitivity   — GIMP drag-zoom-speed (25% of default)
   #   configureLinearMousePreferences  — LinearMouse update-check suppression
+  #   configureMiddleClick             — 4-finger gesture setting to avoid TFD conflict
   #   configureMissionControlSpansDisplays — spans-displays per-user pref
   #   configureMonitorColorProfile     — clear ColorSync device cache
   #   clearFinderCache                 — purge stale Finder state for desktop visibility
+  #   disableSpotlight                 — write hotkey disable as user + apply immediately
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
     # ---- configureBatteryPolicy ------------------------------------------------
@@ -201,6 +203,23 @@
       echo "power: no supported battery charge-limit tool found (expected /usr/local/bin/battery or /opt/homebrew/bin/bclm)." >&2
     fi
 
+    # ---- configureMiddleClick -------------------------------------------------
+    # Set MiddleClick gesture recognition to 4 fingers to avoid conflict with
+    # the built-in Three Finger Drag (TFD) gesture.
+    # WHY 4 fingers: TFD uses 3 fingers; using 4 for middle-click prevents both
+    # the TFD conflict and the phantom left-click issue described at
+    # https://github.com/artginzburg/MiddleClick/blob/main/docs/three-finger-drag.md
+    if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
+      if [ -d "/Applications/MiddleClick.app" ]; then
+        console_uid="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
+        if [ -n "$console_uid" ]; then
+          if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" \
+            /usr/bin/defaults write art.ginzburg.MiddleClick fingers -int 4 2>/dev/null; then
+            echo "middleclick: failed to set fingers=4 for user '$console_user'." >&2
+          fi
+        fi
+      fi
+    fi
     # ---- configureLinearMousePreferences --------------------------------------
     # Keep LinearMouse update checks and auto-update disabled declaratively.
     # These are Sparkle preferences in the app's defaults domain.
