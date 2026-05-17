@@ -412,19 +412,10 @@ in
         # Note: Additional dev settings (Use Node production, logging, disable pop to root)
         # are database-only; configure manually in Settings → Advanced → Developer Tools
 
-        # --- Clipboard History Shortcut ---
-        # Bind Clipboard History command to Command+Option+C (multi-variant fallback).
-        # WHY app shortcut: Command hotkeys stored in app database; NSUserKeyEquivalents
-        # provides stable declarative override for specific commands only.
-        NSUserKeyEquivalents = {
-          "Clipboard History" = "@~c";
-          "Clipboard Manager" = "@~c";
-          "Open Clipboard History" = "@~c";
-          "Open Clipboard Manager" = "@~c";
-        };
-
         # --- Database-Only Settings (Manual Configuration Required) ---
         # The following settings are NOT plist-configurable; configure via Raycast UI:
+        #   • Clipboard History hotkey: Open Raycast Settings → Shortcuts → Search "Clipboard"
+        #     → Record Hotkey → Press ⌥⌘C (manually configured, stored in Raycast database)
         #   • Raycast Hotkey: Set to cmd+space manually (Raycast Settings → Hotkey)
         #   • Show Raycast on screen: Screen containing mouse (Settings → General)
         #   • Pop to Root Search: After 180 seconds (Settings → Advanced)

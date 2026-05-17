@@ -2,6 +2,7 @@
 
 ## One-Time Configuration
 
+- **Raycast clipboard history hotkey**: Open Raycast Settings (⌘,) → Shortcuts tab → Search "Clipboard History" → Click the Record Hotkey field → Press ⌥⌘C (Option+Command+C). Hotkey is stored in Raycast's database and persists across updates.
 - Configure Raycast database-only settings: see [raycast-manual-config.md](raycast-manual-config.md) for step-by-step guide. This includes setting the main hotkey to cmd+space, search sensitivity to high, vim keybindings, and other advanced options that cannot be declaratively managed.
 - Grant Accessibility to BetterDisplay, Chrome Remote Desktop Host, and MiddleClick (MiddleClick requires this to synthesize mouse button events).
 - Grant Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
