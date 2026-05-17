@@ -117,6 +117,7 @@
         "clouds/iCloud"
       ],
       "excludedDirNames": [
+        ".direnv",
         ".hypothesis",
         ".mypy_cache",
         ".next",
