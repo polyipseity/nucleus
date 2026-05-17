@@ -341,6 +341,7 @@ in
             __nucleus_check_icloud_exclusion() {
               local target_path="$1"
               local normalized_path
+              local current_mark
               local target_name
 
               if [[ "$target_path" == /* ]]; then
@@ -356,6 +357,15 @@ in
 
               for excluded in "''${__nucleus_icloud_excluded_names[@]}"; do
                 if [[ "$target_name" == "$excluded" ]]; then
+                  # Missing xattr is expected for newly created paths, so probe the
+                  # value quietly and only log when we actually mutate state.
+                  current_mark="$(
+                    /usr/bin/xattr -p com.apple.fileprovider.ignore#P "$normalized_path" 2>/dev/null
+                  )" || true
+                  if [[ "$current_mark" == "1" ]]; then
+                    return 0
+                  fi
+
                   if /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 "$normalized_path"; then
                     echo "shell: iCloud exclusion marked $normalized_path" >&2
                   else
