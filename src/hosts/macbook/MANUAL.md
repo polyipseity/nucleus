@@ -4,7 +4,7 @@
 
 - **Raycast clipboard history hotkey**: Open Raycast Settings (⌘,) → Shortcuts tab → Search "Clipboard History" → Click the Record Hotkey field → Press ⌥⌘C (Option+Command+C). Hotkey is stored in Raycast's database and persists across updates.
 - Configure Raycast database-only settings: see [raycast-manual-config.md](raycast-manual-config.md) for step-by-step guide. This includes setting the main hotkey to cmd+space, search sensitivity to high, vim keybindings, and other advanced options that cannot be declaratively managed.
-- **Menu bar icons**: AltTab and LinearMouse menu bar icons are hidden automatically. BetterDisplay and MiddleClick do not have documented menu bar hiding options (closed-source for BetterDisplay; MiddleClick provides no preference key). If you need to hide them, use a third-party menu bar manager (e.g., Bartender, Hidden Bar) or check GitHub for undocumented methods.
+- **Menu bar icons**: AltTab, BetterDisplay, and LinearMouse are hidden automatically. To hide `MiddleClick`, hold `⌘`, drag its menu bar icon away until `✖️` appears, then release. Re-open MiddleClick while it is already running to show the icon again.
 - Grant Accessibility to BetterDisplay, Chrome Remote Desktop Host, and MiddleClick (MiddleClick requires this to synthesize mouse button events).
 - Grant Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
 - Open `fuse-t.app` once, then enable the `fuse-t` File System Extension in `System Settings > General > Login Items & Extensions > Extensions`.
