@@ -112,7 +112,25 @@
     },
     "iCloudExclusions": {
       "excludedDirNames": [
-        "node_modules"
+        ".hypothesis",
+        ".mypy_cache",
+        ".next",
+        ".nox",
+        ".npm",
+        ".parcel-cache",
+        ".pnpm-store",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".tox",
+        ".turbo",
+        ".venv",
+        ".yarn",
+        "__pycache__",
+        "build",
+        "dist",
+        "node_modules",
+        "target",
+        "venv"
       ]
     },
     "devRepos": {
