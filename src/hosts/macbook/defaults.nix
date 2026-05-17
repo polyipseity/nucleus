@@ -451,10 +451,15 @@ in
       # internals change across releases.
       "com.raycast.macos" = {
         NSUserKeyEquivalents = {
-          # Command+Option+C: open Raycast Clipboard History command.
+          # Command+Option+C: open Raycast clipboard history/manager command.
           # WHY app shortcut path: Raycast command hotkeys are stored in app
           # internals, while NSUserKeyEquivalents remains stable and declarative.
+          # Keep multiple title variants because Raycast command labels can
+          # change across releases (Clipboard History vs Clipboard Manager).
           "Clipboard History" = "@~c";
+          "Clipboard Manager" = "@~c";
+          "Open Clipboard History" = "@~c";
+          "Open Clipboard Manager" = "@~c";
         };
       };
       # Terminal: focus follows mouse pointer (hover to focus without clicking).
