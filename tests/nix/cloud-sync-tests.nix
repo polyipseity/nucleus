@@ -307,6 +307,7 @@ let
     && containsRegex "blockedRoots" replicaCleanupConfigText
     && containsRegex "skipping inaccessible OneDrive root entry" replicaSyncShellText
     && containsRegex "--disable ListR" replicaSyncShellText
+    && containsRegex "--checkers 1 --transfers 1 --onedrive-chunk-size 320Ki" replicaSyncShellText
     && containsRegex "--dirs-only --disable ListR --log-level ERROR" replicaSyncShellText
     && containsRegex "--timeout 30s --contimeout 10s" replicaSyncShellText
     && containsRegex "--max-duration 1m" replicaSyncShellText
@@ -315,6 +316,7 @@ let
     && containsRegex "BlockedRoots" windowsReplicaModuleText
     && containsRegex "Get-OneDriveRootFilterFile" windowsReplicaModuleText
     && containsRegex "skipping inaccessible OneDrive root entry" windowsReplicaModuleText
+    && containsRegex ''"--checkers", "1", "--transfers", "1", "--onedrive-chunk-size", "320Ki"'' windowsReplicaModuleText
     && containsRegex ''"--disable", "ListR"'' windowsReplicaModuleText
     && containsRegex ''"--timeout", "30s"'' windowsReplicaModuleText
     && containsRegex ''"--contimeout", "10s"'' windowsReplicaModuleText
@@ -333,27 +335,24 @@ let
       "Only macOS may map iCloudReplica to native Mobile Documents; Windows must enforce managed directories";
 
   # Test 43: replica-sync runners enforce pull-only policy and avoid bisync execution paths
-  test_replica_pull_only_policy =
-    assert'
-      (
-        containsRegex "unsupported direction" replicaSyncShellText
-        && containsRegex "pull-only by policy" replicaSyncShellText
-        && containsRegex ''"direction": "pull"'' posixUsersText
-        && containsRegex ''"direction": "pull"'' windowsUsersText
-        && !containsRegex ''"direction": "bidirectional"'' posixUsersText
-        && !containsRegex ''"direction": "bidirectional"'' windowsUsersText
-        && !containsRegex ''"direction": "push"'' posixUsersText
-        && !containsRegex ''"direction": "push"'' windowsUsersText
-        && !(containsRegex "rclone bisync" replicaSyncShellText)
-        && !(containsRegex "--resync" replicaSyncShellText)
-        && !(containsRegex "--check-access" replicaSyncShellText)
-        && containsRegex "unsupported direction" windowsReplicaModuleText
-        && containsRegex "pull-only by policy" windowsReplicaModuleText
-        && !(containsRegex " bisync " windowsReplicaModuleText)
-        && !(containsRegex "--resync" windowsReplicaModuleText)
-        && !(containsRegex "--check-access" windowsReplicaModuleText)
-      )
-      "Replica sync runners must enforce pull-only policy and avoid bisync state machinery";
+  test_replica_pull_only_policy = assert' (
+    containsRegex "unsupported direction" replicaSyncShellText
+    && containsRegex "pull-only by policy" replicaSyncShellText
+    && containsRegex ''"direction": "pull"'' posixUsersText
+    && containsRegex ''"direction": "pull"'' windowsUsersText
+    && !containsRegex ''"direction": "bidirectional"'' posixUsersText
+    && !containsRegex ''"direction": "bidirectional"'' windowsUsersText
+    && !containsRegex ''"direction": "push"'' posixUsersText
+    && !containsRegex ''"direction": "push"'' windowsUsersText
+    && !(containsRegex "rclone bisync" replicaSyncShellText)
+    && !(containsRegex "--resync" replicaSyncShellText)
+    && !(containsRegex "--check-access" replicaSyncShellText)
+    && containsRegex "unsupported direction" windowsReplicaModuleText
+    && containsRegex "pull-only by policy" windowsReplicaModuleText
+    && !(containsRegex " bisync " windowsReplicaModuleText)
+    && !(containsRegex "--resync" windowsReplicaModuleText)
+    && !(containsRegex "--check-access" windowsReplicaModuleText)
+  ) "Replica sync runners must enforce pull-only policy and avoid bisync state machinery";
 
   # Test 44: replica-sync entrypoints resolve repository root outside checkout CWD
   test_replica_entrypoints_resolve_repo_root = assert' (

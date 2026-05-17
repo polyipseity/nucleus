@@ -496,8 +496,14 @@ function Invoke-ReplicaSync {
       $commonArgs += @('--iclouddrive-service', $iCloudService)
     }
     if ($provider -eq 'OneDrive') {
-      $commonArgs += @('--disable', 'ListR')
+      # OneDrive root pulls can stall with backend chunk/transfer pressure even
+      # though this workflow is read-only. Keep syncs conservative and stable.
+      $commonArgs += @('--checkers', '1', '--transfers', '1', '--onedrive-chunk-size', '320Ki')
       if ($remotePath -eq '/') {
+        # Keep the defensive root probe/filter generation for Personal Vault,
+        # but let the real sync use OneDrive's recursive listing path. For
+        # full-root pull replicas, forcing --disable ListR makes syncs
+        # pathologically slow.
         $runtimeFilterPath = Get-OneDriveRootFilterFile -ReplicaId $id -LocalDir $localDir -RemoteRef $remoteRef -RemoteExcludes $cleanupValues.RemoteExcludes -BlockedRoots $cleanupValues.BlockedRoots -IsDryRun:$DryRun
         if ($null -ne $resolvedFilterPath) {
           $commonArgs += @('--filter-from', $resolvedFilterPath)

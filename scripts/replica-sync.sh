@@ -464,8 +464,13 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
     set -- "$@" --iclouddrive-service "$icloud_service"
   fi
   if [ "$provider" = "OneDrive" ]; then
-    set -- "$@" --disable ListR
+    # OneDrive root pulls can stall with backend chunk/transfer pressure even
+    # though this workflow is read-only. Keep syncs conservative and stable.
+    set -- "$@" --checkers 1 --transfers 1 --onedrive-chunk-size 320Ki
     if [ "$remote_path" = "/" ]; then
+      # Keep the defensive root probe/filter generation for Personal Vault, but
+      # let the real sync use OneDrive's recursive listing path. For full-root
+      # pull replicas, forcing --disable ListR makes syncs pathologically slow.
       runtime_filter_file="$(build_onedrive_root_filter_file "$id" "$local_dir" "$remote_ref" "$provider_remote_excludes" "$provider_blocked_roots")"
       if [ -n "$resolved_filters" ]; then
         set -- "$@" --filter-from "$resolved_filters"

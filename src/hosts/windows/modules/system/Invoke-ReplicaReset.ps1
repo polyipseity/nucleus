@@ -115,11 +115,31 @@ function Invoke-ReplicaReset {
     }
 
     # For non-exception replicas, reset clears local replica data only.
+    # Note: If tree is locked read-only (from previous sync), grant write permissions first.
     if (Test-Path -Path $localRoot) {
       if ($DryRun) {
+        Write-Output "replica-reset: [dry-run] Grant write permissions to '$localRoot'"
         Write-Output "replica-reset: [dry-run] Remove-Item -Path '$localRoot' -Recurse -Force"
       }
       else {
+        try {
+          # Grant write permissions recursively before attempting removal
+          $acl = Get-Acl -Path $localRoot
+          $rule = [System.Security.AccessControl.FileSystemAccessRule]::new(
+            [System.Security.Principal.WindowsIdentity]::GetCurrent().User,
+            [System.Security.AccessControl.FileSystemRights]::Modify,
+            [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit,
+            [System.Security.AccessControl.PropagationFlags]::None,
+            [System.Security.AccessControl.AccessControlType]::Allow
+          )
+          $acl.SetAccessRule($rule)
+          Set-Acl -Path $localRoot -AclObject $acl -ErrorAction SilentlyContinue
+        }
+        catch {
+          # Ignore ACL modification errors (non-critical; removal may still work)
+          Write-Debug "replica-reset: Warning: could not modify ACL for '$localRoot': $_"
+        }
+
         Remove-Item -Path $localRoot -Recurse -Force
       }
     }

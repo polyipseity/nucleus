@@ -164,7 +164,11 @@ while IFS="$(printf '\t')" read id local_path provider icloud_service; do
   fi
 
   # For non-exception replicas, reset means clearing local replica data only.
+  # Note: If tree is locked read-only (from previous sync), unlock it first.
   if [ -e "$local_root" ] || [ -L "$local_root" ]; then
+    if ! run_local_cmd chmod -R u+w "$local_root" 2>/dev/null; then
+      : # Ignore chmod errors (may be symlink or already writable)
+    fi
     if ! run_local_cmd rm -rf "$local_root"; then
       local_failures=$((local_failures + 1))
       continue
