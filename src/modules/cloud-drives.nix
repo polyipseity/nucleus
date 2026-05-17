@@ -319,7 +319,6 @@ let
         {
           Hour = 12;
           Minute = 0;
-          Second = 0;
           Weekday = 0;
         }
       ]
@@ -328,7 +327,6 @@ let
         {
           Hour = 12;
           Minute = 0;
-          Second = 0;
           Day = 1;
         }
       ]
@@ -337,7 +335,6 @@ let
         {
           Hour = 12;
           Minute = 0;
-          Second = 0;
         }
       ];
 
