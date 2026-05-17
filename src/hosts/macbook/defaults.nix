@@ -458,20 +458,26 @@ in
       };
 
       # BetterDisplay: launch at login, show resolutions as a flat list, use
-      # maximum native resolution by default, configure update settings, and
-      # set delay values for display transitions.
+      # maximum native resolution by default, configure update settings, enable
+      # crash reporting, disable professional features (licensing), and set delay
+      # values for display transitions.
       #
       # Note: preferences domain is pro.betterdisplay.BetterDisplay (not com.betterdisplay)
-      # Based on screenshot configurations:
-      #   - SUEnableAutomaticChecks: disable automatic update checking
-      #   - SUAutomaticallyUpdate: disable auto-download (manual updates)
-      #   - SUEnablePrerelease: disable early access to prerelease builds
-      #   - setDelay: 0.2s for display setting transitions
-      #   - wakeDelay: 1.5s for wake-from-sleep transitions
-      "com.betterdisplay" = {
+      # Screenshot configurations:
+      #   - LaunchAtLogin: true (app auto-starts at login)
+      #   - sendCrashReports: true (auto-send crash logs to developers)
+      #   - enableProfessionalFeatures: false (disable pro/licensing management)
+      #   - SUEnableAutomaticChecks: false (disable automatic update checking)
+      #   - SUAutomaticallyUpdate: false (disable auto-download, manual updates only)
+      #   - SUEnablePrerelease: false (disable early access to prerelease builds)
+      #   - setDelay: 0.2s (display setting transition time)
+      #   - wakeDelay: 1.5s (wake-from-sleep transition time)
+      "pro.betterdisplay.BetterDisplay" = {
         LaunchAtLogin = true;
         ShowResolutionsAsList = true;
         UseMaximumResolution = true;
+        sendCrashReports = true;
+        enableProfessionalFeatures = false;
         setDelay = 0.2;
         wakeDelay = 1.5;
         SUEnableAutomaticChecks = false;
