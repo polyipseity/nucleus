@@ -68,6 +68,29 @@ favorites behavior on macOS.
 - Keep configuration idempotent: repeated applies should converge without
   duplicate mounts/dirs or repeated destructive work.
 
+## Replica sync performance constraints
+
+**rclone is slow in general** due to expensive remote listing and comparison
+phases. Even incremental syncs incur multi-minute overhead because rclone must
+re-validate entire directory trees against remote backends (for example OneDrive,
+iCloud Drive, Google Drive).
+
+- **Full-root replicas are slowest**: syncing `/` from a cloud backend requires
+  traversing and validating the entire remote tree structure. Expect 5–15 minute
+  runtime even when zero local changes are needed.
+- **Flag tuning does not cure inherent slowness**: conservative rclone flags
+  (`--checkers 1 --transfers 1 --onedrive-chunk-size 320Ki`) mitigate stalls and
+  resource pressure but do not eliminate the fundamental remote-listing cost.
+- **Disable ListR for stability**: by default, rclone ListR uses recursive
+  directory-tree API calls on backends that support them. On OneDrive and similar
+  backends under pressure, ListR can stall or timeout. Use
+  `--checkers 1 --transfers 1` to serialize traffic and limit concurrent remote
+  operations.
+- **Replicas are pull-only and idempotent**: accept slow sync times as a
+  trade-off for safe, one-way replication that never overwrites remote data.
+  Scheduled replicas should account for multi-minute runtime and allow adequate
+  inter-run spacing.
+
 ## Tests and docs coupling (required)
 
 When changing cloud-drive/Finder behavior, update all of the following in the
