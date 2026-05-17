@@ -1370,28 +1370,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   };
 
   # --------------------------------------------------------------------------
-  # LinearMouse autostart LaunchAgent — DISABLED
-  # LinearMouse now includes built-in launch-at-login setting, so this agent
-  # is no longer needed. The app auto-launches via its own internal mechanism.
-  # Disabled but retained in code for historical reference.
-  # --------------------------------------------------------------------------
-  launchd.agents."linearmouse-autostart" = {
-    enable = false;
-    config = {
-      Label = "local.linearmouse-autostart";
-      ProgramArguments = [
-        "/usr/bin/open"
-        "-gj"
-        "-a"
-        "/Applications/LinearMouse.app"
-      ];
-      RunAtLoad = true;
-      StandardOutPath = "/dev/null";
-      StandardErrorPath = "/dev/null";
-    };
-  };
-
-  # --------------------------------------------------------------------------
   # nix-index rebuild LaunchAgent
   # Keeps the nix-index file database current so pay-respects can suggest
   # `nix profile install` commands when an unknown command is typed.
