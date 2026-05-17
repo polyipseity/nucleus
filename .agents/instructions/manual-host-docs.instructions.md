@@ -19,6 +19,7 @@ applyTo: "src/hosts/**/MANUAL.md"
 - Prefer direct actions with concrete command/file names in backticks.
 - Prefer one step per bullet.
 - If a setup command exists (for example `nucleus-cloud-setup`), point to that command instead of expanding internal implementation details.
+- Group permission-grant steps by permission category (for example Accessibility, Screen Recording): each permission should appear exactly once and list all apps that need it.
 
 ## Scope rules
 

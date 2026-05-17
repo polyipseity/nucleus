@@ -3,8 +3,8 @@
 ## One-Time Configuration
 
 - Configure Raycast database-only settings: see [raycast-manual-config.md](raycast-manual-config.md) for step-by-step guide. This includes setting the main hotkey to cmd+space, search sensitivity to high, vim keybindings, and other advanced options that cannot be declaratively managed.
-- Grant Accessibility + Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
-- Grant Accessibility access to MiddleClick (System Settings > Privacy & Security > Accessibility). MiddleClick requires this to synthesize mouse button events; without it the gesture is silently ignored.
+- Grant Accessibility to BetterDisplay, Chrome Remote Desktop Host, and MiddleClick (MiddleClick requires this to synthesize mouse button events).
+- Grant Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
 - Open `fuse-t.app` once, then enable the `fuse-t` File System Extension in `System Settings > General > Login Items & Extensions > Extensions`.
 - Open `battery.app` once so `/usr/local/bin/battery` is installed.
 - Sign in to the App Store once so `mas` installs can provision Xcode.
