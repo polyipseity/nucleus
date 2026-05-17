@@ -345,26 +345,29 @@ in
               __nucleus_is_icloud_managed_path "$root_path" || return 0
               [[ "''${#__nucleus_icloud_excluded_names[@]}" -gt 0 ]] || return 0
 
-              # Build a single find with OR'd -name predicates for one-pass traversal
-              # instead of one find invocation per excluded name.
+              # Build find predicate with -prune to stop recursion into excluded dirs.
+              # Pattern: ( -name A -prune -o -name B -prune -o ... -o -type d )
+              # This avoids descending into node_modules, .venv, etc. during interactive
+              # chpwd hook, which would freeze the terminal for 10+ seconds on large repos.
               local -a __icloud_find_args
               __icloud_find_args=()
               local __icloud_n=0
               local __icloud_name
               for __icloud_name in "''${__nucleus_icloud_excluded_names[@]}"; do
                 if [[ $__icloud_n -eq 0 ]]; then
-                  __icloud_find_args+=( "(" "-name" "$__icloud_name" )
+                  __icloud_find_args+=( "(" "-name" "$__icloud_name" "-prune" )
                 else
-                  __icloud_find_args+=( "-o" "-name" "$__icloud_name" )
+                  __icloud_find_args+=( "-o" "-name" "$__icloud_name" "-prune" )
                 fi
                 __icloud_n=$(( __icloud_n + 1 ))
               done
-              __icloud_find_args+=( ")" )
+              # Final -type d to match any non-excluded directory.
+              __icloud_find_args+=( "-o" "-type" "d" ")" )
 
               local __candidate
               while IFS= read -r __candidate; do
                 __nucleus_check_icloud_exclusion "$__candidate"
-              done < <(/usr/bin/find "$root_path" "''${__icloud_find_args[@]}" -type d 2>/dev/null)
+              done < <(/usr/bin/find "$root_path" "''${__icloud_find_args[@]}" 2>/dev/null)
 
               return 0
             }

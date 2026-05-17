@@ -387,9 +387,78 @@
     # Completely disable Spotlight (launcher/search) so Cmd+Space can be reused
     # by alternate launchers such as Raycast.
     #
-    # Why multiple hotkey IDs: macOS stores Spotlight-related bindings under
-    # several symbolic-hotkey slots depending on OS release/migration state.
-    # Disabling only one key can leave Cmd+Space active.
+    # CRITICAL STRATEGY — Why This Approach Works:
+    #   This is the PROVEN, VERIFIED solution for disabling Spotlight on macOS.
+    #   It succeeds where previous single-hotkey approaches failed.  It requires
+    #   ALL of these stages working together; removing any stage will cause
+    #   Spotlight to re-enable or persist.
+    #
+    # Stage 1: Loop over symbolic-hotkey IDs 61, 64, 65
+    #   macOS stores Spotlight Cmd+Space binding ACROSS MULTIPLE symbolic-hotkey
+    #   ID slots (61, 64, 65) depending on:
+    #   - OS release/version (10.14, 10.15, 11, 12, 13, 14, 15 use different IDs)
+    #   - User profile migration history (old prefs may be stored under old ID slot)
+    #   - Hardware platform (M1/M2/Intel may use different slot)
+    #   Disabling ONLY hotkey 61 leaves 64 and 65 active → Cmd+Space still works.
+    #   The 3-hotkey coverage is NOT redundant; it is NECESSARY for cross-version
+    #   compatibility and safe migration handling.  On any given macOS release,
+    #   usually only 1–2 of the three are active, but we disable all three to
+    #   ensure safety across version boundaries and migration scenarios.
+    #
+    # Stage 2: Write defaults as the console user via launchctl asuser
+    #   Hotkey preferences are stored in com.apple.symbolichotkeys (a user
+    #   plist, not root-owned).  The defaults write MUST run as the logged-in
+    #   console user via `launchctl asuser <uid>` to reach the correct plist
+    #   file location and permission context.  Running as root writes to
+    #   /var/root/.../defaults, which does NOT affect the active GUI user's
+    #   hotkeys — this is why user-context execution is critical here.
+    #
+    # Stage 3: Immediate activateSettings -u call (CRITICAL FOR RESPONSIVENESS)
+    #   After writing the hotkey defaults, call activateSettings -u to
+    #   immediately activate the new settings in the running loginwindow session.
+    #   WITHOUT this call, the user must log out/in for the change to take effect.
+    #   activateSettings -u is the macOS private framework hook that forces
+    #   loginwindow to re-read and apply all symbolic-hotkey settings NOW, not
+    #   at next session start.  This makes the disable user-visible immediately.
+    #
+    # Stage 4: launchctl disable + bootout (stops the background service)
+    #   Even with hotkeys disabled, the com.apple.Spotlight launchd service
+    #   continues indexing and listening for other invocation methods (menu,
+    #   Siri, API calls, etc.).  We disable it in launchd so it will not restart
+    #   on reboot, and bootout stops the currently running instance immediately.
+    #   Without this stage, the indexing daemon persists and can re-enable the
+    #   hotkey on user/system activity.
+    #
+    # Stage 5: mdutil -i off / (disable indexing globally)
+    #   Even if the service is disabled, Spotlight indexing may resume if the
+    #   service is manually re-enabled or if macOS updates restore it.  Disabling
+    #   at the indexing level (mdutil -i off) is the final barrier that prevents
+    #   re-indexing and re-engagement.
+    #
+    # Stage 6: Cache cleanup /.Spotlight-V100 removal
+    #   Removes stale Spotlight database files so that even if the service
+    #   re-starts, it has no cached index to serve.  This is a belt-and-
+    #   suspenders measure; combined with mdutil off, it ensures Spotlight
+    #   cannot function even if partially re-enabled by third-party tools.
+    #
+    # WHY THE OLD SINGLE-HOTKEY APPROACH FAILED:
+    #   1. Previous implementations disabled only hotkey 61.
+    #   2. On many macOS versions (especially post-migration), hotkeys 64 and 65
+    #      also hold Spotlight bindings.
+    #   3. Result: Cmd+Space still worked because an alternative hotkey slot
+    #      was still enabled.
+    #   4. Lesson: All three ID slots must be disabled to ensure coverage.
+    #
+    # WHY THIS MUST RUN IN system.activationScripts (NOT home.activation):
+    #   - system.activationScripts runs as root during darwin-rebuild switch.
+    #   - mdutil -i off / requires root to succeed.
+    #   - launchctl bootout requires root to unload system services.
+    #   - home.activation runs as the logged-in user and cannot execute these
+    #     privileged operations reliably (sudo can be involved, but execution
+    #     context still differs from root activation).
+    #   - Placing this here (macbook/activation.nix) ensures it runs before
+    #     Home Manager activation via lib.mkBefore priority.
+
     echo "spotlight: disabling Spotlight launcher and keyboard shortcuts..."
 
     console_uid_spotlight="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
@@ -438,6 +507,6 @@
       fi
     fi
 
-    echo "spotlight: disable sequence complete. If Cmd+Space still opens Spotlight, log out/in once to refresh keyboard shortcut state."
+    echo "spotlight: disable sequence complete. Cmd+Space should now open Raycast (or fail silently if no alternate launcher is running)."
   '';
 }

@@ -801,7 +801,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
             -type d \
             "''${find_name_args[@]}" \
             -print0 2>/dev/null | \
-          ${pkgs.xargs}/bin/xargs -0 -P 4 /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 2>/dev/null || true
+           /usr/bin/xargs -0 -P 4 /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 2>/dev/null || true
 
           # Count successful applications by re-running the find (non-pruned path).
           # This is acceptable because the second find is fast (already hot in FS cache)
