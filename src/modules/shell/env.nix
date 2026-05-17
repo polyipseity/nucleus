@@ -8,4 +8,10 @@
   CC = "clang";
   CXX = "clang++";
   LD = "ld.lld";
+
+  # Disable OpenCode auto-update globally across all platforms.
+  # WHY: Managed environment controls OpenCode pinning; auto-updates can
+  # introduce version skew across machines. Updates are intentional via
+  # flake updates or package manager upgrades only.
+  OPENCODE_NO_UPDATE_CHECK = "1";
 }
