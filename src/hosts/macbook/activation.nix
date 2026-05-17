@@ -494,8 +494,17 @@
       if ! /bin/launchctl disable "gui/$console_uid_spotlight/com.apple.Spotlight"; then
         echo "spotlight: failed to disable gui/$console_uid_spotlight/com.apple.Spotlight." >&2
       fi
-      if ! /bin/launchctl bootout "gui/$console_uid_spotlight/com.apple.Spotlight"; then
-        echo "spotlight: bootout for com.apple.Spotlight returned non-zero (may already be absent/disabled)." >&2
+      spotlight_bootout_output="$(
+        /bin/launchctl bootout "gui/$console_uid_spotlight/com.apple.Spotlight" 2>&1
+      )" || true
+      if [ -n "$spotlight_bootout_output" ]; then
+        # SIP can block bootout on newer macOS even when disable+mdutil already
+        # converged the effective state; treat this as expected and keep logs actionable.
+        if printf '%s' "$spotlight_bootout_output" | /usr/bin/grep -Fq "System Integrity Protection is engaged"; then
+          echo "spotlight: bootout blocked by SIP (expected on this macOS); disable/indexing state still converged." >&2
+        else
+          echo "spotlight: bootout for com.apple.Spotlight returned non-zero: $spotlight_bootout_output" >&2
+        fi
       fi
     else
       echo "spotlight: skipped launchctl disable/bootout (could not determine user UID)." >&2

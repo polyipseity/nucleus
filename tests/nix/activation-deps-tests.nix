@@ -309,6 +309,16 @@ let
     && (lib.hasInfix "for hotkey in $spotlight_hotkeys; do" macbookActivationText)
   ) "Spotlight disable flow must cover symbolic hotkey IDs 61, 64, and 65";
 
+  # === TEST: Spotlight bootout warning is SIP-aware and classified ===
+  test_spotlight_bootout_is_sip_aware =
+    assert'
+      (
+        (lib.hasInfix "spotlight_bootout_output=\"$(" macbookActivationText)
+        && (lib.hasInfix "System Integrity Protection is engaged" macbookActivationText)
+        && (lib.hasInfix "bootout blocked by SIP" macbookActivationText)
+      )
+      "Spotlight bootout handling must classify SIP-blocked failures to avoid noisy raw launchctl warnings";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -330,6 +340,7 @@ let
     test_posix_git_signing_defaults_enabled
     test_middleclick_native_login_item
     test_spotlight_disables_all_hotkey_slots
+    test_spotlight_bootout_is_sip_aware
   ];
 in
 {
@@ -356,5 +367,6 @@ in
     "17: POSIX Git defaults enforce signed commits and tags"
     "18: MiddleClick startup uses native login-item path"
     "19: Spotlight disables all known launcher hotkey slots"
+    "20: Spotlight bootout warning is SIP-aware and classified"
   ];
 }

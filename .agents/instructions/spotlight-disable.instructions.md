@@ -1,7 +1,7 @@
 ---
 description: "Use when modifying, debugging, or troubleshooting the Spotlight (cmd+space) disable mechanism on macOS. Covers the proven 6-stage strategy, why single-hotkey approaches fail, and the critical role of each disable stage."
 name: "Spotlight Disable Strategy (macOS)"
-applyTo: "src/hosts/macbook/activation.nix, src/hosts/macbook/MANUAL.md, tests/nix/*spotlight*, src/hosts/macbook/defaults.nix"
+applyTo: "src/hosts/macbook/activation.nix, src/hosts/macbook/MANUAL.md, tests/nix/*spotlight*, tests/nix/activation-deps-tests.nix, src/hosts/macbook/defaults.nix"
 ---
 
 # Spotlight Disable Strategy for macOS
@@ -112,6 +112,12 @@ done
 ```
 
 **Note**: `bootout` may fail with a non-zero exit code if the service is already absent (e.g., a previous activation already stopped it, or the system is in a clean state). This is expected and safe; log it as a warning, not an error.
+
+**SIP nuance (macOS 15+)**: `launchctl bootout gui/<uid>/com.apple.Spotlight` can return
+`Operation not permitted while System Integrity Protection is engaged` even when
+`launchctl disable` and `mdutil -i off /` have already converged the effective state.
+Treat this as an expected classified warning (not a hard error), and avoid printing
+raw unclassified `launchctl` output directly in activation logs.
 
 ### Stage 5: mdutil -i off / (disable Spotlight indexing globally)
 
