@@ -485,6 +485,24 @@ in
         SUEnablePrerelease = false;
       };
 
+      # LinearMouse: configure menu bar visibility, battery indicator,
+      # dock visibility, and launch-at-login behavior.
+      #
+      # Screenshot configurations:
+      #   - showInMenuBar: false (menu bar icon hidden via hideMenuBarIcons)
+      #   - showBattery: "always" (always display battery in menu bar when visible)
+      #   - showInDock: true (app icon visible in Dock)
+      #   - launchAtLogin: true (app auto-starts at login)
+      #   - Also: disable automatic update checks (Sparkle preferences)
+      "com.lujjjh.LinearMouse" = {
+        showInMenuBar = false;
+        showBattery = "always";
+        showInDock = true;
+        launchAtLogin = true;
+        SUEnableAutomaticChecks = false;
+        SUAutomaticallyUpdate = false;
+      };
+
       # iTerm2: allow clipboard access from terminal applications, enable the
       # bootstrap daemon (supports shell integration without requiring a full
       # app launch), disable in-app update checks because updates are managed
