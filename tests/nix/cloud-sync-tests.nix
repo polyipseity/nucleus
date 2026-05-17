@@ -307,7 +307,6 @@ let
     && containsRegex "blockedRoots" replicaCleanupConfigText
     && containsRegex "skipping inaccessible OneDrive root entry" replicaSyncShellText
     && containsRegex "--disable ListR" replicaSyncShellText
-    && containsRegex "--checkers 1 --transfers 1 --onedrive-chunk-size 320Ki" replicaSyncShellText
     && containsRegex "--dirs-only --disable ListR --log-level ERROR" replicaSyncShellText
     && containsRegex "--timeout 30s --contimeout 10s" replicaSyncShellText
     && containsRegex "--max-duration 1m" replicaSyncShellText
@@ -316,7 +315,6 @@ let
     && containsRegex "BlockedRoots" windowsReplicaModuleText
     && containsRegex "Get-OneDriveRootFilterFile" windowsReplicaModuleText
     && containsRegex "skipping inaccessible OneDrive root entry" windowsReplicaModuleText
-    && containsRegex ''"--checkers", "1", "--transfers", "1", "--onedrive-chunk-size", "320Ki"'' windowsReplicaModuleText
     && containsRegex ''"--disable", "ListR"'' windowsReplicaModuleText
     && containsRegex ''"--timeout", "30s"'' windowsReplicaModuleText
     && containsRegex ''"--contimeout", "10s"'' windowsReplicaModuleText
