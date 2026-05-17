@@ -458,11 +458,25 @@ in
       };
 
       # BetterDisplay: launch at login, show resolutions as a flat list, use
-      # maximum native resolution by default.
+      # maximum native resolution by default, configure update settings, and
+      # set delay values for display transitions.
+      #
+      # Note: preferences domain is pro.betterdisplay.BetterDisplay (not com.betterdisplay)
+      # Based on screenshot configurations:
+      #   - SUEnableAutomaticChecks: disable automatic update checking
+      #   - SUAutomaticallyUpdate: disable auto-download (manual updates)
+      #   - SUEnablePrerelease: disable early access to prerelease builds
+      #   - setDelay: 0.2s for display setting transitions
+      #   - wakeDelay: 1.5s for wake-from-sleep transitions
       "com.betterdisplay" = {
         LaunchAtLogin = true;
         ShowResolutionsAsList = true;
         UseMaximumResolution = true;
+        setDelay = 0.2;
+        wakeDelay = 1.5;
+        SUEnableAutomaticChecks = false;
+        SUAutomaticallyUpdate = false;
+        SUEnablePrerelease = false;
       };
 
       # iTerm2: allow clipboard access from terminal applications, enable the
