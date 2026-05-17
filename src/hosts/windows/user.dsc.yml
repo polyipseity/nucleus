@@ -264,3 +264,12 @@ properties:
         name: VISUAL
         value: nvim
         scope: User
+
+    - resource: Microsoft.Windows.Environment/Variable
+      id: opencodeNoUpdateCheckEnvVar
+      directives:
+        description: Disable OpenCode auto-update globally to avoid version skew across machines. Updates are controlled via flake updates and managed environment versioning.
+      settings:
+        name: OPENCODE_NO_UPDATE_CHECK
+        value: "1"
+        scope: User
