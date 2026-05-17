@@ -59,7 +59,7 @@ let
         let
           candidateRoots = map normalizeRoot (perUser.managedRoots or [ ]);
           mobileDocumentsRoots = builtins.filter (
-            root: lib.hasPrefix "Library/Mobile Documents/" root
+            root: root != "Library/Mobile Documents" && lib.hasPrefix "Library/Mobile Documents/" root
           ) candidateRoots;
         in
         if mobileDocumentsRoots != [ ] then

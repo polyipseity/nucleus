@@ -26,7 +26,7 @@ let
   test_managed_roots_centralized = assert' (
     managedRoots == [
       "Library/Mobile Documents/com~apple~CloudDocs"
-      "Library/Mobile Documents/iCloud~md~obsidian/."
+      "Library/Mobile Documents/iCloud~md~obsidian"
     ]
   ) "users.json must define the exact centralized iCloudExclusions.managedRoots list for polyipseity";
 
@@ -34,6 +34,22 @@ let
     (root: lib.hasPrefix "Library/Mobile Documents/" root)
     managedRoots
   ) "users.json iCloudExclusions.managedRoots must stay inside Library/Mobile Documents only";
+
+  test_plain_mobile_documents_root_is_rejected =
+    assert'
+      (
+        (lib.hasInfix "root != \"Library/Mobile Documents\"" macosModuleText)
+        && (lib.hasInfix "root != \"Library/Mobile Documents\"" shellModuleText)
+      )
+      "macos and shell iCloud sanitizers must explicitly reject the plain Library/Mobile Documents root";
+
+  test_default_root_is_only_clouddocs =
+    assert'
+      (
+        (lib.hasInfix ''[ "Library/Mobile Documents/com~apple~CloudDocs" ]'' macosModuleText)
+        && (lib.hasInfix ''[ "Library/Mobile Documents/com~apple~CloudDocs" ]'' shellModuleText)
+      )
+      "default iCloud exclusion roots must fall back to only Library/Mobile Documents/com~apple~CloudDocs";
 
   test_required_python_dirs_present = assert' (
     (builtins.elem ".venv" excludedDirNames)
@@ -72,6 +88,8 @@ let
     test_exclusion_list_exists
     test_managed_roots_centralized
     test_managed_roots_are_mobile_documents_only
+    test_plain_mobile_documents_root_is_rejected
+    test_default_root_is_only_clouddocs
     test_required_python_dirs_present
     test_required_node_dirs_present
     test_shell_uses_chpwd_hook
