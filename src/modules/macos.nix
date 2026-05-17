@@ -1174,9 +1174,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # hideMenuBarIcons
-    # Hides menu bar icons for AltTab and LinearMouse to reduce persistent UI
-    # chrome.  BetterDisplay and MiddleClick do not have documented menu bar
-    # hiding options (see src/hosts/macbook/MANUAL.md for limitations).
+    # Hides menu bar icons for AltTab, BetterDisplay, and LinearMouse to reduce
+    # persistent UI chrome. MiddleClick does not have a documented menu bar
+    # hiding option (see src/hosts/macbook/MANUAL.md for limitations).
     #
     # Declarative approach: use defaults write to configure per-app settings.
     # Each app requires restart to apply changes.
@@ -1189,6 +1189,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
         echo "macos: warning — AltTab menu bar hide failed (app may not be installed)." >&2
       fi
 
+      # BetterDisplay: hide menu bar icon (showInMenuBar defaults key)
+      if /usr/bin/defaults write pro.betterdisplay.BetterDisplay showInMenuBar -bool false; then
+        echo "macos: BetterDisplay menu bar icon hidden (restart app to apply)." >&2
+      else
+        echo "macos: warning — BetterDisplay menu bar hide failed (app may not be installed)." >&2
+      fi
+
       # LinearMouse: hide menu bar icon (showInMenuBar defaults key)
       if /usr/bin/defaults write org.linearmouse.LinearMouse showInMenuBar -bool false; then
         echo "macos: LinearMouse menu bar icon hidden (restart app to apply)." >&2
@@ -1196,7 +1203,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         echo "macos: warning — LinearMouse menu bar hide failed (app may not be installed)." >&2
       fi
 
-      echo "macos: menu bar icon hiding configured. Restart AltTab and LinearMouse to apply." >&2
+      echo "macos: menu bar icon hiding configured. Restart AltTab, BetterDisplay, and LinearMouse to apply." >&2
     '';
 
     # -------------------------------------------------------------------------
