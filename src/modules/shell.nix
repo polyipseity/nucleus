@@ -267,6 +267,56 @@ in
       EOF
               return 1
             }
+    ''
+    + lib.optionalString pkgs.stdenv.isDarwin ''
+      # macOS iCloud exclusion for directories during creation.
+      # When mkdir is called with a path containing an excluded directory name,
+      # apply the iCloud FileProvider ignore xattr to mark it as non-synced.
+      #
+      # Uses the same exclusion list from users.json (icloudExclusions.excludedDirNames).
+      # This is a convenience for interactive use; the activation phase handles
+      # existing directories.
+      __nucleus_check_icloud_exclusion() {
+        local target_path="$1"
+        local target_name
+        target_name=$(basename "$target_path")
+
+        # Hardcoded list of excluded directory names (must match users.json config).
+        # WHY hardcoded in shell: shell functions cannot easily parse JSON at
+        # runtime; the activation phase handles the declarative list.
+        local excluded_names=("node_modules")
+
+        for excluded in "''${excluded_names[@]}"; do
+          if [[ "$target_name" == "$excluded" ]]; then
+            if /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 "$target_path" 2>/dev/null; then
+              echo "✅ iCloud sync disabled for: $target_path" >&2
+            fi
+            return 0
+          fi
+        done
+        return 0
+      }
+
+      # Override mkdir to check for excluded directories after creation.
+      mkdir() {
+        /bin/mkdir "$@"
+        local _mkdir_status=$?
+
+        # Only process if mkdir succeeded and we're not in dry-run mode.
+        if [[ $_mkdir_status -eq 0 ]]; then
+          for arg in "$@"; do
+            # Skip option flags (starting with -)
+            if [[ ! "$arg" =~ ^- ]]; then
+              # Check if the path exists (was created successfully)
+              if [[ -d "$arg" ]]; then
+                __nucleus_check_icloud_exclusion "$arg"
+              fi
+            fi
+          done
+        fi
+
+        return $_mkdir_status
+      }
     '';
   };
 

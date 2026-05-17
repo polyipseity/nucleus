@@ -20,10 +20,11 @@
 #   local.nix-index-update — rebuilds the nix-index file database weekly
 #     (Sunday 00:00) and on every agent load; a freshness check makes
 #     reloads a fast no-op when the DB was updated within the past 6 days.
-{
+args@{
   config,
   lib,
   pkgs,
+  users ? null,
   ...
 }:
 let
@@ -287,6 +288,7 @@ let
     "cloudDrivesSetup"
     "configureDisplayResolutions"
     "configureFinderSidebar"
+    "configureICloudExclusions"
     "configureInputAndSiri"
     "configureLaunchServices"
     "configureRaycastApplicationAliases"
@@ -685,6 +687,83 @@ lib.mkIf pkgs.stdenv.isDarwin {
           fi
         fi
       fi
+    '';
+
+    # -------------------------------------------------------------------------
+    # configureICloudExclusions
+    # Marks directories matching configured names with the com.apple.fileprovider
+    # .ignore#P xattr to exclude them from iCloud sync. This prevents large
+    # directories (e.g., node_modules) from syncing across devices.
+    #
+    # Two-phase approach:
+    #   1. Recursive mark: finds all existing matching directories in the home
+    #      tree and applies xattr to each.
+    #   2. Interactive hook: overrides mkdir to mark newly created matching
+    #      directories immediately at creation time.
+    #
+    # Configuration: excludedDirNames from users.json (e.g., ["node_modules"])
+    # -------------------------------------------------------------------------
+    configureICloudExclusions = lib.hm.dag.entryAfter [ "cloudDrivesSetup" ] ''
+      excluded_dirs='${
+        builtins.toJSON (
+          let
+            effectiveUsers = if users != null then users else { };
+            currentUser = config.home.username;
+          in
+          if
+            builtins.hasAttr currentUser effectiveUsers
+            && builtins.hasAttr "iCloudExclusions" effectiveUsers.${currentUser}
+            && builtins.hasAttr "excludedDirNames" effectiveUsers.${currentUser}.iCloudExclusions
+          then
+            effectiveUsers.${currentUser}.iCloudExclusions.excludedDirNames
+          else
+            [ ]
+        )
+      }'
+
+      if [ "$excluded_dirs" = "[]" ]; then
+        exit 0
+      fi
+
+      # Parse JSON array and apply xattr to matching directories.
+      # Use jq if available; fall back to awk for basic parsing.
+      apply_exclusions() {
+        local count=0
+        local start_time
+        start_time=$(date +%s)
+
+        # Extract directory names from JSON array.
+        # Input: ["node_modules", "target"]
+        # Output: node_modules\ntarget
+        dir_names=$(echo "$excluded_dirs" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null || echo "$excluded_dirs" | /usr/bin/sed -E 's/\["([^"]*)"[^]]*\]/\1/g; s/"//g; s/,/\n/g')
+
+        if [ -z "$dir_names" ]; then
+          exit 0
+        fi
+
+        # Find and mark each matching directory.
+        while read -r dir_name; do
+          [ -z "$dir_name" ] && continue
+
+          # Recursive find for directories matching the name.
+          while IFS= read -r dir_path; do
+            if /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 "$dir_path" 2>/dev/null; then
+              count=$((count + 1))
+            else
+              echo "macos: failed to apply xattr to $dir_path" >&2
+            fi
+          done < <(/usr/bin/find "$HOME" -name "$dir_name" -type d 2>/dev/null)
+        done <<< "$dir_names"
+
+        end_time=$(date +%s)
+        elapsed=$((end_time - start_time))
+
+        if [ "$count" -gt 0 ]; then
+          echo "macos: iCloud exclusion applied to $count directories in ''${elapsed}s" >&2
+        fi
+      }
+
+      apply_exclusions
     '';
 
     # -------------------------------------------------------------------------

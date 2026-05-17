@@ -110,6 +110,11 @@
         }
       ]
     },
+    "iCloudExclusions": {
+      "excludedDirNames": [
+        "node_modules"
+      ]
+    },
     "devRepos": {
       "enable": true,
       "gitHubUsername": "polyipseity",

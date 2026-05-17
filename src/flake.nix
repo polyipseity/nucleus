@@ -63,6 +63,7 @@
           imports = [
             {
               _module.args = {
+                inherit users;
                 managedUser = user;
                 managedUsername = name;
               };
