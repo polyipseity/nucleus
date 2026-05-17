@@ -227,11 +227,14 @@ in
         CriticalUpdateInstall = true;
       };
 
-      # Hide the Spotlight menu-bar button to reduce persistent chrome while
-      # preserving keyboard launch via Cmd+Space and launcher parity via
-      # Raycast. This key is not exposed by nix-darwin typed options.
+      # Spotlight: completely disable to avoid conflicts with Raycast as the
+      # primary launcher. Hide menu-bar button and results to reduce chrome.
+      # Raycast replaces Spotlight functionality with Option+Space as primary hotkey.
       "com.apple.Spotlight" = {
         MenuItemHidden = 1;
+        # Disable Spotlight indexing of all categories to prevent background activity.
+        # WHY: Raycast becomes primary launcher; Spotlight is unnecessary overhead.
+        FederatedSearchMaximumCount = 0;
       };
 
       # TextEdit: default to plain text mode instead of RTF.
@@ -271,6 +274,12 @@ in
         "Auto Punctuation Enabled" = true; # insert punctuation during dictation
         "Dictation Enabled" = true;
         "Siri Data Sharing Opt-In Status" = 1; # opt in to Siri improvement program
+      };
+
+      # macOS tips and suggestions: disable persistent notifications.
+      # These interrupt focus and offer limited value for power-user workflows.
+      "com.apple.tips" = {
+        LastSeenVersionForAutoStartTip = 99999; # disable auto-tip startup
       };
 
       # App Store: enable automatic app updates.
@@ -446,16 +455,44 @@ in
       };
 
 
-      # Raycast: bind Clipboard History to a deterministic app shortcut so paste
-      # workflows have a stable keyboard entry point even when Raycast command
-      # internals change across releases.
+      # Raycast: comprehensive declarative configuration matching all UI settings.
+      # WHY structured approach: Store settings that Raycast respects in plist format.
+      # Most Raycast internals (command hotkeys, extension state) are in its own DB;
+      # we configure what's stable via NSUserKeyEquivalents and documented plist keys.
       "com.raycast.macos" = {
+        # Startup behavior: launch at login.
+        LaunchAtLogin = true;
+
+        # Appearance: use System appearance (auto Dark/Light based on time of day).
+        Appearance = "system";
+
+        # Window mode: default (not compact).
+        WindowMode = "default";
+
+        # Show favorites in compact mode.
+        ShowFavoritesInCompactMode = true;
+
+        # Developer tools: enable development mode, auto-reload on save.
+        # These are intentionally set as plist keys even though Raycast may also
+        # store them in its database; plist values provide declarative baseline.
+        DeveloperMode = true;
+        AutoReloadOnSave = true;
+
+        # Web proxy: use System Network Settings (inherited from macOS).
+        UseSystemNetworkSettings = true;
+
+        # Certificates: use Keychain backend.
+        CertificatesProvider = "Keychain";
+
+        # Favicon provider: use Raycast's built-in provider.
+        FaviconProvider = "Raycast";
+
+        # Clipboard History: bind to Command+Option+C via NSUserKeyEquivalents.
+        # WHY app shortcut path: Raycast command hotkeys are stored in app
+        # internals, while NSUserKeyEquivalents remains stable and declarative.
+        # Keep multiple title variants because Raycast command labels can
+        # change across releases (Clipboard History vs Clipboard Manager).
         NSUserKeyEquivalents = {
-          # Command+Option+C: open Raycast clipboard history/manager command.
-          # WHY app shortcut path: Raycast command hotkeys are stored in app
-          # internals, while NSUserKeyEquivalents remains stable and declarative.
-          # Keep multiple title variants because Raycast command labels can
-          # change across releases (Clipboard History vs Clipboard Manager).
           "Clipboard History" = "@~c";
           "Clipboard Manager" = "@~c";
           "Open Clipboard History" = "@~c";

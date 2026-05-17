@@ -386,6 +386,26 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
+    # disableSpotlightHotkey
+    # Disables Spotlight's Command+Space hotkey (hotkey 61) to avoid conflicts
+    # with Raycast as the primary launcher. This is done in activation to ensure
+    # the setting takes effect even if defaults write permission errors are
+    # handled during system activation.
+    #
+    # WHY separate activation: Hotkey bindings are privacy-gated and may fail
+    # if Full Disk Access is not granted to the terminal. We handle this
+    # gracefully and continue activation rather than blocking on it.
+    # -------------------------------------------------------------------------
+    disableSpotlightHotkey = lib.hm.dag.entryAfter [ "clearDesktop" ] ''
+      # Disable hotkey 61 (Command+Space for Spotlight) by setting it to an
+      # empty dict so the hotkey binding is disabled system-wide. This preserves
+      # Option+Space for Raycast as the primary launcher.
+      if ! /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 61 "<dict><key>enabled</key><false/></dict>" 2>/dev/null; then
+        echo "macos: warning — failed to disable Spotlight hotkey (may require Full Disk Access)." >&2
+      fi
+    '';
+
+    # -------------------------------------------------------------------------
     # configureDisplayResolutions
     # Uses displayplacer to match all external monitors to the MacBook's built-in
     # display mode so that remote-desktop clients see a consistent resolution.

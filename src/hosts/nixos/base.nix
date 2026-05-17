@@ -19,4 +19,8 @@
   # derivation instead of linking directly to the nixpkgs source tree path.
   environment.etc."inputrc".text =
     builtins.readFile "${pkgs.path}/nixos/modules/programs/bash/inputrc";
+
+  # Disable OpenCode auto-update globally to avoid version skew across machines.
+  # Updates are controlled via flake updates and managed environment versioning.
+  environment.variables.OPENCODE_NO_UPDATE_CHECK = "1";
 }
