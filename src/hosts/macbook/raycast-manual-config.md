@@ -17,6 +17,10 @@ Open **Raycast Settings** (Cmd+, after launching Raycast) and navigate to each s
 
 3. **Menu Bar Icon**: Verified unchecked (matches declarative setting)
 
+### Shortcuts Tab
+
+1. **Clipboard History**: Search for `Clipboard History`, click `Record Hotkey`, then press `⌥⌘C` (Option+Command+C).
+
 ### Advanced Tab (Part 1)
 
 1. **Pop to Root Search**: Set to `After 180 seconds`
