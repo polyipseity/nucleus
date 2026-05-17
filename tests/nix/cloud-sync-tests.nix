@@ -252,12 +252,15 @@ let
     && containsRegex "replica-sync" flakeText
   ) "flake apps must include replica-sync on supported systems";
 
-  # Test 35: apply script runs replica sync as a post-apply best-effort step
+  # Test 35: apply script keeps replica sync as an opt-in post-apply step
   test_apply_runs_replica_sync = assert' (
     containsRegex "run_replica_sync" applyScriptText
+    && containsRegex "skip_replica_sync=true" applyScriptText
+    && containsRegex "--replica-sync" applyScriptText
     && containsRegex "--skip-replica-sync" applyScriptText
+    && containsRegex "default; pass --replica-sync" applyScriptText
     && containsRegex "scripts/replica-sync\\.sh" applyScriptText
-  ) "apply flow must include post-apply replica sync hook";
+  ) "apply flow must keep replica sync opt-in with an explicit post-apply hook";
 
   # Test 36: macOS Finder sidebar setup creates only canonical local directories and excludes cloud mount subpaths
   test_finder_sidebar_paths_created = assert' (
@@ -288,12 +291,15 @@ let
     && containsRegex "Invoke-ReplicaSync" replicaSyncPwshText
   ) "Windows must include Invoke-ReplicaSync module and scripts/replica-sync.ps1 wrapper";
 
-  # Test 39: Windows apply flow has post-apply replica sync hook with skip flag
+  # Test 39: Windows apply flow has opt-in post-apply replica sync hook
   test_windows_apply_replica_hook = assert' (
+    containsRegex "ReplicaSync" windowsApplyText
     containsRegex "SkipReplicaSync" windowsApplyText
+    && containsRegex "runReplicaSync" windowsApplyText
     && containsRegex "Invoke-ReplicaSync" windowsApplyText
+    && containsRegex "default; pass -ReplicaSync" windowsApplyText
     && containsRegex "post-apply replica sync" windowsApplyText
-  ) "Windows apply flow must include replica sync post-step with skip flag";
+  ) "Windows apply flow must keep replica sync as an explicit opt-in post-step";
 
   # Test 40: Windows shell profile exports nucleus-replica-sync command parity
   test_windows_shell_replica_command = assert' (

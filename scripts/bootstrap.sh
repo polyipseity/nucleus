@@ -10,6 +10,9 @@
 #   --skip-AI-sync  Pass through to nix run .#apply; suppresses the post-apply
 #                   Ollama model sync step.  Useful in CI or on low-bandwidth
 #                   connections where model pulls (2–20 GB) are undesirable.
+#   --replica-sync  Pass through to nix run .#apply; opt in to immediate
+#                   post-apply replica sync. By default apply skips replica
+#                   sync because a scheduled daily sync already converges.
 #   --target-user   Pass through to src/scripts/apply.sh; selects the Home
 #                   Manager flake profile on standalone Linux hosts.
 set -eu
@@ -24,6 +27,7 @@ NIX_FEATURES_CONFIG="experimental-features = nix-command flakes"
 # Flag parsing — collect extra flags to pass through to apply
 # ---------------------------------------------------------------------------
 skip_ai_sync=false
+replica_sync=false
 target_user=""
 _bsh_first=true
 _bsh_expect_target_user=false
@@ -49,6 +53,10 @@ for _bsh_arg in "$@"; do
       # Model pulls are 2–20 GB; suppress post-apply sync in CI or on
       # low-bandwidth connections.
       skip_ai_sync=true
+      ;;
+    --replica-sync)
+      # Replica sync is skipped by default after apply; allow explicit opt-in.
+      replica_sync=true
       ;;
     --target-user)
       # Standalone Linux parity: explicitly select which HM profile key to
@@ -105,6 +113,9 @@ Options:
   --skip-AI-sync  Suppress the post-apply Ollama model sync step.  Useful in
                   CI or on low-bandwidth connections where model pulls
                   (2–20 GB each) are undesirable.
+  --replica-sync  Opt in to immediate post-apply replica sync. By default
+                  apply skips replica sync because scheduled daily sync
+                  converges replicas.
   --target-user   Select the Home Manager flake profile key for standalone
                   Linux apply runs (parity with Windows per-user config
                   selection). Ignored on Darwin/NixOS system rebuild flows.
@@ -314,19 +325,18 @@ if [ "$COMMAND" = "apply" ]; then
   printf '%s\n' "Running apply flow via src#apply..."
   # Health-check is already invoked by apply.sh for each OS branch; calling it
   # here too would print "health checks passed" twice and slow bootstrap down.
+  set --
   if [ "$skip_ai_sync" = true ]; then
-    if [ -n "$target_user" ]; then
-      run_nix run "$REPO_ROOT/src#apply" -- --skip-AI-sync --target-user "$target_user"
-    else
-      run_nix run "$REPO_ROOT/src#apply" -- --skip-AI-sync
-    fi
-  else
-    if [ -n "$target_user" ]; then
-      run_nix run "$REPO_ROOT/src#apply" -- --target-user "$target_user"
-    else
-      run_nix run "$REPO_ROOT/src#apply"
-    fi
+    set -- "$@" --skip-AI-sync
   fi
+  if [ "$replica_sync" = true ]; then
+    set -- "$@" --replica-sync
+  fi
+  if [ -n "$target_user" ]; then
+    set -- "$@" --target-user "$target_user"
+  fi
+
+  run_nix run "$REPO_ROOT/src#apply" -- "$@"
   exit 0
 fi
 

@@ -19,6 +19,7 @@
 #
 # Arguments:
 #   --skip-AI-sync  skip the post-apply Ollama model sync step
+#   --replica-sync  run the post-apply cloud replica sync step (opt-in)
 #   --skip-replica-sync  skip the post-apply cloud replica sync step
 #   --target-user   select the Home Manager flake profile key on standalone
 #                   Linux hosts (ignored on Darwin and NixOS system rebuilds)
@@ -37,7 +38,7 @@ set -eu
 # Flag parsing
 # ---------------------------------------------------------------------------
 skip_ai_sync=false
-skip_replica_sync=false
+skip_replica_sync=true
 target_user=""
 _aas_expect_target_user=false
 
@@ -57,6 +58,11 @@ for _arg in "$@"; do
       # Model pulls are 2–20 GB and may be undesirable in CI or on
       # low-bandwidth connections; this flag opts out of the post-apply sync.
       skip_ai_sync=true
+      ;;
+    --replica-sync)
+      # Replica sync is slow for large trees and skipped by default after
+      # apply; this flag opts in to immediate post-apply convergence.
+      skip_replica_sync=false
       ;;
     --skip-replica-sync)
       # Replica sync can be time-consuming for large datasets; this flag opts
@@ -266,7 +272,7 @@ run_replica_sync() {
   # transfers. A replica error should not retroactively fail a completed
   # system apply.
   if [ "$skip_replica_sync" = true ]; then
-    printf '%s\n' "replica-sync: --skip-replica-sync set; skipping post-apply replica sync"
+    printf '%s\n' "replica-sync: skipping post-apply replica sync (default; pass --replica-sync to run now)"
     return
   fi
 

@@ -148,6 +148,11 @@
 .PARAMETER SkipReplicaSync
   When specified, suppresses the post-apply cloud replica sync step.
 
+.PARAMETER ReplicaSync
+  Run the post-apply cloud replica sync step. By default apply skips replica
+  sync to avoid long blocking runs; a scheduled daily sync already converges
+  replicas.
+
 .PARAMETER MinFreeDiskGB
   Minimum free space threshold (GiB) used by the pre-flight health check.
 
@@ -173,6 +178,10 @@
 .EXAMPLE
   # Apply while skipping the post-apply replica sync:
   .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -SkipReplicaSync
+
+.EXAMPLE
+  # Apply and opt in to immediate post-apply replica sync:
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -Users @('admin') -ReplicaSync
 
 .EXAMPLE
   # Apply while disabling machine age key auto-registration in .sops.yaml:
@@ -217,6 +226,7 @@ param(
   [bool]$EnableVsCodeWorkspaceTrustParity = $true,
   [int]$MinFreeDiskGB = 10,
   [switch]$SkipAISync,
+  [switch]$ReplicaSync,
   [switch]$SkipReplicaSync
 )
 
@@ -592,8 +602,13 @@ if ($SkipAISync) {
 # Converge enabled cloud replicas from users.json as the final post-apply step.
 # This is best-effort: replica sync can be long-running and should not
 # retroactively fail a completed configuration convergence.
-if ($SkipReplicaSync) {
-  Write-Output "replica-sync: -SkipReplicaSync set; skipping post-apply replica sync"
+$runReplicaSync = $ReplicaSync -and (-not $SkipReplicaSync)
+if ($ReplicaSync -and $SkipReplicaSync) {
+  throw "Conflicting arguments: -ReplicaSync and -SkipReplicaSync cannot be used together."
+}
+
+if (-not $runReplicaSync) {
+  Write-Output "replica-sync: skipping post-apply replica sync (default; pass -ReplicaSync to run now)"
 } else {
   # Presence probe: rclone may be absent on first-provision hosts.
   $rcloneOnPath = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
