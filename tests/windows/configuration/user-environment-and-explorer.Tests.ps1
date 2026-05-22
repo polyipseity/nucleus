@@ -107,5 +107,9 @@ Describe "Windows User Configuration Parity" {
         It "Should set the Ollama default context length to 32k" {
             Get-NucleusUserEnvironmentVariable -Name 'OLLAMA_CONTEXT_LENGTH' | Should -Be '32768'
         }
+
+        It "Should disable OpenCode autoupdate checks" {
+            Get-NucleusUserEnvironmentVariable -Name 'OPENCODE_DISABLE_AUTOUPDATE' | Should -Be 'true'
+        }
     }
 }

@@ -81,4 +81,48 @@ Describe "Windows Package Installation" {
             }
         }
     }
+
+    Context "Additional WinGet IDs declared in system.dsc.yml" {
+        # Keep this list synchronized with package IDs declared in
+        # src/hosts/windows/system.dsc.yml so identifier drift is caught by
+        # executable tests instead of silently no-oping at apply time.
+        $additionalPackages = @(
+            @{ id = '9NBDXK71NK08'; displayName = 'WhatsApp Beta (msstore)' }
+            @{ id = 'Adobe.SourceSerif4'; displayName = 'Source Serif 4' }
+            @{ id = 'aelassas.Servy'; displayName = 'Servy' }
+            @{ id = 'ArtifexSoftware.GhostScript'; displayName = 'Ghostscript' }
+            @{ id = 'Clement.bottom'; displayName = 'bottom' }
+            @{ id = 'DEVCOM.JetBrainsMonoNerdFont'; displayName = 'JetBrains Mono Nerd Font' }
+            @{ id = 'eza-community.eza'; displayName = 'eza' }
+            @{ id = 'GIMP.GIMP'; displayName = 'GIMP' }
+            @{ id = 'GnuPG.Gpg4win'; displayName = 'Gpg4win' }
+            @{ id = 'Google.Chrome'; displayName = 'Google Chrome stable' }
+            @{ id = 'Google.ChromeRemoteDesktopHost'; displayName = 'Chrome Remote Desktop Host' }
+            @{ id = 'Google.NotoSans.CJK.SC'; displayName = 'Noto Sans CJK SC' }
+            @{ id = 'Google.NotoSans.CJK.TC'; displayName = 'Noto Sans CJK TC' }
+            @{ id = 'Google.NotoSerif.CJK.SC'; displayName = 'Noto Serif CJK SC' }
+            @{ id = 'Google.NotoSerif.CJK.TC'; displayName = 'Noto Serif CJK TC' }
+            @{ id = 'Gyan.FFmpeg'; displayName = 'FFmpeg (Gyan)' }
+            @{ id = 'ImageMagick.ImageMagick'; displayName = 'ImageMagick' }
+            @{ id = 'Inter.Inter'; displayName = 'Inter' }
+            @{ id = 'KDE.Krita'; displayName = 'Krita' }
+            @{ id = 'LLVM.LLVM'; displayName = 'LLVM/Clang' }
+            @{ id = 'Microsoft.DotNet.Runtime.6'; displayName = '.NET Runtime 6' }
+            @{ id = 'Microsoft.PowerToys'; displayName = 'PowerToys' }
+            @{ id = 'Parsec.Parsec'; displayName = 'Parsec' }
+            @{ id = 'Rclone.Rclone'; displayName = 'rclone' }
+            @{ id = 'Scoop.Scoop'; displayName = 'Scoop' }
+            @{ id = 'SST.opencode'; displayName = 'OpenCode' }
+            @{ id = 'TheDocumentFoundation.LibreOffice'; displayName = 'LibreOffice' }
+            @{ id = 'VideoLAN.VLC'; displayName = 'VLC' }
+            @{ id = 'WinFsp.WinFsp'; displayName = 'WinFsp' }
+            @{ id = 'Zoom.Zoom'; displayName = 'Zoom' }
+        )
+
+        foreach ($pkg in $additionalPackages) {
+            It "Should have $($pkg.displayName) installed" {
+                Test-NucleusWingetPackageInstalled -Id $pkg.id | Should -Be $true
+            }
+        }
+    }
 }
