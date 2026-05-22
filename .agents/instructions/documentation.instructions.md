@@ -14,6 +14,19 @@ The guiding principle is **document the WHY, not the WHAT**: record the
 rationale, security implication, or design tradeoff behind a decision — not a
 restatement of what the code already says. Avoid obvious comments.
 
+## Provenance for non-validated external identifiers
+
+When a setting cannot be automatically validated by the repository's current
+tests or schema checks (for example bundle IDs, app IDs, launchd labels,
+registry paths, environment-variable names, preference domains, or vendor
+setting keys), include at least one inline source citation near the setting.
+
+- Prefer official vendor docs, schemas, or manpages.
+- If official docs are unavailable, use the best stable upstream source
+  (project wiki, upstream code path, or package metadata) and note why.
+- Keep citations local to the exact setting block so reviewers can verify each
+  identifier one-by-one without hunting through external docs.
+
 ## Nix files (`src/**/*.nix`)
 
 There is no Nix-native documentation tool in use here; inline `#` comments are
@@ -42,6 +55,9 @@ the documentation mechanism.
   implication, or design tradeoff behind a setting (e.g. why a PAM service name
   was chosen, why an option combination closes a specific attack surface) over
   comments that merely describe what the option does.
+- **Cite non-validated external keys**: for externally-defined keys/identifiers
+  not covered by automated checks, add an inline `# Source:` comment with at
+  least one verification URL adjacent to the setting.
 
 ## PowerShell files (`src/**/*.ps1`)
 
@@ -139,6 +155,9 @@ documentation mechanism for WinGet DSC configurations.
 - **Setting rationale**: when a resource sets a non-obvious registry value,
   environment variable, or system flag, the description must explain what
   enabling or disabling the setting changes in practice.
+- **Cite non-validated external keys**: when `settings.name`, registry paths,
+  or resource identifiers depend on vendor-defined external contracts that are
+  not test-validated here, include a source URL in `directives.description`.
 - **Dependency rationale**: if a resource uses `dependsOn:`, the description
   should note why the ordering constraint exists.
 
