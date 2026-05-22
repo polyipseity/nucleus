@@ -465,6 +465,8 @@ in
       # Note: preferences domain is pro.betterdisplay.BetterDisplay (not com.betterdisplay)
       # Screenshot configurations:
       #   - LaunchAtLogin: true (app auto-starts at login)
+      #   - hideMenuIcon: true (hide app icon in BetterDisplay menu UI)
+      #   - showInMenuBar: false (legacy key kept for backward compatibility)
       #   - sendCrashReports: true (auto-send crash logs to developers)
       #   - enableProfessionalFeatures: false (disable pro/licensing management)
       #   - SUEnableAutomaticChecks: false (disable automatic update checking)
@@ -474,9 +476,11 @@ in
       #   - wakeDelay: 1.5s (wake-from-sleep transition time)
       "pro.betterdisplay.BetterDisplay" = {
         LaunchAtLogin = true;
+        hideMenuIcon = true;
         ShowResolutionsAsList = true;
         UseMaximumResolution = true;
         sendCrashReports = true;
+        showInMenuBar = false;
         enableProfessionalFeatures = false;
         setDelay = 0.2;
         wakeDelay = 1.5;

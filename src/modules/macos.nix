@@ -84,7 +84,7 @@ let
     "com.apple.terminal"
     "com.apple.universalaccess"
     "com.apple.universalcontrol"
-    "com.betterdisplay"
+    "pro.betterdisplay.BetterDisplay"
     "com.googlecode.iterm2"
     "com.raycast.macos"
   ];
@@ -1209,9 +1209,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
         echo "macos: warning — AltTab menu bar hide failed (app may not be installed)." >&2
       fi
 
-      # BetterDisplay: hide menu bar icon (showInMenuBar defaults key)
-      if /usr/bin/defaults write pro.betterdisplay.BetterDisplay showInMenuBar -bool false; then
-        echo "macos: BetterDisplay menu bar icon hidden (restart app to apply)." >&2
+      # BetterDisplay: hide app icon in menu UI and keep legacy menu-bar key
+      # off for compatibility across BetterDisplay releases.
+      if /usr/bin/defaults write pro.betterdisplay.BetterDisplay hideMenuIcon -bool true; then
+        if /usr/bin/defaults write pro.betterdisplay.BetterDisplay showInMenuBar -bool false; then
+          echo "macos: BetterDisplay menu icon hidden (restart app to apply)." >&2
+        else
+          echo "macos: warning — BetterDisplay legacy menu bar key write failed (app may not be installed)." >&2
+        fi
       else
         echo "macos: warning — BetterDisplay menu bar hide failed (app may not be installed)." >&2
       fi
