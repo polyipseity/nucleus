@@ -22,5 +22,7 @@
 
   # Disable OpenCode auto-update globally to avoid version skew across machines.
   # Updates are controlled via flake updates and managed environment versioning.
-  environment.variables.OPENCODE_NO_UPDATE_CHECK = "1";
+  # Source: OpenCode CLI env var table (`OPENCODE_DISABLE_AUTOUPDATE`)
+  # https://opencode.ai/docs/zh-tw/cli/#環境變數
+  environment.variables.OPENCODE_DISABLE_AUTOUPDATE = "true";
 }
