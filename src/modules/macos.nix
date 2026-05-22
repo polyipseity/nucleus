@@ -46,6 +46,8 @@ let
   #   - user activation defaults hooks (Safari/universalaccess/symbolichotkeys)
   #
   # Keep this list alphabetically sorted for easy drift reviews.
+  # Source for preference-domain write semantics: defaults(1).
+  # https://www.manpagez.com/man/1/defaults/
   resetUserPreferenceDomains = [
     "NSGlobalDomain"
     "com.apple.ActivityMonitor"
@@ -90,6 +92,8 @@ let
   ];
 
   # UTI list for Chrome: set as the default handler for HTML and XHTML documents.
+  # Source: Apple Uniform Type Identifiers.
+  # https://developer.apple.com/documentation/uniformtypeidentifiers
   chromeUTIs = [
     "public.html"
     "public.xhtml"
@@ -97,6 +101,9 @@ let
 
   # UTI list for Keka: covers 7z, RAR, and ZIP archive formats so that opening
   # any archive file launches Keka for graphical extraction/creation.
+  # Sources:
+  # https://developer.apple.com/documentation/uniformtypeidentifiers
+  # https://github.com/moretension/duti
   kekaUTIs = [
     "public.zip-archive"
     "com.rarlab.rar-archive"
@@ -104,6 +111,9 @@ let
 
   # UTI list for VLC: covers the full range of video, audio, and playlist
   # formats that VLC supports so that double-clicking any media file opens VLC.
+  # Sources:
+  # https://developer.apple.com/documentation/uniformtypeidentifiers
+  # https://github.com/moretension/duti
   vlcUTIs = [
     "public.movie"
     "public.video"
@@ -542,6 +552,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # now handled declaratively in defaults.nix via CustomUserPreferences.
     # -------------------------------------------------------------------------
     configureInputAndSiri = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      # Source: symbolic hotkey values are persisted in
+      # com.apple.symbolichotkeys/AppleSymbolicHotKeys via defaults(1).
+      # https://www.manpagez.com/man/1/defaults/
       if ! /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 176 "<dict><key>enabled</key><false/></dict>"; then
         echo "macos: failed to update symbolic hotkey 176." >&2
       fi
@@ -905,6 +918,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
         fi
       }
 
+      # Source: Safari preference behavior.
+      # https://support.apple.com/guide/safari/change-settings-ibrwa005/mac
       set_safari_default "AutoFillPasswords" "false" "bool"
       set_safari_default "IncludeDevelopMenu" "true" "bool"
       set_safari_default "IncludeInternalDebugMenu" "true" "bool"
@@ -958,6 +973,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
         fi
       }
 
+      # Source: macOS Accessibility preference settings.
+      # https://support.apple.com/guide/mac-help/accessibility-settings-on-mac-mh40584/mac
       set_default "com.apple.universalaccess" "FontSizeCategory" "AX1" "string"
       set_default "com.apple.universalaccess" "cursorSize" "1.33" "float"
       set_default "com.apple.universalaccess" "reduceMotion" "false" "bool"
@@ -1209,6 +1226,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Each app requires restart to apply changes.
     # -------------------------------------------------------------------------
     hideMenuBarIcons = lib.hm.dag.entryAfter [ "reloadUserPreferenceState" ] ''
+      # Source: AltTab preference domain/key naming used by the app.
+      # https://alt-tab-macos.netlify.app/
       # AltTab: hide menu bar icon (in-app toggle available in Preferences → General)
       if /usr/bin/defaults write com.lwouis.alt-tab-macos menubarIconShown -bool false; then
         echo "macos: AltTab menu bar icon hidden (restart app to apply)." >&2
@@ -1218,6 +1237,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       # BetterDisplay: hide app icon in menu UI and keep legacy menu-bar key
       # off for compatibility across BetterDisplay releases.
+      # Source: BetterDisplay preference domain and menu-bar options.
+      # https://github.com/waydabber/BetterDisplay/wiki
       if /usr/bin/defaults write pro.betterdisplay.BetterDisplay hideMenuIcon -bool true; then
         if /usr/bin/defaults write pro.betterdisplay.BetterDisplay showInMenuBar -bool false; then
           echo "macos: BetterDisplay menu icon hidden (restart app to apply)." >&2
@@ -1312,6 +1333,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
       create_headless_display() {
         # Use documented virtual-screen parameters and force connected state at
         # creation time so fallback remains available with the lid closed.
+        # Source: BetterDisplay CLI virtual-screen flags.
+        # https://github.com/waydabber/BetterDisplay/wiki
         "$BD_BIN" create \
           -type=VirtualScreen \
           -virtualScreenName="$DISPLAY_NAME" \
