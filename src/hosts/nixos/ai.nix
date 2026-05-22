@@ -25,10 +25,15 @@
     # footprint, enable flash attention to reduce attention memory overhead,
     # and set a 32 k token default context window so models that default to
     # 2 k or 4 k do not silently truncate long conversations.
+    # Source: Ollama runtime environment-variable references.
+    # https://github.com/ollama/ollama/blob/main/docs/faq.md
+    # https://github.com/ollama/ollama/blob/main/envconfig/config.go
     environmentVariables = {
       OLLAMA_FLASH_ATTENTION = "1";
+      # Source: Ollama context-window environment variable.
+      # https://docs.ollama.com/faq#how-can-i-specify-the-context-window-size
+      OLLAMA_CONTEXT_LENGTH = "32768";
       OLLAMA_KV_CACHE_TYPE = "q4_0";
-      OLLAMA_NUM_CTX = "32768";
     };
   };
 
@@ -37,5 +42,7 @@
   # unrelated system services.  macOS has no equivalent RLIMIT-based RAM cap
   # mechanism via launchd; the loopback-only binding and model manifest are
   # the macOS memory guard instead.
+  # Source: systemd resource-control MemoryMax semantics.
+  # https://man7.org/linux/man-pages/man5/systemd.resource-control.5.html
   systemd.services.ollama.serviceConfig.MemoryMax = "16G";
 }

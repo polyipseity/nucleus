@@ -105,7 +105,7 @@ Describe "Windows User Configuration Parity" {
         }
 
         It "Should set the Ollama default context length to 32k" {
-            Get-NucleusUserEnvironmentVariable -Name 'OLLAMA_NUM_CTX' | Should -Be '32768'
+            Get-NucleusUserEnvironmentVariable -Name 'OLLAMA_CONTEXT_LENGTH' | Should -Be '32768'
         }
     }
 }

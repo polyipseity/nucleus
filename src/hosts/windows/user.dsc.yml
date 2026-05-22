@@ -167,7 +167,7 @@ properties:
       dependsOn:
         - wallpaperPath
       directives:
-        description: Refresh desktop parameters after wallpaper state updates
+        description: Refresh desktop parameters after wallpaper state updates (source https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-systemparametersinfoa)
       settings:
         GetScript: |
           return @{ Result = "WallpaperRefresh" }
@@ -211,7 +211,8 @@ properties:
           attention mechanism during inference, keeping peak VRAM usage lower
           on GPU-backed sessions and reducing RAM pressure on CPU-only runs.
           Mirrors OLLAMA_FLASH_ATTENTION set in the macOS launchd agent and
-          the NixOS services.ollama.environmentVariables block.
+          the NixOS services.ollama.environmentVariables block (source:
+          https://docs.ollama.com/faq#how-can-i-enable-flash-attention).
       settings:
         name: OLLAMA_FLASH_ATTENTION
         value: "1"
@@ -224,7 +225,8 @@ properties:
           Bind Ollama client tools (ollama CLI, oterm) to the loopback address
           so API calls never cross to LAN peers.  Mirrors OLLAMA_HOST set in
           home.sessionVariables on macOS and NixOS; explicit declaration guards
-          against upstream Ollama default changes.
+          against upstream Ollama default changes (source:
+          https://docs.ollama.com/faq#how-can-i-expose-ollama-on-my-network).
       settings:
         name: OLLAMA_HOST
         value: "127.0.0.1:11434"
@@ -237,7 +239,9 @@ properties:
           Compress the KV cache with 4-bit quantisation to halve the KV-cache
           RAM footprint so larger context windows fit without evicting model
           weights.  Mirrors OLLAMA_KV_CACHE_TYPE set in the macOS launchd
-          agent and the NixOS services.ollama.environmentVariables block.
+          agent and the NixOS services.ollama.environmentVariables block
+          (source:
+          https://docs.ollama.com/faq#how-can-i-set-the-quantization-type-for-the-kv-cache).
       settings:
         name: OLLAMA_KV_CACHE_TYPE
         value: q4_0
@@ -249,10 +253,11 @@ properties:
         description: >-
           Set a 32 k token default context window so models that default to
           2 k or 4 k do not silently truncate long conversations.  Mirrors
-          OLLAMA_NUM_CTX set in the macOS launchd agent and the NixOS
-          services.ollama.environmentVariables block.
+          OLLAMA_CONTEXT_LENGTH set in the macOS launchd agent and the NixOS
+          services.ollama.environmentVariables block (source:
+          https://docs.ollama.com/faq#how-can-i-specify-the-context-window-size).
       settings:
-        name: OLLAMA_NUM_CTX
+        name: OLLAMA_CONTEXT_LENGTH
         value: "32768"
         scope: User
 

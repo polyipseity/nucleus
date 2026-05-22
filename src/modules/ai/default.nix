@@ -98,7 +98,9 @@ lib.mkMerge [
           # Set a 32 k token default context window so models that default to
           # 2 k or 4 k do not silently truncate long conversations.  Individual
           # `ollama run` calls can still override with --ctx=N.
-          OLLAMA_NUM_CTX = "32768";
+          # Source: Ollama environment variable reference.
+          # https://docs.ollama.com/faq#how-can-i-specify-the-context-window-size
+          OLLAMA_CONTEXT_LENGTH = "32768";
         };
         # Restart the server automatically after crashes or macOS restarts
         # so the inference endpoint is always available without manual
