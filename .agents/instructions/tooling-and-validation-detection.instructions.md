@@ -25,6 +25,17 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
 - If several entrypoints wrap the same behavior, document the canonical one and
   note the wrappers briefly instead of duplicating the whole command matrix.
 
+## GitHub CLI usage (noninteractive by default)
+
+- All `gh` commands in automation, validation, and agent execution must run in
+  noninteractive mode.
+- Set `GH_PROMPT_DISABLED=1` and `GH_PAGER=cat` when invoking `gh` to avoid
+  blocking on prompts or pager sessions.
+- Prefer explicit machine-readable output (`--json`, optionally `--jq`) over
+  interactive flows.
+- Avoid interactive commands (for example `gh run watch`) in agent workflows;
+  poll status with noninteractive list/view commands instead.
+
 ## Config coordination
 
 - When you change an instruction about tooling, check the neighboring configs in
