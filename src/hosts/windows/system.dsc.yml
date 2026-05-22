@@ -2,6 +2,9 @@
 # Package ID policy: prefer human-readable named IDs (for example
 # `Microsoft.PowerToys`) over opaque Microsoft Store-generated IDs. Use
 # generated IDs only when the Store package has no stable named identifier.
+# Source for package ID validity: WinGet package index and manifests.
+# https://learn.microsoft.com/windows/package-manager/winget/
+# https://github.com/microsoft/winget-pkgs
 properties:
   configurationVersion: 0.2.0
   resources:
@@ -474,13 +477,13 @@ properties:
 
     - resource: Microsoft.Windows.Settings/DeveloperMode
       directives:
-        description: Enable Developer Mode
+        description: Enable Developer Mode (source https://learn.microsoft.com/windows/apps/get-started/enable-your-device-for-development)
       settings:
         Enabled: true
 
     - resource: Microsoft.Windows.Settings/Taskbar
       directives:
-        description: Keep a centered large taskbar for improved visibility
+        description: Keep a centered large taskbar for improved visibility (source https://support.microsoft.com/windows/customize-the-windows-11-taskbar)
       settings:
         Alignment: Center
         Size: Large
