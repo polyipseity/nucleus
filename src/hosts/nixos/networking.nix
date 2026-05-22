@@ -2,6 +2,8 @@
 { ... }:
 {
   # mDNS/Bonjour discovery parity with macOS for easier local host discovery.
+  # Source: NixOS Avahi service option.
+  # https://mynixos.com/nixpkgs/option/services.avahi.enable
   services.avahi = {
     enable = true;
     nssmdns4 = true;
@@ -13,11 +15,15 @@
   };
 
   # Enable the nftables-based stateful firewall; blocks unsolicited inbound.
+  # Source: NixOS firewall option.
+  # https://mynixos.com/nixpkgs/option/networking.firewall.enable
   networking.firewall.enable = true;
   # Titlecase hostname preserves consistent local discovery and machine identity
   # semantics for the NixOS host.
   networking.hostName = "NixOS";
   # Use NetworkManager for DHCP/Wi-Fi instead of the legacy wpa_supplicant setup.
+  # Source: NixOS NetworkManager option.
+  # https://mynixos.com/nixpkgs/option/networking.networkmanager.enable
   networking.networkmanager.enable = true;
 
   # Wake-on-LAN parity with macOS (pmset womp=1) and Windows (WakeOnMagicPacket).

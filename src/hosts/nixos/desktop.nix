@@ -18,6 +18,9 @@
   # framebuffer when the lid is closed or no monitor is attached.
   # vkms is a kernel-native virtual DRM/KMS driver; it does not replace GPU
   # drivers — it adds a virtual display alongside any real hardware.
+  # Sources:
+  # https://mynixos.com/nixpkgs/option/boot.kernelModules
+  # https://docs.kernel.org/gpu/vkms.html
   boot.kernelModules = [ "vkms" ];
 
   # Enable X11 server and desktop managers.
@@ -90,11 +93,15 @@
   services.gnome.core-apps.enable = true;
 
   # Run auto-cpufreq as the managed NixOS power optimizer daemon.
+  # Source: NixOS auto-cpufreq service option.
+  # https://mynixos.com/nixpkgs/option/services.auto-cpufreq.enable
   services.auto-cpufreq.enable = true;
 
   # GNOME may enable power-profiles-daemon by default, but that service
   # conflicts with auto-cpufreq (both attempt to control CPU governor policy).
   # Keep auto-cpufreq as the single source of truth for power tuning.
+  # Source: NixOS power-profiles-daemon option.
+  # https://mynixos.com/nixpkgs/option/services.power-profiles-daemon.enable
   services.power-profiles-daemon.enable = false;
 
   # CPU governor profiles mirror macOS lowpowermode parity:
@@ -146,6 +153,8 @@
   # active simultaneously.
   # openFirewall = true opens TCP 3389 in the NixOS firewall automatically;
   # without this the RDP port would be blocked by the default deny policy.
+  # Source: NixOS XRDP defaultWindowManager option.
+  # https://mynixos.com/nixpkgs/option/services.xrdp.defaultWindowManager
   services.xrdp = {
     defaultWindowManager = "${pkgs.gnome-session}/bin/gnome-session";
     enable = true;

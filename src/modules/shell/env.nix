@@ -5,6 +5,9 @@
 {
   # Prefer the LLVM toolchain everywhere so native-extension builds and C/C++
   # projects converge on clang/lld instead of host-specific defaults.
+  # Sources:
+  # https://clang.llvm.org/docs/CommandGuide/clang.html
+  # https://lld.llvm.org/
   CC = "clang";
   CXX = "clang++";
   LD = "ld.lld";

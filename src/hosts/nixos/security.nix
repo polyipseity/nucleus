@@ -12,10 +12,14 @@
       # prompts and challenge-response exchanges).  Without this, even with
       # PasswordAuthentication = false, some PAM modules could still prompt
       # for a password via the keyboard-interactive channel.
+      # Source: NixOS OpenSSH option for keyboard-interactive auth.
+      # https://mynixos.com/nixpkgs/option/services.openssh.settings.KbdInteractiveAuthentication
       KbdInteractiveAuthentication = false;
       # Disable direct password authentication, forcing all logins to use
       # a public/private key pair.  Eliminates brute-force password attacks
       # over SSH entirely.
+      # Source: NixOS OpenSSH option for password auth.
+      # https://mynixos.com/nixpkgs/option/services.openssh.settings.PasswordAuthentication
       PasswordAuthentication = false;
       # Reference the SOPS-materialized personal SSH public key so the
       # authorized key is never hardcoded in the repository.  secrets.nix
@@ -24,6 +28,8 @@
       # %u expands to the connecting username at authentication time.
       # .ssh/authorized_keys is retained as the conventional extensibility path
       # for adding further authorized keys declaratively or manually later.
+      # Source: sshd_config AuthorizedKeysFile semantics.
+      # https://man7.org/linux/man-pages/man5/sshd_config.5.html
       AuthorizedKeysFile = ".ssh/authorized_keys .ssh/ssh_personal_%u.pub";
     };
   };
