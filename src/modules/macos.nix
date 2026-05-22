@@ -601,6 +601,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
         done
       }
 
+      # Bundle identifiers sourced from app bundles + vendor docs:
+      # - Chrome: com.google.chrome
+      #   https://chromeenterprise.google/policies/
+      # - Keka: com.aone.keka
+      #   https://www.keka.io/en/
+      # - VLC: org.videolan.vlc
+      #   https://wiki.videolan.org/MacOS/
       register_handler "com.google.chrome" ${builtins.concatStringsSep " " chromeUTIs}
       register_handler "com.aone.keka" ${builtins.concatStringsSep " " kekaUTIs}
       register_handler "org.videolan.vlc" ${builtins.concatStringsSep " " vlcUTIs}
@@ -1221,8 +1228,19 @@ lib.mkIf pkgs.stdenv.isDarwin {
         echo "macos: warning — BetterDisplay menu bar hide failed (app may not be installed)." >&2
       fi
 
-      # LinearMouse: hide menu bar icon (showInMenuBar defaults key)
+      # LinearMouse: hide menu bar icon (showInMenuBar defaults key).
+      # Source: community-documented preference domain/key and local defaults
+      # domain enumeration (both org.linearmouse.LinearMouse and
+      # com.lujjjh.LinearMouse can exist depending on app build/migration).
+      # https://github.com/linearmouse/linearmouse/wiki
+      linearmouse_hide_ok=0
       if /usr/bin/defaults write org.linearmouse.LinearMouse showInMenuBar -bool false; then
+        linearmouse_hide_ok=1
+      fi
+      if /usr/bin/defaults write com.lujjjh.LinearMouse showInMenuBar -bool false; then
+        linearmouse_hide_ok=1
+      fi
+      if [ "$linearmouse_hide_ok" -eq 1 ]; then
         echo "macos: LinearMouse menu bar icon hidden (restart app to apply)." >&2
       else
         echo "macos: warning — LinearMouse menu bar hide failed (app may not be installed)." >&2
@@ -1379,6 +1397,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
   launchd.agents."betterdisplay-heartbeat" = {
     enable = true;
     config = {
+      # launchd Label is a reverse-DNS-style unique identifier.
+      # Source: launchd.plist(5) Label key semantics.
+      # https://www.manpagez.com/man/5/launchd.plist/
       Label = "local.betterdisplay-heartbeat";
       ProgramArguments = [ "${betterdisplayHeartbeat}" ];
       # Poll interval in seconds; 30 s keeps the display available for
@@ -1415,6 +1436,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
   launchd.agents."nix-index-update" = {
     enable = true;
     config = {
+      # launchd Label is a reverse-DNS-style unique identifier.
+      # Source: launchd.plist(5) Label key semantics.
+      # https://www.manpagez.com/man/5/launchd.plist/
       Label = "local.nix-index-update";
       ProgramArguments = [ "${nixIndexUpdate}" ];
       # Run once at load so a freshly provisioned machine or a machine whose

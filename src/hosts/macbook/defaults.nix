@@ -462,7 +462,9 @@ in
       # crash reporting, disable professional features (licensing), and set delay
       # values for display transitions.
       #
-      # Note: preferences domain is pro.betterdisplay.BetterDisplay (not com.betterdisplay)
+      # Note: preferences domain is pro.betterdisplay.BetterDisplay (not
+      # com.betterdisplay). Source:
+      # https://github.com/waydabber/BetterDisplay/wiki
       # Screenshot configurations:
       #   - LaunchAtLogin: true (app auto-starts at login)
       #   - hideMenuIcon: true (hide app icon in BetterDisplay menu UI)
@@ -492,6 +494,11 @@ in
       # LinearMouse: configure menu bar visibility, battery indicator,
       # dock visibility, and launch-at-login behavior.
       #
+      # Domain source and migration context:
+      # https://github.com/linearmouse/linearmouse/wiki
+      # Runtime writes in src/modules/macos.nix target both
+      # org.linearmouse.LinearMouse and com.lujjjh.LinearMouse because both
+      # domains can appear on migrated installs.
       # Screenshot configurations:
       #   - showInMenuBar: false (menu bar icon hidden via hideMenuBarIcons)
       #   - showBattery: "always" (always display battery in menu bar when visible)
