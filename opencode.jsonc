@@ -4,8 +4,12 @@
   // https://opencode.ai/docs/zh-tw/config/#自動更新
   // https://opencode.ai/config.json
   "autoupdate": false,
+  // Source: OpenCode instructions/rules loading.
+  // https://opencode.ai/docs/zh-tw/rules/
   "instructions": [".agents/instructions/**/*.md"],
   "skills": {
+    // Source: OpenCode skills discovery paths.
+    // https://opencode.ai/docs/zh-tw/skills/
     "paths": [".agents/skills"],
   },
 }
