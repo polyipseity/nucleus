@@ -22,9 +22,9 @@ function Sync-ShellProfile {
         (if fzf is present and PSReadLine is available)
       - pay-respects command correction hook (if pay-respects is present; installed
         via cargo-binstall by Invoke-CargoBinstallSetup)
-      - common aliases (`g`, `ga`, `gc`, `gca`, `gco`, `gd`, `gll`, `gp`,
-        `gpl`, `gs-pdf-opt-*` (Ghostscript PDF presets), `gst`, `la`, `ll` (eza preferred, Get-ChildItem fallback),
-        `ni`, `nr`, `nx` (bun shortcuts, if bun present), `v`)
+      - common aliases (`-g`, `-ga`, `-gc`, `-gca`, `-gco`, `-gd`, `-g-l`, `-gp`,
+        `-gpl`, `-gs-pdf-opt-*` (Ghostscript PDF presets), `-gst`, `-la`, `-ll` (eza preferred, Get-ChildItem fallback),
+        `-ni`, `-nr`, `-nx` (bun shortcuts, if bun present), `-v`)
       - Python ban: blocks system-wide python/pip to prevent accidental
          modifications to system environment
       - Build tool ban: blocks system-wide bun/cargo/rustc/uv direct invocation;
@@ -224,15 +224,15 @@ function Sync-ShellProfile {
     '$env:CC = "clang"'
     '$env:CXX = "clang++"'
     '$env:LD = "ld.lld"'
-    'function g { & git @Args }'
-    'function ga { & git add @Args }'
-    'function gc { & git commit @Args }'
-    'function gca { & git commit --amend @Args }'
-    'function gco { & git checkout @Args }'
-    'function gd { & git diff @Args }'
-    'function gll { & git log --oneline --decorate --graph @Args }'
-    'function gp { & git push @Args }'
-    'function gpl { & git pull @Args }'
+    'function -g { & git @Args }'
+    'function -ga { & git add @Args }'
+    'function -gc { & git commit @Args }'
+    'function -gca { & git commit --amend @Args }'
+    'function -gco { & git checkout @Args }'
+    'function -gd { & git diff @Args }'
+    'function -g-l { & git log --oneline --decorate --graph @Args }'
+    'function -gp { & git push @Args }'
+    'function -gpl { & git pull @Args }'
     'function Invoke-NucleusGhostscript {'
     '  if (Get-Command gs -ErrorAction SilentlyContinue) { & gs @Args; return }'
     '  if (Get-Command gswin64c -ErrorAction SilentlyContinue) { & gswin64c @Args; return }'
@@ -242,27 +242,27 @@ function Sync-ShellProfile {
     # Ghostscript PDF optimization presets.
     # CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
     # newer PDF compatibility target is released by Ghostscript.
-    'function gs-pdf-opt-default  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default  -dNOPAUSE -dQUIET -dBATCH @Args }'
-    'function gs-pdf-opt-ebook    { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args }'
-    'function gs-pdf-opt-prepress { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }'
-    'function gs-pdf-opt-printer  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }'
-    'function gs-pdf-opt-screen   { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }'
-    'function gst { & git status @Args }'
+    'function -gs-pdf-opt-default  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default  -dNOPAUSE -dQUIET -dBATCH @Args }'
+    'function -gs-pdf-opt-ebook    { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args }'
+    'function -gs-pdf-opt-prepress { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }'
+    'function -gs-pdf-opt-printer  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }'
+    'function -gs-pdf-opt-screen   { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }'
+    'function -gst { & git status @Args }'
     # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
     # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
     'if (Get-Command eza -ErrorAction SilentlyContinue) {'
-    '  function la { & eza -la @Args }'
-    '  function ll { & eza -la @Args }'
+    '  function -la { & eza -la @Args }'
+    '  function -ll { & eza -la @Args }'
     '} else {'
-    '  function la { Get-ChildItem -Force @Args }'
-    '  function ll { Get-ChildItem -Force @Args }'
+    '  function -la { Get-ChildItem -Force @Args }'
+    '  function -ll { Get-ChildItem -Force @Args }'
     '}'
-    # bun shortcuts: mirrors ni/nr/nx aliases in shell/aliases.nix on POSIX hosts.
+    # bun shortcuts: mirrors -ni/-nr/-nx aliases in shell/aliases.nix on POSIX hosts.
     # Guarded so the profile loads safely on machines where bun is not yet installed.
     'if (Get-Command bun -ErrorAction SilentlyContinue) {'
-    '  function ni { & bun install @Args }'
-    '  function nr { & bun run @Args }'
-    '  function nx { & bun x @Args }'
+    '  function -ni { & bun install @Args }'
+    '  function -nr { & bun run @Args }'
+    '  function -nx { & bun x @Args }'
     '}'
     'function Resolve-NucleusRepoRoot {'
     '  $configPath = Join-Path $HOME ''.config\nucleus\repo-root'''
@@ -304,7 +304,7 @@ function Sync-ShellProfile {
     '  }'
     '  & $scriptPath @Args'
     '}'
-    'function v { & nvim @Args }'
+    'function -v { & nvim @Args }'
     'function Test-NucleusPythonScopeActive {'
     '  return (-not [string]::IsNullOrWhiteSpace($env:VIRTUAL_ENV)) -or (-not [string]::IsNullOrWhiteSpace($env:CONDA_PREFIX))'
     '}'
@@ -396,7 +396,7 @@ function Sync-ShellProfile {
     '  Write-Host "         For development, use one of these managed entrypoints:" -ForegroundColor Yellow'
     '  Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow'
     '  Write-Host "         - Or use the managed default shell environment installed by apply.ps1" -ForegroundColor Yellow'
-    '  Write-Host "         Shell shortcuts ni/nr/nx also work inside a devShell." -ForegroundColor Yellow'
+    '  Write-Host "         Shell shortcuts -ni/-nr/-nx also work inside a devShell." -ForegroundColor Yellow'
     '  return 1'
     '}'
     'function cargo {'

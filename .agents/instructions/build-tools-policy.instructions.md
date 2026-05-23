@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing system packages, devShells, shell profiles, or build tool references. Covers the system-install-only policy for bun/cargo/rustc/uv/prek, the shell blocking mechanism, and devShell-first development guidance."
 name: "Build Tools Policy"
-applyTo: "src/modules/core.nix, src/modules/shell.nix, src/modules/pwsh.nix, src/flake.nix, src/hosts/windows/modules/Sync-ShellProfile.ps1, .envrc"
+applyTo: "src/modules/core.nix, src/modules/shell.nix, src/modules/pwsh.nix, src/flake.nix, src/hosts/windows/modules/user/Sync-ShellProfile.ps1, .envrc"
 ---
 
 # Build Tools Policy
@@ -18,7 +18,7 @@ interactive sessions:
 | `cargo` | nixpkgs `rustup` | used internally by `cargo-binstall` for system Rust binary installs |
 | `rustc` | nixpkgs `rustup` | compilation during `cargo-binstall` runs |
 | `uv` | nixpkgs / WinGet | `uv tool install` for system-level Python tooling |
-| `prek` | nixpkgs | system-wide Git hook manager binary (invoked by `apply.sh` / `.envrc`) |
+| `prek` | nixpkgs | system-wide Git hook manager binary (invoked by managed shell/apply hooks) |
 | `python` / `pip` | **banned** | no permitted system use; all Python via devShell or uv venv |
 
 Direct developer invocation of any of the above in an interactive shell session
@@ -50,7 +50,7 @@ Equivalent PowerShell functions in `profileContent`. Pass-through first uses
 `$env:DIRENV_DIR`, then the managed fallback toolchain published via
 `$env:NUCLEUS_DEFAULT_DEV_BIN`.
 
-### Windows (PowerShell) — `src/hosts/windows/modules/Sync-ShellProfile.ps1`
+### Windows (PowerShell) — `src/hosts/windows/modules/user/Sync-ShellProfile.ps1`
 
 Same functions emitted into the managed block. Pass-through uses
 `$env:DIRENV_DIR` when present and otherwise the managed default shell
@@ -94,13 +94,12 @@ prek Git hooks are installed by two complementary mechanisms:
 | Mechanism | Scope | Platform |
 |---|---|---|
 | `src/scripts/apply.sh` `ensure_prek_hooks_installed` | nucleus repo, first apply | POSIX |
-| `.envrc` `prek install` block | nucleus repo, every direnv entry | POSIX |
+| zsh `_prek_hook_install_if_needed` | any `prek.toml` repo, on shell startup + directory change | POSIX |
 | PowerShell profile `Invoke-PrekHookInstallIfNeeded` | any prek.toml repo, on directory entry | POSIX pwsh + Windows |
 
-The zsh chpwd hook was **removed** in favour of the direnv-based approach.
-WHY: direnv fires on directory entry and is already part of the managed shell
-setup; a separate zsh hook was redundant and added complexity. The PowerShell
-prompt hook remains as the Windows parity mechanism.
+The POSIX zsh hook remains the canonical mechanism for non-direnv repository
+entry (startup + directory change). PowerShell keeps prompt-hook parity for
+POSIX pwsh and Windows.
 
 ## Adding or changing blocked tools
 
@@ -109,7 +108,7 @@ prompt hook remains as the Windows parity mechanism.
 2. Add the equivalent PowerShell function to `src/modules/pwsh.nix`
    (`profileContent`) for POSIX PowerShell parity.
 3. Add the same function to the `$managedBlock` array in
-   `src/hosts/windows/modules/Sync-ShellProfile.ps1` for Windows parity.
+   `src/hosts/windows/modules/user/Sync-ShellProfile.ps1` for Windows parity.
 4. Update this instruction file and the `core.nix` policy comment table.
 5. If the tool is also a devShell tool (i.e., developers need it for project
    work), add it to both `devShells.default` entries in `src/flake.nix`

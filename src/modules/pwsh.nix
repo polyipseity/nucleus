@@ -193,15 +193,15 @@ let
       }
     }
 
-    function g { & git @Args }
-    function ga { & git add @Args }
-    function gc { & git commit @Args }
-    function gca { & git commit --amend @Args }
-    function gco { & git checkout @Args }
-    function gd { & git diff @Args }
-    function gll { & git log --oneline --decorate --graph @Args }
-    function gp { & git push @Args }
-    function gpl { & git pull @Args }
+    function -g { & git @Args }
+    function -ga { & git add @Args }
+    function -gc { & git commit @Args }
+    function -gca { & git commit --amend @Args }
+    function -gco { & git checkout @Args }
+    function -gd { & git diff @Args }
+    function -g-l { & git log --oneline --decorate --graph @Args }
+    function -gp { & git push @Args }
+    function -gpl { & git pull @Args }
 
     function Invoke-NucleusGhostscript {
       if (Get-Command gs -ErrorAction SilentlyContinue) {
@@ -222,25 +222,25 @@ let
     # Ghostscript PDF optimization presets.
     # CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
     # newer PDF compatibility target is released by Ghostscript.
-    function gs-pdf-opt-default  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default  -dNOPAUSE -dQUIET -dBATCH @Args }
-    function gs-pdf-opt-ebook    { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args }
-    function gs-pdf-opt-prepress { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }
-    function gs-pdf-opt-printer  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }
-    function gs-pdf-opt-screen   { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }
+    function -gs-pdf-opt-default  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default  -dNOPAUSE -dQUIET -dBATCH @Args }
+    function -gs-pdf-opt-ebook    { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args }
+    function -gs-pdf-opt-prepress { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }
+    function -gs-pdf-opt-printer  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }
+    function -gs-pdf-opt-screen   { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }
 
-    function gst { & git status @Args }
+    function -gst { & git status @Args }
 
     # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
     # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
     if (Get-Command eza -ErrorAction SilentlyContinue) {
-      function la { & eza -la @Args }
-      function ll { & eza -la @Args }
+      function -la { & eza -la @Args }
+      function -ll { & eza -la @Args }
     } else {
-      function la { Get-ChildItem -Force @Args }
-      function ll { Get-ChildItem -Force @Args }
+      function -la { Get-ChildItem -Force @Args }
+      function -ll { Get-ChildItem -Force @Args }
     }
 
-    function v { & nvim @Args }
+    function -v { & nvim @Args }
 
     function Test-NucleusPythonScopeActive {
       return (-not [string]::IsNullOrWhiteSpace($env:VIRTUAL_ENV)) -or (-not [string]::IsNullOrWhiteSpace($env:CONDA_PREFIX))
@@ -352,7 +352,7 @@ let
       Write-Host "         For development, use one of these managed entrypoints:" -ForegroundColor Yellow
       Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
       Write-Host "         - Or use the user-scoped default toolchain installed by nucleus apply" -ForegroundColor Yellow
-      Write-Host "         Shell shortcuts ni/nr/nx also work inside a devShell." -ForegroundColor Yellow
+      Write-Host "         Shell shortcuts -ni/-nr/-nx also work inside a devShell." -ForegroundColor Yellow
       return 1
     }
     function cargo {

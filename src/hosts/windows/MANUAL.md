@@ -5,30 +5,33 @@
 
 ## command shortcuts
 
-- `g` — run `git`.
-- `ga` — run `git add`.
-- `gc` — run `git commit`.
-- `gca` — run `git commit --amend`.
-- `gco` — run `git checkout`.
-- `gd` — run `git diff`.
-- `gll` — run `git log --oneline --decorate --graph`.
-- `gst` — run `git status`.
-- `gp` — run `git push`.
-- `gpl` — run `git pull`.
-- `gs-pdf-opt-default` — optimize PDFs with Ghostscript default profile.
-- `gs-pdf-opt-ebook` — optimize PDFs with Ghostscript ebook profile.
-- `gs-pdf-opt-prepress` — optimize PDFs with Ghostscript prepress profile.
-- `gs-pdf-opt-printer` — optimize PDFs with Ghostscript printer profile.
-- `gs-pdf-opt-screen` — optimize PDFs with Ghostscript screen profile.
-- `la` — run `eza -la`.
-- `ll` — run `eza -la`.
-- `ni` — run `bun install`.
+- `-g` — run `git`.
+- `-ga` — run `git add`.
+- `-gc` — run `git commit`.
+- `-gca` — run `git commit --amend`.
+- `-gco` — run `git checkout`.
+- `-gd` — run `git diff`.
+- `-g-l` — run `git log --oneline --decorate --graph`.
+- `-gst` — run `git status`.
+- `-gp` — run `git push`.
+- `-gpl` — run `git pull`.
+- `-gs-pdf-opt-default` — optimize PDFs with Ghostscript default profile.
+- `-gs-pdf-opt-ebook` — optimize PDFs with Ghostscript ebook profile.
+- `-gs-pdf-opt-prepress` — optimize PDFs with Ghostscript prepress profile.
+- `-gs-pdf-opt-printer` — optimize PDFs with Ghostscript printer profile.
+- `-gs-pdf-opt-screen` — optimize PDFs with Ghostscript screen profile.
+- `-la` — run `eza -la`.
+- `-ll` — run `eza -la`.
+- `-ni` — run `bun install`.
+- `-nr` — run `bun run`.
+- `-nx` — run `bun x`.
+- `-v` — open `nvim`.
+
+## nucleus commands
+
 - `nucleus-cloud-setup` — configure required cloud remotes and re-run apply.
 - `nucleus-gc` — run the managed Nix garbage-collection flow.
 - `nucleus-health-check` — run the managed repository health checks.
 - `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
-- `nr` — run `bun run`.
-- `nx` — run `bun x`.
-- `v` — open `nvim`.
