@@ -13,10 +13,7 @@
   "-gco" = "git checkout";
   "-gd" = "git diff";
   "-gf" = "git fetch";
-  # Keep -gll as a compatibility alias because interactive use still exists,
-  # while -gl remains the canonical shortest form for the curated git log view.
   "-gl" = "git log --oneline --decorate --graph";
-  "-gll" = "git log --oneline --decorate --graph";
   "-gp" = "git push";
   "-gpl" = "git pull";
   # Ghostscript PDF optimization presets.

@@ -183,6 +183,9 @@ quick-start commands, and troubleshooting.
 - **Declarative first**: imperative code in `src/scripts/apply.sh` and
   `src/hosts/windows/apply.ps1` is treated as a bug. If desired state can be
   represented in Nix modules or WinGet DSC resources, move it there.
+- **No backward compatibility by default**: remove deprecated code paths,
+  migration shims, and legacy branches unless the user explicitly asks to keep
+  them.
 - **Windows imperative safety**: when imperative Windows logic is unavoidable,
   keep all edits strictly managed-scope, fail fast on unsafe state, and enforce
   idempotency for both configuration and deconfiguration paths.

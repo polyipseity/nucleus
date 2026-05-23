@@ -114,10 +114,11 @@ that describes the shared purpose of the file.
   filesystem.
 - **Remove backwards compatibility code**: this repository does not require
   support for deprecated parameters, conditional migration paths, or old
-  configuration formats. If a feature has changed, remove the old path
-  completely and document the breaking change clearly in examples and
-  commit messages. Git preserves all history; archived code does not need
-  to live alongside the current implementation.
+  configuration formats unless the user explicitly asks for compatibility.
+  If a feature has changed, remove the old path completely and document the
+  breaking change clearly in examples and commit messages. Git preserves all
+  history; archived code does not need to live alongside the current
+  implementation.
 - **Complete function signatures**: every function signature must show all
   mandatory parameters in its `.SYNOPSIS` and `.EXAMPLE` sections so callers
   know what they are required to pass.

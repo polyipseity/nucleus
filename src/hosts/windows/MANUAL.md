@@ -15,7 +15,6 @@
 - `-gd` — run `git diff`.
 - `-gf` — run `git fetch`.
 - `-gl` — run `git log --oneline --decorate --graph`.
-- `-gll` — compatibility alias for `-gl` (`git log --oneline --decorate --graph`).
 - `-gst` — run `git status`.
 - `-gp` — run `git push`.
 - `-gpl` — run `git pull`.

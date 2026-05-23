@@ -79,11 +79,15 @@ applyTo: "src/**/*.nix"
 
 **Repository design principle: we never maintain deprecated code paths.**
 
+Treat backward compatibility as opt-in only: remove old paths by default and
+only preserve them when the user explicitly asks for that compatibility.
+
 When a Nix feature is restructured, moved, or replaced:
 
 - **Remove the old implementation completely** in the same change where the new
-  one is introduced. Do not leave migration shims, conditional fallback logic,
-  or "legacy" code branches alongside modern implementations.
+  one is introduced unless the user explicitly asked to keep a transition path.
+  Do not leave migration shims, conditional fallback logic, or "legacy" code
+  branches alongside modern implementations.
 - **Document the change with a WHY comment** in the new code explaining what
   changed and why (e.g. "replaced whole-directory symlink scheme with per-subdir
   layout to allow clawhub downloads in ~/.agents/skills/ without polluting the

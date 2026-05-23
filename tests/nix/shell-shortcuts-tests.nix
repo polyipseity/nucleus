@@ -22,7 +22,6 @@ let
     && lib.hasInfix ''"-gcl" = "git clone";'' aliasesText
     && lib.hasInfix ''"-gf" = "git fetch";'' aliasesText
     && lib.hasInfix ''"-gl" = "git log --oneline --decorate --graph";'' aliasesText
-    && lib.hasInfix ''"-gll" = "git log --oneline --decorate --graph";'' aliasesText
     && lib.hasInfix ''"-gsw" = "git switch";'' aliasesText
   ) "aliases.nix must expose the curated git shortcut set";
 
@@ -31,7 +30,6 @@ let
     && lib.hasInfix "function -gcl { & git clone @Args }" posixPwshText
     && lib.hasInfix "function -gf { & git fetch @Args }" posixPwshText
     && lib.hasInfix "function -gl { & git log --oneline --decorate --graph @Args }" posixPwshText
-    && lib.hasInfix "function -gll { & git log --oneline --decorate --graph @Args }" posixPwshText
     && lib.hasInfix "function -gsw { & git switch @Args }" posixPwshText
     && lib.hasInfix "function -ni { & bun install @Args }" posixPwshText
     && lib.hasInfix "function -nr { & bun run @Args }" posixPwshText
@@ -43,7 +41,6 @@ let
     && lib.hasInfix "function -gcl { & git clone @Args }" windowsShellProfileText
     && lib.hasInfix "function -gf { & git fetch @Args }" windowsShellProfileText
     && lib.hasInfix "function -gl { & git log --oneline --decorate --graph @Args }" windowsShellProfileText
-    && lib.hasInfix "function -gll { & git log --oneline --decorate --graph @Args }" windowsShellProfileText
     && lib.hasInfix "function -gsw { & git switch @Args }" windowsShellProfileText
     && lib.hasInfix "function -ni { & bun install @Args }" windowsShellProfileText
     && lib.hasInfix "function -nr { & bun run @Args }" windowsShellProfileText
@@ -79,7 +76,6 @@ let
       && lib.hasInfix "`-gcl` — run `git clone`." text
       && lib.hasInfix "`-gf` — run `git fetch`." text
       && lib.hasInfix "`-gl` — run `git log --oneline --decorate --graph`." text
-      && lib.hasInfix "`-gll` — compatibility alias for `-gl` (`git log --oneline --decorate --graph`)." text
       && lib.hasInfix "`-gsw` — run `git switch`." text
       && lib.hasInfix "`-ni` — run `bun install`." text
       && lib.hasInfix "`-nr` — run `bun run`." text

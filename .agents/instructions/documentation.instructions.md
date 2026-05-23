@@ -14,6 +14,10 @@ The guiding principle is **document the WHY, not the WHAT**: record the
 rationale, security implication, or design tradeoff behind a decision — not a
 restatement of what the code already says. Avoid obvious comments.
 
+- **No compatibility shims by default**: if a document or code comment refers
+  to a replaced path or call pattern, keep the new path only unless the user
+  explicitly asked to preserve backward compatibility.
+
 ## Provenance for non-validated external identifiers
 
 When a setting cannot be automatically validated by the repository's current
@@ -59,6 +63,9 @@ the documentation mechanism.
 - **Cite non-validated external keys**: for externally-defined keys/identifiers
   not covered by automated checks, add an inline `# Source:` comment with at
   least one verification URL adjacent to the setting.
+- **No compatibility shims by default**: if a Nix module used to expose a
+  replaced setting, document the new path only unless the user explicitly asked
+  for backward compatibility.
 
 ## PowerShell files (`src/**/*.ps1`)
 
@@ -85,6 +92,9 @@ PowerShell and is required on every function and entry-point script.
 - **Document the WHY**: record the rationale behind security-sensitive patterns
   (e.g. "env var cleared in `finally` so it is never left in the environment on
   failure") and any non-obvious fallback behaviour or error handling choices.
+- **No compatibility shims by default**: if a PowerShell script or function
+  changes calling conventions, remove the old path unless the user explicitly
+  requested backward compatibility.
 
 ### Explicit Parameter Passing Requirement (PowerShell)
 
@@ -182,3 +192,6 @@ the documentation mechanism.
   "`set -a` exports all variables so child processes inherit version pins") and
   document any behaviour that a future reader might otherwise change
   incorrectly.
+- **No compatibility shims by default**: if a shell script or helper changes
+  behavior, remove the old path unless the user explicitly asked to preserve
+  it for compatibility.

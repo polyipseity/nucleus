@@ -203,7 +203,6 @@ let
     function -gd { & git diff @Args }
     function -gf { & git fetch @Args }
     function -gl { & git log --oneline --decorate --graph @Args }
-    function -gll { & git log --oneline --decorate --graph @Args }
     function -gp { & git push @Args }
     function -gpl { & git pull @Args }
 
