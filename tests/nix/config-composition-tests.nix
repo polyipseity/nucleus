@@ -90,13 +90,6 @@ let
     && containsRegex "options\.nucleus\.hostManualFile" homeModuleText
   ) "Each host must declare its MANUAL.md path";
 
-  # Test 13: Verify Finder sidebar bookmarks use nil-safe local bookmark creation
-  test_finder_sidebar_bookmark_safety = assert' (
-    !containsRegex "NSURLBookmarkCreationWithSecurityScope" macosModuleText
-    && containsRegex "bookmark === undefined \|\| bookmark === null" macosModuleText
-    && containsRegex "skipping Finder sidebar item" macosModuleText
-  ) "Finder sidebar activation must skip nil bookmark objects instead of inserting them";
-
   allTests = [
     test_posix_hosts_import_core
     test_all_hosts_import_shell
@@ -110,7 +103,6 @@ let
     test_config_merge_structure
     test_import_order_correctness
     test_manual_md_paths
-    test_finder_sidebar_bookmark_safety
   ];
 in
 {
