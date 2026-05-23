@@ -16,7 +16,7 @@ let
   posixPwshText = builtins.readFile ../../src/modules/pwsh.nix;
   posixShellText = builtins.readFile ../../src/modules/shell.nix;
   windowsApplyText = builtins.readFile ../../src/hosts/windows/apply.ps1;
-  windowsInstallModuleText = builtins.readFile ../../src/hosts/windows/modules/Install-PrekHook.ps1;
+  windowsInstallModuleText = builtins.readFile ../../src/hosts/windows/modules/setup/Install-PrekHook.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-ShellProfile.ps1;
   windowsSystemDscText = builtins.readFile ../../src/hosts/windows/system.dsc.yml;
 
