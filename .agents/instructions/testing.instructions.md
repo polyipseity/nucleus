@@ -342,6 +342,6 @@ Before committing changes, verify:
 ## References
 
 - [AGENTS.md](../AGENTS.md) — Repository-wide testing strategy overview
-- [nix-instantiate(1)](https://nixos.org/manual/nix/stable/command-ref/nix-instantiate.html) — Nix static evaluation tool
+- [nix-instantiate(1)](https://nix.dev/manual/nix/stable/command-ref/nix-instantiate.html) — Nix static evaluation tool
 - [Pester Documentation](https://pester.dev) — PowerShell testing framework
 - [WinGet DSC](https://learn.microsoft.com/en-us/windows/package-manager/configuration/) — Windows Desired State Configuration

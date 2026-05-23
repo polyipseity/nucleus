@@ -32,12 +32,14 @@ For claims about behavior, APIs, or configuration settings:
 ### URL standardization
 
 **Apple support URLs must include explicit US English locale:**
+
 - ✅ `https://support.apple.com/en-us/guide/mac-help/...`
 - ✅ `https://support.apple.com/en-us/HT123456`
 - ❌ `https://support.apple.com/guide/mac-help/...` (no locale prefix; redirects based on browser locale)
 - ❌ `https://support.apple.com/HT123456` (no locale prefix)
 
 **Preferred URL form:**
+
 - Use canonical, stable URLs without query parameters (e.g., `?search=...`)
 - Avoid short URLs or redirects if a canonical form exists
 - Include article/page ID (HT numbers, doc IDs) when possible for long-term stability

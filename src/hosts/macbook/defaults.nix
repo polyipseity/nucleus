@@ -110,7 +110,9 @@ in
           "with" = w;
         }) autocorrectWords;
 
-        # Treat Caps Lock as a per-app input-source switch (e.g. EN ↔ Cangjie).      # Source: https://developer.apple.com/documentation/inputmethodkit        TISCapslockLanguageSwitch = true;
+        # Treat Caps Lock as a per-app input-source switch (e.g. EN ↔ Cangjie).
+        # Source: https://developer.apple.com/documentation/inputmethodkit
+        TISCapslockLanguageSwitch = true;
       };
 
       # Activity Monitor: show CPU usage in the Dock icon; refresh every second.
@@ -279,13 +281,13 @@ in
       # ˜This key may not exist in all Raycast versions; inclusion is defensive.~
 
       # App Store: enable automatic app updates.
-      # Source: https://support.apple.com/en-us/guide/mac-help/use-the-app-store-mh40637/mac
+      # Source: https://support.apple.com/en-us/guide/app-store/fetch-updates-fir9b01adda3/mac
       "com.apple.commerce" = {
         AutoUpdate = true;
       };
 
       # Control Centre: show battery percentage; tighten status-item spacing.
-      # Source: https://support.apple.com/en-us/guide/mac-help/customize-the-menu-bar-mh40628/mac
+      # Source: https://support.apple.com/en-us/guide/mac-help/mchlad96d366/mac
       "com.apple.controlcenter" = {
         BatteryShowPercentage = true;
         NSStatusItemSelectionPadding = 6; # pixels of padding around selected item
@@ -302,7 +304,7 @@ in
       };
 
       # Dock: disable Stage Manager / Widget corner zones (value 0 = no-op).
-      # Source: https://support.apple.com/en-us/guide/mac-help/change-dock-settings-mh40547/mac
+      # Source: https://support.apple.com/en-us/guide/mac-help/mchlp1119/mac
       "com.apple.dock" = {
         wdev-bl = 0;
         wdev-br = 0;
@@ -352,7 +354,7 @@ in
       };
 
       # Menu bar clock: full date + time with seconds.
-      # Source: https://support.apple.com/en-us/guide/mac-help/change-clock-date-and-time-settings-mh40547/mac
+      # Source: https://support.apple.com/en-us/guide/mac-help/mchlp1124/mac
       "com.apple.menuextra.clock" = {
         DateFormat = "EEE y-MM-dd HH:mm:ss";
         ShowDate = 1;
@@ -361,7 +363,7 @@ in
       };
 
       # Screensaver: require password immediately after the screensaver engages.
-      # Source: https://support.apple.com/en-us/guide/mac-help/use-a-screen-saver-on-mac-mh40655/mac
+      # Source: https://support.apple.com/en-us/guide/mac-help/set-your-mac-to-require-a-password-mchlp2270/mac
       "com.apple.screensaver" = {
         askForPassword = true;
         askForPasswordDelay = 0; # seconds before password is required (0 = immediately)
