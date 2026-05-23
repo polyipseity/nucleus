@@ -46,7 +46,20 @@ function Install-PrekHook {
 
   $resolvedRepositoryRoot = (Resolve-Path -Path $RepositoryRoot).Path
   $prekConfigPath = Join-Path -Path $resolvedRepositoryRoot -ChildPath "prek.toml"
-  $hookDir = Join-Path -Path $resolvedRepositoryRoot -ChildPath ".git\hooks"
+
+  # Use git rev-parse --git-dir to handle submodules/worktrees where .git is a file
+  $gitDirOutput = & git -C $resolvedRepositoryRoot rev-parse --git-dir 2>$null
+  if (-not $gitDirOutput) {
+    Write-Warning "prek: unable to detect git directory for $resolvedRepositoryRoot"
+    return
+  }
+
+  $gitDir = ($gitDirOutput | Out-String).Trim()
+  if (-not [System.IO.Path]::IsPathRooted($gitDir)) {
+    $gitDir = Join-Path -Path $resolvedRepositoryRoot -ChildPath $gitDir
+  }
+
+  $hookDir = Join-Path -Path $gitDir -ChildPath "hooks"
   if (-not (Test-Path -Path $prekConfigPath -PathType Leaf)) {
     return
   }
