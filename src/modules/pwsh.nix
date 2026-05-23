@@ -71,7 +71,20 @@ let
         [string]$RepositoryRoot
       )
 
-      $hookDir = Join-Path $RepositoryRoot ".git/hooks"
+      # WHY git rev-parse: handles .git as file (submodules, worktrees) + directory.
+      # Avoids silent failure when .git is a gitlink (file with gitdir: path).
+      $gitDirOutput = & git -C $RepositoryRoot rev-parse --git-dir 2>$null
+      if (-not $gitDirOutput) {
+        return $false
+      }
+
+      # Handle relative and absolute paths from git rev-parse --git-dir
+      $gitDir = ($gitDirOutput | Out-String).Trim()
+      if (-not [System.IO.Path]::IsPathRooted($gitDir)) {
+        $gitDir = Join-Path -Path $RepositoryRoot -ChildPath $gitDir
+      }
+
+      $hookDir = Join-Path -Path $gitDir -ChildPath "hooks"
       if (-not (Test-Path -Path $hookDir -PathType Container)) {
         return $false
       }

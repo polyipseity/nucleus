@@ -135,14 +135,19 @@ ensure_prek_hooks_installed() {
   # protected on the same provision pass that installed or updated the binary.
   # mkApplyApp bundles pkgs.prek in runtimeInputs so first-run `nix run .#apply`
   # can install hooks without depending on host-global PATH state.
+  # WHY git rev-parse: handles .git as file (submodules, worktrees) + directory
+  # (normal repos). Avoids silent failure in workspace-variant scenarios.
   # Args: $1 — absolute path to the repository root to inspect
   _ephi_repo_root="$1"
   _ephi_config_path="$_ephi_repo_root/prek.toml"
-  _ephi_hook_dir="$_ephi_repo_root/.git/hooks"
 
   if [ ! -f "$_ephi_config_path" ]; then
     return
   fi
+
+  # Detect .git directory; works for normal repos, submodules, and worktrees.
+  _ephi_git_dir=$(cd "$_ephi_repo_root" && git rev-parse --git-dir 2>/dev/null) || return
+  _ephi_hook_dir="$_ephi_git_dir/hooks"
 
   # Skip noisy reinstalls when any existing hook file is already a prek-
   # generated shim.  Hook sets can vary by repository, so do not hardcode

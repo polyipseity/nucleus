@@ -61,6 +61,14 @@ let
     && (lib.hasInfix "function global:prompt" windowsShellProfileText)
   ) "Windows shell profile must auto-install prek hooks when pwsh enters a repo";
 
+  test_posix_prek_uses_git_rev_parse = assert' ((lib.hasInfix "git rev-parse --git-dir" applyScriptText)) "POSIX apply.sh must use 'git rev-parse --git-dir' to handle .git as file (submodules, worktrees)";
+
+  test_windows_prek_uses_git_rev_parse = assert' ((lib.hasInfix "git rev-parse --git-dir" posixPwshText)) "Windows pwsh Test-PrekHooksInstalled must use 'git rev-parse --git-dir' to handle .git as file (submodules, worktrees)";
+
+  test_posix_prek_handles_relative_git_dir = assert' ((lib.hasInfix "_ephi_git_dir=" applyScriptText)) "POSIX apply.sh must store git-dir output and construct hook path dynamically";
+
+  test_windows_prek_handles_relative_git_dir = assert' ((lib.hasInfix "IsPathRooted" posixPwshText)) "Windows pwsh must handle relative paths from git rev-parse --git-dir using IsPathRooted check";
+
   allTests = [
     test_posix_binary_baseline
     test_windows_binary_baseline
@@ -71,6 +79,10 @@ let
     test_windows_apply_installs_hooks
     test_windows_install_module_exists
     test_windows_shell_hook_installs_hooks
+    test_posix_prek_uses_git_rev_parse
+    test_windows_prek_uses_git_rev_parse
+    test_posix_prek_handles_relative_git_dir
+    test_windows_prek_handles_relative_git_dir
   ];
 in
 {
@@ -87,5 +99,9 @@ in
     "7: Windows apply installs hooks"
     "8: Windows Install-PrekHook module exists"
     "9: Windows pwsh hook auto-installs hooks"
+    "10: POSIX prek uses git rev-parse --git-dir"
+    "11: Windows prek uses git rev-parse --git-dir"
+    "12: POSIX prek handles relative git-dir paths"
+    "13: Windows prek handles relative git-dir paths"
   ];
 }
