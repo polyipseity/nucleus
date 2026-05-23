@@ -497,6 +497,83 @@ in
         SUEnablePrerelease = false;
       };
 
+      # AltTab: declare switcher behavior explicitly (including values that
+      # match upstream defaults) so rebuilds keep runtime behavior stable.
+      #
+      # Preference keys and enum index ordering are defined by upstream here:
+      # - https://raw.githubusercontent.com/lwouis/alt-tab-macos/master/src/preferences/Preferences.swift
+      # - https://raw.githubusercontent.com/lwouis/alt-tab-macos/master/src/preferences/MacroPreferences.swift
+      #
+      # Note: Shortcut values are persisted by AltTab as encoded shortcut
+      # payloads after app-side migration; this block keeps key-equivalent
+      # strings explicit for declarative intent and convergence.
+      "com.lwouis.alt-tab-macos" = {
+        # --- Requested appearance ---
+        appearanceStyle = "0"; # thumbnails
+        appearanceSize = "3"; # auto
+        appearanceTheme = "2"; # system
+        shortcutStyle = "0"; # focus on release
+        previewFocusedWindow = "false";
+
+        # --- Requested multi-display behavior ---
+        showOnScreen = "1"; # screen including mouse
+
+        # --- Requested controls ---
+        shortcutCount = "2";
+        holdShortcut = "⌥";
+        nextWindowShortcut = "→";
+        holdShortcut2 = "⌥";
+        nextWindowShortcut2 = "`";
+
+        appsToShow = "0"; # all apps
+        spacesToShow = "0"; # all spaces
+        screensToShow = "0"; # all screens
+        showMinimizedWindows = "0"; # show
+        showHiddenWindows = "0"; # show
+        showFullscreenWindows = "0"; # show
+        showWindowlessApps = "2"; # show at the end
+        windowOrder = "0"; # recently focused first
+
+        appsToShow2 = "1"; # active app
+        spacesToShow2 = "0"; # all spaces
+        screensToShow2 = "0"; # all screens
+        showMinimizedWindows2 = "0"; # show
+        showHiddenWindows2 = "0"; # show
+        showFullscreenWindows2 = "0"; # show
+        showWindowlessApps2 = "2"; # show at the end
+        windowOrder2 = "0"; # recently focused first
+        shortcutStyle2 = "0"; # focus on release
+        previewFocusedWindow2 = "false";
+
+        nextWindowGesture = "0"; # disabled
+        appsToShow10 = "0"; # all apps (gesture profile)
+        spacesToShow10 = "0"; # all spaces
+        screensToShow10 = "0"; # all screens
+        showMinimizedWindows10 = "0"; # show
+        showHiddenWindows10 = "0"; # show
+        showFullscreenWindows10 = "0"; # show
+        showWindowlessApps10 = "2"; # show at the end
+        windowOrder10 = "0"; # recently focused first
+        shortcutStyle10 = "0"; # focus on release
+        previewFocusedWindow10 = "false";
+
+        arrowKeysEnabled = "true";
+        vimKeysEnabled = "false";
+        mouseHoverEnabled = "false";
+
+        # --- Requested other settings ---
+        cursorFollowFocus = "0"; # never
+        trackpadHapticFeedbackEnabled = "true";
+
+        # --- Requested general settings ---
+        startAtLogin = "true";
+        menubarIconShown = "false";
+        captureWindowsInBackground = "true";
+        language = "0"; # system default
+        updatePolicy = "0"; # do not check periodically
+        crashPolicy = "2"; # always send crash reports
+      };
+
       # LinearMouse: configure menu bar visibility, battery indicator,
       # dock visibility, and launch-at-login behavior.
       #
