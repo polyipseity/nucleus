@@ -29,6 +29,21 @@ let
     usKeyboard
     cangjieInputMethod
   ];
+
+  # ---------------------------------------------------------------------------
+  # Autocorrect suppression word list
+  # Loaded from src/modules/configs/wordlist.txt: one word per line, sorted
+  # alphabetically. Identity substitutions (word → word) prevent macOS from
+  # autocorrecting technical terms and product names.
+  # This file is intentionally shared and platform-neutral; the actual
+  # NSUserDictionaryReplacementItems key is macOS-only (no NixOS / Windows
+  # equivalent for per-word suppression at the OS level).
+  # ---------------------------------------------------------------------------
+  autocorrectWords = builtins.filter (w: w != "") (
+    builtins.filter builtins.isString (
+      builtins.split "\n" (builtins.readFile ../../modules/configs/wordlist.txt)
+    )
+  );
 in
 {
   system.defaults = {
@@ -85,64 +100,14 @@ in
         # technical terms and product names used frequently in this setup.
         # This key is not available as a typed nix-darwin NSGlobalDomain
         # option, so it is declared as a custom preference payload.
-        NSUserDictionaryReplacementItems = [
-          {
-            replace = "contravariance";
-            "with" = "contravariance";
-          }
-          {
-            replace = "contravariant";
-            "with" = "contravariant";
-          }
-          {
-            replace = "covariance";
-            "with" = "covariance";
-          }
-          {
-            replace = "covector";
-            "with" = "covector";
-          }
-          {
-            replace = "covectors";
-            "with" = "covectors";
-          }
-          {
-            replace = "flashcard";
-            "with" = "flashcard";
-          }
-          {
-            replace = "flashcards";
-            "with" = "flashcards";
-          }
-          {
-            replace = "Google";
-            "with" = "Google";
-          }
-          {
-            replace = "IME";
-            "with" = "IME";
-          }
-          {
-            replace = "Microsoft";
-            "with" = "Microsoft";
-          }
-          {
-            replace = "OneDrive";
-            "with" = "OneDrive";
-          }
-          {
-            replace = "pullback";
-            "with" = "pullback";
-          }
-          {
-            replace = "pushforward";
-            "with" = "pushforward";
-          }
-          {
-            replace = "SynthID";
-            "with" = "SynthID";
-          }
-        ];
+        # Source: https://developer.apple.com/documentation/foundation/userdefaults
+        # Word list is loaded from src/modules/configs/wordlist.txt — edit that
+        # file to add or remove terms. All entries are identity substitutions
+        # (word → word) so macOS leaves them unchanged instead of autocorrecting.
+        NSUserDictionaryReplacementItems = builtins.map (w: {
+          replace = w;
+          "with" = w;
+        }) autocorrectWords;
 
         # Treat Caps Lock as a per-app input-source switch (e.g. EN ↔ Cangjie).
         TISCapslockLanguageSwitch = true;
