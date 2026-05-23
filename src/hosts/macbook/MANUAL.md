@@ -17,12 +17,15 @@
 
 - `-g` — run `git`.
 - `-ga` — run `git add`.
+- `-gb` — run `git branch`.
 - `-gc` — run `git commit`.
 - `-gca` — run `git commit --amend`.
+- `-gcl` — run `git clone`.
 - `-gco` — run `git checkout`.
 - `-gd` — run `git diff`.
+- `-gf` — run `git fetch`.
 - `-gl` — run `git log --oneline --decorate --graph`.
-- `-gll` — run `git log --oneline --decorate --graph`.
+- `-gll` — compatibility alias for `-gl` (`git log --oneline --decorate --graph`).
 - `-gst` — run `git status`.
 - `-gp` — run `git push`.
 - `-gpl` — run `git pull`.
@@ -31,6 +34,7 @@
 - `-gs-pdf-opt-prepress` — optimize PDFs with Ghostscript prepress profile.
 - `-gs-pdf-opt-printer` — optimize PDFs with Ghostscript printer profile.
 - `-gs-pdf-opt-screen` — optimize PDFs with Ghostscript screen profile.
+- `-gsw` — run `git switch`.
 - `-la` — run `eza -la`.
 - `-ll` — run `eza -la`.
 - `-ni` — run `bun install`.
@@ -40,6 +44,8 @@
 
 ## nucleus commands
 
+- `nucleus-ai-sync` — run the managed AI model sync flow.
+- `nucleus-apply` — run the managed apply flow.
 - `nucleus-cloud-setup` — configure required cloud remotes and re-run apply.
 - `nucleus-gc` — run the managed Nix garbage-collection flow.
 - `nucleus-health-check` — run the managed repository health checks.

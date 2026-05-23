@@ -6,10 +6,15 @@
 {
   "-g" = "git";
   "-ga" = "git add";
+  "-gb" = "git branch";
   "-gc" = "git commit";
   "-gca" = "git commit --amend";
+  "-gcl" = "git clone";
   "-gco" = "git checkout";
   "-gd" = "git diff";
+  "-gf" = "git fetch";
+  # Keep -gll as a compatibility alias because interactive use still exists,
+  # while -gl remains the canonical shortest form for the curated git log view.
   "-gl" = "git log --oneline --decorate --graph";
   "-gll" = "git log --oneline --decorate --graph";
   "-gp" = "git push";
@@ -27,6 +32,7 @@
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer -dNOPAUSE -dQUIET -dBATCH";
   "-gs-pdf-opt-screen" =
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH";
+  "-gsw" = "git switch";
   "-gst" = "git status";
   "-la" = "eza -la";
   "-ll" = "eza -la";

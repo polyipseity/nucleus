@@ -195,10 +195,13 @@ let
 
     function -g { & git @Args }
     function -ga { & git add @Args }
+    function -gb { & git branch @Args }
     function -gc { & git commit @Args }
     function -gca { & git commit --amend @Args }
+    function -gcl { & git clone @Args }
     function -gco { & git checkout @Args }
     function -gd { & git diff @Args }
+    function -gf { & git fetch @Args }
     function -gl { & git log --oneline --decorate --graph @Args }
     function -gll { & git log --oneline --decorate --graph @Args }
     function -gp { & git push @Args }
@@ -228,6 +231,7 @@ let
     function -gs-pdf-opt-prepress { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }
     function -gs-pdf-opt-printer  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }
     function -gs-pdf-opt-screen   { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }
+    function -gsw { & git switch @Args }
 
     function -gst { & git status @Args }
 
@@ -240,6 +244,10 @@ let
       function -la { Get-ChildItem -Force @Args }
       function -ll { Get-ChildItem -Force @Args }
     }
+
+    function -ni { & bun install @Args }
+    function -nr { & bun run @Args }
+    function -nx { & bun x @Args }
 
     function -v { & nvim @Args }
 

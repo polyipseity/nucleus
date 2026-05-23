@@ -100,14 +100,26 @@ let
 
       exec nix --option warn-dirty false run ${config.home.homeDirectory}/dev/nucleus/src#${app} -- "$@"
     '';
+
+  # Keep direct script wrappers available for repo utilities that intentionally
+  # use the host runtime environment instead of a flake app wrapper.
+  mkRepoScriptCommand =
+    name: scriptRelativePath:
+    pkgs.writeShellScriptBin name ''
+      set -eu
+
+      exec "${config.home.homeDirectory}/dev/nucleus/${scriptRelativePath}" "$@"
+    '';
 in
 {
   home.packages = [
+    (mkRepoScriptCommand "nucleus-ai-sync" "scripts/AI-sync.sh")
+    (mkNucleusCommand "nucleus-apply" "apply")
     (mkNucleusCommand "nucleus-cloud-setup" "cloud-setup")
     (mkNucleusCommand "nucleus-gc" "gc")
     (mkNucleusCommand "nucleus-health-check" "health-check")
-    (mkNucleusCommand "nucleus-replica-sync" "replica-sync")
     (mkNucleusCommand "nucleus-replica-reset" "replica-reset")
+    (mkNucleusCommand "nucleus-replica-sync" "replica-sync")
     (mkNucleusCommand "nucleus-update" "update")
   ];
 
