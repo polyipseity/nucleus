@@ -706,6 +706,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #
     # Schedule: 18:00 → 06:00 (nightlight schedule start uses default times).
     # No-op if nightlight is not installed.
+    # Source: https://github.com/smudge/nightlight
     # -------------------------------------------------------------------------
     configureNightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       if [ -x "/opt/homebrew/bin/nightlight" ]; then
@@ -743,6 +744,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #   4. find -prune stops descent into excluded directories, keeping scans fast.
     #
     # Configuration: excludedDirNames from users.json (e.g., ["node_modules"])
+    # Source: https://developer.apple.com/documentation/fileprovider
     # -------------------------------------------------------------------------
     configureICloudExclusions = lib.hm.dag.entryAfter [ "cloudDrivesSetup" ] ''
       excluded_dirs='${
@@ -1003,6 +1005,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # WHY separate activation: this is the actual dev-tree hardening/perf work;
     # keeping it isolated makes it easier to reason about than bundling it with
     # Finder metadata cleanup and Dock restarts.
+    # Source: https://support.apple.com/guide/mac-help/spotlight-search-index-on-mac-mchlp2812/mac
     # -------------------------------------------------------------------------
     configureDevSpotlightExclusions = lib.hm.dag.entryAfter [ "provisionDevDirectory" ] ''
       DEV_ROOT="$HOME/dev"
@@ -1046,6 +1049,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # The daemon caches sidebar state; changes are fully visible in Finder only
     # after a macOS logout/reboot. The daemon restarts below provide a partial
     # in-session flush but a full restart is required for order to appear correctly.
+    # Source: https://github.com/mosen/mysides
     configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       set -eu
 
@@ -1121,6 +1125,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Restart Finder to refresh available Services in context menu after
     # installation and preference changes. This ensures "Open in Terminal",
     # "Open in iTerm", and other services are visible without a manual restart.
+    # Source: https://developer.apple.com/documentation/coreservices/launch_services
     # -------------------------------------------------------------------------
     refreshFinderServices =
       lib.hm.dag.entryAfter [ "configureFinderSidebar" "installPackages" "configureLaunchServices" ]
