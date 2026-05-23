@@ -32,9 +32,6 @@
       # Let the per-user QEMU process run as the calling user, not root.
       # Source: https://mynixos.com/nixpkgs/option/virtualisation.libvirtd.qemu.runAsRoot
       runAsRoot = false;
-      # OVMF provides UEFI firmware for modern guest OSes (Windows 11, NixOS).
-      # Source: https://mynixos.com/nixpkgs/option/virtualisation.libvirtd.qemu.ovmf.enable
-      ovmf.enable = true;
       # swtpm emulates a TPM 2.0 chip required by Windows 11 and some secure
       # NixOS setups.
       # Source: https://mynixos.com/nixpkgs/option/virtualisation.libvirtd.qemu.swtpm.enable
