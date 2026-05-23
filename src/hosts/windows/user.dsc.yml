@@ -2,6 +2,7 @@
 properties:
   configurationVersion: 0.2.0
   resources:
+    # Source: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-systemparametersinfoa
     - resource: Microsoft.Windows.Storage/Folder
       id: wallpaperFolder
       directives:
@@ -22,6 +23,7 @@ properties:
         valueData: "__NUCLEUS_ACTIVE_WALLPAPER__"
         valueType: String
 
+    # Source: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-systemparametersinfoa
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: screenSaveActive
       directives:
@@ -52,6 +54,7 @@ properties:
         valueData: "60"
         valueType: String
 
+    # Source: https://admx.help/?Category=Windows_10_2016&Policy=Microsoft.Policies.WindowsExplorer::HideFileExt
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: explorerHideFileExt
       directives:
@@ -194,6 +197,7 @@ properties:
         value: "%USERPROFILE%"
         scope: User
 
+    # Source: https://nixos.org/manual/nix/stable/language/string-interpolation.html#lookup-path
     - resource: Microsoft.Windows.Environment/Variable
       id: nixPathEnvVar
       directives:

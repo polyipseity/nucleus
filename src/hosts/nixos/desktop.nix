@@ -24,22 +24,27 @@
   boot.kernelModules = [ "vkms" ];
 
   # Enable X11 server and desktop managers.
+  # Source: https://mynixos.com/nixpkgs/option/services.xserver.enable
   services.xserver = {
     enable = true;
   };
 
   # Enable GNOME desktop environment with File Roller archive manager.
+  # Source: https://mynixos.com/nixpkgs/option/services.desktopManager.gnome.enable
   services.desktopManager.gnome.enable = true;
 
   # Enable KDE Plasma 6 desktop environment with Ark archive manager.
+  # Source: https://mynixos.com/nixpkgs/option/services.desktopManager.plasma6.enable
   services.desktopManager.plasma6.enable = true;
 
   # Use a display manager that can launch both GNOME and KDE sessions.
+  # Source: https://mynixos.com/nixpkgs/option/services.displayManager.gdm.enable
   services.displayManager.gdm.enable = true;
 
   # GNOME (seahorse) and Plasma (ksshaskpass) both define programs.ssh.askPassword.
   # Pin one deterministic askpass implementation so full toplevel evaluation
   # does not fail with conflicting option values when both desktops are enabled.
+  # Source: https://mynixos.com/nixpkgs/option/programs.ssh.askPassword
   programs.ssh.askPassword = lib.mkForce "${pkgs.kdePackages.ksshaskpass}/bin/ksshaskpass";
 
   # Install graphical archive managers per desktop environment.
@@ -90,6 +95,7 @@
     ];
 
   # Enable GNOME services if GNOME is enabled above.
+  # Source: https://mynixos.com/nixpkgs/option/services.gnome.core-apps.enable
   services.gnome.core-apps.enable = true;
 
   # Run auto-cpufreq as the managed NixOS power optimizer daemon.
@@ -109,6 +115,7 @@
   #     turbo disabled — reduces heat and extends runtime when on battery.
   #   charger (lowpowermode=0 equivalent): performance governor, prefer-performance
   #     EPP, turbo auto — allows full CPU throughput when on AC power.
+  # Source: https://github.com/AdnanHodzic/auto-cpufreq#configuration-file-options
   services.auto-cpufreq.settings = {
     battery = {
       energy_performance_preference = "power";
@@ -127,6 +134,7 @@
   # not die just because the panel was shut.  linux.nix already disables idle
   # sleep on both AC and battery; lid handling must match that always-on
   # posture instead of reintroducing a suspend path only for the lid switch.
+  # Source: https://www.freedesktop.org/software/systemd/man/logind.conf.html
   services.logind.settings.Login = {
     HandleLidSwitch = "ignore";
     HandleLidSwitchDocked = "ignore";
@@ -138,6 +146,7 @@
   #   tcp_keepalive_time:   60 s before the first keepalive probe is sent.
   #   tcp_keepalive_intvl:  10 s between subsequent probes.
   #   tcp_keepalive_probes:  6 consecutive failures before the connection is dropped.
+  # Source: https://www.kernel.org/doc/html/latest/networking/ip-sysctl.html
   boot.kernel.sysctl = {
     "net.ipv4.tcp_keepalive_intvl" = 10;
     "net.ipv4.tcp_keepalive_probes" = 6;

@@ -85,6 +85,7 @@ in
     # -------------------------------------------------------------------------
     CustomUserPreferences = {
       # NSGlobalDomain: global preferences that don't fit nix-darwin typed options.
+      # Source: https://developer.apple.com/documentation/foundation/userdefaults
       "NSGlobalDomain" = {
         # Keep Finder context-menu Services at the default threshold so core
         # entries such as "New Terminal at Folder" remain discoverable from a
@@ -109,23 +110,25 @@ in
           "with" = w;
         }) autocorrectWords;
 
-        # Treat Caps Lock as a per-app input-source switch (e.g. EN ↔ Cangjie).
-        TISCapslockLanguageSwitch = true;
+        # Treat Caps Lock as a per-app input-source switch (e.g. EN ↔ Cangjie).      # Source: https://developer.apple.com/documentation/carbon/text_services_manager        TISCapslockLanguageSwitch = true;
       };
 
       # Activity Monitor: show CPU usage in the Dock icon; refresh every second.
+      # Source: https://support.apple.com/guide/activity-monitor/welcome/mac
       "com.apple.ActivityMonitor" = {
         IconType = 5; # CPU history graph in Dock icon
         UpdatePeriod = 1; # refresh interval in seconds
       };
 
       # Opt out of Apple personalised advertising.
+      # Source: https://support.apple.com/guide/deployment/privacy-management-dep4db1d2fa4/web
       "com.apple.AdLib" = {
         allowApplePersonalizedAdvertising = false;
       };
 
       # Trackpad: silent click (ActuationStrength 0), lightest click threshold,
       # force-touch feedback enabled, three-finger drag instead of Mission Control.
+      # Source: https://support.apple.com/guide/mac-help/change-trackpad-settings-on-mac-mh27502/mac
       "com.apple.AppleMultitouchTrackpad" = {
         ActuationStrength = 0; # silent (haptic-only) click feedback
         FirstClickThreshold = 0; # lightest click force required
@@ -134,6 +137,8 @@ in
       };
 
       # Keyboard backlight: auto-adjust brightness; dim after 5 s of inactivity.
+      # Note: com.apple.BezelServices is an undocumented private preference domain;
+      # keys are community-documented (no official Apple developer reference).
       "com.apple.BezelServices" = {
         dAuto = true; # auto-adjust keyboard backlight to ambient light
         kDim = true; # dim keyboard backlight when idle
@@ -149,6 +154,7 @@ in
       # re-indexing, causing files to appear as cloud-only until re-downloaded;
       # (3) manual recovery available via `brctl download`. See AGENTS.md
       # security invariants for drift reset handling.
+      # Source: https://support.apple.com/guide/mac-help/use-icloud-drive-to-store-files-mchle14b5f56/mac
       "com.apple.CloudDocs" = {
         BRCloudDriveSyncingEnabled = true; # enable iCloud Drive syncing
         OptimizeStorage = false; # disable "Optimize Mac Storage"
@@ -157,6 +163,7 @@ in
       # Input sources: set the full ordered list of enabled input methods,
       # select the first one (US keyboard) as the active source, and configure
       # dictation and keyboard behaviour.
+      # Source: https://developer.apple.com/documentation/carbon/text_services_manager
       "com.apple.HIToolbox" = {
         AppleDictationAutoEnable = true; # auto-enable dictation system-wide
         AppleEnabledInputSources = inputMethods;
@@ -165,11 +172,13 @@ in
 
       # Disable the Gatekeeper quarantine flag that shows "Downloaded from the
       # Internet" dialogs for files opened from other machines / archives.
+      # Source: https://developer.apple.com/documentation/coreservices/launch_services
       "com.apple.LaunchServices" = {
         LSQuarantine = false;
       };
 
       # iCloud Photos: enable library sync and automatic import.
+      # Source: https://support.apple.com/guide/photos/turn-on-icloud-photos-pht28a5bf4c/mac
       "com.apple.Photos" = {
         CloudPhotosEnabled = 1;
         ImportToCloudEnabled = 1;
@@ -178,6 +187,7 @@ in
       # Siri: enable the double-press Command shortcut for Type to Siri so the
       # keyboard shortcut launches Siri in text-input mode. This does not
       # conflict with Raycast's Option+Space binding.
+      # Source: https://support.apple.com/guide/mac-help/change-siri-settings-mh40630/mac
       "com.apple.Siri" = {
         KeyboardShortcut = 3; # 3 = double-press Command: invoke Type to Siri
         StatusMenuVisible = false; # hide Siri from the menu bar; keep chrome minimal
@@ -203,20 +213,24 @@ in
       #   1. Hide UI (this plist section)
       #   2. Disable hotkey 61 (in macos.nix activation: disableSpotlightHotkey)
       #   3. Stop indexing + clear cache (in macos.nix activation: disableSpotlightHotkey)
+      # Source: https://support.apple.com/guide/mac-help/search-with-spotlight-mchlp1090/mac
       "com.apple.Spotlight" = {
         MenuItemHidden = 1; # Hide menu-bar button
         FederatedSearchMaximumCount = 0; # Disable web search/suggestions
       };
 
       # TextEdit: default to plain text mode instead of RTF.
+      # Source: https://support.apple.com/guide/textedit/use-plain-text-mode-txte1092/mac
       "com.apple.TextEdit" = {
         RichText = false;
       };
 
       # Keyboard: Fn key acts as standard function keys (F1–F12) by default.
+      # Source: https://support.apple.com/guide/mac-help/keyboard-settings-mchlp1204/mac
       "com.apple.TextInput.Kybd".FnKeyUsage = 1;
 
       # Show the Input Menu (language switcher) in the menu bar.
+      # Source: https://support.apple.com/guide/mac-help/type-in-another-language-mac-mh21578/mac
       "com.apple.TextInputMenu".visible = true;
 
       # Voice Memos: always record at uncompressed (lossless) quality.
@@ -227,12 +241,14 @@ in
       #       lossy transcoding can be done downstream on a copy without degrading
       #       the original capture.
       # Voice Memos is Apple-only; no Windows/NixOS equivalent exists.
+      # Source: https://support.apple.com/guide/voice-memos/welcome/mac
       "com.apple.VoiceMemos" = {
         RCVoiceMemosAudioQualityKey = 1;
       };
 
       # Window Manager: enable click-to-show-desktop, hide Stage Manager widgets
       # for lower visual noise, and keep window tiling enabled (macOS 15+).
+      # Source: https://support.apple.com/guide/mac-help/stage-manager-mchl534ba392/mac
       "com.apple.WindowManager" = {
         EnableStandardClickToShowDesktop = true;
         StandardHideWidgets = true; # hide Stage Manager widget strip to reduce persistent chrome
@@ -240,6 +256,7 @@ in
       };
 
       # Siri / dictation backend preferences.
+      # Source: https://support.apple.com/guide/mac-help/type-to-siri-on-mac-mh40725/mac
       "com.apple.assistant.support" = {
         "Assistant Enabled" = true;
         "Auto Punctuation Enabled" = true; # insert punctuation during dictation
@@ -262,11 +279,13 @@ in
       # ˜This key may not exist in all Raycast versions; inclusion is defensive.~
 
       # App Store: enable automatic app updates.
+      # Source: https://support.apple.com/guide/mac-help/use-the-app-store-mh40637/mac
       "com.apple.commerce" = {
         AutoUpdate = true;
       };
 
       # Control Centre: show battery percentage; tighten status-item spacing.
+      # Source: https://support.apple.com/guide/mac-help/customize-the-menu-bar-mh40628/mac
       "com.apple.controlcenter" = {
         BatteryShowPercentage = true;
         NSStatusItemSelectionPadding = 6; # pixels of padding around selected item
@@ -276,12 +295,14 @@ in
       # Prevent macOS from writing .DS_Store files on network and removable
       # volumes. macOS does not provide an equivalent supported toggle for local
       # APFS/HFS+ folders.
+      # Source: https://support.apple.com/102541
       "com.apple.desktopservices" = {
         DSDontWriteNetworkStores = true;
         DSDontWriteUSBStores = true;
       };
 
       # Dock: disable Stage Manager / Widget corner zones (value 0 = no-op).
+      # Source: https://support.apple.com/guide/mac-help/change-dock-settings-mh40547/mac
       "com.apple.dock" = {
         wdev-bl = 0;
         wdev-br = 0;
@@ -293,6 +314,7 @@ in
       # WHY in CustomUserPreferences: Finder reads these from the user domain
       # (~/.Library/Preferences/com.apple.finder.plist), not system domain.
       # These settings MUST be written via CustomUserPreferences to take effect.
+      # Source: https://support.apple.com/guide/mac-help/finder-settings-mchla834/mac
       "com.apple.finder" = {
         # Desktop visibility: show mounted drives, external drives, servers, removable media.
         # These are intentionally kept in user domain (not system.defaults.finder) because
@@ -330,6 +352,7 @@ in
       };
 
       # Menu bar clock: full date + time with seconds.
+      # Source: https://support.apple.com/guide/mac-help/change-clock-date-and-time-settings-mh40547/mac
       "com.apple.menuextra.clock" = {
         DateFormat = "EEE y-MM-dd HH:mm:ss";
         ShowDate = 1;
@@ -338,18 +361,21 @@ in
       };
 
       # Screensaver: require password immediately after the screensaver engages.
+      # Source: https://support.apple.com/guide/mac-help/use-a-screen-saver-on-mac-mh40655/mac
       "com.apple.screensaver" = {
         askForPassword = true;
         askForPasswordDelay = 0; # seconds before password is required (0 = immediately)
       };
 
       # Dictation shortcut: double-press Right Command key (value 2).
+      # Source: https://support.apple.com/guide/mac-help/use-dictation-mh40584/mac
       "com.apple.speech.recognition.AppleSpeechRecognition.prefs" = {
         DictationShortcut = 2;
       };
 
       # Mission Control: span desktops across multiple displays so every monitor
       # follows the same active Space when switching desktops.
+      # Source: https://support.apple.com/guide/mac-help/work-in-multiple-spaces-mh14112/mac
       "com.apple.spaces" = {
         "spans-displays" = true;
       };
@@ -359,6 +385,7 @@ in
       # plist. We configure only documented/stable plist keys here. Advanced settings
       # like Pop to Root timeout, Escape behavior, Navigation bindings, and Root Search
       # Sensitivity require manual configuration in Raycast UI → Settings → Advanced.
+      # Source: https://manual.raycast.com
       "com.raycast.macos" = {
         # --- Startup & Window Behavior ---
         LaunchAtLogin = true; # Launch Raycast at login
@@ -402,11 +429,13 @@ in
         #   • Custom Wallpaper: Optional (Settings → Advanced)
       };
       # Terminal: focus follows mouse pointer (hover to focus without clicking).
+      # Source: https://support.apple.com/guide/terminal/welcome/mac
       "com.apple.terminal" = {
         FocusFollowsMouse = "YES";
       };
 
       # Universal Control: automatically connect to nearby Mac/iPad.
+      # Source: https://support.apple.com/guide/mac-help/use-universal-control-mchl89c97b09/mac
       "com.apple.universalcontrol" = {
         autoConnect = true;
       };
@@ -414,6 +443,8 @@ in
       # Archive Vault and Password/Passkey Autofill settings.
       # Handles iCloud Archive Vault, Safari password autofill, and verification
       # code management as shown in System Settings > Passwords.
+      # Note: com.apple.iCloud.fmip.preferences is an internal Apple domain with
+      # no public developer documentation; keys are empirically observed.
       "com.apple.iCloud.fmip.preferences" = {
         # Archive Vault: encrypt Mac content with password-protected storage.
         # This enables the Archive Vault feature in iCloud+ settings.
@@ -422,6 +453,7 @@ in
 
       # Password and passkey autofill settings for Safari and login fields.
       # These control the "Settings" app behavior for autofill across the system.
+      # Source: https://developer.apple.com/documentation/passkit
       "com.apple.PassKit.policy" = {
         AutoFillPasskeysAndPasswords = 1; # enable autofill for passwords/passkeys
         AutoFillPasskeysAndPasswordsSource = "com.apple.Passwords"; # use macOS Passwords app
@@ -495,6 +527,7 @@ in
       # secure-keyboard-entry/open-command warning, keep Secure Keyboard Entry
       # enabled, and enable the Finder service so "Open in iTerm" appears in
       # Finder right-click context menu.
+      # Source: https://iterm2.com/documentation.html
       "com.googlecode.iterm2" = {
         "AllowClipboardAccess" = true;
         "BootstrapDaemon" = true;
@@ -552,10 +585,13 @@ in
     # -------------------------------------------------------------------------
     CustomSystemPreferences = {
       # Enable automatic crash-report and diagnostic submission to Apple.
+      # Source: https://support.apple.com/guide/deployment/privacy-management-dep4db1d2fa4/web
       "com.apple.SubmitDiagInfo".SubmitDiagInfo = true;
 
       # Ambient-light-sensor threshold that drives keyboard backlight brightness.
       # 25 maps to roughly half brightness in subdued lighting conditions.
+      # Note: com.apple.iokit.AmbientLightSensor is a kernel IOKit domain with
+      # no public Apple developer reference; values are empirically calibrated.
       "com.apple.iokit.AmbientLightSensor"."Keyboard Backlight Error Condition" = 25;
     };
 
