@@ -1,0 +1,162 @@
+# Invoke-VMSetup.ps1 — Provisions and configures virtual machines on Windows.
+#
+# Reads VM definitions from src/modules/vms.json and creates QCOW2 disk images
+# plus QEMU start scripts for each declared VM.  QEMU is installed via the
+# Scoop extras bucket (see Invoke-ScoopSetup.ps1).
+#
+# Disk images are stored at %USERPROFILE%\Virtual Machines\<name>.qcow2,
+# mirroring the ~/Virtual Machines/<name>.qcow2 path used on POSIX hosts.
+# QCOW2 format enables copy-based migration to UTM (macOS) or libvirt (NixOS).
+#
+# Each VM also gets a start script at
+#   %USERPROFILE%\Virtual Machines\Start-<display>.ps1
+# so the user can launch QEMU from a PowerShell terminal without remembering
+# the full command line.
+#
+# Exit: always 0 — VM setup failures do not abort the apply workflow.
+# Source: https://www.qemu.org/docs/master/system/invocation.html
+function Invoke-VMSetup {
+    [CmdletBinding()]
+    param(
+        # Absolute path to the repository root.
+        [Parameter(Mandatory)]
+        [string]$RepoRoot,
+
+        # Print planned actions without modifying any state.
+        [switch]$DryRun
+    )
+
+    $manifest = Join-Path $RepoRoot 'src\modules\vms.json'
+
+    if (-not (Test-Path $manifest)) {
+        Write-Information "vm-setup: manifest not found at $manifest; skipping"
+        return
+    }
+
+    $vmDef = Get-Content $manifest -Raw | ConvertFrom-Json
+    $vmDir = Join-Path $env:USERPROFILE 'Virtual Machines'
+
+    # Locate qemu-img from the Scoop-managed QEMU installation.
+    $scoopQemuDir = Join-Path $env:USERPROFILE 'scoop\apps\qemu\current'
+    $qemuImg = Join-Path $scoopQemuDir 'qemu-img.exe'
+    if (-not (Test-Path $qemuImg)) {
+        # Fall back to PATH in case qemu-img is available another way.
+        $qemuImgInPath = Get-Command qemu-img -ErrorAction SilentlyContinue
+        if ($qemuImgInPath) {
+            $qemuImg = $qemuImgInPath.Source
+        } else {
+            Write-Information 'vm-setup: qemu-img not found; install QEMU via Scoop (scoop install qemu)'
+            $qemuImg = $null
+        }
+    }
+
+    if (-not $DryRun) {
+        New-Item -ItemType Directory -Path $vmDir -Force | Out-Null
+    } else {
+        Write-Information "vm-setup: [dry-run] New-Item Directory $vmDir"
+    }
+
+    foreach ($vm in $vmDef.vms) {
+        $diskPath = Join-Path $vmDir "$($vm.name).qcow2"
+        $startScript = Join-Path $vmDir "Start-$($vm.display).ps1"
+
+        Write-Information "vm-setup: configuring VM '$($vm.display)'..."
+
+        # Create QCOW2 disk if absent.
+        if (Test-Path $diskPath) {
+            Write-Information "vm-setup: disk already exists: $diskPath"
+        } elseif ($null -ne $qemuImg) {
+            $diskSizeArg = "$($vm.diskGiB)G"
+            if ($DryRun) {
+                Write-Information "vm-setup: [dry-run] & '$qemuImg' create -f qcow2 '$diskPath' $diskSizeArg"
+            } else {
+                Write-Information "vm-setup: creating QCOW2 disk ($($vm.diskGiB) GiB): $diskPath"
+                & $qemuImg create -f qcow2 $diskPath $diskSizeArg
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "vm-setup: qemu-img failed for '$($vm.name)'; disk not created"
+                }
+            }
+        } else {
+            Write-Information "vm-setup: skipping disk creation for '$($vm.name)' (qemu-img unavailable)"
+        }
+
+        # Determine the QEMU system binary and machine type based on host arch.
+        $hostArch = $env:PROCESSOR_ARCHITECTURE
+        if ($hostArch -eq 'ARM64') {
+            $qemuSystem = Join-Path $scoopQemuDir 'qemu-system-aarch64.exe'
+            $machine = 'virt'
+            $cpu = 'host'
+        } else {
+            $qemuSystem = Join-Path $scoopQemuDir 'qemu-system-x86_64.exe'
+            $machine = 'q35'
+            $cpu = 'host'
+        }
+
+        if ($vm.type -eq 'windows') {
+            $display = 'sdl'
+            $vga = 'std'
+        } else {
+            $display = 'sdl'
+            $vga = 'virtio'
+        }
+
+        # Determine VirtioFS shared directory argument.
+        $virtiofsArgs = ''
+        if ($vm.shareDevDir) {
+            $devDir = Join-Path $env:USERPROFILE 'dev'
+            # VirtioFS on Windows requires virtiofsd running separately.
+            # Add a placeholder reminder; the start script shows how to launch
+            # virtiofsd before starting the guest.
+            $virtiofsArgs = @"
+
+# To enable ~/dev directory sharing:
+# 1. Start virtiofsd in a separate terminal:
+#      virtiofsd --socket-path=\\.\pipe\$($vm.name)-virtiofs --shared-dir="$devDir"
+# 2. Then run this script.
+# -chardev socket,id=char0,path=\\.\pipe\$($vm.name)-virtiofs ``
+# -device vhost-user-fs-pci,chardev=char0,tag=dev ``
+# -object memory-backend-file,id=mem,size=$($vm.ramMiB)M,mem-path=/dev/shm,share=on ``
+# -numa node,memdev=mem
+"@
+        }
+
+        # Write a self-contained QEMU start script for this VM.
+        $startContent = @"
+# Start-$($vm.display).ps1 — Start the '$($vm.display)' QEMU virtual machine.
+# Generated by Invoke-VMSetup; re-run `nucleus-vm-setup` to regenerate.
+# Attach an ISO for first-time installation:
+#   Add: -cdrom 'C:\path\to\install.iso'
+#
+# Source: https://www.qemu.org/docs/master/system/invocation.html
+$virtiofsArgs
+& '$qemuSystem' ``
+    -name '$($vm.display)' ``
+    -machine $machine ``
+    -cpu $cpu ``
+    -smp $($vm.cpus) ``
+    -m $($vm.ramMiB) ``
+    -drive file='$diskPath',format=qcow2,if=virtio ``
+    -netdev user,id=net0 ``
+    -device virtio-net-pci,netdev=net0 ``
+    -vga $vga ``
+    -display $display ``
+    -enable-kvm ``
+    -rtc base=localtime ``
+    -usb -device usb-tablet
+"@
+
+        if ($DryRun) {
+            Write-Information "vm-setup: [dry-run] Write start script: $startScript"
+        } else {
+            Set-Content -Path $startScript -Value $startContent -Encoding UTF8
+            Write-Information "vm-setup: start script written: $startScript"
+        }
+
+        Write-Information "vm-setup: VM '$($vm.display)' setup complete"
+    }
+
+    Write-Information 'vm-setup: Windows VM setup complete'
+    Write-Information "vm-setup: Disk images at: $vmDir"
+    Write-Information 'vm-setup: Run the generated Start-*.ps1 scripts to launch VMs'
+    Write-Information 'vm-setup: Attach an ISO (-cdrom flag) for first-time guest OS installation'
+}

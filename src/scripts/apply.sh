@@ -39,6 +39,7 @@ set -eu
 # ---------------------------------------------------------------------------
 skip_ai_sync=false
 skip_replica_sync=true
+vm_setup=false
 target_user=""
 _aas_expect_target_user=false
 
@@ -68,6 +69,12 @@ for _arg in "$@"; do
       # Replica sync can be time-consuming for large datasets; this flag opts
       # out of the post-apply replica convergence step.
       skip_replica_sync=true
+      ;;
+    --vm-setup)
+      # VM setup provisions QEMU disk images and registers VMs (UTM on macOS,
+      # libvirt on NixOS).  Skipped by default after apply because disk
+      # pre-allocation and VM registration are large, slow, and idempotent.
+      vm_setup=true
       ;;
     --target-user)
       _aas_expect_target_user=true
@@ -278,6 +285,36 @@ run_ai_sync() {
   printf '%s\n' "AI-sync: running post-apply AI model sync..."
   if ! sh "$_ras_script"; then
     printf '%s\n' "AI-sync: AI-sync.sh exited with an error; model sync incomplete (system apply succeeded)" >&2
+  fi
+}
+
+run_vm_setup() {
+  # Call scripts/vm-setup.sh to provision virtual machine disk images and
+  # register VMs after the system configuration has been applied.
+  #
+  # Why opt-in (--vm-setup required):
+  #   Disk pre-allocation is slow (up to 128 GiB) and only needed on the first
+  #   provision of a new machine.  Subsequent applies do not re-create existing
+  #   disks; the guard is in the script itself.  Still, running it on every
+  #   apply would waste time for users who never need it.
+  #
+  # Why best-effort:
+  #   A VM disk or registration error should not retroactively fail a completed
+  #   system apply.
+  if [ "$vm_setup" = false ]; then
+    printf '%s\n' "vm-setup: --vm-setup not set; skipping post-apply VM provisioning"
+    return
+  fi
+
+  _rvs_script="$REPO_ROOT/scripts/vm-setup.sh"
+  if [ ! -f "$_rvs_script" ]; then
+    printf '%s\n' "vm-setup: scripts/vm-setup.sh not found at $_rvs_script; skipping VM setup"
+    return
+  fi
+
+  printf '%s\n' "vm-setup: running post-apply VM provisioning..."
+  if ! sh "$_rvs_script"; then
+    printf '%s\n' "vm-setup: vm-setup.sh exited with an error; VM setup incomplete (system apply succeeded)" >&2
   fi
 }
 
@@ -493,6 +530,7 @@ case "$(uname -s)" in
     ensure_prek_hooks_installed "$REPO_ROOT"
     run_ai_sync
     run_replica_sync
+    run_vm_setup
     ;;
   Linux)
     if [ -f /etc/NIXOS ]; then
@@ -510,6 +548,7 @@ case "$(uname -s)" in
       ensure_prek_hooks_installed "$REPO_ROOT"
       run_ai_sync
       run_replica_sync
+      run_vm_setup
     else
       # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
       # no sudo required — keepalive is not started.
@@ -520,6 +559,7 @@ case "$(uname -s)" in
       ensure_prek_hooks_installed "$REPO_ROOT"
       run_ai_sync
       run_replica_sync
+      run_vm_setup
     fi
     ;;
   *)

@@ -43,3 +43,4 @@
 - `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
+- `nucleus-vm-setup` — provision KVM/libvirt virtual machines declared in `src/modules/vms.json`. Run once after `nucleus apply` on a new machine. Requires `libvirtd` to be active (enabled by `src/hosts/nixos/vms.nix`). After provisioning, use `virt-manager` or `virsh` to attach an installation ISO and install the guest OS. The `~/dev` directory is mounted inside the NixOS VM via VirtioFS when `shareDevDir` is true.

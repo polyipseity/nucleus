@@ -4,11 +4,7 @@
 {
   # Inject the host manual path into Home Manager at the user layer so the
   # system entrypoint never needs to define a Home Manager-only option.
-  home-manager.sharedModules = [
-    {
-      nucleus.hostManualFile = "src/hosts/nixos/MANUAL.md";
-    }
-  ];
+  home-manager.sharedModules = [ { nucleus.hostManualFile = "src/hosts/nixos/MANUAL.md"; } ];
 
   imports = [
     ../../modules/core.nix
@@ -27,5 +23,6 @@
     ./security.nix
     ./sops.nix
     ./users.nix
+    ./vms.nix
   ];
 }

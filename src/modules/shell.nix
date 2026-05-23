@@ -121,6 +121,7 @@ in
     (mkNucleusCommand "nucleus-replica-reset" "replica-reset")
     (mkNucleusCommand "nucleus-replica-sync" "replica-sync")
     (mkNucleusCommand "nucleus-update" "update")
+    (mkRepoScriptCommand "nucleus-vm-setup" "scripts/vm-setup.sh")
   ];
 
   # direnv: automatically loads/unloads per-directory environments.

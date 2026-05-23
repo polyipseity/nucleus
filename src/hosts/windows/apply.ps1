@@ -153,6 +153,11 @@
   sync to avoid long blocking runs; a scheduled daily sync already converges
   replicas.
 
+.PARAMETER VMSetup
+  When specified, runs the post-apply VM provisioning step to create QCOW2
+  disk images and QEMU start scripts for VMs declared in src/modules/vms.json.
+  Skipped by default because disk pre-allocation is slow and only required on
+  the first provision of a new machine.
 .PARAMETER MinFreeDiskGB
   Minimum free space threshold (GiB) used by the pre-flight health check.
 
@@ -227,7 +232,8 @@ param(
   [int]$MinFreeDiskGB = 10,
   [switch]$SkipAISync,
   [switch]$ReplicaSync,
-  [switch]$SkipReplicaSync
+  [switch]$SkipReplicaSync,
+  [switch]$VMSetup
 )
 
 $ErrorActionPreference = "Stop"
@@ -262,6 +268,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $systemModuleDir -ChildPath "Initialize-SSHHostKey.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AISync.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-ReplicaSync.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Invoke-VMSetup.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-ReplicaSyncScheduledTask.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSshServer.ps1")
@@ -621,5 +628,19 @@ if (-not $runReplicaSync) {
     } catch {
       Write-Warning "replica-sync: replica sync incomplete (system apply succeeded): $($_.Exception.Message)"
     }
+  }
+}
+
+# Provision VM disk images and QEMU start scripts for VMs declared in vms.json.
+# This is best-effort: a VM setup failure should not retroactively fail a
+# completed configuration apply.
+if (-not $VMSetup) {
+  Write-Output "vm-setup: -VMSetup not set; skipping post-apply VM provisioning"
+} else {
+  Write-Output "vm-setup: running post-apply VM provisioning..."
+  try {
+    Invoke-VMSetup -RepoRoot $repoRoot
+  } catch {
+    Write-Warning "vm-setup: VM setup incomplete (system apply succeeded): $($_.Exception.Message)"
   }
 }

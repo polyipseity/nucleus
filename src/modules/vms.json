@@ -1,0 +1,22 @@
+{
+  "vms": [
+    {
+      "name": "nixos",
+      "display": "NixOS",
+      "cpus": 4,
+      "ramMiB": 8192,
+      "diskGiB": 64,
+      "type": "nixos",
+      "shareDevDir": true
+    },
+    {
+      "name": "windows",
+      "display": "Windows",
+      "cpus": 4,
+      "ramMiB": 8192,
+      "diskGiB": 128,
+      "type": "windows",
+      "shareDevDir": false
+    }
+  ]
+}

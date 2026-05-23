@@ -112,4 +112,26 @@ function Invoke-ScoopSetup {
   } else {
     Write-Output "scoop: gopass already installed — skipping"
   }
+
+  # Install qemu from the Scoop extras bucket.  qemu provides qemu-img.exe
+  # for QCOW2 disk creation (used by Invoke-VMSetup) and qemu-system-*.exe
+  # for launching guest VMs.  No WinGet package exists for QEMU on Windows;
+  # Scoop extras is the correct install tier per the repository preference
+  # hierarchy (winget > scoop > cargo binstall > bun).
+  $qemuImgBin = Join-Path $scoopShims "qemu-img.cmd"
+  if (-not (Test-Path $qemuImgBin)) {
+    Write-Output "scoop: installing qemu (from extras bucket)"
+    scoop install qemu
+    if ($LASTEXITCODE -ne 0) {
+      Write-Error "scoop: 'scoop install qemu' failed (exit $LASTEXITCODE)"
+      return
+    }
+    if (-not (Test-Path $qemuImgBin)) {
+      Write-Error "scoop: qemu installed but qemu-img shim not found at '$qemuImgBin'"
+      return
+    }
+    Write-Output "scoop: qemu installed successfully"
+  } else {
+    Write-Output "scoop: qemu already installed — skipping"
+  }
 }
