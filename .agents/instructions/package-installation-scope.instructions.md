@@ -15,11 +15,13 @@ applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/windows/**/*.yml, scripts/**, sr
 ## Scope Classification
 
 ### User-Level (Permitted)
+
 - **Binaries/CLI tools**: Installed to user-owned directories (`~/.cargo/bin`, `~/.bun/bin`, `~/.local/share/uv/tools/`, `%USERPROFILE%\.cargo\bin`, `%USERPROFILE%\.bun\bin`)
 - **Library caches**: Centralized user caches (`~/.cargo/registry`, `~/.bun/store`, `~/.cache/uv`, `%USERPROFILE%\.bun\store`)
 - **Project dependencies**: Stored locally per project (`.venv`, `node_modules`, `target/`, `Cargo.lock`)
 
 ### System-Level (Blocked)
+
 - ❌ `/usr/bin`, `/usr/local/bin`, `C:\Windows\System32`, `Program Files`
 - ❌ System-wide PATH modifications without user scoping
 - ❌ `sudo` or admin invocations for package installation
@@ -29,16 +31,17 @@ applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/windows/**/*.yml, scripts/**, sr
 
 ## Cross-Host Package Manager Hierarchy
 
-| Scope | macOS (nix-darwin) | NixOS | Windows |
-|-------|-------------------|-------|---------|
-| **System packages** | `nixpkgs` via nix-darwin `environment.systemPackages` | `nixpkgs` via NixOS system config | WinGet DSC (`system.dsc.yml`) |
-| **User-level CLI tools** | `nixpkgs` via Home Manager `home.packages` | `nixpkgs` via Home Manager `home.packages` | WinGet DSC (`user.dsc.yml`) + Scoop |
-| **Development tools** | devShell (Nix flake) | devShell (Nix flake) | devShell (Nix flake) OR managed fallback |
-| **Managed global packages** | `bun install -g` (JS tools only) | `bun install -g` (JS tools only) | `bun install -g` (JS tools only) |
-| **Prebuilt binaries** | N/A | N/A | `cargo-binstall`, Scoop |
-| **Python tools** | `uv tool install` (isolated venvs) | `uv tool install` (isolated venvs) | `uv tool install` (isolated venvs) |
+| Scope                       | macOS (nix-darwin)                                    | NixOS                                      | Windows                                  |
+| --------------------------- | ----------------------------------------------------- | ------------------------------------------ | ---------------------------------------- |
+| **System packages**         | `nixpkgs` via nix-darwin `environment.systemPackages` | `nixpkgs` via NixOS system config          | WinGet DSC (`system.dsc.yml`)            |
+| **User-level CLI tools**    | `nixpkgs` via Home Manager `home.packages`            | `nixpkgs` via Home Manager `home.packages` | WinGet DSC (`user.dsc.yml`) + Scoop      |
+| **Development tools**       | devShell (Nix flake)                                  | devShell (Nix flake)                       | devShell (Nix flake) OR managed fallback |
+| **Managed global packages** | `bun install -g` (JS tools only)                      | `bun install -g` (JS tools only)           | `bun install -g` (JS tools only)         |
+| **Prebuilt binaries**       | N/A                                                   | N/A                                        | `cargo-binstall`, Scoop                  |
+| **Python tools**            | `uv tool install` (isolated venvs)                    | `uv tool install` (isolated venvs)         | `uv tool install` (isolated venvs)       |
 
 **Preference order** (apply in sequence; use first available):
+
 1. **Declarative (stateless)**: nix-darwin / NixOS / WinGet DSC — preferred for reproducibility
 2. **Managed global**: `bun install -g`, `uv tool install` — for CLI-only tools with isolated environments
 3. **Prebuilt**: `cargo-binstall`, Scoop — for binaries not in nixpkgs/WinGet
@@ -60,14 +63,15 @@ uv tool install black
 pip install --system black
 ```
 
-**Installation path**: `~/.local/share/uv/tools/` (added to `PATH` at user level)  
+**Installation path**: `~/.local/share/uv/tools/` (added to `PATH` at user level)
 **No system-wide Python installation**: All Python via devShell or isolated `uv` environments
 
 ---
 
 ### Rust Tools (`cargo`, `cargo-binstall`)
 
-**POSIX (macOS, NixOS)**:  
+**POSIX (macOS, NixOS)**:
+
 ```bash
 # ✅ Preferred in devShell (nix flake)
 # Inside nix develop: cargo build, cargo test
@@ -77,7 +81,8 @@ cargo binstall ripgrep
 # Installs to ~/.cargo/bin
 ```
 
-**Windows**:  
+**Windows**:
+
 ```powershell
 # ✅ Preferred: cargo-binstall for prebuilt binaries (no system-wide install)
 cargo binstall ripgrep
@@ -88,7 +93,7 @@ scoop install ripgrep
 # Installs to %USERPROFILE%\scoop\shims
 ```
 
-**Installation paths**: `~/.cargo/bin`, `%USERPROFILE%\.cargo\bin`  
+**Installation paths**: `~/.cargo/bin`, `%USERPROFILE%\.cargo\bin`
 **System-wide rustc/cargo**: Blocked in interactive shells (see [build-tools-policy.instructions.md](build-tools-policy.instructions.md))
 
 ---
@@ -106,6 +111,7 @@ npm install -g @tailwindlabs/tailwindcss
 ```
 
 **Managed via**:
+
 - POSIX: `src/modules/agents.nix` — `installBunPackages` activation hook
 - Windows: `src/hosts/windows/modules/setup/Invoke-BunSetup.ps1`
 
@@ -118,6 +124,7 @@ npm install -g @tailwindlabs/tailwindcss
 ### Declarative (Preferred)
 
 **Nix packages** (POSIX):
+
 ```nix
 # src/modules/core.nix or host config
 home.packages = with pkgs; [
@@ -127,6 +134,7 @@ home.packages = with pkgs; [
 ```
 
 **WinGet DSC** (Windows):
+
 ```yaml
 # src/hosts/windows/system.dsc.yml or user.dsc.yml
 - name: Install ripgrep via WinGet
@@ -138,11 +146,13 @@ home.packages = with pkgs; [
 ### Imperative (Last Resort)
 
 Only when declarative solutions don't exist:
+
 - `bun install -g` for unpackaged JS tools
 - `uv tool install` for Python CLI tools
 - `cargo-binstall` for precompiled Rust binaries
 
 **Always ensure**:
+
 1. The tool installs to a **user-owned directory** (not system)
 2. The installation is **idempotent** (safe to re-run)
 3. The directory is in the user's `PATH`
@@ -151,14 +161,14 @@ Only when declarative solutions don't exist:
 
 ## What Violates This Policy
 
-| Pattern | Issue | Fix |
-|---------|-------|-----|
-| `sudo bun install -g …` | Admin escalation for user tool | Remove `sudo`; use plain `bun install -g` |
-| `pip install --system …` | System-wide Python lib | Use `uv tool install` or devShell |
-| `npm install -g …` (unmanaged) | Untracked global package | Use `bun install -g` with manifest tracking |
-| Installing to `/usr/local/bin` | System-level binary pollution | Use user-level tool directories |
-| `cargo install` in `setup.sh` | Imperative build-time tool install | Add to devShell or use `cargo-binstall` |
-| PowerShell `Install-Module -Scope Machine` | System-wide module installation | Use `-Scope CurrentUser` |
+| Pattern                                    | Issue                              | Fix                                         |
+| ------------------------------------------ | ---------------------------------- | ------------------------------------------- |
+| `sudo bun install -g …`                    | Admin escalation for user tool     | Remove `sudo`; use plain `bun install -g`   |
+| `pip install --system …`                   | System-wide Python lib             | Use `uv tool install` or devShell           |
+| `npm install -g …` (unmanaged)             | Untracked global package           | Use `bun install -g` with manifest tracking |
+| Installing to `/usr/local/bin`             | System-level binary pollution      | Use user-level tool directories             |
+| `cargo install` in `setup.sh`              | Imperative build-time tool install | Add to devShell or use `cargo-binstall`     |
+| PowerShell `Install-Module -Scope Machine` | System-wide module installation    | Use `-Scope CurrentUser`                    |
 
 ---
 
@@ -167,6 +177,7 @@ Only when declarative solutions don't exist:
 After adding or modifying packages:
 
 1. **Verify installation paths**:
+
    ```bash
    # POSIX
    which <tool> && echo "Found at: $(which <tool>)"
@@ -176,6 +187,7 @@ After adding or modifying packages:
    ```
 
 2. **Confirm not in system directories**:
+
    ```bash
    # Should NOT match /usr/local, /usr/bin, C:\Windows\System32, Program Files
    which <tool> | grep -E "/usr/(local/)?bin|Program Files"  # Should return nothing
@@ -194,6 +206,7 @@ After adding or modifying packages:
 ### Example 1: Adding a new Rust CLI tool (e.g., `sd`)
 
 **macOS (nix-darwin)**:
+
 ```nix
 # src/modules/core.nix
 home.packages = with pkgs; [
@@ -202,6 +215,7 @@ home.packages = with pkgs; [
 ```
 
 **NixOS**:
+
 ```nix
 # src/hosts/nixos/default.nix
 home.packages = with pkgs; [
@@ -210,15 +224,17 @@ home.packages = with pkgs; [
 ```
 
 **Windows**:
+
 ```yaml
 # src/hosts/windows/system.dsc.yml
 - name: Install sd via WinGet
   resource: Microsoft.WinGet.DSC/WinGetPackage
   properties:
-    id: imr0ybhh.sd.msvc  # Hypothetical ID
+    id: imr0ybhh.sd.msvc # Hypothetical ID
 ```
 
 Or via `cargo-binstall` if WinGet unavailable:
+
 ```powershell
 # In Invoke-CargoBinstallSetup.ps1
 cargo binstall sd --root $env:USERPROFILE\.cargo

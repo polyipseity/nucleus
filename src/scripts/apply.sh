@@ -147,6 +147,19 @@ ensure_prek_hooks_installed() {
 
   # Detect .git directory; works for normal repos, submodules, and worktrees.
   _ephi_git_dir=$(cd "$_ephi_repo_root" && git rev-parse --git-dir 2>/dev/null) || return
+
+  # Convert relative git-dir paths to absolute (git rev-parse --git-dir may
+  # return relative paths like .git or ../../../.git in nested submodules).
+  case "$_ephi_git_dir" in
+    /*)
+      # Absolute path: use as-is
+      ;;
+    *)
+      # Relative path: join with repo root to make absolute
+      _ephi_git_dir="$_ephi_repo_root/$_ephi_git_dir"
+      ;;
+  esac
+
   _ephi_hook_dir="$_ephi_git_dir/hooks"
 
   # Skip noisy reinstalls when any existing hook file is already a prek-
