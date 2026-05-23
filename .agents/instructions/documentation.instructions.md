@@ -24,7 +24,8 @@ setting keys), include at least one inline source citation near the setting.
 - Prefer official vendor docs, schemas, or manpages.
 - If official docs are unavailable, use the best stable upstream source
   (project wiki, upstream code path, or package metadata) and note why.
-- Keep citations local to the exact setting block so reviewers can verify each
+- Keep citations local to the exact setting block
+- For **URL quality, developer-vs-user documentation preference, and deprecation hygiene**, see `.agents/instructions/citation-quality.instructions.md`. so reviewers can verify each
   identifier one-by-one without hunting through external docs.
 
 ## Nix files (`src/**/*.nix`)
