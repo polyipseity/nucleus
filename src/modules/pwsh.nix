@@ -199,7 +199,8 @@ let
     function -gca { & git commit --amend @Args }
     function -gco { & git checkout @Args }
     function -gd { & git diff @Args }
-    function -g-l { & git log --oneline --decorate --graph @Args }
+    function -gl { & git log --oneline --decorate --graph @Args }
+    function -gll { & git log --oneline --decorate --graph @Args }
     function -gp { & git push @Args }
     function -gpl { & git pull @Args }
 

@@ -22,7 +22,7 @@ function Sync-ShellProfile {
         (if fzf is present and PSReadLine is available)
       - pay-respects command correction hook (if pay-respects is present; installed
         via cargo-binstall by Invoke-CargoBinstallSetup)
-      - common aliases (`-g`, `-ga`, `-gc`, `-gca`, `-gco`, `-gd`, `-g-l`, `-gp`,
+      - common aliases (`-g`, `-ga`, `-gc`, `-gca`, `-gco`, `-gd`, `-gl`, `-gll`, `-gp`,
         `-gpl`, `-gs-pdf-opt-*` (Ghostscript PDF presets), `-gst`, `-la`, `-ll` (eza preferred, Get-ChildItem fallback),
         `-ni`, `-nr`, `-nx` (bun shortcuts, if bun present), `-v`)
       - Python ban: blocks system-wide python/pip to prevent accidental
@@ -230,7 +230,8 @@ function Sync-ShellProfile {
     'function -gca { & git commit --amend @Args }'
     'function -gco { & git checkout @Args }'
     'function -gd { & git diff @Args }'
-    'function -g-l { & git log --oneline --decorate --graph @Args }'
+    'function -gl { & git log --oneline --decorate --graph @Args }'
+    'function -gll { & git log --oneline --decorate --graph @Args }'
     'function -gp { & git push @Args }'
     'function -gpl { & git pull @Args }'
     'function Invoke-NucleusGhostscript {'

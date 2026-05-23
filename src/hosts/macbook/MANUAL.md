@@ -21,7 +21,8 @@
 - `-gca` — run `git commit --amend`.
 - `-gco` — run `git checkout`.
 - `-gd` — run `git diff`.
-- `-g-l` — run `git log --oneline --decorate --graph`.
+- `-gl` — run `git log --oneline --decorate --graph`.
+- `-gll` — run `git log --oneline --decorate --graph`.
 - `-gst` — run `git status`.
 - `-gp` — run `git push`.
 - `-gpl` — run `git pull`.

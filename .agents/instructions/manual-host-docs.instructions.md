@@ -15,7 +15,7 @@ applyTo: "src/hosts/**/MANUAL.md"
 
 - Keep formatting minimal: one title plus short bullet lists.
 - Keep text minimal and high signal; remove long explanations, background essays, and full alias reference tables.
-- Include one `command shortcuts` section listing the complete shell-shortcut set (not a subset). Every shortcut name must start with `-` (for example `-g`, `-ga`, `-gc`, `-g-l`).
+- Include one `command shortcuts` section listing the complete shell-shortcut set (not a subset). Every shortcut name must start with `-` (for example `-g`, `-ga`, `-gc`, `-gl`, `-gll`).
 - Include one separate `nucleus commands` section for built-in `nucleus-*` commands. Do not classify `nucleus-*` commands as shortcuts.
 - Prefer direct actions with concrete command/file names in backticks.
 - Prefer one step per bullet.

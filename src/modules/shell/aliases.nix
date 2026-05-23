@@ -10,7 +10,8 @@
   "-gca" = "git commit --amend";
   "-gco" = "git checkout";
   "-gd" = "git diff";
-  "-g-l" = "git log --oneline --decorate --graph";
+  "-gl" = "git log --oneline --decorate --graph";
+  "-gll" = "git log --oneline --decorate --graph";
   "-gp" = "git push";
   "-gpl" = "git pull";
   # Ghostscript PDF optimization presets.
