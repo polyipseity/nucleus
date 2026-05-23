@@ -921,7 +921,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       }
 
       # Source: Safari preference behavior.
-      # https://support.apple.com/guide/safari/change-settings-ibrwa005/mac
+      # https://support.apple.com/en-us/guide/safari/change-settings-ibrwa005/mac
       set_safari_default "AutoFillPasswords" "false" "bool"
       set_safari_default "IncludeDevelopMenu" "true" "bool"
       set_safari_default "IncludeInternalDebugMenu" "true" "bool"
@@ -976,7 +976,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       }
 
       # Source: macOS Accessibility preference settings.
-      # https://support.apple.com/guide/mac-help/accessibility-settings-on-mac-mh40584/mac
+      # https://support.apple.com/en-us/guide/mac-help/accessibility-settings-on-mac-mh40584/mac
       set_default "com.apple.universalaccess" "FontSizeCategory" "AX1" "string"
       set_default "com.apple.universalaccess" "cursorSize" "1.33" "float"
       set_default "com.apple.universalaccess" "reduceMotion" "false" "bool"
@@ -1005,7 +1005,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # WHY separate activation: this is the actual dev-tree hardening/perf work;
     # keeping it isolated makes it easier to reason about than bundling it with
     # Finder metadata cleanup and Dock restarts.
-    # Source: https://support.apple.com/guide/mac-help/spotlight-search-index-on-mac-mchlp2812/mac
+    # Source: https://support.apple.com/en-us/guide/mac-help/spotlight-search-index-on-mac-mchlp2812/mac
     # -------------------------------------------------------------------------
     configureDevSpotlightExclusions = lib.hm.dag.entryAfter [ "provisionDevDirectory" ] ''
       DEV_ROOT="$HOME/dev"
