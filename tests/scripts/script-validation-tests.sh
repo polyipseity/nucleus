@@ -145,6 +145,25 @@ test_no_dangerous_patterns() {
     fi
 }
 
+# Test 9: Verify bootstrap direnv auto-allow is strictly repo-scoped
+test_bootstrap_direnv_scope() {
+    local script="$1"
+
+    # shellcheck disable=SC2016  # Match literal "$REPO_ROOT" text in script source.
+    if ! grep -Fq 'direnv allow "$REPO_ROOT"' "$script"; then
+        assert_fail "Bootstrap direnv scope: $(basename "$script")" "Missing repo-root direnv allow invocation"
+        return
+    fi
+
+    # shellcheck disable=SC2016  # Match literal "$REPO_ROOT" text in script source.
+    if ! grep -Fq 'basename -- "$REPO_ROOT"' "$script" || ! grep -Fq '"nucleus"' "$script"; then
+        assert_fail "Bootstrap direnv scope: $(basename "$script")" "Missing nucleus-only scope guard"
+        return
+    fi
+
+    assert_pass "Bootstrap direnv scope: $(basename "$script")"
+}
+
 # ============================================================================
 # Run Tests on All Scripts
 # ============================================================================
@@ -172,6 +191,7 @@ if [[ -f "$BOOTSTRAP_SH" ]]; then
     test_is_executable "$BOOTSTRAP_SH"
     test_dependencies_available "$BOOTSTRAP_SH" git nix
     test_error_handling "$BOOTSTRAP_SH"
+    test_bootstrap_direnv_scope "$BOOTSTRAP_SH"
     test_has_documentation "$BOOTSTRAP_SH"
     test_no_dangerous_patterns "$BOOTSTRAP_SH"
 fi

@@ -219,6 +219,42 @@ function Invoke-WingetPackageInstall {
   throw "Failed to install package '$Id' with winget. Exit code: $LASTEXITCODE"
 }
 
+function Invoke-RepositoryDirenvAllowIfAvailable {
+  <#
+  .SYNOPSIS
+    Best-effort direnv allow for the canonical nucleus repository root.
+
+  .DESCRIPTION
+    Runs `direnv allow` only when direnv is available, `.envrc` exists, and the
+    bootstrap repository root basename is exactly `nucleus`. This keeps auto-allow
+    scope intentionally narrow and avoids trusting non-nucleus checkouts.
+
+    Failures are warnings (non-fatal) because direnv allow is convenience-only
+    and must not block dependency bootstrap or apply.
+  #>
+  [CmdletBinding()]
+  param()
+
+  if (-not (Get-Command -Name direnv -ErrorAction SilentlyContinue)) {
+    return
+  }
+
+  $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..")).Path
+  if ((Split-Path -Path $repoRoot -Leaf) -ne "nucleus") {
+    return
+  }
+
+  $envrcPath = Join-Path -Path $repoRoot -ChildPath ".envrc"
+  if (-not (Test-Path -Path $envrcPath -PathType Leaf)) {
+    return
+  }
+
+  & direnv allow $repoRoot
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "failed to run 'direnv allow' for $repoRoot"
+  }
+}
+
 if (-not (Get-Command -Name winget -ErrorAction SilentlyContinue)) {
   throw "winget is required but was not found in PATH."
 }
@@ -233,6 +269,8 @@ $BootstrapPackageVersions = [ordered]@{
 foreach ($package in $BootstrapPackageVersions.GetEnumerator()) {
   Invoke-WingetPackageInstall -Id $package.Key -Version $package.Value
 }
+
+Invoke-RepositoryDirenvAllowIfAvailable
 
 if ($Apply) {
   $applyScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\windows\apply.ps1"

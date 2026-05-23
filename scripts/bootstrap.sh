@@ -220,6 +220,9 @@ allow_repo_direnv_if_available() {
   # This keeps first-run developer UX smooth: entering the repo immediately
   # loads the nix-direnv-managed devShell without an extra manual allow step.
   #
+  # Scope guard: only allow the canonical nucleus repository root. This avoids
+  # implicitly trusting arbitrary checkouts that happen to include this script.
+  #
   # Non-fatal behavior is intentional:
   # - direnv might not be installed yet on fresh machines.
   # - .envrc may be absent in forks/partial checkouts.
@@ -229,6 +232,10 @@ allow_repo_direnv_if_available() {
   fi
 
   if [ ! -f "$REPO_ROOT/.envrc" ]; then
+    return
+  fi
+
+  if [ "$(basename -- "$REPO_ROOT")" != "nucleus" ]; then
     return
   fi
 
