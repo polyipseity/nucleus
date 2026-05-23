@@ -220,10 +220,15 @@ in
       };
 
       # Software Update: check for and download updates automatically; install
-      # critical (security) updates without prompting.
+      # critical (security) updates, macOS version updates, and system data files
+      # without prompting. Pre-release / beta updates are explicitly disabled.
+      # Source: https://support.apple.com/guide/deployment/manage-software-updates-depafd2fad80/web
       "com.apple.SoftwareUpdate" = {
+        AllowPreReleaseInstallation = false; # disable beta / pre-release macOS updates
         AutomaticCheckEnabled = true;
         AutomaticDownload = true;
+        AutomaticallyInstallMacOSUpdates = true; # auto-install macOS version updates
+        ConfigDataInstall = true; # auto-install system data files and security responses
         CriticalUpdateInstall = true;
       };
 
@@ -279,8 +284,10 @@ in
 
       # macOS tips and suggestions: disable persistent notifications.
       # These interrupt focus and offer limited value for power-user workflows.
+      # Source: https://support.apple.com/guide/mac-help/change-notifications-settings-on-mac-mh40583/mac
       "com.apple.tips" = {
-        LastSeenVersionForAutoStartTip = 99999; # disable auto-tip startup
+        LastSeenVersionForAutoStartTip = 99999; # mark all tips as already seen
+        ShowTipOfTheDay = false; # disable daily tip notification entirely
       };
 
       # Raycast: hide menu bar icon to reduce persistent chrome.
