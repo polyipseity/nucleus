@@ -12,14 +12,14 @@ The following tools are installed globally (via nixpkgs / WinGet) for **system
 package management only**. They are not available for general developer use in
 interactive sessions:
 
-| Tool | Installed by | Permitted system use |
-|---|---|---|
-| `bun` | nixpkgs / `Oven-sh.Bun` | `bun add -g` for global Node/JS system packages |
-| `cargo` | nixpkgs `rustup` | used internally by `cargo-binstall` for system Rust binary installs |
-| `rustc` | nixpkgs `rustup` | compilation during `cargo-binstall` runs |
-| `uv` | nixpkgs / WinGet | `uv tool install` for system-level Python tooling |
-| `prek` | nixpkgs | system-wide Git hook manager binary (invoked by managed shell/apply hooks) |
-| `python` / `pip` | **banned** | no permitted system use; all Python via devShell or uv venv |
+| Tool             | Installed by            | Permitted system use                                                       |
+| ---------------- | ----------------------- | -------------------------------------------------------------------------- |
+| `bun`            | nixpkgs / `Oven-sh.Bun` | `bun add -g` for global Node/JS system packages                            |
+| `cargo`          | nixpkgs `rustup`        | used internally by `cargo-binstall` for system Rust binary installs        |
+| `rustc`          | nixpkgs `rustup`        | compilation during `cargo-binstall` runs                                   |
+| `uv`             | nixpkgs / WinGet        | `uv tool install` for system-level Python tooling                          |
+| `prek`           | nixpkgs                 | system-wide Git hook manager binary (invoked by managed shell/apply hooks) |
+| `python` / `pip` | **banned**              | no permitted system use; all Python via devShell or uv venv                |
 
 Direct developer invocation of any of the above in an interactive shell session
 must go through a **managed development environment** rather than the raw
@@ -64,13 +64,13 @@ For project-specific development, enter the project devShell. For repositories
 without direnv/Nix metadata, nucleus also provisions a managed default shell
 environment with the same baseline tools. The shared inventory is:
 
-| Tool | Purpose |
-|---|---|
-| `bun` | JS/Node development |
-| `cargo` | Rust build and test |
-| `prek` | Git hook management during development |
-| `rustc` | Rust compilation |
-| `uv` | Python development |
+| Tool    | Purpose                                |
+| ------- | -------------------------------------- |
+| `bun`   | JS/Node development                    |
+| `cargo` | Rust build and test                    |
+| `prek`  | Git hook management during development |
+| `rustc` | Rust compilation                       |
+| `uv`    | Python development                     |
 
 ### Entering the devShell
 
@@ -91,11 +91,11 @@ managed PowerShell profile fallback for repositories without direnv/Nix wiring.
 
 prek Git hooks are installed by two complementary mechanisms:
 
-| Mechanism | Scope | Platform |
-|---|---|---|
-| `src/scripts/apply.sh` `ensure_prek_hooks_installed` | nucleus repo, first apply | POSIX |
-| zsh `_prek_hook_install_if_needed` | any `prek.toml` repo, on shell startup + directory change | POSIX |
-| PowerShell profile `Invoke-PrekHookInstallIfNeeded` | any prek.toml repo, on directory entry | POSIX pwsh + Windows |
+| Mechanism                                            | Scope                                                     | Platform             |
+| ---------------------------------------------------- | --------------------------------------------------------- | -------------------- |
+| `src/scripts/apply.sh` `ensure_prek_hooks_installed` | nucleus repo, first apply                                 | POSIX                |
+| zsh `_prek_hook_install_if_needed`                   | any `prek.toml` repo, on shell startup + directory change | POSIX                |
+| PowerShell profile `Invoke-PrekHookInstallIfNeeded`  | any prek.toml repo, on directory entry                    | POSIX pwsh + Windows |
 
 The POSIX zsh hook remains the canonical mechanism for non-direnv repository
 entry (startup + directory change). PowerShell keeps prompt-hook parity for
@@ -117,9 +117,9 @@ POSIX pwsh and Windows.
 ## Invariants
 
 - The `DIRENV_DIR` pass-through must be present in every blocking function.
-   Omitting it would prevent the tool from working inside nix devShells.
+  Omitting it would prevent the tool from working inside nix devShells.
 - The managed fallback environment must expose the same baseline inventory as
-   `devShells.default`: `bun`, `cargo`, `prek`, `rustc`, and `uv`.
+  `devShells.default`: `bun`, `cargo`, `prek`, `rustc`, and `uv`.
 - `cargo-binstall` and `cargo-cache` are **not** blocked — they are the
   permitted system-package-management invocations of the Rust toolchain.
 - `rustup` is **not** blocked — it is the toolchain manager and must remain
