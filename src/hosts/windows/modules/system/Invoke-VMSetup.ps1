@@ -1,20 +1,22 @@
-# Invoke-VMSetup.ps1 — Provisions and configures virtual machines on Windows.
+# Invoke-VMSetup.ps1 — Build VM images (if needed) and provision VMs on Windows.
 #
-# Reads VM definitions from src/modules/VMs.json and creates QCOW2 disk images
-# plus QEMU start scripts for each declared VM.  QEMU is installed via the
-# Scoop extras bucket (see Invoke-ScoopSetup.ps1).
+# Combines the former Invoke-VMBuild and Invoke-VMSetup into one module.
+# Phase 1 (build): builds pre-built QCOW2 images using Packer for each VM
+# declared in src\modules\VMs.json, if absent at
+# %USERPROFILE%\virtual machines\images\<name>.qcow2.  For NixOS guests on
+# Windows, Packer downloads the NixOS ISO automatically (vms\nixos\packer.pkr.hcl).
+# For Windows 11 guests, a local ISO is required (-WindowsIso).
 #
-# Disk images are stored at %USERPROFILE%\virtual machines\<name>.qcow2,
-# mirroring the ~/virtual machines/<name>.qcow2 path used on POSIX hosts.
-# QCOW2 format enables copy-based migration to UTM (macOS) or libvirt (NixOS).
+# Phase 2 (provision): creates QEMU start scripts and places disk images for
+# each VM.  Disk images are copied from the built images, eliminating the manual
+# OS installation step previously required with empty disks.
 #
-# Each VM also gets a start script at
-#   %USERPROFILE%\virtual machines\Start-<display>.ps1
-# so the user can launch QEMU from a PowerShell terminal without remembering
-# the full command line.
+# Called by scripts\VM-setup.ps1 (alias: nucleus-VM-setup).
+# Not invoked automatically during nucleus apply — run manually when setting
+# up a new machine or rebuilding VM images.
 #
-# Exit: always 0 — VM setup failures do not abort the apply workflow.
-# Source: https://www.qemu.org/docs/master/system/invocation.html
+# Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
+#         https://www.qemu.org/docs/master/system/invocation.html
 function Invoke-VMSetup {
     [CmdletBinding()]
     param(
@@ -22,75 +24,112 @@ function Invoke-VMSetup {
         [Parameter(Mandatory)]
         [string]$RepoRoot,
 
+        # Path to the Windows 11 ISO. Required for Windows 11 guest builds.
+        # Download from: https://www.microsoft.com/software-download/windows11
+        [string]$WindowsIso = '',
+
+        # Build and provision only the NixOS guest.
+        [switch]$NixosOnly,
+
+        # Build and provision only the Windows 11 guest.
+        [switch]$WindowsOnly,
+
+        # QEMU accelerator for image builds. Defaults to tcg (always works).
+        # Use whpx for Windows HyperVisor Platform acceleration (requires enabling
+        # "Windows Hypervisor Platform" in Windows Features).
+        # Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
+        [string]$Accelerator = 'tcg',
+
         # Print planned actions without modifying any state.
         [switch]$DryRun
     )
 
-    $manifest = Join-Path $RepoRoot 'src\modules\VMs.json'
+    $ErrorActionPreference = 'Stop'
 
+    $manifest = Join-Path $RepoRoot 'src\modules\VMs.json'
     if (-not (Test-Path $manifest)) {
         Write-Information "VM-setup: manifest not found at $manifest; skipping"
         return
     }
 
-    $vmDef = Get-Content $manifest -Raw | ConvertFrom-Json
-    $vmDir = Join-Path $env:USERPROFILE 'virtual machines'
+    $vmDef     = Get-Content $manifest -Raw | ConvertFrom-Json
+    $vmsDir    = Join-Path $RepoRoot 'vms'
+    $vmDir     = Join-Path $env:USERPROFILE 'virtual machines'
+    $imagesDir = Join-Path $vmDir 'images'
+
+    if (-not $DryRun) {
+        New-Item -ItemType Directory -Path $vmDir     -Force | Out-Null
+        New-Item -ItemType Directory -Path $imagesDir -Force | Out-Null
+    } else {
+        Write-Information "VM-setup: [dry-run] New-Item Directory $vmDir"
+        Write-Information "VM-setup: [dry-run] New-Item Directory $imagesDir"
+    }
+
+    # -------------------------------------------------------------------------
+    # Phase 1 — Build images (if absent)
+    # -------------------------------------------------------------------------
+
+    foreach ($vm in $vmDef.vms) {
+        # Apply -NixosOnly / -WindowsOnly filter.
+        if ($NixosOnly   -and $vm.type -ne 'nixos')   { continue }
+        if ($WindowsOnly -and $vm.type -ne 'windows') { continue }
+
+        switch ($vm.type) {
+            'nixos' {
+                Invoke-BuildNixosImage -VmName $vm.name -Accelerator $Accelerator `
+                    -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
+            }
+            'windows' {
+                Invoke-BuildWindowsImage -VmName $vm.name -DiskGiB $vm.diskGiB `
+                    -WindowsIso $WindowsIso -Accelerator $Accelerator `
+                    -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
+            }
+            default {
+                Write-Information "VM-setup: skipping build for '$($vm.name)' (unsupported type: $($vm.type))"
+            }
+        }
+    }
+
+    # -------------------------------------------------------------------------
+    # Phase 2 — Provision VMs
+    # -------------------------------------------------------------------------
 
     # Locate qemu-img from the Scoop-managed QEMU installation.
     $scoopQemuDir = Join-Path $env:USERPROFILE 'scoop\apps\qemu\current'
     $qemuImg = Join-Path $scoopQemuDir 'qemu-img.exe'
     if (-not (Test-Path $qemuImg)) {
-        # Fall back to PATH in case qemu-img is available another way.
         $qemuImgInPath = Get-Command qemu-img -ErrorAction SilentlyContinue
         if ($qemuImgInPath) {
             $qemuImg = $qemuImgInPath.Source
         } else {
-            Write-Information 'VM-setup: qemu-img not found; install QEMU via Scoop (scoop install qemu)'
             $qemuImg = $null
         }
     }
 
-    if (-not $DryRun) {
-        New-Item -ItemType Directory -Path $vmDir -Force | Out-Null
-    } else {
-        Write-Information "VM-setup: [dry-run] New-Item Directory $vmDir"
-    }
-
     foreach ($vm in $vmDef.vms) {
-        $diskPath = Join-Path $vmDir "$($vm.name).qcow2"
+        # Apply -NixosOnly / -WindowsOnly filter.
+        if ($NixosOnly   -and $vm.type -ne 'nixos')   { continue }
+        if ($WindowsOnly -and $vm.type -ne 'windows') { continue }
+
+        $diskPath    = Join-Path $vmDir "$($vm.name).qcow2"
         $startScript = Join-Path $vmDir "Start-$($vm.display).ps1"
+        $prebuilt    = Join-Path $imagesDir "$($vm.name).qcow2"
 
         Write-Information "VM-setup: configuring VM '$($vm.display)'..."
 
-        # Create QCOW2 disk if absent.
-        # Use a pre-built image from Invoke-VMBuild if one exists at
-        # <vmDir>\images\<name>.qcow2 (placed there by scripts\VM-build.ps1).
-        $prebuilt = Join-Path $vmDir "images\$($vm.name).qcow2"
+        # Place disk image from pre-built image (empty disk fallback removed).
         if (Test-Path $diskPath) {
             Write-Information "VM-setup: disk already exists: $diskPath"
         } elseif (Test-Path $prebuilt) {
-            # Copy pre-built image; it contains a fully-installed OS so no
-            # manual installation step is needed after VM-setup completes.
-            Write-Information "VM-setup: using pre-built image from VM-build: $prebuilt"
+            Write-Information "VM-setup: using pre-built image: $prebuilt"
             if (-not $DryRun) {
                 Copy-Item $prebuilt $diskPath
             } else {
                 Write-Information "VM-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
             }
-        } elseif ($null -ne $qemuImg) {
-            $diskSizeArg = "$($vm.diskGiB)G"
-            if ($DryRun) {
-                Write-Information "VM-setup: [dry-run] & '$qemuImg' create -f qcow2 '$diskPath' $diskSizeArg"
-            } else {
-                Write-Information "VM-setup: creating empty QCOW2 disk ($($vm.diskGiB) GiB): $diskPath"
-                Write-Information "VM-setup: tip: run nucleus-VM-build first to get a pre-built image with the OS already installed"
-                & $qemuImg create -f qcow2 $diskPath $diskSizeArg
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Warning "VM-setup: qemu-img failed for '$($vm.name)'; disk not created"
-                }
-            }
         } else {
-            Write-Information "VM-setup: skipping disk creation for '$($vm.name)' (qemu-img unavailable)"
+            Write-Warning "VM-setup: image not found for '$($vm.name)': $prebuilt; skipping"
+            continue
         }
 
         # Determine the QEMU system binary and machine type based on host arch.
@@ -136,9 +175,7 @@ function Invoke-VMSetup {
         # Write a self-contained QEMU start script for this VM.
         $startContent = @"
 # Start-$($vm.display).ps1 — Start the '$($vm.display)' QEMU virtual machine.
-# Generated by Invoke-VMSetup; re-run `nucleus-VM-setup` to regenerate.
-# Attach an ISO for first-time installation:
-#   Add: -cdrom 'C:\path\to\install.iso'
+# Generated by Invoke-VMSetup; re-run ``nucleus-VM-setup`` to regenerate.
 #
 # Source: https://www.qemu.org/docs/master/system/invocation.html
 $virtiofsArgs
@@ -209,5 +246,156 @@ sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#nixos"
     Write-Information 'VM-setup: Windows VM setup complete'
     Write-Information "VM-setup: Disk images at: $vmDir"
     Write-Information 'VM-setup: Run the generated Start-*.ps1 scripts to launch VMs'
-    Write-Information 'VM-setup: Attach an ISO (-cdrom flag) for first-time guest OS installation'
+}
+
+# Invoke-BuildNixosImage — Builds the NixOS guest image using Packer.
+#
+# On macOS/NixOS, scripts/VM-setup.sh uses nixos-generators directly (faster,
+# no Packer needed).  On Windows, Packer with the QEMU builder downloads the
+# NixOS minimal ISO and runs a shell provisioner to install NixOS
+# (vms\nixos\packer.pkr.hcl).
+function Invoke-BuildNixosImage {
+    [CmdletBinding()]
+    param(
+        [string]$VmName,
+        [string]$Accelerator,
+        [string]$VmsDir,
+        [string]$ImagesDir,
+        [switch]$DryRun
+    )
+
+    $outPath = Join-Path $ImagesDir "$VmName.qcow2"
+    if (Test-Path $outPath) {
+        Write-Information "VM-setup: NixOS image already built (delete to rebuild): $outPath"
+        return
+    }
+
+    if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
+        Write-Warning 'VM-setup: packer not found; install via WinGet (HashiCorp.Packer)'
+        return
+    }
+
+    $packerDir = Join-Path $VmsDir 'nixos'
+    $tmpOutput = Join-Path $ImagesDir "${VmName}-build"
+
+    Write-Information "VM-setup: building NixOS image (accelerator=$Accelerator)..."
+
+    if ($DryRun) {
+        Write-Information "VM-setup: [dry-run] cd $packerDir; packer init .; packer build -var accelerator=$Accelerator -var output_directory=$tmpOutput ."
+        return
+    }
+
+    Push-Location $packerDir
+    try {
+        & packer init .
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning 'VM-setup: packer init failed for NixOS'
+            return
+        }
+        & packer build `
+            -var "accelerator=$Accelerator" `
+            -var "output_directory=$tmpOutput" `
+            .
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning 'VM-setup: packer build failed for NixOS'
+            return
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $builtImage = Join-Path $tmpOutput 'nixos.qcow2'
+    if (-not (Test-Path $builtImage)) {
+        Write-Warning "VM-setup: Packer did not produce $builtImage"
+        return
+    }
+
+    Move-Item $builtImage $outPath
+    Remove-Item $tmpOutput -Recurse -Force
+    Write-Information "VM-setup: NixOS image ready: $outPath"
+}
+
+# Invoke-BuildWindowsImage — Builds the Windows 11 guest image using Packer.
+#
+# Requires a Windows 11 ISO path (-WindowsIso).  Uses SATA disk during the
+# build (no VirtIO drivers needed during install) then installs VirtIO drivers
+# post-install so the resulting image boots with the VirtIO disk interface used
+# during normal operation.
+function Invoke-BuildWindowsImage {
+    [CmdletBinding()]
+    param(
+        [string]$VmName,
+        [int]$DiskGiB,
+        [string]$WindowsIso,
+        [string]$Accelerator,
+        [string]$VmsDir,
+        [string]$ImagesDir,
+        [switch]$DryRun
+    )
+
+    $outPath = Join-Path $ImagesDir "$VmName.qcow2"
+    if (Test-Path $outPath) {
+        Write-Information "VM-setup: Windows image already built (delete to rebuild): $outPath"
+        return
+    }
+
+    if (-not $WindowsIso) {
+        Write-Warning 'VM-setup: -WindowsIso PATH is required for Windows 11 builds'
+        Write-Information 'VM-setup: download from: https://www.microsoft.com/software-download/windows11'
+        return
+    }
+
+    if (-not (Test-Path $WindowsIso)) {
+        Write-Warning "VM-setup: Windows ISO not found: $WindowsIso"
+        return
+    }
+
+    if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
+        Write-Warning 'VM-setup: packer not found; install via WinGet (HashiCorp.Packer)'
+        return
+    }
+
+    $packerDir = Join-Path $VmsDir 'windows'
+    $tmpOutput = Join-Path $ImagesDir "${VmName}-build"
+
+    Write-Information "VM-setup: building Windows 11 image (disk=${DiskGiB}G, accelerator=$Accelerator)..."
+    Write-Information 'VM-setup: this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
+
+    if ($DryRun) {
+        Write-Information "VM-setup: [dry-run] cd $packerDir; packer init .; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var disk_size=${DiskGiB}G -var output_directory=$tmpOutput ."
+        return
+    }
+
+    Push-Location $packerDir
+    try {
+        & packer init .
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning 'VM-setup: packer init failed for Windows'
+            return
+        }
+        & packer build `
+            -var "windows_iso=$WindowsIso" `
+            -var "accelerator=$Accelerator" `
+            -var "disk_size=${DiskGiB}G" `
+            -var "output_directory=$tmpOutput" `
+            .
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning 'VM-setup: packer build failed for Windows'
+            return
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $builtImage = Join-Path $tmpOutput 'windows.qcow2'
+    if (-not (Test-Path $builtImage)) {
+        Write-Warning "VM-setup: Packer did not produce $builtImage"
+        return
+    }
+
+    Move-Item $builtImage $outPath
+    Remove-Item $tmpOutput -Recurse -Force
+    Write-Information "VM-setup: Windows 11 image ready: $outPath"
 }

@@ -186,7 +186,7 @@ let
   # ---------------------------------------------------------------------------
 
   # Packer templates and the nixos-generators guest config must exist.
-  # Ensures that nucleus-VM-build has all its required input files.
+  # Ensures that nucleus-VM-setup has all its required input files.
   test_packer_templates_exist =
     let
       checks = [
@@ -211,22 +211,22 @@ let
     in
     assert' (builtins.all (r: r == null) results) "Packer template file existence check failed";
 
-  # Build scripts must exist for both POSIX and Windows hosts.
-  test_vm_build_scripts_exist =
+  # VM-setup scripts must exist for both POSIX and Windows hosts.
+  test_vm_setup_scripts_exist =
     let
       checks = [
         {
-          cond = builtins.pathExists ../../scripts/VM-build.sh;
-          msg = "scripts/VM-build.sh must exist";
+          cond = builtins.pathExists ../../scripts/VM-setup.sh;
+          msg = "scripts/VM-setup.sh must exist";
         }
         {
-          cond = builtins.pathExists ../../scripts/VM-build.ps1;
-          msg = "scripts/VM-build.ps1 must exist";
+          cond = builtins.pathExists ../../scripts/VM-setup.ps1;
+          msg = "scripts/VM-setup.ps1 must exist";
         }
       ];
       results = builtins.map (c: assert' c.cond c.msg) checks;
     in
-    assert' (builtins.all (r: r == null) results) "VM build script existence check failed";
+    assert' (builtins.all (r: r == null) results) "VM setup script existence check failed";
 
   # guest.nix must be non-empty (parseable as a Nix expression).
   test_guest_nix_nonempty =
@@ -251,7 +251,7 @@ in
     test_domain_xml_memory_unit
     test_domain_xml_disk_path_lowercase
     test_packer_templates_exist
-    test_vm_build_scripts_exist
+    test_vm_setup_scripts_exist
     test_guest_nix_nonempty
     ;
 

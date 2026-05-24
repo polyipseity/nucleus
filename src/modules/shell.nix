@@ -121,7 +121,6 @@ in
     (mkNucleusCommand "nucleus-replica-reset" "replica-reset")
     (mkNucleusCommand "nucleus-replica-sync" "replica-sync")
     (mkNucleusCommand "nucleus-update" "update")
-    (mkRepoScriptCommand "nucleus-VM-build" "scripts/VM-build.sh")
     (mkRepoScriptCommand "nucleus-VM-setup" "scripts/VM-setup.sh")
   ];
 
