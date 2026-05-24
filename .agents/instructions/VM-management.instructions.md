@@ -14,15 +14,15 @@ setup scripts.
 
 Required fields for each VM entry:
 
-| Field | Type | Description |
-|---|---|---|
-| `name` | string | Machine-readable identifier used as file/domain name |
-| `display` | string | Human-readable name shown in UTM/virt-manager |
-| `cpus` | int | Number of virtual CPUs |
-| `ramMiB` | int | RAM in MiB |
-| `diskGiB` | int | Boot disk size in GiB |
-| `type` | string | Guest OS family: `"nixos"`, `"windows"`, or `"linux"` |
-| `shareDevDir` | bool | Mount `~/dev` inside the guest via VirtioFS |
+| Field         | Type   | Description                                           |
+| ------------- | ------ | ----------------------------------------------------- |
+| `name`        | string | Machine-readable identifier used as file/domain name  |
+| `display`     | string | Human-readable name shown in UTM/virt-manager         |
+| `cpus`        | int    | Number of virtual CPUs                                |
+| `ramMiB`      | int    | RAM in MiB                                            |
+| `diskGiB`     | int    | Boot disk size in GiB                                 |
+| `type`        | string | Guest OS family: `"nixos"`, `"windows"`, or `"linux"` |
+| `shareDevDir` | bool   | Mount `~/dev` inside the guest via VirtioFS           |
 
 ## Disk Format
 
