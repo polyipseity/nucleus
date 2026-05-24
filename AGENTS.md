@@ -136,11 +136,18 @@ quick-start commands, and troubleshooting.
 - **YAML extension policy**: use `.yml` for repository YAML files. Do not add
   long-extension YAML filenames. Exception: `.sops.yaml` is required by SOPS
   config discovery and must keep that exact name.
+- **Shell and entry-point filename policy**: all filenames under `scripts/` use
+  all-lowercase kebab-case; acronyms are fully lowercased (e.g., `ai-sync.sh`,
+  `vm-setup.sh`). Nix test files under `tests/nix/` follow the same
+  all-lowercase kebab-case convention with a `-tests.nix` suffix (e.g.,
+  `ai-sync-tests.nix`, `vm-setup-tests.nix`).
 - **PowerShell filename policy**: when adding or renaming standalone PowerShell
-  entry points, use PascalCase `Verb-Noun` filenames with approved verbs.
-  Files in `scripts/` are the exception: they keep the paired shell basename so
-  the `.sh` and `.ps1` entry points stay aligned; `check-pwsh.ps1` is the
-  intentional runtime-specific exception to `check-sh.sh`.
+  entry points under `src/hosts/windows/modules/`, use PascalCase `Verb-Noun`
+  filenames with approved verbs; acronyms preserve their standard all-caps form
+  (e.g., `Invoke-AISync.ps1`, `Invoke-VMSetup.ps1`). Files in `scripts/` are
+  the exception: they keep the paired shell basename so the `.sh` and `.ps1`
+  entry points stay aligned; `check-pwsh.ps1` is the intentional
+  runtime-specific exception to `check-sh.sh`.
 - **Windows module path**: organize reusable PowerShell functions under
   `src/hosts/windows/modules/` in domain-based subdirectories — `secrets/`
   (decryption and SOPS lifecycle), `system/` (machine-level services),
