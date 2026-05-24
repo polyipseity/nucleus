@@ -158,6 +158,6 @@ in
       value = {
         text = mkConfigPlist vm;
       };
-    }) vmsData.vms
+    }) vmsData.VMs
   );
 }

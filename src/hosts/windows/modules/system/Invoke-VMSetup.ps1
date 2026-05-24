@@ -69,7 +69,7 @@ function Invoke-VMSetup {
     # Phase 1 — Build images (if absent)
     # -------------------------------------------------------------------------
 
-    foreach ($vm in $vmDef.vms) {
+    foreach ($vm in $vmDef.VMs) {
         # Apply -NixosOnly / -WindowsOnly filter.
         if ($NixosOnly   -and $vm.type -ne 'nixos')   { continue }
         if ($WindowsOnly -and $vm.type -ne 'windows') { continue }
@@ -83,6 +83,9 @@ function Invoke-VMSetup {
                 Invoke-BuildWindowsImage -VmName $vm.name -DiskGiB $vm.diskGiB `
                     -WindowsIso $WindowsIso -Accelerator $Accelerator `
                     -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
+            }
+            'macos' {
+                Write-Information "VM-setup: macOS image must be obtained manually (licensing restricts automation)"
             }
             default {
                 Write-Information "VM-setup: skipping build for '$($vm.name)' (unsupported type: $($vm.type))"
@@ -106,7 +109,7 @@ function Invoke-VMSetup {
         }
     }
 
-    foreach ($vm in $vmDef.vms) {
+    foreach ($vm in $vmDef.VMs) {
         # Apply -NixosOnly / -WindowsOnly filter.
         if ($NixosOnly   -and $vm.type -ne 'nixos')   { continue }
         if ($WindowsOnly -and $vm.type -ne 'windows') { continue }

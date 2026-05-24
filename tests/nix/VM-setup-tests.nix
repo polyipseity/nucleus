@@ -37,14 +37,14 @@ let
   # All VMs pass field validation.
   test_required_fields =
     let
-      results = builtins.map validateVm manifest.vms;
+      results = builtins.map validateVm manifest.VMs;
     in
-    assert' (builtins.length manifest.vms > 0) "VMs.json must declare at least one VM";
+    assert' (builtins.length manifest.VMs > 0) "VMs.json must declare at least one VM";
 
   # Disk sizes must be positive integers.
   test_disk_sizes =
     let
-      badDisks = builtins.filter (vm: vm.diskGiB <= 0) manifest.vms;
+      badDisks = builtins.filter (vm: vm.diskGiB <= 0) manifest.VMs;
     in
     assert' (badDisks == [ ])
       "Every VM must have diskGiB > 0; bad entries: ${
@@ -54,7 +54,7 @@ let
   # RAM sizes must be positive integers.
   test_ram_sizes =
     let
-      badRam = builtins.filter (vm: vm.ramMiB <= 0) manifest.vms;
+      badRam = builtins.filter (vm: vm.ramMiB <= 0) manifest.VMs;
     in
     assert' (badRam == [ ])
       "Every VM must have ramMiB > 0; bad entries: ${
@@ -64,7 +64,7 @@ let
   # CPU counts must be positive integers.
   test_cpu_counts =
     let
-      badCpus = builtins.filter (vm: vm.cpus <= 0) manifest.vms;
+      badCpus = builtins.filter (vm: vm.cpus <= 0) manifest.VMs;
     in
     assert' (badCpus == [ ])
       "Every VM must have cpus > 0; bad entries: ${builtins.toString (builtins.map (v: v.name) badCpus)}";
@@ -72,19 +72,20 @@ let
   # VM names must be non-empty strings.
   test_vm_names =
     let
-      badNames = builtins.filter (vm: vm.name == "") manifest.vms;
+      badNames = builtins.filter (vm: vm.name == "") manifest.VMs;
     in
     assert' (badNames == [ ]) "Every VM must have a non-empty name";
 
   # VM types must be one of the known values.
   validTypes = [
+    "linux"
+    "macos"
     "nixos"
     "windows"
-    "linux"
   ];
   test_vm_types =
     let
-      badTypes = builtins.filter (vm: !(builtins.elem vm.type validTypes)) manifest.vms;
+      badTypes = builtins.filter (vm: !(builtins.elem vm.type validTypes)) manifest.VMs;
     in
     assert' (badTypes == [ ])
       "Every VM must have a valid type (${builtins.toString validTypes}); bad entries: ${
@@ -94,7 +95,7 @@ let
   # shareDevDir must be a boolean.
   test_share_dev_dir_types =
     let
-      badShare = builtins.filter (vm: !builtins.isBool vm.shareDevDir) manifest.vms;
+      badShare = builtins.filter (vm: !builtins.isBool vm.shareDevDir) manifest.VMs;
     in
     assert' (badShare == [ ])
       "shareDevDir must be a boolean for all VMs; bad entries: ${
@@ -121,7 +122,7 @@ let
         vm:
         assert' (builtins.stringLength (mkUuid vm.name) == 36)
           "UUID for VM '${vm.name}' must be 36 characters; got ${toString (builtins.stringLength (mkUuid vm.name))}";
-      results = builtins.map checkUuid manifest.vms;
+      results = builtins.map checkUuid manifest.VMs;
     in
     # Force evaluation of all results.
     assert' (builtins.all (r: r == null) results) "UUID format check failed";
@@ -129,7 +130,7 @@ let
   # Each VM must have a distinct UUID so UTM and libvirt can tell them apart.
   test_plist_uuid_uniqueness =
     let
-      uuids = builtins.map (vm: mkUuid vm.name) manifest.vms;
+      uuids = builtins.map (vm: mkUuid vm.name) manifest.VMs;
       uniqueUuids = lib.unique uuids;
     in
     assert' (builtins.length uuids == builtins.length uniqueUuids) "All VMs must have distinct UUIDs";
@@ -157,7 +158,7 @@ let
       results = builtins.map (
         vm:
         assert' (lib.hasInfix "<domain type='kvm'>" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must declare type='kvm'"
-      ) manifest.vms;
+      ) manifest.VMs;
     in
     assert' (builtins.all (r: r == null) results) "Domain XML kvm type check failed";
 
@@ -167,7 +168,7 @@ let
       results = builtins.map (
         vm:
         assert' (lib.hasInfix "unit='MiB'" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must specify memory unit='MiB'"
-      ) manifest.vms;
+      ) manifest.VMs;
     in
     assert' (builtins.all (r: r == null) results) "Domain XML memory unit check failed";
 
@@ -177,7 +178,7 @@ let
       results = builtins.map (
         vm:
         assert' (lib.hasInfix "virtual machines/${vm.name}.qcow2" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must use lowercase 'virtual machines' in disk path"
-      ) manifest.vms;
+      ) manifest.VMs;
     in
     assert' (builtins.all (r: r == null) results) "Domain XML disk path check failed";
 

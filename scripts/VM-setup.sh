@@ -242,17 +242,20 @@ build_windows_image() {
 }
 
 build_images() {
-  _count="$(jq '.vms | length' "$MANIFEST")"
+  _count="$(jq '.VMs | length' "$MANIFEST")"
   _i=0
   while [ "$_i" -lt "$_count" ]; do
-    _vm_name="$(jq -r ".vms[$_i].name" "$MANIFEST")"
-    _vm_type="$(jq -r ".vms[$_i].type" "$MANIFEST")"
-    _vm_disk_gib="$(jq -r ".vms[$_i].diskGiB" "$MANIFEST")"
+    _vm_name="$(jq -r ".VMs[$_i].name" "$MANIFEST")"
+    _vm_type="$(jq -r ".VMs[$_i].type" "$MANIFEST")"
+    _vm_disk_gib="$(jq -r ".VMs[$_i].diskGiB" "$MANIFEST")"
 
     if should_include "$_vm_type"; then
       case "$_vm_type" in
         nixos)   build_nixos_image "$_vm_name" ;;
         windows) build_windows_image "$_vm_name" "$_vm_disk_gib" ;;
+        macos)
+          printf 'VM-setup: macOS image must be obtained manually (licensing restricts automation)\n'
+          ;;
         *)
           printf 'VM-setup: skipping build for "%s" (unsupported type: %s)\n' \
             "$_vm_name" "$_vm_type"
@@ -320,12 +323,12 @@ setup_utm_vms() {
     return
   fi
 
-  vm_count=$(jq '.vms | length' "$MANIFEST")
+  vm_count=$(jq '.VMs | length' "$MANIFEST")
   i=0
   while [ "$i" -lt "$vm_count" ]; do
-    vm_name=$(jq -r ".vms[$i].name" "$MANIFEST")
-    vm_display=$(jq -r ".vms[$i].display" "$MANIFEST")
-    vm_type=$(jq -r ".vms[$i].type" "$MANIFEST")
+    vm_name=$(jq -r ".VMs[$i].name" "$MANIFEST")
+    vm_display=$(jq -r ".VMs[$i].display" "$MANIFEST")
+    vm_type=$(jq -r ".VMs[$i].type" "$MANIFEST")
 
     if ! should_include "$vm_type"; then
       i=$((i + 1))
@@ -401,12 +404,12 @@ setup_libvirt_vms() {
     fi
   fi
 
-  vm_count=$(jq '.vms | length' "$MANIFEST")
+  vm_count=$(jq '.VMs | length' "$MANIFEST")
   i=0
   while [ "$i" -lt "$vm_count" ]; do
-    vm_name=$(jq -r ".vms[$i].name" "$MANIFEST")
-    vm_display=$(jq -r ".vms[$i].display" "$MANIFEST")
-    vm_type=$(jq -r ".vms[$i].type" "$MANIFEST")
+    vm_name=$(jq -r ".VMs[$i].name" "$MANIFEST")
+    vm_display=$(jq -r ".VMs[$i].display" "$MANIFEST")
+    vm_type=$(jq -r ".VMs[$i].type" "$MANIFEST")
 
     if ! should_include "$vm_type"; then
       i=$((i + 1))

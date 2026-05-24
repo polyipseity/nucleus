@@ -151,6 +151,6 @@ in
   environment.etc = lib.listToAttrs (
     builtins.map (
       vm: lib.nameValuePair "nucleus/vms/${vm.name}-domain.xml" { text = mkDomainXml vm; }
-    ) vmsData.vms
+    ) vmsData.VMs
   );
 }

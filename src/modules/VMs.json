@@ -1,22 +1,31 @@
 {
-  "vms": [
+  "VMs": [
     {
-      "name": "nixos",
-      "display": "NixOS",
       "cpus": 4,
+      "diskGiB": 128,
+      "display": "macOS",
+      "name": "macos",
       "ramMiB": 8192,
-      "diskGiB": 64,
-      "type": "nixos",
-      "shareDevDir": true
+      "shareDevDir": true,
+      "type": "macos"
     },
     {
-      "name": "windows",
-      "display": "Windows",
       "cpus": 4,
+      "diskGiB": 64,
+      "display": "NixOS",
+      "name": "nixos",
       "ramMiB": 8192,
+      "shareDevDir": true,
+      "type": "nixos"
+    },
+    {
+      "cpus": 4,
       "diskGiB": 128,
-      "type": "windows",
-      "shareDevDir": false
+      "display": "Windows",
+      "name": "windows",
+      "ramMiB": 8192,
+      "shareDevDir": false,
+      "type": "windows"
     }
   ]
 }
