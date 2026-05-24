@@ -7,7 +7,7 @@
 #   apply         Install bootstrap dependencies, then run the src apply flow
 #
 # Options:
-#   --skip-AI-sync  Pass through to nix run .#apply; suppresses the post-apply
+#   --skip-ai-sync  Pass through to nix run .#apply; suppresses the post-apply
 #                   Ollama model sync step.  Useful in CI or on low-bandwidth
 #                   connections where model pulls (2–20 GB) are undesirable.
 #   --replica-sync  Pass through to nix run .#apply; opt in to immediate
@@ -49,7 +49,7 @@ for _bsh_arg in "$@"; do
   fi
 
   case "$_bsh_arg" in
-    --skip-AI-sync)
+    --skip-ai-sync)
       # Model pulls are 2–20 GB; suppress post-apply sync in CI or on
       # low-bandwidth connections.
       skip_ai_sync=true
@@ -100,7 +100,7 @@ run_nix() {
 
 if [ "$COMMAND" = "-h" ] || [ "$COMMAND" = "--help" ] || [ "$COMMAND" = "help" ]; then
   cat <<'EOF'
-Usage: bootstrap.sh [install-deps|apply] [--skip-AI-sync] [--target-user=<name>]
+Usage: bootstrap.sh [install-deps|apply] [--skip-ai-sync] [--target-user=<name>]
 
 Installs Nix (if absent) and the Nix-managed bootstrap dependencies
 (gnupg, sops, ssh-to-age) for this host.
@@ -110,7 +110,7 @@ Commands:
   apply         Install bootstrap dependencies, then run src apply flow
 
 Options:
-  --skip-AI-sync  Suppress the post-apply Ollama model sync step.  Useful in
+  --skip-ai-sync  Suppress the post-apply Ollama model sync step.  Useful in
                   CI or on low-bandwidth connections where model pulls
                   (2–20 GB each) are undesirable.
   --replica-sync  Opt in to immediate post-apply replica sync. By default
@@ -334,7 +334,7 @@ if [ "$COMMAND" = "apply" ]; then
   # here too would print "health checks passed" twice and slow bootstrap down.
   set --
   if [ "$skip_ai_sync" = true ]; then
-    set -- "$@" --skip-AI-sync
+    set -- "$@" --skip-ai-sync
   fi
   if [ "$replica_sync" = true ]; then
     set -- "$@" --replica-sync

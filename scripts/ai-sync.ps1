@@ -7,7 +7,7 @@
   Thin scripts/ entrypoint wrapper around `Invoke-AISync` from
   `src/hosts/windows/modules/Invoke-AISync.ps1`.
 
-  This mirrors `scripts/AI-sync.sh` on POSIX hosts so operators can run
+  This mirrors `scripts/ai-sync.sh` on POSIX hosts so operators can run
   model convergence directly from `scripts/` on any platform.
 
 .PARAMETER DryRun
@@ -22,16 +22,16 @@
 
 
 .EXAMPLE
-  .\scripts\AI-sync.ps1
+  .\scripts\ai-sync.ps1
 
 .EXAMPLE
-  .\scripts\AI-sync.ps1 -DryRun
+  .\scripts\ai-sync.ps1 -DryRun
 
 .EXAMPLE
-  .\scripts\AI-sync.ps1 -PruneOnly
+  .\scripts\ai-sync.ps1 -PruneOnly
 
 .EXAMPLE
-  .\scripts\AI-sync.ps1 -ServerReadyTimeoutSeconds 60
+  .\scripts\ai-sync.ps1 -ServerReadyTimeoutSeconds 60
 #>
 [CmdletBinding()]
 param(
@@ -46,7 +46,7 @@ $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..'))
 $modulePath = Join-Path -Path $repoRoot -ChildPath 'src\hosts\windows\modules\Invoke-AISync.ps1'
 
 if (-not (Test-Path -LiteralPath $modulePath)) {
-  throw "AI-sync: module not found at '$modulePath'."
+  throw "ai-sync: module not found at '$modulePath'."
 }
 
 . $modulePath

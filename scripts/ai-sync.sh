@@ -39,18 +39,18 @@ ready_poll_seconds="${OLLAMA_READY_POLL_SECONDS:-2}"
 
 case "$ready_timeout_seconds" in
   ''|*[!0-9]*)
-    printf '%s\n' "AI-sync: OLLAMA_READY_TIMEOUT_SECONDS must be a non-negative integer" >&2
+    printf '%s\n' "ai-sync: OLLAMA_READY_TIMEOUT_SECONDS must be a non-negative integer" >&2
     exit 1
     ;;
 esac
 
 case "$ready_poll_seconds" in
   ''|*[!0-9]*)
-    printf '%s\n' "AI-sync: OLLAMA_READY_POLL_SECONDS must be a positive integer" >&2
+    printf '%s\n' "ai-sync: OLLAMA_READY_POLL_SECONDS must be a positive integer" >&2
     exit 1
     ;;
   0)
-    printf '%s\n' "AI-sync: OLLAMA_READY_POLL_SECONDS must be greater than zero" >&2
+    printf '%s\n' "ai-sync: OLLAMA_READY_POLL_SECONDS must be greater than zero" >&2
     exit 1
     ;;
 esac
@@ -64,7 +64,7 @@ while [ "$#" -gt 0 ]; do
       prune_only=true
       ;;
     *)
-      printf '%s\n' "AI-sync: unsupported argument '$1'" >&2
+      printf '%s\n' "ai-sync: unsupported argument '$1'" >&2
       exit 1
       ;;
   esac
@@ -94,7 +94,7 @@ wait_for_ollama_server() {
     return 1
   fi
 
-  printf '%s\n' "AI-sync: waiting up to ${ready_timeout_seconds}s for ollama server readiness..."
+  printf '%s\n' "ai-sync: waiting up to ${ready_timeout_seconds}s for ollama server readiness..."
   _waited=0
   while [ "$_waited" -lt "$ready_timeout_seconds" ]; do
     sleep "$ready_poll_seconds"
@@ -110,7 +110,7 @@ wait_for_ollama_server() {
 # Fail fast if jq is unavailable: the manifest is JSON and the rest of the
 # script depends on jq for reliable parsing.
 if ! command -v jq >/dev/null 2>&1; then
-  printf '%s\n' "AI-sync: jq not found; cannot parse manifest" >&2
+  printf '%s\n' "ai-sync: jq not found; cannot parse manifest" >&2
   exit 1
 fi
 
@@ -121,14 +121,14 @@ fi
 # any unexpected `ollama list` failure — such as a crashed server — still
 # surfaces as an error.
 if ! command -v ollama >/dev/null 2>&1; then
-  printf '%s\n' "AI-sync: ollama not found; skipping sync"
+  printf '%s\n' "ai-sync: ollama not found; skipping sync"
   exit 0
 fi
 # Test probe: `ollama list` exits non-zero when the server is unreachable.
 # Wait for a bounded period after apply so first-run daemon startup races do
 # not silently skip model pulls on otherwise healthy hosts.
 if ! wait_for_ollama_server; then
-  printf '%s\n' "AI-sync: ollama server unavailable after waiting ${ready_timeout_seconds}s; skipping sync"
+  printf '%s\n' "ai-sync: ollama server unavailable after waiting ${ready_timeout_seconds}s; skipping sync"
   exit 0
 fi
 
@@ -150,9 +150,9 @@ if [ "$prune_only" = false ]; then
       continue
     fi
     if [ "$dry_run" = true ]; then
-      printf '%s\n' "AI-sync: would pull $model"
+      printf '%s\n' "ai-sync: would pull $model"
     else
-      printf '%s\n' "AI-sync: pulling $model"
+      printf '%s\n' "ai-sync: pulling $model"
       ollama pull "$model"
     fi
   done
@@ -169,9 +169,9 @@ printf '%s\n' "$installed_models" | while IFS= read -r model; do
     continue
   fi
   if [ "$dry_run" = true ]; then
-    printf '%s\n' "AI-sync: would remove $model"
+    printf '%s\n' "ai-sync: would remove $model"
   else
-    printf '%s\n' "AI-sync: removing $model"
+    printf '%s\n' "ai-sync: removing $model"
     ollama rm "$model"
   fi
 done
@@ -184,4 +184,4 @@ if [ "$prune_only" = true ]; then
   _summary_flags="${_summary_flags}, prune-only mode (no pulls)"
 fi
 
-printf '%s\n' "AI-sync: sync completed (profile=$profile${_summary_flags})"
+printf '%s\n' "ai-sync: sync completed (profile=$profile${_summary_flags})"

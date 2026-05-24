@@ -3,7 +3,7 @@ let
 
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
 
-  aiSyncText = builtins.readFile ../../scripts/AI-sync.sh;
+  aiSyncText = builtins.readFile ../../scripts/ai-sync.sh;
   flakeText = builtins.readFile ../../src/flake.nix;
   gcText = builtins.readFile ../../scripts/gc.sh;
 in
