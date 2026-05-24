@@ -77,12 +77,23 @@ run_cmd() {
 create_qcow2_disk() {
   _disk_path="$1"
   _disk_gib="$2"
+  _vm_name="$3"
   if [ -f "$_disk_path" ]; then
     printf 'VM-setup: disk already exists: %s\n' "$_disk_path"
     return
   fi
+  # Use a pre-built image from VM-build.sh if one exists.
+  # Pre-built images live at ~/virtual machines/images/<name>.qcow2 and
+  # contain a fully-installed OS, eliminating manual guest installation.
+  _prebuilt="$VM_DIR/images/${_vm_name}.qcow2"
+  if [ -f "$_prebuilt" ]; then
+    printf 'VM-setup: using pre-built image from VM-build: %s\n' "$_prebuilt"
+    run_cmd cp "$_prebuilt" "$_disk_path"
+    return
+  fi
   if command -v qemu-img >/dev/null 2>&1; then
-    printf 'VM-setup: creating QCOW2 disk (%s GiB): %s\n' "$_disk_gib" "$_disk_path"
+    printf 'VM-setup: creating empty QCOW2 disk (%s GiB): %s\n' "$_disk_gib" "$_disk_path"
+    printf 'VM-setup: tip: run nucleus-VM-build first to get a pre-built image with the OS already installed\n'
     run_cmd qemu-img create -f qcow2 "$_disk_path" "${_disk_gib}G"
   else
     # Fallback: create a sparse raw disk image.  On macOS this produces a
@@ -90,6 +101,7 @@ create_qcow2_disk() {
     # The guest can use this as a raw disk; convert to QCOW2 later with
     # `qemu-img convert -f raw -O qcow2 <raw> <qcow2>`.
     printf 'VM-setup: qemu-img not found; creating sparse raw disk (%s GiB): %s\n' "$_disk_gib" "$_disk_path"
+    printf 'VM-setup: tip: run nucleus-VM-build first to get a pre-built image with the OS already installed\n'
     run_cmd dd if=/dev/zero bs=1 count=0 seek=$((_disk_gib * 1073741824)) of="$_disk_path" 2>/dev/null || true
   fi
 }
@@ -183,7 +195,7 @@ setup_utm_vms() {
 
     if [ "$dry_run" = false ]; then
       mkdir -p "$images_dir"
-      create_qcow2_disk "$disk_file" "$vm_disk"
+      create_qcow2_disk "$disk_file" "$vm_disk" "$vm_name"
       cp "$_plist_template" "$config_plist"
       printf 'VM-setup: UTM bundle created: %s\n' "$bundle"
       # Register with UTM by opening the bundle package.
@@ -234,7 +246,7 @@ setup_libvirt_vms() {
 
     if [ "$dry_run" = false ]; then
       mkdir -p "$VM_DIR"
-      create_qcow2_disk "$disk_path" "$vm_disk"
+      create_qcow2_disk "$disk_path" "$vm_disk" "$vm_name"
     else
       printf 'VM-setup: [dry-run] create disk %s (%s GiB)\n' "$disk_path" "$vm_disk"
     fi

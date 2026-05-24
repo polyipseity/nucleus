@@ -1,0 +1,153 @@
+# vms/nixos/packer.pkr.hcl — Packer template for building a NixOS QCOW2 image.
+#
+# Used by scripts/VM-build.ps1 on Windows hosts to build the NixOS guest image
+# via QEMU.  On macOS/NixOS hosts, scripts/VM-build.sh uses nixos-generators
+# directly (faster, no Packer needed).
+#
+# Usage (from repo root):
+#   cd vms/nixos && packer init . && packer build \
+#     [-var accelerator=whpx] \
+#     .
+#
+# Accelerator options:
+#   whpx  — Windows HyperVisor Platform (fast; requires enabling in Windows
+#            Features: "Windows Hypervisor Platform")
+#   tcg   — Software emulation (slow; works everywhere)
+#
+# Output: <output_directory>/nixos.qcow2
+#
+# Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
+#         https://nixos.org/manual/nixos/stable/index.html#sec-installation-manual
+
+variable "nixos_iso_url" {
+  type        = string
+  default     = "https://channels.nixos.org/nixos-unstable/latest-nixos-minimal-x86_64-linux.iso"
+  description = "URL to the NixOS minimal installation ISO."
+}
+
+variable "nixos_iso_checksum" {
+  type        = string
+  default     = "none"
+  description = "Checksum for the NixOS ISO (sha256:...).  Set to 'none' to skip."
+}
+
+variable "accelerator" {
+  type        = string
+  default     = "tcg"
+  description = "QEMU accelerator: whpx (Windows HyperVisor Platform) or tcg (software)."
+}
+
+variable "output_directory" {
+  type        = string
+  default     = "output"
+  description = "Directory to write the finished QCOW2 image into."
+}
+
+variable "disk_size" {
+  type        = string
+  default     = "64G"
+  description = "Boot disk size matching VMs.json diskGiB for the NixOS guest."
+}
+
+variable "memory" {
+  type        = number
+  default     = 4096
+  description = "RAM in MiB during the build."
+}
+
+variable "cpus" {
+  type        = number
+  default     = 4
+  description = "vCPUs during the build."
+}
+
+packer {
+  required_plugins {
+    qemu = {
+      source  = "github.com/hashicorp/qemu"
+      version = "~> 1"
+    }
+  }
+}
+
+source "qemu" "nixos" {
+  accelerator    = var.accelerator
+  disk_interface = "virtio"
+  disk_size      = var.disk_size
+  format         = "qcow2"
+  machine_type   = "q35"
+  memory         = var.memory
+  cpus           = var.cpus
+  net_device     = "virtio-net"
+
+  iso_url      = var.nixos_iso_url
+  iso_checksum = var.nixos_iso_checksum
+
+  # SSH communicator: root login is available by default on the NixOS minimal
+  # ISO once sshd is started and a root password is set via boot_command.
+  communicator  = "ssh"
+  ssh_username  = "root"
+  ssh_password  = "packer"
+  ssh_timeout   = "20m"
+
+  # headless = true suppresses the QEMU window; use false for debugging.
+  headless = true
+
+  # boot_command: NixOS minimal boots to an autologin root console within ~40s.
+  # Set root password and start sshd so the SSH communicator can connect.
+  boot_wait = "40s"
+  boot_command = [
+    # Set root password so SSH can authenticate
+    "passwd root<enter><wait2>",
+    "packer<enter><wait>",
+    "packer<enter><wait>",
+    # Ensure sshd is running
+    "systemctl start sshd<enter><wait5>",
+  ]
+
+  output_directory = var.output_directory
+  vm_name          = "nixos.qcow2"
+
+  shutdown_command = "shutdown -h now"
+}
+
+build {
+  sources = ["source.qemu.nixos"]
+
+  # Partition, format, and install NixOS onto /dev/vda.
+  # The configuration mirrors vms/nixos/guest.nix used by nixos-generators.
+  provisioner "shell" {
+    timeout = "60m"
+    inline = [
+      # Partition: MBR with swap + ext4 root
+      "parted -s /dev/vda -- mklabel msdos",
+      "parted -s /dev/vda -- mkpart primary ext4 1MiB -2GiB",
+      "parted -s /dev/vda -- mkpart primary linux-swap -2GiB 100%",
+      "mkfs.ext4 -F /dev/vda1",
+      "mkswap /dev/vda2",
+      # Mount
+      "mount /dev/vda1 /mnt",
+      "swapon /dev/vda2",
+      # Generate hardware configuration
+      "nixos-generate-config --root /mnt",
+      # Write the nucleus NixOS guest configuration
+      "cat > /mnt/etc/nixos/configuration.nix << 'NIXEOF'",
+      "{ config, lib, pkgs, modulesPath, ... }:",
+      "{",
+      "  imports = [ ./hardware-configuration.nix \"${modulesPath}/profiles/qemu-guest.nix\" ];",
+      "  boot.loader.grub.enable = true;",
+      "  boot.loader.grub.device = \"/dev/vda\";",
+      "  networking.hostName = \"nixos\";",
+      "  boot.initrd.availableKernelModules = [ \"virtio_fs\" ];",
+      "  services.openssh = { enable = true; settings.PermitRootLogin = \"yes\"; };",
+      "  users.users.nixos = { isNormalUser = true; extraGroups = [ \"wheel\" ]; initialPassword = \"nixos\"; };",
+      "  security.sudo.wheelNeedsPassword = false;",
+      "  environment.systemPackages = with pkgs; [ git vim ];",
+      "  system.stateVersion = \"25.05\";",
+      "}",
+      "NIXEOF",
+      # Install
+      "nixos-install --no-root-passwd",
+    ]
+  }
+}

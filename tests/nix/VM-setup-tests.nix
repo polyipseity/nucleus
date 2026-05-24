@@ -181,6 +181,60 @@ let
     in
     assert' (builtins.all (r: r == null) results) "Domain XML disk path check failed";
 
+  # ---------------------------------------------------------------------------
+  # VM build artefact tests
+  # ---------------------------------------------------------------------------
+
+  # Packer templates and the nixos-generators guest config must exist.
+  # Ensures that nucleus-VM-build has all its required input files.
+  test_packer_templates_exist =
+    let
+      checks = [
+        {
+          cond = builtins.pathExists ../../vms/nixos/guest.nix;
+          msg = "vms/nixos/guest.nix must exist for nixos-generators builds";
+        }
+        {
+          cond = builtins.pathExists ../../vms/nixos/packer.pkr.hcl;
+          msg = "vms/nixos/packer.pkr.hcl must exist for Windows-host NixOS builds";
+        }
+        {
+          cond = builtins.pathExists ../../vms/windows/packer.pkr.hcl;
+          msg = "vms/windows/packer.pkr.hcl must exist for Windows 11 builds";
+        }
+        {
+          cond = builtins.pathExists ../../vms/windows/Autounattend.xml;
+          msg = "vms/windows/Autounattend.xml must exist for Windows 11 Packer builds";
+        }
+      ];
+      results = builtins.map (c: assert' c.cond c.msg) checks;
+    in
+    assert' (builtins.all (r: r == null) results) "Packer template file existence check failed";
+
+  # Build scripts must exist for both POSIX and Windows hosts.
+  test_vm_build_scripts_exist =
+    let
+      checks = [
+        {
+          cond = builtins.pathExists ../../scripts/VM-build.sh;
+          msg = "scripts/VM-build.sh must exist";
+        }
+        {
+          cond = builtins.pathExists ../../scripts/VM-build.ps1;
+          msg = "scripts/VM-build.ps1 must exist";
+        }
+      ];
+      results = builtins.map (c: assert' c.cond c.msg) checks;
+    in
+    assert' (builtins.all (r: r == null) results) "VM build script existence check failed";
+
+  # guest.nix must be non-empty (parseable as a Nix expression).
+  test_guest_nix_nonempty =
+    let
+      content = builtins.readFile ../../vms/nixos/guest.nix;
+    in
+    assert' (builtins.stringLength content > 0) "vms/nixos/guest.nix must not be empty";
+
 in
 {
   inherit
@@ -196,6 +250,9 @@ in
     test_domain_xml_kvm_type
     test_domain_xml_memory_unit
     test_domain_xml_disk_path_lowercase
+    test_packer_templates_exist
+    test_vm_build_scripts_exist
+    test_guest_nix_nonempty
     ;
 
   summary = "VM-setup-tests: all tests passed";

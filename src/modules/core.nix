@@ -84,6 +84,8 @@ let
   #                    (run `nix-index` once after first activation to build the file-index database)
   #   opencode       — AI-native coding agent and assistant
   #   p7zip          — 7z compression and archive extraction utility
+  #   packer         — HashiCorp Packer for automated VM image building (scripts/VM-build.sh)
+  #                    (Windows: HashiCorp.Packer in system.dsc.yml)
   #   pay-respects    — corrects errors in previous console commands; actively maintained fork of thefuck
   #   pi-coding-agent — coding agent CLI with read, bash, edit, write tools and session management
   #                     (Windows parity not practical: no WinGet/Scoop/cargo-binstall package; npm-only install)
@@ -125,6 +127,7 @@ let
     pkgs.nix-index
     pkgs.opencode
     pkgs.p7zip
+    pkgs.packer
     pkgs.pay-respects
     pkgs.pi-coding-agent
     pkgs.powershell

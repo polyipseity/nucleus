@@ -42,4 +42,5 @@
 - `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
-- `nucleus-VM-setup` — provision QEMU VMs declared in `src/modules/VMs.json`; run once per machine. Requires QEMU (`scoop install qemu`). Run the generated `Start-<Name>.ps1` scripts in `%USERPROFILE%\virtual machines\` (add `-cdrom <iso>` for installation). See the generated `<name>-configure.sh` for the guest configuration command.
+- `nucleus-VM-build` — build pre-built QCOW2 OS images for VMs; eliminates manual guest installation after `nucleus-VM-setup`. NixOS guest uses Packer + NixOS ISO (auto-downloaded). Windows 11 guest requires `-WindowsIso C:\path\to\Win11.iso` (download from https://www.microsoft.com/software-download/windows11). Use `-Accelerator whpx` if Windows HyperVisor Platform is enabled.
+- `nucleus-VM-setup` — provision QEMU VMs declared in `src/modules/VMs.json`; run once per machine. Uses pre-built images from `nucleus-VM-build` if present; otherwise creates empty disks. Requires QEMU (managed by Scoop). Run the generated `Start-<Name>.ps1` in `%USERPROFILE%\virtual machines\` (add `-cdrom <iso>` for manual installation). See the generated `<name>-configure.sh` for the guest configuration command.

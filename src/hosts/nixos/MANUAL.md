@@ -44,4 +44,5 @@
 - `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
-- `nucleus-VM-setup` — provision KVM/libvirt VMs declared in `src/modules/VMs.json`; run once per machine. Requires `libvirtd` active (from `VMs.nix`). Attach an ISO via `virt-manager` or `virsh` to install the guest OS, then run the generated `~/virtual machines/<name>-configure.sh` inside the VM.
+- `nucleus-VM-build` — build pre-built QCOW2 OS images for VMs; eliminates manual guest installation after `nucleus-VM-setup`. NixOS guest uses `nixos-generators` (no extra tools). Windows 11 guest requires `--windows-iso /path/to/Win11.iso` (download from https://www.microsoft.com/software-download/windows11).
+- `nucleus-VM-setup` — provision KVM/libvirt VMs declared in `src/modules/VMs.json`; run once per machine. Uses pre-built images from `nucleus-VM-build` if present; otherwise creates empty disks. Requires `libvirtd` active (from `VMs.nix`). Attach an ISO via `virt-manager` or `virsh` if installing manually, then run the generated `~/virtual machines/<name>-configure.sh` inside the VM.

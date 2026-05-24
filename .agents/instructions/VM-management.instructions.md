@@ -1,7 +1,7 @@
 ---
-description: "Use when adding, editing, or reviewing virtual machine provisioning in scripts/VM-setup.sh, scripts/VM-setup.ps1, src/hosts/nixos/VMs.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, or src/modules/VMs.json."
+description: "Use when adding, editing, or reviewing virtual machine provisioning in scripts/VM-setup.sh, scripts/VM-setup.ps1, scripts/VM-build.sh, scripts/VM-build.ps1, src/hosts/nixos/VMs.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, src/hosts/windows/modules/system/Invoke-VMBuild.ps1, src/modules/VMs.json, vms/nixos/, or vms/windows/."
 name: "VM Management"
-applyTo: "scripts/VM-setup.sh, scripts/VM-setup.ps1, src/hosts/nixos/VMs.nix, src/hosts/macbook/VMs.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, tests/nix/VM-setup-tests.nix"
+applyTo: "scripts/VM-setup.sh, scripts/VM-setup.ps1, scripts/VM-build.sh, scripts/VM-build.ps1, src/hosts/nixos/VMs.nix, src/hosts/macbook/VMs.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, src/hosts/windows/modules/system/Invoke-VMBuild.ps1, src/modules/VMs.json, tests/nix/VM-setup-tests.nix, vms/nixos/guest.nix, vms/nixos/packer.pkr.hcl, vms/windows/packer.pkr.hcl, vms/windows/Autounattend.xml"
 ---
 
 # VM Management
@@ -32,6 +32,10 @@ Stored at:
 - macOS: `~/virtual machines/<name>.utm/Images/disk-main.qcow2`
 - NixOS: `~/virtual machines/<name>.qcow2`
 - Windows: `%USERPROFILE%\virtual machines\<name>.qcow2`
+
+Pre-built images (from `nucleus-VM-build`) land in `~/virtual machines/images/<name>.qcow2`
+(Windows: `%USERPROFILE%\virtual machines\images\<name>.qcow2`).
+VM-setup detects these and copies them to the disk location instead of creating empty disks.
 
 QCOW2 enables copy-based migration between hosts without conversion.
 
@@ -86,9 +90,60 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 ## Adding a New VM
 
 1. Add an entry to `src/modules/VMs.json` with all required fields.
-2. Run `nucleus-VM-setup` on all three host platforms.
-3. Add a test in `tests/nix/VM-setup-tests.nix` if the new VM has platform-specific constraints.
-4. Update `src/hosts/<platform>/MANUAL.md` if the VM requires manual steps (ISO attachment, etc.).
+2. Run `nucleus-VM-build` to produce a pre-built OS image (optional but eliminates manual install).
+3. Run `nucleus-VM-setup` on all three host platforms.
+4. Add a test in `tests/nix/VM-setup-tests.nix` if the new VM has platform-specific constraints.
+5. Update `src/hosts/<platform>/MANUAL.md` if the VM requires manual steps.
+
+## VM Image Building
+
+Pre-built QCOW2 images eliminate the manual OS installation step normally required after VM-setup.
+
+### Files
+
+| File                                          | Purpose                                                          |
+| --------------------------------------------- | ---------------------------------------------------------------- |
+| `vms/nixos/guest.nix`                         | NixOS guest configuration for `nixos-generators` (macOS/NixOS)  |
+| `vms/nixos/packer.pkr.hcl`                    | Packer template for NixOS guest on Windows hosts                 |
+| `vms/windows/packer.pkr.hcl`                  | Packer template for Windows 11 guest on all hosts                |
+| `vms/windows/Autounattend.xml`                | Windows 11 answer file (unattended install, TPM bypass, WinRM)   |
+| `scripts/VM-build.sh`                         | Build script for macOS and NixOS hosts                           |
+| `scripts/VM-build.ps1`                        | Windows wrapper calling `Invoke-VMBuild.ps1`                     |
+| `src/hosts/windows/modules/system/Invoke-VMBuild.ps1` | Actual build logic for Windows hosts                   |
+
+### Build strategies
+
+**NixOS guest on macOS/NixOS** (`nucleus-VM-build --nixos-only`):
+- Uses `nix run github:nix-community/nixos-generators` to build from `vms/nixos/guest.nix`.
+- Architecture-aware: `qcow-efi` (UEFI) on aarch64 hosts (UTM on Apple Silicon), `qcow` (BIOS) on x86_64.
+- No Packer required; just `nix` command which is always present.
+
+**NixOS guest on Windows** (`nucleus-VM-build --nixos-only`):
+- Uses Packer with `vms/nixos/packer.pkr.hcl` and QEMU builder.
+- Downloads NixOS minimal ISO, boots via QEMU, sets root password, SSH-installs NixOS.
+- `whpx` accelerator strongly recommended (Windows Hypervisor Platform); `tcg` works but is very slow.
+
+**Windows 11 guest (all hosts)** (`nucleus-VM-build --windows-only --windows-iso /path/to/Win11.iso`):
+- Uses Packer with `vms/windows/packer.pkr.hcl` and QEMU builder.
+- Requires a Windows 11 ISO (download from https://www.microsoft.com/software-download/windows11).
+- SATA disk during build → VirtIO drivers installed post-install → final image is VirtIO-disk ready.
+- Autounattend.xml bypasses TPM/Secure Boot checks, enables WinRM for Packer, creates `packer` account.
+- Change the `packer` password and apply the nucleus Windows config after first boot.
+
+### Image location
+
+Images land at:
+- macOS/NixOS: `~/virtual machines/images/<name>.qcow2`
+- Windows: `%USERPROFILE%\virtual machines\images\<name>.qcow2`
+
+`nucleus-VM-setup` auto-detects and copies these when creating VM disks.
+Delete an image and re-run `nucleus-VM-build` to rebuild from scratch.
+
+### Packer requirements
+
+- Packer installed as `pkgs.packer` (POSIX) / `HashiCorp.Packer` WinGet (Windows).
+- QEMU available (existing `pkgs.qemu` on POSIX / Scoop on Windows).
+- Windows builds only: `winrm_timeout = "3h"` — builds can take 30–90 minutes.
 
 ## Removing a VM
 

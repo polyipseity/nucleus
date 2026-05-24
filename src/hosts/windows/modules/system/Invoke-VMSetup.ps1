@@ -63,14 +63,27 @@ function Invoke-VMSetup {
         Write-Information "VM-setup: configuring VM '$($vm.display)'..."
 
         # Create QCOW2 disk if absent.
+        # Use a pre-built image from Invoke-VMBuild if one exists at
+        # <vmDir>\images\<name>.qcow2 (placed there by scripts\VM-build.ps1).
+        $prebuilt = Join-Path $vmDir "images\$($vm.name).qcow2"
         if (Test-Path $diskPath) {
             Write-Information "VM-setup: disk already exists: $diskPath"
+        } elseif (Test-Path $prebuilt) {
+            # Copy pre-built image; it contains a fully-installed OS so no
+            # manual installation step is needed after VM-setup completes.
+            Write-Information "VM-setup: using pre-built image from VM-build: $prebuilt"
+            if (-not $DryRun) {
+                Copy-Item $prebuilt $diskPath
+            } else {
+                Write-Information "VM-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
+            }
         } elseif ($null -ne $qemuImg) {
             $diskSizeArg = "$($vm.diskGiB)G"
             if ($DryRun) {
                 Write-Information "VM-setup: [dry-run] & '$qemuImg' create -f qcow2 '$diskPath' $diskSizeArg"
             } else {
-                Write-Information "VM-setup: creating QCOW2 disk ($($vm.diskGiB) GiB): $diskPath"
+                Write-Information "VM-setup: creating empty QCOW2 disk ($($vm.diskGiB) GiB): $diskPath"
+                Write-Information "VM-setup: tip: run nucleus-VM-build first to get a pre-built image with the OS already installed"
                 & $qemuImg create -f qcow2 $diskPath $diskSizeArg
                 if ($LASTEXITCODE -ne 0) {
                     Write-Warning "VM-setup: qemu-img failed for '$($vm.name)'; disk not created"

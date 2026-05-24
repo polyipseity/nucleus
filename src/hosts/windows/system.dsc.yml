@@ -52,6 +52,15 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          Ensure HashiCorp Packer is installed for automated VM image building
+          (scripts\VM-build.ps1; cross-host parity with pkgs.packer on macOS/NixOS).
+      settings:
+        id: HashiCorp.Packer
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure uv is installed for cross-host Python workflow parity with macOS and NixOS
       settings:
         id: astral-sh.uv
