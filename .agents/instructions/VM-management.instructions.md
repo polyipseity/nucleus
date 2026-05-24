@@ -1,7 +1,7 @@
 ---
 description: "Use when adding, editing, or reviewing virtual machine provisioning in scripts/VM-setup.sh, scripts/VM-setup.ps1, src/hosts/nixos/VMs.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, or src/modules/VMs.json."
 name: "VM Management"
-applyTo: "scripts/VM-setup.sh, scripts/VM-setup.ps1, src/hosts/nixos/VMs.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, tests/nix/VM-setup-tests.nix"
+applyTo: "scripts/VM-setup.sh, scripts/VM-setup.ps1, src/hosts/nixos/VMs.nix, src/hosts/macbook/VMs.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, tests/nix/VM-setup-tests.nix"
 ---
 
 # VM Management
@@ -39,10 +39,12 @@ QCOW2 enables copy-based migration between hosts without conversion.
 
 - VM backend: UTM 4.x QEMU backend.
 - Bundle location: `~/virtual machines/<name>.utm/`
-- Config file: `config.plist` generated via `/usr/libexec/PlistBuddy`.
+- Config template: `config.plist` pre-generated at
+  `~/.local/share/nucleus/vms/<name>-config.plist` by `src/hosts/macbook/VMs.nix`
+  at Home Manager activation time; `VM-setup.sh` copies it into the bundle.
 - Disk pre-created in `Images/disk-main.qcow2` using `qemu-img` (from `pkgs.qemu` via nixpkgs).
 - After provisioning, UTM opens each bundle automatically; attach an installation ISO to install the guest OS.
-- VirtioFS shared directory: configured via `Sharing.DirectoryShare` in config.plist.
+- VirtioFS shared directory: configured via `Sharing.DirectoryShare` in the Nix-generated config.plist.
 - Network: Shared (NAT) mode on all VMs.
 - `utmctl` CLI path: `/Applications/UTM.app/Contents/MacOS/utmctl`.
 - Configure script: `~/virtual machines/<name>-configure.sh` written on first provisioning.
@@ -52,7 +54,8 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - VM infrastructure declared in `src/hosts/nixos/VMs.nix` (system module).
 - Package: `qemu_kvm`, `virt-manager`, `virt-viewer`, `virtiofsd` in `environment.systemPackages`.
 - User groups: `kvm` and `libvirtd` added to the managed user via `lib.mkAfter` in `VMs.nix`.
-- Disk images registered with `virsh define` using generated libvirt XML.
+- Domain XML pre-generated at `/etc/nucleus/vms/<name>-domain.xml` by `src/hosts/nixos/VMs.nix`
+  at NixOS activation time; `VM-setup.sh` calls `virsh define` on the pre-generated file (idempotent).
 - VirtioFS shared directory: uses `virtiofsd` daemon; configured in the XML domain definition.
 - SPICE display + clipboard sharing enabled by default.
 - OVMF firmware (UEFI) and swtpm (TPM 2.0) enabled for Windows 11 compatibility.

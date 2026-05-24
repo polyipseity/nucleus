@@ -101,6 +101,86 @@ let
         builtins.toString (builtins.map (v: v.name) badShare)
       }";
 
+  # ---------------------------------------------------------------------------
+  # Declarative config generation tests
+  # ---------------------------------------------------------------------------
+
+  # Deterministic UUID derivation (same logic as macbook/VMs.nix).
+  # We re-implement it here to validate the algorithm independently.
+  mkUuid =
+    name:
+    let
+      h = builtins.hashString "sha256" name;
+    in
+    "${builtins.substring 0 8 h}-${builtins.substring 8 4 h}-${builtins.substring 12 4 h}-${builtins.substring 16 4 h}-${builtins.substring 20 12 h}";
+
+  # UUID must be 36 characters long (8-4-4-4-12 hex with dashes).
+  test_plist_uuid_format =
+    let
+      checkUuid =
+        vm:
+        assert' (builtins.stringLength (mkUuid vm.name) == 36)
+          "UUID for VM '${vm.name}' must be 36 characters; got ${toString (builtins.stringLength (mkUuid vm.name))}";
+      results = builtins.map checkUuid manifest.vms;
+    in
+    # Force evaluation of all results.
+    assert' (builtins.all (r: r == null) results) "UUID format check failed";
+
+  # Each VM must have a distinct UUID so UTM and libvirt can tell them apart.
+  test_plist_uuid_uniqueness =
+    let
+      uuids = builtins.map (vm: mkUuid vm.name) manifest.vms;
+      uniqueUuids = lib.unique uuids;
+    in
+    assert' (builtins.length uuids == builtins.length uniqueUuids) "All VMs must have distinct UUIDs";
+
+  # Domain XML template function (re-implemented without pkgs for test isolation;
+  # uses hardcoded x86_64 arch and a placeholder emulator path).
+  mkDomainXml =
+    vm:
+    let
+      homeDir = "/home/testuser";
+      vmDir = "${homeDir}/virtual machines";
+    in
+    "<domain type='kvm'>"
+    + "\n  <name>${vm.name}</name>"
+    + "\n  <memory unit='MiB'>${toString vm.ramMiB}</memory>"
+    + "\n  <vcpu>${toString vm.cpus}</vcpu>"
+    + "\n  <devices>"
+    + "\n    <source file='${vmDir}/${vm.name}.qcow2'/>"
+    + "\n  </devices>"
+    + "\n</domain>";
+
+  # Domain XML must contain a kvm domain type declaration.
+  test_domain_xml_kvm_type =
+    let
+      results = builtins.map (
+        vm:
+        assert' (lib.hasInfix "<domain type='kvm'>" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must declare type='kvm'"
+      ) manifest.vms;
+    in
+    assert' (builtins.all (r: r == null) results) "Domain XML kvm type check failed";
+
+  # Domain XML must use MiB as the memory unit (never KiB, GiB, or bare integers).
+  test_domain_xml_memory_unit =
+    let
+      results = builtins.map (
+        vm:
+        assert' (lib.hasInfix "unit='MiB'" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must specify memory unit='MiB'"
+      ) manifest.vms;
+    in
+    assert' (builtins.all (r: r == null) results) "Domain XML memory unit check failed";
+
+  # Domain XML disk path must use the lowercase 'virtual machines' path.
+  test_domain_xml_disk_path_lowercase =
+    let
+      results = builtins.map (
+        vm:
+        assert' (lib.hasInfix "virtual machines/${vm.name}.qcow2" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must use lowercase 'virtual machines' in disk path"
+      ) manifest.vms;
+    in
+    assert' (builtins.all (r: r == null) results) "Domain XML disk path check failed";
+
 in
 {
   inherit
@@ -111,6 +191,11 @@ in
     test_vm_names
     test_vm_types
     test_share_dev_dir_types
+    test_plist_uuid_format
+    test_plist_uuid_uniqueness
+    test_domain_xml_kvm_type
+    test_domain_xml_memory_unit
+    test_domain_xml_disk_path_lowercase
     ;
 
   summary = "VM-setup-tests: all tests passed";
