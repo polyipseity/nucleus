@@ -2,7 +2,7 @@
 #
 # Enables the libvirtd hypervisor so QEMU/KVM guests can be managed via virsh
 # and virt-manager.  Guest VMs are declared in src/modules/VMs.json and
-# provisioned by scripts/VM-setup.sh (run via `nucleus-VM-setup`).
+# provisioned by scripts/vm-setup.sh (run via `nucleus-vm-setup`).
 #
 # Disk images are stored at ~/virtual machines/<name>.qcow2 in QCOW2 format,
 # enabling copy-based migration to UTM (macOS) or QEMU (Windows) without
@@ -13,7 +13,7 @@
 # /home/<user>/dev inside the VM for seamless cross-host development.
 #
 # Domain XML is generated at Nix evaluation time and installed to
-# /etc/nucleus/vms/<name>-domain.xml so VM-setup.sh can call virsh define
+# /etc/nucleus/vms/<name>-domain.xml so vm-setup.sh can call virsh define
 # without needing to inline the XML at provisioning time.
 {
   config,
@@ -143,7 +143,7 @@ in
     virtiofsd
   ];
 
-  # Pre-generate libvirt domain XML for each declared VM so VM-setup.sh can
+  # Pre-generate libvirt domain XML for each declared VM so vm-setup.sh can
   # call `virsh define /etc/nucleus/vms/<name>-domain.xml` without needing to
   # inline or template the XML at provisioning time.  Files are mode 444
   # (readable by all) so the regular user can pass them to virsh define.

@@ -48,7 +48,7 @@ let
   ) "Windows shell profile must mirror curated shell shortcuts";
 
   test_posix_shell_exposes_managed_commands = assert' (
-    lib.hasInfix ''"nucleus-AI-sync"'' shellText
+    lib.hasInfix ''"nucleus-ai-sync"'' shellText
     && lib.hasInfix ''"nucleus-apply"'' shellText
     && lib.hasInfix ''"nucleus-cloud-setup"'' shellText
     && lib.hasInfix ''"nucleus-gc"'' shellText
@@ -59,7 +59,7 @@ let
   ) "shell.nix must expose the managed nucleus command set";
 
   test_windows_shell_exposes_managed_commands = assert' (
-    lib.hasInfix "function nucleus-AI-sync" windowsShellProfileText
+    lib.hasInfix "function nucleus-ai-sync" windowsShellProfileText
     && lib.hasInfix "function nucleus-apply" windowsShellProfileText
     && lib.hasInfix "function nucleus-cloud-setup" windowsShellProfileText
     && lib.hasInfix "function nucleus-gc" windowsShellProfileText
@@ -80,7 +80,7 @@ let
       && lib.hasInfix "`-ni` — run `bun install`." text
       && lib.hasInfix "`-nr` — run `bun run`." text
       && lib.hasInfix "`-nx` — run `bun x`." text
-      && lib.hasInfix "`nucleus-AI-sync` — run the managed AI model sync flow." text
+      && lib.hasInfix "`nucleus-ai-sync` — run the managed AI model sync flow." text
       && lib.hasInfix "`nucleus-apply` — run the managed apply flow." text
       && lib.hasInfix "`nucleus-gc` — run the managed Nix garbage-collection flow." text
       && lib.hasInfix "`nucleus-health-check` — run the managed repository health checks." text

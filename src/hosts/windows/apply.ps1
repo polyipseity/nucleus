@@ -599,13 +599,13 @@ Write-Output "-------------------------------------------"
 # missing or unreachable ollama binary is informational, not a hard failure,
 # because the system configuration has already been applied successfully.
 if ($SkipAISync) {
-  Write-Output "AI-sync: -SkipAISync set; skipping post-apply model sync"
+  Write-Output "ai-sync: -SkipAISync set; skipping post-apply model sync"
 } else {
   $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaOnPath) {
-    Write-Output "AI-sync: ollama not found in PATH; skipping post-apply model sync"
+    Write-Output "ai-sync: ollama not found in PATH; skipping post-apply model sync"
   } else {
-    Write-Output "AI-sync: running post-apply AI model sync..."
+    Write-Output "ai-sync: running post-apply AI model sync..."
     Invoke-AISync -RepoRoot $repoRoot -ServerReadyTimeoutSeconds 60
   }
 }
@@ -639,12 +639,12 @@ if (-not $runReplicaSync) {
 # This is best-effort: a VM setup failure should not retroactively fail a
 # completed configuration apply.
 if (-not $VMSetup) {
-  Write-Output "VM-setup: -VMSetup not set; skipping post-apply VM provisioning"
+  Write-Output "vm-setup: -VMSetup not set; skipping post-apply VM provisioning"
 } else {
-  Write-Output "VM-setup: running post-apply VM provisioning..."
+  Write-Output "vm-setup: running post-apply VM provisioning..."
   try {
     Invoke-VMSetup -RepoRoot $repoRoot
   } catch {
-    Write-Warning "VM-setup: VM setup incomplete (system apply succeeded): $($_.Exception.Message)"
+    Write-Warning "vm-setup: VM setup incomplete (system apply succeeded): $($_.Exception.Message)"
   }
 }

@@ -34,7 +34,7 @@
 
 ## nucleus commands
 
-- `nucleus-AI-sync` — run the managed AI model sync flow.
+- `nucleus-ai-sync` — run the managed AI model sync flow.
 - `nucleus-apply` — run the managed apply flow.
 - `nucleus-cloud-setup` — configure required cloud remotes and re-run apply.
 - `nucleus-gc` — run the managed Nix garbage-collection flow.
@@ -42,4 +42,4 @@
 - `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
-- `nucleus-VM-setup` — build (if needed) and provision QEMU VMs declared in `src/modules/VMs.json`; run once per machine. NixOS guest uses Packer (ISO auto-downloaded). Windows 11 guest requires `-WindowsIso C:\path\to\Win11.iso` (download from <https://www.microsoft.com/software-download/windows11>); use `-Accelerator whpx` if Windows HyperVisor Platform is enabled. Requires QEMU (managed by Scoop). Run the generated `Start-<Name>.ps1` in `%USERPROFILE%\virtual machines\`. See the generated `<name>-configure.sh` for the guest configuration command.
+- `nucleus-vm-setup` — build (if needed) and provision QEMU VMs declared in `src/modules/VMs.json`; run once per machine. NixOS guest uses Packer (ISO auto-downloaded). Windows 11 guest requires `-WindowsIso C:\path\to\Win11.iso` (download from <https://www.microsoft.com/software-download/windows11>); use `-Accelerator whpx` if Windows HyperVisor Platform is enabled. Requires QEMU (managed by Scoop). Run the generated `Start-<Name>.ps1` in `%USERPROFILE%\virtual machines\`. See the generated `<name>-configure.sh` for the guest configuration command.

@@ -128,7 +128,7 @@ build {
   sources = ["source.qemu.windows11"]
 
   # Install VirtIO drivers so the finished image boots with the virtio disk
-  # interface used in the VM-setup configurations (libvirt XML, UTM plist, and
+  # interface used in the vm-setup configurations (libvirt XML, UTM plist, and
   # QEMU start scripts).  Drivers are downloaded from the stable Fedora mirror.
   #
   # pnputil /add-driver with /install pre-stages the driver in the Windows

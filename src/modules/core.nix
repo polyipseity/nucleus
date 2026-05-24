@@ -84,7 +84,7 @@ let
   #                    (run `nix-index` once after first activation to build the file-index database)
   #   opencode       — AI-native coding agent and assistant
   #   p7zip          — 7z compression and archive extraction utility
-  #   packer         — HashiCorp Packer for automated VM image building (scripts/VM-setup.sh)
+  #   packer         — HashiCorp Packer for automated VM image building (scripts/vm-setup.sh)
   #                    (Windows: HashiCorp.Packer in system.dsc.yml)
   #   pay-respects    — corrects errors in previous console commands; actively maintained fork of thefuck
   #   pi-coding-agent — coding agent CLI with read, bash, edit, write tools and session management
@@ -231,7 +231,7 @@ let
       # formula is listed for completeness but the policy function
       # (defaultBackendFor) will always select nixpkgs for "cli" category.
       # On POSIX hosts this provides qemu-img for QCOW2 disk management
-      # (used by scripts/VM-setup.sh).  On Windows, qemu is managed via Scoop
+      # (used by scripts/vm-setup.sh).  On Windows, qemu is managed via Scoop
       # (see Invoke-ScoopSetup.ps1).
       # Source: https://formulae.brew.sh/formula/qemu
       category = "cli";

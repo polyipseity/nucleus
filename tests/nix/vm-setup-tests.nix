@@ -1,8 +1,8 @@
-# tests/nix/VM-setup-tests.nix — Tests for VM provisioning manifest and NixOS module options.
+# tests/nix/vm-setup-tests.nix — Tests for VM provisioning manifest and NixOS module options.
 #
 # Validates the structure of src/modules/VMs.json and confirms that the NixOS
 # vms.nix module options are wired correctly.
-# Run via: nix-instantiate --eval tests/nix/VM-setup-tests.nix
+# Run via: nix-instantiate --eval tests/nix/vm-setup-tests.nix
 
 {
   lib ? import <nixpkgs/lib>,
@@ -187,7 +187,7 @@ let
   # ---------------------------------------------------------------------------
 
   # Packer templates and the nixos-generators guest config must exist.
-  # Ensures that nucleus-VM-setup has all its required input files.
+  # Ensures that nucleus-vm-setup has all its required input files.
   test_packer_templates_exist =
     let
       checks = [
@@ -212,17 +212,17 @@ let
     in
     assert' (builtins.all (r: r == null) results) "Packer template file existence check failed";
 
-  # VM-setup scripts must exist for both POSIX and Windows hosts.
+  # vm-setup scripts must exist for both POSIX and Windows hosts.
   test_vm_setup_scripts_exist =
     let
       checks = [
         {
-          cond = builtins.pathExists ../../scripts/VM-setup.sh;
-          msg = "scripts/VM-setup.sh must exist";
+          cond = builtins.pathExists ../../scripts/vm-setup.sh;
+          msg = "scripts/vm-setup.sh must exist";
         }
         {
-          cond = builtins.pathExists ../../scripts/VM-setup.ps1;
-          msg = "scripts/VM-setup.ps1 must exist";
+          cond = builtins.pathExists ../../scripts/vm-setup.ps1;
+          msg = "scripts/vm-setup.ps1 must exist";
         }
       ];
       results = builtins.map (c: assert' c.cond c.msg) checks;
@@ -256,5 +256,5 @@ in
     test_guest_nix_nonempty
     ;
 
-  summary = "VM-setup-tests: all tests passed";
+  summary = "vm-setup-tests: all tests passed";
 }

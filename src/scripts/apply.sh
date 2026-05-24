@@ -12,13 +12,13 @@
 # Standalone Linux (plain Linux / WSL) runs home-manager without sudo and
 # skips the keepalive entirely.
 #
-# After the main apply command succeeds, scripts/AI-sync.sh is called to
+# After the main apply command succeeds, scripts/ai-sync.sh is called to
 # converge locally installed Ollama models with the declarative manifest.
-# Pass --skip-AI-sync to suppress the model sync step — useful in CI or on
+# Pass --skip-ai-sync to suppress the model sync step — useful in CI or on
 # low-bandwidth connections where model pulls (2–20 GB each) are undesirable.
 #
 # Arguments:
-#   --skip-AI-sync  skip the post-apply Ollama model sync step
+#   --skip-ai-sync  skip the post-apply Ollama model sync step
 #   --replica-sync  run the post-apply cloud replica sync step (opt-in)
 #   --skip-replica-sync  skip the post-apply cloud replica sync step
 #   --target-user   select the Home Manager flake profile key on standalone
@@ -55,7 +55,7 @@ for _arg in "$@"; do
   fi
 
   case "$_arg" in
-    --skip-AI-sync)
+    --skip-ai-sync)
       # Model pulls are 2–20 GB and may be undesirable in CI or on
       # low-bandwidth connections; this flag opts out of the post-apply sync.
       skip_ai_sync=true
@@ -70,7 +70,7 @@ for _arg in "$@"; do
       # out of the post-apply replica convergence step.
       skip_replica_sync=true
       ;;
-    --VM-setup)
+    --vm-setup)
       # VM setup provisions QEMU disk images and registers VMs (UTM on macOS,
       # libvirt on NixOS).  Skipped by default after apply because disk
       # pre-allocation and VM registration are large, slow, and idempotent.
@@ -241,7 +241,7 @@ start_sudo_keepalive() {
 }
 
 run_ai_sync() {
-  # Call scripts/AI-sync.sh to converge locally installed Ollama models with
+  # Call scripts/ai-sync.sh to converge locally installed Ollama models with
   # the declarative manifest after the system configuration has been applied.
   #
   # Why post-apply rather than pre-apply:
@@ -256,7 +256,7 @@ run_ai_sync() {
   #
   # Why resolve from REPO_ROOT rather than $SCRIPT_DIR:
   #   When running via `nix run .#apply`, $SCRIPT_DIR points into the Nix
-  #   store where scripts/AI-sync.sh does not exist.  REPO_ROOT is derived
+  #   store where scripts/ai-sync.sh does not exist.  REPO_ROOT is derived
   #   from `git rev-parse --show-toplevel` and always refers to the live
   #   working tree.
   #
@@ -267,32 +267,32 @@ run_ai_sync() {
   #   that could mismatch the running server's version.  PATH detection keeps
   #   the sync aligned with the actual runtime binary.
   if [ "$skip_ai_sync" = true ]; then
-    printf '%s\n' "AI-sync: --skip-AI-sync set; skipping post-apply model sync"
+    printf '%s\n' "ai-sync: --skip-ai-sync set; skipping post-apply model sync"
     return
   fi
 
-  _ras_script="$REPO_ROOT/scripts/AI-sync.sh"
+  _ras_script="$REPO_ROOT/scripts/ai-sync.sh"
   if [ ! -f "$_ras_script" ]; then
-    printf '%s\n' "AI-sync: scripts/AI-sync.sh not found at $_ras_script; skipping model sync"
+    printf '%s\n' "ai-sync: scripts/ai-sync.sh not found at $_ras_script; skipping model sync"
     return
   fi
 
   if ! command -v ollama >/dev/null 2>&1; then
-    printf '%s\n' "AI-sync: ollama not found in PATH; skipping post-apply model sync"
+    printf '%s\n' "ai-sync: ollama not found in PATH; skipping post-apply model sync"
     return
   fi
 
-  printf '%s\n' "AI-sync: running post-apply AI model sync..."
+  printf '%s\n' "ai-sync: running post-apply AI model sync..."
   if ! sh "$_ras_script"; then
-    printf '%s\n' "AI-sync: AI-sync.sh exited with an error; model sync incomplete (system apply succeeded)" >&2
+    printf '%s\n' "ai-sync: ai-sync.sh exited with an error; model sync incomplete (system apply succeeded)" >&2
   fi
 }
 
 run_vm_setup() {
-  # Call scripts/VM-setup.sh to provision virtual machine disk images and
+  # Call scripts/vm-setup.sh to provision virtual machine disk images and
   # register VMs after the system configuration has been applied.
   #
-  # Why opt-in (--VM-setup required):
+  # Why opt-in (--vm-setup required):
   #   Disk pre-allocation is slow (up to 128 GiB) and only needed on the first
   #   provision of a new machine.  Subsequent applies do not re-create existing
   #   disks; the guard is in the script itself.  Still, running it on every
@@ -302,19 +302,19 @@ run_vm_setup() {
   #   A VM disk or registration error should not retroactively fail a completed
   #   system apply.
   if [ "$vm_setup" = false ]; then
-    printf '%s\n' "VM-setup: --VM-setup not set; skipping post-apply VM provisioning"
+    printf '%s\n' "vm-setup: --vm-setup not set; skipping post-apply VM provisioning"
     return
   fi
 
-  _rvs_script="$REPO_ROOT/scripts/VM-setup.sh"
+  _rvs_script="$REPO_ROOT/scripts/vm-setup.sh"
   if [ ! -f "$_rvs_script" ]; then
-    printf '%s\n' "VM-setup: scripts/VM-setup.sh not found at $_rvs_script; skipping VM setup"
+    printf '%s\n' "vm-setup: scripts/vm-setup.sh not found at $_rvs_script; skipping VM setup"
     return
   fi
 
-  printf '%s\n' "VM-setup: running post-apply VM provisioning..."
+  printf '%s\n' "vm-setup: running post-apply VM provisioning..."
   if ! sh "$_rvs_script"; then
-    printf '%s\n' "VM-setup: VM-setup.sh exited with an error; VM setup incomplete (system apply succeeded)" >&2
+    printf '%s\n' "vm-setup: vm-setup.sh exited with an error; VM setup incomplete (system apply succeeded)" >&2
   fi
 }
 

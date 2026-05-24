@@ -1,13 +1,13 @@
 #!/usr/bin/env sh
-# scripts/VM-setup.sh — Build VM images (if needed) and provision VMs.
+# scripts/vm-setup.sh — Build VM images (if needed) and provision VMs.
 #
-# Combines the former nucleus-VM-build and nucleus-VM-setup into one command.
+# Combines the former nucleus-VM-build and nucleus-vm-setup into one command.
 # Phase 1 builds pre-built QCOW2 OS images (if absent) using
 # nixos-generators (NixOS guest on macOS/NixOS) or Packer (Windows).
 # Phase 2 provisions VM bundles/domains from those images.
 #
 # Usage:
-#   scripts/VM-setup.sh [options]
+#   scripts/vm-setup.sh [options]
 #
 # Options:
 #   --dry-run              Print planned actions without executing.
@@ -32,7 +32,7 @@
 #       completed system apply).
 #
 # Run as alias:
-#   nucleus-VM-setup  (equivalent to scripts/VM-setup.sh)
+#   nucleus-vm-setup  (equivalent to scripts/vm-setup.sh)
 #
 # Source: https://github.com/nix-community/nixos-generators
 #         https://developer.hashicorp.com/packer/plugins/builders/qemu
@@ -58,8 +58,8 @@ while [ "$#" -gt 0 ]; do
     --windows-iso)  windows_iso="$2"; shift ;;
     --accelerator)  accelerator="$2"; shift ;;
     *)
-      printf 'VM-setup: unknown argument: %s\n' "$1" >&2
-      printf 'VM-setup: usage: %s [--dry-run] [--nixos-only|--windows-only] [--windows-iso PATH] [--accelerator TYPE]\n' "$0" >&2
+      printf 'vm-setup: unknown argument: %s\n' "$1" >&2
+      printf 'vm-setup: usage: %s [--dry-run] [--nixos-only|--windows-only] [--windows-iso PATH] [--accelerator TYPE]\n' "$0" >&2
       exit 1
       ;;
   esac
@@ -76,12 +76,12 @@ if [ -z "$accelerator" ]; then
 fi
 
 if [ ! -f "$MANIFEST" ]; then
-  printf 'VM-setup: manifest not found at %s; skipping\n' "$MANIFEST" >&2
+  printf 'vm-setup: manifest not found at %s; skipping\n' "$MANIFEST" >&2
   exit 0
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-  printf 'VM-setup: jq not found in PATH; cannot parse manifest\n' >&2
+  printf 'vm-setup: jq not found in PATH; cannot parse manifest\n' >&2
   exit 0
 fi
 
@@ -106,7 +106,7 @@ should_include() {
 
 run_cmd() {
   if [ "$dry_run" = true ]; then
-    printf 'VM-setup: [dry-run] %s\n' "$*"
+    printf 'vm-setup: [dry-run] %s\n' "$*"
   else
     "$@"
   fi
@@ -138,21 +138,21 @@ build_nixos_image() {
   _out="$IMAGES_DIR/${_name}.qcow2"
 
   if [ -f "$_out" ]; then
-    printf 'VM-setup: NixOS image already built (delete to rebuild): %s\n' "$_out"
+    printf 'vm-setup: NixOS image already built (delete to rebuild): %s\n' "$_out"
     return 0
   fi
 
   _guest_nix="$VMS_DIR/nixos/guest.nix"
   if [ ! -f "$_guest_nix" ]; then
-    printf 'VM-setup: nixos guest config not found: %s\n' "$_guest_nix" >&2
+    printf 'vm-setup: nixos guest config not found: %s\n' "$_guest_nix" >&2
     return 1
   fi
 
-  printf 'VM-setup: building NixOS image (system=%s, format=%s)...\n' \
+  printf 'vm-setup: building NixOS image (system=%s, format=%s)...\n' \
     "$_nixos_system" "$_nixos_format"
 
   if [ "$dry_run" = true ]; then
-    printf 'VM-setup: [dry-run] nix run github:nix-community/nixos-generators -- --format %s --system %s --configuration %s -o <tmpdir>\n' \
+    printf 'vm-setup: [dry-run] nix run github:nix-community/nixos-generators -- --format %s --system %s --configuration %s -o <tmpdir>\n' \
       "$_nixos_format" "$_nixos_system" "$_guest_nix"
     return 0
   fi
@@ -168,14 +168,14 @@ build_nixos_image() {
   # nix-store reference that could be garbage-collected).
   _img="$(find "$_tmpdir" -maxdepth 1 -name '*.qcow2' -print -quit 2>/dev/null)"
   if [ -z "$_img" ] || [ ! -e "$_img" ]; then
-    printf 'VM-setup: nixos-generators produced no .qcow2 in %s\n' "$_tmpdir" >&2
+    printf 'vm-setup: nixos-generators produced no .qcow2 in %s\n' "$_tmpdir" >&2
     rm -rf "$_tmpdir"
     return 1
   fi
   # -L follows symlinks so we copy the actual disk image bytes.
   cp -L "$_img" "$_out"
   rm -rf "$_tmpdir"
-  printf 'VM-setup: NixOS image ready: %s\n' "$_out"
+  printf 'vm-setup: NixOS image ready: %s\n' "$_out"
 }
 
 # build_windows_image NAME DISK_GIB
@@ -187,34 +187,34 @@ build_windows_image() {
   _out="$IMAGES_DIR/${_name}.qcow2"
 
   if [ -f "$_out" ]; then
-    printf 'VM-setup: Windows image already built (delete to rebuild): %s\n' "$_out"
+    printf 'vm-setup: Windows image already built (delete to rebuild): %s\n' "$_out"
     return 0
   fi
 
   if [ -z "$windows_iso" ]; then
-    printf 'VM-setup: --windows-iso PATH is required for Windows 11 builds\n' >&2
-    printf 'VM-setup: download from: https://www.microsoft.com/software-download/windows11\n' >&2
+    printf 'vm-setup: --windows-iso PATH is required for Windows 11 builds\n' >&2
+    printf 'vm-setup: download from: https://www.microsoft.com/software-download/windows11\n' >&2
     return 1
   fi
 
   if [ ! -f "$windows_iso" ]; then
-    printf 'VM-setup: Windows ISO not found: %s\n' "$windows_iso" >&2
+    printf 'vm-setup: Windows ISO not found: %s\n' "$windows_iso" >&2
     return 1
   fi
 
   if ! command -v packer >/dev/null 2>&1; then
-    printf 'VM-setup: packer not found; install via nixpkgs (pkgs.packer is in baseSharedPackages)\n' >&2
+    printf 'vm-setup: packer not found; install via nixpkgs (pkgs.packer is in baseSharedPackages)\n' >&2
     return 1
   fi
 
   _packer_dir="$VMS_DIR/windows"
   _tmp_out="$IMAGES_DIR/${_name}-build"
 
-  printf 'VM-setup: building Windows 11 image (disk=%s GiB, accelerator=%s)...\n' \
+  printf 'vm-setup: building Windows 11 image (disk=%s GiB, accelerator=%s)...\n' \
     "$_disk_gib" "$accelerator"
 
   if [ "$dry_run" = true ]; then
-    printf 'VM-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var disk_size=%sG -var output_directory=%s .\n' \
+    printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var disk_size=%sG -var output_directory=%s .\n' \
       "$_packer_dir" "$windows_iso" "$accelerator" "$_disk_gib" "$_tmp_out"
     return 0
   fi
@@ -232,13 +232,13 @@ build_windows_image() {
 
   _built="$_tmp_out/windows.qcow2"
   if [ ! -f "$_built" ]; then
-    printf 'VM-setup: Packer did not produce %s\n' "$_built" >&2
+    printf 'vm-setup: Packer did not produce %s\n' "$_built" >&2
     return 1
   fi
 
   mv "$_built" "$_out"
   rm -rf "$_tmp_out"
-  printf 'VM-setup: Windows 11 image ready: %s\n' "$_out"
+  printf 'vm-setup: Windows 11 image ready: %s\n' "$_out"
 }
 
 build_images() {
@@ -254,10 +254,10 @@ build_images() {
         nixos)   build_nixos_image "$_vm_name" ;;
         windows) build_windows_image "$_vm_name" "$_vm_disk_gib" ;;
         macos)
-          printf 'VM-setup: macOS image must be obtained manually (licensing restricts automation)\n'
+          printf 'vm-setup: macOS image must be obtained manually (licensing restricts automation)\n'
           ;;
         *)
-          printf 'VM-setup: skipping build for "%s" (unsupported type: %s)\n' \
+          printf 'vm-setup: skipping build for "%s" (unsupported type: %s)\n' \
             "$_vm_name" "$_vm_type"
           ;;
       esac
@@ -303,7 +303,7 @@ CFGEOF
       ;;
   esac
   chmod +x "$_wcs_script"
-  printf 'VM-setup: wrote configure script: %s\n' "$_wcs_script"
+  printf 'vm-setup: wrote configure script: %s\n' "$_wcs_script"
 }
 
 # ---------------------------------------------------------------------------
@@ -314,12 +314,12 @@ setup_utm_vms() {
   UTMCTL="/Applications/UTM.app/Contents/MacOS/utmctl"
 
   if [ ! -d /Applications/UTM.app ]; then
-    printf 'VM-setup: UTM not found at /Applications/UTM.app; skipping macOS VM provisioning\n'
+    printf 'vm-setup: UTM not found at /Applications/UTM.app; skipping macOS VM provisioning\n'
     return
   fi
 
   if [ ! -x "$UTMCTL" ]; then
-    printf 'VM-setup: utmctl not found at %s; skipping macOS VM provisioning\n' "$UTMCTL"
+    printf 'vm-setup: utmctl not found at %s; skipping macOS VM provisioning\n' "$UTMCTL"
     return
   fi
 
@@ -340,11 +340,11 @@ setup_utm_vms() {
     disk_file="$images_dir/disk-main.qcow2"
     config_plist="$bundle/config.plist"
 
-    printf 'VM-setup: configuring UTM VM "%s"...\n' "$vm_display"
+    printf 'vm-setup: configuring UTM VM "%s"...\n' "$vm_display"
 
     # Check if bundle already exists to avoid overwriting.
     if [ -d "$bundle" ]; then
-      printf 'VM-setup: UTM bundle already exists: %s; skipping\n' "$bundle"
+      printf 'vm-setup: UTM bundle already exists: %s; skipping\n' "$bundle"
       i=$((i + 1))
       continue
     fi
@@ -353,7 +353,7 @@ setup_utm_vms() {
     # at Home Manager activation time (run nucleus-apply first).
     _plist_template="${HOME}/.local/share/nucleus/vms/${vm_name}-config.plist"
     if [ ! -f "$_plist_template" ]; then
-      printf 'VM-setup: WARNING \u2014 UTM config template not found at %s; apply the macOS config first\n' "$_plist_template" >&2
+      printf 'vm-setup: WARNING \u2014 UTM config template not found at %s; apply the macOS config first\n' "$_plist_template" >&2
       i=$((i + 1))
       continue
     fi
@@ -361,7 +361,7 @@ setup_utm_vms() {
     # Require a pre-built image (built in phase 1).
     _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
     if [ ! -f "$_prebuilt" ]; then
-      printf 'VM-setup: WARNING \u2014 image not found: %s; build failed or type not supported\n' "$_prebuilt" >&2
+      printf 'vm-setup: WARNING \u2014 image not found: %s; build failed or type not supported\n' "$_prebuilt" >&2
       i=$((i + 1))
       continue
     fi
@@ -370,18 +370,18 @@ setup_utm_vms() {
       mkdir -p "$images_dir"
       cp "$_prebuilt" "$disk_file"
       cp "$_plist_template" "$config_plist"
-      printf 'VM-setup: UTM bundle created: %s\n' "$bundle"
+      printf 'vm-setup: UTM bundle created: %s\n' "$bundle"
       # Register with UTM by opening the bundle package.
       open "$bundle"
       write_configure_script "$vm_name" "$vm_type"
     else
-      printf 'VM-setup: [dry-run] create UTM bundle %s from %s\n' "$bundle" "$_plist_template"
+      printf 'vm-setup: [dry-run] create UTM bundle %s from %s\n' "$bundle" "$_plist_template"
     fi
 
     i=$((i + 1))
   done
 
-  printf 'VM-setup: macOS VM setup complete\n'
+  printf 'vm-setup: macOS VM setup complete\n'
 }
 
 # ---------------------------------------------------------------------------
@@ -390,15 +390,15 @@ setup_utm_vms() {
 
 setup_libvirt_vms() {
   if ! command -v virsh >/dev/null 2>&1; then
-    printf 'VM-setup: virsh not found in PATH; libvirtd may not be enabled yet\n'
-    printf 'VM-setup: apply the NixOS configuration first so VMs.nix activates libvirtd\n'
+    printf 'vm-setup: virsh not found in PATH; libvirtd may not be enabled yet\n'
+    printf 'vm-setup: apply the NixOS configuration first so VMs.nix activates libvirtd\n'
     return
   fi
 
   # Ensure the libvirt default network is started so VMs can reach the host.
   if virsh net-list --all 2>/dev/null | grep -q "default"; then
     if ! virsh net-list 2>/dev/null | grep -q "default.*active"; then
-      printf 'VM-setup: starting libvirt default network...\n'
+      printf 'vm-setup: starting libvirt default network...\n'
       run_cmd virsh net-start default || true
       run_cmd virsh net-autostart default || true
     fi
@@ -418,12 +418,12 @@ setup_libvirt_vms() {
 
     disk_path="$VM_DIR/${vm_name}.qcow2"
 
-    printf 'VM-setup: configuring libvirt VM "%s"...\n' "$vm_display"
+    printf 'vm-setup: configuring libvirt VM "%s"...\n' "$vm_display"
 
     # Require a pre-built image (built in phase 1).
     _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
     if [ ! -f "$_prebuilt" ]; then
-      printf 'VM-setup: WARNING \u2014 image not found: %s; skipping "%s"\n' "$_prebuilt" "$vm_name" >&2
+      printf 'vm-setup: WARNING \u2014 image not found: %s; skipping "%s"\n' "$_prebuilt" "$vm_name" >&2
       i=$((i + 1))
       continue
     fi
@@ -432,47 +432,47 @@ setup_libvirt_vms() {
       mkdir -p "$VM_DIR"
       if [ ! -f "$disk_path" ]; then
         cp "$_prebuilt" "$disk_path"
-        printf 'VM-setup: disk image placed: %s\n' "$disk_path"
+        printf 'vm-setup: disk image placed: %s\n' "$disk_path"
       else
-        printf 'VM-setup: disk already exists: %s\n' "$disk_path"
+        printf 'vm-setup: disk already exists: %s\n' "$disk_path"
       fi
     else
-      printf 'VM-setup: [dry-run] copy %s to %s\n' "$_prebuilt" "$disk_path"
+      printf 'vm-setup: [dry-run] copy %s to %s\n' "$_prebuilt" "$disk_path"
     fi
 
     # Define/update the libvirt domain from the Nix-generated XML (idempotent).
     # The file is installed at apply time by environment.etc in VMs.nix.
     _xml_file="/etc/nucleus/vms/${vm_name}-domain.xml"
     if [ ! -f "$_xml_file" ]; then
-      printf 'VM-setup: WARNING — domain XML not found at %s; apply the NixOS config first\n' "$_xml_file" >&2
+      printf 'vm-setup: WARNING — domain XML not found at %s; apply the NixOS config first\n' "$_xml_file" >&2
       i=$((i + 1))
       continue
     fi
 
     if [ "$dry_run" = false ]; then
       if virsh define "$_xml_file"; then
-        printf 'VM-setup: VM "%s" defined/updated in libvirt\n' "$vm_name"
+        printf 'vm-setup: VM "%s" defined/updated in libvirt\n' "$vm_name"
         write_configure_script "$vm_name" "$vm_type"
       else
-        printf 'VM-setup: WARNING — virsh define failed for "%s"; check libvirtd status\n' "$vm_name" >&2
+        printf 'vm-setup: WARNING — virsh define failed for "%s"; check libvirtd status\n' "$vm_name" >&2
       fi
     else
-      printf 'VM-setup: [dry-run] virsh define %s\n' "$_xml_file"
+      printf 'vm-setup: [dry-run] virsh define %s\n' "$_xml_file"
     fi
 
     i=$((i + 1))
   done
 
-  printf 'VM-setup: NixOS VM setup complete; use virt-manager to start VMs\n'
+  printf 'vm-setup: NixOS VM setup complete; use virt-manager to start VMs\n'
 }
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
-printf 'VM-setup: reading manifest from %s\n' "$MANIFEST"
+printf 'vm-setup: reading manifest from %s\n' "$MANIFEST"
 if [ "$dry_run" = true ]; then
-  printf 'VM-setup: dry-run mode — no changes will be made\n'
+  printf 'vm-setup: dry-run mode — no changes will be made\n'
 fi
 
 if [ "$dry_run" = false ]; then
@@ -480,10 +480,10 @@ if [ "$dry_run" = false ]; then
   mkdir -p "$IMAGES_DIR"
 fi
 
-printf 'VM-setup: phase 1 \u2014 building images...\n'
+printf 'vm-setup: phase 1 \u2014 building images...\n'
 build_images
 
-printf 'VM-setup: phase 2 \u2014 provisioning VMs...\n'
+printf 'vm-setup: phase 2 \u2014 provisioning VMs...\n'
 _os=$(uname -s)
 case "$_os" in
   Darwin)
@@ -493,14 +493,14 @@ case "$_os" in
     if [ -f /etc/NIXOS ]; then
       setup_libvirt_vms
     else
-      printf 'VM-setup: standalone Linux detected; use QEMU/KVM directly:\n'
-      printf 'VM-setup:   qemu-img create -f qcow2 ~/virtual\ machines/<name>.qcow2 <size>G\n'
-      printf 'VM-setup:   qemu-system-x86_64 -m <ram> -smp <cpu> -hda ~/virtual\ machines/<name>.qcow2 ...\n'
+      printf 'vm-setup: standalone Linux detected; use QEMU/KVM directly:\n'
+      printf 'vm-setup:   qemu-img create -f qcow2 ~/virtual\ machines/<name>.qcow2 <size>G\n'
+      printf 'vm-setup:   qemu-system-x86_64 -m <ram> -smp <cpu> -hda ~/virtual\ machines/<name>.qcow2 ...\n'
     fi
     ;;
   *)
-    printf 'VM-setup: unsupported OS "%s"; nothing to do\n' "$_os"
+    printf 'vm-setup: unsupported OS "%s"; nothing to do\n' "$_os"
     ;;
 esac
 
-printf 'VM-setup: done\n'
+printf 'vm-setup: done\n'
