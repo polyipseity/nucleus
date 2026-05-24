@@ -172,6 +172,19 @@ in
             export NUCLEUS_DEFAULT_DEV_BIN="${defaultDevTools}/bin"
             export NUCLEUS_DEFAULT_DEV_ENV="1"
 
+            # Expose user-scope package manager bins so globally installed tools
+            # are accessible in interactive sessions without a new login shell.
+            #   bun install -g   → ~/.bun/bin   (BUN_INSTALL_BIN default)
+            #   cargo-binstall   → ~/.cargo/bin  (CARGO_HOME/bin default)
+            #   uv tool install  → ~/.local/bin  (XDG_BIN_HOME default)
+            # Guards prevent PATH growth when a directory does not exist yet.
+            # Source: https://bun.sh/docs/cli/install#global-packages
+            # Source: https://doc.rust-lang.org/cargo/commands/cargo-install.html
+            # Source: https://docs.astral.sh/uv/reference/settings/#tool-bin-dir
+            [[ -d "$HOME/.bun/bin"    ]] && export PATH="$HOME/.bun/bin:$PATH"
+            [[ -d "$HOME/.cargo/bin"  ]] && export PATH="$HOME/.cargo/bin:$PATH"
+            [[ -d "$HOME/.local/bin"  ]] && export PATH="$HOME/.local/bin:$PATH"
+
             # Route managed development tools through either the active direnv
             # environment or the user-scoped default toolchain for repositories
             # that do not provide their own .envrc / nix develop entrypoint.
