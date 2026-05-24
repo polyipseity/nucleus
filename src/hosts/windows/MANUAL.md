@@ -18,6 +18,7 @@
 - `-gst` — run `git status`.
 - `-gp` — run `git push`.
 - `-gpl` — run `git pull`.
+- `-gs` — run `git status -sb`.
 - `-gs-pdf-opt-default` — optimize PDFs with Ghostscript default profile.
 - `-gs-pdf-opt-ebook` — optimize PDFs with Ghostscript ebook profile.
 - `-gs-pdf-opt-prepress` — optimize PDFs with Ghostscript prepress profile.
