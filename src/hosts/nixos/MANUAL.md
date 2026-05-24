@@ -35,7 +35,7 @@
 
 ## nucleus commands
 
-- `nucleus-ai-sync` — run the managed AI model sync flow.
+- `nucleus-AI-sync` — run the managed AI model sync flow.
 - `nucleus-apply` — run the managed apply flow.
 - `nucleus-cloud-setup` — configure required cloud remotes and re-run apply.
 - `nucleus-gc` — run the managed Nix garbage-collection flow.
@@ -43,4 +43,4 @@
 - `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
-- `nucleus-vm-setup` — provision KVM/libvirt virtual machines declared in `src/modules/vms.json`. Run once after `nucleus apply` on a new machine. Requires `libvirtd` to be active (enabled by `src/hosts/nixos/vms.nix`). After provisioning, use `virt-manager` or `virsh` to attach an installation ISO and install the guest OS. The `~/dev` directory is mounted inside the NixOS VM via VirtioFS when `shareDevDir` is true.
+- `nucleus-VM-setup` — provision KVM/libvirt virtual machines declared in `src/modules/VMs.json`. Run once after `nucleus apply` on a new machine. Requires `libvirtd` to be active (enabled by `src/hosts/nixos/VMs.nix`). After provisioning, use `virt-manager` or `virsh` to attach an installation ISO and install the guest OS. The `~/dev` directory is mounted inside the NixOS VM via VirtioFS when `shareDevDir` is true.

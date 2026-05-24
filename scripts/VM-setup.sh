@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Provisions and configures virtual machines declared in src/modules/vms.json.
+# Provisions and configures virtual machines declared in src/modules/VMs.json.
 #
 # What it does:
 #   macOS  (Darwin): creates UTM VM bundles in the UTM document store, pre-allocates
@@ -20,8 +20,8 @@
 # Prerequisites:
 #   macOS:  UTM installed (/Applications/UTM.app); qemu-img in PATH for
 #           disk pre-allocation (falls back to sparse raw file if absent).
-#   NixOS:  virsh in PATH (provided by the libvirt package in vms.nix);
-#           qemu-img in PATH (provided by qemu in vms.nix).
+#   NixOS:  virsh in PATH (provided by the libvirt package in VMs.nix);
+#           qemu-img in PATH (provided by qemu in VMs.nix).
 #
 # Exit: always 0 (best-effort — a VM setup failure does not roll back a
 #       completed system apply).
@@ -30,7 +30,7 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
-MANIFEST="$REPO_ROOT/src/modules/vms.json"
+MANIFEST="$REPO_ROOT/src/modules/VMs.json"
 
 dry_run=false
 
@@ -40,7 +40,7 @@ while [ "$#" -gt 0 ]; do
       dry_run=true
       ;;
     *)
-      printf 'vm-setup: unsupported argument "%s"\n' "$1" >&2
+      printf 'VM-setup: unsupported argument "%s"\n' "$1" >&2
       exit 1
       ;;
   esac
@@ -48,12 +48,12 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ ! -f "$MANIFEST" ]; then
-  printf 'vm-setup: manifest not found at %s; skipping\n' "$MANIFEST" >&2
+  printf 'VM-setup: manifest not found at %s; skipping\n' "$MANIFEST" >&2
   exit 0
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-  printf 'vm-setup: jq not found in PATH; cannot parse manifest\n' >&2
+  printf 'VM-setup: jq not found in PATH; cannot parse manifest\n' >&2
   exit 0
 fi
 
@@ -65,7 +65,7 @@ VM_DIR="${VM_DIR_OVERRIDE:-$HOME/Virtual Machines}"
 
 run_cmd() {
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] %s\n' "$*"
+    printf 'VM-setup: [dry-run] %s\n' "$*"
   else
     "$@"
   fi
@@ -75,18 +75,18 @@ create_qcow2_disk() {
   _disk_path="$1"
   _disk_gib="$2"
   if [ -f "$_disk_path" ]; then
-    printf 'vm-setup: disk already exists: %s\n' "$_disk_path"
+    printf 'VM-setup: disk already exists: %s\n' "$_disk_path"
     return
   fi
   if command -v qemu-img >/dev/null 2>&1; then
-    printf 'vm-setup: creating QCOW2 disk (%s GiB): %s\n' "$_disk_gib" "$_disk_path"
+    printf 'VM-setup: creating QCOW2 disk (%s GiB): %s\n' "$_disk_gib" "$_disk_path"
     run_cmd qemu-img create -f qcow2 "$_disk_path" "${_disk_gib}G"
   else
     # Fallback: create a sparse raw disk image.  On macOS this produces a
     # sparse file via HFS+/APFS copy-on-write; on Linux via ext4 sparse blocks.
     # The guest can use this as a raw disk; convert to QCOW2 later with
     # `qemu-img convert -f raw -O qcow2 <raw> <qcow2>`.
-    printf 'vm-setup: qemu-img not found; creating sparse raw disk (%s GiB): %s\n' "$_disk_gib" "$_disk_path"
+    printf 'VM-setup: qemu-img not found; creating sparse raw disk (%s GiB): %s\n' "$_disk_gib" "$_disk_path"
     run_cmd dd if=/dev/zero bs=1 count=0 seek=$((_disk_gib * 1073741824)) of="$_disk_path" 2>/dev/null || true
   fi
 }
@@ -100,18 +100,18 @@ setup_utm_vms() {
   UTMCTL="/Applications/UTM.app/Contents/MacOS/utmctl"
 
   if [ ! -d /Applications/UTM.app ]; then
-    printf 'vm-setup: UTM not found at /Applications/UTM.app; skipping macOS VM provisioning\n'
+    printf 'VM-setup: UTM not found at /Applications/UTM.app; skipping macOS VM provisioning\n'
     return
   fi
 
   if [ ! -x "$UTMCTL" ]; then
-    printf 'vm-setup: utmctl not found at %s; skipping macOS VM provisioning\n' "$UTMCTL"
+    printf 'VM-setup: utmctl not found at %s; skipping macOS VM provisioning\n' "$UTMCTL"
     return
   fi
 
   if [ ! -d "$UTM_DOCS" ]; then
     # UTM has never been launched; its sandboxed document directory is absent.
-    printf 'vm-setup: UTM document directory not found; launch UTM at least once before running vm-setup\n'
+    printf 'VM-setup: UTM document directory not found; launch UTM at least once before running vm-setup\n'
     return
   fi
 
@@ -131,11 +131,11 @@ setup_utm_vms() {
     disk_file="$images_dir/disk-main.qcow2"
     config_plist="$bundle/config.plist"
 
-    printf 'vm-setup: configuring UTM VM "%s"...\n' "$vm_display"
+    printf 'VM-setup: configuring UTM VM "%s"...\n' "$vm_display"
 
     # Check if VM is already registered to avoid overwriting a running VM.
     if "$UTMCTL" list 2>/dev/null | grep -qF "$vm_display"; then
-      printf 'vm-setup: VM "%s" already registered in UTM; skipping\n' "$vm_display"
+      printf 'VM-setup: VM "%s" already registered in UTM; skipping\n' "$vm_display"
       i=$((i + 1))
       continue
     fi
@@ -143,14 +143,14 @@ setup_utm_vms() {
     if [ "$dry_run" = false ]; then
       mkdir -p "$images_dir"
     else
-      printf 'vm-setup: [dry-run] mkdir -p %s\n' "$images_dir"
+      printf 'VM-setup: [dry-run] mkdir -p %s\n' "$images_dir"
     fi
 
     # Pre-allocate the disk.
     if [ "$dry_run" = false ]; then
       create_qcow2_disk "$disk_file" "$vm_disk"
     else
-      printf 'vm-setup: [dry-run] create_qcow2_disk %s %s\n' "$disk_file" "$vm_disk"
+      printf 'VM-setup: [dry-run] create_qcow2_disk %s %s\n' "$disk_file" "$vm_disk"
     fi
 
     # Determine host architecture for the VM machine type.
@@ -243,16 +243,16 @@ setup_utm_vms() {
       "$PB" -c "Add :Sound:0 dict" "$config_plist"
       "$PB" -c "Add :Sound:0:Hardware string intel-hda" "$config_plist"
 
-      printf 'vm-setup: UTM bundle created: %s\n' "$bundle"
-      printf 'vm-setup: open UTM to install the guest OS on the "%s" VM\n' "$vm_display"
+      printf 'VM-setup: UTM bundle created: %s\n' "$bundle"
+      printf 'VM-setup: open UTM to install the guest OS on the "%s" VM\n' "$vm_display"
     else
-      printf 'vm-setup: [dry-run] create UTM bundle %s\n' "$bundle"
+      printf 'VM-setup: [dry-run] create UTM bundle %s\n' "$bundle"
     fi
 
     i=$((i + 1))
   done
 
-  printf 'vm-setup: macOS VM setup complete; open UTM to manage VMs\n'
+  printf 'VM-setup: macOS VM setup complete; open UTM to manage VMs\n'
 }
 
 # ---------------------------------------------------------------------------
@@ -261,15 +261,15 @@ setup_utm_vms() {
 
 setup_libvirt_vms() {
   if ! command -v virsh >/dev/null 2>&1; then
-    printf 'vm-setup: virsh not found in PATH; libvirtd may not be enabled yet\n'
-    printf 'vm-setup: apply the NixOS configuration first so vms.nix activates libvirtd\n'
+    printf 'VM-setup: virsh not found in PATH; libvirtd may not be enabled yet\n'
+    printf 'VM-setup: apply the NixOS configuration first so VMs.nix activates libvirtd\n'
     return
   fi
 
   # Ensure the libvirt default network is started so VMs can reach the host.
   if virsh net-list --all 2>/dev/null | grep -q "default"; then
     if ! virsh net-list 2>/dev/null | grep -q "default.*active"; then
-      printf 'vm-setup: starting libvirt default network...\n'
+      printf 'VM-setup: starting libvirt default network...\n'
       run_cmd virsh net-start default || true
       run_cmd virsh net-autostart default || true
     fi
@@ -288,11 +288,11 @@ setup_libvirt_vms() {
 
     disk_path="$VM_DIR/${vm_name}.qcow2"
 
-    printf 'vm-setup: configuring libvirt VM "%s"...\n' "$vm_display"
+    printf 'VM-setup: configuring libvirt VM "%s"...\n' "$vm_display"
 
     # Check if VM is already defined.
     if virsh dominfo "$vm_name" >/dev/null 2>&1; then
-      printf 'vm-setup: VM "%s" already defined in libvirt; skipping\n' "$vm_name"
+      printf 'VM-setup: VM "%s" already defined in libvirt; skipping\n' "$vm_name"
       i=$((i + 1))
       continue
     fi
@@ -301,7 +301,7 @@ setup_libvirt_vms() {
       mkdir -p "$VM_DIR"
       create_qcow2_disk "$disk_path" "$vm_disk"
     else
-      printf 'vm-setup: [dry-run] create disk %s (%s GiB)\n' "$disk_path" "$vm_disk"
+      printf 'VM-setup: [dry-run] create disk %s (%s GiB)\n' "$disk_path" "$vm_disk"
     fi
 
     # Determine host architecture for the VM machine type.
@@ -383,29 +383,29 @@ XMLEOF
 
     if [ "$dry_run" = false ]; then
       if virsh define "$_xml_tmp"; then
-        printf 'vm-setup: VM "%s" defined in libvirt\n' "$vm_name"
-        printf 'vm-setup: install a guest OS via: virt-manager or virsh console %s\n' "$vm_name"
+        printf 'VM-setup: VM "%s" defined in libvirt\n' "$vm_name"
+        printf 'VM-setup: install a guest OS via: virt-manager or virsh console %s\n' "$vm_name"
       else
-        printf 'vm-setup: WARNING — virsh define failed for "%s"; check libvirtd status\n' "$vm_name" >&2
+        printf 'VM-setup: WARNING — virsh define failed for "%s"; check libvirtd status\n' "$vm_name" >&2
       fi
     else
-      printf 'vm-setup: [dry-run] virsh define %s\n' "$_xml_tmp"
+      printf 'VM-setup: [dry-run] virsh define %s\n' "$_xml_tmp"
     fi
 
     rm -f "$_xml_tmp"
     i=$((i + 1))
   done
 
-  printf 'vm-setup: NixOS VM setup complete; use virt-manager to install guest OSes\n'
+  printf 'VM-setup: NixOS VM setup complete; use virt-manager to install guest OSes\n'
 }
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
-printf 'vm-setup: reading manifest from %s\n' "$MANIFEST"
+printf 'VM-setup: reading manifest from %s\n' "$MANIFEST"
 if [ "$dry_run" = true ]; then
-  printf 'vm-setup: dry-run mode — no changes will be made\n'
+  printf 'VM-setup: dry-run mode — no changes will be made\n'
 fi
 
 if [ "$dry_run" = false ]; then
@@ -421,14 +421,14 @@ case "$_os" in
     if [ -f /etc/NIXOS ]; then
       setup_libvirt_vms
     else
-      printf 'vm-setup: standalone Linux detected; use QEMU/KVM directly:\n'
-      printf 'vm-setup:   qemu-img create -f qcow2 ~/Virtual\ Machines/<name>.qcow2 <size>G\n'
-      printf 'vm-setup:   qemu-system-x86_64 -m <ram> -smp <cpu> -hda ~/Virtual\ Machines/<name>.qcow2 ...\n'
+      printf 'VM-setup: standalone Linux detected; use QEMU/KVM directly:\n'
+      printf 'VM-setup:   qemu-img create -f qcow2 ~/Virtual\ Machines/<name>.qcow2 <size>G\n'
+      printf 'VM-setup:   qemu-system-x86_64 -m <ram> -smp <cpu> -hda ~/Virtual\ Machines/<name>.qcow2 ...\n'
     fi
     ;;
   *)
-    printf 'vm-setup: unsupported OS "%s"; nothing to do\n' "$_os"
+    printf 'VM-setup: unsupported OS "%s"; nothing to do\n' "$_os"
     ;;
 esac
 
-printf 'vm-setup: done\n'
+printf 'VM-setup: done\n'

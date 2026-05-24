@@ -1,8 +1,8 @@
 # nixos/vms.nix — KVM/libvirt virtual machine infrastructure for the NixOS host.
 #
 # Enables the libvirtd hypervisor so QEMU/KVM guests can be managed via virsh
-# and virt-manager.  Guest VMs are declared in src/modules/vms.json and
-# provisioned by scripts/vm-setup.sh (run via `nucleus-vm-setup`).
+# and virt-manager.  Guest VMs are declared in src/modules/VMs.json and
+# provisioned by scripts/VM-setup.sh (run via `nucleus-VM-setup`).
 #
 # Disk images are stored at ~/Virtual Machines/<name>.qcow2 in QCOW2 format,
 # enabling copy-based migration to UTM (macOS) or QEMU (Windows) without

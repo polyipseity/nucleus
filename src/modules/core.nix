@@ -228,7 +228,7 @@ let
       # formula is listed for completeness but the policy function
       # (defaultBackendFor) will always select nixpkgs for "cli" category.
       # On POSIX hosts this provides qemu-img for QCOW2 disk management
-      # (used by scripts/vm-setup.sh).  On Windows, qemu is managed via Scoop
+      # (used by scripts/VM-setup.sh).  On Windows, qemu is managed via Scoop
       # (see Invoke-ScoopSetup.ps1).
       # Source: https://formulae.brew.sh/formula/qemu
       category = "cli";

@@ -33,7 +33,7 @@
 
 ## nucleus commands
 
-- `nucleus-ai-sync` — run the managed AI model sync flow.
+- `nucleus-AI-sync` — run the managed AI model sync flow.
 - `nucleus-apply` — run the managed apply flow.
 - `nucleus-cloud-setup` — configure required cloud remotes and re-run apply.
 - `nucleus-gc` — run the managed Nix garbage-collection flow.
@@ -41,4 +41,4 @@
 - `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
-- `nucleus-vm-setup` — provision QEMU virtual machines declared in `src/modules/vms.json`. Run once after `nucleus apply` on a new machine. Requires QEMU to be installed via Scoop (`scoop install qemu`). After provisioning, locate the generated `Start-<Name>.ps1` scripts in `%USERPROFILE%\Virtual Machines\`, add a `-cdrom` argument pointing to a guest OS ISO, and run the script to start the VM for installation.
+- `nucleus-VM-setup` — provision QEMU virtual machines declared in `src/modules/VMs.json`. Run once after `nucleus apply` on a new machine. Requires QEMU to be installed via Scoop (`scoop install qemu`). After provisioning, locate the generated `Start-<Name>.ps1` scripts in `%USERPROFILE%\Virtual Machines\`, add a `-cdrom` argument pointing to a guest OS ISO, and run the script to start the VM for installation.

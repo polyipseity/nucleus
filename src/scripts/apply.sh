@@ -70,7 +70,7 @@ for _arg in "$@"; do
       # out of the post-apply replica convergence step.
       skip_replica_sync=true
       ;;
-    --vm-setup)
+    --VM-setup)
       # VM setup provisions QEMU disk images and registers VMs (UTM on macOS,
       # libvirt on NixOS).  Skipped by default after apply because disk
       # pre-allocation and VM registration are large, slow, and idempotent.
@@ -289,10 +289,10 @@ run_ai_sync() {
 }
 
 run_vm_setup() {
-  # Call scripts/vm-setup.sh to provision virtual machine disk images and
+  # Call scripts/VM-setup.sh to provision virtual machine disk images and
   # register VMs after the system configuration has been applied.
   #
-  # Why opt-in (--vm-setup required):
+  # Why opt-in (--VM-setup required):
   #   Disk pre-allocation is slow (up to 128 GiB) and only needed on the first
   #   provision of a new machine.  Subsequent applies do not re-create existing
   #   disks; the guard is in the script itself.  Still, running it on every
@@ -302,19 +302,19 @@ run_vm_setup() {
   #   A VM disk or registration error should not retroactively fail a completed
   #   system apply.
   if [ "$vm_setup" = false ]; then
-    printf '%s\n' "vm-setup: --vm-setup not set; skipping post-apply VM provisioning"
+    printf '%s\n' "VM-setup: --VM-setup not set; skipping post-apply VM provisioning"
     return
   fi
 
-  _rvs_script="$REPO_ROOT/scripts/vm-setup.sh"
+  _rvs_script="$REPO_ROOT/scripts/VM-setup.sh"
   if [ ! -f "$_rvs_script" ]; then
-    printf '%s\n' "vm-setup: scripts/vm-setup.sh not found at $_rvs_script; skipping VM setup"
+    printf '%s\n' "VM-setup: scripts/VM-setup.sh not found at $_rvs_script; skipping VM setup"
     return
   fi
 
-  printf '%s\n' "vm-setup: running post-apply VM provisioning..."
+  printf '%s\n' "VM-setup: running post-apply VM provisioning..."
   if ! sh "$_rvs_script"; then
-    printf '%s\n' "vm-setup: vm-setup.sh exited with an error; VM setup incomplete (system apply succeeded)" >&2
+    printf '%s\n' "VM-setup: VM-setup.sh exited with an error; VM setup incomplete (system apply succeeded)" >&2
   fi
 }
 

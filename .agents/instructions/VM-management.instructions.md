@@ -1,14 +1,14 @@
 ---
-description: "Use when adding, editing, or reviewing virtual machine provisioning in scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/nixos/vms.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, or src/modules/vms.json."
+description: "Use when adding, editing, or reviewing virtual machine provisioning in scripts/VM-setup.sh, scripts/VM-setup.ps1, src/hosts/nixos/VMs.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, or src/modules/VMs.json."
 name: "VM Management"
-applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/nixos/vms.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, src/modules/vms.json, tests/nix/vm-setup-tests.nix"
+applyTo: "scripts/VM-setup.sh, scripts/VM-setup.ps1, src/hosts/nixos/VMs.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, tests/nix/VM-setup-tests.nix"
 ---
 
 # VM Management
 
 ## VM Manifest
 
-All virtual machines are declared in `src/modules/vms.json`.
+All virtual machines are declared in `src/modules/VMs.json`.
 This is the single source of truth for VM names, resources, and options consumed by all three platform
 setup scripts.
 
@@ -41,7 +41,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - Bundle location: `~/Library/Containers/com.utmapp.UTM/Data/Documents/<name>.utm/`
 - Config file: `config.plist` generated via `/usr/libexec/PlistBuddy`.
 - Disk pre-created in `Images/disk-main.qcow2` using `qemu-img` (from `pkgs.qemu` via nixpkgs).
-- UTM must be launched at least once before `nucleus-vm-setup` so its sandboxed document store exists.
+- UTM must be launched at least once before `nucleus-VM-setup` so its sandboxed document store exists.
 - After provisioning, open UTM, attach an installation ISO, and run the VM to install the guest OS.
 - Verify generated `config.plist` settings in the UTM GUI before first boot, especially Architecture,
   Memory, CPU count, and Drive path.
@@ -51,9 +51,9 @@ QCOW2 enables copy-based migration between hosts without conversion.
 
 ## NixOS — libvirt/KVM
 
-- VM infrastructure declared in `src/hosts/nixos/vms.nix` (system module).
+- VM infrastructure declared in `src/hosts/nixos/VMs.nix` (system module).
 - Package: `qemu_kvm`, `virt-manager`, `virt-viewer`, `virtiofsd` in `environment.systemPackages`.
-- User groups: `kvm` and `libvirtd` added to the managed user via `lib.mkAfter` in `vms.nix`.
+- User groups: `kvm` and `libvirtd` added to the managed user via `lib.mkAfter` in `VMs.nix`.
 - Disk images registered with `virsh define` using generated libvirt XML.
 - VirtioFS shared directory: uses `virtiofsd` daemon; configured in the XML domain definition.
 - SPICE display + clipboard sharing enabled by default.
@@ -73,23 +73,23 @@ QCOW2 enables copy-based migration between hosts without conversion.
 
 ## Apply Hook
 
-`nucleus-vm-setup` (and the `--vm-setup` flag for `nucleus apply`) is **opt-in**:
+`nucleus-VM-setup` (and the `--VM-setup` flag for `nucleus apply`) is **opt-in**:
 
-- POSIX: `src/scripts/apply.sh` passes `--vm-setup` to enable; skipped by default.
+- POSIX: `src/scripts/apply.sh` passes `--VM-setup` to enable; skipped by default.
 - Windows: `src/hosts/windows/apply.ps1` uses `-VMSetup` switch; skipped by default.
 
 The hook is always best-effort: a VM setup failure does not abort a completed system apply.
 
 ## Adding a New VM
 
-1. Add an entry to `src/modules/vms.json` with all required fields.
-2. Run `nucleus-vm-setup` on all three host platforms.
-3. Add a test in `tests/nix/vm-setup-tests.nix` if the new VM has platform-specific constraints.
+1. Add an entry to `src/modules/VMs.json` with all required fields.
+2. Run `nucleus-VM-setup` on all three host platforms.
+3. Add a test in `tests/nix/VM-setup-tests.nix` if the new VM has platform-specific constraints.
 4. Update `src/hosts/<platform>/MANUAL.md` if the VM requires manual steps (ISO attachment, etc.).
 
 ## Removing a VM
 
-1. Remove the entry from `src/modules/vms.json`.
+1. Remove the entry from `src/modules/VMs.json`.
 2. Manually delete the disk image and registration:
    - macOS: delete `<name>.utm` bundle from UTM document store.
    - NixOS: run `virsh undefine <name>` then delete `~/Virtual Machines/<name>.qcow2`.

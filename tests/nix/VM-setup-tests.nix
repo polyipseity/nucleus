@@ -1,8 +1,8 @@
-# tests/nix/vm-setup-tests.nix — Tests for VM provisioning manifest and NixOS module options.
+# tests/nix/VM-setup-tests.nix — Tests for VM provisioning manifest and NixOS module options.
 #
-# Validates the structure of src/modules/vms.json and confirms that the NixOS
+# Validates the structure of src/modules/VMs.json and confirms that the NixOS
 # vms.nix module options are wired correctly.
-# Run via: nix-instantiate --eval tests/nix/vm-setup-tests.nix
+# Run via: nix-instantiate --eval tests/nix/VM-setup-tests.nix
 
 {
   lib ? import <nixpkgs/lib>,
@@ -10,7 +10,7 @@
 let
   assert' = cond: msg: if !cond then builtins.throw msg else null;
 
-  manifest = builtins.fromJSON (builtins.readFile ../../src/modules/vms.json);
+  manifest = builtins.fromJSON (builtins.readFile ../../src/modules/VMs.json);
 
   # Required fields for every VM entry.
   requiredFields = [
@@ -39,7 +39,7 @@ let
     let
       results = builtins.map validateVm manifest.vms;
     in
-    assert' (builtins.length manifest.vms > 0) "vms.json must declare at least one VM";
+    assert' (builtins.length manifest.vms > 0) "VMs.json must declare at least one VM";
 
   # Disk sizes must be positive integers.
   test_disk_sizes =
@@ -113,5 +113,5 @@ in
     test_share_dev_dir_types
     ;
 
-  summary = "vm-setup-tests: all tests passed";
+  summary = "VM-setup-tests: all tests passed";
 }

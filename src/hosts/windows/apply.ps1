@@ -155,7 +155,7 @@
 
 .PARAMETER VMSetup
   When specified, runs the post-apply VM provisioning step to create QCOW2
-  disk images and QEMU start scripts for VMs declared in src/modules/vms.json.
+  disk images and QEMU start scripts for VMs declared in src/modules/VMs.json.
   Skipped by default because disk pre-allocation is slow and only required on
   the first provision of a new machine.
 .PARAMETER MinFreeDiskGB
@@ -631,16 +631,16 @@ if (-not $runReplicaSync) {
   }
 }
 
-# Provision VM disk images and QEMU start scripts for VMs declared in vms.json.
+# Provision VM disk images and QEMU start scripts for VMs declared in VMs.json.
 # This is best-effort: a VM setup failure should not retroactively fail a
 # completed configuration apply.
 if (-not $VMSetup) {
-  Write-Output "vm-setup: -VMSetup not set; skipping post-apply VM provisioning"
+  Write-Output "VM-setup: -VMSetup not set; skipping post-apply VM provisioning"
 } else {
-  Write-Output "vm-setup: running post-apply VM provisioning..."
+  Write-Output "VM-setup: running post-apply VM provisioning..."
   try {
     Invoke-VMSetup -RepoRoot $repoRoot
   } catch {
-    Write-Warning "vm-setup: VM setup incomplete (system apply succeeded): $($_.Exception.Message)"
+    Write-Warning "VM-setup: VM setup incomplete (system apply succeeded): $($_.Exception.Message)"
   }
 }

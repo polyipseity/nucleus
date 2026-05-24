@@ -113,7 +113,7 @@ let
 in
 {
   home.packages = [
-    (mkRepoScriptCommand "nucleus-ai-sync" "scripts/AI-sync.sh")
+    (mkRepoScriptCommand "nucleus-AI-sync" "scripts/AI-sync.sh")
     (mkNucleusCommand "nucleus-apply" "apply")
     (mkNucleusCommand "nucleus-cloud-setup" "cloud-setup")
     (mkNucleusCommand "nucleus-gc" "gc")
@@ -121,7 +121,7 @@ in
     (mkNucleusCommand "nucleus-replica-reset" "replica-reset")
     (mkNucleusCommand "nucleus-replica-sync" "replica-sync")
     (mkNucleusCommand "nucleus-update" "update")
-    (mkRepoScriptCommand "nucleus-vm-setup" "scripts/vm-setup.sh")
+    (mkRepoScriptCommand "nucleus-VM-setup" "scripts/VM-setup.sh")
   ];
 
   # direnv: automatically loads/unloads per-directory environments.

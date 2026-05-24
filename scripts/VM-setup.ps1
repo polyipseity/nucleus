@@ -1,9 +1,9 @@
-# vm-setup.ps1 — Windows wrapper for the VM provisioning module.
-# Provisions and configures virtual machines declared in src/modules/vms.json
+# VM-setup.ps1 — Windows wrapper for the VM provisioning module.
+# Provisions and configures virtual machines declared in src/modules/VMs.json
 # using QEMU (installed via Scoop extras bucket) on Windows.
 #
 # Usage:
-#   .\scripts\vm-setup.ps1 [-DryRun]
+#   .\scripts\VM-setup.ps1 [-DryRun]
 #
 # Parameters:
 #   -DryRun  Print planned actions without executing them.
@@ -22,7 +22,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..') |
 $modulePath = Join-Path $repoRoot 'src\hosts\windows\modules\system\Invoke-VMSetup.ps1'
 
 if (-not (Test-Path $modulePath)) {
-    Write-Information "vm-setup: module not found: $modulePath"
+    Write-Information "VM-setup: module not found: $modulePath"
     exit 0
 }
 
