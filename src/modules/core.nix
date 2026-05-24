@@ -56,7 +56,7 @@ let
   #   bat            — syntax-highlighted cat replacement
   #   bottom         — cross-platform system monitor (btm)
   #   bun            — high-speed all-in-one JS toolkit (runtime, package manager, bundler); global runtime for JS ecosystem tasks
-  #                    (Windows: Oven-sh.Bun in system.dsc.yml; last tier in install hierarchy: nixpkgs/winget > scoop > cargo binstall > bun)
+  #                    (Windows: Oven-sh.Bun in system.dsc.yml; fourth tier in install hierarchy: nixpkgs/winget > scoop > cargo binstall > bun > uv)
   #   cargo-binstall — Rust crate binary installer; second-to-last-resort fallback when a package is absent from nixpkgs/WinGet/Scoop
   #   cargo-cache    — reclaim disk space from ~/.cargo registry, git, and advisory-db clones
   #   direnv         — per-directory env loader (shell integration in shell.nix)

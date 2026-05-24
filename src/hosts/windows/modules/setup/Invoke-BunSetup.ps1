@@ -1,9 +1,9 @@
 # modules/windows/bun-setup.ps1 — Declarative bun global package management.
 #
 # Installs and removes JS CLI tools via `bun install -g` for packages that are
-# not available in WinGet, Scoop, or cargo-binstall.  Bun occupies the last
+# not available in WinGet, Scoop, or cargo-binstall.  Bun occupies the fourth
 # tier of the repository install preference hierarchy:
-#   nixpkgs/winget > scoop > cargo binstall > bun
+#   nixpkgs/winget > scoop > cargo binstall > bun > uv
 #
 # Bun itself is installed from WinGet (Oven-sh.Bun in system.dsc.yml).
 # This module must run after the WinGet DSC step.
@@ -22,7 +22,7 @@ function Invoke-BunSetup {
 
     Only packages absent from WinGet, Scoop, and cargo-binstall are managed
     here, following the repository preference hierarchy
-    (nixpkgs/winget > scoop > cargo binstall > bun).
+    (nixpkgs/winget > scoop > cargo binstall > bun > uv).
 
     Currently managed:
       - @google/gemini-cli         — Gemini terminal agent CLI.

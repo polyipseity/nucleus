@@ -320,7 +320,7 @@ in
     # deletions.
     #
     # Only packages absent from nixpkgs and cargo-binstall are managed here
-    # (install preference: nixpkgs > cargo binstall > bun).
+    # (install preference: nixpkgs > cargo binstall > bun > uv).
     #
     # Currently managed:
     #   clawhub — fetched skill install vehicle; absent from nixpkgs and
@@ -378,7 +378,7 @@ in
       # Declarative desired-state list.  One package per line.
       # Add a package name here to install it; remove it to trigger uninstall
       # on the next apply.  Only add packages absent from nixpkgs and
-      # cargo-binstall (install preference: nixpkgs > cargo binstall > bun).
+      # cargo-binstall (install preference: nixpkgs > cargo binstall > bun > uv).
       _ibp_desired="$(mktemp)"
       printf '%s\n' \
         'clawhub' \
@@ -469,8 +469,8 @@ in
     # On each apply it compares the desired list against a per-user manifest at
     # ~/.config/nucleus/uv-tools.json, installs additions, and removes deletions.
     #
-    # Only tools absent from nixpkgs and cargo-binstall are managed here
-    # (install preference: nixpkgs > cargo binstall > uv).
+    # Only tools absent from nixpkgs, cargo-binstall, and bun are managed here
+    # (install preference: nixpkgs > cargo binstall > bun > uv).
     # -------------------------------------------------------------------------
     installUvTools = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
       set -eu
@@ -481,7 +481,7 @@ in
       # Declarative desired-state list.  One tool per line.
       # Add a PyPI package name here to install it; remove it to trigger
       # uninstall on the next apply.  Only add tools absent from nixpkgs and
-      # cargo-binstall (install preference: nixpkgs > cargo binstall > uv).
+      # cargo-binstall and bun (install preference: nixpkgs > cargo binstall > bun > uv).
       _iut_desired="$(mktemp)"
       # Empty file; no tools managed yet.  Add printf '%s\n' lines as needed.
       : > "$_iut_desired"

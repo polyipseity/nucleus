@@ -26,7 +26,7 @@ function Invoke-ScoopSetup {
     Currently managed:
       - cargo-binstall — Rust CLI install vehicle; absent from WinGet; Scoop
                          main bucket is the correct tier
-                         (winget > scoop > cargo binstall > bun).
+                         (winget > scoop > cargo binstall > bun > uv).
       - gopass         — cross-platform pass reimplementation; Windows parity
                          for pkgs.pass on POSIX hosts.
       - qemu           — QCOW2 tooling and guest VM runner for Invoke-VMSetup;
@@ -43,7 +43,7 @@ function Invoke-ScoopSetup {
   # app name.  Only add packages absent from WinGet.
   $desiredPackages = @(
     # Rust CLI install vehicle; absent from WinGet; Scoop main bucket is the
-    # correct install tier (winget > scoop > cargo binstall > bun).
+    # correct install tier (winget > scoop > cargo binstall > bun > uv).
     'cargo-binstall',
     # Cross-platform pass reimplementation; Windows parity for pkgs.pass;
     # absent from WinGet; Scoop main bucket.
