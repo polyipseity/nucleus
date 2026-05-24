@@ -1,26 +1,35 @@
 [
-	{
-		"models": [
-			{
-				"id": "devstral-small-2:24b",
-				"maxInputTokens": 32768,
-				"maxOutputTokens": 8192,
-				"name": "Devstral Small 2 24B",
-				"toolCalling": true,
-				"url": "http://localhost:11434/v1",
-				"vision": false
-			},
-			{
-				"id": "magistral:24b",
-				"maxInputTokens": 32768,
-				"maxOutputTokens": 8192,
-				"name": "Magistral 24B",
-				"toolCalling": true,
-				"url": "http://localhost:11434/v1",
-				"vision": false
-			}
-		],
-		"name": "Ollama",
-		"vendor": "customoai"
-	}
+        {
+                "models": [
+                        {
+                                "id": "devstral-small-2:24b",
+                                "maxInputTokens": 32768,
+                                "maxOutputTokens": 8192,
+                                "name": "Devstral Small 2 24B",
+                                "toolCalling": true,
+                                "url": "http://localhost:11434/v1",
+                                "vision": false
+                        },
+                        {
+                                "id": "magistral:24b",
+                                "maxInputTokens": 32768,
+                                "maxOutputTokens": 8192,
+                                "name": "Magistral 24B",
+                                "toolCalling": true,
+                                "url": "http://localhost:11434/v1",
+                                "vision": false
+                        },
+                        {
+                                "id": "qwen2.5:1.5b",
+                                "maxInputTokens": 32768,
+                                "maxOutputTokens": 8192,
+                                "name": "Qwen 2.5 1.5B",
+                                "toolCalling": false,
+                                "url": "http://localhost:11434/v1",
+                                "vision": false
+                        }
+                ],
+                "name": "Ollama",
+                "vendor": "customoai"
+        }
 ]

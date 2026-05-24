@@ -15,10 +15,14 @@
 # Model manifest: src/modules/ai/models.json
 #   macbook: devstral-small-2:24b, magistral:24b  — re-test tool-calling curl on macbook
 #                                             after model swap before relying on tools
-#   nixos:   qwen3:8b               — tool-calling NOT yet curl-tested on nixos;
+#            qwen2.5:1.5b            — small utility model; ~1 GB; runs on any modern PC;
+#                                      no tool-calling (not reliable at 1.5B)
+#   nixos:   qwen2.5:1.5b            — same utility model; no tool-calling
+#            qwen3:8b               — tool-calling NOT yet curl-tested on nixos;
 #                                     verify with the same curl test before relying
 #                                     on tool-calling on the nixos host.
-#   windows: qwen3:8b               — same as nixos; tool-calling NOT yet
+#   windows: qwen2.5:1.5b            — same utility model; no tool-calling
+#            qwen3:8b               — same as nixos; tool-calling NOT yet
 #                                     curl-tested on windows.
 {
   lib,
