@@ -271,9 +271,9 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-VMSetup.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-ReplicaSyncScheduledTask.ps1")
-. (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSshServer.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSSHServer.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-PowerPolicy.ps1")
-. (Join-Path -Path $systemModuleDir -ChildPath "Sync-WindowsRdp.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-WindowsRDP.ps1")
 # setup/: one-time or infrequent toolchain provisioning (Scoop, Bun, Cargo, prek).
 . (Join-Path -Path $setupModuleDir -ChildPath "Initialize-DevDirectory.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Install-PrekHook.ps1")
@@ -561,8 +561,8 @@ if ($EnableCloudDrivesParity) {
   }
 }
 Sync-ReplicaSyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
-Sync-OpenSshServer -Enabled:$EnableRemoteAccessParity
-# Re-run host age key registration after Sync-OpenSshServer has started
+Sync-OpenSSHServer -Enabled:$EnableRemoteAccessParity
+# Re-run host age key registration after Sync-OpenSSHServer has started
 # the sshd service (which generates host keys on a fresh machine).  This second
 # call is a no-op when the key is already registered; on first-ever apply it
 # completes registration in the same run without requiring a second apply.
@@ -574,7 +574,7 @@ if ($EnableHostAgeKeyRegistration) {
     -SecretsDir $secretsDir `
     -WallpaperAssetsDir $wallpaperAssetsDir
 }
-Sync-WindowsRdp -Enabled:$EnableRdpParity
+Sync-WindowsRDP -Enabled:$EnableRdpParity
 Sync-PowerPolicy -Enabled:$EnablePowerParity
 
 # Health check: verify archiving ecosystem (7-Zip CLI + app) is functional post-apply.

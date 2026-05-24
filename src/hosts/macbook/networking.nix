@@ -48,7 +48,7 @@
     # ---- enableScreenSharing ---------------------------------------------------
     /bin/launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
     if ! /bin/launchctl list com.apple.screensharing > /dev/null 2>&1; then
-      echo "rdp: Screen Sharing daemon not listed after load; remote desktop may not be active." >&2
+          echo "RDP: Screen Sharing daemon not listed after load; remote desktop may not be active." >&2
     fi
   '';
 

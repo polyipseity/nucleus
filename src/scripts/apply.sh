@@ -373,21 +373,21 @@ generate_ssh_host_key_if_needed() {
     return
   fi
 
-  printf 'ssh: %s not found; generating SSH host keys...\n' "$_gsk_host_key"
+  printf 'SSH: %s not found; generating SSH host keys...\n' "$_gsk_host_key"
   # Pass PATH explicitly so sudo finds the Nix openssh ssh-keygen rather than
   # any older system ssh-keygen that may be shadowed by runtimeInputs.
   if ! sudo env "PATH=$PATH" ssh-keygen -A; then
-    printf 'ssh: ERROR — ssh-keygen -A failed; cannot generate SSH host keys.\n' >&2
+    printf 'SSH: ERROR — ssh-keygen -A failed; cannot generate SSH host keys.\n' >&2
     exit 1
   fi
 
   if [ ! -f "$_gsk_host_key" ]; then
-    printf 'ssh: ERROR — ssh-keygen -A completed but %s is still absent.\n' \
+    printf 'SSH: ERROR — ssh-keygen -A completed but %s is still absent.\n' \
       "$_gsk_host_key" >&2
     exit 1
   fi
 
-  printf 'ssh: SSH host keys generated successfully.\n'
+  printf 'SSH: SSH host keys generated successfully.\n'
 }
 
 register_host_age_key_if_needed() {

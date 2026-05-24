@@ -2,7 +2,7 @@
 #
 # Applies SSH-server remote access posture with explicit managed cleanup path.
 
-function Sync-OpenSshServer {
+function Sync-OpenSSHServer {
   <#
   .SYNOPSIS
     Converges OpenSSH Server startup, auth policy, and firewall access.
@@ -35,10 +35,10 @@ function Sync-OpenSshServer {
     Whether remote-access parity should be enforced. False applies cleanup.
 
   .EXAMPLE
-    Sync-OpenSshServer -Enabled:$true
+    Sync-OpenSSHServer -Enabled:$true
 
   .EXAMPLE
-    Sync-OpenSshServer -Enabled:$false
+    Sync-OpenSSHServer -Enabled:$false
   #>
   param(
     [Parameter()]

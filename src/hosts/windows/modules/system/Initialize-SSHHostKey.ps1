@@ -25,7 +25,7 @@ function Initialize-SSHHostKey {
 
     If sshd is not yet installed (first-ever apply on a fresh machine before
     WinGet DSC has run), emits an advisory warning and returns without error.
-    After DSC installs OpenSSH and Sync-NucleusOpenSshServer starts the service,
+    After DSC installs OpenSSH and Sync-OpenSSHServer starts the service,
     the keys will be generated in the same apply run and the trailing call to
     Register-HostAgeKey will complete registration automatically.
 
@@ -61,11 +61,11 @@ function Initialize-SSHHostKey {
   if ($null -eq $sshdService) {
     # sshd not yet installed: advisory warning only.  WinGet DSC
     # (system.dsc.yml) installs OpenSSH Server later in this apply run.
-    # Sync-NucleusOpenSshServer then starts the service and host keys are
+    # Sync-OpenSSHServer then starts the service and host keys are
     # generated; the trailing Register-NucleusHostAgeKey call completes
     # registration in the same run.
-    Write-Warning ("ssh: sshd service not installed; SSH host key cannot be " +
-                   "generated yet.  Keys will be generated when Sync-NucleusOpenSshServer " +
+    Write-Warning ("SSH: sshd service not installed; SSH host key cannot be " +
+                   "generated yet.  Keys will be generated when Sync-OpenSSHServer " +
                    "starts sshd after DSC installs OpenSSH.")
     return
   }
@@ -76,7 +76,7 @@ function Initialize-SSHHostKey {
   # Sync-NucleusOpenSshServer, called later in the apply run.
   $wasRunning = $sshdService.Status -eq 'Running'
   if (-not $wasRunning) {
-    Write-Output "$($PSStyle.Foreground.Cyan)ssh: starting sshd temporarily to generate SSH host keys...$($PSStyle.Reset)"
+    Write-Output "$($PSStyle.Foreground.Cyan)SSH: starting sshd temporarily to generate SSH host keys...$($PSStyle.Reset)"
     Start-Service -Name 'sshd'
   }
 
@@ -91,7 +91,7 @@ function Initialize-SSHHostKey {
 
   if (-not $wasRunning) {
     # Restore the service to stopped so this function does not leave sshd
-    # running unexpectedly; proper enablement is handled by Sync-NucleusOpenSshServer.
+    # running unexpectedly; proper enablement is handled by Sync-OpenSSHServer.
     Stop-Service -Name 'sshd' -Force
   }
 
@@ -99,10 +99,10 @@ function Initialize-SSHHostKey {
     # Advisory warning: a second apply run will succeed once the keys are fully
     # written to disk (for example if sshd initialisation takes longer than
     # StartupTimeoutSeconds on this hardware).
-    Write-Warning ("ssh: sshd started but $MachineSshHostKeyPath still absent after " +
+    Write-Warning ("SSH: sshd started but $MachineSshHostKeyPath still absent after " +
                    "${StartupTimeoutSeconds}s.  Run apply again after sshd fully initializes.")
   }
   else {
-    Write-Output "$($PSStyle.Foreground.Green)ssh: SSH host keys generated.$($PSStyle.Reset)"
+    Write-Output "$($PSStyle.Foreground.Green)SSH: SSH host keys generated.$($PSStyle.Reset)"
   }
 }
