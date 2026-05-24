@@ -16,6 +16,8 @@
   "-gl" = "git log --oneline --decorate --graph";
   "-gp" = "git push";
   "-gpl" = "git pull";
+  # git status in short format with branch info, restored from git history.
+  "-gs" = "git status -sb";
   # Ghostscript PDF optimization presets.
   # CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
   # newer PDF compatibility target is released by Ghostscript.
@@ -29,8 +31,8 @@
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer -dNOPAUSE -dQUIET -dBATCH";
   "-gs-pdf-opt-screen" =
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH";
-  "-gsw" = "git switch";
   "-gst" = "git status";
+  "-gsw" = "git switch";
   "-la" = "eza -la";
   "-ll" = "eza -la";
   # bun shortcuts — mirror the Windows bun function aliases in shell.ps1 managed block.

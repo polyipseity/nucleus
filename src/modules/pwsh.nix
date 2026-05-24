@@ -205,6 +205,8 @@ let
     function -gl { & git log --oneline --decorate --graph @Args }
     function -gp { & git push @Args }
     function -gpl { & git pull @Args }
+    # git status in short format with branch info, restored from git history.
+    function -gs { & git status -sb @Args }
 
     function Invoke-NucleusGhostscript {
       if (Get-Command gs -ErrorAction SilentlyContinue) {
@@ -230,9 +232,8 @@ let
     function -gs-pdf-opt-prepress { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }
     function -gs-pdf-opt-printer  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }
     function -gs-pdf-opt-screen   { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }
-    function -gsw { & git switch @Args }
-
     function -gst { & git status @Args }
+    function -gsw { & git switch @Args }
 
     # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
     # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
