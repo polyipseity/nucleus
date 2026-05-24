@@ -51,4 +51,4 @@
 - `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
-- `nucleus-VM-setup` — provision UTM virtual machines declared in `src/modules/VMs.json`. Run once after `nucleus apply` on a new machine or to add a new VM. Requires UTM to have been launched at least once (to initialise its sandboxed document store). After provisioning, open UTM, locate each VM, and attach an installation ISO to install the guest OS. Verify the generated config.plist values in UTM's settings GUI before first boot.
+- `nucleus-VM-setup` — provision UTM VMs declared in `src/modules/VMs.json`; run once per machine or when adding a VM. After provisioning, UTM opens each bundle automatically — attach an installation ISO to install the guest OS. See the generated `~/Virtual Machines/<name>-configure.sh` for the configuration command.

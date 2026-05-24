@@ -152,6 +152,44 @@ $virtiofsArgs
             Write-Information "VM-setup: start script written: $startScript"
         }
 
+        # Write a configuration reference script for the guest OS.
+        $configureScript = Join-Path $vmDir "$($vm.name)-configure.sh"
+        $configureContent = switch ($vm.type) {
+            'nixos' {
+@'
+#!/usr/bin/env sh
+# Apply the nucleus nixos host configuration inside this VM.
+# ~/dev is shared via VirtioFS when shareDevDir=true.
+sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#nixos"
+'@
+            }
+            'windows' {
+@'
+#!/usr/bin/env sh
+# Apply the nucleus Windows host configuration inside this VM.
+# Clone this repository to %USERPROFILE%\dev\nucleus inside the VM, then run:
+#   .\src\hosts\windows\apply.ps1
+'@
+            }
+            'macos' {
+@'
+#!/usr/bin/env sh
+# Apply the nucleus macbook host configuration inside this VM.
+# Clone this repository to ~/dev/nucleus inside the VM, then run:
+#   ~/dev/nucleus/scripts/bootstrap.sh apply
+'@
+            }
+            default { $null }
+        }
+        if ($null -ne $configureContent) {
+            if ($DryRun) {
+                Write-Information "VM-setup: [dry-run] Write configure script: $configureScript"
+            } else {
+                Set-Content -Path $configureScript -Value $configureContent -Encoding UTF8
+                Write-Information "VM-setup: configure script written: $configureScript"
+            }
+        }
+
         Write-Information "VM-setup: VM '$($vm.display)' setup complete"
     }
 

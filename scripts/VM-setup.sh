@@ -2,7 +2,7 @@
 # Provisions and configures virtual machines declared in src/modules/VMs.json.
 #
 # What it does:
-#   macOS  (Darwin): creates UTM VM bundles in the UTM document store, pre-allocates
+#   macOS  (Darwin): creates UTM VM bundles in ~/Virtual Machines/, pre-allocates
 #                    QCOW2 disk images, and configures VirtioFS sharing for ~/dev.
 #   NixOS  (Linux/NIXOS): writes libvirt domain XML for each VM and registers it
 #                    with virsh so KVM-accelerated VMs are ready for use.
@@ -91,12 +91,50 @@ create_qcow2_disk() {
   fi
 }
 
+write_configure_script() {
+  # Generate a reference script documenting how to apply the nucleus host
+  # configuration inside the named VM guest.
+  _wcs_name="$1"
+  _wcs_type="$2"
+  _wcs_script="$VM_DIR/${_wcs_name}-configure.sh"
+  case "$_wcs_type" in
+    nixos)
+      cat > "$_wcs_script" << 'CFGEOF'
+#!/usr/bin/env sh
+# Apply the nucleus nixos host configuration inside this VM.
+# ~/dev is shared via VirtioFS when shareDevDir=true.
+sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#nixos"
+CFGEOF
+      ;;
+    windows)
+      cat > "$_wcs_script" << 'CFGEOF'
+#!/usr/bin/env sh
+# Apply the nucleus Windows host configuration inside this VM.
+# Clone this repository to %USERPROFILE%\dev\nucleus inside the VM, then run:
+#   .\src\hosts\windows\apply.ps1
+CFGEOF
+      ;;
+    macos)
+      cat > "$_wcs_script" << 'CFGEOF'
+#!/usr/bin/env sh
+# Apply the nucleus macbook host configuration inside this VM.
+# Clone this repository to ~/dev/nucleus inside the VM, then run:
+#   ~/dev/nucleus/scripts/bootstrap.sh apply
+CFGEOF
+      ;;
+    *)
+      return
+      ;;
+  esac
+  chmod +x "$_wcs_script"
+  printf 'VM-setup: wrote configure script: %s\n' "$_wcs_script"
+}
+
 # ---------------------------------------------------------------------------
 # macOS / UTM
 # ---------------------------------------------------------------------------
 
 setup_utm_vms() {
-  UTM_DOCS="$HOME/Library/Containers/com.utmapp.UTM/Data/Documents"
   UTMCTL="/Applications/UTM.app/Contents/MacOS/utmctl"
 
   if [ ! -d /Applications/UTM.app ]; then
@@ -106,12 +144,6 @@ setup_utm_vms() {
 
   if [ ! -x "$UTMCTL" ]; then
     printf 'VM-setup: utmctl not found at %s; skipping macOS VM provisioning\n' "$UTMCTL"
-    return
-  fi
-
-  if [ ! -d "$UTM_DOCS" ]; then
-    # UTM has never been launched; its sandboxed document directory is absent.
-    printf 'VM-setup: UTM document directory not found; launch UTM at least once before running vm-setup\n'
     return
   fi
 
@@ -126,16 +158,16 @@ setup_utm_vms() {
     vm_type=$(jq -r ".vms[$i].type" "$MANIFEST")
     vm_share_dev=$(jq -r ".vms[$i].shareDevDir" "$MANIFEST")
 
-    bundle="$UTM_DOCS/${vm_name}.utm"
+    bundle="$VM_DIR/${vm_name}.utm"
     images_dir="$bundle/Images"
     disk_file="$images_dir/disk-main.qcow2"
     config_plist="$bundle/config.plist"
 
     printf 'VM-setup: configuring UTM VM "%s"...\n' "$vm_display"
 
-    # Check if VM is already registered to avoid overwriting a running VM.
-    if "$UTMCTL" list 2>/dev/null | grep -qF "$vm_display"; then
-      printf 'VM-setup: VM "%s" already registered in UTM; skipping\n' "$vm_display"
+    # Check if bundle already exists to avoid overwriting.
+    if [ -d "$bundle" ]; then
+      printf 'VM-setup: UTM bundle already exists: %s; skipping\n' "$bundle"
       i=$((i + 1))
       continue
     fi
@@ -244,7 +276,10 @@ setup_utm_vms() {
       "$PB" -c "Add :Sound:0:Hardware string intel-hda" "$config_plist"
 
       printf 'VM-setup: UTM bundle created: %s\n' "$bundle"
-      printf 'VM-setup: open UTM to install the guest OS on the "%s" VM\n' "$vm_display"
+      # Register with UTM by opening the bundle package.
+      open "$bundle"
+      write_configure_script "$vm_name" "$vm_type"
+      printf 'VM-setup: attach an installation ISO in UTM to install the "%s" guest OS\n' "$vm_display"
     else
       printf 'VM-setup: [dry-run] create UTM bundle %s\n' "$bundle"
     fi
@@ -252,7 +287,7 @@ setup_utm_vms() {
     i=$((i + 1))
   done
 
-  printf 'VM-setup: macOS VM setup complete; open UTM to manage VMs\n'
+  printf 'VM-setup: macOS VM setup complete\n'
 }
 
 # ---------------------------------------------------------------------------
@@ -384,6 +419,7 @@ XMLEOF
     if [ "$dry_run" = false ]; then
       if virsh define "$_xml_tmp"; then
         printf 'VM-setup: VM "%s" defined in libvirt\n' "$vm_name"
+        write_configure_script "$vm_name" "$vm_type"
         printf 'VM-setup: install a guest OS via: virt-manager or virsh console %s\n' "$vm_name"
       else
         printf 'VM-setup: WARNING — virsh define failed for "%s"; check libvirtd status\n' "$vm_name" >&2

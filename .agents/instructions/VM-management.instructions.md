@@ -29,7 +29,7 @@ Required fields for each VM entry:
 QCOW2 throughout all three platforms.
 Stored at:
 
-- macOS: `~/Library/Containers/com.utmapp.UTM/Data/Documents/<name>.utm/Images/disk-main.qcow2`
+- macOS: `~/Virtual Machines/<name>.utm/Images/disk-main.qcow2`
 - NixOS: `~/Virtual Machines/<name>.qcow2`
 - Windows: `%USERPROFILE%\Virtual Machines\<name>.qcow2`
 
@@ -38,16 +38,14 @@ QCOW2 enables copy-based migration between hosts without conversion.
 ## macOS — UTM
 
 - VM backend: UTM 4.x QEMU backend.
-- Bundle location: `~/Library/Containers/com.utmapp.UTM/Data/Documents/<name>.utm/`
+- Bundle location: `~/Virtual Machines/<name>.utm/`
 - Config file: `config.plist` generated via `/usr/libexec/PlistBuddy`.
 - Disk pre-created in `Images/disk-main.qcow2` using `qemu-img` (from `pkgs.qemu` via nixpkgs).
-- UTM must be launched at least once before `nucleus-VM-setup` so its sandboxed document store exists.
-- After provisioning, open UTM, attach an installation ISO, and run the VM to install the guest OS.
-- Verify generated `config.plist` settings in the UTM GUI before first boot, especially Architecture,
-  Memory, CPU count, and Drive path.
+- After provisioning, UTM opens each bundle automatically; attach an installation ISO to install the guest OS.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in config.plist.
 - Network: Shared (NAT) mode on all VMs.
 - `utmctl` CLI path: `/Applications/UTM.app/Contents/MacOS/utmctl`.
+- Configure script: `~/Virtual Machines/<name>-configure.sh` written on first provisioning.
 
 ## NixOS — libvirt/KVM
 
@@ -59,6 +57,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - SPICE display + clipboard sharing enabled by default.
 - OVMF firmware (UEFI) and swtpm (TPM 2.0) enabled for Windows 11 compatibility.
 - After provisioning, run `virt-manager` to attach an installation ISO.
+- Configure script: `~/Virtual Machines/<name>-configure.sh` written on first provisioning.
 
 ## Windows — QEMU via Scoop
 
@@ -70,6 +69,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
   To install a guest OS, add `-cdrom 'C:\path\to\install.iso'` to the start script.
 - VirtioFS on Windows requires `virtiofsd` running as a separate process before the VM starts.
   See the comment in the generated start script for the exact command.
+- Configure script: `%USERPROFILE%\Virtual Machines\<name>-configure.sh` written on first provisioning.
 
 ## Apply Hook
 
