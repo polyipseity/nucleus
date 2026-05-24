@@ -173,18 +173,10 @@ in
             export NUCLEUS_DEFAULT_DEV_BIN="${defaultDevTools}/bin"
             export NUCLEUS_DEFAULT_DEV_ENV="1"
 
-            # Expose user-scope package manager bins so globally installed tools
-            # are accessible in interactive sessions without a new login shell.
-            #   bun install -g   → ~/.bun/bin   (BUN_INSTALL_BIN default)
-            #   cargo-binstall   → ~/.cargo/bin  (CARGO_HOME/bin default)
-            #   uv tool install  → ~/.local/bin  (XDG_BIN_HOME default)
-            # Guards prevent PATH growth when a directory does not exist yet.
-            # Source: https://bun.sh/docs/cli/install#global-packages
-            # Source: https://doc.rust-lang.org/cargo/commands/cargo-install.html
-            # Source: https://docs.astral.sh/uv/reference/settings/#tool-bin-dir
-            [[ -d "$HOME/.bun/bin"    ]] && export PATH="$HOME/.bun/bin:$PATH"
-            [[ -d "$HOME/.cargo/bin"  ]] && export PATH="$HOME/.cargo/bin:$PATH"
-            [[ -d "$HOME/.local/bin"  ]] && export PATH="$HOME/.local/bin:$PATH"
+            # (User-scope package manager bin dirs are declared via home.sessionPath
+            # below; that path goes to ~/.zshenv which is sourced before this
+            # .zshrc file and before the direnv hook, making them immune to
+            # direnv save/restore cycles regardless of when the dirs were created.)
 
             # Route managed development tools through either the active direnv
             # environment or the user-scoped default toolchain for repositories
@@ -544,6 +536,27 @@ in
             }
     '';
   };
+
+  # User-scope package manager bin directories declared unconditionally so PATH
+  # is stable across direnv activation/deactivation cycles regardless of
+  # whether the directories existed at shell startup time.
+  # home.sessionPath writes to ~/.zshenv (via the HM session-vars mechanism)
+  # which is sourced before ~/.zshrc (where the direnv hook lives), so these
+  # entries are always part of the "original" PATH state that direnv saves and
+  # restores — fixing the reliability issue of .zshrc-based PATH guards that
+  # only run once at startup.
+  #   bun install -g   → ~/.bun/bin   (BUN_INSTALL_BIN default)
+  #   cargo-binstall   → ~/.cargo/bin  (CARGO_HOME/bin default)
+  #   uv tool install  → ~/.local/bin  (XDG_BIN_HOME default)
+  # Sources:
+  # https://bun.sh/docs/cli/install#global-packages
+  # https://doc.rust-lang.org/cargo/commands/cargo-install.html
+  # https://docs.astral.sh/uv/reference/settings/#tool-bin-dir
+  home.sessionPath = [
+    "${config.home.homeDirectory}/.bun/bin"
+    "${config.home.homeDirectory}/.cargo/bin"
+    "${config.home.homeDirectory}/.local/bin"
+  ];
 
   home.sessionVariables = mergedSessionVariables;
 }

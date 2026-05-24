@@ -44,6 +44,17 @@ Functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`,
 4. If neither context is available, print a `shell: …` banner to stderr and
    return 1.
 
+**User-scope bin dir PATH wiring**: `~/.bun/bin`, `~/.cargo/bin`, and
+`~/.local/bin` are declared via `home.sessionPath`, **not** via `initContent`
+PATH guards. `home.sessionPath` writes to `~/.zshenv` (via the Home Manager
+session-vars mechanism) which is sourced before `~/.zshrc` (where the direnv
+hook lives). This ensures these directories are always part of the "original"
+PATH state that direnv captures and restores, even if the directories did not
+exist at the time the shell first started. Do **not** revert to `initContent`
+guarded `export PATH=...` lines — they are fragile under direnv because they
+only run at shell startup and are lost after a direnv deactivation if the
+directory was created later in the same session.
+
 ### POSIX (pwsh) — `src/modules/pwsh.nix`
 
 Equivalent PowerShell functions in `profileContent`. Pass-through first uses
@@ -57,6 +68,14 @@ Same functions emitted into the managed block. Pass-through uses
 environment flag (`$env:NUCLEUS_DEFAULT_DEV_ENV`). Windows currently reuses the
 managed user PATH entries instead of a second Nix-backed fallback root because
 the WinGet/PowerShell workflow has no nix-direnv-equivalent store path today.
+
+**User-scope bin dir PATH wiring**: `~\.bun\bin` and `~\.cargo\bin` are
+prepended **unconditionally** (no `Test-Path` guard) at the top of the managed
+block, before the direnv hook. This mirrors the POSIX `home.sessionPath`
+approach: the entries are always present in the environment direnv saves and
+restores, so they survive activation/deactivation cycles even when the
+directories were created after the current session started. Do **not** add
+`Test-Path` guards back — they break this contract.
 
 ## devShell — development environment
 

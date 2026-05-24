@@ -4,6 +4,13 @@
 # metadata: POSIX shells must expose the dedicated fallback tool bundle and
 # Windows PowerShell must expose the managed default shell environment.
 #
+# Also guards the direnv-safe PATH wiring contract:
+#   - POSIX: user-scope bin dirs declared via home.sessionPath (goes to
+#     ~/.zshenv, sourced before ~/.zshrc where direnv hook lives) so the
+#     entries survive direnv save/restore cycles.
+#   - Windows: user-scope bin dirs prepended unconditionally (no Test-Path
+#     guard) at the top of the managed block, before the direnv hook.
+#
 # Run with: nix-instantiate --eval tests/nix/default-dev-tooling-tests.nix
 
 {
@@ -50,6 +57,39 @@ let
 
   test_ci_runs_this_suite = assert' (lib.hasInfix "tests/nix/default-dev-tooling-tests.nix" ciWorkflowText) "CI must execute the managed fallback tooling tests";
 
+  # Verify that user-scope bin dirs are declared via home.sessionPath (POSIX)
+  # and not via initContent PATH guards.  home.sessionPath writes to ~/.zshenv
+  # which is sourced before ~/.zshrc (where direnv hook lives), making the
+  # entries immune to direnv save/restore cycles.
+  test_posix_uses_session_path_for_user_bins =
+    assert'
+      (
+        (lib.hasInfix "home.sessionPath" posixShellText)
+        && (lib.hasInfix "/.bun/bin" posixShellText)
+        && (lib.hasInfix "/.cargo/bin" posixShellText)
+        && (lib.hasInfix "/.local/bin" posixShellText)
+        # Must NOT have old-style guarded PATH export in initContent.
+        && !(lib.hasInfix "[[ -d \"$HOME/.bun/bin\"" posixShellText)
+        && !(lib.hasInfix "[[ -d \"$HOME/.cargo/bin\"" posixShellText)
+        && !(lib.hasInfix "[[ -d \"$HOME/.local/bin\"" posixShellText)
+      )
+      "shell.nix must declare user-scope bin dirs via home.sessionPath (direnv-safe), not initContent PATH guards";
+
+  # Verify that Windows managed block adds user-scope bin dirs unconditionally
+  # (no Test-Path guard) and before the direnv hook so the entries are in the
+  # environment direnv captures and restores.
+  test_windows_unconditional_user_bin_path =
+    assert'
+      (
+        (lib.hasInfix "\\.bun\\bin" windowsShellProfileText)
+        && (lib.hasInfix "\\.cargo\\bin" windowsShellProfileText)
+        # Must NOT use Test-Path guard for these entries (would silently drop them
+        # when the dir is newly created and a direnv cycle has already run).
+        && !(lib.hasInfix "Test-Path $bunBinDir" windowsShellProfileText)
+        && !(lib.hasInfix "Test-Path $cargoBinDir" windowsShellProfileText)
+      )
+      "Sync-ShellProfile.ps1 must prepend .bun\\bin and .cargo\\bin unconditionally (no Test-Path guard) for direnv reliability";
+
   allTests = [
     test_posix_shell_exports_fallback_bundle
     test_posix_pwsh_uses_fallback_bundle
@@ -57,6 +97,8 @@ let
     test_windows_apply_wires_shell_profile_sync
     test_policy_docs_capture_fallback
     test_ci_runs_this_suite
+    test_posix_uses_session_path_for_user_bins
+    test_windows_unconditional_user_bin_path
   ];
 in
 {
@@ -70,5 +112,7 @@ in
     "4: Windows apply wires shell profile sync"
     "5: Build tools policy documents fallback environment"
     "6: CI executes fallback tooling tests"
+    "7: POSIX zsh uses home.sessionPath for user-scope bin dirs (direnv-safe)"
+    "8: Windows managed block prepends user-scope bin dirs unconditionally"
   ];
 }

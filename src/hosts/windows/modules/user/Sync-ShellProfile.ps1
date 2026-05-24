@@ -54,6 +54,25 @@ function Sync-ShellProfile {
   $managedBlockEnd = '# <<< config managed shell parity <<<'
   $managedBlock = @(
     $managedBlockStart
+    # User-scope package manager bin directories are prepended before the
+    # direnv hook initializes so they are always part of the environment
+    # direnv saves and restores, regardless of whether the directories
+    # existed at profile load time.  No existence guard: non-existent dirs
+    # in PATH are harmless and the unconditional add ensures a new terminal
+    # opened after apply sees the correct PATH immediately.
+    #   bun install -g   -> ~\.bun\bin  (BUN_INSTALL_BIN default)
+    #   cargo-binstall   -> ~\.cargo\bin (CARGO_HOME/bin default)
+    # Sources:
+    # https://bun.sh/docs/cli/install#global-packages
+    # https://doc.rust-lang.org/cargo/commands/cargo-install.html
+    '$bunBinDir = Join-Path $env:USERPROFILE ".bun\bin"'
+    'if ($env:PATH -notlike "*$bunBinDir*") {'
+    '  $env:PATH = "$bunBinDir;$env:PATH"'
+    '}'
+    '$cargoBinDir = Join-Path $env:USERPROFILE ".cargo\bin"'
+    'if ($env:PATH -notlike "*$cargoBinDir*") {'
+    '  $env:PATH = "$cargoBinDir;$env:PATH"'
+    '}'
     'if (Get-Command direnv -ErrorAction SilentlyContinue) {'
     '  (& direnv hook pwsh) | Out-String | Invoke-Expression'
     '}'
@@ -207,14 +226,6 @@ function Sync-ShellProfile {
     '  }'
     '}'
     'Invoke-PrekHookInstallIfNeeded'
-    # bun global packages land in ~\.bun\bin (BUN_INSTALL_BIN default).
-    # WinGet bun installer adds this to the user PATH registry entry; the
-    # prepend here covers sessions opened before that registry change was
-    # applied (for example the terminal running apply.ps1 itself).
-    '$bunBinDir = Join-Path $env:USERPROFILE ".bun\bin"'
-    'if ((Test-Path $bunBinDir) -and ($env:PATH -notlike "*$bunBinDir*")) {'
-    '  $env:PATH = "$bunBinDir;$env:PATH"'
-    '}'
     # LLVM/Clang: add LLVM bin directory to PATH for the current session so
     # newly provisioned hosts can run clang/ld.lld immediately.
     '$llvmBinDir = "C:\Program Files\LLVM\bin"'
