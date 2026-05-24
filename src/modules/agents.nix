@@ -462,6 +462,88 @@ in
     '';
 
     # -------------------------------------------------------------------------
+    # installUvTools
+    # Idempotently converges the declarative uv tool set (install + prune).
+    #
+    # Maintains a managed set of Python CLI tools installed via `uv tool install`.
+    # On each apply it compares the desired list against a per-user manifest at
+    # ~/.config/nucleus/uv-tools.json, installs additions, and removes deletions.
+    #
+    # Only tools absent from nixpkgs and cargo-binstall are managed here
+    # (install preference: nixpkgs > cargo binstall > uv).
+    # -------------------------------------------------------------------------
+    installUvTools = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
+      set -eu
+
+      _iut_jq_bin='${pkgs.jq}/bin/jq'
+      _iut_uv_bin='${pkgs.uv}/bin/uv'
+
+      # Declarative desired-state list.  One tool per line.
+      # Add a PyPI package name here to install it; remove it to trigger
+      # uninstall on the next apply.  Only add tools absent from nixpkgs and
+      # cargo-binstall (install preference: nixpkgs > cargo binstall > uv).
+      _iut_desired="$(mktemp)"
+      # Empty file; no tools managed yet.  Add printf '%s\n' lines as needed.
+      : > "$_iut_desired"
+      # No uv-managed tools yet.  Add entries here as needed.
+
+      _iut_manifest="$HOME/.config/nucleus/uv-tools.json"
+      _iut_manifest_dir="$(dirname "$_iut_manifest")"
+
+      # Read the previously-managed tool list.  An absent or malformed manifest
+      # (first run) is treated as an empty set so all desired tools become
+      # additions.  || true is intentional: malformed manifest → empty previous
+      # set is safe (desired tools install; nothing is removed).
+      _iut_previous="$(mktemp)"
+      if [ -f "$_iut_manifest" ]; then
+        "$_iut_jq_bin" -r '.[]?' "$_iut_manifest" > "$_iut_previous" || true
+      fi
+
+      # Tools no longer desired: present in the previous manifest but absent
+      # from the desired list.
+      _iut_to_remove="$(mktemp)"
+      while IFS= read -r _iut_tool; do
+        [ -z "$_iut_tool" ] && continue
+        if ! grep -qxF "$_iut_tool" "$_iut_desired"; then
+          printf '%s\n' "$_iut_tool" >> "$_iut_to_remove"
+        fi
+      done < "$_iut_previous"
+
+      # Desired tools not yet installed (binary absent from ~/.local/bin).
+      _iut_to_install="$(mktemp)"
+      while IFS= read -r _iut_tool; do
+        [ -z "$_iut_tool" ] && continue
+        if [ ! -x "$HOME/.local/bin/$_iut_tool" ]; then
+          printf '%s\n' "$_iut_tool" >> "$_iut_to_install"
+        fi
+      done < "$_iut_desired"
+
+      # Prune tools removed from the desired list.
+      while IFS= read -r _iut_tool; do
+        [ -z "$_iut_tool" ] && continue
+        echo "uv: uninstalling removed tool '$_iut_tool'"
+        "$_iut_uv_bin" tool uninstall "$_iut_tool"
+      done < "$_iut_to_remove"
+
+      # Install additions.
+      while IFS= read -r _iut_tool; do
+        [ -z "$_iut_tool" ] && continue
+        echo "uv: installing tool '$_iut_tool'"
+        "$_iut_uv_bin" tool install "$_iut_tool"
+      done < "$_iut_to_install"
+
+      if [ ! -s "$_iut_to_install" ] && [ ! -s "$_iut_to_remove" ]; then
+        echo "uv: all managed tools already converged — skipping"
+      fi
+
+      # Persist the new desired set so the next apply can detect future removals.
+      mkdir -p "$_iut_manifest_dir"
+      "$_iut_jq_bin" -R -n '[inputs | select(length > 0)]' "$_iut_desired" > "$_iut_manifest"
+
+      rm -f "$_iut_desired" "$_iut_previous" "$_iut_to_remove" "$_iut_to_install"
+    '';
+
+    # -------------------------------------------------------------------------
     # syncClawHubSkills
     # Converges fetched skills (non-AGPL-compatible, downloaded at apply time
     # via ClawHub) with the declarative manifest in

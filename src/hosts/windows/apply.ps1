@@ -280,6 +280,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-BunSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CargoBinstallSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-ScoopSetup.ps1")
+. (Join-Path -Path $setupModuleDir -ChildPath "Invoke-UvSetup.ps1")
 # user/: per-user home convergence (git/SSH, shell, agents, dev repos, apps).
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CloudDrive.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsClawHubSkill.ps1")
@@ -497,6 +498,9 @@ Invoke-CargoBinstallSetup
 if ($EnableBunParity) {
   Invoke-BunSetup
 }
+# uv global tools run after WinGet DSC has installed astral-sh.uv.
+# uv-setup prepends ~/.local/bin to PATH internally for this session.
+Invoke-UvSetup
 
 # Ensure the live nucleus checkout installs its own Git hooks during the same
 # provision run that installs or updates prek itself.

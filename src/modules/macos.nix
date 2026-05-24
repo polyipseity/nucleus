@@ -340,6 +340,7 @@ let
     "hideMenuBarIcons"
     "installBunPackages"
     "installPackages"
+    "installUvTools"
     "installPwshScriptAnalyzer"
     "linkGeneration"
     "onFilesChange"
