@@ -43,4 +43,4 @@
 - `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
-- `nucleus-VM-setup` — provision KVM/libvirt VMs declared in `src/modules/VMs.json`; run once per machine. Requires `libvirtd` active (from `VMs.nix`). Attach an ISO via `virt-manager` or `virsh` to install the guest OS, then run the generated `~/Virtual Machines/<name>-configure.sh` inside the VM.
+- `nucleus-VM-setup` — provision KVM/libvirt VMs declared in `src/modules/VMs.json`; run once per machine. Requires `libvirtd` active (from `VMs.nix`). Attach an ISO via `virt-manager` or `virsh` to install the guest OS, then run the generated `~/virtual machines/<name>-configure.sh` inside the VM.

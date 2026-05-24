@@ -29,23 +29,23 @@ Required fields for each VM entry:
 QCOW2 throughout all three platforms.
 Stored at:
 
-- macOS: `~/Virtual Machines/<name>.utm/Images/disk-main.qcow2`
-- NixOS: `~/Virtual Machines/<name>.qcow2`
-- Windows: `%USERPROFILE%\Virtual Machines\<name>.qcow2`
+- macOS: `~/virtual machines/<name>.utm/Images/disk-main.qcow2`
+- NixOS: `~/virtual machines/<name>.qcow2`
+- Windows: `%USERPROFILE%\virtual machines\<name>.qcow2`
 
 QCOW2 enables copy-based migration between hosts without conversion.
 
 ## macOS — UTM
 
 - VM backend: UTM 4.x QEMU backend.
-- Bundle location: `~/Virtual Machines/<name>.utm/`
+- Bundle location: `~/virtual machines/<name>.utm/`
 - Config file: `config.plist` generated via `/usr/libexec/PlistBuddy`.
 - Disk pre-created in `Images/disk-main.qcow2` using `qemu-img` (from `pkgs.qemu` via nixpkgs).
 - After provisioning, UTM opens each bundle automatically; attach an installation ISO to install the guest OS.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in config.plist.
 - Network: Shared (NAT) mode on all VMs.
 - `utmctl` CLI path: `/Applications/UTM.app/Contents/MacOS/utmctl`.
-- Configure script: `~/Virtual Machines/<name>-configure.sh` written on first provisioning.
+- Configure script: `~/virtual machines/<name>-configure.sh` written on first provisioning.
 
 ## NixOS — libvirt/KVM
 
@@ -57,19 +57,19 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - SPICE display + clipboard sharing enabled by default.
 - OVMF firmware (UEFI) and swtpm (TPM 2.0) enabled for Windows 11 compatibility.
 - After provisioning, run `virt-manager` to attach an installation ISO.
-- Configure script: `~/Virtual Machines/<name>-configure.sh` written on first provisioning.
+- Configure script: `~/virtual machines/<name>-configure.sh` written on first provisioning.
 
 ## Windows — QEMU via Scoop
 
 - QEMU installed via Scoop extras bucket by `Invoke-ScoopSetup.ps1`.
   - `qemu-img.exe`: disk creation.
   - `qemu-system-x86_64.exe` / `qemu-system-aarch64.exe`: VM launch.
-- Disk images and generated start scripts placed in `%USERPROFILE%\Virtual Machines\`.
+- Disk images and generated start scripts placed in `%USERPROFILE%\virtual machines\`.
 - Start script: `Start-<display>.ps1` — a self-contained PowerShell launch command.
   To install a guest OS, add `-cdrom 'C:\path\to\install.iso'` to the start script.
 - VirtioFS on Windows requires `virtiofsd` running as a separate process before the VM starts.
   See the comment in the generated start script for the exact command.
-- Configure script: `%USERPROFILE%\Virtual Machines\<name>-configure.sh` written on first provisioning.
+- Configure script: `%USERPROFILE%\virtual machines\<name>-configure.sh` written on first provisioning.
 
 ## Apply Hook
 
@@ -92,5 +92,5 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 1. Remove the entry from `src/modules/VMs.json`.
 2. Manually delete the disk image and registration:
    - macOS: delete `<name>.utm` bundle from UTM document store.
-   - NixOS: run `virsh undefine <name>` then delete `~/Virtual Machines/<name>.qcow2`.
-   - Windows: delete `%USERPROFILE%\Virtual Machines\<name>.qcow2` and the start script.
+   - NixOS: run `virsh undefine <name>` then delete `~/virtual machines/<name>.qcow2`.
+   - Windows: delete `%USERPROFILE%\virtual machines\<name>.qcow2` and the start script.

@@ -4,7 +4,7 @@
 # and virt-manager.  Guest VMs are declared in src/modules/VMs.json and
 # provisioned by scripts/VM-setup.sh (run via `nucleus-VM-setup`).
 #
-# Disk images are stored at ~/Virtual Machines/<name>.qcow2 in QCOW2 format,
+# Disk images are stored at ~/virtual machines/<name>.qcow2 in QCOW2 format,
 # enabling copy-based migration to UTM (macOS) or QEMU (Windows) without
 # conversion.  The directory is local-only and excluded from cloud sync.
 #

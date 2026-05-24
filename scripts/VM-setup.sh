@@ -2,7 +2,7 @@
 # Provisions and configures virtual machines declared in src/modules/VMs.json.
 #
 # What it does:
-#   macOS  (Darwin): creates UTM VM bundles in ~/Virtual Machines/, pre-allocates
+#   macOS  (Darwin): creates UTM VM bundles in ~/virtual machines/, pre-allocates
 #                    QCOW2 disk images, and configures VirtioFS sharing for ~/dev.
 #   NixOS  (Linux/NIXOS): writes libvirt domain XML for each VM and registers it
 #                    with virsh so KVM-accelerated VMs are ready for use.
@@ -15,7 +15,7 @@
 #   --dry-run  print planned actions without executing them
 #
 # Environment variables:
-#   VM_DIR_OVERRIDE  override the default ~/Virtual Machines path
+#   VM_DIR_OVERRIDE  override the default ~/virtual machines path
 #
 # Prerequisites:
 #   macOS:  UTM installed (/Applications/UTM.app); qemu-img in PATH for
@@ -57,7 +57,7 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-VM_DIR="${VM_DIR_OVERRIDE:-$HOME/Virtual Machines}"
+VM_DIR="${VM_DIR_OVERRIDE:-$HOME/virtual machines}"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -458,8 +458,8 @@ case "$_os" in
       setup_libvirt_vms
     else
       printf 'VM-setup: standalone Linux detected; use QEMU/KVM directly:\n'
-      printf 'VM-setup:   qemu-img create -f qcow2 ~/Virtual\ Machines/<name>.qcow2 <size>G\n'
-      printf 'VM-setup:   qemu-system-x86_64 -m <ram> -smp <cpu> -hda ~/Virtual\ Machines/<name>.qcow2 ...\n'
+      printf 'VM-setup:   qemu-img create -f qcow2 ~/virtual\ machines/<name>.qcow2 <size>G\n'
+      printf 'VM-setup:   qemu-system-x86_64 -m <ram> -smp <cpu> -hda ~/virtual\ machines/<name>.qcow2 ...\n'
     fi
     ;;
   *)

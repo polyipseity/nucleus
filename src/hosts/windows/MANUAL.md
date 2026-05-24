@@ -41,4 +41,4 @@
 - `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
-- `nucleus-VM-setup` — provision QEMU VMs declared in `src/modules/VMs.json`; run once per machine. Requires QEMU (`scoop install qemu`). Run the generated `Start-<Name>.ps1` scripts in `%USERPROFILE%\Virtual Machines\` (add `-cdrom <iso>` for installation). See the generated `<name>-configure.sh` for the guest configuration command.
+- `nucleus-VM-setup` — provision QEMU VMs declared in `src/modules/VMs.json`; run once per machine. Requires QEMU (`scoop install qemu`). Run the generated `Start-<Name>.ps1` scripts in `%USERPROFILE%\virtual machines\` (add `-cdrom <iso>` for installation). See the generated `<name>-configure.sh` for the guest configuration command.

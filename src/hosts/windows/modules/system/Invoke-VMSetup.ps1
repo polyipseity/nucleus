@@ -4,12 +4,12 @@
 # plus QEMU start scripts for each declared VM.  QEMU is installed via the
 # Scoop extras bucket (see Invoke-ScoopSetup.ps1).
 #
-# Disk images are stored at %USERPROFILE%\Virtual Machines\<name>.qcow2,
-# mirroring the ~/Virtual Machines/<name>.qcow2 path used on POSIX hosts.
+# Disk images are stored at %USERPROFILE%\virtual machines\<name>.qcow2,
+# mirroring the ~/virtual machines/<name>.qcow2 path used on POSIX hosts.
 # QCOW2 format enables copy-based migration to UTM (macOS) or libvirt (NixOS).
 #
 # Each VM also gets a start script at
-#   %USERPROFILE%\Virtual Machines\Start-<display>.ps1
+#   %USERPROFILE%\virtual machines\Start-<display>.ps1
 # so the user can launch QEMU from a PowerShell terminal without remembering
 # the full command line.
 #
@@ -34,7 +34,7 @@ function Invoke-VMSetup {
     }
 
     $vmDef = Get-Content $manifest -Raw | ConvertFrom-Json
-    $vmDir = Join-Path $env:USERPROFILE 'Virtual Machines'
+    $vmDir = Join-Path $env:USERPROFILE 'virtual machines'
 
     # Locate qemu-img from the Scoop-managed QEMU installation.
     $scoopQemuDir = Join-Path $env:USERPROFILE 'scoop\apps\qemu\current'
