@@ -529,11 +529,211 @@ in
         echo "uv: all managed tools already converged — skipping"
       fi
 
-      # Persist the new desired set so the next apply can detect future removals.
-      mkdir -p "$_iut_manifest_dir"
-      "$_iut_jq_bin" -R -n '[inputs | select(length > 0)]' "$_iut_desired" > "$_iut_manifest"
+      rm -f "$_iut_desired" "$_iut_installed" "$_iut_to_remove" "$_iut_to_install"
+    '';
 
-      rm -f "$_iut_desired" "$_iut_previous" "$_iut_to_remove" "$_iut_to_install"
+    # -------------------------------------------------------------------------
+    # installRustupToolchains
+    # Converges the declarative rustup toolchain set (install + zap).
+    #
+    # Queries `rustup toolchain list`, extracts the channel prefix from each
+    # installed toolchain name, and removes any whose channel is not in the
+    # desired list (zap-style).  Installs desired channels not currently present.
+    #
+    # Mirrors homebrew cleanup = "zap": removes anything installed but absent
+    # from the declared desired set, regardless of when or how it was installed.
+    #
+    # Why after linkGeneration: rustup is provided by pkgs.rustup in core.nix
+    # (baseSharedPackages) and becomes available once the Home Manager profile
+    # is linked.  This activation is independent of agents/bun/uv setup.
+    # -------------------------------------------------------------------------
+    installRustupToolchains = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      set -eu
+
+      # Declarative desired toolchain channels.  Add a channel name here to
+      # install it; remove it to trigger removal on the next apply.  Use the
+      # short channel name without the host triple (rustup appends it
+      # automatically when installing).
+      _irt_desired="$(mktemp)"
+      printf '%s\n' \
+        'stable' \
+        > "$_irt_desired"
+
+      # Guard: rustup is provided by pkgs.rustup in baseSharedPackages.  If
+      # not on PATH after linkGeneration something is wrong with the Nix
+      # profile; log and skip rather than failing the whole activation.
+      if ! command -v rustup >/dev/null 2>&1; then
+        echo "rustup: rustup not found in PATH after linkGeneration; skipping toolchain management"
+        rm -f "$_irt_desired"
+      else
+        # Get actually installed toolchains.  `rustup toolchain list` emits
+        # lines like "stable-aarch64-apple-darwin (default)" or just the full
+        # toolchain name.  The first whitespace-delimited token is the name.
+        _irt_installed="$(mktemp)"
+        # || true is intentional: if rustup toolchain list fails (e.g. rustup
+        # is freshly installed with no toolchains yet), the installed set is
+        # treated as empty — safe because desired channels will be installed.
+        rustup toolchain list 2>/dev/null | awk '{print $1}' > "$_irt_installed" || true
+
+        # Extract the channel prefix from each installed toolchain name and
+        # collect all channel names.  Pattern: <channel>[-<host-triple>]
+        #   stable-aarch64-apple-darwin  → stable
+        #   nightly-2024-01-01-aarch64-… → nightly (longest suffix from first -)
+        #   1.75.0-aarch64-apple-darwin  → 1.75.0
+        # ''${var%%-*} removes the longest suffix matching -* (everything from
+        # the first dash onward).
+        _irt_channels="$(mktemp)"
+        while IFS= read -r _irt_tc; do
+          [ -z "$_irt_tc" ] && continue
+          _irt_channel="''${_irt_tc%%-*}"
+          printf '%s\n' "$_irt_channel" >> "$_irt_channels"
+        done < "$_irt_installed"
+
+        # Toolchains whose channel is not desired: zap-style removal.
+        _irt_to_remove="$(mktemp)"
+        while IFS= read -r _irt_tc; do
+          [ -z "$_irt_tc" ] && continue
+          _irt_channel="''${_irt_tc%%-*}"
+          if ! grep -qxF "$_irt_channel" "$_irt_desired"; then
+            printf '%s\n' "$_irt_tc" >> "$_irt_to_remove"
+          fi
+        done < "$_irt_installed"
+
+        # Desired channels not currently installed (channel absent from all
+        # installed toolchain names).
+        _irt_to_install="$(mktemp)"
+        while IFS= read -r _irt_channel; do
+          [ -z "$_irt_channel" ] && continue
+          if ! grep -qxF "$_irt_channel" "$_irt_channels"; then
+            printf '%s\n' "$_irt_channel" >> "$_irt_to_install"
+          fi
+        done < "$_irt_desired"
+
+        # Remove toolchains whose channel is not in the desired list.
+        while IFS= read -r _irt_tc; do
+          [ -z "$_irt_tc" ] && continue
+          echo "rustup: removing toolchain '$_irt_tc'"
+          if ! rustup toolchain remove "$_irt_tc"; then
+            echo "rustup: 'rustup toolchain remove $_irt_tc' failed" >&2
+            rm -f "$_irt_desired" "$_irt_installed" "$_irt_channels" "$_irt_to_remove" "$_irt_to_install"
+            exit 1
+          fi
+          echo "rustup: '$_irt_tc' removed"
+        done < "$_irt_to_remove"
+
+        # Install desired channels not currently present.
+        while IFS= read -r _irt_channel; do
+          [ -z "$_irt_channel" ] && continue
+          echo "rustup: installing toolchain '$_irt_channel'"
+          if ! rustup toolchain install "$_irt_channel"; then
+            echo "rustup: 'rustup toolchain install $_irt_channel' failed" >&2
+            rm -f "$_irt_desired" "$_irt_installed" "$_irt_channels" "$_irt_to_remove" "$_irt_to_install"
+            exit 1
+          fi
+          echo "rustup: '$_irt_channel' installed"
+        done < "$_irt_to_install"
+
+        if [ ! -s "$_irt_to_remove" ] && [ ! -s "$_irt_to_install" ]; then
+          echo "rustup: all managed toolchains already converged — skipping"
+        fi
+
+        rm -f "$_irt_desired" "$_irt_installed" "$_irt_channels" "$_irt_to_remove" "$_irt_to_install"
+      fi
+    '';
+
+    # -------------------------------------------------------------------------
+    # installCargoBinstallPackages
+    # Converges the declarative cargo-binstall package set (install + zap).
+    #
+    # On POSIX hosts all packages that would otherwise require cargo-binstall
+    # are available in nixpkgs (e.g. pay-respects, cargo-cache), so the
+    # desired list is intentionally empty.  Any crate installed via
+    # `cargo install` or `cargo binstall` that is NOT in the desired list will
+    # be uninstalled (zap).
+    #
+    # Mirrors homebrew cleanup = "zap": removes anything installed but absent
+    # from the declared desired set, regardless of how it was installed.
+    #
+    # Why after installRustupToolchains: cargo is provided by the rustup stable
+    # toolchain.  installRustupToolchains must run first to ensure `cargo
+    # install --list` is available via the Nix-managed rustup.
+    # -------------------------------------------------------------------------
+    installCargoBinstallPackages = lib.hm.dag.entryAfter [ "installRustupToolchains" ] ''
+      set -eu
+
+      # Declarative desired-state list.  On POSIX hosts this list is
+      # intentionally empty because all managed Rust tools are provided by
+      # nixpkgs (install preference: nixpkgs > cargo binstall > bun > uv).
+      # Add a crate name here to install it via cargo-binstall if it is
+      # truly absent from nixpkgs.
+      _icp_desired="$(mktemp)"
+      # No cargo-binstall-managed crates on POSIX.
+      : > "$_icp_desired"
+
+      # Guard: cargo is available only if a rustup toolchain is installed.
+      # If cargo is absent, skip rather than failing the whole activation;
+      # nothing is installed by this step on POSIX hosts anyway.
+      if ! command -v cargo >/dev/null 2>&1; then
+        echo "cargo-binstall: cargo not found in PATH; skipping package management"
+        rm -f "$_icp_desired"
+      else
+        # Get actually installed crates from `cargo install --list` (zap-style).
+        # Output format: "crate-name vX.Y.Z:" on header lines; extract the
+        # crate name (first field) from lines matching that pattern.
+        _icp_installed="$(mktemp)"
+        # || true is intentional and benign: if cargo install --list fails
+        # (e.g. no crates are installed yet and ~/.cargo is uninitialised),
+        # an empty installed set is correct — nothing to remove.
+        cargo install --list 2>/dev/null | awk '/^[a-zA-Z0-9_-]+ v/{print $1}' > "$_icp_installed" || true
+
+        # Crates installed but not desired: zap-style removal.
+        _icp_to_remove="$(mktemp)"
+        while IFS= read -r _icp_crate; do
+          [ -z "$_icp_crate" ] && continue
+          if ! grep -qxF "$_icp_crate" "$_icp_desired"; then
+            printf '%s\n' "$_icp_crate" >> "$_icp_to_remove"
+          fi
+        done < "$_icp_installed"
+
+        # Desired crates not yet installed.
+        _icp_to_install="$(mktemp)"
+        while IFS= read -r _icp_crate; do
+          [ -z "$_icp_crate" ] && continue
+          if ! grep -qxF "$_icp_crate" "$_icp_installed"; then
+            printf '%s\n' "$_icp_crate" >> "$_icp_to_install"
+          fi
+        done < "$_icp_desired"
+
+        # Remove crates not in the desired list.
+        while IFS= read -r _icp_crate; do
+          [ -z "$_icp_crate" ] && continue
+          echo "cargo-binstall: removing $_icp_crate"
+          if ! cargo uninstall "$_icp_crate"; then
+            echo "cargo-binstall: 'cargo uninstall $_icp_crate' failed" >&2
+            rm -f "$_icp_desired" "$_icp_installed" "$_icp_to_remove" "$_icp_to_install"
+            exit 1
+          fi
+          echo "cargo-binstall: '$_icp_crate' removed"
+        done < "$_icp_to_remove"
+
+        # Install desired crates not currently installed.
+        while IFS= read -r _icp_crate; do
+          [ -z "$_icp_crate" ] && continue
+          echo "cargo-binstall: installing $_icp_crate"
+          if ! cargo-binstall --no-confirm "$_icp_crate"; then
+            echo "cargo-binstall: 'cargo-binstall $_icp_crate' failed" >&2
+            rm -f "$_icp_desired" "$_icp_installed" "$_icp_to_remove" "$_icp_to_install"
+            exit 1
+          fi
+          echo "cargo-binstall: '$_icp_crate' installed"
+        done < "$_icp_to_install"
+
+        if [ ! -s "$_icp_to_remove" ] && [ ! -s "$_icp_to_install" ]; then
+          echo "cargo-binstall: all managed packages already converged — skipping"
+        fi
+
+        rm -f "$_icp_desired" "$_icp_installed" "$_icp_to_remove" "$_icp_to_install"
+      fi
     '';
 
     # -------------------------------------------------------------------------

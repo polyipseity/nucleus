@@ -279,6 +279,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $setupModuleDir -ChildPath "Install-PrekHook.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-BunSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CargoBinstallSetup.ps1")
+. (Join-Path -Path $setupModuleDir -ChildPath "Invoke-RustupSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-ScoopSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-UvSetup.ps1")
 # user/: per-user home convergence (git/SSH, shell, agents, dev repos, apps).
@@ -489,6 +490,10 @@ foreach ($configFile in $effectiveConfigFiles) {
 # scoop shims are written to a user-local directory that is not on PATH in
 # the current session until explicitly prepended; Invoke-ScoopSetup handles
 # that prepend internally.
+# rustup toolchain management runs after WinGet DSC has installed Rustlang.Rustup.
+# Must run before Invoke-CargoBinstallSetup so the stable toolchain (and its
+# cargo binary) are available for compilation fallback.
+Invoke-RustupSetup
 Invoke-ScoopSetup
 # cargo-binstall managed packages run after Invoke-ScoopSetup has installed
 # cargo-binstall from Scoop and prepended the shims directory to PATH.
