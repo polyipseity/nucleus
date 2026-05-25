@@ -343,6 +343,58 @@ function Invoke-BuildNixosImage {
     Write-Information "vm-setup: NixOS image ready: $outPath"
 }
 
+# Get-WindowsIsoUrl — Attempt to fetch a Windows 11 ISO direct download URL
+# using Microsoft's software-download API (same technique as Rufus/Fido).
+# Returns the URL string on success; returns an empty string when the API is
+# unavailable, rate-limited, or has changed.  All failures are silently
+# swallowed; the caller is responsible for falling back to manual ISO supply.
+# Source: https://github.com/pbatard/fido
+function Get-WindowsIsoUrl {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param()
+
+    try {
+        $ua     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        $base   = 'https://www.microsoft.com/en-us/api/controls/contentinclude/html'
+        $pageId = 'a224afab-2097-4dfa-a2ba-463eb191a285'
+
+        # Fetch the Windows 11 download page to extract the session ID.
+        $page = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 20 `
+            -Uri 'https://www.microsoft.com/en-us/software-download/windows11' `
+            -Headers @{ 'User-Agent' = $ua }).Content
+
+        # Extract the 36-char UUID session ID embedded in download page links.
+        if ($page -notmatch 'sessionId=([0-9a-f-]{36})') { return '' }
+        $session = $Matches[1]
+
+        # Extract the first Windows 11 productEditionId from <option> elements.
+        if ($page -notmatch 'value="(\d+)">[^<]*Windows 11') { return '' }
+        $prodId = $Matches[1]
+
+        # Get the SKU list for this product edition.
+        $skuResp = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 20 `
+            -Uri "$base?pageId=$pageId&host=www.microsoft.com&segments=software-download,windows11&query=&action=getskuinformationbyproductedition&sessionId=$session&productEditionId=$prodId&sdVersion=2" `
+            -Headers @{ 'User-Agent' = $ua }).Content
+
+        # Extract the English SKU ID from the JSON response.
+        if ($skuResp -notmatch '"Id":(\d+),"Language":"English"') { return '' }
+        $skuId = $Matches[1]
+
+        # Get the time-limited download links for this SKU.
+        $linkResp = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 20 `
+            -Uri "$base?pageId=$pageId&host=www.microsoft.com&segments=software-download,windows11&query=&action=GetProductDownloadLinksBySku&sessionId=$session&skuId=$skuId&language=English&sdVersion=2" `
+            -Headers @{ 'User-Agent' = $ua }).Content
+
+        # Extract the first x64 ISO URL from the response HTML.
+        if ($linkResp -notmatch '(https://[^\s"]+x64[^\s"]*\.iso[^\s"]*)') { return '' }
+        return $Matches[1]
+    } catch {
+        # Network failure, API change, or rate limiting — caller falls back to manual.
+        return ''
+    }
+}
+
 # Invoke-BuildWindowsImage — Builds the Windows 11 guest image using Packer.
 #
 # Requires a Windows 11 ISO path (-WindowsIso).  Uses SATA disk during the
@@ -402,8 +454,42 @@ function Invoke-BuildWindowsImage {
         }
     }
 
+    # If still no ISO resolved, attempt Fido-style dynamic URL fetching.
+    # Gracefully skips on any network or API failure so the build never
+    # aborts solely because auto-fetch is unavailable.
     if (-not $resolvedIso) {
-        Write-Warning 'vm-setup: -WindowsIso PATH is required for Windows 11 builds'
+        Write-Information 'vm-setup: attempting automatic Windows ISO fetch (Fido-style)...'
+        if (-not $DryRun) {
+            $fetchedUrl = Get-WindowsIsoUrl
+            if ($fetchedUrl) {
+                $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
+                if (Test-Path $cachedIso) {
+                    Write-Information "vm-setup: using cached Windows installer: $cachedIso"
+                    $resolvedIso = $cachedIso
+                } else {
+                    Write-Information 'vm-setup: downloading Windows ISO from Microsoft...'
+                    if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
+                        Write-Information 'vm-setup: curl.exe not found; skipping auto-fetch'
+                    } else {
+                        & curl.exe -fL -o $cachedIso $fetchedUrl
+                        if ($LASTEXITCODE -eq 0) {
+                            $resolvedIso = $cachedIso
+                            Write-Information "vm-setup: Windows ISO downloaded: $cachedIso"
+                        } else {
+                            Write-Warning 'vm-setup: automatic ISO download failed; removing partial file'
+                            Remove-Item $cachedIso -Force -ErrorAction SilentlyContinue
+                        }
+                    }
+                }
+            } else {
+                Write-Information 'vm-setup: automatic ISO fetch skipped (API unavailable or changed)'
+            }
+        } else {
+            Write-Information 'vm-setup: [dry-run] would attempt Fido-style automatic Windows ISO fetch'
+        }
+    }
+
+    if (-not $resolvedIso) {
         Write-Information 'vm-setup: alternatively add "windowsIsoUrl": "<url>" to the VMs.json windows entry'
         Write-Information 'vm-setup: download from: https://www.microsoft.com/software-download/windows11'
         return

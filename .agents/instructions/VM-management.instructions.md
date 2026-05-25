@@ -44,9 +44,9 @@ Required fields for each VM entry:
 
 Optional fields:
 
-| Field            | Type   | Description                                                       |
-| ---------------- | ------ | ----------------------------------------------------------------- |
-| `windowsIsoUrl`  | string | URL to auto-download the Windows installer ISO when `--windows-iso` is omitted. Set to a stable direct download URL (e.g. an evaluation ISO from Microsoft's Evaluation Center or an internal mirror). The downloaded ISO is cached at `~/virtual machines/images/<name>-installer.iso`. |
+| Field           | Type   | Description                                                                                                                                                                                                                                                                              |
+| --------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `windowsIsoUrl` | string | URL to auto-download the Windows installer ISO when `--windows-iso` is omitted. Set to a stable direct download URL (e.g. an evaluation ISO from Microsoft's Evaluation Center or an internal mirror). The downloaded ISO is cached at `~/virtual machines/images/<name>-installer.iso`. |
 
 ## Disk Format
 
