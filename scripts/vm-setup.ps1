@@ -17,7 +17,7 @@
 # Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
 [CmdletBinding()]
 param(
-    # Path to Windows 11 ISO (required for Windows 11 guest builds).
+    # Path to Windows 11 ISO. Optional when windowsIsoUrl is set in VMs.json.
     # Download from: https://www.microsoft.com/software-download/windows11
     [string]$WindowsIso = '',
 
@@ -27,8 +27,8 @@ param(
     # Build and provision only the Windows 11 guest.
     [switch]$WindowsOnly,
 
-    # QEMU accelerator for image builds (default: tcg).
-    # Use whpx for Windows HyperVisor Platform acceleration.
+    # QEMU accelerator for image builds (default: tcg, auto-upgraded to whpx
+    # when Windows Hypervisor Platform is detected).
     [string]$Accelerator = 'tcg',
 
     # Print planned actions without executing.

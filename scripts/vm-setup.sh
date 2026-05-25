@@ -191,14 +191,42 @@ build_windows_image() {
     return 0
   fi
 
-  if [ -z "$windows_iso" ]; then
+  # Resolve the installer ISO: use --windows-iso if provided, otherwise try the
+  # windowsIsoUrl field from VMs.json as a download source.
+  _iso="$windows_iso"
+  if [ -z "$_iso" ]; then
+    _iso_url="$(jq -r ".VMs[] | select(.name == \"$_name\") | .windowsIsoUrl // empty" "$MANIFEST")"
+    if [ -n "$_iso_url" ]; then
+      _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
+      if [ -f "$_cached_iso" ]; then
+        printf 'vm-setup: using cached Windows installer: %s\n' "$_cached_iso"
+        _iso="$_cached_iso"
+      else
+        printf 'vm-setup: downloading Windows installer from windowsIsoUrl...\n'
+        if [ "$dry_run" = false ]; then
+          curl -fL -o "$_cached_iso" "$_iso_url" || {
+            printf 'vm-setup: download failed; remove %s and retry\n' "$_cached_iso" >&2
+            rm -f "$_cached_iso"
+            return 1
+          }
+          _iso="$_cached_iso"
+          printf 'vm-setup: Windows installer downloaded: %s\n' "$_cached_iso"
+        else
+          printf 'vm-setup: [dry-run] curl -fL -o %s %s\n' "$_cached_iso" "$_iso_url"
+        fi
+      fi
+    fi
+  fi
+
+  if [ -z "$_iso" ]; then
     printf 'vm-setup: --windows-iso PATH is required for Windows 11 builds\n' >&2
+    printf 'vm-setup: alternatively add "windowsIsoUrl": "<url>" to the VMs.json windows entry\n' >&2
     printf 'vm-setup: download from: https://www.microsoft.com/software-download/windows11\n' >&2
     return 1
   fi
 
-  if [ ! -f "$windows_iso" ]; then
-    printf 'vm-setup: Windows ISO not found: %s\n' "$windows_iso" >&2
+  if [ ! -f "$_iso" ]; then
+    printf 'vm-setup: Windows ISO not found: %s\n' "$_iso" >&2
     return 1
   fi
 
@@ -215,7 +243,7 @@ build_windows_image() {
 
   if [ "$dry_run" = true ]; then
     printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var disk_size=%sG -var output_directory=%s .\n' \
-      "$_packer_dir" "$windows_iso" "$accelerator" "$_disk_gib" "$_tmp_out"
+      "$_packer_dir" "$_iso" "$accelerator" "$_disk_gib" "$_tmp_out"
     return 0
   fi
 
@@ -223,7 +251,7 @@ build_windows_image() {
     cd "$_packer_dir"
     packer init .
     packer build \
-      -var "windows_iso=$windows_iso" \
+      -var "windows_iso=$_iso" \
       -var "accelerator=$accelerator" \
       -var "disk_size=${_disk_gib}G" \
       -var "output_directory=$_tmp_out" \

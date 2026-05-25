@@ -18,6 +18,7 @@ host OS. The canonical values are:
 | Windows  | `Windows`                              | `Windows`             |
 
 Apply this convention when adding or modifying:
+
 - `vms/nixos/guest.nix` — set `networking.hostName = "NixOS"`
 - `vms/nixos/packer.pkr.hcl` — set `networking.hostName = "NixOS"` inline
 - `vms/windows/Autounattend.xml` — set `<ComputerName>Windows</ComputerName>`
@@ -40,6 +41,12 @@ Required fields for each VM entry:
 | `diskGiB`     | int    | Boot disk size in GiB                                 |
 | `type`        | string | Guest OS family: `"nixos"`, `"windows"`, or `"linux"` |
 | `shareDevDir` | bool   | Mount `~/dev` inside the guest via VirtioFS           |
+
+Optional fields:
+
+| Field            | Type   | Description                                                       |
+| ---------------- | ------ | ----------------------------------------------------------------- |
+| `windowsIsoUrl`  | string | URL to auto-download the Windows installer ISO when `--windows-iso` is omitted. Set to a stable direct download URL (e.g. an evaluation ISO from Microsoft's Evaluation Center or an internal mirror). The downloaded ISO is cached at `~/virtual machines/images/<name>-installer.iso`. |
 
 ## Disk Format
 
@@ -143,7 +150,12 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 **Windows 11 guest (all hosts)** (`nucleus-vm-setup --windows-only --windows-iso /path/to/Win11.iso`):
 
 - Uses Packer with `vms/windows/packer.pkr.hcl` and QEMU builder.
-- Requires a Windows 11 ISO (download from https://www.microsoft.com/software-download/windows11).
+- Requires a Windows 11 ISO path via `--windows-iso` **or** a `windowsIsoUrl` field in the `VMs.json`
+  windows entry. When `windowsIsoUrl` is set, the ISO is downloaded automatically to
+  `~/virtual machines/images/<name>-installer.iso` on first run (subsequent runs reuse the cache).
+- On Windows hosts, `Invoke-VMSetup` auto-detects WHPX (Windows Hypervisor Platform) when the
+  default `tcg` accelerator is in use. If WHPX is enabled, it upgrades automatically. If not,
+  it warns and prints the command to enable it. Pass `-Accelerator tcg` explicitly to suppress.
 - SATA disk during build → VirtIO drivers installed post-install → final image is VirtIO-disk ready.
 - Autounattend.xml bypasses TPM/Secure Boot checks, enables WinRM for Packer, creates `packer` account.
 - Change the `packer` password and apply the nucleus Windows config after first boot.

@@ -24,7 +24,8 @@ function Invoke-VMSetup {
         [Parameter(Mandatory)]
         [string]$RepoRoot,
 
-        # Path to the Windows 11 ISO. Required for Windows 11 guest builds.
+        # Path to the Windows 11 ISO. Optional when windowsIsoUrl is set in VMs.json;
+        # the URL is used to auto-download the installer on first run.
         # Download from: https://www.microsoft.com/software-download/windows11
         [string]$WindowsIso = '',
 
@@ -35,8 +36,8 @@ function Invoke-VMSetup {
         [switch]$WindowsOnly,
 
         # QEMU accelerator for image builds. Defaults to tcg (always works).
-        # Use whpx for Windows HyperVisor Platform acceleration (requires enabling
-        # "Windows Hypervisor Platform" in Windows Features).
+        # When tcg is used, Invoke-VMSetup auto-detects WHPX (Windows Hypervisor
+        # Platform) and upgrades to whpx automatically if it is enabled.
         # Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
         [string]$Accelerator = 'tcg',
 
@@ -65,6 +66,27 @@ function Invoke-VMSetup {
         Write-Information "vm-setup: [dry-run] New-Item Directory $imagesDir"
     }
 
+    # Auto-detect WHPX when the user has not specified a non-default accelerator.
+    # WHPX (Windows Hypervisor Platform) is significantly faster than tcg software
+    # emulation and should be used when available.
+    # Source: https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/user-guide/nested-virtualization
+    if ($Accelerator -eq 'tcg') {
+        try {
+            $whpxFeature = Get-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -ErrorAction Stop
+            if ($whpxFeature.State -eq 'Enabled') {
+                $Accelerator = 'whpx'
+                Write-Information 'vm-setup: WHPX detected; using whpx accelerator for faster VM builds'
+            } else {
+                Write-Warning 'vm-setup: WHPX is not enabled; using slow tcg accelerator. Enable for faster builds:'
+                Write-Information 'vm-setup:   Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -NoRestart'
+            }
+        } catch {
+            # Get-WindowsOptionalFeature requires elevation; skip detection and keep tcg.
+            # Source: https://learn.microsoft.com/en-us/powershell/module/dism/get-windowsoptionalfeature
+            Write-Information 'vm-setup: cannot detect WHPX (requires elevation); defaulting to tcg'
+        }
+    }
+
     # -------------------------------------------------------------------------
     # Phase 1 — Build images (if absent)
     # -------------------------------------------------------------------------
@@ -80,8 +102,10 @@ function Invoke-VMSetup {
                     -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
             }
             'windows' {
+                $isoUrl = if ($null -ne $vm.windowsIsoUrl) { [string]$vm.windowsIsoUrl } else { '' }
                 Invoke-BuildWindowsImage -VmName $vm.name -DiskGiB $vm.diskGiB `
-                    -WindowsIso $WindowsIso -Accelerator $Accelerator `
+                    -WindowsIso $WindowsIso -WindowsIsoUrl $isoUrl `
+                    -Accelerator $Accelerator `
                     -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
             }
             'macos' {
@@ -331,6 +355,9 @@ function Invoke-BuildWindowsImage {
         [string]$VmName,
         [int]$DiskGiB,
         [string]$WindowsIso,
+        # Optional URL to auto-download the Windows installer ISO when -WindowsIso
+        # is not provided.  Set via the windowsIsoUrl field in VMs.json.
+        [string]$WindowsIsoUrl = '',
         [string]$Accelerator,
         [string]$VmsDir,
         [string]$ImagesDir,
@@ -343,14 +370,47 @@ function Invoke-BuildWindowsImage {
         return
     }
 
-    if (-not $WindowsIso) {
+    # Resolve the installer ISO: use -WindowsIso if provided, otherwise try the
+    # VMs.json windowsIsoUrl field as a download source.
+    $resolvedIso = $WindowsIso
+    if (-not $resolvedIso -and $WindowsIsoUrl) {
+        $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
+        if (Test-Path $cachedIso) {
+            Write-Information "vm-setup: using cached Windows installer: $cachedIso"
+            $resolvedIso = $cachedIso
+        } else {
+            Write-Information "vm-setup: downloading Windows installer from windowsIsoUrl..."
+            if (-not $DryRun) {
+                # Use curl.exe (available on Windows 10 1803+) for large ISO downloads;
+                # Invoke-WebRequest buffers the full file in memory before writing to disk.
+                # Source: https://curl.se/docs/manpage.html
+                if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
+                    Write-Warning 'vm-setup: curl.exe not found; Windows 10 1803+ includes it in system32'
+                    return
+                }
+                & curl.exe -fL -o $cachedIso $WindowsIsoUrl
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "vm-setup: download failed; removing partial file $cachedIso"
+                    Remove-Item $cachedIso -Force -ErrorAction SilentlyContinue
+                    return
+                }
+                $resolvedIso = $cachedIso
+                Write-Information "vm-setup: Windows installer downloaded: $cachedIso"
+            } else {
+                Write-Information "vm-setup: [dry-run] curl.exe -fL -o $cachedIso $WindowsIsoUrl"
+            }
+        }
+    }
+
+    if (-not $resolvedIso) {
         Write-Warning 'vm-setup: -WindowsIso PATH is required for Windows 11 builds'
+        Write-Information 'vm-setup: alternatively add "windowsIsoUrl": "<url>" to the VMs.json windows entry'
         Write-Information 'vm-setup: download from: https://www.microsoft.com/software-download/windows11'
         return
     }
 
-    if (-not (Test-Path $WindowsIso)) {
-        Write-Warning "vm-setup: Windows ISO not found: $WindowsIso"
+    if (-not (Test-Path $resolvedIso)) {
+        Write-Warning "vm-setup: Windows ISO not found: $resolvedIso"
         return
     }
 
@@ -366,7 +426,7 @@ function Invoke-BuildWindowsImage {
     Write-Information 'vm-setup: this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
 
     if ($DryRun) {
-        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var disk_size=${DiskGiB}G -var output_directory=$tmpOutput ."
+        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var windows_iso=$resolvedIso -var accelerator=$Accelerator -var disk_size=${DiskGiB}G -var output_directory=$tmpOutput ."
         return
     }
 
@@ -378,7 +438,7 @@ function Invoke-BuildWindowsImage {
             return
         }
         & packer build `
-            -var "windows_iso=$WindowsIso" `
+            -var "windows_iso=$resolvedIso" `
             -var "accelerator=$Accelerator" `
             -var "disk_size=${DiskGiB}G" `
             -var "output_directory=$tmpOutput" `

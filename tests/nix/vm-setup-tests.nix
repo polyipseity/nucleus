@@ -102,6 +102,18 @@ let
         builtins.toString (builtins.map (v: v.name) badShare)
       }";
 
+  # windowsIsoUrl must be a string when present; the field is optional.
+  test_windows_iso_url_type =
+    let
+      badIsoUrls = builtins.filter (
+        vm: builtins.hasAttr "windowsIsoUrl" vm && !builtins.isString vm.windowsIsoUrl
+      ) manifest.VMs;
+    in
+    assert' (badIsoUrls == [ ])
+      "windowsIsoUrl must be a string for all VMs that declare it; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badIsoUrls)
+      }";
+
   # ---------------------------------------------------------------------------
   # Declarative config generation tests
   # ---------------------------------------------------------------------------
@@ -246,6 +258,7 @@ in
     test_vm_names
     test_vm_types
     test_share_dev_dir_types
+    test_windows_iso_url_type
     test_plist_uuid_format
     test_plist_uuid_uniqueness
     test_domain_xml_kvm_type
