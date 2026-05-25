@@ -31,7 +31,7 @@
     "${modulesPath}/profiles/qemu-guest.nix"
   ];
 
-  networking.hostName = "nixos";
+  networking.hostName = "NixOS";
 
   # VirtioFS kernel module enables zero-copy host-directory sharing.
   # The mount point must be configured inside the guest (e.g. in

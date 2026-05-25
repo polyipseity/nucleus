@@ -499,6 +499,18 @@ properties:
 
     - resource: Microsoft.Windows.Registry/RegistryValue
       directives:
+        description: >-
+          Set the Windows computer name to "Windows" so the hostname matches the
+          host-name convention used across all nucleus hosts (MacBook/NixOS/Windows).
+          Takes effect after the next reboot.
+      settings:
+        keyPath: HKLM\System\CurrentControlSet\Control\ComputerName\ComputerName
+        valueName: ComputerName
+        valueData: Windows
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
         description: Enable long path support so Nix store paths and deep Git worktrees do not hit the default 260-character Windows path limit
       settings:
         keyPath: HKLM\System\CurrentControlSet\Control\FileSystem

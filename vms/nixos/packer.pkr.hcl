@@ -137,7 +137,7 @@ build {
       "  imports = [ ./hardware-configuration.nix \"${modulesPath}/profiles/qemu-guest.nix\" ];",
       "  boot.loader.grub.enable = true;",
       "  boot.loader.grub.device = \"/dev/vda\";",
-      "  networking.hostName = \"nixos\";",
+      "  networking.hostName = \"NixOS\";",
       "  boot.initrd.availableKernelModules = [ \"virtio_fs\" ];",
       "  services.openssh = { enable = true; settings.PermitRootLogin = \"yes\"; };",
       "  users.users.nixos = { isNormalUser = true; extraGroups = [ \"wheel\" ]; initialPassword = \"nixos\"; };",

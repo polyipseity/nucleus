@@ -149,7 +149,7 @@
                language="neutral"
                versionScope="nonSxS"
                xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
-      <ComputerName>windows</ComputerName>
+      <ComputerName>Windows</ComputerName>
       <TimeZone>UTC</TimeZone>
     </component>
   </settings>
