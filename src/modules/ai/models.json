@@ -1,15 +1,15 @@
 {
   "models": {
-    "macbook": [
+    "MacBook": [
       "devstral-small-2:24b",
       "magistral:24b",
       "qwen2.5:1.5b"
     ],
-    "nixos": [
+    "NixOS": [
       "qwen2.5:1.5b",
       "qwen3:8b"
     ],
-    "windows": [
+    "Windows": [
       "qwen2.5:1.5b",
       "qwen3:8b"
     ]
