@@ -519,6 +519,10 @@
               pkgsMac.rustc
               pkgsMac.uv
             ];
+            # libiconv is required by the macOS linker when building Rust/C projects
+            # (ld: library not found for -liconv). It is included in glibc on Linux
+            # so no equivalent addition is needed in the Linux devShell.
+            buildInputs = [ pkgsMac.libiconv ];
           };
           bootstrap = pkgsMac.mkShell {
             packages = [
