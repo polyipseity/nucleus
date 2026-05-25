@@ -4,7 +4,7 @@
       "cpus": 4,
       "diskBytes": 137438953472,
       "display": "MacBook",
-      "macosVersion": "sequoia",
+      "macOSVersion": "sequoia",
       "name": "MacBook",
       "ramBytes": 8589934592,
       "shareDevDir": true,

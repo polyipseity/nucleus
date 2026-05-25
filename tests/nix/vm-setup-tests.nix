@@ -114,15 +114,15 @@ let
         builtins.toString (builtins.map (v: v.name) badIsoUrls)
       }";
 
-  # macosVersion must be a string when present; the field is optional (macOS guests only).
+  # macOSVersion must be a string when present; the field is optional (macOS guests only).
   test_macos_version_type =
     let
       badVersions = builtins.filter (
-        vm: builtins.hasAttr "macosVersion" vm && !builtins.isString vm.macosVersion
+        vm: builtins.hasAttr "macOSVersion" vm && !builtins.isString vm.macOSVersion
       ) manifest.VMs;
     in
     assert' (badVersions == [ ])
-      "macosVersion must be a string for all VMs that declare it; bad entries: ${
+      "macOSVersion must be a string for all VMs that declare it; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badVersions)
       }";
 

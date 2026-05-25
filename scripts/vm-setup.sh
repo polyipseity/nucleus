@@ -439,7 +439,7 @@ build_images() {
           build_windows_image "$_vm_name" "$_vm_disk_gib" "$_vm_edition"
           ;;
         macOS)
-          _vm_macos_ver="$(jq -r ".VMs[$_i].macosVersion // \"sequoia\"" "$MANIFEST")"
+          _vm_macos_ver="$(jq -r ".VMs[$_i].macOSVersion // \"sequoia\"" "$MANIFEST")"
           _vm_ram_bytes="$(jq -r ".VMs[$_i].ramBytes" "$MANIFEST")"
           _vm_ram_mib="$(( _vm_ram_bytes / 1048576 ))"
           _vm_cpus="$(jq -r ".VMs[$_i].cpus" "$MANIFEST")"
