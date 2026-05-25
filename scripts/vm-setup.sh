@@ -514,10 +514,18 @@ build_images() {
 
     if should_include "$_vm_type"; then
       case "$_vm_type" in
-        NixOS)   build_nixos_image "$_vm_name" ;;
+        NixOS)
+          # WHY: best-effort — a prerequisite-missing or build failure for one
+          # VM type must not abort builds for the remaining VMs; the build
+          # function prints a specific error before returning non-zero.
+          build_nixos_image "$_vm_name" \
+            || printf 'vm-setup: NixOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
+          ;;
         Windows)
           _vm_edition="$(jq -r ".VMs[$_i].windowsEdition // \"Pro\"" "$MANIFEST")"
-          build_windows_image "$_vm_name" "$_vm_disk_gib" "$_vm_edition"
+          # WHY: best-effort — see NixOS branch above.
+          build_windows_image "$_vm_name" "$_vm_disk_gib" "$_vm_edition" \
+            || printf 'vm-setup: Windows image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
           ;;
         macOS)
           _vm_macos_ver="$(jq -r ".VMs[$_i].macOSVersion // \"sequoia\"" "$MANIFEST")"
@@ -526,7 +534,9 @@ build_images() {
           # Uses (n + 2^19) / 2^20 for round-half-up in POSIX integer arithmetic.
           _vm_ram_mib="$(( (_vm_ram_bytes + 524288) / 1048576 ))"
           _vm_cpus="$(jq -r ".VMs[$_i].cpus" "$MANIFEST")"
-          build_macos_image "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver"
+          # WHY: best-effort — see NixOS branch above.
+          build_macos_image "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver" \
+            || printf 'vm-setup: macOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
           ;;
         *)
           printf 'vm-setup: skipping build for "%s" (unsupported type: %s)\n' \

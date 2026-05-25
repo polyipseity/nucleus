@@ -278,6 +278,16 @@ let
     in
     assert' (builtins.stringLength content > 0) "vms/nixos/guest.nix must not be empty";
 
+  # ---------------------------------------------------------------------------
+  # Homebrew dependency tests
+  # ---------------------------------------------------------------------------
+
+  # tart (the macOS guest hypervisor) must be declared in homebrew.nix so that
+  # it is installed via the Homebrew tap; it cannot be packaged in nixpkgs due
+  # to its reliance on Apple Virtualization.framework code-signing entitlements.
+  homebrew_text = builtins.readFile ../../src/hosts/MacBook/homebrew.nix;
+  test_tart_in_homebrew = assert' (lib.hasInfix "cirruslabs/cli/tart" homebrew_text) "homebrew.nix must include cirruslabs/cli/tart for the macOS Tart VM guest";
+
 in
 {
   inherit
@@ -299,6 +309,7 @@ in
     test_packer_templates_exist
     test_vm_setup_scripts_exist
     test_guest_nix_nonempty
+    test_tart_in_homebrew
     ;
 
   summary = "vm-setup-tests: all tests passed";
