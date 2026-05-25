@@ -184,7 +184,13 @@ in
               _tool_name="$1"
               shift
 
-              if [[ -n "''${DIRENV_DIR:-}" ]]; then
+              # direnv active: use the devShell tool if present in PATH; fall
+              # through to NUCLEUS_DEFAULT_DEV_BIN otherwise so projects that
+              # do not include the managed tool in their devShell still get
+              # the baseline inventory.  Mirrors the PowerShell
+              # Invoke-NucleusManagedDevTool availability-check pattern.
+              # 2>/dev/null: command -v is read-only; failure means absent ← expected.
+              if [[ -n "''${DIRENV_DIR:-}" ]] && command -v "$_tool_name" >/dev/null 2>&1; then
                 command "$_tool_name" "$@"
                 return $?
               fi

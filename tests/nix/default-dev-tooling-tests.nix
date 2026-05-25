@@ -90,6 +90,13 @@ let
       )
       "Sync-ShellProfile.ps1 must prepend .bun\\bin and .cargo\\bin unconditionally (no Test-Path guard) for direnv reliability";
 
+  # Verify that __nucleus_run_managed_dev_tool probes tool availability via
+  # command -v before routing through the direnv context.  This mirrors the
+  # PowerShell Invoke-NucleusManagedDevTool pattern so projects that do not
+  # include a managed tool in their devShell fall through to
+  # NUCLEUS_DEFAULT_DEV_BIN instead of failing with "command not found".
+  test_posix_shell_probes_tool_in_direnv = assert' (lib.hasInfix "command -v \"$_tool_name\"" posixShellText) "shell.nix must probe tool availability (command -v) in direnv context before routing, so projects lacking the managed tool fall through to NUCLEUS_DEFAULT_DEV_BIN";
+
   allTests = [
     test_posix_shell_exports_fallback_bundle
     test_posix_pwsh_uses_fallback_bundle
@@ -99,6 +106,7 @@ let
     test_ci_runs_this_suite
     test_posix_uses_session_path_for_user_bins
     test_windows_unconditional_user_bin_path
+    test_posix_shell_probes_tool_in_direnv
   ];
 in
 {
@@ -114,5 +122,6 @@ in
     "6: CI executes fallback tooling tests"
     "7: POSIX zsh uses home.sessionPath for user-scope bin dirs (direnv-safe)"
     "8: Windows managed block prepends user-scope bin dirs unconditionally"
+    "9: POSIX zsh probes tool availability in direnv context before routing"
   ];
 }
