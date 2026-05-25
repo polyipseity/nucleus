@@ -1,7 +1,7 @@
 # tests/nix/vm-setup-tests.nix — Tests for VM provisioning manifest and NixOS module options.
 #
 # Validates the structure of src/modules/VMs.json and confirms that the NixOS
-# vms.nix module options are wired correctly.
+# VMs.nix module options are wired correctly.
 # Run via: nix-instantiate --eval tests/nix/vm-setup-tests.nix
 
 {
