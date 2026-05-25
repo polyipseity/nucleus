@@ -1,6 +1,6 @@
 ---
 description: "Use when implementing new features, modules, or changes that require test coverage. Mandates test-driven development (TDD) practices for Nix and Windows DSC configurations. Covers test structure, CI integration, and validation patterns."
-applyTo: "src/**/*.nix, src/hosts/windows/**/*.yml, src/hosts/windows/modules/*.ps1, tests/**, .github/workflows/**"
+applyTo: "src/**/*.nix, src/hosts/Windows/**/*.yml, src/hosts/Windows/modules/*.ps1, tests/**, .github/workflows/**"
 ---
 
 # Test-Driven Development Practices
@@ -225,7 +225,7 @@ Invoke-Pester tests/windows/packages/package-installation.Tests.ps1
 # Test fails: ripgrep not found
 ```
 
-**Step 3: Add ripgrep to src/hosts/windows/system.dsc.yml**
+**Step 3: Add ripgrep to src/hosts/Windows/system.dsc.yml**
 
 ```yaml
 - resource: Microsoft.WinGet.Client/Package
@@ -246,7 +246,7 @@ Invoke-Pester tests/windows/packages/package-installation.Tests.ps1
 **Step 5: Commit atomically**
 
 ```bash
-git add tests/windows/packages/package-installation.Tests.ps1 src/hosts/windows/system.dsc.yml
+git add tests/windows/packages/package-installation.Tests.ps1 src/hosts/Windows/system.dsc.yml
 git commit -S -m "feat(windows): add ripgrep for fast text search
 
 - Add ripgrep to system.dsc.yml for cross-host CLI parity

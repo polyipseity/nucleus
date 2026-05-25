@@ -9,10 +9,10 @@
   Use -Apply to run the Windows apply script after dependency installation.
 
 .PARAMETER Apply
-  Install dependencies, then run src/hosts/windows/apply.ps1.
+  Install dependencies, then run src/hosts/Windows/apply.ps1.
 
 .PARAMETER ApplyArgs
-  Optional arguments passed through to src/hosts/windows/apply.ps1.
+  Optional arguments passed through to src/hosts/Windows/apply.ps1.
 
 .PARAMETER Help
   Show this help message and exit.
@@ -273,7 +273,7 @@ foreach ($package in $BootstrapPackageVersions.GetEnumerator()) {
 Invoke-RepositoryDirenvAllowIfAvailable
 
 if ($Apply) {
-  $applyScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\windows\apply.ps1"
+  $applyScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\Windows\apply.ps1"
   if (-not (Test-Path -Path $applyScriptPath)) {
     throw "Apply script not found: $applyScriptPath"
   }
@@ -284,7 +284,7 @@ if ($Apply) {
   $effectiveApplyArgs = @($ApplyArgs)
   $applyArgsText = ($effectiveApplyArgs -join " ")
   if ($applyArgsText -notmatch "(?i)(^|\s)-ModuleDir(\s|$)") {
-    $defaultModuleDir = Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\windows\modules"
+    $defaultModuleDir = Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\Windows\modules"
     $effectiveApplyArgs += @("-ModuleDir", $defaultModuleDir)
   }
 
@@ -306,4 +306,4 @@ if ($Apply) {
   return
 }
 
-Write-Output "$($PSStyle.Foreground.Green)Bootstrap complete. Run '.\src\hosts\windows\apply.ps1' to configure this host, or use -Apply.$($PSStyle.Reset)"
+Write-Output "$($PSStyle.Foreground.Green)Bootstrap complete. Run '.\src\hosts\Windows\apply.ps1' to configure this host, or use -Apply.$($PSStyle.Reset)"

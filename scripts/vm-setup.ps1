@@ -5,7 +5,7 @@
 # Phase 2 provisions QEMU start scripts and copies disk images.
 #
 # Thin wrapper that delegates to
-# src\hosts\windows\modules\system\Invoke-VMSetup.ps1.
+# src\hosts\Windows\modules\system\Invoke-VMSetup.ps1.
 #
 # Usage:
 #   .\scripts\vm-setup.ps1 [-WindowsIso PATH] [-NixosOnly] [-WindowsOnly]
@@ -40,7 +40,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..') |
     Select-Object -ExpandProperty Path
 
-$module = Join-Path $repoRoot 'src\hosts\windows\modules\system\Invoke-VMSetup.ps1'
+$module = Join-Path $repoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
 if (-not (Test-Path $module)) {
     Write-Warning "vm-setup: module not found at $module"
     exit 1

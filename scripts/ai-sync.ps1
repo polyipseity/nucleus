@@ -5,7 +5,7 @@
 
 .DESCRIPTION
   Thin scripts/ entrypoint wrapper around `Invoke-AISync` from
-  `src/hosts/windows/modules/Invoke-AISync.ps1`.
+  `src/hosts/Windows/modules/Invoke-AISync.ps1`.
 
   This mirrors `scripts/ai-sync.sh` on POSIX hosts so operators can run
   model convergence directly from `scripts/` on any platform.
@@ -43,7 +43,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
-$modulePath = Join-Path -Path $repoRoot -ChildPath 'src\hosts\windows\modules\Invoke-AISync.ps1'
+$modulePath = Join-Path -Path $repoRoot -ChildPath 'src\hosts\Windows\modules\Invoke-AISync.ps1'
 
 if (-not (Test-Path -LiteralPath $modulePath)) {
   throw "ai-sync: module not found at '$modulePath'."

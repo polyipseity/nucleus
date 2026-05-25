@@ -369,7 +369,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   assertions = [
     {
       assertion = config.nucleus.hostManualFile != null;
-      message = "modules/macos.nix requires nucleus.hostManualFile to be set by the Darwin host entrypoint (for example ./MANUAL.md in src/hosts/macbook/default.nix).";
+      message = "modules/macos.nix requires nucleus.hostManualFile to be set by the Darwin host entrypoint (for example ./MANUAL.md in src/hosts/MacBook/default.nix).";
     }
   ];
 
@@ -1226,7 +1226,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # hideMenuBarIcons
     # Hides menu bar icons for AltTab, BetterDisplay, and LinearMouse to reduce
     # persistent UI chrome. MiddleClick does not have a documented menu bar
-    # hiding option (see src/hosts/macbook/MANUAL.md for limitations).
+    # hiding option (see src/hosts/MacBook/MANUAL.md for limitations).
     #
     # Declarative approach: use defaults write to configure per-app settings.
     # Each app requires restart to apply changes.

@@ -1,5 +1,5 @@
 ---
-description: "Use when adding or editing files under scripts/, src/scripts/, or src/hosts/windows/modules/. Covers script placement, newline policy, cross-platform behavior, runtime detection, and permission expectations."
+description: "Use when adding or editing files under scripts/, src/scripts/, or src/hosts/Windows/modules/. Covers script placement, newline policy, cross-platform behavior, runtime detection, and permission expectations."
 name: "Scripts and Executable Permissions"
 applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
 ---
@@ -51,13 +51,13 @@ shell basename so the `.sh` and `.ps1` entry points stay aligned. That means
 `check-pwsh.ps1`, and the existing `check-pwsh.ps1` name is intentional
 because it checks PowerShell rather than shell.
 
-For reusable Windows modules under `src/hosts/windows/modules/`, keep the file
+For reusable Windows modules under `src/hosts/Windows/modules/`, keep the file
 name aligned with the exported function name and prefer a single exported
 `Verb-Noun` function per file. If a module is renamed, update the dot-sourcing
-paths in `src/hosts/windows/apply.ps1` in the same change.
+paths in `src/hosts/Windows/apply.ps1` in the same change.
 
 If a PowerShell file exports multiple functions or none, keep it in
-`src/hosts/windows/modules/` as a utility module and give the filename a scope
+`src/hosts/Windows/modules/` as a utility module and give the filename a scope
 that describes the shared purpose of the file.
 
 ## Line endings and permissions
@@ -69,7 +69,7 @@ that describes the shared purpose of the file.
   - additional script types should get explicit policy before widespread use
 - Every `.sh`, `.ps1`, and `.bat` script file anywhere in the repository must
   have its executable bit tracked in Git, regardless of location (`scripts/`,
-  `src/scripts/`, `src/hosts/windows/`, `src/hosts/windows/modules/`, or elsewhere).
+  `src/scripts/`, `src/hosts/Windows/`, `src/hosts/Windows/modules/`, or elsewhere).
   This applies to Windows scripts too — Git stores the executable bit
   independent of CRLF line endings, and many CI environments and tooling
   wrappers check the mode before invoking scripts. Set it with

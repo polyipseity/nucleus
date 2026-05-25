@@ -262,7 +262,7 @@ run_ai_sync() {
   #
   # Why detect ollama from $PATH rather than adding it to runtimeInputs:
   #   ollama is a user-installed daemon managed declaratively by the AI
-  #   module (src/modules/ai/default.nix and hosts/nixos/ai.nix).  Bundling
+  #   module (src/modules/ai/default.nix and hosts/NixOS/ai.nix).  Bundling
   #   it in runtimeInputs would create a second, potentially different binary
   #   that could mismatch the running server's version.  PATH detection keeps
   #   the sync aligned with the actual runtime binary.

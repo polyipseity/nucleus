@@ -84,7 +84,7 @@ Describe "Windows Package Installation" {
 
     Context "Additional WinGet IDs declared in system.dsc.yml" {
         # Keep this list synchronized with package IDs declared in
-        # src/hosts/windows/system.dsc.yml so identifier drift is caught by
+        # src/hosts/Windows/system.dsc.yml so identifier drift is caught by
         # executable tests instead of silently no-oping at apply time.
         $additionalPackages = @(
             @{ id = '9NBDXK71NK08'; displayName = 'WhatsApp Beta (msstore)' }

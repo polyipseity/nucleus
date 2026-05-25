@@ -1,7 +1,7 @@
 ---
 description: "Use when adding, updating, or reviewing package installations across hosts (nixpkgs, WinGet, Scoop, cargo-binstall, bun). Enforces user-level-only for all tools and libraries, blocking system-wide installations."
 name: "Package Installation Scope"
-applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/windows/**/*.yml, scripts/**, src/scripts/**, AGENTS.md, .agents/**/*.md"
+applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, src/scripts/**, AGENTS.md, .agents/**/*.md"
 ---
 
 # Package Installation Scope Policy
@@ -113,7 +113,7 @@ npm install -g @tailwindlabs/tailwindcss
 **Managed via**:
 
 - POSIX: `src/modules/agents.nix` — `installBunPackages` activation hook
-- Windows: `src/hosts/windows/modules/setup/Invoke-BunSetup.ps1`
+- Windows: `src/hosts/Windows/modules/setup/Invoke-BunSetup.ps1`
 
 **Installation path**: `~/.bun/bin`, `%USERPROFILE%\.bun\bin`
 
@@ -136,7 +136,7 @@ home.packages = with pkgs; [
 **WinGet DSC** (Windows):
 
 ```yaml
-# src/hosts/windows/system.dsc.yml or user.dsc.yml
+# src/hosts/Windows/system.dsc.yml or user.dsc.yml
 - name: Install ripgrep via WinGet
   resource: Microsoft.WinGet.DSC/WinGetPackage
   properties:
@@ -217,7 +217,7 @@ home.packages = with pkgs; [
 **NixOS**:
 
 ```nix
-# src/hosts/nixos/default.nix
+# src/hosts/NixOS/default.nix
 home.packages = with pkgs; [
   sd  # User-level, installed via Nix
 ];
@@ -226,7 +226,7 @@ home.packages = with pkgs; [
 **Windows**:
 
 ```yaml
-# src/hosts/windows/system.dsc.yml
+# src/hosts/Windows/system.dsc.yml
 - name: Install sd via WinGet
   resource: Microsoft.WinGet.DSC/WinGetPackage
   properties:

@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or modifying application settings and configurations. Covers storage location selection, per-user override patterns, cross-platform parity, and testing requirements."
 name: "App Configuration Management"
-applyTo: "src/modules/**/*.nix, src/modules/configs/**, src/hosts/windows/modules/*.ps1, src/flake.nix, src/hosts/windows/users.json, tests/nix/*-tests.nix"
+applyTo: "src/modules/**/*.nix, src/modules/configs/**, src/hosts/Windows/modules/*.ps1, src/flake.nix, src/hosts/Windows/users.json, tests/nix/*-tests.nix"
 ---
 
 # App Configuration Management
@@ -72,7 +72,7 @@ users = {
 };
 ```
 
-**In `src/hosts/windows/users.json` (Windows users)**:
+**In `src/hosts/Windows/users.json` (Windows users)**:
 ```json
 {
   "users": {
@@ -154,11 +154,11 @@ true
 
 When adding app settings, audit all three hosts:
 
-1. **macOS** (`src/hosts/macbook/`, `src/modules/macos.nix`): Does the app exist? Are settings applied via
+1. **macOS** (`src/hosts/MacBook/`, `src/modules/macos.nix`): Does the app exist? Are settings applied via
    `defaults`, LaunchAgent, or symlinked config?
-2. **NixOS** (`src/hosts/nixos/`, `src/modules/linux.nix`): Does the app exist? Are settings applied via INI files,
+2. **NixOS** (`src/hosts/NixOS/`, `src/modules/linux.nix`): Does the app exist? Are settings applied via INI files,
    systemd, or other mechanisms?
-3. **Windows** (`src/hosts/windows/`, `src/hosts/windows/modules/*.ps1`): Does the app exist? Are settings applied via
+3. **Windows** (`src/hosts/Windows/`, `src/hosts/Windows/modules/*.ps1`): Does the app exist? Are settings applied via
    registry, DSC YAML, or manifest files?
 
 For each platform where the app exists, ensure:
@@ -217,7 +217,7 @@ All app configs must have corresponding tests:
 
 - [ ] Determine storage location: separate JSON (if app reads it) or native format?
 - [ ] Add defaults: `src/modules/home.nix`, `src/modules/configs/<app>/`, or flake.nix?
-- [ ] Add user override fields to `src/flake.nix` and `src/hosts/windows/users.json`.
+- [ ] Add user override fields to `src/flake.nix` and `src/hosts/Windows/users.json`.
 - [ ] Implement merge logic: `defaults // platform_overrides // user_overrides`.
 - [ ] Activate on all three platforms (macOS, NixOS, Windows) or document exceptions with `# WHY`.
 - [ ] Add tests: Nix assertions for defaults/overrides; Windows Pester tests for registry values.
@@ -230,9 +230,9 @@ All app configs must have corresponding tests:
 - `src/modules/home.nix`: Central location for cross-platform app activation and settings.
 - `src/modules/configs/`: Separate config files for apps that read them directly (LinearMouse, VS Code).
 - `src/flake.nix`: User registry with per-user override fields.
-- `src/hosts/windows/users.json`: Windows equivalent of flake.nix user registry.
-- `src/hosts/windows/modules/Load-UserRegistry.ps1`: Loads users.json and exposes user records to PowerShell.
-- `src/modules/macos.nix`, `src/modules/linux.nix`, `src/hosts/windows/apply.ps1`: Platform-specific activation.
+- `src/hosts/Windows/users.json`: Windows equivalent of flake.nix user registry.
+- `src/hosts/Windows/modules/Load-UserRegistry.ps1`: Loads users.json and exposes user records to PowerShell.
+- `src/modules/macos.nix`, `src/modules/linux.nix`, `src/hosts/Windows/apply.ps1`: Platform-specific activation.
 - `AGENTS.md`: Repository conventions and invariants for package selection and settings management.
 
 ## Key Principle: Configuration Storage ≠ Configuration Format

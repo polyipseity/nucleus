@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Thin scripts/ entrypoint wrapper around `Invoke-ReplicaSync` from
-  `src/hosts/windows/modules/system/Invoke-ReplicaSync.ps1`.
+  `src/hosts/Windows/modules/system/Invoke-ReplicaSync.ps1`.
 
 .PARAMETER DryRun
   Print planned actions without executing rclone commands.
@@ -40,7 +40,7 @@ function Resolve-NucleusRepoRoot {
 }
 
 $repoRoot = Resolve-NucleusRepoRoot
-$modulePath = Join-Path -Path $repoRoot -ChildPath 'src\hosts\windows\modules\system\Invoke-ReplicaSync.ps1'
+$modulePath = Join-Path -Path $repoRoot -ChildPath 'src\hosts\Windows\modules\system\Invoke-ReplicaSync.ps1'
 
 if (-not (Test-Path -LiteralPath $modulePath)) {
   throw "replica-sync: module not found at '$modulePath'."

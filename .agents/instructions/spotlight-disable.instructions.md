@@ -1,7 +1,7 @@
 ---
 description: "Use when modifying, debugging, or troubleshooting the Spotlight (cmd+space) disable mechanism on macOS. Covers the proven 6-stage strategy, why single-hotkey approaches fail, and the critical role of each disable stage."
 name: "Spotlight Disable Strategy (macOS)"
-applyTo: "src/hosts/macbook/activation.nix, src/hosts/macbook/MANUAL.md, tests/nix/*spotlight*, tests/nix/activation-deps-tests.nix, src/hosts/macbook/defaults.nix"
+applyTo: "src/hosts/MacBook/activation.nix, src/hosts/MacBook/MANUAL.md, tests/nix/*spotlight*, tests/nix/activation-deps-tests.nix, src/hosts/MacBook/defaults.nix"
 ---
 
 # Spotlight Disable Strategy for macOS
@@ -42,7 +42,7 @@ The working solution comprises **six interdependent stages**, each handling a di
 - Disabling only one ID leaves the others active → Cmd+Space still works.
 - **Covering all three ensures safety across version boundaries and migration scenarios.**
 
-**Implementation** (in `src/hosts/macbook/activation.nix`):
+**Implementation** (in `src/hosts/MacBook/activation.nix`):
 
 ```bash
 spotlight_hotkeys="61 64 65"
@@ -163,7 +163,7 @@ fi
 
 ## Why This Must Run in system.activationScripts (NOT home.activation)
 
-The entire Spotlight disable strategy must run in `src/hosts/macbook/activation.nix` under `system.activationScripts.postActivation.text`, **not** in `src/modules/macos.nix` under `home.activation`.
+The entire Spotlight disable strategy must run in `src/hosts/MacBook/activation.nix` under `system.activationScripts.postActivation.text`, **not** in `src/modules/macos.nix` under `home.activation`.
 
 **Reason**:
 
@@ -296,7 +296,7 @@ After applying the Spotlight disable strategy, verify:
 
 **Diagnosis**: Most likely running in user context (home.activation) instead of system context.
 
-**Solution**: Ensure the disable code is in `src/hosts/macbook/activation.nix` under `system.activationScripts.postActivation`, not in `src/modules/macos.nix`.
+**Solution**: Ensure the disable code is in `src/hosts/MacBook/activation.nix` under `system.activationScripts.postActivation`, not in `src/modules/macos.nix`.
 
 ### Symptom: "activateSettings -u failed or returned non-zero"
 
@@ -315,10 +315,10 @@ After applying the Spotlight disable strategy, verify:
 
 ## Related Files
 
-- **Implementation**: [src/hosts/macbook/activation.nix](src/hosts/macbook/activation.nix#L363) — the `disableSpotlight` section
+- **Implementation**: [src/hosts/MacBook/activation.nix](src/hosts/MacBook/activation.nix#L363) — the `disableSpotlight` section
 - **Testing**: `tests/nix/*spotlight*.nix` — test cases validating the disable
-- **Manual Steps**: [src/hosts/macbook/MANUAL.md](src/hosts/macbook/MANUAL.md) — note if any manual steps are required post-activation
-- **Defaults Configuration**: [src/hosts/macbook/defaults.nix](src/hosts/macbook/defaults.nix) — ensure no conflicting `com.apple.spotlight` plist settings re-enable it
+- **Manual Steps**: [src/hosts/MacBook/MANUAL.md](src/hosts/MacBook/MANUAL.md) — note if any manual steps are required post-activation
+- **Defaults Configuration**: [src/hosts/MacBook/defaults.nix](src/hosts/MacBook/defaults.nix) — ensure no conflicting `com.apple.spotlight` plist settings re-enable it
 
 ---
 

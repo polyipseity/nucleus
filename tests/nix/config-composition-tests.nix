@@ -19,8 +19,8 @@ let
   secretsModuleText = builtins.readFile ../../src/modules/secrets.nix;
   shellModuleText = builtins.readFile ../../src/modules/shell.nix;
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
-  macbookDefaultText = builtins.readFile ../../src/hosts/macbook/default.nix;
-  nixosDefaultText = builtins.readFile ../../src/hosts/nixos/default.nix;
+  macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
+  nixosDefaultText = builtins.readFile ../../src/hosts/NixOS/default.nix;
 
   assert' = cond: msg: if !cond then throw "COMPOSITION FAILED: ${msg}" else null;
 
@@ -85,8 +85,8 @@ let
 
   # Test 12: Verify host-specific MANUAL.md paths are set
   test_manual_md_paths = assert' (
-    containsRegex "src/hosts/macbook/MANUAL\.md" macbookDefaultText
-    && containsRegex "src/hosts/nixos/MANUAL\.md" nixosDefaultText
+    containsRegex "src/hosts/MacBook/MANUAL\.md" macbookDefaultText
+    && containsRegex "src/hosts/NixOS/MANUAL\.md" nixosDefaultText
     && containsRegex "options\.nucleus\.hostManualFile" homeModuleText
   ) "Each host must declare its MANUAL.md path";
 

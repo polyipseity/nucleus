@@ -4,9 +4,9 @@ let
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
 
   macosText = builtins.readFile ../../src/modules/macos.nix;
-  macbookDefaultsText = builtins.readFile ../../src/hosts/macbook/defaults.nix;
-  macbookManualText = builtins.readFile ../../src/hosts/macbook/MANUAL.md;
-  raycastManualConfigText = builtins.readFile ../../src/hosts/macbook/raycast-manual-config.md;
+  macbookDefaultsText = builtins.readFile ../../src/hosts/MacBook/defaults.nix;
+  macbookManualText = builtins.readFile ../../src/hosts/MacBook/MANUAL.md;
+  raycastManualConfigText = builtins.readFile ../../src/hosts/MacBook/raycast-manual-config.md;
 in
 assert containsRegex "configureRaycastApplicationAliases" macosText;
 assert containsRegex "Nucleus App Aliases" macosText;

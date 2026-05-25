@@ -163,7 +163,7 @@ let
   #   GUI/hardware-integrated apps → Homebrew
   # Entries here install via Homebrew on macOS (when backend resolves to
   # homebrew).  NixOS installs for these GUI apps must be declared separately
-  # in host configs (e.g. src/hosts/nixos/desktop.nix), as the overlap routing
+  # in host configs (e.g. src/hosts/NixOS/desktop.nix), as the overlap routing
   # logic is macOS-only.
   overlappingPackages = {
     blender = {

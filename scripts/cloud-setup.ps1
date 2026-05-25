@@ -87,7 +87,7 @@ function Resolve-ICloudServiceForRemote {
     Resolves the configured iCloud service for a remote from the user registry.
 
   .DESCRIPTION
-    Reads src/hosts/windows/users.json and returns the single configured
+    Reads src/hosts/Windows/users.json and returns the single configured
     iCloud service (`drive` or `photos`) for the current user's matching remote.
     If there is no explicit entry, or multiple entries disagree, the function
     defaults the remote config to `drive` and lets mount commands override per
@@ -110,7 +110,7 @@ function Resolve-ICloudServiceForRemote {
     [string]$RemoteName
   )
 
-  $registryPath = Join-Path $RepoRoot 'src\hosts\windows\users.json'
+  $registryPath = Join-Path $RepoRoot 'src\hosts\Windows\users.json'
   if (-not (Test-Path -Path $registryPath -PathType Leaf)) {
     return 'drive'
   }

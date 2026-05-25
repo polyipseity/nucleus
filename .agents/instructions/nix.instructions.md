@@ -116,8 +116,8 @@ When a Nix feature is restructured, moved, or replaced:
   (for example CLI tooling parity, editor behavior, secrets workflow parity, or
   wallpaper provisioning policy), update the Windows declarative path in the
   same change where practical:
-  - `src/hosts/windows/*.dsc.yml` for declarative state
-  - `src/hosts/windows/modules/*.ps1` for reusable helper logic
+  - `src/hosts/Windows/*.dsc.yml` for declarative state
+  - `src/hosts/Windows/modules/*.ps1` for reusable helper logic
 - If a capability intentionally remains POSIX-only, add a short WHY comment in
   code explaining the platform constraint.
 - Follow `.agents/instructions/cross-host-feature-parity.instructions.md`
@@ -154,7 +154,7 @@ When a Nix feature is restructured, moved, or replaced:
 ## macOS defaults domain synchronization
 
 - When adding a new managed macOS defaults domain in either:
-  - `src/hosts/macbook/defaults.nix` (`system.defaults.*` or
+  - `src/hosts/MacBook/defaults.nix` (`system.defaults.*` or
     `system.defaults.CustomUserPreferences.<domain>`), or
   - `src/modules/macos.nix` (user activation `defaults write` hooks),
     you must update `resetUserPreferenceDomains` in
@@ -229,7 +229,7 @@ foreground command is still checked normally after the redirect.
 
 ## macOS pmset power policy
 
-`src/hosts/macbook/activation.nix` (in the `postActivation` fragment) owns the
+`src/hosts/MacBook/activation.nix` (in the `postActivation` fragment) owns the
 full declarative pmset posture. The target state verified against
 `pmset -g custom` output is:
 
@@ -281,11 +281,11 @@ full declarative pmset posture. The target state verified against
   `exit 1`. The activation script deliberately does **not** attempt to set
   them. `SleepServices=1` follows from `powernap=1` automatically.
   `Sleep On Power Button` must be set manually in System Settings → General
-  (see `src/hosts/macbook/MANUAL.md`).
+  (see `src/hosts/MacBook/MANUAL.md`).
 
 **Validation procedure:**
 
-After any change to `src/hosts/macbook/activation.nix` that touches pmset
+After any change to `src/hosts/MacBook/activation.nix` that touches pmset
 settings, run a complete enforcement cycle to confirm the script converges:
 
 1. **Verify systemsetup layer** (requires `sudo`):
@@ -338,8 +338,8 @@ womp=1 networkoversleep=0 sleep=0 lessbright=1 tcpkeepalive=1 disksleep=0`
 - Keep `displayHostManualInstructionDeps` (macOS) and the `entryAfter` list
   (Linux) alphabetically sorted.
 - If a feature needs a one-time manual step that cannot be safely automated,
-  update the host manual Markdown file (`src/hosts/macbook/MANUAL.md`,
-  `src/hosts/nixos/MANUAL.md`, and/or `src/hosts/windows/MANUAL.md`) in the
+  update the host manual Markdown file (`src/hosts/MacBook/MANUAL.md`,
+  `src/hosts/NixOS/MANUAL.md`, and/or `src/hosts/Windows/MANUAL.md`) in the
   same change so activation output remains a complete checklist.
 
 ## sops-nix macOS LaunchAgent async behaviour
@@ -438,7 +438,7 @@ before handing off to `darwin-rebuild` / `nixos-rebuild`.
   using `nix run .#apply`.
 
 The equivalent Windows function is `Register-NucleusHostAgeKey` in
-`src/hosts/windows/modules/register-hostaagekey.ps1`, called from `apply.ps1`
+`src/hosts/Windows/modules/register-hostaagekey.ps1`, called from `apply.ps1`
 when `$EnableHostAgeKeyRegistration` is `$true` (the default).
 
 ## Pre-provision key adoption semantics

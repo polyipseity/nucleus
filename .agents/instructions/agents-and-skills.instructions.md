@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing agents configuration, skill management, or ClawHub provisioning. Covers ~/.agents directory layout, bundled vs. fetched skill licensing rules, permission patterns, and the installBunPackages/syncClawHubSkills activation DAG."
 name: "Agents and Skills"
-applyTo: "src/modules/agents.nix, src/hosts/windows/modules/Sync-AgentsSkill.ps1, src/hosts/windows/modules/Sync-AgentsClawHubSkill.ps1, src/hosts/windows/modules/Invoke-BunSetup.ps1, src/modules/configs/agents/**"
+applyTo: "src/modules/agents.nix, src/hosts/Windows/modules/Sync-AgentsSkill.ps1, src/hosts/Windows/modules/Sync-AgentsClawHubSkill.ps1, src/hosts/Windows/modules/Invoke-BunSetup.ps1, src/modules/configs/agents/**"
 ---
 
 # Agents and Skills
@@ -87,7 +87,7 @@ than attempt a second install.
 ### Windows
 
 ClawHub is managed by `Invoke-BunSetup` in
-`src/hosts/windows/modules/Invoke-BunSetup.ps1`, which is called by `apply.ps1` before
+`src/hosts/Windows/modules/Invoke-BunSetup.ps1`, which is called by `apply.ps1` before
 `Sync-AgentsClawHubSkills`. `Invoke-BunSetup` manages a
 `$desiredPackages` list (currently `@mariozechner/pi-coding-agent` and
 `clawhub`) and writes a manifest to
@@ -132,13 +132,13 @@ WinGet DSC (system.dsc.yml)
 | `src/modules/agents.nix`                                | POSIX activation DAG: `agentsSymlink`, `agentsSkills`, `installBunPackages`, `syncClawHubSkills` |
 | `src/modules/macos.nix`                                 | `displayHostManualInstructionDeps` must include all activation names                             |
 | `src/modules/linux.nix`                                 | `displayHostManualInstructions` `entryAfter` must include all activation names                   |
-| `src/hosts/windows/apply.ps1`                           | Windows orchestrator; displays `MANUAL.md` as the final step after all convergence               |
+| `src/hosts/Windows/apply.ps1`                           | Windows orchestrator; displays `MANUAL.md` as the final step after all convergence               |
 | `src/modules/configs/agents/clawhub-skills.json`        | Declarative fetched skill manifest (`{"skills":[...slugs...]}`)                                  |
 | `src/modules/configs/agents/skills/`                    | Bundled (committed, AGPL-compatible) skill directories                                           |
-| `src/hosts/windows/modules/Invoke-BunSetup.ps1`         | Windows bun global package manager; includes clawhub                                             |
-| `src/hosts/windows/modules/Sync-AgentsSkill.ps1`        | Windows bundled skill sync                                                                       |
-| `src/hosts/windows/modules/Sync-AgentsClawHubSkill.ps1` | Windows fetched skill sync; expects ClawHub pre-installed by `Invoke-BunSetup`                   |
-| `src/hosts/windows/apply.ps1`                           | Windows orchestrator; calls `Invoke-BunSetup` before `Sync-AgentsClawHubSkills`                  |
+| `src/hosts/Windows/modules/Invoke-BunSetup.ps1`         | Windows bun global package manager; includes clawhub                                             |
+| `src/hosts/Windows/modules/Sync-AgentsSkill.ps1`        | Windows bundled skill sync                                                                       |
+| `src/hosts/Windows/modules/Sync-AgentsClawHubSkill.ps1` | Windows fetched skill sync; expects ClawHub pre-installed by `Invoke-BunSetup`                   |
+| `src/hosts/Windows/apply.ps1`                           | Windows orchestrator; calls `Invoke-BunSetup` before `Sync-AgentsClawHubSkills`                  |
 
 ## Authoring rules
 

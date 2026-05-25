@@ -50,8 +50,8 @@
   repository-supported checks such as `nix-instantiate --parse <file.nix>`
   (or `nix flake check` from `src/` for broader Nix validation),
   `nix shell nixpkgs#powershell -c pwsh ...` for PowerShell parser checks, and
-  `winget configure --what-if .\src\hosts\windows\system.dsc.yml` plus
-  `winget configure --what-if .\src\hosts\windows\user.dsc.yml` for WinGet
+  `winget configure --what-if .\src\hosts\Windows\system.dsc.yml` plus
+  `winget configure --what-if .\src\hosts\Windows\user.dsc.yml` for WinGet
   DSC changes.
 - For Nix profile operations, prefer `nix profile add` over the deprecated
   `nix profile install` alias, and use presence checks (`nix profile list`)
@@ -128,7 +128,7 @@ quick-start commands, and troubleshooting.
   PowerShell and batch scripts use CRLF.
 - **Executable bit policy**: every `.sh`, `.ps1`, and `.bat` file anywhere in
   the repository must be tracked in Git with mode `100755`. This includes
-  `src/hosts/windows/apply.ps1`, all `src/hosts/windows/modules/*.ps1`, and
+  `src/hosts/Windows/apply.ps1`, all `src/hosts/Windows/modules/*.ps1`, and
   `src/scripts/apply.sh`. Set the bit with
   `git update-index --chmod=+x <path>` when adding or renaming any script.
   Non-script files (`.env`, `.yml`, `.json`, `.nix`, `.md`, `.jsonc`) must
@@ -142,23 +142,23 @@ quick-start commands, and troubleshooting.
   all-lowercase kebab-case convention with a `-tests.nix` suffix (e.g.,
   `ai-sync-tests.nix`, `vm-setup-tests.nix`).
 - **PowerShell filename policy**: when adding or renaming standalone PowerShell
-  entry points under `src/hosts/windows/modules/`, use PascalCase `Verb-Noun`
+  entry points under `src/hosts/Windows/modules/`, use PascalCase `Verb-Noun`
   filenames with approved verbs; acronyms preserve their standard all-caps form
   (e.g., `Invoke-AISync.ps1`, `Invoke-VMSetup.ps1`). Files in `scripts/` are
   the exception: they keep the paired shell basename so the `.sh` and `.ps1`
   entry points stay aligned; `check-pwsh.ps1` is the intentional
   runtime-specific exception to `check-sh.sh`.
 - **Windows module path**: organize reusable PowerShell functions under
-  `src/hosts/windows/modules/` in domain-based subdirectories — `secrets/`
+  `src/hosts/Windows/modules/` in domain-based subdirectories — `secrets/`
   (decryption and SOPS lifecycle), `system/` (machine-level services),
   `setup/` (toolchain provisioning), `user/` (per-user home convergence),
   `editors/` (VS Code), `wallpapers/` (wallpaper management) — and keep pure
   utility helpers with no single domain at the root; filenames must match the
-  exported function name; keep `src/hosts/windows/apply.ps1` as a thin
+  exported function name; keep `src/hosts/Windows/apply.ps1` as a thin
   trigger/orchestrator.
 - **Windows function isolation**: keep one reusable PowerShell function per
-  file under `src/hosts/windows/modules/`; orchestrators (for example
-  `src/hosts/windows/apply.ps1`) should dot-source only the modules needed for
+  file under `src/hosts/Windows/modules/`; orchestrators (for example
+  `src/hosts/Windows/apply.ps1`) should dot-source only the modules needed for
   the current run.
 - **App config storage and overrides**: store app settings in the format the app
   directly reads from (separate JSON only if app reads JSON; otherwise use Nix,
@@ -171,8 +171,8 @@ quick-start commands, and troubleshooting.
   load them from Nix with `builtins.fromJSON (builtins.readFile ...)` so JSON
   can be linted/validated independently.
 - **Manual activation docs**: keep one-time manual instructions in host Markdown
-  files (for example `src/hosts/macbook/MANUAL.md`,
-  `src/hosts/nixos/MANUAL.md`, and `src/hosts/windows/MANUAL.md`) and have
+  files (for example `src/hosts/MacBook/MANUAL.md`,
+  `src/hosts/NixOS/MANUAL.md`, and `src/hosts/Windows/MANUAL.md`) and have
   activation hooks print those files at the end of every apply (Nix:
   `displayHostManualInstructions`; Windows: `apply.ps1` final step), rather
   than embedding long instruction strings directly in code.
@@ -180,7 +180,7 @@ quick-start commands, and troubleshooting.
   dedicated fragments (for example `src/modules/shell/aliases.nix` and
   `src/modules/shell/env.nix`) with strict alphabetical ordering of keys.
 - **NixOS hardware granularity**: when hardware settings grow, split
-  `src/hosts/nixos/hardware.nix` into `src/hosts/nixos/hardware/` fragments
+  `src/hosts/NixOS/hardware.nix` into `src/hosts/NixOS/hardware/` fragments
   (`cpu.nix`, `gpu.nix`, `disks.nix`) and import them through the host entrypoint.
 - **SOPS binary policy docs**: do not add documentation rules that require
   marking `.sops` files as `binary` in `.gitattributes`.
@@ -188,7 +188,7 @@ quick-start commands, and troubleshooting.
   Windows state, prefer adding it to `system.dsc.yml` or `user.dsc.yml` rather
   than introducing new imperative commands in `bootstrap.ps1` or `apply.ps1`.
 - **Declarative first**: imperative code in `src/scripts/apply.sh` and
-  `src/hosts/windows/apply.ps1` is treated as a bug. If desired state can be
+  `src/hosts/Windows/apply.ps1` is treated as a bug. If desired state can be
   represented in Nix modules or WinGet DSC resources, move it there.
 - **No backward compatibility by default**: remove deprecated code paths,
   migration shims, and legacy branches unless the user explicitly asks to keep
@@ -197,7 +197,7 @@ quick-start commands, and troubleshooting.
   keep all edits strictly managed-scope, fail fast on unsafe state, and enforce
   idempotency for both configuration and deconfiguration paths.
 - **POSIX shared config**: any setting duplicated between
-  `src/hosts/macbook/` and `src/hosts/nixos/` (for example Nix experimental
+  `src/hosts/MacBook/` and `src/hosts/NixOS/` (for example Nix experimental
   features, system Zsh enablement, sudo timeout policy, or shared SOPS key
   sources) should be centralized in `src/modules/*.nix` and imported by both
   hosts.
@@ -289,7 +289,7 @@ following logic:
 3. **Hardware/Drivers**: Use Homebrew. Any tool requiring kernel extensions or
    deep system integration (for example `bclm`) should be managed via Homebrew.
 4. **Symmetry**: When adding a package, check whether a Windows equivalent
-   exists in `src/hosts/windows/system.dsc.yml` to maintain cross-platform
+   exists in `src/hosts/Windows/system.dsc.yml` to maintain cross-platform
    parity.
 
 ### Channel Preference Policy (All Platforms)
@@ -370,14 +370,14 @@ Darwin bridge symlinks only apply when the backend resolves to Homebrew.
   (`waitForSopsSecrets`, `gitIdentityFromSops`, `gpgImport`, `sshKeyAdopt`,
   `verifySecretDecryption`) so Git-over-SSH provisioning always sees imported
   keys and the final verified secret state before any clone/update runs.
-  Windows `src/hosts/windows/apply.ps1` must keep `Sync-DevRepo` after
+  Windows `src/hosts/Windows/apply.ps1` must keep `Sync-DevRepo` after
   `Sync-GitAndSshConfig` so all hosts converge dev repos after the same
   secret/key setup phase.
 - **Manual-Step Visibility Invariant** — whenever a feature requires a user
   one-time action that cannot be automated safely (for example opening an app to
   finish helper/CLI installation or granting first-run permissions), add the
   exact step to the host manual document (for example
-  `src/hosts/macbook/MANUAL.md`) in the same change so activation output stays
+  `src/hosts/MacBook/MANUAL.md`) in the same change so activation output stays
   actionable.
 - **Drift Reset Invariant: Manual Only** — keep macOS preference-domain purge
   logic (`purge-managed-user-preferences`, driven by
@@ -400,7 +400,7 @@ Darwin bridge symlinks only apply when the backend resolves to Homebrew.
 
 - **Long Path Invariant** — always keep
   `HKLM\System\CurrentControlSet\Control\FileSystem\LongPathsEnabled = 1`
-  in `src/hosts/windows/system.dsc.yml`. This prevents Nix/Git path failures
+  in `src/hosts/Windows/system.dsc.yml`. This prevents Nix/Git path failures
   on deep directory trees.
 
 - **Managed Wallpaper Source Invariant** — keep wallpaper paths sourced from
@@ -455,10 +455,10 @@ a rotating gallery, never as a single static file.
   both Unix and Windows (for example secrets, fonts, or wallpapers), add or
   update both implementations in the same change:
   - Unix side under `src/modules/*.nix`
-  - Windows side under `src/hosts/windows/modules/*.ps1`
+  - Windows side under `src/hosts/Windows/modules/*.ps1`
 - **Windows module enforcement**: all reusable PowerShell functions must live
-  under `src/hosts/windows/modules/*.ps1` with lowercase filenames; keep
-  `src/hosts/windows/apply.ps1` orchestration-only.
+  under `src/hosts/Windows/modules/*.ps1` with lowercase filenames; keep
+  `src/hosts/Windows/apply.ps1` orchestration-only.
 
 ## Key References
 

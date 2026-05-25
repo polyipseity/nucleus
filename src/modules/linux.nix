@@ -15,7 +15,7 @@ lib.mkIf pkgs.stdenv.isLinux {
   assertions = [
     {
       assertion = config.nucleus.hostManualFile != null;
-      message = "modules/linux.nix requires nucleus.hostManualFile to be set by the Linux host entrypoint (for example ./MANUAL.md in src/hosts/nixos/default.nix).";
+      message = "modules/linux.nix requires nucleus.hostManualFile to be set by the Linux host entrypoint (for example ./MANUAL.md in src/hosts/NixOS/default.nix).";
     }
   ];
 

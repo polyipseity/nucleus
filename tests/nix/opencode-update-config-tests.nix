@@ -4,8 +4,8 @@ let
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
 
   shellEnvText = builtins.readFile ../../src/modules/shell/env.nix;
-  nixosBaseText = builtins.readFile ../../src/hosts/nixos/base.nix;
-  windowsUserDscText = builtins.readFile ../../src/hosts/windows/user.dsc.yml;
+  nixosBaseText = builtins.readFile ../../src/hosts/NixOS/base.nix;
+  windowsUserDscText = builtins.readFile ../../src/hosts/Windows/user.dsc.yml;
   rootOpenCodeConfigText = builtins.readFile ../../opencode.jsonc;
   userOpenCodeConfigText = builtins.readFile ../../src/modules/configs/agents/opencode.user.jsonc;
 in

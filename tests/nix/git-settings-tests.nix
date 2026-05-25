@@ -10,7 +10,7 @@ let
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
 
   posixGitText = builtins.readFile ../../src/modules/git.nix;
-  windowsGitText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-GitAndSshConfig.ps1;
+  windowsGitText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1;
 in
 assert containsRegex "core\.autocrlf = false" posixGitText;
 assert containsRegex "core\.symlinks = true" posixGitText;

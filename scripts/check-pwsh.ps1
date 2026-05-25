@@ -28,7 +28,7 @@
   nix run ./src#check-pwsh
 
 .EXAMPLE
-  nix run ./src#check-pwsh -- src/hosts/windows/apply.ps1
+  nix run ./src#check-pwsh -- src/hosts/Windows/apply.ps1
 #>
 [CmdletBinding()]
 param(

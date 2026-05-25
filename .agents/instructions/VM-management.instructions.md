@@ -1,7 +1,7 @@
 ---
-description: "Use when adding, editing, or reviewing virtual machine provisioning in scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/nixos/vms.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, vms/nixos/, or vms/windows/."
+description: "Use when adding, editing, or reviewing virtual machine provisioning in scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, vms/nixos/, or vms/windows/."
 name: "VM Management"
-applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/nixos/vms.nix, src/hosts/macbook/vms.nix, src/hosts/windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, tests/nix/vm-setup-tests.nix, vms/nixos/guest.nix, vms/nixos/packer.pkr.hcl, vms/windows/packer.pkr.hcl, vms/windows/Autounattend.xml"
+applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/MacBook/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, tests/nix/vm-setup-tests.nix, vms/nixos/guest.nix, vms/nixos/packer.pkr.hcl, vms/windows/packer.pkr.hcl, vms/windows/Autounattend.xml"
 ---
 
 # VM Management
@@ -61,7 +61,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - VM backend: UTM 4.x QEMU backend.
 - Bundle location: `~/virtual machines/<name>.utm/`
 - Config template: `config.plist` pre-generated at
-  `~/.local/share/nucleus/vms/<name>-config.plist` by `src/hosts/macbook/vms.nix`
+  `~/.local/share/nucleus/vms/<name>-config.plist` by `src/hosts/MacBook/vms.nix`
   at Home Manager activation time; `vm-setup.sh` copies it into the bundle.
 - Disk pre-created in `Images/disk-main.qcow2` by copying the pre-built image from the images directory.
 - After provisioning, UTM opens each bundle automatically.
@@ -72,10 +72,10 @@ QCOW2 enables copy-based migration between hosts without conversion.
 
 ## NixOS — libvirt/KVM
 
-- VM infrastructure declared in `src/hosts/nixos/vms.nix` (system module).
+- VM infrastructure declared in `src/hosts/NixOS/vms.nix` (system module).
 - Package: `qemu_kvm`, `virt-manager`, `virt-viewer`, `virtiofsd` in `environment.systemPackages`.
 - User groups: `kvm` and `libvirtd` added to the managed user via `lib.mkAfter` in `vms.nix`.
-- Domain XML pre-generated at `/etc/nucleus/vms/<name>-domain.xml` by `src/hosts/nixos/vms.nix`
+- Domain XML pre-generated at `/etc/nucleus/vms/<name>-domain.xml` by `src/hosts/NixOS/vms.nix`
   at NixOS activation time; `vm-setup.sh` calls `virsh define` on the pre-generated file (idempotent).
 - VirtioFS shared directory: uses `virtiofsd` daemon; configured in the XML domain definition.
 - SPICE display + clipboard sharing enabled by default.
@@ -99,7 +99,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 `nucleus-vm-setup` (and the `--vm-setup` flag for `nucleus apply`) is **opt-in**:
 
 - POSIX: `src/scripts/apply.sh` passes `--vm-setup` to enable; skipped by default.
-- Windows: `src/hosts/windows/apply.ps1` uses `-VMSetup` switch; skipped by default.
+- Windows: `src/hosts/Windows/apply.ps1` uses `-VMSetup` switch; skipped by default.
 
 The hook is always best-effort: a VM setup failure does not abort a completed system apply.
 
@@ -124,7 +124,7 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 | `vms/windows/Autounattend.xml`                        | Windows 11 answer file (unattended install, TPM bypass, WinRM) |
 | `scripts/vm-setup.sh`                                 | Unified build+provision script for macOS and NixOS hosts       |
 | `scripts/vm-setup.ps1`                                | Windows wrapper calling `Invoke-VMSetup.ps1`                   |
-| `src/hosts/windows/modules/system/Invoke-VMSetup.ps1` | Build + provision logic for Windows hosts                      |
+| `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1` | Build + provision logic for Windows hosts                      |
 
 ### Build strategies
 

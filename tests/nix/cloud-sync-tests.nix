@@ -12,7 +12,7 @@ let
 
   moduleText = builtins.readFile ../../src/modules/cloud-drives.nix;
   posixUsersText = builtins.readFile ../../src/modules/users.json;
-  windowsUsersText = builtins.readFile ../../src/hosts/windows/users.json;
+  windowsUsersText = builtins.readFile ../../src/hosts/Windows/users.json;
   flakeText = builtins.readFile ../../src/flake.nix;
   shellScriptText = builtins.readFile ../../scripts/cloud-setup.sh;
   pwshScriptText = builtins.readFile ../../scripts/cloud-setup.ps1;
@@ -21,18 +21,18 @@ let
   replicaResetShellText = builtins.readFile ../../scripts/replica-reset.sh;
   replicaResetPwshText = builtins.readFile ../../scripts/replica-reset.ps1;
   applyScriptText = builtins.readFile ../../src/scripts/apply.sh;
-  windowsApplyText = builtins.readFile ../../src/hosts/windows/apply.ps1;
-  windowsCloudDriveModuleText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-CloudDrive.ps1;
-  windowsShellProfileText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-ShellProfile.ps1;
-  windowsReplicaModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Invoke-ReplicaSync.ps1;
-  windowsReplicaResetModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Invoke-ReplicaReset.ps1;
-  windowsReplicaScheduleModuleText = builtins.readFile ../../src/hosts/windows/modules/system/Sync-ReplicaSyncScheduledTask.ps1;
+  windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
+  windowsCloudDriveModuleText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-CloudDrive.ps1;
+  windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
+  windowsReplicaModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-ReplicaSync.ps1;
+  windowsReplicaResetModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-ReplicaReset.ps1;
+  windowsReplicaScheduleModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-ReplicaSyncScheduledTask.ps1;
   replicaCleanupConfigText = builtins.readFile ../../src/modules/configs/cloud/replica-cleanup.json;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
-  macbookActivationText = builtins.readFile ../../src/hosts/macbook/activation.nix;
-  macbookHomebrewText = builtins.readFile ../../src/hosts/macbook/homebrew.nix;
+  macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
+  macbookHomebrewText = builtins.readFile ../../src/hosts/MacBook/homebrew.nix;
 
   assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
 

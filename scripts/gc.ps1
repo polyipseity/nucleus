@@ -46,8 +46,8 @@
   Skip stale wallpaper file cleanup.
 
 .EXAMPLE
-  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -RepoRoot "C:\Users\admin\nucleus"
-  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\windows\modules" -RepoRoot "C:\Users\admin\nucleus" -SkipToolCachePrune
+  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus"
+  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -SkipToolCachePrune
 #>
 [CmdletBinding()]
 param(

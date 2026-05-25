@@ -73,16 +73,16 @@ nucleus/
 - `src/modules/shell/aliases.nix`: shared shell aliases (strict alphabetical keys).
 - `src/modules/shell/env.nix`: shared shell environment attrset (strict alphabetical keys).
 - `src/modules/wallpapers.nix`: decrypts wallpaper blobs to `~/Pictures/wallpapers` and applies gallery rotation.
-- `src/hosts/windows/modules/*.ps1`: reusable Windows helper modules (secret materialization, executable resolution, host age-key registration, wallpaper sync).
-- `src/hosts/macbook/default.nix`: nix-darwin entrypoint for the macbook host.
-- `src/hosts/macbook/MANUAL.md`: one-time manual macOS steps printed at activation tail.
-- `src/hosts/macbook/manual-installations.nix`: imperative installers for software not in nixpkgs/Homebrew.
-- `src/hosts/nixos/default.nix`: NixOS entrypoint for the nixos host.
-- `src/hosts/nixos/MANUAL.md`: one-time manual NixOS steps printed at activation tail.
-- `src/hosts/windows/system.dsc.yml`: pre-provision Windows baseline (packages + machine settings).
-- `src/hosts/windows/user.dsc.yml`: post-provision Windows baseline (folders + user settings).
+- `src/hosts/Windows/modules/*.ps1`: reusable Windows helper modules (secret materialization, executable resolution, host age-key registration, wallpaper sync).
+- `src/hosts/MacBook/default.nix`: nix-darwin entrypoint for the macbook host.
+- `src/hosts/MacBook/MANUAL.md`: one-time manual macOS steps printed at activation tail.
+- `src/hosts/MacBook/manual-installations.nix`: imperative installers for software not in nixpkgs/Homebrew.
+- `src/hosts/NixOS/default.nix`: NixOS entrypoint for the nixos host.
+- `src/hosts/NixOS/MANUAL.md`: one-time manual NixOS steps printed at activation tail.
+- `src/hosts/Windows/system.dsc.yml`: pre-provision Windows baseline (packages + machine settings).
+- `src/hosts/Windows/user.dsc.yml`: post-provision Windows baseline (folders + user settings).
 - `src/scripts/apply.sh`: OS-detecting apply dispatcher (wrapped as `nix run .#apply`).
-- `src/hosts/windows/apply.ps1`: Windows apply orchestrator; invokes WinGet DSC and helper modules.
+- `src/hosts/Windows/apply.ps1`: Windows apply orchestrator; invokes WinGet DSC and helper modules.
 - `src/assets/wallpapers/*.sops`: encrypted wallpaper blobs.
 - `.sops.yaml`: recipient policy (shared age recipients + global GPG backup recipient).
 - `src/secrets/*.yml`: shared SOPS-encrypted identities (GPG keys and SSH keys).
@@ -117,7 +117,7 @@ winget configure .\src\hosts\windows\user.dsc.yml
 
 ## Engine-first apply pattern
 
-Both apply entrypoints (`src/scripts/apply.sh` and `src/hosts/windows/apply.ps1`)
+Both apply entrypoints (`src/scripts/apply.sh` and `src/hosts/Windows/apply.ps1`)
 follow the same minimal orchestration:
 
 1. Load environment/module context.
@@ -127,7 +127,7 @@ Pre-flight checks, secret materialization, and gallery refresh live in the
 declarative layers — not in the orchestration scripts:
 
 - Unix/macOS: Home Manager activation hooks in `secrets.nix` and `wallpapers.nix`.
-- Windows: WinGet DSC resources in `src/hosts/windows/*.dsc.yml`; PowerShell
+- Windows: WinGet DSC resources in `src/hosts/Windows/*.dsc.yml`; PowerShell
   module helpers provide JIT secret materialization when needed.
 
 ## Security model
@@ -160,7 +160,7 @@ Apply-time materialization:
 - **Unix/macOS**: Home Manager activation (`wallpapers.nix`) decrypts all blobs
   to `~/Pictures/wallpapers/`, deletes stale files with no matching `.sops`
   source, then applies the rotating gallery (folder on macOS; XML on GNOME).
-- **Windows**: JIT decryption via `src/hosts/windows/modules/sync-wallpaper.ps1`.
+- **Windows**: JIT decryption via `src/hosts/Windows/modules/sync-wallpaper.ps1`.
 
 Naming: `<original-name>.<ext>.sops` (e.g. `aurora.jpg.sops`). Keep plaintext
 images out of the repository after encryption.

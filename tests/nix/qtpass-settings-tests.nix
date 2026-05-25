@@ -3,14 +3,14 @@ let
 
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
 
-  applyText = builtins.readFile ../../src/hosts/windows/apply.ps1;
+  applyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   flakeText = builtins.readFile ../../src/flake.nix;
   editorsText = builtins.readFile ../../src/modules/editors.nix;
   homeText = builtins.readFile ../../src/modules/home.nix;
-  loadUserRegistryText = builtins.readFile ../../src/hosts/windows/modules/Load-UserRegistry.ps1;
-  syncQtPassText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-QtPassConfig.ps1;
+  loadUserRegistryText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
+  syncQtPassText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-QtPassConfig.ps1;
   usersRegistryText = builtins.readFile ../../src/modules/users.json;
-  windowsUsers = builtins.fromJSON (builtins.readFile ../../src/hosts/windows/users.json);
+  windowsUsers = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
 in
 # Verify QtPass settings are now stored in home.nix (not separate JSON)
 assert containsRegex "qtPassDefaultSettings = " homeText;

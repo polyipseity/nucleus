@@ -10,10 +10,10 @@ let
   aliasesText = builtins.readFile ../../src/modules/shell/aliases.nix;
   shellText = builtins.readFile ../../src/modules/shell.nix;
   posixPwshText = builtins.readFile ../../src/modules/pwsh.nix;
-  windowsShellProfileText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-ShellProfile.ps1;
-  macManualText = builtins.readFile ../../src/hosts/macbook/MANUAL.md;
-  nixosManualText = builtins.readFile ../../src/hosts/nixos/MANUAL.md;
-  windowsManualText = builtins.readFile ../../src/hosts/windows/MANUAL.md;
+  windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
+  macManualText = builtins.readFile ../../src/hosts/MacBook/MANUAL.md;
+  nixosManualText = builtins.readFile ../../src/hosts/NixOS/MANUAL.md;
+  windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
 
   assert' = cond: msg: if !cond then throw msg else null;
 

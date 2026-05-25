@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or changing capabilities that may apply to multiple hosts (macOS, NixOS, Windows). Enforces cross-host parity-first design and explicit rationale for platform-specific exceptions."
 name: "Cross-Host Feature Parity"
-applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/windows/**/*.yml, scripts/**, src/scripts/**, AGENTS.md, .agents/instructions/**/*.md"
+applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, src/scripts/**, AGENTS.md, .agents/instructions/**/*.md"
 ---
 
 # Cross-Host Feature Parity
@@ -12,16 +12,16 @@ applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/windows/**/*.yml, scripts/**, sr
   as practical in the same change.
 - Avoid one-host features unless there is a concrete platform constraint.
 - Keep host orchestration thin and push reusable behavior into shared modules
-  (`src/modules/*.nix` and `src/hosts/windows/modules/*.ps1`) or declarative state
-  files (`src/hosts/windows/*.dsc.yml`).
+  (`src/modules/*.nix` and `src/hosts/Windows/modules/*.ps1`) or declarative state
+  files (`src/hosts/Windows/*.dsc.yml`).
 
 ## Feature scope triage (required)
 
 For every new capability, evaluate all three hosts before coding:
 
-1. macOS (`src/hosts/macbook/` + shared modules)
-2. NixOS (`src/hosts/nixos/` + shared modules)
-3. Windows (`src/hosts/windows/` + `src/hosts/windows/modules/`)
+1. macOS (`src/hosts/MacBook/` + shared modules)
+2. NixOS (`src/hosts/NixOS/` + shared modules)
+3. Windows (`src/hosts/Windows/` + `src/hosts/Windows/modules/`)
 
 If a capability can exist on more than one host, implement those hosts in the
 same change whenever feasible.
@@ -56,10 +56,10 @@ Windows when practical.
 
 - **POSIX shared behavior** (applies to both macOS and NixOS):
   centralize in `src/modules/*.nix`.
-- **Windows declarative state**: prefer `src/hosts/windows/system.dsc.yml` or
-  `src/hosts/windows/user.dsc.yml` when a WinGet DSC resource can represent it.
+- **Windows declarative state**: prefer `src/hosts/Windows/system.dsc.yml` or
+  `src/hosts/Windows/user.dsc.yml` when a WinGet DSC resource can represent it.
 - **Windows reusable imperative logic**: keep in
-  `src/hosts/windows/modules/*.ps1`; keep `src/hosts/windows/apply.ps1`
+  `src/hosts/Windows/modules/*.ps1`; keep `src/hosts/Windows/apply.ps1`
   orchestration-only.
 - If a Windows parity feature cannot be represented declaratively, implement it
   in a reusable module with an explicit **cleanup/deconfiguration path** so the
@@ -79,12 +79,12 @@ following in both configuration and deconfiguration paths:
 - **Idempotent cleanup**: disabling a feature must remove only managed state
   and be a no-op when that managed state is already absent.
 - **Explicit toggle wiring**: expose enable/disable in
-  `src/hosts/windows/apply.ps1` and wire cleanup when disabled.
+  `src/hosts/Windows/apply.ps1` and wire cleanup when disabled.
 
 ## Package parity rules
 
 - When adding a cross-host CLI tool to `src/modules/core.nix`, check whether
-  a Windows equivalent should be added to `src/hosts/windows/system.dsc.yml`.
+  a Windows equivalent should be added to `src/hosts/Windows/system.dsc.yml`.
 - When adding a Windows CLI package to `system.dsc.yml`, check whether POSIX
   hosts should also receive it through `core.nix`.
 - If parity is intentionally not applied, document why in code comments and in
@@ -94,10 +94,10 @@ following in both configuration and deconfiguration paths:
 
 - Keep secret provisioning behavior symmetrical in intent:
   - POSIX: `src/modules/secrets.nix`
-  - Windows: `src/hosts/windows/modules/sync-secret.ps1` wired by `apply.ps1`
+  - Windows: `src/hosts/Windows/modules/sync-secret.ps1` wired by `apply.ps1`
 - Keep wallpaper provisioning symmetrical in intent:
   - POSIX: `src/modules/wallpapers.nix`
-  - Windows: `src/hosts/windows/modules/sync-wallpaper.ps1` + `user.dsc.yml`
+  - Windows: `src/hosts/Windows/modules/sync-wallpaper.ps1` + `user.dsc.yml`
 - Stale cleanup rules must be preserved on every host implementation.
 
 ## Cloud-drive parity rules

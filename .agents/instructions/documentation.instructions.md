@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing any infrastructure code: Nix files, PowerShell modules, WinGet DSC YAML, or shell scripts. Mandates documentation standards for each file type and applies the WHY-not-WHAT commenting principle."
 name: "Documentation Standards"
-applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/windows/**/*.yml, scripts/**, src/scripts/**"
+applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, src/scripts/**"
 ---
 
 # Documentation Standards
@@ -151,7 +151,7 @@ All Nix modules must enforce explicit configuration and avoid implicit assumptio
   or nix-darwin-only options must use `lib.mkIf` checks to avoid evaluation
   errors on incompatible platforms.
 
-## WinGet DSC YAML (`src/hosts/windows/**/*.yml`)
+## WinGet DSC YAML (`src/hosts/Windows/**/*.yml`)
 
 The `directives.description:` field on each resource entry is the formal
 documentation mechanism for WinGet DSC configurations.

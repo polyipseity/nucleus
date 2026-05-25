@@ -78,10 +78,10 @@ in
   shouldProcessCompliance =
     let
       # Path to Windows PS1 files
-      vsCodePs1Path = ../../src/hosts/windows/modules/editors/Sync-VSCodeConfig.ps1;
-      agentsConfigPs1Path = ../../src/hosts/windows/modules/user/Sync-AgentsConfig.ps1;
-      agentsSkillPs1Path = ../../src/hosts/windows/modules/user/Sync-AgentsSkill.ps1;
-      devRepoPs1Path = ../../src/hosts/windows/modules/user/Sync-DevRepo.ps1;
+      vsCodePs1Path = ../../src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1;
+      agentsConfigPs1Path = ../../src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1;
+      agentsSkillPs1Path = ../../src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1;
+      devRepoPs1Path = ../../src/hosts/Windows/modules/user/Sync-DevRepo.ps1;
     in
     assert builtins.pathExists vsCodePs1Path;
     assert builtins.pathExists agentsConfigPs1Path;

@@ -1,7 +1,7 @@
 ---
-description: "Use when adding, updating, or reviewing AI model selections in src/modules/ai/models.json, VS Code chatLanguageModels host files, scripts/ai-sync.sh, src/hosts/windows/modules/Invoke-AISync.ps1, or src/modules/ai/default.nix. Covers host-name key convention, hardware constraints per host, quantization guidance, required cross-file sync steps, and tool-calling verification requirements."
+description: "Use when adding, updating, or reviewing AI model selections in src/modules/ai/models.json, VS Code chatLanguageModels host files, scripts/ai-sync.sh, src/hosts/Windows/modules/Invoke-AISync.ps1, or src/modules/ai/default.nix. Covers host-name key convention, hardware constraints per host, quantization guidance, required cross-file sync steps, and tool-calling verification requirements."
 name: "AI Model Selection"
-applyTo: "src/modules/ai/**, src/modules/configs/vscode/chatLanguageModels.*.json, scripts/ai-sync.sh, scripts/ai-sync.ps1, src/hosts/windows/modules/Invoke-AISync.ps1"
+applyTo: "src/modules/ai/**, src/modules/configs/vscode/chatLanguageModels.*.json, scripts/ai-sync.sh, scripts/ai-sync.ps1, src/hosts/Windows/modules/Invoke-AISync.ps1"
 ---
 
 # AI Model Selection

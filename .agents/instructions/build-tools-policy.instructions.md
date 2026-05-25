@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing system packages, devShells, shell profiles, or build tool references. Covers the system-install-only policy for bun/cargo/rustc/uv/prek, the shell blocking mechanism, and devShell-first development guidance."
 name: "Build Tools Policy"
-applyTo: "src/modules/core.nix, src/modules/shell.nix, src/modules/pwsh.nix, src/flake.nix, src/hosts/windows/modules/user/Sync-ShellProfile.ps1, .envrc"
+applyTo: "src/modules/core.nix, src/modules/shell.nix, src/modules/pwsh.nix, src/flake.nix, src/hosts/Windows/modules/user/Sync-ShellProfile.ps1, .envrc"
 ---
 
 # Build Tools Policy
@@ -61,7 +61,7 @@ Equivalent PowerShell functions in `profileContent`. Pass-through first uses
 `$env:DIRENV_DIR`, then the managed fallback toolchain published via
 `$env:NUCLEUS_DEFAULT_DEV_BIN`.
 
-### Windows (PowerShell) — `src/hosts/windows/modules/user/Sync-ShellProfile.ps1`
+### Windows (PowerShell) — `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1`
 
 Same functions emitted into the managed block. Pass-through uses
 `$env:DIRENV_DIR` when present and otherwise the managed default shell
@@ -127,7 +127,7 @@ POSIX pwsh and Windows.
 2. Add the equivalent PowerShell function to `src/modules/pwsh.nix`
    (`profileContent`) for POSIX PowerShell parity.
 3. Add the same function to the `$managedBlock` array in
-   `src/hosts/windows/modules/user/Sync-ShellProfile.ps1` for Windows parity.
+   `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` for Windows parity.
 4. Update this instruction file and the `core.nix` policy comment table.
 5. If the tool is also a devShell tool (i.e., developers need it for project
    work), add it to both `devShells.default` entries in `src/flake.nix`

@@ -1,0 +1,521 @@
+# MacBook/activation.nix — nix-darwin system activation hooks for the MacBook.
+#
+# All scripts run as root during `darwin-rebuild switch`.  Because
+# system.activationScripts is a nix-darwin-only option they are guaranteed to
+# execute on macOS; no OS check inside the shell body is needed.
+#
+# WHY postActivation.text, not custom script names:
+#   nix-darwin's activation-scripts.nix (rev 8c62fba) assembles only a fixed
+#   hardcoded list of named scripts into the activate binary.  Any name outside
+#   that list (e.g. configureBatteryPolicy, enableScreenSharing) is silently
+#   ignored.  The user extension points are extraActivation (before openssh)
+#   and postActivation (after homebrew, last before the gc-root symlink).
+#   lib.mkBefore ensures these fragments are prepended before home-manager's
+#   HM activation call, which is also appended to postActivation.text.
+{ lib, ... }:
+{
+  # ---------------------------------------------------------------------------
+  # Declarative power-management settings handled by nix-darwin's power module.
+  # These translate to systemsetup / pmset calls at activation time.
+  #   computer = "never" — idle sleep disabled            (was: pmset -a sleep 0)
+  #   display  = 1       — display sleeps after 1 minute to save power
+  #   harddisk = "never" — disk sleep disabled            (was: pmset -a disksleep 0)
+  #   restartAfterPowerFailure is intentionally omitted because this machine
+  #   model/firmware does not support it; setting it at all causes activation
+  #   failure on this hardware.
+  # ---------------------------------------------------------------------------
+  power.sleep.computer = "never";
+  power.sleep.display = 1;
+  power.sleep.harddisk = "never";
+  # power.restartAfterPowerFailure = true;  # Keep the comment and keep it disabled.
+
+  # ---------------------------------------------------------------------------
+  # postActivation fragments (all macbook-specific activation scripts)
+  #
+  # lib.mkBefore (priority 500) positions these fragments before the
+  # home-manager activation call that nix-darwin appends to postActivation.text
+  # at default priority 1000.  Each logical section is separated by a shell
+  # comment banner for readability in the assembled activate script.
+  #
+  # Scripts included:
+  #   configureBatteryPolicy           — pmset AC/battery policy
+  #   configureChargeLimit             — 80 % charge cap via battery CLI / bclm
+  #   configureGimpScrollSensitivity   — GIMP drag-zoom-speed (25% of default)
+  #   configureLinearMousePreferences  — LinearMouse update-check suppression
+  #   configureMiddleClick             — 4-finger gesture + native login item
+  #   configureMissionControlSpansDisplays — spans-displays per-user pref
+  #   configureMonitorColorProfile     — clear ColorSync device cache
+  #   clearFinderCache                 — purge stale Finder state for desktop visibility
+  #   disableSpotlight                 — disable all Spotlight hotkeys + service
+  # ---------------------------------------------------------------------------
+  system.activationScripts.postActivation.text = lib.mkBefore ''
+    # ---- configureBatteryPolicy ------------------------------------------------
+    # Enforce pmset values directly for AC and battery because newer macOS
+    # releases can ignore or partially override higher-level power options.
+    #
+    # Invariant:
+    #   Global (-a): standby=1, ttyskeepawake=1, hibernatemode=3, networkoversleep=0,
+    #     tcpkeepalive=1, powernap=1, lidwake=1, hibernatefile=/var/vm/sleepimage
+    #   AC (-c): displaysleep=1, sleep=0, disksleep=0, womp=1, lowpowermode=0
+    #   Battery (-b): displaysleep=1, sleep=0, disksleep=0, womp=1, lowpowermode=1,
+    #     lessbright=1 (when supported)
+    #
+    # NOTE — keys NOT settable via pmset CLI on this hardware (Apple Silicon /
+    # macOS 15+): "Sleep On Power Button" and "SleepServices".  Both appear in
+    # `pmset -g` output but are absent from `pmset -g cap` and rejected with a
+    # usage error when written.  They are managed read-only by the OS/firmware.
+    # The desired sleep-on-button behaviour must be set manually in System
+    # Settings → General; SleepServices follows the powernap=1 setting above.
+    #
+    # womp=1 on both AC and battery: empirical pmset -g custom output confirms
+    # the machine honours womp on battery; setting it on both sources ensures
+    # inbound magic-packet wakes succeed regardless of power source.
+    #
+    # sleep=0 on battery: remote-desktop sessions (Chrome Remote Desktop, VNC/ARD,
+    # SSH) must survive when the machine is on battery.  Idle sleep would
+    # disconnect active sessions and prevent new inbound connections.
+    #
+    # displaysleep and disksleep are declared on both sources even with
+    # lowpowermode=1 active on battery.  Empirical testing (pmset -g custom)
+    # confirms all three battery values are honoured when applied after the
+    # lowpowermode preset is set.
+    #
+    # The helper emits a clear error when any write fails so a mis-typed key
+    # does not silently leave a stale policy in place.
+    apply_pmset() {
+      if ! /usr/bin/pmset "$@"; then
+        echo "power: failed to apply pmset settings: $*" >&2
+        return 1
+      fi
+    }
+
+    pmset_supports() {
+      capability="$1"
+      # pmset -g cap rarely fails on a live macOS system; stderr is suppressed
+      # to avoid confusing output when an unsupported capability probe returns
+      # non-zero (grep handles the boolean result).  Any real pmset failure
+      # surfaces separately when apply_pmset later tries to write the value.
+      /usr/bin/pmset -g cap 2>/dev/null | /usr/bin/grep -Eq "(^|[[:space:]])$capability([[:space:]]|$)"
+    }
+
+    if [ -x /usr/bin/pmset ]; then
+      # Global settings (-a) apply regardless of power source.
+      #   standby=1: allow transition to deeper standby after extended sleep;
+      #     keeps the machine in a recoverable low-power state for long idle
+      #     periods without fully powering down.
+      #   ttyskeepawake=1: prevent system sleep while any network terminal (SSH,
+      #     ARD/VNC screen sharing) holds an active tty; critical for keeping
+      #     live remote sessions from being dropped by an unexpected idle sleep.
+      #   hibernatemode=3: safe-sleep — write RAM image to disk before sleeping
+      #     so the session can be restored from disk if battery drains during
+      #     sleep (mirrors Windows hybrid sleep).
+      #   networkoversleep=0: suppress background network activity during sleep;
+      #     deliberate remote wakes are handled by womp (AC) separately.
+      #   tcpkeepalive=1: issue TCP keepalives through sleep so persistent SSH
+      #     tunnels and remote-desktop sessions stay alive across sleep/wake
+      #     cycles without requiring application-level keepalive configuration.
+      #   powernap=1: allow background mail/calendar sync during Power Nap.
+      #   lidwake=1: wake when the lid is opened (standard laptop ergonomics).
+      apply_pmset -a standby 1 ttyskeepawake 1 hibernatemode 3 networkoversleep 0 tcpkeepalive 1 powernap 1 lidwake 1
+      # hibernatefile set separately: a path argument on the same line as other
+      # flag-value pairs is easy to misread as a flag rather than a path.
+      apply_pmset -a hibernatefile /var/vm/sleepimage
+
+      if pmset_supports lowpowermode; then
+        # Set lowpowermode per source BEFORE applying per-source timers so that
+        # any OS preset adjustments triggered by lowpowermode activation are
+        # then overridden by the explicit values below.
+        apply_pmset -c lowpowermode 0
+        apply_pmset -b lowpowermode 1
+      fi
+
+      # AC settings: 1-minute display sleep, no idle system sleep, no disk sleep.
+      # womp=1 (wake-on-Ethernet LAN): wake when a magic packet arrives over the
+      # wired network; set on both AC and battery so remote wakes succeed
+      # regardless of power source.
+      apply_pmset -c displaysleep 1 sleep 0 disksleep 0 womp 1
+
+      # Battery settings: 1-minute display sleep, no idle system sleep, no disk sleep.
+      # womp=1: mirror the AC setting; machine honours womp on battery empirically.
+      apply_pmset -b displaysleep 1 sleep 0 disksleep 0 womp 1
+
+      if pmset_supports lessbright; then
+        # lessbright dims the display on battery to extend runtime.
+        # There is no separate AC-source control for brightness dimming.
+        apply_pmset -b lessbright 1
+      fi
+    fi
+
+    # ---- configureChargeLimit --------------------------------------------------
+    # Keep charge capped at 80 % to reduce long-term battery wear on a mostly
+    # docked development machine.
+    #
+    # On macOS 15+, bclm no longer works due kernel entitlement enforcement.
+    # Prefer the maintained `battery` CLI (installed by the `battery` cask) and
+    # run it as the active console user so user-scoped launch-agent state stays
+    # in that user's home directory.
+    #
+    # bclm is retained as a fallback only for older macOS versions.
+    console_user="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+    macos_major="$(/usr/bin/sw_vers -productVersion 2>/dev/null | /usr/bin/awk -F. '{print $1}')"
+
+    battery_app="/Applications/battery.app"
+    battery_cli=""
+    for candidate in /usr/local/bin/battery /usr/local/co.palokaj.battery/battery; do
+      if [ -x "$candidate" ]; then
+        battery_cli="$candidate"
+        break
+      fi
+    done
+
+    if [ -n "$battery_cli" ] && [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
+      # -H sets HOME to the target user's home directory.  Without it, sudo
+      # inherits HOME=/var/root from the root activation context, causing
+      # battery to write its state files to /var/root/.battery/ which the
+      # console user cannot write to.
+      #
+      # Redirect stdin/stdout/stderr to /dev/null: battery maintain forks a
+      # long-running background daemon via `nohup ... &` that inherits open
+      # file descriptors.  Without this redirect, the daemon holds the
+      # activation pipeline's pipe write-end open indefinitely, causing any
+      # `./scripts/bootstrap.sh apply ... | <cmd>` invocation to hang until
+      # the daemon exits (which is never during normal operation).  The exit
+      # code is still checked below so real failures are not silenced;
+      # battery's own log file (~/.battery/battery.log) retains full
+      # diagnostic output for post-failure inspection.
+      if ! /usr/bin/sudo -H -u "$console_user" "$battery_cli" maintain 80 </dev/null >/dev/null 2>&1; then
+        echo "power: battery maintain 80 failed for user '$console_user'." >&2
+      fi
+    elif [ -x /opt/homebrew/bin/bclm ]; then
+      if [ -n "$macos_major" ] && [ "$macos_major" -ge 15 ]; then
+        echo "power: bclm is unsupported on macOS >= 15; install and initialize the battery app to enforce 80% charge limit." >&2
+      else
+        if ! /opt/homebrew/bin/bclm write 80; then
+          echo "power: bclm write 80 failed." >&2
+        fi
+        if ! /opt/homebrew/bin/bclm persist; then
+          echo "power: bclm persist failed." >&2
+        fi
+      fi
+    elif [ -d "$battery_app" ]; then
+      echo "power: battery.app is installed but the battery CLI is unavailable; open battery.app once and complete setup to install the helper command." >&2
+    else
+      echo "power: no supported battery charge-limit tool found (expected /usr/local/bin/battery or /opt/homebrew/bin/bclm)." >&2
+    fi
+
+    # ---- configureMiddleClick -------------------------------------------------
+    # Set MiddleClick gesture recognition to 4 fingers and ensure it starts at
+    # login using the native macOS Login Items mechanism (not LaunchAgent).
+    # WHY 4 fingers: TFD uses 3 fingers; using 4 for middle-click prevents both
+    # the TFD conflict and the phantom left-click issue described at
+    # https://github.com/artginzburg/MiddleClick/blob/main/docs/three-finger-drag.md
+    # WHY native login item: MiddleClick upstream manages startup through macOS
+    # Login Items APIs (ServiceManagement), so declarative convergence should
+    # target that same system surface instead of maintaining a parallel
+    # LaunchAgent path.
+    if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
+      if [ -d "/Applications/MiddleClick.app" ]; then
+        console_uid="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
+        if [ -n "$console_uid" ]; then
+          if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" \
+            /usr/bin/defaults write art.ginzburg.MiddleClick fingers -int 4; then
+            echo "middleclick: failed to set fingers=4 for user '$console_user'." >&2
+          fi
+
+          if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" \
+            /usr/bin/osascript \
+              -e 'tell application "System Events"' \
+              -e 'if not (exists login item "MiddleClick") then' \
+              -e 'make login item at end with properties {name:"MiddleClick", path:"/Applications/MiddleClick.app", hidden:true}' \
+              -e 'end if' \
+              -e 'end tell'; then
+            echo "middleclick: failed to ensure native Login Item startup for user '$console_user'; enable 'Launch at login' from MiddleClick menu as fallback." >&2
+          fi
+        fi
+      fi
+    fi
+    # ---- configureLinearMousePreferences --------------------------------------
+    # Keep LinearMouse update checks and auto-update disabled declaratively.
+    # These are Sparkle preferences in the app's defaults domain.
+    if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
+      if [ -d "/Applications/LinearMouse.app" ]; then
+        console_uid="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
+        if [ -n "$console_uid" ]; then
+          if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" /usr/bin/defaults write com.lujjjh.LinearMouse SUEnableAutomaticChecks -bool false; then
+            echo "linearmouse: failed to disable automatic update checks for user '$console_user'." >&2
+          fi
+          if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" /usr/bin/defaults write com.lujjjh.LinearMouse SUAutomaticallyUpdate -bool false; then
+            echo "linearmouse: failed to disable automatic updates for user '$console_user'." >&2
+          fi
+        fi
+      fi
+    fi
+    # ---- configureGimpScrollSensitivity ---------------------------------------
+    # Reduce GIMP zoom sensitivity to 25% of upstream default by setting the
+    # drag-zoom-speed token in the active user gimprc to 25.0 (default 100.0).
+    #
+    # Why this token: GIMP upstream exposes drag-zoom-speed as a persisted
+    # display config token.  Mouse-wheel zoom on macOS uses native scroll
+    # deltas and does not have an equivalent persisted sensitivity token.
+    # This hook therefore converges the closest supported persistent control.
+    #
+    # Version tracking rule: always target the major.minor branch of the GIMP
+    # app provisioned by Nucleus (/Applications/GIMP.app), rather than using a
+    # hardcoded version list, so new app upgrades keep working automatically.
+    if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
+      console_home="$(/usr/bin/dscl . -read "/Users/$console_user" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}')"
+      if [ -z "$console_home" ]; then
+        console_home="/Users/$console_user"
+      fi
+
+      console_group="$(/usr/bin/id -gn "$console_user" 2>/dev/null || true)"
+
+      gimp_app_info="/Applications/GIMP.app/Contents/Info"
+      gimp_version_raw=""
+      if [ -d "/Applications/GIMP.app" ]; then
+        gimp_version_raw="$(/usr/bin/defaults read "$gimp_app_info" CFBundleShortVersionString 2>/dev/null || true)"
+      fi
+
+      # Derive major.minor branch used by GIMP's config directory layout,
+      # e.g. 3.2.4 -> 3.2
+      gimp_version_branch="$(printf '%s' "$gimp_version_raw" | /usr/bin/awk -F. 'NF >= 2 { print $1 "." $2 }')"
+      if [ -z "$gimp_version_branch" ]; then
+        echo "gimp: unable to determine installed GIMP major.minor version from /Applications/GIMP.app; skipping sensitivity convergence." >&2
+      else
+        gimprc_dir="$console_home/Library/Application Support/GIMP/$gimp_version_branch"
+        gimprc_file="$gimprc_dir/gimprc"
+
+        if ! /bin/mkdir -p "$gimprc_dir"; then
+          echo "gimp: failed to create $gimprc_dir." >&2
+        else
+          if [ ! -f "$gimprc_file" ]; then
+            if ! /usr/bin/touch "$gimprc_file"; then
+              echo "gimp: failed to create $gimprc_file." >&2
+            fi
+          fi
+
+          if [ -f "$gimprc_file" ]; then
+            # Keep all other user settings intact: only replace or append the
+            # drag-zoom-speed token.
+            if /usr/bin/grep -Eq '^\(drag-zoom-speed[[:space:]]+[^)]*\)$' "$gimprc_file"; then
+              if ! /usr/bin/sed -E -i.bak 's#^\(drag-zoom-speed[[:space:]]+[^)]*\)$#(drag-zoom-speed 25.0)#' "$gimprc_file"; then
+                echo "gimp: failed to update drag-zoom-speed in $gimprc_file." >&2
+              fi
+              /bin/rm -f "$gimprc_file.bak"
+            else
+              if ! printf '\n(drag-zoom-speed 25.0)\n' >> "$gimprc_file"; then
+                echo "gimp: failed to append drag-zoom-speed to $gimprc_file." >&2
+              fi
+            fi
+
+            if [ -n "$console_group" ]; then
+              if ! /usr/sbin/chown "$console_user:$console_group" "$gimprc_file"; then
+                echo "gimp: failed to set ownership on $gimprc_file." >&2
+              fi
+            else
+              if ! /usr/sbin/chown "$console_user" "$gimprc_file"; then
+                echo "gimp: failed to set ownership on $gimprc_file." >&2
+              fi
+            fi
+          fi
+        fi
+      fi
+    fi
+
+    # ---- configureMissionControlSpansDisplays ----------------------------------
+    # Forces Mission Control to span desktops across displays for the currently
+    # logged-in console user.  Applying this from system activation ensures the
+    # preference is re-asserted after migrations and major macOS updates that
+    # sometimes reset com.apple.spaces user defaults.
+    #
+    # Algorithm:
+    #   1. Resolve the active console UID from /dev/console.
+    #   2. Skip when no non-root GUI session is present (e.g. headless rebuild).
+    #   3. Use launchctl asuser to write the per-user defaults domain as that user.
+    console_uid="$(/usr/bin/stat -f%u /dev/console 2>/dev/null || true)"
+
+    if [ -z "$console_uid" ] || [ "$console_uid" -eq 0 ]; then
+      echo "power: no active non-root console user; skipping spans-displays write." >&2
+    else
+      if ! /bin/launchctl asuser "$console_uid" /usr/bin/defaults write com.apple.spaces spans-displays -bool true; then
+        echo "power: failed to enable Mission Control spans-displays for console uid $console_uid." >&2
+      fi
+    fi
+
+    # ---- configureMonitorColorProfile ------------------------------------------
+    # Clears the ColorSync device-profile cache so that newly connected monitors
+    # re-trigger profile detection and pick up the correct ICC profile.
+    # ColorSync is a macOS-only subsystem; NixOS uses colord for ICC profile
+    # management (handled by GNOME) and Windows has its own Color Management
+    # subsystem — neither requires an equivalent cache-clearing step here.
+    # Guard with a file-existence check: on fresh installs or machines with no
+    # custom color profile the plist never exists, and `defaults delete` on a
+    # missing domain emits a noisy "Domain not found" error that is neither a
+    # real failure nor actionable.  Using [ -f ] avoids that entirely — if the
+    # file is present we delete it; if not, there is nothing to do.
+    if [ -f /Library/Preferences/com.apple.ColorSync.DeviceCache.plist ]; then
+      /usr/bin/defaults delete /Library/Preferences/com.apple.ColorSync.DeviceCache
+    fi
+
+    # ---- clearFinderCache -------------------------------------------------------
+    # Clears Finder's saved application state cache so that desktop visibility
+    # settings (ShowExternalHardDrivesOnDesktop, ShowHardDrivesOnDesktop,
+    # ShowMountedServersOnDesktop, ShowRemovableMediaOnDesktop) take effect
+    # immediately. Without this, Finder may display a stale cached state even
+    # when system.defaults has been correctly updated. The cache file is
+    # automatically regenerated by Finder on next launch with current defaults.
+    #
+    # WHY: Finder's cached state can become stale or corrupted, causing it to
+    # ignore system default changes. Clearing it on every apply ensures the
+    # live system state matches declared configuration without requiring manual
+    # user intervention (Cmd+Opt+Esc, cache deletion, etc.).
+    if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
+      finder_cache_dir="/Users/$console_user/Library/Saved Application State/com.apple.finder.savedState"
+      if [ -d "$finder_cache_dir" ]; then
+        if /bin/rm -rf "$finder_cache_dir"; then
+          echo "finder: cleared cached application state from $finder_cache_dir"
+        else
+          echo "finder: failed to clear cached state at $finder_cache_dir (non-fatal; user may need manual restart)." >&2
+        fi
+      fi
+      # Relaunch Finder so it picks up the cleared cache and current defaults.
+      # Use killall to terminate the process; macOS will auto-relaunch it.
+      /usr/bin/killall -9 Finder 2>/dev/null || true
+    fi
+
+    # ---- disableSpotlight -------------------------------------------------------
+    # Completely disable Spotlight (launcher/search) so Cmd+Space can be reused
+    # by alternate launchers such as Raycast.
+    #
+    # CRITICAL STRATEGY — Why This Approach Works:
+    #   This is the PROVEN, VERIFIED solution for disabling Spotlight on macOS.
+    #   It succeeds where previous single-hotkey approaches failed.  It requires
+    #   ALL of these stages working together; removing any stage will cause
+    #   Spotlight to re-enable or persist.
+    #
+    # Stage 1: Loop over symbolic-hotkey IDs 61, 64, 65
+    #   macOS stores Spotlight Cmd+Space binding ACROSS MULTIPLE symbolic-hotkey
+    #   ID slots (61, 64, 65) depending on:
+    #   - OS release/version (10.14, 10.15, 11, 12, 13, 14, 15 use different IDs)
+    #   - User profile migration history (old prefs may be stored under old ID slot)
+    #   - Hardware platform (M1/M2/Intel may use different slot)
+    #   Disabling ONLY hotkey 61 leaves 64 and 65 active → Cmd+Space still works.
+    #   The 3-hotkey coverage is NOT redundant; it is NECESSARY for cross-version
+    #   compatibility and safe migration handling.  On any given macOS release,
+    #   usually only 1–2 of the three are active, but we disable all three to
+    #   ensure safety across version boundaries and migration scenarios.
+    #
+    # Stage 2: Write defaults as the console user via launchctl asuser
+    #   Hotkey preferences are stored in com.apple.symbolichotkeys (a user
+    #   plist, not root-owned).  The defaults write MUST run as the logged-in
+    #   console user via `launchctl asuser <uid>` to reach the correct plist
+    #   file location and permission context.  Running as root writes to
+    #   /var/root/.../defaults, which does NOT affect the active GUI user's
+    #   hotkeys — this is why user-context execution is critical here.
+    #
+    # Stage 3: Immediate activateSettings -u call (CRITICAL FOR RESPONSIVENESS)
+    #   After writing the hotkey defaults, call activateSettings -u to
+    #   immediately activate the new settings in the running loginwindow session.
+    #   WITHOUT this call, the user must log out/in for the change to take effect.
+    #   activateSettings -u is the macOS private framework hook that forces
+    #   loginwindow to re-read and apply all symbolic-hotkey settings NOW, not
+    #   at next session start.  This makes the disable user-visible immediately.
+    #
+    # Stage 4: launchctl disable + bootout (stops the background service)
+    #   Even with hotkeys disabled, the com.apple.Spotlight launchd service
+    #   continues indexing and listening for other invocation methods (menu,
+    #   Siri, API calls, etc.).  We disable it in launchd so it will not restart
+    #   on reboot, and bootout stops the currently running instance immediately.
+    #   Without this stage, the indexing daemon persists and can re-enable the
+    #   hotkey on user/system activity.
+    #
+    # Stage 5: mdutil -i off / (disable indexing globally)
+    #   Even if the service is disabled, Spotlight indexing may resume if the
+    #   service is manually re-enabled or if macOS updates restore it.  Disabling
+    #   at the indexing level (mdutil -i off) is the final barrier that prevents
+    #   re-indexing and re-engagement.
+    #
+    # Stage 6: Cache cleanup /.Spotlight-V100 removal
+    #   Removes stale Spotlight database files so that even if the service
+    #   re-starts, it has no cached index to serve.  This is a belt-and-
+    #   suspenders measure; combined with mdutil off, it ensures Spotlight
+    #   cannot function even if partially re-enabled by third-party tools.
+    #
+    # WHY THE OLD SINGLE-HOTKEY APPROACH FAILED:
+    #   1. Previous implementations disabled only hotkey 61.
+    #   2. On many macOS versions (especially post-migration), hotkeys 64 and 65
+    #      also hold Spotlight bindings.
+    #   3. Result: Cmd+Space still worked because an alternative hotkey slot
+    #      was still enabled.
+    #   4. Lesson: All three ID slots must be disabled to ensure coverage.
+    #
+    # WHY THIS MUST RUN IN system.activationScripts (NOT home.activation):
+    #   - system.activationScripts runs as root during darwin-rebuild switch.
+    #   - mdutil -i off / requires root to succeed.
+    #   - launchctl bootout requires root to unload system services.
+    #   - home.activation runs as the logged-in user and cannot execute these
+    #     privileged operations reliably (sudo can be involved, but execution
+    #     context still differs from root activation).
+    #   - Placing this here (macbook/activation.nix) ensures it runs before
+    #     Home Manager activation via lib.mkBefore priority.
+
+    echo "spotlight: disabling Spotlight launcher and keyboard shortcuts..."
+
+    console_uid_spotlight="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
+    if [ -n "$console_user" ] && [ "$console_user" != "root" ] && [ -n "$console_uid_spotlight" ]; then
+      spotlight_hotkeys="61 64 65"
+      spotlight_hotkeys_ok=1
+      for hotkey in $spotlight_hotkeys; do
+        if ! /bin/launchctl asuser "$console_uid_spotlight" /usr/bin/sudo -H -u "$console_user" \
+          /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add "$hotkey" \
+          "<dict><key>enabled</key><false/></dict>"; then
+          spotlight_hotkeys_ok=0
+          echo "spotlight: failed to disable symbolic hotkey $hotkey for user '$console_user'." >&2
+        fi
+      done
+
+      if [ "$spotlight_hotkeys_ok" -eq 1 ]; then
+        if ! /bin/launchctl asuser "$console_uid_spotlight" /usr/bin/sudo -H -u "$console_user" \
+          /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
+          echo "spotlight: keyboard shortcut changes were written but not fully activated; log out/in once to apply." >&2
+        fi
+      else
+        echo "spotlight: one or more hotkey writes failed; Cmd+Space may remain active until fixed manually." >&2
+      fi
+    else
+      echo "spotlight: skipped hotkey disable (no active non-root GUI session detected)." >&2
+    fi
+
+    if ! /usr/bin/mdutil -i off /; then
+      echo "spotlight: failed to disable Spotlight indexing." >&2
+    fi
+
+    if [ -n "$console_uid_spotlight" ]; then
+      if ! /bin/launchctl disable "gui/$console_uid_spotlight/com.apple.Spotlight"; then
+        echo "spotlight: failed to disable gui/$console_uid_spotlight/com.apple.Spotlight." >&2
+      fi
+      spotlight_bootout_output="$(
+        /bin/launchctl bootout "gui/$console_uid_spotlight/com.apple.Spotlight" 2>&1
+      )" || true
+      if [ -n "$spotlight_bootout_output" ]; then
+        # SIP can block bootout on newer macOS even when disable+mdutil already
+        # converged the effective state; treat this as expected and keep logs actionable.
+        if printf '%s' "$spotlight_bootout_output" | /usr/bin/grep -Fq "System Integrity Protection is engaged"; then
+          echo "spotlight: bootout blocked by SIP (expected on this macOS); disable/indexing state still converged." >&2
+        else
+          echo "spotlight: bootout for com.apple.Spotlight returned non-zero: $spotlight_bootout_output" >&2
+        fi
+      fi
+    else
+      echo "spotlight: skipped launchctl disable/bootout (could not determine user UID)." >&2
+    fi
+
+    if [ -d "/.Spotlight-V100" ]; then
+      if ! /bin/rm -rf "/.Spotlight-V100"; then
+        echo "spotlight: failed to remove /.Spotlight-V100 cache directory." >&2
+      fi
+    fi
+
+    echo "spotlight: disable sequence complete. Cmd+Space should now open Raycast (or fail silently if no alternate launcher is running)."
+  '';
+}

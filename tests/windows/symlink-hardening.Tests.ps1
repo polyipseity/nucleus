@@ -5,10 +5,10 @@ BeforeAll {
 
   # Paths to modules under test
   $ModulePaths = @(
-    "src/hosts/windows/modules/editors/Sync-VSCodeConfig.ps1"
-    "src/hosts/windows/modules/user/Sync-AgentsConfig.ps1"
-    "src/hosts/windows/modules/user/Sync-AgentsSkill.ps1"
-    "src/hosts/windows/modules/user/Sync-DevRepo.ps1"
+    "src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1"
+    "src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1"
+    "src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1"
+    "src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
   )
 
   # Verify all module files exist
@@ -23,25 +23,25 @@ BeforeAll {
 Describe "Symlink Hardening - Windows" {
   Context "Sync-VSCodeConfig" {
     It "should contain Set-ManagedSymlinkDeleteProtection" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/windows/modules/editors/Sync-VSCodeConfig.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "Set-ManagedSymlinkDeleteProtection"
     }
 
     It "should contain Remove-ManagedSymlinkDeleteProtection" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/windows/modules/editors/Sync-VSCodeConfig.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "Remove-ManagedSymlinkDeleteProtection"
     }
 
     It "should use icacls for ACL deny operations" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/windows/modules/editors/Sync-VSCodeConfig.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match 'icacls.*\/deny.*\(D\)'
     }
 
     It "should support ShouldProcess for deletion protection" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/windows/modules/editors/Sync-VSCodeConfig.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "SupportsShouldProcess"
       $content | Should -Match "PSCmdlet.ShouldProcess"
@@ -50,19 +50,19 @@ Describe "Symlink Hardening - Windows" {
 
   Context "Sync-AgentsConfig" {
     It "should contain Set-ManagedSymlinkDeleteProtection" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/windows/modules/user/Sync-AgentsConfig.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "Set-ManagedSymlinkDeleteProtection"
     }
 
     It "should contain Remove-ManagedSymlinkDeleteProtection" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/windows/modules/user/Sync-AgentsConfig.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "Remove-ManagedSymlinkDeleteProtection"
     }
 
     It "should apply protection to managed symlinks" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/windows/modules/user/Sync-AgentsConfig.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "Sync-AgentsConfig"
     }
@@ -70,13 +70,13 @@ Describe "Symlink Hardening - Windows" {
 
   Context "Sync-AgentsSkill" {
     It "should contain Set-ManagedSymlinkDeleteProtection" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/windows/modules/user/Sync-AgentsSkill.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "Set-ManagedSymlinkDeleteProtection"
     }
 
     It "should protect bundled skill symlinks" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/windows/modules/user/Sync-AgentsSkill.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "Sync-AgentsSkill"
     }
@@ -84,13 +84,13 @@ Describe "Symlink Hardening - Windows" {
 
   Context "Sync-DevRepo" {
     It "should contain Set-ManagedSymlinkDeleteProtection" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/windows/modules/user/Sync-DevRepo.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "Set-ManagedSymlinkDeleteProtection"
     }
 
     It "should protect newly created dev repo symlinks" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/windows/modules/user/Sync-DevRepo.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "Sync-DevRepo"
     }
@@ -99,10 +99,10 @@ Describe "Symlink Hardening - Windows" {
   Context "ACL Compliance Across All Modules" {
     It "should not expose plaintext ACL deny operations without ShouldProcess" {
       $modulePaths = @(
-        "src/hosts/windows/modules/editors/Sync-VSCodeConfig.ps1",
-        "src/hosts/windows/modules/user/Sync-AgentsConfig.ps1",
-        "src/hosts/windows/modules/user/Sync-AgentsSkill.ps1",
-        "src/hosts/windows/modules/user/Sync-DevRepo.ps1"
+        "src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1",
+        "src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1",
+        "src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1",
+        "src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
       )
 
       foreach ($relativePath in $modulePaths) {
@@ -117,8 +117,8 @@ Describe "Symlink Hardening - Windows" {
 
     It "should use variable interpolation safely with braces" {
       $modulePaths = @(
-        "src/hosts/windows/modules/editors/Sync-VSCodeConfig.ps1",
-        "src/hosts/windows/modules/user/Sync-AgentsConfig.ps1"
+        "src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1",
+        "src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1"
       )
 
       foreach ($relativePath in $modulePaths) {
@@ -135,7 +135,7 @@ Describe "Symlink Hardening - Windows" {
 Describe "Obsidian Configuration - Windows DSC" {
   Context "WinGet DSC Obsidian Settings" {
     It "should have DisableAutoUpdate configuration" {
-      $dscPath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/windows/user.dsc.yml"
+      $dscPath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/user.dsc.yml"
       $content = Get-Content -Path $dscPath -Raw
       # Check if Obsidian is configured (DSC format check)
       $content | Should -Match "Obsidian|obsidian" -Because "Obsidian should be configured in Windows DSC"

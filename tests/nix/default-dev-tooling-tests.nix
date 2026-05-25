@@ -17,12 +17,12 @@
   lib ? import <nixpkgs/lib>,
 }:
 let
-  applyScriptText = builtins.readFile ../../src/hosts/windows/apply.ps1;
+  applyScriptText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   buildToolsPolicyText = builtins.readFile ../../.agents/instructions/build-tools-policy.instructions.md;
   ciWorkflowText = builtins.readFile ../../.github/workflows/ci.yml;
   posixPwshText = builtins.readFile ../../src/modules/pwsh.nix;
   posixShellText = builtins.readFile ../../src/modules/shell.nix;
-  windowsShellProfileText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-ShellProfile.ps1;
+  windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
 
   # Simple assertion helper with descriptive errors.
   assert' = cond: msg: if !cond then throw msg else null;

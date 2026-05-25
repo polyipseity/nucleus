@@ -19,9 +19,9 @@ let
   # instead of relying only on mocked activation maps.
   agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
-  macbookActivationText = builtins.readFile ../../src/hosts/macbook/activation.nix;
-  macbookDefaultText = builtins.readFile ../../src/hosts/macbook/default.nix;
-  windowsGitSshModuleText = builtins.readFile ../../src/hosts/windows/modules/user/Sync-GitAndSshConfig.ps1;
+  macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
+  macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
+  windowsGitSshModuleText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1;
   sharedGitModuleText = builtins.readFile ../../src/modules/git.nix;
 
   # Assertion helper.

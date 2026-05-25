@@ -91,9 +91,7 @@
           # .NET 6 is intentionally pinned for EIDE/runtime compatibility across
           # hosts. Upstream marks it insecure because it is EOL; keep this
           # exception narrowly scoped to the exact runtime derivation.
-          config.permittedInsecurePackages = [
-            "dotnet-runtime-6.0.36"
-          ];
+          config.permittedInsecurePackages = [ "dotnet-runtime-6.0.36" ];
 
           overlays = [
             (_final: prev: {
@@ -425,7 +423,7 @@
         specialArgs = { inherit username users; };
         system = systems.mac;
         modules = [
-          ./hosts/macbook/default.nix
+          ./hosts/MacBook/default.nix
           sops-nix.darwinModules.sops
           home-manager.darwinModules.home-manager
           {
@@ -457,7 +455,7 @@
         specialArgs = { inherit username users; };
         system = systems.linux;
         modules = [
-          ./hosts/nixos/default.nix
+          ./hosts/NixOS/default.nix
           sops-nix.nixosModules.sops
           home-manager.nixosModules.home-manager
           {
@@ -558,7 +556,7 @@
       # -----------------------------------------------------------------------
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
         extraSpecialArgs = {
-          hostManualFile = "src/hosts/nixos/MANUAL.md";
+          hostManualFile = "src/hosts/NixOS/MANUAL.md";
           inherit nixpkgs username users;
           vsCodeMarketplace = vsCodeMarketplaceLinux;
         };

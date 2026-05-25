@@ -6,7 +6,7 @@
 
 let
   lib = import <nixpkgs/lib>;
-  defaultsText = builtins.readFile ../../src/hosts/macbook/defaults.nix;
+  defaultsText = builtins.readFile ../../src/hosts/MacBook/defaults.nix;
 in
 assert lib.hasInfix ''"com.lwouis.alt-tab-macos"'' defaultsText;
 

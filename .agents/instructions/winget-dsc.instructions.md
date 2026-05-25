@@ -1,19 +1,19 @@
 ---
-description: "Use when authoring or editing WinGet DSC configuration files under src/hosts/windows/. Covers DSC v3 YAML structure, resource ordering, sorting, and safe authoring patterns for this repository."
+description: "Use when authoring or editing WinGet DSC configuration files under src/hosts/Windows/. Covers DSC v3 YAML structure, resource ordering, sorting, and safe authoring patterns for this repository."
 name: "WinGet DSC Authoring"
-applyTo: "src/hosts/windows/**/*.yml"
+applyTo: "src/hosts/Windows/**/*.yml"
 ---
 
 # WinGet DSC Authoring
 
 ## File location and purpose
 
-- `src/hosts/windows/system.dsc.yml` contains pre-provision system baseline
+- `src/hosts/Windows/system.dsc.yml` contains pre-provision system baseline
   resources (packages, machine settings, machine registry).
-- `src/hosts/windows/user.dsc.yml` contains post-provision user baseline
+- `src/hosts/Windows/user.dsc.yml` contains post-provision user baseline
   resources (folder layout, user registry, user environment variables).
-- They are applied in-order by `src/hosts/windows/apply.ps1`.
-- Reusable Windows helper logic is loaded from `src/hosts/windows/modules/*.ps1`; DSC
+- They are applied in-order by `src/hosts/Windows/apply.ps1`.
+- Reusable Windows helper logic is loaded from `src/hosts/Windows/modules/*.ps1`; DSC
   files should remain state declarations rather than script logic.
 
 ## DSC v3 document structure
@@ -53,7 +53,7 @@ packages) or `settings.valueName` / `settings.name` (for other resources).
 ## Authoring rules
 
 - Always use `.yml` extension for WinGet DSC manifests; do not create
-  long-extension YAML filenames in `src/hosts/windows/`.
+  long-extension YAML filenames in `src/hosts/Windows/`.
 - Always specify `source: winget` for `Microsoft.WinGet.Client/Package`
   entries; do not omit it even if it is technically the default.
 - Use the canonical WinGet package identifier (verified via `winget search`)
@@ -94,7 +94,7 @@ any `PSDscResources/Script` entry will cause WinGet to download and install the
 
 Use `PSDscResources/Script` only for imperative steps that cannot be expressed
 by any declarative resource type. Prefer moving complex logic to
-`src/hosts/windows/modules/*.ps1` (dot-sourced by `apply.ps1`) so the DSC file stays
+`src/hosts/Windows/modules/*.ps1` (dot-sourced by `apply.ps1`) so the DSC file stays
 a state declaration rather than a script host.
 
 **When PATH is not guaranteed during DSC execution:**
@@ -108,7 +108,7 @@ document the gap and rely on a graceful probe in `apply.ps1` or a
 
 **cargo-cache is managed via cargo-binstall, not `system.dsc.yml`:** `cargo-cache`
 has no WinGet package ID and is not in Scoop. It is installed declaratively by
-`Invoke-CargoBinstallSetup` (in `src/hosts/windows/modules/Invoke-CargoBinstallSetup.ps1`)
+`Invoke-CargoBinstallSetup` (in `src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1`)
 which runs after the DSC step in `apply.ps1`. `scripts/gc.ps1` probes for the
 binary gracefully and skips pruning when it is absent.
 
@@ -219,14 +219,14 @@ When adding a new tool or capability, choose the package manager in this order:
 
 1. **WinGet (`system.dsc.yml`)** — preferred for any package with a WinGet ID.
    Declarative, `--what-if`-capable, and centrally tracked.
-2. **Scoop (`src/hosts/windows/modules/Invoke-ScoopSetup.ps1`)** — for portable CLI
+2. **Scoop (`src/hosts/Windows/modules/Invoke-ScoopSetup.ps1`)** — for portable CLI
    utilities that have no WinGet ID but exist in a Scoop bucket. Scoop is the
    user-space fallback: it requires no admin rights and installs to
    `%USERPROFILE%\scoop\`.
-3. **cargo binstall (`src/hosts/windows/modules/Invoke-CargoBinstallSetup.ps1`)** — for
+3. **cargo binstall (`src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1`)** — for
    Rust CLI tools not available in WinGet or Scoop. cargo-binstall downloads
    prebuilt binaries without requiring a local Rust toolchain.
-4. **bun (`src/hosts/windows/modules/Invoke-BunSetup.ps1`)** — last resort for JS/npm-only
+4. **bun (`src/hosts/Windows/modules/Invoke-BunSetup.ps1`)** — last resort for JS/npm-only
    tools absent from WinGet, Scoop, and cargo-binstall. `bun install -g`
    places binaries in `%USERPROFILE%\.bun\bin`. Bun itself is installed via
    WinGet (`Oven-sh.Bun` in `system.dsc.yml`).
@@ -276,7 +276,7 @@ immediately after WinGet installs Scoop — the same PATH-guarantee constraint
 that excludes cargo-cache.
 
 Instead, manage Scoop buckets and apps in a dedicated module
-`src/hosts/windows/modules/Invoke-ScoopSetup.ps1` dot-sourced and called by `apply.ps1`
+`src/hosts/Windows/modules/Invoke-ScoopSetup.ps1` dot-sourced and called by `apply.ps1`
 **after** the DSC run completes, so `~\scoop\shims` is resolvable by then.
 
 ### Idempotency in Scoop operations
@@ -301,7 +301,7 @@ if (-not (Test-Path $cbBin)) {
 
 ### cargo binstall for Rust tools
 
-After Scoop installs cargo-binstall, `src/hosts/windows/modules/Invoke-CargoBinstallSetup.ps1`
+After Scoop installs cargo-binstall, `src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1`
 manages Rust CLI tools that have no WinGet or Scoop equivalent (e.g.
 `cargo-cache`, `pay-respects`). It maintains a desired-state list and a
 manifest at `~\.config\nucleus\cargo-binstall-packages.json`; on each apply it
@@ -327,7 +327,7 @@ shims at `~\scoop\shims` are already resolvable.
 ## Imperative fallback safety (Windows modules)
 
 When a capability cannot be represented in WinGet DSC and must be implemented
-in `src/hosts/windows/modules/*.ps1` + `apply.ps1`, enforce all of the following:
+in `src/hosts/Windows/modules/*.ps1` + `apply.ps1`, enforce all of the following:
 
 - **Managed-scope only**: modify only declaratively managed files/blocks/keys.
   Do not overwrite or delete unrelated user content.
@@ -340,7 +340,7 @@ in `src/hosts/windows/modules/*.ps1` + `apply.ps1`, enforce all of the following
 - **Idempotent deconfiguration**: disabling a feature must safely remove only
   managed state and be no-op when already absent.
 - **Explicit toggle**: every imperative parity feature must expose an enable/
-  disable toggle in `src/hosts/windows/apply.ps1` and wire cleanup when false.
+  disable toggle in `src/hosts/Windows/apply.ps1` and wire cleanup when false.
 
 ## Validation
 

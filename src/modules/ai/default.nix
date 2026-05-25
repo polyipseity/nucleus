@@ -53,7 +53,7 @@ lib.mkMerge [
   {
     home.packages = [
       # Inference server and CLI.  On NixOS the server is managed by the
-      # system-level services.ollama unit (hosts/nixos/ai.nix); the package
+      # system-level services.ollama unit (hosts/NixOS/ai.nix); the package
       # here provides the `ollama` CLI for user-facing pulls, queries, and
       # model management.  On macOS the launchd agent below starts the server.
       pkgs.ollama
@@ -73,7 +73,7 @@ lib.mkMerge [
 
   # macOS-only: user launchd agent for the Ollama inference server.
   # On NixOS the equivalent is the system-level services.ollama unit in
-  # hosts/nixos/ai.nix; no Home Manager unit is needed there.
+  # hosts/NixOS/ai.nix; no Home Manager unit is needed there.
   # The launchd option is Darwin-only in Home Manager so the entire block
   # must be guarded to avoid "unknown option" errors on Linux.
   (lib.mkIf pkgs.stdenv.isDarwin {

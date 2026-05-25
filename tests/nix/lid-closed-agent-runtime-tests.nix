@@ -11,11 +11,11 @@
 }:
 let
   ciWorkflowText = builtins.readFile ../../.github/workflows/ci.yml;
-  macManualText = builtins.readFile ../../src/hosts/macbook/MANUAL.md;
-  macbookActivationText = builtins.readFile ../../src/hosts/macbook/activation.nix;
-  nixosDesktopText = builtins.readFile ../../src/hosts/nixos/desktop.nix;
-  windowsApplyText = builtins.readFile ../../src/hosts/windows/apply.ps1;
-  windowsPowerPolicyText = builtins.readFile ../../src/hosts/windows/modules/system/Sync-PowerPolicy.ps1;
+  macManualText = builtins.readFile ../../src/hosts/MacBook/MANUAL.md;
+  macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
+  nixosDesktopText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
+  windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
+  windowsPowerPolicyText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-PowerPolicy.ps1;
 
   assert' = cond: msg: if !cond then throw msg else null;
 
