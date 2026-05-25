@@ -9,31 +9,31 @@ applyTo: "src/modules/ai/**, src/modules/configs/vscode/chatLanguageModels.*.jso
 ## Profile key convention
 
 `src/modules/ai/models.json` groups model lists by **host name**, not by
-platform nickname.  Use the exact OS hostname as keys (PascalCase, matching
+platform nickname. Use the exact OS hostname as keys (PascalCase, matching
 `networking.hostName` / `ComputerName` on each host):
 
-| Key       | Host           | Resolved by                              |
-| --------- | -------------- | ---------------------------------------- |
-| `MacBook` | macOS          | `ai-sync.sh` Darwin branch               |
-| `NixOS`   | NixOS (Linux)  | `ai-sync.sh` wildcard branch             |
-| `Windows` | Windows        | `Invoke-AISync.ps1` (always `Windows`)   |
+| Key       | Host          | Resolved by                            |
+| --------- | ------------- | -------------------------------------- |
+| `MacBook` | macOS         | `ai-sync.sh` Darwin branch             |
+| `NixOS`   | NixOS (Linux) | `ai-sync.sh` wildcard branch           |
+| `Windows` | Windows       | `Invoke-AISync.ps1` (always `Windows`) |
 
 Do **not** use lowercase names like `"macbook"`, `"nixos"`, or `"windows"` —
 the keys must match the exact OS hostname (see `AGENTS.md` **Host name equals
-display name** policy).  Do **not** use generic names like `"mac"` or `"pc"`.
+display name** policy). Do **not** use generic names like `"mac"` or `"pc"`.
 When adding a new host, add a new key matching its exact OS hostname and update
 the profile detection logic in both `ai-sync.sh` and `Invoke-AISync.ps1`.
 
 ## Hardware constraints per host
 
-These are the authoritative assumptions for model size budgeting.  Update
+These are the authoritative assumptions for model size budgeting. Update
 this table whenever hardware changes.
 
-| Host      | Memory budget                                      | Notes                                                                               |
-| --------- | -------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `macbook` | ≤ 16 GB GPU (slight excess ~17–18 GB is OK)        | 24 GB unified RAM; Apple Silicon Metal; flash attention + q4_0 KV cache enabled     |
+| Host      | Memory budget                                     | Notes                                                                                                                   |
+| --------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `macbook` | ≤ 16 GB GPU (slight excess ~17–18 GB is OK)       | 24 GB unified RAM; Apple Silicon Metal; flash attention + q4_0 KV cache enabled                                         |
 | `nixos`   | ≤ 6 GB discrete VRAM (model file ≤ ~5 GB target)  | GPU acceleration enabled via `services.ollama.acceleration = "cuda"`; `MemoryMax = "16G"` systemd cap remains in effect |
-| `windows` | ≤ 6 GB discrete VRAM (same assumption as `nixos`)  | Same hardware class as nixos PC; update if specs differ                             |
+| `windows` | ≤ 6 GB discrete VRAM (same assumption as `nixos`) | Same hardware class as nixos PC; update if specs differ                                                                 |
 
 ## Required cross-file sync (do not forget)
 
@@ -47,28 +47,28 @@ change** so editor/runtime behavior stays aligned:
 5. Manifest comment block in `src/modules/ai/default.nix`.
 
 Rule: each host's `chatLanguageModels.<host>.json` IDs must be a subset of
-that host key in `models.json` (or exactly match).  Never leave stale editor
+that host key in `models.json` (or exactly match). Never leave stale editor
 entries for models no longer present in the host manifest.
 
 ## Quantization guidance
 
-Ollama model tags follow `<base>-<quant>` naming.  Key quantizations:
+Ollama model tags follow `<base>-<quant>` naming. Key quantizations:
 
-| Tag suffix    | Typical size vs Q4_K_M | Quality vs Q4_K_M | When to use                                             |
-| ------------- | ---------------------- | ----------------- | ------------------------------------------------------- |
-| `q4_K_M`      | baseline (default)     | baseline          | Default; best quality/size tradeoff for most models     |
-| `q8_0`        | ~1.7× larger           | noticeably better | macbook only when headroom allows; never for nixos/windows |
-| `fp16` / `bf16` | ~2× larger           | near-lossless     | macbook only for small models (e.g. e4b) where size allows |
-| `it-qat`      | same as Q4_K_M         | approaches BF16   | Preferred over plain Q4_K_M for Gemma models that ship QAT variants (gemma3, gemma4) |
-| `nvfp4`       | slightly smaller than Q4_K_M | similar    | NVIDIA GPU only (nixos/windows with NVIDIA); not for macbook Metal |
-| `mxfp8`       | ~1.5× Q4_K_M           | good              | NVIDIA GPU or Apple MLX only                            |
-| `mlx-bf16`    | ~2× Q4_K_M             | near-lossless     | Apple MLX only; macbook with sufficient headroom        |
+| Tag suffix      | Typical size vs Q4_K_M       | Quality vs Q4_K_M | When to use                                                                          |
+| --------------- | ---------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
+| `q4_K_M`        | baseline (default)           | baseline          | Default; best quality/size tradeoff for most models                                  |
+| `q8_0`          | ~1.7× larger                 | noticeably better | macbook only when headroom allows; never for nixos/windows                           |
+| `fp16` / `bf16` | ~2× larger                   | near-lossless     | macbook only for small models (e.g. e4b) where size allows                           |
+| `it-qat`        | same as Q4_K_M               | approaches BF16   | Preferred over plain Q4_K_M for Gemma models that ship QAT variants (gemma3, gemma4) |
+| `nvfp4`         | slightly smaller than Q4_K_M | similar           | NVIDIA GPU only (nixos/windows with NVIDIA); not for macbook Metal                   |
+| `mxfp8`         | ~1.5× Q4_K_M                 | good              | NVIDIA GPU or Apple MLX only                                                         |
+| `mlx-bf16`      | ~2× Q4_K_M                   | near-lossless     | Apple MLX only; macbook with sufficient headroom                                     |
 
 ## Model selection preference
 
 When choosing between a larger model at a lower quantization vs a smaller
 model at a higher quantization, **prefer the larger parameter count** even at
-the cost of running the lower quantization.  Examples:
+the cost of running the lower quantization. Examples:
 
 - Prefer `qwen3.5:27b` (17 GB, 27B params, `q4_K_M`) over `qwen3:14b-q8_0`
   (16 GB, 14B params, `q8_0`) for the macbook slot.
@@ -86,12 +86,12 @@ ceilings: macbook ≤ ~18 GB (slight excess OK); nixos/windows ≤ 6 GB
 
 Ollama's available quantizations for models in the relevant size range are
 limited to `q4_K_M` (or equivalent), `q8_0`, `fp16`/`bf16`, and selected
-hardware-specific formats (`nvfp4`, `mxfp8`, `mlx-bf16`).  There are **no
+hardware-specific formats (`nvfp4`, `mxfp8`, `mlx-bf16`). There are **no
 q3 or lower GGUF variants** available in Ollama for any model in this
 repository's selection; do not expect or look for them.
 
 - **macbook default**: `q4_K_M` (default tag); use `it-qat` when the model
-  family ships one (e.g. `gemma3:27b-it-qat`).  Use `e4b-it-bf16` (16 GB)
+  family ships one (e.g. `gemma3:27b-it-qat`). Use `e4b-it-bf16` (16 GB)
   for `gemma4:e4b` when maximum quality at a single small model is desired.
 - **nixos / windows default**: always `q4_K_M` (default tag) — VRAM is
   tight; do not use q8_0 or fp16 variants.
@@ -107,31 +107,31 @@ All tags below confirmed to exist on Ollama as of 2026-05.
 
 Ordered by preference under the high-param-count policy.
 
-| Model tag              | Size   | Capabilities                | Notes                                                        |
-| ---------------------- | ------ | --------------------------- | ------------------------------------------------------------ |
-| `qwen3.5:27b`          | 17 GB  | vision tools thinking       | **High-param pick**; 27B dense; 256K ctx; slight excess OK   |
-| `qwen3.6:27b`          | 17 GB  | vision tools thinking       | 27B; 256K ctx; agentic coding focus; slight excess OK        |
-| `gemma4:26b`           | 18 GB  | vision tools thinking       | MoE 26B/4B active; frontier benchmarks; slight excess OK     |
-| `devstral:24b`         | 14 GB  | tools                       | 24B; 128K ctx; coding agent SWE-bench #1 open-source (46.8%) |
-| `magistral:24b`        | 14 GB  | tools thinking              | 24B; 40K effective ctx (128K window); reasoning specialist   |
-| `gemma4:e4b`           | 9.6 GB | vision tools thinking audio | Current; MoE 4B active; QAT; Apple Silicon Metal             |
-| `qwen3:14b`            | 9.3 GB | tools thinking              | Current; 14B dense; 40K ctx                                  |
-| `qwen3.5:27b-int4`     | 16 GB  | tools thinking              | 27B int4 text-only; just fits budget; no vision              |
-| `qwen3:30b`            | 19 GB  | tools thinking              | MoE 30B/3B active; 256K ctx; ~3 GB over target — use cautiously |
+| Model tag          | Size   | Capabilities                | Notes                                                           |
+| ------------------ | ------ | --------------------------- | --------------------------------------------------------------- |
+| `qwen3.5:27b`      | 17 GB  | vision tools thinking       | **High-param pick**; 27B dense; 256K ctx; slight excess OK      |
+| `qwen3.6:27b`      | 17 GB  | vision tools thinking       | 27B; 256K ctx; agentic coding focus; slight excess OK           |
+| `gemma4:26b`       | 18 GB  | vision tools thinking       | MoE 26B/4B active; frontier benchmarks; slight excess OK        |
+| `devstral:24b`     | 14 GB  | tools                       | 24B; 128K ctx; coding agent SWE-bench #1 open-source (46.8%)    |
+| `magistral:24b`    | 14 GB  | tools thinking              | 24B; 40K effective ctx (128K window); reasoning specialist      |
+| `gemma4:e4b`       | 9.6 GB | vision tools thinking audio | Current; MoE 4B active; QAT; Apple Silicon Metal                |
+| `qwen3:14b`        | 9.3 GB | tools thinking              | Current; 14B dense; 40K ctx                                     |
+| `qwen3.5:27b-int4` | 16 GB  | tools thinking              | 27B int4 text-only; just fits budget; no vision                 |
+| `qwen3:30b`        | 19 GB  | tools thinking              | MoE 30B/3B active; 256K ctx; ~3 GB over target — use cautiously |
 
 ### nixos / windows candidates (≤ 6 GB VRAM — strict; high-param preferred)
 
 `qwen3:8b` (5.2 GB, `q4_K_M`) is the maximum-parameter model that fits within
-6 GB VRAM at any Ollama-available quantization.  Ollama offers no sub-`q4_K_M`
-variants for models in this size range.  The next size up (`qwen3.5:9b-q4_K_M`
+6 GB VRAM at any Ollama-available quantization. Ollama offers no sub-`q4_K_M`
+variants for models in this size range. The next size up (`qwen3.5:9b-q4_K_M`
 = 6.6 GB, `qwen3:14b-q4_K_M` = 9.3 GB) all exceed the strict 6 GB budget.
 The high-param preference does not change the selection here — `qwen3:8b` is
 already the optimum.
 
-| Model tag        | Size   | Fits 6 GB? | Capabilities          | Notes                                                       |
-| ---------------- | ------ | ---------- | --------------------- | ----------------------------------------------------------- |
-| `qwen3:8b`       | 5.2 GB | Yes        | tools thinking        | Current; maximum params within budget; 40K ctx              |
-| `qwen3.5:9b`     | 6.6 GB | No         | vision tools thinking | 0.6 GB over — viable CPU-only on nixos (MemoryMax=16G); not for GPU slot |
+| Model tag    | Size   | Fits 6 GB? | Capabilities          | Notes                                                                    |
+| ------------ | ------ | ---------- | --------------------- | ------------------------------------------------------------------------ |
+| `qwen3:8b`   | 5.2 GB | Yes        | tools thinking        | Current; maximum params within budget; 40K ctx                           |
+| `qwen3.5:9b` | 6.6 GB | No         | vision tools thinking | 0.6 GB over — viable CPU-only on nixos (MemoryMax=16G); not for GPU slot |
 
 ## Tool-calling verification
 
