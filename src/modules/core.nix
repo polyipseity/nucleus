@@ -96,6 +96,8 @@ let
   #   ruff           — fast Python linter/formatter CLI
   #   shellcheck     — shell linter used by CI and pre-commit validation
   #   sops           — secret encryption/decryption tool
+  #   ssh-to-age     — derives age public/private keys from SSH keys; required by
+  #                    apply.sh when invoked directly (not via nix run .#apply)
   #   ty             — Astral ty Python type checker / language server CLI
   #   typst          — modern document-composition compiler; pairs with the Tinymist LSP in editors.nix
   #   uv             — fast Python package/project manager
@@ -137,6 +139,7 @@ let
     pkgs.rustup
     pkgs.shellcheck
     pkgs.sops
+    pkgs.ssh-to-age
     pkgs.ty
     pkgs.typst
     pkgs.uv

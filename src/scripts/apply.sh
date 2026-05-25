@@ -100,6 +100,22 @@ fi
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 
+# Augment PATH with the user Nix profile bin directory so Nix-managed binaries
+# (e.g. ssh-to-age, sops) are available when the script is invoked directly
+# rather than through `nix run .#apply` (which adds them via runtimeInputs).
+# The guard avoids redundant PATH modifications when already present.
+_nix_profile_bin="$HOME/.nix-profile/bin"
+case ":$PATH:" in
+  *":$_nix_profile_bin:"*) ;;
+  *)
+    if [ -d "$_nix_profile_bin" ]; then
+      PATH="$_nix_profile_bin:$PATH"
+      export PATH
+    fi
+    ;;
+esac
+unset _nix_profile_bin
+
 # Write the repo root to a well-known path so Home Manager activation scripts
 # (particularly vscodeSymlinks in editors.nix) can locate live repo files such
 # as src/modules/configs/vscode/.  Environment variables are not reliably
