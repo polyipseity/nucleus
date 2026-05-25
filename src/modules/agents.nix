@@ -637,6 +637,18 @@ in
           echo "rustup: all managed toolchains already converged — skipping"
         fi
 
+        # Set the global default toolchain to none so every project must declare
+        # its toolchain explicitly via rust-toolchain.toml or a +channel override.
+        # WHY: a global default channel silently masks missing per-project
+        # toolchain files and makes the effective compiler version opaque.
+        # `rustup default none` is idempotent.
+        if ! rustup default none; then
+          echo "rustup: 'rustup default none' failed" >&2
+          rm -f "$_irt_desired" "$_irt_installed" "$_irt_channels" "$_irt_to_remove" "$_irt_to_install"
+          exit 1
+        fi
+        echo "rustup: global default toolchain set to none"
+
         rm -f "$_irt_desired" "$_irt_installed" "$_irt_channels" "$_irt_to_remove" "$_irt_to_install"
       fi
     '';

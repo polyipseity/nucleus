@@ -108,4 +108,17 @@ function Invoke-RustupSetup {
   if ($toInstall.Count -eq 0 -and $toRemove.Count -eq 0) {
     Write-Output "rustup: all managed toolchains already converged — skipping"
   }
+
+  # Set the global default toolchain to none so every project must declare its
+  # toolchain explicitly via rust-toolchain.toml or a +channel override.
+  # WHY: a global default channel silently masks missing per-project toolchain
+  # files and makes the effective compiler version opaque.
+  # `rustup default none` is idempotent.
+  Write-Output "rustup: setting global default toolchain to none"
+  rustup default none
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "rustup: 'rustup default none' failed (exit $LASTEXITCODE)"
+    return
+  }
+  Write-Output "rustup: global default toolchain set to none"
 }

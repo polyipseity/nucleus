@@ -117,4 +117,7 @@ function Invoke-CargoBinstallSetup {
     Write-Output "cargo-binstall-setup: $pkg installed successfully"
   }
 
+  if ($toRemove.Count -eq 0 -and $toInstall.Count -eq 0) {
+    Write-Output "cargo-binstall-setup: all managed packages already converged — skipping"
+  }
 }

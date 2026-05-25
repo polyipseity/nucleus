@@ -19,9 +19,12 @@
 let
   applyScriptText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   buildToolsPolicyText = builtins.readFile ../../.agents/instructions/build-tools-policy.instructions.md;
+  cargoBinstallSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-CargoBinstallSetup.ps1;
   ciWorkflowText = builtins.readFile ../../.github/workflows/ci.yml;
+  posixAgentsText = builtins.readFile ../../src/modules/agents.nix;
   posixPwshText = builtins.readFile ../../src/modules/pwsh.nix;
   posixShellText = builtins.readFile ../../src/modules/shell.nix;
+  rustupSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-RustupSetup.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
 
   # Simple assertion helper with descriptive errors.
@@ -109,6 +112,34 @@ let
       )
       "shell.nix must define NUCLEUS_LIBICONV_LIB and set LIBRARY_PATH in the fallback for macOS cargo/rustc builds";
 
+  # Verify that installRustupToolchains sets the global default to none so
+  # every project must declare its toolchain explicitly via rust-toolchain.toml
+  # or a +channel override, preventing opaque global defaults.
+  test_posix_rustup_sets_default_stable = assert' (lib.hasInfix "rustup default none" posixAgentsText) "agents.nix installRustupToolchains must call 'rustup default none' after toolchain convergence";
+
+  # Same guard for the Windows equivalent.
+  test_windows_rustup_sets_default_stable = assert' (lib.hasInfix "rustup default none" rustupSetupText) "Invoke-RustupSetup.ps1 must call 'rustup default none' after toolchain convergence";
+
+  # Verify that the cargo package convergence uses `cargo install --list` as
+  # the authoritative installed-set source, which covers BOTH plain
+  # `cargo install` packages AND `cargo-binstall` packages in one pass.
+  # The removal side uses `cargo uninstall`, which handles both origins.
+  test_posix_cargo_prunes_both_install_and_binstall =
+    assert'
+      (
+        (lib.hasInfix "cargo install --list" posixAgentsText)
+        && (lib.hasInfix "cargo uninstall" posixAgentsText)
+      )
+      "agents.nix must use 'cargo install --list' + 'cargo uninstall' to prune both cargo install and cargo-binstall packages";
+
+  test_windows_cargo_prunes_both_install_and_binstall =
+    assert'
+      (
+        (lib.hasInfix "cargo install --list" cargoBinstallSetupText)
+        && (lib.hasInfix "cargo uninstall" cargoBinstallSetupText)
+      )
+      "Invoke-CargoBinstallSetup.ps1 must use 'cargo install --list' + 'cargo uninstall' to prune both cargo install and cargo-binstall packages";
+
   allTests = [
     test_posix_shell_exports_fallback_bundle
     test_posix_pwsh_uses_fallback_bundle
@@ -120,6 +151,10 @@ let
     test_windows_unconditional_user_bin_path
     test_posix_shell_probes_tool_in_direnv
     test_posix_shell_prepends_libiconv_in_fallback
+    test_posix_rustup_sets_default_stable
+    test_windows_rustup_sets_default_stable
+    test_posix_cargo_prunes_both_install_and_binstall
+    test_windows_cargo_prunes_both_install_and_binstall
   ];
 in
 {
@@ -137,5 +172,9 @@ in
     "8: Windows managed block prepends user-scope bin dirs unconditionally"
     "9: POSIX zsh probes tool availability in direnv context before routing"
     "10: POSIX zsh fallback sets LIBRARY_PATH for macOS libiconv (cargo/rustc builds)"
+    "11: POSIX installRustupToolchains calls rustup default none"
+    "12: Windows Invoke-RustupSetup calls rustup default none"
+    "13: POSIX cargo convergence prunes both cargo install and cargo-binstall packages"
+    "14: Windows cargo convergence prunes both cargo install and cargo-binstall packages"
   ];
 }
