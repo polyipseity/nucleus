@@ -32,22 +32,22 @@ setup scripts.
 
 Required fields for each VM entry:
 
-| Field         | Type   | Description                                             |
-| ------------- | ------ | ------------------------------------------------------- |
-| `name`        | string | Machine-readable identifier used as file/domain name    |
-| `display`     | string | Human-readable name shown in UTM/virt-manager           |
-| `cpus`        | int    | Number of virtual CPUs                                  |
-| `ramBytes`    | int    | RAM in bytes                                            |
-| `diskBytes`   | int    | Boot disk size in bytes                                 |
-| `type`        | string | Guest OS family: `"NixOS"`, `"Windows"`, or `"Linux"`   |
-| `shareDevDir` | bool   | Mount `~/dev` inside the guest via VirtioFS             |
+| Field         | Type   | Description                                           |
+| ------------- | ------ | ----------------------------------------------------- |
+| `name`        | string | Machine-readable identifier used as file/domain name  |
+| `display`     | string | Human-readable name shown in UTM/virt-manager         |
+| `cpus`        | int    | Number of virtual CPUs                                |
+| `ramBytes`    | int    | RAM in bytes                                          |
+| `diskBytes`   | int    | Boot disk size in bytes                               |
+| `type`        | string | Guest OS family: `"NixOS"`, `"Windows"`, or `"Linux"` |
+| `shareDevDir` | bool   | Mount `~/dev` inside the guest via VirtioFS           |
 
 Optional fields:
 
 | Field            | Type   | Description                                                                                                                                                                                                                                                                              |
 | ---------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `macosVersion`   | string | macOS release name (e.g. `"sequoia"`). Required for `type: "macOS"` entries; used by the Tart Packer build to select the base image.                                                                                                                                                    |
-| `windowsEdition` | string | Windows edition string passed to Packer (e.g. `"pro"`). Optional for `type: "Windows"` entries; defaults to `"Pro"` when absent.                                                                                                                                                        |
+| `macOSVersion`   | string | macOS release name (e.g. `"sequoia"`). Required for `type: "macOS"` entries; used by the Tart Packer build to select the base image.                                                                                                                                                     |
+| `windowsEdition` | string | Windows edition string passed to Packer (e.g. `"pro"`). Optional for `type: "Windows"` entries; defaults to `"Pro"` when absent.                                                                                                                                                         |
 | `windowsIsoUrl`  | string | URL to auto-download the Windows installer ISO when `--windows-iso` is omitted. Set to a stable direct download URL (e.g. an evaluation ISO from Microsoft's Evaluation Center or an internal mirror). The downloaded ISO is cached at `~/virtual machines/images/<name>-installer.iso`. |
 
 ## Disk Format
