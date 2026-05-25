@@ -26,7 +26,7 @@
 #   NixOS guest  : nix (for nix run github:nix-community/nixos-generators).
 #   Windows guest: packer (installed via pkgs.packer), QEMU, Windows 11 ISO.
 #   macOS        : UTM installed (/Applications/UTM.app); qemu-img in PATH.
-#   NixOS        : libvirtd enabled (VMs.nix); qemu-img and virsh in PATH.
+#   NixOS        : libvirtd enabled (vms.nix); qemu-img and virsh in PATH.
 #
 # Exit: always 0 (best-effort — a VM setup failure does not roll back a
 #       completed system apply).
@@ -391,7 +391,7 @@ setup_utm_vms() {
 setup_libvirt_vms() {
   if ! command -v virsh >/dev/null 2>&1; then
     printf 'vm-setup: virsh not found in PATH; libvirtd may not be enabled yet\n'
-    printf 'vm-setup: apply the NixOS configuration first so VMs.nix activates libvirtd\n'
+    printf 'vm-setup: apply the NixOS configuration first so vms.nix activates libvirtd\n'
     return
   fi
 
@@ -441,7 +441,7 @@ setup_libvirt_vms() {
     fi
 
     # Define/update the libvirt domain from the Nix-generated XML (idempotent).
-    # The file is installed at apply time by environment.etc in VMs.nix.
+    # The file is installed at apply time by environment.etc in vms.nix.
     _xml_file="/etc/nucleus/vms/${vm_name}-domain.xml"
     if [ ! -f "$_xml_file" ]; then
       printf 'vm-setup: WARNING — domain XML not found at %s; apply the NixOS config first\n' "$_xml_file" >&2
