@@ -2,6 +2,7 @@
 	path = vendor/Fido
 	url = https://github.com/pbatard/Fido.git
 	branch = master
-[submodule "vendor/Mido"]
-	path = vendor/Mido
+[submodule "vendor/qvm-create-windows-qube"]
+	path = vendor/qvm-create-windows-qube
 	url = https://github.com/QubesOS/qvm-create-windows-qube.git
+	branch = master

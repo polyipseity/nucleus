@@ -182,7 +182,7 @@ build_nixos_image() {
 }
 
 # download_windows_iso_mido CACHED_ISO EDITION
-#   Downloads a Windows 11 ISO using vendor/Mido/windows/isos/mido.sh.
+#   Downloads a Windows 11 ISO using vendor/qvm-create-windows-qube/windows/isos/mido.sh.
 #   Mido is the secure Microsoft Windows Downloader for UNIX systems.
 #   The EDITION parameter maps to a Mido media identifier.
 #   Returns 0 on success, 1 on failure.
@@ -192,9 +192,9 @@ download_windows_iso_mido() {
   _mido_cached="$1"
   _mido_edition="${2:-Pro}"
 
-  _mido_script="$REPO_ROOT/vendor/Mido/windows/isos/mido.sh"
+  _mido_script="$REPO_ROOT/vendor/qvm-create-windows-qube/windows/isos/mido.sh"
   if [ ! -f "$_mido_script" ]; then
-    printf 'vm-setup: mido.sh not found; run: git submodule update --init vendor/Mido\n' >&2
+    printf 'vm-setup: mido.sh not found; run: git submodule update --init vendor/qvm-create-windows-qube\n' >&2
     return 1
   fi
 
@@ -366,7 +366,7 @@ build_windows_image() {
           _iso="$_cached_iso"
         fi
       else
-        printf 'vm-setup: [dry-run] would call vendor/Mido/windows/isos/mido.sh (or Fido fallback) to download Windows 11 ISO\n'
+        printf 'vm-setup: [dry-run] would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (or Fido fallback) to download Windows 11 ISO\n'
       fi
     fi
   fi
