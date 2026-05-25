@@ -11,10 +11,9 @@
 #   python / pip — BANNED entirely; see Python section below.
 #   bun          — installs global Node/JS ecosystem system packages via
 #                  `bun add -g`.  Direct developer use is forbidden.
-#   cargo        — used only by cargo-binstall to install Rust binary system
-#                  packages.  Direct developer use is forbidden.
-#   rustc        — companion to cargo for compilation during cargo-binstall
-#                  runs.  Direct developer use is forbidden.
+#   cargo        — used only by cargo-binstall / cargo install for system Rust
+#                  binary packages.  Direct developer use is forbidden.
+#                  POSIX: nixpkgs pkgs.cargo.  Windows: via rustup toolchain.
 #   uv           — installs system-level Python tooling (e.g. `uv tool install`).
 #                  Direct developer use is forbidden.
 # All of the above are blocked at the interactive shell level (shell.nix zsh
@@ -57,6 +56,8 @@ let
   #   bottom         — cross-platform system monitor (btm)
   #   bun            — high-speed all-in-one JS toolkit (runtime, package manager, bundler); global runtime for JS ecosystem tasks
   #                    (Windows: Oven-sh.Bun in system.dsc.yml; fourth tier in install hierarchy: nixpkgs/winget > scoop > cargo binstall > bun > uv)
+  #   cargo          — Rust cargo binary for system-level use (cargo-binstall, cargo install) only
+  #                    (POSIX: pkgs.cargo from nixpkgs; Windows: cargo comes from rustup-managed toolchain via Rust.Rustup)
   #   cargo-binstall — Rust crate binary installer; second-to-last-resort fallback when a package is absent from nixpkgs/WinGet/Scoop
   #   cargo-cache    — reclaim disk space from ~/.cargo registry, git, and advisory-db clones
   #   direnv         — per-directory env loader (shell integration in shell.nix)
@@ -92,7 +93,6 @@ let
   #   powershell      — cross-platform PowerShell runtime (`pwsh`)
   #   prek           — pre-commit hook manager used by prek.toml
   #   ripgrep        — fast grep replacement
-  #   rustup         — Rust toolchain manager
   #   ruff           — fast Python linter/formatter CLI
   #   shellcheck     — shell linter used by CI and pre-commit validation
   #   sops           — secret encryption/decryption tool
@@ -106,6 +106,7 @@ let
     pkgs.bat
     pkgs.bottom
     pkgs.bun
+    pkgs.cargo
     pkgs.cargo-binstall
     pkgs.cargo-cache
     pkgs.direnv
@@ -136,7 +137,6 @@ let
     pkgs.prek
     pkgs.ripgrep
     pkgs.ruff
-    pkgs.rustup
     pkgs.shellcheck
     pkgs.sops
     pkgs.ssh-to-age

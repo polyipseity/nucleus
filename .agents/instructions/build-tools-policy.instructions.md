@@ -1,5 +1,5 @@
 ---
-description: "Use when adding or editing system packages, devShells, shell profiles, or build tool references. Covers the system-install-only policy for bun/cargo/rustc/uv/prek, the shell blocking mechanism, and devShell-first development guidance."
+description: "Use when adding or editing system packages, devShells, shell profiles, or build tool references. Covers the system-install-only policy for bun/cargo/uv/prek (and Windows-only rustup), the shell blocking mechanism, and devShell-first development guidance."
 name: "Build Tools Policy"
 applyTo: "src/modules/core.nix, src/modules/shell.nix, src/modules/pwsh.nix, src/flake.nix, src/hosts/Windows/modules/user/Sync-ShellProfile.ps1, .envrc"
 ---
@@ -12,14 +12,14 @@ The following tools are installed globally (via nixpkgs / WinGet) for **system
 package management only**. They are not available for general developer use in
 interactive sessions:
 
-| Tool             | Installed by            | Permitted system use                                                       |
-| ---------------- | ----------------------- | -------------------------------------------------------------------------- |
-| `bun`            | nixpkgs / `Oven-sh.Bun` | `bun add -g` for global Node/JS system packages                            |
-| `cargo`          | nixpkgs `rustup`        | used internally by `cargo-binstall` for system Rust binary installs        |
-| `rustc`          | nixpkgs `rustup`        | compilation during `cargo-binstall` runs                                   |
-| `uv`             | nixpkgs / WinGet        | `uv tool install` for system-level Python tooling                          |
-| `prek`           | nixpkgs                 | system-wide Git hook manager binary (invoked by managed shell/apply hooks) |
-| `python` / `pip` | **banned**              | no permitted system use; all Python via devShell or uv venv                |
+| Tool             | Installed by                                        | Permitted system use                                                       |
+| ---------------- | --------------------------------------------------- | -------------------------------------------------------------------------- |
+| `bun`            | nixpkgs / `Oven-sh.Bun`                             | `bun add -g` for global Node/JS system packages                            |
+| `cargo`          | POSIX: `nixpkgs pkgs.cargo` / Windows: via `rustup` | `cargo-binstall` / `cargo install` for system Rust binary installs         |
+| `rustup`         | Windows only: `Rust.Rustup` (WinGet)                | manages per-project toolchains via `rust-toolchain.toml`; default = `none` |
+| `uv`             | nixpkgs / WinGet                                    | `uv tool install` for system-level Python tooling                          |
+| `prek`           | nixpkgs                                             | system-wide Git hook manager binary (invoked by managed shell/apply hooks) |
+| `python` / `pip` | **banned**                                          | no permitted system use; all Python via devShell or uv venv                |
 
 Direct developer invocation of any of the above in an interactive shell session
 must go through a **managed development environment** rather than the raw

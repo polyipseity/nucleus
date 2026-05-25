@@ -21,6 +21,7 @@ let
   buildToolsPolicyText = builtins.readFile ../../.agents/instructions/build-tools-policy.instructions.md;
   cargoBinstallSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-CargoBinstallSetup.ps1;
   ciWorkflowText = builtins.readFile ../../.github/workflows/ci.yml;
+  coreNixText = builtins.readFile ../../src/modules/core.nix;
   posixAgentsText = builtins.readFile ../../src/modules/agents.nix;
   posixPwshText = builtins.readFile ../../src/modules/pwsh.nix;
   posixShellText = builtins.readFile ../../src/modules/shell.nix;
@@ -112,10 +113,19 @@ let
       )
       "shell.nix must define NUCLEUS_LIBICONV_LIB and set LIBRARY_PATH in the fallback for macOS cargo/rustc builds";
 
-  # Verify that installRustupToolchains sets the global default to none so
-  # every project must declare its toolchain explicitly via rust-toolchain.toml
-  # or a +channel override, preventing opaque global defaults.
-  test_posix_rustup_sets_default_stable = assert' (lib.hasInfix "rustup default none" posixAgentsText) "agents.nix installRustupToolchains must call 'rustup default none' after toolchain convergence";
+  # Verify that POSIX hosts install cargo from nixpkgs directly (pkgs.cargo),
+  # NOT via rustup.  rustup is Windows-only; on POSIX, Nix provides cargo for
+  # system package management (cargo-binstall, cargo install).  The
+  # installRustupToolchains hook must be absent from agents.nix to prevent
+  # accidental reimplementation.
+  test_posix_rustup_sets_default_stable =
+    assert'
+      (
+        (lib.hasInfix "pkgs.cargo" coreNixText)
+        && !(lib.hasInfix "pkgs.rustup" coreNixText)
+        && !(lib.hasInfix "installRustupToolchains" posixAgentsText)
+      )
+      "POSIX hosts must use pkgs.cargo from nixpkgs (not pkgs.rustup) and agents.nix must not contain installRustupToolchains";
 
   # Same guard for the Windows equivalent.
   test_windows_rustup_sets_default_stable = assert' (lib.hasInfix "rustup default none" rustupSetupText) "Invoke-RustupSetup.ps1 must call 'rustup default none' after toolchain convergence";
@@ -172,7 +182,7 @@ in
     "8: Windows managed block prepends user-scope bin dirs unconditionally"
     "9: POSIX zsh probes tool availability in direnv context before routing"
     "10: POSIX zsh fallback sets LIBRARY_PATH for macOS libiconv (cargo/rustc builds)"
-    "11: POSIX installRustupToolchains calls rustup default none"
+    "11: POSIX hosts use pkgs.cargo from nixpkgs (not pkgs.rustup)"
     "12: Windows Invoke-RustupSetup calls rustup default none"
     "13: POSIX cargo convergence prunes both cargo install and cargo-binstall packages"
     "14: Windows cargo convergence prunes both cargo install and cargo-binstall packages"

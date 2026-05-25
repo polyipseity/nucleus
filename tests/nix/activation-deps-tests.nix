@@ -328,15 +328,6 @@ let
       )
       "installCargoBinstallPackages activation name must match between agents.nix and macos.nix dependency list";
 
-  # === TEST: installRustupToolchains activation name aligned across modules ===
-  test_install_rustup_toolchains_dependency_name_alignment =
-    assert'
-      (
-        (lib.hasInfix "installRustupToolchains = lib.hm.dag.entryAfter" agentsModuleText)
-        && (lib.hasInfix "\"installRustupToolchains\"" macosModuleText)
-      )
-      "installCargoBinstallPackages activation name must match between agents.nix and macos.nix dependency list";
-
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -360,7 +351,6 @@ let
     test_spotlight_disables_all_hotkey_slots
     test_spotlight_bootout_is_sip_aware
     test_install_cargo_binstall_dependency_name_alignment
-    test_install_rustup_toolchains_dependency_name_alignment
   ];
 in
 {
@@ -389,6 +379,5 @@ in
     "19: Spotlight disables all known launcher hotkey slots"
     "20: Spotlight bootout warning is SIP-aware and classified"
     "21: installCargoBinstallPackages activation name alignment"
-    "22: installRustupToolchains activation name alignment"
   ];
 }

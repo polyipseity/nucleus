@@ -533,127 +533,6 @@ in
     '';
 
     # -------------------------------------------------------------------------
-    # installRustupToolchains
-    # Converges the declarative rustup toolchain set (install + zap).
-    #
-    # Queries `rustup toolchain list`, extracts the channel prefix from each
-    # installed toolchain name, and removes any whose channel is not in the
-    # desired list (zap-style).  Installs desired channels not currently present.
-    #
-    # Mirrors homebrew cleanup = "zap": removes anything installed but absent
-    # from the declared desired set, regardless of when or how it was installed.
-    #
-    # Why after linkGeneration: rustup is provided by pkgs.rustup in core.nix
-    # (baseSharedPackages) and becomes available once the Home Manager profile
-    # is linked.  This activation is independent of agents/bun/uv setup.
-    # -------------------------------------------------------------------------
-    installRustupToolchains = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      set -eu
-
-      # Declarative desired toolchain channels.  Add a channel name here to
-      # install it; remove it to trigger removal on the next apply.  Use the
-      # short channel name without the host triple (rustup appends it
-      # automatically when installing).
-      _irt_desired="$(mktemp)"
-      printf '%s\n' \
-        'stable' \
-        > "$_irt_desired"
-
-      # Guard: rustup is provided by pkgs.rustup in baseSharedPackages.  If
-      # not on PATH after linkGeneration something is wrong with the Nix
-      # profile; log and skip rather than failing the whole activation.
-      if ! command -v rustup >/dev/null 2>&1; then
-        echo "rustup: rustup not found in PATH after linkGeneration; skipping toolchain management"
-        rm -f "$_irt_desired"
-      else
-        # Get actually installed toolchains.  `rustup toolchain list` emits
-        # lines like "stable-aarch64-apple-darwin (default)" or just the full
-        # toolchain name.  The first whitespace-delimited token is the name.
-        _irt_installed="$(mktemp)"
-        # || true is intentional: if rustup toolchain list fails (e.g. rustup
-        # is freshly installed with no toolchains yet), the installed set is
-        # treated as empty — safe because desired channels will be installed.
-        rustup toolchain list 2>/dev/null | ${pkgs.gawk}/bin/awk '{print $1}' > "$_irt_installed" || true
-
-        # Extract the channel prefix from each installed toolchain name and
-        # collect all channel names.  Pattern: <channel>[-<host-triple>]
-        #   stable-aarch64-apple-darwin  → stable
-        #   nightly-2024-01-01-aarch64-… → nightly (longest suffix from first -)
-        #   1.75.0-aarch64-apple-darwin  → 1.75.0
-        # ''${var%%-*} removes the longest suffix matching -* (everything from
-        # the first dash onward).
-        _irt_channels="$(mktemp)"
-        while IFS= read -r _irt_tc; do
-          [ -z "$_irt_tc" ] && continue
-          _irt_channel="''${_irt_tc%%-*}"
-          printf '%s\n' "$_irt_channel" >> "$_irt_channels"
-        done < "$_irt_installed"
-
-        # Toolchains whose channel is not desired: zap-style removal.
-        _irt_to_remove="$(mktemp)"
-        while IFS= read -r _irt_tc; do
-          [ -z "$_irt_tc" ] && continue
-          _irt_channel="''${_irt_tc%%-*}"
-          if ! grep -qxF "$_irt_channel" "$_irt_desired"; then
-            printf '%s\n' "$_irt_tc" >> "$_irt_to_remove"
-          fi
-        done < "$_irt_installed"
-
-        # Desired channels not currently installed (channel absent from all
-        # installed toolchain names).
-        _irt_to_install="$(mktemp)"
-        while IFS= read -r _irt_channel; do
-          [ -z "$_irt_channel" ] && continue
-          if ! grep -qxF "$_irt_channel" "$_irt_channels"; then
-            printf '%s\n' "$_irt_channel" >> "$_irt_to_install"
-          fi
-        done < "$_irt_desired"
-
-        # Remove toolchains whose channel is not in the desired list.
-        while IFS= read -r _irt_tc; do
-          [ -z "$_irt_tc" ] && continue
-          echo "rustup: removing toolchain '$_irt_tc'"
-          if ! rustup toolchain remove "$_irt_tc"; then
-            echo "rustup: 'rustup toolchain remove $_irt_tc' failed" >&2
-            rm -f "$_irt_desired" "$_irt_installed" "$_irt_channels" "$_irt_to_remove" "$_irt_to_install"
-            exit 1
-          fi
-          echo "rustup: '$_irt_tc' removed"
-        done < "$_irt_to_remove"
-
-        # Install desired channels not currently present.
-        while IFS= read -r _irt_channel; do
-          [ -z "$_irt_channel" ] && continue
-          echo "rustup: installing toolchain '$_irt_channel'"
-          if ! rustup toolchain install "$_irt_channel"; then
-            echo "rustup: 'rustup toolchain install $_irt_channel' failed" >&2
-            rm -f "$_irt_desired" "$_irt_installed" "$_irt_channels" "$_irt_to_remove" "$_irt_to_install"
-            exit 1
-          fi
-          echo "rustup: '$_irt_channel' installed"
-        done < "$_irt_to_install"
-
-        if [ ! -s "$_irt_to_remove" ] && [ ! -s "$_irt_to_install" ]; then
-          echo "rustup: all managed toolchains already converged — skipping"
-        fi
-
-        # Set the global default toolchain to none so every project must declare
-        # its toolchain explicitly via rust-toolchain.toml or a +channel override.
-        # WHY: a global default channel silently masks missing per-project
-        # toolchain files and makes the effective compiler version opaque.
-        # `rustup default none` is idempotent.
-        if ! rustup default none; then
-          echo "rustup: 'rustup default none' failed" >&2
-          rm -f "$_irt_desired" "$_irt_installed" "$_irt_channels" "$_irt_to_remove" "$_irt_to_install"
-          exit 1
-        fi
-        echo "rustup: global default toolchain set to none"
-
-        rm -f "$_irt_desired" "$_irt_installed" "$_irt_channels" "$_irt_to_remove" "$_irt_to_install"
-      fi
-    '';
-
-    # -------------------------------------------------------------------------
     # installCargoBinstallPackages
     # Converges the declarative cargo-binstall package set (install + zap).
     #
@@ -666,11 +545,12 @@ in
     # Mirrors homebrew cleanup = "zap": removes anything installed but absent
     # from the declared desired set, regardless of how it was installed.
     #
-    # Why after installRustupToolchains: cargo is provided by the rustup stable
-    # toolchain.  installRustupToolchains must run first to ensure `cargo
-    # install --list` is available via the Nix-managed rustup.
+    # Why after linkGeneration: cargo is provided by pkgs.cargo in
+    # baseSharedPackages (core.nix) and becomes available once the Home Manager
+    # profile is linked.  Rust toolchain management (rustup) is Windows-only;
+    # on POSIX, Nix provides cargo directly for system package operations.
     # -------------------------------------------------------------------------
-    installCargoBinstallPackages = lib.hm.dag.entryAfter [ "installRustupToolchains" ] ''
+    installCargoBinstallPackages = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
 
       # Declarative desired-state list.  On POSIX hosts this list is

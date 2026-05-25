@@ -342,7 +342,6 @@ let
     "installCargoBinstallPackages"
     "installPackages"
     "installPwshScriptAnalyzer"
-    "installRustupToolchains"
     "installUvTools"
     "linkGeneration"
     "onFilesChange"
