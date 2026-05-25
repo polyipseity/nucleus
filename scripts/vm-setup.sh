@@ -72,7 +72,18 @@ done
 # Auto-detect QEMU accelerator for this host platform.
 if [ -z "$accelerator" ]; then
   case "$(uname -s)" in
-    Darwin) accelerator='hvf' ;;
+    Darwin)
+      if [ "$(uname -m)" = "arm64" ]; then
+        # WHY: Hypervisor.framework on Apple Silicon (arm64) only accelerates
+        # AArch64 guests; qemu-system-x86_64 -accel hvf fails immediately with
+        # "invalid accelerator hvf".  Windows x86_64 builds must use software
+        # emulation (tcg) instead — slow but correct.  macOS guests use Tart
+        # (Virtualization.framework) independently of this accelerator setting.
+        accelerator='tcg'
+      else
+        accelerator='hvf'
+      fi
+      ;;
     Linux)  accelerator='kvm' ;;
     *)      accelerator='tcg' ;;
   esac

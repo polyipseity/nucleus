@@ -171,6 +171,27 @@ test_bootstrap_direnv_scope() {
 echo "Testing shell scripts for correctness and best practices..."
 echo ""
 
+# Test scripts/vm-setup.sh
+VM_SETUP_SH="scripts/vm-setup.sh"
+if [[ -f "$VM_SETUP_SH" ]]; then
+    test_bash_syntax "$VM_SETUP_SH"
+    test_has_shebang "$VM_SETUP_SH"
+    test_is_executable "$VM_SETUP_SH"
+    test_error_handling "$VM_SETUP_SH"
+    test_has_documentation "$VM_SETUP_SH"
+
+    # Verify Apple Silicon arm64 tcg fallback: HVF on arm64 macOS only
+    # accelerates AArch64 guests; x86_64 Windows QEMU builds must use tcg.
+    # Without this fix, qemu-system-x86_64 -accel hvf fails with
+    # "invalid accelerator hvf" on Apple Silicon.
+    if grep -q 'arm64' "$VM_SETUP_SH" && grep -q "accelerator='tcg'" "$VM_SETUP_SH"; then
+        assert_pass "arm64 tcg fallback present: $(basename "$VM_SETUP_SH")"
+    else
+        assert_fail "arm64 tcg fallback present: $(basename "$VM_SETUP_SH")" \
+            "Missing Apple Silicon tcg fallback for x86_64 QEMU builds"
+    fi
+fi
+
 # Test scripts/apply.sh
 APPLY_SH="scripts/apply.sh"
 if [[ -f "$APPLY_SH" ]]; then
