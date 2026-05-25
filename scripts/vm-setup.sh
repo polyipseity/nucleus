@@ -178,6 +178,47 @@ build_nixos_image() {
   printf 'vm-setup: NixOS image ready: %s\n' "$_out"
 }
 
+# fetch_windows_iso_url — Attempt to fetch a Windows 11 ISO direct download URL
+#   using Microsoft's software-download API (same technique as Rufus/Fido).
+#   Prints the URL to stdout on success; exits non-zero with no output on any
+#   failure (network error, API change, rate limit, etc.).
+#   Source: https://github.com/pbatard/fido
+fetch_windows_iso_url() {
+  _ua='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+  _base='https://www.microsoft.com/en-us/api/controls/contentinclude/html'
+  _page_id='a224afab-2097-4dfa-a2ba-463eb191a285'
+
+  # Fetch the Windows 11 download page to extract the session ID.
+  _page="$(curl -sf --max-time 20 -A "$_ua" \
+    'https://www.microsoft.com/en-us/software-download/windows11')" || return 1
+
+  # Extract the 36-char UUID session ID embedded in download page links.
+  _session="$(printf '%s' "$_page" | grep -o 'sessionId=[0-9a-f-]\{36\}' | head -1 | cut -d= -f2)"
+  [ -n "$_session" ] || return 1
+
+  # Extract the first Windows 11 productEditionId from <option> elements.
+  _prod_id="$(printf '%s' "$_page" | grep -o 'value="[0-9]*">[^<]*Windows 11' | head -1 | grep -o '[0-9]*' | head -1)"
+  [ -n "$_prod_id" ] || return 1
+
+  # Get the SKU list for this product edition.
+  _sku_resp="$(curl -sf --max-time 20 -A "$_ua" \
+    "${_base}?pageId=${_page_id}&host=www.microsoft.com&segments=software-download,windows11&query=&action=getskuinformationbyproductedition&sessionId=${_session}&productEditionId=${_prod_id}&sdVersion=2")" || return 1
+
+  # Extract the English SKU ID from the JSON response.
+  _sku_id="$(printf '%s' "$_sku_resp" | grep -o '"Id":[0-9]*,"Language":"English"' | head -1 | grep -o '[0-9]*' | head -1)"
+  [ -n "$_sku_id" ] || return 1
+
+  # Get the time-limited download links for this SKU.
+  _link_resp="$(curl -sf --max-time 20 -A "$_ua" \
+    "${_base}?pageId=${_page_id}&host=www.microsoft.com&segments=software-download,windows11&query=&action=GetProductDownloadLinksBySku&sessionId=${_session}&skuId=${_sku_id}&language=English&sdVersion=2")" || return 1
+
+  # Extract the first x64 ISO URL from the response HTML.
+  _url="$(printf '%s' "$_link_resp" | grep -o 'https://[^"]*x64[^"]*\.iso[^"]*' | head -1)"
+  [ -n "$_url" ] || return 1
+
+  printf '%s' "$_url"
+}
+
 # build_windows_image NAME DISK_GIB
 #   Builds the Windows 11 guest image using Packer and the Autounattend.xml
 #   answer file at vms/windows/Autounattend.xml.
@@ -215,6 +256,40 @@ build_windows_image() {
           printf 'vm-setup: [dry-run] curl -fL -o %s %s\n' "$_cached_iso" "$_iso_url"
         fi
       fi
+    fi
+  fi
+
+  # If still no ISO resolved, attempt Fido-style dynamic URL fetching.
+  # Gracefully skips on any network or API failure so the build never
+  # aborts solely because auto-fetch is unavailable.
+  if [ -z "$_iso" ]; then
+    printf 'vm-setup: attempting automatic Windows ISO fetch (Fido-style)...\n'
+    if [ "$dry_run" = false ]; then
+      # Suppress fetch stderr: failures are expected (API change, network, rate
+      # limit, etc.) and handled by the empty-URL check below.  WHY: this is an
+      # optional probe; the user sees the explicit manual-download error below if
+      # auto-fetch fails.
+      _fetched_url="$(fetch_windows_iso_url 2>/dev/null)" || _fetched_url=''
+      if [ -n "$_fetched_url" ]; then
+        _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
+        if [ -f "$_cached_iso" ]; then
+          printf 'vm-setup: using cached Windows installer: %s\n' "$_cached_iso"
+          _iso="$_cached_iso"
+        else
+          printf 'vm-setup: downloading Windows ISO from Microsoft...\n'
+          if curl -fL -o "$_cached_iso" "$_fetched_url"; then
+            _iso="$_cached_iso"
+            printf 'vm-setup: Windows ISO downloaded: %s\n' "$_cached_iso"
+          else
+            printf 'vm-setup: automatic ISO download failed; removing partial file\n' >&2
+            rm -f "$_cached_iso"
+          fi
+        fi
+      else
+        printf 'vm-setup: automatic ISO fetch skipped (API unavailable or changed)\n'
+      fi
+    else
+      printf 'vm-setup: [dry-run] would attempt Fido-style automatic Windows ISO fetch\n'
     fi
   fi
 
