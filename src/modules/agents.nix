@@ -461,8 +461,9 @@ in
     # Idempotently converges the declarative uv tool set (install + prune).
     #
     # Maintains a managed set of Python CLI tools installed via `uv tool install`.
-    # On each apply it compares the desired list against a per-user manifest at
-    # ~/.config/nucleus/uv-tools.json, installs additions, and removes deletions.
+    # On each apply it queries `uv tool list` for the actually installed set,
+    # removes anything installed but absent from the desired list (zap-style),
+    # and installs any desired tools that are missing.
     #
     # Only tools absent from nixpkgs, cargo-binstall, and bun are managed here
     # (install preference: nixpkgs > cargo binstall > bun > uv).
@@ -470,7 +471,6 @@ in
     installUvTools = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
       set -eu
 
-      _iut_jq_bin='${pkgs.jq}/bin/jq'
       _iut_uv_bin='${pkgs.uv}/bin/uv'
 
       # Declarative desired-state list.  One tool per line.
@@ -478,37 +478,35 @@ in
       # uninstall on the next apply.  Only add tools absent from nixpkgs and
       # cargo-binstall and bun (install preference: nixpkgs > cargo binstall > bun > uv).
       _iut_desired="$(mktemp)"
-      # Empty file; no tools managed yet.  Add printf '%s\n' lines as needed.
+      # No uv-managed tools yet.  Add printf '%s\n' lines as needed.
       : > "$_iut_desired"
-      # No uv-managed tools yet.  Add entries here as needed.
 
-      _iut_manifest="$HOME/.config/nucleus/uv-tools.json"
-      _iut_manifest_dir="$(dirname "$_iut_manifest")"
+      # Get actually installed uv tools from `uv tool list` (zap-style: remove
+      # any installed tool absent from the desired list, regardless of prior
+      # managed state).  `uv tool list` emits "name vX.Y.Z" on non-indented
+      # lines; the first field is the package name.
+      _iut_installed="$(mktemp)"
+      # || true is intentional and benign: if uv tool list fails (e.g. no tool
+      # environment is initialised yet), the installed set is treated as empty
+      # and nothing is erroneously removed.
+      "$_iut_uv_bin" tool list 2>/dev/null | awk '/^[^ \t]/{print $1}' > "$_iut_installed" || true
 
-      # Read the previously-managed tool list.  An absent or malformed manifest
-      # (first run) is treated as an empty set so all desired tools become
-      # additions.  || true is intentional: malformed manifest → empty previous
-      # set is safe (desired tools install; nothing is removed).
-      _iut_previous="$(mktemp)"
-      if [ -f "$_iut_manifest" ]; then
-        "$_iut_jq_bin" -r '.[]?' "$_iut_manifest" > "$_iut_previous" || true
-      fi
-
-      # Tools no longer desired: present in the previous manifest but absent
-      # from the desired list.
+      # Tools installed but not desired: zap-style removal.
+      # Mirrors homebrew cleanup = "zap": removes anything installed but absent
+      # from the declared desired set, regardless of how it was installed.
       _iut_to_remove="$(mktemp)"
       while IFS= read -r _iut_tool; do
         [ -z "$_iut_tool" ] && continue
         if ! grep -qxF "$_iut_tool" "$_iut_desired"; then
           printf '%s\n' "$_iut_tool" >> "$_iut_to_remove"
         fi
-      done < "$_iut_previous"
+      done < "$_iut_installed"
 
-      # Desired tools not yet installed (binary absent from ~/.local/bin).
+      # Desired tools not yet installed according to `uv tool list`.
       _iut_to_install="$(mktemp)"
       while IFS= read -r _iut_tool; do
         [ -z "$_iut_tool" ] && continue
-        if [ ! -x "$HOME/.local/bin/$_iut_tool" ]; then
+        if ! grep -qxF "$_iut_tool" "$_iut_installed"; then
           printf '%s\n' "$_iut_tool" >> "$_iut_to_install"
         fi
       done < "$_iut_desired"

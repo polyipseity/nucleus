@@ -15,9 +15,9 @@ function Invoke-UvSetup {
 
   .DESCRIPTION
     Maintains a managed set of Python CLI tools installed via `uv tool install`.
-    On each apply it computes the diff between the desired package list and a
-    per-user manifest at %USERPROFILE%\.config\nucleus\uv-tools.json, installs
-    additions via `uv tool install`, and removes deletions via `uv tool uninstall`.
+    On each apply it queries `uv tool list` for the actually installed set,
+    removes anything installed but absent from the desired list (zap-style),
+    and installs any desired tools that are missing.
 
     Requires uv to be on PATH (installed from WinGet by system.dsc.yml).
     Prepends %USERPROFILE%\.local\bin to PATH internally so uv-installed
@@ -39,8 +39,6 @@ function Invoke-UvSetup {
 
   # uv tool install places binaries in ~\.local\bin by default (UV_TOOL_BIN_DIR).
   $uvBinDir = Join-Path $HOME ".local\bin"
-  $manifestPath = Join-Path $HOME ".config\nucleus\uv-tools.json"
-  $manifestDir = Split-Path $manifestPath -Parent
 
   # Guard: uv must be accessible after WinGet DSC has installed astral-sh.uv.
   if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
@@ -56,32 +54,23 @@ function Invoke-UvSetup {
     $env:PATH = "$uvBinDir;$env:PATH"
   }
 
-  # Read the previously-managed package list.  An absent or malformed manifest
-  # (first run) is treated as an empty set so all desired packages become
-  # additions and nothing is pruned unexpectedly.
-  $previousPackages = @()
-  if (Test-Path $manifestPath) {
-    try {
-      $parsed = Get-Content -Path $manifestPath -Raw | ConvertFrom-Json
-      if ($null -ne $parsed) {
-        $previousPackages = @($parsed)
-      }
-    }
-    catch {
-      Write-Warning "Invoke-UvSetup: manifest at '$manifestPath' could not be parsed; treating as empty"
-    }
-  }
+  # Get actually installed uv tools from `uv tool list` (zap-style: remove
+  # any installed tool absent from the desired list, regardless of prior
+  # managed state).  `uv tool list` emits lines of the form "name vX.Y.Z";
+  # non-indented lines are tool entries.
+  $uvListOutput = @(uv tool list 2>&1 | Where-Object { $_ -match '^\S' -and $_ -match '\S' })
+  $installedTools = @($uvListOutput | ForEach-Object { ($_ -split '\s+')[0] })
 
-  # Packages no longer desired: present in the previous manifest but absent
-  # from the desired list.
-  $toRemove = @($previousPackages | Where-Object { $desiredPackages -notcontains $_ })
+  # Tools installed but not desired: zap-style removal.
+  # Mirrors homebrew cleanup = "zap": removes anything installed but absent
+  # from the declared desired set, regardless of how it was installed.
+  $toRemove = @($installedTools | Where-Object { $desiredPackages -notcontains $_ })
 
-  # Desired packages whose binary is absent from ~\.local\bin.
+  # Desired tools not yet installed.  uv tool install uses the package name
+  # as the binary name by default; fall back to binary-presence check.
   $toInstall = @($desiredPackages | Where-Object {
     $pkg = $_
-    # uv tool install uses the package name as the binary name by default.
-    -not (Test-Path (Join-Path $uvBinDir "$pkg.exe")) -and
-    -not (Test-Path (Join-Path $uvBinDir $pkg))
+    $installedTools -notcontains $pkg
   })
 
   # Prune packages removed from the desired list.
@@ -110,9 +99,4 @@ function Invoke-UvSetup {
     Write-Output "uv: all managed tools already converged — skipping"
   }
 
-  # Persist the new desired set so the next apply can detect future removals.
-  if (-not (Test-Path $manifestDir)) {
-    New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
-  }
-  $desiredPackages | ConvertTo-Json -Compress | Set-Content -Path $manifestPath -Encoding UTF8
 }
