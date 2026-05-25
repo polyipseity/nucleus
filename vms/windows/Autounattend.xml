@@ -200,33 +200,45 @@
       <!-- Enable WinRM so Packer can connect after Windows boots.
            Commands run synchronously at first logon before the desktop appears. -->
       <FirstLogonCommands>
+        <!-- Scan all CD-ROM drives for VirtIO drivers and install any found.
+             Runs before WinRM is configured so drivers are ready if the image
+             is attached with a VirtIO disk interface.  Works when virtio-win.iso
+             is attached as a secondary CD by vm-setup (via secondary_iso_images
+             in packer.pkr.hcl); the Packer PowerShell provisioner downloads and
+             installs drivers as a fallback when no secondary CD is present.
+             Source: https://fedorapeople.org/groups/virt/virtio-win/ -->
         <SynchronousCommand wcm:action="add">
           <Order>1</Order>
-          <CommandLine>cmd /c winrm quickconfig -q</CommandLine>
+          <CommandLine>cmd /c powershell -NonInteractive -Command "Get-Volume | Where-Object {$_.DriveType -eq 'CD-ROM'} | ForEach-Object { $d = $_.DriveLetter + ':'; if (Test-Path ($d + '\viostor\w11\amd64')) { pnputil /add-driver ($d + '\viostor\w11\amd64\*.inf') /install; pnputil /add-driver ($d + '\NetKVM\w11\amd64\*.inf') /install; pnputil /add-driver ($d + '\Balloon\w11\amd64\*.inf') /install } }" 2&gt;&amp;1 &gt;nul</CommandLine>
           <RequiresUserInput>false</RequiresUserInput>
         </SynchronousCommand>
         <SynchronousCommand wcm:action="add">
           <Order>2</Order>
-          <CommandLine>cmd /c winrm set winrm/config/winrs @{MaxMemoryPerShellMB="512"}</CommandLine>
+          <CommandLine>cmd /c winrm quickconfig -q</CommandLine>
           <RequiresUserInput>false</RequiresUserInput>
         </SynchronousCommand>
         <SynchronousCommand wcm:action="add">
           <Order>3</Order>
-          <CommandLine>cmd /c winrm set winrm/config @{MaxTimeoutms="1800000"}</CommandLine>
+          <CommandLine>cmd /c winrm set winrm/config/winrs @{MaxMemoryPerShellMB="512"}</CommandLine>
           <RequiresUserInput>false</RequiresUserInput>
         </SynchronousCommand>
         <SynchronousCommand wcm:action="add">
           <Order>4</Order>
-          <CommandLine>cmd /c winrm set winrm/config/service @{AllowUnencrypted="true"}</CommandLine>
+          <CommandLine>cmd /c winrm set winrm/config @{MaxTimeoutms="1800000"}</CommandLine>
           <RequiresUserInput>false</RequiresUserInput>
         </SynchronousCommand>
         <SynchronousCommand wcm:action="add">
           <Order>5</Order>
-          <CommandLine>cmd /c winrm set winrm/config/service/auth @{Basic="true"}</CommandLine>
+          <CommandLine>cmd /c winrm set winrm/config/service @{AllowUnencrypted="true"}</CommandLine>
           <RequiresUserInput>false</RequiresUserInput>
         </SynchronousCommand>
         <SynchronousCommand wcm:action="add">
           <Order>6</Order>
+          <CommandLine>cmd /c winrm set winrm/config/service/auth @{Basic="true"}</CommandLine>
+          <RequiresUserInput>false</RequiresUserInput>
+        </SynchronousCommand>
+        <SynchronousCommand wcm:action="add">
+          <Order>7</Order>
           <CommandLine>cmd /c netsh advfirewall firewall set rule group="windows remote management" new enable=yes</CommandLine>
           <RequiresUserInput>false</RequiresUserInput>
         </SynchronousCommand>

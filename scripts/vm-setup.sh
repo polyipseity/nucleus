@@ -23,10 +23,11 @@
 #   VM_DIR_OVERRIDE  override the default ~/virtual machines path
 #
 # Prerequisites:
-#   NixOS guest  : nix (for nix run github:nix-community/nixos-generators).
-#   Windows guest: packer (installed via pkgs.packer), QEMU, Windows 11 ISO.
-#   macOS        : UTM installed (/Applications/UTM.app); qemu-img in PATH.
-#   NixOS        : libvirtd enabled (vms.nix); qemu-img and virsh in PATH.
+#   NixOS guest    : nix (for nix run github:nix-community/nixos-generators).
+#   Windows guest  : packer (pkgs.packer), QEMU, ISO auto-fetched via Fido.
+#   macOS guest    : tart (brew install cirruslabs/cli/tart), packer; macOS host only.
+#   macOS host     : UTM installed (/Applications/UTM.app); qemu-img in PATH.
+#   NixOS host     : libvirtd enabled (vms.nix); qemu-img and virsh in PATH.
 #
 # Exit: always 0 (best-effort — a VM setup failure does not roll back a
 #       completed system apply).
@@ -36,6 +37,8 @@
 #
 # Source: https://github.com/nix-community/nixos-generators
 #         https://developer.hashicorp.com/packer/plugins/builders/qemu
+#         https://github.com/cirruslabs/packer-plugin-tart
+#         https://github.com/pbatard/Fido
 
 set -eu
 
@@ -178,45 +181,60 @@ build_nixos_image() {
   printf 'vm-setup: NixOS image ready: %s\n' "$_out"
 }
 
-# fetch_windows_iso_url — Attempt to fetch a Windows 11 ISO direct download URL
-#   using Microsoft's software-download API (same technique as Rufus/Fido).
-#   Prints the URL to stdout on success; exits non-zero with no output on any
-#   failure (network error, API change, rate limit, etc.).
-#   Source: https://github.com/pbatard/fido
-fetch_windows_iso_url() {
-  _ua='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-  _base='https://www.microsoft.com/en-us/api/controls/contentinclude/html'
-  _page_id='a224afab-2097-4dfa-a2ba-463eb191a285'
+# download_windows_iso_fido CACHED_ISO EDITION
+#   Downloads a Windows 11 ISO using vendor/Fido/Fido.ps1 (the same engine
+#   that drives Rufus download automation).  Moves the downloaded ISO to
+#   CACHED_ISO on success; returns 0 on success, 1 on failure.
+#   Requires pwsh (PowerShell Core) in PATH.
+#   Source: https://github.com/pbatard/Fido
+download_windows_iso_fido() {
+  _fido_cached="$1"
+  _fido_edition="${2:-Pro}"
 
-  # Fetch the Windows 11 download page to extract the session ID.
-  _page="$(curl -sf --max-time 20 -A "$_ua" \
-    'https://www.microsoft.com/en-us/software-download/windows11')" || return 1
+  _fido_script="$REPO_ROOT/vendor/Fido/Fido.ps1"
+  if [ ! -f "$_fido_script" ]; then
+    printf 'vm-setup: Fido.ps1 not found; run: git submodule update --init vendor/Fido\n' >&2
+    return 1
+  fi
 
-  # Extract the 36-char UUID session ID embedded in download page links.
-  _session="$(printf '%s' "$_page" | grep -o 'sessionId=[0-9a-f-]\{36\}' | head -1 | cut -d= -f2)"
-  [ -n "$_session" ] || return 1
+  if ! command -v pwsh >/dev/null 2>&1; then
+    printf 'vm-setup: pwsh not found; cannot use Fido for ISO auto-download\n'
+    return 1
+  fi
 
-  # Extract the first Windows 11 productEditionId from <option> elements.
-  _prod_id="$(printf '%s' "$_page" | grep -o 'value="[0-9]*">[^<]*Windows 11' | head -1 | grep -o '[0-9]*' | head -1)"
-  [ -n "$_prod_id" ] || return 1
+  printf 'vm-setup: downloading Windows 11 ISO via Fido (edition=%s)...\n' "$_fido_edition"
+  # Run Fido in a temp dir so it downloads the ISO to a known location.
+  # Fido.ps1 downloads to the working directory and returns the filename.
+  # Source: https://github.com/pbatard/Fido#usage
+  _fido_tmp="$(mktemp -d)"
+  _fido_status=0
+  (
+    cd "$_fido_tmp"
+    pwsh -NonInteractive -ExecutionPolicy Bypass \
+      -File "$_fido_script" \
+      -Win 11 -Ed "$_fido_edition" -Lang English -Arch x64 \
+      -Download -NoPrompt
+  ) || _fido_status=$?
 
-  # Get the SKU list for this product edition.
-  _sku_resp="$(curl -sf --max-time 20 -A "$_ua" \
-    "${_base}?pageId=${_page_id}&host=www.microsoft.com&segments=software-download,windows11&query=&action=getskuinformationbyproductedition&sessionId=${_session}&productEditionId=${_prod_id}&sdVersion=2")" || return 1
+  if [ "$_fido_status" -ne 0 ]; then
+    printf 'vm-setup: Fido exited with code %s\n' "$_fido_status" >&2
+    rm -rf "$_fido_tmp"
+    return 1
+  fi
 
-  # Extract the English SKU ID from the JSON response.
-  _sku_id="$(printf '%s' "$_sku_resp" | grep -o '"Id":[0-9]*,"Language":"English"' | head -1 | grep -o '[0-9]*' | head -1)"
-  [ -n "$_sku_id" ] || return 1
+  # Use find rather than ls to safely handle any filename; Fido downloads one
+  # ISO so sort-by-time is unnecessary.
+  _fido_iso="$(find "$_fido_tmp" -maxdepth 1 -name '*.iso' | head -1)"
+  if [ -z "$_fido_iso" ]; then
+    printf 'vm-setup: Fido: no ISO found in temp dir after download\n' >&2
+    rm -rf "$_fido_tmp"
+    return 1
+  fi
 
-  # Get the time-limited download links for this SKU.
-  _link_resp="$(curl -sf --max-time 20 -A "$_ua" \
-    "${_base}?pageId=${_page_id}&host=www.microsoft.com&segments=software-download,windows11&query=&action=GetProductDownloadLinksBySku&sessionId=${_session}&skuId=${_sku_id}&language=English&sdVersion=2")" || return 1
-
-  # Extract the first x64 ISO URL from the response HTML.
-  _url="$(printf '%s' "$_link_resp" | grep -o 'https://[^"]*x64[^"]*\.iso[^"]*' | head -1)"
-  [ -n "$_url" ] || return 1
-
-  printf '%s' "$_url"
+  mv "$_fido_iso" "$_fido_cached"
+  rm -rf "$_fido_tmp"
+  printf 'vm-setup: Windows ISO downloaded: %s\n' "$_fido_cached"
+  return 0
 }
 
 # build_windows_image NAME DISK_GIB
@@ -225,6 +243,7 @@ fetch_windows_iso_url() {
 build_windows_image() {
   _name="$1"
   _disk_gib="$2"
+  _edition="${3:-Pro}"
   _out="$IMAGES_DIR/${_name}.qcow2"
 
   if [ -f "$_out" ]; then
@@ -259,37 +278,19 @@ build_windows_image() {
     fi
   fi
 
-  # If still no ISO resolved, attempt Fido-style dynamic URL fetching.
-  # Gracefully skips on any network or API failure so the build never
-  # aborts solely because auto-fetch is unavailable.
+  # If still no ISO resolved, attempt download via vendor/Fido/Fido.ps1.
+  # Silently skips if pwsh or the Fido submodule is unavailable.
   if [ -z "$_iso" ]; then
-    printf 'vm-setup: attempting automatic Windows ISO fetch (Fido-style)...\n'
-    if [ "$dry_run" = false ]; then
-      # Suppress fetch stderr: failures are expected (API change, network, rate
-      # limit, etc.) and handled by the empty-URL check below.  WHY: this is an
-      # optional probe; the user sees the explicit manual-download error below if
-      # auto-fetch fails.
-      _fetched_url="$(fetch_windows_iso_url 2>/dev/null)" || _fetched_url=''
-      if [ -n "$_fetched_url" ]; then
-        _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
-        if [ -f "$_cached_iso" ]; then
-          printf 'vm-setup: using cached Windows installer: %s\n' "$_cached_iso"
-          _iso="$_cached_iso"
-        else
-          printf 'vm-setup: downloading Windows ISO from Microsoft...\n'
-          if curl -fL -o "$_cached_iso" "$_fetched_url"; then
-            _iso="$_cached_iso"
-            printf 'vm-setup: Windows ISO downloaded: %s\n' "$_cached_iso"
-          else
-            printf 'vm-setup: automatic ISO download failed; removing partial file\n' >&2
-            rm -f "$_cached_iso"
-          fi
-        fi
-      else
-        printf 'vm-setup: automatic ISO fetch skipped (API unavailable or changed)\n'
-      fi
+    _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
+    if [ -f "$_cached_iso" ]; then
+      printf 'vm-setup: using cached Windows installer: %s\n' "$_cached_iso"
+      _iso="$_cached_iso"
     else
-      printf 'vm-setup: [dry-run] would attempt Fido-style automatic Windows ISO fetch\n'
+      if [ "$dry_run" = false ]; then
+        download_windows_iso_fido "$_cached_iso" "$_edition" && _iso="$_cached_iso" || true
+      else
+        printf 'vm-setup: [dry-run] would call vendor/Fido/Fido.ps1 -Ed %s to download Windows ISO\n' "$_edition"
+      fi
     fi
   fi
 
@@ -308,6 +309,20 @@ build_windows_image() {
   if ! command -v packer >/dev/null 2>&1; then
     printf 'vm-setup: packer not found; install via nixpkgs (pkgs.packer is in baseSharedPackages)\n' >&2
     return 1
+  fi
+
+  # Pre-download VirtIO drivers ISO so it can be injected into the build via
+  # secondary_iso_images (used by Autounattend.xml FirstLogonCommands).
+  # Falls back to runtime download in the Packer provisioner if this fails.
+  # Source: https://fedorapeople.org/groups/virt/virtio-win/
+  _virtio_iso="$IMAGES_DIR/virtio-win.iso"
+  if [ ! -f "$_virtio_iso" ] && [ "$dry_run" = false ]; then
+    printf 'vm-setup: downloading VirtIO drivers ISO...\n'
+    _virtio_url='https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso'
+    curl -fL -o "$_virtio_iso" "$_virtio_url" || {
+      printf 'vm-setup: VirtIO ISO pre-download failed; Packer provisioner will download at runtime\n' >&2
+      _virtio_iso=''
+    }
   fi
 
   _packer_dir="$VMS_DIR/windows"
@@ -330,6 +345,7 @@ build_windows_image() {
       -var "accelerator=$accelerator" \
       -var "disk_size=${_disk_gib}G" \
       -var "output_directory=$_tmp_out" \
+      ${_virtio_iso:+-var "virtio_win_iso=$_virtio_iso"} \
       .
   )
 
@@ -344,6 +360,68 @@ build_windows_image() {
   printf 'vm-setup: Windows 11 image ready: %s\n' "$_out"
 }
 
+# build_macos_image NAME DISK_GIB RAM_MIB CPUS MACOS_VERSION
+#   Builds the macOS guest VM using the Packer Tart plugin.  Requires tart
+#   and packer to be installed; only runs on Darwin hosts (Tart uses Apple
+#   Virtualization.framework which is not available on other platforms).
+#   The resulting VM is stored in ~/.tart/vms/<name>/ managed by tart.
+#   Source: https://github.com/cirruslabs/packer-plugin-tart
+build_macos_image() {
+  _name="$1"
+  _disk_gib="$2"
+  _ram_mib="$3"
+  _cpus="$4"
+  _macos_version="${5:-sequoia}"
+
+  # Tart requires Apple Virtualization.framework — macOS host only.
+  if [ "$(uname -s)" != "Darwin" ]; then
+    printf 'vm-setup: macOS guest build requires a macOS host (Tart uses Virtualization.framework); skipping\n'
+    return 0
+  fi
+
+  if ! command -v tart >/dev/null 2>&1; then
+    printf 'vm-setup: tart not found; install with: brew install cirruslabs/cli/tart\n' >&2
+    return 1
+  fi
+
+  if ! command -v packer >/dev/null 2>&1; then
+    printf 'vm-setup: packer not found; install via nixpkgs (pkgs.packer)\n' >&2
+    return 1
+  fi
+
+  # Check if tart VM already exists.
+  if tart list 2>/dev/null | awk '{print $1}' | grep -qxF "$_name"; then
+    printf 'vm-setup: tart VM "%s" already exists (delete to rebuild: tart delete %s)\n' "$_name" "$_name"
+    return 0
+  fi
+
+  _packer_dir="$VMS_DIR/macos"
+  _mem_gib="$(( (_ram_mib + 512) / 1024 ))"
+
+  printf 'vm-setup: building macOS %s VM via Packer Tart (disk=%s GiB, mem=%s GiB, cpus=%s)...\n' \
+    "$_macos_version" "$_disk_gib" "$_mem_gib" "$_cpus"
+
+  if [ "$dry_run" = true ]; then
+    printf 'vm-setup: [dry-run] cd %s && packer build -var vm_name=%s -var macos_version=%s -var disk_size_gib=%s -var memory_gib=%s -var cpus=%s .\n' \
+      "$_packer_dir" "$_name" "$_macos_version" "$_disk_gib" "$_mem_gib" "$_cpus"
+    return 0
+  fi
+
+  (
+    cd "$_packer_dir"
+    packer init .
+    packer build \
+      -var "vm_name=$_name" \
+      -var "macos_version=$_macos_version" \
+      -var "disk_size_gib=$_disk_gib" \
+      -var "memory_gib=$_mem_gib" \
+      -var "cpus=$_cpus" \
+      .
+  )
+
+  printf 'vm-setup: macOS VM "%s" built and registered in tart\n' "$_name"
+}
+
 build_images() {
   _count="$(jq '.VMs | length' "$MANIFEST")"
   _i=0
@@ -355,9 +433,15 @@ build_images() {
     if should_include "$_vm_type"; then
       case "$_vm_type" in
         nixos)   build_nixos_image "$_vm_name" ;;
-        windows) build_windows_image "$_vm_name" "$_vm_disk_gib" ;;
+        windows)
+          _vm_edition="$(jq -r ".VMs[$_i].windows_edition // \"Pro\"" "$MANIFEST")"
+          build_windows_image "$_vm_name" "$_vm_disk_gib" "$_vm_edition"
+          ;;
         macos)
-          printf 'vm-setup: macOS image must be obtained manually (licensing restricts automation)\n'
+          _vm_macos_ver="$(jq -r ".VMs[$_i].macos_version // \"sequoia\"" "$MANIFEST")"
+          _vm_ram_mib="$(jq -r ".VMs[$_i].ramMiB" "$MANIFEST")"
+          _vm_cpus="$(jq -r ".VMs[$_i].cpus" "$MANIFEST")"
+          build_macos_image "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver"
           ;;
         *)
           printf 'vm-setup: skipping build for "%s" (unsupported type: %s)\n' \
@@ -410,7 +494,59 @@ CFGEOF
 }
 
 # ---------------------------------------------------------------------------
-# macOS / UTM
+# macOS / Tart (macOS guests)
+# ---------------------------------------------------------------------------
+
+# setup_tart_vms — Phase 2 provisioning for macOS-type VM guests.
+#   The Packer Tart build already registered the VM in tart's store; this
+#   function writes a start script and configure script for each macOS guest.
+#   Source: https://github.com/cirruslabs/tart
+setup_tart_vms() {
+  if ! command -v tart >/dev/null 2>&1; then
+    printf 'vm-setup: tart not found; skipping macOS VM start-script generation\n'
+    return
+  fi
+
+  vm_count=$(jq '.VMs | length' "$MANIFEST")
+  i=0
+  while [ "$i" -lt "$vm_count" ]; do
+    vm_name=$(jq -r ".VMs[$i].name" "$MANIFEST")
+    vm_type=$(jq -r ".VMs[$i].type" "$MANIFEST")
+
+    if [ "$vm_type" != "macos" ] || ! should_include "$vm_type"; then
+      i=$((i + 1))
+      continue
+    fi
+
+    # Verify the tart VM was created in phase 1.
+    if ! tart list 2>/dev/null | awk '{print $1}' | grep -qxF "$vm_name"; then
+      printf 'vm-setup: WARNING — tart VM "%s" not found; Packer build may have failed or was skipped\n' "$vm_name" >&2
+      i=$((i + 1))
+      continue
+    fi
+
+    # Write a simple start script.
+    _tart_start="$VM_DIR/Start-${vm_name}.sh"
+    if [ "$dry_run" = false ]; then
+      cat > "$_tart_start" << TARTEOF
+#!/usr/bin/env sh
+# Start the $vm_name macOS VM managed by tart.
+# Source: https://github.com/cirruslabs/tart
+exec tart run "$vm_name" "\$@"
+TARTEOF
+      chmod +x "$_tart_start"
+      printf 'vm-setup: tart start script: %s\n' "$_tart_start"
+      write_configure_script "$vm_name" "$vm_type"
+    else
+      printf 'vm-setup: [dry-run] write tart start script: %s\n' "$_tart_start"
+    fi
+
+    i=$((i + 1))
+  done
+}
+
+# ---------------------------------------------------------------------------
+# macOS / UTM (NixOS and Windows guests on macOS host)
 # ---------------------------------------------------------------------------
 
 setup_utm_vms() {
@@ -434,6 +570,12 @@ setup_utm_vms() {
     vm_type=$(jq -r ".VMs[$i].type" "$MANIFEST")
 
     if ! should_include "$vm_type"; then
+      i=$((i + 1))
+      continue
+    fi
+
+    # macOS guests are provisioned via tart (setup_tart_vms), not UTM.
+    if [ "$vm_type" = "macos" ]; then
       i=$((i + 1))
       continue
     fi
@@ -590,6 +732,7 @@ printf 'vm-setup: phase 2 \u2014 provisioning VMs...\n'
 _os=$(uname -s)
 case "$_os" in
   Darwin)
+    setup_tart_vms
     setup_utm_vms
     ;;
   Linux)

@@ -17,6 +17,7 @@
 #
 # Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
 #         https://www.qemu.org/docs/master/system/invocation.html
+#         https://github.com/pbatard/Fido
 function Invoke-VMSetup {
     [CmdletBinding()]
     param(
@@ -105,6 +106,8 @@ function Invoke-VMSetup {
                 $isoUrl = if ($null -ne $vm.windowsIsoUrl) { [string]$vm.windowsIsoUrl } else { '' }
                 Invoke-BuildWindowsImage -VmName $vm.name -DiskGiB $vm.diskGiB `
                     -WindowsIso $WindowsIso -WindowsIsoUrl $isoUrl `
+                    -RepoRoot $RepoRoot `
+                    -WindowsEdition ($vm.windows_edition ?? 'Pro') `
                     -Accelerator $Accelerator `
                     -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
             }
@@ -343,55 +346,71 @@ function Invoke-BuildNixosImage {
     Write-Information "vm-setup: NixOS image ready: $outPath"
 }
 
-# Get-WindowsIsoUrl — Attempt to fetch a Windows 11 ISO direct download URL
-# using Microsoft's software-download API (same technique as Rufus/Fido).
-# Returns the URL string on success; returns an empty string when the API is
-# unavailable, rate-limited, or has changed.  All failures are silently
-# swallowed; the caller is responsible for falling back to manual ISO supply.
-# Source: https://github.com/pbatard/fido
-function Get-WindowsIsoUrl {
+# Invoke-FidoWindowsIso — Download a Windows 11 ISO using vendor/Fido/Fido.ps1
+# (the same engine that drives Rufus download automation).  Returns the full
+# path to the downloaded ISO on success or an empty string on failure.
+# Requires the vendor/Fido submodule to be checked out.
+# Source: https://github.com/pbatard/Fido
+function Invoke-FidoWindowsIso {
     [CmdletBinding()]
     [OutputType([string])]
-    param()
+    param(
+        # Absolute path to the repository root (for locating vendor/Fido).
+        [string]$RepoRoot,
+        # Directory where the downloaded ISO will be placed.
+        [string]$ImagesDir,
+        # VM name — used to name the cached ISO file.
+        [string]$VmName,
+        # Windows edition to download (passed to Fido -Ed parameter).
+        [string]$Edition = 'Pro',
+        [switch]$DryRun
+    )
 
-    try {
-        $ua     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        $base   = 'https://www.microsoft.com/en-us/api/controls/contentinclude/html'
-        $pageId = 'a224afab-2097-4dfa-a2ba-463eb191a285'
-
-        # Fetch the Windows 11 download page to extract the session ID.
-        $page = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 20 `
-            -Uri 'https://www.microsoft.com/en-us/software-download/windows11' `
-            -Headers @{ 'User-Agent' = $ua }).Content
-
-        # Extract the 36-char UUID session ID embedded in download page links.
-        if ($page -notmatch 'sessionId=([0-9a-f-]{36})') { return '' }
-        $session = $Matches[1]
-
-        # Extract the first Windows 11 productEditionId from <option> elements.
-        if ($page -notmatch 'value="(\d+)">[^<]*Windows 11') { return '' }
-        $prodId = $Matches[1]
-
-        # Get the SKU list for this product edition.
-        $skuResp = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 20 `
-            -Uri "$base?pageId=$pageId&host=www.microsoft.com&segments=software-download,windows11&query=&action=getskuinformationbyproductedition&sessionId=$session&productEditionId=$prodId&sdVersion=2" `
-            -Headers @{ 'User-Agent' = $ua }).Content
-
-        # Extract the English SKU ID from the JSON response.
-        if ($skuResp -notmatch '"Id":(\d+),"Language":"English"') { return '' }
-        $skuId = $Matches[1]
-
-        # Get the time-limited download links for this SKU.
-        $linkResp = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 20 `
-            -Uri "$base?pageId=$pageId&host=www.microsoft.com&segments=software-download,windows11&query=&action=GetProductDownloadLinksBySku&sessionId=$session&skuId=$skuId&language=English&sdVersion=2" `
-            -Headers @{ 'User-Agent' = $ua }).Content
-
-        # Extract the first x64 ISO URL from the response HTML.
-        if ($linkResp -notmatch '(https://[^\s"]+x64[^\s"]*\.iso[^\s"]*)') { return '' }
-        return $Matches[1]
-    } catch {
-        # Network failure, API change, or rate limiting — caller falls back to manual.
+    $fidoScript = Join-Path $RepoRoot 'vendor\Fido\Fido.ps1'
+    if (-not (Test-Path $fidoScript)) {
+        Write-Warning "vm-setup: Fido.ps1 not found at $fidoScript; run: git submodule update --init vendor/Fido"
         return ''
+    }
+
+    $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
+
+    if ($DryRun) {
+        Write-Information "vm-setup: [dry-run] & '$fidoScript' -Win 11 -Ed $Edition -Lang English -Arch x64 -Download -NoPrompt"
+        return $cachedIso
+    }
+
+    Write-Information "vm-setup: downloading Windows 11 ISO via Fido (edition=$Edition)..."
+    # Run Fido in a temp dir; it downloads the ISO to the working directory.
+    # Source: https://github.com/pbatard/Fido#usage
+    $tmpDir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
+    try {
+        Push-Location $tmpDir
+        try {
+            & $fidoScript -Win 11 -Ed $Edition -Lang English -Arch x64 -Download -NoPrompt
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "vm-setup: Fido exited with code $LASTEXITCODE"
+                return ''
+            }
+        } finally {
+            Pop-Location
+        }
+
+        $downloadedIso = Get-ChildItem $tmpDir -Filter '*.iso' |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+        if (-not $downloadedIso) {
+            Write-Warning 'vm-setup: Fido: no ISO found in temp dir after download'
+            return ''
+        }
+
+        Move-Item $downloadedIso.FullName $cachedIso
+        Write-Information "vm-setup: Windows ISO downloaded: $cachedIso"
+        return $cachedIso
+    } finally {
+        # WHY: always clean up the temp dir; -ErrorAction SilentlyContinue is
+        # acceptable here because temp-dir removal is a best-effort cleanup and
+        # failure is benign (the OS will eventually clean it up).
+        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -413,6 +432,8 @@ function Invoke-BuildWindowsImage {
         [string]$Accelerator,
         [string]$VmsDir,
         [string]$ImagesDir,
+        [string]$RepoRoot = (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))))),
+        [string]$WindowsEdition = 'Pro',
         [switch]$DryRun
     )
 
@@ -424,12 +445,11 @@ function Invoke-BuildWindowsImage {
 
     # Resolve the installer ISO: use -WindowsIso if provided, otherwise try the
     # VMs.json windowsIsoUrl field as a download source.
-    $resolvedIso = $WindowsIso
-    if (-not $resolvedIso -and $WindowsIsoUrl) {
+    if (-not $WindowsIso -and $WindowsIsoUrl) {
         $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
         if (Test-Path $cachedIso) {
             Write-Information "vm-setup: using cached Windows installer: $cachedIso"
-            $resolvedIso = $cachedIso
+            $WindowsIso = $cachedIso
         } else {
             Write-Information "vm-setup: downloading Windows installer from windowsIsoUrl..."
             if (-not $DryRun) {
@@ -446,7 +466,7 @@ function Invoke-BuildWindowsImage {
                     Remove-Item $cachedIso -Force -ErrorAction SilentlyContinue
                     return
                 }
-                $resolvedIso = $cachedIso
+                $WindowsIso = $cachedIso
                 Write-Information "vm-setup: Windows installer downloaded: $cachedIso"
             } else {
                 Write-Information "vm-setup: [dry-run] curl.exe -fL -o $cachedIso $WindowsIsoUrl"
@@ -454,49 +474,30 @@ function Invoke-BuildWindowsImage {
         }
     }
 
-    # If still no ISO resolved, attempt Fido-style dynamic URL fetching.
-    # Gracefully skips on any network or API failure so the build never
-    # aborts solely because auto-fetch is unavailable.
-    if (-not $resolvedIso) {
-        Write-Information 'vm-setup: attempting automatic Windows ISO fetch (Fido-style)...'
-        if (-not $DryRun) {
-            $fetchedUrl = Get-WindowsIsoUrl
-            if ($fetchedUrl) {
-                $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
-                if (Test-Path $cachedIso) {
-                    Write-Information "vm-setup: using cached Windows installer: $cachedIso"
-                    $resolvedIso = $cachedIso
-                } else {
-                    Write-Information 'vm-setup: downloading Windows ISO from Microsoft...'
-                    if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
-                        Write-Information 'vm-setup: curl.exe not found; skipping auto-fetch'
-                    } else {
-                        & curl.exe -fL -o $cachedIso $fetchedUrl
-                        if ($LASTEXITCODE -eq 0) {
-                            $resolvedIso = $cachedIso
-                            Write-Information "vm-setup: Windows ISO downloaded: $cachedIso"
-                        } else {
-                            Write-Warning 'vm-setup: automatic ISO download failed; removing partial file'
-                            Remove-Item $cachedIso -Force -ErrorAction SilentlyContinue
-                        }
-                    }
-                }
-            } else {
-                Write-Information 'vm-setup: automatic ISO fetch skipped (API unavailable or changed)'
-            }
+    # If still no ISO resolved, attempt download via vendor/Fido/Fido.ps1.
+    if (-not $WindowsIso) {
+        $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
+        if (Test-Path $cachedIso) {
+            Write-Information "vm-setup: using cached Windows installer: $cachedIso"
+            $WindowsIso = $cachedIso
         } else {
-            Write-Information 'vm-setup: [dry-run] would attempt Fido-style automatic Windows ISO fetch'
+            $WindowsIso = Invoke-FidoWindowsIso `
+                -RepoRoot $RepoRoot `
+                -ImagesDir $ImagesDir `
+                -VmName $VmName `
+                -Edition $WindowsEdition `
+                -DryRun:$DryRun
         }
     }
-
-    if (-not $resolvedIso) {
+    # If ISO is still empty after all resolution attempts, fail with instructions.
+    if (-not $WindowsIso) {
         Write-Information 'vm-setup: alternatively add "windowsIsoUrl": "<url>" to the VMs.json windows entry'
         Write-Information 'vm-setup: download from: https://www.microsoft.com/software-download/windows11'
         return
     }
 
-    if (-not (Test-Path $resolvedIso)) {
-        Write-Warning "vm-setup: Windows ISO not found: $resolvedIso"
+    if (-not (Test-Path $WindowsIso)) {
+        Write-Warning "vm-setup: Windows ISO not found: $WindowsIso"
         return
     }
 
@@ -511,8 +512,30 @@ function Invoke-BuildWindowsImage {
     Write-Information "vm-setup: building Windows 11 image (disk=${DiskGiB}G, accelerator=$Accelerator)..."
     Write-Information 'vm-setup: this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
 
+    # Pre-download VirtIO drivers ISO so it can be injected via secondary_iso_images,
+    # enabling Autounattend.xml FirstLogonCommands early driver installation.
+    # Falls back to runtime download in the Packer provisioner if this fails.
+    # Source: https://fedorapeople.org/groups/virt/virtio-win/
+    $VirtioIso = Join-Path $ImagesDir 'virtio-win.iso'
+    if (-not (Test-Path $VirtioIso)) {
+        if (-not $DryRun) {
+            Write-Information 'vm-setup: downloading VirtIO drivers ISO...'
+            $VirtioUrl = 'https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso'
+            try {
+                Invoke-WebRequest -Uri $VirtioUrl -OutFile $VirtioIso -UseBasicParsing
+                Write-Information "vm-setup: VirtIO ISO downloaded: $VirtioIso"
+            } catch {
+                Write-Warning "vm-setup: VirtIO ISO pre-download failed ($_); Packer provisioner will download at runtime"
+                $VirtioIso = ''
+            }
+        } else {
+            Write-Information "vm-setup: [dry-run] would download VirtIO ISO to $VirtioIso"
+            $VirtioIso = ''
+        }
+    }
+
     if ($DryRun) {
-        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var windows_iso=$resolvedIso -var accelerator=$Accelerator -var disk_size=${DiskGiB}G -var output_directory=$tmpOutput ."
+        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var disk_size=${DiskGiB}G -var output_directory=$tmpOutput ."
         return
     }
 
@@ -523,12 +546,19 @@ function Invoke-BuildWindowsImage {
             Write-Warning 'vm-setup: packer init failed for Windows'
             return
         }
-        & packer build `
-            -var "windows_iso=$resolvedIso" `
-            -var "accelerator=$Accelerator" `
-            -var "disk_size=${DiskGiB}G" `
-            -var "output_directory=$tmpOutput" `
-            .
+        $packerArgs = @(
+            '-var', "windows_iso=$WindowsIso"
+        )
+        if ($VirtioIso) {
+            $packerArgs += '-var', "virtio_win_iso=$VirtioIso"
+        }
+        $packerArgs += @(
+            '-var', "accelerator=$Accelerator",
+            '-var', "disk_size=${DiskGiB}G",
+            '-var', "output_directory=$tmpOutput",
+            '.'
+        )
+        & packer build @packerArgs
         if ($LASTEXITCODE -ne 0) {
             Write-Warning 'vm-setup: packer build failed for Windows'
             return

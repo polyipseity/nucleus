@@ -72,6 +72,12 @@ variable "cpus" {
   description = "vCPUs during the build (match VMs.json cpus)."
 }
 
+variable "virtio_win_iso" {
+  type        = string
+  default     = ""
+  description = "Local path to virtio-win.iso; when set, attached as secondary CD for early driver injection via Autounattend.xml FirstLogonCommands. Falls back to Packer provisioner download when empty."
+}
+
 packer {
   required_plugins {
     qemu = {
@@ -117,6 +123,13 @@ source "qemu" "windows11" {
   boot_command = ["<return>"]
 
   headless = true
+
+  # Attach VirtIO driver ISO as secondary CD when pre-downloaded by vm-setup.
+  # Enables Autounattend.xml FirstLogonCommands to scan and install drivers
+  # before Packer's WinRM connection opens.  Packer provisioner handles the
+  # download fallback when this is empty.
+  # Source: https://fedorapeople.org/groups/virt/virtio-win/
+  secondary_iso_images = var.virtio_win_iso != "" ? [var.virtio_win_iso] : []
 
   output_directory = var.output_directory
   vm_name          = "windows.qcow2"

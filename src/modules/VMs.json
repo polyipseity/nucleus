@@ -4,6 +4,7 @@
       "cpus": 4,
       "diskGiB": 128,
       "display": "MacBook",
+      "macos_version": "sequoia",
       "name": "macos",
       "ramMiB": 8192,
       "shareDevDir": true,
@@ -25,7 +26,8 @@
       "name": "windows",
       "ramMiB": 8192,
       "shareDevDir": false,
-      "type": "windows"
+      "type": "windows",
+      "windows_edition": "pro"
     }
   ]
 }

@@ -114,6 +114,30 @@ let
         builtins.toString (builtins.map (v: v.name) badIsoUrls)
       }";
 
+  # macos_version must be a string when present; the field is optional (macOS guests only).
+  test_macos_version_type =
+    let
+      badVersions = builtins.filter (
+        vm: builtins.hasAttr "macos_version" vm && !builtins.isString vm.macos_version
+      ) manifest.VMs;
+    in
+    assert' (badVersions == [ ])
+      "macos_version must be a string for all VMs that declare it; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badVersions)
+      }";
+
+  # windows_edition must be a string when present; the field is optional (Windows guests only).
+  test_windows_edition_type =
+    let
+      badEditions = builtins.filter (
+        vm: builtins.hasAttr "windows_edition" vm && !builtins.isString vm.windows_edition
+      ) manifest.VMs;
+    in
+    assert' (badEditions == [ ])
+      "windows_edition must be a string for all VMs that declare it; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badEditions)
+      }";
+
   # ---------------------------------------------------------------------------
   # Declarative config generation tests
   # ---------------------------------------------------------------------------
@@ -219,6 +243,10 @@ let
           cond = builtins.pathExists ../../vms/windows/Autounattend.xml;
           msg = "vms/windows/Autounattend.xml must exist for Windows 11 Packer builds";
         }
+        {
+          cond = builtins.pathExists ../../vms/macos/packer.pkr.hcl;
+          msg = "vms/macos/packer.pkr.hcl must exist for macOS Tart builds";
+        }
       ];
       results = builtins.map (c: assert' c.cond c.msg) checks;
     in
@@ -259,6 +287,8 @@ in
     test_vm_types
     test_share_dev_dir_types
     test_windows_iso_url_type
+    test_macos_version_type
+    test_windows_edition_type
     test_plist_uuid_format
     test_plist_uuid_uniqueness
     test_domain_xml_kvm_type
