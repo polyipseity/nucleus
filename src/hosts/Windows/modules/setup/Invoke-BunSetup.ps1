@@ -15,10 +15,10 @@ function Invoke-BunSetup {
 
   .DESCRIPTION
     Maintains a managed set of JS CLI tools installed via `bun install -g`.
-    On each apply it computes the diff between the desired package list and a
-    per-user manifest at %USERPROFILE%\.config\nucleus\bun-packages.json,
-    installs additions via `bun install -g`, and removes deletions via
-    `bun remove -g`.
+    On each apply it queries bun's global package.json for the actually
+    installed set, removes anything installed but absent from the desired list
+    (zap-style, mirroring homebrew's cleanup = "zap"), and installs any
+    desired packages that are missing.
 
     Only packages absent from WinGet, Scoop, and cargo-binstall are managed
     here, following the repository preference hierarchy
@@ -62,7 +62,6 @@ function Invoke-BunSetup {
 
   # bun install -g places binaries in ~\.bun\bin by default (BUN_INSTALL_BIN).
   $bunBinDir = Join-Path $HOME ".bun\bin"
-  $manifestPath = Join-Path $HOME ".config\nucleus\bun-packages.json"
 
   # Guard: bun must be accessible after WinGet DSC has installed Oven-sh.Bun.
   if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
@@ -78,35 +77,44 @@ function Invoke-BunSetup {
     $env:PATH = "$bunBinDir;$env:PATH"
   }
 
-  # Read the previously-managed package list from the manifest.  An absent
-  # manifest (first run) is treated as an empty previous set so all desired
-  # packages are treated as additions.
-  $previousPackages = @()
-  if (Test-Path $manifestPath) {
+  # Get actually installed global packages from bun's authoritative package
+  # registry (zap-style: remove any installed package absent from the desired
+  # list, regardless of prior managed state).
+  $bunGlobalJson = Join-Path $HOME ".bun\install\global\package.json"
+  $installedPackages = @()
+  if (Test-Path $bunGlobalJson) {
     try {
-      $parsed = Get-Content -Path $manifestPath -Raw | ConvertFrom-Json
-      if ($null -ne $parsed) {
-        $previousPackages = @($parsed)
+      $globalPkg = Get-Content -Path $bunGlobalJson -Raw | ConvertFrom-Json
+      if ($null -ne $globalPkg -and $null -ne $globalPkg.dependencies) {
+        $installedPackages = @($globalPkg.dependencies.PSObject.Properties.Name)
       }
     }
     catch {
-      Write-Warning "Invoke-BunSetup: manifest at '$manifestPath' could not be parsed; treating as empty"
+      # || SilentlyContinue equivalent: parse failure treats installed set as
+      # empty — safe because any desired packages will simply be re-installed.
+      Write-Warning "Invoke-BunSetup: could not parse '$bunGlobalJson'; treating as empty installed set"
     }
   }
 
-  # Packages no longer desired that were previously managed by this module.
-  $toRemove = @($previousPackages | Where-Object { $desiredPackages -notcontains $_ })
+  # Packages installed but not desired: zap-style removal.
+  # Mirrors homebrew cleanup = "zap": removes anything installed but absent
+  # from the declared desired set, regardless of how it was installed.
+  $toRemove = @($installedPackages | Where-Object { $desiredPackages -notcontains $_ })
 
-  # Desired packages whose binary is absent from ~\.bun\bin.
-  # Derive the binary name from the package name: strip the scope prefix if
-  # present (@scope/name → name) because bun uses the unscoped name for the bin.
+  # Desired packages not yet in bun's global package.json, or whose binary is
+  # absent from ~\.bun\bin (re-install needed).  Binary name = last path
+  # component after '/' so @scope/name becomes name (bun uses the unscoped
+  # name for the bin).
   $toInstall = @($desiredPackages | Where-Object {
-    $binName = ($_ -split '/')[-1]
-    -not (
+    $pkg = $_
+    $binName = ($pkg -split '/')[-1]
+    $notInstalled = $installedPackages -notcontains $pkg
+    $binMissing = -not (
       (Test-Path (Join-Path $bunBinDir $binName)) -or
       (Test-Path (Join-Path $bunBinDir "$binName.exe")) -or
       (Test-Path (Join-Path $bunBinDir "$binName.cmd"))
     )
+    $notInstalled -or $binMissing
   })
 
   foreach ($pkg in $toRemove) {
@@ -137,11 +145,4 @@ function Invoke-BunSetup {
     Write-Output "bun-setup: $pkg installed successfully"
   }
 
-  # Persist the current desired set as the new managed manifest so future
-  # applies can compute removals when a package is dropped from the list.
-  $manifestDir = Split-Path -Parent $manifestPath
-  if (-not (Test-Path $manifestDir)) {
-    New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
-  }
-  $desiredPackages | ConvertTo-Json | Set-Content -Path $manifestPath -Encoding UTF8
 }

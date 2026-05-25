@@ -384,38 +384,41 @@ in
         'clawhub' \
         > "$_ibp_desired"
 
-      _ibp_manifest="$HOME/.config/nucleus/bun-packages.json"
-      _ibp_manifest_dir="$(dirname "$_ibp_manifest")"
-
-      # Read the previously-managed package list.  An absent or malformed
-      # manifest (first run) is treated as an empty set so all desired packages
-      # become additions.  jq -r '.[]?' exits non-zero only on malformed JSON;
-      # || true is intentional and benign: the fallback is an empty previous
-      # set, which is safe (all desired packages install; nothing is removed).
-      _ibp_previous="$(mktemp)"
-      if [ -f "$_ibp_manifest" ]; then
-        "$_ibp_jq_bin" -r '.[]?' "$_ibp_manifest" > "$_ibp_previous" || true
+      # Get actually installed global packages from bun's authoritative package
+      # registry (zap-style: remove any installed package absent from the desired
+      # list, regardless of prior managed state).  The global package.json is
+      # bun's canonical record of all globally-installed packages.
+      _ibp_global_json="$HOME/.bun/install/global/package.json"
+      _ibp_installed="$(mktemp)"
+      if [ -f "$_ibp_global_json" ]; then
+        # || true is intentional and benign: parse failure on a malformed or
+        # partially-written file treats the installed set as empty — safe
+        # because desired packages will simply be re-installed on the next run.
+        "$_ibp_jq_bin" -r '.dependencies // {} | keys[]' "$_ibp_global_json" > "$_ibp_installed" || true
       fi
 
-      # Packages no longer desired: present in the previous manifest but absent
-      # from the desired list.
+      # Packages installed but not desired: zap-style removal.
+      # Mirrors homebrew cleanup = "zap": removes anything installed but absent
+      # from the declared desired set, regardless of how it was installed.
       _ibp_to_remove="$(mktemp)"
       while IFS= read -r _ibp_pkg; do
         [ -z "$_ibp_pkg" ] && continue
         if ! grep -qxF "$_ibp_pkg" "$_ibp_desired"; then
           printf '%s\n' "$_ibp_pkg" >> "$_ibp_to_remove"
         fi
-      done < "$_ibp_previous"
+      done < "$_ibp_installed"
 
-      # Desired packages whose binary is absent from ~/.bun/bin.  Binary name
-      # = last path component after '/' so @scope/name becomes name (bun uses
-      # the unscoped basename as the binary name).
+      # Desired packages not yet in bun's global package.json, or whose binary
+      # is absent from ~/.bun/bin (re-install needed).  Binary name = last path
+      # component after '/' so @scope/name becomes name (bun uses the unscoped
+      # basename as the binary name).
       _ibp_to_install="$(mktemp)"
       while IFS= read -r _ibp_pkg; do
         [ -z "$_ibp_pkg" ] && continue
         _ibp_bin="''${_ibp_pkg##*/}"
-        if [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] && \
-           [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; then
+        if ! grep -qxF "$_ibp_pkg" "$_ibp_installed" || \
+           { [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] && \
+             [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; }; then
           printf '%s\n' "$_ibp_pkg" >> "$_ibp_to_install"
         fi
       done < "$_ibp_desired"
@@ -426,7 +429,7 @@ in
         echo "bun: removing $_ibp_pkg"
         if ! bun remove -g "$_ibp_pkg"; then
           echo "bun: 'bun remove -g $_ibp_pkg' failed" >&2
-          rm -f "$_ibp_desired" "$_ibp_previous" "$_ibp_to_remove" "$_ibp_to_install"
+          rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
           exit 1
         fi
       done < "$_ibp_to_remove"
@@ -437,28 +440,20 @@ in
         echo "bun: installing $_ibp_pkg"
         if ! bun install -g "$_ibp_pkg"; then
           echo "bun: 'bun install -g $_ibp_pkg' failed" >&2
-          rm -f "$_ibp_desired" "$_ibp_previous" "$_ibp_to_remove" "$_ibp_to_install"
+          rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
           exit 1
         fi
         _ibp_bin="''${_ibp_pkg##*/}"
         if [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] && \
            [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; then
           echo "bun: $_ibp_pkg installed but binary '$_ibp_bin' not found in '$HOME/.bun/bin'" >&2
-          rm -f "$_ibp_desired" "$_ibp_previous" "$_ibp_to_remove" "$_ibp_to_install"
+          rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
           exit 1
         fi
         echo "bun: $_ibp_pkg installed successfully"
       done < "$_ibp_to_install"
 
-      # Persist the current desired set as the new managed manifest.  Future
-      # applies read this to compute removals when a package is dropped from
-      # the desired list above.
-      if [ ! -d "$_ibp_manifest_dir" ]; then
-        mkdir -p "$_ibp_manifest_dir"
-      fi
-      "$_ibp_jq_bin" -Rn '[inputs | select(length > 0)]' "$_ibp_desired" > "$_ibp_manifest"
-
-      rm -f "$_ibp_desired" "$_ibp_previous" "$_ibp_to_remove" "$_ibp_to_install"
+      rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
     '';
 
     # -------------------------------------------------------------------------
