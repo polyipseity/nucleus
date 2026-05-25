@@ -489,7 +489,7 @@ in
       # || true is intentional and benign: if uv tool list fails (e.g. no tool
       # environment is initialised yet), the installed set is treated as empty
       # and nothing is erroneously removed.
-      "$_iut_uv_bin" tool list 2>/dev/null | awk '/^[^ \t]/{print $1}' > "$_iut_installed" || true
+      "$_iut_uv_bin" tool list 2>/dev/null | ${pkgs.gawk}/bin/awk '/^[^ \t]/{print $1}' > "$_iut_installed" || true
 
       # Tools installed but not desired: zap-style removal.
       # Mirrors homebrew cleanup = "zap": removes anything installed but absent
@@ -573,7 +573,7 @@ in
         # || true is intentional: if rustup toolchain list fails (e.g. rustup
         # is freshly installed with no toolchains yet), the installed set is
         # treated as empty — safe because desired channels will be installed.
-        rustup toolchain list 2>/dev/null | awk '{print $1}' > "$_irt_installed" || true
+        rustup toolchain list 2>/dev/null | ${pkgs.gawk}/bin/awk '{print $1}' > "$_irt_installed" || true
 
         # Extract the channel prefix from each installed toolchain name and
         # collect all channel names.  Pattern: <channel>[-<host-triple>]
@@ -684,7 +684,7 @@ in
         # || true is intentional and benign: if cargo install --list fails
         # (e.g. no crates are installed yet and ~/.cargo is uninitialised),
         # an empty installed set is correct — nothing to remove.
-        cargo install --list 2>/dev/null | awk '/^[a-zA-Z0-9_-]+ v/{print $1}' > "$_icp_installed" || true
+        cargo install --list 2>/dev/null | ${pkgs.gawk}/bin/awk '/^[a-zA-Z0-9_-]+ v/{print $1}' > "$_icp_installed" || true
 
         # Crates installed but not desired: zap-style removal.
         _icp_to_remove="$(mktemp)"
