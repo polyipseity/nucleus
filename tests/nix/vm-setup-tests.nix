@@ -1,7 +1,7 @@
 # tests/nix/vm-setup-tests.nix — Tests for VM provisioning manifest and NixOS module options.
 #
 # Validates the structure of src/modules/VMs.json and confirms that the NixOS
-# VMs.nix module options are wired correctly.
+# vms.nix module options are wired correctly.
 # Run via: nix-instantiate --eval tests/nix/vm-setup-tests.nix
 
 {
@@ -106,7 +106,7 @@ let
   # Declarative config generation tests
   # ---------------------------------------------------------------------------
 
-  # Deterministic UUID derivation (same logic as macbook/VMs.nix).
+  # Deterministic UUID derivation (same logic as macbook/vms.nix).
   # We re-implement it here to validate the algorithm independently.
   mkUuid =
     name:
