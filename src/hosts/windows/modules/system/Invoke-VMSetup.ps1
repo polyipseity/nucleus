@@ -253,7 +253,7 @@ sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#nixos"
 
 # Invoke-BuildNixosImage — Builds the NixOS guest image using Packer.
 #
-# On macOS/NixOS, scripts/VM-setup.sh uses nixos-generators directly (faster,
+# On macOS/NixOS, scripts/vm-setup.sh uses nixos-generators directly (faster,
 # no Packer needed).  On Windows, Packer with the QEMU builder downloads the
 # NixOS minimal ISO and runs a shell provisioner to install NixOS
 # (vms\nixos\packer.pkr.hcl).
