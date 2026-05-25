@@ -212,5 +212,8 @@
   "workbench.editor.showTabs": "single",
   "workbench.preferredDarkColorTheme": "Monokai Dimmed",
   "workbench.preferredLightColorTheme": "Solarized Light",
-  "workbench.secondarySideBar.defaultVisibility": "visible"
+  "workbench.secondarySideBar.defaultVisibility": "visible",
+  "workbench.view.showQuietly": {
+    "workbench.panel.output": true
+  }
 }
