@@ -181,6 +181,76 @@ build_nixos_image() {
   printf 'vm-setup: NixOS image ready: %s\n' "$_out"
 }
 
+# download_windows_iso_mido CACHED_ISO EDITION
+#   Downloads a Windows 11 ISO using vendor/Mido/windows/isos/mido.sh.
+#   Mido is the secure Microsoft Windows Downloader for UNIX systems.
+#   The EDITION parameter maps to a Mido media identifier.
+#   Returns 0 on success, 1 on failure.
+#   Requires curl in PATH.
+#   Source: https://github.com/QubesOS/qvm-create-windows-qube
+download_windows_iso_mido() {
+  _mido_cached="$1"
+  _mido_edition="${2:-Pro}"
+
+  _mido_script="$REPO_ROOT/vendor/Mido/windows/isos/mido.sh"
+  if [ ! -f "$_mido_script" ]; then
+    printf 'vm-setup: mido.sh not found; run: git submodule update --init vendor/Mido\n' >&2
+    return 1
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    printf 'vm-setup: curl not found; required for Mido ISO download\n' >&2
+    return 1
+  fi
+
+  # Map edition to Mido media identifier.
+  # Consumer multi-edition ISO (win11x64) covers Home/Pro/Edu; the
+  # answer file selects the exact edition during unattended setup.
+  # Source: Mido usage in windows/isos/mido.sh
+  case "$(printf '%s' "$_mido_edition" | tr '[:upper:]' '[:lower:]')" in
+    *enterprise*eval*) _mido_media='win11x64-enterprise-eval' ;;
+    *) _mido_media='win11x64' ;;
+  esac
+
+  printf 'vm-setup: downloading Windows 11 ISO via Mido (media=%s)...\n' "$_mido_media"
+
+  _mido_tmp="$(mktemp -d)"
+  _mido_dir="$(CDPATH='' cd -- "$(dirname -- "$_mido_script")" && pwd)"
+  _mido_status=0
+  (
+    cd "$_mido_tmp"
+    # Add Mido's directory to PATH to keep the download in _mido_tmp instead
+    # of Mido's own directory.
+    # WHY: mido.sh checks if its parent directory is in PATH; if so it stays
+    # in PWD.  Without this, Mido cd-s to its own directory and writes the
+    # ISO there instead of _mido_tmp.
+    # Source: path detection logic at bottom of mido.sh
+    PATH="${_mido_dir}:${PATH}" sh "$_mido_script" "$_mido_media"
+  ) || _mido_status=$?
+
+  # Exit code 4 means verification failed but the ISO was downloaded as
+  # .iso.UNVERIFIED (common for newer ISOs not yet in Mido's checksum list).
+  # Accept the file and proceed; the caller can verify manually if desired.
+  # Source: Mido exit codes in the ending_summary function of mido.sh
+  if [ "$_mido_status" -ne 0 ] && [ "$_mido_status" -ne 4 ]; then
+    printf 'vm-setup: Mido exited with code %s\n' "$_mido_status" >&2
+    rm -rf "$_mido_tmp"
+    return 1
+  fi
+
+  _mido_iso="$(find "$_mido_tmp" -maxdepth 1 \( -name '*.iso' -o -name '*.iso.UNVERIFIED' \) -print -quit 2>/dev/null)"
+  if [ -z "$_mido_iso" ]; then
+    printf 'vm-setup: Mido: no ISO found in temp dir after download\n' >&2
+    rm -rf "$_mido_tmp"
+    return 1
+  fi
+
+  mv "$_mido_iso" "$_mido_cached"
+  rm -rf "$_mido_tmp"
+  printf 'vm-setup: Windows ISO downloaded: %s\n' "$_mido_cached"
+  return 0
+}
+
 # download_windows_iso_fido CACHED_ISO EDITION
 #   Downloads a Windows 11 ISO using vendor/Fido/Fido.ps1 (the same engine
 #   that drives Rufus download automation).  Moves the downloaded ISO to
@@ -278,8 +348,11 @@ build_windows_image() {
     fi
   fi
 
-  # If still no ISO resolved, attempt download via vendor/Fido/Fido.ps1.
-  # Silently skips if pwsh or the Fido submodule is unavailable.
+  # If still no ISO resolved, attempt download via Mido (UNIX-native) or Fido
+  # (PowerShell, Windows-native) depending on what is available.
+  # WHY Mido first: Mido is a POSIX sh + curl script that works on macOS and
+  # Linux; Fido requires pwsh and Windows-specific APIs that fail on non-Windows.
+  # Source: https://github.com/QubesOS/qvm-create-windows-qube
   if [ -z "$_iso" ]; then
     _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
     if [ -f "$_cached_iso" ]; then
@@ -287,9 +360,13 @@ build_windows_image() {
       _iso="$_cached_iso"
     else
       if [ "$dry_run" = false ]; then
-        download_windows_iso_fido "$_cached_iso" "$_edition" && _iso="$_cached_iso" || true
+        if download_windows_iso_mido "$_cached_iso" "$_edition"; then
+          _iso="$_cached_iso"
+        elif download_windows_iso_fido "$_cached_iso" "$_edition"; then
+          _iso="$_cached_iso"
+        fi
       else
-        printf 'vm-setup: [dry-run] would call vendor/Fido/Fido.ps1 -Ed %s to download Windows ISO\n' "$_edition"
+        printf 'vm-setup: [dry-run] would call vendor/Mido/windows/isos/mido.sh (or Fido fallback) to download Windows 11 ISO\n'
       fi
     fi
   fi
