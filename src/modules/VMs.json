@@ -2,32 +2,32 @@
   "VMs": [
     {
       "cpus": 4,
-      "diskGiB": 128,
+      "diskBytes": 137438953472,
       "display": "MacBook",
-      "macos_version": "sequoia",
-      "name": "macos",
-      "ramMiB": 8192,
+      "macosVersion": "sequoia",
+      "name": "MacBook",
+      "ramBytes": 8589934592,
       "shareDevDir": true,
-      "type": "macos"
+      "type": "macOS"
     },
     {
       "cpus": 4,
-      "diskGiB": 64,
+      "diskBytes": 68719476736,
       "display": "NixOS",
-      "name": "nixos",
-      "ramMiB": 8192,
+      "name": "NixOS",
+      "ramBytes": 8589934592,
       "shareDevDir": true,
-      "type": "nixos"
+      "type": "NixOS"
     },
     {
       "cpus": 4,
-      "diskGiB": 128,
+      "diskBytes": 137438953472,
       "display": "Windows",
-      "name": "windows",
-      "ramMiB": 8192,
-      "shareDevDir": false,
-      "type": "windows",
-      "windows_edition": "pro"
+      "name": "Windows",
+      "ramBytes": 8589934592,
+      "shareDevDir": true,
+      "type": "Windows",
+      "windowsEdition": "pro"
     }
   ]
 }

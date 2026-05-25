@@ -94,10 +94,10 @@ IMAGES_DIR="$VM_DIR/images"
 # should_include TYPE — returns 0 if a VM of the given type should be processed.
 should_include() {
   _type="$1"
-  if [ "$nixos_only" = true ] && [ "$_type" != "nixos" ]; then
+  if [ "$nixos_only" = true ] && [ "$_type" != "NixOS" ]; then
     return 1
   fi
-  if [ "$windows_only" = true ] && [ "$_type" != "windows" ]; then
+  if [ "$windows_only" = true ] && [ "$_type" != "Windows" ]; then
     return 1
   fi
   return 0
@@ -428,18 +428,20 @@ build_images() {
   while [ "$_i" -lt "$_count" ]; do
     _vm_name="$(jq -r ".VMs[$_i].name" "$MANIFEST")"
     _vm_type="$(jq -r ".VMs[$_i].type" "$MANIFEST")"
-    _vm_disk_gib="$(jq -r ".VMs[$_i].diskGiB" "$MANIFEST")"
+    _vm_disk_bytes="$(jq -r ".VMs[$_i].diskBytes" "$MANIFEST")"
+    _vm_disk_gib="$(( _vm_disk_bytes / 1073741824 ))"
 
     if should_include "$_vm_type"; then
       case "$_vm_type" in
-        nixos)   build_nixos_image "$_vm_name" ;;
-        windows)
-          _vm_edition="$(jq -r ".VMs[$_i].windows_edition // \"Pro\"" "$MANIFEST")"
+        NixOS)   build_nixos_image "$_vm_name" ;;
+        Windows)
+          _vm_edition="$(jq -r ".VMs[$_i].windowsEdition // \"Pro\"" "$MANIFEST")"
           build_windows_image "$_vm_name" "$_vm_disk_gib" "$_vm_edition"
           ;;
-        macos)
-          _vm_macos_ver="$(jq -r ".VMs[$_i].macos_version // \"sequoia\"" "$MANIFEST")"
-          _vm_ram_mib="$(jq -r ".VMs[$_i].ramMiB" "$MANIFEST")"
+        macOS)
+          _vm_macos_ver="$(jq -r ".VMs[$_i].macosVersion // \"sequoia\"" "$MANIFEST")"
+          _vm_ram_bytes="$(jq -r ".VMs[$_i].ramBytes" "$MANIFEST")"
+          _vm_ram_mib="$(( _vm_ram_bytes / 1048576 ))"
           _vm_cpus="$(jq -r ".VMs[$_i].cpus" "$MANIFEST")"
           build_macos_image "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver"
           ;;
@@ -461,23 +463,23 @@ write_configure_script() {
   _wcs_type="$2"
   _wcs_script="$VM_DIR/${_wcs_name}-configure.sh"
   case "$_wcs_type" in
-    nixos)
+    NixOS)
       cat > "$_wcs_script" << 'CFGEOF'
 #!/usr/bin/env sh
 # Apply the nucleus nixos host configuration inside this VM.
 # ~/dev is shared via VirtioFS when shareDevDir=true.
-sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#nixos"
+sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"
 CFGEOF
       ;;
-    windows)
+    Windows)
       cat > "$_wcs_script" << 'CFGEOF'
 #!/usr/bin/env sh
 # Apply the nucleus Windows host configuration inside this VM.
 # Clone this repository to %USERPROFILE%\dev\nucleus inside the VM, then run:
-#   .\src\hosts\windows\apply.ps1
+#   .\src\hosts\Windows\apply.ps1
 CFGEOF
       ;;
-    macos)
+    macOS)
       cat > "$_wcs_script" << 'CFGEOF'
 #!/usr/bin/env sh
 # Apply the nucleus macbook host configuration inside this VM.
@@ -513,7 +515,7 @@ setup_tart_vms() {
     vm_name=$(jq -r ".VMs[$i].name" "$MANIFEST")
     vm_type=$(jq -r ".VMs[$i].type" "$MANIFEST")
 
-    if [ "$vm_type" != "macos" ] || ! should_include "$vm_type"; then
+    if [ "$vm_type" != "macOS" ] || ! should_include "$vm_type"; then
       i=$((i + 1))
       continue
     fi
@@ -575,7 +577,7 @@ setup_utm_vms() {
     fi
 
     # macOS guests are provisioned via tart (setup_tart_vms), not UTM.
-    if [ "$vm_type" = "macos" ]; then
+    if [ "$vm_type" = "macOS" ]; then
       i=$((i + 1))
       continue
     fi

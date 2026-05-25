@@ -8,7 +8,7 @@
 # Usage (from repo root):
 #   cd vms/macos && packer init . && packer build \
 #     [-var macos_version=sequoia]               \
-#     [-var vm_name=macos]                        \
+#     [-var vm_name=MacBook]                     \
 #     .
 #
 # Prerequisites:
@@ -31,7 +31,7 @@ variable "macos_version" {
 
 variable "vm_name" {
   type        = string
-  default     = "macos"
+  default     = "MacBook"
   description = "Name of the tart VM to create (stored in ~/.tart/vms/<vm_name>)."
 }
 

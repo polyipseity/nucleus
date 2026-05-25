@@ -17,8 +17,8 @@ let
     "name"
     "display"
     "cpus"
-    "ramMiB"
-    "diskGiB"
+    "ramBytes"
+    "diskBytes"
     "type"
     "shareDevDir"
   ];
@@ -44,20 +44,20 @@ let
   # Disk sizes must be positive integers.
   test_disk_sizes =
     let
-      badDisks = builtins.filter (vm: vm.diskGiB <= 0) manifest.VMs;
+      badDisks = builtins.filter (vm: vm.diskBytes <= 0) manifest.VMs;
     in
     assert' (badDisks == [ ])
-      "Every VM must have diskGiB > 0; bad entries: ${
+      "Every VM must have diskBytes > 0; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badDisks)
       }";
 
   # RAM sizes must be positive integers.
   test_ram_sizes =
     let
-      badRam = builtins.filter (vm: vm.ramMiB <= 0) manifest.VMs;
+      badRam = builtins.filter (vm: vm.ramBytes <= 0) manifest.VMs;
     in
     assert' (badRam == [ ])
-      "Every VM must have ramMiB > 0; bad entries: ${
+      "Every VM must have ramBytes > 0; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badRam)
       }";
 
@@ -78,10 +78,10 @@ let
 
   # VM types must be one of the known values.
   validTypes = [
-    "linux"
-    "macos"
-    "nixos"
-    "windows"
+    "Linux"
+    "macOS"
+    "NixOS"
+    "Windows"
   ];
   test_vm_types =
     let
@@ -114,27 +114,27 @@ let
         builtins.toString (builtins.map (v: v.name) badIsoUrls)
       }";
 
-  # macos_version must be a string when present; the field is optional (macOS guests only).
+  # macosVersion must be a string when present; the field is optional (macOS guests only).
   test_macos_version_type =
     let
       badVersions = builtins.filter (
-        vm: builtins.hasAttr "macos_version" vm && !builtins.isString vm.macos_version
+        vm: builtins.hasAttr "macosVersion" vm && !builtins.isString vm.macosVersion
       ) manifest.VMs;
     in
     assert' (badVersions == [ ])
-      "macos_version must be a string for all VMs that declare it; bad entries: ${
+      "macosVersion must be a string for all VMs that declare it; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badVersions)
       }";
 
-  # windows_edition must be a string when present; the field is optional (Windows guests only).
+  # windowsEdition must be a string when present; the field is optional (Windows guests only).
   test_windows_edition_type =
     let
       badEditions = builtins.filter (
-        vm: builtins.hasAttr "windows_edition" vm && !builtins.isString vm.windows_edition
+        vm: builtins.hasAttr "windowsEdition" vm && !builtins.isString vm.windowsEdition
       ) manifest.VMs;
     in
     assert' (badEditions == [ ])
-      "windows_edition must be a string for all VMs that declare it; bad entries: ${
+      "windowsEdition must be a string for all VMs that declare it; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badEditions)
       }";
 
@@ -181,7 +181,7 @@ let
     in
     "<domain type='kvm'>"
     + "\n  <name>${vm.name}</name>"
-    + "\n  <memory unit='MiB'>${toString vm.ramMiB}</memory>"
+    + "\n  <memory unit='MiB'>${toString (vm.ramBytes / 1048576)}</memory>"
     + "\n  <vcpu>${toString vm.cpus}</vcpu>"
     + "\n  <devices>"
     + "\n    <source file='${vmDir}/${vm.name}.qcow2'/>"

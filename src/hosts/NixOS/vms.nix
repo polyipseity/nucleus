@@ -32,7 +32,7 @@ let
   homeDir = "/home/${username}";
   vmDir = "${homeDir}/virtual machines";
 
-  videoModel = vm: if vm.type == "windows" then "vga" else "virtio";
+  videoModel = vm: if vm.type == "Windows" then "vga" else "virtio";
 
   # Optional VirtioFS filesystem element appended after <channel>.
   # The leading \n keeps it on its own line at 4-space indent (matching the
@@ -54,7 +54,7 @@ let
     <domain type='kvm'>
       <name>${vm.name}</name>
       <title>${vm.display}</title>
-      <memory unit='MiB'>${toString vm.ramMiB}</memory>
+      <memory unit='MiB'>${toString (vm.ramBytes / 1048576)}</memory>
       <vcpu>${toString vm.cpus}</vcpu>
       <os>
         <type arch='${arch}' machine='${machine}'>hvm</type>

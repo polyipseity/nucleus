@@ -94,24 +94,25 @@ function Invoke-VMSetup {
 
     foreach ($vm in $vmDef.VMs) {
         # Apply -NixosOnly / -WindowsOnly filter.
-        if ($NixosOnly   -and $vm.type -ne 'nixos')   { continue }
-        if ($WindowsOnly -and $vm.type -ne 'windows') { continue }
+        if ($NixosOnly   -and $vm.type -ne 'NixOS')   { continue }
+        if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
 
         switch ($vm.type) {
-            'nixos' {
+            'NixOS' {
                 Invoke-BuildNixosImage -VmName $vm.name -Accelerator $Accelerator `
                     -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
             }
-            'windows' {
+            'Windows' {
+                $diskGiB = [long]($vm.diskBytes / 1073741824)
                 $isoUrl = if ($null -ne $vm.windowsIsoUrl) { [string]$vm.windowsIsoUrl } else { '' }
-                Invoke-BuildWindowsImage -VmName $vm.name -DiskGiB $vm.diskGiB `
+                Invoke-BuildWindowsImage -VmName $vm.name -DiskGiB $diskGiB `
                     -WindowsIso $WindowsIso -WindowsIsoUrl $isoUrl `
                     -RepoRoot $RepoRoot `
-                    -WindowsEdition ($vm.windows_edition ?? 'Pro') `
+                    -WindowsEdition ($vm.windowsEdition ?? 'Pro') `
                     -Accelerator $Accelerator `
                     -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
             }
-            'macos' {
+            'macOS' {
                 Write-Information "vm-setup: macOS image must be obtained manually (licensing restricts automation)"
             }
             default {
@@ -138,9 +139,10 @@ function Invoke-VMSetup {
 
     foreach ($vm in $vmDef.VMs) {
         # Apply -NixosOnly / -WindowsOnly filter.
-        if ($NixosOnly   -and $vm.type -ne 'nixos')   { continue }
-        if ($WindowsOnly -and $vm.type -ne 'windows') { continue }
+        if ($NixosOnly   -and $vm.type -ne 'NixOS')   { continue }
+        if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
 
+        $ramMiB      = [long]($vm.ramBytes / 1048576)
         $diskPath    = Join-Path $vmDir "$($vm.name).qcow2"
         $startScript = Join-Path $vmDir "Start-$($vm.display).ps1"
         $prebuilt    = Join-Path $imagesDir "$($vm.name).qcow2"
@@ -174,7 +176,7 @@ function Invoke-VMSetup {
             $cpu = 'host'
         }
 
-        if ($vm.type -eq 'windows') {
+        if ($vm.type -eq 'Windows') {
             $display = 'sdl'
             $vga = 'std'
         } else {
@@ -197,7 +199,7 @@ function Invoke-VMSetup {
 # 2. Then run this script.
 # -chardev socket,id=char0,path=\\.\pipe\$($vm.name)-virtiofs ``
 # -device vhost-user-fs-pci,chardev=char0,tag=dev ``
-# -object memory-backend-file,id=mem,size=$($vm.ramMiB)M,mem-path=/dev/shm,share=on ``
+# -object memory-backend-file,id=mem,size=$ramMiB`M,mem-path=/dev/shm,share=on ``
 # -numa node,memdev=mem
 "@
         }
@@ -214,7 +216,7 @@ $virtiofsArgs
     -machine $machine ``
     -cpu $cpu ``
     -smp $($vm.cpus) ``
-    -m $($vm.ramMiB) ``
+    -m $ramMiB ``
     -drive file='$diskPath',format=qcow2,if=virtio ``
     -netdev user,id=net0 ``
     -device virtio-net-pci,netdev=net0 ``
@@ -235,15 +237,15 @@ $virtiofsArgs
         # Write a configuration reference script for the guest OS.
         $configureScript = Join-Path $vmDir "$($vm.name)-configure.sh"
         $configureContent = switch ($vm.type) {
-            'nixos' {
+            'NixOS' {
 @'
 #!/usr/bin/env sh
 # Apply the nucleus nixos host configuration inside this VM.
 # ~/dev is shared via VirtioFS when shareDevDir=true.
-sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#nixos"
+sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"
 '@
             }
-            'windows' {
+            'Windows' {
 @'
 #!/usr/bin/env sh
 # Apply the nucleus Windows host configuration inside this VM.
@@ -251,7 +253,7 @@ sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#nixos"
 #   .\src\hosts\Windows\apply.ps1
 '@
             }
-            'macos' {
+            'macOS' {
 @'
 #!/usr/bin/env sh
 # Apply the nucleus macbook host configuration inside this VM.

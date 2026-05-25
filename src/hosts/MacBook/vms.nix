@@ -39,9 +39,9 @@ let
   displayCard =
     vm:
     if isArm then
-      (if vm.type == "windows" then "vga" else "virtio-ramfb-gl")
+      (if vm.type == "Windows" then "vga" else "virtio-ramfb-gl")
     else
-      (if vm.type == "windows" then "vga" else "virtio-gpu-pci");
+      (if vm.type == "Windows" then "vga" else "virtio-gpu-pci");
 
   # Optional VirtioFS directory-share keys appended inside <key>Sharing</key>.
   # Leading \n keeps each key on its own line at consistent 12-space indent
@@ -140,7 +140,7 @@ let
             <key>JITCacheSize</key>
             <integer>0</integer>
             <key>MemorySize</key>
-            <integer>${toString vm.ramMiB}</integer>
+            <integer>${toString (vm.ramBytes / 1048576)}</integer>
             <key>Target</key>
             <string>${machine}</string>
         </dict>
