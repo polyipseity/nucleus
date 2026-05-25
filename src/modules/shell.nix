@@ -33,10 +33,21 @@ let
   # Publish the fallback toolchain path as a session variable so every managed
   # shell can reach the same user-scoped binaries without duplicating the store
   # path string in multiple helper functions.
-  mergedSessionVariables = sessionVariables // {
-    NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin";
-    NUCLEUS_DEFAULT_DEV_ENV = "1";
-  };
+  mergedSessionVariables =
+    sessionVariables
+    // {
+      NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin";
+      NUCLEUS_DEFAULT_DEV_ENV = "1";
+    }
+    // lib.optionalAttrs pkgs.stdenv.isDarwin {
+      # WHY: libiconv is required by the macOS linker when cargo/rustc compile
+      # C-dependent crates (e.g., openssl-sys, libgit2-sys).  Without this path in
+      # LIBRARY_PATH the linker fails with "library not found for -liconv".
+      # NUCLEUS_LIBICONV_LIB is injected only in the fallback subprocess (not
+      # exported persistently to the interactive shell) so it does not override
+      # a devShell's own LIBRARY_PATH settings.
+      NUCLEUS_LIBICONV_LIB = "${pkgs.libiconv}/lib";
+    };
 
   # Keep iCloud exclusion names and managed root paths in one declarative source
   # (users.json) so activation-time recursive marking and interactive shell hooks
@@ -171,6 +182,7 @@ in
             # usable even when the shell did not start as a login shell.
             export NUCLEUS_DEFAULT_DEV_BIN="${defaultDevTools}/bin"
             export NUCLEUS_DEFAULT_DEV_ENV="1"
+            ${lib.optionalString pkgs.stdenv.isDarwin "export NUCLEUS_LIBICONV_LIB=\"${pkgs.libiconv}/lib\""}
 
             # (User-scope package manager bin dirs are declared via home.sessionPath
             # below; that path goes to ~/.zshenv which is sourced before this
@@ -196,7 +208,16 @@ in
               fi
 
               if [[ -n "''${NUCLEUS_DEFAULT_DEV_BIN:-}" && -x "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" ]]; then
-                "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" "$@"
+                if [[ -n "''${NUCLEUS_LIBICONV_LIB:-}" ]]; then
+                  # WHY: Prepend managed libiconv so the fallback cargo/rustc can
+                  # build C-dependent crates on macOS even when no devShell is
+                  # active.  LIBRARY_PATH is set only for the subprocess so it
+                  # does not pollute the interactive shell's link-search state.
+                  LIBRARY_PATH="''${NUCLEUS_LIBICONV_LIB}''${LIBRARY_PATH:+:''${LIBRARY_PATH}}" \
+                    "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" "$@"
+                else
+                  "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" "$@"
+                fi
                 return $?
               fi
 

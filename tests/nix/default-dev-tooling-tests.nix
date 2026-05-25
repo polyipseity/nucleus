@@ -97,6 +97,18 @@ let
   # NUCLEUS_DEFAULT_DEV_BIN instead of failing with "command not found".
   test_posix_shell_probes_tool_in_direnv = assert' (lib.hasInfix "command -v \"$_tool_name\"" posixShellText) "shell.nix must probe tool availability (command -v) in direnv context before routing, so projects lacking the managed tool fall through to NUCLEUS_DEFAULT_DEV_BIN";
 
+  # Verify that the managed dev tool fallback sets LIBRARY_PATH to include the
+  # Nix-managed libiconv on macOS so cargo/rustc can build C-dependent crates
+  # (e.g. openssl-sys) outside a devShell without a linker "library not found"
+  # error.  LIBRARY_PATH must only be set for the subprocess (env prefix), not
+  # permanently exported to the interactive shell.
+  test_posix_shell_prepends_libiconv_in_fallback =
+    assert'
+      (
+        (lib.hasInfix "NUCLEUS_LIBICONV_LIB" posixShellText) && (lib.hasInfix "LIBRARY_PATH" posixShellText)
+      )
+      "shell.nix must define NUCLEUS_LIBICONV_LIB and set LIBRARY_PATH in the fallback for macOS cargo/rustc builds";
+
   allTests = [
     test_posix_shell_exports_fallback_bundle
     test_posix_pwsh_uses_fallback_bundle
@@ -107,6 +119,7 @@ let
     test_posix_uses_session_path_for_user_bins
     test_windows_unconditional_user_bin_path
     test_posix_shell_probes_tool_in_direnv
+    test_posix_shell_prepends_libiconv_in_fallback
   ];
 in
 {
@@ -123,5 +136,6 @@ in
     "7: POSIX zsh uses home.sessionPath for user-scope bin dirs (direnv-safe)"
     "8: Windows managed block prepends user-scope bin dirs unconditionally"
     "9: POSIX zsh probes tool availability in direnv context before routing"
+    "10: POSIX zsh fallback sets LIBRARY_PATH for macOS libiconv (cargo/rustc builds)"
   ];
 }
