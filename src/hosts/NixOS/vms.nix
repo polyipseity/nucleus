@@ -54,7 +54,7 @@ let
     <domain type='kvm'>
       <name>${vm.name}</name>
       <title>${vm.display}</title>
-      <memory unit='MiB'>${toString (vm.ramBytes / 1000000)}</memory>
+      <memory unit='MB'>${toString (vm.ramBytes / 1000000)}</memory>
       <vcpu>${toString vm.cpus}</vcpu>
       <os>
         <type arch='${arch}' machine='${machine}'>hvm</type>

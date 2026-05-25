@@ -181,7 +181,7 @@ let
     in
     "<domain type='kvm'>"
     + "\n  <name>${vm.name}</name>"
-    + "\n  <memory unit='MiB'>${toString (vm.ramBytes / 1000000)}</memory>"
+    + "\n  <memory unit='MB'>${toString (vm.ramBytes / 1000000)}</memory>"
     + "\n  <vcpu>${toString vm.cpus}</vcpu>"
     + "\n  <devices>"
     + "\n    <source file='${vmDir}/${vm.name}.qcow2'/>"
@@ -198,12 +198,14 @@ let
     in
     assert' (builtins.all (r: r == null) results) "Domain XML kvm type check failed";
 
-  # Domain XML must use MiB as the memory unit (never KiB, GiB, or bare integers).
+  # Domain XML must use MB (SI megabytes) as the memory unit so the SI byte
+  # value from VMs.json maps to libvirt without lossy binary conversion.
+  # libvirt supports SI units directly; see https://libvirt.org/formatdomain.html
   test_domain_xml_memory_unit =
     let
       results = builtins.map (
         vm:
-        assert' (lib.hasInfix "unit='MiB'" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must specify memory unit='MiB'"
+        assert' (lib.hasInfix "unit='MB'" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must specify memory unit='MB' (SI megabytes)"
       ) manifest.VMs;
     in
     assert' (builtins.all (r: r == null) results) "Domain XML memory unit check failed";

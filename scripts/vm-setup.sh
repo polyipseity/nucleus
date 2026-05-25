@@ -237,12 +237,12 @@ download_windows_iso_fido() {
   return 0
 }
 
-# build_windows_image NAME DISK_GB
+# build_windows_image NAME DISK_GIB
 #   Builds the Windows 11 guest image using Packer and the Autounattend.xml
 #   answer file at vms/windows/Autounattend.xml.
 build_windows_image() {
   _name="$1"
-  _disk_gb="$2"
+  _disk_gib="$2"
   _edition="${3:-Pro}"
   _out="$IMAGES_DIR/${_name}.qcow2"
 
@@ -328,12 +328,12 @@ build_windows_image() {
   _packer_dir="$VMS_DIR/windows"
   _tmp_out="$IMAGES_DIR/${_name}-build"
 
-  printf 'vm-setup: building Windows 11 image (disk=%s GB, accelerator=%s)...\n' \
-    "$_disk_gb" "$accelerator"
+  printf 'vm-setup: building Windows 11 image (disk=%s GiB, accelerator=%s)...\n' \
+    "$_disk_gib" "$accelerator"
 
   if [ "$dry_run" = true ]; then
     printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var disk_size=%sG -var output_directory=%s .\n' \
-      "$_packer_dir" "$_iso" "$accelerator" "$_disk_gb" "$_tmp_out"
+      "$_packer_dir" "$_iso" "$accelerator" "$_disk_gib" "$_tmp_out"
     return 0
   fi
 
@@ -343,7 +343,7 @@ build_windows_image() {
     packer build \
       -var "windows_iso=$_iso" \
       -var "accelerator=$accelerator" \
-      -var "disk_size=${_disk_gb}G" \
+      -var "disk_size=${_disk_gib}G" \
       -var "output_directory=$_tmp_out" \
       ${_virtio_iso:+-var "virtio_win_iso=$_virtio_iso"} \
       .
@@ -360,7 +360,7 @@ build_windows_image() {
   printf 'vm-setup: Windows 11 image ready: %s\n' "$_out"
 }
 
-# build_macos_image NAME DISK_GB RAM_MB CPUS MACOS_VERSION
+# build_macos_image NAME DISK_GIB RAM_MIB CPUS MACOS_VERSION
 #   Builds the macOS guest VM using the Packer Tart plugin.  Requires tart
 #   and packer to be installed; only runs on Darwin hosts (Tart uses Apple
 #   Virtualization.framework which is not available on other platforms).
@@ -368,8 +368,8 @@ build_windows_image() {
 #   Source: https://github.com/cirruslabs/packer-plugin-tart
 build_macos_image() {
   _name="$1"
-  _disk_gb="$2"
-  _ram_mb="$3"
+  _disk_gib="$2"
+  _ram_mib="$3"
   _cpus="$4"
   _macos_version="${5:-sequoia}"
 
@@ -396,14 +396,16 @@ build_macos_image() {
   fi
 
   _packer_dir="$VMS_DIR/macos"
-  _mem_gb="$(( _ram_mb / 1000 ))"
+  # Round MiB to nearest GiB for Tart (which accepts integer GiB only).
+  # Uses (n + 512) / 1024 for round-half-up in integer arithmetic.
+  _mem_gib="$(( (_ram_mib + 512) / 1024 ))"
 
-  printf 'vm-setup: building macOS %s VM via Packer Tart (disk=%s GB, mem=%s GB, cpus=%s)...\n' \
-    "$_macos_version" "$_disk_gb" "$_mem_gb" "$_cpus"
+  printf 'vm-setup: building macOS %s VM via Packer Tart (disk=%s GiB, mem=%s GiB, cpus=%s)...\n' \
+    "$_macos_version" "$_disk_gib" "$_mem_gib" "$_cpus"
 
   if [ "$dry_run" = true ]; then
     printf 'vm-setup: [dry-run] cd %s && packer build -var vm_name=%s -var macos_version=%s -var disk_size_gib=%s -var memory_gib=%s -var cpus=%s .\n' \
-      "$_packer_dir" "$_name" "$_macos_version" "$_disk_gb" "$_mem_gb" "$_cpus"
+      "$_packer_dir" "$_name" "$_macos_version" "$_disk_gib" "$_mem_gib" "$_cpus"
     return 0
   fi
 
@@ -413,8 +415,8 @@ build_macos_image() {
     packer build \
       -var "vm_name=$_name" \
       -var "macos_version=$_macos_version" \
-      -var "disk_size_gib=$_disk_gb" \
-      -var "memory_gib=$_mem_gb" \
+      -var "disk_size_gib=$_disk_gib" \
+      -var "memory_gib=$_mem_gib" \
       -var "cpus=$_cpus" \
       .
   )
@@ -429,21 +431,25 @@ build_images() {
     _vm_name="$(jq -r ".VMs[$_i].name" "$MANIFEST")"
     _vm_type="$(jq -r ".VMs[$_i].type" "$MANIFEST")"
     _vm_disk_bytes="$(jq -r ".VMs[$_i].diskBytes" "$MANIFEST")"
-    _vm_disk_gb="$(( _vm_disk_bytes / 1000000000 ))"
+    # Convert SI bytes to nearest binary GiB for hypervisor tools.
+    # Uses (n + 2^29) / 2^30 for round-half-up in POSIX integer arithmetic.
+    _vm_disk_gib="$(( (_vm_disk_bytes + 536870912) / 1073741824 ))"
 
     if should_include "$_vm_type"; then
       case "$_vm_type" in
         NixOS)   build_nixos_image "$_vm_name" ;;
         Windows)
           _vm_edition="$(jq -r ".VMs[$_i].windowsEdition // \"Pro\"" "$MANIFEST")"
-          build_windows_image "$_vm_name" "$_vm_disk_gb" "$_vm_edition"
+          build_windows_image "$_vm_name" "$_vm_disk_gib" "$_vm_edition"
           ;;
         macOS)
           _vm_macos_ver="$(jq -r ".VMs[$_i].macOSVersion // \"sequoia\"" "$MANIFEST")"
           _vm_ram_bytes="$(jq -r ".VMs[$_i].ramBytes" "$MANIFEST")"
-          _vm_ram_mb="$(( _vm_ram_bytes / 1000000 ))"
+          # Convert SI bytes to nearest binary MiB for hypervisor tools.
+          # Uses (n + 2^19) / 2^20 for round-half-up in POSIX integer arithmetic.
+          _vm_ram_mib="$(( (_vm_ram_bytes + 524288) / 1048576 ))"
           _vm_cpus="$(jq -r ".VMs[$_i].cpus" "$MANIFEST")"
-          build_macos_image "$_vm_name" "$_vm_disk_gb" "$_vm_ram_mb" "$_vm_cpus" "$_vm_macos_ver"
+          build_macos_image "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver"
           ;;
         *)
           printf 'vm-setup: skipping build for "%s" (unsupported type: %s)\n' \

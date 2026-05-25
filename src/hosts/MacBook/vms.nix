@@ -140,7 +140,7 @@ let
             <key>JITCacheSize</key>
             <integer>0</integer>
             <key>MemorySize</key>
-            <integer>${toString (vm.ramBytes / 1000000)}</integer>
+            <integer>${toString ((vm.ramBytes + 524288) / 1048576)}</integer>
             <key>Target</key>
             <string>${machine}</string>
         </dict>
