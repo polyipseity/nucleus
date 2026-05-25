@@ -9,18 +9,20 @@ applyTo: "src/modules/ai/**, src/modules/configs/vscode/chatLanguageModels.*.jso
 ## Profile key convention
 
 `src/modules/ai/models.json` groups model lists by **host name**, not by
-platform nickname.  Use the exact host names as keys:
+platform nickname.  Use the exact OS hostname as keys (PascalCase, matching
+`networking.hostName` / `ComputerName` on each host):
 
-| Key        | Host           | Resolved by                             |
-| ---------- | -------------- | --------------------------------------- |
-| `macbook`  | macOS          | `ai-sync.sh` Darwin branch              |
-| `nixos`    | NixOS (Linux)  | `ai-sync.sh` wildcard branch            |
-| `windows`  | Windows        | `Invoke-AISync.ps1` (always `windows`)  |
+| Key       | Host           | Resolved by                              |
+| --------- | -------------- | ---------------------------------------- |
+| `MacBook` | macOS          | `ai-sync.sh` Darwin branch               |
+| `NixOS`   | NixOS (Linux)  | `ai-sync.sh` wildcard branch             |
+| `Windows` | Windows        | `Invoke-AISync.ps1` (always `Windows`)   |
 
-Do **not** use generic names like `"mac"` or `"pc"` — they break when a
-second host of the same OS type is added and make the manifest ambiguous.
-When adding a new host, add a new key matching its host name and update the
-profile detection logic in both `ai-sync.sh` and `Invoke-AISync.ps1`.
+Do **not** use lowercase names like `"macbook"`, `"nixos"`, or `"windows"` —
+the keys must match the exact OS hostname (see `AGENTS.md` **Host name equals
+display name** policy).  Do **not** use generic names like `"mac"` or `"pc"`.
+When adding a new host, add a new key matching its exact OS hostname and update
+the profile detection logic in both `ai-sync.sh` and `Invoke-AISync.ps1`.
 
 ## Hardware constraints per host
 

@@ -234,6 +234,15 @@ quick-start commands, and troubleshooting.
 - **Naming style**: avoid `nucleus` branding prefixes in new identifiers
   (activation names, helper names, options, scripts) unless a prefix is needed
   for external integration or collision avoidance.
+- **Host name equals display name**: always set the OS hostname and any display
+  name to the same value for every host and VM guest. The canonical names are:
+  `MacBook` for the macOS host and its macOS VM guest; `NixOS` for the NixOS
+  host and its NixOS VM guest; `Windows` for the Windows host and its Windows
+  VM guest. AI model profile keys in `src/modules/ai/models.json` must use
+  the exact OS hostname (case-matching) of each host as the profile key.
+  VM guest OSes inherit this name from their corresponding host: set
+  `networking.hostName` in NixOS guest configs, `ComputerName` in Windows
+  unattend/DSC, and the `display` field in `src/modules/VMs.json` accordingly.
 - **UI policy: minimal chrome, full capability**: prefer reducing persistent UI
   chrome (for example auto-hide surfaces, hidden optional menu/task controls,
   and trimmed recents) when equivalent keyboard or command access remains.

@@ -6,6 +6,23 @@ applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/nixos/vms.nix, sr
 
 # VM Management
 
+## Hostname Convention
+
+VM guest OSes must use the same hostname and display name as the corresponding
+host OS. The canonical values are:
+
+| Guest OS | `networking.hostName` / `ComputerName` | `display` in VMs.json |
+| -------- | -------------------------------------- | --------------------- |
+| macOS    | (set manually inside guest)            | `MacBook`             |
+| NixOS    | `NixOS`                                | `NixOS`               |
+| Windows  | `Windows`                              | `Windows`             |
+
+Apply this convention when adding or modifying:
+- `vms/nixos/guest.nix` — set `networking.hostName = "NixOS"`
+- `vms/nixos/packer.pkr.hcl` — set `networking.hostName = "NixOS"` inline
+- `vms/windows/Autounattend.xml` — set `<ComputerName>Windows</ComputerName>`
+- `src/modules/VMs.json` — set `display` to the canonical PascalCase name
+
 ## VM Manifest
 
 All virtual machines are declared in `src/modules/VMs.json`.
