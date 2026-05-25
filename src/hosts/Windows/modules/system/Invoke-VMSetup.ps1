@@ -103,9 +103,9 @@ function Invoke-VMSetup {
                     -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
             }
             'Windows' {
-                $diskGiB = [long]($vm.diskBytes / 1073741824)
+                $diskGb = [long]($vm.diskBytes / 1000000000)
                 $isoUrl = if ($null -ne $vm.windowsIsoUrl) { [string]$vm.windowsIsoUrl } else { '' }
-                Invoke-BuildWindowsImage -VmName $vm.name -DiskGiB $diskGiB `
+                Invoke-BuildWindowsImage -VmName $vm.name -DiskGb $diskGb `
                     -WindowsIso $WindowsIso -WindowsIsoUrl $isoUrl `
                     -RepoRoot $RepoRoot `
                     -WindowsEdition ($vm.windowsEdition ?? 'Pro') `
@@ -142,7 +142,7 @@ function Invoke-VMSetup {
         if ($NixosOnly   -and $vm.type -ne 'NixOS')   { continue }
         if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
 
-        $ramMiB      = [long]($vm.ramBytes / 1048576)
+        $ramMb       = [long]($vm.ramBytes / 1000000)
         $diskPath    = Join-Path $vmDir "$($vm.name).qcow2"
         $startScript = Join-Path $vmDir "Start-$($vm.display).ps1"
         $prebuilt    = Join-Path $imagesDir "$($vm.name).qcow2"
@@ -199,7 +199,7 @@ function Invoke-VMSetup {
 # 2. Then run this script.
 # -chardev socket,id=char0,path=\\.\pipe\$($vm.name)-virtiofs ``
 # -device vhost-user-fs-pci,chardev=char0,tag=dev ``
-# -object memory-backend-file,id=mem,size=$ramMiB`M,mem-path=/dev/shm,share=on ``
+# -object memory-backend-file,id=mem,size=$ramMb`M,mem-path=/dev/shm,share=on ``
 # -numa node,memdev=mem
 "@
         }
@@ -216,7 +216,7 @@ $virtiofsArgs
     -machine $machine ``
     -cpu $cpu ``
     -smp $($vm.cpus) ``
-    -m $ramMiB ``
+    -m $ramMb ``
     -drive file='$diskPath',format=qcow2,if=virtio ``
     -netdev user,id=net0 ``
     -device virtio-net-pci,netdev=net0 ``
@@ -426,7 +426,7 @@ function Invoke-BuildWindowsImage {
     [CmdletBinding()]
     param(
         [string]$VmName,
-        [int]$DiskGiB,
+        [int]$DiskGb,
         [string]$WindowsIso,
         # Optional URL to auto-download the Windows installer ISO when -WindowsIso
         # is not provided.  Set via the windowsIsoUrl field in VMs.json.
@@ -511,7 +511,7 @@ function Invoke-BuildWindowsImage {
     $packerDir = Join-Path $VmsDir 'windows'
     $tmpOutput = Join-Path $ImagesDir "${VmName}-build"
 
-    Write-Information "vm-setup: building Windows 11 image (disk=${DiskGiB}G, accelerator=$Accelerator)..."
+    Write-Information "vm-setup: building Windows 11 image (disk=${DiskGb}G, accelerator=$Accelerator)..."
     Write-Information 'vm-setup: this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
 
     # Pre-download VirtIO drivers ISO so it can be injected via secondary_iso_images,
@@ -537,7 +537,7 @@ function Invoke-BuildWindowsImage {
     }
 
     if ($DryRun) {
-        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var disk_size=${DiskGiB}G -var output_directory=$tmpOutput ."
+        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var disk_size=${DiskGb}G -var output_directory=$tmpOutput ."
         return
     }
 
@@ -556,7 +556,7 @@ function Invoke-BuildWindowsImage {
         }
         $packerArgs += @(
             '-var', "accelerator=$Accelerator",
-            '-var', "disk_size=${DiskGiB}G",
+            '-var', "disk_size=${DiskGb}G",
             '-var', "output_directory=$tmpOutput",
             '.'
         )

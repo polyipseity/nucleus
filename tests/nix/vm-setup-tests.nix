@@ -181,7 +181,7 @@ let
     in
     "<domain type='kvm'>"
     + "\n  <name>${vm.name}</name>"
-    + "\n  <memory unit='MiB'>${toString (vm.ramBytes / 1048576)}</memory>"
+    + "\n  <memory unit='MiB'>${toString (vm.ramBytes / 1000000)}</memory>"
     + "\n  <vcpu>${toString vm.cpus}</vcpu>"
     + "\n  <devices>"
     + "\n    <source file='${vmDir}/${vm.name}.qcow2'/>"

@@ -293,7 +293,7 @@ run_vm_setup() {
   # register VMs after the system configuration has been applied.
   #
   # Why opt-in (--vm-setup required):
-  #   Disk pre-allocation is slow (up to 128 GiB) and only needed on the first
+  #   Disk pre-allocation is slow (up to 128 GB) and only needed on the first
   #   provision of a new machine.  Subsequent applies do not re-create existing
   #   disks; the guard is in the script itself.  Still, running it on every
   #   apply would waste time for users who never need it.
