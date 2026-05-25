@@ -1,0 +1,9 @@
+# Rust toolchain declaration for the nucleus devShell.
+# rust-overlay reads this file via pkgs.rust-bin.fromRustupToolchainFile in
+# src/flake.nix and assembles a Nix-patched stable toolchain without
+# system-level rustup on POSIX hosts.
+
+[toolchain]
+channel = "stable"
+profile = "minimal"
+components = ["clippy", "rustfmt"]

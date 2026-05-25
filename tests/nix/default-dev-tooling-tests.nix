@@ -22,9 +22,11 @@ let
   cargoBinstallSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-CargoBinstallSetup.ps1;
   ciWorkflowText = builtins.readFile ../../.github/workflows/ci.yml;
   coreNixText = builtins.readFile ../../src/modules/core.nix;
+  flakeNixText = builtins.readFile ../../src/flake.nix;
   posixAgentsText = builtins.readFile ../../src/modules/agents.nix;
   posixPwshText = builtins.readFile ../../src/modules/pwsh.nix;
   posixShellText = builtins.readFile ../../src/modules/shell.nix;
+  rustToolchainText = builtins.readFile ../../rust-toolchain.toml;
   rustupSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-RustupSetup.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
 
@@ -150,6 +152,25 @@ let
       )
       "Invoke-CargoBinstallSetup.ps1 must use 'cargo install --list' + 'cargo uninstall' to prune both cargo install and cargo-binstall packages";
 
+  # Verify that the POSIX devShell uses rust-overlay so that projects can pin
+  # their Rust toolchain via rust-toolchain.toml.  rust-overlay assembles a
+  # Nix-patched toolchain without system-level rustup on POSIX hosts.
+  test_posix_devshell_uses_rust_overlay =
+    assert'
+      (
+        (lib.hasInfix "rust-overlay" flakeNixText)
+        && (lib.hasInfix "fromRustupToolchainFile" flakeNixText)
+        && (lib.hasInfix "rust-bin" flakeNixText)
+      )
+      "flake.nix devShell must use rust-overlay with fromRustupToolchainFile for per-project Rust toolchain management";
+
+  # Verify that the nucleus repo has a rust-toolchain.toml at its root so the
+  # POSIX devShell has a pinned stable toolchain (the file-present branch of the
+  # builtins.pathExists conditional is exercised on the nucleus repo itself).
+  test_rust_toolchain_toml_exists_and_is_stable =
+    assert' ((lib.hasInfix "channel" rustToolchainText) && (lib.hasInfix "stable" rustToolchainText))
+      "rust-toolchain.toml must exist at the repo root with a stable channel so the POSIX devShell resolves to a pinned toolchain";
+
   allTests = [
     test_posix_shell_exports_fallback_bundle
     test_posix_pwsh_uses_fallback_bundle
@@ -165,6 +186,8 @@ let
     test_windows_rustup_sets_default_stable
     test_posix_cargo_prunes_both_install_and_binstall
     test_windows_cargo_prunes_both_install_and_binstall
+    test_posix_devshell_uses_rust_overlay
+    test_rust_toolchain_toml_exists_and_is_stable
   ];
 in
 {
@@ -186,5 +209,7 @@ in
     "12: Windows Invoke-RustupSetup calls rustup default none"
     "13: POSIX cargo convergence prunes both cargo install and cargo-binstall packages"
     "14: Windows cargo convergence prunes both cargo install and cargo-binstall packages"
+    "15: POSIX devShell uses rust-overlay with fromRustupToolchainFile"
+    "16: rust-toolchain.toml exists at repo root with stable channel"
   ];
 }

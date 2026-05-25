@@ -27,6 +27,14 @@
     # nixpkgs: the single shared package set; pinned to nixos-unstable for
     # access to recent packages on both NixOS and Darwin.
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    # rust-overlay: provides rust-bin.fromRustupToolchainFile and friends for
+    # declarative Rust toolchain management in devShells.  Reads the project's
+    # rust-toolchain.toml to assemble a Nix-patched toolchain, preserving
+    # reproducibility without system-level rustup on POSIX hosts.
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     # sops-nix: integrates SOPS secret decryption into NixOS / nix-darwin /
     # Home Manager activation without ever writing secrets to the Nix store.
     sops-nix = {
@@ -41,6 +49,7 @@
       home-manager,
       nix-vscode-extensions,
       nixpkgs,
+      rust-overlay,
       sops-nix,
       ...
     }:
@@ -177,6 +186,22 @@
 
       pkgsLinux = mkPkgs systems.linux;
       pkgsMac = mkPkgs systems.mac;
+
+      # mkDevPkgs — nixpkgs package set with rust-overlay applied.
+      # Used exclusively for devShells so the overlay does not affect the
+      # darwinConfigurations / nixosConfigurations / homeConfigurations
+      # evaluations.  Intentionally separate from mkPkgs (which carries
+      # system-specific overlays like the gnupg pin and codec doCheck=false
+      # patches).
+      mkDevPkgs =
+        system:
+        import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+          overlays = [ (import rust-overlay) ];
+        };
+      pkgsDevLinux = mkDevPkgs systems.linux;
+      pkgsDevMac = mkDevPkgs systems.mac;
 
       # Per-system VS Code Marketplace derivation sets from nix-vscode-extensions.
       # Used by editors.nix to build Nix derivations for the ~20 extensions that
@@ -503,7 +528,9 @@
       # nix-direnv when an .envrc with `use flake` is present.
       #
       #   default   — general development tools: bun (JS runtime), uv (Python
-      #               package manager), cargo + rustc (Rust toolchain), prek
+      #               package manager), Rust toolchain via rust-overlay (reads
+      #               rust-toolchain.toml when present in the project root;
+      #               falls back to the latest stable default otherwise), prek
       #               (Git hook manager for repos that opt in via prek.toml).
       #               Auto-loaded by nix-direnv from the repo root .envrc.
       #   bootstrap — bootstrap tool set (gnupg, sops, ssh-to-age) for manual
@@ -511,19 +538,31 @@
       # -----------------------------------------------------------------------
       devShells = {
         "${systems.mac}" = {
-          default = pkgsMac.mkShell {
-            packages = [
-              pkgsMac.bun
-              pkgsMac.cargo
-              pkgsMac.prek
-              pkgsMac.rustc
-              pkgsMac.uv
-            ];
-            # libiconv is required by the macOS linker when building Rust/C projects
-            # (ld: library not found for -liconv). It is included in glibc on Linux
-            # so no equivalent addition is needed in the Linux devShell.
-            buildInputs = [ pkgsMac.libiconv ];
-          };
+          default =
+            let
+              # Prefer the project's rust-toolchain.toml when present; fall back
+              # to the latest stable default profile (cargo, rustc, clippy,
+              # rustfmt).  rust-overlay parses the file and assembles a
+              # Nix-patched toolchain without invoking system-level rustup on
+              # POSIX hosts.
+              rustToolchain =
+                if builtins.pathExists ../rust-toolchain.toml then
+                  pkgsDevMac.rust-bin.fromRustupToolchainFile ../rust-toolchain.toml
+                else
+                  pkgsDevMac.rust-bin.stable.latest.default;
+            in
+            pkgsDevMac.mkShell {
+              packages = [
+                pkgsDevMac.bun
+                pkgsDevMac.prek
+                rustToolchain
+                pkgsDevMac.uv
+              ];
+              # libiconv is required by the macOS linker when building Rust/C projects
+              # (ld: library not found for -liconv). It is included in glibc on Linux
+              # so no equivalent addition is needed in the Linux devShell.
+              buildInputs = [ pkgsDevMac.libiconv ];
+            };
           bootstrap = pkgsMac.mkShell {
             packages = [
               pkgsMac.gnupg
@@ -533,15 +572,22 @@
           };
         };
         "${systems.linux}" = {
-          default = pkgsLinux.mkShell {
-            packages = [
-              pkgsLinux.bun
-              pkgsLinux.cargo
-              pkgsLinux.prek
-              pkgsLinux.rustc
-              pkgsLinux.uv
-            ];
-          };
+          default =
+            let
+              rustToolchain =
+                if builtins.pathExists ../rust-toolchain.toml then
+                  pkgsDevLinux.rust-bin.fromRustupToolchainFile ../rust-toolchain.toml
+                else
+                  pkgsDevLinux.rust-bin.stable.latest.default;
+            in
+            pkgsDevLinux.mkShell {
+              packages = [
+                pkgsDevLinux.bun
+                pkgsDevLinux.prek
+                rustToolchain
+                pkgsDevLinux.uv
+              ];
+            };
           bootstrap = pkgsLinux.mkShell {
             packages = [
               pkgsLinux.gnupg
