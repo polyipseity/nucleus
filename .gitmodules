@@ -1,0 +1,4 @@
+[submodule "vendor/Fido"]
+	path = vendor/Fido
+	url = https://github.com/pbatard/Fido
+	branch = master
