@@ -562,9 +562,38 @@ in
       # No cargo-binstall-managed crates on POSIX.
       : > "$_icp_desired"
 
-      # Guard: cargo is available only if a rustup toolchain is installed.
-      # If cargo is absent, skip rather than failing the whole activation;
-      # nothing is installed by this step on POSIX hosts anyway.
+      # Probe nix-profile / home-manager-profile bin directories so that
+      # pkgs.cargo (linked after linkGeneration) is discoverable even when the
+      # activation shell's PATH has not yet been updated.  Also checks the
+      # Darwin system sw path (/run/current-system/sw/bin) where nix-darwin
+      # places system packages on macOS.
+      for _icp_dir in \
+        "/run/current-system/sw/bin" \
+        "$HOME/.local/state/nix/profiles/profile/bin" \
+        "$HOME/.nix-profile/bin" \
+        "$HOME/.local/state/home-manager/profile/bin" \
+        "$HOME/.local/home-manager/profile/bin"; do
+        if [ -x "$_icp_dir/cargo" ]; then
+          PATH="$_icp_dir:$PATH"
+          export PATH
+          break
+        fi
+      done
+
+      # Final fallback: search the nix store for a cargo binary (handles the
+      # case where no standard profile path is active yet but the derivation
+      # is already in the store).
+      if ! command -v cargo >/dev/null 2>&1; then
+        _icp_cargo_store="$(find /nix/store -maxdepth 3 -name 'cargo' -type f -print -quit 2>/dev/null || true)"
+        if [ -n "$_icp_cargo_store" ] && [ -x "$_icp_cargo_store" ]; then
+          PATH="$(dirname "$_icp_cargo_store"):$PATH"
+          export PATH
+        fi
+      fi
+
+      # Guard: cargo is provided by pkgs.cargo (POSIX) via the nix profile.
+      # If cargo is absent after PATH probing, skip rather than failing the
+      # whole activation; nothing is installed by this step on POSIX hosts.
       if ! command -v cargo >/dev/null 2>&1; then
         echo "cargo-binstall: cargo not found in PATH; skipping package management"
         rm -f "$_icp_desired"
