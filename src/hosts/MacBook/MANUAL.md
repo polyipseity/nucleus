@@ -52,4 +52,7 @@
 - `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
-- `nucleus-vm-setup` — build (if needed) and provision UTM VMs declared in `src/modules/VMs.json`; run once per machine or when adding a VM. NixOS guest uses `nixos-generators` (no extra tools). Windows 11 guest requires `--windows-iso /path/to/Win11.iso` (download from <https://www.microsoft.com/software-download/windows11>). See the generated `~/virtual machines/<name>-configure.sh` for the configuration command.
+- `nucleus-vm-setup` — build (if needed) and provision UTM VMs declared in `src/modules/VMs.json`; run once per machine or when adding a VM. See the generated `~/virtual machines/<name>-configure.sh` for the configuration command.
+  - **macOS guest**: macOS VM build is not automated (Apple EULA restricts redistribution). Obtain a macOS QCOW2 image manually, place it at `~/virtual machines/images/macos.qcow2`, then re-run `nucleus-vm-setup` to provision the UTM bundle.
+  - **NixOS guest** (`--nixos-only`): fully automatic; `nixos-generators` builds the image (no extra tools needed).
+  - **Windows 11 guest** (`--windows-only`): attempts to auto-download the ISO from Microsoft on first run (Fido-style); falls back to `--windows-iso /path/to/Win11.iso` if auto-fetch fails (download from <https://www.microsoft.com/software-download/windows11>).
