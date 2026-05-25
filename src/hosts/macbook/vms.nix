@@ -1,4 +1,4 @@
-# macbook/VMs.nix — UTM VM configuration templates for the macOS host.
+# macbook/vms.nix — UTM VM configuration templates for the macOS host.
 #
 # Generates UTM 4.x QEMU-backend config.plist templates for each VM declared in
 # src/modules/VMs.json.  Templates are written to

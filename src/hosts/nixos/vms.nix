@@ -1,4 +1,4 @@
-# nixos/VMs.nix — KVM/libvirt virtual machine infrastructure for the NixOS host.
+# nixos/vms.nix — KVM/libvirt virtual machine infrastructure for the NixOS host.
 #
 # Enables the libvirtd hypervisor so QEMU/KVM guests can be managed via virsh
 # and virt-manager.  Guest VMs are declared in src/modules/VMs.json and

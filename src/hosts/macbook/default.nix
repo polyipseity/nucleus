@@ -4,10 +4,10 @@
 {
   # Inject the host manual path into Home Manager at the user layer so the
   # system entrypoint never needs to define a Home Manager-only option.
-  # VMs.nix generates UTM config.plist templates for each VM in VMs.json.
+  # vms.nix generates UTM config.plist templates for each VM in VMs.json.
   home-manager.sharedModules = [
     { nucleus.hostManualFile = "src/hosts/macbook/MANUAL.md"; }
-    ./VMs.nix
+    ./vms.nix
   ];
 
   imports = [

@@ -23,6 +23,6 @@
     ./security.nix
     ./sops.nix
     ./users.nix
-    ./VMs.nix
+    ./vms.nix
   ];
 }
