@@ -14,10 +14,9 @@ function Invoke-CargoBinstallSetup {
 
   .DESCRIPTION
     Maintains a managed set of Rust CLI binaries installed via cargo-binstall.
-    On each apply it computes the diff between the desired package list and a
-    per-user manifest at %USERPROFILE%\.config\nucleus\cargo-binstall-packages.json,
-    installs additions via `cargo-binstall --no-confirm`, and uninstalls removals
-    via `cargo uninstall`.
+    On each apply it queries `cargo install --list` for the actually installed
+    set and removes anything not in the desired list (zap-style), then installs
+    any desired packages that are missing via `cargo-binstall --no-confirm`.
 
     Only packages absent from both WinGet and Scoop are managed here, following
     the repository preference hierarchy (nixpkgs/winget > scoop > cargo binstall > bun > uv).
@@ -55,7 +54,6 @@ function Invoke-CargoBinstallSetup {
     'pay-respects'
   )
 
-  $manifestPath = Join-Path $HOME ".config\nucleus\cargo-binstall-packages.json"
   # cargo-binstall and `cargo uninstall` both operate on this directory.
   $cargoBinDir = Join-Path $HOME ".cargo\bin"
 
@@ -73,29 +71,27 @@ function Invoke-CargoBinstallSetup {
     return
   }
 
-  # Read previously-managed package list from manifest.  An absent manifest
-  # (first run) is treated as an empty previous set so all desired packages
-  # are treated as additions.
-  $previousPackages = @()
-  if (Test-Path $manifestPath) {
-    try {
-      $parsed = Get-Content -Path $manifestPath -Raw | ConvertFrom-Json
-      if ($null -ne $parsed) {
-        $previousPackages = @($parsed)
-      }
-    }
-    catch {
-      Write-Warning "Invoke-CargoBinstallSetup: manifest at '$manifestPath' could not be parsed; treating as empty"
-    }
-  }
+  # Get actually installed crates from `cargo install --list` (zap-style:
+  # remove any installed crate absent from the desired list, regardless of
+  # prior managed state).  `cargo install --list` emits lines of the form
+  # "name vX.Y.Z:" for each installed crate.
+  $cargoListOutput = @(cargo install --list 2>&1)
+  $installedCrates = @(
+    $cargoListOutput |
+      Where-Object { $_ -match '^[a-zA-Z0-9_-]+ v' } |
+      ForEach-Object { ($_ -split '\s+')[0] }
+  )
 
-  # Packages no longer desired that were previously managed by this module.
-  $toRemove = @($previousPackages | Where-Object { $desiredPackages -notcontains $_ })
+  # Crates installed but not desired: zap-style removal.
+  # Mirrors homebrew cleanup = "zap": removes anything installed but absent
+  # from the declared desired set, regardless of how it was installed.
+  $toRemove = @($installedCrates | Where-Object { $desiredPackages -notcontains $_ })
 
-  # Desired packages whose binary is absent in ~/.cargo/bin.
-  # Binary name matches the crate name for all managed packages.
+  # Desired crates not yet installed (absent from cargo install --list or
+  # binary missing from ~/.cargo/bin).
   $toInstall = @($desiredPackages | Where-Object {
-    -not (Test-Path (Join-Path $cargoBinDir "$_.exe"))
+    $pkg = $_
+    $installedCrates -notcontains $pkg
   })
 
   foreach ($pkg in $toRemove) {
@@ -121,11 +117,4 @@ function Invoke-CargoBinstallSetup {
     Write-Output "cargo-binstall-setup: $pkg installed successfully"
   }
 
-  # Persist the current desired set as the new managed manifest so future
-  # applies can compute removals when a package is dropped from the list.
-  $manifestDir = Split-Path -Parent $manifestPath
-  if (-not (Test-Path $manifestDir)) {
-    New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
-  }
-  $desiredPackages | ConvertTo-Json | Set-Content -Path $manifestPath -Encoding UTF8
 }
