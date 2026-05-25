@@ -83,18 +83,18 @@ For project-specific development, enter the project devShell. For repositories
 without direnv/Nix metadata, nucleus also provisions a managed default shell
 environment with the same baseline tools. The shared inventory is:
 
-| Tool            | Purpose                                                                                           |
-| --------------- | ------------------------------------------------------------------------------------------------- |
-| `bun`           | JS/Node development                                                                               |
-| `cargo`/`rustc` | Rust toolchain via **rust-overlay** (reads project `rust-toolchain.toml`; falls back to stable)  |
-| `prek`          | Git hook management during development                                                            |
-| `uv`            | Python development                                                                                |
+| Tool            | Purpose                                                                                         |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| `bun`           | JS/Node development                                                                             |
+| `cargo`/`rustc` | Rust toolchain via **rust-overlay** (reads project `rust-toolchain.toml`; falls back to stable) |
+| `prek`          | Git hook management during development                                                          |
+| `uv`            | Python development                                                                              |
 
 On POSIX hosts the devShell Rust toolchain is provided by
 `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) when a
 `rust-toolchain.toml` is present in the project root, or
 `pkgs.rust-bin.stable.latest.default` otherwise — no system-level rustup
-required.  On Windows, rustup (installed via `Rust.Rustup`) intercepts cargo
+required. On Windows, rustup (installed via `Rust.Rustup`) intercepts cargo
 invocations and reads `rust-toolchain.toml` natively.
 
 ### Entering the devShell
