@@ -1,9 +1,9 @@
 # modules/Windows/scoop-setup.ps1 — Declarative Scoop bucket and app management.
 #
-# Idempotently converges the declared set of Scoop apps and prunes removed
-# entries from a per-user manifest at %USERPROFILE%\.config\nucleus\scoop-packages.json.
-# Mirrors the declarative install+prune approach used by Invoke-BunSetup and the
-# installBunPackages POSIX activation.
+# Idempotently converges the declared set of Scoop apps using zap-style pruning:
+# reads the Scoop apps directory for the actually installed set and removes
+# anything not in the desired list.  Mirrors the declarative install+prune
+# approach used by Invoke-BunSetup and the installBunPackages POSIX activation.
 
 function Invoke-ScoopSetup {
   <#
@@ -12,12 +12,9 @@ function Invoke-ScoopSetup {
 
   .DESCRIPTION
     Ensures the 'extras' and 'main' Scoop buckets are registered, then
-    converges the managed Scoop app set:
-      - Installs additions listed in $desiredPackages but absent from Scoop.
-      - Uninstalls packages present in the previous manifest but no longer
-        declared, mirroring the prune behaviour of Invoke-BunSetup.
-    The manifest at %USERPROFILE%\.config\nucleus\scoop-packages.json records
-    the current managed set so subsequent runs can detect deletions.
+    reads the Scoop apps directory for the actually installed set and removes
+    anything not in the desired list (zap-style), then installs any desired
+    apps that are missing.
 
     This function must run after the WinGet DSC step that installs Scoop.Scoop,
     because Scoop shims are written to %USERPROFILE%\scoop\shims which is not
@@ -85,36 +82,30 @@ function Invoke-ScoopSetup {
     }
   }
 
-  $manifestPath = Join-Path $HOME ".config\nucleus\scoop-packages.json"
-  $manifestDir = Split-Path $manifestPath -Parent
-
-  # Read the previously-managed package list.  An absent or malformed manifest
-  # (first run) is treated as an empty set so all desired packages become
-  # additions and nothing is pruned unexpectedly.
-  $previousPackages = @()
-  if (Test-Path $manifestPath) {
-    try {
-      $parsed = Get-Content -Path $manifestPath -Raw | ConvertFrom-Json
-      if ($null -ne $parsed) {
-        $previousPackages = @($parsed)
-      }
-    }
-    catch {
-      Write-Warning "Invoke-ScoopSetup: manifest at '$manifestPath' could not be parsed; treating as empty"
-    }
+  # Get actually installed Scoop apps by reading the apps directory (zap-style:
+  # remove any installed app absent from the desired list, regardless of prior
+  # managed state).  Scoop installs each app to ~\scoop\apps\<name>\, so
+  # directory names are the authoritative installed set.
+  $scoopAppsDir = Join-Path $env:USERPROFILE "scoop\apps"
+  $installedApps = @()
+  if (Test-Path $scoopAppsDir) {
+    $installedApps = @(
+      Get-ChildItem -Path $scoopAppsDir -Directory |
+        Select-Object -ExpandProperty Name
+    )
   }
 
-  # Packages no longer desired: present in the previous manifest but absent
-  # from the desired list.
-  $toRemove = @($previousPackages | Where-Object { $desiredPackages -notcontains $_ })
+  # Apps installed but not desired: zap-style removal.
+  # Mirrors homebrew cleanup = "zap": removes anything installed but absent
+  # from the declared desired set, regardless of how it was installed.
+  $toRemove = @($installedApps | Where-Object { $desiredPackages -notcontains $_ })
 
-  # Desired packages not yet installed (shim absent from scoopShims).
-  # Scoop writes a <name>.cmd shim for most apps; fall back to <name>.exe for
-  # apps (like gopass) that ship a native binary shim.
+  # Desired apps not yet installed (shim absent from scoopShims or not in
+  # apps directory).  Scoop writes a <name>.cmd shim for most apps; fall back
+  # to <name>.exe for apps (like gopass) that ship a native binary shim.
   $toInstall = @($desiredPackages | Where-Object {
     $pkg = $_
-    -not (Test-Path (Join-Path $scoopShims "$pkg.cmd")) -and
-    -not (Test-Path (Join-Path $scoopShims "$pkg.exe"))
+    $installedApps -notcontains $pkg
   })
 
   # Prune packages removed from the desired list.
@@ -148,9 +139,4 @@ function Invoke-ScoopSetup {
     Write-Output "scoop: all managed packages already converged — skipping"
   }
 
-  # Persist the new desired set so the next apply can detect future removals.
-  if (-not (Test-Path $manifestDir)) {
-    New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
-  }
-  $desiredPackages | ConvertTo-Json -Compress | Set-Content -Path $manifestPath -Encoding UTF8
 }
