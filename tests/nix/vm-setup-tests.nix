@@ -311,6 +311,16 @@ let
   # The Packer failure branch for the Windows build must also surface the error.
   test_windows_packer_failure_message = assert' (lib.hasInfix "Packer build for Windows VM" vm_setup_sh_text) "scripts/vm-setup.sh must print a failure message for a failed Windows Packer build";
 
+  # Fido fallback must be gated to Windows hosts only; on macOS/Linux the
+  # script must skip Fido and print the explicit Windows-CIM requirement.
+  test_windows_iso_fido_windows_only =
+    assert'
+      (
+        (lib.hasInfix "skipping Fido fallback on" vm_setup_sh_text)
+        && (lib.hasInfix "Fido requires Windows CIM cmdlets" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must skip Fido fallback on non-Windows hosts and explain the Windows CIM requirement";
+
 in
 {
   inherit
@@ -338,6 +348,7 @@ in
     test_macos_packer_exit_check
     test_macos_packer_failure_message
     test_windows_packer_failure_message
+    test_windows_iso_fido_windows_only
     ;
 
   summary = "vm-setup-tests: all tests passed";

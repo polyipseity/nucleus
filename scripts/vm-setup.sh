@@ -377,8 +377,21 @@ build_windows_image() {
       if [ "$dry_run" = false ]; then
         if download_windows_iso_mido "$_cached_iso" "$_edition"; then
           _iso="$_cached_iso"
-        elif download_windows_iso_fido "$_cached_iso" "$_edition"; then
-          _iso="$_cached_iso"
+        else
+          _host_uname="$(uname -s)"
+          case "$_host_uname" in
+            MINGW*|MSYS*|CYGWIN*|Windows_NT)
+              # WHY: Fido uses Windows CIM cmdlets/APIs and is only reliable on
+              # Windows hosts.  On macOS/Linux it can fail with missing cmdlets
+              # (for example Get-CimInstance), so we skip it there.
+              if download_windows_iso_fido "$_cached_iso" "$_edition"; then
+                _iso="$_cached_iso"
+              fi
+              ;;
+            *)
+              printf 'vm-setup: Mido failed; skipping Fido fallback on %s because Fido requires Windows CIM cmdlets\n' "$_host_uname" >&2
+              ;;
+          esac
         fi
       else
         printf 'vm-setup: [dry-run] would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (or Fido fallback) to download Windows 11 ISO\n'
