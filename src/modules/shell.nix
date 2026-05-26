@@ -32,10 +32,22 @@ let
   # Publish the fallback toolchain path as a session variable so every managed
   # shell can reach the same user-scoped binaries without duplicating the store
   # path string in multiple helper functions.
-  mergedSessionVariables = sessionVariables // {
-    NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin";
-    NUCLEUS_DEFAULT_DEV_ENV = "1";
-  };
+  mergedSessionVariables =
+    sessionVariables
+    // {
+      NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin";
+      NUCLEUS_DEFAULT_DEV_ENV = "1";
+    }
+    // lib.optionalAttrs pkgs.stdenv.isDarwin {
+      # WHY: rustup-managed cargo on macOS needs libiconv in LIBRARY_PATH when
+      # building crates with C dependencies (for example openssl-sys, libgit2-sys).
+      # Without this, the system linker fails with "ld: library not found for -liconv".
+      # In devShells (use flake), buildInputs = [libiconv] handles this via NIX_LDFLAGS.
+      # For interactive sessions outside a devShell — including rustup run stable cargo
+      # and cargo in a directory that has only .envrc (even empty) with a rust-toolchain.toml
+      # — this persistent variable ensures the linker finds Nix's libiconv.
+      LIBRARY_PATH = "${pkgs.libiconv}/lib";
+    };
 
   # Keep iCloud exclusion names and managed root paths in one declarative source
   # (users.json) so activation-time recursive marking and interactive shell hooks
@@ -344,9 +356,16 @@ in
             #   rustc  — companion to cargo; both come from the rustup-managed toolchain
             #   uv     — installs system-level Python tooling
             # Direct developer use of these system binaries is blocked.
-            # When DIRENV_DIR is set, a direnv environment (devShell) is active and
-            # its scoped binaries shadow the system tools; otherwise use
-            # rustup run stable cargo/rustc for Rust outside a devShell.
+            # When DIRENV_DIR is set, a project context is active — this covers
+            # two intended cases:
+            #   • 'use flake' .envrc: the devShell provides its own cargo/rustc;
+            #     its scoped binaries shadow the system tools.
+            #   • empty (or non-flake) .envrc with rust-toolchain.toml: rustup reads
+            #     the toolchain file and routes cargo to the pinned toolchain; the
+            #     shell pass-through is intentional so project builds work without a
+            #     full devShell.  The .envrc (even if empty) serves as an explicit
+            #     signal that the directory is a managed project context.
+            # Outside any .envrc (no DIRENV_DIR): use 'rustup run stable cargo/rustc'.
             bun() {
               __nucleus_run_managed_dev_tool bun "$@"
               _status=$?

@@ -35,7 +35,14 @@ command and prints a helpful error pointing to the devShell.
 Functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`,
 `pip3` are defined in `programs.zsh.initContent`. They:
 
-1. Check `$DIRENV_DIR` — set by direnv whenever an `.envrc` is active.
+1. Check `$DIRENV_DIR` — set by direnv whenever an `.envrc` is active,
+   including an **empty** `.envrc`.  An empty `.envrc` (or any non-flake
+   `.envrc`) with a `rust-toolchain.toml` present is an **intentional**
+   design: it signals a managed project directory and allows cargo to
+   route through the rustup shim which reads the toolchain file.  The
+   devShell (from a `use flake` `.envrc`) is the preferred path; empty
+   `.envrc` is the lightweight alternative for projects that only need
+   rustup-based toolchain selection without full Nix devShell overhead.
 2. If set, invoke `command <tool>` to bypass the function and reach the
    devShell-scoped binary at the front of `PATH`.
 3. Otherwise, invoke the managed fallback toolchain published via

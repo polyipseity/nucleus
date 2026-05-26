@@ -173,6 +173,19 @@ let
     assert' ((lib.hasInfix "channel" rustToolchainText) && (lib.hasInfix "stable" rustToolchainText))
       "rust-toolchain.toml must exist at the repo root with a stable channel so the POSIX devShell resolves to a pinned toolchain";
 
+  # Verify that shell.nix sets LIBRARY_PATH to the Nix libiconv path on Darwin
+  # so that rustup-managed cargo can link C-dependent crates (e.g. openssl-sys)
+  # outside a devShell without hitting "ld: library not found for -liconv".
+  # The Darwin guard ensures the variable is only set on macOS (Linux uses glibc).
+  test_posix_shell_darwin_libiconv_library_path =
+    assert'
+      (
+        (lib.hasInfix "LIBRARY_PATH" posixShellText)
+        && (lib.hasInfix "libiconv" posixShellText)
+        && (lib.hasInfix "isDarwin" posixShellText)
+      )
+      "shell.nix must set LIBRARY_PATH to the Nix libiconv path on Darwin for rustup-managed cargo builds outside a devShell";
+
   allTests = [
     test_posix_shell_exports_fallback_bundle
     test_posix_pwsh_uses_fallback_bundle
@@ -194,6 +207,7 @@ let
     test_windows_cargo_prunes_both_install_and_binstall
     test_posix_devshell_uses_rust_overlay
     test_rust_toolchain_toml_exists_and_is_stable
+    test_posix_shell_darwin_libiconv_library_path
   ];
 in
 {
