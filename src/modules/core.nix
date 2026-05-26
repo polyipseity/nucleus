@@ -11,9 +11,13 @@
 #   python / pip — BANNED entirely; see Python section below.
 #   bun          — installs global Node/JS ecosystem system packages via
 #                  `bun add -g`.  Direct developer use is forbidden.
-#   cargo        — used only by cargo-binstall / cargo install for system Rust
-#                  binary packages.  Direct developer use is forbidden.
-#                  POSIX: nixpkgs pkgs.cargo.  Windows: via rustup toolchain.
+#   cargo        — system cargo comes from the rustup stable toolchain; used only
+#                  by cargo-binstall / cargo install for system Rust binary
+#                  packages.  Direct developer use is forbidden.
+#                  All platforms: via rustup (pkgs.rustup on POSIX; Rustlang.Rustup on Windows).
+#   rustup       — manages per-project Rust toolchains; default is set to none
+#                  so rust-toolchain.toml is always authoritative.
+#                  All platforms: pkgs.rustup on POSIX; Rustlang.Rustup on Windows.
 #   uv           — installs system-level Python tooling (e.g. `uv tool install`).
 #                  Direct developer use is forbidden.
 # All of the above are blocked at the interactive shell level (shell.nix zsh
@@ -30,7 +34,7 @@
 #   - POSIX manual: run `nix develop` from the repo root.
 #   - Windows: run the equivalent `nix develop` or use WSL with direnv.
 # For repositories without direnv/Nix metadata, the managed default shell
-# environment provides the same baseline bun/cargo/rustc/uv/prek inventory.
+# environment provides the same baseline bun/uv/prek inventory.
 #
 # === PYTHON POLICY ===
 # System-wide Python is explicitly banned across all platforms. This prevents:
@@ -56,8 +60,6 @@ let
   #   bottom         — cross-platform system monitor (btm)
   #   bun            — high-speed all-in-one JS toolkit (runtime, package manager, bundler); global runtime for JS ecosystem tasks
   #                    (Windows: Oven-sh.Bun in system.dsc.yml; fourth tier in install hierarchy: nixpkgs/winget > scoop > cargo binstall > bun > uv)
-  #   cargo          — Rust cargo binary for system-level use (cargo-binstall, cargo install) only
-  #                    (POSIX: pkgs.cargo from nixpkgs; Windows: cargo comes from rustup-managed toolchain via Rust.Rustup)
   #   cargo-binstall — Rust crate binary installer; second-to-last-resort fallback when a package is absent from nixpkgs/WinGet/Scoop
   #   cargo-cache    — reclaim disk space from ~/.cargo registry, git, and advisory-db clones
   #   direnv         — per-directory env loader (shell integration in shell.nix)
@@ -94,6 +96,9 @@ let
   #   prek           — pre-commit hook manager used by prek.toml
   #   ripgrep        — fast grep replacement
   #   ruff           — fast Python linter/formatter CLI
+  #   rustup         — Rust toolchain manager; default set to none so rust-toolchain.toml is
+  #                    authoritative; stable toolchain installed for cargo-binstall fallback
+  #                    (all platforms: pkgs.rustup on POSIX; Rustlang.Rustup via WinGet on Windows)
   #   shellcheck     — shell linter used by CI and pre-commit validation
   #   sops           — secret encryption/decryption tool
   #   ssh-to-age     — derives age public/private keys from SSH keys; required by
@@ -106,7 +111,6 @@ let
     pkgs.bat
     pkgs.bottom
     pkgs.bun
-    pkgs.cargo
     pkgs.cargo-binstall
     pkgs.cargo-cache
     pkgs.direnv
@@ -137,6 +141,7 @@ let
     pkgs.prek
     pkgs.ripgrep
     pkgs.ruff
+    pkgs.rustup
     pkgs.shellcheck
     pkgs.sops
     pkgs.ssh-to-age

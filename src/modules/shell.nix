@@ -18,14 +18,13 @@ let
   # Keep a user-scoped baseline toolchain available even in repositories that do
   # not ship direnv or Nix metadata. This preserves the "no direct system tool
   # invocation" policy while still giving unmanaged projects a predictable bun /
-  # cargo / rustc / uv / prek bundle.
+  # uv / prek bundle.  Rust toolchain management is via rustup on all platforms;
+  # cargo/rustc are not included here so users go through rustup or a devShell.
   defaultDevTools = pkgs.symlinkJoin {
     name = "default-dev-tools";
     paths = [
       pkgs.bun
-      pkgs.cargo
       pkgs.prek
-      pkgs.rustc
       pkgs.uv
     ];
   };
@@ -33,21 +32,10 @@ let
   # Publish the fallback toolchain path as a session variable so every managed
   # shell can reach the same user-scoped binaries without duplicating the store
   # path string in multiple helper functions.
-  mergedSessionVariables =
-    sessionVariables
-    // {
-      NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin";
-      NUCLEUS_DEFAULT_DEV_ENV = "1";
-    }
-    // lib.optionalAttrs pkgs.stdenv.isDarwin {
-      # WHY: libiconv is required by the macOS linker when cargo/rustc compile
-      # C-dependent crates (e.g., openssl-sys, libgit2-sys).  Without this path in
-      # LIBRARY_PATH the linker fails with "library not found for -liconv".
-      # NUCLEUS_LIBICONV_LIB is injected only in the fallback subprocess (not
-      # exported persistently to the interactive shell) so it does not override
-      # a devShell's own LIBRARY_PATH settings.
-      NUCLEUS_LIBICONV_LIB = "${pkgs.libiconv}/lib";
-    };
+  mergedSessionVariables = sessionVariables // {
+    NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin";
+    NUCLEUS_DEFAULT_DEV_ENV = "1";
+  };
 
   # Keep iCloud exclusion names and managed root paths in one declarative source
   # (users.json) so activation-time recursive marking and interactive shell hooks
@@ -182,7 +170,6 @@ in
             # usable even when the shell did not start as a login shell.
             export NUCLEUS_DEFAULT_DEV_BIN="${defaultDevTools}/bin"
             export NUCLEUS_DEFAULT_DEV_ENV="1"
-            ${lib.optionalString pkgs.stdenv.isDarwin "export NUCLEUS_LIBICONV_LIB=\"${pkgs.libiconv}/lib\""}
 
             # (User-scope package manager bin dirs are declared via home.sessionPath
             # below; that path goes to ~/.zshenv which is sourced before this
@@ -208,16 +195,7 @@ in
               fi
 
               if [[ -n "''${NUCLEUS_DEFAULT_DEV_BIN:-}" && -x "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" ]]; then
-                if [[ -n "''${NUCLEUS_LIBICONV_LIB:-}" ]]; then
-                  # WHY: Prepend managed libiconv so the fallback cargo/rustc can
-                  # build C-dependent crates on macOS even when no devShell is
-                  # active.  LIBRARY_PATH is set only for the subprocess so it
-                  # does not pollute the interactive shell's link-search state.
-                  LIBRARY_PATH="''${NUCLEUS_LIBICONV_LIB}''${LIBRARY_PATH:+:''${LIBRARY_PATH}}" \
-                    "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" "$@"
-                else
-                  "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" "$@"
-                fi
+                "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" "$@"
                 return $?
               fi
 
@@ -362,13 +340,13 @@ in
             # Intercept system-wide bun/cargo/rustc/uv invocations.
             # These tools are installed globally for system package management only:
             #   bun    — installs global Node/JS ecosystem system packages
-            #   cargo  — cargo-binstall installs Rust binary system packages
-            #   rustc  — companion to cargo for compilation during binstall
+            #   cargo  — cargo-binstall installs Rust binary system packages via rustup stable
+            #   rustc  — companion to cargo; both come from the rustup-managed toolchain
             #   uv     — installs system-level Python tooling
             # Direct developer use of these system binaries is blocked.
             # When DIRENV_DIR is set, a direnv environment (devShell) is active and
-            # its scoped binaries shadow the system tools; otherwise use the
-            # managed default toolchain installed under the user's profile.
+            # its scoped binaries shadow the system tools; otherwise use
+            # rustup run stable cargo/rustc for Rust outside a devShell.
             bun() {
               __nucleus_run_managed_dev_tool bun "$@"
               _status=$?
@@ -395,7 +373,8 @@ in
       shell: managed cargo is unavailable right now.
                For Rust development, use one of these managed entrypoints:
                - Enter a project directory with .envrc (direnv auto-loads the devShell)
-               - Or use the user-scoped default toolchain installed by nucleus apply
+               - Or use: rustup run stable cargo <command>
+               - To install a toolchain: rustup toolchain install stable
       EOF
               return 1
             }
@@ -410,7 +389,8 @@ in
       shell: managed rustc is unavailable right now.
                For Rust development, use one of these managed entrypoints:
                - Enter a project directory with .envrc (direnv auto-loads the devShell)
-               - Or use the user-scoped default toolchain installed by nucleus apply
+               - Or use: rustup run stable rustc <command>
+               - To install a toolchain: rustup toolchain install stable
       EOF
               return 1
             }

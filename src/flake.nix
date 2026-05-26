@@ -29,8 +29,9 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     # rust-overlay: provides rust-bin.fromRustupToolchainFile and friends for
     # declarative Rust toolchain management in devShells.  Reads the project's
-    # rust-toolchain.toml to assemble a Nix-patched toolchain, preserving
-    # reproducibility without system-level rustup on POSIX hosts.
+    # rust-toolchain.toml to assemble a Nix-patched toolchain, providing
+    # reproducible per-project toolchains in devShells independent of the
+    # system rustup install (pkgs.rustup) that manages the interactive shell.
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -543,8 +544,8 @@
               # Prefer the project's rust-toolchain.toml when present; fall back
               # to the latest stable default profile (cargo, rustc, clippy,
               # rustfmt).  rust-overlay parses the file and assembles a
-              # Nix-patched toolchain without invoking system-level rustup on
-              # POSIX hosts.
+              # Nix-patched toolchain distinct from the system pkgs.rustup install
+              # so devShell toolchain versions are reproducible and version-pinned.
               rustToolchain =
                 if builtins.pathExists ../rust-toolchain.toml then
                   pkgsDevMac.rust-bin.fromRustupToolchainFile ../rust-toolchain.toml

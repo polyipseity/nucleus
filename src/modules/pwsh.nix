@@ -9,13 +9,13 @@
 let
   # Keep the same fallback tool inventory as the POSIX zsh profile so managed
   # pwsh sessions can work in repositories that do not provide direnv/Nix hooks.
+  # Rust toolchain management is via rustup on all platforms; cargo/rustc are
+  # not included so users go through rustup or a devShell.
   defaultDevTools = pkgs.symlinkJoin {
     name = "default-dev-tools";
     paths = [
       pkgs.bun
-      pkgs.cargo
       pkgs.prek
-      pkgs.rustc
       pkgs.uv
     ];
   };
@@ -392,7 +392,8 @@ let
       Write-Host "shell: managed cargo is unavailable right now." -ForegroundColor Yellow
       Write-Host "         For Rust development, use one of these managed entrypoints:" -ForegroundColor Yellow
       Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
-      Write-Host "         - Or use the user-scoped default toolchain installed by nucleus apply" -ForegroundColor Yellow
+      Write-Host "         - Or use: rustup run stable cargo <command>" -ForegroundColor Yellow
+      Write-Host "         - To install a toolchain: rustup toolchain install stable" -ForegroundColor Yellow
       return 1
     }
     function rustc {
@@ -402,7 +403,8 @@ let
       Write-Host "shell: managed rustc is unavailable right now." -ForegroundColor Yellow
       Write-Host "         For Rust development, use one of these managed entrypoints:" -ForegroundColor Yellow
       Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
-      Write-Host "         - Or use the user-scoped default toolchain installed by nucleus apply" -ForegroundColor Yellow
+      Write-Host "         - Or use: rustup run stable rustc <command>" -ForegroundColor Yellow
+      Write-Host "         - To install a toolchain: rustup toolchain install stable" -ForegroundColor Yellow
       return 1
     }
     function uv {

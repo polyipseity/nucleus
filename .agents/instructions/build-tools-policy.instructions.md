@@ -1,5 +1,5 @@
 ---
-description: "Use when adding or editing system packages, devShells, shell profiles, or build tool references. Covers the system-install-only policy for bun/cargo/uv/prek (and Windows-only rustup), the shell blocking mechanism, and devShell-first development guidance."
+description: "Use when adding or editing system packages, devShells, shell profiles, or build tool references. Covers the system-install-only policy for bun/cargo/uv/prek/rustup (rustup on all platforms), the shell blocking mechanism, and devShell-first development guidance."
 name: "Build Tools Policy"
 applyTo: "src/modules/core.nix, src/modules/shell.nix, src/modules/pwsh.nix, src/flake.nix, src/hosts/Windows/modules/user/Sync-ShellProfile.ps1, .envrc"
 ---
@@ -15,8 +15,8 @@ interactive sessions:
 | Tool             | Installed by                                        | Permitted system use                                                       |
 | ---------------- | --------------------------------------------------- | -------------------------------------------------------------------------- |
 | `bun`            | nixpkgs / `Oven-sh.Bun`                             | `bun add -g` for global Node/JS system packages                            |
-| `cargo`          | POSIX: `nixpkgs pkgs.cargo` / Windows: via `rustup` | `cargo-binstall` / `cargo install` for system Rust binary installs         |
-| `rustup`         | Windows only: `Rust.Rustup` (WinGet)                | manages per-project toolchains via `rust-toolchain.toml`; default = `none` |
+| `cargo`          | all platforms: via `rustup` stable toolchain                               | `cargo-binstall` / `cargo install` for system Rust binary installs                              |
+| `rustup`         | all platforms: `pkgs.rustup` (POSIX) / `Rustlang.Rustup` (Windows WinGet) | manages Rust toolchains; default = `none`; stable installed for cargo-binstall fallback         |
 | `uv`             | nixpkgs / WinGet                                    | `uv tool install` for system-level Python tooling                          |
 | `prek`           | nixpkgs                                             | system-wide Git hook manager binary (invoked by managed shell/apply hooks) |
 | `python` / `pip` | **banned**                                          | no permitted system use; all Python via devShell or uv venv                |
@@ -90,12 +90,13 @@ environment with the same baseline tools. The shared inventory is:
 | `prek`          | Git hook management during development                                                          |
 | `uv`            | Python development                                                                              |
 
-On POSIX hosts the devShell Rust toolchain is provided by
-`pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) when a
-`rust-toolchain.toml` is present in the project root, or
-`pkgs.rust-bin.stable.latest.default` otherwise — no system-level rustup
-required. On Windows, rustup (installed via `Rust.Rustup`) intercepts cargo
-invocations and reads `rust-toolchain.toml` natively.
+On all hosts, the devShell Rust toolchain is handled per-project. On POSIX,
+`pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix-patched
+toolchain from the project's `rust-toolchain.toml` (or falls back to
+`pkgs.rust-bin.stable.latest.default`) — distinct from the system `pkgs.rustup`
+install so devShell toolchains are reproducible and version-pinned. On Windows,
+rustup (`Rustlang.Rustup`) intercepts cargo invocations and reads
+`rust-toolchain.toml` natively.
 
 ### Entering the devShell
 

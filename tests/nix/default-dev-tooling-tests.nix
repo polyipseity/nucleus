@@ -103,46 +103,47 @@ let
   # NUCLEUS_DEFAULT_DEV_BIN instead of failing with "command not found".
   test_posix_shell_probes_tool_in_direnv = assert' (lib.hasInfix "command -v \"$_tool_name\"" posixShellText) "shell.nix must probe tool availability (command -v) in direnv context before routing, so projects lacking the managed tool fall through to NUCLEUS_DEFAULT_DEV_BIN";
 
-  # Verify that the managed dev tool fallback sets LIBRARY_PATH to include the
-  # Nix-managed libiconv on macOS so cargo/rustc can build C-dependent crates
-  # (e.g. openssl-sys) outside a devShell without a linker "library not found"
-  # error.  LIBRARY_PATH must only be set for the subprocess (env prefix), not
-  # permanently exported to the interactive shell.
-  test_posix_shell_prepends_libiconv_in_fallback =
+  # Verify that POSIX hosts use pkgs.rustup (not pkgs.cargo from nixpkgs) so
+  # that all platforms are unified on rustup for Rust toolchain management.
+  # agents.nix must contain initRustup to set up rustup on POSIX hosts.
+  test_posix_uses_rustup_not_cargo_nix =
     assert'
       (
-        (lib.hasInfix "NUCLEUS_LIBICONV_LIB" posixShellText) && (lib.hasInfix "LIBRARY_PATH" posixShellText)
+        !(lib.hasInfix "pkgs.cargo" coreNixText)
+        && (lib.hasInfix "pkgs.rustup" coreNixText)
+        && (lib.hasInfix "initRustup" posixAgentsText)
       )
-      "shell.nix must define NUCLEUS_LIBICONV_LIB and set LIBRARY_PATH in the fallback for macOS cargo/rustc builds";
+      "POSIX hosts must use pkgs.rustup (not pkgs.cargo from nixpkgs) and agents.nix must contain initRustup";
 
-  # Verify that POSIX hosts install cargo from nixpkgs directly (pkgs.cargo),
-  # NOT via rustup.  rustup is Windows-only; on POSIX, Nix provides cargo for
-  # system package management (cargo-binstall, cargo install).  The
-  # installRustupToolchains hook must be absent from agents.nix to prevent
-  # accidental reimplementation.
-  test_posix_rustup_sets_default_stable =
-    assert'
-      (
-        (lib.hasInfix "pkgs.cargo" coreNixText)
-        && !(lib.hasInfix "pkgs.rustup" coreNixText)
-        && !(lib.hasInfix "installRustupToolchains" posixAgentsText)
-      )
-      "POSIX hosts must use pkgs.cargo from nixpkgs (not pkgs.rustup) and agents.nix must not contain installRustupToolchains";
+  # Verify that the POSIX initRustup activation calls 'rustup default none' to
+  # enforce project-local toolchain selection, matching Invoke-RustupSetup.ps1
+  # on Windows.
+  test_posix_init_rustup_sets_default_none = assert' (lib.hasInfix "rustup default none" posixAgentsText) "agents.nix initRustup must call 'rustup default none' to enforce project-local toolchain selection on POSIX hosts";
 
-  # Same guard for the Windows equivalent.
+  # Verify that POSIX shell.nix does NOT include NUCLEUS_LIBICONV_LIB since
+  # Nix-managed cargo/rustc are no longer in the fallback bundle.  The devShell
+  # handles libiconv via buildInputs in flake.nix; shell profile injection is
+  # no longer needed.
+  test_posix_shell_no_libiconv_fallback =
+    assert' (!(lib.hasInfix "NUCLEUS_LIBICONV_LIB" posixShellText))
+      "shell.nix must NOT contain NUCLEUS_LIBICONV_LIB after removal of Nix-managed cargo/rustc from the fallback bundle";
+
+  # Verify that the Windows Invoke-RustupSetup.ps1 calls 'rustup default none'
+  # after toolchain installation so per-project toolchains are always
+  # authoritative on Windows (mirrors initRustup behavior on POSIX).
   test_windows_rustup_sets_default_stable = assert' (lib.hasInfix "rustup default none" rustupSetupText) "Invoke-RustupSetup.ps1 must call 'rustup default none' after toolchain convergence";
 
-  # Verify that the cargo package convergence uses `cargo install --list` as
-  # the authoritative installed-set source, which covers BOTH plain
-  # `cargo install` packages AND `cargo-binstall` packages in one pass.
-  # The removal side uses `cargo uninstall`, which handles both origins.
+  # Verify that the cargo package convergence uses `cargo +stable install --list`
+  # as the authoritative installed-set source (rustup default is none on POSIX;
+  # +stable selects the installed stable toolchain explicitly).
+  # The removal side uses `cargo +stable uninstall`, which handles both origins.
   test_posix_cargo_prunes_both_install_and_binstall =
     assert'
       (
-        (lib.hasInfix "cargo install --list" posixAgentsText)
-        && (lib.hasInfix "cargo uninstall" posixAgentsText)
+        (lib.hasInfix "cargo +stable install --list" posixAgentsText)
+        && (lib.hasInfix "cargo +stable uninstall" posixAgentsText)
       )
-      "agents.nix must use 'cargo install --list' + 'cargo uninstall' to prune both cargo install and cargo-binstall packages";
+      "agents.nix must use 'cargo +stable install --list' + 'cargo +stable uninstall' to prune both cargo install and cargo-binstall packages";
 
   test_windows_cargo_prunes_both_install_and_binstall =
     assert'
@@ -154,7 +155,8 @@ let
 
   # Verify that the POSIX devShell uses rust-overlay so that projects can pin
   # their Rust toolchain via rust-toolchain.toml.  rust-overlay assembles a
-  # Nix-patched toolchain without system-level rustup on POSIX hosts.
+  # Nix-patched toolchain for devShells; the system interactive shell uses
+  # pkgs.rustup for Rust management on POSIX hosts.
   test_posix_devshell_uses_rust_overlay =
     assert'
       (
@@ -181,8 +183,12 @@ let
     test_posix_uses_session_path_for_user_bins
     test_windows_unconditional_user_bin_path
     test_posix_shell_probes_tool_in_direnv
-    test_posix_shell_prepends_libiconv_in_fallback
-    test_posix_rustup_sets_default_stable
+    # Verify test about removed libiconv in shell fallback.
+    test_posix_shell_no_libiconv_fallback
+    # Verify POSIX now uses pkgs.rustup (not pkgs.cargo).
+    test_posix_uses_rustup_not_cargo_nix
+    # Verify initRustup sets default none on POSIX.
+    test_posix_init_rustup_sets_default_none
     test_windows_rustup_sets_default_stable
     test_posix_cargo_prunes_both_install_and_binstall
     test_windows_cargo_prunes_both_install_and_binstall
@@ -204,12 +210,13 @@ in
     "7: POSIX zsh uses home.sessionPath for user-scope bin dirs (direnv-safe)"
     "8: Windows managed block prepends user-scope bin dirs unconditionally"
     "9: POSIX zsh probes tool availability in direnv context before routing"
-    "10: POSIX zsh fallback sets LIBRARY_PATH for macOS libiconv (cargo/rustc builds)"
-    "11: POSIX hosts use pkgs.cargo from nixpkgs (not pkgs.rustup)"
-    "12: Windows Invoke-RustupSetup calls rustup default none"
-    "13: POSIX cargo convergence prunes both cargo install and cargo-binstall packages"
-    "14: Windows cargo convergence prunes both cargo install and cargo-binstall packages"
-    "15: POSIX devShell uses rust-overlay with fromRustupToolchainFile"
-    "16: rust-toolchain.toml exists at repo root with stable channel"
+    "10: POSIX zsh fallback does not inject libiconv (cargo/rustc removed from fallback bundle)"
+    "11: POSIX hosts use pkgs.rustup (not pkgs.cargo from nixpkgs)"
+    "12: POSIX agents.nix initRustup sets rustup default none"
+    "13: Windows Invoke-RustupSetup calls rustup default none"
+    "14: POSIX cargo convergence prunes both cargo install and cargo-binstall packages"
+    "15: Windows cargo convergence prunes both cargo install and cargo-binstall packages"
+    "16: POSIX devShell uses rust-overlay with fromRustupToolchainFile"
+    "17: rust-toolchain.toml exists at repo root with stable channel"
   ];
 }

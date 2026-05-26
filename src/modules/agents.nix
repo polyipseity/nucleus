@@ -533,6 +533,59 @@ in
     '';
 
     # -------------------------------------------------------------------------
+    # initRustup
+    # Initialises the rustup Rust toolchain manager on POSIX hosts, mirroring
+    # the Windows Invoke-RustupSetup behaviour.
+    #
+    # Sets rustup default to none so rust-toolchain.toml is always authoritative
+    # and installs the stable toolchain for cargo-binstall compilation fallback
+    # and for cargo +stable list/uninstall operations in the next step.
+    #
+    # Why after linkGeneration: pkgs.rustup (linked by linkGeneration) must be
+    # on PATH before this step invokes it to configure the toolchain state.
+    # -------------------------------------------------------------------------
+    initRustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      set -eu
+
+      # Locate pkgs.rustup in the newly linked home-manager profile.  The
+      # activation shell PATH has not yet been updated to reflect the profile, so
+      # probe known profile bin directories in priority order.
+      for _iru_dir in \
+        "/etc/profiles/per-user/$USER/bin" \
+        "/run/current-system/sw/bin" \
+        "$HOME/.local/state/nix/profiles/profile/bin" \
+        "$HOME/.nix-profile/bin" \
+        "$HOME/.local/state/home-manager/profile/bin" \
+        "$HOME/.local/home-manager/profile/bin"; do
+        if [ -x "$_iru_dir/rustup" ]; then
+          PATH="$_iru_dir:$PATH"
+          export PATH
+          break
+        fi
+      done
+
+      if ! command -v rustup >/dev/null 2>&1; then
+        echo "rustup: rustup not found after profile link; skipping initialization" >&2
+      else
+        # WHY none: forces every project to declare its toolchain via
+        # rust-toolchain.toml; prevents silent use of a global stable and
+        # matches Windows Invoke-RustupSetup.
+        rustup default none
+        echo "rustup: default toolchain set to none"
+
+        # Install the stable toolchain so cargo +stable is available for
+        # cargo-binstall compilation fallback and cargo install --list operations.
+        # Mirrors Windows Invoke-RustupSetup desiredChannels=["stable"] behavior.
+        if rustup toolchain list 2>/dev/null | grep -q "^stable"; then
+          echo "rustup: stable toolchain already present"
+        else
+          echo "rustup: installing stable toolchain for cargo-binstall fallback"
+          rustup toolchain install stable --no-self-update
+        fi
+      fi
+    '';
+
+    # -------------------------------------------------------------------------
     # installCargoBinstallPackages
     # Converges the declarative cargo-binstall package set (install + zap).
     #
@@ -545,12 +598,12 @@ in
     # Mirrors homebrew cleanup = "zap": removes anything installed but absent
     # from the declared desired set, regardless of how it was installed.
     #
-    # Why after linkGeneration: cargo is provided by pkgs.cargo in
-    # baseSharedPackages (core.nix) and becomes available once the Home Manager
-    # profile is linked.  Rust toolchain management (rustup) is Windows-only;
-    # on POSIX, Nix provides cargo directly for system package operations.
+    # Why after initRustup: cargo is provided by rustup's stable toolchain via
+    # ~/.cargo/bin; initRustup ensures stable is installed before this step
+    # invokes `cargo +stable` for list and uninstall operations.  Unified with
+    # Windows Invoke-RustupSetup + Invoke-CargoBinstallSetup behavior.
     # -------------------------------------------------------------------------
-    installCargoBinstallPackages = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    installCargoBinstallPackages = lib.hm.dag.entryAfter [ "initRustup" ] ''
       set -eu
 
       # Declarative desired-state list.  On POSIX hosts this list is
@@ -562,12 +615,12 @@ in
       # No cargo-binstall-managed crates on POSIX.
       : > "$_icp_desired"
 
-      # Probe nix-profile / home-manager-profile bin directories so that
-      # pkgs.cargo (linked after linkGeneration) is discoverable even when the
-      # activation shell's PATH has not yet been updated.  Also checks the
-      # Darwin system sw path (/run/current-system/sw/bin) where nix-darwin
-      # places system packages on macOS.
+      # Probe ~/.cargo/bin (rustup shim location) first, then nix-profile /
+      # home-manager-profile bin directories as fallback.  initRustup runs
+      # before this step to ensure the stable toolchain is installed.
       for _icp_dir in \
+        "$HOME/.cargo/bin" \
+        "/etc/profiles/per-user/$USER/bin" \
         "/run/current-system/sw/bin" \
         "$HOME/.local/state/nix/profiles/profile/bin" \
         "$HOME/.nix-profile/bin" \
@@ -580,18 +633,8 @@ in
         fi
       done
 
-      # Final fallback: search the nix store for a cargo binary (handles the
-      # case where no standard profile path is active yet but the derivation
-      # is already in the store).
-      if ! command -v cargo >/dev/null 2>&1; then
-        _icp_cargo_store="$(find /nix/store -maxdepth 3 -name 'cargo' -type f -print -quit 2>/dev/null || true)"
-        if [ -n "$_icp_cargo_store" ] && [ -x "$_icp_cargo_store" ]; then
-          PATH="$(dirname "$_icp_cargo_store"):$PATH"
-          export PATH
-        fi
-      fi
-
-      # Guard: cargo is provided by pkgs.cargo (POSIX) via the nix profile.
+      # Guard: cargo is provided by rustup (stable toolchain) via ~/.cargo/bin;
+      # initRustup ensures stable is installed before this step runs.
       # If cargo is absent after PATH probing, skip rather than failing the
       # whole activation; nothing is installed by this step on POSIX hosts.
       if ! command -v cargo >/dev/null 2>&1; then
@@ -602,10 +645,10 @@ in
         # Output format: "crate-name vX.Y.Z:" on header lines; extract the
         # crate name (first field) from lines matching that pattern.
         _icp_installed="$(mktemp)"
-        # || true is intentional and benign: if cargo install --list fails
-        # (e.g. no crates are installed yet and ~/.cargo is uninitialised),
+        # || true is intentional and benign: if cargo +stable install --list fails
+        # (e.g. stable toolchain missing or ~/.cargo is uninitialised),
         # an empty installed set is correct — nothing to remove.
-        cargo install --list 2>/dev/null | ${pkgs.gawk}/bin/awk '/^[a-zA-Z0-9_-]+ v/{print $1}' > "$_icp_installed" || true
+        cargo +stable install --list 2>/dev/null | ${pkgs.gawk}/bin/awk '/^[a-zA-Z0-9_-]+ v/{print $1}' > "$_icp_installed" || true
 
         # Crates installed but not desired: zap-style removal.
         _icp_to_remove="$(mktemp)"
@@ -629,8 +672,8 @@ in
         while IFS= read -r _icp_crate; do
           [ -z "$_icp_crate" ] && continue
           echo "cargo-binstall: removing $_icp_crate"
-          if ! cargo uninstall "$_icp_crate"; then
-            echo "cargo-binstall: 'cargo uninstall $_icp_crate' failed" >&2
+          if ! cargo +stable uninstall "$_icp_crate"; then
+            echo "cargo-binstall: 'cargo +stable uninstall $_icp_crate' failed" >&2
             rm -f "$_icp_desired" "$_icp_installed" "$_icp_to_remove" "$_icp_to_install"
             exit 1
           fi

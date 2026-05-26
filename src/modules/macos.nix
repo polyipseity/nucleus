@@ -339,6 +339,7 @@ let
     "gpgImport"
     "hideMenuBarIcons"
     "installBunPackages"
+    "initRustup"
     "installCargoBinstallPackages"
     "installPackages"
     "installPwshScriptAnalyzer"
