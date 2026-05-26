@@ -622,6 +622,18 @@ in
         "SUEnableAutomaticChecks" = false;
         "WarnAboutSecureKeyboardInputWithOpenCommand" = false;
       };
+
+      # Amphetamine: declaratively enable the Power Protect install toggle.
+      # WHY partial declarative only: upstream requires users to place the
+      # helper script and sudoers fragment manually due platform restrictions;
+      # this key activates that feature path once those files exist.
+      # Source (upstream maintainer docs):
+      # https://raw.githubusercontent.com/x74353/Amphetamine/master/README.md
+      # Parity note: this feature is macOS-only; there is no equivalent
+      # Power Protect surface on NixOS/Windows in this repository.
+      "com.if.Amphetamine" = {
+        "Enable Power Protect Install" = true;
+      };
     };
 
     # -------------------------------------------------------------------------

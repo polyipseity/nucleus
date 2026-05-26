@@ -111,6 +111,9 @@ in
     # Provision full Xcode from the Mac App Store via brew bundle's `mas` stanza.
     # Requires the managed user to be signed in to the App Store.
     masApps = {
+      # Amphetamine is Mac App Store-only; masApps is the canonical declarative
+      # install surface in nix-darwin's Homebrew bridge for this host.
+      Amphetamine = 937984704;
       Xcode = 497799835;
     };
   };
