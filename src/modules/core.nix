@@ -82,9 +82,12 @@ let
   #   llvmPackages_18.lldb     — LLVM debugger (`lldb`) for cross-host debug parity
   #   llvmPackages_18.lld      — LLVM linker (`ld.lld`) for cross-host link parity
   #   nixd           — Nix language server (LSP) for nix-ide in VS Code on POSIX hosts
+  #   nickel         — Nickel configuration language CLI; also used via the tweag.vscode-nickel VS Code extension
   #   nixfmt         — Nix formatter used by nix-ide/VS Code formatting pipeline
   #   nix-index      — provides nix-locate; required by pay-respects to suggest nixpkgs packages for unknown commands
   #                    (run `nix-index` once after first activation to build the file-index database)
+  #   nls            — Nickel Language Server; provides language intelligence for the tweag.vscode-nickel VS Code extension
+  #                    (Windows: cargo-binstall nickel-lang-lsp in Invoke-CargoBinstallSetup.ps1)
   #   opencode       — AI-native coding agent and assistant
   #   p7zip          — 7z compression and archive extraction utility
   #   packer         — HashiCorp Packer for automated VM image building (scripts/vm-setup.sh)
@@ -129,9 +132,11 @@ let
     pkgs.llvmPackages_18.clang
     pkgs.llvmPackages_18.lldb
     pkgs.llvmPackages_18.lld
+    pkgs.nickel
     pkgs.nixd
     pkgs.nixfmt
     pkgs.nix-index
+    pkgs.nls
     pkgs.opencode
     pkgs.p7zip
     pkgs.packer

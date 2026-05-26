@@ -40,18 +40,26 @@ function Invoke-CargoBinstallSetup {
   [CmdletBinding()]
   param()
 
-  # Declarative desired-state list.  Add a crate name here to install it;
-  # remove it to trigger uninstall on the next apply.  Use the exact crate
-  # name as published on crates.io.  Only add packages absent from both
-  # WinGet and Scoop.
+  # Structured desired-state list.  Each entry has a CrateName (published on
+  # crates.io) and a BinaryName (the executable placed in ~/.cargo/bin).
+  # The two may differ when a crate installs a binary under a different name
+  # (for example nickel-lang-lsp installs nls.exe, not nickel-lang-lsp.exe).
+  # Add an entry here to install it; remove it to trigger uninstall on the
+  # next apply.  Only add packages absent from both WinGet and Scoop.
   $desiredPackages = @(
-    'cargo-cache'
+    [pscustomobject]@{ CrateName = 'cargo-cache'; BinaryName = 'cargo-cache' }
+    # nickel-lang-lsp provides the nls (Nickel Language Server) binary required
+    # by the tweag.vscode-nickel VS Code extension for Nickel file editing.
+    # nls is not available in WinGet or Scoop; cargo-binstall downloads nls.exe
+    # from the nickel-lang GitHub release assets.
+    # Cross-platform parity: pkgs.nls in baseSharedPackages on POSIX.
+    [pscustomobject]@{ CrateName = 'nickel-lang-lsp'; BinaryName = 'nls' }
     # nix-index is managed on POSIX hosts (pkgs.nix-index in core.nix plus
     # a LaunchAgent/systemd timer for periodic DB builds) but has no Windows
     # equivalent and is not needed here.  pay-respects on Windows never
     # attempts nix package lookup because `nix` is never in PATH; the
     # nix-locate code path is simply never reached.
-    'pay-respects'
+    [pscustomobject]@{ CrateName = 'pay-respects'; BinaryName = 'pay-respects' }
   )
 
   # cargo-binstall and `cargo uninstall` both operate on this directory.
@@ -85,13 +93,12 @@ function Invoke-CargoBinstallSetup {
   # Crates installed but not desired: zap-style removal.
   # Mirrors homebrew cleanup = "zap": removes anything installed but absent
   # from the declared desired set, regardless of how it was installed.
-  $toRemove = @($installedCrates | Where-Object { $desiredPackages -notcontains $_ })
+  $desiredCrateNames = @($desiredPackages | ForEach-Object { $_.CrateName })
+  $toRemove = @($installedCrates | Where-Object { $desiredCrateNames -notcontains $_ })
 
-  # Desired crates not yet installed (absent from cargo install --list or
-  # binary missing from ~/.cargo/bin).
+  # Desired crates not yet installed (absent from cargo install --list).
   $toInstall = @($desiredPackages | Where-Object {
-    $pkg = $_
-    $installedCrates -notcontains $pkg
+    $installedCrates -notcontains $_.CrateName
   })
 
   foreach ($pkg in $toRemove) {
@@ -104,17 +111,17 @@ function Invoke-CargoBinstallSetup {
   }
 
   foreach ($pkg in $toInstall) {
-    Write-Output "cargo-binstall-setup: installing $pkg"
-    cargo-binstall --no-confirm $pkg
+    Write-Output "cargo-binstall-setup: installing $($pkg.CrateName)"
+    cargo-binstall --no-confirm $pkg.CrateName
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "cargo-binstall-setup: 'cargo-binstall $pkg' failed (exit $LASTEXITCODE)"
+      Write-Error "cargo-binstall-setup: 'cargo-binstall $($pkg.CrateName)' failed (exit $LASTEXITCODE)"
       return
     }
-    if (-not (Test-Path (Join-Path $cargoBinDir "$pkg.exe"))) {
-      Write-Error "cargo-binstall-setup: $pkg installed but binary not found at '$cargoBinDir\$pkg.exe'"
+    if (-not (Test-Path (Join-Path $cargoBinDir "$($pkg.BinaryName).exe"))) {
+      Write-Error "cargo-binstall-setup: $($pkg.CrateName) installed but $($pkg.BinaryName).exe not found at '$cargoBinDir\$($pkg.BinaryName).exe'"
       return
     }
-    Write-Output "cargo-binstall-setup: $pkg installed successfully"
+    Write-Output "cargo-binstall-setup: $($pkg.CrateName) installed successfully"
   }
 
   if ($toRemove.Count -eq 0 -and $toInstall.Count -eq 0) {

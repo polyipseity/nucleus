@@ -186,6 +186,13 @@ let
       )
       "shell.nix must set LIBRARY_PATH to the Nix libiconv path on Darwin for rustup-managed cargo builds outside a devShell";
 
+  # Verify that pkgs.nickel (CLI) and pkgs.nls (Nickel Language Server) are both
+  # declared in core.nix baseSharedPackages so that .ncl tooling works on POSIX
+  # hosts.  Windows installs nls via cargo-binstall (nickel-lang-lsp crate).
+  test_core_nickel_lsp_in_shared_packages =
+    assert' ((lib.hasInfix "pkgs.nickel" coreNixText) && (lib.hasInfix "pkgs.nls" coreNixText))
+      "core.nix must include pkgs.nickel and pkgs.nls in baseSharedPackages for Nickel language support";
+
   allTests = [
     test_posix_shell_exports_fallback_bundle
     test_posix_pwsh_uses_fallback_bundle
@@ -208,6 +215,7 @@ let
     test_posix_devshell_uses_rust_overlay
     test_rust_toolchain_toml_exists_and_is_stable
     test_posix_shell_darwin_libiconv_library_path
+    test_core_nickel_lsp_in_shared_packages
   ];
 in
 {
