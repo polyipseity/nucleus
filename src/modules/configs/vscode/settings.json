@@ -30,6 +30,7 @@
   },
   "chat.mcp.apps.enabled": true,
   "chat.mcp.assisted.nuget.enabled": true,
+  "chat.mcp.autostart": "never",
   "chat.mcp.discovery.enabled": {
     "claude-desktop": true,
     "cursor-global": true,
@@ -124,6 +125,7 @@
   "github.copilot.chat.enableUserPreferences": true,
   "github.copilot.chat.executionSubagent.enabled": true,
   "github.copilot.chat.getChangedFilesTool.enabled": true,
+  "github.copilot.chat.githubMcpServer.channel": "insiders",
   "github.copilot.chat.githubMcpServer.enabled": true,
   "github.copilot.chat.inlineChat.reasoningEffort": "high",
   "github.copilot.chat.inlineEdits.chatSessionContextProvider.enabled": true,
