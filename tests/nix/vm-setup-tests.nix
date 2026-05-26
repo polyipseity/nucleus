@@ -288,6 +288,18 @@ let
   homebrew_text = builtins.readFile ../../src/hosts/MacBook/homebrew.nix;
   test_tart_in_homebrew = assert' (lib.hasInfix "cirruslabs/cli/tart" homebrew_text) "homebrew.nix must include cirruslabs/cli/tart for the macOS Tart VM guest";
 
+  # vm-setup.sh must capture the Packer exit code for the macOS Tart build so
+  # a failed packer invocation does not falsely report success.
+  vm_setup_sh_text = builtins.readFile ../../scripts/vm-setup.sh;
+  test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm-setup.sh must capture packer exit status (_packer_status=0)";
+
+  # The Packer failure branch for the macOS build must print a human-readable
+  # error and return the captured exit code.
+  test_macos_packer_failure_message = assert' (lib.hasInfix "Packer build for macOS VM" vm_setup_sh_text) "scripts/vm-setup.sh must print a failure message for a failed macOS Packer build";
+
+  # The Packer failure branch for the Windows build must also surface the error.
+  test_windows_packer_failure_message = assert' (lib.hasInfix "Packer build for Windows VM" vm_setup_sh_text) "scripts/vm-setup.sh must print a failure message for a failed Windows Packer build";
+
 in
 {
   inherit
@@ -310,6 +322,9 @@ in
     test_vm_setup_scripts_exist
     test_guest_nix_nonempty
     test_tart_in_homebrew
+    test_macos_packer_exit_check
+    test_macos_packer_failure_message
+    test_windows_packer_failure_message
     ;
 
   summary = "vm-setup-tests: all tests passed";

@@ -146,7 +146,11 @@ esac
 
 # build_nixos_image NAME
 #   Builds the NixOS guest image via nixos-generators.  On macOS this
-#   cross-compiles to the target Linux architecture using the Nix binary cache.
+#   requires an aarch64-linux builder; enable nix.linux-builder.enable in the
+#   macOS host config so the Nix daemon delegates Linux derivations to the
+#   Virtualization.framework-backed builder VM created by nix-darwin.
+#   Most derivations are fetched from the binary cache; hostname-specific ones
+#   (e.g. etc-hostname) are configuration-specific and cannot be cached.
 build_nixos_image() {
   _name="$1"
   _out="$IMAGES_DIR/${_name}.qcow2"
@@ -425,6 +429,7 @@ build_windows_image() {
     return 0
   fi
 
+  _packer_status=0
   (
     cd "$_packer_dir"
     packer init .
@@ -435,8 +440,12 @@ build_windows_image() {
       -var "output_directory=$_tmp_out" \
       ${_virtio_iso:+-var "virtio_win_iso=$_virtio_iso"} \
       .
-  )
+  ) || _packer_status=$?
 
+  if [ "$_packer_status" -ne 0 ]; then
+    printf 'vm-setup: Packer build for Windows VM "%s" failed (exit %s)\n' "$_name" "$_packer_status" >&2
+    return "$_packer_status"
+  fi
   _built="$_tmp_out/windows.qcow2"
   if [ ! -f "$_built" ]; then
     printf 'vm-setup: Packer did not produce %s\n' "$_built" >&2
@@ -497,6 +506,7 @@ build_macos_image() {
     return 0
   fi
 
+  _packer_status=0
   (
     cd "$_packer_dir"
     packer init .
@@ -507,8 +517,12 @@ build_macos_image() {
       -var "memory_gib=$_mem_gib" \
       -var "cpus=$_cpus" \
       .
-  )
+  ) || _packer_status=$?
 
+  if [ "$_packer_status" -ne 0 ]; then
+    printf 'vm-setup: Packer build for macOS VM "%s" failed (exit %s)\n' "$_name" "$_packer_status" >&2
+    return "$_packer_status"
+  fi
   printf 'vm-setup: macOS VM "%s" built and registered in tart\n' "$_name"
 }
 
