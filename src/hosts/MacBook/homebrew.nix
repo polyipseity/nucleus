@@ -49,6 +49,7 @@ let
     "orbstack" # Docker/Linux VM runtime (faster than Docker Desktop)
     "parsec" # Low-latency remote gaming / desktop streaming
     "raycast" # Spotlight replacement and launcher
+    "steam" # Game distribution and launcher platform
     "telegram-desktop@beta" # Telegram beta channel; kept static (no exact nixpkgs beta mapping)
     "whatsapp@beta" # WhatsApp pre-release client
   ];

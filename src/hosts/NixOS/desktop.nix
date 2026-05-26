@@ -169,4 +169,19 @@
     enable = true;
     openFirewall = true;
   };
+
+  # Steam game distribution platform.
+  # hardware.graphics.enable32Bit provides the 32-bit Mesa/Vulkan drivers
+  # required by Steam's 32-bit game runtime.  programs.steam.enable wires up
+  # system integration: udev rules, required runtime libraries, and the Steam
+  # binary itself.
+  # Channel note: no Steam beta/preview channel is exposed as a NixOS module
+  # option; programs.steam always tracks the latest stable release.
+  # Cross-platform parity: macOS uses the Homebrew steam cask; Windows uses
+  # Valve.Steam in system.dsc.yml.
+  # Sources:
+  # https://nixos.wiki/wiki/Steam
+  # https://mynixos.com/nixpkgs/option/programs.steam.enable
+  hardware.graphics.enable32Bit = true;
+  programs.steam.enable = true;
 }

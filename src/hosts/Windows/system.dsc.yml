@@ -436,6 +436,17 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          Steam — game distribution and launcher platform. Cross-platform parity with
+          macOS (Homebrew steam cask) and NixOS (programs.steam.enable). No Steam
+          beta/preview channel is available via WinGet; stable release only per
+          repository channel policy exception.
+      settings:
+        id: Valve.Steam
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Telegram Desktop Beta is installed to mirror the macOS beta-channel messaging baseline
       settings:
         id: Telegram.TelegramDesktop.Beta
