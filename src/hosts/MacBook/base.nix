@@ -6,8 +6,17 @@
   nix.enable = false;
 
   # Allow Nix to use Rosetta for x86_64-darwin binaries on Apple Silicon.
-  # Written to nix.conf by nix-darwin, so it applies to all users.
+  # Point the daemon at the machines file written by linux-builder.nix so it
+  # routes aarch64-linux derivations to the builder VM.
+  # WHY builders-use-substitutes: lets the builder VM fetch cached derivations
+  # from the binary cache directly instead of routing all bytes through the
+  # macOS host, which would be much slower for large NixOS guest builds.
+  # WHY nix.extraOptions instead of nix.settings: nix.settings is only written
+  # to nix.conf when nix.enable = true; extraOptions is always appended so
+  # Determinate Nix picks up these settings via its own nix.conf management.
   nix.extraOptions = ''
+    builders = @/etc/nix/machines
+    builders-use-substitutes = true
     extra-platforms = x86_64-darwin aarch64-darwin
   '';
 

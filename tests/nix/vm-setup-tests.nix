@@ -288,6 +288,17 @@ let
   homebrew_text = builtins.readFile ../../src/hosts/MacBook/homebrew.nix;
   test_tart_in_homebrew = assert' (lib.hasInfix "cirruslabs/cli/tart" homebrew_text) "homebrew.nix must include cirruslabs/cli/tart for the macOS Tart VM guest";
 
+  # MacBook must have a linux-builder module that registers the builder VM so
+  # aarch64-linux derivations (required for nixos-generators NixOS guest image
+  # builds) can be compiled on macOS via the Virtualization.framework VM.
+  linux_builder_nix_text = builtins.readFile ../../src/hosts/MacBook/linux-builder.nix;
+  test_macbook_linux_builder_enabled = assert' (lib.hasInfix "launchd.daemons.linux-builder" linux_builder_nix_text) "MacBook linux-builder.nix must configure the linux-builder launchd daemon";
+
+  # The MacBook base.nix must point the Nix daemon at /etc/nix/machines so the
+  # linux-builder registration written by nix-darwin is actually used.
+  base_nix_text = builtins.readFile ../../src/hosts/MacBook/base.nix;
+  test_macbook_builders_machines = assert' (lib.hasInfix "builders = @/etc/nix/machines" base_nix_text) "MacBook base.nix must set builders = @/etc/nix/machines in nix.extraOptions";
+
   # vm-setup.sh must capture the Packer exit code for the macOS Tart build so
   # a failed packer invocation does not falsely report success.
   vm_setup_sh_text = builtins.readFile ../../scripts/vm-setup.sh;
@@ -322,6 +333,8 @@ in
     test_vm_setup_scripts_exist
     test_guest_nix_nonempty
     test_tart_in_homebrew
+    test_macbook_linux_builder_enabled
+    test_macbook_builders_machines
     test_macos_packer_exit_check
     test_macos_packer_failure_message
     test_windows_packer_failure_message

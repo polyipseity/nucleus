@@ -21,6 +21,7 @@
     ./base.nix
     ./defaults.nix
     ./homebrew.nix
+    ./linux-builder.nix
     ./manual-installations.nix
     ./networking.nix
     ./security.nix
