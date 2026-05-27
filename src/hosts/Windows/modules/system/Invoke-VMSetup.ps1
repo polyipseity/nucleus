@@ -561,28 +561,6 @@ function Invoke-BuildWindowsImage {
     Write-Information "vm-setup: building Windows 11 image (disk=${DiskGib} GiB, accelerator=$Accelerator)..."
     Write-Information 'vm-setup: this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
 
-    # Pre-download VirtIO drivers ISO so it can be injected via secondary_iso_images,
-    # enabling Autounattend.xml FirstLogonCommands early driver installation.
-    # Falls back to runtime download in the Packer provisioner if this fails.
-    # Source: https://fedorapeople.org/groups/virt/virtio-win/
-    $VirtioIso = Join-Path $ImagesDir 'virtio-win.iso'
-    if (-not (Test-Path $VirtioIso)) {
-        if (-not $DryRun) {
-            Write-Information 'vm-setup: downloading VirtIO drivers ISO...'
-            $VirtioUrl = 'https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso'
-            try {
-                Invoke-WebRequest -Uri $VirtioUrl -OutFile $VirtioIso -UseBasicParsing
-                Write-Information "vm-setup: VirtIO ISO downloaded: $VirtioIso"
-            } catch {
-                Write-Warning "vm-setup: VirtIO ISO pre-download failed ($_); Packer provisioner will download at runtime"
-                $VirtioIso = ''
-            }
-        } else {
-            Write-Information "vm-setup: [dry-run] would download VirtIO ISO to $VirtioIso"
-            $VirtioIso = ''
-        }
-    }
-
     if ($DryRun) {
         Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
         return
@@ -596,12 +574,7 @@ function Invoke-BuildWindowsImage {
             return
         }
         $packerArgs = @(
-            '-var', "windows_iso=$WindowsIso"
-        )
-        if ($VirtioIso) {
-            $packerArgs += '-var', "virtio_win_iso=$VirtioIso"
-        }
-        $packerArgs += @(
+            '-var', "windows_iso=$WindowsIso",
             '-var', "accelerator=$Accelerator",
             '-var', "disk_size=${DiskGib}G",
             '-var', "output_directory=$tmpOutput",

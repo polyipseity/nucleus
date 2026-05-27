@@ -72,12 +72,6 @@ variable "cpus" {
   description = "vCPUs during the build (match VMs.json cpus)."
 }
 
-variable "virtio_win_iso" {
-  type        = string
-  default     = ""
-  description = "Local path to virtio-win.iso; when set, attached as secondary CD for early driver injection via Autounattend.xml FirstLogonCommands. Falls back to Packer provisioner download when empty."
-}
-
 packer {
   required_plugins {
     qemu = {
@@ -90,11 +84,13 @@ packer {
 source "qemu" "windows11" {
   accelerator = var.accelerator
 
-  # Use SATA during the build so Windows Setup sees the disk without
+  # Use IDE during the build so Windows Setup sees the disk without
   # requiring VirtIO storage drivers to be present in the installer.
+  # (SATA is not supported by qemu-system-x86_64 on some host builds,
+  # including the Darwin arm64 package used by this repo.)
   # VirtIO drivers are injected by the PowerShell provisioner below,
   # so the finished image is compatible with VirtIO disk interface.
-  disk_interface = "sata"
+  disk_interface = "ide"
   disk_size      = var.disk_size
   disk_discard   = "unmap"
   format         = "qcow2"
@@ -124,12 +120,9 @@ source "qemu" "windows11" {
 
   headless = true
 
-  # Attach VirtIO driver ISO as secondary CD when pre-downloaded by vm-setup.
-  # Enables Autounattend.xml FirstLogonCommands to scan and install drivers
-  # before Packer's WinRM connection opens.  Packer provisioner handles the
-  # download fallback when this is empty.
-  # Source: https://fedorapeople.org/groups/virt/virtio-win/
-  secondary_iso_images = var.virtio_win_iso != "" ? [var.virtio_win_iso] : []
+  # NOTE: qemu plugin v1.1.x does not support `secondary_iso_images` on all
+  # hosts. VirtIO drivers are installed by the PowerShell provisioner below
+  # using a runtime download from the stable Fedora mirror.
 
   output_directory = var.output_directory
   vm_name          = "windows.qcow2"

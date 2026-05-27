@@ -722,20 +722,6 @@ build_windows_image() {
     return 1
   fi
 
-  # Pre-download VirtIO drivers ISO so it can be injected into the build via
-  # secondary_iso_images (used by Autounattend.xml FirstLogonCommands).
-  # Falls back to runtime download in the Packer provisioner if this fails.
-  # Source: https://fedorapeople.org/groups/virt/virtio-win/
-  _virtio_iso="$IMAGES_DIR/virtio-win.iso"
-  if [ ! -f "$_virtio_iso" ] && [ "$dry_run" = false ]; then
-    printf 'vm-setup: downloading VirtIO drivers ISO...\n'
-    _virtio_url='https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso'
-    curl -fL -o "$_virtio_iso" "$_virtio_url" || {
-      printf 'vm-setup: VirtIO ISO pre-download failed; Packer provisioner will download at runtime\n' >&2
-      _virtio_iso=''
-    }
-  fi
-
   _packer_dir="$VMS_DIR/windows"
   _tmp_out="$IMAGES_DIR/${_name}-build"
 
@@ -757,7 +743,6 @@ build_windows_image() {
       -var "accelerator=$accelerator" \
       -var "disk_size=${_disk_gib}G" \
       -var "output_directory=$_tmp_out" \
-      ${_virtio_iso:+-var "virtio_win_iso=$_virtio_iso"} \
       .
   ) || _packer_status=$?
 
