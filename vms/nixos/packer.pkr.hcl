@@ -138,7 +138,9 @@ build {
       "  boot.loader.grub.enable = true;",
       "  boot.loader.grub.device = \"/dev/vda\";",
       "  networking.hostName = \"NixOS\";",
-      "  boot.initrd.availableKernelModules = [ \"virtio_fs\" ];",
+      # VirtioFS is mounted after first boot when the host exposes a share.
+      # Do not force virtio_fs into the initrd here: the current guest kernel
+      # may not ship it as a standalone module, which breaks image generation.
       "  services.openssh = { enable = true; settings.PermitRootLogin = \"yes\"; };",
       "  users.users.nixos = { isNormalUser = true; extraGroups = [ \"wheel\" ]; initialPassword = \"nixos\"; };",
       "  security.sudo.wheelNeedsPassword = false;",

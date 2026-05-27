@@ -18,12 +18,7 @@
 # the chosen format (qcow = BIOS + ext4, qcow-efi = UEFI + ext4).
 #
 # Source: https://github.com/nix-community/nixos-generators
-{
-  modulesPath,
-  lib,
-  pkgs,
-  ...
-}:
+{ modulesPath, pkgs, ... }:
 {
   imports = [
     # VirtIO drivers for disk, network, memory balloon, and random number
@@ -33,11 +28,12 @@
 
   networking.hostName = "NixOS";
 
-  # VirtioFS kernel module enables zero-copy host-directory sharing.
-  # The mount point must be configured inside the guest (e.g. in
-  # configuration.nix on the VM) after first boot using:
+  # VirtioFS sharing is configured after first boot when the host actually
+  # exposes a shared directory. Do not force virtio_fs into the initrd here:
+  # current aarch64 guest kernels may not ship it as a standalone module, which
+  # breaks image generation before the VM ever boots.
+  # Example guest-side mount after first boot:
   #   fileSystems."/home/nixos/dev" = { device = "dev"; fsType = "virtiofs"; };
-  boot.initrd.availableKernelModules = [ "virtio_fs" ];
 
   # SSH access for post-boot management and initial configuration.
   # Allow root login for initial setup; harden after applying the nucleus
