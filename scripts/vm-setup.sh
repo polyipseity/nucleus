@@ -831,10 +831,13 @@ setup_utm_vms() {
       mkdir -p "$data_dir"
       cp "$_prebuilt" "$disk_file"
       cp "$_plist_template" "$config_plist"
+      # Nix store files are read-only (mode 0444).  Make the bundle-local copy
+      # writable so UTM can update the plist after import if needed.
+      chmod +w "$config_plist"
       printf 'vm-setup: UTM bundle created: %s\n' "$bundle"
-      # Avoid auto-import via `open "$bundle"`: current UTM builds can reject
-      # .utm package imports in this flow and show a blocking popup even when
-      # the bundle itself is otherwise usable. Keep provisioning deterministic
+      # Avoid auto-import via the macOS `open` command on .utm bundles: current
+      # UTM builds can reject imports in this flow and show a blocking popup even
+      # when the bundle itself is otherwise usable. Keep provisioning deterministic
       # and let users register bundles via UTM's “Browse UTM virtual machines”.
       printf 'vm-setup: register this bundle in UTM via “Browse UTM virtual machines”: %s\n' "$bundle"
       write_configure_script "$vm_name" "$vm_type"

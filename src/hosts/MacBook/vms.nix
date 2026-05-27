@@ -55,18 +55,13 @@ let
     else
       (if vm.type == "Windows" then "vga" else "virtio-gpu-pci");
 
-  # Optional VirtioFS directory-share keys appended inside <key>Sharing</key>.
-  # Leading \n keeps each key on its own line at consistent 12-space indent
-  # matching the existing ClipboardShare key in the template below.
-  sharingExtra =
-    vm:
-    if !vm.shareDevDir then
-      ""
-    else
-      "\n            <key>DirectoryReadOnly</key>"
-      + "\n            <false/>"
-      + "\n            <key>DirectoryShare</key>"
-      + "\n            <string>${config.home.homeDirectory}/dev</string>";
+  # UTM 4.x VirtioFS directory-sharing toggle.
+  # The SharedDirectories array requires macOS security-scoped bookmarks that
+  # cannot be serialised from Nix.  When shareDevDir is true we set
+  # DirectorySharing=true so UTM knows sharing is desired; the user picks the
+  # host directory once inside UTM's Settings after import.  An empty
+  # SharedDirectories array is always valid and never blocks import.
+  directorySharing = vm: if vm.shareDevDir then "<true/>" else "<false/>";
 
   # UTM 4.x QEMU-backend plist template.  Indented strings in Nix strip the
   # common leading whitespace (6 spaces here), producing a 0-based document.
@@ -76,7 +71,7 @@ let
     <plist version="1.0">
     <dict>
         <key>Backend</key>
-        <string>qemu</string>
+        <string>QEMU</string>
         <key>ConfigurationVersion</key>
         <integer>4</integer>
         <key>Drive</key>
@@ -102,9 +97,9 @@ let
                 <key>DynamicResolution</key>
                 <true/>
                 <key>UpscalingFilter</key>
-                <string>Nearest</string>
+                <string>nearest</string>
                 <key>DownscalingFilter</key>
-                <string>Linear</string>
+                <string>linear</string>
                 <key>NativeResolution</key>
                 <false/>
             </dict>
@@ -133,8 +128,14 @@ let
         <array/>
         <key>Sharing</key>
         <dict>
-            <key>ClipboardShare</key>
-            <true/>${sharingExtra vm}
+            <key>ClipboardSharing</key>
+            <true/>
+            <key>DirectorySharing</key>
+            ${directorySharing vm}
+            <key>ReadOnlySharing</key>
+            <false/>
+            <key>SharedDirectories</key>
+            <array/>
         </dict>
         <key>Sound</key>
         <array>
@@ -176,7 +177,7 @@ let
         <key>System</key>
         <dict>
             <key>Architecture</key>
-          <string>${vmArch vm}</string>
+            <string>${vmArch vm}</string>
             <key>CPU</key>
             <string>default</string>
             <key>CPUCount</key>

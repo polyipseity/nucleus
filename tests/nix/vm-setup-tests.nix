@@ -375,7 +375,7 @@ let
   test_macbook_utm_windows_arch_override =
     assert'
       (
-        (lib.hasInfix "vm.type == \"Windows\" then \"x86_64\"" macbook_vms_nix_text)
+        (lib.hasInfix "if vm.type == \"Windows\" then" macbook_vms_nix_text)
         && (lib.hasInfix "vmMachine = vm: if vmArch vm == \"x86_64\" then \"q35\" else \"virt\";" macbook_vms_nix_text)
       )
       "src/hosts/MacBook/vms.nix must force Windows UTM guests to x86_64/q35 so imported bundles match built Windows images";
@@ -390,6 +390,25 @@ let
         && (lib.hasInfix "<key>CPUFlagsRemove</key>" macbook_vms_nix_text)
       )
       "src/hosts/MacBook/vms.nix must include modern UTM schema keys (Drive/ImageName/QEMU/Input/CPUFlagsAdd/CPUFlagsRemove) for reliable imports";
+  # The Backend value must be exactly "QEMU" (uppercase) — UTM's Swift enum
+  # performs a case-sensitive match and throws invalidBackend on any other value.
+  # The Sharing section must use the correct key names from UTMQemuConfigurationSharing:
+  # ClipboardSharing, DirectorySharing, ReadOnlySharing, SharedDirectories.
+  # Filter strings must be lowercase ("nearest"/"linear") matching enum raw values.
+  test_macbook_utm_plist_correctness =
+    assert'
+      (
+        (lib.hasInfix "<string>QEMU</string>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>ClipboardSharing</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>DirectorySharing</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>ReadOnlySharing</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>SharedDirectories</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<string>nearest</string>" macbook_vms_nix_text)
+        && (lib.hasInfix "<string>linear</string>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<string>qemu</string>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>ClipboardShare</key>" macbook_vms_nix_text)
+      )
+      "src/hosts/MacBook/vms.nix plist must use exact UTM enum values: Backend=QEMU, correct Sharing keys, lowercase filter strings";
   test_macbook_utm_data_dir_disk_path =
     assert'
       (
@@ -448,6 +467,7 @@ in
     test_windows_iso_mido_runtime_patch_support
     test_macbook_utm_windows_arch_override
     test_macbook_utm_schema_keys
+    test_macbook_utm_plist_correctness
     test_macbook_utm_data_dir_disk_path
     test_macbook_utm_no_auto_open_import
     test_windows_iso_fido_windows_only
