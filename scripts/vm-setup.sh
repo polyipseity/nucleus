@@ -140,6 +140,13 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
 - `<name>.utm/` — UTM bundle directory on macOS hosts.
 - `<name>.qcow2` — libvirt/QEMU runtime disk on Linux/Windows hosts.
 
+## Start commands
+
+- macOS guest (Tart): `tart run MacBook`
+- NixOS/Windows guests on macOS (UTM): open UTM and click Run for `NixOS` / `Windows`
+- NixOS/Windows guests on NixOS (libvirt): start from `virt-manager`
+- NixOS/Windows guests on Windows (QEMU): run `Start-<display>.ps1`
+
 ## UTM bundle portability
 
 `*.utm` is a folder bundle (not a single opaque file). It contains VM metadata
@@ -154,9 +161,10 @@ To move a UTM VM to another macOS host:
 Copying only `config.plist` or only `disk-main.qcow2` is not sufficient for a
 portable UTM VM transfer.
 
-## Guest converge commands
+## Guest configuration
 
-Run the host converge command inside each guest after first boot:
+Guest OS configuration is **not automatic** after first boot.
+Run the host converge command inside each guest:
 
 - NixOS guest: `sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"`
 - Windows guest: `.\src\hosts\Windows\apply.ps1` (from `%USERPROFILE%\dev\nucleus`)
@@ -508,6 +516,94 @@ download_windows_iso_fido() {
   return 0
 }
 
+# download_windows_iso_fido_url_nonwindows CACHED_ISO EDITION
+#   Resolves a Windows ISO URL via vendor/Fido/Fido.ps1 -GetUrl, then downloads
+#   it with curl.  This is a non-Windows fallback for Darwin/Linux hosts when
+#   Mido's consumer path fails.  A temporary script copy is patched at runtime
+#   to bypass Fido's Windows-only guard; vendor sources remain unchanged.
+#   Source: https://github.com/pbatard/Fido
+download_windows_iso_fido_url_nonwindows() {
+  _fido_cached="$1"
+  _fido_edition="${2:-Pro}"
+
+  _fido_script="$REPO_ROOT/vendor/Fido/Fido.ps1"
+  if [ ! -f "$_fido_script" ]; then
+    printf 'vm-setup: Fido.ps1 not found; run: git submodule update --init vendor/Fido\n' >&2
+    return 1
+  fi
+
+  if ! command -v pwsh >/dev/null 2>&1; then
+    printf 'vm-setup: pwsh not found; cannot use Fido URL fallback\n' >&2
+    return 1
+  fi
+
+  if ! command -v perl >/dev/null 2>&1; then
+    printf 'vm-setup: perl not found; cannot patch temporary Fido script for non-Windows URL fallback\n' >&2
+    return 1
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    printf 'vm-setup: curl not found; required for Fido URL fallback download\n' >&2
+    return 1
+  fi
+
+  case "$(printf '%s' "$_fido_edition" | tr '[:upper:]' '[:lower:]')" in
+    *enterprise*) _fido_ed_query='Enterprise' ;;
+    *) _fido_ed_query='Home/Pro/Edu' ;;
+  esac
+
+  printf 'vm-setup: resolving Windows 11 ISO URL via Fido fallback (edition=%s)...\n' "$_fido_ed_query"
+
+  _fido_tmp="$(mktemp -d)"
+  _fido_exec="$_fido_tmp/Fido.ps1"
+  _fido_output_file="$_fido_tmp/fido-url.out"
+  cp "$_fido_script" "$_fido_exec"
+
+  # Fido intentionally blocks non-Windows at runtime; patch only the temp copy.
+  # This keeps vendor sources immutable while still allowing CLI URL resolution.
+  _fido_patch_status=0
+  perl -0pi -e 's/if \(\$winver -le 6\.1\) \{/if (\$false) {/g' "$_fido_exec" || _fido_patch_status=$?
+  if [ "$_fido_patch_status" -ne 0 ]; then
+    printf 'vm-setup: failed to patch temporary Fido script for non-Windows fallback (exit %s)\n' "$_fido_patch_status" >&2
+    rm -rf "$_fido_tmp"
+    return 1
+  fi
+
+  _fido_status=0
+  pwsh -NonInteractive -ExecutionPolicy Bypass \
+    -File "$_fido_exec" \
+    -Win 11 -Rel Latest -Ed "$_fido_ed_query" -Lang English -Arch x64 -PlatformArch x64 -GetUrl \
+    >"$_fido_output_file" 2>&1 || _fido_status=$?
+  cat "$_fido_output_file"
+
+  if [ "$_fido_status" -ne 0 ]; then
+    printf 'vm-setup: Fido URL resolver exited with code %s\n' "$_fido_status" >&2
+    rm -rf "$_fido_tmp"
+    return 1
+  fi
+
+  _fido_url="$(grep -Eo 'https://[^[:space:]]+\.iso[^[:space:]]*' "$_fido_output_file" | tail -1)"
+  if [ -z "$_fido_url" ]; then
+    printf 'vm-setup: Fido URL resolver returned no ISO URL\n' >&2
+    rm -rf "$_fido_tmp"
+    return 1
+  fi
+
+  printf 'vm-setup: downloading Windows ISO from resolved URL...\n'
+  _fido_dl_status=0
+  curl -fL -o "$_fido_cached" "$_fido_url" || _fido_dl_status=$?
+  if [ "$_fido_dl_status" -ne 0 ]; then
+    printf 'vm-setup: Fido URL fallback download failed (exit %s); removing partial file\n' "$_fido_dl_status" >&2
+    rm -f "$_fido_cached"
+    rm -rf "$_fido_tmp"
+    return 1
+  fi
+
+  rm -rf "$_fido_tmp"
+  printf 'vm-setup: Windows ISO downloaded via Fido URL fallback: %s\n' "$_fido_cached"
+  return 0
+}
+
 # build_windows_image NAME DISK_GIB
 #   Builds the Windows 11 guest image using Packer and the Autounattend.xml
 #   answer file at vms/windows/Autounattend.xml.
@@ -549,11 +645,11 @@ build_windows_image() {
     fi
   fi
 
-  # If still no ISO resolved, attempt download via Mido (UNIX-native) or Fido
-  # (PowerShell, Windows-native) depending on what is available.
-  # WHY Mido first: Mido is a POSIX sh + curl script that works on macOS and
-  # Linux; Fido requires pwsh and Windows-specific APIs that fail on non-Windows.
+  # If still no ISO resolved, attempt automatic download fallback.
+  # On Windows hosts: Mido first, then native Fido download fallback.
+  # On macOS/Linux hosts: Fido URL resolver first (via pwsh -GetUrl), then Mido.
   # Source: https://github.com/QubesOS/qvm-create-windows-qube
+  #         https://github.com/pbatard/Fido
   if [ -z "$_iso" ]; then
     _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
     if [ -f "$_cached_iso" ]; then
@@ -571,24 +667,26 @@ build_windows_image() {
             fi
             ;;
           auto)
-            if download_windows_iso_mido "$_cached_iso" "$_edition"; then
-              _iso="$_cached_iso"
-            else
-              _host_uname="$(uname -s)"
-              case "$_host_uname" in
-                MINGW*|MSYS*|CYGWIN*|Windows_NT)
-                  # WHY: Fido uses Windows CIM cmdlets/APIs and is only reliable on
-                  # Windows hosts.  On macOS/Linux it can fail with missing cmdlets
-                  # (for example Get-CimInstance), so we skip it there.
-                  if download_windows_iso_fido "$_cached_iso" "$_edition"; then
+            _host_uname="$(uname -s)"
+            case "$_host_uname" in
+              MINGW*|MSYS*|CYGWIN*|Windows_NT)
+                if download_windows_iso_mido "$_cached_iso" "$_edition"; then
+                  _iso="$_cached_iso"
+                elif download_windows_iso_fido "$_cached_iso" "$_edition"; then
+                  _iso="$_cached_iso"
+                fi
+                ;;
+              *)
+                if download_windows_iso_fido_url_nonwindows "$_cached_iso" "$_edition"; then
+                  _iso="$_cached_iso"
+                else
+                  printf 'vm-setup: Fido URL fallback failed on %s; trying Mido as secondary fallback\n' "$_host_uname" >&2
+                  if download_windows_iso_mido "$_cached_iso" "$_edition"; then
                     _iso="$_cached_iso"
                   fi
-                  ;;
-                *)
-                  printf 'vm-setup: Mido failed; skipping Fido fallback on %s because Fido requires Windows CIM cmdlets\n' "$_host_uname" >&2
-                  ;;
-              esac
-            fi
+                fi
+                ;;
+            esac
             ;;
         esac
       else
@@ -600,7 +698,7 @@ build_windows_image() {
             printf 'vm-setup: [dry-run] would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (with runtime patch copy) to download Windows 11 ISO\n'
             ;;
           auto)
-            printf 'vm-setup: [dry-run] would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (with runtime patch copy) and then Windows-only Fido fallback if available\n'
+            printf 'vm-setup: [dry-run] non-Windows hosts: Fido URL resolver first, then Mido fallback; Windows hosts: Mido first, then native Fido fallback\n'
             ;;
         esac
       fi

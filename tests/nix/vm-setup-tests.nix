@@ -474,6 +474,9 @@ let
       (
         (lib.hasInfix "write_vm_directory_readme" vm_setup_sh_text)
         && (lib.hasInfix "wrote VM directory guide" vm_setup_sh_text)
+        && (lib.hasInfix "## Start commands" vm_setup_sh_text)
+        && (lib.hasInfix "tart run MacBook" vm_setup_sh_text)
+        && (lib.hasInfix "Guest OS configuration is **not automatic**" vm_setup_sh_text)
         && (lib.hasInfix "Copying only `config.plist` or only `disk-main.qcow2` is not sufficient" vm_setup_sh_text)
       )
       "scripts/vm-setup.sh must write ~/virtual machines/README.md with explicit .utm bundle transfer guidance";
@@ -482,6 +485,8 @@ let
       (
         (lib.hasInfix "$vmReadmePath = Join-Path $vmDir 'README.md'" windows_vm_setup_ps1_text)
         && (lib.hasInfix "VM directory guide written" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "## Start commands" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Guest OS configuration is **not automatic**" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Copying only `config.plist` or only `disk-main.qcow2` is not sufficient" windows_vm_setup_ps1_text)
       )
       "Invoke-VMSetup.ps1 must write %USERPROFILE%\\virtual machines\\README.md with .utm bundle transfer instructions";
@@ -520,15 +525,16 @@ let
       )
       "MacBook macOS guest version must default to Tahoe across VMs.json, vm-setup.sh, and the macOS Packer template";
 
-  # Fido fallback must be gated to Windows hosts only; on macOS/Linux the
-  # script must skip Fido and print the explicit Windows-CIM requirement.
-  test_windows_iso_fido_windows_only =
+  # On non-Windows hosts, after Mido failure the script should try a pwsh/Fido
+  # URL resolver fallback before requiring manual ISO input.
+  test_windows_iso_fido_nonwindows_fallback =
     assert'
       (
-        (lib.hasInfix "skipping Fido fallback on" vm_setup_sh_text)
-        && (lib.hasInfix "Fido requires Windows CIM cmdlets" vm_setup_sh_text)
+        (lib.hasInfix "download_windows_iso_fido_url_nonwindows" vm_setup_sh_text)
+        && (lib.hasInfix "Fido URL fallback failed on" vm_setup_sh_text)
+        && (lib.hasInfix "trying Mido as secondary fallback" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must skip Fido fallback on non-Windows hosts and explain the Windows CIM requirement";
+      "scripts/vm-setup.sh must attempt a non-Windows Fido URL fallback first on Darwin/Linux, with Mido as secondary fallback";
 
 in
 {
@@ -582,7 +588,7 @@ in
     test_macbook_utm_default_location_link
     test_macbook_tart_storage_link
     test_macbook_macos_version_tahoe
-    test_windows_iso_fido_windows_only
+    test_windows_iso_fido_nonwindows_fallback
     ;
 
   summary = "vm-setup-tests: all tests passed";

@@ -236,6 +236,16 @@ All VM artifacts (Tart store, UTM bundles, QCOW2 images) land under
 `~/virtual machines/` for unified backup. `nucleus-vm-setup` symlinks
 `~/.tart → ~/virtual machines/.tart` on macOS so Tart uses the same tree.
 
+Quick start:
+
+- macOS guest: `tart run MacBook`
+- NixOS/Windows guests on macOS: open UTM and click Run for `NixOS` / `Windows`
+- NixOS/Windows guests on NixOS: start from `virt-manager`
+- NixOS/Windows guests on Windows: run `%USERPROFILE%\virtual machines\Start-<display>.ps1`
+
+Guest OS configuration is **not automatic** after first boot. Run the
+guest-specific converge commands from `~/virtual machines/README.md` inside each guest.
+
 Run `nucleus-vm-setup --dry-run` to preview planned actions without changes.
 
 ## Notes

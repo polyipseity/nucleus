@@ -8,11 +8,11 @@ applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, sr
 
 ## Host × Guest Matrix
 
-| Host \ Guest | macOS           | NixOS              | Windows            |
-| ------------ | --------------- | ------------------ | ------------------ |
-| macOS        | Tart (Packer)   | UTM 4.x (QEMU)     | UTM 4.x (QEMU)     |
-| NixOS        | not supported   | libvirt/KVM        | libvirt/KVM        |
-| Windows      | not supported   | QEMU standalone    | QEMU standalone    |
+| Host \ Guest | macOS         | NixOS           | Windows         |
+| ------------ | ------------- | --------------- | --------------- |
+| macOS        | Tart (Packer) | UTM 4.x (QEMU)  | UTM 4.x (QEMU)  |
+| NixOS        | not supported | libvirt/KVM     | libvirt/KVM     |
+| Windows      | not supported | QEMU standalone | QEMU standalone |
 
 macOS guest uses Tart (Apple Virtualization.framework) exclusively; automated
 Tart→UTM runtime handoff is not supported (format mismatch, no tooling).
@@ -175,12 +175,20 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 - Requires a Windows 11 ISO path via `--windows-iso` **or** a `windowsIsoUrl` field in the `VMs.json`
   windows entry. When `windowsIsoUrl` is set, the ISO is downloaded automatically to
   `~/virtual machines/images/<name>-installer.iso` on first run (subsequent runs reuse the cache).
+- On macOS/Linux hosts, when Mido fails, `vm-setup.sh` attempts a non-Windows
+  Fido URL resolver fallback via `pwsh` (`Fido.ps1 -GetUrl`) and then downloads
+  the resolved ISO URL with `curl`.
 - On Windows hosts, `Invoke-VMSetup` auto-detects WHPX (Windows Hypervisor Platform) when the
   default `tcg` accelerator is in use. If WHPX is enabled, it upgrades automatically. If not,
   it warns and prints the command to enable it. Pass `-Accelerator tcg` explicitly to suppress.
 - SATA disk during build → VirtIO drivers installed post-install → final image is VirtIO-disk ready.
 - Autounattend.xml bypasses TPM/Secure Boot checks, enables WinRM for Packer, creates `packer` account.
 - Change the `packer` password and apply the nucleus Windows config after first boot.
+
+### Guest configuration status
+
+Guest configuration is not automatic after first boot. `nucleus-vm-setup` builds
+images and provisions VM runtimes; apply commands must be run inside each guest.
 
 ### Image location
 

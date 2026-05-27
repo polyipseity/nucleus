@@ -86,6 +86,13 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
 - `<name>.utm/` — UTM bundle directory on macOS hosts.
 - `<name>.qcow2` — libvirt/QEMU runtime disk on Linux/Windows hosts.
 
+## Start commands
+
+- macOS guest (Tart): `tart run MacBook`
+- NixOS/Windows guests on macOS (UTM): open UTM and click Run for `NixOS` / `Windows`
+- NixOS/Windows guests on NixOS (libvirt): start from `virt-manager`
+- NixOS/Windows guests on Windows (QEMU): run `Start-<display>.ps1`
+
 ## UTM bundle portability
 
 `*.utm` is a folder bundle (not a single opaque file). It contains VM metadata
@@ -100,9 +107,10 @@ To move a UTM VM to another macOS host:
 Copying only `config.plist` or only `disk-main.qcow2` is not sufficient for a
 portable UTM VM transfer.
 
-## Guest converge commands
+## Guest configuration
 
-Run the host converge command inside each guest after first boot:
+Guest OS configuration is **not automatic** after first boot.
+Run the host converge command inside each guest:
 
 - NixOS guest: `sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"`
 - Windows guest: `.\src\hosts\Windows\apply.ps1` (from `%USERPROFILE%\dev\nucleus`)
