@@ -36,6 +36,13 @@ function Invoke-VMSetup {
         # Build and provision only the Windows 11 guest.
         [switch]$WindowsOnly,
 
+        # Windows installer ISO resolution strategy.
+        # Auto: windowsIsoUrl cache/download first, then Fido fallback.
+        # Url:  use only -WindowsIso or windowsIsoUrl (no downloader fallback).
+        # Fido: use only local cache/Fido when -WindowsIso is omitted.
+        [ValidateSet('Auto', 'Url', 'Fido')]
+        [string]$WindowsIsoSource = 'Auto',
+
         # QEMU accelerator for image builds. Defaults to tcg (always works).
         # When tcg is used, Invoke-VMSetup auto-detects WHPX (Windows Hypervisor
         # Platform) and upgrades to whpx automatically if it is enabled.
@@ -108,6 +115,7 @@ function Invoke-VMSetup {
                 $isoUrl = if ($null -ne $vm.windowsIsoUrl) { [string]$vm.windowsIsoUrl } else { '' }
                 Invoke-BuildWindowsImage -VmName $vm.name -DiskGib $diskGib `
                     -WindowsIso $WindowsIso -WindowsIsoUrl $isoUrl `
+                    -WindowsIsoSource $WindowsIsoSource `
                     -RepoRoot $RepoRoot `
                     -WindowsEdition ($vm.windowsEdition ?? 'Pro') `
                     -Accelerator $Accelerator `
@@ -434,6 +442,8 @@ function Invoke-BuildWindowsImage {
         # Optional URL to auto-download the Windows installer ISO when -WindowsIso
         # is not provided.  Set via the windowsIsoUrl field in VMs.json.
         [string]$WindowsIsoUrl = '',
+        [ValidateSet('Auto', 'Url', 'Fido')]
+        [string]$WindowsIsoSource = 'Auto',
         [string]$Accelerator,
         [string]$VmsDir,
         [string]$ImagesDir,
@@ -450,7 +460,7 @@ function Invoke-BuildWindowsImage {
 
     # Resolve the installer ISO: use -WindowsIso if provided, otherwise try the
     # VMs.json windowsIsoUrl field as a download source.
-    if (-not $WindowsIso -and $WindowsIsoUrl) {
+    if (-not $WindowsIso -and $WindowsIsoSource -ne 'Fido' -and $WindowsIsoUrl) {
         $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
         if (Test-Path $cachedIso) {
             Write-Information "vm-setup: using cached Windows installer: $cachedIso"
@@ -480,7 +490,7 @@ function Invoke-BuildWindowsImage {
     }
 
     # If still no ISO resolved, attempt download via vendor/Fido/Fido.ps1.
-    if (-not $WindowsIso) {
+    if (-not $WindowsIso -and $WindowsIsoSource -ne 'Url') {
         $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
         if (Test-Path $cachedIso) {
             Write-Information "vm-setup: using cached Windows installer: $cachedIso"
@@ -496,6 +506,9 @@ function Invoke-BuildWindowsImage {
     }
     # If ISO is still empty after all resolution attempts, fail with instructions.
     if (-not $WindowsIso) {
+        if ($WindowsIsoSource -eq 'Url') {
+            Write-Information 'vm-setup: windowsIsoSource=Url selected and no cached URL-based installer was resolved'
+        }
         Write-Information 'vm-setup: alternatively add "windowsIsoUrl": "<url>" to the VMs.json windows entry'
         Write-Information 'vm-setup: download from: https://www.microsoft.com/software-download/windows11'
         return

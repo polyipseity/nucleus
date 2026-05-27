@@ -278,6 +278,16 @@ let
     in
     assert' (builtins.stringLength content > 0) "vms/nixos/guest.nix must not be empty";
 
+  # The NixOS guest image must not force virtio_fs into the initrd. The share
+  # is optional at runtime and some current kernels do not provide a loadable
+  # virtio_fs module, which would make image generation fail before first boot.
+  guest_nix_text = builtins.readFile ../../vms/nixos/guest.nix;
+  nixos_packer_text = builtins.readFile ../../vms/nixos/packer.pkr.hcl;
+  test_nixos_guest_virtiofs_not_forced = assert' (
+    !(lib.hasInfix "boot.initrd.availableKernelModules = [ \"virtio_fs\" ];" guest_nix_text)
+    && !(lib.hasInfix "boot.initrd.availableKernelModules = [ \\\"virtio_fs\\\" ];" nixos_packer_text)
+  ) "NixOS guest generation must not force virtio_fs into the initrd on current kernels";
+
   # ---------------------------------------------------------------------------
   # Homebrew dependency tests
   # ---------------------------------------------------------------------------
@@ -293,6 +303,30 @@ let
   # builds) can be compiled on macOS via the Virtualization.framework VM.
   linux_builder_nix_text = builtins.readFile ../../src/hosts/MacBook/linux-builder.nix;
   test_macbook_linux_builder_enabled = assert' (lib.hasInfix "launchd.daemons.linux-builder" linux_builder_nix_text) "MacBook linux-builder.nix must configure the linux-builder launchd daemon";
+  test_macbook_linux_builder_machines_file = assert' (lib.hasInfix "environment.etc.\"nix/machines\".text" linux_builder_nix_text) "MacBook linux-builder.nix must materialize /etc/nix/machines so Determinate Nix can see the remote builder";
+  test_macbook_linux_builder_uses_ssh_protocol =
+    assert'
+      (
+        lib.hasInfix "ssh://builder@linux-builder" linux_builder_nix_text
+        && lib.hasInfix "protocol = \"ssh\";" linux_builder_nix_text
+        && lib.hasInfix "benchmark,big-parallel,kvm - -" linux_builder_nix_text
+      )
+      "MacBook linux-builder.nix must register the builder via ssh:// without an inline host-key field because the current ssh-ng/master path fails on this host and legacy ssh must use the managed known_hosts alias instead";
+  test_macbook_linux_builder_user_ssh_key_copy =
+    assert'
+      (
+        lib.hasInfix "linux-builder_ed25519" linux_builder_nix_text
+        && lib.hasInfix "install -m 600 -o \${username}" linux_builder_nix_text
+      )
+      "MacBook linux-builder.nix must mirror the builder key into the primary user's SSH directory for user-space ssh-ng clients";
+  test_macbook_linux_builder_ssh_match_blocks =
+    assert'
+      (
+        (lib.hasInfix "IdentitiesOnly yes" linux_builder_nix_text)
+        && (lib.hasInfix "Match originalhost linux-builder localuser root" linux_builder_nix_text)
+        && (lib.hasInfix "Match originalhost linux-builder localuser \${username}" linux_builder_nix_text)
+      )
+      "MacBook linux-builder.nix must route root and the primary user to separate builder identity files without falling back to unrelated SSH agent keys";
 
   # The MacBook base.nix must point the Nix daemon at /etc/nix/machines so the
   # linux-builder registration written by nix-darwin is actually used.
@@ -302,7 +336,20 @@ let
   # vm-setup.sh must capture the Packer exit code for the macOS Tart build so
   # a failed packer invocation does not falsely report success.
   vm_setup_sh_text = builtins.readFile ../../scripts/vm-setup.sh;
+  macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
   test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm-setup.sh must capture packer exit status (_packer_status=0)";
+
+  # nixos-generators' -o flag expects a non-existent symlink path, not a
+  # pre-created directory. The script must therefore use a child output link and
+  # resolve the resulting symlink before copying the QCOW2 image.
+  test_nixos_generators_output_link_handling =
+    assert'
+      (
+        (lib.hasInfix "_out_link=\"$_tmpdir/result\"" vm_setup_sh_text)
+        && (lib.hasInfix "readlink \"$_out_link\"" vm_setup_sh_text)
+        && (lib.hasInfix "find -L \"$_out_link\"" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must give nixos-generators a non-existent output link path and resolve the resulting symlink";
 
   # The Packer failure branch for the macOS build must print a human-readable
   # error and return the captured exit code.
@@ -310,6 +357,28 @@ let
 
   # The Packer failure branch for the Windows build must also surface the error.
   test_windows_packer_failure_message = assert' (lib.hasInfix "Packer build for Windows VM" vm_setup_sh_text) "scripts/vm-setup.sh must print a failure message for a failed Windows Packer build";
+
+  # Local Mido compatibility adjustments must be applied at runtime from a
+  # repository-owned patch file, not by editing the vendored submodule files.
+  test_windows_iso_mido_patch_file_exists = assert' (builtins.pathExists ../../vms/windows/patches/mido-iso-link.patch) "vms/windows/patches/mido-iso-link.patch must exist for runtime Mido patching";
+  test_windows_iso_mido_runtime_patch_support =
+    assert'
+      (
+        (lib.hasInfix "NUCLEUS_MIDO_PATCH_FILE" vm_setup_sh_text)
+        && (lib.hasInfix "vms/windows/patches/mido-iso-link.patch" vm_setup_sh_text)
+        && (lib.hasInfix "patch -s" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must patch a temporary Mido copy at runtime instead of editing vendored submodule files";
+
+  # UTM on Apple Silicon must keep Windows guests on x86_64/q35 while allowing
+  # NixOS guests to follow host-native aarch64/virt when applicable.
+  test_macbook_utm_windows_arch_override =
+    assert'
+      (
+        (lib.hasInfix "vm.type == \"Windows\" then \"x86_64\"" macbook_vms_nix_text)
+        && (lib.hasInfix "vmMachine = vm: if vmArch vm == \"x86_64\" then \"q35\" else \"virt\";" macbook_vms_nix_text)
+      )
+      "src/hosts/MacBook/vms.nix must force Windows UTM guests to x86_64/q35 so imported bundles match built Windows images";
 
   # Fido fallback must be gated to Windows hosts only; on macOS/Linux the
   # script must skip Fido and print the explicit Windows-CIM requirement.
@@ -342,12 +411,21 @@ in
     test_packer_templates_exist
     test_vm_setup_scripts_exist
     test_guest_nix_nonempty
+    test_nixos_guest_virtiofs_not_forced
     test_tart_in_homebrew
     test_macbook_linux_builder_enabled
+    test_macbook_linux_builder_machines_file
+    test_macbook_linux_builder_uses_ssh_protocol
+    test_macbook_linux_builder_user_ssh_key_copy
+    test_macbook_linux_builder_ssh_match_blocks
     test_macbook_builders_machines
     test_macos_packer_exit_check
+    test_nixos_generators_output_link_handling
     test_macos_packer_failure_message
     test_windows_packer_failure_message
+    test_windows_iso_mido_patch_file_exists
+    test_windows_iso_mido_runtime_patch_support
+    test_macbook_utm_windows_arch_override
     test_windows_iso_fido_windows_only
     ;
 

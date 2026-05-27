@@ -8,7 +8,7 @@
 # src\hosts\Windows\modules\system\Invoke-VMSetup.ps1.
 #
 # Usage:
-#   .\scripts\vm-setup.ps1 [-WindowsIso PATH] [-NixosOnly] [-WindowsOnly]
+#   .\scripts\vm-setup.ps1 [-WindowsIso PATH] [-WindowsIsoSource Auto|Url|Fido] [-NixosOnly] [-WindowsOnly]
 #                          [-Accelerator TYPE] [-DryRun]
 #
 # Or via the shell alias:
@@ -26,6 +26,13 @@ param(
 
     # Build and provision only the Windows 11 guest.
     [switch]$WindowsOnly,
+
+    # Windows installer ISO resolution strategy.
+    # Auto: windowsIsoUrl cache/download first, then Fido fallback.
+    # Url:  use only -WindowsIso or windowsIsoUrl (no downloader fallback).
+    # Fido: use only local cache/Fido when -WindowsIso is omitted.
+    [ValidateSet('Auto', 'Url', 'Fido')]
+    [string]$WindowsIsoSource = 'Auto',
 
     # QEMU accelerator for image builds (default: tcg, auto-upgraded to whpx
     # when Windows Hypervisor Platform is detected).
@@ -52,6 +59,7 @@ $invokeArgs = @{ RepoRoot = $repoRoot; DryRun = $DryRun }
 if ($WindowsIso)  { $invokeArgs['WindowsIso']  = $WindowsIso }
 if ($NixosOnly)   { $invokeArgs['NixosOnly']   = $true }
 if ($WindowsOnly) { $invokeArgs['WindowsOnly'] = $true }
+if ($WindowsIsoSource) { $invokeArgs['WindowsIsoSource'] = $WindowsIsoSource }
 if ($Accelerator) { $invokeArgs['Accelerator'] = $Accelerator }
 
 Invoke-VMSetup @invokeArgs

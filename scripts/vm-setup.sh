@@ -16,11 +16,15 @@
 #   --windows-iso PATH     Path to the Windows 11 ISO (required for Windows
 #                          guest builds). Download from:
 #                          https://www.microsoft.com/software-download/windows11
+#   --windows-iso-source S Source for Windows ISO auto-resolution when
+#                          --windows-iso is omitted: auto|url|mido.
 #   --accelerator TYPE     QEMU accelerator for image builds (hvf/kvm/tcg).
 #                          Defaults: hvf on macOS, kvm on Linux.
 #
 # Environment variables:
 #   VM_DIR_OVERRIDE  override the default ~/virtual machines path
+#   NUCLEUS_MIDO_SCRIPT      override the Mido script path (default: vendored script)
+#   NUCLEUS_MIDO_PATCH_FILE  override runtime patch file path (default: vms/windows/patches/mido-iso-link.patch)
 #
 # Prerequisites:
 #   NixOS guest    : nix (for nix run github:nix-community/nixos-generators).
@@ -51,6 +55,7 @@ dry_run=false
 nixos_only=false
 windows_only=false
 windows_iso=''
+windows_iso_source='auto'
 accelerator=''
 
 while [ "$#" -gt 0 ]; do
@@ -59,15 +64,25 @@ while [ "$#" -gt 0 ]; do
     --nixos-only)   nixos_only=true ;;
     --windows-only) windows_only=true ;;
     --windows-iso)  windows_iso="$2"; shift ;;
+    --windows-iso-source) windows_iso_source="$2"; shift ;;
     --accelerator)  accelerator="$2"; shift ;;
     *)
       printf 'vm-setup: unknown argument: %s\n' "$1" >&2
-      printf 'vm-setup: usage: %s [--dry-run] [--nixos-only|--windows-only] [--windows-iso PATH] [--accelerator TYPE]\n' "$0" >&2
+      printf 'vm-setup: usage: %s [--dry-run] [--nixos-only|--windows-only] [--windows-iso PATH] [--windows-iso-source auto|url|mido] [--accelerator TYPE]\n' "$0" >&2
       exit 1
       ;;
   esac
   shift
 done
+
+case "$windows_iso_source" in
+  auto|url|mido) ;;
+  *)
+    printf 'vm-setup: invalid --windows-iso-source value: %s\n' "$windows_iso_source" >&2
+    printf 'vm-setup: expected one of: auto, url, mido\n' >&2
+    exit 1
+    ;;
+esac
 
 # Auto-detect QEMU accelerator for this host platform.
 if [ -z "$accelerator" ]; then
@@ -176,17 +191,23 @@ build_nixos_image() {
   fi
 
   _tmpdir="$(mktemp -d)"
+  _out_link="$_tmpdir/result"
   nix run github:nix-community/nixos-generators -- \
     --format "$_nixos_format" \
     --system "$_nixos_system" \
     --configuration "$_guest_nix" \
-    -o "$_tmpdir"
+    -o "$_out_link"
 
-  # Copy the produced image (follow symlinks so we get the real file, not a
-  # nix-store reference that could be garbage-collected).
-  _img="$(find "$_tmpdir" -maxdepth 1 -name '*.qcow2' -print -quit 2>/dev/null)"
+  # nixos-generators' -o flag expects a non-existent symlink path, not an
+  # already-created directory. Use a child path inside our temp dir so the link
+  # can be created atomically, then resolve either a direct symlink-to-file or a
+  # symlinked directory containing the final QCOW2 image.
+  _img="$(readlink "$_out_link" 2>/dev/null || true)"
+  if [ -z "$_img" ] || [ ! -f "$_img" ]; then
+    _img="$(find -L "$_out_link" -maxdepth 2 -name '*.qcow2' -print -quit 2>/dev/null)"
+  fi
   if [ -z "$_img" ] || [ ! -e "$_img" ]; then
-    printf 'vm-setup: nixos-generators produced no .qcow2 in %s\n' "$_tmpdir" >&2
+    printf 'vm-setup: nixos-generators produced no .qcow2 via %s\n' "$_out_link" >&2
     rm -rf "$_tmpdir"
     return 1
   fi
@@ -207,7 +228,8 @@ download_windows_iso_mido() {
   _mido_cached="$1"
   _mido_edition="${2:-Pro}"
 
-  _mido_script="$REPO_ROOT/vendor/qvm-create-windows-qube/windows/isos/mido.sh"
+  _mido_vendor_script="$REPO_ROOT/vendor/qvm-create-windows-qube/windows/isos/mido.sh"
+  _mido_script="${NUCLEUS_MIDO_SCRIPT:-$_mido_vendor_script}"
   if [ ! -f "$_mido_script" ]; then
     printf 'vm-setup: mido.sh not found; run: git submodule update --init vendor/qvm-create-windows-qube\n' >&2
     return 1
@@ -229,8 +251,44 @@ download_windows_iso_mido() {
 
   printf 'vm-setup: downloading Windows 11 ISO via Mido (media=%s)...\n' "$_mido_media"
 
+  # Keep vendor submodules immutable by patching a temporary copy only.
+  # This preserves a clean submodule tree while allowing fast compatibility
+  # updates when Microsoft changes download-link HTML structures.
+  _mido_patch_file="${NUCLEUS_MIDO_PATCH_FILE:-$REPO_ROOT/vms/windows/patches/mido-iso-link.patch}"
+  _mido_script_tmp=''
+  _mido_exec_script="$_mido_script"
+  if [ -f "$_mido_patch_file" ]; then
+    if command -v patch >/dev/null 2>&1; then
+      _mido_script_tmp="$(mktemp -d)"
+      _mido_exec_script="$_mido_script_tmp/mido.sh"
+      cp "$_mido_script" "$_mido_exec_script"
+      chmod 755 "$_mido_exec_script"
+      if patch -s "$_mido_exec_script" "$_mido_patch_file" >/dev/null 2>&1; then
+        printf 'vm-setup: applied runtime Mido patch: %s\n' "$_mido_patch_file"
+      elif patch -s -R --dry-run "$_mido_exec_script" "$_mido_patch_file" >/dev/null 2>&1; then
+        printf 'vm-setup: runtime Mido patch already present in source script; continuing\n'
+      else
+        printf 'vm-setup: warning: runtime Mido patch did not apply cleanly; continuing with unpatched script\n' >&2
+        _mido_exec_script="$_mido_script"
+        rm -rf "$_mido_script_tmp"
+        _mido_script_tmp=''
+      fi
+    else
+      printf 'vm-setup: warning: patch command not found; continuing with unpatched Mido script\n' >&2
+    fi
+  fi
+
   _mido_tmp="$(mktemp -d)"
-  _mido_dir="$(CDPATH='' cd -- "$(dirname -- "$_mido_script")" && pwd)"
+  _mido_uuidgen_shim="$_mido_tmp/uuidgen"
+  cat >"$_mido_uuidgen_shim" <<'EOF'
+#!/bin/sh
+if [ "${1-}" = "--random" ] || [ "${1-}" = "-r" ]; then
+  shift
+fi
+exec /usr/bin/uuidgen "$@"
+EOF
+  chmod 755 "$_mido_uuidgen_shim"
+  _mido_dir="$(CDPATH='' cd -- "$(dirname -- "$_mido_exec_script")" && pwd)"
   _mido_status=0
   (
     cd "$_mido_tmp"
@@ -240,7 +298,7 @@ download_windows_iso_mido() {
     # in PWD.  Without this, Mido cd-s to its own directory and writes the
     # ISO there instead of _mido_tmp.
     # Source: path detection logic at bottom of mido.sh
-    PATH="${_mido_dir}:${PATH}" sh "$_mido_script" "$_mido_media"
+    PATH="${_mido_tmp}:${_mido_dir}:${PATH}" sh "$_mido_exec_script" "$_mido_media"
   ) || _mido_status=$?
 
   # Exit code 4 means verification failed but the ISO was downloaded as
@@ -250,6 +308,7 @@ download_windows_iso_mido() {
   if [ "$_mido_status" -ne 0 ] && [ "$_mido_status" -ne 4 ]; then
     printf 'vm-setup: Mido exited with code %s\n' "$_mido_status" >&2
     rm -rf "$_mido_tmp"
+    rm -rf "$_mido_script_tmp"
     return 1
   fi
 
@@ -257,11 +316,13 @@ download_windows_iso_mido() {
   if [ -z "$_mido_iso" ]; then
     printf 'vm-setup: Mido: no ISO found in temp dir after download\n' >&2
     rm -rf "$_mido_tmp"
+    rm -rf "$_mido_script_tmp"
     return 1
   fi
 
   mv "$_mido_iso" "$_mido_cached"
   rm -rf "$_mido_tmp"
+  rm -rf "$_mido_script_tmp"
   printf 'vm-setup: Windows ISO downloaded: %s\n' "$_mido_cached"
   return 0
 }
@@ -339,7 +400,7 @@ build_windows_image() {
   # Resolve the installer ISO: use --windows-iso if provided, otherwise try the
   # windowsIsoUrl field from VMs.json as a download source.
   _iso="$windows_iso"
-  if [ -z "$_iso" ]; then
+  if [ -z "$_iso" ] && [ "$windows_iso_source" != "mido" ]; then
     _iso_url="$(jq -r ".VMs[] | select(.name == \"$_name\") | .windowsIsoUrl // empty" "$MANIFEST")"
     if [ -n "$_iso_url" ]; then
       _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
@@ -375,26 +436,48 @@ build_windows_image() {
       _iso="$_cached_iso"
     else
       if [ "$dry_run" = false ]; then
-        if download_windows_iso_mido "$_cached_iso" "$_edition"; then
-          _iso="$_cached_iso"
-        else
-          _host_uname="$(uname -s)"
-          case "$_host_uname" in
-            MINGW*|MSYS*|CYGWIN*|Windows_NT)
-              # WHY: Fido uses Windows CIM cmdlets/APIs and is only reliable on
-              # Windows hosts.  On macOS/Linux it can fail with missing cmdlets
-              # (for example Get-CimInstance), so we skip it there.
-              if download_windows_iso_fido "$_cached_iso" "$_edition"; then
-                _iso="$_cached_iso"
-              fi
-              ;;
-            *)
-              printf 'vm-setup: Mido failed; skipping Fido fallback on %s because Fido requires Windows CIM cmdlets\n' "$_host_uname" >&2
-              ;;
-          esac
-        fi
+        case "$windows_iso_source" in
+          url)
+            printf 'vm-setup: windows-iso-source=url selected and no cached installer exists\n' >&2
+            ;;
+          mido)
+            if download_windows_iso_mido "$_cached_iso" "$_edition"; then
+              _iso="$_cached_iso"
+            fi
+            ;;
+          auto)
+            if download_windows_iso_mido "$_cached_iso" "$_edition"; then
+              _iso="$_cached_iso"
+            else
+              _host_uname="$(uname -s)"
+              case "$_host_uname" in
+                MINGW*|MSYS*|CYGWIN*|Windows_NT)
+                  # WHY: Fido uses Windows CIM cmdlets/APIs and is only reliable on
+                  # Windows hosts.  On macOS/Linux it can fail with missing cmdlets
+                  # (for example Get-CimInstance), so we skip it there.
+                  if download_windows_iso_fido "$_cached_iso" "$_edition"; then
+                    _iso="$_cached_iso"
+                  fi
+                  ;;
+                *)
+                  printf 'vm-setup: Mido failed; skipping Fido fallback on %s because Fido requires Windows CIM cmdlets\n' "$_host_uname" >&2
+                  ;;
+              esac
+            fi
+            ;;
+        esac
       else
-        printf 'vm-setup: [dry-run] would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (or Fido fallback) to download Windows 11 ISO\n'
+        case "$windows_iso_source" in
+          url)
+            printf 'vm-setup: [dry-run] windows-iso-source=url selected; no automatic downloader will run\n'
+            ;;
+          mido)
+            printf 'vm-setup: [dry-run] would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (with runtime patch copy) to download Windows 11 ISO\n'
+            ;;
+          auto)
+            printf 'vm-setup: [dry-run] would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (with runtime patch copy) and then Windows-only Fido fallback if available\n'
+            ;;
+        esac
       fi
     fi
   fi
@@ -500,7 +583,7 @@ build_macos_image() {
   fi
 
   # Check if tart VM already exists.
-  if tart list 2>/dev/null | awk '{print $1}' | grep -qxF "$_name"; then
+  if tart list 2>/dev/null | awk 'NR > 1 { print $2 }' | grep -qxF "$_name"; then
     printf 'vm-setup: tart VM "%s" already exists (delete to rebuild: tart delete %s)\n' "$_name" "$_name"
     return 0
   fi
@@ -652,7 +735,7 @@ setup_tart_vms() {
     fi
 
     # Verify the tart VM was created in phase 1.
-    if ! tart list 2>/dev/null | awk '{print $1}' | grep -qxF "$vm_name"; then
+    if ! tart list 2>/dev/null | awk 'NR > 1 { print $2 }' | grep -qxF "$vm_name"; then
       printf 'vm-setup: WARNING — tart VM "%s" not found; Packer build may have failed or was skipped\n' "$vm_name" >&2
       i=$((i + 1))
       continue

@@ -10,18 +10,25 @@
 # so re-provisioning from scratch always produces the same UTM identity.
 #
 # Source: https://github.com/utmapp/UTM/blob/main/Configuration/UTMQemuConfiguration.swift
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ config, pkgs, ... }:
 let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
 
   isArm = pkgs.stdenv.hostPlatform.isAarch64;
-  arch = if isArm then "aarch64" else "x86_64";
-  machine = if isArm then "virt" else "q35";
+
+  # Windows images in this repository are built as x86_64 QCOW2 artefacts.
+  # Keep UTM system architecture aligned with the guest image architecture,
+  # not with the host CPU architecture, so Apple Silicon hosts do not try to
+  # import x86_64 guest bundles as aarch64 virtual machines.
+  vmArch =
+    vm:
+    if vm.type == "Windows" then
+      "x86_64"
+    else if isArm then
+      "aarch64"
+    else
+      "x86_64";
+  vmMachine = vm: if vmArch vm == "x86_64" then "q35" else "virt";
 
   # Derive a deterministic UUID from the VM name (format: 8-4-4-4-12 hex).
   # The same name always maps to the same UUID so re-provisioning the same VM
@@ -128,7 +135,7 @@ let
         <key>System</key>
         <dict>
             <key>Architecture</key>
-            <string>${arch}</string>
+          <string>${vmArch vm}</string>
             <key>CPU</key>
             <string>default</string>
             <key>CPUCount</key>
@@ -142,7 +149,7 @@ let
             <key>MemorySize</key>
             <integer>${toString ((vm.ramBytes + 524288) / 1048576)}</integer>
             <key>Target</key>
-            <string>${machine}</string>
+            <string>${vmMachine vm}</string>
         </dict>
     </dict>
     </plist>
