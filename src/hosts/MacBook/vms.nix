@@ -51,17 +51,21 @@ let
   displayCard =
     vm:
     if isArm then
-      (if vm.type == "Windows" then "vga" else "virtio-ramfb-gl")
+      (if vm.type == "Windows" then "vga" else "virtio-ramfb")
     else
       (if vm.type == "Windows" then "vga" else "virtio-gpu-pci");
 
-  # UTM 4.x VirtioFS directory-sharing toggle.
-  # The SharedDirectories array requires macOS security-scoped bookmarks that
-  # cannot be serialised from Nix.  When shareDevDir is true we set
-  # DirectorySharing=true so UTM knows sharing is desired; the user picks the
-  # host directory once inside UTM's Settings after import.  An empty
-  # SharedDirectories array is always valid and never blocks import.
-  directorySharing = vm: if vm.shareDevDir then "<true/>" else "<false/>";
+  # UTM 4.x sharing mode selector.
+  # Modern UTM uses DirectoryShareMode/DirectoryShareReadOnly (not the legacy
+  # DirectorySharing/ReadOnlySharing keys).  We emit webdav when sharing is
+  # requested and none otherwise; users still choose the host path in UTM UI.
+  directoryShareMode =
+    vm: if vm.shareDevDir then "<string>webdav</string>" else "<string>none</string>";
+
+  # Match firmware mode to the guest image build contract:
+  # - Windows images are built BIOS/MBR (Autounattend.xml), so disable UEFI.
+  # - NixOS images are qcow-efi on aarch64 and qcow (BIOS) on x86_64.
+  qemuUefiBoot = vm: vm.type != "Windows" && vmArch vm == "aarch64";
 
   # UTM 4.x QEMU-backend plist template.  Indented strings in Nix strip the
   # common leading whitespace (6 spaces here), producing a 0-based document.
@@ -130,12 +134,10 @@ let
         <dict>
             <key>ClipboardSharing</key>
             <true/>
-            <key>DirectorySharing</key>
-            ${directorySharing vm}
-            <key>ReadOnlySharing</key>
+          <key>DirectoryShareMode</key>
+          ${directoryShareMode vm}
+          <key>DirectoryShareReadOnly</key>
             <false/>
-            <key>SharedDirectories</key>
-            <array/>
         </dict>
         <key>Sound</key>
         <array>
@@ -163,7 +165,7 @@ let
             <key>TPMDevice</key>
             <false/>
             <key>UEFIBoot</key>
-            <true/>
+            ${if qemuUefiBoot vm then "<true/>" else "<false/>"}
         </dict>
         <key>Input</key>
         <dict>

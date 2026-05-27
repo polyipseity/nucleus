@@ -392,23 +392,39 @@ let
       "src/hosts/MacBook/vms.nix must include modern UTM schema keys (Drive/ImageName/QEMU/Input/CPUFlagsAdd/CPUFlagsRemove) for reliable imports";
   # The Backend value must be exactly "QEMU" (uppercase) — UTM's Swift enum
   # performs a case-sensitive match and throws invalidBackend on any other value.
-  # The Sharing section must use the correct key names from UTMQemuConfigurationSharing:
-  # ClipboardSharing, DirectorySharing, ReadOnlySharing, SharedDirectories.
+  # The Sharing section must use modern UTM keys from UTMQemuConfigurationSharing:
+  # ClipboardSharing, DirectoryShareMode, DirectoryShareReadOnly.
   # Filter strings must be lowercase ("nearest"/"linear") matching enum raw values.
   test_macbook_utm_plist_correctness =
     assert'
       (
         (lib.hasInfix "<string>QEMU</string>" macbook_vms_nix_text)
         && (lib.hasInfix "<key>ClipboardSharing</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>DirectorySharing</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>ReadOnlySharing</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>SharedDirectories</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>DirectoryShareMode</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>DirectoryShareReadOnly</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>DirectorySharing</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>ReadOnlySharing</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>SharedDirectories</key>" macbook_vms_nix_text)
         && (lib.hasInfix "<string>nearest</string>" macbook_vms_nix_text)
         && (lib.hasInfix "<string>linear</string>" macbook_vms_nix_text)
         && !(lib.hasInfix "<string>qemu</string>" macbook_vms_nix_text)
         && !(lib.hasInfix "<key>ClipboardShare</key>" macbook_vms_nix_text)
       )
-      "src/hosts/MacBook/vms.nix plist must use exact UTM enum values: Backend=QEMU, correct Sharing keys, lowercase filter strings";
+      "src/hosts/MacBook/vms.nix plist must use exact UTM enum values: Backend=QEMU, modern Sharing keys, lowercase filter strings";
+  test_macbook_utm_display_card_validity =
+    assert'
+      (
+        (lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
+        && !(lib.hasInfix "virtio-ramfb-gl" macbook_vms_nix_text)
+      )
+      "src/hosts/MacBook/vms.nix must use a UTM-supported ARM Linux display card (virtio-ramfb), not virtio-ramfb-gl";
+  test_macbook_utm_firmware_contract =
+    assert'
+      (
+        (lib.hasInfix "qemuUefiBoot = vm: vm.type != \"Windows\" && vmArch vm == \"aarch64\";" macbook_vms_nix_text)
+        && (lib.hasInfix "qemuUefiBoot vm then \"<true/>\" else \"<false/>\"" macbook_vms_nix_text)
+      )
+      "src/hosts/MacBook/vms.nix must derive UEFIBoot from guest image contract (Windows BIOS/MBR, aarch64 NixOS UEFI)";
   test_macbook_utm_data_dir_disk_path =
     assert'
       (
@@ -419,6 +435,17 @@ let
   test_macbook_utm_no_auto_open_import =
     assert' (!(lib.hasInfix "open \"$bundle\"" vm_setup_sh_text))
       "scripts/vm-setup.sh must not auto-open .utm bundles because that import path can trigger a blocking UTM popup";
+  test_macbook_utm_refreshes_existing_bundle =
+    assert'
+      (
+        (lib.hasInfix "refreshing config.plist" vm_setup_sh_text)
+        && !(lib.hasInfix "UTM bundle already exists: %s; skipping" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must refresh config.plist for existing UTM bundles so schema fixes apply without deleting bundles";
+  test_macbook_utm_stale_template_guard = assert' (
+    (lib.hasInfix "stale UTM template detected" vm_setup_sh_text)
+    && (lib.hasInfix "run home-manager switch (or nucleus apply) before vm-setup" vm_setup_sh_text)
+  ) "scripts/vm-setup.sh must fail fast on stale UTM templates and print the recovery action";
 
   # Fido fallback must be gated to Windows hosts only; on macOS/Linux the
   # script must skip Fido and print the explicit Windows-CIM requirement.
@@ -468,8 +495,12 @@ in
     test_macbook_utm_windows_arch_override
     test_macbook_utm_schema_keys
     test_macbook_utm_plist_correctness
+    test_macbook_utm_display_card_validity
+    test_macbook_utm_firmware_contract
     test_macbook_utm_data_dir_disk_path
     test_macbook_utm_no_auto_open_import
+    test_macbook_utm_refreshes_existing_bundle
+    test_macbook_utm_stale_template_guard
     test_windows_iso_fido_windows_only
     ;
 

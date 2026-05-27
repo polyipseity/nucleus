@@ -233,7 +233,6 @@ $virtiofsArgs
     -device virtio-net-pci,netdev=net0 ``
     -vga $vga ``
     -display $display ``
-    -enable-kvm ``
     -rtc base=localtime ``
     -usb -device usb-tablet
 "@

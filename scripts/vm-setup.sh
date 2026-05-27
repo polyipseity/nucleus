@@ -800,14 +800,13 @@ setup_utm_vms() {
     data_dir="$bundle/Data"
     disk_file="$data_dir/disk-main.qcow2"
     config_plist="$bundle/config.plist"
+    bundle_exists=false
 
     printf 'vm-setup: configuring UTM VM "%s"...\n' "$vm_display"
 
-    # Check if bundle already exists to avoid overwriting.
     if [ -d "$bundle" ]; then
-      printf 'vm-setup: UTM bundle already exists: %s; skipping\n' "$bundle"
-      i=$((i + 1))
-      continue
+      bundle_exists=true
+      printf 'vm-setup: UTM bundle already exists: %s; refreshing config.plist\n' "$bundle"
     fi
 
     # Use the Nix-generated UTM config.plist written to ~/.local/share/nucleus/
@@ -818,23 +817,39 @@ setup_utm_vms() {
       i=$((i + 1))
       continue
     fi
-
-    # Require a pre-built image (built in phase 1).
+    # Detect stale templates from older schema/value generations and fail fast
+    # with a concrete action instead of copying a known-invalid plist.
+    if grep -qE 'virtio-ramfb-gl|<key>DirectorySharing</key>|<key>ReadOnlySharing</key>|<key>SharedDirectories</key>' "$_plist_template"; then
+      printf 'vm-setup: WARNING — stale UTM template detected at %s; run home-manager switch (or nucleus apply) before vm-setup\n' "$_plist_template" >&2
+      i=$((i + 1))
+      continue
+    fi
+    # Require a pre-built image only when the bundle does not already have a
+    # disk. Existing bundles can refresh config.plist in-place.
     _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
-    if [ ! -f "$_prebuilt" ]; then
-      printf 'vm-setup: WARNING \u2014 image not found: %s; build failed or type not supported\n' "$_prebuilt" >&2
+    if [ ! -f "$disk_file" ] && [ ! -f "$_prebuilt" ]; then
+      printf 'vm-setup: WARNING — image not found: %s; build failed or type not supported\n' "$_prebuilt" >&2
       i=$((i + 1))
       continue
     fi
 
     if [ "$dry_run" = false ]; then
       mkdir -p "$data_dir"
-      cp "$_prebuilt" "$disk_file"
+      if [ ! -f "$disk_file" ]; then
+        cp "$_prebuilt" "$disk_file"
+        printf 'vm-setup: copied pre-built disk image: %s\n' "$disk_file"
+      else
+        printf 'vm-setup: preserving existing disk image: %s\n' "$disk_file"
+      fi
       cp "$_plist_template" "$config_plist"
       # Nix store files are read-only (mode 0444).  Make the bundle-local copy
       # writable so UTM can update the plist after import if needed.
       chmod +w "$config_plist"
-      printf 'vm-setup: UTM bundle created: %s\n' "$bundle"
+      if [ "$bundle_exists" = true ]; then
+        printf 'vm-setup: refreshed UTM bundle config: %s\n' "$bundle"
+      else
+        printf 'vm-setup: UTM bundle created: %s\n' "$bundle"
+      fi
       # Avoid auto-import via the macOS `open` command on .utm bundles: current
       # UTM builds can reject imports in this flow and show a blocking popup even
       # when the bundle itself is otherwise usable. Keep provisioning deterministic
