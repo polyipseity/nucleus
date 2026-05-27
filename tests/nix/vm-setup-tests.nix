@@ -505,6 +505,7 @@ let
         (lib.hasInfix "ensure_tart_vm_dir" vm_setup_sh_text)
         && (lib.hasInfix "/.tart" vm_setup_sh_text)
         && (lib.hasInfix "linked tart storage" vm_setup_sh_text)
+        && (lib.hasInfix "rsync" vm_setup_sh_text)
       )
       "scripts/vm-setup.sh must link ~/.tart -> ~/virtual machines/.tart so Tart artifacts co-locate with UTM bundles for backup";
 

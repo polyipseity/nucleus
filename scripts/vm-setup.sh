@@ -228,8 +228,10 @@ ensure_tart_vm_dir() {
   if [ -d "$_etd_default" ]; then
     # WHY: migrate existing ~/.tart to VM_DIR on first run so existing VMs are
     # not lost when this policy was introduced.
+    # Use rsync --no-specials to skip Unix socket files (e.g. control.sock)
+    # which cp -a cannot copy and which are not persistent data.
     printf 'vm-setup: migrating ~/.tart to %s...\n' "$_etd_target"
-    cp -a "$_etd_default/." "$_etd_target/"
+    rsync -a --no-specials --no-devices "$_etd_default/" "$_etd_target/"
     rm -rf "$_etd_default"
   fi
 
