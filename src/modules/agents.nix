@@ -483,13 +483,14 @@ in
 
       # Get actually installed uv tools from `uv tool list` (zap-style: remove
       # any installed tool absent from the desired list, regardless of prior
-      # managed state).  `uv tool list` emits "name vX.Y.Z" on non-indented
-      # lines; the first field is the package name.
+      # managed state).  Parse only lines that match the documented
+      # "name vX.Y.Z" shape so separator/header lines (for example "-")
+      # cannot be misparsed as package names.
       _iut_installed="$(mktemp)"
       # || true is intentional and benign: if uv tool list fails (e.g. no tool
       # environment is initialised yet), the installed set is treated as empty
       # and nothing is erroneously removed.
-      "$_iut_uv_bin" tool list 2>/dev/null | ${pkgs.gawk}/bin/awk '/^[^ \t]/{print $1}' > "$_iut_installed" || true
+      "$_iut_uv_bin" tool list 2>/dev/null | ${pkgs.gawk}/bin/awk '/^[A-Za-z0-9][A-Za-z0-9._-]*[[:space:]]+v[0-9]/{print $1}' > "$_iut_installed" || true
 
       # Tools installed but not desired: zap-style removal.
       # Mirrors homebrew cleanup = "zap": removes anything installed but absent
@@ -514,6 +515,10 @@ in
       # Prune tools removed from the desired list.
       while IFS= read -r _iut_tool; do
         [ -z "$_iut_tool" ] && continue
+        if ! printf '%s' "$_iut_tool" | ${pkgs.gnugrep}/bin/grep -Eq '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
+          echo "uv: skipping invalid uninstall token '$_iut_tool'"
+          continue
+        fi
         echo "uv: uninstalling removed tool '$_iut_tool'"
         "$_iut_uv_bin" tool uninstall "$_iut_tool"
       done < "$_iut_to_remove"
@@ -521,6 +526,10 @@ in
       # Install additions.
       while IFS= read -r _iut_tool; do
         [ -z "$_iut_tool" ] && continue
+        if ! printf '%s' "$_iut_tool" | ${pkgs.gnugrep}/bin/grep -Eq '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
+          echo "uv: skipping invalid install token '$_iut_tool'"
+          continue
+        fi
         echo "uv: installing tool '$_iut_tool'"
         "$_iut_uv_bin" tool install "$_iut_tool"
       done < "$_iut_to_install"

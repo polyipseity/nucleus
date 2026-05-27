@@ -56,9 +56,9 @@ function Invoke-UvSetup {
 
   # Get actually installed uv tools from `uv tool list` (zap-style: remove
   # any installed tool absent from the desired list, regardless of prior
-  # managed state).  `uv tool list` emits lines of the form "name vX.Y.Z";
-  # non-indented lines are tool entries.
-  $uvListOutput = @(uv tool list 2>&1 | Where-Object { $_ -match '^\S' -and $_ -match '\S' })
+  # managed state). Parse only "name vX.Y.Z" lines so separators/headers
+  # cannot become uninstall candidates.
+  $uvListOutput = @(uv tool list 2>&1 | Where-Object { $_ -match '^[A-Za-z0-9][A-Za-z0-9._-]*\s+v\d' })
   $installedTools = @($uvListOutput | ForEach-Object { ($_ -split '\s+')[0] })
 
   # Tools installed but not desired: zap-style removal.
@@ -75,6 +75,10 @@ function Invoke-UvSetup {
 
   # Prune packages removed from the desired list.
   foreach ($pkg in $toRemove) {
+    if ($pkg -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+      Write-Output "uv: skipping invalid uninstall token '$pkg'"
+      continue
+    }
     Write-Output "uv: uninstalling removed tool '$pkg'"
     uv tool uninstall $pkg
     if ($LASTEXITCODE -ne 0) {
@@ -86,6 +90,10 @@ function Invoke-UvSetup {
 
   # Install additions.
   foreach ($pkg in $toInstall) {
+    if ($pkg -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+      Write-Output "uv: skipping invalid install token '$pkg'"
+      continue
+    }
     Write-Output "uv: installing tool '$pkg'"
     uv tool install $pkg
     if ($LASTEXITCODE -ne 0) {

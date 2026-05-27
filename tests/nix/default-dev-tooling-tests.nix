@@ -28,6 +28,7 @@ let
   posixShellText = builtins.readFile ../../src/modules/shell.nix;
   rustToolchainText = builtins.readFile ../../rust-toolchain.toml;
   rustupSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-RustupSetup.ps1;
+  uvSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-UvSetup.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
 
   # Simple assertion helper with descriptive errors.
@@ -153,6 +154,21 @@ let
       )
       "Invoke-CargoBinstallSetup.ps1 must use 'cargo install --list' + 'cargo uninstall' to prune both cargo install and cargo-binstall packages";
 
+  # Verify uv prune parsing is strict and resilient on both POSIX and Windows:
+  # only "name vX.Y.Z" lines are parsed and uninstall/install tokens are
+  # validated before command invocation.
+  test_uv_prune_parsing_and_validation_parity =
+    assert'
+      (
+        (lib.hasInfix "awk '/^[A-Za-z0-9][A-Za-z0-9._-]*[[:space:]]+v[0-9]/{print $1}'" posixAgentsText)
+        && (lib.hasInfix "skipping invalid uninstall token" posixAgentsText)
+        && (lib.hasInfix "skipping invalid install token" posixAgentsText)
+        && (lib.hasInfix "-match '^[A-Za-z0-9][A-Za-z0-9._-]*\\s+v\\d'" uvSetupText)
+        && (lib.hasInfix "skipping invalid uninstall token" uvSetupText)
+        && (lib.hasInfix "skipping invalid install token" uvSetupText)
+      )
+      "POSIX and Windows uv convergence scripts must strictly parse uv tool list output and validate uninstall/install tokens";
+
   # Verify that the POSIX devShell uses rust-overlay so that projects can pin
   # their Rust toolchain via rust-toolchain.toml.  rust-overlay assembles a
   # Nix-patched toolchain for devShells; the system interactive shell uses
@@ -212,6 +228,7 @@ let
     test_windows_rustup_sets_default_stable
     test_posix_cargo_prunes_both_install_and_binstall
     test_windows_cargo_prunes_both_install_and_binstall
+    test_uv_prune_parsing_and_validation_parity
     test_posix_devshell_uses_rust_overlay
     test_rust_toolchain_toml_exists_and_is_stable
     test_posix_shell_darwin_libiconv_library_path
