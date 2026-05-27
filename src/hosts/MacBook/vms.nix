@@ -13,6 +13,7 @@
 { config, pkgs, ... }:
 let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
+  lib = pkgs.lib;
 
   isArm = pkgs.stdenv.hostPlatform.isAarch64;
 
@@ -45,6 +46,17 @@ let
     in
     "${builtins.substring 0 8 h}-${builtins.substring 8 4 h}-${builtins.substring 12 4 h}-${builtins.substring 16 4 h}-${builtins.substring 20 12 h}";
 
+  # Deterministic, locally-administered unicast MAC address per VM.
+  # Prefix 52:54:00 is qemu-common and host-safe; suffix is hash-derived.
+  mkMacAddress =
+    name:
+    let
+      h = builtins.hashString "sha256" ("mac:" + name);
+    in
+    "52:54:00:${lib.toUpper (builtins.substring 0 2 h)}:${lib.toUpper (builtins.substring 2 2 h)}:${
+      lib.toUpper (builtins.substring 4 2 h)
+    }";
+
   # QEMU display card appropriate for the guest OS and host arch.
   # Windows VMs use vga for broadest driver coverage.
   # Linux/NixOS VMs use virtio variants for best performance.
@@ -57,10 +69,10 @@ let
 
   # UTM 4.x sharing mode selector.
   # Modern UTM uses DirectoryShareMode/DirectoryShareReadOnly (not the legacy
-  # DirectorySharing/ReadOnlySharing keys).  We emit webdav when sharing is
-  # requested and none otherwise; users still choose the host path in UTM UI.
+  # DirectorySharing/ReadOnlySharing keys).  UTM import expects enum display
+  # names (WebDAV/None), not lowercase raw values.
   directoryShareMode =
-    vm: if vm.shareDevDir then "<string>webdav</string>" else "<string>none</string>";
+    vm: if vm.shareDevDir then "<string>WebDAV</string>" else "<string>None</string>";
 
   # Match firmware mode to the guest image build contract:
   # - Windows images are built BIOS/MBR (Autounattend.xml), so disable UEFI.
@@ -88,7 +100,9 @@ let
                 <key>ImageType</key>
                 <string>Disk</string>
                 <key>Interface</key>
-                <string>virtio</string>
+                <string>VirtIO</string>
+                <key>InterfaceVersion</key>
+                <integer>1</integer>
                 <key>ReadOnly</key>
                 <false/>
             </dict>
@@ -101,17 +115,17 @@ let
                 <key>DynamicResolution</key>
                 <true/>
                 <key>UpscalingFilter</key>
-                <string>nearest</string>
+                <string>Nearest</string>
                 <key>DownscalingFilter</key>
-                <string>linear</string>
+                <string>Linear</string>
                 <key>NativeResolution</key>
                 <false/>
             </dict>
         </array>
         <key>Information</key>
         <dict>
-            <key>Icon</key>
-            <string>generic</string>
+          <key>IconCustom</key>
+          <false/>
             <key>Name</key>
             <string>${vm.display}</string>
             <key>UUID</key>
@@ -122,6 +136,10 @@ let
             <dict>
                 <key>Hardware</key>
                 <string>virtio-net-pci</string>
+            <key>IsolateFromHost</key>
+            <false/>
+            <key>MacAddress</key>
+            <string>${mkMacAddress vm.name}</string>
                 <key>Mode</key>
                 <string>Shared</string>
                 <key>PortForward</key>

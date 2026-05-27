@@ -7,7 +7,7 @@
 #
 # Usage (from repo root):
 #   cd vms/macos && packer init . && packer build \
-#     [-var macos_version=sequoia]               \
+#     [-var macos_version=tahoe]                 \
 #     [-var vm_name=MacBook]                     \
 #     .
 #
@@ -25,8 +25,8 @@
 
 variable "macos_version" {
   type        = string
-  default     = "sequoia"
-  description = "macOS version to provision (sequoia, sonoma, ventura, etc.)."
+  default     = "tahoe"
+  description = "macOS version to provision (tahoe, sequoia, sonoma, ventura, etc.)."
 }
 
 variable "vm_name" {

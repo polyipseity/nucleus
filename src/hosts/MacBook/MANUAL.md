@@ -9,6 +9,7 @@
 - Open `fuse-t.app` once, then enable the `fuse-t` File System Extension in `System Settings > General > Login Items & Extensions > Extensions`.
 - Open `battery.app` once so `/usr/local/bin/battery` is installed.
 - Sign in to the App Store once so `mas` installs can provision Xcode and Amphetamine.
+- Grant Automation permission to the shell or terminal app that runs `nucleus-vm-setup` so it can ask UTM to import `.utm` bundles automatically.
 - Install Amphetamine Power Protect one time (upstream requires manual placement): copy the Power Protect script to `~/Library/Application Scripts/com.if.Amphetamine/` and the Power Protect sudoers file to `/private/etc/sudoers.d/` as documented at `https://raw.githubusercontent.com/x74353/Amphetamine/master/README.md`, then re-run `nucleus-apply`.
 - Create the per-user rclone passphrase: from the repo root, run `sops edit src/secrets/users-<username>.yml`, add `rclone_config_pass: <output of openssl rand -hex 64>`, save (sops encrypts automatically), commit the file, then re-run `nucleus apply`. If you already configured rclone remotes without this passphrase, delete `~/.config/rclone/rclone.conf` first so the remotes are re-created with encryption.
 - Run `nucleus-cloud-setup` and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.

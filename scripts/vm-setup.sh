@@ -564,7 +564,7 @@ build_macos_image() {
   _disk_gib="$2"
   _ram_mib="$3"
   _cpus="$4"
-  _macos_version="${5:-sequoia}"
+  _macos_version="${5:-tahoe}"
 
   # Tart requires Apple Virtualization.framework — macOS host only.
   if [ "$(uname -s)" != "Darwin" ]; then
@@ -649,7 +649,7 @@ build_images() {
             || printf 'vm-setup: Windows image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
           ;;
         macOS)
-          _vm_macos_ver="$(jq -r ".VMs[$_i].macOSVersion // \"sequoia\"" "$MANIFEST")"
+          _vm_macos_ver="$(jq -r ".VMs[$_i].macOSVersion // \"tahoe\"" "$MANIFEST")"
           _vm_ram_bytes="$(jq -r ".VMs[$_i].ramBytes" "$MANIFEST")"
           # Convert SI bytes to nearest binary MiB for hypervisor tools.
           # Uses (n + 2^19) / 2^20 for round-half-up in POSIX integer arithmetic.
@@ -773,11 +773,6 @@ setup_utm_vms() {
     return
   fi
 
-  if [ ! -x "$UTMCTL" ]; then
-    printf 'vm-setup: utmctl not found at %s; skipping macOS VM provisioning\n' "$UTMCTL"
-    return
-  fi
-
   vm_count=$(jq '.VMs | length' "$MANIFEST")
   i=0
   while [ "$i" -lt "$vm_count" ]; do
@@ -850,11 +845,12 @@ setup_utm_vms() {
       else
         printf 'vm-setup: UTM bundle created: %s\n' "$bundle"
       fi
-      # Avoid auto-import via the macOS `open` command on .utm bundles: current
-      # UTM builds can reject imports in this flow and show a blocking popup even
-      # when the bundle itself is otherwise usable. Keep provisioning deterministic
-      # and let users register bundles via UTM's “Browse UTM virtual machines”.
-      printf 'vm-setup: register this bundle in UTM via “Browse UTM virtual machines”: %s\n' "$bundle"
+      if ! "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$vm_name"; then
+        printf 'vm-setup: importing UTM bundle via AppleScript: %s\n' "$bundle"
+        osascript -e "tell application \"UTM\" to import new virtual machine from POSIX file \"$bundle\""
+      else
+        printf 'vm-setup: UTM VM already registered: %s\n' "$vm_name"
+      fi
       write_configure_script "$vm_name" "$vm_type"
     else
       printf 'vm-setup: [dry-run] create UTM bundle %s from %s\n' "$bundle" "$_plist_template"

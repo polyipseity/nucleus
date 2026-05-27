@@ -337,6 +337,8 @@ let
   # a failed packer invocation does not falsely report success.
   vm_setup_sh_text = builtins.readFile ../../scripts/vm-setup.sh;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
+  vms_json_text = builtins.readFile ../../src/modules/VMs.json;
+  vms_macos_packer_text = builtins.readFile ../../vms/macos/packer.pkr.hcl;
   test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm-setup.sh must capture packer exit status (_packer_status=0)";
 
   # nixos-generators' -o flag expects a non-existent symlink path, not a
@@ -394,7 +396,7 @@ let
   # performs a case-sensitive match and throws invalidBackend on any other value.
   # The Sharing section must use modern UTM keys from UTMQemuConfigurationSharing:
   # ClipboardSharing, DirectoryShareMode, DirectoryShareReadOnly.
-  # Filter strings must be lowercase ("nearest"/"linear") matching enum raw values.
+  # Filter strings use UTM's enum display names ("Nearest"/"Linear").
   test_macbook_utm_plist_correctness =
     assert'
       (
@@ -405,19 +407,27 @@ let
         && !(lib.hasInfix "<key>DirectorySharing</key>" macbook_vms_nix_text)
         && !(lib.hasInfix "<key>ReadOnlySharing</key>" macbook_vms_nix_text)
         && !(lib.hasInfix "<key>SharedDirectories</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<string>nearest</string>" macbook_vms_nix_text)
-        && (lib.hasInfix "<string>linear</string>" macbook_vms_nix_text)
+        && (lib.hasInfix "<string>Nearest</string>" macbook_vms_nix_text)
+        && (lib.hasInfix "<string>Linear</string>" macbook_vms_nix_text)
+        && (lib.hasInfix "<string>WebDAV</string>" macbook_vms_nix_text)
+        && (lib.hasInfix "<string>None</string>" macbook_vms_nix_text)
+        && (lib.hasInfix "<string>VirtIO</string>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>IconCustom</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>IsolateFromHost</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>MacAddress</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "52:54:00:" macbook_vms_nix_text)
         && !(lib.hasInfix "<string>qemu</string>" macbook_vms_nix_text)
         && !(lib.hasInfix "<key>ClipboardShare</key>" macbook_vms_nix_text)
       )
-      "src/hosts/MacBook/vms.nix plist must use exact UTM enum values: Backend=QEMU, modern Sharing keys, lowercase filter strings";
+      "src/hosts/MacBook/vms.nix plist must use exact UTM enum values/casing: Backend=QEMU, Sharing enum names, VirtIO drive interface, IconCustom, deterministic MAC, and modern Sharing keys";
   test_macbook_utm_display_card_validity =
     assert'
       (
         (lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
+        && !(lib.hasInfix "virtio_ramfb" macbook_vms_nix_text)
         && !(lib.hasInfix "virtio-ramfb-gl" macbook_vms_nix_text)
       )
-      "src/hosts/MacBook/vms.nix must use a UTM-supported ARM Linux display card (virtio-ramfb), not virtio-ramfb-gl";
+      "src/hosts/MacBook/vms.nix must use a UTM-supported ARM Linux display card (virtio-ramfb), not virtio_ramfb/-gl";
   test_macbook_utm_firmware_contract =
     assert'
       (
@@ -435,6 +445,14 @@ let
   test_macbook_utm_no_auto_open_import =
     assert' (!(lib.hasInfix "open \"$bundle\"" vm_setup_sh_text))
       "scripts/vm-setup.sh must not auto-open .utm bundles because that import path can trigger a blocking UTM popup";
+  test_macbook_utm_uses_apple_script_import =
+    assert'
+      (
+        (lib.hasInfix "osascript -e" vm_setup_sh_text)
+        && (lib.hasInfix "import new virtual machine from POSIX file" vm_setup_sh_text)
+        && (lib.hasInfix "importing UTM bundle via AppleScript" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must automate UTM import via AppleScript when the VM is not already registered";
   test_macbook_utm_refreshes_existing_bundle =
     assert'
       (
@@ -446,6 +464,17 @@ let
     (lib.hasInfix "stale UTM template detected" vm_setup_sh_text)
     && (lib.hasInfix "run home-manager switch (or nucleus apply) before vm-setup" vm_setup_sh_text)
   ) "scripts/vm-setup.sh must fail fast on stale UTM templates and print the recovery action";
+
+  test_macbook_macos_version_tahoe =
+    assert'
+      (
+        (lib.hasInfix "\"macOSVersion\": \"tahoe\"" vms_json_text)
+        && (lib.hasInfix "[-var macos_version=tahoe]" vms_macos_packer_text)
+        && (lib.hasInfix "default     = \"tahoe\"" vms_macos_packer_text)
+        && (lib.hasInfix "macOS version to provision (tahoe, sequoia, sonoma, ventura, etc.)" vms_macos_packer_text)
+        && (lib.hasInfix "tahoe" vm_setup_sh_text)
+      )
+      "MacBook macOS guest version must default to Tahoe across VMs.json, vm-setup.sh, and the macOS Packer template";
 
   # Fido fallback must be gated to Windows hosts only; on macOS/Linux the
   # script must skip Fido and print the explicit Windows-CIM requirement.
@@ -499,8 +528,10 @@ in
     test_macbook_utm_firmware_contract
     test_macbook_utm_data_dir_disk_path
     test_macbook_utm_no_auto_open_import
+    test_macbook_utm_uses_apple_script_import
     test_macbook_utm_refreshes_existing_bundle
     test_macbook_utm_stale_template_guard
+    test_macbook_macos_version_tahoe
     test_windows_iso_fido_windows_only
     ;
 
