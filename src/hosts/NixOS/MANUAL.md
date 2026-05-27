@@ -44,7 +44,7 @@
 - `nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas.
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
-- `nucleus-vm-setup` — build (if needed) and provision KVM/libvirt VMs declared in `src/modules/VMs.json`; run once per machine or when adding a VM. Requires `libvirtd` active (from `vms.nix`). Run the generated `~/virtual machines/<name>-configure.sh` inside the VM to apply the nucleus configuration.
+- `nucleus-vm-setup` — build (if needed) and provision KVM/libvirt VMs declared in `src/modules/VMs.json`; run once per machine or when adding a VM. Requires `libvirtd` active (from `vms.nix`). Run `~/virtual machines/<name>-configure.sh` on the host to print the exact command to run inside the guest.
   - **macOS guest**: macOS VM build is not automated on NixOS (Apple EULA restricts redistribution). The entry exists in `VMs.json` but `nucleus-vm-setup` skips the image build step.
   - **NixOS guest** (`--nixos-only`): fully automatic; `nixos-generators` builds the image (no extra tools needed).
   - **Windows 11 guest** (`--windows-only`): attempts to auto-download the ISO from Microsoft on first run (Fido-style); falls back to `--windows-iso /path/to/Win11.iso` if auto-fetch fails (download from <https://www.microsoft.com/software-download/windows11>).

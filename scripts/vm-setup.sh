@@ -142,9 +142,9 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
 
 ## Start commands
 
-- macOS guest (Tart): `tart run MacBook`
-- NixOS/Windows guests on macOS (UTM): open UTM and click Run for `NixOS` / `Windows`
-- NixOS/Windows guests on NixOS (libvirt): start from `virt-manager`
+- macOS guest (Tart): run `~/virtual machines/Start-<display>.sh`
+- NixOS/Windows guests on macOS (UTM): run `~/virtual machines/Start-<display>.sh`
+- NixOS/Windows guests on NixOS (libvirt): run `~/virtual machines/Start-<display>.sh`
 - NixOS/Windows guests on Windows (QEMU): run `Start-<display>.ps1`
 
 ## UTM bundle portability
@@ -164,7 +164,12 @@ portable UTM VM transfer.
 ## Guest configuration
 
 Guest OS configuration is **not automatic** after first boot.
-Run the host converge command inside each guest:
+Run the generated helper script in `~/virtual machines/` to print the exact
+guest-side converge command:
+
+- `~/virtual machines/<name>-configure.sh`
+
+The converge commands are run inside each guest:
 
 - NixOS guest: `sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"`
 - Windows guest: `.\src\hosts\Windows\apply.ps1` (from `%USERPROFILE%\dev\nucleus`)
@@ -269,6 +274,112 @@ run_cmd() {
   else
     "$@"
   fi
+}
+
+# write_start_script NAME DISPLAY TYPE HOST_KIND
+# Args:
+#   $1 — VM machine name (manifest .name)
+#   $2 — VM display name (manifest .display)
+#   $3 — VM type (macOS/NixOS/Windows/...)
+#   $4 — host runtime kind (darwin-utm|darwin-tart|nixos-libvirt)
+# Writes a host-side helper script to start the VM runtime from ~/virtual machines.
+write_start_script() {
+  _wss_name="$1"
+  _wss_display="$2"
+  _wss_type="$3"
+  _wss_host_kind="$4"
+  _wss_path="$VM_DIR/Start-${_wss_display}.sh"
+
+  if [ "$dry_run" = true ]; then
+    printf 'vm-setup: [dry-run] write start helper script: %s\n' "$_wss_path"
+    return 0
+  fi
+
+  case "$_wss_host_kind" in
+    darwin-tart)
+      cat >"$_wss_path" <<EOF
+#!/usr/bin/env sh
+set -eu
+tart run "$_wss_name"
+EOF
+      ;;
+    darwin-utm)
+      cat >"$_wss_path" <<EOF
+#!/usr/bin/env sh
+set -eu
+if [ -x '/Applications/UTM.app/Contents/MacOS/utmctl' ]; then
+  '/Applications/UTM.app/Contents/MacOS/utmctl' start "$_wss_name" || {
+    printf 'vm-setup: utmctl start failed for %s; opening bundle instead\n' "$_wss_name" >&2
+    open "$VM_DIR/$_wss_name.utm"
+  }
+else
+  open "$VM_DIR/$_wss_name.utm"
+fi
+EOF
+      ;;
+    nixos-libvirt)
+      cat >"$_wss_path" <<EOF
+#!/usr/bin/env sh
+set -eu
+if ! virsh start "$_wss_name" >/dev/null; then
+  printf 'vm-setup: virsh start failed (or VM already running): %s\n' "$_wss_name" >&2
+fi
+if command -v virt-viewer >/dev/null 2>&1; then
+  exec virt-viewer --connect qemu:///system "$_wss_name"
+fi
+printf 'vm-setup: VM started: %s\n' "$_wss_name"
+printf 'vm-setup: install virt-viewer to open a console automatically\n'
+EOF
+      ;;
+    *)
+      printf 'vm-setup: unknown start-script host kind: %s\n' "$_wss_host_kind" >&2
+      return 1
+      ;;
+  esac
+
+  chmod 755 "$_wss_path"
+  printf 'vm-setup: wrote start helper script: %s\n' "$_wss_path"
+}
+
+# write_configure_script NAME TYPE
+# Args:
+#   $1 — VM machine name (manifest .name)
+#   $2 — VM type (macOS/NixOS/Windows/...)
+# Writes a host-side helper script that prints the guest-side converge command.
+write_configure_script() {
+  _wcs_name="$1"
+  _wcs_type="$2"
+  _wcs_path="$VM_DIR/${_wcs_name}-configure.sh"
+
+  if [ "$dry_run" = true ]; then
+    printf 'vm-setup: [dry-run] write configure helper script: %s\n' "$_wcs_path"
+    return 0
+  fi
+
+  case "$_wcs_type" in
+    NixOS)
+      _wcs_cmd="sudo nixos-rebuild switch --flake \"\$HOME/dev/nucleus/src#NixOS\""
+      ;;
+    Windows)
+      _wcs_cmd='.\src\hosts\Windows\apply.ps1'
+      ;;
+    macOS)
+      _wcs_cmd="\$HOME/dev/nucleus/scripts/bootstrap.sh apply"
+      ;;
+    *)
+      _wcs_cmd='No guest converge command is defined for this VM type.'
+      ;;
+  esac
+
+  cat >"$_wcs_path" <<EOF
+#!/usr/bin/env sh
+set -eu
+printf 'Guest configuration is not automatic. Run inside the guest:\n\n'
+printf '%s\n' '$_wcs_cmd'
+EOF
+
+  chmod 755 "$_wcs_path"
+  printf 'vm-setup: wrote configure helper script: %s\n' "$_wcs_path"
 }
 
 # ---------------------------------------------------------------------------
@@ -724,15 +835,26 @@ build_windows_image() {
 
   _packer_dir="$VMS_DIR/windows"
   _tmp_out="$IMAGES_DIR/${_name}-build"
+  _winrm_timeout='3h'
+  if [ "$accelerator" = 'tcg' ]; then
+    # WHY: x86_64 Windows setup under software emulation can take much longer
+    # than hardware-accelerated paths; use a larger communicator timeout.
+    _winrm_timeout='8h'
+  fi
 
   printf 'vm-setup: building Windows 11 image (disk=%s GiB, accelerator=%s)...\n' \
     "$_disk_gib" "$accelerator"
 
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var disk_size=%sG -var output_directory=%s .\n' \
-      "$_packer_dir" "$_iso" "$accelerator" "$_disk_gib" "$_tmp_out"
+    printf 'vm-setup: [dry-run] remove stale temporary output directory (if present): %s\n' "$_tmp_out"
+    printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var winrm_timeout=%s -var disk_size=%sG -var output_directory=%s .\n' \
+      "$_packer_dir" "$_iso" "$accelerator" "$_winrm_timeout" "$_disk_gib" "$_tmp_out"
     return 0
   fi
+
+  # WHY: Packer qemu builder requires a non-existent output_directory.
+  # Previous interrupted runs may leave this directory behind.
+  rm -rf "$_tmp_out"
 
   _packer_status=0
   (
@@ -741,6 +863,7 @@ build_windows_image() {
     packer build \
       -var "windows_iso=$_iso" \
       -var "accelerator=$accelerator" \
+      -var "winrm_timeout=$_winrm_timeout" \
       -var "disk_size=${_disk_gib}G" \
       -var "output_directory=$_tmp_out" \
       .
@@ -883,24 +1006,6 @@ build_images() {
 #   Removes obsolete helper artifacts from ~/virtual machines now that converge
 #   guidance is centralized in ~/virtual machines/README.md.
 cleanup_vm_directory_artifacts() {
-  _cls_count="$(jq '.VMs | length' "$MANIFEST")"
-  _cls_i=0
-  while [ "$_cls_i" -lt "$_cls_count" ]; do
-    _cls_name="$(jq -r ".VMs[$_cls_i].name" "$MANIFEST")"
-    _cls_legacy="$VM_DIR/${_cls_name}-configure.sh"
-    if [ -f "$_cls_legacy" ]; then
-      rm -f "$_cls_legacy"
-      printf 'vm-setup: removed legacy helper script: %s\n' "$_cls_legacy"
-    fi
-    # Remove legacy Start-<name>.sh tart start scripts (replaced by README guidance).
-    _cls_tart_start="$VM_DIR/Start-${_cls_name}.sh"
-    if [ -f "$_cls_tart_start" ]; then
-      rm -f "$_cls_tart_start"
-      printf 'vm-setup: removed legacy tart start script: %s\n' "$_cls_tart_start"
-    fi
-    _cls_i=$((_cls_i + 1))
-  done
-
   _cls_legacy_dir="$HOME/.local/share/nucleus/vms/configure"
   if [ -d "$_cls_legacy_dir" ]; then
     rm -rf "$_cls_legacy_dir"
@@ -947,6 +1052,8 @@ setup_tart_vms() {
 
     if [ "$dry_run" = false ]; then
       printf 'vm-setup: tart VM ready: %s (start with: tart run %s)\n' "$vm_name" "$vm_name"
+      write_start_script "$vm_name" "$vm_name" "$vm_type" 'darwin-tart'
+      write_configure_script "$vm_name" "$vm_type"
     else
       printf 'vm-setup: [dry-run] verify tart VM registration: %s\n' "$vm_name"
     fi
@@ -1002,6 +1109,8 @@ setup_utm_vms() {
     # Use the Nix-generated UTM config.plist written to ~/.local/share/nucleus/
     # at Home Manager activation time (run nucleus-apply first).
     _plist_template="${HOME}/.local/share/nucleus/vms/${vm_name}-config.plist"
+    write_start_script "$vm_name" "$vm_display" "$vm_type" 'darwin-utm'
+    write_configure_script "$vm_name" "$vm_type"
     if [ ! -f "$_plist_template" ]; then
       printf 'vm-setup: WARNING \u2014 UTM config template not found at %s; apply the macOS config first\n' "$_plist_template" >&2
       i=$((i + 1))
@@ -1124,6 +1233,8 @@ setup_libvirt_vms() {
     if [ "$dry_run" = false ]; then
       if virsh define "$_xml_file"; then
         printf 'vm-setup: VM "%s" defined/updated in libvirt\n' "$vm_name"
+        write_start_script "$vm_name" "$vm_display" "$vm_type" 'nixos-libvirt'
+        write_configure_script "$vm_name" "$vm_type"
       else
         printf 'vm-setup: WARNING — virsh define failed for "%s"; check libvirtd status\n' "$vm_name" >&2
       fi

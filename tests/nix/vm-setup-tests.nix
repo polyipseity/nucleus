@@ -475,7 +475,8 @@ let
         (lib.hasInfix "write_vm_directory_readme" vm_setup_sh_text)
         && (lib.hasInfix "wrote VM directory guide" vm_setup_sh_text)
         && (lib.hasInfix "## Start commands" vm_setup_sh_text)
-        && (lib.hasInfix "tart run MacBook" vm_setup_sh_text)
+        && (lib.hasInfix "Start-<display>.sh" vm_setup_sh_text)
+        && (lib.hasInfix "<name>-configure.sh" vm_setup_sh_text)
         && (lib.hasInfix "Guest OS configuration is **not automatic**" vm_setup_sh_text)
         && (lib.hasInfix "Copying only `config.plist` or only `disk-main.qcow2` is not sufficient" vm_setup_sh_text)
       )
@@ -486,19 +487,21 @@ let
         (lib.hasInfix "$vmReadmePath = Join-Path $vmDir 'README.md'" windows_vm_setup_ps1_text)
         && (lib.hasInfix "VM directory guide written" windows_vm_setup_ps1_text)
         && (lib.hasInfix "## Start commands" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "<name>-configure.ps1" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Guest OS configuration is **not automatic**" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Copying only `config.plist` or only `disk-main.qcow2` is not sufficient" windows_vm_setup_ps1_text)
       )
       "Invoke-VMSetup.ps1 must write %USERPROFILE%\\virtual machines\\README.md with .utm bundle transfer instructions";
-  test_vm_setup_removes_legacy_configure_helpers =
+  test_vm_setup_generates_helper_scripts =
     assert'
       (
-        (lib.hasInfix "cleanup_vm_directory_artifacts" vm_setup_sh_text)
-        && (lib.hasInfix "removed legacy helper directory" vm_setup_sh_text)
-        && !(lib.hasInfix "write_configure_script" vm_setup_sh_text)
-        && !(lib.hasInfix "configure helper written" windows_vm_setup_ps1_text)
+        (lib.hasInfix "write_start_script" vm_setup_sh_text)
+        && (lib.hasInfix "write_configure_script" vm_setup_sh_text)
+        && (lib.hasInfix "wrote configure helper script" vm_setup_sh_text)
+        && (lib.hasInfix "configure helper written" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "removed legacy helper script" windows_vm_setup_ps1_text)
       )
-      "VM setup flows must remove legacy configure-helper artifacts and rely on README guidance instead";
+      "VM setup flows must generate discoverable start/config helper scripts while removing legacy .sh helpers on Windows";
   test_macbook_utm_default_location_link = assert' (
     (lib.hasInfix "ensure_utm_default_vm_location" vm_setup_sh_text)
     && (lib.hasInfix "$HOME/Documents/UTM" vm_setup_sh_text)
@@ -584,7 +587,7 @@ in
     test_macbook_utm_stale_template_guard
     test_vm_directory_readme_generation
     test_windows_vm_directory_readme_generation
-    test_vm_setup_removes_legacy_configure_helpers
+    test_vm_setup_generates_helper_scripts
     test_macbook_utm_default_location_link
     test_macbook_tart_storage_link
     test_macbook_macos_version_tahoe

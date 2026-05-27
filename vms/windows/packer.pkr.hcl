@@ -72,6 +72,12 @@ variable "cpus" {
   description = "vCPUs during the build (match VMs.json cpus)."
 }
 
+variable "winrm_timeout" {
+  type        = string
+  default     = "3h"
+  description = "Timeout for WinRM communicator readiness (for slow emulation paths use a larger value such as 8h)."
+}
+
 packer {
   required_plugins {
     qemu = {
@@ -110,9 +116,9 @@ source "qemu" "windows11" {
 
   # WinRM communicator: Autounattend.xml enables WinRM during oobeSystem.
   communicator   = "winrm"
-  winrm_username = "packer"
+  winrm_username = "Administrator"
   winrm_password = "packer"
-  winrm_timeout  = "3h"
+  winrm_timeout  = var.winrm_timeout
 
   # Press Enter to pass the "Press any key to boot from CD" prompt.
   boot_wait    = "4s"
