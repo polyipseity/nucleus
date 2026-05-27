@@ -809,6 +809,12 @@ cleanup_vm_directory_artifacts() {
       rm -f "$_cls_legacy"
       printf 'vm-setup: removed legacy helper script: %s\n' "$_cls_legacy"
     fi
+    # Remove legacy Start-<name>.sh tart start scripts (replaced by README guidance).
+    _cls_tart_start="$VM_DIR/Start-${_cls_name}.sh"
+    if [ -f "$_cls_tart_start" ]; then
+      rm -f "$_cls_tart_start"
+      printf 'vm-setup: removed legacy tart start script: %s\n' "$_cls_tart_start"
+    fi
     _cls_i=$((_cls_i + 1))
   done
 
