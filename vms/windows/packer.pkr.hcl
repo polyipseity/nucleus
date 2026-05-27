@@ -120,9 +120,15 @@ source "qemu" "windows11" {
   winrm_password = "packer"
   winrm_timeout  = var.winrm_timeout
 
-  # Press Enter to pass the "Press any key to boot from CD" prompt.
-  boot_wait    = "4s"
-  boot_command = ["<return>"]
+  # Press Enter repeatedly to reliably pass the "Press any key to boot from
+  # CD" prompt. On slower emulation paths, a single key press can be missed
+  # and the VM then never reaches setup/WinRM.
+  boot_wait = "6s"
+  boot_command = [
+    "<wait2><return>",
+    "<wait2><return>",
+    "<wait2><return>",
+  ]
 
   headless = true
 
