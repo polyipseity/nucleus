@@ -65,13 +65,16 @@ function Invoke-VMSetup {
     $vmsDir    = Join-Path $RepoRoot 'vms'
     $vmDir     = Join-Path $env:USERPROFILE 'virtual machines'
     $imagesDir = Join-Path $vmDir 'images'
+    $configureHelpersDir = Join-Path $env:LOCALAPPDATA 'nucleus\vms\configure'
 
     if (-not $DryRun) {
         New-Item -ItemType Directory -Path $vmDir     -Force | Out-Null
         New-Item -ItemType Directory -Path $imagesDir -Force | Out-Null
+        New-Item -ItemType Directory -Path $configureHelpersDir -Force | Out-Null
     } else {
         Write-Information "vm-setup: [dry-run] New-Item Directory $vmDir"
         Write-Information "vm-setup: [dry-run] New-Item Directory $imagesDir"
+        Write-Information "vm-setup: [dry-run] New-Item Directory $configureHelpersDir"
     }
 
     # Auto-detect WHPX when the user has not specified a non-default accelerator.
@@ -245,7 +248,7 @@ $virtiofsArgs
         }
 
         # Write a configuration reference script for the guest OS.
-        $configureScript = Join-Path $vmDir "$($vm.name)-configure.sh"
+        $configureScript = Join-Path $configureHelpersDir "$($vm.name).sh"
         $configureContent = switch ($vm.type) {
             'NixOS' {
 @'
@@ -278,8 +281,16 @@ sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"
                 Write-Information "vm-setup: [dry-run] Write configure script: $configureScript"
             } else {
                 Set-Content -Path $configureScript -Value $configureContent -Encoding UTF8
-                Write-Information "vm-setup: configure script written: $configureScript"
+                Write-Information "vm-setup: configure helper written: $configureScript"
             }
+        }
+
+        # Remove legacy helper scripts from %USERPROFILE%\virtual machines now
+        # that helper scripts live under %LOCALAPPDATA%\nucleus\vms\configure.
+        $legacyConfigureScript = Join-Path $vmDir "$($vm.name)-configure.sh"
+        if (-not $DryRun -and (Test-Path $legacyConfigureScript)) {
+            Remove-Item $legacyConfigureScript -Force
+            Write-Information "vm-setup: removed legacy helper script: $legacyConfigureScript"
         }
 
         Write-Information "vm-setup: VM '$($vm.display)' setup complete"
@@ -287,6 +298,7 @@ sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"
 
     Write-Information 'vm-setup: Windows VM setup complete'
     Write-Information "vm-setup: Disk images at: $vmDir"
+    Write-Information "vm-setup: Configure helpers at: $configureHelpersDir"
     Write-Information 'vm-setup: Run the generated Start-*.ps1 scripts to launch VMs'
 }
 

@@ -336,6 +336,7 @@ let
   # vm-setup.sh must capture the Packer exit code for the macOS Tart build so
   # a failed packer invocation does not falsely report success.
   vm_setup_sh_text = builtins.readFile ../../scripts/vm-setup.sh;
+  windows_vm_setup_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-VMSetup.ps1;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
   vms_macos_packer_text = builtins.readFile ../../vms/macos/packer.pkr.hcl;
@@ -371,6 +372,10 @@ let
         && (lib.hasInfix "patch -s" vm_setup_sh_text)
       )
       "scripts/vm-setup.sh must patch a temporary Mido copy at runtime instead of editing vendored submodule files";
+  test_windows_iso_mido_patch_failure_is_fatal = assert' (
+    (lib.hasInfix "runtime Mido patch failed to apply" vm_setup_sh_text)
+    && (lib.hasInfix "install patch and retry" vm_setup_sh_text)
+  ) "scripts/vm-setup.sh must fail fast when runtime Mido patching is unavailable or out-of-date";
 
   # UTM on Apple Silicon must keep Windows guests on x86_64/q35 while allowing
   # NixOS guests to follow host-native aarch64/virt when applicable.
@@ -464,6 +469,22 @@ let
     (lib.hasInfix "stale UTM template detected" vm_setup_sh_text)
     && (lib.hasInfix "run home-manager switch (or nucleus apply) before vm-setup" vm_setup_sh_text)
   ) "scripts/vm-setup.sh must fail fast on stale UTM templates and print the recovery action";
+  test_vm_configure_helpers_hidden_path =
+    assert'
+      (
+        (lib.hasInfix "CONFIGURE_HELPERS_DIR=\"$HOME/.local/share/nucleus/vms/configure\"" vm_setup_sh_text)
+        && (lib.hasInfix "wrote configure helper" vm_setup_sh_text)
+        && (lib.hasInfix "cleanup_legacy_helper_scripts" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must write configure helpers under ~/.local/share/nucleus/vms/configure and remove legacy helper scripts from ~/virtual machines";
+  test_windows_vm_configure_helpers_hidden_path =
+    assert'
+      (
+        (lib.hasInfix "configureHelpersDir" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "LOCALAPPDATA" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "configure helper written" windows_vm_setup_ps1_text)
+      )
+      "Invoke-VMSetup.ps1 must store configure helpers under a dedicated LOCALAPPDATA nucleus path instead of cluttering %USERPROFILE%\\virtual machines";
 
   test_macbook_macos_version_tahoe =
     assert'
@@ -521,6 +542,7 @@ in
     test_windows_packer_failure_message
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
+    test_windows_iso_mido_patch_failure_is_fatal
     test_macbook_utm_windows_arch_override
     test_macbook_utm_schema_keys
     test_macbook_utm_plist_correctness
@@ -531,6 +553,8 @@ in
     test_macbook_utm_uses_apple_script_import
     test_macbook_utm_refreshes_existing_bundle
     test_macbook_utm_stale_template_guard
+    test_vm_configure_helpers_hidden_path
+    test_windows_vm_configure_helpers_hidden_path
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_windows_only
     ;

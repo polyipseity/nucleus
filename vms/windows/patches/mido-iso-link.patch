@@ -1,5 +1,5 @@
 --- mido.sh
 +++ mido.sh
 @@ -391,1 +391,1 @@
--    iso_download_link="$(echo "$iso_download_link_html" | grep -o "https://software.download.prss.microsoft.com[^\"[:space:]]*\.iso[^\"[:space:]]*" | cut -d '"' -f 1 | sed 's/&amp;/\&/g' | tr -cd '[:alnum:][:punct:]' | head -c 512)"
+-    iso_download_link="$(echo "$iso_download_link_html" | grep -o "https://software.download.prss.microsoft.com.*IsoX64" | cut -d '"' -f 1 | sed 's/&amp;/\&/g' | tr -cd '[:alnum:][:punct:]' | head -c 512)"
 +    iso_download_link="$(echo "$iso_download_link_html" | grep -Eo "https://[^\"[:space:]]*microsoft[^\"[:space:]]*\.iso[^\"[:space:]]*" | cut -d '"' -f 1 | sed 's/&amp;/\&/g' | tr -cd '[:alnum:][:punct:]' | head -c 512)"

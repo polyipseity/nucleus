@@ -116,6 +116,7 @@ fi
 
 VM_DIR="${VM_DIR_OVERRIDE:-$HOME/virtual machines}"
 IMAGES_DIR="$VM_DIR/images"
+CONFIGURE_HELPERS_DIR="$HOME/.local/share/nucleus/vms/configure"
 
 # should_include TYPE — returns 0 if a VM of the given type should be processed.
 should_include() {
@@ -268,14 +269,17 @@ download_windows_iso_mido() {
       elif patch -s -R --dry-run "$_mido_exec_script" "$_mido_patch_file" >/dev/null 2>&1; then
         printf 'vm-setup: runtime Mido patch already present in source script; continuing\n'
       else
-        printf 'vm-setup: warning: runtime Mido patch did not apply cleanly; continuing with unpatched script\n' >&2
-        _mido_exec_script="$_mido_script"
+        printf 'vm-setup: runtime Mido patch failed to apply; update %s for current vendor mido.sh before retrying\n' "$_mido_patch_file" >&2
         rm -rf "$_mido_script_tmp"
         _mido_script_tmp=''
+        return 1
       fi
     else
-      printf 'vm-setup: warning: patch command not found; continuing with unpatched Mido script\n' >&2
+      printf 'vm-setup: patch command is required for Mido runtime patching; install patch and retry\n' >&2
+      return 1
     fi
+  else
+    printf 'vm-setup: warning: runtime Mido patch file not found (%s); continuing with vendor script\n' "$_mido_patch_file" >&2
   fi
 
   _mido_tmp="$(mktemp -d)"
@@ -675,7 +679,7 @@ write_configure_script() {
   # configuration inside the named VM guest.
   _wcs_name="$1"
   _wcs_type="$2"
-  _wcs_script="$VM_DIR/${_wcs_name}-configure.sh"
+  _wcs_script="$CONFIGURE_HELPERS_DIR/${_wcs_name}.sh"
   case "$_wcs_type" in
     NixOS)
       cat > "$_wcs_script" << 'CFGEOF'
@@ -706,7 +710,29 @@ CFGEOF
       ;;
   esac
   chmod +x "$_wcs_script"
-  printf 'vm-setup: wrote configure script: %s\n' "$_wcs_script"
+  printf 'vm-setup: wrote configure helper: %s\n' "$_wcs_script"
+}
+
+# cleanup_legacy_helper_scripts
+#   Removes legacy helper scripts from ~/virtual machines now that helper
+#   scripts live under ~/.local/share/nucleus/vms/configure.
+cleanup_legacy_helper_scripts() {
+  _cls_count="$(jq '.VMs | length' "$MANIFEST")"
+  _cls_i=0
+  while [ "$_cls_i" -lt "$_cls_count" ]; do
+    _cls_name="$(jq -r ".VMs[$_cls_i].name" "$MANIFEST")"
+    _cls_legacy="$VM_DIR/${_cls_name}-configure.sh"
+    if [ -f "$_cls_legacy" ]; then
+      rm -f "$_cls_legacy"
+      printf 'vm-setup: removed legacy helper script: %s\n' "$_cls_legacy"
+    fi
+    _cls_i=$((_cls_i + 1))
+  done
+
+  if [ -f "$VM_DIR/.DS_Store" ]; then
+    rm -f "$VM_DIR/.DS_Store"
+    printf 'vm-setup: removed Finder metadata file: %s\n' "$VM_DIR/.DS_Store"
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -956,6 +982,7 @@ fi
 if [ "$dry_run" = false ]; then
   mkdir -p "$VM_DIR"
   mkdir -p "$IMAGES_DIR"
+  mkdir -p "$CONFIGURE_HELPERS_DIR"
 fi
 
 printf 'vm-setup: phase 1 \u2014 building images...\n'
@@ -981,5 +1008,9 @@ case "$_os" in
     printf 'vm-setup: unsupported OS "%s"; nothing to do\n' "$_os"
     ;;
 esac
+
+if [ "$dry_run" = false ]; then
+  cleanup_legacy_helper_scripts
+fi
 
 printf 'vm-setup: done\n'
