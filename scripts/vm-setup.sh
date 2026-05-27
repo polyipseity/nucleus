@@ -116,7 +116,91 @@ fi
 
 VM_DIR="${VM_DIR_OVERRIDE:-$HOME/virtual machines}"
 IMAGES_DIR="$VM_DIR/images"
-CONFIGURE_HELPERS_DIR="$HOME/.local/share/nucleus/vms/configure"
+
+# write_vm_directory_readme
+#   Writes a cross-host usage guide into the managed VM directory so operators
+#   can transfer VM artifacts between hosts and run guest-specific converge
+#   commands without relying on generated helper scripts.
+write_vm_directory_readme() {
+  _wvdr_readme="$VM_DIR/README.md"
+  if [ "$dry_run" = true ]; then
+    printf 'vm-setup: [dry-run] write VM directory guide: %s\n' "$_wvdr_readme"
+    return 0
+  fi
+
+  cat >"$_wvdr_readme" <<'EOF'
+# virtual machines
+
+This directory stores VM artifacts managed by `nucleus-vm-setup`.
+
+## Layout
+
+- `images/<name>.qcow2` — pre-built guest images produced in build phase.
+- `<name>.utm/` — UTM bundle directory on macOS hosts.
+- `<name>.qcow2` — libvirt/QEMU runtime disk on Linux/Windows hosts.
+
+## UTM bundle portability
+
+`*.utm` is a folder bundle (not a single opaque file). It contains VM metadata
+plus disk data (typically `Data/disk-main.qcow2`).
+
+To move a UTM VM to another macOS host:
+
+1. Copy the entire `<name>.utm` directory.
+2. Place it under `~/virtual machines/` on the target host.
+3. Import it in UTM (or re-run `nucleus-vm-setup` so import automation can detect it).
+
+Copying only `config.plist` or only `disk-main.qcow2` is not sufficient for a
+portable UTM VM transfer.
+
+## Guest converge commands
+
+Run the host converge command inside each guest after first boot:
+
+- NixOS guest: `sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"`
+- Windows guest: `.\src\hosts\Windows\apply.ps1` (from `%USERPROFILE%\dev\nucleus`)
+- macOS guest: `~/dev/nucleus/scripts/bootstrap.sh apply`
+
+## Notes
+
+- Keep this directory managed by `nucleus-vm-setup`; avoid hand-editing generated artifacts.
+- Re-run `nucleus-vm-setup` after changing `src/modules/VMs.json`.
+- macOS guest images are built and run with Tart today; automated Tart→UTM runtime handoff is not yet supported.
+EOF
+  printf 'vm-setup: wrote VM directory guide: %s\n' "$_wvdr_readme"
+}
+
+# ensure_utm_default_vm_location
+#   Best-effort default-location wiring for UTM by linking ~/Documents/UTM to
+#   the managed ~/virtual machines directory when safe.
+ensure_utm_default_vm_location() {
+  _eudvl_utm_docs="$HOME/Documents/UTM"
+
+  if [ -L "$_eudvl_utm_docs" ]; then
+    _eudvl_target="$(readlink "$_eudvl_utm_docs" 2>/dev/null || true)"
+    if [ "$_eudvl_target" = "$VM_DIR" ]; then
+      printf 'vm-setup: UTM default VM location already points to %s\n' "$VM_DIR"
+    else
+      printf 'vm-setup: WARNING — %s is a symlink to %s; expected %s\n' \
+        "$_eudvl_utm_docs" "$_eudvl_target" "$VM_DIR" >&2
+    fi
+    return 0
+  fi
+
+  if [ -d "$_eudvl_utm_docs" ]; then
+    # WHY: preserve existing user-managed UTM document stores; only replace an
+    # empty directory to avoid destructive moves.
+    if [ -n "$(find "$_eudvl_utm_docs" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+      printf 'vm-setup: WARNING — %s is non-empty; cannot auto-link to %s\n' \
+        "$_eudvl_utm_docs" "$VM_DIR" >&2
+      return 0
+    fi
+    rmdir "$_eudvl_utm_docs"
+  fi
+
+  ln -s "$VM_DIR" "$_eudvl_utm_docs"
+  printf 'vm-setup: linked UTM default VM location: %s -> %s\n' "$_eudvl_utm_docs" "$VM_DIR"
+}
 
 # should_include TYPE — returns 0 if a VM of the given type should be processed.
 should_include() {
@@ -674,49 +758,10 @@ build_images() {
   done
 }
 
-write_configure_script() {
-  # Generate a reference script documenting how to apply the nucleus host
-  # configuration inside the named VM guest.
-  _wcs_name="$1"
-  _wcs_type="$2"
-  _wcs_script="$CONFIGURE_HELPERS_DIR/${_wcs_name}.sh"
-  case "$_wcs_type" in
-    NixOS)
-      cat > "$_wcs_script" << 'CFGEOF'
-#!/usr/bin/env sh
-# Apply the nucleus nixos host configuration inside this VM.
-# ~/dev is shared via VirtioFS when shareDevDir=true.
-sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"
-CFGEOF
-      ;;
-    Windows)
-      cat > "$_wcs_script" << 'CFGEOF'
-#!/usr/bin/env sh
-# Apply the nucleus Windows host configuration inside this VM.
-# Clone this repository to %USERPROFILE%\dev\nucleus inside the VM, then run:
-#   .\src\hosts\Windows\apply.ps1
-CFGEOF
-      ;;
-    macOS)
-      cat > "$_wcs_script" << 'CFGEOF'
-#!/usr/bin/env sh
-# Apply the nucleus macbook host configuration inside this VM.
-# Clone this repository to ~/dev/nucleus inside the VM, then run:
-#   ~/dev/nucleus/scripts/bootstrap.sh apply
-CFGEOF
-      ;;
-    *)
-      return
-      ;;
-  esac
-  chmod +x "$_wcs_script"
-  printf 'vm-setup: wrote configure helper: %s\n' "$_wcs_script"
-}
-
-# cleanup_legacy_helper_scripts
-#   Removes legacy helper scripts from ~/virtual machines now that helper
-#   scripts live under ~/.local/share/nucleus/vms/configure.
-cleanup_legacy_helper_scripts() {
+# cleanup_vm_directory_artifacts
+#   Removes obsolete helper artifacts from ~/virtual machines now that converge
+#   guidance is centralized in ~/virtual machines/README.md.
+cleanup_vm_directory_artifacts() {
   _cls_count="$(jq '.VMs | length' "$MANIFEST")"
   _cls_i=0
   while [ "$_cls_i" -lt "$_cls_count" ]; do
@@ -729,6 +774,12 @@ cleanup_legacy_helper_scripts() {
     _cls_i=$((_cls_i + 1))
   done
 
+  _cls_legacy_dir="$HOME/.local/share/nucleus/vms/configure"
+  if [ -d "$_cls_legacy_dir" ]; then
+    rm -rf "$_cls_legacy_dir"
+    printf 'vm-setup: removed legacy helper directory: %s\n' "$_cls_legacy_dir"
+  fi
+
   if [ -f "$VM_DIR/.DS_Store" ]; then
     rm -f "$VM_DIR/.DS_Store"
     printf 'vm-setup: removed Finder metadata file: %s\n' "$VM_DIR/.DS_Store"
@@ -739,9 +790,9 @@ cleanup_legacy_helper_scripts() {
 # macOS / Tart (macOS guests)
 # ---------------------------------------------------------------------------
 
-# setup_tart_vms — Phase 2 provisioning for macOS-type VM guests.
+# setup_tart_vms — Phase 2 provisioning checks for macOS-type VM guests.
 #   The Packer Tart build already registered the VM in tart's store; this
-#   function writes a start script and configure script for each macOS guest.
+#   function validates registration and reports runtime entry points.
 #   Source: https://github.com/cirruslabs/tart
 setup_tart_vms() {
   if ! command -v tart >/dev/null 2>&1; then
@@ -767,20 +818,10 @@ setup_tart_vms() {
       continue
     fi
 
-    # Write a simple start script.
-    _tart_start="$VM_DIR/Start-${vm_name}.sh"
     if [ "$dry_run" = false ]; then
-      cat > "$_tart_start" << TARTEOF
-#!/usr/bin/env sh
-# Start the $vm_name macOS VM managed by tart.
-# Source: https://github.com/cirruslabs/tart
-exec tart run "$vm_name" "\$@"
-TARTEOF
-      chmod +x "$_tart_start"
-      printf 'vm-setup: tart start script: %s\n' "$_tart_start"
-      write_configure_script "$vm_name" "$vm_type"
+      printf 'vm-setup: tart VM ready: %s (start with: tart run %s)\n' "$vm_name" "$vm_name"
     else
-      printf 'vm-setup: [dry-run] write tart start script: %s\n' "$_tart_start"
+      printf 'vm-setup: [dry-run] verify tart VM registration: %s\n' "$vm_name"
     fi
 
     i=$((i + 1))
@@ -813,6 +854,7 @@ setup_utm_vms() {
 
     # macOS guests are provisioned via tart (setup_tart_vms), not UTM.
     if [ "$vm_type" = "macOS" ]; then
+      printf 'vm-setup: macOS guest "%s" stays on Tart runtime; skipping UTM bundle provisioning for this VM\n' "$vm_name"
       i=$((i + 1))
       continue
     fi
@@ -877,7 +919,6 @@ setup_utm_vms() {
       else
         printf 'vm-setup: UTM VM already registered: %s\n' "$vm_name"
       fi
-      write_configure_script "$vm_name" "$vm_type"
     else
       printf 'vm-setup: [dry-run] create UTM bundle %s from %s\n' "$bundle" "$_plist_template"
     fi
@@ -982,7 +1023,11 @@ fi
 if [ "$dry_run" = false ]; then
   mkdir -p "$VM_DIR"
   mkdir -p "$IMAGES_DIR"
-  mkdir -p "$CONFIGURE_HELPERS_DIR"
+  write_vm_directory_readme
+
+  if [ "$(uname -s)" = "Darwin" ]; then
+    ensure_utm_default_vm_location
+  fi
 fi
 
 printf 'vm-setup: phase 1 \u2014 building images...\n'
@@ -1010,7 +1055,7 @@ case "$_os" in
 esac
 
 if [ "$dry_run" = false ]; then
-  cleanup_legacy_helper_scripts
+  cleanup_vm_directory_artifacts
 fi
 
 printf 'vm-setup: done\n'

@@ -65,16 +65,60 @@ function Invoke-VMSetup {
     $vmsDir    = Join-Path $RepoRoot 'vms'
     $vmDir     = Join-Path $env:USERPROFILE 'virtual machines'
     $imagesDir = Join-Path $vmDir 'images'
-    $configureHelpersDir = Join-Path $env:LOCALAPPDATA 'nucleus\vms\configure'
 
     if (-not $DryRun) {
         New-Item -ItemType Directory -Path $vmDir     -Force | Out-Null
         New-Item -ItemType Directory -Path $imagesDir -Force | Out-Null
-        New-Item -ItemType Directory -Path $configureHelpersDir -Force | Out-Null
     } else {
         Write-Information "vm-setup: [dry-run] New-Item Directory $vmDir"
         Write-Information "vm-setup: [dry-run] New-Item Directory $imagesDir"
-        Write-Information "vm-setup: [dry-run] New-Item Directory $configureHelpersDir"
+    }
+
+    $vmReadmePath = Join-Path $vmDir 'README.md'
+    $vmReadmeContent = @'
+# virtual machines
+
+This directory stores VM artifacts managed by `nucleus-vm-setup`.
+
+## Layout
+
+- `images/<name>.qcow2` — pre-built guest images produced in build phase.
+- `<name>.utm/` — UTM bundle directory on macOS hosts.
+- `<name>.qcow2` — libvirt/QEMU runtime disk on Linux/Windows hosts.
+
+## UTM bundle portability
+
+`*.utm` is a folder bundle (not a single opaque file). It contains VM metadata
+plus disk data (typically `Data/disk-main.qcow2`).
+
+To move a UTM VM to another macOS host:
+
+1. Copy the entire `<name>.utm` directory.
+2. Place it under `~/virtual machines/` on the target host.
+3. Import it in UTM (or re-run `nucleus-vm-setup` so import automation can detect it).
+
+Copying only `config.plist` or only `disk-main.qcow2` is not sufficient for a
+portable UTM VM transfer.
+
+## Guest converge commands
+
+Run the host converge command inside each guest after first boot:
+
+- NixOS guest: `sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"`
+- Windows guest: `.\src\hosts\Windows\apply.ps1` (from `%USERPROFILE%\dev\nucleus`)
+- macOS guest: `~/dev/nucleus/scripts/bootstrap.sh apply`
+
+## Notes
+
+- Keep this directory managed by `nucleus-vm-setup`; avoid hand-editing generated artifacts.
+- Re-run `nucleus-vm-setup` after changing `src/modules/VMs.json`.
+- macOS guest images are built and run with Tart today; automated Tart→UTM runtime handoff is not yet supported.
+'@
+    if ($DryRun) {
+        Write-Information "vm-setup: [dry-run] Write VM directory guide: $vmReadmePath"
+    } else {
+        Set-Content -Path $vmReadmePath -Value $vmReadmeContent -Encoding UTF8
+        Write-Information "vm-setup: VM directory guide written: $vmReadmePath"
     }
 
     # Auto-detect WHPX when the user has not specified a non-default accelerator.
@@ -247,46 +291,8 @@ $virtiofsArgs
             Write-Information "vm-setup: start script written: $startScript"
         }
 
-        # Write a configuration reference script for the guest OS.
-        $configureScript = Join-Path $configureHelpersDir "$($vm.name).sh"
-        $configureContent = switch ($vm.type) {
-            'NixOS' {
-@'
-#!/usr/bin/env sh
-# Apply the nucleus nixos host configuration inside this VM.
-# ~/dev is shared via VirtioFS when shareDevDir=true.
-sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"
-'@
-            }
-            'Windows' {
-@'
-#!/usr/bin/env sh
-# Apply the nucleus Windows host configuration inside this VM.
-# Clone this repository to %USERPROFILE%\dev\nucleus inside the VM, then run:
-#   .\src\hosts\Windows\apply.ps1
-'@
-            }
-            'macOS' {
-@'
-#!/usr/bin/env sh
-# Apply the nucleus macbook host configuration inside this VM.
-# Clone this repository to ~/dev/nucleus inside the VM, then run:
-#   ~/dev/nucleus/scripts/bootstrap.sh apply
-'@
-            }
-            default { $null }
-        }
-        if ($null -ne $configureContent) {
-            if ($DryRun) {
-                Write-Information "vm-setup: [dry-run] Write configure script: $configureScript"
-            } else {
-                Set-Content -Path $configureScript -Value $configureContent -Encoding UTF8
-                Write-Information "vm-setup: configure helper written: $configureScript"
-            }
-        }
-
         # Remove legacy helper scripts from %USERPROFILE%\virtual machines now
-        # that helper scripts live under %LOCALAPPDATA%\nucleus\vms\configure.
+        # that converge instructions live in %USERPROFILE%\virtual machines\README.md.
         $legacyConfigureScript = Join-Path $vmDir "$($vm.name)-configure.sh"
         if (-not $DryRun -and (Test-Path $legacyConfigureScript)) {
             Remove-Item $legacyConfigureScript -Force
@@ -296,9 +302,15 @@ sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"
         Write-Information "vm-setup: VM '$($vm.display)' setup complete"
     }
 
+    $legacyConfigureDir = Join-Path $env:LOCALAPPDATA 'nucleus\vms\configure'
+    if (-not $DryRun -and (Test-Path $legacyConfigureDir)) {
+        Remove-Item $legacyConfigureDir -Recurse -Force
+        Write-Information "vm-setup: removed legacy helper directory: $legacyConfigureDir"
+    }
+
     Write-Information 'vm-setup: Windows VM setup complete'
     Write-Information "vm-setup: Disk images at: $vmDir"
-    Write-Information "vm-setup: Configure helpers at: $configureHelpersDir"
+    Write-Information "vm-setup: VM directory guide at: $vmReadmePath"
     Write-Information 'vm-setup: Run the generated Start-*.ps1 scripts to launch VMs'
 }
 

@@ -469,22 +469,36 @@ let
     (lib.hasInfix "stale UTM template detected" vm_setup_sh_text)
     && (lib.hasInfix "run home-manager switch (or nucleus apply) before vm-setup" vm_setup_sh_text)
   ) "scripts/vm-setup.sh must fail fast on stale UTM templates and print the recovery action";
-  test_vm_configure_helpers_hidden_path =
+  test_vm_directory_readme_generation =
     assert'
       (
-        (lib.hasInfix "CONFIGURE_HELPERS_DIR=\"$HOME/.local/share/nucleus/vms/configure\"" vm_setup_sh_text)
-        && (lib.hasInfix "wrote configure helper" vm_setup_sh_text)
-        && (lib.hasInfix "cleanup_legacy_helper_scripts" vm_setup_sh_text)
+        (lib.hasInfix "write_vm_directory_readme" vm_setup_sh_text)
+        && (lib.hasInfix "wrote VM directory guide" vm_setup_sh_text)
+        && (lib.hasInfix "Copying only `config.plist` or only `disk-main.qcow2` is not sufficient" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must write configure helpers under ~/.local/share/nucleus/vms/configure and remove legacy helper scripts from ~/virtual machines";
-  test_windows_vm_configure_helpers_hidden_path =
+      "scripts/vm-setup.sh must write ~/virtual machines/README.md with explicit .utm bundle transfer guidance";
+  test_windows_vm_directory_readme_generation =
     assert'
       (
-        (lib.hasInfix "configureHelpersDir" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "LOCALAPPDATA" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "configure helper written" windows_vm_setup_ps1_text)
+        (lib.hasInfix "$vmReadmePath = Join-Path $vmDir 'README.md'" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "VM directory guide written" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Copying only `config.plist` or only `disk-main.qcow2` is not sufficient" windows_vm_setup_ps1_text)
       )
-      "Invoke-VMSetup.ps1 must store configure helpers under a dedicated LOCALAPPDATA nucleus path instead of cluttering %USERPROFILE%\\virtual machines";
+      "Invoke-VMSetup.ps1 must write %USERPROFILE%\\virtual machines\\README.md with .utm bundle transfer instructions";
+  test_vm_setup_removes_legacy_configure_helpers =
+    assert'
+      (
+        (lib.hasInfix "cleanup_vm_directory_artifacts" vm_setup_sh_text)
+        && (lib.hasInfix "removed legacy helper directory" vm_setup_sh_text)
+        && !(lib.hasInfix "write_configure_script" vm_setup_sh_text)
+        && !(lib.hasInfix "configure helper written" windows_vm_setup_ps1_text)
+      )
+      "VM setup flows must remove legacy configure-helper artifacts and rely on README guidance instead";
+  test_macbook_utm_default_location_link = assert' (
+    (lib.hasInfix "ensure_utm_default_vm_location" vm_setup_sh_text)
+    && (lib.hasInfix "$HOME/Documents/UTM" vm_setup_sh_text)
+    && (lib.hasInfix "linked UTM default VM location" vm_setup_sh_text)
+  ) "scripts/vm-setup.sh must best-effort wire UTM's default document location to ~/virtual machines";
 
   test_macbook_macos_version_tahoe =
     assert'
@@ -553,8 +567,10 @@ in
     test_macbook_utm_uses_apple_script_import
     test_macbook_utm_refreshes_existing_bundle
     test_macbook_utm_stale_template_guard
-    test_vm_configure_helpers_hidden_path
-    test_windows_vm_configure_helpers_hidden_path
+    test_vm_directory_readme_generation
+    test_windows_vm_directory_readme_generation
+    test_vm_setup_removes_legacy_configure_helpers
+    test_macbook_utm_default_location_link
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_windows_only
     ;
