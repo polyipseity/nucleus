@@ -221,6 +221,23 @@ recipient.
 
 1. Commit and push.
 
+## Virtual machines
+
+`nucleus-vm-setup` (alias: `scripts/vm-setup.sh`) builds and provisions guest
+VMs from the manifest in `src/modules/VMs.json`.
+
+| Host \ Guest | macOS         | NixOS           | Windows         |
+| ------------ | ------------- | --------------- | --------------- |
+| macOS        | Tart (Packer) | UTM 4.x (QEMU)  | UTM 4.x (QEMU)  |
+| NixOS        | —             | libvirt/KVM     | libvirt/KVM     |
+| Windows      | —             | QEMU standalone | QEMU standalone |
+
+All VM artifacts (Tart store, UTM bundles, QCOW2 images) land under
+`~/virtual machines/` for unified backup. `nucleus-vm-setup` symlinks
+`~/.tart → ~/virtual machines/.tart` on macOS so Tart uses the same tree.
+
+Run `nucleus-vm-setup --dry-run` to preview planned actions without changes.
+
 ## Notes
 
 - Add a new POSIX host by creating a directory under `src/hosts/` and wiring it

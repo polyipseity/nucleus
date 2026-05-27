@@ -6,6 +6,17 @@ applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, sr
 
 # VM Management
 
+## Host × Guest Matrix
+
+| Host \ Guest | macOS           | NixOS              | Windows            |
+| ------------ | --------------- | ------------------ | ------------------ |
+| macOS        | Tart (Packer)   | UTM 4.x (QEMU)     | UTM 4.x (QEMU)     |
+| NixOS        | not supported   | libvirt/KVM        | libvirt/KVM        |
+| Windows      | not supported   | QEMU standalone    | QEMU standalone    |
+
+macOS guest uses Tart (Apple Virtualization.framework) exclusively; automated
+Tart→UTM runtime handoff is not supported (format mismatch, no tooling).
+
 ## Hostname Convention
 
 VM guest OSes must use the same hostname and display name as the corresponding
@@ -55,7 +66,7 @@ Optional fields:
 QCOW2 throughout all three platforms.
 Stored at:
 
-- macOS: `~/virtual machines/<name>.utm/Images/disk-main.qcow2`
+- macOS: `~/virtual machines/<name>.utm/Data/disk-main.qcow2`
 - NixOS: `~/virtual machines/<name>.qcow2`
 - Windows: `%USERPROFILE%\virtual machines\<name>.qcow2`
 
@@ -64,6 +75,17 @@ Pre-built images land in `~/virtual machines/images/<name>.qcow2`
 `nucleus-vm-setup` builds these images in phase 1 (if absent) and copies them to the disk location in phase 2.
 
 QCOW2 enables copy-based migration between hosts without conversion.
+
+## macOS — Tart (macOS guests)
+
+- VM backend: Tart CLI (Apple Virtualization.framework); macOS host only.
+- VM store: `~/virtual machines/.tart/vms/<name>/` — Tart's storage root
+  (`~/.tart`) is symlinked to `~/virtual machines/.tart` by `nucleus-vm-setup`
+  so Tart artifacts co-locate with UTM bundles for unified backup.
+- Build tool: Packer + `tart-cli` plugin pulling
+  `ghcr.io/cirruslabs/macos-<version>-base:latest` from GHCR.
+- Start command (after build): `tart run <name>`.
+- No UTM bundle is created for macOS guests; they remain Tart-managed.
 
 ## macOS — UTM
 
@@ -76,8 +98,8 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - After provisioning, UTM opens each bundle automatically.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in the Nix-generated config.plist.
 - Network: Shared (NAT) mode on all VMs.
+
 - `utmctl` CLI path: `/Applications/UTM.app/Contents/MacOS/utmctl`.
-- Configure script: `~/virtual machines/<name>-configure.sh` written on first provisioning.
 
 ## NixOS — libvirt/KVM
 
@@ -90,7 +112,6 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - SPICE display + clipboard sharing enabled by default.
 - OVMF firmware (UEFI) and swtpm (TPM 2.0) enabled for Windows 11 compatibility.
 - After provisioning, run `virt-manager` to attach an installation ISO.
-- Configure script: `~/virtual machines/<name>-configure.sh` written on first provisioning.
 
 ## Windows — QEMU via Scoop
 
@@ -100,8 +121,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - Disk images and generated start scripts placed in `%USERPROFILE%\virtual machines\`.
 - Start script: `Start-<display>.ps1` — a self-contained PowerShell launch command.
 - VirtioFS on Windows requires `virtiofsd` running as a separate process before the VM starts.
-  See the comment in the generated start script for the exact command.
-- Configure script: `%USERPROFILE%\virtual machines\<name>-configure.sh` written on first provisioning.
+  See `~/virtual machines/README.md` for the exact command.
 
 ## Apply Hook
 

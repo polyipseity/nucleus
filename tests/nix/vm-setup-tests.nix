@@ -499,6 +499,14 @@ let
     && (lib.hasInfix "$HOME/Documents/UTM" vm_setup_sh_text)
     && (lib.hasInfix "linked UTM default VM location" vm_setup_sh_text)
   ) "scripts/vm-setup.sh must best-effort wire UTM's default document location to ~/virtual machines";
+  test_macbook_tart_storage_link =
+    assert'
+      (
+        (lib.hasInfix "ensure_tart_vm_dir" vm_setup_sh_text)
+        && (lib.hasInfix "/.tart" vm_setup_sh_text)
+        && (lib.hasInfix "linked tart storage" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must link ~/.tart -> ~/virtual machines/.tart so Tart artifacts co-locate with UTM bundles for backup";
 
   test_macbook_macos_version_tahoe =
     assert'
@@ -571,6 +579,7 @@ in
     test_windows_vm_directory_readme_generation
     test_vm_setup_removes_legacy_configure_helpers
     test_macbook_utm_default_location_link
+    test_macbook_tart_storage_link
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_windows_only
     ;

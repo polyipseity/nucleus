@@ -16,7 +16,8 @@
 #   - packer installed (pkgs.packer in baseSharedPackages)
 #   - Apple Silicon Mac (Tart requires Virtualization.framework)
 #
-# The resulting VM is stored in ~/.tart/vms/<vm_name>/.
+# The resulting VM is stored in ~/virtual machines/.tart/vms/<vm_name>/
+# (via the ~/.tart symlink created by nucleus-vm-setup).
 # Start with: tart run <vm_name> [--no-graphics]
 #
 # Source: https://github.com/cirruslabs/packer-plugin-tart
@@ -32,7 +33,7 @@ variable "macos_version" {
 variable "vm_name" {
   type        = string
   default     = "MacBook"
-  description = "Name of the tart VM to create (stored in ~/.tart/vms/<vm_name>)."
+  description = "Name of the tart VM to create (stored in ~/virtual machines/.tart/vms/<vm_name> via ~/.tart symlink)."
 }
 
 variable "cpus" {

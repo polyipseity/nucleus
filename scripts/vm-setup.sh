@@ -135,6 +135,7 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
 
 ## Layout
 
+- `.tart/` — Tart VM store on macOS hosts (symlinked from `~/.tart`).
 - `images/<name>.qcow2` — pre-built guest images produced in build phase.
 - `<name>.utm/` — UTM bundle directory on macOS hosts.
 - `<name>.qcow2` — libvirt/QEMU runtime disk on Linux/Windows hosts.
@@ -200,6 +201,40 @@ ensure_utm_default_vm_location() {
 
   ln -s "$VM_DIR" "$_eudvl_utm_docs"
   printf 'vm-setup: linked UTM default VM location: %s -> %s\n' "$_eudvl_utm_docs" "$VM_DIR"
+}
+
+# ensure_tart_vm_dir
+#   Co-locates Tart's VM store inside the managed ~/virtual machines directory
+#   by symlinking ~/.tart → ~/virtual machines/.tart so Tart artifacts (VMs and
+#   OCI cache) stay alongside UTM bundles in one tree for unified backup.
+#   Only runs on Darwin; Tart uses Apple's Virtualization.framework.
+ensure_tart_vm_dir() {
+  _etd_target="$VM_DIR/.tart"
+  _etd_default="$HOME/.tart"
+
+  mkdir -p "$_etd_target"
+
+  if [ -L "$_etd_default" ]; then
+    _etd_current="$(readlink "$_etd_default" 2>/dev/null || true)"
+    if [ "$_etd_current" = "$_etd_target" ]; then
+      printf 'vm-setup: tart storage already linked: %s -> %s\n' "$_etd_default" "$_etd_target"
+    else
+      printf 'vm-setup: WARNING — %s is a symlink to %s (expected %s); not relinking\n' \
+        "$_etd_default" "$_etd_current" "$_etd_target" >&2
+    fi
+    return 0
+  fi
+
+  if [ -d "$_etd_default" ]; then
+    # WHY: migrate existing ~/.tart to VM_DIR on first run so existing VMs are
+    # not lost when this policy was introduced.
+    printf 'vm-setup: migrating ~/.tart to %s...\n' "$_etd_target"
+    cp -a "$_etd_default/." "$_etd_target/"
+    rm -rf "$_etd_default"
+  fi
+
+  ln -s "$_etd_target" "$_etd_default"
+  printf 'vm-setup: linked tart storage: %s -> %s\n' "$_etd_default" "$_etd_target"
 }
 
 # should_include TYPE — returns 0 if a VM of the given type should be processed.
@@ -645,7 +680,8 @@ build_windows_image() {
 #   Builds the macOS guest VM using the Packer Tart plugin.  Requires tart
 #   and packer to be installed; only runs on Darwin hosts (Tart uses Apple
 #   Virtualization.framework which is not available on other platforms).
-#   The resulting VM is stored in ~/.tart/vms/<name>/ managed by tart.
+#   The resulting VM is stored in ~/virtual machines/.tart/vms/<name>/ (via
+#   the ~/.tart symlink created by ensure_tart_vm_dir).
 #   Source: https://github.com/cirruslabs/packer-plugin-tart
 build_macos_image() {
   _name="$1"
@@ -997,7 +1033,6 @@ setup_libvirt_vms() {
     if [ "$dry_run" = false ]; then
       if virsh define "$_xml_file"; then
         printf 'vm-setup: VM "%s" defined/updated in libvirt\n' "$vm_name"
-        write_configure_script "$vm_name" "$vm_type"
       else
         printf 'vm-setup: WARNING — virsh define failed for "%s"; check libvirtd status\n' "$vm_name" >&2
       fi
@@ -1026,6 +1061,7 @@ if [ "$dry_run" = false ]; then
   write_vm_directory_readme
 
   if [ "$(uname -s)" = "Darwin" ]; then
+    ensure_tart_vm_dir
     ensure_utm_default_vm_location
   fi
 fi
