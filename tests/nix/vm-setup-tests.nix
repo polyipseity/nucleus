@@ -475,6 +475,9 @@ let
         (lib.hasInfix "write_vm_directory_readme" vm_setup_sh_text)
         && (lib.hasInfix "wrote VM directory guide" vm_setup_sh_text)
         && (lib.hasInfix "## Start commands" vm_setup_sh_text)
+        && (lib.hasInfix "images/<name>-build/" vm_setup_sh_text)
+        && (lib.hasInfix "images/<name>-installer.iso" vm_setup_sh_text)
+        && (lib.hasInfix "## Safe cleanup" vm_setup_sh_text)
         && (lib.hasInfix "Start-<display>.sh" vm_setup_sh_text)
         && (lib.hasInfix "<name>-configure.sh" vm_setup_sh_text)
         && (lib.hasInfix "Guest OS configuration is **not automatic**" vm_setup_sh_text)
@@ -487,6 +490,9 @@ let
         (lib.hasInfix "$vmReadmePath = Join-Path $vmDir 'README.md'" windows_vm_setup_ps1_text)
         && (lib.hasInfix "VM directory guide written" windows_vm_setup_ps1_text)
         && (lib.hasInfix "## Start commands" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "images/<name>-build/" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "images/<name>-installer.iso" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "## Safe cleanup" windows_vm_setup_ps1_text)
         && (lib.hasInfix "<name>-configure.ps1" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Guest OS configuration is **not automatic**" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Copying only `config.plist` or only `disk-main.qcow2` is not sufficient" windows_vm_setup_ps1_text)
@@ -536,8 +542,11 @@ let
         (lib.hasInfix "download_windows_iso_fido_url_nonwindows" vm_setup_sh_text)
         && (lib.hasInfix "Fido URL fallback failed on" vm_setup_sh_text)
         && (lib.hasInfix "trying Mido as secondary fallback" vm_setup_sh_text)
+        && (lib.hasInfix "Windows ISO fallback order" vm_setup_sh_text)
+        && (lib.hasInfix "--windows-iso-retries" vm_setup_sh_text)
+        && (lib.hasInfix "run_with_backoff" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must attempt a non-Windows Fido URL fallback first on Darwin/Linux, with Mido as secondary fallback";
+      "scripts/vm-setup.sh must attempt a non-Windows Fido URL fallback first on Darwin/Linux, with Mido as secondary fallback and retry support";
 
 in
 {

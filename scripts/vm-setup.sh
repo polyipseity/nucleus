@@ -18,6 +18,8 @@
 #                          https://www.microsoft.com/software-download/windows11
 #   --windows-iso-source S Source for Windows ISO auto-resolution when
 #                          --windows-iso is omitted: auto|url|mido.
+#   --windows-iso-retries N Retry attempts for Windows ISO network downloads
+#                          (default: 0, which means a single attempt).
 #   --accelerator TYPE     QEMU accelerator for image builds (hvf/kvm/tcg).
 #                          Defaults: hvf on macOS, kvm on Linux.
 #
@@ -56,6 +58,7 @@ nixos_only=false
 windows_only=false
 windows_iso=''
 windows_iso_source='auto'
+windows_iso_retries='0'
 accelerator=''
 
 while [ "$#" -gt 0 ]; do
@@ -65,10 +68,11 @@ while [ "$#" -gt 0 ]; do
     --windows-only) windows_only=true ;;
     --windows-iso)  windows_iso="$2"; shift ;;
     --windows-iso-source) windows_iso_source="$2"; shift ;;
+    --windows-iso-retries) windows_iso_retries="$2"; shift ;;
     --accelerator)  accelerator="$2"; shift ;;
     *)
       printf 'vm-setup: unknown argument: %s\n' "$1" >&2
-      printf 'vm-setup: usage: %s [--dry-run] [--nixos-only|--windows-only] [--windows-iso PATH] [--windows-iso-source auto|url|mido] [--accelerator TYPE]\n' "$0" >&2
+      printf 'vm-setup: usage: %s [--dry-run] [--nixos-only|--windows-only] [--windows-iso PATH] [--windows-iso-source auto|url|mido] [--windows-iso-retries N] [--accelerator TYPE]\n' "$0" >&2
       exit 1
       ;;
   esac
@@ -80,6 +84,14 @@ case "$windows_iso_source" in
   *)
     printf 'vm-setup: invalid --windows-iso-source value: %s\n' "$windows_iso_source" >&2
     printf 'vm-setup: expected one of: auto, url, mido\n' >&2
+    exit 1
+    ;;
+esac
+
+case "$windows_iso_retries" in
+  ''|*[!0-9]*)
+    printf 'vm-setup: invalid --windows-iso-retries value: %s\n' "$windows_iso_retries" >&2
+    printf 'vm-setup: expected a non-negative integer\n' >&2
     exit 1
     ;;
 esac
@@ -136,7 +148,10 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
 ## Layout
 
 - `.tart/` — Tart VM store on macOS hosts (symlinked from `~/.tart`).
+- `images/` — build outputs, temporary build directories, and installer cache.
 - `images/<name>.qcow2` — pre-built guest images produced in build phase.
+- `images/<name>-build/` — temporary Packer output directory used during builds.
+- `images/<name>-installer.iso` — cached Windows installer ISO used by rebuilds.
 - `<name>.utm/` — UTM bundle directory on macOS hosts.
 - `<name>.qcow2` — libvirt/QEMU runtime disk on Linux/Windows hosts.
 
@@ -174,6 +189,24 @@ The converge commands are run inside each guest:
 - NixOS guest: `sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"`
 - Windows guest: `.\src\hosts\Windows\apply.ps1` (from `%USERPROFILE%\dev\nucleus`)
 - macOS guest: `~/dev/nucleus/scripts/bootstrap.sh apply`
+
+## Safe cleanup
+
+Temporary files/directories that are safe to remove when builds fail, are
+interrupted, or when reclaiming space:
+
+- `~/virtual machines/images/<name>-build/`
+- `~/virtual machines/images/<name>-installer.iso`
+
+Persistent VM artifacts (remove only when intentionally deleting a VM):
+
+- `~/virtual machines/images/<name>.qcow2`
+- `~/virtual machines/.tart/`
+- `~/virtual machines/<name>.utm/`
+- `~/virtual machines/<name>.qcow2`
+
+If the installer cache is removed, `nucleus-vm-setup` re-downloads it on the
+next run.
 
 ## Notes
 
@@ -274,6 +307,47 @@ run_cmd() {
   else
     "$@"
   fi
+}
+
+# run_with_backoff LABEL COMMAND [ARG...]
+# Args:
+#   $1 — human-readable operation label
+#   $2.. — command and arguments to execute
+# Retries failed network operations with exponential backoff when
+# --windows-iso-retries is greater than 0.
+run_with_backoff() {
+  _rwb_label="$1"
+  shift
+  _rwb_attempt=1
+  _rwb_max=$((windows_iso_retries + 1))
+
+  while [ "$_rwb_attempt" -le "$_rwb_max" ]; do
+    if "$@"; then
+      return 0
+    fi
+    _rwb_status=$?
+
+    if [ "$_rwb_attempt" -ge "$_rwb_max" ]; then
+      return "$_rwb_status"
+    fi
+
+    _rwb_sleep=1
+    _rwb_i=1
+    while [ "$_rwb_i" -lt "$_rwb_attempt" ]; do
+      _rwb_sleep=$((_rwb_sleep * 2))
+      _rwb_i=$((_rwb_i + 1))
+    done
+    if [ "$_rwb_sleep" -gt 30 ]; then
+      _rwb_sleep=30
+    fi
+
+    printf 'vm-setup: %s failed (attempt %s/%s); retrying in %ss\n' \
+      "$_rwb_label" "$_rwb_attempt" "$_rwb_max" "$_rwb_sleep" >&2
+    sleep "$_rwb_sleep"
+    _rwb_attempt=$((_rwb_attempt + 1))
+  done
+
+  return 1
 }
 
 # write_start_script NAME DISPLAY TYPE HOST_KIND
@@ -688,6 +762,9 @@ download_windows_iso_fido_url_nonwindows() {
   cat "$_fido_output_file"
 
   if [ "$_fido_status" -ne 0 ]; then
+    if grep -q '715-123130' "$_fido_output_file"; then
+      printf 'vm-setup: Microsoft blocked automated ISO URL resolution (code 715-123130); retry later or use --windows-iso PATH\n' >&2
+    fi
     printf 'vm-setup: Fido URL resolver exited with code %s\n' "$_fido_status" >&2
     rm -rf "$_fido_tmp"
     return 1
@@ -695,6 +772,9 @@ download_windows_iso_fido_url_nonwindows() {
 
   _fido_url="$(grep -Eo 'https://[^[:space:]]+\.iso[^[:space:]]*' "$_fido_output_file" | tail -1)"
   if [ -z "$_fido_url" ]; then
+    if grep -q '715-123130' "$_fido_output_file"; then
+      printf 'vm-setup: Microsoft blocked automated ISO URL resolution (code 715-123130); retry later or use --windows-iso PATH\n' >&2
+    fi
     printf 'vm-setup: Fido URL resolver returned no ISO URL\n' >&2
     rm -rf "$_fido_tmp"
     return 1
@@ -732,26 +812,36 @@ build_windows_image() {
   # Resolve the installer ISO: use --windows-iso if provided, otherwise try the
   # windowsIsoUrl field from VMs.json as a download source.
   _iso="$windows_iso"
+  if [ -z "$_iso" ]; then
+    printf 'vm-setup: Windows ISO fallback order: cached installer -> windowsIsoUrl -> downloader (%s mode)\n' "$windows_iso_source"
+  fi
+
+  # Resolve from cache first when --windows-iso is omitted.
+  if [ -z "$_iso" ]; then
+    _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
+    if [ -f "$_cached_iso" ]; then
+      printf 'vm-setup: using cached Windows installer: %s\n' "$_cached_iso"
+      _iso="$_cached_iso"
+    fi
+  fi
+
+  # Resolve via windowsIsoUrl next when allowed by source mode.
   if [ -z "$_iso" ] && [ "$windows_iso_source" != "mido" ]; then
     _iso_url="$(jq -r ".VMs[] | select(.name == \"$_name\") | .windowsIsoUrl // empty" "$MANIFEST")"
     if [ -n "$_iso_url" ]; then
       _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
-      if [ -f "$_cached_iso" ]; then
-        printf 'vm-setup: using cached Windows installer: %s\n' "$_cached_iso"
-        _iso="$_cached_iso"
-      else
-        printf 'vm-setup: downloading Windows installer from windowsIsoUrl...\n'
-        if [ "$dry_run" = false ]; then
-          curl -fL -o "$_cached_iso" "$_iso_url" || {
-            printf 'vm-setup: download failed; remove %s and retry\n' "$_cached_iso" >&2
-            rm -f "$_cached_iso"
-            return 1
-          }
+      printf 'vm-setup: downloading Windows installer from windowsIsoUrl...\n'
+      if [ "$dry_run" = false ]; then
+        if run_with_backoff 'windowsIsoUrl download' curl -fL -o "$_cached_iso" "$_iso_url"; then
           _iso="$_cached_iso"
           printf 'vm-setup: Windows installer downloaded: %s\n' "$_cached_iso"
         else
-          printf 'vm-setup: [dry-run] curl -fL -o %s %s\n' "$_cached_iso" "$_iso_url"
+          printf 'vm-setup: windowsIsoUrl download failed; remove %s and retry\n' "$_cached_iso" >&2
+          rm -f "$_cached_iso"
+          return 1
         fi
+      else
+        printf 'vm-setup: [dry-run] curl -fL -o %s %s\n' "$_cached_iso" "$_iso_url"
       fi
     fi
   fi
@@ -763,56 +853,51 @@ build_windows_image() {
   #         https://github.com/pbatard/Fido
   if [ -z "$_iso" ]; then
     _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
-    if [ -f "$_cached_iso" ]; then
-      printf 'vm-setup: using cached Windows installer: %s\n' "$_cached_iso"
-      _iso="$_cached_iso"
+    if [ "$dry_run" = false ]; then
+      case "$windows_iso_source" in
+        url)
+          printf 'vm-setup: windows-iso-source=url selected and no cached/windowsIsoUrl installer was resolved\n' >&2
+          ;;
+        mido)
+          if run_with_backoff 'Mido Windows ISO download' download_windows_iso_mido "$_cached_iso" "$_edition"; then
+            _iso="$_cached_iso"
+          fi
+          ;;
+        auto)
+          _host_uname="$(uname -s)"
+          case "$_host_uname" in
+            MINGW*|MSYS*|CYGWIN*|Windows_NT)
+              if run_with_backoff 'Mido Windows ISO download' download_windows_iso_mido "$_cached_iso" "$_edition"; then
+                _iso="$_cached_iso"
+              elif run_with_backoff 'Fido Windows ISO download' download_windows_iso_fido "$_cached_iso" "$_edition"; then
+                _iso="$_cached_iso"
+              fi
+              ;;
+            *)
+              if run_with_backoff 'Fido URL resolver/download' download_windows_iso_fido_url_nonwindows "$_cached_iso" "$_edition"; then
+                _iso="$_cached_iso"
+              else
+                printf 'vm-setup: Fido URL fallback failed on %s; trying Mido as secondary fallback\n' "$_host_uname" >&2
+                if run_with_backoff 'Mido Windows ISO download' download_windows_iso_mido "$_cached_iso" "$_edition"; then
+                  _iso="$_cached_iso"
+                fi
+              fi
+              ;;
+          esac
+          ;;
+      esac
     else
-      if [ "$dry_run" = false ]; then
-        case "$windows_iso_source" in
-          url)
-            printf 'vm-setup: windows-iso-source=url selected and no cached installer exists\n' >&2
-            ;;
-          mido)
-            if download_windows_iso_mido "$_cached_iso" "$_edition"; then
-              _iso="$_cached_iso"
-            fi
-            ;;
-          auto)
-            _host_uname="$(uname -s)"
-            case "$_host_uname" in
-              MINGW*|MSYS*|CYGWIN*|Windows_NT)
-                if download_windows_iso_mido "$_cached_iso" "$_edition"; then
-                  _iso="$_cached_iso"
-                elif download_windows_iso_fido "$_cached_iso" "$_edition"; then
-                  _iso="$_cached_iso"
-                fi
-                ;;
-              *)
-                if download_windows_iso_fido_url_nonwindows "$_cached_iso" "$_edition"; then
-                  _iso="$_cached_iso"
-                else
-                  printf 'vm-setup: Fido URL fallback failed on %s; trying Mido as secondary fallback\n' "$_host_uname" >&2
-                  if download_windows_iso_mido "$_cached_iso" "$_edition"; then
-                    _iso="$_cached_iso"
-                  fi
-                fi
-                ;;
-            esac
-            ;;
-        esac
-      else
-        case "$windows_iso_source" in
-          url)
-            printf 'vm-setup: [dry-run] windows-iso-source=url selected; no automatic downloader will run\n'
-            ;;
-          mido)
-            printf 'vm-setup: [dry-run] would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (with runtime patch copy) to download Windows 11 ISO\n'
-            ;;
-          auto)
-            printf 'vm-setup: [dry-run] non-Windows hosts: Fido URL resolver first, then Mido fallback; Windows hosts: Mido first, then native Fido fallback\n'
-            ;;
-        esac
-      fi
+      case "$windows_iso_source" in
+        url)
+          printf 'vm-setup: [dry-run] windows-iso-source=url selected; no downloader fallback will run\n'
+          ;;
+        mido)
+          printf 'vm-setup: [dry-run] would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (with runtime patch copy)\n'
+          ;;
+        auto)
+          printf 'vm-setup: [dry-run] non-Windows hosts: Fido URL resolver then Mido; Windows hosts: Mido then Fido\n'
+          ;;
+      esac
     fi
   fi
 

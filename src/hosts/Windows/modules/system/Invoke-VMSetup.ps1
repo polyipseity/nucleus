@@ -43,6 +43,9 @@ function Invoke-VMSetup {
         [ValidateSet('Auto', 'Url', 'Fido')]
         [string]$WindowsIsoSource = 'Auto',
 
+        # Retry attempts for Windows ISO network downloads.
+        [int]$WindowsIsoRetries = 0,
+
         # QEMU accelerator for image builds. Defaults to tcg (always works).
         # When tcg is used, Invoke-VMSetup auto-detects WHPX (Windows Hypervisor
         # Platform) and upgrades to whpx automatically if it is enabled.
@@ -82,7 +85,10 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
 
 ## Layout
 
+- `images/` — build outputs, temporary build directories, and installer cache.
 - `images/<name>.qcow2` — pre-built guest images produced in build phase.
+- `images/<name>-build/` — temporary Packer output directory used during builds.
+- `images/<name>-installer.iso` — cached Windows installer ISO used by rebuilds.
 - `<name>.utm/` — UTM bundle directory on macOS hosts.
 - `<name>.qcow2` — libvirt/QEMU runtime disk on Linux/Windows hosts.
 
@@ -119,6 +125,23 @@ Then run the command inside each guest:
 - NixOS guest: `sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"`
 - Windows guest: `.\src\hosts\Windows\apply.ps1` (from `%USERPROFILE%\dev\nucleus`)
 - macOS guest: `~/dev/nucleus/scripts/bootstrap.sh apply`
+
+## Safe cleanup
+
+Temporary files/directories that are safe to remove when builds fail, are
+interrupted, or when reclaiming space:
+
+- `%USERPROFILE%\virtual machines\images\<name>-build\`
+- `%USERPROFILE%\virtual machines\images\<name>-installer.iso`
+
+Persistent VM artifacts (remove only when intentionally deleting a VM):
+
+- `%USERPROFILE%\virtual machines\images\<name>.qcow2`
+- `%USERPROFILE%\virtual machines\<name>.utm\`
+- `%USERPROFILE%\virtual machines\<name>.qcow2`
+
+If the installer cache is removed, `nucleus-vm-setup` re-downloads it on the
+next run.
 
 ## Notes
 
@@ -175,6 +198,7 @@ Then run the command inside each guest:
                 Invoke-BuildWindowsImage -VmName $vm.name -DiskGib $diskGib `
                     -WindowsIso $WindowsIso -WindowsIsoUrl $isoUrl `
                     -WindowsIsoSource $WindowsIsoSource `
+                    -WindowsIsoRetries $WindowsIsoRetries `
                     -RepoRoot $RepoRoot `
                     -WindowsEdition ($vm.windowsEdition ?? 'Pro') `
                     -Accelerator $Accelerator `
@@ -444,6 +468,8 @@ function Invoke-FidoWindowsIso {
         [string]$VmName,
         # Windows edition to download (passed to Fido -Ed parameter).
         [string]$Edition = 'Pro',
+        # Retry attempts for transient network errors.
+        [int]$Retries = 0,
         [switch]$DryRun
     )
 
@@ -460,20 +486,45 @@ function Invoke-FidoWindowsIso {
         return $cachedIso
     }
 
+    if ($Retries -lt 0) {
+        Write-Warning "vm-setup: invalid retry count ($Retries); expected a non-negative integer"
+        return ''
+    }
+
     Write-Information "vm-setup: downloading Windows 11 ISO via Fido (edition=$Edition)..."
     # Run Fido in a temp dir; it downloads the ISO to the working directory.
     # Source: https://github.com/pbatard/Fido#usage
     $tmpDir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
     try {
-        Push-Location $tmpDir
-        try {
-            & $fidoScript -Win 11 -Ed $Edition -Lang English -Arch x64 -Download -NoPrompt
-            if ($LASTEXITCODE -ne 0) {
-                Write-Warning "vm-setup: Fido exited with code $LASTEXITCODE"
-                return ''
+        $maxAttempts = $Retries + 1
+        $attempt = 1
+        while ($attempt -le $maxAttempts) {
+            Push-Location $tmpDir
+            try {
+                $fidoOutput = & $fidoScript -Win 11 -Ed $Edition -Lang English -Arch x64 -Download -NoPrompt 2>&1
+                if ($fidoOutput) {
+                    $fidoOutput | ForEach-Object { Write-Information "$_" }
+                }
+                if ($LASTEXITCODE -eq 0) {
+                    break
+                }
+
+                if (($fidoOutput -join "`n") -match '715-123130') {
+                    Write-Warning 'vm-setup: Microsoft blocked automated ISO download (code 715-123130); retry later or provide -WindowsIso path'
+                }
+
+                if ($attempt -ge $maxAttempts) {
+                    Write-Warning "vm-setup: Fido exited with code $LASTEXITCODE"
+                    return ''
+                }
+
+                $sleepSeconds = [Math]::Min([Math]::Pow(2, $attempt - 1), 30)
+                Write-Warning "vm-setup: Fido download attempt $attempt/$maxAttempts failed; retrying in $sleepSeconds seconds"
+                Start-Sleep -Seconds $sleepSeconds
+                $attempt++
+            } finally {
+                Pop-Location
             }
-        } finally {
-            Pop-Location
         }
 
         $downloadedIso = Get-ChildItem $tmpDir -Filter '*.iso' |
@@ -512,6 +563,7 @@ function Invoke-BuildWindowsImage {
         [string]$WindowsIsoUrl = '',
         [ValidateSet('Auto', 'Url', 'Fido')]
         [string]$WindowsIsoSource = 'Auto',
+        [int]$WindowsIsoRetries = 0,
         [string]$Accelerator,
         [string]$VmsDir,
         [string]$ImagesDir,
@@ -526,51 +578,76 @@ function Invoke-BuildWindowsImage {
         return
     }
 
+    if ($WindowsIsoRetries -lt 0) {
+        Write-Warning "vm-setup: invalid WindowsIsoRetries value ($WindowsIsoRetries); expected a non-negative integer"
+        return
+    }
+
+    Write-Information "vm-setup: Windows ISO fallback order: cached installer -> windowsIsoUrl -> downloader ($WindowsIsoSource mode)"
+
+    $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
+    if (-not $WindowsIso -and (Test-Path $cachedIso)) {
+        Write-Information "vm-setup: using cached Windows installer: $cachedIso"
+        $WindowsIso = $cachedIso
+    }
+
     # Resolve the installer ISO: use -WindowsIso if provided, otherwise try the
     # VMs.json windowsIsoUrl field as a download source.
     if (-not $WindowsIso -and $WindowsIsoSource -ne 'Fido' -and $WindowsIsoUrl) {
-        $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
-        if (Test-Path $cachedIso) {
-            Write-Information "vm-setup: using cached Windows installer: $cachedIso"
-            $WindowsIso = $cachedIso
-        } else {
-            Write-Information "vm-setup: downloading Windows installer from windowsIsoUrl..."
-            if (-not $DryRun) {
-                # Use curl.exe (available on Windows 10 1803+) for large ISO downloads;
-                # Invoke-WebRequest buffers the full file in memory before writing to disk.
-                # Source: https://curl.se/docs/manpage.html
-                if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
-                    Write-Warning 'vm-setup: curl.exe not found; Windows 10 1803+ includes it in system32'
-                    return
-                }
-                & curl.exe -fL -o $cachedIso $WindowsIsoUrl
-                if ($LASTEXITCODE -ne 0) {
-                    Write-Warning "vm-setup: download failed; removing partial file $cachedIso"
-                    Remove-Item $cachedIso -Force -ErrorAction SilentlyContinue
-                    return
-                }
-                $WindowsIso = $cachedIso
-                Write-Information "vm-setup: Windows installer downloaded: $cachedIso"
-            } else {
-                Write-Information "vm-setup: [dry-run] curl.exe -fL -o $cachedIso $WindowsIsoUrl"
+        Write-Information "vm-setup: downloading Windows installer from windowsIsoUrl..."
+        if (-not $DryRun) {
+            # Use curl.exe (available on Windows 10 1803+) for large ISO downloads;
+            # Invoke-WebRequest buffers the full file in memory before writing to disk.
+            # Source: https://curl.se/docs/manpage.html
+            if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
+                Write-Warning 'vm-setup: curl.exe not found; Windows 10 1803+ includes it in system32'
+                return
             }
+
+            $maxAttempts = $WindowsIsoRetries + 1
+            $attempt = 1
+            $downloadOk = $false
+            while ($attempt -le $maxAttempts) {
+                & curl.exe -fL -o $cachedIso $WindowsIsoUrl
+                if ($LASTEXITCODE -eq 0) {
+                    $downloadOk = $true
+                    break
+                }
+
+                if ($attempt -ge $maxAttempts) {
+                    break
+                }
+
+                $sleepSeconds = [Math]::Min([Math]::Pow(2, $attempt - 1), 30)
+                Write-Warning "vm-setup: windowsIsoUrl download attempt $attempt/$maxAttempts failed; retrying in $sleepSeconds seconds"
+                Start-Sleep -Seconds $sleepSeconds
+                $attempt++
+            }
+
+            if (-not $downloadOk) {
+                Write-Warning "vm-setup: windowsIsoUrl download failed; removing partial file $cachedIso"
+                if (Test-Path $cachedIso) {
+                    Remove-Item $cachedIso -Force
+                }
+                return
+            }
+
+            $WindowsIso = $cachedIso
+            Write-Information "vm-setup: Windows installer downloaded: $cachedIso"
+        } else {
+            Write-Information "vm-setup: [dry-run] curl.exe -fL -o $cachedIso $WindowsIsoUrl"
         }
     }
 
     # If still no ISO resolved, attempt download via vendor/Fido/Fido.ps1.
     if (-not $WindowsIso -and $WindowsIsoSource -ne 'Url') {
-        $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
-        if (Test-Path $cachedIso) {
-            Write-Information "vm-setup: using cached Windows installer: $cachedIso"
-            $WindowsIso = $cachedIso
-        } else {
-            $WindowsIso = Invoke-FidoWindowsIso `
-                -RepoRoot $RepoRoot `
-                -ImagesDir $ImagesDir `
-                -VmName $VmName `
-                -Edition $WindowsEdition `
-                -DryRun:$DryRun
-        }
+        $WindowsIso = Invoke-FidoWindowsIso `
+            -RepoRoot $RepoRoot `
+            -ImagesDir $ImagesDir `
+            -VmName $VmName `
+            -Edition $WindowsEdition `
+            -Retries $WindowsIsoRetries `
+            -DryRun:$DryRun
     }
     # If ISO is still empty after all resolution attempts, fail with instructions.
     if (-not $WindowsIso) {

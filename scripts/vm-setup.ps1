@@ -34,6 +34,9 @@ param(
     [ValidateSet('Auto', 'Url', 'Fido')]
     [string]$WindowsIsoSource = 'Auto',
 
+    # Retry attempts for Windows ISO network downloads (default: 0).
+    [int]$WindowsIsoRetries = 0,
+
     # QEMU accelerator for image builds (default: tcg, auto-upgraded to whpx
     # when Windows Hypervisor Platform is detected).
     [string]$Accelerator = 'tcg',
@@ -60,6 +63,7 @@ if ($WindowsIso)  { $invokeArgs['WindowsIso']  = $WindowsIso }
 if ($NixosOnly)   { $invokeArgs['NixosOnly']   = $true }
 if ($WindowsOnly) { $invokeArgs['WindowsOnly'] = $true }
 if ($WindowsIsoSource) { $invokeArgs['WindowsIsoSource'] = $WindowsIsoSource }
+if ($PSBoundParameters.ContainsKey('WindowsIsoRetries')) { $invokeArgs['WindowsIsoRetries'] = $WindowsIsoRetries }
 if ($Accelerator) { $invokeArgs['Accelerator'] = $Accelerator }
 
 Invoke-VMSetup @invokeArgs
