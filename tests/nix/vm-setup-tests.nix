@@ -379,6 +379,27 @@ let
         && (lib.hasInfix "vmMachine = vm: if vmArch vm == \"x86_64\" then \"q35\" else \"virt\";" macbook_vms_nix_text)
       )
       "src/hosts/MacBook/vms.nix must force Windows UTM guests to x86_64/q35 so imported bundles match built Windows images";
+  test_macbook_utm_schema_keys =
+    assert'
+      (
+        (lib.hasInfix "<key>Drive</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>ImageName</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>QEMU</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>Input</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>CPUFlagsAdd</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>CPUFlagsRemove</key>" macbook_vms_nix_text)
+      )
+      "src/hosts/MacBook/vms.nix must include modern UTM schema keys (Drive/ImageName/QEMU/Input/CPUFlagsAdd/CPUFlagsRemove) for reliable imports";
+  test_macbook_utm_data_dir_disk_path =
+    assert'
+      (
+        (lib.hasInfix "data_dir=\"$bundle/Data\"" vm_setup_sh_text)
+        && (lib.hasInfix "disk_file=\"$data_dir/disk-main.qcow2\"" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must place UTM disk-main.qcow2 under bundle Data/ to match ImageName-based UTM drive resolution";
+  test_macbook_utm_no_auto_open_import =
+    assert' (!(lib.hasInfix "open \"$bundle\"" vm_setup_sh_text))
+      "scripts/vm-setup.sh must not auto-open .utm bundles because that import path can trigger a blocking UTM popup";
 
   # Fido fallback must be gated to Windows hosts only; on macOS/Linux the
   # script must skip Fido and print the explicit Windows-CIM requirement.
@@ -426,6 +447,9 @@ in
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
     test_macbook_utm_windows_arch_override
+    test_macbook_utm_schema_keys
+    test_macbook_utm_data_dir_disk_path
+    test_macbook_utm_no_auto_open_import
     test_windows_iso_fido_windows_only
     ;
 

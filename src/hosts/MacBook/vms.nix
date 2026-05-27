@@ -30,6 +30,11 @@ let
       "x86_64";
   vmMachine = vm: if vmArch vm == "x86_64" then "q35" else "virt";
 
+  # UTM cannot use HVF for x86_64 guest emulation on Apple Silicon hosts.
+  # Keep Hypervisor false in that case so imports/starts do not fail with an
+  # invalid accelerator path; native-arch guests still use acceleration.
+  qemuHypervisor = vm: if isArm then vmArch vm == "aarch64" else true;
+
   # Derive a deterministic UUID from the VM name (format: 8-4-4-4-12 hex).
   # The same name always maps to the same UUID so re-provisioning the same VM
   # produces a stable UTM identity across apply runs.
@@ -74,15 +79,13 @@ let
         <string>qemu</string>
         <key>ConfigurationVersion</key>
         <integer>4</integer>
-        <key>Drives</key>
+        <key>Drive</key>
         <array>
             <dict>
-                <key>Bootable</key>
-                <false/>
-                <key>Fixed</key>
-                <false/>
-                <key>ImagePath</key>
-                <string>Images/disk-main.qcow2</string>
+                <key>Identifier</key>
+                <string>${vm.name}-disk-main</string>
+                <key>ImageName</key>
+                <string>disk-main.qcow2</string>
                 <key>ImageType</key>
                 <string>Disk</string>
                 <key>Interface</key>
@@ -92,12 +95,20 @@ let
             </dict>
         </array>
         <key>Display</key>
-        <dict>
-            <key>Card</key>
-            <string>${displayCard vm}</string>
-            <key>FitScreen</key>
-            <true/>
-        </dict>
+        <array>
+            <dict>
+                <key>Hardware</key>
+                <string>${displayCard vm}</string>
+                <key>DynamicResolution</key>
+                <true/>
+                <key>UpscalingFilter</key>
+                <string>Nearest</string>
+                <key>DownscalingFilter</key>
+                <string>Linear</string>
+                <key>NativeResolution</key>
+                <false/>
+            </dict>
+        </array>
         <key>Information</key>
         <dict>
             <key>Icon</key>
@@ -132,6 +143,36 @@ let
                 <string>intel-hda</string>
             </dict>
         </array>
+        <key>QEMU</key>
+        <dict>
+            <key>AdditionalArguments</key>
+            <array/>
+            <key>BalloonDevice</key>
+            <false/>
+            <key>DebugLog</key>
+            <false/>
+            <key>Hypervisor</key>
+            ${if qemuHypervisor vm then "<true/>" else "<false/>"}
+            <key>PS2Controller</key>
+            <false/>
+            <key>RTCLocalTime</key>
+            <false/>
+            <key>RNGDevice</key>
+            <true/>
+            <key>TPMDevice</key>
+            <false/>
+            <key>UEFIBoot</key>
+            <true/>
+        </dict>
+        <key>Input</key>
+        <dict>
+            <key>MaximumUsbShare</key>
+            <integer>3</integer>
+            <key>UsbBusSupport</key>
+            <string>3.0</string>
+            <key>UsbSharing</key>
+            <false/>
+        </dict>
         <key>System</key>
         <dict>
             <key>Architecture</key>
@@ -140,7 +181,9 @@ let
             <string>default</string>
             <key>CPUCount</key>
             <integer>${toString vm.cpus}</integer>
-            <key>CPUFlags</key>
+            <key>CPUFlagsAdd</key>
+            <array/>
+            <key>CPUFlagsRemove</key>
             <array/>
             <key>ForceMulticore</key>
             <false/>
