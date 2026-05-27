@@ -14,7 +14,7 @@ rev = "3e8a8703264a2f4a69428a0aa4dcb512790b2c8c"
 # Notes:
 # - These hooks are a recommended baseline. If a particular hook is undesired (for example, forbidding
 #   submodules in a repository that intentionally uses them), remove or configure that hook in `prek.toml`.
-# - Keep hook repositories pinned (set `rev`) to an explicit release to ensure reproducible behaviour.
+# - Keep hook repositories pinned (set `rev`) to an explicit commit hash to ensure reproducible behaviour.
 hooks = [
   { id = "check-case-conflict" },
   { id = "check-executables-have-shebangs", exclude = "\\.(bat|cmd|ps1|psd1|psm1|vbs|wsf|wsh)$" },
