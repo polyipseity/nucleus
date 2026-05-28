@@ -132,15 +132,19 @@ source "qemu" "windows11" {
   # 4-second window at t=50–54s misses the prompt whenever it appears outside
   # that narrow range (which happens on both fast and slow hosts).
   #
-  # Under QEMU tcg on Apple Silicon the emulation runs at 0.3-10% of native
-  # speed, so the El Torito "Press any key" boot prompt (which appears at
-  # emulated t≈3-8s) maps to anywhere from real t≈50s (10% speed) to
-  # real t≈2000s (0.3% speed).  The window itself is 5 emulated seconds wide,
-  # i.e. 50-1700 real seconds depending on speed.
-  # Solution: send Enter every 10s for the first 200s (fast-tcg coverage),
-  # then every 60s for the next 1800s (slow-tcg coverage), for a total of
-  # 50 presses covering real t=5-2005s (≈33 min).  Extra presses after boot
-  # are harmless — the installer ignores input once Windows PE is loading.
+  # Under QEMU tcg on Apple Silicon the emulation can fall below 0.3% of
+  # native speed on sustained host load.  In that regime the El Torito
+  # "Press any key" prompt can appear after the original 33-minute window,
+  # so Packer transitions to WinRM probing while setup never started.
+  #
+  # Solution: keep dense keypresses early, then extend sparse coverage to
+  # roughly 2h13m:
+  #   - 20 × wait10  (real t≈5s..205s)
+  #   - 30 × wait60  (real t≈205s..2005s)
+  #   - 50 × wait120 (real t≈2005s..8005s)
+  #
+  # Extra Enter presses after boot are harmless — once Windows PE takes over,
+  # they are ignored by setup UI flow controlled via Autounattend.xml.
   boot_wait = "5s"
   boot_command = [
     # fast tcg (5-10%): prompt at real t≈60-200s
@@ -158,6 +162,20 @@ source "qemu" "windows11" {
     "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
     "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
     "<return><wait60>", "<return><wait60>",
+    # ultra-slow tcg (<0.3%): extend coverage out to ~2h13m
+    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
+    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
+    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
+    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
+    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
+    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
+    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
+    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
+    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
+    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
+    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
+    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
+    "<return><wait120>", "<return><wait120>",
   ]
 
   # WHY: Packer's WinRM communicator starts probing as soon as boot_command
