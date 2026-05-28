@@ -964,7 +964,9 @@ build_windows_image() {
   _winrm_timeout='3h'
   if [ "$accelerator" = 'tcg' ]; then
     # WHY: x86_64 Windows setup under software emulation can take much longer
-    # than hardware-accelerated paths; use a larger communicator timeout.
+    # than hardware-accelerated paths. TCG with FirstLogonCommands can easily
+    # exceed 3 hours (Windows PE load + setup + first logon + VirtIO scan can
+    # take 60+ minutes on very slow hosts). Use a generous timeout.
     _winrm_timeout='8h'
   fi
 

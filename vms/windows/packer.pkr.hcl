@@ -126,15 +126,21 @@ source "qemu" "windows11" {
   # WinRM port explicitly so Packer and QEMU agree on 5985.
   skip_nat_mapping = true
 
-  # Press Enter repeatedly to reliably pass the "Press any key to boot from
-  # CD" prompt. On slower emulation paths, a single key press can be missed
-  # and the VM then never reaches setup/WinRM.
-  boot_wait = "6s"
+  # WHY: Windows PE under software emulation (tcg) takes 30–60+ seconds to load
+  # before Setup appears. 6s is far too short and causes the VM to stall.
+  # Using 50s (vs. NixOS' proven 40s baseline) to account for Windows installer
+  # overhead. Without this, FirstLogonCommands never execute and WinRM hangs.
+  boot_wait = "50s"
   boot_command = [
     "<wait2><return>",
     "<wait2><return>",
     "<wait2><return>",
   ]
+
+  # WHY: On slow emulation, the VM needs a grace period after boot to settle
+  # before Packer's WinRM communicator starts probing. FirstLogonCommands
+  # (especially VirtIO driver scan) can take 60+ seconds on tcg.
+  pause_before_connecting = "180s"
 
   qemuargs = [
     ["-netdev", "user,id=user.0,hostfwd=tcp::5985-:5985"],
