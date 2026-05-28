@@ -365,9 +365,9 @@ let
 
   # Windows QEMU builds must:
   # 1. Pin WinRM to 5985 with explicit port forward (not random NAT mapping)
-  # 2. Set boot_wait to 10s and send 20 Enter presses at 10s intervals (covering
-  #    t=10s to t=210s) to reliably catch the Windows bootmgr "Press any key" prompt
-  #    under any tcg timing (can appear 10–120s after VM start)
+  # 2. Set boot_wait to 5s; send 20 Enter presses every 10s (fast-tcg, t=5-205s)
+  #    followed by 30 Enter presses every 60s (slow-tcg, t=205-2005s) to reliably
+  #    catch the El Torito "Press any key" prompt at 0.3-10% emulation speed
   # 3. Add pause_before_connecting (120s) to reduce log noise before WinRM is ready
   # 4. Reorder FirstLogonCommands so WinRM is configured (Orders 1–6) before VirtIO driver scan (Order 7)
   test_windows_packer_winrm_port_forward =
@@ -379,8 +379,9 @@ let
         && (lib.hasInfix "boot_wait = \"5s\"" vms_windows_packer_text)
         && (lib.hasInfix "pause_before_connecting = \"120s\"" vms_windows_packer_text)
         && (lib.hasInfix "<return><wait10>" vms_windows_packer_text)
+        && (lib.hasInfix "<return><wait60>" vms_windows_packer_text)
       )
-      "vms/windows/packer.pkr.hcl must pin WinRM to 5985, set boot_wait to 10s, use repeated <return><wait10> entries, and add pause_before_connecting 120s to reliably catch the Windows bootmgr prompt across all tcg timing scenarios";
+      "vms/windows/packer.pkr.hcl must pin WinRM to 5985, use boot_wait=5s, have both <return><wait10> (fast-tcg) and <return><wait60> (slow-tcg) presses covering t=5-2005s, and add pause_before_connecting=120s";
 
   # Autounattend.xml must configure WinRM before VirtIO driver scan to prevent blocking.
   test_windows_autounattend_winrm_before_virtio =

@@ -132,18 +132,32 @@ source "qemu" "windows11" {
   # 4-second window at t=50–54s misses the prompt whenever it appears outside
   # that narrow range (which happens on both fast and slow hosts).
   #
-  # Solution: start sending Enter at t=10s (after BIOS POST) and repeat every
-  # 10s for 200s total (20 presses), covering t=10s to t=210s from VM start.
-  # The installer ignores extra Enter presses once Windows PE is loading.
-  # This approach is used by community Windows QEMU Packer builds and is the
-  # recommended technique for reliably catching the bootmgr prompt under tcg.
+  # Under QEMU tcg on Apple Silicon the emulation runs at 0.3-10% of native
+  # speed, so the El Torito "Press any key" boot prompt (which appears at
+  # emulated t≈3-8s) maps to anywhere from real t≈50s (10% speed) to
+  # real t≈2000s (0.3% speed).  The window itself is 5 emulated seconds wide,
+  # i.e. 50-1700 real seconds depending on speed.
+  # Solution: send Enter every 10s for the first 200s (fast-tcg coverage),
+  # then every 60s for the next 1800s (slow-tcg coverage), for a total of
+  # 50 presses covering real t=5-2005s (≈33 min).  Extra presses after boot
+  # are harmless — the installer ignores input once Windows PE is loading.
   boot_wait = "5s"
   boot_command = [
+    # fast tcg (5-10%): prompt at real t≈60-200s
     "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
     "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
     "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
     "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
     "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
+    # slow tcg (0.3-3%): prompt at real t≈200-2000s
+    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
+    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
+    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
+    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
+    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
+    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
+    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
+    "<return><wait60>", "<return><wait60>",
   ]
 
   # WHY: Packer's WinRM communicator starts probing as soon as boot_command
