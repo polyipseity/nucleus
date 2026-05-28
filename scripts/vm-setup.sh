@@ -964,10 +964,12 @@ build_windows_image() {
   _winrm_timeout='3h'
   if [ "$accelerator" = 'tcg' ]; then
     # WHY: x86_64 Windows setup under software emulation can take much longer
-    # than hardware-accelerated paths. TCG with FirstLogonCommands can easily
-    # exceed 3 hours (Windows PE load + setup + first logon + VirtIO scan can
-    # take 60+ minutes on very slow hosts). Use a generous timeout.
-    _winrm_timeout='8h'
+    # than hardware-accelerated paths.  On Apple Silicon (arm64 host emulating
+    # x86_64 guest) QEMU tcg typically runs at 2-5% of native speed, meaning
+    # Windows PE load + installation + OOBE + FirstLogonCommands can take
+    # 10-30 real hours.  Use a very generous timeout that covers even the
+    # slowest realistic tcg speed.
+    _winrm_timeout='72h'
   fi
 
   printf 'vm-setup: building Windows 11 image (disk=%s GiB, accelerator=%s)...\n' \
