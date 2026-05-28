@@ -152,6 +152,34 @@
       <ComputerName>Windows</ComputerName>
       <TimeZone>UTC</TimeZone>
     </component>
+    <!-- Configure WinRM during specialize as a pre-logon baseline.
+         WHY: some install paths can delay or skip first-logon command timing;
+         setting WinRM here improves Packer communicator reliability. -->
+    <component name="Microsoft-Windows-Deployment"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral"
+               versionScope="nonSxS"
+               xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+      <RunSynchronous>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Path>cmd /c winrm quickconfig -q</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>2</Order>
+          <Path>cmd /c winrm set winrm/config/service @{AllowUnencrypted=&quot;true&quot;}</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>3</Order>
+          <Path>cmd /c winrm set winrm/config/service/auth @{Basic=&quot;true&quot;}</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>4</Order>
+          <Path>cmd /c netsh advfirewall firewall set rule group=&quot;windows remote management&quot; new enable=yes</Path>
+        </RunSynchronousCommand>
+      </RunSynchronous>
+    </component>
   </settings>
 
   <!-- ================================================================
