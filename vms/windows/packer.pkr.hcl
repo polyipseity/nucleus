@@ -126,21 +126,32 @@ source "qemu" "windows11" {
   # WinRM port explicitly so Packer and QEMU agree on 5985.
   skip_nat_mapping = true
 
-  # WHY: Windows PE under software emulation (tcg) takes 30–60+ seconds to load
-  # before Setup appears. 6s is far too short and causes the VM to stall.
-  # Using 50s (vs. NixOS' proven 40s baseline) to account for Windows installer
-  # overhead. Without this, FirstLogonCommands never execute and WinRM hangs.
-  boot_wait = "50s"
+  # WHY: The Windows bootmgr "Press any key to boot from CD or DVD" prompt
+  # appears unpredictably under tcg (software emulation) — typically 10–120s
+  # after VM start depending on host CPU speed.  Sending 3 Enter presses in a
+  # 4-second window at t=50–54s misses the prompt whenever it appears outside
+  # that narrow range (which happens on both fast and slow hosts).
+  #
+  # Solution: start sending Enter at t=10s (after BIOS POST) and repeat every
+  # 10s for 200s total (20 presses), covering t=10s to t=210s from VM start.
+  # The installer ignores extra Enter presses once Windows PE is loading.
+  # This approach is used by community Windows QEMU Packer builds and is the
+  # recommended technique for reliably catching the bootmgr prompt under tcg.
+  boot_wait = "10s"
   boot_command = [
-    "<wait2><return>",
-    "<wait2><return>",
-    "<wait2><return>",
+    "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
+    "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
+    "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
+    "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
+    "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
   ]
 
-  # WHY: On slow emulation, the VM needs a grace period after boot to settle
-  # before Packer's WinRM communicator starts probing. FirstLogonCommands
-  # (especially VirtIO driver scan) can take 60+ seconds on tcg.
-  pause_before_connecting = "180s"
+  # WHY: Packer's WinRM communicator starts probing as soon as boot_command
+  # completes.  Even with 8h timeout, excessive early retries during Windows
+  # PE / first-install / OOBE waste log space and obscure real errors.
+  # 120s gives Windows time to complete the OOBE AutoLogon and reach a usable
+  # shell before probes begin; the 8h winrm_timeout handles the rest.
+  pause_before_connecting = "120s"
 
   qemuargs = [
     ["-netdev", "user,id=user.0,hostfwd=tcp::5985-:5985"],

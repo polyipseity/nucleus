@@ -365,8 +365,10 @@ let
 
   # Windows QEMU builds must:
   # 1. Pin WinRM to 5985 with explicit port forward (not random NAT mapping)
-  # 2. Set boot_wait to 50s (not 6s) to allow Windows PE to load on slow emulation
-  # 3. Add pause_before_connecting (180s) to wait for FirstLogonCommands to complete before Packer probes
+  # 2. Set boot_wait to 10s and send 20 Enter presses at 10s intervals (covering
+  #    t=10s to t=210s) to reliably catch the Windows bootmgr "Press any key" prompt
+  #    under any tcg timing (can appear 10–120s after VM start)
+  # 3. Add pause_before_connecting (120s) to reduce log noise before WinRM is ready
   # 4. Reorder FirstLogonCommands so WinRM is configured (Orders 1–6) before VirtIO driver scan (Order 7)
   test_windows_packer_winrm_port_forward =
     assert'
@@ -374,10 +376,11 @@ let
         (lib.hasInfix "winrm_port     = 5985" vms_windows_packer_text)
         && (lib.hasInfix "skip_nat_mapping = true" vms_windows_packer_text)
         && (lib.hasInfix "hostfwd=tcp::5985-:5985" vms_windows_packer_text)
-        && (lib.hasInfix "boot_wait = \"50s\"" vms_windows_packer_text)
-        && (lib.hasInfix "pause_before_connecting = \"180s\"" vms_windows_packer_text)
+        && (lib.hasInfix "boot_wait = \"10s\"" vms_windows_packer_text)
+        && (lib.hasInfix "pause_before_connecting = \"120s\"" vms_windows_packer_text)
+        && (lib.hasInfix "<return><wait10>" vms_windows_packer_text)
       )
-      "vms/windows/packer.pkr.hcl must pin WinRM to 5985, set boot_wait to 50s, add pause_before_connecting 180s, and reorder FirstLogonCommands so WinRM is configured before VirtIO driver scan (which is slow on tcg)";
+      "vms/windows/packer.pkr.hcl must pin WinRM to 5985, set boot_wait to 10s, use repeated <return><wait10> entries, and add pause_before_connecting 120s to reliably catch the Windows bootmgr prompt across all tcg timing scenarios";
 
   # Autounattend.xml must configure WinRM before VirtIO driver scan to prevent blocking.
   test_windows_autounattend_winrm_before_virtio =
