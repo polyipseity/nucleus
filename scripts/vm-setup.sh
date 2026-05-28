@@ -157,10 +157,10 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
 
 ## Start commands
 
-- macOS guest (Tart): run `~/virtual machines/Start-<display>.sh`
-- NixOS/Windows guests on macOS (UTM): run `~/virtual machines/Start-<display>.sh`
-- NixOS/Windows guests on NixOS (libvirt): run `~/virtual machines/Start-<display>.sh`
-- NixOS/Windows guests on Windows (QEMU): run `Start-<display>.ps1`
+- macOS guest (Tart): run `~/virtual machines/start-<name>.sh` or `~/virtual machines/start-<name>.ps1`
+- NixOS/Windows guests on macOS (UTM): run `~/virtual machines/start-<name>.sh` or `~/virtual machines/start-<name>.ps1`
+- NixOS/Windows guests on NixOS (libvirt): run `~/virtual machines/start-<name>.sh` or `~/virtual machines/start-<name>.ps1`
+- NixOS/Windows guests on Windows (QEMU): run `start-<name>.ps1` (or `start-<name>.sh` in Git Bash/MSYS)
 
 ## UTM bundle portability
 
@@ -182,7 +182,8 @@ Guest OS configuration is **not automatic** after first boot.
 Run the generated helper script in `~/virtual machines/` to print the exact
 guest-side converge command:
 
-- `~/virtual machines/<name>-configure.sh`
+- `~/virtual machines/configure-<name>.sh`
+- `~/virtual machines/configure-<name>.ps1`
 
 The converge commands are run inside each guest:
 
@@ -362,23 +363,28 @@ write_start_script() {
   _wss_display="$2"
   _wss_type="$3"
   _wss_host_kind="$4"
-  _wss_path="$VM_DIR/Start-${_wss_display}.sh"
+  _wss_path_sh="$VM_DIR/start-${_wss_name}.sh"
+  _wss_path_ps1="$VM_DIR/start-${_wss_name}.ps1"
 
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] write start helper script: %s\n' "$_wss_path"
+    printf 'vm-setup: [dry-run] write start helper scripts: %s, %s\n' "$_wss_path_sh" "$_wss_path_ps1"
     return 0
   fi
 
   case "$_wss_host_kind" in
     darwin-tart)
-      cat >"$_wss_path" <<EOF
+      cat >"$_wss_path_sh" <<EOF
 #!/usr/bin/env sh
 set -eu
 tart run "$_wss_name"
 EOF
+      cat >"$_wss_path_ps1" <<EOF
+# start-$_wss_name.ps1 — Start VM '$_wss_name' on macOS via Tart.
+& tart run '$_wss_name'
+EOF
       ;;
     darwin-utm)
-      cat >"$_wss_path" <<EOF
+      cat >"$_wss_path_sh" <<EOF
 #!/usr/bin/env sh
 set -eu
 if [ -x '/Applications/UTM.app/Contents/MacOS/utmctl' ]; then
@@ -390,9 +396,21 @@ else
   open "$VM_DIR/$_wss_name.utm"
 fi
 EOF
+      cat >"$_wss_path_ps1" <<EOF
+# start-$_wss_name.ps1 — Start VM '$_wss_name' on macOS via UTM.
+if (Test-Path '/Applications/UTM.app/Contents/MacOS/utmctl') {
+  & '/Applications/UTM.app/Contents/MacOS/utmctl' start '$_wss_name'
+  if (\$LASTEXITCODE -ne 0) {
+    Write-Warning "vm-setup: utmctl start failed for $_wss_name; opening bundle instead"
+    Start-Process -FilePath open -ArgumentList '$VM_DIR/$_wss_name.utm' | Out-Null
+  }
+} else {
+  Start-Process -FilePath open -ArgumentList '$VM_DIR/$_wss_name.utm' | Out-Null
+}
+EOF
       ;;
     nixos-libvirt)
-      cat >"$_wss_path" <<EOF
+      cat >"$_wss_path_sh" <<EOF
 #!/usr/bin/env sh
 set -eu
 if ! virsh start "$_wss_name" >/dev/null; then
@@ -404,6 +422,19 @@ fi
 printf 'vm-setup: VM started: %s\n' "$_wss_name"
 printf 'vm-setup: install virt-viewer to open a console automatically\n'
 EOF
+      cat >"$_wss_path_ps1" <<EOF
+# start-$_wss_name.ps1 — Start VM '$_wss_name' with libvirt.
+& virsh start '$_wss_name' | Out-Null
+if (\$LASTEXITCODE -ne 0) {
+  Write-Warning "vm-setup: virsh start failed (or VM already running): $_wss_name"
+}
+if (Get-Command virt-viewer -ErrorAction SilentlyContinue) {
+  & virt-viewer --connect qemu:///system '$_wss_name'
+} else {
+  Write-Host "vm-setup: VM started: $_wss_name"
+  Write-Host 'vm-setup: install virt-viewer to open a console automatically'
+}
+EOF
       ;;
     *)
       printf 'vm-setup: unknown start-script host kind: %s\n' "$_wss_host_kind" >&2
@@ -411,8 +442,9 @@ EOF
       ;;
   esac
 
-  chmod 755 "$_wss_path"
-  printf 'vm-setup: wrote start helper script: %s\n' "$_wss_path"
+  chmod 755 "$_wss_path_sh"
+  chmod 755 "$_wss_path_ps1"
+  printf 'vm-setup: wrote start helper scripts: %s, %s\n' "$_wss_path_sh" "$_wss_path_ps1"
 }
 
 # write_configure_script NAME TYPE
@@ -423,10 +455,11 @@ EOF
 write_configure_script() {
   _wcs_name="$1"
   _wcs_type="$2"
-  _wcs_path="$VM_DIR/${_wcs_name}-configure.sh"
+  _wcs_path_sh="$VM_DIR/configure-${_wcs_name}.sh"
+  _wcs_path_ps1="$VM_DIR/configure-${_wcs_name}.ps1"
 
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] write configure helper script: %s\n' "$_wcs_path"
+    printf 'vm-setup: [dry-run] write configure helper scripts: %s, %s\n' "$_wcs_path_sh" "$_wcs_path_ps1"
     return 0
   fi
 
@@ -445,15 +478,23 @@ write_configure_script() {
       ;;
   esac
 
-  cat >"$_wcs_path" <<EOF
+  cat >"$_wcs_path_sh" <<EOF
 #!/usr/bin/env sh
 set -eu
 printf 'Guest configuration is not automatic. Run inside the guest:\n\n'
 printf '%s\n' '$_wcs_cmd'
 EOF
 
-  chmod 755 "$_wcs_path"
-  printf 'vm-setup: wrote configure helper script: %s\n' "$_wcs_path"
+  cat >"$_wcs_path_ps1" <<EOF
+# configure-$_wcs_name.ps1 — Show guest converge command for '$_wcs_name'.
+Write-Host 'Guest configuration is not automatic. Run inside the guest:'
+Write-Host ''
+Write-Host '$_wcs_cmd'
+EOF
+
+  chmod 755 "$_wcs_path_sh"
+  chmod 755 "$_wcs_path_ps1"
+  printf 'vm-setup: wrote configure helper scripts: %s, %s\n' "$_wcs_path_sh" "$_wcs_path_ps1"
 }
 
 # ---------------------------------------------------------------------------
@@ -1091,6 +1132,25 @@ build_images() {
 #   Removes obsolete helper artifacts from ~/virtual machines now that converge
 #   guidance is centralized in ~/virtual machines/README.md.
 cleanup_vm_directory_artifacts() {
+  _cls_count="$(jq '.VMs | length' "$MANIFEST")"
+  _cls_i=0
+  while [ "$_cls_i" -lt "$_cls_count" ]; do
+    _cls_name="$(jq -r ".VMs[$_cls_i].name" "$MANIFEST")"
+    _cls_display="$(jq -r ".VMs[$_cls_i].display" "$MANIFEST")"
+    for _cls_legacy in \
+      "$VM_DIR/Start-${_cls_display}.sh" \
+      "$VM_DIR/Start-${_cls_display}.ps1" \
+      "$VM_DIR/${_cls_name}-configure.sh" \
+      "$VM_DIR/${_cls_name}-configure.ps1"
+    do
+      if [ -f "$_cls_legacy" ]; then
+        rm -f "$_cls_legacy"
+        printf 'vm-setup: removed legacy helper script: %s\n' "$_cls_legacy"
+      fi
+    done
+    _cls_i=$((_cls_i + 1))
+  done
+
   _cls_legacy_dir="$HOME/.local/share/nucleus/vms/configure"
   if [ -d "$_cls_legacy_dir" ]; then
     rm -rf "$_cls_legacy_dir"
@@ -1194,8 +1254,6 @@ setup_utm_vms() {
     # Use the Nix-generated UTM config.plist written to ~/.local/share/nucleus/
     # at Home Manager activation time (run nucleus-apply first).
     _plist_template="${HOME}/.local/share/nucleus/vms/${vm_name}-config.plist"
-    write_start_script "$vm_name" "$vm_display" "$vm_type" 'darwin-utm'
-    write_configure_script "$vm_name" "$vm_type"
     if [ ! -f "$_plist_template" ]; then
       printf 'vm-setup: WARNING \u2014 UTM config template not found at %s; apply the macOS config first\n' "$_plist_template" >&2
       i=$((i + 1))
@@ -1212,10 +1270,18 @@ setup_utm_vms() {
     # disk. Existing bundles can refresh config.plist in-place.
     _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
     if [ ! -f "$disk_file" ] && [ ! -f "$_prebuilt" ]; then
-      printf 'vm-setup: WARNING — image not found: %s; build failed or type not supported\n' "$_prebuilt" >&2
+      _build_tmp="$IMAGES_DIR/${vm_name}-build"
+      if [ -d "$_build_tmp" ]; then
+        printf 'vm-setup: WARNING — image not ready for %s; build appears in progress at %s\n' "$vm_name" "$_build_tmp" >&2
+      else
+        printf 'vm-setup: WARNING — image not found: %s; build failed or type not supported\n' "$_prebuilt" >&2
+      fi
       i=$((i + 1))
       continue
     fi
+
+    write_start_script "$vm_name" "$vm_display" "$vm_type" 'darwin-utm'
+    write_configure_script "$vm_name" "$vm_type"
 
     if [ "$dry_run" = false ]; then
       mkdir -p "$data_dir"
