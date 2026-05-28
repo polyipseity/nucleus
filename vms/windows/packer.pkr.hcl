@@ -118,7 +118,13 @@ source "qemu" "windows11" {
   communicator   = "winrm"
   winrm_username = "Administrator"
   winrm_password = "packer"
+  winrm_port     = 5985
   winrm_timeout  = var.winrm_timeout
+
+  # WHY: QEMU's automatic communicator NAT mapping can select a port mapping
+  # that never reaches the guest on slow Windows boots.  Pin the host-forwarded
+  # WinRM port explicitly so Packer and QEMU agree on 5985.
+  skip_nat_mapping = true
 
   # Press Enter repeatedly to reliably pass the "Press any key to boot from
   # CD" prompt. On slower emulation paths, a single key press can be missed
@@ -128,6 +134,10 @@ source "qemu" "windows11" {
     "<wait2><return>",
     "<wait2><return>",
     "<wait2><return>",
+  ]
+
+  qemuargs = [
+    ["-netdev", "user,id=user.0,hostfwd=tcp::5985-:5985"],
   ]
 
   headless = true

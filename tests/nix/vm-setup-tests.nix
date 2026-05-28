@@ -339,6 +339,7 @@ let
   windows_vm_setup_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-VMSetup.ps1;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
+  vms_windows_packer_text = builtins.readFile ../../vms/windows/packer.pkr.hcl;
   vms_macos_packer_text = builtins.readFile ../../vms/macos/packer.pkr.hcl;
   test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm-setup.sh must capture packer exit status (_packer_status=0)";
 
@@ -360,6 +361,18 @@ let
 
   # The Packer failure branch for the Windows build must also surface the error.
   test_windows_packer_failure_message = assert' (lib.hasInfix "Packer build for Windows VM" vm_setup_sh_text) "scripts/vm-setup.sh must print a failure message for a failed Windows Packer build";
+
+  # Windows QEMU builds must pin WinRM to 5985 and disable automatic NAT
+  # mapping so the communicator uses the explicit port forward instead of a
+  # randomly chosen host port.
+  test_windows_packer_winrm_port_forward =
+    assert'
+      (
+        (lib.hasInfix "winrm_port     = 5985" vms_windows_packer_text)
+        && (lib.hasInfix "skip_nat_mapping = true" vms_windows_packer_text)
+        && (lib.hasInfix "hostfwd=tcp::5985-:5985" vms_windows_packer_text)
+      )
+      "vms/windows/packer.pkr.hcl must pin WinRM to port 5985 with explicit QEMU host forwarding so Packer does not hang on randomized NAT mapping";
 
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
@@ -583,6 +596,7 @@ in
     test_nixos_generators_output_link_handling
     test_macos_packer_failure_message
     test_windows_packer_failure_message
+    test_windows_packer_winrm_port_forward
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
     test_windows_iso_mido_patch_failure_is_fatal
