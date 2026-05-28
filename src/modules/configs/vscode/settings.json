@@ -82,6 +82,7 @@
   "extensions.experimental.deferredStartupFinishedActivation": true,
   "extensions.supportNodeGlobalNavigator": true,
   "files.associations": {
+    ".prekignore": "ignore",
     ".prettierignore": "ignore"
   },
   "files.autoSave": "onFocusChange",
@@ -165,6 +166,11 @@
   "inlineChat.notebookAgent": true,
   "js/ts.implementationsCodeLens.showOnInterfaceMethods": true,
   "js/ts.updateImportsOnFileMove.enabled": "always",
+  "json.schemaDownload.trustedDomains": {
+    "https://models.dev/model-schema.json": true,
+    "https://opencode.ai/config.json": true,
+    "https://raw.githubusercontent.com/DavidAnson/markdownlint/main/schema/markdownlint-config-schema.json": true
+  },
   "jsts-chat-features.skills.enabled": true,
   "latex-workshop.formatting.latex": "tex-fmt",
   "latex-workshop.linting.run": "onType",
