@@ -717,7 +717,10 @@ function Invoke-BuildWindowsImage {
 
     $packerDir = Join-Path $VmsDir 'windows'
     $tmpOutput = Join-Path $ImagesDir "${VmName}-build"
-    $winrmTimeout = if ($Accelerator -eq 'tcg') { '8h' } else { '3h' }
+    # WHY: Under tcg software emulation, Windows setup + OOBE can take
+    # substantially longer than hardware-accelerated paths. Keep timeout parity
+    # with scripts/vm-setup.sh so long-running builds do not fail prematurely.
+    $winrmTimeout = if ($Accelerator -eq 'tcg') { '72h' } else { '3h' }
 
     Write-Information "vm-setup: building Windows 11 image (disk=${DiskGib} GiB, accelerator=$Accelerator)..."
     Write-Information 'vm-setup: this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
