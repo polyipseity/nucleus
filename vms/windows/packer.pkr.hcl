@@ -87,6 +87,19 @@ packer {
   }
 }
 
+locals {
+  # WHY: The BIOS "Press any key to boot from CD or DVD" window is short.
+  # Sparse keypresses can miss it repeatedly under tcg, leaving setup stalled
+  # while Packer eventually transitions to WinRM probes against a guest that
+  # never started installation.
+  #
+  # Phase strategy:
+  #   1) Dense (1s cadence) for 15 minutes to maximize early-hit probability.
+  #   2) Slow (2s cadence) for 30 minutes to keep coverage on very slow hosts.
+  bootPromptDensePhase = [for _ in range(0, 900) : "<return><wait>"]
+  bootPromptSlowPhase  = [for _ in range(0, 900) : "<return><wait2>"]
+}
+
 source "qemu" "windows11" {
   accelerator = var.accelerator
 
@@ -126,57 +139,10 @@ source "qemu" "windows11" {
   # WinRM port explicitly so Packer and QEMU agree on 5985.
   skip_nat_mapping = true
 
-  # WHY: The Windows bootmgr "Press any key to boot from CD or DVD" prompt
-  # appears unpredictably under tcg (software emulation) — typically 10–120s
-  # after VM start depending on host CPU speed.  Sending 3 Enter presses in a
-  # 4-second window at t=50–54s misses the prompt whenever it appears outside
-  # that narrow range (which happens on both fast and slow hosts).
-  #
-  # Under QEMU tcg on Apple Silicon the emulation can fall below 0.3% of
-  # native speed on sustained host load.  In that regime the El Torito
-  # "Press any key" prompt can appear after the original 33-minute window,
-  # so Packer transitions to WinRM probing while setup never started.
-  #
-  # Solution: keep dense keypresses early, then extend sparse coverage to
-  # roughly 2h13m:
-  #   - 20 × wait10  (real t≈5s..205s)
-  #   - 30 × wait60  (real t≈205s..2005s)
-  #   - 50 × wait120 (real t≈2005s..8005s)
-  #
-  # Extra Enter presses after boot are harmless — once Windows PE takes over,
-  # they are ignored by setup UI flow controlled via Autounattend.xml.
+  # WHY: Keypress frequency matters more than total duration for the BIOS CD
+  # prompt.  Dense cadence is more reliable than sparse long waits.
   boot_wait = "5s"
-  boot_command = [
-    # fast tcg (5-10%): prompt at real t≈60-200s
-    "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
-    "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
-    "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
-    "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
-    "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
-    # slow tcg (0.3-3%): prompt at real t≈200-2000s
-    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
-    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
-    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
-    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
-    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
-    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
-    "<return><wait60>", "<return><wait60>", "<return><wait60>", "<return><wait60>",
-    "<return><wait60>", "<return><wait60>",
-    # ultra-slow tcg (<0.3%): extend coverage out to ~2h13m
-    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
-    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
-    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
-    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
-    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
-    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
-    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
-    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
-    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
-    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
-    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
-    "<return><wait120>", "<return><wait120>", "<return><wait120>", "<return><wait120>",
-    "<return><wait120>", "<return><wait120>",
-  ]
+  boot_command = concat(local.bootPromptDensePhase, local.bootPromptSlowPhase)
 
   # WHY: Packer's WinRM communicator starts probing as soon as boot_command
   # completes.  Even with 8h timeout, excessive early retries during Windows
