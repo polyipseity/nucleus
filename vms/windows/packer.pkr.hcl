@@ -137,7 +137,7 @@ source "qemu" "windows11" {
   # The installer ignores extra Enter presses once Windows PE is loading.
   # This approach is used by community Windows QEMU Packer builds and is the
   # recommended technique for reliably catching the bootmgr prompt under tcg.
-  boot_wait = "10s"
+  boot_wait = "5s"
   boot_command = [
     "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",
     "<return><wait10>", "<return><wait10>", "<return><wait10>", "<return><wait10>",

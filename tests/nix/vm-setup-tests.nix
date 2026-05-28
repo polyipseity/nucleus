@@ -376,7 +376,7 @@ let
         (lib.hasInfix "winrm_port     = 5985" vms_windows_packer_text)
         && (lib.hasInfix "skip_nat_mapping = true" vms_windows_packer_text)
         && (lib.hasInfix "hostfwd=tcp::5985-:5985" vms_windows_packer_text)
-        && (lib.hasInfix "boot_wait = \"10s\"" vms_windows_packer_text)
+        && (lib.hasInfix "boot_wait = \"5s\"" vms_windows_packer_text)
         && (lib.hasInfix "pause_before_connecting = \"120s\"" vms_windows_packer_text)
         && (lib.hasInfix "<return><wait10>" vms_windows_packer_text)
       )
