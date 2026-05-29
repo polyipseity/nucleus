@@ -98,6 +98,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Caddy is installed as the host-local HTTPS reverse proxy used for Jellyfin and other managed service TLS ingress
+      settings:
+        id: CaddyServer.Caddy
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure bottom is installed for cross-host terminal monitoring parity with macOS and NixOS
       settings:
         id: Clement.bottom

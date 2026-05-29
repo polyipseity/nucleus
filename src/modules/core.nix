@@ -60,6 +60,8 @@ let
   #   bottom         — cross-platform system monitor (btm)
   #   bun            — high-speed all-in-one JS toolkit (runtime, package manager, bundler); global runtime for JS ecosystem tasks
   #                    (Windows: Oven-sh.Bun in system.dsc.yml; fourth tier in install hierarchy: nixpkgs/winget > scoop > cargo binstall > bun > uv)
+  #   caddy          — HTTPS reverse proxy used as a shared TLS front door for
+  #                    Jellyfin (and future local services) on POSIX hosts
   #   cargo-binstall — Rust crate binary installer; second-to-last-resort fallback when a package is absent from nixpkgs/WinGet/Scoop
   #   cargo-cache    — reclaim disk space from ~/.cargo registry, git, and advisory-db clones
   #   direnv         — per-directory env loader (shell integration in shell.nix)
@@ -117,6 +119,7 @@ let
     pkgs.bat
     pkgs.bottom
     pkgs.bun
+    pkgs.caddy
     pkgs.cargo-binstall
     pkgs.cargo-cache
     pkgs.direnv

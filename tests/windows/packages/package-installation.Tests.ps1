@@ -91,6 +91,7 @@ Describe "Windows Package Installation" {
             @{ id = 'Adobe.SourceSerif4'; displayName = 'Source Serif 4' }
             @{ id = 'aelassas.Servy'; displayName = 'Servy' }
             @{ id = 'ArtifexSoftware.GhostScript'; displayName = 'Ghostscript' }
+            @{ id = 'CaddyServer.Caddy'; displayName = 'Caddy' }
             @{ id = 'Clement.bottom'; displayName = 'bottom' }
             @{ id = 'DEVCOM.JetBrainsMonoNerdFont'; displayName = 'JetBrains Mono Nerd Font' }
             @{ id = 'eza-community.eza'; displayName = 'eza' }
