@@ -143,7 +143,9 @@ locals {
   # WHY: Some EFI boots land in the UEFI shell instead of auto-launching the
   # installer. Put the launcher in startup.nsh so the shell can auto-run it
   # without relying on fragile VNC timing or manual confirmation keys.
-  bootPromptEfiDirect = [ ]
+  bootPromptEfiDirect = [
+    "<wait5>fs1:\\startup.nsh<enter>",
+  ]
 
   bootPromptByStrategy = local.efiEnabled ? local.bootPromptEfiDirect : (
     var.boot_strategy == "none" ? [] :
@@ -206,8 +208,8 @@ source "qemu" "windows11" {
   ]
 
   # WHY: The Windows installer ISO frequently lands in the UEFI shell on this
-  # QEMU build. startup.nsh runs automatically from the mapped floppy and boots
-  # the installer without depending on shell keystroke timing.
+  # QEMU build. startup.nsh launches the installer script from the mapped floppy
+  # without depending on shell keystroke timing.
   floppy_content = {
     "startup.nsh" = <<-EOF
       map -r

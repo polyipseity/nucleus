@@ -385,6 +385,7 @@ let
         && (lib.hasInfix "variable \"display_backend\"" vms_windows_packer_text)
         && (lib.hasInfix "bootPromptByStrategy" vms_windows_packer_text)
         && (lib.hasInfix "bootPromptEfiDirect" vms_windows_packer_text)
+        && (lib.hasInfix "fs1:\\\\startup.nsh<enter>" vms_windows_packer_text)
         && (lib.hasInfix "startup.nsh" vms_windows_packer_text)
         && (lib.hasInfix "map -r" vms_windows_packer_text)
         && (lib.hasInfix "fs0:" vms_windows_packer_text)
