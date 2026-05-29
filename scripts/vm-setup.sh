@@ -975,29 +975,145 @@ build_windows_image() {
   printf 'vm-setup: building Windows 11 image (disk=%s GiB, accelerator=%s)...\n' \
     "$_disk_gib" "$accelerator"
 
+  # WHY: BIOS installs may stall on the short "Press any key" prompt. Prefer
+  # EFI-first attempts (no key spam) when host firmware files are available,
+  # then fall back to BIOS strategies for broader compatibility.
+  _efi_code=''
+  _efi_vars=''
+  _qemu_share=''
+  _qemu_bin="$(command -v qemu-system-x86_64 2>/dev/null || true)"
+  if [ -n "$_qemu_bin" ]; then
+    _qemu_resolved="$_qemu_bin"
+    _qemu_link_hops=0
+    while [ "$_qemu_link_hops" -lt 8 ]; do
+      _qemu_next="$(readlink "$_qemu_resolved" 2>/dev/null || true)"
+      [ -n "$_qemu_next" ] || break
+      _qemu_resolved="$_qemu_next"
+      _qemu_link_hops=$((_qemu_link_hops + 1))
+    done
+    _qemu_root="$(cd "$(dirname "$_qemu_resolved")/.." 2>/dev/null && pwd -P || true)"
+    if [ -n "$_qemu_root" ] && [ -d "$_qemu_root/share/qemu" ]; then
+      _qemu_share="$_qemu_root/share/qemu"
+    fi
+  fi
+
+  for _efi_dir in \
+    "$_qemu_share" \
+    "/etc/profiles/per-user/${USER}/share/qemu" \
+    "/Applications/UTM.app/Contents/Resources/qemu"
+  do
+    [ -n "$_efi_dir" ] || continue
+    if [ -z "$_efi_code" ] && [ -f "$_efi_dir/edk2-x86_64-code.fd" ]; then
+      _efi_code="$_efi_dir/edk2-x86_64-code.fd"
+    fi
+    if [ -z "$_efi_vars" ] && [ -f "$_efi_dir/edk2-i386-vars.fd" ]; then
+      _efi_vars_size="$(wc -c < "$_efi_dir/edk2-i386-vars.fd" | tr -d '[:space:]')"
+      if [ -n "$_efi_vars_size" ] && [ $((_efi_vars_size % 4096)) -eq 0 ]; then
+        _efi_vars="$_efi_dir/edk2-i386-vars.fd"
+      fi
+    fi
+  done
+
+  _build_attempts='bios spacebar 2h'
+  if [ "$accelerator" = 'tcg' ]; then
+    _build_attempts='bios spacebar 8h
+bios alpha 8h
+bios legacy 72h'
+  else
+    _build_attempts='bios none 30m
+bios spacebar 2h
+bios alpha 2h
+bios legacy 3h'
+  fi
+
+  if [ -n "$_efi_code" ] && [ -n "$_efi_vars" ]; then
+    _build_attempts="efi none 4h
+$_build_attempts"
+    printf 'vm-setup: EFI firmware detected; enabling EFI-first attempt (%s, %s)\n' "$_efi_code" "$_efi_vars"
+  else
+    printf 'vm-setup: EFI firmware not detected; using BIOS-only build attempts\n'
+  fi
+
   if [ "$dry_run" = true ]; then
     printf 'vm-setup: [dry-run] remove stale temporary output directory (if present): %s\n' "$_tmp_out"
-    printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var winrm_timeout=%s -var disk_size=%sG -var output_directory=%s .\n' \
-      "$_packer_dir" "$_iso" "$accelerator" "$_winrm_timeout" "$_disk_gib" "$_tmp_out"
+    while IFS=' ' read -r _firmware_mode _boot_strategy _attempt_timeout; do
+      [ -n "$_firmware_mode" ] || continue
+      if [ "$_firmware_mode" = 'efi' ]; then
+        printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
+          "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$_efi_code" "$_efi_vars" "$_disk_gib" "$_tmp_out"
+      else
+        printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var disk_size=%sG -var output_directory=%s .\n' \
+          "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$_disk_gib" "$_tmp_out"
+      fi
+    done <<EOF
+$_build_attempts
+EOF
     return 0
   fi
 
-  # WHY: Packer qemu builder requires a non-existent output_directory.
-  # Previous interrupted runs may leave this directory behind.
-  rm -rf "$_tmp_out"
-
-  _packer_status=0
+  _packer_init_status=0
   (
     cd "$_packer_dir"
     packer init .
-    packer build \
-      -var "windows_iso=$_iso" \
-      -var "accelerator=$accelerator" \
-      -var "winrm_timeout=$_winrm_timeout" \
-      -var "disk_size=${_disk_gib}G" \
-      -var "output_directory=$_tmp_out" \
-      .
-  ) || _packer_status=$?
+  ) || _packer_init_status=$?
+  if [ "$_packer_init_status" -ne 0 ]; then
+    printf 'vm-setup: Packer init for Windows VM "%s" failed (exit %s)\n' "$_name" "$_packer_init_status" >&2
+    return "$_packer_init_status"
+  fi
+
+  _packer_status=1
+  while IFS=' ' read -r _firmware_mode _boot_strategy _attempt_timeout; do
+    [ -n "$_firmware_mode" ] || continue
+
+    printf 'vm-setup: Windows Packer attempt using firmware_mode=%s boot_strategy=%s (winrm_timeout=%s)...\n' \
+      "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout"
+
+    # WHY: Packer qemu builder requires a non-existent output_directory.
+    # Previous interrupted runs may leave this directory behind.
+    rm -rf "$_tmp_out"
+
+    _attempt_status=0
+    if [ "$_firmware_mode" = 'efi' ]; then
+      (
+        cd "$_packer_dir"
+        packer build \
+          -var "windows_iso=$_iso" \
+          -var "accelerator=$accelerator" \
+          -var "firmware_mode=$_firmware_mode" \
+          -var "boot_strategy=$_boot_strategy" \
+          -var "winrm_timeout=$_attempt_timeout" \
+          -var "efi_firmware_code=$_efi_code" \
+          -var "efi_firmware_vars=$_efi_vars" \
+          -var "disk_size=${_disk_gib}G" \
+          -var "output_directory=$_tmp_out" \
+          .
+      ) || _attempt_status=$?
+    else
+      (
+        cd "$_packer_dir"
+        packer build \
+          -var "windows_iso=$_iso" \
+          -var "accelerator=$accelerator" \
+          -var "firmware_mode=$_firmware_mode" \
+          -var "boot_strategy=$_boot_strategy" \
+          -var "winrm_timeout=$_attempt_timeout" \
+          -var "disk_size=${_disk_gib}G" \
+          -var "output_directory=$_tmp_out" \
+          .
+      ) || _attempt_status=$?
+    fi
+
+    if [ "$_attempt_status" -eq 0 ]; then
+      _packer_status=0
+      break
+    fi
+
+    printf 'vm-setup: Windows Packer attempt failed for firmware_mode=%s boot_strategy=%s (exit %s); trying next strategy\n' \
+      "$_firmware_mode" "$_boot_strategy" "$_attempt_status" >&2
+    _packer_status="$_attempt_status"
+  done <<EOF
+$_build_attempts
+EOF
 
   if [ "$_packer_status" -ne 0 ]; then
     printf 'vm-setup: Packer build for Windows VM "%s" failed (exit %s)\n' "$_name" "$_packer_status" >&2

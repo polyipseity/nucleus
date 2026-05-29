@@ -78,6 +78,30 @@ variable "winrm_timeout" {
   description = "Timeout for WinRM communicator readiness (for slow emulation paths use a larger value such as 8h)."
 }
 
+variable "boot_strategy" {
+  type        = string
+  default     = "spacebar"
+  description = "BIOS installer boot strategy: none, spacebar, alpha, or legacy."
+}
+
+variable "firmware_mode" {
+  type        = string
+  default     = "bios"
+  description = "Firmware mode: bios or efi."
+}
+
+variable "efi_firmware_code" {
+  type        = string
+  default     = ""
+  description = "Path to EFI firmware CODE file (used when firmware_mode=efi)."
+}
+
+variable "efi_firmware_vars" {
+  type        = string
+  default     = ""
+  description = "Path to EFI firmware VARS file (used when firmware_mode=efi)."
+}
+
 packer {
   required_plugins {
     qemu = {
@@ -88,26 +112,42 @@ packer {
 }
 
 locals {
-  # WHY: The BIOS "Press any key to boot from CD or DVD" window is short.
-  # Under tcg on arm64 (emulating x86_64), SeaBIOS POST + device init can take
-  # much longer than the boot_command window, leaving setup stalled at an empty
-  # disk forever.  Use alphanumeric "any key" presses (never <return>, which can
-  # accidentally confirm Windows setup dialogs and trigger a reboot loop back to
-  # an empty disk) over a very long window to cover all realistic BIOS init times.
+  # WHY: Windows BIOS installs can require one "any key" press to boot from ISO.
+  # Different host accelerators and QEMU builds behave differently, so callers
+  # can choose the strategy per attempt instead of hard-coding one fragile path.
   #
-  # WHY 'a' not '<return>': pressing <return> continuously during Windows PE
-  # can dismiss error dialogs and trigger unintended reboots, causing the VM to
-  # fall back to the (empty) hard disk and loop.  'a' is inert to Windows setup
-  # prompts handled by Autounattend.xml.
+  # Strategy summary:
+  #   none     — do not send any keypresses (works when firmware auto-boots ISO)
+  #   spacebar — safe explicit "any key" cadence (~17m)
+  #   alpha    — alphanumeric fallback (~17m)
+  #   legacy   — extended dense+slow coverage for worst-case tcg timing
   #
-  # Phase strategy (total ~5h58m):
-  #   1) any-key dense  (1s cadence, 1024 presses) for ~17 min — covers early BIOS timing.
-  #   2) any-key slow   (20s cadence, 1024 presses) for ~5h41m — covers extremely slow
-  #      BIOS init under tcg on arm64.
-  # NOTE: Packer HCL range() is capped at 1024 values; use longer wait intervals
-  # to achieve broad coverage without exceeding that limit.
+  # Packer HCL range() is capped at 1024 values per expression.
+  bootPromptSpacebarPhase   = [for _ in range(0, 1024) : "<spacebar><wait>"]
+  bootPromptAlphaPhase      = [for _ in range(0, 1024) : "a<wait>"]
   bootPromptAnyKeyDensePhase = [for _ in range(0, 1024) : "a<wait>"]
   bootPromptAnyKeySlowPhase  = [for _ in range(0, 1024) : "a<wait20>"]
+
+  bootPromptByStrategy = (
+    var.boot_strategy == "none" ? [] :
+    var.boot_strategy == "spacebar" ? local.bootPromptSpacebarPhase :
+    var.boot_strategy == "alpha" ? local.bootPromptAlphaPhase :
+    concat(local.bootPromptAnyKeyDensePhase, local.bootPromptAnyKeySlowPhase)
+  )
+
+  efiEnabled = var.firmware_mode == "efi"
+
+  # WHY: EFI-first attempts avoid BIOS "Press any key" fragility for Windows
+  # ISOs. Wrapper scripts can pass host-specific firmware paths explicitly.
+  efiCodeResolved = local.efiEnabled ? (
+    var.efi_firmware_code != "" ? var.efi_firmware_code :
+    "/Applications/UTM.app/Contents/Resources/qemu/edk2-x86_64-code.fd"
+  ) : ""
+
+  efiVarsResolved = local.efiEnabled ? (
+    var.efi_firmware_vars != "" ? var.efi_firmware_vars :
+    "/Applications/UTM.app/Contents/Resources/qemu/edk2-i386-vars.fd"
+  ) : ""
 }
 
 source "qemu" "windows11" {
@@ -124,6 +164,10 @@ source "qemu" "windows11" {
   disk_discard   = "unmap"
   format         = "qcow2"
   machine_type   = "q35"
+
+  efi_boot          = local.efiEnabled
+  efi_firmware_code = local.efiCodeResolved
+  efi_firmware_vars = local.efiVarsResolved
 
   memory     = var.memory
   cpus       = var.cpus
@@ -149,12 +193,11 @@ source "qemu" "windows11" {
   # WinRM port explicitly so Packer and QEMU agree on 5985.
   skip_nat_mapping = true
 
-  # WHY: Keypress frequency matters more than total duration for the BIOS CD
-  # prompt.  Dense cadence is more reliable than sparse long waits.  The slow
-  # phase extends coverage to 5+ hours so even worst-case tcg BIOS init times
-  # on arm64 are covered.
+  # WHY: The exact BIOS installer timing differs by host acceleration/runtime.
+  # Keep keying policy selectable via var.boot_strategy and let the wrapper
+  # iterate through strategies from fast/clean to conservative fallback.
   boot_wait    = "5s"
-  boot_command = concat(local.bootPromptAnyKeyDensePhase, local.bootPromptAnyKeySlowPhase)
+  boot_command = local.bootPromptByStrategy
 
   # WHY: Packer's WinRM communicator starts probing as soon as boot_command
   # completes.  Even with 8h timeout, excessive early retries during Windows

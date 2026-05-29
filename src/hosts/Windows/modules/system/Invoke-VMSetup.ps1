@@ -722,18 +722,55 @@ function Invoke-BuildWindowsImage {
     # with scripts/vm-setup.sh so long-running builds do not fail prematurely.
     $winrmTimeout = if ($Accelerator -eq 'tcg') { '72h' } else { '3h' }
 
+    # WHY: BIOS installs may stall on the short "Press any key" prompt. Prefer
+    # EFI-first attempts when firmware files are available, then fall back to
+    # BIOS strategies for broad compatibility.
+    $efiCodeCandidates = @(
+        (Join-Path $env:ProgramFiles 'qemu\share\qemu\edk2-x86_64-code.fd'),
+        (Join-Path $env:ProgramFiles 'qemu\share\qemu\OVMF_CODE.fd')
+    )
+    $efiVarsCandidates = @(
+        (Join-Path $env:ProgramFiles 'qemu\share\qemu\edk2-i386-vars.fd'),
+        (Join-Path $env:ProgramFiles 'qemu\share\qemu\OVMF_VARS.fd')
+    )
+    $efiCode = $efiCodeCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+    $efiVars = $efiVarsCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+
+    $buildAttempts = if ($Accelerator -eq 'tcg') {
+        @(
+            @{ Firmware = 'bios'; Boot = 'spacebar'; Timeout = '8h' },
+            @{ Firmware = 'bios'; Boot = 'alpha'; Timeout = '8h' },
+            @{ Firmware = 'bios'; Boot = 'legacy'; Timeout = '72h' }
+        )
+    } else {
+        @(
+            @{ Firmware = 'bios'; Boot = 'none'; Timeout = '30m' },
+            @{ Firmware = 'bios'; Boot = 'spacebar'; Timeout = '2h' },
+            @{ Firmware = 'bios'; Boot = 'alpha'; Timeout = '2h' },
+            @{ Firmware = 'bios'; Boot = 'legacy'; Timeout = $winrmTimeout }
+        )
+    }
+
+    if ($efiCode -and $efiVars) {
+        $buildAttempts = @(@{ Firmware = 'efi'; Boot = 'none'; Timeout = '4h' }) + $buildAttempts
+        Write-Information "vm-setup: EFI firmware detected; enabling EFI-first attempt ($efiCode, $efiVars)"
+    } else {
+        Write-Information 'vm-setup: EFI firmware not detected; using BIOS-only build attempts'
+    }
+
     Write-Information "vm-setup: building Windows 11 image (disk=${DiskGib} GiB, accelerator=$Accelerator)..."
     Write-Information 'vm-setup: this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
 
     if ($DryRun) {
         Write-Information "vm-setup: [dry-run] Remove stale temporary output directory if present: $tmpOutput"
-        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var winrm_timeout=$winrmTimeout -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+        foreach ($attempt in $buildAttempts) {
+            if ($attempt.Firmware -eq 'efi') {
+                Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+            } else {
+                Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+            }
+        }
         return
-    }
-
-    # WHY: Packer qemu builder requires output_directory to not already exist.
-    if (Test-Path $tmpOutput) {
-        Remove-Item $tmpOutput -Recurse -Force
     }
 
     Push-Location $packerDir
@@ -743,17 +780,50 @@ function Invoke-BuildWindowsImage {
             Write-Warning 'vm-setup: packer init failed for Windows'
             return
         }
-        $packerArgs = @(
-            '-var', "windows_iso=$WindowsIso",
-            '-var', "accelerator=$Accelerator",
-            '-var', "winrm_timeout=$winrmTimeout",
-            '-var', "disk_size=${DiskGib}G",
-            '-var', "output_directory=$tmpOutput",
-            '.'
-        )
-        & packer build @packerArgs
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning 'vm-setup: packer build failed for Windows'
+        $buildSucceeded = $false
+        foreach ($attempt in $buildAttempts) {
+            Write-Information "vm-setup: Windows Packer attempt using firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (winrm_timeout=$($attempt.Timeout))..."
+
+            # WHY: Packer qemu builder requires output_directory to not already exist.
+            if (Test-Path $tmpOutput) {
+                Remove-Item $tmpOutput -Recurse -Force
+            }
+
+            $packerArgs = @(
+                '-var', "windows_iso=$WindowsIso",
+                '-var', "accelerator=$Accelerator",
+                '-var', "firmware_mode=$($attempt.Firmware)",
+                '-var', "boot_strategy=$($attempt.Boot)",
+                '-var', "winrm_timeout=$($attempt.Timeout)",
+                '-var', "disk_size=${DiskGib}G",
+                '-var', "output_directory=$tmpOutput",
+                '.'
+            )
+            if ($attempt.Firmware -eq 'efi') {
+                $packerArgs = @(
+                    '-var', "windows_iso=$WindowsIso",
+                    '-var', "accelerator=$Accelerator",
+                    '-var', "firmware_mode=$($attempt.Firmware)",
+                    '-var', "boot_strategy=$($attempt.Boot)",
+                    '-var', "winrm_timeout=$($attempt.Timeout)",
+                    '-var', "efi_firmware_code=$efiCode",
+                    '-var', "efi_firmware_vars=$efiVars",
+                    '-var', "disk_size=${DiskGib}G",
+                    '-var', "output_directory=$tmpOutput",
+                    '.'
+                )
+            }
+            & packer build @packerArgs
+            if ($LASTEXITCODE -eq 0) {
+                $buildSucceeded = $true
+                break
+            }
+
+            Write-Warning "vm-setup: packer build attempt failed for firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (exit $LASTEXITCODE); trying next strategy"
+        }
+
+        if (-not $buildSucceeded) {
+            Write-Warning 'vm-setup: packer build failed for Windows after all boot strategies'
             return
         }
     }

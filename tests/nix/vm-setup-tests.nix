@@ -365,11 +365,11 @@ let
 
   # Windows QEMU builds must:
   # 1. Pin WinRM to 5985 with explicit port forward (not random NAT mapping)
-  # 2. Set boot_wait to 5s and use dense/slow phased keypress cadence
-  #    (<return><wait> and <return><wait2>) to reliably catch the short BIOS
-  #    "Press any key to boot from CD/DVD" prompt under tcg
-  # 3. Add pause_before_connecting (120s) to reduce log noise before WinRM is ready
-  # 4. Reorder FirstLogonCommands so WinRM is configured (Orders 1–6) before VirtIO driver scan (Order 7)
+  # 2. Keep boot_wait=5s and pause_before_connecting=120s
+  # 3. Expose selectable firmware_mode and boot_strategy in packer.pkr.hcl
+  # 4. Retry packer builds in vm-setup wrappers with EFI-first + BIOS fallback
+  #    before giving up, so installer timing changes do not hard-lock on one
+  #    brittle keying pattern.
   test_windows_packer_winrm_port_forward =
     assert'
       (
@@ -378,12 +378,19 @@ let
         && (lib.hasInfix "hostfwd=tcp::5985-:5985" vms_windows_packer_text)
         && (lib.hasInfix "boot_wait = \"5s\"" vms_windows_packer_text)
         && (lib.hasInfix "pause_before_connecting = \"120s\"" vms_windows_packer_text)
-        && (lib.hasInfix "bootPromptAnyKeyDensePhase" vms_windows_packer_text)
-        && (lib.hasInfix "a<wait>" vms_windows_packer_text)
-        && (lib.hasInfix "bootPromptAnyKeySlowPhase" vms_windows_packer_text)
-        && (lib.hasInfix "a<wait20>" vms_windows_packer_text)
+        && (lib.hasInfix "variable \"firmware_mode\"" vms_windows_packer_text)
+        && (lib.hasInfix "variable \"boot_strategy\"" vms_windows_packer_text)
+        && (lib.hasInfix "bootPromptByStrategy" vms_windows_packer_text)
+        && (lib.hasInfix "efi_boot          = local.efiEnabled" vms_windows_packer_text)
+        && (lib.hasInfix "firmware_mode=$_firmware_mode" vm_setup_sh_text)
+        && (lib.hasInfix "EFI firmware detected; enabling EFI-first attempt" vm_setup_sh_text)
+        && (lib.hasInfix "boot_strategy=$_boot_strategy" vm_setup_sh_text)
+        && (lib.hasInfix "Windows Packer attempt using firmware_mode=" vm_setup_sh_text)
+        && (lib.hasInfix "firmware_mode=$($attempt.Firmware)" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "EFI firmware detected; enabling EFI-first attempt" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Windows Packer attempt using firmware_mode=" windows_vm_setup_ps1_text)
       )
-      "vms/windows/packer.pkr.hcl must pin WinRM to 5985, use boot_wait=5s, contain AnyKey dense/slow phased keypress cadence (a<wait>/a<wait20>), and add pause_before_connecting=120s";
+      "Windows VM builds must pin WinRM port forwarding and implement EFI-first firmware_mode retries with BIOS fallback across POSIX and Windows wrappers";
 
   # Autounattend.xml must configure WinRM before VirtIO driver scan to prevent blocking.
   test_windows_autounattend_winrm_before_virtio =
