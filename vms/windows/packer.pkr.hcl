@@ -144,8 +144,8 @@ locals {
   # installer. Explicitly invoke the Windows bootloader from the mapped
   # filesystem aliases seen in shell mapping output (fs0/fs1).
   bootPromptEfiDirect = [
-    "<wait5>map -r<enter><wait5>fs0:<enter><wait5>\\EFI\\BOOT\\BOOTX64.EFI<enter><wait10>",
-    "fs1:<enter><wait5>\\EFI\\BOOT\\BOOTX64.EFI<enter>",
+    "<wait5>map -r<enter><wait5>fs0:<enter><wait5>\\EFI\\BOOT\\BOOTX64.EFI<enter><wait15><spacebar><wait15><spacebar><wait15><spacebar>",
+    "fs1:<enter><wait5>\\EFI\\BOOT\\BOOTX64.EFI<enter><wait15><spacebar><wait15><spacebar><wait15><spacebar>",
   ]
 
   bootPromptByStrategy = local.efiEnabled ? local.bootPromptEfiDirect : (
