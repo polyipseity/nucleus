@@ -76,6 +76,9 @@ let
   #                    and CLI parity with Windows (ArtifexSoftware.GhostScript)
   #   imagemagick    — image conversion and processing CLI (`convert`, `magick`)
   #                    and CLI parity with Windows (ImageMagick.ImageMagick)
+  #   jellyfin       — self-hosted media server binary used by the macOS launchd
+  #                    agent and Linux systemd user service; Windows parity uses
+  #                    the Jellyfin.Server WinGet package
   #   jq             — JSON processor used by activation scripts
   #   dotnetCorePackages.runtime_6_0 — .NET 6 runtime required by EIDE and legacy tooling parity
   #   llvmPackages_18.clang    — unified C/C++ compiler frontend
@@ -128,6 +131,7 @@ let
     pkgs.gnupg
     pkgs.ghostscript
     pkgs.imagemagick
+    pkgs.jellyfin
     pkgs.jq
     pkgs.llvmPackages_18.clang
     pkgs.llvmPackages_18.lldb

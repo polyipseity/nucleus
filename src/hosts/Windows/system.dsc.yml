@@ -258,6 +258,17 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          Ensure Jellyfin Server is installed for cross-host media-server parity
+          with the macOS launchd agent and Linux systemd user service. WinGet
+          package ID verified from microsoft/winget-pkgs manifests:
+          https://github.com/microsoft/winget-pkgs/tree/master/manifests/j/Jellyfin/Server
+      settings:
+        id: Jellyfin.Server
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure fzf is installed for cross-host fuzzy finder parity with macOS and NixOS
       settings:
         id: junegunn.fzf

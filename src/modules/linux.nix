@@ -3,6 +3,9 @@
 # exist (clock, lock behavior, touchpad/keyboard ergonomics, privacy, and power).
 #
 # Systemd user units managed by this module:
+#   jellyfin-media-server.service — runs Jellyfin from the managed user profile
+#     so the media library lives in the user's home directory without an extra
+#     system account to reconcile across hosts.
 #   nix-index-update.service — rebuilds the nix-index file database on demand.
 #   nix-index-update.timer   — fires daily (00:00) with Persistent=true.
 {
@@ -11,6 +14,29 @@
   pkgs,
   ...
 }:
+let
+  # User-scoped Jellyfin launcher.
+  # WHY user service: this repository already converges per-user media/storage
+  # state through Home Manager on POSIX hosts, so keeping Jellyfin inside the
+  # managed user session avoids an extra system account and keeps library paths
+  # consistent with the cross-host cloud-drive layout.
+  jellyfinMediaServer = pkgs.writeShellScript "jellyfin-media-server" ''
+    set -eu
+
+    config_dir="${config.home.homeDirectory}/.config/jellyfin"
+    data_dir="${config.home.homeDirectory}/.local/share/jellyfin"
+    cache_dir="${config.home.homeDirectory}/.cache/jellyfin"
+    log_dir="${config.home.homeDirectory}/.local/state/jellyfin/log"
+
+    mkdir -p "$config_dir" "$data_dir" "$cache_dir" "$log_dir"
+
+    exec ${pkgs.jellyfin}/bin/jellyfin \
+      --configdir "$config_dir" \
+      --datadir "$data_dir" \
+      --cachedir "$cache_dir" \
+      --logdir "$log_dir"
+  '';
+in
 lib.mkIf pkgs.stdenv.isLinux {
   assertions = [
     {
@@ -272,6 +298,30 @@ lib.mkIf pkgs.stdenv.isLinux {
     Service = {
       Type = "oneshot";
       ExecStart = "${pkgs.nix-index}/bin/nix-index";
+    };
+  };
+
+  # --------------------------------------------------------------------------
+  # jellyfin-media-server systemd user service
+  # Runs Jellyfin as the managed user so media-library paths remain inside the
+  # same per-user cloud/local storage layout that the rest of this repository
+  # configures. Windows uses the vendor service installed by Jellyfin.Server;
+  # macOS mirrors this with a user LaunchAgent.
+  # --------------------------------------------------------------------------
+  systemd.user.services."jellyfin-media-server" = {
+    Unit = {
+      Description = "Jellyfin media server";
+      After = "network.target";
+      Wants = "network.target";
+    };
+    Service = {
+      Type = "simple";
+      ExecStart = "${jellyfinMediaServer}";
+      Restart = "on-failure";
+      RestartSec = "30s";
+    };
+    Install = {
+      WantedBy = [ "default.target" ];
     };
   };
 
