@@ -189,6 +189,13 @@ source "qemu" "windows11" {
   disk_size      = var.disk_size
   disk_discard   = "unmap"
   format         = "qcow2"
+
+  # WHY: qemu-img convert compaction can produce corrupted images on macOS in
+  # some environments. Keep output as a direct qcow2 artifact copy path.
+  # Source: https://raw.githubusercontent.com/hashicorp/packer-plugin-qemu/main/.web-docs/components/builder/qemu/README.md
+  skip_compaction  = true
+  disk_compression = false
+
   machine_type   = "q35"
 
   efi_boot          = local.efiEnabled
