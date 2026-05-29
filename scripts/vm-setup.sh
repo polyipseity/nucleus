@@ -1159,7 +1159,8 @@ build_windows_image() {
 
   _build_attempts='bios spacebar 2h'
   if [ "$accelerator" = 'tcg' ]; then
-    _build_attempts='bios spacebar 8h
+    _build_attempts='bios none 8h
+bios spacebar 8h
 bios alpha 8h
 bios legacy 72h'
   else

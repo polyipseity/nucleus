@@ -832,6 +832,7 @@ function Invoke-BuildWindowsImage {
 
     $buildAttempts = if ($Accelerator -eq 'tcg') {
         @(
+            @{ Firmware = 'bios'; Boot = 'none'; Timeout = '8h' },
             @{ Firmware = 'bios'; Boot = 'spacebar'; Timeout = '8h' },
             @{ Firmware = 'bios'; Boot = 'alpha'; Timeout = '8h' },
             @{ Firmware = 'bios'; Boot = 'legacy'; Timeout = '72h' }
@@ -918,13 +919,13 @@ function Invoke-BuildWindowsImage {
         $stalePids = @()
         $nonStalePids = @()
         foreach ($listener in $listeners) {
-            $pid = [int]$listener.OwningProcess
-            $process = Get-Process -Id $pid -ErrorAction SilentlyContinue
+            $listenerPid = [int]$listener.OwningProcess
+            $process = Get-Process -Id $listenerPid -ErrorAction SilentlyContinue
             $name = if ($process) { $process.ProcessName } else { '' }
             if ($name -match '^(qemu-system-x86_64|packer|packer-plugin-qemu)') {
-                $stalePids += $pid
+                $stalePids += $listenerPid
             } else {
-                $nonStalePids += $pid
+                $nonStalePids += $listenerPid
             }
         }
 

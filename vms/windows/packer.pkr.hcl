@@ -238,9 +238,10 @@ source "qemu" "windows11" {
   # WinRM port explicitly so Packer and QEMU agree on 5985.
   skip_nat_mapping = true
 
-  # WHY: QEMU should boot the installer ISO once and then fall back to the disk
-  # on later reboots. EFI still needs explicit loader keying because the shell
-  # countdown can skip startup.nsh and floppy mapping is not always available.
+  # WHY: Force CD-ROM first so fresh builds always reach Windows Setup even when
+  # BIOS ignores/defers `once=` semantics and would otherwise boot the empty
+  # hard disk. On post-install reboots, Windows setup still continues from disk
+  # unless a key is pressed at the CD prompt.
   boot_wait    = "5s"
   boot_command = local.bootPromptByStrategy
 
@@ -252,7 +253,7 @@ source "qemu" "windows11" {
   pause_before_connecting = "120s"
 
   qemuargs = [
-    ["-boot", "order=c,once=d"],
+    ["-boot", "order=d"],
     ["-netdev", "user,id=user.0,hostfwd=tcp::5985-:5985"],
   ]
 
