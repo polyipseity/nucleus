@@ -141,12 +141,9 @@ locals {
   bootPromptAnyKeySlowPhase  = [for _ in range(0, 1024) : "a<wait20>"]
 
   # WHY: Some EFI boots land in the UEFI shell instead of auto-launching the
-  # installer. Explicitly invoke the Windows bootloader from the mapped
-  # filesystem aliases seen in shell mapping output (fs0/fs1).
-  bootPromptEfiDirect = [
-    "<wait5>map -r<enter><wait5>fs0:<enter><wait5>\\EFI\\Microsoft\\Boot\\cdboot_noprompt.efi<enter>",
-    "fs1:<enter><wait5>\\EFI\\Microsoft\\Boot\\cdboot_noprompt.efi<enter>",
-  ]
+  # installer. Put the launcher in startup.nsh so the shell can auto-run it
+  # without relying on fragile VNC timing or manual confirmation keys.
+  bootPromptEfiDirect = [ ]
 
   bootPromptByStrategy = local.efiEnabled ? local.bootPromptEfiDirect : (
     var.boot_strategy == "none" ? [] :
@@ -207,6 +204,17 @@ source "qemu" "windows11" {
   floppy_files = [
     "${path.root}/Autounattend.xml",
   ]
+
+  # WHY: The Windows installer ISO frequently lands in the UEFI shell on this
+  # QEMU build. startup.nsh runs automatically from the mapped floppy and boots
+  # the installer without depending on shell keystroke timing.
+  floppy_content = {
+    "startup.nsh" = <<-EOF
+      map -r
+      fs0:
+      \\EFI\\Microsoft\\Boot\\cdboot_noprompt.efi
+    EOF
+  }
 
   # WinRM communicator: Autounattend.xml enables WinRM during oobeSystem.
   communicator   = "winrm"
