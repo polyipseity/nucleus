@@ -4,7 +4,7 @@
 #
 # Systemd user units managed by this module:
 #   nix-index-update.service — rebuilds the nix-index file database on demand.
-#   nix-index-update.timer   — fires weekly (Sunday 00:00) with Persistent=true.
+#   nix-index-update.timer   — fires daily (00:00) with Persistent=true.
 {
   config,
   lib,
@@ -162,7 +162,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     # -----------------------------------------------------------------------
     # buildNixIndex
     # Starts a background nix-index build on first provision so the database
-    # is available shortly after provisioning without waiting for the weekly
+    # is available shortly after provisioning without waiting for the daily
     # systemd timer.  Subsequent refreshes are handled by the timer.
     #
     # The build is backgrounded to avoid blocking the activation chain; a full
@@ -258,8 +258,9 @@ lib.mkIf pkgs.stdenv.isLinux {
   # Keeps the nix-index file database current so pay-respects can suggest
   # `nix profile install` commands when an unknown command is typed.
   #
-  # The timer fires weekly (Sunday 00:00, Persistent=true) so the DB stays
-  # fresh even on infrequently used machines.  buildNixIndex handles the
+  # The timer fires daily (00:00, Persistent=true) so the DB stays fresh even
+  # after mid-week package installs on intermittently used machines.
+  # buildNixIndex handles the
   # first-provision case so the DB is available before the timer first fires.
   # --------------------------------------------------------------------------
   systemd.user.services."nix-index-update" = {
@@ -276,14 +277,14 @@ lib.mkIf pkgs.stdenv.isLinux {
 
   systemd.user.timers."nix-index-update" = {
     Unit = {
-      Description = "Weekly nix-index database refresh";
+      Description = "Daily nix-index database refresh";
     };
     Timer = {
-      # Fire every Sunday at 00:00 local time.  Persistent=true ensures the
-      # timer fires on the next login when the machine was off at the
-      # scheduled time, preventing the DB from going indefinitely stale on
-      # infrequently-used machines.
-      OnCalendar = "Sun 00:00:00";
+      # Fire daily at 00:00 local time.  Persistent=true ensures the timer
+      # catches up on the next login when the machine was off at the
+      # scheduled time, preventing the DB from going stale on laptops that
+      # are not powered on overnight every day.
+      OnCalendar = "00:00:00";
       Persistent = true;
       Unit = "nix-index-update.service";
     };

@@ -22,8 +22,8 @@
 #     under ~/dev daily at 00:00 so apply runs do not block on large tree scans.
 #   local.betterdisplay-heartbeat — polls HeadlessDisplay every 30 s and
 #     reconnects it if BetterDisplay drops the virtual screen connection.
-#   local.nix-index-update — rebuilds the nix-index file database weekly
-#     (Sunday 00:00) and on every agent load; a freshness check makes
+#   local.nix-index-update — rebuilds the nix-index file database daily
+#     (00:00) and on every agent load; a freshness check makes
 #     reloads a fast no-op when the DB was updated within the past 6 days.
 args@{
   config,
@@ -225,7 +225,7 @@ let
     fi
   '';
 
-  # Wrapper script for the nix-index weekly database rebuild LaunchAgent.
+  # Wrapper script for the nix-index daily database rebuild LaunchAgent.
   # Lives in the Nix store so the ProgramArguments path is stable across
   # home-manager generations without a home.file symlink.
   #
@@ -1562,7 +1562,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # on stdout even for successful builds, which would fill the system log.
   # This suppression is intentional: failure is benign (stale DB means
   # pay-respects falls back to not suggesting packages), and the agent retries
-  # on the next weekly run or load.  Check exit status with:
+  # on the next daily run or load.  Check exit status with:
   #   launchctl list | grep nix-index-update
   # --------------------------------------------------------------------------
   launchd.agents."nix-index-update" = {
@@ -1575,15 +1575,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
       ProgramArguments = [ "${nixIndexUpdate}" ];
       # Run once at load so a freshly provisioned machine or a machine whose
       # DB is absent or stale gets an immediate rebuild rather than waiting
-      # for the next weekly calendar window.
+      # for the next daily calendar window.
       RunAtLoad = true;
-      # Weekly Sunday 00:00 rebuild to keep the index current with nixpkgs
-      # updates.  Weekday 0 = Sunday in launchd's calendar convention.
+      # Daily 00:00 rebuild keeps the index fresh without waiting a full week
+      # after package additions or nixpkgs updates.
       StartCalendarInterval = [
         {
           Hour = 0;
           Minute = 0;
-          Weekday = 0;
         }
       ];
       # Suppress per-build output to avoid filling system logs.  See above.
