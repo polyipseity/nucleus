@@ -378,12 +378,12 @@ let
         && (lib.hasInfix "hostfwd=tcp::5985-:5985" vms_windows_packer_text)
         && (lib.hasInfix "boot_wait = \"5s\"" vms_windows_packer_text)
         && (lib.hasInfix "pause_before_connecting = \"120s\"" vms_windows_packer_text)
-        && (lib.hasInfix "bootPromptDensePhase" vms_windows_packer_text)
-        && (lib.hasInfix "<return><wait>" vms_windows_packer_text)
-        && (lib.hasInfix "bootPromptSlowPhase" vms_windows_packer_text)
-        && (lib.hasInfix "<return><wait2>" vms_windows_packer_text)
+        && (lib.hasInfix "bootPromptAnyKeyDensePhase" vms_windows_packer_text)
+        && (lib.hasInfix "a<wait>" vms_windows_packer_text)
+        && (lib.hasInfix "bootPromptAnyKeySlowPhase" vms_windows_packer_text)
+        && (lib.hasInfix "a<wait10>" vms_windows_packer_text)
       )
-      "vms/windows/packer.pkr.hcl must pin WinRM to 5985, use boot_wait=5s, contain dense/slow phased keypress cadence (<wait>/<wait2>), and add pause_before_connecting=120s";
+      "vms/windows/packer.pkr.hcl must pin WinRM to 5985, use boot_wait=5s, contain AnyKey dense/slow phased keypress cadence (a<wait>/a<wait10>), and add pause_before_connecting=120s";
 
   # Autounattend.xml must configure WinRM before VirtIO driver scan to prevent blocking.
   test_windows_autounattend_winrm_before_virtio =

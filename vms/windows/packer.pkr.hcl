@@ -89,15 +89,23 @@ packer {
 
 locals {
   # WHY: The BIOS "Press any key to boot from CD or DVD" window is short.
-  # Sparse keypresses can miss it repeatedly under tcg, leaving setup stalled
-  # while Packer eventually transitions to WinRM probes against a guest that
-  # never started installation.
+  # Under tcg on arm64 (emulating x86_64), SeaBIOS POST + device init can take
+  # much longer than the boot_command window, leaving setup stalled at an empty
+  # disk forever.  Use alphanumeric "any key" presses (never <return>, which can
+  # accidentally confirm Windows setup dialogs and trigger a reboot loop back to
+  # an empty disk) over a very long window to cover all realistic BIOS init times.
   #
-  # Phase strategy:
-  #   1) Dense (1s cadence) for 15 minutes to maximize early-hit probability.
-  #   2) Slow (2s cadence) for 30 minutes to keep coverage on very slow hosts.
-  bootPromptDensePhase = [for _ in range(0, 900) : "<return><wait>"]
-  bootPromptSlowPhase  = [for _ in range(0, 900) : "<return><wait2>"]
+  # WHY 'a' not '<return>': pressing <return> continuously during Windows PE
+  # can dismiss error dialogs and trigger unintended reboots, causing the VM to
+  # fall back to the (empty) hard disk and loop.  'a' is inert to Windows setup
+  # prompts handled by Autounattend.xml.
+  #
+  # Phase strategy (total ~5h20m):
+  #   1) any-key dense  (1s cadence) for 20 minutes — covers early BIOS timing.
+  #   2) any-key slow   (10s cadence) for 5 hours   — covers extremely slow
+  #      BIOS init under tcg on arm64.
+  bootPromptAnyKeyDensePhase = [for _ in range(0, 1200) : "a<wait>"]
+  bootPromptAnyKeySlowPhase  = [for _ in range(0, 1800) : "a<wait10>"]
 }
 
 source "qemu" "windows11" {
@@ -140,9 +148,11 @@ source "qemu" "windows11" {
   skip_nat_mapping = true
 
   # WHY: Keypress frequency matters more than total duration for the BIOS CD
-  # prompt.  Dense cadence is more reliable than sparse long waits.
-  boot_wait = "5s"
-  boot_command = concat(local.bootPromptDensePhase, local.bootPromptSlowPhase)
+  # prompt.  Dense cadence is more reliable than sparse long waits.  The slow
+  # phase extends coverage to 5+ hours so even worst-case tcg BIOS init times
+  # on arm64 are covered.
+  boot_wait    = "5s"
+  boot_command = concat(local.bootPromptAnyKeyDensePhase, local.bootPromptAnyKeySlowPhase)
 
   # WHY: Packer's WinRM communicator starts probing as soon as boot_command
   # completes.  Even with 8h timeout, excessive early retries during Windows
