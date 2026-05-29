@@ -826,13 +826,16 @@ function Invoke-BuildWindowsImage {
             return
         }
         $buildSucceeded = $false
+        $builtTempDir = $null
         foreach ($attempt in $buildAttempts) {
             Write-Information "vm-setup: Windows Packer attempt using firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (winrm_timeout=$($attempt.Timeout))..."
 
             # WHY: Packer qemu builder requires output_directory to not already exist.
-            if (Test-Path $tmpOutput) {
-                Remove-Item $tmpOutput -Recurse -Force
-            }
+            # Use a fresh temp tree per attempt so a failed try cannot poison the
+            # next firmware/boot-strategy combination.
+            $attemptTempDir = Join-Path $ImagesDir ('.{0}.{1}.{2}.{3}' -f $Name, $attempt.Firmware, $attempt.Boot, ([guid]::NewGuid().ToString('N')))
+            New-Item -ItemType Directory -Path $attemptTempDir -Force | Out-Null
+            $tmpOutput = Join-Path $attemptTempDir 'output'
 
             $packerArgs = @(
                 '-var', "windows_iso=$WindowsIso",
@@ -893,10 +896,12 @@ function Invoke-BuildWindowsImage {
             & packer build @packerArgs
             if ($LASTEXITCODE -eq 0) {
                 $buildSucceeded = $true
+                $builtTempDir = $attemptTempDir
                 break
             }
 
             Write-Warning "vm-setup: packer build attempt failed for firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (exit $LASTEXITCODE); trying next strategy"
+            Remove-Item $attemptTempDir -Recurse -Force
         }
 
         if (-not $buildSucceeded) {
@@ -908,13 +913,13 @@ function Invoke-BuildWindowsImage {
         Pop-Location
     }
 
-    $builtImage = Join-Path $tmpOutput 'windows.qcow2'
+        $builtImage = Join-Path (Join-Path $builtTempDir 'output') 'windows.qcow2'
     if (-not (Test-Path $builtImage)) {
         Write-Warning "vm-setup: Packer did not produce $builtImage"
         return
     }
 
-    Move-Item $builtImage $outPath
-    Remove-Item $tmpOutput -Recurse -Force
+        Move-Item $builtImage $outPath
+        Remove-Item $builtTempDir -Recurse -Force
     Write-Information "vm-setup: Windows 11 image ready: $outPath"
 }

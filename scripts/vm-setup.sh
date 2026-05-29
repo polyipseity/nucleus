@@ -1092,6 +1092,7 @@ EOF
   fi
 
   _packer_status=1
+  _built_tmpdir=''
   while IFS=' ' read -r _firmware_mode _boot_strategy _attempt_timeout; do
     [ -n "$_firmware_mode" ] || continue
 
@@ -1099,8 +1100,10 @@ EOF
       "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout"
 
     # WHY: Packer qemu builder requires a non-existent output_directory.
-    # Previous interrupted runs may leave this directory behind.
-    rm -rf "$_tmp_out"
+    # Use a fresh temp tree per attempt so a failed try cannot poison the next
+    # firmware/boot-strategy combination.
+    _attempt_tmpdir="$(mktemp -d "${IMAGES_DIR}/.${_name}.${_firmware_mode}.${_boot_strategy}.XXXXXX")"
+    _tmp_out="$_attempt_tmpdir/output"
 
     _attempt_status=0
     if [ "$_firmware_mode" = 'efi' ]; then
@@ -1139,12 +1142,14 @@ EOF
 
     if [ "$_attempt_status" -eq 0 ]; then
       _packer_status=0
+      _built_tmpdir="$_attempt_tmpdir"
       break
     fi
 
     printf 'vm-setup: Windows Packer attempt failed for firmware_mode=%s boot_strategy=%s (exit %s); trying next strategy\n' \
       "$_firmware_mode" "$_boot_strategy" "$_attempt_status" >&2
     _packer_status="$_attempt_status"
+    rm -rf "$_attempt_tmpdir"
   done <<EOF
 $_build_attempts
 EOF
@@ -1153,14 +1158,15 @@ EOF
     printf 'vm-setup: Packer build for Windows VM "%s" failed (exit %s)\n' "$_name" "$_packer_status" >&2
     return "$_packer_status"
   fi
-  _built="$_tmp_out/windows.qcow2"
+  _built="$_built_tmpdir/output/windows.qcow2"
   if [ ! -f "$_built" ]; then
     printf 'vm-setup: Packer did not produce %s\n' "$_built" >&2
+    rm -rf "$_built_tmpdir"
     return 1
   fi
 
   mv "$_built" "$_out"
-  rm -rf "$_tmp_out"
+  rm -rf "$_built_tmpdir"
   printf 'vm-setup: Windows 11 image ready: %s\n' "$_out"
 }
 
