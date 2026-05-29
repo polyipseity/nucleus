@@ -100,12 +100,14 @@ locals {
   # fall back to the (empty) hard disk and loop.  'a' is inert to Windows setup
   # prompts handled by Autounattend.xml.
   #
-  # Phase strategy (total ~5h20m):
-  #   1) any-key dense  (1s cadence) for 20 minutes — covers early BIOS timing.
-  #   2) any-key slow   (10s cadence) for 5 hours   — covers extremely slow
+  # Phase strategy (total ~5h58m):
+  #   1) any-key dense  (1s cadence, 1024 presses) for ~17 min — covers early BIOS timing.
+  #   2) any-key slow   (20s cadence, 1024 presses) for ~5h41m — covers extremely slow
   #      BIOS init under tcg on arm64.
-  bootPromptAnyKeyDensePhase = [for _ in range(0, 1200) : "a<wait>"]
-  bootPromptAnyKeySlowPhase  = [for _ in range(0, 1800) : "a<wait10>"]
+  # NOTE: Packer HCL range() is capped at 1024 values; use longer wait intervals
+  # to achieve broad coverage without exceeding that limit.
+  bootPromptAnyKeyDensePhase = [for _ in range(0, 1024) : "a<wait>"]
+  bootPromptAnyKeySlowPhase  = [for _ in range(0, 1024) : "a<wait20>"]
 }
 
 source "qemu" "windows11" {
