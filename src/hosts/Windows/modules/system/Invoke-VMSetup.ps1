@@ -252,10 +252,26 @@ next run.
 
         Write-Information "vm-setup: configuring VM '$($vm.display)'..."
 
+        $prebuiltValid = (Test-Path $prebuilt) -and (Test-Qcow2Image -ImagePath $prebuilt -ImageLabel "pre-built image '$($vm.name)'")
+
         # Place disk image from pre-built image (empty disk fallback removed).
         if (Test-Path $diskPath) {
-            Write-Information "vm-setup: disk already exists: $diskPath"
-        } elseif (Test-Path $prebuilt) {
+            if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "runtime disk '$($vm.name)'") {
+                Write-Information "vm-setup: disk already exists: $diskPath"
+            } elseif ($prebuiltValid) {
+                Write-Warning "vm-setup: existing runtime disk is invalid; replacing with pre-built image: $diskPath"
+                if (-not $DryRun) {
+                    Remove-Item $diskPath -Force
+                    Copy-Item $prebuilt $diskPath
+                } else {
+                    Write-Information "vm-setup: [dry-run] Remove-Item '$diskPath' -Force"
+                    Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
+                }
+            } else {
+                Write-Warning "vm-setup: runtime disk is invalid and no valid pre-built image exists for '$($vm.name)'; skipping"
+                continue
+            }
+        } elseif ($prebuiltValid) {
             Write-Information "vm-setup: using pre-built image: $prebuilt"
             if (-not $DryRun) {
                 Copy-Item $prebuilt $diskPath
@@ -263,7 +279,7 @@ next run.
                 Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
             }
         } else {
-            Write-Warning "vm-setup: image not found for '$($vm.name)': $prebuilt; skipping"
+            Write-Warning "vm-setup: image not found or invalid for '$($vm.name)': $prebuilt; skipping"
             continue
         }
 
@@ -428,6 +444,62 @@ printf '%s\n' '$configureCommand'
     Write-Information 'vm-setup: Run the generated start-<name>.ps1 (or start-<name>.sh) scripts to launch VMs'
 }
 
+# Test-Qcow2Image — Validates a QCOW2 image file before reuse.
+#
+# Ensures the image exists, has a non-zero size, and (when qemu-img is
+# available) reports format=qcow2 with a sensible virtual size.
+function Test-Qcow2Image {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ImagePath,
+
+        [string]$ImageLabel = 'image'
+    )
+
+    if (-not (Test-Path $ImagePath)) {
+        Write-Warning "vm-setup: $ImageLabel not found: $ImagePath"
+        return $false
+    }
+
+    $item = Get-Item $ImagePath -ErrorAction SilentlyContinue
+    if (-not $item -or $item.Length -le 0) {
+        Write-Warning "vm-setup: $ImageLabel is empty or unreadable: $ImagePath"
+        return $false
+    }
+
+    $qemuImg = Get-Command qemu-img -ErrorAction SilentlyContinue
+    if (-not $qemuImg) {
+        return $true
+    }
+
+    $infoJson = & $qemuImg.Source info --output=json $ImagePath 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $infoJson) {
+        Write-Warning "vm-setup: qemu-img could not read ${ImageLabel}: $ImagePath"
+        return $false
+    }
+
+    try {
+        $info = $infoJson | ConvertFrom-Json
+    } catch {
+        Write-Warning "vm-setup: qemu-img returned invalid JSON for ${ImageLabel}: $ImagePath"
+        return $false
+    }
+
+    if ($info.format -ne 'qcow2') {
+        Write-Warning "vm-setup: $ImageLabel has unexpected format '$($info.format)' (expected qcow2): $ImagePath"
+        return $false
+    }
+
+    if ([long]$info.'virtual-size' -lt 10737418240) {
+        Write-Warning "vm-setup: $ImageLabel virtual size is too small ($($info.'virtual-size') bytes): $ImagePath"
+        return $false
+    }
+
+    return $true
+}
+
 # Invoke-BuildNixosImage — Builds the NixOS guest image using Packer.
 #
 # On macOS/NixOS, scripts/vm-setup.sh uses nixos-generators directly (faster,
@@ -446,8 +518,12 @@ function Invoke-BuildNixosImage {
 
     $outPath = Join-Path $ImagesDir "$VmName.qcow2"
     if (Test-Path $outPath) {
-        Write-Information "vm-setup: NixOS image already built (delete to rebuild): $outPath"
-        return
+        if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing NixOS image') {
+            Write-Information "vm-setup: NixOS image already built (delete to rebuild): $outPath"
+            return
+        }
+        Write-Warning "vm-setup: existing NixOS image is invalid; rebuilding from scratch: $outPath"
+        Remove-Item $outPath -Force
     }
 
     if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
@@ -499,6 +575,13 @@ function Invoke-BuildNixosImage {
 
     Move-Item $builtImage $outPath
     Remove-Item $tmpOutput -Recurse -Force
+
+    if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built NixOS image')) {
+        Write-Warning "vm-setup: NixOS image validation failed after build; removing $outPath"
+        Remove-Item $outPath -Force
+        return
+    }
+
     Write-Information "vm-setup: NixOS image ready: $outPath"
 }
 
@@ -626,8 +709,12 @@ function Invoke-BuildWindowsImage {
 
     $outPath = Join-Path $ImagesDir "$VmName.qcow2"
     if (Test-Path $outPath) {
-        Write-Information "vm-setup: Windows image already built (delete to rebuild): $outPath"
-        return
+        if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing Windows image') {
+            Write-Information "vm-setup: Windows image already built (delete to rebuild): $outPath"
+            return
+        }
+        Write-Warning "vm-setup: existing Windows image is invalid; rebuilding from scratch: $outPath"
+        Remove-Item $outPath -Force
     }
 
     if ($WindowsIsoRetries -lt 0) {
@@ -728,9 +815,10 @@ function Invoke-BuildWindowsImage {
     # with scripts/vm-setup.sh so long-running builds do not fail prematurely.
     $winrmTimeout = if ($Accelerator -eq 'tcg') { '72h' } else { '3h' }
 
-    # WHY: BIOS installs may stall on the short "Press any key" prompt. Prefer
-    # EFI-first attempts when firmware files are available, then fall back to
-    # BIOS strategies for broad compatibility.
+    # WHY: This repository currently standardizes Windows guest runtime on BIOS
+    # (for example src/hosts/MacBook/vms.nix keeps UEFIBoot=false and
+    # Autounattend.xml uses BIOS partitioning). Keep build attempts BIOS-only by
+    # default to avoid EFI shell loops.
     $efiCodeCandidates = @(
         (Join-Path $env:ProgramFiles 'qemu\share\qemu\edk2-x86_64-code.fd'),
         (Join-Path $env:ProgramFiles 'qemu\share\qemu\OVMF_CODE.fd')
@@ -758,8 +846,7 @@ function Invoke-BuildWindowsImage {
     }
 
     if ($efiCode -and $efiVars) {
-        $buildAttempts = @(@{ Firmware = 'efi'; Boot = 'none'; Timeout = '4h' }) + $buildAttempts
-        Write-Information "vm-setup: EFI firmware detected; enabling EFI-first attempt ($efiCode, $efiVars)"
+        Write-Information "vm-setup: EFI firmware detected ($efiCode, $efiVars) but BIOS-only build policy is active"
     } else {
         Write-Information 'vm-setup: EFI firmware not detected; using BIOS-only build attempts'
     }
@@ -780,7 +867,7 @@ function Invoke-BuildWindowsImage {
 
         $displayHelp = & $qemuCommand.Source -display help
         foreach ($candidate in @('sdl', 'gtk', 'spice-app', 'curses')) {
-            if ($displayHelp -contains $candidate) {
+            if (($displayHelp -join "`n") -match "(^|\s)${candidate}(\s|$)") {
                 $packerDisplayBackend = $candidate
                 break
             }
@@ -877,6 +964,8 @@ function Invoke-BuildWindowsImage {
             $attemptTempDir = Join-Path $ImagesDir ('.{0}.{1}.{2}.{3}' -f $VmName, $attempt.Firmware, $attempt.Boot, ([guid]::NewGuid().ToString('N')))
             New-Item -ItemType Directory -Path $attemptTempDir -Force | Out-Null
             $tmpOutput = Join-Path $attemptTempDir 'output'
+            $packerLog = Join-Path $attemptTempDir 'packer.log'
+            Write-Information "vm-setup: writing Packer debug log for this attempt: $packerLog"
 
             if (-not (Test-WindowsWinRmPortReady -Port 5985)) {
                 Remove-Item $attemptTempDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -940,7 +1029,13 @@ function Invoke-BuildWindowsImage {
                     )
                 }
             }
+            $oldPackerLog = $env:PACKER_LOG
+            $oldPackerLogPath = $env:PACKER_LOG_PATH
+            $env:PACKER_LOG = '1'
+            $env:PACKER_LOG_PATH = $packerLog
             & packer build @packerArgs
+            $env:PACKER_LOG = $oldPackerLog
+            $env:PACKER_LOG_PATH = $oldPackerLogPath
             if ($LASTEXITCODE -eq 0) {
                 $buildSucceeded = $true
                 $builtTempDir = $attemptTempDir
@@ -954,6 +1049,10 @@ function Invoke-BuildWindowsImage {
             }
 
             Write-Warning "vm-setup: packer build attempt failed for firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (exit $LASTEXITCODE); trying next strategy"
+            if (Test-Path $packerLog) {
+                Write-Warning "vm-setup: last 60 lines from failed Packer log ($packerLog):"
+                Get-Content -Path $packerLog -Tail 60 | ForEach-Object { Write-Warning $_ }
+            }
             Remove-Item $attemptTempDir -Recurse -Force
         }
 
@@ -974,5 +1073,12 @@ function Invoke-BuildWindowsImage {
 
         Move-Item $builtImage $outPath
         Remove-Item $builtTempDir -Recurse -Force
+
+    if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built Windows image')) {
+        Write-Warning "vm-setup: Windows image validation failed after build; removing $outPath"
+        Remove-Item $outPath -Force
+        return
+    }
+
     Write-Information "vm-setup: Windows 11 image ready: $outPath"
 }

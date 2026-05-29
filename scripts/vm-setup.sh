@@ -314,6 +314,67 @@ run_cmd() {
   fi
 }
 
+# validate_qcow2_image PATH LABEL
+#   Verifies that a QCOW2 image exists, is non-empty, and (when qemu-img is
+#   available) reports format=qcow2 with a sensible virtual size.
+validate_qcow2_image() {
+  _vqi_path="$1"
+  _vqi_label="$2"
+
+  if [ ! -f "$_vqi_path" ]; then
+    printf 'vm-setup: %s not found: %s\n' "$_vqi_label" "$_vqi_path" >&2
+    return 1
+  fi
+
+  _vqi_size_bytes="$(wc -c < "$_vqi_path" | tr -d '[:space:]')"
+  if [ -z "$_vqi_size_bytes" ] || [ "$_vqi_size_bytes" -le 0 ]; then
+    printf 'vm-setup: %s is empty or unreadable: %s\n' "$_vqi_label" "$_vqi_path" >&2
+    return 1
+  fi
+
+  if command -v qemu-img >/dev/null 2>&1; then
+    _vqi_info="$(qemu-img info --output=json "$_vqi_path" 2>/dev/null || true)"
+    if [ -z "$_vqi_info" ]; then
+      printf 'vm-setup: qemu-img could not read %s: %s\n' "$_vqi_label" "$_vqi_path" >&2
+      return 1
+    fi
+
+    _vqi_format="$(printf '%s' "$_vqi_info" | jq -r '.format // empty')"
+    if [ "$_vqi_format" != 'qcow2' ]; then
+      printf 'vm-setup: %s has unexpected format "%s" (expected qcow2): %s\n' \
+        "$_vqi_label" "$_vqi_format" "$_vqi_path" >&2
+      return 1
+    fi
+
+    _vqi_virtual_size="$(printf '%s' "$_vqi_info" | jq -r '."virtual-size" // 0')"
+    if [ -z "$_vqi_virtual_size" ] || [ "$_vqi_virtual_size" -lt 10737418240 ]; then
+      printf 'vm-setup: %s virtual size is too small (%s bytes): %s\n' \
+        "$_vqi_label" "$_vqi_virtual_size" "$_vqi_path" >&2
+      return 1
+    fi
+  fi
+
+  return 0
+}
+
+# wait_for_utm_registration NAME
+#   Polls utmctl list until VM NAME appears or timeout is reached.
+wait_for_utm_registration() {
+  _wfur_name="$1"
+  _wfur_attempt=1
+  _wfur_max_attempts=15
+
+  while [ "$_wfur_attempt" -le "$_wfur_max_attempts" ]; do
+    if "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$_wfur_name"; then
+      return 0
+    fi
+    sleep 1
+    _wfur_attempt=$((_wfur_attempt + 1))
+  done
+
+  return 1
+}
+
 # run_with_backoff LABEL COMMAND [ARG...]
 # Args:
 #   $1 — human-readable operation label
@@ -907,8 +968,12 @@ build_windows_image() {
   _out="$IMAGES_DIR/${_name}.qcow2"
 
   if [ -f "$_out" ]; then
-    printf 'vm-setup: Windows image already built (delete to rebuild): %s\n' "$_out"
-    return 0
+    if validate_qcow2_image "$_out" "existing Windows image"; then
+      printf 'vm-setup: Windows image already built (delete to rebuild): %s\n' "$_out"
+      return 0
+    fi
+    printf 'vm-setup: existing Windows image is invalid; rebuilding from scratch: %s\n' "$_out" >&2
+    rm -f "$_out"
   fi
 
   # Resolve the installer ISO: use --windows-iso if provided, otherwise try the
@@ -1039,7 +1104,7 @@ build_windows_image() {
   if [ "$windows_headless" = 'false' ]; then
     _display_help="$(qemu-system-x86_64 -display help || true)"
     for _display_candidate in cocoa gtk sdl spice-app curses; do
-      if printf '%s\n' "$_display_help" | grep -qx "$_display_candidate"; then
+      if printf '%s\n' "$_display_help" | grep -Eiq "(^|[[:space:]])${_display_candidate}([[:space:]]|$)"; then
         _display_backend="$_display_candidate"
         break
       fi
@@ -1052,9 +1117,10 @@ build_windows_image() {
     printf 'vm-setup: using QEMU display backend for debug run: %s\n' "$_display_backend"
   fi
 
-  # WHY: BIOS installs may stall on the short "Press any key" prompt. Prefer
-  # EFI-first attempts (no key spam) when host firmware files are available,
-  # then fall back to BIOS strategies for broader compatibility.
+  # WHY: This repository currently standardizes Windows guest runtime on BIOS
+  # (see src/hosts/MacBook/vms.nix UEFIBoot=false and Autounattend.xml BIOS
+  # partitioning). Keep build attempts BIOS-only by default to avoid landing in
+  # OVMF Shell loops during EFI-first boot.
   _efi_code=''
   _efi_vars=''
   _qemu_share=''
@@ -1104,9 +1170,7 @@ bios legacy 3h'
   fi
 
   if [ -n "$_efi_code" ] && [ -n "$_efi_vars" ]; then
-    _build_attempts="efi none 4h
-$_build_attempts"
-    printf 'vm-setup: EFI firmware detected; enabling EFI-first attempt (%s, %s)\n' "$_efi_code" "$_efi_vars"
+    printf 'vm-setup: EFI firmware detected (%s, %s) but BIOS-only build policy is active\n' "$_efi_code" "$_efi_vars"
   else
     printf 'vm-setup: EFI firmware not detected; using BIOS-only build attempts\n'
   fi
@@ -1161,6 +1225,8 @@ EOF
     # firmware/boot-strategy combination.
     _attempt_tmpdir="$(mktemp -d "${IMAGES_DIR}/.${_name}.${_firmware_mode}.${_boot_strategy}.XXXXXX")"
     _tmp_out="$_attempt_tmpdir/output"
+    _packer_log="$_attempt_tmpdir/packer.log"
+    printf 'vm-setup: writing Packer debug log for this attempt: %s\n' "$_packer_log"
 
     if ! ensure_windows_winrm_port_ready; then
       _packer_status=1
@@ -1172,7 +1238,7 @@ EOF
     if [ "$_firmware_mode" = 'efi' ]; then
       (
         cd "$_packer_dir"
-        packer build \
+        PACKER_LOG=1 PACKER_LOG_PATH="$_packer_log" packer build \
           -var "windows_iso=$_iso" \
           -var "accelerator=$accelerator" \
           -var "firmware_mode=$_firmware_mode" \
@@ -1189,7 +1255,7 @@ EOF
     else
       (
         cd "$_packer_dir"
-        packer build \
+        PACKER_LOG=1 PACKER_LOG_PATH="$_packer_log" packer build \
           -var "windows_iso=$_iso" \
           -var "accelerator=$accelerator" \
           -var "firmware_mode=$_firmware_mode" \
@@ -1218,6 +1284,10 @@ EOF
 
     printf 'vm-setup: Windows Packer attempt failed for firmware_mode=%s boot_strategy=%s (exit %s); trying next strategy\n' \
       "$_firmware_mode" "$_boot_strategy" "$_attempt_status" >&2
+    if [ -f "$_packer_log" ]; then
+      printf 'vm-setup: last 60 lines from failed Packer log (%s):\n' "$_packer_log" >&2
+      tail -n 60 "$_packer_log" >&2
+    fi
     _packer_status="$_attempt_status"
     rm -rf "$_attempt_tmpdir"
   done <<EOF
@@ -1237,6 +1307,13 @@ EOF
 
   mv "$_built" "$_out"
   rm -rf "$_built_tmpdir"
+
+  if ! validate_qcow2_image "$_out" 'newly built Windows image'; then
+    printf 'vm-setup: Windows image validation failed after build; removing %s\n' "$_out" >&2
+    rm -f "$_out"
+    return 1
+  fi
+
   printf 'vm-setup: Windows 11 image ready: %s\n' "$_out"
 }
 
@@ -1510,11 +1587,21 @@ setup_utm_vms() {
       continue
     fi
 
+    if [ -f "$_prebuilt" ] && ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
+      printf 'vm-setup: WARNING — pre-built image is invalid for %s: %s\n' "$vm_name" "$_prebuilt" >&2
+      i=$((i + 1))
+      continue
+    fi
+
     write_start_script "$vm_name" "$vm_display" "$vm_type" 'darwin-utm'
     write_configure_script "$vm_name" "$vm_type"
 
     if [ "$dry_run" = false ]; then
       mkdir -p "$data_dir"
+      if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}"; then
+        printf 'vm-setup: existing runtime disk is invalid for %s; replacing from pre-built image\n' "$vm_name" >&2
+        rm -f "$disk_file"
+      fi
       if [ ! -f "$disk_file" ]; then
         cp "$_prebuilt" "$disk_file"
         printf 'vm-setup: copied pre-built disk image: %s\n' "$disk_file"
@@ -1532,7 +1619,15 @@ setup_utm_vms() {
       fi
       if ! "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$vm_name"; then
         printf 'vm-setup: importing UTM bundle via AppleScript: %s\n' "$bundle"
-        osascript -e "tell application \"UTM\" to import new virtual machine from POSIX file \"$bundle\""
+        if osascript -e "tell application \"UTM\" to import new virtual machine from POSIX file \"$bundle\""; then
+          if wait_for_utm_registration "$vm_name"; then
+            printf 'vm-setup: UTM VM imported and registered: %s\n' "$vm_name"
+          else
+            printf 'vm-setup: WARNING — UTM import did not register VM "%s" within timeout; open UTM and retry vm-setup\n' "$vm_name" >&2
+          fi
+        else
+          printf 'vm-setup: WARNING — AppleScript import failed for %s; ensure UTM Automation permissions are granted and retry\n' "$bundle" >&2
+        fi
       else
         printf 'vm-setup: UTM VM already registered: %s\n' "$vm_name"
       fi
