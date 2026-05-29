@@ -355,6 +355,63 @@ run_with_backoff() {
   return 1
 }
 
+# ensure_windows_winrm_port_ready
+#   Prevents immediate QEMU launch failures caused by stale builders that still
+#   hold host WinRM forward port 5985.  Only auto-terminates known stale
+#   qemu/packer listeners; for any other listener, fail fast with diagnostics.
+ensure_windows_winrm_port_ready() {
+  _ewpr_port='5985'
+
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+
+  _ewpr_pids="$(lsof -nP -t -iTCP:"$_ewpr_port" -sTCP:LISTEN 2>/dev/null | tr '\n' ' ' | awk '{$1=$1; print}')"
+  [ -n "$_ewpr_pids" ] || return 0
+
+  _ewpr_stale_pids=''
+  _ewpr_nonstale=''
+  for _ewpr_pid in $_ewpr_pids; do
+    _ewpr_cmd="$(ps -p "$_ewpr_pid" -o command= 2>/dev/null || true)"
+    case "$_ewpr_cmd" in
+      *qemu-system-x86_64*hostfwd=tcp::5985-:5985*|*packer\ build*|*packer-plugin-qemu*)
+        _ewpr_stale_pids="$_ewpr_stale_pids $_ewpr_pid"
+        ;;
+      *)
+        _ewpr_nonstale="$_ewpr_nonstale $_ewpr_pid"
+        ;;
+    esac
+  done
+
+  if [ -n "$(printf '%s' "$_ewpr_stale_pids" | awk '{$1=$1; print}')" ]; then
+    printf 'vm-setup: detected stale Windows builder listener(s) on tcp/%s; terminating pid(s):%s\n' \
+      "$_ewpr_port" "$_ewpr_stale_pids" >&2
+    # shellcheck disable=SC2086
+    kill $_ewpr_stale_pids 2>/dev/null || true
+    _ewpr_stale_still="$(lsof -nP -t -iTCP:"$_ewpr_port" -sTCP:LISTEN 2>/dev/null | tr '\n' ' ' | awk '{$1=$1; print}')"
+    if [ -n "$_ewpr_stale_still" ]; then
+      printf 'vm-setup: forcing termination of stale listener pid(s): %s\n' "$_ewpr_stale_still" >&2
+      # shellcheck disable=SC2086
+      kill -9 $_ewpr_stale_still 2>/dev/null || true
+    fi
+  fi
+
+  if [ -n "$(printf '%s' "$_ewpr_nonstale" | awk '{$1=$1; print}')" ]; then
+    printf 'vm-setup: tcp/%s is in use by non-builder pid(s):%s\n' "$_ewpr_port" "$_ewpr_nonstale" >&2
+    printf 'vm-setup: stop that process (or reconfigure it) and retry; cannot launch QEMU with hostfwd=tcp::5985-:5985\n' >&2
+    return 1
+  fi
+
+  _ewpr_after="$(lsof -nP -t -iTCP:"$_ewpr_port" -sTCP:LISTEN 2>/dev/null | tr '\n' ' ' | awk '{$1=$1; print}')"
+  if [ -n "$_ewpr_after" ]; then
+    printf 'vm-setup: tcp/%s still busy after stale-listener cleanup; retry after clearing pid(s): %s\n' \
+      "$_ewpr_port" "$_ewpr_after" >&2
+    return 1
+  fi
+
+  return 0
+}
+
 # write_start_script NAME DISPLAY TYPE HOST_KIND
 # Args:
 #   $1 — VM machine name (manifest .name)
@@ -1105,6 +1162,12 @@ EOF
     _attempt_tmpdir="$(mktemp -d "${IMAGES_DIR}/.${_name}.${_firmware_mode}.${_boot_strategy}.XXXXXX")"
     _tmp_out="$_attempt_tmpdir/output"
 
+    if ! ensure_windows_winrm_port_ready; then
+      _packer_status=1
+      rm -rf "$_attempt_tmpdir"
+      break
+    fi
+
     _attempt_status=0
     if [ "$_firmware_mode" = 'efi' ]; then
       (
@@ -1143,6 +1206,13 @@ EOF
     if [ "$_attempt_status" -eq 0 ]; then
       _packer_status=0
       _built_tmpdir="$_attempt_tmpdir"
+      break
+    fi
+
+    if [ "$_attempt_status" -eq 130 ] || [ "$_attempt_status" -eq 143 ]; then
+      printf 'vm-setup: Windows Packer attempt cancelled (exit %s); aborting retry matrix\n' "$_attempt_status" >&2
+      _packer_status="$_attempt_status"
+      rm -rf "$_attempt_tmpdir"
       break
     fi
 

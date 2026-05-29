@@ -818,6 +818,47 @@ function Invoke-BuildWindowsImage {
         return
     }
 
+    function Test-WindowsWinRmPortReady {
+        param(
+            [int]$Port = 5985
+        )
+
+        $listeners = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+        if (-not $listeners) {
+            return $true
+        }
+
+        $stalePids = @()
+        $nonStalePids = @()
+        foreach ($listener in $listeners) {
+            $pid = [int]$listener.OwningProcess
+            $process = Get-Process -Id $pid -ErrorAction SilentlyContinue
+            $name = if ($process) { $process.ProcessName } else { '' }
+            if ($name -match '^(qemu-system-x86_64|packer|packer-plugin-qemu)') {
+                $stalePids += $pid
+            } else {
+                $nonStalePids += $pid
+            }
+        }
+
+        if ($stalePids.Count -gt 0) {
+            $stalePids = $stalePids | Sort-Object -Unique
+            Write-Warning "vm-setup: detected stale Windows builder listener(s) on tcp/$Port; terminating pid(s): $($stalePids -join ', ')"
+            foreach ($stalePid in $stalePids) {
+                Stop-Process -Id $stalePid -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        $remaining = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+        if (-not $remaining) {
+            return $true
+        }
+
+        $remainingPids = ($remaining | Select-Object -ExpandProperty OwningProcess | Sort-Object -Unique)
+        Write-Warning "vm-setup: tcp/$Port is still in use by pid(s): $($remainingPids -join ', '); cannot launch QEMU with hostfwd=tcp::5985-:5985"
+        return $false
+    }
+
     Push-Location $packerDir
     try {
         & packer init .
@@ -833,9 +874,15 @@ function Invoke-BuildWindowsImage {
             # WHY: Packer qemu builder requires output_directory to not already exist.
             # Use a fresh temp tree per attempt so a failed try cannot poison the
             # next firmware/boot-strategy combination.
-            $attemptTempDir = Join-Path $ImagesDir ('.{0}.{1}.{2}.{3}' -f $Name, $attempt.Firmware, $attempt.Boot, ([guid]::NewGuid().ToString('N')))
+            $attemptTempDir = Join-Path $ImagesDir ('.{0}.{1}.{2}.{3}' -f $VmName, $attempt.Firmware, $attempt.Boot, ([guid]::NewGuid().ToString('N')))
             New-Item -ItemType Directory -Path $attemptTempDir -Force | Out-Null
             $tmpOutput = Join-Path $attemptTempDir 'output'
+
+            if (-not (Test-WindowsWinRmPortReady -Port 5985)) {
+                Remove-Item $attemptTempDir -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Warning 'vm-setup: aborting Windows build attempts because WinRM host port preflight failed'
+                return
+            }
 
             $packerArgs = @(
                 '-var', "windows_iso=$WindowsIso",
@@ -898,6 +945,12 @@ function Invoke-BuildWindowsImage {
                 $buildSucceeded = $true
                 $builtTempDir = $attemptTempDir
                 break
+            }
+
+            if ($LASTEXITCODE -in 130, 143) {
+                Write-Warning "vm-setup: Windows Packer attempt cancelled (exit $LASTEXITCODE); aborting retry matrix"
+                Remove-Item $attemptTempDir -Recurse -Force -ErrorAction SilentlyContinue
+                return
             }
 
             Write-Warning "vm-setup: packer build attempt failed for firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (exit $LASTEXITCODE); trying next strategy"

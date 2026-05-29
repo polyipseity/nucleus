@@ -141,10 +141,10 @@ locals {
   bootPromptAnyKeySlowPhase  = [for _ in range(0, 1024) : "a<wait20>"]
 
   # WHY: Some EFI boots land in the UEFI shell instead of auto-launching the
-  # installer. Put the launcher in startup.nsh so the shell can auto-run it
-  # without relying on fragile VNC timing or manual confirmation keys.
+  # installer.  Do not rely on startup.nsh on floppy (it is not always mapped
+  # as a filesystem); send direct ISO loader paths instead.
   bootPromptEfiDirect = [
-    "<wait5><enter><wait1>fs1:\\startup.nsh<enter><wait1>fs0:\\startup.nsh<enter>",
+    "<wait5><enter><wait1>fs0:\\EFI\\Microsoft\\Boot\\cdboot_noprompt.efi<enter><wait1>fs0:\\EFI\\BOOT\\BOOTX64.EFI<enter><wait1>fs1:\\EFI\\Microsoft\\Boot\\cdboot_noprompt.efi<enter><wait1>fs1:\\EFI\\BOOT\\BOOTX64.EFI<enter>",
   ]
 
   bootPromptByStrategy = local.efiEnabled ? local.bootPromptEfiDirect : (
@@ -207,9 +207,8 @@ source "qemu" "windows11" {
     "${path.root}/Autounattend.xml",
   ]
 
-  # WHY: The Windows installer ISO frequently lands in the UEFI shell on this
-  # QEMU build. startup.nsh launches the installer script from the mapped floppy
-  # without depending on shell keystroke timing.
+  # WHY: Keep fallback commands available on floppy for manual shell recovery,
+  # but EFI auto-keying uses direct ISO paths from bootPromptEfiDirect.
   floppy_content = {
     "startup.nsh" = <<-EOF
       map -r
@@ -233,8 +232,8 @@ source "qemu" "windows11" {
   skip_nat_mapping = true
 
   # WHY: QEMU should boot the installer ISO once and then fall back to the disk
-  # on later reboots. EFI still needs explicit startup.nsh invocation because
-  # the shell countdown can skip script execution when no key is sent.
+  # on later reboots. EFI still needs explicit loader keying because the shell
+  # countdown can skip startup.nsh and floppy mapping is not always available.
   boot_wait    = "5s"
   boot_command = local.bootPromptByStrategy
 
