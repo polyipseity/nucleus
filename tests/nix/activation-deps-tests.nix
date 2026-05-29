@@ -328,6 +328,18 @@ let
       )
       "installCargoBinstallPackages activation name must match between agents.nix and macos.nix dependency list";
 
+  # === TEST: macOS dev-tree maintenance is scheduled, not activation-bound ===
+  test_macos_dev_maintenance_is_scheduled = assert' (
+    (lib.hasInfix "launchd.agents.\"dev-ds-store-cleanup\"" macosModuleText)
+    && (lib.hasInfix "launchd.agents.\"dev-spotlight-exclusions\"" macosModuleText)
+    && (lib.hasInfix "Label = \"local.dev-ds-store-cleanup\";" macosModuleText)
+    && (lib.hasInfix "Label = \"local.dev-spotlight-exclusions\";" macosModuleText)
+    && (lib.hasInfix "ProgramArguments = [ \"\${devDsStoreCleanup}\" ];" macosModuleText)
+    && (lib.hasInfix "ProgramArguments = [ \"\${devSpotlightExclusions}\" ];" macosModuleText)
+    && !(lib.hasInfix "cleanDevDsStore = lib.hm.dag.entryAfter" macosModuleText)
+    && !(lib.hasInfix "configureDevSpotlightExclusions = lib.hm.dag.entryAfter" macosModuleText)
+  ) "macOS dev-tree maintenance must run from launchd agents instead of Home Manager activation";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -351,6 +363,7 @@ let
     test_spotlight_disables_all_hotkey_slots
     test_spotlight_bootout_is_sip_aware
     test_install_cargo_binstall_dependency_name_alignment
+    test_macos_dev_maintenance_is_scheduled
   ];
 in
 {
@@ -379,5 +392,6 @@ in
     "19: Spotlight disables all known launcher hotkey slots"
     "20: Spotlight bootout warning is SIP-aware and classified"
     "21: installCargoBinstallPackages activation name alignment"
+    "22: macOS dev-tree maintenance runs from launchd instead of activation"
   ];
 }

@@ -6,7 +6,6 @@
 # Activation order (Home Manager DAG):
 #   writeBoundary / linkGeneration
 #     → clearDesktop, configureInputAndSiri, provisionDevDirectory,
-#       configureDevSpotlightExclusions, cleanDevDsStore,
 #       reloadDockPreferenceState
 #     → preflightPrivacyPermissions
 #       → configureSafariDefaults, configureUniversalAccessDefaults
@@ -17,6 +16,10 @@
 #           → displayHostManualInstructions
 #
 # LaunchAgents managed by this module:
+#   local.dev-ds-store-cleanup — removes Finder metadata files from ~/dev
+#     daily at 00:00 so apply runs do not block on large tree scans.
+#   local.dev-spotlight-exclusions — refreshes Spotlight exclusion markers
+#     under ~/dev daily at 00:00 so apply runs do not block on large tree scans.
 #   local.betterdisplay-heartbeat — polls HeadlessDisplay every 30 s and
 #     reconnects it if BetterDisplay drops the virtual screen connection.
 #   local.nix-index-update — rebuilds the nix-index file database weekly
@@ -244,6 +247,88 @@ let
     exec ${pkgs.nix-index}/bin/nix-index
   '';
 
+  # Directory names inside ~/dev whose contents should stay out of Spotlight.
+  # This is intentionally macOS-only because `.metadata_never_index` is a
+  # Finder/Spotlight convention, not a cross-host filesystem primitive.
+  devSpotlightExcludedDirectoryNames = [
+    ".gradle"
+    ".next"
+    ".turbo"
+    ".venv"
+    "__pycache__"
+    "bin"
+    "build"
+    "dist"
+    "incremental"
+    "node_modules"
+    "obj"
+    "target"
+    "vendor"
+    "venv"
+  ];
+
+  # Single-pass find predicate for low-signal build/cache directories in ~/dev.
+  # Precompute the expression in Nix so the launchd job shell stays readable.
+  devSpotlightExcludedDirectoryFindExpression = builtins.concatStringsSep " -o " (
+    map (directoryName: "-name ${lib.escapeShellArg directoryName}") devSpotlightExcludedDirectoryNames
+  );
+
+  # Daily Spotlight exclusion refresh for the mutable ~/dev tree.
+  # Kept out of Home Manager activation because large worktrees can make a full
+  # scan slow enough to noticeably delay `nix run .#apply` and bootstrap apply.
+  devSpotlightExclusions = pkgs.writeShellScript "dev-spotlight-exclusions" ''
+    set -eu
+
+    DEV_ROOT="$HOME/dev"
+    updated_count=0
+
+    # Create the canonical dev root lazily so the maintenance timer remains
+    # safe even before the first repo checkout populates ~/dev.
+    mkdir -p "$DEV_ROOT"
+
+    while IFS= read -r -d "" directory_path; do
+      marker_path="$directory_path/.metadata_never_index"
+      if [ -f "$marker_path" ]; then
+        continue
+      fi
+
+      : > "$marker_path"
+      updated_count=$((updated_count + 1))
+    done < <(
+      /usr/bin/find "$DEV_ROOT" \( ${devSpotlightExcludedDirectoryFindExpression} \) -type d -print0
+    )
+
+    if [ "$updated_count" -gt 0 ]; then
+      echo "macos: added Spotlight exclusion markers to $updated_count dev directories." >&2
+    fi
+  '';
+
+  # Daily Finder metadata cleanup for ~/dev.
+  # Kept out of Home Manager activation for the same reason as Spotlight marker
+  # maintenance: deleting stale .DS_Store files can take noticeable time on a
+  # large checkout and should not slow synchronous apply/bootstrap flows.
+  devDsStoreCleanup = pkgs.writeShellScript "dev-ds-store-cleanup" ''
+    set -eu
+
+    DEV_ROOT="$HOME/dev"
+    removed_count=0
+
+    # Create the canonical dev root lazily so the maintenance timer remains
+    # safe even before the first repo checkout populates ~/dev.
+    mkdir -p "$DEV_ROOT"
+
+    while IFS= read -r -d "" ds_store_path; do
+      /bin/rm "$ds_store_path"
+      removed_count=$((removed_count + 1))
+    done < <(
+      /usr/bin/find "$DEV_ROOT" -name ".DS_Store" -type f -print0
+    )
+
+    if [ "$removed_count" -gt 0 ]; then
+      echo "macos: removed $removed_count .DS_Store files from ~/dev." >&2
+    fi
+  '';
+
   # Pinned iTerm2 zsh shell integration script placed at
   # ~/.iterm2_shell_integration.zsh via home.file.  The script enables command
   # marks, command history, directory reporting, and in-terminal image display
@@ -317,8 +402,6 @@ let
     "clearDesktop"
     "cloudDrivesICloudRefresh"
     "cloudDrivesSetup"
-    "cleanDevDsStore"
-    "configureDevSpotlightExclusions"
     "configureDisplayResolutions"
     "configureFinderSidebar"
     "configureICloudExclusions"
@@ -1001,36 +1084,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # configureDevSpotlightExclusions
-    # Marks build/cache directories under ~/dev with .metadata_never_index so
-    # Spotlight skips low-signal artifacts and reduces indexing churn.
-    #
-    # WHY separate activation: this is the actual dev-tree hardening/perf work;
-    # keeping it isolated makes it easier to reason about than bundling it with
-    # Finder metadata cleanup and Dock restarts.
-    # Source: https://support.apple.com/en-us/guide/mac-help/spotlight-search-index-on-mac-mchlp2812/mac
-    # -------------------------------------------------------------------------
-    configureDevSpotlightExclusions = lib.hm.dag.entryAfter [ "provisionDevDirectory" ] ''
-      DEV_ROOT="$HOME/dev"
-      # WHY single find pass: marking Spotlight-excluded directories is O(n * 16)
-      # when done with separate find calls; combine patterns with -o for a single
-      # tree traversal. Only create .metadata_never_index if absent (check first).
-      /usr/bin/find "$DEV_ROOT" \( -name ".gradle" -o -name ".next" -o -name ".turbo" -o -name ".venv" -o -name "__pycache__" -o -name "bin" -o -name "build" -o -name "dist" -o -name "incremental" -o -name "node_modules" -o -name "obj" -o -name "target" -o -name "venv" -o -name "vendor" \) -type d ! -exec test -f "{}/.metadata_never_index" \; -exec touch "{}/.metadata_never_index" \; 2>/dev/null || true
-    '';
-
-    # -------------------------------------------------------------------------
-    # cleanDevDsStore
-    # Removes Finder metadata files from ~/dev so Git worktrees stay cleaner.
-    #
-    # WHY separate activation: .DS_Store cleanup is repository hygiene, not the
-    # same concern as Spotlight exclusion markers.
-    # -------------------------------------------------------------------------
-    cleanDevDsStore = lib.hm.dag.entryAfter [ "provisionDevDirectory" ] ''
-      DEV_ROOT="$HOME/dev"
-      /usr/bin/find "$DEV_ROOT" -name ".DS_Store" -type f -delete 2>/dev/null || true
-    '';
-
-    # -------------------------------------------------------------------------
     # reloadDockPreferenceState
     # Restarts Dock so declarative Dock defaults take effect immediately.
     #
@@ -1443,6 +1496,54 @@ lib.mkIf pkgs.stdenv.isDarwin {
       # 30-second no-op heartbeat entries.
       StandardOutPath = "/dev/null";
       StandardErrorPath = "/dev/null";
+    };
+  };
+
+  # --------------------------------------------------------------------------
+  # Daily dev-tree maintenance LaunchAgents
+  # `.DS_Store` cleanup and Spotlight exclusion markers only make sense on
+  # macOS because both mechanisms are Finder/Spotlight-specific filesystem
+  # conventions. Keep them as background launchd jobs instead of activation
+  # hooks so `nix run .#apply` and bootstrap apply stay synchronous only for
+  # configuration work that must happen immediately.
+  # --------------------------------------------------------------------------
+  launchd.agents."dev-ds-store-cleanup" = {
+    enable = true;
+    config = {
+      # launchd Label is a reverse-DNS-style unique identifier.
+      # Source: launchd.plist(5) Label key semantics.
+      # https://www.manpagez.com/man/5/launchd.plist/
+      Label = "local.dev-ds-store-cleanup";
+      ProgramArguments = [ "${devDsStoreCleanup}" ];
+      # Do not run on every agent reload during apply/bootstrap apply; daily
+      # midnight maintenance is sufficient for repository hygiene.
+      RunAtLoad = false;
+      StartCalendarInterval = [
+        {
+          Hour = 0;
+          Minute = 0;
+        }
+      ];
+    };
+  };
+
+  launchd.agents."dev-spotlight-exclusions" = {
+    enable = true;
+    config = {
+      # launchd Label is a reverse-DNS-style unique identifier.
+      # Source: launchd.plist(5) Label key semantics.
+      # https://www.manpagez.com/man/5/launchd.plist/
+      Label = "local.dev-spotlight-exclusions";
+      ProgramArguments = [ "${devSpotlightExclusions}" ];
+      # Do not run on every agent reload during apply/bootstrap apply; daily
+      # midnight maintenance is sufficient for dev-tree indexing hygiene.
+      RunAtLoad = false;
+      StartCalendarInterval = [
+        {
+          Hour = 0;
+          Minute = 0;
+        }
+      ];
     };
   };
 
