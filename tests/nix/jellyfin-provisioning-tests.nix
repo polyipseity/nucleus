@@ -11,6 +11,10 @@ let
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
 
   coreText = builtins.readFile ../../src/modules/core.nix;
+  macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
+  macbookJellyfinText = builtins.readFile ../../src/hosts/MacBook/jellyfin.nix;
+  nixosDefaultText = builtins.readFile ../../src/hosts/NixOS/default.nix;
+  nixosJellyfinText = builtins.readFile ../../src/hosts/NixOS/jellyfin.nix;
   linuxText = builtins.readFile ../../src/modules/linux.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   windowsSystemText = builtins.readFile ../../src/hosts/Windows/system.dsc.yml;
@@ -19,24 +23,33 @@ let
 
   test_core_installs_jellyfin = assert' (containsRegex ''pkgs\.jellyfin'' coreText) "core.nix must install pkgs.jellyfin on Nix-managed hosts";
 
-  test_linux_runs_jellyfin_service = assert' (
-    containsRegex ''jellyfinMediaServer = pkgs\.writeShellScript "jellyfin-media-server"'' linuxText
-    && containsRegex ''systemd\.user\.services\."jellyfin-media-server"'' linuxText
-    && containsRegex ''ExecStart = "\$\{jellyfinMediaServer\}";'' linuxText
-  ) "linux.nix must provision a Jellyfin systemd user service";
+  test_nixos_imports_host_jellyfin_module = assert' (containsRegex ''\./jellyfin\.nix'' nixosDefaultText) "NixOS host entrypoint must import ./jellyfin.nix";
 
-  test_macos_runs_jellyfin_agent = assert' (
-    containsRegex ''jellyfinMediaServer = pkgs\.writeShellScript "jellyfin-media-server"'' macosText
-    && containsRegex ''launchd\.agents\."jellyfin-media-server"'' macosText
-    && containsRegex ''Label = "local\.jellyfin-media-server";'' macosText
-  ) "macos.nix must provision a Jellyfin launch agent";
+  test_nixos_runs_shared_jellyfin_service = assert' (
+    containsRegex ''services\.jellyfin'' nixosJellyfinText
+    && containsRegex "enable = true" nixosJellyfinText
+  ) "NixOS must provision Jellyfin as a host-level shared service";
+
+  test_macbook_imports_host_jellyfin_module = assert' (containsRegex ''\./jellyfin\.nix'' macbookDefaultText) "MacBook host entrypoint must import ./jellyfin.nix";
+
+  test_macbook_runs_shared_jellyfin_daemon = assert' (
+    containsRegex ''launchd\.daemons\.jellyfin'' macbookJellyfinText
+    && containsRegex ''state_root="/Users/Shared/Jellyfin"'' macbookJellyfinText
+  ) "macOS must provision Jellyfin as a host-level shared launchd daemon";
+
+  test_no_per_user_jellyfin_units = assert' (
+    !containsRegex "jellyfin-media-server" linuxText && !containsRegex "jellyfin-media-server" macosText
+  ) "Per-user Jellyfin units must not exist in shared linux.nix or macos.nix modules";
 
   test_windows_installs_jellyfin_server = assert' (containsRegex ''id: Jellyfin\.Server'' windowsSystemText) "Windows DSC must install Jellyfin.Server via WinGet";
 
   allTests = [
     test_core_installs_jellyfin
-    test_linux_runs_jellyfin_service
-    test_macos_runs_jellyfin_agent
+    test_nixos_imports_host_jellyfin_module
+    test_nixos_runs_shared_jellyfin_service
+    test_macbook_imports_host_jellyfin_module
+    test_macbook_runs_shared_jellyfin_daemon
+    test_no_per_user_jellyfin_units
     test_windows_installs_jellyfin_server
   ];
 in

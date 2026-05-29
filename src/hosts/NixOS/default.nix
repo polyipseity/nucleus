@@ -19,6 +19,7 @@
     ./hardware/cpu.nix
     ./hardware/disks.nix
     ./hardware/gpu.nix
+    ./jellyfin.nix
     ./networking.nix
     ./security.nix
     ./sops.nix

@@ -110,6 +110,7 @@ foreach ($userName in $rawRegistry.users.PSObject.Properties.Name) {
     cloudDrives    = ConvertTo-PlainObject -InputObject $userConfig.cloudDrives
     customProvisionSymlinks = ConvertTo-PlainObject -InputObject $userConfig.customProvisionSymlinks
     devRepos       = ConvertTo-PlainObject -InputObject $userConfig.devRepos
+    jellyfin       = ConvertTo-PlainObject -InputObject $userConfig.jellyfin
     homeDirectory  = $userConfig.homeDirectory
     isPrimary      = if ($userConfig.isPrimary) { $true } else { $false }
     obsidian       = ConvertTo-PlainObject -InputObject $userConfig.obsidian

@@ -103,6 +103,15 @@
           }
         }
       ],
+      "jellyfin": {
+        "accounts": [
+          {
+            "id": "polyipseity",
+            "passwordSecretKey": "jellyfin_password",
+            "usernameSecretKey": "jellyfin_username"
+          }
+        ]
+      },
       "devRepos": {
         "enable": true,
         "gitHubUsername": "polyipseity",

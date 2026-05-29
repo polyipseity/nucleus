@@ -22,6 +22,7 @@
     ./base.nix
     ./defaults.nix
     ./homebrew.nix
+    ./jellyfin.nix
     ./linux-builder.nix
     ./manual-installations.nix
     ./networking.nix

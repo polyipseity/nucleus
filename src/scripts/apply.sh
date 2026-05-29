@@ -334,6 +334,274 @@ run_vm_setup() {
   fi
 }
 
+run_jellyfin_account_sync() {
+  # Converge Jellyfin user accounts declared in src/modules/users.json.
+  # Credentials are resolved from per-user SOPS files
+  # src/secrets/users-<username>.yml via key references (usernameSecretKey /
+  # passwordSecretKey), so plaintext passwords are never stored in users.json.
+  #
+  # Upstream Jellyfin API sources:
+  # - User endpoints (/Users/AuthenticateByName, /Users/New, /Users/Password):
+  #   https://raw.githubusercontent.com/jellyfin/jellyfin/0beb07c40756aca5ab6a6ba4f8494bc5147e3c2b/Jellyfin.Api/Controllers/UserController.cs
+  # - Startup bootstrap endpoints (/Startup/User, /Startup/Complete):
+  #   https://raw.githubusercontent.com/jellyfin/jellyfin/0beb07c40756aca5ab6a6ba4f8494bc5147e3c2b/Jellyfin.Api/Controllers/StartupController.cs
+
+  _rjas_users_json="$REPO_ROOT/src/modules/users.json"
+  if [ ! -f "$_rjas_users_json" ]; then
+    return
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    printf '%s\n' "jellyfin: curl is not available; skipping account sync"
+    return
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    printf '%s\n' "jellyfin: jq is not available; skipping account sync"
+    return
+  fi
+  if ! command -v sops >/dev/null 2>&1; then
+    printf '%s\n' "jellyfin: sops is not available; skipping account sync"
+    return
+  fi
+
+  _rjas_base_url="${JELLYFIN_BASE_URL:-http://127.0.0.1:8096}"
+  _rjas_auth_base='MediaBrowser Client="nucleus-apply", DeviceId="posix-apply", Device="POSIX", Version="1.0.0"'
+
+  _rjas_specs_file="$(mktemp)"
+  _rjas_resolved_file="$(mktemp)"
+
+  jq -cr '
+    to_entries[]
+    | . as $u
+    | (($u.value.jellyfin.accounts // []) | sort_by(.id)[])
+    | {
+        owner: $u.key,
+        id: .id,
+        usernameSecretKey: .usernameSecretKey,
+        passwordSecretKey: .passwordSecretKey
+      }
+  ' "$_rjas_users_json" > "$_rjas_specs_file"
+
+  if [ ! -s "$_rjas_specs_file" ]; then
+    rm -f "$_rjas_specs_file" "$_rjas_resolved_file"
+    return
+  fi
+
+  while IFS= read -r _rjas_spec; do
+    _rjas_owner="$(printf '%s' "$_rjas_spec" | jq -r '.owner')"
+    _rjas_id="$(printf '%s' "$_rjas_spec" | jq -r '.id')"
+    _rjas_user_key="$(printf '%s' "$_rjas_spec" | jq -r '.usernameSecretKey // empty')"
+    _rjas_pass_key="$(printf '%s' "$_rjas_spec" | jq -r '.passwordSecretKey // empty')"
+
+    if [ -z "$_rjas_owner" ] || [ -z "$_rjas_user_key" ] || [ -z "$_rjas_pass_key" ]; then
+      printf '%s\n' "jellyfin: invalid account declaration for id '${_rjas_id:-<unknown>}'; skipping" >&2
+      continue
+    fi
+
+    _rjas_secret_file="$REPO_ROOT/src/secrets/users-${_rjas_owner}.yml"
+    if [ ! -f "$_rjas_secret_file" ]; then
+      printf '%s\n' "jellyfin: missing users-${_rjas_owner}.yml; skipping account declaration '${_rjas_id}'" >&2
+      continue
+    fi
+
+    if ! _rjas_secret_json="$(sops --decrypt --output-type json "$_rjas_secret_file")"; then
+      printf '%s\n' "jellyfin: failed to decrypt $_rjas_secret_file; skipping account declaration '${_rjas_id}'" >&2
+      continue
+    fi
+
+    _rjas_username="$(printf '%s' "$_rjas_secret_json" | jq -r --arg key "$_rjas_user_key" '.[$key] // empty')"
+    _rjas_password="$(printf '%s' "$_rjas_secret_json" | jq -r --arg key "$_rjas_pass_key" '.[$key] // empty')"
+    if [ -z "$_rjas_username" ] || [ -z "$_rjas_password" ]; then
+      printf '%s\n' "jellyfin: missing secret values for account declaration '${_rjas_id}' in users-${_rjas_owner}.yml" >&2
+      continue
+    fi
+
+    jq -cn \
+      --arg owner "$_rjas_owner" \
+      --arg id "$_rjas_id" \
+      --arg username "$_rjas_username" \
+      --arg password "$_rjas_password" \
+      '{owner:$owner,id:$id,username:$username,password:$password}' >> "$_rjas_resolved_file"
+  done < "$_rjas_specs_file"
+
+  rm -f "$_rjas_specs_file"
+  if [ ! -s "$_rjas_resolved_file" ]; then
+    rm -f "$_rjas_resolved_file"
+    return
+  fi
+
+  # Probe readiness; startup can lag behind service registration after apply.
+  _rjas_waited=0
+  while [ "$_rjas_waited" -lt 60 ]; do
+    # Expected-benign failures (connection refused during startup) are checked
+    # via exit status; suppressing output keeps apply logs readable.
+    if curl -fsS --max-time 5 "$_rjas_base_url/System/Info/Public" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+    _rjas_waited=$((_rjas_waited + 1))
+  done
+
+  if [ "$_rjas_waited" -ge 60 ]; then
+    printf '%s\n' "jellyfin: API at $_rjas_base_url is not reachable; skipping account sync"
+    rm -f "$_rjas_resolved_file"
+    return
+  fi
+
+  _rjas_api_request() {
+    _rjar_method="$1"
+    _rjar_path="$2"
+    _rjar_token="$3"
+    _rjar_body="$4"
+    _rjar_url="$_rjas_base_url$_rjar_path"
+    _rjar_auth="$_rjas_auth_base"
+    if [ -n "$_rjar_token" ]; then
+      _rjar_auth="$_rjar_auth, Token=$_rjar_token"
+    fi
+
+    if [ -n "$_rjar_body" ]; then
+      curl -sS -X "$_rjar_method" "$_rjar_url" \
+        -H "Authorization: $_rjar_auth" \
+        -H "Content-Type: application/json" \
+        --data "$_rjar_body" \
+        -w 'HTTPSTATUS:%{http_code}'
+    else
+      curl -sS -X "$_rjar_method" "$_rjar_url" \
+        -H "Authorization: $_rjar_auth" \
+        -w 'HTTPSTATUS:%{http_code}'
+    fi
+  }
+
+  _rjas_status_from_response() {
+    printf '%s' "$1" | sed -n 's/.*HTTPSTATUS:\([0-9][0-9][0-9]\)$/\1/p'
+  }
+
+  _rjas_body_from_response() {
+    printf '%s' "$1" | sed 's/HTTPSTATUS:[0-9][0-9][0-9]$//'
+  }
+
+  _rjas_admin_token=""
+  while IFS= read -r _rjas_account; do
+    _rjas_username="$(printf '%s' "$_rjas_account" | jq -r '.username')"
+    _rjas_password="$(printf '%s' "$_rjas_account" | jq -r '.password')"
+
+    _rjas_auth_payload="$(jq -cn --arg username "$_rjas_username" --arg password "$_rjas_password" '{Username:$username,Pw:$password}')"
+    _rjas_auth_response="$(_rjas_api_request POST '/Users/AuthenticateByName' '' "$_rjas_auth_payload")"
+    _rjas_auth_status="$(_rjas_status_from_response "$_rjas_auth_response")"
+    if [ "$_rjas_auth_status" != "200" ]; then
+      continue
+    fi
+
+    _rjas_token="$(printf '%s' "$(_rjas_body_from_response "$_rjas_auth_response")" | jq -r '.AccessToken // empty')"
+    if [ -z "$_rjas_token" ]; then
+      continue
+    fi
+
+    _rjas_me_response="$(_rjas_api_request GET '/Users/Me' "$_rjas_token" '')"
+    _rjas_me_status="$(_rjas_status_from_response "$_rjas_me_response")"
+    if [ "$_rjas_me_status" != "200" ]; then
+      continue
+    fi
+
+    _rjas_is_admin="$(printf '%s' "$(_rjas_body_from_response "$_rjas_me_response")" | jq -r '.Policy.IsAdministrator // false')"
+    if [ "$_rjas_is_admin" = "true" ]; then
+      _rjas_admin_token="$_rjas_token"
+      break
+    fi
+  done < "$_rjas_resolved_file"
+
+  if [ -z "$_rjas_admin_token" ]; then
+    _rjas_bootstrap_account="$(head -n 1 "$_rjas_resolved_file")"
+    _rjas_bootstrap_username="$(printf '%s' "$_rjas_bootstrap_account" | jq -r '.username')"
+    _rjas_bootstrap_password="$(printf '%s' "$_rjas_bootstrap_account" | jq -r '.password')"
+    _rjas_startup_payload="$(jq -cn --arg name "$_rjas_bootstrap_username" --arg password "$_rjas_bootstrap_password" '{Name:$name,Password:$password}')"
+
+    _rjas_startup_response="$(_rjas_api_request POST '/Startup/User' '' "$_rjas_startup_payload")"
+    _rjas_startup_status="$(_rjas_status_from_response "$_rjas_startup_response")"
+    if [ "$_rjas_startup_status" = "204" ]; then
+      _rjas_complete_response="$(_rjas_api_request POST '/Startup/Complete' '' '')"
+      _rjas_complete_status="$(_rjas_status_from_response "$_rjas_complete_response")"
+      if [ "$_rjas_complete_status" != "204" ]; then
+        printf '%s\n' "jellyfin: startup completion returned HTTP $_rjas_complete_status" >&2
+      fi
+    fi
+
+    _rjas_bootstrap_auth_payload="$(jq -cn --arg username "$_rjas_bootstrap_username" --arg password "$_rjas_bootstrap_password" '{Username:$username,Pw:$password}')"
+    _rjas_bootstrap_attempt=0
+    while [ "$_rjas_bootstrap_attempt" -lt 15 ] && [ -z "$_rjas_admin_token" ]; do
+      _rjas_bootstrap_auth_response="$(_rjas_api_request POST '/Users/AuthenticateByName' '' "$_rjas_bootstrap_auth_payload")"
+      _rjas_bootstrap_auth_status="$(_rjas_status_from_response "$_rjas_bootstrap_auth_response")"
+      if [ "$_rjas_bootstrap_auth_status" = "200" ]; then
+        _rjas_bootstrap_token="$(printf '%s' "$(_rjas_body_from_response "$_rjas_bootstrap_auth_response")" | jq -r '.AccessToken // empty')"
+        if [ -n "$_rjas_bootstrap_token" ]; then
+          _rjas_bootstrap_me_response="$(_rjas_api_request GET '/Users/Me' "$_rjas_bootstrap_token" '')"
+          _rjas_bootstrap_me_status="$(_rjas_status_from_response "$_rjas_bootstrap_me_response")"
+          if [ "$_rjas_bootstrap_me_status" = "200" ]; then
+            _rjas_bootstrap_is_admin="$(printf '%s' "$(_rjas_body_from_response "$_rjas_bootstrap_me_response")" | jq -r '.Policy.IsAdministrator // false')"
+            if [ "$_rjas_bootstrap_is_admin" = "true" ]; then
+              _rjas_admin_token="$_rjas_bootstrap_token"
+              break
+            fi
+          fi
+        fi
+      fi
+      sleep 1
+      _rjas_bootstrap_attempt=$((_rjas_bootstrap_attempt + 1))
+    done
+  fi
+
+  if [ -z "$_rjas_admin_token" ]; then
+    printf '%s\n' "jellyfin: no elevated account credentials available; skipping account sync"
+    rm -f "$_rjas_resolved_file"
+    return
+  fi
+
+  while IFS= read -r _rjas_account; do
+    _rjas_username="$(printf '%s' "$_rjas_account" | jq -r '.username')"
+    _rjas_password="$(printf '%s' "$_rjas_account" | jq -r '.password')"
+
+    _rjas_users_response="$(_rjas_api_request GET '/Users' "$_rjas_admin_token" '')"
+    _rjas_users_status="$(_rjas_status_from_response "$_rjas_users_response")"
+    if [ "$_rjas_users_status" != "200" ]; then
+      printf '%s\n' "jellyfin: failed to list users (HTTP $_rjas_users_status); stopping account sync" >&2
+      break
+    fi
+    _rjas_users_body="$(_rjas_body_from_response "$_rjas_users_response")"
+
+    _rjas_user_id="$(printf '%s' "$_rjas_users_body" | jq -r --arg username "$_rjas_username" 'map(select(.Name == $username)) | .[0].Id // empty')"
+
+    if [ -z "$_rjas_user_id" ]; then
+      _rjas_create_payload="$(jq -cn --arg name "$_rjas_username" --arg password "$_rjas_password" '{Name:$name,Password:$password}')"
+      _rjas_create_response="$(_rjas_api_request POST '/Users/New' "$_rjas_admin_token" "$_rjas_create_payload")"
+      _rjas_create_status="$(_rjas_status_from_response "$_rjas_create_response")"
+      if [ "$_rjas_create_status" = "200" ]; then
+        printf '%s\n' "jellyfin: created account '$_rjas_username'"
+      else
+        printf '%s\n' "jellyfin: failed to create account '$_rjas_username' (HTTP $_rjas_create_status)" >&2
+      fi
+      continue
+    fi
+
+    _rjas_check_payload="$(jq -cn --arg username "$_rjas_username" --arg password "$_rjas_password" '{Username:$username,Pw:$password}')"
+    _rjas_check_response="$(_rjas_api_request POST '/Users/AuthenticateByName' '' "$_rjas_check_payload")"
+    _rjas_check_status="$(_rjas_status_from_response "$_rjas_check_response")"
+    if [ "$_rjas_check_status" = "200" ]; then
+      continue
+    fi
+
+    _rjas_password_payload="$(jq -cn --arg password "$_rjas_password" '{ResetPassword:false,NewPw:$password}')"
+    _rjas_password_response="$(_rjas_api_request POST "/Users/Password?userId=${_rjas_user_id}" "$_rjas_admin_token" "$_rjas_password_payload")"
+    _rjas_password_status="$(_rjas_status_from_response "$_rjas_password_response")"
+    if [ "$_rjas_password_status" = "204" ]; then
+      printf '%s\n' "jellyfin: updated password for account '$_rjas_username'"
+    else
+      printf '%s\n' "jellyfin: failed to update password for account '$_rjas_username' (HTTP $_rjas_password_status)" >&2
+    fi
+  done < "$_rjas_resolved_file"
+
+  rm -f "$_rjas_resolved_file"
+}
+
 run_replica_sync() {
   # Call scripts/replica-sync.sh so enabled replicas in users.json are
   # synchronized after a successful apply. This keeps local replica trees
@@ -544,6 +812,7 @@ case "$(uname -s)" in
     # while running as root (which otherwise produces ownership warnings).
     run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
     ensure_prek_hooks_installed "$REPO_ROOT"
+    run_jellyfin_account_sync
     run_ai_sync
     run_replica_sync
     run_vm_setup
@@ -562,6 +831,7 @@ case "$(uname -s)" in
       # Keep root invocations on root-owned HOME for consistent Nix behavior.
       run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
       ensure_prek_hooks_installed "$REPO_ROOT"
+      run_jellyfin_account_sync
       run_ai_sync
       run_replica_sync
       run_vm_setup
@@ -573,6 +843,7 @@ case "$(uname -s)" in
       run_nix run "$REPO_ROOT/src#health-check"
       run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
       ensure_prek_hooks_installed "$REPO_ROOT"
+      run_jellyfin_account_sync
       run_ai_sync
       run_replica_sync
       run_vm_setup

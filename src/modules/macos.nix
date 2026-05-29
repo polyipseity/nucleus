@@ -20,9 +20,6 @@
 #     daily at 00:00 so apply runs do not block on large tree scans.
 #   local.dev-spotlight-exclusions — refreshes Spotlight exclusion markers
 #     under ~/dev daily at 00:00 so apply runs do not block on large tree scans.
-#   local.jellyfin-media-server — runs Jellyfin from the managed user profile so
-#     library/config paths stay in the user's home directory without a root-run
-#     daemon that would need separate ownership reconciliation.
 #   local.betterdisplay-heartbeat — polls HeadlessDisplay every 30 s and
 #     reconnects it if BetterDisplay drops the virtual screen connection.
 #   local.nix-index-update — rebuilds the nix-index file database daily
@@ -248,28 +245,6 @@ let
     fi
 
     exec ${pkgs.nix-index}/bin/nix-index
-  '';
-
-  # User-scoped Jellyfin launcher.
-  # WHY LaunchAgent instead of launchd daemon: the repo's shared media/storage
-  # state is managed in the user's home directory via Home Manager, so keeping
-  # Jellyfin in that same user context avoids a root-owned library tree that
-  # would need separate ownership repair on every host.
-  jellyfinMediaServer = pkgs.writeShellScript "jellyfin-media-server" ''
-    set -eu
-
-    config_dir="$HOME/Library/Application Support/Jellyfin/config"
-    data_dir="$HOME/Library/Application Support/Jellyfin/data"
-    cache_dir="$HOME/Library/Caches/Jellyfin"
-    log_dir="$HOME/Library/Logs/Jellyfin"
-
-    mkdir -p "$config_dir" "$data_dir" "$cache_dir" "$log_dir"
-
-    exec ${pkgs.jellyfin}/bin/jellyfin \
-      --configdir "$config_dir" \
-      --datadir "$data_dir" \
-      --cachedir "$cache_dir" \
-      --logdir "$log_dir"
   '';
 
   # Directory names inside ~/dev whose contents should stay out of Spotlight.
@@ -1572,29 +1547,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
           Minute = 0;
         }
       ];
-    };
-  };
-
-  # --------------------------------------------------------------------------
-  # jellyfin-media-server LaunchAgent
-  # Runs Jellyfin from the managed user profile so the media library and its
-  # config/cache/log roots remain writable by the same user context that owns
-  # the cloud-drive mounts and local media paths managed elsewhere in nucleus.
-  # --------------------------------------------------------------------------
-  launchd.agents."jellyfin-media-server" = {
-    enable = true;
-    config = {
-      # launchd Label is a reverse-DNS-style unique identifier.
-      # Source: launchd.plist(5) Label key semantics.
-      # https://www.manpagez.com/man/5/launchd.plist/
-      Label = "local.jellyfin-media-server";
-      ProgramArguments = [ "${jellyfinMediaServer}" ];
-      KeepAlive = true;
-      RunAtLoad = true;
-      # Jellyfin writes structured logs to --logdir, so suppress launchd's own
-      # stdout/stderr capture to avoid duplicate low-signal log files.
-      StandardOutPath = "/dev/null";
-      StandardErrorPath = "/dev/null";
     };
   };
 

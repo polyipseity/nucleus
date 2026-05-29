@@ -227,6 +227,7 @@
           pkgs.writeShellApplication {
             name = "nucleus-apply";
             runtimeInputs = [
+              pkgs.curl
               pkgs.git
               pkgs.jq
               pkgs.openssh
