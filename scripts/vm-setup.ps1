@@ -9,7 +9,7 @@
 #
 # Usage:
 #   .\scripts\vm-setup.ps1 [-WindowsIso PATH] [-WindowsIsoSource Auto|Url|Fido] [-NixosOnly] [-WindowsOnly]
-#                          [-Accelerator TYPE] [-DryRun]
+#                          [-Accelerator TYPE] [-DebugHeadful] [-DryRun]
 #
 # Or via the shell alias:
 #   nucleus-vm-setup [same parameters]
@@ -41,6 +41,10 @@ param(
     # when Windows Hypervisor Platform is detected).
     [string]$Accelerator = 'tcg',
 
+    # Run Windows image builds headful (headless=false) for interactive
+    # debugging of installer/WinRM readiness issues.
+    [switch]$DebugHeadful,
+
     # Print planned actions without executing.
     [switch]$DryRun
 )
@@ -65,5 +69,6 @@ if ($WindowsOnly) { $invokeArgs['WindowsOnly'] = $true }
 if ($WindowsIsoSource) { $invokeArgs['WindowsIsoSource'] = $WindowsIsoSource }
 if ($PSBoundParameters.ContainsKey('WindowsIsoRetries')) { $invokeArgs['WindowsIsoRetries'] = $WindowsIsoRetries }
 if ($Accelerator) { $invokeArgs['Accelerator'] = $Accelerator }
+if ($DebugHeadful) { $invokeArgs['DebugHeadful'] = $true }
 
 Invoke-VMSetup @invokeArgs

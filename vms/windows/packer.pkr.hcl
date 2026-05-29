@@ -102,6 +102,12 @@ variable "efi_firmware_vars" {
   description = "Path to EFI firmware VARS file (used when firmware_mode=efi)."
 }
 
+variable "headless" {
+  type        = bool
+  default     = true
+  description = "Whether to run QEMU headless during build (set false for interactive debugging)."
+}
+
 packer {
   required_plugins {
     qemu = {
@@ -210,7 +216,7 @@ source "qemu" "windows11" {
     ["-netdev", "user,id=user.0,hostfwd=tcp::5985-:5985"],
   ]
 
-  headless = true
+  headless = var.headless
 
   # NOTE: qemu plugin v1.1.x does not support `secondary_iso_images` on all
   # hosts. VirtIO drivers are installed by the PowerShell provisioner below

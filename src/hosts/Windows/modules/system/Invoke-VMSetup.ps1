@@ -52,6 +52,10 @@ function Invoke-VMSetup {
         # Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
         [string]$Accelerator = 'tcg',
 
+        # Run Windows image builds headful (headless=false) for interactive
+        # debugging of installer/WinRM readiness issues.
+        [switch]$DebugHeadful,
+
         # Print planned actions without modifying any state.
         [switch]$DryRun
     )
@@ -203,6 +207,7 @@ next run.
                     -RepoRoot $RepoRoot `
                     -WindowsEdition ($vm.windowsEdition ?? 'Pro') `
                     -Accelerator $Accelerator `
+                    -DebugHeadful:$DebugHeadful `
                     -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
             }
             'macOS' {
@@ -615,6 +620,7 @@ function Invoke-BuildWindowsImage {
         [string]$ImagesDir,
         [string]$RepoRoot = (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))))),
         [string]$WindowsEdition = 'Pro',
+        [switch]$DebugHeadful,
         [switch]$DryRun
     )
 
@@ -758,16 +764,23 @@ function Invoke-BuildWindowsImage {
         Write-Information 'vm-setup: EFI firmware not detected; using BIOS-only build attempts'
     }
 
+    # WHY: Packer HCL bool vars are easiest to pass as explicit true/false
+    # strings from wrapper scripts for cross-shell consistency.
+    $packerHeadless = if ($DebugHeadful) { 'false' } else { 'true' }
+
     Write-Information "vm-setup: building Windows 11 image (disk=${DiskGib} GiB, accelerator=$Accelerator)..."
     Write-Information 'vm-setup: this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
+    if ($DebugHeadful) {
+        Write-Information 'vm-setup: debug mode enabled; running Windows Packer build headful (headless=false)'
+    }
 
     if ($DryRun) {
         Write-Information "vm-setup: [dry-run] Remove stale temporary output directory if present: $tmpOutput"
         foreach ($attempt in $buildAttempts) {
             if ($attempt.Firmware -eq 'efi') {
-                Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
             } else {
-                Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
             }
         }
         return
@@ -795,6 +808,7 @@ function Invoke-BuildWindowsImage {
                 '-var', "firmware_mode=$($attempt.Firmware)",
                 '-var', "boot_strategy=$($attempt.Boot)",
                 '-var', "winrm_timeout=$($attempt.Timeout)",
+                '-var', "headless=$packerHeadless",
                 '-var', "disk_size=${DiskGib}G",
                 '-var', "output_directory=$tmpOutput",
                 '.'
@@ -806,6 +820,7 @@ function Invoke-BuildWindowsImage {
                     '-var', "firmware_mode=$($attempt.Firmware)",
                     '-var', "boot_strategy=$($attempt.Boot)",
                     '-var', "winrm_timeout=$($attempt.Timeout)",
+                    '-var', "headless=$packerHeadless",
                     '-var', "efi_firmware_code=$efiCode",
                     '-var', "efi_firmware_vars=$efiVars",
                     '-var', "disk_size=${DiskGib}G",

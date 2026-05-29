@@ -20,6 +20,8 @@
 #                          --windows-iso is omitted: auto|url|mido.
 #   --windows-iso-retries N Retry attempts for Windows ISO network downloads
 #                          (default: 0, which means a single attempt).
+#   --debug-headful        Run Windows Packer QEMU builds with a visible GUI
+#                          window (headless=false) for interactive debugging.
 #   --accelerator TYPE     QEMU accelerator for image builds (hvf/kvm/tcg).
 #                          Defaults: hvf on macOS, kvm on Linux.
 #
@@ -59,6 +61,7 @@ windows_only=false
 windows_iso=''
 windows_iso_source='auto'
 windows_iso_retries='0'
+windows_headless='true'
 accelerator=''
 
 while [ "$#" -gt 0 ]; do
@@ -69,10 +72,11 @@ while [ "$#" -gt 0 ]; do
     --windows-iso)  windows_iso="$2"; shift ;;
     --windows-iso-source) windows_iso_source="$2"; shift ;;
     --windows-iso-retries) windows_iso_retries="$2"; shift ;;
+    --debug-headful) windows_headless='false' ;;
     --accelerator)  accelerator="$2"; shift ;;
     *)
       printf 'vm-setup: unknown argument: %s\n' "$1" >&2
-      printf 'vm-setup: usage: %s [--dry-run] [--nixos-only|--windows-only] [--windows-iso PATH] [--windows-iso-source auto|url|mido] [--windows-iso-retries N] [--accelerator TYPE]\n' "$0" >&2
+      printf 'vm-setup: usage: %s [--dry-run] [--nixos-only|--windows-only] [--windows-iso PATH] [--windows-iso-source auto|url|mido] [--windows-iso-retries N] [--debug-headful] [--accelerator TYPE]\n' "$0" >&2
       exit 1
       ;;
   esac
@@ -974,6 +978,9 @@ build_windows_image() {
 
   printf 'vm-setup: building Windows 11 image (disk=%s GiB, accelerator=%s)...\n' \
     "$_disk_gib" "$accelerator"
+  if [ "$windows_headless" = 'false' ]; then
+    printf 'vm-setup: debug mode enabled; running Windows Packer build headful (headless=false)\n'
+  fi
 
   # WHY: BIOS installs may stall on the short "Press any key" prompt. Prefer
   # EFI-first attempts (no key spam) when host firmware files are available,
@@ -1045,6 +1052,7 @@ $_build_attempts"
         printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var disk_size=%sG -var output_directory=%s .\n' \
           "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$_disk_gib" "$_tmp_out"
       fi
+      printf 'vm-setup: [dry-run]     (with -var headless=%s)\n' "$windows_headless"
     done <<EOF
 $_build_attempts
 EOF
@@ -1082,6 +1090,7 @@ EOF
           -var "firmware_mode=$_firmware_mode" \
           -var "boot_strategy=$_boot_strategy" \
           -var "winrm_timeout=$_attempt_timeout" \
+          -var "headless=$windows_headless" \
           -var "efi_firmware_code=$_efi_code" \
           -var "efi_firmware_vars=$_efi_vars" \
           -var "disk_size=${_disk_gib}G" \
@@ -1097,6 +1106,7 @@ EOF
           -var "firmware_mode=$_firmware_mode" \
           -var "boot_strategy=$_boot_strategy" \
           -var "winrm_timeout=$_attempt_timeout" \
+          -var "headless=$windows_headless" \
           -var "disk_size=${_disk_gib}G" \
           -var "output_directory=$_tmp_out" \
           .

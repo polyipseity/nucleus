@@ -337,6 +337,7 @@ let
   # a failed packer invocation does not falsely report success.
   vm_setup_sh_text = builtins.readFile ../../scripts/vm-setup.sh;
   windows_vm_setup_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-VMSetup.ps1;
+  windows_vm_setup_wrapper_ps1_text = builtins.readFile ../../scripts/vm-setup.ps1;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
   vms_windows_packer_text = builtins.readFile ../../vms/windows/packer.pkr.hcl;
@@ -380,15 +381,23 @@ let
         && (lib.hasInfix "pause_before_connecting = \"120s\"" vms_windows_packer_text)
         && (lib.hasInfix "variable \"firmware_mode\"" vms_windows_packer_text)
         && (lib.hasInfix "variable \"boot_strategy\"" vms_windows_packer_text)
+        && (lib.hasInfix "variable \"headless\"" vms_windows_packer_text)
         && (lib.hasInfix "bootPromptByStrategy" vms_windows_packer_text)
         && (lib.hasInfix "efi_boot          = local.efiEnabled" vms_windows_packer_text)
+        && (lib.hasInfix "headless = var.headless" vms_windows_packer_text)
+        && (lib.hasInfix "--debug-headful" vm_setup_sh_text)
+        && (lib.hasInfix "-var \"headless=$windows_headless\"" vm_setup_sh_text)
         && (lib.hasInfix "firmware_mode=$_firmware_mode" vm_setup_sh_text)
         && (lib.hasInfix "EFI firmware detected; enabling EFI-first attempt" vm_setup_sh_text)
         && (lib.hasInfix "boot_strategy=$_boot_strategy" vm_setup_sh_text)
         && (lib.hasInfix "Windows Packer attempt using firmware_mode=" vm_setup_sh_text)
+        && (lib.hasInfix "[switch]$DebugHeadful" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "$packerHeadless = if ($DebugHeadful) { 'false' } else { 'true' }" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "-var', \"headless=$packerHeadless\"" windows_vm_setup_ps1_text)
         && (lib.hasInfix "firmware_mode=$($attempt.Firmware)" windows_vm_setup_ps1_text)
         && (lib.hasInfix "EFI firmware detected; enabling EFI-first attempt" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Windows Packer attempt using firmware_mode=" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "[switch]$DebugHeadful" windows_vm_setup_wrapper_ps1_text)
       )
       "Windows VM builds must pin WinRM port forwarding and implement EFI-first firmware_mode retries with BIOS fallback across POSIX and Windows wrappers";
 
