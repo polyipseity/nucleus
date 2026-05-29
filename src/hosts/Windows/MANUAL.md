@@ -3,6 +3,18 @@
 - Create the per-user rclone passphrase: from the repo root, run `sops edit src/secrets/users-<username>.yml`, add `rclone_config_pass: <output of openssl rand -hex 64>`, save (sops encrypts automatically), commit the file, then re-run `nucleus apply`. If you already configured rclone remotes without this passphrase, delete `%USERPROFILE%\.config\rclone\rclone.conf` first so the remotes are re-created with encryption.
 - Run `nucleus-cloud-setup` in PowerShell and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
 
+## accessible ports
+
+- `https://localhost:8920` — Jellyfin HTTPS endpoint (Caddy local reverse proxy).
+- `http://127.0.0.1:8096` — Jellyfin internal loopback HTTP API (automation upstream).
+- `http://127.0.0.1:11434` — Ollama local API.
+- `tcp/5985` — WinRM HTTP listener.
+- `tcp/3389` — Windows Remote Desktop.
+
+## HTTPS certificate trust (one-time)
+
+- Trust the local Caddy CA so `https://localhost:8920` is recognized by browsers: run `caddy trust --address 127.0.0.1:2019` in an elevated PowerShell session.
+
 ## command shortcuts
 
 - `-g` — run `git`.

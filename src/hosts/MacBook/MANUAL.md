@@ -15,6 +15,18 @@
 - Run `nucleus-cloud-setup` and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
 - Finder sidebar favorites set by `nucleus apply` are visible only after restarting macOS (log out and back in, or reboot).
 
+## accessible ports
+
+- `https://localhost:8920` — Jellyfin HTTPS endpoint (Caddy local reverse proxy).
+- `http://127.0.0.1:8096` — Jellyfin internal loopback HTTP API (automation upstream).
+- `http://127.0.0.1:11434` — Ollama local API.
+- `tcp/5900` — macOS Screen Sharing / VNC (when enabled).
+- `tcp/31022` — Linux builder SSH endpoint.
+
+## HTTPS certificate trust (one-time)
+
+- Trust the local Caddy CA so `https://localhost:8920` is recognized by browsers: run `sudo caddy trust --address 127.0.0.1:2019`.
+
 ## command shortcuts
 
 - `-g` — run `git`.

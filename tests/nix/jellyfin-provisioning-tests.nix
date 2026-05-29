@@ -13,10 +13,15 @@ let
   coreText = builtins.readFile ../../src/modules/core.nix;
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   macbookJellyfinText = builtins.readFile ../../src/hosts/MacBook/jellyfin.nix;
+  macbookManualText = builtins.readFile ../../src/hosts/MacBook/MANUAL.md;
   nixosDefaultText = builtins.readFile ../../src/hosts/NixOS/default.nix;
   nixosJellyfinText = builtins.readFile ../../src/hosts/NixOS/jellyfin.nix;
+  nixosManualText = builtins.readFile ../../src/hosts/NixOS/MANUAL.md;
   linuxText = builtins.readFile ../../src/modules/linux.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
+  windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
+  windowsJellyfinHttpsProxyText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinHttpsProxy.ps1;
+  windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
   windowsSystemText = builtins.readFile ../../src/hosts/Windows/system.dsc.yml;
 
   assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
@@ -37,11 +42,42 @@ let
     && containsRegex ''state_root="/Users/Shared/Jellyfin"'' macbookJellyfinText
   ) "macOS must provision Jellyfin as a host-level shared launchd daemon";
 
+  test_macbook_runs_local_https_proxy = assert' (
+    containsRegex ''launchd\.daemons\.jellyfinHttpsProxy'' macbookJellyfinText
+    && containsRegex "tls internal" macbookJellyfinText
+    && containsRegex ''reverse_proxy 127\.0\.0\.1:8096'' macbookJellyfinText
+  ) "macOS must provision a local HTTPS reverse proxy for Jellyfin";
+
+  test_nixos_runs_local_https_proxy = assert' (
+    containsRegex ''services\.caddy'' nixosJellyfinText
+    && containsRegex "tls internal" nixosJellyfinText
+    && containsRegex ''reverse_proxy 127\.0\.0\.1:8096'' nixosJellyfinText
+    && containsRegex "8920" nixosJellyfinText
+  ) "NixOS must provision a local HTTPS reverse proxy for Jellyfin";
+
   test_no_per_user_jellyfin_units = assert' (
     !containsRegex "jellyfin-media-server" linuxText && !containsRegex "jellyfin-media-server" macosText
   ) "Per-user Jellyfin units must not exist in shared linux.nix or macos.nix modules";
 
   test_windows_installs_jellyfin_server = assert' (containsRegex ''id: Jellyfin\.Server'' windowsSystemText) "Windows DSC must install Jellyfin.Server via WinGet";
+
+  test_windows_installs_caddy_for_https_proxy = assert' (containsRegex ''id: CaddyServer\.Caddy'' windowsSystemText) "Windows DSC must install Caddy for Jellyfin HTTPS proxy";
+
+  test_windows_wires_https_proxy_module = assert' (
+    containsRegex "Sync-JellyfinHttpsProxy" windowsApplyText
+    && containsRegex "function Sync-JellyfinHttpsProxy" windowsJellyfinHttpsProxyText
+    && containsRegex "tls internal" windowsJellyfinHttpsProxyText
+    && containsRegex ":8920" windowsJellyfinHttpsProxyText
+  ) "Windows apply flow must converge Jellyfin HTTPS proxy service";
+
+  test_host_manuals_document_jellyfin_endpoints = assert' (
+    containsRegex "https://localhost:8920" macbookManualText
+    && containsRegex ''http://127\.0\.0\.1:8096'' macbookManualText
+    && containsRegex "https://localhost:8920" nixosManualText
+    && containsRegex ''http://127\.0\.0\.1:8096'' nixosManualText
+    && containsRegex "https://localhost:8920" windowsManualText
+    && containsRegex ''http://127\.0\.0\.1:8096'' windowsManualText
+  ) "Host manuals must document Jellyfin HTTPS and loopback HTTP endpoints";
 
   allTests = [
     test_core_installs_jellyfin
@@ -49,8 +85,13 @@ let
     test_nixos_runs_shared_jellyfin_service
     test_macbook_imports_host_jellyfin_module
     test_macbook_runs_shared_jellyfin_daemon
+    test_macbook_runs_local_https_proxy
+    test_nixos_runs_local_https_proxy
     test_no_per_user_jellyfin_units
     test_windows_installs_jellyfin_server
+    test_windows_installs_caddy_for_https_proxy
+    test_windows_wires_https_proxy_module
+    test_host_manuals_document_jellyfin_endpoints
   ];
 in
 {
