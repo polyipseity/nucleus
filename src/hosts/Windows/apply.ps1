@@ -82,8 +82,7 @@
 
 .PARAMETER EnableCloudDrivesParity
   Enable managed cloud drive mount directory provisioning and rclone remote verification
-  for each configured user. iCloud entries are skipped with a warning (no rclone backend
-  on Windows). False skips provisioning without error.
+  for each configured user. False skips provisioning without error.
 
 .PARAMETER EnableCustomProvisionSymlinkParity
   Enable managed custom symlink provisioning from users.json. Each link is created only

@@ -40,7 +40,7 @@
           "iCloudService": "drive",
           "localPath": "clouds/iCloud",
           "provider": "iCloud",
-          "readWrite": false,
+          "readWrite": true,
           "remoteName": "iCloud",
           "remotePath": "/"
         },
@@ -58,7 +58,7 @@
       "replicas": [
         {
           "direction": "pull",
-          "enable": false,
+          "enable": true,
           "fallbackTimer": {
             "enable": true,
             "interval": "daily"

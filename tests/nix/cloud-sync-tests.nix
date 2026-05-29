@@ -32,6 +32,7 @@ let
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
+  macbookCloudOverrideText = builtins.readFile ../../src/hosts/MacBook/cloud-drives.nix;
   macbookHomebrewText = builtins.readFile ../../src/hosts/MacBook/homebrew.nix;
 
   assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
@@ -440,6 +441,25 @@ let
     && containsRegex "deny write/create/delete" windowsReplicaModuleText
   ) "Replica sync runners must enforce read-only local replica permissions on POSIX and Windows";
 
+  # Test 50: shared user registries keep cloud mounts read-write (including iCloud)
+  test_mounts_read_write_matrix =
+    assert'
+      (
+        containsRegex ''"id": "GoogleDrive"'' posixUsersText
+        && containsRegex ''"id": "iCloud"'' posixUsersText
+        && containsRegex ''"id": "OneDrive"'' posixUsersText
+        && containsRegex ''"readWrite": true'' posixUsersText
+        && containsRegex ''"readWrite": true'' windowsUsersText
+      )
+      "Cloud mount matrix must keep GoogleDrive/iCloud/OneDrive readWrite=true across POSIX and Windows registries";
+
+  # Test 51: MacBook host override disables only GoogleDrive replica via list transform
+  test_macbook_google_drive_replica_exception = assert' (
+    containsRegex ''nucleus\.cloudDrives\.replicas = map'' macbookCloudOverrideText
+    && containsRegex ''replica\.id == "GoogleDrive"'' macbookCloudOverrideText
+    && containsRegex "enable = false" macbookCloudOverrideText
+  ) "MacBook cloud override must disable only GoogleDrive replica with a list-based transform";
+
   allTests = [
     test_options_exist
     test_mounts_are_list
@@ -490,6 +510,8 @@ let
     test_replica_reset_command_parity
     test_replica_cleanup_config_centralized
     test_replica_read_only_permissions
+    test_mounts_read_write_matrix
+    test_macbook_google_drive_replica_exception
   ];
 in
 {

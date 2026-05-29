@@ -6,6 +6,7 @@
   # system entrypoint never needs to define a Home Manager-only option.
   # vms.nix generates UTM config.plist templates for each VM in VMs.json.
   home-manager.sharedModules = [
+    ./cloud-drives.nix
     { nucleus.hostManualFile = "src/hosts/MacBook/MANUAL.md"; }
     ./vms.nix
   ];
