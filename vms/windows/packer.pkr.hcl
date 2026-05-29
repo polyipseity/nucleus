@@ -144,7 +144,7 @@ locals {
   # installer. Put the launcher in startup.nsh so the shell can auto-run it
   # without relying on fragile VNC timing or manual confirmation keys.
   bootPromptEfiDirect = [
-    "<wait5>fs1:\\startup.nsh<enter>",
+    "<wait5><enter><wait1>fs1:\\startup.nsh<enter><wait1>fs0:\\startup.nsh<enter>",
   ]
 
   bootPromptByStrategy = local.efiEnabled ? local.bootPromptEfiDirect : (
@@ -213,8 +213,10 @@ source "qemu" "windows11" {
   floppy_content = {
     "startup.nsh" = <<-EOF
       map -r
-      fs0:
-      \\EFI\\Microsoft\\Boot\\cdboot_noprompt.efi
+      fs0:\EFI\Microsoft\Boot\cdboot_noprompt.efi
+      fs0:\EFI\BOOT\BOOTX64.EFI
+      fs1:\EFI\Microsoft\Boot\cdboot_noprompt.efi
+      fs1:\EFI\BOOT\BOOTX64.EFI
     EOF
   }
 
@@ -231,10 +233,10 @@ source "qemu" "windows11" {
   skip_nat_mapping = true
 
   # WHY: QEMU should boot the installer ISO once and then fall back to the disk
-  # on later reboots. Avoid synthetic boot keystrokes so SeaBIOS/UEFI do not get
-  # stuck in their shell or boot menu prompts.
+  # on later reboots. EFI still needs explicit startup.nsh invocation because
+  # the shell countdown can skip script execution when no key is sent.
   boot_wait    = "5s"
-  boot_command = []
+  boot_command = local.bootPromptByStrategy
 
   # WHY: Packer's WinRM communicator starts probing as soon as boot_command
   # completes.  Even with 8h timeout, excessive early retries during Windows
