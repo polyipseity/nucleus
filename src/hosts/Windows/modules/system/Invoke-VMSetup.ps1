@@ -767,20 +767,52 @@ function Invoke-BuildWindowsImage {
     # WHY: Packer HCL bool vars are easiest to pass as explicit true/false
     # strings from wrapper scripts for cross-shell consistency.
     $packerHeadless = if ($DebugHeadful) { 'false' } else { 'true' }
+    $packerDisplayBackend = ''
+    if ($DebugHeadful) {
+        # WHY: Packer defaults to gtk for headful builds, but not every QEMU
+        # package includes gtk support. Select from backends QEMU advertises.
+        try {
+            $qemuCommand = Get-Command qemu-system-x86_64 -ErrorAction Stop
+        } catch {
+            Write-Warning 'vm-setup: qemu-system-x86_64 not found; cannot run headful debug mode'
+            return
+        }
+
+        $displayHelp = & $qemuCommand.Source -display help
+        foreach ($candidate in @('sdl', 'gtk', 'spice-app', 'curses')) {
+            if ($displayHelp -contains $candidate) {
+                $packerDisplayBackend = $candidate
+                break
+            }
+        }
+        if (-not $packerDisplayBackend) {
+            Write-Warning "vm-setup: no supported headful QEMU display backend detected. Available backends:`n$($displayHelp -join "`n")"
+            return
+        }
+    }
 
     Write-Information "vm-setup: building Windows 11 image (disk=${DiskGib} GiB, accelerator=$Accelerator)..."
     Write-Information 'vm-setup: this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
     if ($DebugHeadful) {
         Write-Information 'vm-setup: debug mode enabled; running Windows Packer build headful (headless=false)'
+        Write-Information "vm-setup: using QEMU display backend for debug run: $packerDisplayBackend"
     }
 
     if ($DryRun) {
         Write-Information "vm-setup: [dry-run] Remove stale temporary output directory if present: $tmpOutput"
         foreach ($attempt in $buildAttempts) {
             if ($attempt.Firmware -eq 'efi') {
-                Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                if ($DebugHeadful) {
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                } else {
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                }
             } else {
-                Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                if ($DebugHeadful) {
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                } else {
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                }
             }
         }
         return
@@ -813,6 +845,20 @@ function Invoke-BuildWindowsImage {
                 '-var', "output_directory=$tmpOutput",
                 '.'
             )
+            if ($DebugHeadful) {
+                $packerArgs = @(
+                    '-var', "windows_iso=$WindowsIso",
+                    '-var', "accelerator=$Accelerator",
+                    '-var', "firmware_mode=$($attempt.Firmware)",
+                    '-var', "boot_strategy=$($attempt.Boot)",
+                    '-var', "winrm_timeout=$($attempt.Timeout)",
+                    '-var', "headless=$packerHeadless",
+                    '-var', "display_backend=$packerDisplayBackend",
+                    '-var', "disk_size=${DiskGib}G",
+                    '-var', "output_directory=$tmpOutput",
+                    '.'
+                )
+            }
             if ($attempt.Firmware -eq 'efi') {
                 $packerArgs = @(
                     '-var', "windows_iso=$WindowsIso",
@@ -827,6 +873,22 @@ function Invoke-BuildWindowsImage {
                     '-var', "output_directory=$tmpOutput",
                     '.'
                 )
+                if ($DebugHeadful) {
+                    $packerArgs = @(
+                        '-var', "windows_iso=$WindowsIso",
+                        '-var', "accelerator=$Accelerator",
+                        '-var', "firmware_mode=$($attempt.Firmware)",
+                        '-var', "boot_strategy=$($attempt.Boot)",
+                        '-var', "winrm_timeout=$($attempt.Timeout)",
+                        '-var', "headless=$packerHeadless",
+                        '-var', "display_backend=$packerDisplayBackend",
+                        '-var', "efi_firmware_code=$efiCode",
+                        '-var', "efi_firmware_vars=$efiVars",
+                        '-var', "disk_size=${DiskGib}G",
+                        '-var', "output_directory=$tmpOutput",
+                        '.'
+                    )
+                }
             }
             & packer build @packerArgs
             if ($LASTEXITCODE -eq 0) {

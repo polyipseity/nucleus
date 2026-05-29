@@ -108,6 +108,12 @@ variable "headless" {
   description = "Whether to run QEMU headless during build (set false for interactive debugging)."
 }
 
+variable "display_backend" {
+  type        = string
+  default     = ""
+  description = "QEMU display backend to use for headful builds (for example: cocoa, gtk, sdl)."
+}
+
 packer {
   required_plugins {
     qemu = {
@@ -154,6 +160,13 @@ locals {
     var.efi_firmware_vars != "" ? var.efi_firmware_vars :
     "/Applications/UTM.app/Contents/Resources/qemu/edk2-i386-vars.fd"
   ) : ""
+
+  # WHY: The qemu builder defaults to gtk when headless=false, but some QEMU
+  # packages (including this Darwin profile) do not ship gtk support.
+  # Wrapper scripts pass a supported backend during interactive debug runs.
+  displayBackendResolved = var.headless ? "none" : (
+    var.display_backend != "" ? var.display_backend : "gtk"
+  )
 }
 
 source "qemu" "windows11" {
@@ -217,6 +230,7 @@ source "qemu" "windows11" {
   ]
 
   headless = var.headless
+  display  = local.displayBackendResolved
 
   # NOTE: qemu plugin v1.1.x does not support `secondary_iso_images` on all
   # hosts. VirtIO drivers are installed by the PowerShell provisioner below

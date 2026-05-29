@@ -978,8 +978,21 @@ build_windows_image() {
 
   printf 'vm-setup: building Windows 11 image (disk=%s GiB, accelerator=%s)...\n' \
     "$_disk_gib" "$accelerator"
+  _display_backend=''
   if [ "$windows_headless" = 'false' ]; then
+    _display_help="$(qemu-system-x86_64 -display help || true)"
+    for _display_candidate in cocoa gtk sdl spice-app curses; do
+      if printf '%s\n' "$_display_help" | grep -qx "$_display_candidate"; then
+        _display_backend="$_display_candidate"
+        break
+      fi
+    done
+    if [ -z "$_display_backend" ]; then
+      printf 'vm-setup: no supported QEMU display backend found for headful debugging; available backends:\n%s\n' "$_display_help" >&2
+      return 1
+    fi
     printf 'vm-setup: debug mode enabled; running Windows Packer build headful (headless=false)\n'
+    printf 'vm-setup: using QEMU display backend for debug run: %s\n' "$_display_backend"
   fi
 
   # WHY: BIOS installs may stall on the short "Press any key" prompt. Prefer
@@ -1046,13 +1059,22 @@ $_build_attempts"
     while IFS=' ' read -r _firmware_mode _boot_strategy _attempt_timeout; do
       [ -n "$_firmware_mode" ] || continue
       if [ "$_firmware_mode" = 'efi' ]; then
-        printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
-          "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$_efi_code" "$_efi_vars" "$_disk_gib" "$_tmp_out"
+        if [ "$windows_headless" = 'false' ]; then
+          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var display_backend=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
+            "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_display_backend" "$_efi_code" "$_efi_vars" "$_disk_gib" "$_tmp_out"
+        else
+          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
+            "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_efi_code" "$_efi_vars" "$_disk_gib" "$_tmp_out"
+        fi
       else
-        printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var disk_size=%sG -var output_directory=%s .\n' \
-          "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$_disk_gib" "$_tmp_out"
+        if [ "$windows_headless" = 'false' ]; then
+          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var display_backend=%s -var disk_size=%sG -var output_directory=%s .\n' \
+            "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_display_backend" "$_disk_gib" "$_tmp_out"
+        else
+          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var disk_size=%sG -var output_directory=%s .\n' \
+            "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_disk_gib" "$_tmp_out"
+        fi
       fi
-      printf 'vm-setup: [dry-run]     (with -var headless=%s)\n' "$windows_headless"
     done <<EOF
 $_build_attempts
 EOF
@@ -1091,6 +1113,7 @@ EOF
           -var "boot_strategy=$_boot_strategy" \
           -var "winrm_timeout=$_attempt_timeout" \
           -var "headless=$windows_headless" \
+          ${_display_backend:+-var "display_backend=$_display_backend"} \
           -var "efi_firmware_code=$_efi_code" \
           -var "efi_firmware_vars=$_efi_vars" \
           -var "disk_size=${_disk_gib}G" \
@@ -1107,6 +1130,7 @@ EOF
           -var "boot_strategy=$_boot_strategy" \
           -var "winrm_timeout=$_attempt_timeout" \
           -var "headless=$windows_headless" \
+          ${_display_backend:+-var "display_backend=$_display_backend"} \
           -var "disk_size=${_disk_gib}G" \
           -var "output_directory=$_tmp_out" \
           .
