@@ -130,13 +130,13 @@ locals {
   #
   # Strategy summary:
   #   none     — do not send any keypresses (works when firmware auto-boots ISO)
-  #   spacebar — safe explicit "any key" cadence (~17m)
-  #   alpha    — alphanumeric fallback (~17m)
+  #   spacebar — safe explicit "any key" cadence (~4m)
+  #   alpha    — alphanumeric fallback (~4m)
   #   legacy   — extended dense+slow coverage for worst-case tcg timing
   #
   # Packer HCL range() is capped at 1024 values per expression.
-  bootPromptSpacebarPhase   = [for _ in range(0, 1024) : "<spacebar><wait>"]
-  bootPromptAlphaPhase      = [for _ in range(0, 1024) : "a<wait>"]
+  bootPromptSpacebarPhase   = [for _ in range(0, 240) : "<spacebar><wait>"]
+  bootPromptAlphaPhase      = [for _ in range(0, 240) : "a<wait>"]
   bootPromptAnyKeyDensePhase = [for _ in range(0, 1024) : "a<wait>"]
   bootPromptAnyKeySlowPhase  = [for _ in range(0, 1024) : "a<wait20>"]
 
