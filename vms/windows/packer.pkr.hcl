@@ -230,11 +230,11 @@ source "qemu" "windows11" {
   # WinRM port explicitly so Packer and QEMU agree on 5985.
   skip_nat_mapping = true
 
-  # WHY: The exact BIOS installer timing differs by host acceleration/runtime.
-  # Keep keying policy selectable via var.boot_strategy and let the wrapper
-  # iterate through strategies from fast/clean to conservative fallback.
+  # WHY: QEMU should boot the installer ISO once and then fall back to the disk
+  # on later reboots. Avoid synthetic boot keystrokes so SeaBIOS/UEFI do not get
+  # stuck in their shell or boot menu prompts.
   boot_wait    = "5s"
-  boot_command = local.bootPromptByStrategy
+  boot_command = []
 
   # WHY: Packer's WinRM communicator starts probing as soon as boot_command
   # completes.  Even with 8h timeout, excessive early retries during Windows
@@ -244,6 +244,7 @@ source "qemu" "windows11" {
   pause_before_connecting = "120s"
 
   qemuargs = [
+    ["-boot", "order=c,once=d"],
     ["-netdev", "user,id=user.0,hostfwd=tcp::5985-:5985"],
   ]
 
