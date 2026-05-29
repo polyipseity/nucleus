@@ -232,6 +232,8 @@ lib.mkIf pkgs.stdenv.isLinux {
           "agentsSymlink"
           "buildNixIndex"
           "configureObsidianSettings"
+          "ensureCustomProvisionSymlinkTargets"
+          "finalizeCustomProvisionSymlinks"
           # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
           # are defined in secrets.nix (shared module) but run as Home Manager
           # activations on this host; include them here so manual instructions
@@ -242,6 +244,7 @@ lib.mkIf pkgs.stdenv.isLinux {
           "installBunPackages"
           "installPwshScriptAnalyzer"
           "installUvTools"
+          "prepareCustomProvisionSymlinks"
           "provisionDevDirectory"
           "sshKeyAdopt"
           "syncClawHubSkills"

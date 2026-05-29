@@ -92,6 +92,17 @@
           }
         ]
       },
+      "customProvisionSymlinks": [
+        {
+          "createTargetDirectory": true,
+          "path": "data",
+          "targets": {
+            "linux": "clouds/GoogleDrive/data",
+            "macos": "Library/Mobile Documents/com~apple~CloudDocs/data",
+            "windows": "clouds\\GoogleDrive\\data"
+          }
+        }
+      ],
       "devRepos": {
         "enable": true,
         "gitHubUsername": "polyipseity",

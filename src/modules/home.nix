@@ -210,6 +210,7 @@ in
     ./ai
     ./cloud-drives.nix
     ./core.nix
+    ./custom-provision-symlinks.nix
     ./dev-repos.nix
     ./editors.nix
     ./fonts.nix

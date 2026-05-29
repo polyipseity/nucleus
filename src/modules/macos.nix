@@ -437,7 +437,9 @@ let
     "configureObsidianSettings"
     "configureSafariDefaults"
     "configureUniversalAccessDefaults"
+    "ensureCustomProvisionSymlinkTargets"
     "ensureHeadlessDisplay"
+    "finalizeCustomProvisionSymlinks"
     # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
     # are defined in secrets.nix (shared module) but run as Home Manager
     # activations on this host; they must all complete before the manual
@@ -454,6 +456,7 @@ let
     "installUvTools"
     "linkGeneration"
     "onFilesChange"
+    "prepareCustomProvisionSymlinks"
     "preflightPrivacyPermissions"
     "provisionDevDirectory"
     "refreshFinderServices"

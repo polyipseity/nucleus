@@ -8,6 +8,7 @@ BeforeAll {
     "src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1"
     "src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1"
     "src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1"
+    "src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1"
     "src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
   )
 
@@ -96,12 +97,33 @@ Describe "Symlink Hardening - Windows" {
     }
   }
 
+  Context "Sync-CustomProvisionSymlink" {
+    It "should contain Set-ManagedSymlinkDeleteProtection" {
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1"
+      $content = Get-Content -Path $modulePath -Raw
+      $content | Should -Match "Set-ManagedSymlinkDeleteProtection"
+    }
+
+    It "should contain Remove-ManagedSymlinkDeleteProtection" {
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1"
+      $content = Get-Content -Path $modulePath -Raw
+      $content | Should -Match "Remove-ManagedSymlinkDeleteProtection"
+    }
+
+    It "should protect managed custom symlinks" {
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1"
+      $content = Get-Content -Path $modulePath -Raw
+      $content | Should -Match "Sync-CustomProvisionSymlink"
+    }
+  }
+
   Context "ACL Compliance Across All Modules" {
     It "should not expose plaintext ACL deny operations without ShouldProcess" {
       $modulePaths = @(
         "src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1",
         "src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1",
         "src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1",
+        "src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1",
         "src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
       )
 

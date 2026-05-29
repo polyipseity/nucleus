@@ -85,6 +85,11 @@
   for each configured user. iCloud entries are skipped with a warning (no rclone backend
   on Windows). False skips provisioning without error.
 
+.PARAMETER EnableCustomProvisionSymlinkParity
+  Enable managed custom symlink provisioning from users.json. Each link is created only
+  for entries that declare a Windows target and receives delete-protection ACLs.
+  False removes only previously managed custom symlinks.
+
 .PARAMETER EnableGitSshParity
   Enable managed user-level Git/SSH parity convergence and block cleanup logic.
 
@@ -216,6 +221,7 @@ param(
   [bool]$EnableSecretsParity = $true,
   [bool]$EnableBunParity = $true,
   [bool]$EnableCloudDrivesParity = $true,
+  [bool]$EnableCustomProvisionSymlinkParity = $true,
   [bool]$EnableGitSshParity = $true,
   [bool]$EnableHostAgeKeyRegistration = $true,
   [bool]$EnablePowerParity = $true,
@@ -287,6 +293,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsClawHubSkill.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsSkill.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-CustomProvisionSymlink.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DevRepo.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-GitAndSshConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ObsidianConfig.ps1")
@@ -569,6 +576,7 @@ if ($EnableCloudDrivesParity) {
     Sync-CloudDrive -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
   }
 }
+Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRecords $selectedUserRecords
 Sync-ReplicaSyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
 Sync-OpenSSHServer -Enabled:$EnableRemoteAccessParity
 # Re-run host age key registration after Sync-OpenSSHServer has started

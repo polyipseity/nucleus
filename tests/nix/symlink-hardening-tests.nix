@@ -7,6 +7,7 @@ let
   editorsText = builtins.readFile ../../src/modules/editors.nix;
   agentsText = builtins.readFile ../../src/modules/agents.nix;
   devReposText = builtins.readFile ../../src/modules/dev-repos.nix;
+  customProvisionSymlinksText = builtins.readFile ../../src/modules/custom-provision-symlinks.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
 in
 {
@@ -50,6 +51,17 @@ in
     true;
 
   # =========================================================================
+  # Assertion 5: Custom provision symlink protection in custom-provision-symlinks.nix
+  # =========================================================================
+  customProvisionSymlinkProtection =
+    assert containsRegex "_nucleus_protect_symlink" customProvisionSymlinksText;
+    assert containsRegex "_nucleus_unprotect_symlink" customProvisionSymlinksText;
+    assert containsRegex "custom-provision-symlinks\.json" customProvisionSymlinksText;
+    assert containsRegex "chflags -h uchg" customProvisionSymlinksText;
+    assert containsRegex "chattr -h \\+i" customProvisionSymlinksText;
+    true;
+
+  # =========================================================================
   # Assertion 5: Raycast alias symlink protection in macos.nix
   # =========================================================================
   raycastAliasProtection =
@@ -65,9 +77,9 @@ in
     assert containsRegex "pkgs\\.mysides" macosText;
     assert containsRegex "\\$MYSIDES_BIN list" macosText;
     assert containsRegex "add_favorite" macosText;
-    assert containsRegex "\\$MYSIDES_BIN add \"Applications\"" macosText;
-    assert containsRegex "\\$MYSIDES_BIN add \"clouds\"" macosText;
-    assert containsRegex "\\$MYSIDES_BIN add \"dev\"" macosText;
+    assert containsRegex "\"\\$MYSIDES_BIN\" add \"Applications\"" macosText;
+    assert containsRegex "\"\\$MYSIDES_BIN\" add \"clouds\"" macosText;
+    assert containsRegex "\"\\$MYSIDES_BIN\" add \"dev\"" macosText;
     assert !containsRegex "sfltool add-item" macosText;
     assert !containsRegex "sfltool remove-item" macosText;
     true;
@@ -81,11 +93,13 @@ in
       vsCodePs1Path = ../../src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1;
       agentsConfigPs1Path = ../../src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1;
       agentsSkillPs1Path = ../../src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1;
+      customProvisionPs1Path = ../../src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1;
       devRepoPs1Path = ../../src/hosts/Windows/modules/user/Sync-DevRepo.ps1;
     in
     assert builtins.pathExists vsCodePs1Path;
     assert builtins.pathExists agentsConfigPs1Path;
     assert builtins.pathExists agentsSkillPs1Path;
+    assert builtins.pathExists customProvisionPs1Path;
     assert builtins.pathExists devRepoPs1Path;
     true;
 
@@ -93,7 +107,7 @@ in
   # Assertion 8: Dev repos logging keeps errors visible and no-op skips quiet
   # =========================================================================
   devReposLoggingPolicy =
-    assert containsRegex "report_error\(\)" devReposText;
+    assert containsRegex "report_error\\(\\)" devReposText;
     assert containsRegex "completed with .*non-fatal error" devReposText;
     assert !containsRegex "devReposProvision: .*\(skipping\)" devReposText;
     true;
@@ -103,11 +117,12 @@ in
   # =========================================================================
   summary = {
     testSuiteName = "Symlink Hardening Regression Tests";
-    totalAssertions = 8;
+    totalAssertions = 9;
     coverage = [
       "VS Code"
       "Agents Config"
       "Agents Skills"
+      "Custom Provision Symlinks"
       "Dev Repos"
       "Dev Repos Logging"
       "Raycast Aliases"
