@@ -140,7 +140,15 @@ locals {
   bootPromptAnyKeyDensePhase = [for _ in range(0, 1024) : "a<wait>"]
   bootPromptAnyKeySlowPhase  = [for _ in range(0, 1024) : "a<wait20>"]
 
-  bootPromptByStrategy = (
+  # WHY: Some EFI boots land in the UEFI shell instead of auto-launching the
+  # installer. Explicitly invoke the Windows bootloader from the mapped
+  # filesystem aliases seen in shell mapping output (fs0/fs1).
+  bootPromptEfiDirect = [
+    "<wait5>fs0:/EFI/BOOT/BOOTX64.EFI<enter>",
+    "<wait5>fs1:/EFI/BOOT/BOOTX64.EFI<enter>",
+  ]
+
+  bootPromptByStrategy = local.efiEnabled ? local.bootPromptEfiDirect : (
     var.boot_strategy == "none" ? [] :
     var.boot_strategy == "spacebar" ? local.bootPromptSpacebarPhase :
     var.boot_strategy == "alpha" ? local.bootPromptAlphaPhase :

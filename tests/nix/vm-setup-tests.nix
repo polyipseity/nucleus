@@ -384,6 +384,8 @@ let
         && (lib.hasInfix "variable \"headless\"" vms_windows_packer_text)
         && (lib.hasInfix "variable \"display_backend\"" vms_windows_packer_text)
         && (lib.hasInfix "bootPromptByStrategy" vms_windows_packer_text)
+        && (lib.hasInfix "bootPromptEfiDirect" vms_windows_packer_text)
+        && (lib.hasInfix "fs0:/EFI/BOOT/BOOTX64.EFI" vms_windows_packer_text)
         && (lib.hasInfix "efi_boot          = local.efiEnabled" vms_windows_packer_text)
         && (lib.hasInfix "headless = var.headless" vms_windows_packer_text)
         && (lib.hasInfix "display  = local.displayBackendResolved" vms_windows_packer_text)
