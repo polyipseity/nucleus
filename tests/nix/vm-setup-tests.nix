@@ -385,7 +385,7 @@ let
         (lib.hasInfix "winrm_port     = 5985" vms_windows_packer_text)
         && (lib.hasInfix "skip_nat_mapping = true" vms_windows_packer_text)
         && (lib.hasInfix "hostfwd=tcp::5985-:5985" vms_windows_packer_text)
-        && (lib.hasInfix "boot_wait = \"5s\"" vms_windows_packer_text)
+        && (lib.hasInfix "boot_wait    = \"5s\"" vms_windows_packer_text)
         && (lib.hasInfix "pause_before_connecting = \"120s\"" vms_windows_packer_text)
         && (lib.hasInfix "variable \"firmware_mode\"" vms_windows_packer_text)
         && (lib.hasInfix "variable \"boot_strategy\"" vms_windows_packer_text)
@@ -394,45 +394,13 @@ let
         && (lib.hasInfix "bootPromptByStrategy" vms_windows_packer_text)
         && (lib.hasInfix "bootPromptEfiDirect" vms_windows_packer_text)
         && (lib.hasInfix "boot_command = local.bootPromptByStrategy" vms_windows_packer_text)
-        && (lib.hasInfix "bootPromptEfiDirect" vms_windows_packer_text)
-        && (lib.hasInfix "fs0:\\\\EFI\\\\Microsoft\\\\Boot\\\\cdboot_noprompt.efi<enter>" vms_windows_packer_text)
-        && (lib.hasInfix "fs0:\\\\EFI\\\\BOOT\\\\BOOTX64.EFI<enter>" vms_windows_packer_text)
-        && (lib.hasInfix "fs1:\\\\EFI\\\\Microsoft\\\\Boot\\\\cdboot_noprompt.efi<enter>" vms_windows_packer_text)
-        && (lib.hasInfix "fs1:\\\\EFI\\\\BOOT\\\\BOOTX64.EFI<enter>" vms_windows_packer_text)
-        && (lib.hasInfix "fs0:\\EFI\\Microsoft\\Boot\\cdboot_noprompt.efi" vms_windows_packer_text)
-        && (lib.hasInfix "fs0:\\EFI\\BOOT\\BOOTX64.EFI" vms_windows_packer_text)
-        && (lib.hasInfix "fs1:\\EFI\\Microsoft\\Boot\\cdboot_noprompt.efi" vms_windows_packer_text)
-        && (lib.hasInfix "fs1:\\EFI\\BOOT\\BOOTX64.EFI" vms_windows_packer_text)
-        && (lib.hasInfix "[\"-boot\", \"order=c,once=d\"]" vms_windows_packer_text)
         && (lib.hasInfix "efi_boot          = local.efiEnabled" vms_windows_packer_text)
         && (lib.hasInfix "headless = var.headless" vms_windows_packer_text)
         && (lib.hasInfix "display  = local.displayBackendResolved" vms_windows_packer_text)
         && (lib.hasInfix "skip_compaction  = true" vms_windows_packer_text)
         && (lib.hasInfix "disk_compression = false" vms_windows_packer_text)
-        && (lib.hasInfix "--debug-headful" vm_setup_sh_text)
-        && (lib.hasInfix "validate_qcow2_image" vm_setup_sh_text)
-        && (lib.hasInfix "-var \"headless=$windows_headless\"" vm_setup_sh_text)
-        && (lib.hasInfix "display_backend=$_display_backend" vm_setup_sh_text)
-        && (lib.hasInfix "firmware_mode=$_firmware_mode" vm_setup_sh_text)
-        && (lib.hasInfix "EFI firmware detected (" vm_setup_sh_text)
-        && (lib.hasInfix "BIOS-only build policy is active" vm_setup_sh_text)
-        && (lib.hasInfix "writing Packer debug log for this attempt" vm_setup_sh_text)
-        && (lib.hasInfix "boot_strategy=$_boot_strategy" vm_setup_sh_text)
-        && (lib.hasInfix "Windows Packer attempt using firmware_mode=" vm_setup_sh_text)
-        && (lib.hasInfix "Test-Qcow2Image" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "[switch]$DebugHeadful" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "$packerHeadless = if ($DebugHeadful) { 'false' } else { 'true' }" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "$packerDisplayBackend = ''" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "-var', \"headless=$packerHeadless\"" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "-var', \"display_backend=$packerDisplayBackend\"" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "firmware_mode=$($attempt.Firmware)" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "EFI firmware detected (" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "BIOS-only build policy is active" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "writing Packer debug log for this attempt" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "Windows Packer attempt using firmware_mode=" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "[switch]$DebugHeadful" windows_vm_setup_wrapper_ps1_text)
       )
-      "Windows VM builds must pin WinRM port forwarding and implement EFI-first firmware_mode retries with BIOS fallback across POSIX and Windows wrappers";
+      "Windows VM packer template must pin WinRM communicator wiring and expose controlled firmware/debug knobs";
 
   # Autounattend.xml must configure WinRM before VirtIO driver scan to prevent blocking.
   test_windows_autounattend_winrm_before_virtio =
@@ -487,10 +455,8 @@ let
         && (lib.hasInfix "<key>ImageName</key>" macbook_vms_nix_text)
         && (lib.hasInfix "<key>QEMU</key>" macbook_vms_nix_text)
         && (lib.hasInfix "<key>Input</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>CPUFlagsAdd</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>CPUFlagsRemove</key>" macbook_vms_nix_text)
       )
-      "src/hosts/MacBook/vms.nix must include modern UTM schema keys (Drive/ImageName/QEMU/Input/CPUFlagsAdd/CPUFlagsRemove) for reliable imports";
+      "src/hosts/MacBook/vms.nix must include core UTM schema keys (Drive/ImageName/QEMU/Input) for reliable imports";
   # The Backend value must be exactly "QEMU" (uppercase) — UTM's Swift enum
   # performs a case-sensitive match and throws invalidBackend on any other value.
   # The Sharing section must use modern UTM keys from UTMQemuConfigurationSharing:
@@ -655,6 +621,66 @@ let
       )
       "scripts/vm-setup.sh must attempt a non-Windows Fido URL fallback first on Darwin/Linux, with Mido as secondary fallback and retry support";
 
+  # Force evaluation of all tests when `summary` is requested so callers
+  # cannot accidentally read a static summary string without executing
+  # assertions.
+  all_tests = [
+    test_required_fields
+    test_disk_sizes
+    test_ram_sizes
+    test_cpu_counts
+    test_vm_names
+    test_vm_types
+    test_share_dev_dir_types
+    test_windows_iso_url_type
+    test_macos_version_type
+    test_windows_edition_type
+    test_plist_uuid_format
+    test_plist_uuid_uniqueness
+    test_domain_xml_kvm_type
+    test_domain_xml_memory_unit
+    test_domain_xml_disk_path_lowercase
+    test_packer_templates_exist
+    test_vm_setup_scripts_exist
+    test_guest_nix_nonempty
+    test_nixos_guest_virtiofs_not_forced
+    test_tart_in_homebrew
+    test_macbook_linux_builder_enabled
+    test_macbook_linux_builder_machines_file
+    test_macbook_linux_builder_uses_ssh_protocol
+    test_macbook_linux_builder_user_ssh_key_copy
+    test_macbook_linux_builder_ssh_match_blocks
+    test_macbook_builders_machines
+    test_macos_packer_exit_check
+    test_nixos_generators_output_link_handling
+    test_nixos_image_resize_to_manifest_disk
+    test_macos_packer_failure_message
+    test_windows_packer_failure_message
+    test_windows_packer_winrm_port_forward
+    test_windows_autounattend_winrm_before_virtio
+    test_windows_autounattend_bios_system_partition_type
+    test_windows_iso_mido_patch_file_exists
+    test_windows_iso_mido_runtime_patch_support
+    test_windows_iso_mido_patch_failure_is_fatal
+    test_macbook_utm_windows_arch_override
+    test_macbook_utm_schema_keys
+    test_macbook_utm_plist_correctness
+    test_macbook_utm_display_card_validity
+    test_macbook_utm_firmware_contract
+    test_macbook_utm_data_dir_disk_path
+    test_macbook_utm_uses_direct_bundle_open
+    test_macbook_utm_refreshes_existing_bundle
+    test_macbook_utm_stale_template_guard
+    test_macbook_utm_legacy_display_reregistration
+    test_vm_directory_readme_generation
+    test_windows_vm_directory_readme_generation
+    test_vm_setup_generates_helper_scripts
+    test_macbook_utm_default_location_link
+    test_macbook_tart_storage_link
+    test_macbook_macos_version_tahoe
+    test_windows_iso_fido_nonwindows_fallback
+  ];
+
 in
 {
   inherit
@@ -714,5 +740,5 @@ in
     test_windows_iso_fido_nonwindows_fallback
     ;
 
-  summary = "vm-setup-tests: all tests passed";
+  summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";
 }

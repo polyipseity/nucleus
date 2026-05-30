@@ -1860,9 +1860,7 @@ case "$_os" in
     if [ -f /etc/NIXOS ]; then
       setup_libvirt_vms
     else
-      printf 'vm-setup: standalone Linux detected; use QEMU/KVM directly:\n'
-      printf 'vm-setup:   qemu-img create -f qcow2 ~/virtual\ machines/<name>.qcow2 <size>G\n'
-      printf 'vm-setup:   qemu-system-x86_64 -m <ram> -smp <cpu> -hda ~/virtual\ machines/<name>.qcow2 ...\n'
+      printf 'vm-setup: unsupported Linux host outside NixOS; no provisioning actions executed\n'
     fi
     ;;
   *)
