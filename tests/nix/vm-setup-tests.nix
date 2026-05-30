@@ -512,11 +512,11 @@ let
   test_macbook_utm_display_card_validity =
     assert'
       (
-        (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"std\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
+        (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"virtio-vga\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
         && !(lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
         && !(lib.hasInfix "virtio-ramfb-gl" macbook_vms_nix_text)
       )
-      "src/hosts/MacBook/vms.nix must use supported UTM display cards (std for Windows, virtio-gpu-pci for Linux/NixOS)";
+      "src/hosts/MacBook/vms.nix must use supported UTM display cards (virtio-vga for Windows, virtio-gpu-pci for Linux/NixOS)";
   test_macbook_utm_firmware_contract =
     assert'
       (

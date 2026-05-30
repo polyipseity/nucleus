@@ -58,11 +58,12 @@ let
     }";
 
   # QEMU display card appropriate for the guest OS.
-  # Windows VMs use standard VGA because raw `vga` is not a valid UTM/QEMU
-  # device model name.
+  # Windows VMs must use `virtio-vga` on this UTM/QEMU stack because legacy
+  # `vga`/`std` models are rejected at launch (`-device ... is not a valid
+  # device model name`).
   # Linux/NixOS VMs use VirtIO GPU so UTM exposes an active display on both
   # Apple Silicon and Intel hosts.
-  displayCard = vm: if vm.type == "Windows" then "std" else "virtio-gpu-pci";
+  displayCard = vm: if vm.type == "Windows" then "virtio-vga" else "virtio-gpu-pci";
 
   # UTM 4.x sharing mode selector.
   # Modern UTM uses DirectoryShareMode/DirectoryShareReadOnly (not the legacy
