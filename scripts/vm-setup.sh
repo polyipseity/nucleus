@@ -637,7 +637,7 @@ case "$(uname -m)" in
     ;;
 esac
 
-# build_nixos_image NAME
+# build_nixos_image NAME DISK_GIB
 #   Builds the NixOS guest image via nixos-generators.  On macOS this
 #   requires an aarch64-linux builder; enable nix.linux-builder.enable in the
 #   macOS host config so the Nix daemon delegates Linux derivations to the
@@ -646,6 +646,7 @@ esac
 #   (e.g. etc-hostname) are configuration-specific and cannot be cached.
 build_nixos_image() {
   _name="$1"
+  _disk_gib="$2"
   _out="$IMAGES_DIR/${_name}.qcow2"
 
   if [ -f "$_out" ]; then
@@ -691,6 +692,24 @@ build_nixos_image() {
   fi
   # -L follows symlinks so we copy the actual disk image bytes.
   cp -L "$_img" "$_out"
+  chmod u+w "$_out"
+
+  # WHY: nixos-generators defaults to a small virtual disk (~4 GiB) for qcow
+  # outputs, but this repository declares guest disk sizes in VMs.json.
+  # Resize here so the pre-built image matches the manifest contract used by
+  # all runtime backends (UTM/libvirt/QEMU).
+  if command -v qemu-img >/dev/null 2>&1; then
+    if ! qemu-img resize "$_out" "${_disk_gib}G" >/dev/null; then
+      printf 'vm-setup: failed to resize NixOS image to %s GiB: %s\n' "$_disk_gib" "$_out" >&2
+      rm -rf "$_tmpdir"
+      return 1
+    fi
+  else
+    printf 'vm-setup: qemu-img not found; cannot resize NixOS image to %s GiB\n' "$_disk_gib" >&2
+    rm -rf "$_tmpdir"
+    return 1
+  fi
+
   rm -rf "$_tmpdir"
   printf 'vm-setup: NixOS image ready: %s\n' "$_out"
 }
@@ -1405,7 +1424,7 @@ build_images() {
           # WHY: best-effort — a prerequisite-missing or build failure for one
           # VM type must not abort builds for the remaining VMs; the build
           # function prints a specific error before returning non-zero.
-          build_nixos_image "$_vm_name" \
+          build_nixos_image "$_vm_name" "$_vm_disk_gib" \
             || printf 'vm-setup: NixOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
           ;;
         Windows)
@@ -1452,6 +1471,25 @@ cleanup_vm_directory_artifacts() {
       "$VM_DIR/${_cls_name}-configure.ps1"
     do
       if [ -f "$_cls_legacy" ]; then
+        case "$_cls_legacy" in
+          "$VM_DIR/Start-"*.sh)
+            _cls_modern="$VM_DIR/start-${_cls_name}.sh"
+            # WHY: default macOS APFS is case-insensitive, so Start-*.sh and
+            # start-*.sh resolve to the same path. Removing the legacy variant
+            # would delete the newly generated helper script.
+            if [ -f "$_cls_modern" ]; then
+              printf 'vm-setup: skipping legacy cleanup due case-insensitive filename collision: %s\n' "$_cls_legacy"
+              continue
+            fi
+            ;;
+          "$VM_DIR/Start-"*.ps1)
+            _cls_modern="$VM_DIR/start-${_cls_name}.ps1"
+            if [ -f "$_cls_modern" ]; then
+              printf 'vm-setup: skipping legacy cleanup due case-insensitive filename collision: %s\n' "$_cls_legacy"
+              continue
+            fi
+            ;;
+        esac
         rm -f "$_cls_legacy"
         printf 'vm-setup: removed legacy helper script: %s\n' "$_cls_legacy"
       fi

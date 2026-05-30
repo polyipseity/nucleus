@@ -357,6 +357,14 @@ let
       )
       "scripts/vm-setup.sh must give nixos-generators a non-existent output link path and resolve the resulting symlink";
 
+  # nixos-generators produces a small default qcow2 unless resized explicitly.
+  # vm-setup must resize NixOS images to manifest disk size so provisioning
+  # logic does not reject the pre-built image for being too small.
+  test_nixos_image_resize_to_manifest_disk = assert' (
+    (lib.hasInfix "build_nixos_image NAME DISK_GIB" vm_setup_sh_text)
+    && (lib.hasInfix "qemu-img resize \"$_out\" \"\${_disk_gib}G\"" vm_setup_sh_text)
+  ) "scripts/vm-setup.sh must resize generated NixOS qcow2 images to the manifest disk size";
+
   # The Packer failure branch for the macOS build must print a human-readable
   # error and return the captured exit code.
   test_macos_packer_failure_message = assert' (lib.hasInfix "Packer build for macOS VM" vm_setup_sh_text) "scripts/vm-setup.sh must print a failure message for a failed macOS Packer build";
@@ -580,6 +588,7 @@ let
         (lib.hasInfix "write_start_script" vm_setup_sh_text)
         && (lib.hasInfix "write_configure_script" vm_setup_sh_text)
         && (lib.hasInfix "wrote configure helper scripts" vm_setup_sh_text)
+        && (lib.hasInfix "case-insensitive filename collision" vm_setup_sh_text)
         && (lib.hasInfix "configure helpers written" windows_vm_setup_ps1_text)
         && (lib.hasInfix "removed legacy helper script" windows_vm_setup_ps1_text)
       )
@@ -658,6 +667,7 @@ in
     test_macbook_builders_machines
     test_macos_packer_exit_check
     test_nixos_generators_output_link_handling
+    test_nixos_image_resize_to_manifest_disk
     test_macos_packer_failure_message
     test_windows_packer_failure_message
     test_windows_packer_winrm_port_forward
