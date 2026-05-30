@@ -423,6 +423,71 @@ let
       )
       "vms/windows/Autounattend.xml must keep the active BIOS system partition TypeID at 0x07 (not 0x27)";
 
+  # Guest credential policy: username/password must derive from the current
+  # host user and be wired across all guest build paths.
+  test_guest_credentials_policy_in_vm_setup_sh =
+    assert'
+      (
+        (lib.hasInfix "vm_guest_username" vm_setup_sh_text)
+        && (lib.hasInfix "vm_guest_password=\"$vm_guest_username\"" vm_setup_sh_text)
+        && (lib.hasInfix "NUCLEUS_VM_GUEST_USERNAME" vm_setup_sh_text)
+        && (lib.hasInfix "NUCLEUS_VM_GUEST_PASSWORD" vm_setup_sh_text)
+        && (lib.hasInfix "--argstr guestUsername" vm_setup_sh_text)
+        && (lib.hasInfix "--argstr guestPassword" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must derive guest credentials from the current user and export/pass them to guest builders";
+
+  test_guest_credentials_policy_in_windows_vm_setup_ps1 =
+    assert'
+      (
+        (lib.hasInfix "$guestUsername" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "$guestPassword = $guestUsername" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "$guestPrincipal = $guestUsername" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "$guestSecret = $guestPassword" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "-GuestPrincipal $guestPrincipal -GuestSecret $guestSecret" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "__NUCLEUS_GUEST_USERNAME__" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "__NUCLEUS_GUEST_PASSWORD__" windows_vm_setup_ps1_text)
+      )
+      "Invoke-VMSetup.ps1 must derive and propagate current-user guest credentials to all Windows-host build paths";
+
+  test_guest_credentials_policy_in_nixos_guest = assert' (
+    (lib.hasInfix "guestUsername ? builtins.getEnv \"NUCLEUS_VM_GUEST_USERNAME\"" guest_nix_text)
+    && (lib.hasInfix "guestPassword ? builtins.getEnv \"NUCLEUS_VM_GUEST_PASSWORD\"" guest_nix_text)
+    && (lib.hasInfix "users.users.\"\${guestUsername}\"" guest_nix_text)
+  ) "vms/nixos/guest.nix must consume exported guest credentials and create a login user";
+
+  test_guest_credentials_policy_in_nixos_packer = assert' (
+    (lib.hasInfix "variable \"guest_username\"" nixos_packer_text)
+    && (lib.hasInfix "variable \"guest_password\"" nixos_packer_text)
+    && (lib.hasInfix "users.users.\\\"\${var.guest_username}\\\"" nixos_packer_text)
+  ) "vms/nixos/packer.pkr.hcl must accept and apply guest credentials for Windows-host NixOS builds";
+
+  test_guest_credentials_policy_in_windows_packer =
+    assert'
+      (
+        (lib.hasInfix "variable \"guest_username\"" vms_windows_packer_text)
+        && (lib.hasInfix "variable \"guest_password\"" vms_windows_packer_text)
+        && (lib.hasInfix "variable \"autounattend_path\"" vms_windows_packer_text)
+        && (lib.hasInfix "winrm_username = var.guest_username" vms_windows_packer_text)
+        && (lib.hasInfix "winrm_password = var.guest_password" vms_windows_packer_text)
+        && (lib.hasInfix "var.autounattend_path" vms_windows_packer_text)
+      )
+      "vms/windows/packer.pkr.hcl must wire guest credentials into WinRM and consume a rendered Autounattend path";
+
+  test_guest_credentials_policy_in_windows_autounattend = assert' (
+    (lib.hasInfix "__NUCLEUS_GUEST_USERNAME__" vms_windows_autounattend_text)
+    && (lib.hasInfix "__NUCLEUS_GUEST_PASSWORD__" vms_windows_autounattend_text)
+  ) "vms/windows/Autounattend.xml must expose guest credential placeholders for runtime rendering";
+
+  test_guest_credentials_policy_in_macos_packer =
+    assert'
+      (
+        (lib.hasInfix "variable \"guest_username\"" vms_macos_packer_text)
+        && (lib.hasInfix "variable \"guest_password\"" vms_macos_packer_text)
+        && (lib.hasInfix "sysadminctl -addUser" vms_macos_packer_text)
+      )
+      "vms/macos/packer.pkr.hcl must provision a guest account using the current-user credential policy";
+
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
   test_windows_iso_mido_patch_file_exists = assert' (builtins.pathExists ../../vms/windows/patches/mido-iso-link.patch) "vms/windows/patches/mido-iso-link.patch must exist for runtime Mido patching";
@@ -659,6 +724,13 @@ let
     test_windows_packer_winrm_port_forward
     test_windows_autounattend_winrm_before_virtio
     test_windows_autounattend_bios_system_partition_type
+    test_guest_credentials_policy_in_vm_setup_sh
+    test_guest_credentials_policy_in_windows_vm_setup_ps1
+    test_guest_credentials_policy_in_nixos_guest
+    test_guest_credentials_policy_in_nixos_packer
+    test_guest_credentials_policy_in_windows_packer
+    test_guest_credentials_policy_in_windows_autounattend
+    test_guest_credentials_policy_in_macos_packer
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
     test_windows_iso_mido_patch_failure_is_fatal
@@ -718,6 +790,13 @@ in
     test_windows_packer_winrm_port_forward
     test_windows_autounattend_winrm_before_virtio
     test_windows_autounattend_bios_system_partition_type
+    test_guest_credentials_policy_in_vm_setup_sh
+    test_guest_credentials_policy_in_windows_vm_setup_ps1
+    test_guest_credentials_policy_in_nixos_guest
+    test_guest_credentials_policy_in_nixos_packer
+    test_guest_credentials_policy_in_windows_packer
+    test_guest_credentials_policy_in_windows_autounattend
+    test_guest_credentials_policy_in_macos_packer
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
     test_windows_iso_mido_patch_failure_is_fatal

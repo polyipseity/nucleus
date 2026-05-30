@@ -61,6 +61,18 @@ variable "cpus" {
   description = "vCPUs during the build."
 }
 
+variable "guest_username" {
+  type        = string
+  default     = "nixos"
+  description = "Primary login username for the built NixOS guest."
+}
+
+variable "guest_password" {
+  type        = string
+  default     = "nixos"
+  description = "Password for the primary NixOS guest user."
+}
+
 packer {
   required_plugins {
     qemu = {
@@ -138,6 +150,11 @@ build {
       "  boot.loader.grub.enable = true;",
       "  boot.loader.grub.device = \"/dev/vda\";",
       "  networking.hostName = \"NixOS\";",
+      "  users.users.\"${var.guest_username}\" = {",
+      "    isNormalUser = true;",
+      "    extraGroups = [ \"wheel\" ];",
+      "    initialPassword = \"${var.guest_password}\";",
+      "  };",
       "  system.stateVersion = \"25.05\";",
       "}",
       "NIXEOF",

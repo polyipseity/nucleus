@@ -18,7 +18,12 @@
 # the chosen format (qcow = BIOS + ext4, qcow-efi = UEFI + ext4).
 #
 # Source: https://github.com/nix-community/nixos-generators
-{ modulesPath, ... }:
+{
+  modulesPath,
+  guestUsername ? builtins.getEnv "NUCLEUS_VM_GUEST_USERNAME",
+  guestPassword ? builtins.getEnv "NUCLEUS_VM_GUEST_PASSWORD",
+  ...
+}:
 {
   imports = [ "${modulesPath}/profiles/qemu-guest.nix" ];
 
@@ -30,6 +35,12 @@
   # breaks image generation before the VM ever boots.
   # Example guest-side mount after first boot:
   #   fileSystems."/home/nixos/dev" = { device = "dev"; fsType = "virtiofs"; };
+
+  users.users."${guestUsername}" = {
+    isNormalUser = true;
+    extraGroups = [ "wheel" ];
+    initialPassword = guestPassword;
+  };
 
   system.stateVersion = "25.05";
 }

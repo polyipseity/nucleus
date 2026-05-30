@@ -133,6 +133,17 @@ fi
 VM_DIR="${VM_DIR_OVERRIDE:-$HOME/virtual machines}"
 IMAGES_DIR="$VM_DIR/images"
 
+if [ -n "${USER:-}" ]; then
+  vm_guest_username="$USER"
+elif command -v id >/dev/null 2>&1; then
+  vm_guest_username="$(id -un)"
+else
+  vm_guest_username='user'
+fi
+vm_guest_password="$vm_guest_username"
+export NUCLEUS_VM_GUEST_USERNAME="$vm_guest_username"
+export NUCLEUS_VM_GUEST_PASSWORD="$vm_guest_password"
+
 # write_vm_directory_readme
 #   Writes a cross-host usage guide into the managed VM directory so operators
 #   can transfer VM artifacts between hosts and run guest-specific converge
@@ -675,6 +686,8 @@ build_nixos_image() {
     --format "$_nixos_format" \
     --system "$_nixos_system" \
     --configuration "$_guest_nix" \
+    --argstr guestUsername "$vm_guest_username" \
+    --argstr guestPassword "$vm_guest_password" \
     -o "$_out_link"
 
   # nixos-generators' -o flag expects a non-existent symlink path, not an
@@ -1201,25 +1214,30 @@ bios legacy 3h'
       [ -n "$_firmware_mode" ] || continue
       if [ "$_firmware_mode" = 'efi' ]; then
         if [ "$windows_headless" = 'false' ]; then
-          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var display_backend=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
-            "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_display_backend" "$_efi_code" "$_efi_vars" "$_disk_gib" "$_tmp_out"
+          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var display_backend=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
+            "$_packer_dir" "$_iso" "$vm_guest_username" "$VMS_DIR/windows/Autounattend.xml" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_display_backend" "$_efi_code" "$_efi_vars" "$_disk_gib" "$_tmp_out"
         else
-          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
-            "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_efi_code" "$_efi_vars" "$_disk_gib" "$_tmp_out"
+          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
+            "$_packer_dir" "$_iso" "$vm_guest_username" "$VMS_DIR/windows/Autounattend.xml" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_efi_code" "$_efi_vars" "$_disk_gib" "$_tmp_out"
         fi
       else
         if [ "$windows_headless" = 'false' ]; then
-          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var display_backend=%s -var disk_size=%sG -var output_directory=%s .\n' \
-            "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_display_backend" "$_disk_gib" "$_tmp_out"
+          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var display_backend=%s -var disk_size=%sG -var output_directory=%s .\n' \
+            "$_packer_dir" "$_iso" "$vm_guest_username" "$VMS_DIR/windows/Autounattend.xml" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_display_backend" "$_disk_gib" "$_tmp_out"
         else
-          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var disk_size=%sG -var output_directory=%s .\n' \
-            "$_packer_dir" "$_iso" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_disk_gib" "$_tmp_out"
+          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var disk_size=%sG -var output_directory=%s .\n' \
+            "$_packer_dir" "$_iso" "$vm_guest_username" "$VMS_DIR/windows/Autounattend.xml" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_disk_gib" "$_tmp_out"
         fi
       fi
     done <<EOF
 $_build_attempts
 EOF
     return 0
+  fi
+
+  if ! command -v perl >/dev/null 2>&1; then
+    printf 'vm-setup: perl not found; required to render Windows Autounattend.xml guest credentials\n' >&2
+    return 1
   fi
 
   _packer_init_status=0
@@ -1246,6 +1264,9 @@ EOF
     _attempt_tmpdir="$(mktemp -d "${IMAGES_DIR}/.${_name}.${_firmware_mode}.${_boot_strategy}.XXXXXX")"
     _tmp_out="$_attempt_tmpdir/output"
     _packer_log="$_attempt_tmpdir/packer.log"
+    _autounattend_rendered="$_attempt_tmpdir/Autounattend.xml"
+    perl -pe "s/__NUCLEUS_GUEST_USERNAME__/${vm_guest_username}/g; s/__NUCLEUS_GUEST_PASSWORD__/${vm_guest_password}/g" \
+      "$VMS_DIR/windows/Autounattend.xml" >"$_autounattend_rendered"
     printf 'vm-setup: writing Packer debug log for this attempt: %s\n' "$_packer_log"
 
     if ! ensure_windows_winrm_port_ready; then
@@ -1260,6 +1281,9 @@ EOF
         cd "$_packer_dir"
         PACKER_LOG=1 PACKER_LOG_PATH="$_packer_log" packer build \
           -var "windows_iso=$_iso" \
+          -var "guest_username=$vm_guest_username" \
+          -var "guest_password=$vm_guest_password" \
+          -var "autounattend_path=$_autounattend_rendered" \
           -var "accelerator=$accelerator" \
           -var "firmware_mode=$_firmware_mode" \
           -var "boot_strategy=$_boot_strategy" \
@@ -1277,6 +1301,9 @@ EOF
         cd "$_packer_dir"
         PACKER_LOG=1 PACKER_LOG_PATH="$_packer_log" packer build \
           -var "windows_iso=$_iso" \
+          -var "guest_username=$vm_guest_username" \
+          -var "guest_password=$vm_guest_password" \
+          -var "autounattend_path=$_autounattend_rendered" \
           -var "accelerator=$accelerator" \
           -var "firmware_mode=$_firmware_mode" \
           -var "boot_strategy=$_boot_strategy" \
@@ -1382,8 +1409,8 @@ build_macos_image() {
     "$_macos_version" "$_disk_gib" "$_mem_gib" "$_cpus"
 
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] cd %s && packer build -var vm_name=%s -var macos_version=%s -var disk_size_gib=%s -var memory_gib=%s -var cpus=%s .\n' \
-      "$_packer_dir" "$_name" "$_macos_version" "$_disk_gib" "$_mem_gib" "$_cpus"
+    printf 'vm-setup: [dry-run] cd %s && packer build -var vm_name=%s -var macos_version=%s -var guest_username=%s -var guest_password=<redacted> -var disk_size_gib=%s -var memory_gib=%s -var cpus=%s .\n' \
+      "$_packer_dir" "$_name" "$_macos_version" "$vm_guest_username" "$_disk_gib" "$_mem_gib" "$_cpus"
     return 0
   fi
 
@@ -1394,6 +1421,8 @@ build_macos_image() {
     packer build \
       -var "vm_name=$_name" \
       -var "macos_version=$_macos_version" \
+      -var "guest_username=$vm_guest_username" \
+      -var "guest_password=$vm_guest_password" \
       -var "disk_size_gib=$_disk_gib" \
       -var "memory_gib=$_mem_gib" \
       -var "cpus=$_cpus" \
@@ -1831,6 +1860,7 @@ setup_libvirt_vms() {
 # ---------------------------------------------------------------------------
 
 printf 'vm-setup: reading manifest from %s\n' "$MANIFEST"
+printf 'vm-setup: guest credential policy active (username/password=%s)\n' "$vm_guest_username"
 if [ "$dry_run" = true ]; then
   printf 'vm-setup: dry-run mode — no changes will be made\n'
 fi

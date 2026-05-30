@@ -54,6 +54,18 @@ variable "disk_size_gib" {
   description = "Disk size in GiB (match VMs.json diskGiB)."
 }
 
+variable "guest_username" {
+  type        = string
+  default     = "admin"
+  description = "Primary guest login username to provision."
+}
+
+variable "guest_password" {
+  type        = string
+  default     = "admin"
+  description = "Primary guest login password to provision."
+}
+
 packer {
   required_plugins {
     tart = {
@@ -90,6 +102,7 @@ build {
       "sudo scutil --set HostName MacBook",
       "sudo scutil --set ComputerName MacBook",
       "sudo scutil --set LocalHostName MacBook",
+      "if id -u '${var.guest_username}' >/dev/null 2>&1; then sudo dscl . -passwd '/Users/${var.guest_username}' '${var.guest_password}'; else sudo sysadminctl -addUser '${var.guest_username}' -fullName '${var.guest_username}' -password '${var.guest_password}' -admin; fi",
       "echo 'macOS VM provisioned via Packer Tart'",
     ]
   }

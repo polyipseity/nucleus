@@ -208,20 +208,20 @@
         <!-- Built-in Administrator enabled with the Packer build password.
              Change this password before using the image in production. -->
         <AdministratorPassword>
-          <Value>packer</Value>
+          <Value>__NUCLEUS_GUEST_PASSWORD__</Value>
           <PlainText>true</PlainText>
         </AdministratorPassword>
         <!-- Local Packer account used by the Packer WinRM communicator. -->
         <LocalAccounts>
           <LocalAccount wcm:action="add">
             <Password>
-              <Value>packer</Value>
+              <Value>__NUCLEUS_GUEST_PASSWORD__</Value>
               <PlainText>true</PlainText>
             </Password>
             <Description>Packer build account</Description>
-            <DisplayName>packer</DisplayName>
+            <DisplayName>__NUCLEUS_GUEST_USERNAME__</DisplayName>
             <Group>Administrators</Group>
-            <Name>packer</Name>
+            <Name>__NUCLEUS_GUEST_USERNAME__</Name>
           </LocalAccount>
         </LocalAccounts>
       </UserAccounts>
@@ -230,9 +230,9 @@
            waiting on an interactive sign-in, which causes Packer timeouts. -->
       <AutoLogon>
         <Enabled>true</Enabled>
-        <Username>Administrator</Username>
+        <Username>__NUCLEUS_GUEST_USERNAME__</Username>
         <Password>
-          <Value>packer</Value>
+          <Value>__NUCLEUS_GUEST_PASSWORD__</Value>
           <PlainText>true</PlainText>
         </Password>
         <LogonCount>1</LogonCount>

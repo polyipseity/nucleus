@@ -114,6 +114,24 @@ variable "display_backend" {
   description = "QEMU display backend to use for headful builds (for example: cocoa, gtk, sdl)."
 }
 
+variable "guest_username" {
+  type        = string
+  default     = "packer"
+  description = "Primary login username for the guest and WinRM communicator."
+}
+
+variable "guest_password" {
+  type        = string
+  default     = "packer"
+  description = "Primary login password for the guest and WinRM communicator."
+}
+
+variable "autounattend_path" {
+  type        = string
+  default     = "${path.root}/Autounattend.xml"
+  description = "Path to the rendered Autounattend.xml consumed by Windows Setup."
+}
+
 packer {
   required_plugins {
     qemu = {
@@ -211,7 +229,7 @@ source "qemu" "windows11" {
 
   # Autounattend.xml on floppy (A:\) — Windows Setup reads it automatically.
   floppy_files = [
-    "${path.root}/Autounattend.xml",
+    var.autounattend_path,
   ]
 
   # WHY: Keep fallback commands available on floppy for manual shell recovery,
@@ -228,8 +246,8 @@ source "qemu" "windows11" {
 
   # WinRM communicator: Autounattend.xml enables WinRM during oobeSystem.
   communicator   = "winrm"
-  winrm_username = "Administrator"
-  winrm_password = "packer"
+  winrm_username = var.guest_username
+  winrm_password = var.guest_password
   winrm_port     = 5985
   winrm_timeout  = var.winrm_timeout
 
