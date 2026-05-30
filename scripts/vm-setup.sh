@@ -1560,6 +1560,51 @@ setup_tart_vms() {
 setup_utm_vms() {
   UTMCTL="/Applications/UTM.app/Contents/MacOS/utmctl"
 
+  # re_register_utm_bundle NAME BUNDLE
+  #   Force UTM to reload bundle config by temporarily preserving the bundle,
+  #   deleting the registered VM entry, then reopening the preserved bundle.
+  #   WHY: UTM can keep stale runtime config for already-registered VMs even
+  #   after config.plist is refreshed in-place.
+  re_register_utm_bundle() {
+    _rr_name="$1"
+    _rr_bundle="$2"
+    _rr_backup="${_rr_bundle}.reimport"
+
+    rm -rf "$_rr_backup"
+    if ! cp -R "$_rr_bundle" "$_rr_backup"; then
+      printf 'vm-setup: WARNING — failed to stage re-registration backup for %s; keeping current registration\n' "$_rr_name" >&2
+      return 1
+    fi
+
+    if ! "$UTMCTL" delete "$_rr_name"; then
+      printf 'vm-setup: WARNING — failed to delete stale UTM registration for %s; keeping current registration\n' "$_rr_name" >&2
+      rm -rf "$_rr_backup"
+      return 1
+    fi
+
+    if [ -d "$_rr_bundle" ]; then
+      rm -rf "$_rr_bundle"
+    fi
+
+    if ! mv "$_rr_backup" "$_rr_bundle"; then
+      printf 'vm-setup: WARNING — failed to restore bundle after re-registration delete for %s\n' "$_rr_name" >&2
+      return 1
+    fi
+
+    printf 'vm-setup: re-opening UTM bundle to refresh registration: %s\n' "$_rr_bundle"
+    if ! open "$_rr_bundle"; then
+      printf 'vm-setup: WARNING — opening %s failed after re-registration; open it manually in UTM\n' "$_rr_bundle" >&2
+      return 1
+    fi
+
+    if ! wait_for_utm_registration "$_rr_name"; then
+      printf 'vm-setup: WARNING — UTM did not re-register VM "%s" within timeout after stale-config repair\n' "$_rr_name" >&2
+      return 1
+    fi
+
+    return 0
+  }
+
   if [ ! -d /Applications/UTM.app ]; then
     printf 'vm-setup: UTM not found at /Applications/UTM.app; skipping macOS VM provisioning\n'
     return
@@ -1589,12 +1634,17 @@ setup_utm_vms() {
     disk_file="$data_dir/disk-main.qcow2"
     config_plist="$bundle/config.plist"
     bundle_exists=false
+    legacy_display_config=false
 
     printf 'vm-setup: configuring UTM VM "%s"...\n' "$vm_display"
 
     if [ -d "$bundle" ]; then
       bundle_exists=true
       printf 'vm-setup: UTM bundle already exists: %s; refreshing config.plist\n' "$bundle"
+      if [ -f "$config_plist" ] && grep -qE '<string>(vga|std|virtio-ramfb|virtio-ramfb-gl)</string>' "$config_plist"; then
+        legacy_display_config=true
+        printf 'vm-setup: detected legacy display config in existing bundle; VM will be re-registered to refresh runtime state: %s\n' "$vm_name"
+      fi
     fi
 
     # Use the Nix-generated UTM config.plist written to ~/.local/share/nucleus/
@@ -1666,6 +1716,11 @@ setup_utm_vms() {
           fi
         else
           printf 'vm-setup: WARNING — opening %s failed; ensure UTM can access the managed VM directory and retry\n' "$bundle" >&2
+        fi
+      elif [ "$legacy_display_config" = true ]; then
+        printf 'vm-setup: repairing stale UTM runtime registration for %s\n' "$vm_name"
+        if re_register_utm_bundle "$vm_name" "$bundle"; then
+          printf 'vm-setup: stale UTM registration repaired: %s\n' "$vm_name"
         fi
       else
         printf 'vm-setup: UTM VM already registered: %s\n' "$vm_name"

@@ -551,6 +551,15 @@ let
     (lib.hasInfix "stale UTM template detected" vm_setup_sh_text)
     && (lib.hasInfix "run home-manager switch (or nucleus apply) before vm-setup" vm_setup_sh_text)
   ) "scripts/vm-setup.sh must fail fast on stale UTM templates and print the recovery action";
+  test_macbook_utm_legacy_display_reregistration =
+    assert'
+      (
+        (lib.hasInfix "re_register_utm_bundle" vm_setup_sh_text)
+        && (lib.hasInfix "detected legacy display config in existing bundle" vm_setup_sh_text)
+        && (lib.hasInfix "<string>(vga|std|virtio-ramfb|virtio-ramfb-gl)</string>" vm_setup_sh_text)
+        && (lib.hasInfix "repairing stale UTM runtime registration" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must re-register UTM VMs when legacy display configs are detected so refreshed config.plist values take effect";
   test_vm_directory_readme_generation =
     assert'
       (
@@ -684,6 +693,7 @@ in
     test_macbook_utm_uses_direct_bundle_open
     test_macbook_utm_refreshes_existing_bundle
     test_macbook_utm_stale_template_guard
+    test_macbook_utm_legacy_display_reregistration
     test_vm_directory_readme_generation
     test_windows_vm_directory_readme_generation
     test_vm_setup_generates_helper_scripts
