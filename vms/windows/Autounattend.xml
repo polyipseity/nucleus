@@ -92,7 +92,7 @@
               <Label>System Reserved</Label>
               <Order>1</Order>
               <PartitionID>1</PartitionID>
-              <TypeID>0x27</TypeID>
+              <TypeID>0x07</TypeID>
             </ModifyPartition>
             <ModifyPartition wcm:action="add">
               <Format>NTFS</Format>

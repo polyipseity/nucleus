@@ -444,6 +444,16 @@ let
         && (lib.hasInfix "VirtIO" vms_windows_autounattend_text)
       )
       "vms/windows/Autounattend.xml must configure WinRM in Orders 1–6 before VirtIO driver scan in Order 7 so WinRM is ready even if driver scan is slow";
+  # BIOS installs need a normal NTFS partition type for the active system
+  # partition. TypeID 0x27 is a recovery/hidden partition type and can leave
+  # SeaBIOS stuck at "Booting from Hard Disk...".
+  test_windows_autounattend_bios_system_partition_type =
+    assert'
+      (
+        (lib.hasInfix "<TypeID>0x07</TypeID>" vms_windows_autounattend_text)
+        && !(lib.hasInfix "<TypeID>0x27</TypeID>" vms_windows_autounattend_text)
+      )
+      "vms/windows/Autounattend.xml must keep the active BIOS system partition TypeID at 0x07 (not 0x27)";
 
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
@@ -681,6 +691,7 @@ in
     test_windows_packer_failure_message
     test_windows_packer_winrm_port_forward
     test_windows_autounattend_winrm_before_virtio
+    test_windows_autounattend_bios_system_partition_type
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
     test_windows_iso_mido_patch_failure_is_fatal
