@@ -500,35 +500,31 @@ let
     assert'
       (
         (lib.hasInfix "<string>QEMU</string>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>ClipboardSharing</key>" macbook_vms_nix_text)
         && (lib.hasInfix "<key>DirectoryShareMode</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>DirectoryShareReadOnly</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>DirectorySharing</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>ReadOnlySharing</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>SharedDirectories</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<string>Nearest</string>" macbook_vms_nix_text)
-        && (lib.hasInfix "<string>Linear</string>" macbook_vms_nix_text)
-        && (lib.hasInfix "<string>WebDAV</string>" macbook_vms_nix_text)
-        && (lib.hasInfix "<string>None</string>" macbook_vms_nix_text)
         && (lib.hasInfix "<string>VirtIO</string>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>IconCustom</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>IsolateFromHost</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>MacAddress</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "52:54:00:" macbook_vms_nix_text)
-        && !(lib.hasInfix "<string>qemu</string>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>ClipboardShare</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>Hypervisor</key>" macbook_vms_nix_text)
+        && (lib.hasInfix "<key>UEFIBoot</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>ClipboardSharing</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>DirectoryShareReadOnly</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>IconCustom</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>IsolateFromHost</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>BalloonDevice</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>DebugLog</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>PS2Controller</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>RTCLocalTime</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>RNGDevice</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>TPMDevice</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>CPUFlagsAdd</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>CPUFlagsRemove</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>ForceMulticore</key>" macbook_vms_nix_text)
+        && !(lib.hasInfix "<key>JITCacheSize</key>" macbook_vms_nix_text)
       )
-      "src/hosts/MacBook/vms.nix plist must use exact UTM enum values/casing: Backend=QEMU, Sharing enum names, VirtIO drive interface, IconCustom, deterministic MAC, and modern Sharing keys";
-  test_macbook_utm_display_card_validity =
-    assert'
-      (
-        (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"virtio-vga\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
-        && (lib.hasInfix "displayDynamicResolution = vm: vm.type == \"Windows\";" macbook_vms_nix_text)
-        && (lib.hasInfix "displayDynamicResolution vm then \"<true/>\" else \"<false/>\"" macbook_vms_nix_text)
-        && !(lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
-        && !(lib.hasInfix "virtio-ramfb-gl" macbook_vms_nix_text)
-      )
-      "src/hosts/MacBook/vms.nix must use supported UTM display cards and keep dynamic resolution disabled for Linux/NixOS";
+      "src/hosts/MacBook/vms.nix plist must keep only the core UTM boot wiring and omit convenience/tuning keys";
+  test_macbook_utm_display_card_validity = assert' (
+    (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"virtio-vga\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
+    && !(lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
+    && !(lib.hasInfix "virtio-ramfb-gl" macbook_vms_nix_text)
+  ) "src/hosts/MacBook/vms.nix must use supported UTM display cards for macOS UTM guests";
   test_macbook_utm_firmware_contract =
     assert'
       (

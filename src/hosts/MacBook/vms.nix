@@ -46,29 +46,10 @@ let
     in
     "${builtins.substring 0 8 h}-${builtins.substring 8 4 h}-${builtins.substring 12 4 h}-${builtins.substring 16 4 h}-${builtins.substring 20 12 h}";
 
-  # Deterministic, locally-administered unicast MAC address per VM.
-  # Prefix 52:54:00 is qemu-common and host-safe; suffix is hash-derived.
-  mkMacAddress =
-    name:
-    let
-      h = builtins.hashString "sha256" ("mac:" + name);
-    in
-    "52:54:00:${lib.toUpper (builtins.substring 0 2 h)}:${lib.toUpper (builtins.substring 2 2 h)}:${
-      lib.toUpper (builtins.substring 4 2 h)
-    }";
-
   # QEMU display card appropriate for the guest OS.
-  # Windows VMs must use `virtio-vga` on this UTM/QEMU stack because legacy
-  # `vga`/`std` models are rejected at launch (`-device ... is not a valid
-  # device model name`).
   # Linux/NixOS VMs use VirtIO GPU so UTM exposes an active display on both
   # Apple Silicon and Intel hosts.
   displayCard = vm: if vm.type == "Windows" then "virtio-vga" else "virtio-gpu-pci";
-
-  # Keep dynamic resolution for Windows where guest tooling handles resize
-  # transitions reliably. For Linux/NixOS guests, disable it to avoid transient
-  # display deactivation loops during early boot on some UTM/QEMU combinations.
-  displayDynamicResolution = vm: vm.type == "Windows";
 
   # UTM 4.x sharing mode selector.
   # Modern UTM uses DirectoryShareMode/DirectoryShareReadOnly (not the legacy
@@ -116,19 +97,11 @@ let
                 <key>Hardware</key>
                 <string>${displayCard vm}</string>
                 <key>DynamicResolution</key>
-                ${if displayDynamicResolution vm then "<true/>" else "<false/>"}
-                <key>UpscalingFilter</key>
-                <string>Nearest</string>
-                <key>DownscalingFilter</key>
-                <string>Linear</string>
-                <key>NativeResolution</key>
-                <false/>
+            <false/>
             </dict>
         </array>
         <key>Information</key>
         <dict>
-          <key>IconCustom</key>
-          <false/>
             <key>Name</key>
             <string>${vm.display}</string>
             <key>UUID</key>
@@ -139,64 +112,26 @@ let
             <dict>
                 <key>Hardware</key>
                 <string>virtio-net-pci</string>
-            <key>IsolateFromHost</key>
-            <false/>
-            <key>MacAddress</key>
-            <string>${mkMacAddress vm.name}</string>
                 <key>Mode</key>
                 <string>Shared</string>
-                <key>PortForward</key>
-                <array/>
             </dict>
         </array>
         <key>Serial</key>
         <array/>
         <key>Sharing</key>
         <dict>
-            <key>ClipboardSharing</key>
-            <true/>
           <key>DirectoryShareMode</key>
           ${directoryShareMode vm}
-          <key>DirectoryShareReadOnly</key>
-            <false/>
         </dict>
-        <key>Sound</key>
-        <array>
-            <dict>
-                <key>Hardware</key>
-                <string>intel-hda</string>
-            </dict>
-        </array>
         <key>QEMU</key>
         <dict>
-            <key>AdditionalArguments</key>
-            <array/>
-            <key>BalloonDevice</key>
-            <false/>
-            <key>DebugLog</key>
-            <false/>
             <key>Hypervisor</key>
             ${if qemuHypervisor vm then "<true/>" else "<false/>"}
-            <key>PS2Controller</key>
-            <false/>
-            <key>RTCLocalTime</key>
-            <false/>
-            <key>RNGDevice</key>
-            <true/>
-            <key>TPMDevice</key>
-            <false/>
             <key>UEFIBoot</key>
             ${if qemuUefiBoot vm then "<true/>" else "<false/>"}
         </dict>
         <key>Input</key>
-        <dict>
-            <key>MaximumUsbShare</key>
-            <integer>3</integer>
-            <key>UsbBusSupport</key>
-            <string>3.0</string>
-            <key>UsbSharing</key>
-            <false/>
-        </dict>
+        <dict/>
         <key>System</key>
         <dict>
             <key>Architecture</key>
@@ -205,14 +140,6 @@ let
             <string>default</string>
             <key>CPUCount</key>
             <integer>${toString vm.cpus}</integer>
-            <key>CPUFlagsAdd</key>
-            <array/>
-            <key>CPUFlagsRemove</key>
-            <array/>
-            <key>ForceMulticore</key>
-            <false/>
-            <key>JITCacheSize</key>
-            <integer>0</integer>
             <key>MemorySize</key>
             <integer>${toString ((vm.ramBytes + 524288) / 1048576)}</integer>
             <key>Target</key>
