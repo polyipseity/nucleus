@@ -131,6 +131,10 @@
         }
       ]
     },
+    "vmGuest": {
+      "passwordSecretKey": "vm_guest_password",
+      "usernameSecretKey": "vm_guest_username"
+    },
     "iCloudExclusions": {
       "managedRoots": [
         "Library/Mobile Documents/com~apple~CloudDocs",

@@ -62,6 +62,111 @@ function Invoke-VMSetup {
 
     $ErrorActionPreference = 'Stop'
 
+    function Get-VMGuestSecretHash {
+        param(
+            [Parameter(Mandatory)]
+            [string]$AccountName,
+
+            [Parameter(Mandatory)]
+            [string]$SecretValue
+        )
+
+        $hashBytes = [System.Security.Cryptography.SHA256]::HashData(
+            [System.Text.Encoding]::UTF8.GetBytes("$AccountName`n$SecretValue")
+        )
+        return ([System.Convert]::ToHexString($hashBytes)).ToLowerInvariant()
+    }
+
+    function Get-VMGuestSecretMarkerPath {
+        param(
+            [Parameter(Mandatory)]
+            [string]$BasePath
+        )
+
+        return "${BasePath}.vm-guest-credentials-sha256"
+    }
+
+    function Test-VMGuestSecretMarker {
+        param(
+            [Parameter(Mandatory)]
+            [string]$ExpectedHash,
+
+            [Parameter(Mandatory)]
+            [string]$MarkerPath
+        )
+
+        if (-not (Test-Path -LiteralPath $MarkerPath -PathType Leaf)) {
+            return $false
+        }
+
+        return ((Get-Content -Path $MarkerPath -Raw).Trim() -eq $ExpectedHash)
+    }
+
+    function Resolve-VMGuestCredential {
+        param(
+            [Parameter(Mandatory)]
+            [string]$RepoRoot
+        )
+
+        $secretOwner = if (-not [string]::IsNullOrWhiteSpace([string]$env:NUCLEUS_VM_SECRET_OWNER)) {
+            [string]$env:NUCLEUS_VM_SECRET_OWNER
+        } elseif (-not [string]::IsNullOrWhiteSpace([string]$env:USERNAME)) {
+            [string]$env:USERNAME
+        } elseif (-not [string]::IsNullOrWhiteSpace([Environment]::UserName)) {
+            [Environment]::UserName
+        } else {
+            throw 'vm-setup: could not determine the per-user VM secret owner (set NUCLEUS_VM_SECRET_OWNER to override).'
+        }
+
+        $userRegistryPath = Join-Path $RepoRoot 'src\hosts\Windows\users.json'
+        if (-not (Test-Path -LiteralPath $userRegistryPath -PathType Leaf)) {
+            throw "vm-setup: users registry not found: $userRegistryPath"
+        }
+
+        $userRegistry = Get-Content -Path $userRegistryPath -Raw | ConvertFrom-Json
+        $userProperty = $userRegistry.users.PSObject.Properties[$secretOwner]
+        if ($null -eq $userProperty -or $null -eq $userProperty.Value) {
+            throw "vm-setup: user '$secretOwner' is missing from $userRegistryPath"
+        }
+
+        $vmGuestRef = $userProperty.Value.vmGuest
+        if ($null -eq $vmGuestRef -or [string]::IsNullOrWhiteSpace([string]$vmGuestRef.usernameSecretKey) -or [string]::IsNullOrWhiteSpace([string]$vmGuestRef.passwordSecretKey)) {
+            throw "vm-setup: vmGuest secret-key references are missing for user '$secretOwner' in $userRegistryPath"
+        }
+
+        $secretFile = Join-Path $RepoRoot "src\secrets\users-$secretOwner.yml"
+        if (-not (Test-Path -LiteralPath $secretFile -PathType Leaf)) {
+            throw "vm-setup: per-user VM secret file not found: $secretFile"
+        }
+
+        $sopsCommand = Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue
+        if (-not $sopsCommand) {
+            $sopsCommand = Get-Command -Name 'sops' -ErrorAction SilentlyContinue
+        }
+        if (-not $sopsCommand) {
+            throw 'vm-setup: sops was not found in PATH; cannot resolve VM guest credentials from SOPS.'
+        }
+
+        $secretJsonText = & $sopsCommand.Source --decrypt --output-type json $secretFile
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($secretJsonText -join "`n"))) {
+            throw "vm-setup: failed to decrypt per-user VM secret file: $secretFile"
+        }
+
+        $secretJson = ($secretJsonText -join "`n") | ConvertFrom-Json
+        $guestUsername = [string]$secretJson.($vmGuestRef.usernameSecretKey)
+        $guestPassword = [string]$secretJson.($vmGuestRef.passwordSecretKey)
+        if ([string]::IsNullOrWhiteSpace($guestUsername) -or [string]::IsNullOrWhiteSpace($guestPassword)) {
+            throw "vm-setup: vmGuest secret values are missing in $secretFile for user '$secretOwner'"
+        }
+
+        return [PSCustomObject]@{
+            Owner = $secretOwner
+            AccountName = $guestUsername
+            Secret = $guestPassword
+            Hash = Get-VMGuestSecretHash -AccountName $guestUsername -SecretValue $guestPassword
+        }
+    }
+
     $manifest = Join-Path $RepoRoot 'src\modules\VMs.json'
     if (-not (Test-Path $manifest)) {
         Write-Information "vm-setup: manifest not found at $manifest; skipping"
@@ -72,18 +177,19 @@ function Invoke-VMSetup {
     $vmsDir    = Join-Path $RepoRoot 'vms'
     $vmDir     = Join-Path $env:USERPROFILE 'virtual machines'
     $imagesDir = Join-Path $vmDir 'images'
-    $guestUsername = if (-not [string]::IsNullOrWhiteSpace([string]$env:USERNAME)) {
-        [string]$env:USERNAME
-    } elseif (-not [string]::IsNullOrWhiteSpace([Environment]::UserName)) {
-        [Environment]::UserName
-    } else {
-        'user'
+    try {
+        $guestCredential = Resolve-VMGuestCredential -RepoRoot $RepoRoot
     }
-    $guestPassword = $guestUsername
-    $guestPrincipal = $guestUsername
-    $guestSecret = $guestPassword
+    catch {
+        Write-Warning $_.Exception.Message
+        return
+    }
 
-    Write-Information "vm-setup: guest credential policy active (username/password=$guestUsername)"
+    $guestUsername = $guestCredential.AccountName
+    $guestPassword = $guestCredential.Secret
+    $guestSecretHash = $guestCredential.Hash
+
+    Write-Information "vm-setup: guest credential policy active (owner=$($guestCredential.Owner), username=$guestUsername, source=SOPS)"
 
     if (-not $DryRun) {
         New-Item -ItemType Directory -Path $vmDir     -Force | Out-Null
@@ -207,7 +313,8 @@ next run.
             'NixOS' {
                 Invoke-BuildNixosImage -VmName $vm.name -Accelerator $Accelerator `
                     -VmsDir $vmsDir -ImagesDir $imagesDir `
-                    -GuestPrincipal $guestPrincipal -GuestSecret $guestSecret `
+                    -GuestAccountName $guestUsername -GuestSecret $guestPassword `
+                    -GuestSecretHash $guestSecretHash `
                     -DryRun:$DryRun
             }
             'Windows' {
@@ -221,7 +328,8 @@ next run.
                     -RepoRoot $RepoRoot `
                     -WindowsEdition ($vm.windowsEdition ?? 'Pro') `
                     -Accelerator $Accelerator `
-                    -GuestPrincipal $guestPrincipal -GuestSecret $guestSecret `
+                        -GuestAccountName $guestUsername -GuestSecret $guestPassword `
+                        -GuestSecretHash $guestSecretHash `
                     -DebugHeadful:$DebugHeadful `
                     -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
             }
@@ -259,7 +367,7 @@ next run.
         # interprets bare integers as MiB).
         $ramMib      = [long](($vm.ramBytes + 524288) / 1048576)
         $diskPath    = Join-Path $vmDir "$($vm.name).qcow2"
-        $diskPrincipalMarker = "${diskPath}.nixos-guest-principal"
+        $diskCredentialMarker = Get-VMGuestSecretMarkerPath -BasePath $diskPath
         $startScriptPs1 = Join-Path $vmDir "start-$($vm.name).ps1"
         $startScriptSh = Join-Path $vmDir "start-$($vm.name).sh"
         $configureScriptPs1 = Join-Path $vmDir "configure-$($vm.name).ps1"
@@ -273,30 +381,21 @@ next run.
         # Place disk image from pre-built image (empty disk fallback removed).
         if (Test-Path $diskPath) {
             if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "runtime disk '$($vm.name)'") {
-                if ($vm.type -eq 'NixOS') {
-                    $runtimePrincipal = if (Test-Path $diskPrincipalMarker) {
-                        (Get-Content -Path $diskPrincipalMarker -Raw).Trim()
-                    } else {
-                        ''
-                    }
-                    if ($runtimePrincipal -ne $guestPrincipal) {
-                        if ($prebuiltValid) {
-                            Write-Warning "vm-setup: NixOS runtime disk guest principal drift detected for '$($vm.name)'; replacing runtime disk from pre-built image"
-                            if (-not $DryRun) {
-                                Remove-Item $diskPath -Force
-                                Copy-Item $prebuilt $diskPath
-                                Set-Content -Path $diskPrincipalMarker -Value $guestPrincipal -Encoding UTF8
-                            } else {
-                                Write-Information "vm-setup: [dry-run] Remove-Item '$diskPath' -Force"
-                                Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
-                                Write-Information "vm-setup: [dry-run] Set-Content '$diskPrincipalMarker' '$guestPrincipal'"
-                            }
+                if (-not (Test-VMGuestSecretMarker -ExpectedHash $guestSecretHash -MarkerPath $diskCredentialMarker)) {
+                    if ($prebuiltValid) {
+                        Write-Warning "vm-setup: $($vm.type) runtime disk guest credential drift detected for '$($vm.name)'; replacing runtime disk from pre-built image"
+                        if (-not $DryRun) {
+                            Remove-Item $diskPath -Force
+                            Copy-Item $prebuilt $diskPath
+                            Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
                         } else {
-                            Write-Warning "vm-setup: NixOS runtime disk principal drift detected but no valid pre-built image exists for '$($vm.name)'; skipping"
-                            continue
+                            Write-Information "vm-setup: [dry-run] Remove-Item '$diskPath' -Force"
+                            Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
+                            Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
                         }
                     } else {
-                        Write-Information "vm-setup: disk already exists: $diskPath"
+                        Write-Warning "vm-setup: $($vm.type) runtime disk credential drift detected but no valid pre-built image exists for '$($vm.name)'; skipping"
+                        continue
                     }
                 } else {
                     Write-Information "vm-setup: disk already exists: $diskPath"
@@ -306,15 +405,11 @@ next run.
                 if (-not $DryRun) {
                     Remove-Item $diskPath -Force
                     Copy-Item $prebuilt $diskPath
-                    if ($vm.type -eq 'NixOS') {
-                        Set-Content -Path $diskPrincipalMarker -Value $guestPrincipal -Encoding UTF8
-                    }
+                    Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
                 } else {
                     Write-Information "vm-setup: [dry-run] Remove-Item '$diskPath' -Force"
                     Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
-                    if ($vm.type -eq 'NixOS') {
-                        Write-Information "vm-setup: [dry-run] Set-Content '$diskPrincipalMarker' '$guestPrincipal'"
-                    }
+                    Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
                 }
             } else {
                 Write-Warning "vm-setup: runtime disk is invalid and no valid pre-built image exists for '$($vm.name)'; skipping"
@@ -324,14 +419,10 @@ next run.
             Write-Information "vm-setup: using pre-built image: $prebuilt"
             if (-not $DryRun) {
                 Copy-Item $prebuilt $diskPath
-                if ($vm.type -eq 'NixOS') {
-                    Set-Content -Path $diskPrincipalMarker -Value $guestPrincipal -Encoding UTF8
-                }
+                Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
             } else {
                 Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
-                if ($vm.type -eq 'NixOS') {
-                    Write-Information "vm-setup: [dry-run] Set-Content '$diskPrincipalMarker' '$guestPrincipal'"
-                }
+                Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
             }
         } else {
             Write-Warning "vm-setup: image not found or invalid for '$($vm.name)': $prebuilt; skipping"
@@ -568,28 +659,24 @@ function Invoke-BuildNixosImage {
         [string]$Accelerator,
         [string]$VmsDir,
         [string]$ImagesDir,
-        [string]$GuestPrincipal,
+        [string]$GuestAccountName,
         [string]$GuestSecret,
+        [string]$GuestSecretHash,
         [switch]$DryRun
     )
 
     $outPath = Join-Path $ImagesDir "$VmName.qcow2"
-    $principalMarkerPath = "${outPath}.nixos-guest-principal"
+    $credentialMarkerPath = Get-VMGuestSecretMarkerPath -BasePath $outPath
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing NixOS image') {
-            $markerPrincipal = if (Test-Path $principalMarkerPath) {
-                (Get-Content -Path $principalMarkerPath -Raw).Trim()
-            } else {
-                ''
-            }
-            if ($markerPrincipal -eq $GuestPrincipal) {
-                Write-Information "vm-setup: NixOS image already built for guest principal '$GuestPrincipal': $outPath"
+            if (Test-VMGuestSecretMarker -ExpectedHash $GuestSecretHash -MarkerPath $credentialMarkerPath) {
+                Write-Information "vm-setup: NixOS image already built for the current guest credentials (username=$GuestAccountName): $outPath"
                 return
             }
-            Write-Warning "vm-setup: NixOS image guest principal drift detected (expected '$GuestPrincipal'); rebuilding image: $outPath"
+            Write-Warning "vm-setup: NixOS image guest credential drift detected; rebuilding image: $outPath"
             Remove-Item $outPath -Force
-            if (Test-Path $principalMarkerPath) {
-                Remove-Item $principalMarkerPath -Force
+            if (Test-Path $credentialMarkerPath) {
+                Remove-Item $credentialMarkerPath -Force
             }
         } else {
             Write-Warning "vm-setup: existing NixOS image is invalid; rebuilding from scratch: $outPath"
@@ -609,7 +696,7 @@ function Invoke-BuildNixosImage {
 
     if ($DryRun) {
         Write-Information "vm-setup: [dry-run] Remove stale temporary output directory if present: $tmpOutput"
-        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var accelerator=$Accelerator -var guest_username=$GuestPrincipal -var guest_password=<redacted> -var output_directory=$tmpOutput ."
+        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var accelerator=$Accelerator -var guest_username=$GuestAccountName -var guest_password=<redacted> -var output_directory=$tmpOutput ."
         return
     }
 
@@ -627,7 +714,7 @@ function Invoke-BuildNixosImage {
         }
         & packer build `
             -var "accelerator=$Accelerator" `
-            -var "guest_username=$GuestPrincipal" `
+            -var "guest_username=$GuestAccountName" `
             -var "guest_password=$GuestSecret" `
             -var "output_directory=$tmpOutput" `
             .
@@ -648,7 +735,7 @@ function Invoke-BuildNixosImage {
 
     Move-Item $builtImage $outPath
     Remove-Item $tmpOutput -Recurse -Force
-    Set-Content -Path $principalMarkerPath -Value $GuestPrincipal -Encoding UTF8
+    Set-Content -Path $credentialMarkerPath -Value $GuestSecretHash -Encoding UTF8
 
     if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built NixOS image')) {
         Write-Warning "vm-setup: NixOS image validation failed after build; removing $outPath"
@@ -777,20 +864,28 @@ function Invoke-BuildWindowsImage {
         [string]$ImagesDir,
         [string]$RepoRoot = (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))))),
         [string]$WindowsEdition = 'Pro',
-        [string]$GuestPrincipal,
+        [string]$GuestAccountName,
         [string]$GuestSecret,
+        [string]$GuestSecretHash,
         [switch]$DebugHeadful,
         [switch]$DryRun
     )
 
     $outPath = Join-Path $ImagesDir "$VmName.qcow2"
+    $credentialMarkerPath = Get-VMGuestSecretMarkerPath -BasePath $outPath
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing Windows image') {
-            Write-Information "vm-setup: Windows image already built (delete to rebuild): $outPath"
-            return
+            if (Test-VMGuestSecretMarker -ExpectedHash $GuestSecretHash -MarkerPath $credentialMarkerPath) {
+                Write-Information "vm-setup: Windows image already built for the current guest credentials (username=$GuestAccountName): $outPath"
+                return
+            }
+            Write-Warning "vm-setup: Windows image guest credential drift detected; rebuilding image: $outPath"
         }
         Write-Warning "vm-setup: existing Windows image is invalid; rebuilding from scratch: $outPath"
         Remove-Item $outPath -Force
+        if (Test-Path $credentialMarkerPath) {
+            Remove-Item $credentialMarkerPath -Force
+        }
     }
 
     if ($WindowsIsoRetries -lt 0) {
@@ -967,15 +1062,15 @@ function Invoke-BuildWindowsImage {
         foreach ($attempt in $buildAttempts) {
             if ($attempt.Firmware -eq 'efi') {
                 if ($DebugHeadful) {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestPrincipal -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
                 } else {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestPrincipal -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
                 }
             } else {
                 if ($DebugHeadful) {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestPrincipal -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
                 } else {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestPrincipal -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
                 }
             }
         }
@@ -1045,7 +1140,7 @@ function Invoke-BuildWindowsImage {
             $autounattendTemplate = Join-Path $VmsDir 'windows\Autounattend.xml'
             $autounattendRendered = Join-Path $attemptTempDir 'Autounattend.xml'
             $autounattendContent = Get-Content -Path $autounattendTemplate -Raw
-            $autounattendContent = $autounattendContent.Replace('__NUCLEUS_GUEST_USERNAME__', $GuestPrincipal)
+            $autounattendContent = $autounattendContent.Replace('__NUCLEUS_GUEST_USERNAME__', $GuestAccountName)
             $autounattendContent = $autounattendContent.Replace('__NUCLEUS_GUEST_PASSWORD__', $GuestSecret)
             Set-Content -Path $autounattendRendered -Value $autounattendContent -Encoding UTF8
             Write-Information "vm-setup: writing Packer debug log for this attempt: $packerLog"
@@ -1058,7 +1153,7 @@ function Invoke-BuildWindowsImage {
 
             $packerArgs = @(
                 '-var', "windows_iso=$WindowsIso",
-                '-var', "guest_username=$GuestPrincipal",
+                '-var', "guest_username=$GuestAccountName",
                 '-var', "guest_password=$GuestSecret",
                 '-var', "autounattend_path=$autounattendRendered",
                 '-var', "accelerator=$Accelerator",
@@ -1073,7 +1168,7 @@ function Invoke-BuildWindowsImage {
             if ($DebugHeadful) {
                 $packerArgs = @(
                     '-var', "windows_iso=$WindowsIso",
-                    '-var', "guest_username=$GuestPrincipal",
+                    '-var', "guest_username=$GuestAccountName",
                     '-var', "guest_password=$GuestSecret",
                     '-var', "autounattend_path=$autounattendRendered",
                     '-var', "accelerator=$Accelerator",
@@ -1090,7 +1185,7 @@ function Invoke-BuildWindowsImage {
             if ($attempt.Firmware -eq 'efi') {
                 $packerArgs = @(
                     '-var', "windows_iso=$WindowsIso",
-                    '-var', "guest_username=$GuestPrincipal",
+                    '-var', "guest_username=$GuestAccountName",
                     '-var', "guest_password=$GuestSecret",
                     '-var', "autounattend_path=$autounattendRendered",
                     '-var', "accelerator=$Accelerator",
@@ -1107,7 +1202,7 @@ function Invoke-BuildWindowsImage {
                 if ($DebugHeadful) {
                     $packerArgs = @(
                         '-var', "windows_iso=$WindowsIso",
-                        '-var', "guest_username=$GuestPrincipal",
+                        '-var', "guest_username=$GuestAccountName",
                         '-var', "guest_password=$GuestSecret",
                         '-var', "autounattend_path=$autounattendRendered",
                         '-var', "accelerator=$Accelerator",
@@ -1168,6 +1263,7 @@ function Invoke-BuildWindowsImage {
 
         Move-Item $builtImage $outPath
         Remove-Item $builtTempDir -Recurse -Force
+        Set-Content -Path $credentialMarkerPath -Value $GuestSecretHash -Encoding UTF8
 
     if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built Windows image')) {
         Write-Warning "vm-setup: Windows image validation failed after build; removing $outPath"

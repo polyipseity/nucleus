@@ -340,6 +340,9 @@ let
   windows_vm_setup_wrapper_ps1_text = builtins.readFile ../../scripts/vm-setup.ps1;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
+  users_json_text = builtins.readFile ../../src/modules/users.json;
+  windows_users_json_text = builtins.readFile ../../src/hosts/Windows/users.json;
+  user_secret_text = builtins.readFile ../../src/secrets/users-polyipseity.yml;
   vms_windows_packer_text = builtins.readFile ../../vms/windows/packer.pkr.hcl;
   vms_windows_autounattend_text = builtins.readFile ../../vms/windows/Autounattend.xml;
   vms_macos_packer_text = builtins.readFile ../../vms/macos/packer.pkr.hcl;
@@ -423,32 +426,53 @@ let
       )
       "vms/windows/Autounattend.xml must keep the active BIOS system partition TypeID at 0x07 (not 0x27)";
 
-  # Guest credential policy: username/password must derive from the current
-  # host user and be wired across all guest build paths.
+  # Guest credential policy: username/password must resolve from per-user SOPS
+  # secrets via vmGuest secret-key references and stay wired across all guest
+  # build paths.
+  test_guest_credentials_policy_in_user_registries = assert' (
+    (lib.hasInfix "\"vmGuest\"" users_json_text)
+    && (lib.hasInfix "\"usernameSecretKey\": \"vm_guest_username\"" users_json_text)
+    && (lib.hasInfix "\"passwordSecretKey\": \"vm_guest_password\"" users_json_text)
+    && (lib.hasInfix "\"vmGuest\"" windows_users_json_text)
+    && (lib.hasInfix "\"usernameSecretKey\": \"vm_guest_username\"" windows_users_json_text)
+    && (lib.hasInfix "\"passwordSecretKey\": \"vm_guest_password\"" windows_users_json_text)
+  ) "POSIX and Windows user registries must declare vmGuest secret-key references";
+
+  test_guest_credentials_policy_in_user_secrets = assert' (
+    (lib.hasInfix "vm_guest_username:" user_secret_text)
+    && (lib.hasInfix "vm_guest_password:" user_secret_text)
+  ) "users-polyipseity.yml must contain secret-backed VM guest username/password keys";
+
   test_guest_credentials_policy_in_vm_setup_sh =
     assert'
       (
-        (lib.hasInfix "vm_guest_username" vm_setup_sh_text)
-        && (lib.hasInfix "vm_guest_password=\"$vm_guest_username\"" vm_setup_sh_text)
+        (lib.hasInfix "resolve_vm_guest_credentials" vm_setup_sh_text)
+        && (lib.hasInfix "src/modules/users.json" vm_setup_sh_text)
+        && (lib.hasInfix "users-\${_rvgc_owner}.yml" vm_setup_sh_text)
+        && (lib.hasInfix "vmGuest.usernameSecretKey" vm_setup_sh_text)
+        && (lib.hasInfix "vmGuest.passwordSecretKey" vm_setup_sh_text)
+        && (lib.hasInfix "sops --decrypt --output-type json" vm_setup_sh_text)
         && (lib.hasInfix "NUCLEUS_VM_GUEST_USERNAME" vm_setup_sh_text)
         && (lib.hasInfix "NUCLEUS_VM_GUEST_PASSWORD" vm_setup_sh_text)
         && (lib.hasInfix "--argstr guestUsername" vm_setup_sh_text)
         && (lib.hasInfix "--argstr guestPassword" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must derive guest credentials from the current user and export/pass them to guest builders";
+      "scripts/vm-setup.sh must resolve guest credentials from per-user SOPS secrets and export/pass them to guest builders";
 
   test_guest_credentials_policy_in_windows_vm_setup_ps1 =
     assert'
       (
-        (lib.hasInfix "$guestUsername" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "$guestPassword = $guestUsername" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "$guestPrincipal = $guestUsername" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "$guestSecret = $guestPassword" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "-GuestPrincipal $guestPrincipal -GuestSecret $guestSecret" windows_vm_setup_ps1_text)
+        (lib.hasInfix "Resolve-VMGuestCredential" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "src\\hosts\\Windows\\users.json" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "src\\secrets\\users-$secretOwner.yml" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "vmGuest secret-key references" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "--decrypt --output-type json" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "-GuestAccountName $guestUsername -GuestSecret $guestPassword" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "-GuestSecretHash $guestSecretHash" windows_vm_setup_ps1_text)
         && (lib.hasInfix "__NUCLEUS_GUEST_USERNAME__" windows_vm_setup_ps1_text)
         && (lib.hasInfix "__NUCLEUS_GUEST_PASSWORD__" windows_vm_setup_ps1_text)
       )
-      "Invoke-VMSetup.ps1 must derive and propagate current-user guest credentials to all Windows-host build paths";
+      "Invoke-VMSetup.ps1 must resolve and propagate secret-backed guest credentials to all Windows-host build paths";
 
   test_guest_credentials_policy_in_nixos_guest = assert' (
     (lib.hasInfix "guestUsername ? builtins.getEnv \"NUCLEUS_VM_GUEST_USERNAME\"" guest_nix_text)
@@ -486,22 +510,25 @@ let
         && (lib.hasInfix "variable \"guest_password\"" vms_macos_packer_text)
         && (lib.hasInfix "sysadminctl -addUser" vms_macos_packer_text)
       )
-      "vms/macos/packer.pkr.hcl must provision a guest account using the current-user credential policy";
+      "vms/macos/packer.pkr.hcl must provision a guest account using the secret-backed guest credential policy";
 
-  test_nixos_guest_principal_drift_replacement =
+  test_vm_guest_credential_drift_replacement =
     assert'
       (
-        (lib.hasInfix "nixos_guest_principal_marker_path" vm_setup_sh_text)
-        && (lib.hasInfix "nixos_guest_principal_matches" vm_setup_sh_text)
-        && (lib.hasInfix "NixOS image guest principal drift detected" vm_setup_sh_text)
-        && (lib.hasInfix "NixOS runtime disk guest principal drift detected" vm_setup_sh_text)
-        && (lib.hasInfix ".nixos-guest-principal" vm_setup_sh_text)
-        && (lib.hasInfix "$principalMarkerPath = \"\${outPath}.nixos-guest-principal\"" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "$diskPrincipalMarker = \"\${diskPath}.nixos-guest-principal\"" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "NixOS image guest principal drift detected" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "NixOS runtime disk guest principal drift detected" windows_vm_setup_ps1_text)
+        (lib.hasInfix "vm_guest_credentials_marker_path" vm_setup_sh_text)
+        && (lib.hasInfix "vm_guest_credentials_marker_matches" vm_setup_sh_text)
+        && (lib.hasInfix "NixOS image guest credential drift detected" vm_setup_sh_text)
+        && (lib.hasInfix "Windows image guest credential drift detected" vm_setup_sh_text)
+        && (lib.hasInfix "macOS guest credential drift detected" vm_setup_sh_text)
+        && (lib.hasInfix "runtime disk guest credential drift detected" vm_setup_sh_text)
+        && (lib.hasInfix ".vm-guest-credentials-sha256" vm_setup_sh_text)
+        && (lib.hasInfix "Get-VMGuestSecretMarkerPath" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Test-VMGuestSecretMarker" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "NixOS image guest credential drift detected" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Windows image guest credential drift detected" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "runtime disk guest credential drift detected" windows_vm_setup_ps1_text)
       )
-      "POSIX and Windows vm setup flows must detect NixOS guest principal drift via marker files and replace stale NixOS images/runtime disks";
+      "POSIX and Windows vm setup flows must detect VM guest credential drift via marker files and replace stale images/runtime disks";
 
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
@@ -739,6 +766,8 @@ let
     test_windows_packer_winrm_port_forward
     test_windows_autounattend_winrm_before_virtio
     test_windows_autounattend_bios_system_partition_type
+    test_guest_credentials_policy_in_user_registries
+    test_guest_credentials_policy_in_user_secrets
     test_guest_credentials_policy_in_vm_setup_sh
     test_guest_credentials_policy_in_windows_vm_setup_ps1
     test_guest_credentials_policy_in_nixos_guest
@@ -746,7 +775,7 @@ let
     test_guest_credentials_policy_in_windows_packer
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
-    test_nixos_guest_principal_drift_replacement
+    test_vm_guest_credential_drift_replacement
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
     test_windows_iso_mido_patch_failure_is_fatal
@@ -806,6 +835,8 @@ in
     test_windows_packer_winrm_port_forward
     test_windows_autounattend_winrm_before_virtio
     test_windows_autounattend_bios_system_partition_type
+    test_guest_credentials_policy_in_user_registries
+    test_guest_credentials_policy_in_user_secrets
     test_guest_credentials_policy_in_vm_setup_sh
     test_guest_credentials_policy_in_windows_vm_setup_ps1
     test_guest_credentials_policy_in_nixos_guest
@@ -813,7 +844,7 @@ in
     test_guest_credentials_policy_in_windows_packer
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
-    test_nixos_guest_principal_drift_replacement
+    test_vm_guest_credential_drift_replacement
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
     test_windows_iso_mido_patch_failure_is_fatal

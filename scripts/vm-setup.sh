@@ -133,14 +133,109 @@ fi
 VM_DIR="${VM_DIR_OVERRIDE:-$HOME/virtual machines}"
 IMAGES_DIR="$VM_DIR/images"
 
-if [ -n "${USER:-}" ]; then
-  vm_guest_username="$USER"
-elif command -v id >/dev/null 2>&1; then
-  vm_guest_username="$(id -un)"
-else
-  vm_guest_username='user'
+current_vm_secret_owner() {
+  if [ -n "${NUCLEUS_VM_SECRET_OWNER:-}" ]; then
+    printf '%s\n' "$NUCLEUS_VM_SECRET_OWNER"
+    return 0
+  fi
+
+  if [ -n "${USER:-}" ]; then
+    printf '%s\n' "$USER"
+    return 0
+  fi
+
+  if command -v id >/dev/null 2>&1; then
+    id -un
+    return 0
+  fi
+
+  return 1
+}
+
+resolve_vm_guest_credentials() {
+  _rvgc_owner=''
+  _rvgc_users_json="$REPO_ROOT/src/modules/users.json"
+  _rvgc_secret_file=''
+
+  if _rvgc_owner="$(current_vm_secret_owner)"; then
+    :
+  else
+    _rvgc_owner=''
+  fi
+
+  if [ -z "$_rvgc_owner" ]; then
+    printf 'vm-setup: could not determine the per-user VM secret owner (set NUCLEUS_VM_SECRET_OWNER to override)\n' >&2
+    return 1
+  fi
+
+  if ! command -v sops >/dev/null 2>&1; then
+    printf 'vm-setup: sops not found in PATH; cannot resolve VM guest credentials from SOPS\n' >&2
+    return 1
+  fi
+
+  if [ ! -f "$_rvgc_users_json" ]; then
+    printf 'vm-setup: users registry not found: %s\n' "$_rvgc_users_json" >&2
+    return 1
+  fi
+
+  _rvgc_secret_file="$REPO_ROOT/src/secrets/users-${_rvgc_owner}.yml"
+  if [ ! -f "$_rvgc_secret_file" ]; then
+    printf 'vm-setup: per-user VM secret file not found: %s\n' "$_rvgc_secret_file" >&2
+    return 1
+  fi
+
+  _rvgc_username_key="$(jq -r --arg owner "$_rvgc_owner" '.[ $owner ].vmGuest.usernameSecretKey // empty' "$_rvgc_users_json")"
+  _rvgc_password_key="$(jq -r --arg owner "$_rvgc_owner" '.[ $owner ].vmGuest.passwordSecretKey // empty' "$_rvgc_users_json")"
+  if [ -z "$_rvgc_username_key" ] || [ -z "$_rvgc_password_key" ]; then
+    printf 'vm-setup: vmGuest secret-key references are missing for user %s in %s\n' "$_rvgc_owner" "$_rvgc_users_json" >&2
+    return 1
+  fi
+
+  if ! _rvgc_secret_json="$(sops --decrypt --output-type json "$_rvgc_secret_file")"; then
+    printf 'vm-setup: failed to decrypt per-user VM secret file: %s\n' "$_rvgc_secret_file" >&2
+    return 1
+  fi
+
+  vm_secret_owner="$_rvgc_owner"
+  vm_guest_username="$(printf '%s' "$_rvgc_secret_json" | jq -r --arg key "$_rvgc_username_key" '.[ $key ] // empty')"
+  vm_guest_password="$(printf '%s' "$_rvgc_secret_json" | jq -r --arg key "$_rvgc_password_key" '.[ $key ] // empty')"
+
+  if [ -z "$vm_guest_username" ] || [ -z "$vm_guest_password" ]; then
+    printf 'vm-setup: vmGuest secret values are missing in %s for user %s\n' "$_rvgc_secret_file" "$_rvgc_owner" >&2
+    return 1
+  fi
+
+  return 0
+}
+
+vm_guest_credentials_hash() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    printf '%s\n%s' "$vm_guest_username" "$vm_guest_password" | sha256sum | awk '{print $1}'
+    return 0
+  fi
+
+  if command -v shasum >/dev/null 2>&1; then
+    printf '%s\n%s' "$vm_guest_username" "$vm_guest_password" | shasum -a 256 | awk '{print $1}'
+    return 0
+  fi
+
+  if command -v openssl >/dev/null 2>&1; then
+    printf '%s\n%s' "$vm_guest_username" "$vm_guest_password" | openssl dgst -sha256 | awk '{print $NF}'
+    return 0
+  fi
+
+  printf 'vm-setup: no SHA-256 tool is available; cannot track VM guest credential drift\n' >&2
+  return 1
+}
+
+if ! resolve_vm_guest_credentials; then
+  exit 0
 fi
-vm_guest_password="$vm_guest_username"
+
+if ! vm_guest_credentials_fingerprint="$(vm_guest_credentials_hash)"; then
+  exit 0
+fi
+
 export NUCLEUS_VM_GUEST_USERNAME="$vm_guest_username"
 export NUCLEUS_VM_GUEST_PASSWORD="$vm_guest_password"
 
@@ -368,29 +463,29 @@ validate_qcow2_image() {
   return 0
 }
 
-# nixos_guest_principal_marker_path NAME [DISK_PATH]
-#   Returns the sidecar marker path storing the guest principal used when
-#   building/provisioning the NixOS disk image.
-nixos_guest_principal_marker_path() {
-  _ngp_name="$1"
-  _ngp_disk_path="${2:-}"
-  if [ -n "$_ngp_disk_path" ]; then
-    printf '%s.nixos-guest-principal\n' "$_ngp_disk_path"
+# vm_guest_credentials_marker_path NAME [DISK_PATH]
+#   Returns the sidecar marker path storing the guest-credential fingerprint
+#   used when building/provisioning the VM image or runtime disk.
+vm_guest_credentials_marker_path() {
+  _vgcm_name="$1"
+  _vgcm_disk_path="${2:-}"
+  if [ -n "$_vgcm_disk_path" ]; then
+    printf '%s.vm-guest-credentials-sha256\n' "$_vgcm_disk_path"
   else
-    printf '%s/%s.nixos-guest-principal\n' "$IMAGES_DIR" "$_ngp_name"
+    printf '%s/%s.vm-guest-credentials-sha256\n' "$IMAGES_DIR" "$_vgcm_name"
   fi
 }
 
-# nixos_guest_principal_matches EXPECTED MARKER_PATH
+# vm_guest_credentials_marker_matches EXPECTED_FINGERPRINT MARKER_PATH
 #   Returns 0 when MARKER_PATH exists and equals EXPECTED.
-nixos_guest_principal_matches() {
-  _ngm_expected="$1"
-  _ngm_marker="$2"
-  if [ ! -f "$_ngm_marker" ]; then
+vm_guest_credentials_marker_matches() {
+  _vgcm_expected="$1"
+  _vgcm_marker="$2"
+  if [ ! -f "$_vgcm_marker" ]; then
     return 1
   fi
-  _ngm_actual="$(tr -d '\r\n' <"$_ngm_marker")"
-  [ "$_ngm_actual" = "$_ngm_expected" ]
+  _vgcm_actual="$(tr -d '\r\n' <"$_vgcm_marker")"
+  [ "$_vgcm_actual" = "$_vgcm_expected" ]
 }
 
 # wait_for_utm_registration NAME
@@ -684,15 +779,15 @@ build_nixos_image() {
   _name="$1"
   _disk_gib="$2"
   _out="$IMAGES_DIR/${_name}.qcow2"
-  _marker="$(nixos_guest_principal_marker_path "$_name")"
+  _marker="$(vm_guest_credentials_marker_path "$_name")"
 
   if [ -f "$_out" ]; then
     if validate_qcow2_image "$_out" "existing NixOS image"; then
-      if nixos_guest_principal_matches "$vm_guest_username" "$_marker"; then
-        printf 'vm-setup: NixOS image already built for guest principal "%s": %s\n' "$vm_guest_username" "$_out"
+      if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
+        printf 'vm-setup: NixOS image already built for the current guest credentials (owner=%s, username=%s): %s\n' "$vm_secret_owner" "$vm_guest_username" "$_out"
         return 0
       fi
-      printf 'vm-setup: NixOS image guest principal drift detected (expected "%s"); rebuilding image: %s\n' "$vm_guest_username" "$_out"
+      printf 'vm-setup: NixOS image guest credential drift detected; rebuilding image: %s\n' "$_out"
     else
       printf 'vm-setup: existing NixOS image is invalid; rebuilding from scratch: %s\n' "$_out" >&2
     fi
@@ -763,7 +858,7 @@ build_nixos_image() {
   fi
 
   rm -rf "$_tmpdir"
-  printf '%s\n' "$vm_guest_username" >"$_marker"
+  printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_marker"
   printf 'vm-setup: NixOS image ready: %s\n' "$_out"
 }
 
@@ -1038,14 +1133,18 @@ build_windows_image() {
   _disk_gib="$2"
   _edition="${3:-Pro}"
   _out="$IMAGES_DIR/${_name}.qcow2"
+  _marker="$(vm_guest_credentials_marker_path "$_name")"
 
   if [ -f "$_out" ]; then
     if validate_qcow2_image "$_out" "existing Windows image"; then
-      printf 'vm-setup: Windows image already built (delete to rebuild): %s\n' "$_out"
-      return 0
+      if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
+        printf 'vm-setup: Windows image already built for the current guest credentials (owner=%s, username=%s): %s\n' "$vm_secret_owner" "$vm_guest_username" "$_out"
+        return 0
+      fi
+      printf 'vm-setup: Windows image guest credential drift detected; rebuilding image: %s\n' "$_out"
     fi
     printf 'vm-setup: existing Windows image is invalid; rebuilding from scratch: %s\n' "$_out" >&2
-    rm -f "$_out"
+    rm -f "$_out" "$_marker"
   fi
 
   # Resolve the installer ISO: use --windows-iso if provided, otherwise try the
@@ -1401,6 +1500,7 @@ EOF
     return 1
   fi
 
+  printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_marker"
   printf 'vm-setup: Windows 11 image ready: %s\n' "$_out"
 }
 
@@ -1417,6 +1517,7 @@ build_macos_image() {
   _ram_mib="$3"
   _cpus="$4"
   _macos_version="${5:-tahoe}"
+  _marker="$(vm_guest_credentials_marker_path "$_name")"
 
   # Tart requires Apple Virtualization.framework — macOS host only.
   if [ "$(uname -s)" != "Darwin" ]; then
@@ -1436,8 +1537,17 @@ build_macos_image() {
 
   # Check if tart VM already exists.
   if tart list 2>/dev/null | awk 'NR > 1 { print $2 }' | grep -qxF "$_name"; then
-    printf 'vm-setup: tart VM "%s" already exists (delete to rebuild: tart delete %s)\n' "$_name" "$_name"
-    return 0
+    if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
+      printf 'vm-setup: tart VM "%s" already exists for the current guest credentials (owner=%s, username=%s)\n' "$_name" "$vm_secret_owner" "$vm_guest_username"
+      return 0
+    fi
+
+    printf 'vm-setup: macOS guest credential drift detected; rebuilding tart VM "%s"\n' "$_name"
+    if ! tart delete "$_name"; then
+      printf 'vm-setup: failed to delete stale tart VM "%s" before rebuild\n' "$_name" >&2
+      return 1
+    fi
+    rm -f "$_marker"
   fi
 
   _packer_dir="$VMS_DIR/macos"
@@ -1473,6 +1583,7 @@ build_macos_image() {
     printf 'vm-setup: Packer build for macOS VM "%s" failed (exit %s)\n' "$_name" "$_packer_status" >&2
     return "$_packer_status"
   fi
+  printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_marker"
   printf 'vm-setup: macOS VM "%s" built and registered in tart\n' "$_name"
 }
 
@@ -1701,7 +1812,7 @@ setup_utm_vms() {
     bundle="$VM_DIR/${vm_name}.utm"
     data_dir="$bundle/Data"
     disk_file="$data_dir/disk-main.qcow2"
-    disk_principal_marker="$(nixos_guest_principal_marker_path "$vm_name" "$disk_file")"
+    disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_file")"
     config_plist="$bundle/config.plist"
     bundle_exists=false
     legacy_display_config=false
@@ -1769,16 +1880,14 @@ setup_utm_vms() {
         printf 'vm-setup: existing runtime disk is invalid for %s; replacing from pre-built image\n' "$vm_name" >&2
         rm -f "$disk_file"
       fi
-      if [ -f "$disk_file" ] && [ "$vm_type" = 'NixOS' ] && ! nixos_guest_principal_matches "$vm_guest_username" "$disk_principal_marker"; then
-        printf 'vm-setup: NixOS runtime disk guest principal drift detected for %s; replacing runtime disk from pre-built image\n' "$vm_name" >&2
+      if [ -f "$disk_file" ] && ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
+        printf 'vm-setup: %s runtime disk guest credential drift detected; replacing runtime disk from pre-built image\n' "$vm_name" >&2
         rm -f "$disk_file"
       fi
       if [ ! -f "$disk_file" ]; then
         cp "$_prebuilt" "$disk_file"
         printf 'vm-setup: copied pre-built disk image: %s\n' "$disk_file"
-        if [ "$vm_type" = 'NixOS' ]; then
-          printf '%s\n' "$vm_guest_username" >"$disk_principal_marker"
-        fi
+        printf '%s\n' "$vm_guest_credentials_fingerprint" >"$disk_credential_marker"
       else
         printf 'vm-setup: preserving existing disk image: %s\n' "$disk_file"
       fi
@@ -1853,7 +1962,7 @@ setup_libvirt_vms() {
     fi
 
     disk_path="$VM_DIR/${vm_name}.qcow2"
-    disk_principal_marker="$(nixos_guest_principal_marker_path "$vm_name" "$disk_path")"
+    disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_path")"
 
     printf 'vm-setup: configuring libvirt VM "%s"...\n' "$vm_display"
 
@@ -1870,8 +1979,8 @@ setup_libvirt_vms() {
       _replace_runtime=false
       if [ ! -f "$disk_path" ]; then
         _replace_runtime=true
-      elif [ "$vm_type" = 'NixOS' ] && ! nixos_guest_principal_matches "$vm_guest_username" "$disk_principal_marker"; then
-        printf 'vm-setup: NixOS runtime disk guest principal drift detected for %s; replacing runtime disk from pre-built image\n' "$vm_name" >&2
+      elif ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
+        printf 'vm-setup: %s runtime disk guest credential drift detected; replacing runtime disk from pre-built image\n' "$vm_name" >&2
         rm -f "$disk_path"
         _replace_runtime=true
       fi
@@ -1879,9 +1988,7 @@ setup_libvirt_vms() {
       if [ "$_replace_runtime" = true ]; then
         cp "$_prebuilt" "$disk_path"
         printf 'vm-setup: disk image placed: %s\n' "$disk_path"
-        if [ "$vm_type" = 'NixOS' ]; then
-          printf '%s\n' "$vm_guest_username" >"$disk_principal_marker"
-        fi
+        printf '%s\n' "$vm_guest_credentials_fingerprint" >"$disk_credential_marker"
       else
         printf 'vm-setup: disk already exists: %s\n' "$disk_path"
       fi
@@ -1921,7 +2028,7 @@ setup_libvirt_vms() {
 # ---------------------------------------------------------------------------
 
 printf 'vm-setup: reading manifest from %s\n' "$MANIFEST"
-printf 'vm-setup: guest credential policy active (username/password=%s)\n' "$vm_guest_username"
+printf 'vm-setup: guest credential policy active (owner=%s, username=%s, source=SOPS)\n' "$vm_secret_owner" "$vm_guest_username"
 if [ "$dry_run" = true ]; then
   printf 'vm-setup: dry-run mode — no changes will be made\n'
 fi
