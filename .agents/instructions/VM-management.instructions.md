@@ -1,7 +1,7 @@
 ---
-description: "Use when adding, editing, or reviewing virtual machine provisioning in scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, vms/nixos/, or vms/windows/."
+description: "Use when adding, editing, or reviewing virtual machine provisioning in scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, vms/nixos/, vms/windows/, or vms/macos/."
 name: "VM Management"
-applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/MacBook/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, tests/nix/vm-setup-tests.nix, vms/nixos/guest.nix, vms/nixos/packer.pkr.hcl, vms/windows/packer.pkr.hcl, vms/windows/Autounattend.xml"
+applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/MacBook/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, tests/nix/vm-setup-tests.nix, vms/nixos/guest.nix, vms/nixos/packer.pkr.hcl, vms/windows/packer.pkr.hcl, vms/windows/Autounattend.xml, vms/macos/packer.pkr.hcl"
 ---
 
 # VM Management
@@ -37,27 +37,41 @@ Apply this convention when adding or modifying:
 
 ## Guest Credential Convention
 
-Default VM guest credentials must track the current host user identity on every
-host OS (macOS, NixOS, Windows) and every guest OS path (NixOS, Windows,
-macOS), unless an explicit override is introduced in the same change.
+VM guest credentials must come from per-user SOPS secrets, not from the host
+login name or any guessed/default password. This applies on every host OS
+(macOS, NixOS, Windows) and every guest OS path (NixOS, Windows, macOS).
 
-- Default guest username = current host user name.
-- Default guest password = same value as guest username.
+- Store the actual values in `src/secrets/users-<username>.yml`.
+- Keep the keys flat and user-scoped by filename, for example:
+  - `vm_guest_username`
+  - `vm_guest_password`
+- Reference those keys from:
+  - `src/modules/users.json` on POSIX hosts
+  - `src/hosts/Windows/users.json` on Windows hosts
+- Use a `vmGuest` object with:
+  - `usernameSecretKey`
+  - `passwordSecretKey`
 
 Required wiring and parity checks:
 
-- POSIX flow: `scripts/vm-setup.sh` must derive credentials once and pass them
-  into guest builders/templates.
+- POSIX flow: `scripts/vm-setup.sh` must resolve the current secret owner,
+  read `src/modules/users.json`, decrypt `src/secrets/users-<username>.yml`,
+  and pass the resolved credentials into every guest builder/template.
 - Windows flow:
-  `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1` must derive the same
-  credentials and pass them into guest builders/templates.
+  `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1` must resolve the same
+  `vmGuest` references from `src/hosts/Windows/users.json`, decrypt the same
+  per-user secret file, and pass the resolved credentials into every guest
+  builder/template.
 - NixOS guest paths: both `vms/nixos/guest.nix` and
-  `vms/nixos/packer.pkr.hcl` must consume these values.
+  `vms/nixos/packer.pkr.hcl` must consume the injected credentials.
 - Windows guest paths: `vms/windows/Autounattend.xml` placeholders and
   `vms/windows/packer.pkr.hcl` variables must stay in sync with runtime
   rendering.
 - macOS guest path: `vms/macos/packer.pkr.hcl` must provision/update the guest
-  account from the same derived values.
+  account from the same resolved secret-backed values.
+- Credential drift must invalidate stale VM artifacts on every supported build
+  path so changing the secret-backed username or password actually rebuilds or
+  refreshes the guest image/runtime instead of silently reusing stale disks.
 
 When changing credential policy behavior, update
 `tests/nix/vm-setup-tests.nix` in the same commit.
