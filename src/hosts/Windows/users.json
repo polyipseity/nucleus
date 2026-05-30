@@ -133,6 +133,7 @@
         "accounts": [
           {
             "id": "polyipseity",
+            "isAdmin": true,
             "passwordSecretKey": "jellyfin_password",
             "usernameSecretKey": "jellyfin_username"
           }

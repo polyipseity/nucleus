@@ -377,6 +377,7 @@ run_jellyfin_account_sync() {
     | {
         owner: $u.key,
         id: .id,
+        isAdmin: (.isAdmin // false),
         usernameSecretKey: .usernameSecretKey,
         passwordSecretKey: .passwordSecretKey
       }
@@ -390,6 +391,7 @@ run_jellyfin_account_sync() {
   while IFS= read -r _rjas_spec; do
     _rjas_owner="$(printf '%s' "$_rjas_spec" | jq -r '.owner')"
     _rjas_id="$(printf '%s' "$_rjas_spec" | jq -r '.id')"
+    _rjas_is_admin_spec="$(printf '%s' "$_rjas_spec" | jq -r '.isAdmin // false')"
     _rjas_user_key="$(printf '%s' "$_rjas_spec" | jq -r '.usernameSecretKey // empty')"
     _rjas_pass_key="$(printf '%s' "$_rjas_spec" | jq -r '.passwordSecretKey // empty')"
 
@@ -420,8 +422,9 @@ run_jellyfin_account_sync() {
       --arg owner "$_rjas_owner" \
       --arg id "$_rjas_id" \
       --arg username "$_rjas_username" \
-      --arg password "$_rjas_password" \
-      '{owner:$owner,id:$id,username:$username,password:$password}' >> "$_rjas_resolved_file"
+        --arg password "$_rjas_password" \
+        --argjson isAdmin "$_rjas_is_admin_spec" \
+        '{owner:$owner,id:$id,username:$username,password:$password,isAdmin:$isAdmin}' >> "$_rjas_resolved_file"
   done < "$_rjas_specs_file"
 
   rm -f "$_rjas_specs_file"
@@ -484,6 +487,7 @@ run_jellyfin_account_sync() {
   while IFS= read -r _rjas_account; do
     _rjas_username="$(printf '%s' "$_rjas_account" | jq -r '.username')"
     _rjas_password="$(printf '%s' "$_rjas_account" | jq -r '.password')"
+    _rjas_desired_admin="$(printf '%s' "$_rjas_account" | jq -r '.isAdmin // false')"
 
     _rjas_auth_payload="$(jq -cn --arg username "$_rjas_username" --arg password "$_rjas_password" '{Username:$username,Pw:$password}')"
     _rjas_auth_response="$(_rjas_api_request POST '/Users/AuthenticateByName' '' "$_rjas_auth_payload")"
@@ -576,10 +580,40 @@ run_jellyfin_account_sync() {
       _rjas_create_status="$(_rjas_status_from_response "$_rjas_create_response")"
       if [ "$_rjas_create_status" = "200" ]; then
         printf '%s\n' "jellyfin: created account '$_rjas_username'"
+        _rjas_user_id="$(printf '%s' "$(_rjas_body_from_response "$_rjas_create_response")" | jq -r '.Id // empty')"
+        if [ -z "$_rjas_user_id" ]; then
+          printf '%s\n' "jellyfin: created account '$_rjas_username' but could not resolve user id for policy sync" >&2
+          continue
+        fi
       else
         printf '%s\n' "jellyfin: failed to create account '$_rjas_username' (HTTP $_rjas_create_status)" >&2
+        continue
       fi
+    fi
+
+    _rjas_user_detail_response="$(_rjas_api_request GET "/Users/${_rjas_user_id}" "$_rjas_admin_token" '')"
+    _rjas_user_detail_status="$(_rjas_status_from_response "$_rjas_user_detail_response")"
+    if [ "$_rjas_user_detail_status" != "200" ]; then
+      printf '%s\n' "jellyfin: failed to query account details for '$_rjas_username' (HTTP $_rjas_user_detail_status)" >&2
       continue
+    fi
+
+    _rjas_user_policy_json="$(printf '%s' "$(_rjas_body_from_response "$_rjas_user_detail_response")" | jq -c '.Policy // empty')"
+    if [ -z "$_rjas_user_policy_json" ]; then
+      printf '%s\n' "jellyfin: missing policy payload for account '$_rjas_username'; skipping admin policy sync" >&2
+      continue
+    fi
+
+    _rjas_current_admin="$(printf '%s' "$_rjas_user_policy_json" | jq -r '.IsAdministrator // false')"
+    if [ "$_rjas_current_admin" != "$_rjas_desired_admin" ]; then
+      _rjas_updated_policy="$(printf '%s' "$_rjas_user_policy_json" | jq -c --argjson isAdmin "$_rjas_desired_admin" '.IsAdministrator = $isAdmin')"
+      _rjas_policy_update_response="$(_rjas_api_request POST "/Users/${_rjas_user_id}/Policy" "$_rjas_admin_token" "$_rjas_updated_policy")"
+      _rjas_policy_update_status="$(_rjas_status_from_response "$_rjas_policy_update_response")"
+      if [ "$_rjas_policy_update_status" = "204" ]; then
+        printf '%s\n' "jellyfin: updated admin policy for account '$_rjas_username' to $_rjas_desired_admin"
+      else
+        printf '%s\n' "jellyfin: failed to update admin policy for account '$_rjas_username' (HTTP $_rjas_policy_update_status)" >&2
+      fi
     fi
 
     _rjas_check_payload="$(jq -cn --arg username "$_rjas_username" --arg password "$_rjas_password" '{Username:$username,Pw:$password}')"

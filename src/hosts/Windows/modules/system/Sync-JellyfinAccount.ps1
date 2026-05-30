@@ -124,6 +124,7 @@ function Sync-JellyfinAccount {
         id = [string]$account.id
         username = $resolvedUsername
         password = $resolvedPassword
+        isAdmin = if ($null -eq $account.isAdmin) { $false } else { [bool]$account.isAdmin }
       }
     }
   }
@@ -280,11 +281,41 @@ function Sync-JellyfinAccount {
       }
       if ($createResponse.StatusCode -eq 200) {
         Write-Output "jellyfin: created account '$($spec.username)'."
+        $matchingUser = $createResponse.Body
+        if (-not $matchingUser -or [string]::IsNullOrWhiteSpace([string]$matchingUser.Id)) {
+          Write-Warning "jellyfin: created account '$($spec.username)' but failed to resolve user id for policy convergence."
+          continue
+        }
       }
       else {
         Write-Warning "jellyfin: failed to create account '$($spec.username)' (HTTP $($createResponse.StatusCode))."
+        continue
       }
+    }
+
+    $userDetail = Invoke-JellyfinApi -Method GET -Path "/Users/$($matchingUser.Id)" -Token $adminToken
+    if ($userDetail.StatusCode -ne 200 -or -not $userDetail.Body) {
+      Write-Warning "jellyfin: failed to query account details for '$($spec.username)' (HTTP $($userDetail.StatusCode))."
       continue
+    }
+
+    $currentPolicy = $userDetail.Body.Policy
+    if ($null -eq $currentPolicy) {
+      Write-Warning "jellyfin: missing policy payload for '$($spec.username)'; skipping admin policy convergence."
+      continue
+    }
+
+    $currentIsAdmin = if ($null -eq $currentPolicy.IsAdministrator) { $false } else { [bool]$currentPolicy.IsAdministrator }
+    if ($currentIsAdmin -ne [bool]$spec.isAdmin) {
+      $policyBody = $currentPolicy | ConvertTo-Json -Depth 16 -Compress | ConvertFrom-Json
+      $policyBody.IsAdministrator = [bool]$spec.isAdmin
+      $policyUpdate = Invoke-JellyfinApi -Method POST -Path "/Users/$($matchingUser.Id)/Policy" -Token $adminToken -Body $policyBody
+      if ($policyUpdate.StatusCode -eq 204) {
+        Write-Output "jellyfin: updated admin policy for account '$($spec.username)' to $([bool]$spec.isAdmin)."
+      }
+      else {
+        Write-Warning "jellyfin: failed to update admin policy for '$($spec.username)' (HTTP $($policyUpdate.StatusCode))."
+      }
     }
 
     # Idempotency: keep existing password when current credentials still work.
