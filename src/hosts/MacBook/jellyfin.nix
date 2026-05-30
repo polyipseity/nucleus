@@ -39,9 +39,11 @@ let
     {
       # Keep the admin API local-only; manual trust uses this endpoint.
       admin 127.0.0.1:2019
+      # Avoid implicit HTTP redirect listener on :80 for localhost-only service.
+      auto_https disable_redirects
     }
 
-    :${toString jellyfinHttpsPort} {
+    https://localhost:${toString jellyfinHttpsPort} {
       bind 127.0.0.1 ::1
       tls internal
       reverse_proxy 127.0.0.1:${toString jellyfinHttpPort}

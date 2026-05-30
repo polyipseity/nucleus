@@ -44,12 +44,15 @@ let
 
   test_macbook_runs_local_https_proxy = assert' (
     containsRegex ''launchd\.daemons\.jellyfinHttpsProxy'' macbookJellyfinText
+    && containsRegex "https://localhost:8920" macbookJellyfinText
+    && containsRegex "auto_https disable_redirects" macbookJellyfinText
     && containsRegex "tls internal" macbookJellyfinText
     && containsRegex ''reverse_proxy 127\.0\.0\.1:8096'' macbookJellyfinText
   ) "macOS must provision a local HTTPS reverse proxy for Jellyfin";
 
   test_nixos_runs_local_https_proxy = assert' (
     containsRegex ''services\.caddy'' nixosJellyfinText
+    && containsRegex "auto_https disable_redirects" nixosJellyfinText
     && containsRegex "tls internal" nixosJellyfinText
     && containsRegex ''reverse_proxy 127\.0\.0\.1:8096'' nixosJellyfinText
     && containsRegex "8920" nixosJellyfinText
@@ -66,8 +69,9 @@ let
   test_windows_wires_https_proxy_module = assert' (
     containsRegex "Sync-JellyfinHttpsProxy" windowsApplyText
     && containsRegex "function Sync-JellyfinHttpsProxy" windowsJellyfinHttpsProxyText
+    && containsRegex "https://localhost:8920" windowsJellyfinHttpsProxyText
+    && containsRegex "auto_https disable_redirects" windowsJellyfinHttpsProxyText
     && containsRegex "tls internal" windowsJellyfinHttpsProxyText
-    && containsRegex ":8920" windowsJellyfinHttpsProxyText
   ) "Windows apply flow must converge Jellyfin HTTPS proxy service";
 
   test_host_manuals_document_jellyfin_endpoints = assert' (

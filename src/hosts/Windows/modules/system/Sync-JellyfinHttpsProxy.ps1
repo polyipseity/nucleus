@@ -75,9 +75,10 @@ function Sync-JellyfinHttpsProxy {
     $caddyfile = @'
 {
   admin 127.0.0.1:2019
+  auto_https disable_redirects
 }
 
-:8920 {
+https://localhost:8920 {
   bind 127.0.0.1 ::1
   tls internal
   reverse_proxy 127.0.0.1:8096

@@ -24,6 +24,10 @@ in
 
   services.caddy = {
     enable = true;
+    globalConfig = ''
+      # Avoid implicit HTTP redirect listener on :80 for localhost-only service.
+      auto_https disable_redirects
+    '';
     virtualHosts."https://localhost:${toString jellyfinHttpsPort}".extraConfig = ''
       bind 127.0.0.1 ::1
       tls internal
