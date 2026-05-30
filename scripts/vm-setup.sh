@@ -368,6 +368,31 @@ validate_qcow2_image() {
   return 0
 }
 
+# nixos_guest_principal_marker_path NAME [DISK_PATH]
+#   Returns the sidecar marker path storing the guest principal used when
+#   building/provisioning the NixOS disk image.
+nixos_guest_principal_marker_path() {
+  _ngp_name="$1"
+  _ngp_disk_path="${2:-}"
+  if [ -n "$_ngp_disk_path" ]; then
+    printf '%s.nixos-guest-principal\n' "$_ngp_disk_path"
+  else
+    printf '%s/%s.nixos-guest-principal\n' "$IMAGES_DIR" "$_ngp_name"
+  fi
+}
+
+# nixos_guest_principal_matches EXPECTED MARKER_PATH
+#   Returns 0 when MARKER_PATH exists and equals EXPECTED.
+nixos_guest_principal_matches() {
+  _ngm_expected="$1"
+  _ngm_marker="$2"
+  if [ ! -f "$_ngm_marker" ]; then
+    return 1
+  fi
+  _ngm_actual="$(tr -d '\r\n' <"$_ngm_marker")"
+  [ "$_ngm_actual" = "$_ngm_expected" ]
+}
+
 # wait_for_utm_registration NAME
 #   Polls utmctl list until VM NAME appears or timeout is reached.
 wait_for_utm_registration() {
@@ -659,10 +684,24 @@ build_nixos_image() {
   _name="$1"
   _disk_gib="$2"
   _out="$IMAGES_DIR/${_name}.qcow2"
+  _marker="$(nixos_guest_principal_marker_path "$_name")"
 
   if [ -f "$_out" ]; then
-    printf 'vm-setup: NixOS image already built (delete to rebuild): %s\n' "$_out"
-    return 0
+    if validate_qcow2_image "$_out" "existing NixOS image"; then
+      if nixos_guest_principal_matches "$vm_guest_username" "$_marker"; then
+        printf 'vm-setup: NixOS image already built for guest principal "%s": %s\n' "$vm_guest_username" "$_out"
+        return 0
+      fi
+      printf 'vm-setup: NixOS image guest principal drift detected (expected "%s"); rebuilding image: %s\n' "$vm_guest_username" "$_out"
+    else
+      printf 'vm-setup: existing NixOS image is invalid; rebuilding from scratch: %s\n' "$_out" >&2
+    fi
+    if [ "$dry_run" = false ]; then
+      rm -f "$_out" "$_marker"
+    else
+      printf 'vm-setup: [dry-run] rm -f %s %s\n' "$_out" "$_marker"
+      return 0
+    fi
   fi
 
   _guest_nix="$VMS_DIR/nixos/guest.nix"
@@ -724,6 +763,7 @@ build_nixos_image() {
   fi
 
   rm -rf "$_tmpdir"
+  printf '%s\n' "$vm_guest_username" >"$_marker"
   printf 'vm-setup: NixOS image ready: %s\n' "$_out"
 }
 
@@ -1661,6 +1701,7 @@ setup_utm_vms() {
     bundle="$VM_DIR/${vm_name}.utm"
     data_dir="$bundle/Data"
     disk_file="$data_dir/disk-main.qcow2"
+    disk_principal_marker="$(nixos_guest_principal_marker_path "$vm_name" "$disk_file")"
     config_plist="$bundle/config.plist"
     bundle_exists=false
     legacy_display_config=false
@@ -1728,9 +1769,16 @@ setup_utm_vms() {
         printf 'vm-setup: existing runtime disk is invalid for %s; replacing from pre-built image\n' "$vm_name" >&2
         rm -f "$disk_file"
       fi
+      if [ -f "$disk_file" ] && [ "$vm_type" = 'NixOS' ] && ! nixos_guest_principal_matches "$vm_guest_username" "$disk_principal_marker"; then
+        printf 'vm-setup: NixOS runtime disk guest principal drift detected for %s; replacing runtime disk from pre-built image\n' "$vm_name" >&2
+        rm -f "$disk_file"
+      fi
       if [ ! -f "$disk_file" ]; then
         cp "$_prebuilt" "$disk_file"
         printf 'vm-setup: copied pre-built disk image: %s\n' "$disk_file"
+        if [ "$vm_type" = 'NixOS' ]; then
+          printf '%s\n' "$vm_guest_username" >"$disk_principal_marker"
+        fi
       else
         printf 'vm-setup: preserving existing disk image: %s\n' "$disk_file"
       fi
@@ -1805,6 +1853,7 @@ setup_libvirt_vms() {
     fi
 
     disk_path="$VM_DIR/${vm_name}.qcow2"
+    disk_principal_marker="$(nixos_guest_principal_marker_path "$vm_name" "$disk_path")"
 
     printf 'vm-setup: configuring libvirt VM "%s"...\n' "$vm_display"
 
@@ -1818,9 +1867,21 @@ setup_libvirt_vms() {
 
     if [ "$dry_run" = false ]; then
       mkdir -p "$VM_DIR"
+      _replace_runtime=false
       if [ ! -f "$disk_path" ]; then
+        _replace_runtime=true
+      elif [ "$vm_type" = 'NixOS' ] && ! nixos_guest_principal_matches "$vm_guest_username" "$disk_principal_marker"; then
+        printf 'vm-setup: NixOS runtime disk guest principal drift detected for %s; replacing runtime disk from pre-built image\n' "$vm_name" >&2
+        rm -f "$disk_path"
+        _replace_runtime=true
+      fi
+
+      if [ "$_replace_runtime" = true ]; then
         cp "$_prebuilt" "$disk_path"
         printf 'vm-setup: disk image placed: %s\n' "$disk_path"
+        if [ "$vm_type" = 'NixOS' ]; then
+          printf '%s\n' "$vm_guest_username" >"$disk_principal_marker"
+        fi
       else
         printf 'vm-setup: disk already exists: %s\n' "$disk_path"
       fi

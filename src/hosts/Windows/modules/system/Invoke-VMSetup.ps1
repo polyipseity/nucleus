@@ -259,6 +259,7 @@ next run.
         # interprets bare integers as MiB).
         $ramMib      = [long](($vm.ramBytes + 524288) / 1048576)
         $diskPath    = Join-Path $vmDir "$($vm.name).qcow2"
+        $diskPrincipalMarker = "${diskPath}.nixos-guest-principal"
         $startScriptPs1 = Join-Path $vmDir "start-$($vm.name).ps1"
         $startScriptSh = Join-Path $vmDir "start-$($vm.name).sh"
         $configureScriptPs1 = Join-Path $vmDir "configure-$($vm.name).ps1"
@@ -272,15 +273,48 @@ next run.
         # Place disk image from pre-built image (empty disk fallback removed).
         if (Test-Path $diskPath) {
             if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "runtime disk '$($vm.name)'") {
-                Write-Information "vm-setup: disk already exists: $diskPath"
+                if ($vm.type -eq 'NixOS') {
+                    $runtimePrincipal = if (Test-Path $diskPrincipalMarker) {
+                        (Get-Content -Path $diskPrincipalMarker -Raw).Trim()
+                    } else {
+                        ''
+                    }
+                    if ($runtimePrincipal -ne $guestPrincipal) {
+                        if ($prebuiltValid) {
+                            Write-Warning "vm-setup: NixOS runtime disk guest principal drift detected for '$($vm.name)'; replacing runtime disk from pre-built image"
+                            if (-not $DryRun) {
+                                Remove-Item $diskPath -Force
+                                Copy-Item $prebuilt $diskPath
+                                Set-Content -Path $diskPrincipalMarker -Value $guestPrincipal -Encoding UTF8
+                            } else {
+                                Write-Information "vm-setup: [dry-run] Remove-Item '$diskPath' -Force"
+                                Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
+                                Write-Information "vm-setup: [dry-run] Set-Content '$diskPrincipalMarker' '$guestPrincipal'"
+                            }
+                        } else {
+                            Write-Warning "vm-setup: NixOS runtime disk principal drift detected but no valid pre-built image exists for '$($vm.name)'; skipping"
+                            continue
+                        }
+                    } else {
+                        Write-Information "vm-setup: disk already exists: $diskPath"
+                    }
+                } else {
+                    Write-Information "vm-setup: disk already exists: $diskPath"
+                }
             } elseif ($prebuiltValid) {
                 Write-Warning "vm-setup: existing runtime disk is invalid; replacing with pre-built image: $diskPath"
                 if (-not $DryRun) {
                     Remove-Item $diskPath -Force
                     Copy-Item $prebuilt $diskPath
+                    if ($vm.type -eq 'NixOS') {
+                        Set-Content -Path $diskPrincipalMarker -Value $guestPrincipal -Encoding UTF8
+                    }
                 } else {
                     Write-Information "vm-setup: [dry-run] Remove-Item '$diskPath' -Force"
                     Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
+                    if ($vm.type -eq 'NixOS') {
+                        Write-Information "vm-setup: [dry-run] Set-Content '$diskPrincipalMarker' '$guestPrincipal'"
+                    }
                 }
             } else {
                 Write-Warning "vm-setup: runtime disk is invalid and no valid pre-built image exists for '$($vm.name)'; skipping"
@@ -290,8 +324,14 @@ next run.
             Write-Information "vm-setup: using pre-built image: $prebuilt"
             if (-not $DryRun) {
                 Copy-Item $prebuilt $diskPath
+                if ($vm.type -eq 'NixOS') {
+                    Set-Content -Path $diskPrincipalMarker -Value $guestPrincipal -Encoding UTF8
+                }
             } else {
                 Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
+                if ($vm.type -eq 'NixOS') {
+                    Write-Information "vm-setup: [dry-run] Set-Content '$diskPrincipalMarker' '$guestPrincipal'"
+                }
             }
         } else {
             Write-Warning "vm-setup: image not found or invalid for '$($vm.name)': $prebuilt; skipping"
@@ -534,13 +574,27 @@ function Invoke-BuildNixosImage {
     )
 
     $outPath = Join-Path $ImagesDir "$VmName.qcow2"
+    $principalMarkerPath = "${outPath}.nixos-guest-principal"
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing NixOS image') {
-            Write-Information "vm-setup: NixOS image already built (delete to rebuild): $outPath"
-            return
+            $markerPrincipal = if (Test-Path $principalMarkerPath) {
+                (Get-Content -Path $principalMarkerPath -Raw).Trim()
+            } else {
+                ''
+            }
+            if ($markerPrincipal -eq $GuestPrincipal) {
+                Write-Information "vm-setup: NixOS image already built for guest principal '$GuestPrincipal': $outPath"
+                return
+            }
+            Write-Warning "vm-setup: NixOS image guest principal drift detected (expected '$GuestPrincipal'); rebuilding image: $outPath"
+            Remove-Item $outPath -Force
+            if (Test-Path $principalMarkerPath) {
+                Remove-Item $principalMarkerPath -Force
+            }
+        } else {
+            Write-Warning "vm-setup: existing NixOS image is invalid; rebuilding from scratch: $outPath"
+            Remove-Item $outPath -Force
         }
-        Write-Warning "vm-setup: existing NixOS image is invalid; rebuilding from scratch: $outPath"
-        Remove-Item $outPath -Force
     }
 
     if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
@@ -594,6 +648,7 @@ function Invoke-BuildNixosImage {
 
     Move-Item $builtImage $outPath
     Remove-Item $tmpOutput -Recurse -Force
+    Set-Content -Path $principalMarkerPath -Value $GuestPrincipal -Encoding UTF8
 
     if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built NixOS image')) {
         Write-Warning "vm-setup: NixOS image validation failed after build; removing $outPath"

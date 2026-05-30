@@ -488,6 +488,21 @@ let
       )
       "vms/macos/packer.pkr.hcl must provision a guest account using the current-user credential policy";
 
+  test_nixos_guest_principal_drift_replacement =
+    assert'
+      (
+        (lib.hasInfix "nixos_guest_principal_marker_path" vm_setup_sh_text)
+        && (lib.hasInfix "nixos_guest_principal_matches" vm_setup_sh_text)
+        && (lib.hasInfix "NixOS image guest principal drift detected" vm_setup_sh_text)
+        && (lib.hasInfix "NixOS runtime disk guest principal drift detected" vm_setup_sh_text)
+        && (lib.hasInfix ".nixos-guest-principal" vm_setup_sh_text)
+        && (lib.hasInfix "$principalMarkerPath = \"\${outPath}.nixos-guest-principal\"" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "$diskPrincipalMarker = \"\${diskPath}.nixos-guest-principal\"" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "NixOS image guest principal drift detected" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "NixOS runtime disk guest principal drift detected" windows_vm_setup_ps1_text)
+      )
+      "POSIX and Windows vm setup flows must detect NixOS guest principal drift via marker files and replace stale NixOS images/runtime disks";
+
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
   test_windows_iso_mido_patch_file_exists = assert' (builtins.pathExists ../../vms/windows/patches/mido-iso-link.patch) "vms/windows/patches/mido-iso-link.patch must exist for runtime Mido patching";
@@ -731,6 +746,7 @@ let
     test_guest_credentials_policy_in_windows_packer
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
+    test_nixos_guest_principal_drift_replacement
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
     test_windows_iso_mido_patch_failure_is_fatal
@@ -797,6 +813,7 @@ in
     test_guest_credentials_policy_in_windows_packer
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
+    test_nixos_guest_principal_drift_replacement
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
     test_windows_iso_mido_patch_failure_is_fatal
