@@ -223,10 +223,10 @@ EOF
 }
 
 # ensure_utm_default_vm_location
-#   Best-effort default-location wiring for UTM by linking ~/Documents/UTM to
-#   the managed ~/virtual machines directory when safe.
+#   Best-effort default-location wiring for UTM by linking the sandboxed
+#   Documents root to the managed ~/virtual machines directory when safe.
 ensure_utm_default_vm_location() {
-  _eudvl_utm_docs="$HOME/Documents/UTM"
+  _eudvl_utm_docs="$HOME/Library/Containers/com.utmapp.UTM/Data/Documents"
 
   if [ -L "$_eudvl_utm_docs" ]; then
     _eudvl_target="$(readlink "$_eudvl_utm_docs" 2>/dev/null || true)"
@@ -1619,15 +1619,15 @@ setup_utm_vms() {
         printf 'vm-setup: UTM bundle created: %s\n' "$bundle"
       fi
       if ! "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$vm_name"; then
-        printf 'vm-setup: importing UTM bundle via AppleScript: %s\n' "$bundle"
-        if osascript -e "tell application \"UTM\" to import new virtual machine from POSIX file \"$bundle\""; then
+        printf 'vm-setup: opening UTM bundle in place: %s\n' "$bundle"
+        if open "$bundle"; then
           if wait_for_utm_registration "$vm_name"; then
-            printf 'vm-setup: UTM VM imported and registered: %s\n' "$vm_name"
+            printf 'vm-setup: UTM VM opened and registered: %s\n' "$vm_name"
           else
-            printf 'vm-setup: WARNING — UTM import did not register VM "%s" within timeout; open UTM and retry vm-setup\n' "$vm_name" >&2
+            printf 'vm-setup: WARNING — UTM did not register VM "%s" within timeout; open UTM and retry vm-setup\n' "$vm_name" >&2
           fi
         else
-          printf 'vm-setup: WARNING — AppleScript import failed for %s; ensure UTM Automation permissions are granted and retry\n' "$bundle" >&2
+          printf 'vm-setup: WARNING — opening %s failed; ensure UTM can access the managed VM directory and retry\n' "$bundle" >&2
         fi
       else
         printf 'vm-setup: UTM VM already registered: %s\n' "$vm_name"

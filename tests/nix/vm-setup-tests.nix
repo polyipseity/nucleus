@@ -504,11 +504,11 @@ let
   test_macbook_utm_display_card_validity =
     assert'
       (
-        (lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
-        && !(lib.hasInfix "virtio_ramfb" macbook_vms_nix_text)
+        (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"std\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
+        && !(lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
         && !(lib.hasInfix "virtio-ramfb-gl" macbook_vms_nix_text)
       )
-      "src/hosts/MacBook/vms.nix must use a UTM-supported ARM Linux display card (virtio-ramfb), not virtio_ramfb/-gl";
+      "src/hosts/MacBook/vms.nix must use supported UTM display cards (std for Windows, virtio-gpu-pci for Linux/NixOS)";
   test_macbook_utm_firmware_contract =
     assert'
       (
@@ -523,17 +523,15 @@ let
         && (lib.hasInfix "disk_file=\"$data_dir/disk-main.qcow2\"" vm_setup_sh_text)
       )
       "scripts/vm-setup.sh must place UTM disk-main.qcow2 under bundle Data/ to match ImageName-based UTM drive resolution";
-  test_macbook_utm_no_auto_open_import =
-    assert' (!(lib.hasInfix "open \"$bundle\"" vm_setup_sh_text))
-      "scripts/vm-setup.sh must not auto-open .utm bundles because that import path can trigger a blocking UTM popup";
-  test_macbook_utm_uses_apple_script_import =
+  test_macbook_utm_uses_direct_bundle_open =
     assert'
       (
-        (lib.hasInfix "osascript -e" vm_setup_sh_text)
-        && (lib.hasInfix "import new virtual machine from POSIX file" vm_setup_sh_text)
-        && (lib.hasInfix "importing UTM bundle via AppleScript" vm_setup_sh_text)
+        (lib.hasInfix "open \"$bundle\"" vm_setup_sh_text)
+        && !(lib.hasInfix "osascript -e" vm_setup_sh_text)
+        && !(lib.hasInfix "import new virtual machine from POSIX file" vm_setup_sh_text)
+        && (lib.hasInfix "opening UTM bundle in place" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must automate UTM import via AppleScript when the VM is not already registered";
+      "scripts/vm-setup.sh must open the managed .utm bundle directly instead of importing it into a copied UTM storage tree";
   test_macbook_utm_refreshes_existing_bundle =
     assert'
       (
@@ -586,11 +584,14 @@ let
         && (lib.hasInfix "removed legacy helper script" windows_vm_setup_ps1_text)
       )
       "VM setup flows must generate discoverable start/config helper scripts while removing legacy .sh helpers on Windows";
-  test_macbook_utm_default_location_link = assert' (
-    (lib.hasInfix "ensure_utm_default_vm_location" vm_setup_sh_text)
-    && (lib.hasInfix "$HOME/Documents/UTM" vm_setup_sh_text)
-    && (lib.hasInfix "linked UTM default VM location" vm_setup_sh_text)
-  ) "scripts/vm-setup.sh must best-effort wire UTM's default document location to ~/virtual machines";
+  test_macbook_utm_default_location_link =
+    assert'
+      (
+        (lib.hasInfix "ensure_utm_default_vm_location" vm_setup_sh_text)
+        && (lib.hasInfix "$HOME/Library/Containers/com.utmapp.UTM/Data/Documents" vm_setup_sh_text)
+        && (lib.hasInfix "linked UTM default VM location" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must best-effort wire UTM's sandboxed document location to ~/virtual machines";
   test_macbook_tart_storage_link =
     assert'
       (
@@ -670,8 +671,7 @@ in
     test_macbook_utm_display_card_validity
     test_macbook_utm_firmware_contract
     test_macbook_utm_data_dir_disk_path
-    test_macbook_utm_no_auto_open_import
-    test_macbook_utm_uses_apple_script_import
+    test_macbook_utm_uses_direct_bundle_open
     test_macbook_utm_refreshes_existing_bundle
     test_macbook_utm_stale_template_guard
     test_vm_directory_readme_generation
