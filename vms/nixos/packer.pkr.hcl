@@ -132,19 +132,12 @@ build {
       "nixos-generate-config --root /mnt",
       # Write the nucleus NixOS guest configuration
       "cat > /mnt/etc/nixos/configuration.nix << 'NIXEOF'",
-      "{ config, lib, pkgs, modulesPath, ... }:",
+      "{ modulesPath, ... }:",
       "{",
       "  imports = [ ./hardware-configuration.nix \"${modulesPath}/profiles/qemu-guest.nix\" ];",
       "  boot.loader.grub.enable = true;",
       "  boot.loader.grub.device = \"/dev/vda\";",
       "  networking.hostName = \"NixOS\";",
-      # VirtioFS is mounted after first boot when the host exposes a share.
-      # Do not force virtio_fs into the initrd here: the current guest kernel
-      # may not ship it as a standalone module, which breaks image generation.
-      "  services.openssh = { enable = true; settings.PermitRootLogin = \"yes\"; };",
-      "  users.users.nixos = { isNormalUser = true; extraGroups = [ \"wheel\" ]; initialPassword = \"nixos\"; };",
-      "  security.sudo.wheelNeedsPassword = false;",
-      "  environment.systemPackages = with pkgs; [ git vim ];",
       "  system.stateVersion = \"25.05\";",
       "}",
       "NIXEOF",

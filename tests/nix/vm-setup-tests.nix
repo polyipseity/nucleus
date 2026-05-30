@@ -523,10 +523,12 @@ let
     assert'
       (
         (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"virtio-vga\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
+        && (lib.hasInfix "displayDynamicResolution = vm: vm.type == \"Windows\";" macbook_vms_nix_text)
+        && (lib.hasInfix "displayDynamicResolution vm then \"<true/>\" else \"<false/>\"" macbook_vms_nix_text)
         && !(lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
         && !(lib.hasInfix "virtio-ramfb-gl" macbook_vms_nix_text)
       )
-      "src/hosts/MacBook/vms.nix must use supported UTM display cards (virtio-vga for Windows, virtio-gpu-pci for Linux/NixOS)";
+      "src/hosts/MacBook/vms.nix must use supported UTM display cards and keep dynamic resolution disabled for Linux/NixOS";
   test_macbook_utm_firmware_contract =
     assert'
       (
@@ -567,9 +569,11 @@ let
         (lib.hasInfix "re_register_utm_bundle" vm_setup_sh_text)
         && (lib.hasInfix "detected legacy display config in existing bundle" vm_setup_sh_text)
         && (lib.hasInfix "<string>(vga|std|virtio-ramfb|virtio-ramfb-gl)</string>" vm_setup_sh_text)
+        && (lib.hasInfix "detected config drift in existing bundle" vm_setup_sh_text)
+        && (lib.hasInfix "cmp -s \"$_plist_template\" \"$config_plist\"" vm_setup_sh_text)
         && (lib.hasInfix "repairing stale UTM runtime registration" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must re-register UTM VMs when legacy display configs are detected so refreshed config.plist values take effect";
+      "scripts/vm-setup.sh must re-register UTM VMs when legacy display configs or template drift are detected so refreshed config.plist values take effect";
   test_vm_directory_readme_generation =
     assert'
       (

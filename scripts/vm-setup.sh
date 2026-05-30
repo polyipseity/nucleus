@@ -1635,6 +1635,7 @@ setup_utm_vms() {
     config_plist="$bundle/config.plist"
     bundle_exists=false
     legacy_display_config=false
+    template_drift_config=false
 
     printf 'vm-setup: configuring UTM VM "%s"...\n' "$vm_display"
 
@@ -1661,6 +1662,13 @@ setup_utm_vms() {
       printf 'vm-setup: WARNING — stale UTM template detected at %s; run home-manager switch (or nucleus apply) before vm-setup\n' "$_plist_template" >&2
       i=$((i + 1))
       continue
+    fi
+    # Detect config drift in already-registered bundles. UTM can keep runtime
+    # state from the registered entry, so we re-register when the on-disk
+    # bundle config no longer matches the managed template.
+    if [ "$bundle_exists" = true ] && [ -f "$config_plist" ] && ! cmp -s "$_plist_template" "$config_plist"; then
+      template_drift_config=true
+      printf 'vm-setup: detected config drift in existing bundle; VM will be re-registered to refresh runtime state: %s\n' "$vm_name"
     fi
     # Require a pre-built image only when the bundle does not already have a
     # disk. Existing bundles can refresh config.plist in-place.
@@ -1717,7 +1725,7 @@ setup_utm_vms() {
         else
           printf 'vm-setup: WARNING — opening %s failed; ensure UTM can access the managed VM directory and retry\n' "$bundle" >&2
         fi
-      elif [ "$legacy_display_config" = true ]; then
+      elif [ "$legacy_display_config" = true ] || [ "$template_drift_config" = true ]; then
         printf 'vm-setup: repairing stale UTM runtime registration for %s\n' "$vm_name"
         if re_register_utm_bundle "$vm_name" "$bundle"; then
           printf 'vm-setup: stale UTM registration repaired: %s\n' "$vm_name"

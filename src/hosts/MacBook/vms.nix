@@ -65,6 +65,11 @@ let
   # Apple Silicon and Intel hosts.
   displayCard = vm: if vm.type == "Windows" then "virtio-vga" else "virtio-gpu-pci";
 
+  # Keep dynamic resolution for Windows where guest tooling handles resize
+  # transitions reliably. For Linux/NixOS guests, disable it to avoid transient
+  # display deactivation loops during early boot on some UTM/QEMU combinations.
+  displayDynamicResolution = vm: vm.type == "Windows";
+
   # UTM 4.x sharing mode selector.
   # Modern UTM uses DirectoryShareMode/DirectoryShareReadOnly (not the legacy
   # DirectorySharing/ReadOnlySharing keys).  UTM import expects enum display
@@ -111,7 +116,7 @@ let
                 <key>Hardware</key>
                 <string>${displayCard vm}</string>
                 <key>DynamicResolution</key>
-                <true/>
+                ${if displayDynamicResolution vm then "<true/>" else "<false/>"}
                 <key>UpscalingFilter</key>
                 <string>Nearest</string>
                 <key>DownscalingFilter</key>

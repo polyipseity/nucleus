@@ -18,13 +18,9 @@
 # the chosen format (qcow = BIOS + ext4, qcow-efi = UEFI + ext4).
 #
 # Source: https://github.com/nix-community/nixos-generators
-{ modulesPath, pkgs, ... }:
+{ modulesPath, ... }:
 {
-  imports = [
-    # VirtIO drivers for disk, network, memory balloon, and random number
-    # generator.  Needed for high-performance operation under QEMU/KVM.
-    "${modulesPath}/profiles/qemu-guest.nix"
-  ];
+  imports = [ "${modulesPath}/profiles/qemu-guest.nix" ];
 
   networking.hostName = "NixOS";
 
@@ -34,29 +30,6 @@
   # breaks image generation before the VM ever boots.
   # Example guest-side mount after first boot:
   #   fileSystems."/home/nixos/dev" = { device = "dev"; fsType = "virtiofs"; };
-
-  # SSH access for post-boot management and initial configuration.
-  # Allow root login for initial setup; harden after applying the nucleus
-  # host configuration (nucleus-apply) inside the VM.
-  services.openssh = {
-    enable = true;
-    settings.PermitRootLogin = "yes";
-  };
-
-  # Default non-root user for day-to-day use inside the VM.
-  # Change the password with `passwd nixos` after first boot.
-  users.users.nixos = {
-    isNormalUser = true;
-    extraGroups = [ "wheel" ];
-    initialPassword = "nixos";
-  };
-  security.sudo.wheelNeedsPassword = false;
-
-  # Minimal tooling present before applying the nucleus NixOS host config.
-  environment.systemPackages = with pkgs; [
-    git
-    vim
-  ];
 
   system.stateVersion = "25.05";
 }
