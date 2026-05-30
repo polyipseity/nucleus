@@ -13,7 +13,8 @@
 
 ## HTTPS certificate trust (one-time)
 
-- Trust the local Caddy CA so `https://localhost:8920` is recognized by browsers: run `caddy trust --address 127.0.0.1:2019` in an elevated PowerShell session.
+- `nucleus-apply` now runs Caddy local-CA trust automatically for managed localhost HTTPS reverse proxies.
+- If trust is still missing after apply, run `caddy trust --address 127.0.0.1:2019` once in an elevated PowerShell session.
 
 ## command shortcuts
 

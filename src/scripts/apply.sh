@@ -602,6 +602,41 @@ run_jellyfin_account_sync() {
   rm -f "$_rjas_resolved_file"
 }
 
+run_caddy_local_ca_trust() {
+  # Trust Caddy's local CA so certificates from tls internal are recognized by
+  # local TLS clients. This applies generally to every local reverse proxy that
+  # uses the same Caddy PKI authority, not just Jellyfin.
+  #
+  # Arguments:
+  #   $1 — either "sudo" (run trust with sudo) or "user" (run as current user)
+  _rclct_mode="$1"
+
+  if ! command -v caddy >/dev/null 2>&1; then
+    printf '%s\n' 'caddy-trust: caddy not found in PATH; skipping local CA trust'
+    return
+  fi
+
+  _rclct_attempt=0
+  while [ "$_rclct_attempt" -lt 20 ]; do
+    if [ "$_rclct_mode" = "sudo" ]; then
+      if sudo env "PATH=$PATH" caddy trust --address 127.0.0.1:2019; then
+        printf '%s\n' 'caddy-trust: local CA trusted successfully'
+        return
+      fi
+    else
+      if caddy trust --address 127.0.0.1:2019; then
+        printf '%s\n' 'caddy-trust: local CA trusted successfully'
+        return
+      fi
+    fi
+
+    _rclct_attempt=$((_rclct_attempt + 1))
+    sleep 1
+  done
+
+  printf '%s\n' 'caddy-trust: failed to trust local CA from admin endpoint 127.0.0.1:2019; continuing without failing apply' >&2
+}
+
 run_replica_sync() {
   # Call scripts/replica-sync.sh so enabled replicas in users.json are
   # synchronized after a successful apply. This keeps local replica trees
@@ -812,6 +847,7 @@ case "$(uname -s)" in
     # while running as root (which otherwise produces ownership warnings).
     run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
     ensure_prek_hooks_installed "$REPO_ROOT"
+    run_caddy_local_ca_trust sudo
     run_jellyfin_account_sync
     run_ai_sync
     run_replica_sync
@@ -831,6 +867,7 @@ case "$(uname -s)" in
       # Keep root invocations on root-owned HOME for consistent Nix behavior.
       run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
       ensure_prek_hooks_installed "$REPO_ROOT"
+      run_caddy_local_ca_trust sudo
       run_jellyfin_account_sync
       run_ai_sync
       run_replica_sync
@@ -843,6 +880,7 @@ case "$(uname -s)" in
       run_nix run "$REPO_ROOT/src#health-check"
       run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
       ensure_prek_hooks_installed "$REPO_ROOT"
+      run_caddy_local_ca_trust user
       run_jellyfin_account_sync
       run_ai_sync
       run_replica_sync
