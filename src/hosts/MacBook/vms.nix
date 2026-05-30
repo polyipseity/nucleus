@@ -57,15 +57,12 @@ let
       lib.toUpper (builtins.substring 4 2 h)
     }";
 
-  # QEMU display card appropriate for the guest OS and host arch.
-  # Windows VMs use vga for broadest driver coverage.
-  # Linux/NixOS VMs use virtio variants for best performance.
-  displayCard =
-    vm:
-    if isArm then
-      (if vm.type == "Windows" then "vga" else "virtio-ramfb")
-    else
-      (if vm.type == "Windows" then "vga" else "virtio-gpu-pci");
+  # QEMU display card appropriate for the guest OS.
+  # Windows VMs use standard VGA because raw `vga` is not a valid UTM/QEMU
+  # device model name.
+  # Linux/NixOS VMs use VirtIO GPU so UTM exposes an active display on both
+  # Apple Silicon and Intel hosts.
+  displayCard = vm: if vm.type == "Windows" then "std" else "virtio-gpu-pci";
 
   # UTM 4.x sharing mode selector.
   # Modern UTM uses DirectoryShareMode/DirectoryShareReadOnly (not the legacy
