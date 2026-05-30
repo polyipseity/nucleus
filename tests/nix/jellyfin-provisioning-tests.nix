@@ -9,8 +9,14 @@
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  hasAdminAccount =
+    accounts:
+    builtins.any (
+      account: (account.id or "") == "polyipseity" && ((account.isAdmin or false) == true)
+    ) accounts;
 
   coreText = builtins.readFile ../../src/modules/core.nix;
+  applyScriptText = builtins.readFile ../../src/scripts/apply.sh;
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   macbookJellyfinText = builtins.readFile ../../src/hosts/MacBook/jellyfin.nix;
   macbookManualText = builtins.readFile ../../src/hosts/MacBook/MANUAL.md;
@@ -19,9 +25,13 @@ let
   nixosManualText = builtins.readFile ../../src/hosts/NixOS/MANUAL.md;
   linuxText = builtins.readFile ../../src/modules/linux.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
+  usersRegistry = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
+  windowsCaddyTrustText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyLocalCA.ps1;
   windowsJellyfinHttpsProxyText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinHttpsProxy.ps1;
+  windowsJellyfinAccountText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinAccount.ps1;
   windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
+  windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
   windowsSystemText = builtins.readFile ../../src/hosts/Windows/system.dsc.yml;
 
   assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
@@ -83,6 +93,29 @@ let
     && containsRegex ''http://127\.0\.0\.1:8096'' windowsManualText
   ) "Host manuals must document Jellyfin HTTPS and loopback HTTP endpoints";
 
+  test_polyipseity_declared_as_jellyfin_admin = assert' (
+    hasAdminAccount (usersRegistry.polyipseity.jellyfin.accounts or [ ])
+    && hasAdminAccount (windowsUsersRegistry.users.polyipseity.jellyfin.accounts or [ ])
+  ) "polyipseity Jellyfin account must be declared as admin on POSIX and Windows user registries";
+
+  test_jellyfin_admin_flag_defaults_false_in_sync_logic = assert' (
+    containsRegex ''isAdmin: \(\.isAdmin // false\)'' applyScriptText
+    && containsRegex ''isAdmin = if \(\$null -eq \$account\.isAdmin\) \{ \$false \}'' windowsJellyfinAccountText
+  ) "Jellyfin account sync logic must default isAdmin to false when omitted";
+
+  test_jellyfin_admin_policy_is_converged = assert' (
+    containsRegex ''/Users/\$\{_rjas_user_id\}/Policy'' applyScriptText
+    && containsRegex ''/Users/\$\(\$matchingUser\.Id\)/Policy'' windowsJellyfinAccountText
+  ) "Jellyfin account sync must converge admin policy on POSIX and Windows";
+
+  test_caddy_local_ca_trust_is_automated = assert' (
+    containsRegex "run_caddy_local_ca_trust" applyScriptText
+    && containsRegex ''caddy trust --address 127\.0\.0\.1:2019'' applyScriptText
+    && containsRegex "Sync-CaddyLocalCA" windowsApplyText
+    && containsRegex "function Sync-CaddyLocalCA" windowsCaddyTrustText
+    && containsRegex ''caddy.*trust --address 127\.0\.0\.1:2019'' windowsCaddyTrustText
+  ) "Caddy local CA trust must be automated across POSIX and Windows apply flows";
+
   allTests = [
     test_core_installs_jellyfin
     test_nixos_imports_host_jellyfin_module
@@ -96,6 +129,10 @@ let
     test_windows_installs_caddy_for_https_proxy
     test_windows_wires_https_proxy_module
     test_host_manuals_document_jellyfin_endpoints
+    test_polyipseity_declared_as_jellyfin_admin
+    test_jellyfin_admin_flag_defaults_false_in_sync_logic
+    test_jellyfin_admin_policy_is_converged
+    test_caddy_local_ca_trust_is_automated
   ];
 in
 {
