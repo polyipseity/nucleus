@@ -35,6 +35,33 @@ Apply this convention when adding or modifying:
 - `vms/windows/Autounattend.xml` — set `<ComputerName>Windows</ComputerName>`
 - `src/modules/VMs.json` — set `display` to the canonical PascalCase name
 
+## Guest Credential Convention
+
+Default VM guest credentials must track the current host user identity on every
+host OS (macOS, NixOS, Windows) and every guest OS path (NixOS, Windows,
+macOS), unless an explicit override is introduced in the same change.
+
+- Default guest username = current host user name.
+- Default guest password = same value as guest username.
+
+Required wiring and parity checks:
+
+- POSIX flow: `scripts/vm-setup.sh` must derive credentials once and pass them
+  into guest builders/templates.
+- Windows flow:
+  `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1` must derive the same
+  credentials and pass them into guest builders/templates.
+- NixOS guest paths: both `vms/nixos/guest.nix` and
+  `vms/nixos/packer.pkr.hcl` must consume these values.
+- Windows guest paths: `vms/windows/Autounattend.xml` placeholders and
+  `vms/windows/packer.pkr.hcl` variables must stay in sync with runtime
+  rendering.
+- macOS guest path: `vms/macos/packer.pkr.hcl` must provision/update the guest
+  account from the same derived values.
+
+When changing credential policy behavior, update
+`tests/nix/vm-setup-tests.nix` in the same commit.
+
 ## VM Manifest
 
 All virtual machines are declared in `src/modules/VMs.json`.
@@ -182,8 +209,9 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
   default `tcg` accelerator is in use. If WHPX is enabled, it upgrades automatically. If not,
   it warns and prints the command to enable it. Pass `-Accelerator tcg` explicitly to suppress.
 - SATA disk during build → VirtIO drivers installed post-install → final image is VirtIO-disk ready.
-- Autounattend.xml bypasses TPM/Secure Boot checks, enables WinRM for Packer, creates `packer` account.
-- Change the `packer` password and apply the nucleus Windows config after first boot.
+- Autounattend.xml bypasses TPM/Secure Boot checks, enables WinRM for Packer,
+  and renders the managed guest account from the current host user identity.
+- Apply the nucleus Windows guest config after first boot.
 
 ### Guest configuration status
 
