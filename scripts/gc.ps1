@@ -70,6 +70,56 @@ $ErrorActionPreference = "Stop"
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 $resolvedRepoRoot  = (Resolve-Path -Path $RepoRoot).Path
 
+function Clear-DirectoryContentsIfPresent {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Label
+  )
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+    return
+  }
+
+  try {
+    Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop | Remove-Item -Recurse -Force -ErrorAction Stop
+  }
+  catch {
+    Write-Warning "gc: failed to prune $Label at '$Path' — $($_.Exception.Message)"
+  }
+}
+
+function Remove-VMPruneItem {
+  [CmdletBinding(SupportsShouldProcess = $true)]
+  param(
+    [Parameter(Mandatory = $true)]
+    [System.IO.FileSystemInfo]$Item,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Label,
+
+    [switch]$Recurse
+  )
+
+  if (-not $PSCmdlet.ShouldProcess($Item.FullName, "Remove $Label")) {
+    return
+  }
+
+  try {
+    if ($Recurse) {
+      Remove-Item -LiteralPath $Item.FullName -Recurse -Force -ErrorAction Stop
+    } else {
+      Remove-Item -LiteralPath $Item.FullName -Force -ErrorAction Stop
+    }
+    Write-Output "gc: removed $Label '$($Item.Name)'"
+  }
+  catch {
+    Write-Warning "gc: failed to remove $Label '$($Item.FullName)' — $($_.Exception.Message)"
+  }
+}
+
 # Load only the modules required by this script.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
@@ -92,27 +142,6 @@ if (-not $SkipWallpaperPrune) {
 # dependencies. rustc has no standalone cache tree; its transient artifacts are
 # cleaned via cargo-cache and rustup's tmp directory.
 if (-not $SkipToolCachePrune) {
-  function Clear-DirectoryContentsIfPresent {
-    param(
-      [Parameter(Mandatory = $true)]
-      [string]$Path,
-
-      [Parameter(Mandatory = $true)]
-      [string]$Label
-    )
-
-    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
-      return
-    }
-
-    try {
-      Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop | Remove-Item -Recurse -Force -ErrorAction Stop
-    }
-    catch {
-      Write-Warning "gc: failed to prune $Label at '$Path' — $($_.Exception.Message)"
-    }
-  }
-
   $bunCacheDir = Join-Path $HOME ".bun\install\cache"
   $cargoBinstallCacheDir = Join-Path $env:LOCALAPPDATA "cargo-binstall\cache"
   $rustupTmpDir = Join-Path $HOME ".rustup\tmp"
@@ -206,44 +235,22 @@ if (-not $SkipVMPrune) {
       $declaredVMNames = @()
     }
 
-    # Remove temporary Packer build directories.
-    if ((Test-Path -LiteralPath $imagesDir -PathType Container)) {
+    if (Test-Path -LiteralPath $imagesDir -PathType Container) {
+      # Remove temporary Packer build directories.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*-build" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-        try {
-          Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-          Write-Output "gc: removed temporary VM build directory '$($_.Name)'"
-        }
-        catch {
-          Write-Warning "gc: failed to remove temporary VM build directory '$($_.FullName)' — $($_.Exception.Message)"
-        }
+        Remove-VMPruneItem -Item $_ -Label "temporary VM build directory" -Recurse
       }
-    }
 
-    # Remove cached Windows installer ISOs.
-    if ((Test-Path -LiteralPath $imagesDir -PathType Container)) {
+      # Remove cached Windows installer ISOs.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*-installer.iso" -File -ErrorAction SilentlyContinue | ForEach-Object {
-        try {
-          Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop
-          Write-Output "gc: removed cached Windows installer '$($_.Name)'"
-        }
-        catch {
-          Write-Warning "gc: failed to remove cached Windows installer '$($_.FullName)' — $($_.Exception.Message)"
-        }
+        Remove-VMPruneItem -Item $_ -Label "cached Windows installer"
       }
-    }
 
-    # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
-    if ((Test-Path -LiteralPath $imagesDir -PathType Container)) {
+      # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*.qcow2" -File -ErrorAction SilentlyContinue | ForEach-Object {
         $imageName = $_.BaseName
         if ($imageName -notin $declaredVMNames) {
-          try {
-            Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop
-            Write-Output "gc: removed stale VM disk image '$($_.Name)'"
-          }
-          catch {
-            Write-Warning "gc: failed to remove stale VM disk image '$($_.FullName)' — $($_.Exception.Message)"
-          }
+          Remove-VMPruneItem -Item $_ -Label "stale VM disk image"
         }
       }
     }

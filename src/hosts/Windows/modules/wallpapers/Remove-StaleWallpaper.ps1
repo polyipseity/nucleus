@@ -1,4 +1,4 @@
-# modules/Windows/remove-stalewallpaper.ps1 — Managed wallpaper stale-file cleanup.
+# hosts/Windows/modules/wallpapers/Remove-StaleWallpaper.ps1 — Managed wallpaper stale-file cleanup.
 #
 # Removes only decrypted files without matching source blobs so gallery state
 # stays aligned with declarative assets.
@@ -23,7 +23,7 @@ function Remove-StaleWallpaper {
     Directory containing decrypted wallpaper files.
 
   .EXAMPLE
-    Remove-NucleusStaleWallpapers -AssetsDir '.\assets\wallpapers' -OutputDir "$HOME\Pictures\wallpapers"
+    Remove-StaleWallpaper -AssetsDir '.\assets\wallpapers\admin' -OutputDir "$HOME\Pictures\wallpapers"
   #>
   [CmdletBinding(SupportsShouldProcess = $true)]
   param(
@@ -34,27 +34,21 @@ function Remove-StaleWallpaper {
     [string]$OutputDir
   )
 
-  if (-not (Test-Path -Path $AssetsDir) -or -not (Test-Path -Path $OutputDir)) {
+  if (-not (Test-Path -LiteralPath $AssetsDir -PathType Container) -or -not (Test-Path -LiteralPath $OutputDir -PathType Container)) {
     return
   }
 
-  $expectedWallpaperNames = @(
-    # SilentlyContinue: AssetsDir existence is confirmed by Test-Path above;
-    # suppression covers unlikely access-denied errors so the function degrades
-    # gracefully (no stale-cleanup) rather than aborting the apply run.
-    Get-ChildItem -Path $AssetsDir -Filter "*.sops" -File -ErrorAction SilentlyContinue |
-      ForEach-Object { [System.IO.Path]::GetFileNameWithoutExtension($_.Name) }
-  )
-
-  $managedWallpaperSet = @{}
-  foreach ($expectedWallpaperName in $expectedWallpaperNames) {
-    $managedWallpaperSet[$expectedWallpaperName] = $true
-  }
+  $managedWallpaperSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+  # SilentlyContinue: AssetsDir existence is confirmed by Test-Path above;
+  # suppression covers unlikely access-denied errors so the function degrades
+  # gracefully (no stale-cleanup) rather than aborting the apply run.
+  Get-ChildItem -LiteralPath $AssetsDir -Filter "*.sops" -File -ErrorAction SilentlyContinue |
+    ForEach-Object { [void]$managedWallpaperSet.Add([System.IO.Path]::GetFileNameWithoutExtension($_.Name)) }
 
   # SilentlyContinue: OutputDir existence is confirmed by Test-Path above;
   # suppression covers unlikely access-denied errors (result is null/empty
   # collection, which the foreach handles as a no-op).
-  $decryptedWallpapers = Get-ChildItem -Path $OutputDir -File -ErrorAction SilentlyContinue | Sort-Object -Property Name
+  $decryptedWallpapers = Get-ChildItem -LiteralPath $OutputDir -File -ErrorAction SilentlyContinue
   foreach ($decryptedWallpaper in $decryptedWallpapers) {
     if ($decryptedWallpaper.Extension -eq ".xml") {
       continue

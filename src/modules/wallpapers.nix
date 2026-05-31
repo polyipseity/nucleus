@@ -48,21 +48,26 @@ let
   currentUsername = config.home.username;
   currentUserHome = config.home.homeDirectory;
 
+  # Build normalized wallpaper item metadata for a user once so secret
+  # generation and activation wiring share the same source of truth.
+  mkWallpaperItemsForUser =
+    userName:
+    map (
+      blobName:
+      let
+        wallpaperName = lib.removeSuffix ".sops" blobName;
+      in
+      {
+        inherit blobName wallpaperName;
+        secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${userName}";
+      }
+    ) (wallpaperBlobsForUser userName);
+
   # Generate wallpaper secrets for a given user.
   mkWallpaperSecretsForUser =
     userName:
     let
-      blobs = wallpaperBlobsForUser userName;
-      items = map (
-        blobName:
-        let
-          wallpaperName = lib.removeSuffix ".sops" blobName;
-        in
-        {
-          inherit blobName wallpaperName;
-          secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${userName}";
-        }
-      ) blobs;
+      items = mkWallpaperItemsForUser userName;
     in
     lib.listToAttrs (
       map (item: {
@@ -82,17 +87,7 @@ let
   wallpaperSecrets = lib.foldl' lib.recursiveUpdate { } (map mkWallpaperSecretsForUser userDirs);
 
   # Items list for the activation script - use current user's secrets.
-  wallpaperBlobsCurrentUser = wallpaperBlobsForUser currentUsername;
-  wallpaperItemsForCurrentUser = map (
-    blobName:
-    let
-      wallpaperName = lib.removeSuffix ".sops" blobName;
-    in
-    {
-      inherit blobName wallpaperName;
-      secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${currentUsername}";
-    }
-  ) wallpaperBlobsCurrentUser;
+  wallpaperItemsForCurrentUser = mkWallpaperItemsForUser currentUsername;
 
   # desktoppr is darwin-only; keep this reference lazy so Linux evaluation
   # does not attempt to instantiate an unsupported package.
@@ -105,7 +100,7 @@ in
       message = "wallpapers: required wallpapers directory is missing.";
     }
     {
-      assertion = builtins.any (u: u == currentUsername) userDirs;
+      assertion = builtins.elem currentUsername userDirs;
       message = "wallpapers: current user has no managed wallpaper directory.";
     }
   ];
