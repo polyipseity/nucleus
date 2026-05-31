@@ -454,10 +454,18 @@ let
         && (lib.hasInfix "sops --decrypt --output-type json" vm_setup_sh_text)
         && (lib.hasInfix "NUCLEUS_VM_GUEST_USERNAME" vm_setup_sh_text)
         && (lib.hasInfix "NUCLEUS_VM_GUEST_PASSWORD" vm_setup_sh_text)
-        && (lib.hasInfix "--argstr guestUsername" vm_setup_sh_text)
-        && (lib.hasInfix "--argstr guestPassword" vm_setup_sh_text)
       )
       "scripts/vm-setup.sh must resolve guest credentials from per-user SOPS secrets and export/pass them to guest builders";
+
+  test_nixos_generators_uses_exported_env_credentials =
+    assert'
+      (
+        (lib.hasInfix "guestUsername ? builtins.getEnv \"NUCLEUS_VM_GUEST_USERNAME\"" guest_nix_text)
+        && (lib.hasInfix "guestPassword ? builtins.getEnv \"NUCLEUS_VM_GUEST_PASSWORD\"" guest_nix_text)
+        && !(lib.hasInfix "--argstr guestUsername" vm_setup_sh_text)
+        && !(lib.hasInfix "--argstr guestPassword" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must let nixos-generators consume exported guest credentials directly instead of passing unsupported --argstr flags";
 
   test_guest_credentials_policy_in_windows_vm_setup_ps1 =
     assert'
@@ -549,6 +557,14 @@ let
         && (lib.hasInfix "runtime disk guest credential drift detected" windows_vm_setup_ps1_text)
       )
       "POSIX and Windows vm setup flows must detect VM guest credential drift via marker files and replace stale images/runtime disks";
+
+  test_utm_runtime_replacement_requires_valid_prebuilt =
+    assert'
+      (
+        (lib.hasInfix "_prebuilt_valid=false" vm_setup_sh_text)
+        && (lib.hasInfix "cannot replace the %s runtime disk because no valid pre-built image is available" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must refuse to replace UTM runtime disks when the rebuild step did not produce a valid pre-built qcow2";
 
   test_libvirt_runtime_validation_parity =
     assert'
@@ -800,6 +816,7 @@ let
     test_guest_credentials_policy_in_user_registries
     test_guest_credentials_policy_in_user_secrets
     test_guest_credentials_policy_in_vm_setup_sh
+    test_nixos_generators_uses_exported_env_credentials
     test_guest_credentials_policy_in_windows_vm_setup_ps1
     test_guest_credentials_policy_in_nixos_guest
     test_guest_credentials_policy_in_nixos_packer
@@ -809,6 +826,7 @@ let
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
     test_vm_guest_credential_drift_replacement
+    test_utm_runtime_replacement_requires_valid_prebuilt
     test_libvirt_runtime_validation_parity
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
@@ -872,6 +890,7 @@ in
     test_guest_credentials_policy_in_user_registries
     test_guest_credentials_policy_in_user_secrets
     test_guest_credentials_policy_in_vm_setup_sh
+    test_nixos_generators_uses_exported_env_credentials
     test_guest_credentials_policy_in_windows_vm_setup_ps1
     test_guest_credentials_policy_in_nixos_guest
     test_guest_credentials_policy_in_nixos_packer
@@ -881,6 +900,7 @@ in
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
     test_vm_guest_credential_drift_replacement
+    test_utm_runtime_replacement_requires_valid_prebuilt
     test_libvirt_runtime_validation_parity
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support

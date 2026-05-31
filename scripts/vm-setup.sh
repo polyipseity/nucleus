@@ -820,8 +820,6 @@ build_nixos_image() {
     --format "$_nixos_format" \
     --system "$_nixos_system" \
     --configuration "$_guest_nix" \
-    --argstr guestUsername "$vm_guest_username" \
-    --argstr guestPassword "$vm_guest_password" \
     -o "$_out_link"
 
   # nixos-generators' -o flag expects a non-existent symlink path, not an
@@ -1854,6 +1852,7 @@ setup_utm_vms() {
     # Require a pre-built image only when the bundle does not already have a
     # disk. Existing bundles can refresh config.plist in-place.
     _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
+    _prebuilt_valid=false
     if [ ! -f "$disk_file" ] && [ ! -f "$_prebuilt" ]; then
       _build_tmp="$IMAGES_DIR/${vm_name}-build"
       if [ -d "$_build_tmp" ]; then
@@ -1865,10 +1864,14 @@ setup_utm_vms() {
       continue
     fi
 
-    if [ -f "$_prebuilt" ] && ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
-      printf 'vm-setup: WARNING — pre-built image is invalid for %s: %s\n' "$vm_name" "$_prebuilt" >&2
-      i=$((i + 1))
-      continue
+    if [ -f "$_prebuilt" ]; then
+      if validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
+        _prebuilt_valid=true
+      else
+        printf 'vm-setup: WARNING — pre-built image is invalid for %s: %s\n' "$vm_name" "$_prebuilt" >&2
+        i=$((i + 1))
+        continue
+      fi
     fi
 
     write_start_script "$vm_name" "$vm_display" "$vm_type" 'darwin-utm'
@@ -1876,18 +1879,28 @@ setup_utm_vms() {
 
     if [ "$dry_run" = false ]; then
       mkdir -p "$data_dir"
+      _replace_runtime=false
       if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}"; then
         printf 'vm-setup: existing runtime disk is invalid for %s; replacing from pre-built image\n' "$vm_name" >&2
         rm -f "$disk_file"
+        _replace_runtime=true
       fi
       if [ -f "$disk_file" ] && ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
         printf 'vm-setup: %s runtime disk guest credential drift detected; replacing runtime disk from pre-built image\n' "$vm_name" >&2
         rm -f "$disk_file"
+        _replace_runtime=true
       fi
       if [ ! -f "$disk_file" ]; then
+        if [ "$_prebuilt_valid" != true ]; then
+          printf 'vm-setup: WARNING — cannot replace the %s runtime disk because no valid pre-built image is available: %s\n' "$vm_name" "$_prebuilt" >&2
+          i=$((i + 1))
+          continue
+        fi
         cp "$_prebuilt" "$disk_file"
         printf 'vm-setup: copied pre-built disk image: %s\n' "$disk_file"
         printf '%s\n' "$vm_guest_credentials_fingerprint" >"$disk_credential_marker"
+      elif [ "$_replace_runtime" = true ]; then
+        printf 'vm-setup: WARNING — replacement was requested for %s but the runtime disk still exists; leaving it untouched\n' "$vm_name" >&2
       else
         printf 'vm-setup: preserving existing disk image: %s\n' "$disk_file"
       fi
