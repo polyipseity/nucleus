@@ -22,6 +22,9 @@
 #     under ~/dev daily at 00:00 so apply runs do not block on large tree scans.
 #   local.betterdisplay-heartbeat — polls HeadlessDisplay every 30 s and
 #     reconnects it if BetterDisplay drops the virtual screen connection.
+#   local.icloud-exclusions — marks large/transient directories with the
+#     com.apple.fileprovider.ignore#P xattr daily at 00:00 to prevent iCloud
+#     from syncing build/cache trees across devices.
 #   local.nix-index-update — rebuilds the nix-index file database daily
 #     (00:00) and on every agent load; a freshness check makes
 #     reloads a fast no-op when the DB was updated within the past 6 days.
@@ -180,6 +183,111 @@ let
       mobileDocumentsRoots
     else
       [ "Library/Mobile Documents/com~apple~CloudDocs" ];
+
+  # Pre-computed JSON payloads for the iCloud exclusions launchd script.
+  # Evaluated at derivation time so the standalone script can be placed in the
+  # Nix store without needing runtime user-context access.  Both values mirror
+  # the inline computation in configureICloudExclusions to keep the activation
+  # hook and the daily launchd agent in sync.
+  icloudExcludedDirsJson = builtins.toJSON (
+    let
+      effectiveUsers = if users != null then users else { };
+      currentUser = config.home.username;
+    in
+    if
+      builtins.hasAttr currentUser effectiveUsers
+      && builtins.hasAttr "iCloudExclusions" effectiveUsers.${currentUser}
+      && builtins.hasAttr "excludedDirNames" effectiveUsers.${currentUser}.iCloudExclusions
+    then
+      effectiveUsers.${currentUser}.iCloudExclusions.excludedDirNames
+    else
+      [ ]
+  );
+
+  icloudManagedRootsJson = builtins.toJSON (
+    let
+      effectiveUsers = if users != null then users else { };
+      currentUser = config.home.username;
+    in
+    if
+      builtins.hasAttr currentUser effectiveUsers
+      && builtins.hasAttr "iCloudExclusions" effectiveUsers.${currentUser}
+      && builtins.hasAttr "managedRoots" effectiveUsers.${currentUser}.iCloudExclusions
+    then
+      sanitizeICloudManagedRoots effectiveUsers.${currentUser}.iCloudExclusions.managedRoots
+    else
+      sanitizeICloudManagedRoots [ ]
+  );
+
+  # Standalone script for the daily icloud-exclusions LaunchAgent.
+  # Uses bash (from the Nix store) rather than /bin/sh because the array-based
+  # find-predicate builder and process substitution (< <(...)) require bash
+  # semantics that macOS /bin/sh (zsh in POSIX mode) does not provide.
+  # Logic mirrors configureICloudExclusions so both paths stay in sync.
+  # Source: https://developer.apple.com/documentation/fileprovider
+  icloudExclusionsScript = pkgs.writeTextFile {
+    name = "icloud-exclusions";
+    executable = true;
+    text = ''
+      #!${pkgs.bash}/bin/bash
+      set -eu
+
+      excluded_dirs=${lib.escapeShellArg icloudExcludedDirsJson}
+      managed_roots=${lib.escapeShellArg icloudManagedRootsJson}
+
+      if [ "$excluded_dirs" = "[]" ]; then
+        exit 0
+      fi
+
+      apply_exclusions() {
+        local count=0
+        local start_time
+        start_time=$(date +%s)
+
+        while IFS= read -r rel_root; do
+          [ -z "$rel_root" ] && continue
+          icloud_root="$HOME/$rel_root"
+          [ -d "$icloud_root" ] || continue
+
+          find_args=()
+          first=1
+          while IFS= read -r dir_name; do
+            [ -z "$dir_name" ] && continue
+            if [ "$first" -eq 1 ]; then
+              find_args=( "(" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
+              first=0
+            else
+              find_args+=( "-o" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
+            fi
+          # jq error output intentionally suppressed: excluded_dirs is always
+          # valid JSON baked in at eval time; stderr noise from a bad-state jq
+          # would be confusing in launchd logs without being actionable.
+          done < <(echo "$excluded_dirs" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
+
+          if [ "$first" -eq 1 ]; then
+            continue
+          fi
+
+          find_args+=( ")" )
+
+          # find 2>/dev/null: "permission denied" on protected iCloud internals
+          # is expected and benign; the xattr is applied to every accessible
+          # directory, and count tracks all successfully marked dirs.
+          count_batch=$(${pkgs.findutils}/bin/find "$icloud_root" -type d "''${find_args[@]}" -print 2>/dev/null | /usr/bin/wc -l | /usr/bin/tr -d ' ') || count_batch=0
+          count=$(( count + count_batch ))
+        done < <(echo "$managed_roots" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
+
+        end_time=$(date +%s)
+        elapsed=$(( end_time - start_time ))
+
+        if [ "$count" -gt 0 ]; then
+          echo "macos: iCloud exclusion applied to $count directories in ''${elapsed}s" >&2
+        fi
+      }
+
+      apply_exclusions
+    '';
+  };
 
   betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" ''
     set +e  # heartbeat is fully soft-fail; never abort on individual check failure
@@ -836,38 +944,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Source: https://developer.apple.com/documentation/fileprovider
     # -------------------------------------------------------------------------
     configureICloudExclusions = lib.hm.dag.entryAfter [ "cloudDrivesSetup" ] ''
-      excluded_dirs='${
-        builtins.toJSON (
-          let
-            effectiveUsers = if users != null then users else { };
-            currentUser = config.home.username;
-          in
-          if
-            builtins.hasAttr currentUser effectiveUsers
-            && builtins.hasAttr "iCloudExclusions" effectiveUsers.${currentUser}
-            && builtins.hasAttr "excludedDirNames" effectiveUsers.${currentUser}.iCloudExclusions
-          then
-            effectiveUsers.${currentUser}.iCloudExclusions.excludedDirNames
-          else
-            [ ]
-        )
-      }'
-      managed_roots='${
-        builtins.toJSON (
-          let
-            effectiveUsers = if users != null then users else { };
-            currentUser = config.home.username;
-          in
-          if
-            builtins.hasAttr currentUser effectiveUsers
-            && builtins.hasAttr "iCloudExclusions" effectiveUsers.${currentUser}
-            && builtins.hasAttr "managedRoots" effectiveUsers.${currentUser}.iCloudExclusions
-          then
-            sanitizeICloudManagedRoots effectiveUsers.${currentUser}.iCloudExclusions.managedRoots
-          else
-            sanitizeICloudManagedRoots [ ]
-        )
-      }'
+      excluded_dirs=${lib.escapeShellArg icloudExcludedDirsJson}
+      managed_roots=${lib.escapeShellArg icloudManagedRootsJson}
 
       if [ "$excluded_dirs" = "[]" ]; then
         echo "macos: iCloud exclusions skipped (no excluded directory names configured)." >&2
@@ -1591,6 +1669,37 @@ lib.mkIf pkgs.stdenv.isDarwin {
       # Suppress per-build output to avoid filling system logs.  See above.
       StandardOutPath = "/dev/null";
       StandardErrorPath = "/dev/null";
+    };
+  };
+
+  # --------------------------------------------------------------------------
+  # iCloud exclusion LaunchAgent
+  # Runs the iCloud directory exclusion logic daily (00:00) so that newly
+  # created build/cache directories inside iCloud-managed trees are marked
+  # with com.apple.fileprovider.ignore#P without waiting for the next
+  # home-manager switch.  configureICloudExclusions handles the immediate
+  # first-run case; this agent provides drift correction between activations.
+  # RunAtLoad = false because the activation hook already runs on every apply.
+  # --------------------------------------------------------------------------
+  launchd.agents."icloud-exclusions" = {
+    enable = true;
+    config = {
+      # launchd Label is a reverse-DNS-style unique identifier.
+      # Source: launchd.plist(5) Label key semantics.
+      # https://www.manpagez.com/man/5/launchd.plist/
+      Label = "local.icloud-exclusions";
+      ProgramArguments = [ "${icloudExclusionsScript}" ];
+      # Do not run on every agent reload during apply/bootstrap apply; the
+      # activation hook (configureICloudExclusions) runs synchronously during
+      # apply and covers the immediate case.  The daily timer handles drift
+      # correction for directories created between activations.
+      RunAtLoad = false;
+      StartCalendarInterval = [
+        {
+          Hour = 0;
+          Minute = 0;
+        }
+      ];
     };
   };
 }
