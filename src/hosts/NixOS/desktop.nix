@@ -87,6 +87,7 @@
       krita
       libreoffice
       pass
+      picard
       qtpass
       zoom-us
     ])

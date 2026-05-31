@@ -245,6 +245,15 @@ let
       };
       nixpkgsAttr = "obsidian";
     };
+    "musicbrainz-picard" = {
+      # Available on Linux via nixpkgs; macOS routes to Homebrew cask.
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "musicbrainz-picard";
+      };
+      nixpkgsAttr = "picard";
+    };
     qemu = {
       # QEMU is a CLI tool; `category = "cli"` routes to nixpkgs on all
       # platforms per the repository package selection policy.  The Homebrew

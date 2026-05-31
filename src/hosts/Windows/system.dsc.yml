@@ -352,6 +352,17 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          Ensure MusicBrainz Picard is installed for cross-host tagging workflow
+          parity with macOS (Homebrew cask musicbrainz-picard) and NixOS
+          (nixpkgs picard). WinGet does not expose a preview/beta channel for
+          Picard, so stable is used by policy exception.
+      settings:
+        id: MusicBrainz.Picard
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Obsidian is installed to mirror the macOS GUI package declaration
       settings:
         id: Obsidian.Obsidian
