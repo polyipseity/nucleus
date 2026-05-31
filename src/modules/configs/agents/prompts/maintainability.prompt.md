@@ -15,7 +15,7 @@ Aggressively remove unnecessary complexity across code, docs, and AI customizati
 3. Partition scope into independent lanes.
 4. Run parallel `maintainability` subagents, one per lane, using:
 
-   ```
+   ```text
    Improve maintainability across {{LANE_SCOPE}}.
    Be aggressive: remove unnecessary indirection, duplicated policy,
    stale guidance, and avoidable abstractions.
@@ -36,9 +36,9 @@ Aggressively remove unnecessary complexity across code, docs, and AI customizati
 
 ## Final output
 
-- Baseline hash confirmation.
-- Waves run and subagent runs.
-- Commits (subject + SHA) and why each boundary was chosen.
+- Baseline hash.
+- Waves run.
+- Commits (subject + SHA) and boundary rationale.
 - Files modified.
 - Simplifications by category.
 - Remaining hotspots.

@@ -6,6 +6,9 @@ applyTo: "**"
 
 Default rule: optimize for long-term human maintainability.
 
+This file is the canonical maintainability policy text. Keep this as the single
+source of truth; mode-specific files should stay concise and execution-focused.
+
 - Prefer deletion over abstraction.
 - Keep edits local, explicit, and reversible.
 - Remove duplication and stale guidance aggressively.

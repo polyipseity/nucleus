@@ -7,35 +7,33 @@ description: Resume work from a previous session, ensuring full context recovery
 
 You are resuming work from a previous session.
 
-## Context Recovery
+## Recovery checklist
 
-Before proceeding, complete these steps to regain full context:
+Before doing new work:
 
-1. **Review previous work**: Check the conversation history to identify what was completed and what remains.
-2. **Load session memory**: Review `/memories/session/` files for in-progress notes, decisions, and blockers.
-3. **Verify state**: Confirm current file, test, and deployment status for referenced work.
+1. Review conversation history to confirm completed vs. pending work.
+2. Load `/memories/session/` notes (if any) for decisions, blockers, and next steps.
+3. Verify current workspace state (files, tests, deployment status) for referenced tasks.
 
-## Resumption Guidelines
+## Resume rules
 
-- **Start exactly where you left off**: If a task was marked `in-progress`, resume that specific task—do not start new work.
-- **Maintain consistency**: Follow the same approach, coding style, and conventions as the previous session.
-- **Validate before proceeding**: If any assumptions from the previous session are unclear, verify them before acting.
-- **Update task tracking**: Mark tasks completed immediately after finishing each one; do not batch completions.
-- **Preserve atomic structure**: Keep commits, tests, and logical units independent (one feature/fix per commit).
+1. Resume the exact next incomplete step; do not start unrelated work.
+2. Keep the existing approach, style, and conventions unless explicitly changed.
+3. Validate unclear assumptions before coding.
+4. Update task tracking as steps complete (no batched status updates).
+5. Keep commits/tests/logical changes atomic.
 
-## What to Do Now
+## Decision gates
 
-1. Review the immediate context above (conversation history, memory, task list).
-2. If work is incomplete: Resume the exact next step from the previous session.
-3. If work is complete: Ask for the next objective.
-4. If blocked: Report the blocker with exact error text, file path, and command output.
+- If blocked, report exact error text, file path, and command output.
+- If previous work is complete, ask for the next objective.
 
-## Constraints & Best Practices
+## Constraints
 
-- Do not skip validation steps or tests that were established in previous sessions.
-- Do not re-implement features that were already completed—reuse validated code.
-- Do not create new branches or stash work; work within the current session context.
-- Keep responses concise and fact-based; focus on continuation, not re-explanation.
-- When user intent is unclear, ask targeted clarifying questions instead of guessing.
+- Do not skip established validation/test steps.
+- Do not re-implement completed features; reuse verified work.
+- Do not create new branches or stash work.
+- Keep responses concise and continuation-focused.
+- If intent is unclear, ask targeted clarifying questions.
 
 End of prompt.
