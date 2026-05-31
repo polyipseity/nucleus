@@ -1944,8 +1944,12 @@ setup_libvirt_vms() {
   if virsh net-list --all 2>/dev/null | grep -q "default"; then
     if ! virsh net-list 2>/dev/null | grep -q "default.*active"; then
       printf 'vm-setup: starting libvirt default network...\n'
-      run_cmd virsh net-start default || true
-      run_cmd virsh net-autostart default || true
+      if ! run_cmd virsh net-start default; then
+        printf 'vm-setup: WARNING — failed to start libvirt default network; guest networking may be unavailable until it is started manually\n' >&2
+      fi
+      if ! run_cmd virsh net-autostart default; then
+        printf 'vm-setup: WARNING — failed to mark libvirt default network for autostart; future boots may require manual recovery\n' >&2
+      fi
     fi
   fi
 
@@ -1973,11 +1977,20 @@ setup_libvirt_vms() {
       i=$((i + 1))
       continue
     fi
+    if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
+      printf 'vm-setup: WARNING — pre-built image is invalid for %s: %s\n' "$vm_name" "$_prebuilt" >&2
+      i=$((i + 1))
+      continue
+    fi
 
     if [ "$dry_run" = false ]; then
       mkdir -p "$VM_DIR"
       _replace_runtime=false
       if [ ! -f "$disk_path" ]; then
+        _replace_runtime=true
+      elif ! validate_qcow2_image "$disk_path" "existing libvirt runtime disk for ${vm_name}"; then
+        printf 'vm-setup: existing libvirt runtime disk is invalid for %s; replacing from pre-built image\n' "$vm_name" >&2
+        rm -f "$disk_path"
         _replace_runtime=true
       elif ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
         printf 'vm-setup: %s runtime disk guest credential drift detected; replacing runtime disk from pre-built image\n' "$vm_name" >&2

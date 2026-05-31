@@ -530,6 +530,17 @@ let
       )
       "POSIX and Windows vm setup flows must detect VM guest credential drift via marker files and replace stale images/runtime disks";
 
+  test_libvirt_runtime_validation_parity =
+    assert'
+      (
+        (lib.hasInfix "failed to start libvirt default network" vm_setup_sh_text)
+        && (lib.hasInfix "failed to mark libvirt default network for autostart" vm_setup_sh_text)
+        && (lib.hasInfix "validate_qcow2_image \"$_prebuilt\" \"pre-built image for \${vm_name}\"" vm_setup_sh_text)
+        && (lib.hasInfix "validate_qcow2_image \"$disk_path\" \"existing libvirt runtime disk for \${vm_name}\"" vm_setup_sh_text)
+        && (lib.hasInfix "existing libvirt runtime disk is invalid" vm_setup_sh_text)
+      )
+      "scripts/vm-setup.sh must validate libvirt prebuilt/runtime disks and surface default-network recovery failures";
+
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
   test_windows_iso_mido_patch_file_exists = assert' (builtins.pathExists ../../vms/windows/patches/mido-iso-link.patch) "vms/windows/patches/mido-iso-link.patch must exist for runtime Mido patching";
@@ -776,6 +787,7 @@ let
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
     test_vm_guest_credential_drift_replacement
+    test_libvirt_runtime_validation_parity
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
     test_windows_iso_mido_patch_failure_is_fatal
@@ -845,6 +857,7 @@ in
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
     test_vm_guest_credential_drift_replacement
+    test_libvirt_runtime_validation_parity
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
     test_windows_iso_mido_patch_failure_is_fatal
