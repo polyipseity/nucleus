@@ -1842,6 +1842,43 @@ setup_utm_vms() {
       i=$((i + 1))
       continue
     fi
+    _required_utm_keys='\
+<key>IconCustom</key>\
+<key>Sound</key>\
+<key>ClipboardSharing</key>\
+<key>DirectoryShareReadOnly</key>\
+<key>DownscalingFilter</key>\
+<key>UpscalingFilter</key>\
+<key>NativeResolution</key>\
+<key>MacAddress</key>\
+<key>IsolateFromHost</key>\
+<key>PortForward</key>\
+<key>AdditionalArguments</key>\
+<key>BalloonDevice</key>\
+<key>DebugLog</key>\
+<key>PS2Controller</key>\
+<key>RNGDevice</key>\
+<key>RTCLocalTime</key>\
+<key>TPMDevice</key>\
+<key>MaximumUsbShare</key>\
+<key>UsbBusSupport</key>\
+<key>UsbSharing</key>\
+<key>CPUFlagsAdd</key>\
+<key>CPUFlagsRemove</key>\
+<key>ForceMulticore</key>\
+<key>JITCacheSize</key>'
+    _missing_utm_keys=''
+    for _required_utm_key in $_required_utm_keys; do
+      if ! grep -q "$_required_utm_key" "$_plist_template"; then
+        _missing_utm_keys="$_missing_utm_keys ${_required_utm_key#<key>}"
+      fi
+    done
+    if [ -n "$_missing_utm_keys" ]; then
+      printf 'vm-setup: WARNING — stale or incomplete UTM template detected at %s (missing key(s):%s); run home-manager switch (or nucleus apply) before vm-setup\n' \
+        "$_plist_template" "$_missing_utm_keys" >&2
+      i=$((i + 1))
+      continue
+    fi
     # Detect config drift in already-registered bundles. UTM can keep runtime
     # state from the registered entry, so we re-register when the on-disk
     # bundle config no longer matches the managed template.

@@ -613,33 +613,39 @@ let
       "src/hosts/MacBook/vms.nix must include core UTM schema keys (Drive/ImageName/QEMU/Input) for reliable imports";
   # The Backend value must be exactly "QEMU" (uppercase) — UTM's Swift enum
   # performs a case-sensitive match and throws invalidBackend on any other value.
-  # The Sharing section must use modern UTM keys from UTMQemuConfigurationSharing:
-  # ClipboardSharing, DirectoryShareMode, DirectoryShareReadOnly.
-  # Filter strings use UTM's enum display names ("Nearest"/"Linear").
-  test_macbook_utm_plist_correctness =
-    assert'
-      (
-        (lib.hasInfix "<string>QEMU</string>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>DirectoryShareMode</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<string>VirtIO</string>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>Hypervisor</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>UEFIBoot</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>ClipboardSharing</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>DirectoryShareReadOnly</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>IconCustom</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>IsolateFromHost</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>BalloonDevice</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>DebugLog</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>PS2Controller</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>RTCLocalTime</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>RNGDevice</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>TPMDevice</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>CPUFlagsAdd</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>CPUFlagsRemove</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>ForceMulticore</key>" macbook_vms_nix_text)
-        && !(lib.hasInfix "<key>JITCacheSize</key>" macbook_vms_nix_text)
-      )
-      "src/hosts/MacBook/vms.nix plist must keep only the core UTM boot wiring and omit convenience/tuning keys";
+  # Keep generated templates schema-complete so UTM can decode/import bundles
+  # without requiring app-side defaults for missing keys.
+  test_macbook_utm_plist_correctness = assert' (
+    (lib.hasInfix "<string>QEMU</string>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>IconCustom</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>Sound</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>DirectoryShareMode</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>ClipboardSharing</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>DirectoryShareReadOnly</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>DownscalingFilter</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>UpscalingFilter</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>NativeResolution</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>MacAddress</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>IsolateFromHost</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>PortForward</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<string>VirtIO</string>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>Hypervisor</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>AdditionalArguments</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>BalloonDevice</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>DebugLog</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>PS2Controller</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>RNGDevice</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>RTCLocalTime</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>TPMDevice</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>UEFIBoot</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>MaximumUsbShare</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>UsbBusSupport</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>UsbSharing</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>CPUFlagsAdd</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>CPUFlagsRemove</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>ForceMulticore</key>" macbook_vms_nix_text)
+    && (lib.hasInfix "<key>JITCacheSize</key>" macbook_vms_nix_text)
+  ) "src/hosts/MacBook/vms.nix plist must include a schema-complete UTM configuration";
   test_macbook_utm_display_card_validity = assert' (
     (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"virtio-vga\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
     && !(lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
@@ -679,6 +685,13 @@ let
     (lib.hasInfix "stale UTM template detected" vm_setup_sh_text)
     && (lib.hasInfix "run home-manager switch (or nucleus apply) before vm-setup" vm_setup_sh_text)
   ) "scripts/vm-setup.sh must fail fast on stale UTM templates and print the recovery action";
+  test_macbook_utm_required_key_guard = assert' (
+    (lib.hasInfix "_required_utm_keys" vm_setup_sh_text)
+    && (lib.hasInfix "_missing_utm_keys" vm_setup_sh_text)
+    && (lib.hasInfix "stale or incomplete UTM template detected" vm_setup_sh_text)
+    && (lib.hasInfix "<key>IconCustom</key>" vm_setup_sh_text)
+    && (lib.hasInfix "<key>UsbBusSupport</key>" vm_setup_sh_text)
+  ) "scripts/vm-setup.sh must block incomplete UTM templates missing required keys";
   test_macbook_utm_legacy_display_reregistration =
     assert'
       (
