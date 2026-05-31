@@ -39,6 +39,4 @@ Before proceeding, complete these steps to regain full context:
 - Keep responses concise and fact-based; focus on continuation, not re-explanation.
 - When uncertain about user intent, ask targeted clarifying questions instead of guessing.
 
----
-
-**This prompt is generic and applies to any coding agent, CLI tool, or interactive programming environment.**
+End of prompt.
