@@ -26,6 +26,87 @@ let
   # symlinks so user-level OpenCode config stays pointed at the mutable working
   # tree rather than a read-only Nix store snapshot.
   liveRepoRoot = "${config.home.homeDirectory}/dev/nucleus";
+
+  # Keep path fragments centralized so activation entries reference one source
+  # of truth for the repo-hosted agents configuration tree.
+  agentsConfigRelativePath = "src/modules/configs/agents";
+  agentsSkillsRelativePath = "${agentsConfigRelativePath}/skills";
+  clawhubManifestRelativePath = "${agentsConfigRelativePath}/clawhub-skills.json";
+
+  # Shared shell helpers used by activation entries that manage symlink targets.
+  symlinkProtectionHelpers = ''
+    _nucleus_protect_symlink() {
+      _nps_context="$1"
+      _nps_path="$2"
+      case "$(uname -s)" in
+        Darwin)
+          if ! /usr/bin/chflags -h uchg "$_nps_path"; then
+            echo "$_nps_context: warning — could not protect symlink $_nps_path with uchg." >&2
+          fi
+          ;;
+        Linux)
+          if command -v chattr >/dev/null; then
+            if ! chattr -h +i "$_nps_path"; then
+              echo "$_nps_context: warning — could not protect symlink $_nps_path with chattr +i." >&2
+            fi
+          fi
+          ;;
+      esac
+    }
+
+    _nucleus_unprotect_symlink() {
+      _nus_context="$1"
+      _nus_path="$2"
+      case "$(uname -s)" in
+        Darwin)
+          if ! /usr/bin/chflags -h nouchg "$_nus_path"; then
+            echo "$_nus_context: warning — could not clear uchg from symlink $_nus_path before update." >&2
+          fi
+          ;;
+        Linux)
+          if command -v chattr >/dev/null; then
+            if ! chattr -h -i "$_nus_path"; then
+              echo "$_nus_context: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
+            fi
+          fi
+          ;;
+      esac
+    }
+  '';
+
+  # Resolve the active repo root from apply-time environment, falling back to
+  # the persisted marker that survives sudo/rebuild boundaries.
+  repoRootResolver = ''
+    _nucleus_resolve_repo_root() {
+      _nrr_context="$1"
+      _nrr_repo_root_file="$HOME/.config/nucleus/repo-root"
+      if [ -n "''${NUCLEUS_REPO:-}" ]; then
+        printf '%s\n' "$NUCLEUS_REPO"
+      elif [ -f "$_nrr_repo_root_file" ]; then
+        cat "$_nrr_repo_root_file"
+      else
+        echo "$_nrr_context: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
+        return 1
+      fi
+    }
+  '';
+
+  # Reuse one PATH-probing helper so activation entries share the same
+  # executable-discovery behavior without repeating near-identical loops.
+  executablePathProbeHelpers = ''
+    _nucleus_prepend_first_executable_dir() {
+      _nped_executable="$1"
+      shift
+      for _nped_dir in "$@"; do
+        if [ -x "$_nped_dir/$_nped_executable" ]; then
+          PATH="$_nped_dir:$PATH"
+          export PATH
+          return 0
+        fi
+      done
+      return 1
+    }
+  '';
 in
 {
   home.file = {
@@ -34,7 +115,7 @@ in
     ".config/opencode/commands".source =
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
     ".config/opencode/opencode.jsonc".source =
-      config.lib.file.mkOutOfStoreSymlink "${liveRepoRoot}/src/modules/configs/agents/opencode.user.jsonc";
+      config.lib.file.mkOutOfStoreSymlink "${liveRepoRoot}/${agentsConfigRelativePath}/opencode.user.jsonc";
   };
 
   home.activation = {
@@ -48,57 +129,16 @@ in
     agentsSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
 
-      _nucleus_protect_symlink() {
-        _nps_path="$1"
-        case "$(uname -s)" in
-          Darwin)
-            if ! /usr/bin/chflags -h uchg "$_nps_path"; then
-              echo "agents-config: warning — could not protect symlink $_nps_path with uchg." >&2
-            fi
-            ;;
-          Linux)
-            if command -v chattr >/dev/null; then
-              if ! chattr -h +i "$_nps_path"; then
-                echo "agents-config: warning — could not protect symlink $_nps_path with chattr +i." >&2
-              fi
-            fi
-            ;;
-        esac
-      }
-
-      _nucleus_unprotect_symlink() {
-        _nus_path="$1"
-        case "$(uname -s)" in
-          Darwin)
-            if ! /usr/bin/chflags -h nouchg "$_nus_path"; then
-              echo "agents-config: warning — could not clear uchg from symlink $_nus_path before update." >&2
-            fi
-            ;;
-          Linux)
-            if command -v chattr >/dev/null; then
-              if ! chattr -h -i "$_nus_path"; then
-                echo "agents-config: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
-              fi
-            fi
-            ;;
-        esac
-      }
+      ${symlinkProtectionHelpers}
+      ${repoRootResolver}
 
       # Resolve the repo root so the activation can construct an absolute path
       # to src/modules/configs/agents/ regardless of where the repo is checked
       # out.  $NUCLEUS_REPO is set by apply.sh; the file fallback survives the
       # sudo boundary that darwin-rebuild / nixos-rebuild cross.
-      _as_repo_root_file="$HOME/.config/nucleus/repo-root"
-      if [ -n "''${NUCLEUS_REPO:-}" ]; then
-        _as_repo_root="$NUCLEUS_REPO"
-      elif [ -f "$_as_repo_root_file" ]; then
-        _as_repo_root="$(cat "$_as_repo_root_file")"
-      else
-        echo "agents-config: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
-        exit 1
-      fi
+      _as_repo_root="$(_nucleus_resolve_repo_root "agents-config")"
 
-      _as_agents_source="$_as_repo_root/src/modules/configs/agents"
+      _as_agents_source="$_as_repo_root/${agentsConfigRelativePath}"
       if [ ! -d "$_as_agents_source" ]; then
         echo "agents-config: agents config dir not found: $_as_agents_source" >&2
         exit 1
@@ -120,9 +160,7 @@ in
       # pointed into _as_agents_source/ but whose source entry no longer exists.
       # This keeps ~/.agents/ free of dangling links after source entries are
       # removed from the repo.  skills/ is skipped — agentsSkills owns it.
-      _as_stale_list="$(mktemp)"
-      find "$_as_agents_dir" -mindepth 1 -maxdepth 1 -type l > "$_as_stale_list"
-      while IFS= read -r _as_candidate; do
+      find "$_as_agents_dir" -mindepth 1 -maxdepth 1 -type l | while IFS= read -r _as_candidate; do
         _as_cname="$(basename "$_as_candidate")"
         [ "$_as_cname" = "skills" ] && continue
         _as_ctarget="$(readlink "$_as_candidate")"
@@ -130,20 +168,17 @@ in
           "$_as_agents_source"/*)
             # Managed per-subdir symlink: remove if its source no longer exists.
             if [ ! -e "$_as_ctarget" ] && [ ! -L "$_as_ctarget" ]; then
-              _nucleus_unprotect_symlink "$_as_candidate"
+              _nucleus_unprotect_symlink "agents-config" "$_as_candidate"
               rm "$_as_candidate"
               echo "agents-config: removed stale link for $_as_cname (source removed)"
             fi
             ;;
         esac
-      done < "$_as_stale_list"
-      rm -f "$_as_stale_list"
+      done
 
       # Create or update per-entry symlinks for every top-level source entry
       # except skills/ (managed independently by agentsSkills).
-      _as_source_list="$(mktemp)"
-      find "$_as_agents_source" -mindepth 1 -maxdepth 1 > "$_as_source_list"
-      while IFS= read -r _as_entry; do
+      find "$_as_agents_source" -mindepth 1 -maxdepth 1 | while IFS= read -r _as_entry; do
         _as_name="$(basename "$_as_entry")"
         # skills/ is managed by agentsSkills; skip it here to avoid conflicts
         # with the real directory that agentsSkills creates for fetched downloads.
@@ -154,10 +189,10 @@ in
             continue  # Correct symlink — no-op.
           fi
           # Wrong target (e.g. leftover from a previous checkout path): replace.
-          _nucleus_unprotect_symlink "$_as_link"
+          _nucleus_unprotect_symlink "agents-config" "$_as_link"
           rm "$_as_link"
           ln -s "$_as_entry" "$_as_link"
-          _nucleus_protect_symlink "$_as_link"
+          _nucleus_protect_symlink "agents-config" "$_as_link"
           echo "agents-config: updated $HOME/.agents/$_as_name -> $_as_entry"
         elif [ -e "$_as_link" ]; then
           # Real file or directory: fail fast to prevent silent data loss.
@@ -165,11 +200,10 @@ in
           exit 1
         else
           ln -s "$_as_entry" "$_as_link"
-          _nucleus_protect_symlink "$_as_link"
+          _nucleus_protect_symlink "agents-config" "$_as_link"
           echo "agents-config: linked $HOME/.agents/$_as_name -> $_as_entry"
         fi
-      done < "$_as_source_list"
-      rm -f "$_as_source_list"
+      done
     '';
 
     # -------------------------------------------------------------------------
@@ -195,54 +229,13 @@ in
     agentsSkills = lib.hm.dag.entryAfter [ "agentsSymlink" ] ''
       set -eu
 
-      _nucleus_protect_symlink() {
-        _nps_path="$1"
-        case "$(uname -s)" in
-          Darwin)
-            if ! /usr/bin/chflags -h uchg "$_nps_path"; then
-              echo "agents-skills: warning — could not protect symlink $_nps_path with uchg." >&2
-            fi
-            ;;
-          Linux)
-            if command -v chattr >/dev/null; then
-              if ! chattr -h +i "$_nps_path"; then
-                echo "agents-skills: warning — could not protect symlink $_nps_path with chattr +i." >&2
-              fi
-            fi
-            ;;
-        esac
-      }
-
-      _nucleus_unprotect_symlink() {
-        _nus_path="$1"
-        case "$(uname -s)" in
-          Darwin)
-            if ! /usr/bin/chflags -h nouchg "$_nus_path"; then
-              echo "agents-skills: warning — could not clear uchg from symlink $_nus_path before update." >&2
-            fi
-            ;;
-          Linux)
-            if command -v chattr >/dev/null; then
-              if ! chattr -h -i "$_nus_path"; then
-                echo "agents-skills: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
-              fi
-            fi
-            ;;
-        esac
-      }
+      ${symlinkProtectionHelpers}
+      ${repoRootResolver}
 
       # Resolve the repo root (same mechanism as agentsSymlink above).
-      _ask_repo_root_file="$HOME/.config/nucleus/repo-root"
-      if [ -n "''${NUCLEUS_REPO:-}" ]; then
-        _ask_repo_root="$NUCLEUS_REPO"
-      elif [ -f "$_ask_repo_root_file" ]; then
-        _ask_repo_root="$(cat "$_ask_repo_root_file")"
-      else
-        echo "agents-skills: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
-        exit 1
-      fi
+      _ask_repo_root="$(_nucleus_resolve_repo_root "agents-skills")"
 
-      _ask_skills_source="$_ask_repo_root/src/modules/configs/agents/skills"
+      _ask_skills_source="$_ask_repo_root/${agentsSkillsRelativePath}"
       if [ ! -d "$_ask_skills_source" ]; then
         echo "agents-skills: skills source dir not found: $_ask_skills_source" >&2
         exit 1
@@ -259,30 +252,25 @@ in
 
       # Remove stale per-skill symlinks: skill dirs that once existed in the
       # source but have since been removed from the repo.
-      _ask_stale_list="$(mktemp)"
-      find "$_ask_skills_dir" -mindepth 1 -maxdepth 1 -type l > "$_ask_stale_list"
-      while IFS= read -r _ask_candidate; do
+      find "$_ask_skills_dir" -mindepth 1 -maxdepth 1 -type l | while IFS= read -r _ask_candidate; do
         _ask_cname="$(basename "$_ask_candidate")"
         _ask_ctarget="$(readlink "$_ask_candidate")"
         case "$_ask_ctarget" in
           "$_ask_skills_source"/*)
             # Managed per-skill symlink: remove if its source no longer exists.
             if [ ! -e "$_ask_ctarget" ] && [ ! -L "$_ask_ctarget" ]; then
-              _nucleus_unprotect_symlink "$_ask_candidate"
+              _nucleus_unprotect_symlink "agents-skills" "$_ask_candidate"
               rm "$_ask_candidate"
               echo "agents-skills: removed stale skill link for $_ask_cname (source removed)"
             fi
             ;;
         esac
-      done < "$_ask_stale_list"
-      rm -f "$_ask_stale_list"
+      done
 
       # Create or update per-skill symlinks for every subdirectory committed to
       # src/modules/configs/agents/skills/.  Non-directory entries (.gitkeep etc.)
       # are skipped; only skill directories are linked.
-      _ask_source_list="$(mktemp)"
-      find "$_ask_skills_source" -mindepth 1 -maxdepth 1 -type d > "$_ask_source_list"
-      while IFS= read -r _ask_skill_dir; do
+      find "$_ask_skills_source" -mindepth 1 -maxdepth 1 -type d | while IFS= read -r _ask_skill_dir; do
         _ask_skill_name="$(basename "$_ask_skill_dir")"
         _ask_link="$_ask_skills_dir/$_ask_skill_name"
         if [ -L "$_ask_link" ]; then
@@ -290,10 +278,10 @@ in
             continue  # Correct symlink — no-op.
           fi
           # Wrong target: replace symlink.
-          _nucleus_unprotect_symlink "$_ask_link"
+          _nucleus_unprotect_symlink "agents-skills" "$_ask_link"
           rm "$_ask_link"
           ln -s "$_ask_skill_dir" "$_ask_link"
-          _nucleus_protect_symlink "$_ask_link"
+          _nucleus_protect_symlink "agents-skills" "$_ask_link"
           echo "agents-skills: updated $HOME/.agents/skills/$_ask_skill_name -> $_ask_skill_dir"
         elif [ -d "$_ask_link" ]; then
           # Real directory in place of a committed skill — could be a fetched
@@ -303,11 +291,10 @@ in
           exit 1
         else
           ln -s "$_ask_skill_dir" "$_ask_link"
-          _nucleus_protect_symlink "$_ask_link"
+          _nucleus_protect_symlink "agents-skills" "$_ask_link"
           echo "agents-skills: linked $HOME/.agents/skills/$_ask_skill_name -> $_ask_skill_dir"
         fi
-      done < "$_ask_source_list"
-      rm -f "$_ask_source_list"
+      done
     '';
 
     # -------------------------------------------------------------------------
@@ -315,9 +302,8 @@ in
     # Idempotently converges the declarative bun global package set.
     #
     # Maintains a managed set of JS CLI tools installed via `bun install -g`.
-    # On each apply it compares the desired list against a per-user manifest at
-    # ~/.config/nucleus/bun-packages.json, installs additions, and removes
-    # deletions.
+    # On each apply it derives the installed set from bun's global package.json,
+    # installs additions, and removes deletions.
     #
     # Only packages absent from nixpkgs and cargo-binstall are managed here
     # (install preference: nixpkgs > cargo binstall > bun > uv).
@@ -330,6 +316,7 @@ in
       set -eu
 
       _ibp_jq_bin='${pkgs.jq}/bin/jq'
+      ${executablePathProbeHelpers}
 
       # Prepend ~/.bun/bin so binaries installed by previous apply runs and
       # by this activation are discoverable in subsequent activation steps
@@ -344,17 +331,11 @@ in
       # directory, and directly probe the nix store for common package bins.
       # After linkGeneration the profile symlinks exist, but the activation
       # shell's PATH may not include them.
-      for _dir in \
+      _nucleus_prepend_first_executable_dir bun \
         "$HOME/.local/state/nix/profiles/profile/bin" \
         "$HOME/.nix-profile/bin" \
         "$HOME/.local/state/home-manager/profile/bin" \
-        "$HOME/.local/home-manager/profile/bin"; do
-        if [ -x "$_dir/bun" ]; then
-          PATH="$_dir:$PATH"
-          export PATH
-          break
-        fi
-      done
+        "$HOME/.local/home-manager/profile/bin" || true
 
       # If bun is still not found, search the nix store for any bun binary
       # and add its parent directory to PATH.
@@ -555,23 +536,18 @@ in
     # -------------------------------------------------------------------------
     initRustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
+      ${executablePathProbeHelpers}
 
       # Locate pkgs.rustup in the newly linked home-manager profile.  The
       # activation shell PATH has not yet been updated to reflect the profile, so
       # probe known profile bin directories in priority order.
-      for _iru_dir in \
+      _nucleus_prepend_first_executable_dir rustup \
         "/etc/profiles/per-user/$USER/bin" \
         "/run/current-system/sw/bin" \
         "$HOME/.local/state/nix/profiles/profile/bin" \
         "$HOME/.nix-profile/bin" \
         "$HOME/.local/state/home-manager/profile/bin" \
-        "$HOME/.local/home-manager/profile/bin"; do
-        if [ -x "$_iru_dir/rustup" ]; then
-          PATH="$_iru_dir:$PATH"
-          export PATH
-          break
-        fi
-      done
+        "$HOME/.local/home-manager/profile/bin" || true
 
       if ! command -v rustup >/dev/null 2>&1; then
         echo "rustup: rustup not found after profile link; skipping initialization" >&2
@@ -614,6 +590,7 @@ in
     # -------------------------------------------------------------------------
     installCargoBinstallPackages = lib.hm.dag.entryAfter [ "initRustup" ] ''
       set -eu
+      ${executablePathProbeHelpers}
 
       # Declarative desired-state list.  On POSIX hosts this list is
       # intentionally empty because all managed Rust tools are provided by
@@ -627,20 +604,14 @@ in
       # Probe ~/.cargo/bin (rustup shim location) first, then nix-profile /
       # home-manager-profile bin directories as fallback.  initRustup runs
       # before this step to ensure the stable toolchain is installed.
-      for _icp_dir in \
+      _nucleus_prepend_first_executable_dir cargo \
         "$HOME/.cargo/bin" \
         "/etc/profiles/per-user/$USER/bin" \
         "/run/current-system/sw/bin" \
         "$HOME/.local/state/nix/profiles/profile/bin" \
         "$HOME/.nix-profile/bin" \
         "$HOME/.local/state/home-manager/profile/bin" \
-        "$HOME/.local/home-manager/profile/bin"; do
-        if [ -x "$_icp_dir/cargo" ]; then
-          PATH="$_icp_dir:$PATH"
-          export PATH
-          break
-        fi
-      done
+        "$HOME/.local/home-manager/profile/bin" || true
 
       # Guard: cargo is provided by rustup (stable toolchain) via ~/.cargo/bin;
       # initRustup ensures stable is installed before this step runs.
@@ -727,6 +698,7 @@ in
       set -eu
 
       _scs_jq_bin='${pkgs.jq}/bin/jq'
+      ${repoRootResolver}
 
       _scs_skip_sync=false
 
@@ -738,21 +710,13 @@ in
       fi
 
       # Resolve the repo root (same mechanism as agentsSymlink and agentsSkills).
-      _scs_repo_root_file="$HOME/.config/nucleus/repo-root"
-      if [ -n "''${NUCLEUS_REPO:-}" ]; then
-        _scs_repo_root="$NUCLEUS_REPO"
-      elif [ -f "$_scs_repo_root_file" ]; then
-        _scs_repo_root="$(cat "$_scs_repo_root_file")"
-      else
-        echo "clawhub: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
-        exit 1
-      fi
+      _scs_repo_root="$(_nucleus_resolve_repo_root "clawhub")"
 
       # Path to the declarative fetched skill manifest.  Slugs listed here are
       # downloaded by ClawHub; slugs absent from the manifest are cleaned up
       # from ~/.agents/skills/ when their .clawhub/origin.json marker is
       # present.
-      _scs_manifest="$_scs_repo_root/src/modules/configs/agents/clawhub-skills.json"
+      _scs_manifest="$_scs_repo_root/${clawhubManifestRelativePath}"
       if [ ! -f "$_scs_manifest" ]; then
         echo "clawhub: manifest not found at $_scs_manifest; skipping fetched skill sync"
         _scs_skip_sync=true
