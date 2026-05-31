@@ -285,18 +285,14 @@ prune_vm_artifacts_if_present() {
     return 0
   fi
 
-  # Build a list of declared VM names (these must be preserved).
+  # Build a list of enabled VM names (disabled VMs are treated as stale).
   declared_names_tmp=$(mktemp)
   trap 'rm -f "$declared_names_tmp"' EXIT INT TERM
 
-  i=0
-  while [ "$i" -lt "$vm_count" ]; do
-    vm_name=$(jq -r ".VMs[$i].name" "$manifest" 2>/dev/null || true)
-    if [ -n "$vm_name" ]; then
-      printf '%s\n' "$vm_name" >>"$declared_names_tmp"
-    fi
-    i=$((i + 1))
-  done
+  if ! jq -r '.VMs[] | select(.enabled == true) | .name' "$manifest" >"$declared_names_tmp" 2>/dev/null; then
+    printf '%s\n' "gc: failed to parse enabled VM names from '$manifest'; skipping VM artifact prune" >&2
+    return 1
+  fi
 
   # Remove temporary Packer build directories.
   if [ -d "$images_dir" ]; then

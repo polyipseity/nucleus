@@ -196,10 +196,10 @@ if (-not $SkipVMPrune) {
   } elseif (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
     Write-Warning "gc: manifest '$manifest' not found; skipping VM artifact prune"
   } else {
-    # Load the manifest and build a list of declared VM names.
+    # Load the manifest and build a list of enabled VM names.
     try {
       $manifestContent = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
-      $declaredVMNames = @($manifestContent.VMs | ForEach-Object { $_.name })
+      $declaredVMNames = @($manifestContent.VMs | Where-Object { $_.enabled -eq $true } | ForEach-Object { $_.name })
     }
     catch {
       Write-Warning "gc: failed to parse manifest '$manifest' — $($_.Exception.Message); skipping VM artifact prune"

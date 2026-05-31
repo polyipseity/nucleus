@@ -1591,10 +1591,26 @@ build_images() {
   while [ "$_i" -lt "$_count" ]; do
     _vm_name="$(jq -r ".VMs[$_i].name" "$MANIFEST")"
     _vm_type="$(jq -r ".VMs[$_i].type" "$MANIFEST")"
+    _vm_enabled="$(jq -r ".VMs[$_i].enabled" "$MANIFEST")"
     _vm_disk_bytes="$(jq -r ".VMs[$_i].diskBytes" "$MANIFEST")"
     # Convert SI bytes to nearest binary GiB for hypervisor tools.
     # Uses (n + 2^29) / 2^30 for round-half-up in POSIX integer arithmetic.
     _vm_disk_gib="$(( (_vm_disk_bytes + 536870912) / 1073741824 ))"
+
+    case "$_vm_enabled" in
+      true|false) ;;
+      *)
+        printf 'vm-setup: WARNING — VM "%s" has invalid enabled value "%s"; expected boolean true/false in manifest\n' "$_vm_name" "$_vm_enabled" >&2
+        _i=$((_i + 1))
+        continue
+        ;;
+    esac
+
+    if [ "$_vm_enabled" != "true" ]; then
+      printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$_vm_name"
+      _i=$((_i + 1))
+      continue
+    fi
 
     if should_include "$_vm_type"; then
       case "$_vm_type" in
@@ -1706,6 +1722,22 @@ setup_tart_vms() {
   while [ "$i" -lt "$vm_count" ]; do
     vm_name=$(jq -r ".VMs[$i].name" "$MANIFEST")
     vm_type=$(jq -r ".VMs[$i].type" "$MANIFEST")
+    vm_enabled=$(jq -r ".VMs[$i].enabled" "$MANIFEST")
+
+    case "$vm_enabled" in
+      true|false) ;;
+      *)
+        printf 'vm-setup: WARNING — VM "%s" has invalid enabled value "%s"; expected boolean true/false in manifest\n' "$vm_name" "$vm_enabled" >&2
+        i=$((i + 1))
+        continue
+        ;;
+    esac
+
+    if [ "$vm_enabled" != "true" ]; then
+      printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$vm_name"
+      i=$((i + 1))
+      continue
+    fi
 
     if [ "$vm_type" != "macOS" ] || ! should_include "$vm_type"; then
       i=$((i + 1))
@@ -1794,6 +1826,22 @@ setup_utm_vms() {
     vm_name=$(jq -r ".VMs[$i].name" "$MANIFEST")
     vm_display=$(jq -r ".VMs[$i].display" "$MANIFEST")
     vm_type=$(jq -r ".VMs[$i].type" "$MANIFEST")
+    vm_enabled=$(jq -r ".VMs[$i].enabled" "$MANIFEST")
+
+    case "$vm_enabled" in
+      true|false) ;;
+      *)
+        printf 'vm-setup: WARNING — VM "%s" has invalid enabled value "%s"; expected boolean true/false in manifest\n' "$vm_name" "$vm_enabled" >&2
+        i=$((i + 1))
+        continue
+        ;;
+    esac
+
+    if [ "$vm_enabled" != "true" ]; then
+      printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$vm_name"
+      i=$((i + 1))
+      continue
+    fi
 
     if ! should_include "$vm_type"; then
       i=$((i + 1))
@@ -2009,6 +2057,22 @@ setup_libvirt_vms() {
     vm_name=$(jq -r ".VMs[$i].name" "$MANIFEST")
     vm_display=$(jq -r ".VMs[$i].display" "$MANIFEST")
     vm_type=$(jq -r ".VMs[$i].type" "$MANIFEST")
+    vm_enabled=$(jq -r ".VMs[$i].enabled" "$MANIFEST")
+
+    case "$vm_enabled" in
+      true|false) ;;
+      *)
+        printf 'vm-setup: WARNING — VM "%s" has invalid enabled value "%s"; expected boolean true/false in manifest\n' "$vm_name" "$vm_enabled" >&2
+        i=$((i + 1))
+        continue
+        ;;
+    esac
+
+    if [ "$vm_enabled" != "true" ]; then
+      printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$vm_name"
+      i=$((i + 1))
+      continue
+    fi
 
     if ! should_include "$vm_type"; then
       i=$((i + 1))

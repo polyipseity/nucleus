@@ -16,6 +16,7 @@ let
   requiredFields = [
     "name"
     "display"
+    "enabled"
     "cpus"
     "ramBytes"
     "diskBytes"
@@ -100,6 +101,16 @@ let
     assert' (badShare == [ ])
       "shareDevDir must be a boolean for all VMs; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badShare)
+      }";
+
+  # enabled must be a boolean.
+  test_enabled_types =
+    let
+      badEnabled = builtins.filter (vm: !builtins.isBool vm.enabled) manifest.VMs;
+    in
+    assert' (badEnabled == [ ])
+      "enabled must be a boolean for all VMs; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badEnabled)
       }";
 
   # windowsIsoUrl must be a string when present; the field is optional.
@@ -759,6 +770,18 @@ let
         && (lib.hasInfix "linked UTM default VM location" vm_setup_sh_text)
       )
       "scripts/vm-setup.sh must best-effort wire UTM's sandboxed document location to ~/virtual machines";
+
+  test_vm_enabled_policy_wiring = assert' (
+    (lib.hasInfix "\"enabled\"" vms_json_text)
+    && (lib.hasInfix ".VMs[$_i].enabled" vm_setup_sh_text)
+    && (lib.hasInfix "disabled in manifest; skipping" vm_setup_sh_text)
+    && (lib.hasInfix "function Test-VMEnabled" windows_vm_setup_ps1_text)
+    && (lib.hasInfix "$Vm.enabled -isnot [bool]" windows_vm_setup_ps1_text)
+    && (lib.hasInfix "enabledVms = builtins.filter (vm: vm.enabled) vmsData.VMs;" macbook_vms_nix_text)
+    && (lib.hasInfix "enabledVms = builtins.filter (vm: vm.enabled) vmsData.VMs;" (
+      builtins.readFile ../../src/hosts/NixOS/vms.nix
+    ))
+  ) "VM enable/disable policy must be wired in manifest, setup scripts, and host template generation";
   test_macbook_tart_storage_link =
     assert'
       (
@@ -805,6 +828,7 @@ let
     test_vm_names
     test_vm_types
     test_share_dev_dir_types
+    test_enabled_types
     test_windows_iso_url_type
     test_macos_version_type
     test_windows_edition_type
@@ -865,6 +889,7 @@ let
     test_vm_setup_generates_helper_scripts
     test_macbook_utm_default_location_link
     test_macbook_tart_storage_link
+    test_vm_enabled_policy_wiring
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_nonwindows_fallback
   ];
@@ -879,6 +904,7 @@ in
     test_vm_names
     test_vm_types
     test_share_dev_dir_types
+    test_enabled_types
     test_windows_iso_url_type
     test_macos_version_type
     test_windows_edition_type
@@ -939,6 +965,7 @@ in
     test_vm_setup_generates_helper_scripts
     test_macbook_utm_default_location_link
     test_macbook_tart_storage_link
+    test_vm_enabled_policy_wiring
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_nonwindows_fallback
     ;

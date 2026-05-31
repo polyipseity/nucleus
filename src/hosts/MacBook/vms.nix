@@ -13,6 +13,7 @@
 { config, pkgs, ... }:
 let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
+  enabledVms = builtins.filter (vm: vm.enabled) vmsData.VMs;
   lib = pkgs.lib;
 
   isArm = pkgs.stdenv.hostPlatform.isAarch64;
@@ -221,6 +222,6 @@ in
       value = {
         text = mkConfigPlist vm;
       };
-    }) vmsData.VMs
+    }) enabledVms
   );
 }

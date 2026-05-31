@@ -167,6 +167,19 @@ function Invoke-VMSetup {
         }
     }
 
+    function Test-VMEnabled {
+        param(
+            [Parameter(Mandatory)]
+            $Vm
+        )
+
+        if ($Vm.enabled -isnot [bool]) {
+            throw "vm-setup: VM '$($Vm.name)' must declare boolean 'enabled' in src\\modules\\VMs.json"
+        }
+
+        return [bool]$Vm.enabled
+    }
+
     $manifest = Join-Path $RepoRoot 'src\modules\VMs.json'
     if (-not (Test-Path $manifest)) {
         Write-Information "vm-setup: manifest not found at $manifest; skipping"
@@ -305,6 +318,11 @@ next run.
     # -------------------------------------------------------------------------
 
     foreach ($vm in $vmDef.VMs) {
+        if (-not (Test-VMEnabled -Vm $vm)) {
+            Write-Information "vm-setup: VM '$($vm.name)' is disabled in manifest; skipping"
+            continue
+        }
+
         # Apply -NixosOnly / -WindowsOnly filter.
         if ($NixosOnly   -and $vm.type -ne 'NixOS')   { continue }
         if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
@@ -361,6 +379,11 @@ next run.
     }
 
     foreach ($vm in $vmDef.VMs) {
+        if (-not (Test-VMEnabled -Vm $vm)) {
+            Write-Information "vm-setup: VM '$($vm.name)' is disabled in manifest; skipping"
+            continue
+        }
+
         # Apply -NixosOnly / -WindowsOnly filter.
         if ($NixosOnly   -and $vm.type -ne 'NixOS')   { continue }
         if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }

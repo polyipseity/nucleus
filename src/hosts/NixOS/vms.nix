@@ -24,6 +24,7 @@
 }:
 let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
+  enabledVms = builtins.filter (vm: vm.enabled) vmsData.VMs;
 
   isArm = pkgs.stdenv.hostPlatform.isAarch64;
   arch = if isArm then "aarch64" else "x86_64";
@@ -151,6 +152,6 @@ in
   environment.etc = lib.listToAttrs (
     builtins.map (
       vm: lib.nameValuePair "nucleus/vms/${vm.name}-domain.xml" { text = mkDomainXml vm; }
-    ) vmsData.VMs
+    ) enabledVms
   );
 }
