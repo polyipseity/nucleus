@@ -152,7 +152,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - VirtioFS shared directory: uses `virtiofsd` daemon; configured in the XML domain definition.
 - SPICE display + clipboard sharing enabled by default.
 - OVMF firmware (UEFI) and swtpm (TPM 2.0) enabled for Windows 11 compatibility.
-- After provisioning, run `virt-manager` to attach an installation ISO.
+- After provisioning, start the guest with the generated `start-<name>.sh` / `start-<name>.ps1` helpers (or use `virt-manager`).
 
 ## Windows — QEMU via Scoop
 
@@ -160,7 +160,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
   - `qemu-img.exe`: disk creation.
   - `qemu-system-x86_64.exe` / `qemu-system-aarch64.exe`: VM launch.
 - Disk images and generated start scripts placed in `%USERPROFILE%\virtual machines\`.
-- Start script: `Start-<display>.ps1` — a self-contained PowerShell launch command.
+- Start script: `start-<name>.ps1` — a self-contained PowerShell launch command.
 - VirtioFS on Windows requires `virtiofsd` running as a separate process before the VM starts.
   See `~/virtual machines/README.md` for the exact command.
 

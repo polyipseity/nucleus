@@ -230,7 +230,7 @@ To move a UTM VM to another macOS host:
 
 1. Copy the entire `<name>.utm` directory.
 2. Place it under `~/virtual machines/` on the target host.
-3. Import it in UTM (or re-run `nucleus-vm-setup` so import automation can detect it).
+3. Open it in UTM (or re-run `nucleus-vm-setup` to refresh the managed registration).
 
 Copying only `config.plist` or only `disk-main.qcow2` is not sufficient for a
 portable UTM VM transfer.

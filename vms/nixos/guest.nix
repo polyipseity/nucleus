@@ -1,7 +1,7 @@
 # vms/nixos/guest.nix — NixOS guest configuration for nixos-generators.
 #
 # Builds a minimal, development-ready NixOS system suitable for use as a
-# QEMU/KVM or UTM VM guest.  Used by scripts/VM-build.sh on macOS and NixOS
+# QEMU/KVM or UTM VM guest. Used by scripts/vm-setup.sh on macOS and NixOS
 # hosts via:
 #
 #   nix run github:nix-community/nixos-generators -- \
@@ -10,8 +10,9 @@
 #     --configuration ./vms/nixos/guest.nix \
 #     -o <output-dir>
 #
-# On Windows hosts, scripts/VM-build.ps1 uses vms/nixos/packer.pkr.hcl instead,
-# which generates a similar configuration inline during a Packer QEMU build.
+# On Windows hosts, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1 uses
+# vms/nixos/packer.pkr.hcl instead, which generates a similar configuration
+# inline during a Packer QEMU build.
 #
 # Do NOT declare fileSystems, boot.loader, or hardware-configuration here:
 # nixos-generators injects the correct disk/bootloader setup automatically for
@@ -34,7 +35,7 @@
   # current aarch64 guest kernels may not ship it as a standalone module, which
   # breaks image generation before the VM ever boots.
   # Example guest-side mount after first boot:
-  #   fileSystems."/home/nixos/dev" = { device = "dev"; fsType = "virtiofs"; };
+  #   fileSystems."/home/<guest-user>/dev" = { device = "dev"; fsType = "virtiofs"; };
 
   users.users."${guestUsername}" = {
     isNormalUser = true;

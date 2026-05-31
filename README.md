@@ -241,7 +241,7 @@ Quick start:
 - macOS guest: `tart run MacBook`
 - NixOS/Windows guests on macOS: open UTM and click Run for `NixOS` / `Windows`
 - NixOS/Windows guests on NixOS: start from `virt-manager`
-- NixOS/Windows guests on Windows: run `%USERPROFILE%\virtual machines\Start-<display>.ps1`
+- NixOS/Windows guests on Windows: run `%USERPROFILE%\virtual machines\start-<name>.ps1`
 
 Guest OS configuration is **not automatic** after first boot. Run the
 guest-specific converge commands from `~/virtual machines/README.md` inside each guest.
