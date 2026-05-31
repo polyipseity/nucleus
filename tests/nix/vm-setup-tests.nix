@@ -460,8 +460,8 @@ let
   test_nixos_generators_uses_exported_env_credentials =
     assert'
       (
-        (lib.hasInfix "guestUsername ? builtins.getEnv \"NUCLEUS_VM_GUEST_USERNAME\"" guest_nix_text)
-        && (lib.hasInfix "guestPassword ? builtins.getEnv \"NUCLEUS_VM_GUEST_PASSWORD\"" guest_nix_text)
+        (lib.hasInfix "guestUsername = builtins.getEnv \"NUCLEUS_VM_GUEST_USERNAME\"" guest_nix_text)
+        && (lib.hasInfix "guestPassword = builtins.getEnv \"NUCLEUS_VM_GUEST_PASSWORD\"" guest_nix_text)
         && !(lib.hasInfix "--argstr guestUsername" vm_setup_sh_text)
         && !(lib.hasInfix "--argstr guestPassword" vm_setup_sh_text)
       )
@@ -483,8 +483,8 @@ let
       "Invoke-VMSetup.ps1 must resolve and propagate secret-backed guest credentials to all Windows-host build paths";
 
   test_guest_credentials_policy_in_nixos_guest = assert' (
-    (lib.hasInfix "guestUsername ? builtins.getEnv \"NUCLEUS_VM_GUEST_USERNAME\"" guest_nix_text)
-    && (lib.hasInfix "guestPassword ? builtins.getEnv \"NUCLEUS_VM_GUEST_PASSWORD\"" guest_nix_text)
+    (lib.hasInfix "guestUsername = builtins.getEnv \"NUCLEUS_VM_GUEST_USERNAME\"" guest_nix_text)
+    && (lib.hasInfix "guestPassword = builtins.getEnv \"NUCLEUS_VM_GUEST_PASSWORD\"" guest_nix_text)
     && (lib.hasInfix "users.users.\"\${guestUsername}\"" guest_nix_text)
   ) "vms/nixos/guest.nix must consume exported guest credentials and create a login user";
 

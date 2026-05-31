@@ -19,12 +19,11 @@
 # the chosen format (qcow = BIOS + ext4, qcow-efi = UEFI + ext4).
 #
 # Source: https://github.com/nix-community/nixos-generators
-{
-  modulesPath,
-  guestUsername ? builtins.getEnv "NUCLEUS_VM_GUEST_USERNAME",
-  guestPassword ? builtins.getEnv "NUCLEUS_VM_GUEST_PASSWORD",
-  ...
-}:
+{ modulesPath, ... }:
+let
+  guestUsername = builtins.getEnv "NUCLEUS_VM_GUEST_USERNAME";
+  guestPassword = builtins.getEnv "NUCLEUS_VM_GUEST_PASSWORD";
+in
 {
   imports = [ "${modulesPath}/profiles/qemu-guest.nix" ];
 
