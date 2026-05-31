@@ -673,3 +673,18 @@ if (-not $VMSetup) {
     Write-Warning "vm-setup: VM setup incomplete (system apply succeeded): $($_.Exception.Message)"
   }
 }
+
+# Perform bounded garbage collection as the final step after all provisioning.
+# GC is best-effort: failures should not retroactively fail a completed apply.
+# After all provisioning, GC can reclaim build artifacts, caches, and stale files.
+$gcScript = Join-Path -Path $repoRoot -ChildPath "scripts\gc.ps1"
+if (-not (Test-Path -LiteralPath $gcScript)) {
+  Write-Output "gc: scripts/gc.ps1 not found; skipping garbage collection"
+} else {
+  Write-Output "gc: running post-apply garbage collection..."
+  try {
+    & $gcScript -ModuleDir $systemModuleDir -RepoRoot $repoRoot
+  } catch {
+    Write-Warning "gc: GC incomplete (system apply succeeded): $($_.Exception.Message)"
+  }
+}

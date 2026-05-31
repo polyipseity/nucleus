@@ -334,6 +334,30 @@ run_vm_setup() {
   fi
 }
 
+run_gc() {
+  # Call scripts/gc.sh to perform bounded garbage collection after the system
+  # configuration and model/VM setup have completed.
+  #
+  # Why post-apply:
+  #   Build outputs, caches, and stale artifacts accumulate during updates.
+  #   GC after all provisioning steps ensures the cleanup pass sees the most
+  #   recent set of intended resources.
+  #
+  # Why best-effort:
+  #   The system configuration and all provisioning steps have succeeded.
+  #   GC failures should not retroactively fail a completed apply.
+  _rgc_script="$REPO_ROOT/scripts/gc.sh"
+  if [ ! -f "$_rgc_script" ]; then
+    printf '%s\n' "gc: scripts/gc.sh not found at $_rgc_script; skipping garbage collection"
+    return
+  fi
+
+  printf '%s\n' "gc: running post-apply garbage collection..."
+  if ! sh "$_rgc_script"; then
+    printf '%s\n' "gc: gc.sh exited with an error; GC incomplete (system apply succeeded)" >&2
+  fi
+}
+
 run_jellyfin_account_sync() {
   # Converge Jellyfin user accounts declared in src/modules/users.json.
   # Credentials are resolved from per-user SOPS files
@@ -906,6 +930,8 @@ case "$(uname -s)" in
       run_ai_sync
       run_replica_sync
       run_vm_setup
+      run_gc
+      run_gc
     else
       # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
       # no sudo required — keepalive is not started.
@@ -919,6 +945,7 @@ case "$(uname -s)" in
       run_ai_sync
       run_replica_sync
       run_vm_setup
+      run_gc
     fi
     ;;
   *)

@@ -45,6 +45,9 @@
 .PARAMETER SkipWallpaperPrune
   Skip stale wallpaper file cleanup.
 
+.PARAMETER SkipVMPrune
+  Skip stale VM artifact removal.
+
 .EXAMPLE
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus"
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -SkipToolCachePrune
@@ -58,7 +61,8 @@ param(
   [switch]$SkipToolCachePrune,
   [switch]$SkipOllamaPrune,
   [switch]$SkipScoopCleanup,
-  [switch]$SkipWallpaperPrune
+  [switch]$SkipWallpaperPrune,
+  [switch]$SkipVMPrune
 )
 
 $ErrorActionPreference = "Stop"
@@ -173,6 +177,76 @@ if (-not $SkipOllamaPrune) {
     Write-Output "gc: ollama not installed; skipping ollama model prune"
   } else {
     Invoke-AISync -PruneOnly -RepoRoot $resolvedRepoRoot -ServerReadyTimeoutSeconds 0
+  }
+}
+
+# ---- Step 5: stale VM artifact removal ------________________________________
+# Removes temporary Packer build directories, cached Windows installers, and
+# pre-built disk images for VMs no longer declared in src/modules/VMs.json.
+# WHY: VM disk images and installer caches are large (multi-gigabyte);
+# clearing stale files keeps disk usage bounded and VM provisioning fast.
+if (-not $SkipVMPrune) {
+  $vmDir = Join-Path $env:USERPROFILE "virtual machines"
+  $imagesDir = Join-Path $vmDir "images"
+  $manifest = Join-Path $resolvedRepoRoot "src\modules\VMs.json"
+
+  # If VM directories do not exist, there is nothing to clean.
+  if (-not (Test-Path -LiteralPath $vmDir -PathType Container)) {
+    Write-Output "gc: VM directory not found; skipping VM artifact prune"
+  } elseif (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
+    Write-Warning "gc: manifest '$manifest' not found; skipping VM artifact prune"
+  } else {
+    # Load the manifest and build a list of declared VM names.
+    try {
+      $manifestContent = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+      $declaredVMNames = @($manifestContent.VMs | ForEach-Object { $_.name })
+    }
+    catch {
+      Write-Warning "gc: failed to parse manifest '$manifest' — $($_.Exception.Message); skipping VM artifact prune"
+      $declaredVMNames = @()
+    }
+
+    # Remove temporary Packer build directories.
+    if ((Test-Path -LiteralPath $imagesDir -PathType Container)) {
+      Get-ChildItem -LiteralPath $imagesDir -Filter "*-build" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+        try {
+          Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+          Write-Output "gc: removed temporary VM build directory '$($_.Name)'"
+        }
+        catch {
+          Write-Warning "gc: failed to remove temporary VM build directory '$($_.FullName)' — $($_.Exception.Message)"
+        }
+      }
+    }
+
+    # Remove cached Windows installer ISOs.
+    if ((Test-Path -LiteralPath $imagesDir -PathType Container)) {
+      Get-ChildItem -LiteralPath $imagesDir -Filter "*-installer.iso" -File -ErrorAction SilentlyContinue | ForEach-Object {
+        try {
+          Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop
+          Write-Output "gc: removed cached Windows installer '$($_.Name)'"
+        }
+        catch {
+          Write-Warning "gc: failed to remove cached Windows installer '$($_.FullName)' — $($_.Exception.Message)"
+        }
+      }
+    }
+
+    # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
+    if ((Test-Path -LiteralPath $imagesDir -PathType Container)) {
+      Get-ChildItem -LiteralPath $imagesDir -Filter "*.qcow2" -File -ErrorAction SilentlyContinue | ForEach-Object {
+        $imageName = $_.BaseName
+        if ($imageName -notin $declaredVMNames) {
+          try {
+            Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop
+            Write-Output "gc: removed stale VM disk image '$($_.Name)'"
+          }
+          catch {
+            Write-Warning "gc: failed to remove stale VM disk image '$($_.FullName)' — $($_.Exception.Message)"
+          }
+        }
+      }
+    }
   }
 }
 

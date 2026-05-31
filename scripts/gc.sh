@@ -14,6 +14,7 @@
 #   --skip-nix-gc          skip nix-collect-garbage
 #   --skip-ollama-prune    skip stale Ollama model removal
 #   --skip-wallpaper-prune skip stale wallpaper cleanup
+#   --skip-vm-prune        skip stale VM artifact removal
 #
 # Environment variables:
 #   (none)
@@ -55,6 +56,7 @@ skip_hm_gc=false
 skip_nix_gc=false
 skip_ollama_prune=false
 skip_wallpaper_prune=false
+skip_vm_prune=false
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -72,6 +74,9 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-wallpaper-prune)
       skip_wallpaper_prune=true
+      ;;
+    --skip-vm-prune)
+      skip_vm_prune=true
       ;;
     *)
       printf '%s\n' "gc: unsupported argument '$1'" >&2
@@ -246,6 +251,96 @@ prune_ollama_models_if_available() {
   OLLAMA_READY_TIMEOUT_SECONDS=0 "$REPO_ROOT/scripts/ai-sync.sh" --prune-only
 }
 
+prune_vm_artifacts_if_present() {
+  # Remove stale VM artifacts from ~/virtual machines that accumulate across
+  # provisioning cycles. This includes temporary Packer build directories,
+  # cached installers, and pre-built images for VMs no longer declared in the
+  # manifest at src/modules/VMs.json.
+  #
+  # WHY: VM disk images and installer caches are large (multi-gigabyte);
+  # clearing stale files keeps disk usage bounded and VM provisioning fast.
+  if ! command -v jq >/dev/null 2>&1; then
+    # jq is required to parse the manifest.
+    printf '%s\n' "gc: jq unavailable; skipping VM artifact prune"
+    return 0
+  fi
+
+  vm_dir="${HOME}/virtual machines"
+  images_dir="$vm_dir/images"
+  manifest="$REPO_ROOT/src/modules/VMs.json"
+
+  # If VM directories do not exist, there is nothing to clean.
+  if [ ! -d "$vm_dir" ]; then
+    return 0
+  fi
+
+  # Load the list of VMs declared in the manifest.
+  if [ ! -f "$manifest" ]; then
+    printf '%s\n' "gc: manifest '$manifest' not found; skipping VM artifact prune" >&2
+    return 1
+  fi
+
+  vm_count=$(jq '.VMs | length' "$manifest" 2>/dev/null || printf '%s\n' "0")
+  if [ "$vm_count" -eq 0 ]; then
+    return 0
+  fi
+
+  # Build a list of declared VM names (these must be preserved).
+  declared_names_tmp=$(mktemp)
+  trap 'rm -f "$declared_names_tmp"' EXIT INT TERM
+
+  i=0
+  while [ "$i" -lt "$vm_count" ]; do
+    vm_name=$(jq -r ".VMs[$i].name" "$manifest" 2>/dev/null || true)
+    if [ -n "$vm_name" ]; then
+      printf '%s\n' "$vm_name" >>"$declared_names_tmp"
+    fi
+    i=$((i + 1))
+  done
+
+  # Remove temporary Packer build directories.
+  if [ -d "$images_dir" ]; then
+    for build_dir in "$images_dir"/*-build; do
+      if [ -d "$build_dir" ]; then
+        if rm -rf "$build_dir" 2>/dev/null; then
+          printf '%s\n' "gc: removed temporary VM build directory '$(basename "$build_dir")'"
+        else
+          printf '%s\n' "gc: warning: failed to remove temporary VM build directory '$build_dir'" >&2
+        fi
+      fi
+    done
+  fi
+
+  # Remove cached Windows installer ISOs (will be re-downloaded if needed).
+  if [ -d "$images_dir" ]; then
+    for iso_file in "$images_dir"/*-installer.iso; do
+      if [ -f "$iso_file" ]; then
+        if rm -f "$iso_file" 2>/dev/null; then
+          printf '%s\n' "gc: removed cached Windows installer '$(basename "$iso_file")'"
+        else
+          printf '%s\n' "gc: warning: failed to remove cached Windows installer '$iso_file'" >&2
+        fi
+      fi
+    done
+  fi
+
+  # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
+  if [ -d "$images_dir" ]; then
+    for qcow2_file in "$images_dir"/*.qcow2; do
+      if [ -f "$qcow2_file" ]; then
+        qcow2_name=$(basename "$qcow2_file" .qcow2)
+        if ! grep -Fxq "$qcow2_name" "$declared_names_tmp"; then
+          if rm -f "$qcow2_file" 2>/dev/null; then
+            printf '%s\n' "gc: removed stale VM disk image '$(basename "$qcow2_file")'"
+          else
+            printf '%s\n' "gc: warning: failed to remove stale VM disk image '$qcow2_file'" >&2
+          fi
+        fi
+      fi
+    done
+  fi
+}
+
 # Step 1: expire HM generations before Nix store GC so the store can reclaim
 # paths that were previously held alive as generation GC roots.
 if [ "$skip_hm_gc" = false ]; then
@@ -270,6 +365,11 @@ fi
 # Step 5: remove orphaned Ollama models not declared in the manifest.
 if [ "$skip_ollama_prune" = false ]; then
   prune_ollama_models_if_available
+fi
+
+# Step 6: remove stale VM artifacts (temporary builds, cached installers, orphaned images).
+if [ "$skip_vm_prune" = false ]; then
+  prune_vm_artifacts_if_present
 fi
 
 printf '%s\n' "gc: gc workflow completed"

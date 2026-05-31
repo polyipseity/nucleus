@@ -1,3 +1,35 @@
+    - resource: Microsoft.Windows.Settings/TaskScheduler
+      directives:
+        description: >-
+          Schedule weekly garbage collection on Sunday at 00:00 UTC to reclaim stale
+          VM artifacts, build outputs, and tool caches (mirrors macOS launchd and NixOS
+          systemd timers for cross-host gc parity). The task discovers nucleus repo root
+          via %USERPROFILE%\.config\nucleus\repo-root fallback git discovery,
+          or canonical path %USERPROFILE%\dev\nucleus so gc is always rooted correctly.
+      settings:
+        TaskPath: \nucleus\
+        TaskName: gc-weekly
+        TaskDescriptionLiteral: Scheduled weekly garbage collection cleanup
+        Action: |
+          $RepoRoot = if (Test-Path "$env:USERPROFILE\.config\nucleus\repo-root") {
+            Get-Content "$env:USERPROFILE\.config\nucleus\repo-root" -Raw | ForEach-Object { $_.Trim() }
+          } else {
+            "$env:USERPROFILE\dev\nucleus"
+          }
+          $GcScript = Join-Path $RepoRoot "scripts\gc.ps1"
+          $ModuleDir = Join-Path $RepoRoot "src\hosts\Windows\modules"
+          if (-not (Test-Path $GcScript)) {
+            Write-Output "gc: scripts/gc.ps1 not found; skipping weekly GC"
+            exit 1
+          }
+          & $GcScript -ModuleDir $ModuleDir -RepoRoot $RepoRoot
+        Trigger: Weekly
+        DaysOfWeek: Sunday
+        AtTime: 00:00
+        Enabled: true
+        RunWithHighestPrivileges: false
+        RunOnlyWhenNetworkAvailable: false
+        RunOnlyIfLoggedOn: true
 # WinGet DSC v3 - system-level baseline for Windows host
 # Package ID policy: prefer human-readable named IDs (for example
 # `Microsoft.PowerToys`) over opaque Microsoft Store-generated IDs. Use

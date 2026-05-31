@@ -293,6 +293,38 @@ lib.mkIf pkgs.stdenv.isLinux {
     };
     Install = {
       WantedBy = [ "timers.target" ];
+
+      # --------------------------------------------------------------------------
+      # Weekly garbage collection — runs on Sunday at midnight to reclaim stale VM
+      # artifacts, build outputs, and tool caches that accumulate across weeks.
+      systemd.user.services."gc-weekly" = {
+        Unit = {
+          Description = "Weekly garbage collection (VM, build, cache artifacts)";
+          After = [ "network-online.target" ];
+          Wants = [ "network-online.target" ];
+        };
+        Service = {
+          Type = "oneshot";
+          ExecStart = "${pkgs.bash}/bin/bash $HOME/dev/nucleus/scripts/gc.sh";
+        };
+      };
+
+      systemd.user.timers."gc-weekly" = {
+        Unit = {
+          Description = "Weekly garbage collection timer";
+        };
+        Timer = {
+          # Fire every Sunday at 00:00 local time. Persistent=true ensures the timer
+          # catches up on the next login when the machine was off at the scheduled
+          # time, preventing stale artifacts from accumulating indefinitely.
+          OnCalendar = "Sun *-*-* 00:00:00";
+          Persistent = true;
+          Unit = "gc-weekly.service";
+        };
+        Install = {
+          WantedBy = [ "timers.target" ];
+        };
+      };
     };
   };
 

@@ -289,6 +289,31 @@ let
     '';
   };
 
+  # --------------------------------------------------------------------------
+  # Weekly garbage collection LaunchAgent
+  # Performs bounded GC on every Sunday at midnight to reclaim stale VM
+  # artifacts, build outputs, and tool caches that accumulate across weeks.
+  launchd.agents."gc-weekly" = {
+    enable = true;
+    config = {
+      # launchd Label is a reverse-DNS-style unique identifier.
+      # Source: launchd.plist(5) Label key semantics.
+      # https://www.manpagez.com/man/5/launchd.plist/
+      Label = "local.gc-weekly";
+      ProgramArguments = [ "${gcWeekly}" ];
+      # Do not run on every agent reload during apply/bootstrap apply; weekly
+      # Sunday maintenance at midnight is sufficient for accumulated artifact cleanup.
+      RunAtLoad = false;
+      StartCalendarInterval = [
+        {
+          Hour = 0;
+          Minute = 0;
+          Weekday = 0; # Sunday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+        }
+      ];
+    };
+  };
+
   betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" ''
     set +e  # heartbeat is fully soft-fail; never abort on individual check failure
 
@@ -496,6 +521,32 @@ let
     /bin/sleep 2
 
     echo "Managed preference domains purged. Run your apply flow to re-assert declarative defaults."
+  '';
+
+  gcWeekly = pkgs.writeShellScript "gc-weekly" ''
+    set -eu
+
+    # Locate the nucleus repository root. Launchd jobs run with a generic HOME,
+    # so we look for the canonical canonical repo path first, then fall back to
+    # git discovery.
+    REPO_ROOT=""
+    if [ -f "$HOME/.config/nucleus/repo-root" ]; then
+      REPO_ROOT="$(cat "$HOME/.config/nucleus/repo-root")"
+    elif REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+      :
+    else
+      REPO_ROOT="$HOME/dev/nucleus"
+    fi
+
+    if [ ! -f "$REPO_ROOT/scripts/gc.sh" ]; then
+      echo "gc: scripts/gc.sh not found at $REPO_ROOT; skipping weekly GC"
+      exit 1
+    fi
+
+    # Weekly GC is space-reclaim only; skip model pulls and skip any operations
+    # that would block the background launchd job (like waiting for Ollama).
+    # GC script handles tool availability checks internally.
+    exec "$REPO_ROOT/scripts/gc.sh"
   '';
 
   # Keep displayHostManualInstructions as the final user-visible activation
