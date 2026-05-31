@@ -15,14 +15,14 @@ Aggressively remove unnecessary complexity across code, docs, and AI customizati
 3. Partition scope into independent lanes.
 4. Run parallel `maintainability` subagents, one per lane, using:
 
-	```
-	Improve maintainability across {{LANE_SCOPE}}.
-	Be aggressive: remove unnecessary indirection, duplicated policy,
-	stale guidance, and avoidable abstractions.
-	Preserve behavior.
-	Report: (1) changes made with file paths, (2) simplifications applied,
-	(3) remaining hotspots, (4) recommended atomic commit slices.
-	```
+   ```
+   Improve maintainability across {{LANE_SCOPE}}.
+   Be aggressive: remove unnecessary indirection, duplicated policy,
+   stale guidance, and avoidable abstractions.
+   Preserve behavior.
+   Report: (1) changes made with file paths, (2) simplifications applied,
+   (3) remaining hotspots, (4) recommended atomic commit slices.
+   ```
 
 5. Merge lane results and commit in atomic slices.
 6. Re-run another parallel wave for remaining hotspots.
