@@ -1,5 +1,5 @@
 ---
-description: "Use always: aggressively simplify code, human docs, and AI customization docs; prefer deletion over abstraction; enforce atomic commits and parallel multi-pass maintainability subagent runs for broad cleanup."
+description: "Use always: aggressively simplify code, human docs, and AI customization docs; prefer deletion over abstraction; enforce atomic commits and parallel multi-pass maintain subagent runs for broad cleanup."
 name: "Maintainability"
 applyTo: "**"
 ---
@@ -24,7 +24,7 @@ Execution checklist:
 
 Broad cleanup rule:
 
-- For multi-file cleanup, run `maintainability` subagents in parallel on independent lanes.
+- For multi-file cleanup, run `maintain` subagents in parallel on independent lanes.
 - Merge results, then run another parallel pass for remaining hotspots.
 - Stop when only minor/cosmetic improvements remain.
 
@@ -45,5 +45,3 @@ Final check:
 2. Is this the simplest design that still meets the requirement?
 3. Did we remove at least as much complexity as we added?
 4. Can a human quickly locate the source of truth?
-
-If any answer is "no", simplify again.

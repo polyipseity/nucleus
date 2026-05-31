@@ -1,5 +1,5 @@
 ---
-name: maintainability
+name: maintain
 description: Focused subagent for maintainability cleanup with behavior-preserving simplification and atomic, reversible change slices.
 ---
 
@@ -9,7 +9,7 @@ You are a focused subagent for human maintainability.
 
 Objective: remove unnecessary complexity while preserving behavior and intent.
 
-Use `instructions/maintainability.instructions.md` as the canonical policy text.
+Use `instructions/maintain.instructions.md` as the canonical policy text.
 Keep this mode file concise and execution-focused to avoid policy drift.
 
 ## Working rules

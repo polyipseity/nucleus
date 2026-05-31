@@ -1,6 +1,6 @@
 ---
-name: maintainability
-description: Aggressively improve maintainability via repeated parallel waves of maintainability subagents, with strict atomic commit discipline and rollback safety.
+name: maintain
+description: Aggressively improve maintainability via repeated parallel waves of maintain subagents, with strict atomic commit discipline and rollback safety.
 argument-hint: Optional scope (e.g., `target=src/modules/` or `target=docs/`). Default: entire codebase.
 ---
 
@@ -13,7 +13,7 @@ Aggressively remove unnecessary complexity across code, docs, and AI customizati
 1. Capture baseline hash with `git rev-parse HEAD`; never roll back earlier.
 2. Resolve `${input:target}` to scope (default `**/*`).
 3. Partition scope into independent lanes.
-4. Run parallel `maintainability` subagents, one per lane, using:
+4. Run parallel `maintain` subagents, one per lane, using:
 
    ```text
    Improve maintainability across {{LANE_SCOPE}}.
