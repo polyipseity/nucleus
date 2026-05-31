@@ -11,49 +11,43 @@ Never ask for confirmation or clarification. Proceed automatically using best-ef
 ## Workflow
 
 1. **Read staged changes**
-  - Run one compound command to print staged file list and full staged patch:
+   - Run one compound command to print staged file list and full staged patch:
 
-     ```shell
-     git diff --cached --name-status --no-color && git --no-pager diff --cached --staged --patch --no-color
-     ```
+   ```shell
+   git diff --cached --name-status --no-color && git --no-pager diff --cached --staged --patch --no-color
+   ```
 
-  - Present the exact command. If it cannot run, produce a best-effort message from available context and stop.
+   - Present the exact command. If it cannot run, produce a best-effort message from available context and stop.
 
 2. **Compose commit message**
-  - Use Command 1 output and repository conventions (for example `CONTRIBUTING.md`, `.agents/`, `package.json`, `commitlint`, `prek.toml`, `CHANGELOG.md`).
+   - Use Command 1 output and repository conventions (for example `CONTRIBUTING.md`, `.agents/`, `package.json`, `commitlint`, `prek.toml`, `CHANGELOG.md`).
    - Produce a commit message with:
      - Short subject (~50 chars)
      - Optional body (each line **must be wrapped to 72 characters or fewer**; bullets allowed)
      - Footer (BREAKING CHANGE / Refs / Ticket), including `${input:extra}` if provided
    - **If the commit is rejected by commitlint due to line length or other formatting, rewrap and retry until the commit passes.**
    - Prefer tooling-enforced rules. If unsure, default to Conventional Commits. **Strictly enforce commit header and body line length (72 chars max) as required by commitlint.**
-  - Do not ask for approval before committing.
+   - Do not ask for approval before committing.
 
 3. **Create the commit**
-  - If `${input:commitNow}` is `no`, skip this step and only present the message.
-  - Otherwise, present the exact command to create the commit from stdin and print the new SHA. Run both commands in the same shell command block. Use the right syntax for the detected shell:
+   - If `${input:commitNow}` is `no`, skip this step and only present the message.
+   - Otherwise, present the exact command to create the commit from stdin and print the new SHA. Run both commands in the same shell command block. Use the right syntax for the detected shell:
      - **PowerShell (Windows):**
-
        ```powershell
        (@'
        <full commit message>
        '@ | git commit --file=-) ; git rev-parse HEAD
        ```
-
-      Use a single-quoted here-string (`@'...'@`) to avoid variable expansion.
-
+       Use a single-quoted here-string (`@'...'@`) to avoid variable expansion.
      - **Bash/zsh (Linux/macOS):**
-
        ```bash
        (git commit --file - <<'MSG'
        <full commit message>
        MSG
        ) && git rev-parse HEAD
        ```
-
-      Use a single-quoted heredoc delimiter (`<<'MSG'`) to avoid shell expansion. If `MSG` appears in the message, use a different delimiter.
-
-  - If Command 2 fails due to quoting/heredoc syntax, retry up to 3 corrected forms. For other failures, report the error and do not modify the index.
+       Use a single-quoted heredoc delimiter (`<<'MSG'`) to avoid shell expansion. If `MSG` appears in the message, use a different delimiter.
+   - If Command 2 fails due to quoting/heredoc syntax, retry up to 3 corrected forms. For other failures, report the error and do not modify the index.
 
 4. **Output**
    - 1–2 line summary: staged files and detected convention
