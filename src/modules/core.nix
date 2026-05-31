@@ -168,10 +168,6 @@ let
   #   duti         — set default application for a UTI (used in macos.nix)
   #   pinentry_mac — macOS-native GPG PIN entry dialog
   darwinSharedPackages = lib.optionals pkgs.stdenv.isDarwin [
-    # Darwin-only extras:
-    #   desktoppr    — set desktop wallpaper from the command line
-    #   duti         — set default application for a UTI (used in macos.nix)
-    #   pinentry_mac — macOS-native GPG PIN entry dialog
     pkgs.desktoppr
     pkgs.duti
     pkgs.pinentry_mac
