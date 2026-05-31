@@ -1,5 +1,5 @@
 ---
-description: "Use always: keep code, human docs, and AI customization docs minimal, clear, and maintainable; prefer simplification over cleverness and invoke the maintainability subagent for broad cleanup work."
+description: "Use always: aggressively simplify code, human docs, and AI customization docs; prefer deletion over abstraction; enforce atomic commits and parallel multi-pass maintainability subagent runs for broad cleanup."
 name: "Maintainability"
 applyTo: "**"
 ---
@@ -7,6 +7,7 @@ applyTo: "**"
 Default operating rule:
 
 - Prioritize long-term human maintainability over short-term cleverness.
+- Be aggressive about removing complexity, duplication, and stale guidance.
 - Keep changes as small and local as possible.
 - Prefer deleting complexity to adding abstractions.
 - Write for future maintainers who did not author the original code.
@@ -26,6 +27,14 @@ Maintainability constraints:
 - Minimize hidden coupling and surprising behavior.
 - Do not introduce complexity unless a concrete requirement demands it.
 
+Git safety and commit discipline:
+
+- At the start of maintainability work, capture a baseline commit hash (`git rev-parse HEAD`).
+- Commit frequently in atomic slices (one aspect per commit) with clear, specific commit messages.
+- Prefer many small reversible commits over large mixed commits.
+- Never revert/reset/cherry-pick to a commit earlier than the captured baseline hash.
+- If rollback is needed, roll back only to the baseline hash or newer.
+
 When modifying guidance files (`AGENTS.md` and `.agents/**`):
 
 - Preserve a clear hierarchy: durable root guidance, focused specialized files.
@@ -36,6 +45,8 @@ When modifying guidance files (`AGENTS.md` and `.agents/**`):
 Subagent collaboration:
 
 - For broad maintainability cleanup, instruction consolidation, or architecture simplification spanning multiple files, invoke the `maintainability` subagent.
+- For high-complexity cleanup, run multiple `maintainability` subagents in parallel on independent scopes.
+- Run multiple passes; after each pass, merge findings and launch another parallel pass for remaining hotspots until diminishing returns.
 - Also invoke it when requested explicitly by a human.
 - If task scope is small and clear, apply these rules directly without delegation.
 

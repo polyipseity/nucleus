@@ -1,16 +1,26 @@
 ---
 name: maintainability
-description: Iteratively improve codebase maintainability by invoking the maintainability subagent repeatedly until high maintainability is achieved.
+description: Aggressively improve maintainability via repeated parallel waves of maintainability subagents, with strict atomic commit discipline and rollback safety.
 argument-hint: Optional scope (e.g., `target=src/modules/` or `target=docs/`). Default: entire codebase.
 ---
 
 # Maintainability Improvement Loop
 
-Systematically reduce unnecessary complexity and improve readability across the codebase, documentation, and AI customization files. Repeat until no significant improvements remain.
+Systematically and aggressively remove unnecessary complexity across code, human docs, and AI customization files. Run repeated parallel subagent waves until improvements plateau.
 
 ## Workflow
 
-### 1. Initialize Scope
+### 1. Capture Baseline and Scope
+
+Before edits, capture and persist baseline commit hash:
+
+```shell
+git rev-parse HEAD
+```
+
+Treat this hash as the rollback floor for the entire run.
+
+Hard rule: never revert/reset/cherry-pick to any commit older than this baseline.
 
 Parse optional input `${input:target}` to determine scope:
 
@@ -19,67 +29,79 @@ Parse optional input `${input:target}` to determine scope:
 
 **Output**: Clearly state the scope being improved in this session.
 
-### 2. Invoke Maintainability Subagent (Iteration 1)
+### 2. Partition Scope for Parallelism
 
-Invoke the `maintainability` subagent with:
+Break scope into independent cleanup lanes (for example: core code paths, tests, docs, AI customization files). Keep lanes isolated to reduce merge conflicts.
+
+### 3. Launch Parallel Subagent Wave (Pass 1)
+
+Invoke multiple `maintainability` subagents in parallel, one per lane.
+
+Use this prompt per lane:
 
 ```
-Improve maintainability across {{SCOPE}}.
-Focus on: removing unnecessary complexity, consolidating duplication, simplifying documentation,
-reducing hidden coupling, and making code/docs easier for humans to read and maintain.
-Report: (1) changes made (with file paths), (2) simplifications applied, (3) remaining hotspots/pain points.
+Improve maintainability across {{LANE_SCOPE}}.
+Be aggressive: remove unnecessary indirection, duplicated policy, stale guidance, and avoidable abstractions.
+Preserve behavior.
+Report: (1) changes made with file paths, (2) simplifications applied, (3) remaining hotspots, (4) recommended atomic commit slices.
 ```
 
-**Record output**:
+### 4. Commit in Atomic Slices (Per Wave)
+
+For each lane outcome:
+
+- Apply edits in small coherent slices.
+- Commit frequently (one aspect per commit).
+- Use clear, specific commit messages describing the exact simplification.
+- Keep unrelated edits out of the same commit.
+
+### 5. Merge Results and Record Wave Output
+
+Record for each wave:
 
 - List of all simplifications (consolidations, deletions, rewrites)
-- Files touched (with line ranges if available)
-- Identified remaining complexity hotspots (backlog for next iteration)
-- Estimated maintainability improvement (subjective: low/medium/high)
+- Commits created per lane (subject + SHA)
+- Files touched
+- Remaining hotspots backlog for next wave
+- Estimated improvement per lane (low/medium/high)
 
-### 3. Termination Check (After Each Iteration)
+### 6. Termination Check (After Each Wave)
 
 Evaluate whether maintainability is now "highly improved":
 
 **Continue if ANY of these conditions hold:**
 
-- Subagent found and completed ≥5 meaningful simplifications in this iteration
+- At least one lane produced ≥3 meaningful simplifications in this wave
 - Remaining hotspots are substantial (multiple files, complex logic, deep nesting, duplicated patterns)
 - Subagent identified specific categories of improvement still pending (e.g., "docs still sprawling", "module coupling remains high")
 
 **Stop if ALL of these conditions hold:**
 
-- Subagent found <3 meaningful simplifications in this iteration (diminishing returns)
+- All lanes produced <3 meaningful simplifications (diminishing returns)
 - Remaining hotspots are minor (isolated edge cases, single-file concerns, cosmetic issues)
-- Subagent reports: "Maintainability is now high; remaining issues are edge cases or out-of-scope"
-- Estimated improvement rating is "medium" or lower (indicating plateau reached)
+- Subagents report remaining work is edge-case or out-of-scope
+- Overall improvement plateaus at "medium" or lower for a full wave
 
-### 4. Iterate (Repeat if Continuing)
+### 7. Iterate with Another Parallel Wave
 
-If continuing, invoke the maintainability subagent again with an updated scope:
+If continuing:
 
-```
-Continue improving maintainability, focusing now on the remaining hotspots identified in the previous iteration:
-{{PREVIOUS_HOTSPOTS}}
+- Repartition remaining hotspots into independent lanes.
+- Launch another set of maintainability subagents in parallel.
+- Repeat steps 4–7.
 
-Apply the same simplification principles: remove complexity, consolidate duplication, clarify intent.
-Report: (1) changes made, (2) new simplifications, (3) any remaining pain points.
-```
+### 8. Final Summary
 
-**Record output** using the same format as Iteration 1.
+When stopping, provide:
 
-Repeat steps 3–4 until termination condition is met.
-
-### 5. Final Summary
-
-When stopping, produce a comprehensive summary:
-
-- **Total iterations**: N
-- **Total files modified**: X (list them)
-- **Total simplifications across all iterations**: Y (categorized by type: deletions, consolidations, rewrites, documentation improvements)
-- **Complexity reduction**: Before/after (subjective assessment)
-- **Remaining hotspots** (if any, for future work or explicit deferral)
-- **Estimated maintainability rating**: Low / Medium / High (subjective based on complexity, clarity, duplication)
+- Baseline hash and confirmation no rollback went earlier
+- Total waves run (parallel passes)
+- Total subagent runs across all waves
+- Total commits created and why each commit boundary was chosen
+- Total files modified
+- Total simplifications by category
+- Remaining hotspots (if any)
+- Final maintainability rating (low/medium/high)
 
 ---
 
@@ -88,7 +110,9 @@ When stopping, produce a comprehensive summary:
 - **No speculative changes**: Every simplification must reduce genuine complexity or improve readability. Do not refactor for style alone.
 - **Preserve behavior**: All changes must be pure simplifications—no logic changes, feature additions, or bug fixes.
 - **Respect conventions**: Follow repository guidelines (naming, sorting, formatting) from `AGENTS.md` and `.agents/instructions/*.md`.
-- **Atomic commits** (if applicable): Each iteration may produce one or more logical commits; preserve one-aspect-per-commit rule.
+- **Atomic commits**: Commit often and keep one coherent simplification per commit.
+- **Rollback floor**: Never revert/reset/cherry-pick earlier than the recorded baseline hash.
+- **Parallelism requirement**: Use parallel subagent waves for independent lanes; do not serialize independent cleanup work.
 
 ## Success Criteria
 
@@ -97,5 +121,6 @@ When stopping, produce a comprehensive summary:
 - Shortened and clarified documentation (no wall-of-text sections)
 - Simpler mental model for understanding the codebase
 - Fewer hidden dependencies and surprising behaviors
+- Clear, fine-grained commit history that enables safe targeted rollback
 
 End of prompt.
