@@ -1,12 +1,15 @@
 # vms/nixos/packer.pkr.hcl — Packer template for building a NixOS QCOW2 image.
 #
-# Used by scripts/VM-build.ps1 on Windows hosts to build the NixOS guest image
-# via QEMU.  On macOS/NixOS hosts, scripts/VM-build.sh uses nixos-generators
-# directly (faster, no Packer needed).
+# Used by src/hosts/Windows/modules/system/Invoke-VMSetup.ps1 on Windows hosts
+# to build the NixOS guest image via QEMU. On macOS/NixOS hosts,
+# scripts/vm-setup.sh uses nixos-generators directly (faster, no Packer
+# needed).
 #
 # Usage (from repo root):
 #   cd vms/nixos && packer init . && packer build \
 #     [-var accelerator=whpx] \
+#     -var guest_username=<username> \
+#     -var guest_password=<password> \
 #     .
 #
 # Accelerator options:
@@ -63,13 +66,11 @@ variable "cpus" {
 
 variable "guest_username" {
   type        = string
-  default     = "nixos"
   description = "Primary login username for the built NixOS guest."
 }
 
 variable "guest_password" {
   type        = string
-  default     = "nixos"
   description = "Password for the primary NixOS guest user."
 }
 

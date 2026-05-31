@@ -484,7 +484,27 @@ let
     (lib.hasInfix "variable \"guest_username\"" nixos_packer_text)
     && (lib.hasInfix "variable \"guest_password\"" nixos_packer_text)
     && (lib.hasInfix "users.users.\\\"\${var.guest_username}\\\"" nixos_packer_text)
+    && !(lib.hasInfix "default     = \"nixos\"" nixos_packer_text)
   ) "vms/nixos/packer.pkr.hcl must accept and apply guest credentials for Windows-host NixOS builds";
+
+  test_windows_nixos_build_honors_manifest_disk_size =
+    assert'
+      (
+        (lib.hasInfix "-DiskGib $diskGib" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "[int]$DiskGib" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "-var \"disk_size=\${DiskGib}G\"" windows_vm_setup_ps1_text)
+      )
+      "Invoke-VMSetup.ps1 must pass the manifest-derived disk size into Windows-host NixOS Packer builds";
+
+  test_windows_helper_cleanup_collision_guard =
+    assert'
+      (
+        (lib.hasInfix "case-insensitive filename collision" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "$legacyHelper.ToLowerInvariant()" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "$startScriptPs1" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "$startScriptSh" windows_vm_setup_ps1_text)
+      )
+      "Invoke-VMSetup.ps1 must not delete freshly generated start-* helpers when cleaning up legacy Start-* names on Windows";
 
   test_guest_credentials_policy_in_windows_packer =
     assert'
@@ -783,6 +803,8 @@ let
     test_guest_credentials_policy_in_windows_vm_setup_ps1
     test_guest_credentials_policy_in_nixos_guest
     test_guest_credentials_policy_in_nixos_packer
+    test_windows_nixos_build_honors_manifest_disk_size
+    test_windows_helper_cleanup_collision_guard
     test_guest_credentials_policy_in_windows_packer
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
@@ -853,6 +875,8 @@ in
     test_guest_credentials_policy_in_windows_vm_setup_ps1
     test_guest_credentials_policy_in_nixos_guest
     test_guest_credentials_policy_in_nixos_packer
+    test_windows_nixos_build_honors_manifest_disk_size
+    test_windows_helper_cleanup_collision_guard
     test_guest_credentials_policy_in_windows_packer
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer

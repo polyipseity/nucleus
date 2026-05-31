@@ -311,7 +311,9 @@ next run.
 
         switch ($vm.type) {
             'NixOS' {
+                $diskGib = [long](($vm.diskBytes + 536870912) / 1073741824)
                 Invoke-BuildNixosImage -VmName $vm.name -Accelerator $Accelerator `
+                    -DiskGib $diskGib `
                     -VmsDir $vmsDir -ImagesDir $imagesDir `
                     -GuestAccountName $guestUsername -GuestSecret $guestPassword `
                     -GuestSecretHash $guestSecretHash `
@@ -569,6 +571,15 @@ printf '%s\n' '$configureCommand'
         if (-not $DryRun) {
             foreach ($legacyHelper in $legacyHelpers) {
                 if (Test-Path $legacyHelper) {
+                    $legacyHelperNormalized = $legacyHelper.ToLowerInvariant()
+                    $collidesWithModernHelper = @(
+                        $startScriptPs1,
+                        $startScriptSh
+                    ) | Where-Object { $_.ToLowerInvariant() -eq $legacyHelperNormalized } | Select-Object -First 1
+                    if ($collidesWithModernHelper) {
+                        Write-Information "vm-setup: skipping legacy cleanup due case-insensitive filename collision: $legacyHelper"
+                        continue
+                    }
                     Remove-Item $legacyHelper -Force
                     Write-Information "vm-setup: removed legacy helper script: $legacyHelper"
                 }
@@ -657,6 +668,7 @@ function Invoke-BuildNixosImage {
     param(
         [string]$VmName,
         [string]$Accelerator,
+        [int]$DiskGib,
         [string]$VmsDir,
         [string]$ImagesDir,
         [string]$GuestAccountName,
@@ -696,7 +708,7 @@ function Invoke-BuildNixosImage {
 
     if ($DryRun) {
         Write-Information "vm-setup: [dry-run] Remove stale temporary output directory if present: $tmpOutput"
-        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var accelerator=$Accelerator -var guest_username=$GuestAccountName -var guest_password=<redacted> -var output_directory=$tmpOutput ."
+        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var accelerator=$Accelerator -var disk_size=${DiskGib}G -var guest_username=$GuestAccountName -var guest_password=<redacted> -var output_directory=$tmpOutput ."
         return
     }
 
@@ -714,6 +726,7 @@ function Invoke-BuildNixosImage {
         }
         & packer build `
             -var "accelerator=$Accelerator" `
+            -var "disk_size=${DiskGib}G" `
             -var "guest_username=$GuestAccountName" `
             -var "guest_password=$GuestSecret" `
             -var "output_directory=$tmpOutput" `
