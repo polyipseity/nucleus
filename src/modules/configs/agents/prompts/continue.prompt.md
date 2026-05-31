@@ -12,9 +12,8 @@ You are resuming work from a previous session.
 Before proceeding, complete these steps to regain full context:
 
 1. **Review previous work**: Check the conversation history to identify what was completed and what remains.
-2. **Check task tracking**: Look for any open `manage_todo_list` items marked `not-started` or `in-progress`.
-3. **Load session memory**: Review `/memories/session/` files for in-progress notes, decisions, and blockers.
-4. **Verify state**: Confirm the current state of any files, tests, or deployments mentioned in recent work.
+2. **Load session memory**: Review `/memories/session/` files for in-progress notes, decisions, and blockers.
+3. **Verify state**: Confirm current file, test, and deployment status for referenced work.
 
 ## Resumption Guidelines
 
@@ -28,8 +27,8 @@ Before proceeding, complete these steps to regain full context:
 
 1. Review the immediate context above (conversation history, memory, task list).
 2. If work is incomplete: Resume the exact next step from the previous session.
-3. If work is complete: Ask for clarification on the next objective or awaiting further direction.
-4. If blocked or uncertain: Describe the blocker with specifics (exact error, file path, command output) and ask for guidance.
+3. If work is complete: Ask for the next objective.
+4. If blocked: Report the blocker with exact error text, file path, and command output.
 
 ## Constraints & Best Practices
 
@@ -37,6 +36,6 @@ Before proceeding, complete these steps to regain full context:
 - Do not re-implement features that were already completed—reuse validated code.
 - Do not create new branches or stash work; work within the current session context.
 - Keep responses concise and fact-based; focus on continuation, not re-explanation.
-- When uncertain about user intent, ask targeted clarifying questions instead of guessing.
+- When user intent is unclear, ask targeted clarifying questions instead of guessing.
 
 End of prompt.
