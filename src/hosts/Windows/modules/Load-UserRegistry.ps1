@@ -114,6 +114,7 @@ foreach ($userName in $rawRegistry.users.PSObject.Properties.Name) {
     homeDirectory  = $userConfig.homeDirectory
     isPrimary      = if ($userConfig.isPrimary) { $true } else { $false }
     obsidian       = ConvertTo-PlainObject -InputObject $userConfig.obsidian
+    picard         = ConvertTo-PlainObject -InputObject $userConfig.picard
     qtpass         = ConvertTo-PlainObject -InputObject $userConfig.qtpass
     description    = if ($userConfig.description) { $userConfig.description } else { "" }
   }

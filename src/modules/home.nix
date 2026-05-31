@@ -130,6 +130,41 @@ let
   obsidianManagedSettings = managedAppSettings "obsidian" obsidianDefaultSettings;
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;
 
+  # Picard stores user preferences in native INI format (Picard.ini) under the
+  # [setting] section. Keep declarative defaults small and non-sensitive, then
+  # merge user overrides from users.json and upsert managed keys in-place so
+  # unmanaged keys (for example private API or plugin state) are preserved.
+  picardDefaultSettings = {
+    completeness_ignore_data = false;
+    completeness_ignore_pregap = false;
+    release_ars = true;
+  };
+
+  picardManagedSettings = managedAppSettings "picard" picardDefaultSettings;
+
+  renderIniScalarValue =
+    value:
+    if builtins.isBool value then
+      if value then "true" else "false"
+    else if builtins.isInt value then
+      toString value
+    else
+      value;
+
+  renderPicardIniCommand =
+    confVar: section: name: value:
+    let
+      renderedValue = renderIniScalarValue value;
+      valueArg = lib.escapeShellArg renderedValue;
+    in
+    ''_upsert_ini_key "${confVar}" "${section}" "${name}" ${valueArg}'';
+
+  picardIniCommands = builtins.concatStringsSep "\n" (
+    lib.mapAttrsToList (
+      name: value: renderPicardIniCommand "$_picard_conf" "setting" name value
+    ) picardManagedSettings
+  );
+
   renderQtPassValue =
     value:
     if builtins.isBool value then
@@ -338,6 +373,79 @@ in
                 fi
                 ;;
             esac
+    '';
+
+    # Picard reads native INI settings from ~/.config/MusicBrainz/Picard.ini
+    # on macOS and Linux. Merge-overwrite only managed keys into [setting]
+    # while preserving all unmanaged keys and sections.
+    home.activation.configurePicardSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+            _upsert_ini_key() {
+              _conf="$1"
+              _section="$2"
+              _key="$3"
+              _value="$4"
+
+              _conf_dir="$(dirname "$_conf")"
+              mkdir -p "$_conf_dir"
+
+              if [ -f "$_conf" ]; then
+                _tmp="$(mktemp "$_conf.XXXXXX")"
+                ${pkgs.gawk}/bin/awk -v section="$_section" -v key="$_key" -v value="$_value" '
+                  function write_pair() {
+                    if (wrote == 0) {
+                      print key "=" value
+                      wrote = 1
+                    }
+                  }
+                  BEGIN {
+                    in_target = 0
+                    section_seen = 0
+                    wrote = 0
+                  }
+                  {
+                    if ($0 ~ /^\[/) {
+                      if (in_target) {
+                        write_pair()
+                        in_target = 0
+                      }
+                      if ($0 == "[" section "]") {
+                        section_seen = 1
+                        in_target = 1
+                      }
+                      print
+                      next
+                    }
+
+                    if (in_target && $0 ~ ("^" key "=")) {
+                      if (wrote == 0) {
+                        print key "=" value
+                        wrote = 1
+                      }
+                      next
+                    }
+
+                    print
+                  }
+                  END {
+                    if (section_seen == 0) {
+                      print "[" section "]"
+                    }
+                    if (wrote == 0) {
+                      print key "=" value
+                    }
+                  }
+                ' "$_conf" > "$_tmp"
+                mv "$_tmp" "$_conf"
+              else
+                cat > "$_conf" <<EOF
+      [$_section]
+      $_key=$_value
+      EOF
+              fi
+            }
+
+            _picard_conf="''${XDG_CONFIG_HOME:-$HOME/.config}/MusicBrainz/Picard.ini"
+            ${picardIniCommands}
     '';
 
     # Obsidian stores app-global settings in obsidian.json alongside dynamic

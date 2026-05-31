@@ -101,6 +101,9 @@
 .PARAMETER EnablePowerParity
   Enable managed Windows power policy parity convergence and cleanup fallback.
 
+.PARAMETER EnablePicardParity
+  Enable managed MusicBrainz Picard native INI convergence and cleanup fallback.
+
 .PARAMETER EnableObsidianParity
   Enable managed Obsidian advanced-settings parity convergence and cleanup
   fallback while preserving unmanaged vault metadata in the live app config.
@@ -224,6 +227,7 @@ param(
   [bool]$EnableGitSshParity = $true,
   [bool]$EnableHostAgeKeyRegistration = $true,
   [bool]$EnablePowerParity = $true,
+  [bool]$EnablePicardParity = $true,
   [bool]$EnableObsidianParity = $true,
   [bool]$EnableQtPassParity = $true,
   [bool]$EnableRdpParity = $true,
@@ -299,6 +303,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DevRepo.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-GitAndSshConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ObsidianConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-PicardConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-QtPassConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ShellProfile.ps1")
 # editors/: VS Code configuration and workspace management.
@@ -563,6 +568,7 @@ Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VSCodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords
+Sync-PicardConfig -Enabled:$EnablePicardParity -Users $selectedUserRecords
 Sync-QtPassConfig -Enabled:$EnableQtPassParity -SettingsPath $qtPassSettingsPath -Users $selectedUserRecords
 # Default to false if devReposEnabled not yet set (user not in registry or no repos configured).
 if ($null -eq $EnableDevReposParity) {
