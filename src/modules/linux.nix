@@ -295,4 +295,35 @@ lib.mkIf pkgs.stdenv.isLinux {
       WantedBy = [ "timers.target" ];
     };
   };
+
+  # --------------------------------------------------------------------------
+  # Audio MIME type defaults — keep VLC as the default handler for all audio
+  # formats that MusicBrainz Picard claims in its desktop file.  Without
+  # explicit overrides, installation order determines which application handles
+  # double-clicks on audio files, which causes Picard (a tagger, not a player)
+  # to open instead of VLC.
+  # Sources:
+  # https://specifications.freedesktop.org/mime-apps-spec/1.0/
+  # https://wiki.videolan.org/VLC_Features_Formats/
+  # --------------------------------------------------------------------------
+  xdg.mimeApps = {
+    enable = true;
+    defaultApplications = lib.genAttrs [
+      "audio/aiff"
+      "audio/flac"
+      "audio/mp4"
+      "audio/mpeg"
+      "audio/ogg"
+      "audio/x-ape"
+      "audio/x-aiff"
+      "audio/x-flac"
+      "audio/x-ms-wma"
+      "audio/x-musepack"
+      "audio/x-opus+ogg"
+      "audio/x-tta"
+      "audio/x-vorbis+ogg"
+      "audio/x-wav"
+      "audio/x-wavpack"
+    ] (_: [ "vlc.desktop" ]);
+  };
 }
