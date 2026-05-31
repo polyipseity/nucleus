@@ -13,6 +13,8 @@
 - Install Amphetamine Power Protect one time (upstream requires manual placement): copy the Power Protect script to `~/Library/Application Scripts/com.if.Amphetamine/` and the Power Protect sudoers file to `/private/etc/sudoers.d/` as documented at `https://raw.githubusercontent.com/x74353/Amphetamine/master/README.md`, then re-run `nucleus-apply`.
 - Create the per-user rclone passphrase: from the repo root, run `sops edit src/secrets/users-<username>.yml`, add `rclone_config_pass: <output of openssl rand -hex 64>`, save (sops encrypts automatically), commit the file, then re-run `nucleus apply`. If you already configured rclone remotes without this passphrase, delete `~/.config/rclone/rclone.conf` first so the remotes are re-created with encryption.
 - Run `nucleus-cloud-setup` and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
+- Open MusicBrainz Picard, then sign in with your MusicBrainz account in `Options > General`.
+- In MusicBrainz Picard, add your AcoustID user API key in `Options > Fingerprinting`, then save.
 - Finder sidebar favorites set by `nucleus apply` are visible only after restarting macOS (log out and back in, or reboot).
 
 ## accessible ports

@@ -4,6 +4,8 @@
 - Rebuild once after updating hardware fragments to confirm there are no missing device references.
 - Create the per-user rclone passphrase: from the repo root, run `sops edit src/secrets/users-<username>.yml`, add `rclone_config_pass: <output of openssl rand -hex 64>`, save (sops encrypts automatically), commit the file, then re-run `nucleus apply`. If you already configured rclone remotes without this passphrase, delete `~/.config/rclone/rclone.conf` first so the remotes are re-created with encryption.
 - Run `nucleus-cloud-setup` and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
+- Open MusicBrainz Picard, then sign in with your MusicBrainz account in `Options > General`.
+- In MusicBrainz Picard, add your AcoustID user API key in `Options > Fingerprinting`, then save.
 
 ## accessible ports
 
