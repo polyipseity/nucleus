@@ -1842,34 +1842,34 @@ setup_utm_vms() {
       i=$((i + 1))
       continue
     fi
-    _required_utm_keys='\
-<key>IconCustom</key>\
-<key>Sound</key>\
-<key>ClipboardSharing</key>\
-<key>DirectoryShareReadOnly</key>\
-<key>DownscalingFilter</key>\
-<key>UpscalingFilter</key>\
-<key>NativeResolution</key>\
-<key>MacAddress</key>\
-<key>IsolateFromHost</key>\
-<key>PortForward</key>\
-<key>AdditionalArguments</key>\
-<key>BalloonDevice</key>\
-<key>DebugLog</key>\
-<key>PS2Controller</key>\
-<key>RNGDevice</key>\
-<key>RTCLocalTime</key>\
-<key>TPMDevice</key>\
-<key>MaximumUsbShare</key>\
-<key>UsbBusSupport</key>\
-<key>UsbSharing</key>\
-<key>CPUFlagsAdd</key>\
-<key>CPUFlagsRemove</key>\
-<key>ForceMulticore</key>\
+    _required_utm_keys='
+<key>IconCustom</key>
+<key>Sound</key>
+<key>ClipboardSharing</key>
+<key>DirectoryShareReadOnly</key>
+<key>DownscalingFilter</key>
+<key>UpscalingFilter</key>
+<key>NativeResolution</key>
+<key>MacAddress</key>
+<key>IsolateFromHost</key>
+<key>PortForward</key>
+<key>AdditionalArguments</key>
+<key>BalloonDevice</key>
+<key>DebugLog</key>
+<key>PS2Controller</key>
+<key>RNGDevice</key>
+<key>RTCLocalTime</key>
+<key>TPMDevice</key>
+<key>MaximumUsbShare</key>
+<key>UsbBusSupport</key>
+<key>UsbSharing</key>
+<key>CPUFlagsAdd</key>
+<key>CPUFlagsRemove</key>
+<key>ForceMulticore</key>
 <key>JITCacheSize</key>'
     _missing_utm_keys=''
     for _required_utm_key in $_required_utm_keys; do
-      if ! grep -q "$_required_utm_key" "$_plist_template"; then
+      if ! grep -Fq "$_required_utm_key" "$_plist_template"; then
         _missing_utm_keys="$_missing_utm_keys ${_required_utm_key#<key>}"
       fi
     done
