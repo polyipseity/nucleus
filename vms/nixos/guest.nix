@@ -1,7 +1,8 @@
 # vms/nixos/guest.nix — NixOS guest configuration for nixos-generators.
 #
-# Builds a minimal, development-ready NixOS system suitable for use as a
-# QEMU/KVM or UTM VM guest. Used by scripts/vm-setup.sh on macOS and NixOS
+# Builds a development-ready NixOS system suitable for use as a QEMU/KVM or UTM
+# VM guest, with full parity to the NixOS host configuration (excluding AI models
+# and hypervisor infrastructure).  Used by scripts/vm-setup.sh on macOS and NixOS
 # hosts via:
 #
 #   nix run github:nix-community/nixos-generators -- \
@@ -18,14 +19,41 @@
 # nixos-generators injects the correct disk/bootloader setup automatically for
 # the chosen format (qcow = BIOS + ext4, qcow-efi = UEFI + ext4).
 #
+# Excludes:
+# - src/hosts/NixOS/ai.nix — no AI models inside VMs
+# - src/hosts/NixOS/vms.nix — no hypervisor/nested VM support needed
+# - src/hosts/NixOS/hardware/* — qemu-guest.nix handles virtualized hardware
+# - src/hosts/NixOS/jellyfin.nix — singleton media server not guest-appropriate
+#
 # Source: https://github.com/nix-community/nixos-generators
-{ modulesPath, ... }:
+{
+  lib,
+  modulesPath,
+  pkgs,
+  ...
+}:
 let
   guestUsername = builtins.getEnv "NUCLEUS_VM_GUEST_USERNAME";
   guestPassword = builtins.getEnv "NUCLEUS_VM_GUEST_PASSWORD";
 in
 {
-  imports = [ "${modulesPath}/profiles/qemu-guest.nix" ];
+  imports = [
+    "${modulesPath}/profiles/qemu-guest.nix"
+    # Shared POSIX modules from src/modules/
+    ../../src/modules/core.nix
+    ../../src/modules/gnupg.nix
+    ../../src/modules/posix-base.nix
+    ../../src/modules/posix-security.nix
+    ../../src/modules/posix-sops.nix
+    ../../src/modules/posix-user-shell.nix
+    # NixOS host modules (excluding vms, hardware, ai, jellyfin infrastructure)
+    ../../src/hosts/NixOS/base.nix
+    ../../src/hosts/NixOS/desktop.nix
+    ../../src/hosts/NixOS/networking.nix
+    ../../src/hosts/NixOS/security.nix
+    ../../src/hosts/NixOS/sops.nix
+    ../../src/hosts/NixOS/users.nix
+  ];
 
   networking.hostName = "NixOS";
 
