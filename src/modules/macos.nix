@@ -547,6 +547,88 @@ let
     echo "Managed preference domains purged. Run your apply flow to re-assert declarative defaults."
   '';
 
+  # Single source of truth for managed Finder favorites and ordering.
+  finderSidebarManagedFavorites = [
+    {
+      name = "Applications";
+      url = "file:///Applications";
+    }
+    {
+      name = "Downloads";
+      url = "file://$HOME/Downloads";
+    }
+    {
+      name = "clouds";
+      url = "file://$HOME/clouds";
+    }
+    {
+      name = "dev";
+      url = "file://$HOME/dev";
+    }
+    {
+      name = "Desktop";
+      url = "file://$HOME/Desktop";
+    }
+    {
+      name = "Documents";
+      url = "file://$HOME/Documents";
+    }
+    {
+      name = "Music";
+      url = "file://$HOME/Music";
+    }
+    {
+      name = "Movies";
+      url = "file://$HOME/Movies";
+    }
+    {
+      name = "Pictures";
+      url = "file://$HOME/Pictures";
+    }
+  ];
+
+  # Keep expected sidebar order derivable from the managed favorites list.
+  finderSidebarExpectedOrder = builtins.concatStringsSep "|" (
+    map (favorite: favorite.name) finderSidebarManagedFavorites
+  );
+
+  # Ensure directories referenced by managed Finder favorites exist before add.
+  finderSidebarEnsureDirectoriesShell = ''
+    mkdir -p "$HOME/dev" "$HOME/clouds"
+    mkdir -p "$HOME/Desktop" "$HOME/Documents" "$HOME/Downloads" "$HOME/Movies" "$HOME/Music" "$HOME/Pictures"
+  '';
+
+  # Clear all current sidebar favorites so managed order can be rebuilt.
+  finderSidebarClearShell = ''
+    "$MYSIDES_BIN" list 2>/dev/null | while IFS= read -r _sidebar_line; do
+      _sidebar_name="''${_sidebar_line%% -> *}"
+      [ -n "$_sidebar_name" ] || continue
+      "$MYSIDES_BIN" remove "$_sidebar_name" >/dev/null 2>&1 || true
+    done
+  '';
+
+  # Strict add mode for configureFinderSidebar: preserve per-item failure logs.
+  finderSidebarAddManagedStrictShell = builtins.concatStringsSep "\n" (
+    map (
+      favorite: "add_favorite ${lib.escapeShellArg favorite.name} ${lib.escapeShellArg favorite.url}"
+    ) finderSidebarManagedFavorites
+  );
+
+  # Best-effort add mode for refreshFinderServices: preserve soft-fail behavior.
+  finderSidebarAddManagedBestEffortShell = builtins.concatStringsSep "\n" (
+    map (
+      favorite:
+      ''"$MYSIDES_BIN" add ${lib.escapeShellArg favorite.name} ${lib.escapeShellArg favorite.url} >/dev/null 2>&1 || true''
+    ) finderSidebarManagedFavorites
+  );
+
+  # Remove Finder defaults that can reappear after daemon restarts.
+  finderSidebarRemoveDefaultExtrasShell = ''
+    "$MYSIDES_BIN" remove "/" >/dev/null 2>&1 || true
+    "$MYSIDES_BIN" remove "$(id -un)" >/dev/null 2>&1 || true
+    "$MYSIDES_BIN" remove ".Trash" >/dev/null 2>&1 || true
+  '';
+
   gcWeekly = pkgs.writeShellScript "gc-weekly" ''
     set -eu
 
@@ -1185,8 +1267,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       set -eu
 
-      mkdir -p "$HOME/dev" "$HOME/clouds"
-      mkdir -p "$HOME/Desktop" "$HOME/Documents" "$HOME/Downloads" "$HOME/Movies" "$HOME/Music" "$HOME/Pictures"
+      ${finderSidebarEnsureDirectoriesShell}
 
       MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
 
@@ -1209,29 +1290,15 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       # Clear current favorites first so the final list order is deterministic.
       # `mysides list` is now considered healthy in this environment.
-      $MYSIDES_BIN list 2>/dev/null | while IFS= read -r _sidebar_line; do
-        _sidebar_name="''${_sidebar_line%% -> *}"
-        [ -n "$_sidebar_name" ] || continue
-        "$MYSIDES_BIN" remove "$_sidebar_name" >/dev/null 2>&1 || true
-      done
+      ${finderSidebarClearShell}
 
       # Rebuild the exact managed order requested for Finder favorites.
-      add_favorite "Applications" "file:///Applications"
-      add_favorite "Downloads" "file://$HOME/Downloads"
-      add_favorite "clouds" "file://$HOME/clouds"
-      add_favorite "dev" "file://$HOME/dev"
-      add_favorite "Desktop" "file://$HOME/Desktop"
-      add_favorite "Documents" "file://$HOME/Documents"
-      add_favorite "Music" "file://$HOME/Music"
-      add_favorite "Movies" "file://$HOME/Movies"
-      add_favorite "Pictures" "file://$HOME/Pictures"
+      ${finderSidebarAddManagedStrictShell}
 
       # Remove known default extras that Finder may retain across restarts.
-      "$MYSIDES_BIN" remove "/" >/dev/null 2>&1 || true
-      "$MYSIDES_BIN" remove "$(id -un)" >/dev/null 2>&1 || true
-      "$MYSIDES_BIN" remove ".Trash" >/dev/null 2>&1 || true
+      ${finderSidebarRemoveDefaultExtrasShell}
 
-      _finder_expected_order="Applications|Downloads|clouds|dev|Desktop|Documents|Music|Movies|Pictures"
+      _finder_expected_order="${finderSidebarExpectedOrder}"
       _finder_actual_order="$($MYSIDES_BIN list 2>/dev/null | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n 9 | /usr/bin/paste -sd'|' -)"
       if [ "$_finder_actual_order" != "$_finder_expected_order" ]; then
         echo "macos: warning — mysides reported sidebar order mismatch (expected: $_finder_expected_order, actual: $_finder_actual_order)." >&2
@@ -1307,25 +1374,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
           # Re-apply managed favorites to keep deterministic output.
           MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
           if [ -x "$MYSIDES_BIN" ]; then
-            $MYSIDES_BIN list 2>/dev/null | while IFS= read -r _sidebar_line; do
-              _sidebar_name="''${_sidebar_line%% -> *}"
-              [ -n "$_sidebar_name" ] || continue
-              "$MYSIDES_BIN" remove "$_sidebar_name" >/dev/null 2>&1 || true
-            done
-
-            "$MYSIDES_BIN" add "Applications" "file:///Applications" >/dev/null 2>&1 || true
-            "$MYSIDES_BIN" add "Downloads" "file://$HOME/Downloads" >/dev/null 2>&1 || true
-            "$MYSIDES_BIN" add "clouds" "file://$HOME/clouds" >/dev/null 2>&1 || true
-            "$MYSIDES_BIN" add "dev" "file://$HOME/dev" >/dev/null 2>&1 || true
-            "$MYSIDES_BIN" add "Desktop" "file://$HOME/Desktop" >/dev/null 2>&1 || true
-            "$MYSIDES_BIN" add "Documents" "file://$HOME/Documents" >/dev/null 2>&1 || true
-            "$MYSIDES_BIN" add "Music" "file://$HOME/Music" >/dev/null 2>&1 || true
-            "$MYSIDES_BIN" add "Movies" "file://$HOME/Movies" >/dev/null 2>&1 || true
-            "$MYSIDES_BIN" add "Pictures" "file://$HOME/Pictures" >/dev/null 2>&1 || true
-
-            "$MYSIDES_BIN" remove "/" >/dev/null 2>&1 || true
-            "$MYSIDES_BIN" remove "$(id -un)" >/dev/null 2>&1 || true
-            "$MYSIDES_BIN" remove ".Trash" >/dev/null 2>&1 || true
+            ${finderSidebarClearShell}
+            ${finderSidebarAddManagedBestEffortShell}
+            ${finderSidebarRemoveDefaultExtrasShell}
           fi
         '';
 
