@@ -219,6 +219,80 @@ let
       sanitizeICloudManagedRoots [ ]
   );
 
+  # Shared shell body for iCloud exclusion convergence, used by both the
+  # synchronous activation hook and the daily launchd maintenance script.
+  # Keep this as one source of truth so behavior stays aligned.
+  icloudExclusionsShellBody = ''
+    if [ "$excluded_dirs" = "[]" ]; then
+      exit 0
+    fi
+
+    apply_exclusions() {
+      local count=0
+      local start_time
+      start_time=$(date +%s)
+
+      while IFS= read -r rel_root; do
+        [ -z "$rel_root" ] && continue
+        icloud_root="$HOME/$rel_root"
+        [ -d "$icloud_root" ] || continue
+
+        find_args=()
+        first=1
+        while IFS= read -r dir_name; do
+          [ -z "$dir_name" ] && continue
+          if [ "$first" -eq 1 ]; then
+            find_args=( "(" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
+            first=0
+          else
+            find_args+=( "-o" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
+          fi
+        done < <(echo "$excluded_dirs" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
+
+        if [ "$first" -eq 1 ]; then
+          continue
+        fi
+
+        find_args+=( ")" )
+
+        count_batch=$(${pkgs.findutils}/bin/find "$icloud_root" -type d "''${find_args[@]}" -print 2>/dev/null | /usr/bin/wc -l | /usr/bin/tr -d ' ') || count_batch=0
+        count=$(( count + count_batch ))
+      done < <(echo "$managed_roots" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
+
+      end_time=$(date +%s)
+      elapsed=$(( end_time - start_time ))
+
+      if [ "$count" -gt 0 ]; then
+        echo "macos: iCloud exclusion applied to $count directories in ''${elapsed}s" >&2
+      fi
+    }
+
+    apply_exclusions
+  '';
+
+  # Shared FDA warning printer used by domain-specific defaults hooks.
+  mkFdaWarningFunction = target: ''
+    print_fda_warning() {
+      if [ "$fda_warning_emitted" -eq 1 ]; then
+        return
+      fi
+
+      bold="$(printf '\033[1m')"
+      red="$(printf '\033[31m')"
+      reset="$(printf '\033[0m')"
+      yellow="$(printf '\033[33m')"
+
+      printf '%s%sERROR: Full Disk Access Required%s\n' "$red" "$bold" "$reset" >&2
+      printf '%sNucleus cannot write ${target} from this terminal session.%s\n' "$yellow" "$reset" >&2
+      printf '%s\n' "To fix this:" >&2
+      printf '  1. Open %sSystem Settings > Privacy & Security > Full Disk Access%s\n' "$bold" "$reset" >&2
+      printf '  2. Toggle %sOn%s for your terminal emulator\n' "$bold" "$reset" >&2
+      printf '  3. If already enabled, remove and re-add it, then restart the terminal\n' >&2
+
+      fda_warning_emitted=1
+    }
+  '';
+
   # Standalone script for the daily icloud-exclusions LaunchAgent.
   # Uses bash (from the Nix store) rather than /bin/sh because the array-based
   # find-predicate builder and process substitution (< <(...)) require bash
@@ -235,57 +309,7 @@ let
       excluded_dirs=${lib.escapeShellArg icloudExcludedDirsJson}
       managed_roots=${lib.escapeShellArg icloudManagedRootsJson}
 
-      if [ "$excluded_dirs" = "[]" ]; then
-        exit 0
-      fi
-
-      apply_exclusions() {
-        local count=0
-        local start_time
-        start_time=$(date +%s)
-
-        while IFS= read -r rel_root; do
-          [ -z "$rel_root" ] && continue
-          icloud_root="$HOME/$rel_root"
-          [ -d "$icloud_root" ] || continue
-
-          find_args=()
-          first=1
-          while IFS= read -r dir_name; do
-            [ -z "$dir_name" ] && continue
-            if [ "$first" -eq 1 ]; then
-              find_args=( "(" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
-              first=0
-            else
-              find_args+=( "-o" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
-            fi
-          # jq error output intentionally suppressed: excluded_dirs is always
-          # valid JSON baked in at eval time; stderr noise from a bad-state jq
-          # would be confusing in launchd logs without being actionable.
-          done < <(echo "$excluded_dirs" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
-
-          if [ "$first" -eq 1 ]; then
-            continue
-          fi
-
-          find_args+=( ")" )
-
-          # find 2>/dev/null: "permission denied" on protected iCloud internals
-          # is expected and benign; the xattr is applied to every accessible
-          # directory, and count tracks all successfully marked dirs.
-          count_batch=$(${pkgs.findutils}/bin/find "$icloud_root" -type d "''${find_args[@]}" -print 2>/dev/null | /usr/bin/wc -l | /usr/bin/tr -d ' ') || count_batch=0
-          count=$(( count + count_batch ))
-        done < <(echo "$managed_roots" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
-
-        end_time=$(date +%s)
-        elapsed=$(( end_time - start_time ))
-
-        if [ "$count" -gt 0 ]; then
-          echo "macos: iCloud exclusion applied to $count directories in ''${elapsed}s" >&2
-        fi
-      }
-
-      apply_exclusions
+      ${icloudExclusionsShellBody}
     '';
   };
 
@@ -1000,53 +1024,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       if [ "$excluded_dirs" = "[]" ]; then
         echo "macos: iCloud exclusions skipped (no excluded directory names configured)." >&2
-        exit 0
+      else
+        ${icloudExclusionsShellBody}
       fi
-
-      apply_exclusions() {
-        local count=0
-        local start_time
-        start_time=$(date +%s)
-
-        while IFS= read -r rel_root; do
-          [ -z "$rel_root" ] && continue
-          icloud_root="$HOME/$rel_root"
-          [ -d "$icloud_root" ] || continue
-
-          # Build a find expression that marks matches and prunes them from
-          # traversal so large dependency/cache trees are never descended into.
-          find_args=()
-          first=1
-          while IFS= read -r dir_name; do
-            [ -z "$dir_name" ] && continue
-            if [ "$first" -eq 1 ]; then
-              find_args=( "(" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
-              first=0
-            else
-              find_args+=( "-o" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
-            fi
-          done < <(echo "$excluded_dirs" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
-
-          if [ "$first" -eq 1 ]; then
-            continue
-          fi
-
-          find_args+=( ")" )
-
-          count_batch=$(${pkgs.findutils}/bin/find "$icloud_root" -type d "''${find_args[@]}" -print 2>/dev/null | /usr/bin/wc -l | /usr/bin/tr -d ' ') || count_batch=0
-
-          count=$(( count + count_batch ))
-        done < <(echo "$managed_roots" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
-
-        end_time=$(date +%s)
-        elapsed=$(( end_time - start_time ))
-
-        if [ "$count" -gt 0 ]; then
-          echo "macos: iCloud exclusion applied to $count directories in ''${elapsed}s" >&2
-        fi
-      }
-
-      apply_exclusions
     '';
 
     # -------------------------------------------------------------------------
@@ -1103,25 +1083,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     configureSafariDefaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
       fda_warning_emitted=0
 
-      print_fda_warning() {
-        if [ "$fda_warning_emitted" -eq 1 ]; then
-          return
-        fi
-
-        bold="$(printf '\033[1m')"
-        red="$(printf '\033[31m')"
-        reset="$(printf '\033[0m')"
-        yellow="$(printf '\033[33m')"
-
-        printf '%s%sERROR: Full Disk Access Required%s\n' "$red" "$bold" "$reset" >&2
-        printf '%sNucleus cannot write protected Safari preferences from this terminal session.%s\n' "$yellow" "$reset" >&2
-        printf '%s\n' "To fix this:" >&2
-        printf '  1. Open %sSystem Settings > Privacy & Security > Full Disk Access%s\n' "$bold" "$reset" >&2
-        printf '  2. Toggle %sOn%s for your terminal emulator\n' "$bold" "$reset" >&2
-        printf '  3. If already enabled, remove and re-add it, then restart the terminal\n' >&2
-
-        fda_warning_emitted=1
-      }
+      ${mkFdaWarningFunction "protected Safari preferences"}
 
       set_safari_default() {
         key="$1"
@@ -1154,25 +1116,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     configureUniversalAccessDefaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
       fda_warning_emitted=0
 
-      print_fda_warning() {
-        if [ "$fda_warning_emitted" -eq 1 ]; then
-          return
-        fi
-
-        bold="$(printf '\033[1m')"
-        red="$(printf '\033[31m')"
-        reset="$(printf '\033[0m')"
-        yellow="$(printf '\033[33m')"
-
-        printf '%s%sERROR: Full Disk Access Required%s\n' "$red" "$bold" "$reset" >&2
-        printf '%sNucleus cannot write Accessibility preferences from this terminal session.%s\n' "$yellow" "$reset" >&2
-        printf '%s\n' "To fix this:" >&2
-        printf '  1. Open %sSystem Settings > Privacy & Security > Full Disk Access%s\n' "$bold" "$reset" >&2
-        printf '  2. Toggle %sOn%s for your terminal emulator\n' "$bold" "$reset" >&2
-        printf '  3. If already enabled, remove and re-add it, then restart the terminal\n' >&2
-
-        fda_warning_emitted=1
-      }
+      ${mkFdaWarningFunction "Accessibility preferences"}
 
       set_default() {
         domain="$1"
