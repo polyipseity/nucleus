@@ -126,15 +126,6 @@ prune_stale_wallpapers() {
     return 0
   fi
 
-  managed_names_tmp=$(mktemp)
-  trap 'rm -f "$managed_names_tmp"' EXIT INT TERM
-
-  for asset in "$assets_dir"/*.sops; do
-    if [ -f "$asset" ]; then
-      basename "$asset" .sops >>"$managed_names_tmp"
-    fi
-  done
-
   for candidate in "$output_dir"/*; do
     if [ ! -f "$candidate" ]; then
       continue
@@ -147,7 +138,7 @@ prune_stale_wallpapers() {
         ;;
     esac
 
-    if ! grep -Fxq "$candidate_name" "$managed_names_tmp"; then
+    if [ ! -e "$assets_dir/$candidate_name.sops" ]; then
       if ! rm -f "$candidate" 2>/dev/null; then
         # Non-fatal: some files under ~/Pictures may be protected by Finder
         # metadata/ACL flags (for example iCloud-managed placeholders). GC
@@ -274,6 +265,11 @@ prune_vm_artifacts_if_present() {
     return 0
   fi
 
+  # If the VM images directory does not exist, there is nothing to clean.
+  if [ ! -d "$images_dir" ]; then
+    return 0
+  fi
+
   # Load the list of VMs declared in the manifest.
   if [ ! -f "$manifest" ]; then
     printf '%s\n' "gc: manifest '$manifest' not found; skipping VM artifact prune" >&2
@@ -287,54 +283,50 @@ prune_vm_artifacts_if_present() {
 
   # Build a list of enabled VM names (disabled VMs are treated as stale).
   declared_names_tmp=$(mktemp)
-  trap 'rm -f "$declared_names_tmp"' EXIT INT TERM
 
   if ! jq -r '.VMs[] | select(.enabled == true) | .name' "$manifest" >"$declared_names_tmp" 2>/dev/null; then
+    rm -f "$declared_names_tmp"
     printf '%s\n' "gc: failed to parse enabled VM names from '$manifest'; skipping VM artifact prune" >&2
     return 1
   fi
 
   # Remove temporary Packer build directories.
-  if [ -d "$images_dir" ]; then
-    for build_dir in "$images_dir"/*-build; do
-      if [ -d "$build_dir" ]; then
-        if rm -rf "$build_dir" 2>/dev/null; then
-          printf '%s\n' "gc: removed temporary VM build directory '$(basename "$build_dir")'"
-        else
-          printf '%s\n' "gc: warning: failed to remove temporary VM build directory '$build_dir'" >&2
-        fi
+  for build_dir in "$images_dir"/*-build; do
+    if [ -d "$build_dir" ]; then
+      if rm -rf "$build_dir" 2>/dev/null; then
+        printf '%s\n' "gc: removed temporary VM build directory '$(basename "$build_dir")'"
+      else
+        printf '%s\n' "gc: warning: failed to remove temporary VM build directory '$build_dir'" >&2
       fi
-    done
-  fi
+    fi
+  done
 
   # Remove cached Windows installer ISOs (will be re-downloaded if needed).
-  if [ -d "$images_dir" ]; then
-    for iso_file in "$images_dir"/*-installer.iso; do
-      if [ -f "$iso_file" ]; then
-        if rm -f "$iso_file" 2>/dev/null; then
-          printf '%s\n' "gc: removed cached Windows installer '$(basename "$iso_file")'"
-        else
-          printf '%s\n' "gc: warning: failed to remove cached Windows installer '$iso_file'" >&2
-        fi
+  for iso_file in "$images_dir"/*-installer.iso; do
+    if [ -f "$iso_file" ]; then
+      if rm -f "$iso_file" 2>/dev/null; then
+        printf '%s\n' "gc: removed cached Windows installer '$(basename "$iso_file")'"
+      else
+        printf '%s\n' "gc: warning: failed to remove cached Windows installer '$iso_file'" >&2
       fi
-    done
-  fi
+    fi
+  done
 
   # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
-  if [ -d "$images_dir" ]; then
-    for qcow2_file in "$images_dir"/*.qcow2; do
-      if [ -f "$qcow2_file" ]; then
-        qcow2_name=$(basename "$qcow2_file" .qcow2)
-        if ! grep -Fxq "$qcow2_name" "$declared_names_tmp"; then
-          if rm -f "$qcow2_file" 2>/dev/null; then
-            printf '%s\n' "gc: removed stale VM disk image '$(basename "$qcow2_file")'"
-          else
-            printf '%s\n' "gc: warning: failed to remove stale VM disk image '$qcow2_file'" >&2
-          fi
+  for qcow2_file in "$images_dir"/*.qcow2; do
+    if [ -f "$qcow2_file" ]; then
+      qcow2_name=$(basename "$qcow2_file" .qcow2)
+      if ! grep -Fxq "$qcow2_name" "$declared_names_tmp"; then
+        if rm -f "$qcow2_file" 2>/dev/null; then
+          printf '%s\n' "gc: removed stale VM disk image '$(basename "$qcow2_file")'"
+        else
+          printf '%s\n' "gc: warning: failed to remove stale VM disk image '$qcow2_file'" >&2
         fi
       fi
-    done
-  fi
+    fi
+  done
+
+  rm -f "$declared_names_tmp"
 }
 
 # Step 1: expire HM generations before Nix store GC so the store can reclaim
