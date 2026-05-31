@@ -418,6 +418,7 @@ $wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wal
 $machineSshHostKeyPubPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key.pub"
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\")).Path
 $qtPassSettingsPath = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\qtpass\settings.json"
+$picardDefaultsPath = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\picard\Picard.ini"
 $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 
 # Expose the repo root to any subprocesses (e.g. DSC script resources) that
@@ -568,7 +569,7 @@ Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VSCodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords
-Sync-PicardConfig -Enabled:$EnablePicardParity -Users $selectedUserRecords
+Sync-PicardConfig -Enabled:$EnablePicardParity -Users $selectedUserRecords -DefaultsFilePath $picardDefaultsPath
 Sync-QtPassConfig -Enabled:$EnableQtPassParity -SettingsPath $qtPassSettingsPath -Users $selectedUserRecords
 # Default to false if devReposEnabled not yet set (user not in registry or no repos configured).
 if ($null -eq $EnableDevReposParity) {

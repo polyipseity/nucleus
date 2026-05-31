@@ -130,17 +130,11 @@ let
   obsidianManagedSettings = managedAppSettings "obsidian" obsidianDefaultSettings;
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;
 
-  # Picard stores user preferences in native INI format (Picard.ini) under the
-  # [setting] section. Keep declarative defaults small and non-sensitive, then
-  # merge user overrides from users.json and upsert managed keys in-place so
-  # unmanaged keys (for example private API or plugin state) are preserved.
-  picardDefaultSettings = {
-    completeness_ignore_data = false;
-    completeness_ignore_pregap = false;
-    release_ars = true;
-  };
-
-  picardManagedSettings = managedAppSettings "picard" picardDefaultSettings;
+  # Picard baseline defaults are sourced from the canonical native INI file.
+  # We apply these defaults with merge-overwrite semantics, then layer
+  # user-specific [setting] overrides from users.json.
+  picardDefaultsIniText = builtins.readFile ./configs/picard/Picard.ini;
+  picardUserSettings = userAppSettings "picard";
 
   renderIniScalarValue =
     value:
@@ -159,10 +153,10 @@ let
     in
     ''_upsert_ini_key "${confVar}" "${section}" "${name}" ${valueArg}'';
 
-  picardIniCommands = builtins.concatStringsSep "\n" (
+  picardOverrideCommands = builtins.concatStringsSep "\n" (
     lib.mapAttrsToList (
       name: value: renderPicardIniCommand "$_picard_conf" "setting" name value
-    ) picardManagedSettings
+    ) picardUserSettings
   );
 
   renderQtPassValue =
@@ -376,8 +370,9 @@ in
     '';
 
     # Picard reads native INI settings from ~/.config/MusicBrainz/Picard.ini
-    # on macOS and Linux. Merge-overwrite only managed keys into [setting]
-    # while preserving all unmanaged keys and sections.
+    # on macOS and Linux. Merge-overwrite defaults from the canonical
+    # Picard.ini baseline file, then layer per-user [setting] overrides.
+    # Always preserve unmanaged keys and sections.
     home.activation.configurePicardSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
             _upsert_ini_key() {
               _conf="$1"
@@ -444,8 +439,52 @@ in
               fi
             }
 
+            _apply_picard_defaults_from_file() {
+              _defaults="$1"
+              _conf="$2"
+
+              ${pkgs.gawk}/bin/awk '
+                BEGIN { section = "" }
+
+                /^[[:space:]]*([;#]|$)/ { next }
+
+                /^\[[^]]+\][[:space:]]*$/ {
+                  section = $0
+                  sub(/^\[/, "", section)
+                  sub(/\][[:space:]]*$/, "", section)
+                  next
+                }
+
+                {
+                  if (section == "") {
+                    next
+                  }
+
+                  pos = index($0, "=")
+                  if (pos == 0) {
+                    next
+                  }
+
+                  key = substr($0, 1, pos - 1)
+                  value = substr($0, pos + 1)
+                  gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+
+                  if (key != "") {
+                    print section "\t" key "\t" value
+                  }
+                }
+              ' "$_defaults" | while IFS=$'\t' read -r _section _key _value; do
+                _upsert_ini_key "$_conf" "$_section" "$_key" "$_value"
+              done
+            }
+
             _picard_conf="''${XDG_CONFIG_HOME:-$HOME/.config}/MusicBrainz/Picard.ini"
-            ${picardIniCommands}
+            _picard_defaults_file="$(mktemp "''${TMPDIR:-/tmp}/picard-defaults.XXXXXX.ini")"
+            trap 'rm -f "$_picard_defaults_file"' EXIT
+            printf '%s' ${lib.escapeShellArg picardDefaultsIniText} > "$_picard_defaults_file"
+
+            _apply_picard_defaults_from_file "$_picard_defaults_file" "$_picard_conf"
+            ${picardOverrideCommands}
     '';
 
     # Obsidian stores app-global settings in obsidian.json alongside dynamic
