@@ -385,7 +385,12 @@ in
 
               if [ -f "$_conf" ]; then
                 _tmp="$(mktemp "$_conf.XXXXXX")"
-                ${pkgs.gawk}/bin/awk -v section="$_section" -v key="$_key" -v value="$_value" '
+                # Pass value through ENVIRON instead of -v to prevent AWK from
+                # interpreting escape sequences (e.g. \0, \b, \x41) that appear
+                # literally in Picard's @Variant(…) serialized Qt values.
+                # AWK -v treats the argument as a string constant and processes
+                # backslash escapes; ENVIRON reads the raw bytes unchanged.
+                _UPSERT_VALUE="$_value" ${pkgs.gawk}/bin/awk -v section="$_section" -v key="$_key" '
                   function write_pair() {
                     if (wrote == 0) {
                       print key "=" value
@@ -395,6 +400,7 @@ in
                   BEGIN {
                     in_target = 0
                     section_seen = 0
+                    value = ENVIRON["_UPSERT_VALUE"]
                     wrote = 0
                   }
                   {
