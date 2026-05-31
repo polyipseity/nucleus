@@ -1,7 +1,7 @@
 ---
-description: "Use when adding, editing, or reviewing virtual machine provisioning in scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, vms/nixos/, vms/windows/, or vms/macos/."
+description: "Use when adding, editing, or reviewing virtual machine provisioning in scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, src/vms/nixos/, src/vms/windows/, or src/vms/macos/."
 name: "VM Management"
-applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/MacBook/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, tests/nix/vm-setup-tests.nix, vms/nixos/guest.nix, vms/nixos/packer.pkr.hcl, vms/windows/packer.pkr.hcl, vms/windows/Autounattend.xml, vms/macos/packer.pkr.hcl"
+applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/MacBook/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, tests/nix/vm-setup-tests.nix, src/vms/nixos/guest.nix, src/vms/nixos/packer.pkr.hcl, src/vms/windows/packer.pkr.hcl, src/vms/windows/Autounattend.xml, src/vms/macos/packer.pkr.hcl"
 ---
 
 # VM Management
@@ -30,9 +30,9 @@ host OS. The canonical values are:
 
 Apply this convention when adding or modifying:
 
-- `vms/nixos/guest.nix` — set `networking.hostName = "NixOS"`
-- `vms/nixos/packer.pkr.hcl` — set `networking.hostName = "NixOS"` inline
-- `vms/windows/Autounattend.xml` — set `<ComputerName>Windows</ComputerName>`
+- `src/vms/nixos/guest.nix` — set `networking.hostName = "NixOS"`
+- `src/vms/nixos/packer.pkr.hcl` — set `networking.hostName = "NixOS"` inline
+- `src/vms/windows/Autounattend.xml` — set `<ComputerName>Windows</ComputerName>`
 - `src/modules/VMs.json` — set `display` to the canonical PascalCase name
 
 ## Guest Credential Convention
@@ -62,12 +62,12 @@ Required wiring and parity checks:
   `vmGuest` references from `src/hosts/Windows/users.json`, decrypt the same
   per-user secret file, and pass the resolved credentials into every guest
   builder/template.
-- NixOS guest paths: both `vms/nixos/guest.nix` and
-  `vms/nixos/packer.pkr.hcl` must consume the injected credentials.
-- Windows guest paths: `vms/windows/Autounattend.xml` placeholders and
-  `vms/windows/packer.pkr.hcl` variables must stay in sync with runtime
+- NixOS guest paths: both `src/vms/nixos/guest.nix` and
+  `src/vms/nixos/packer.pkr.hcl` must consume the injected credentials.
+- Windows guest paths: `src/vms/windows/Autounattend.xml` placeholders and
+  `src/vms/windows/packer.pkr.hcl` variables must stay in sync with runtime
   rendering.
-- macOS guest path: `vms/macos/packer.pkr.hcl` must provision/update the guest
+- macOS guest path: `src/vms/macos/packer.pkr.hcl` must provision/update the guest
   account from the same resolved secret-backed values.
 - Credential drift must invalidate stale VM artifacts on every supported build
   path so changing the secret-backed username or password actually rebuilds or
@@ -188,10 +188,10 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 
 | File                                                  | Purpose                                                        |
 | ----------------------------------------------------- | -------------------------------------------------------------- |
-| `vms/nixos/guest.nix`                                 | NixOS guest configuration for `nixos-generators` (macOS/NixOS) |
-| `vms/nixos/packer.pkr.hcl`                            | Packer template for NixOS guest on Windows hosts               |
-| `vms/windows/packer.pkr.hcl`                          | Packer template for Windows 11 guest on all hosts              |
-| `vms/windows/Autounattend.xml`                        | Windows 11 answer file (unattended install, TPM bypass, WinRM) |
+| `src/vms/nixos/guest.nix`                             | NixOS guest configuration for `nixos-generators` (macOS/NixOS) |
+| `src/vms/nixos/packer.pkr.hcl`                        | Packer template for NixOS guest on Windows hosts               |
+| `src/vms/windows/packer.pkr.hcl`                      | Packer template for Windows 11 guest on all hosts              |
+| `src/vms/windows/Autounattend.xml`                    | Windows 11 answer file (unattended install, TPM bypass, WinRM) |
 | `scripts/vm-setup.sh`                                 | Unified build+provision script for macOS and NixOS hosts       |
 | `scripts/vm-setup.ps1`                                | Windows wrapper calling `Invoke-VMSetup.ps1`                   |
 | `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1` | Build + provision logic for Windows hosts                      |
@@ -200,19 +200,19 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 
 **NixOS guest on macOS/NixOS** (`nucleus-vm-setup --nixos-only`):
 
-- Uses `nix run github:nix-community/nixos-generators` to build from `vms/nixos/guest.nix`.
+- Uses `nix run github:nix-community/nixos-generators` to build from `src/vms/nixos/guest.nix`.
 - Architecture-aware: `qcow-efi` (UEFI) on aarch64 hosts (UTM on Apple Silicon), `qcow` (BIOS) on x86_64.
 - No Packer required; just `nix` command which is always present.
 
 **NixOS guest on Windows** (`nucleus-vm-setup --nixos-only`):
 
-- Uses Packer with `vms/nixos/packer.pkr.hcl` and QEMU builder.
+- Uses Packer with `src/vms/nixos/packer.pkr.hcl` and QEMU builder.
 - Downloads NixOS minimal ISO, boots via QEMU, sets root password, SSH-installs NixOS.
 - `whpx` accelerator strongly recommended (Windows Hypervisor Platform); `tcg` works but is very slow.
 
 **Windows 11 guest (all hosts)** (`nucleus-vm-setup --windows-only --windows-iso /path/to/Win11.iso`):
 
-- Uses Packer with `vms/windows/packer.pkr.hcl` and QEMU builder.
+- Uses Packer with `src/vms/windows/packer.pkr.hcl` and QEMU builder.
 - Requires a Windows 11 ISO path via `--windows-iso` **or** a `windowsIsoUrl` field in the `VMs.json`
   windows entry. When `windowsIsoUrl` is set, the ISO is downloaded automatically to
   `~/virtual machines/images/<name>-installer.iso` on first run (subsequent runs reuse the cache).

@@ -28,7 +28,7 @@
 # Environment variables:
 #   VM_DIR_OVERRIDE  override the default ~/virtual machines path
 #   NUCLEUS_MIDO_SCRIPT      override the Mido script path (default: vendored script)
-#   NUCLEUS_MIDO_PATCH_FILE  override runtime patch file path (default: vms/windows/patches/mido-iso-link.patch)
+#   NUCLEUS_MIDO_PATCH_FILE  override runtime patch file path (default: src/vms/windows/patches/mido-iso-link.patch)
 #
 # Prerequisites:
 #   NixOS guest    : nix (for nix run github:nix-community/nixos-generators).
@@ -53,7 +53,7 @@ set -eu
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 MANIFEST="$REPO_ROOT/src/modules/VMs.json"
-VMS_DIR="$REPO_ROOT/vms"
+VMS_DIR="$REPO_ROOT/src/vms"
 
 dry_run=false
 nixos_only=false
@@ -897,7 +897,7 @@ download_windows_iso_mido() {
   # Keep vendor submodules immutable by patching a temporary copy only.
   # This preserves a clean submodule tree while allowing fast compatibility
   # updates when Microsoft changes download-link HTML structures.
-  _mido_patch_file="${NUCLEUS_MIDO_PATCH_FILE:-$REPO_ROOT/vms/windows/patches/mido-iso-link.patch}"
+  _mido_patch_file="${NUCLEUS_MIDO_PATCH_FILE:-$REPO_ROOT/src/vms/windows/patches/mido-iso-link.patch}"
   _mido_script_tmp=''
   _mido_exec_script="$_mido_script"
   if [ -f "$_mido_patch_file" ]; then
@@ -1125,7 +1125,7 @@ download_windows_iso_fido_url_nonwindows() {
 
 # build_windows_image NAME DISK_GIB
 #   Builds the Windows 11 guest image using Packer and the Autounattend.xml
-#   answer file at vms/windows/Autounattend.xml.
+#   answer file at src/vms/windows/Autounattend.xml.
 build_windows_image() {
   _name="$1"
   _disk_gib="$2"

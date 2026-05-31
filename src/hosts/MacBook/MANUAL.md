@@ -70,6 +70,6 @@
 - `nucleus-replica-reset` — clear local replica state without touching remote data.
 - `nucleus-update` — run the managed repository update flow.
 - `nucleus-vm-setup` — build (if needed) and provision VMs declared in `src/modules/VMs.json`; run once per machine or when adding a VM.
-  - **macOS guest** (tart): fully automatic on Apple Silicon when `type: "macOS"` exists in `VMs.json`; Packer Tart builds the VM via `vms/macos/packer.pkr.hcl`. Requires `tart` (installed via `brew install cirruslabs/cli/tart`). Start with `tart run MacBook [--no-graphics]`.
+  - **macOS guest** (tart): fully automatic on Apple Silicon when `type: "macOS"` exists in `VMs.json`; Packer Tart builds the VM via `src/vms/macos/packer.pkr.hcl`. Requires `tart` (installed via `brew install cirruslabs/cli/tart`). Start with `tart run MacBook [--no-graphics]`.
   - **NixOS guest** (`--nixos-only`): fully automatic; `nixos-generators` builds the QCOW2 image (no extra tools needed).
   - **Windows 11 guest** (`--windows-only`): ISO is auto-downloaded on first run via Mido on POSIX hosts and Fido on Windows hosts; pass `--windows-iso /path/to/Win11.iso` to skip downloader resolution.

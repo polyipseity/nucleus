@@ -4,7 +4,7 @@
 # Phase 1 (build): builds pre-built QCOW2 images using Packer for each VM
 # declared in src\modules\VMs.json, if absent at
 # %USERPROFILE%\virtual machines\images\<name>.qcow2.  For NixOS guests on
-# Windows, Packer downloads the NixOS ISO automatically (vms\nixos\packer.pkr.hcl).
+# Windows, Packer downloads the NixOS ISO automatically (src\vms\nixos\packer.pkr.hcl).
 # For Windows 11 guests, a local ISO is required (-WindowsIso).
 #
 # Phase 2 (provision): creates QEMU start scripts and places disk images for
@@ -174,7 +174,7 @@ function Invoke-VMSetup {
     }
 
     $vmDef     = Get-Content $manifest -Raw | ConvertFrom-Json
-    $vmsDir    = Join-Path $RepoRoot 'vms'
+    $vmsDir    = Join-Path $RepoRoot 'src\vms'
     $vmDir     = Join-Path $env:USERPROFILE 'virtual machines'
     $imagesDir = Join-Path $vmDir 'images'
     try {
@@ -662,7 +662,7 @@ function Test-Qcow2Image {
 # On macOS/NixOS, scripts/vm-setup.sh uses nixos-generators directly (faster,
 # no Packer needed).  On Windows, Packer with the QEMU builder downloads the
 # NixOS minimal ISO and runs a shell provisioner to install NixOS
-# (vms\nixos\packer.pkr.hcl).
+# (src\vms\nixos\packer.pkr.hcl).
 function Invoke-BuildNixosImage {
     [CmdletBinding()]
     param(

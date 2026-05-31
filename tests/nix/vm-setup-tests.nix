@@ -230,24 +230,24 @@ let
     let
       checks = [
         {
-          cond = builtins.pathExists ../../vms/nixos/guest.nix;
-          msg = "vms/nixos/guest.nix must exist for nixos-generators builds";
+          cond = builtins.pathExists ../../src/vms/nixos/guest.nix;
+          msg = "src/vms/nixos/guest.nix must exist for nixos-generators builds";
         }
         {
-          cond = builtins.pathExists ../../vms/nixos/packer.pkr.hcl;
-          msg = "vms/nixos/packer.pkr.hcl must exist for Windows-host NixOS builds";
+          cond = builtins.pathExists ../../src/vms/nixos/packer.pkr.hcl;
+          msg = "src/vms/nixos/packer.pkr.hcl must exist for Windows-host NixOS builds";
         }
         {
-          cond = builtins.pathExists ../../vms/windows/packer.pkr.hcl;
-          msg = "vms/windows/packer.pkr.hcl must exist for Windows 11 builds";
+          cond = builtins.pathExists ../../src/vms/windows/packer.pkr.hcl;
+          msg = "src/vms/windows/packer.pkr.hcl must exist for Windows 11 builds";
         }
         {
-          cond = builtins.pathExists ../../vms/windows/Autounattend.xml;
-          msg = "vms/windows/Autounattend.xml must exist for Windows 11 Packer builds";
+          cond = builtins.pathExists ../../src/vms/windows/Autounattend.xml;
+          msg = "src/vms/windows/Autounattend.xml must exist for Windows 11 Packer builds";
         }
         {
-          cond = builtins.pathExists ../../vms/macos/packer.pkr.hcl;
-          msg = "vms/macos/packer.pkr.hcl must exist for macOS Tart builds";
+          cond = builtins.pathExists ../../src/vms/macos/packer.pkr.hcl;
+          msg = "src/vms/macos/packer.pkr.hcl must exist for macOS Tart builds";
         }
       ];
       results = builtins.map (c: assert' c.cond c.msg) checks;
@@ -274,15 +274,15 @@ let
   # guest.nix must be non-empty (parseable as a Nix expression).
   test_guest_nix_nonempty =
     let
-      content = builtins.readFile ../../vms/nixos/guest.nix;
+      content = builtins.readFile ../../src/vms/nixos/guest.nix;
     in
-    assert' (builtins.stringLength content > 0) "vms/nixos/guest.nix must not be empty";
+    assert' (builtins.stringLength content > 0) "src/vms/nixos/guest.nix must not be empty";
 
   # The NixOS guest image must not force virtio_fs into the initrd. The share
   # is optional at runtime and some current kernels do not provide a loadable
   # virtio_fs module, which would make image generation fail before first boot.
-  guest_nix_text = builtins.readFile ../../vms/nixos/guest.nix;
-  nixos_packer_text = builtins.readFile ../../vms/nixos/packer.pkr.hcl;
+  guest_nix_text = builtins.readFile ../../src/vms/nixos/guest.nix;
+  nixos_packer_text = builtins.readFile ../../src/vms/nixos/packer.pkr.hcl;
   test_nixos_guest_virtiofs_not_forced = assert' (
     !(lib.hasInfix "boot.initrd.availableKernelModules = [ \"virtio_fs\" ];" guest_nix_text)
     && !(lib.hasInfix "boot.initrd.availableKernelModules = [ \\\"virtio_fs\\\" ];" nixos_packer_text)
@@ -343,9 +343,9 @@ let
   users_json_text = builtins.readFile ../../src/modules/users.json;
   windows_users_json_text = builtins.readFile ../../src/hosts/Windows/users.json;
   user_secret_text = builtins.readFile ../../src/secrets/users-polyipseity.yml;
-  vms_windows_packer_text = builtins.readFile ../../vms/windows/packer.pkr.hcl;
-  vms_windows_autounattend_text = builtins.readFile ../../vms/windows/Autounattend.xml;
-  vms_macos_packer_text = builtins.readFile ../../vms/macos/packer.pkr.hcl;
+  vms_windows_packer_text = builtins.readFile ../../src/vms/windows/packer.pkr.hcl;
+  vms_windows_autounattend_text = builtins.readFile ../../src/vms/windows/Autounattend.xml;
+  vms_macos_packer_text = builtins.readFile ../../src/vms/macos/packer.pkr.hcl;
   test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm-setup.sh must capture packer exit status (_packer_status=0)";
 
   # nixos-generators' -o flag expects a non-existent symlink path, not a
@@ -414,7 +414,7 @@ let
         && (lib.hasInfix "<Order>7</Order>" vms_windows_autounattend_text)
         && (lib.hasInfix "VirtIO" vms_windows_autounattend_text)
       )
-      "vms/windows/Autounattend.xml must configure WinRM in Orders 1–6 before VirtIO driver scan in Order 7 so WinRM is ready even if driver scan is slow";
+      "src/vms/windows/Autounattend.xml must configure WinRM in Orders 1–6 before VirtIO driver scan in Order 7 so WinRM is ready even if driver scan is slow";
   # BIOS installs need a normal NTFS partition type for the active system
   # partition. TypeID 0x27 is a recovery/hidden partition type and can leave
   # SeaBIOS stuck at "Booting from Hard Disk...".
@@ -424,7 +424,7 @@ let
         (lib.hasInfix "<TypeID>0x07</TypeID>" vms_windows_autounattend_text)
         && !(lib.hasInfix "<TypeID>0x27</TypeID>" vms_windows_autounattend_text)
       )
-      "vms/windows/Autounattend.xml must keep the active BIOS system partition TypeID at 0x07 (not 0x27)";
+      "src/vms/windows/Autounattend.xml must keep the active BIOS system partition TypeID at 0x07 (not 0x27)";
 
   # Guest credential policy: username/password must resolve from per-user SOPS
   # secrets via vmGuest secret-key references and stay wired across all guest
@@ -486,14 +486,17 @@ let
     (lib.hasInfix "guestUsername = builtins.getEnv \"NUCLEUS_VM_GUEST_USERNAME\"" guest_nix_text)
     && (lib.hasInfix "guestPassword = builtins.getEnv \"NUCLEUS_VM_GUEST_PASSWORD\"" guest_nix_text)
     && (lib.hasInfix "users.users.\"\${guestUsername}\"" guest_nix_text)
-  ) "vms/nixos/guest.nix must consume exported guest credentials and create a login user";
+  ) "src/vms/nixos/guest.nix must consume exported guest credentials and create a login user";
 
-  test_guest_credentials_policy_in_nixos_packer = assert' (
-    (lib.hasInfix "variable \"guest_username\"" nixos_packer_text)
-    && (lib.hasInfix "variable \"guest_password\"" nixos_packer_text)
-    && (lib.hasInfix "users.users.\\\"\${var.guest_username}\\\"" nixos_packer_text)
-    && !(lib.hasInfix "default     = \"nixos\"" nixos_packer_text)
-  ) "vms/nixos/packer.pkr.hcl must accept and apply guest credentials for Windows-host NixOS builds";
+  test_guest_credentials_policy_in_nixos_packer =
+    assert'
+      (
+        (lib.hasInfix "variable \"guest_username\"" nixos_packer_text)
+        && (lib.hasInfix "variable \"guest_password\"" nixos_packer_text)
+        && (lib.hasInfix "users.users.\\\"\${var.guest_username}\\\"" nixos_packer_text)
+        && !(lib.hasInfix "default     = \"nixos\"" nixos_packer_text)
+      )
+      "src/vms/nixos/packer.pkr.hcl must accept and apply guest credentials for Windows-host NixOS builds";
 
   test_windows_nixos_build_honors_manifest_disk_size =
     assert'
@@ -524,12 +527,15 @@ let
         && (lib.hasInfix "winrm_password = var.guest_password" vms_windows_packer_text)
         && (lib.hasInfix "var.autounattend_path" vms_windows_packer_text)
       )
-      "vms/windows/packer.pkr.hcl must wire guest credentials into WinRM and consume a rendered Autounattend path";
+      "src/vms/windows/packer.pkr.hcl must wire guest credentials into WinRM and consume a rendered Autounattend path";
 
-  test_guest_credentials_policy_in_windows_autounattend = assert' (
-    (lib.hasInfix "__NUCLEUS_GUEST_USERNAME__" vms_windows_autounattend_text)
-    && (lib.hasInfix "__NUCLEUS_GUEST_PASSWORD__" vms_windows_autounattend_text)
-  ) "vms/windows/Autounattend.xml must expose guest credential placeholders for runtime rendering";
+  test_guest_credentials_policy_in_windows_autounattend =
+    assert'
+      (
+        (lib.hasInfix "__NUCLEUS_GUEST_USERNAME__" vms_windows_autounattend_text)
+        && (lib.hasInfix "__NUCLEUS_GUEST_PASSWORD__" vms_windows_autounattend_text)
+      )
+      "src/vms/windows/Autounattend.xml must expose guest credential placeholders for runtime rendering";
 
   test_guest_credentials_policy_in_macos_packer =
     assert'
@@ -538,7 +544,7 @@ let
         && (lib.hasInfix "variable \"guest_password\"" vms_macos_packer_text)
         && (lib.hasInfix "sysadminctl -addUser" vms_macos_packer_text)
       )
-      "vms/macos/packer.pkr.hcl must provision a guest account using the secret-backed guest credential policy";
+      "src/vms/macos/packer.pkr.hcl must provision a guest account using the secret-backed guest credential policy";
 
   test_vm_guest_credential_drift_replacement =
     assert'
@@ -579,12 +585,12 @@ let
 
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
-  test_windows_iso_mido_patch_file_exists = assert' (builtins.pathExists ../../vms/windows/patches/mido-iso-link.patch) "vms/windows/patches/mido-iso-link.patch must exist for runtime Mido patching";
+  test_windows_iso_mido_patch_file_exists = assert' (builtins.pathExists ../../src/vms/windows/patches/mido-iso-link.patch) "src/vms/windows/patches/mido-iso-link.patch must exist for runtime Mido patching";
   test_windows_iso_mido_runtime_patch_support =
     assert'
       (
         (lib.hasInfix "NUCLEUS_MIDO_PATCH_FILE" vm_setup_sh_text)
-        && (lib.hasInfix "vms/windows/patches/mido-iso-link.patch" vm_setup_sh_text)
+        && (lib.hasInfix "src/vms/windows/patches/mido-iso-link.patch" vm_setup_sh_text)
         && (lib.hasInfix "patch -s" vm_setup_sh_text)
       )
       "scripts/vm-setup.sh must patch a temporary Mido copy at runtime instead of editing vendored submodule files";

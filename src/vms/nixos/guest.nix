@@ -1,4 +1,4 @@
-# vms/nixos/guest.nix — NixOS guest configuration for nixos-generators.
+# src/vms/nixos/guest.nix — NixOS guest configuration for nixos-generators.
 #
 # Builds a development-ready NixOS system suitable for use as a QEMU/KVM or UTM
 # VM guest, with full parity to the NixOS host configuration (excluding AI models
@@ -8,11 +8,11 @@
 #   nix run github:nix-community/nixos-generators -- \
 #     --format qcow           \  # qcow-efi on aarch64 hosts (UTM/virt machine)
 #     --system x86_64-linux   \  # or aarch64-linux on Apple Silicon
-#     --configuration ./vms/nixos/guest.nix \
+#     --configuration ./src/vms/nixos/guest.nix \
 #     -o <output-dir>
 #
 # On Windows hosts, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1 uses
-# vms/nixos/packer.pkr.hcl instead, which generates a similar configuration
+# src/vms/nixos/packer.pkr.hcl instead, which generates a similar configuration
 # inline during a Packer QEMU build.
 #
 # Do NOT declare fileSystems, boot.loader, or hardware-configuration here:
