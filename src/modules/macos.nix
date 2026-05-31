@@ -629,6 +629,26 @@ let
     "$MYSIDES_BIN" remove ".Trash" >/dev/null 2>&1 || true
   '';
 
+  # Shared strict-mode sidebar reconciliation used during activation.
+  finderSidebarRebuildStrictShell = ''
+    ${finderSidebarClearShell}
+    ${finderSidebarAddManagedStrictShell}
+    ${finderSidebarRemoveDefaultExtrasShell}
+  '';
+
+  # Shared best-effort sidebar reconciliation used after Finder restarts.
+  finderSidebarRebuildBestEffortShell = ''
+    ${finderSidebarClearShell}
+    ${finderSidebarAddManagedBestEffortShell}
+    ${finderSidebarRemoveDefaultExtrasShell}
+  '';
+
+  # Shared refresh for Finder sidebar/cache daemons.
+  finderRefreshDaemonsShell = ''
+    /usr/bin/killall sharedfilelistd 2>/dev/null || true
+    /usr/bin/killall cfprefsd 2>/dev/null || true
+  '';
+
   gcWeekly = pkgs.writeShellScript "gc-weekly" ''
     set -eu
 
@@ -1290,13 +1310,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       # Clear current favorites first so the final list order is deterministic.
       # `mysides list` is now considered healthy in this environment.
-      ${finderSidebarClearShell}
-
       # Rebuild the exact managed order requested for Finder favorites.
-      ${finderSidebarAddManagedStrictShell}
-
-      # Remove known default extras that Finder may retain across restarts.
-      ${finderSidebarRemoveDefaultExtrasShell}
+      ${finderSidebarRebuildStrictShell}
 
       _finder_expected_order="${finderSidebarExpectedOrder}"
       _finder_actual_order="$($MYSIDES_BIN list 2>/dev/null | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n 9 | /usr/bin/paste -sd'|' -)"
@@ -1307,8 +1322,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       # Refresh finder-related daemons in-session. If the sidebar still shows
       # stale entries due to macOS caching, a logout/login may be required.
-      /usr/bin/killall sharedfilelistd 2>/dev/null || true
-      /usr/bin/killall cfprefsd 2>/dev/null || true
+      ${finderRefreshDaemonsShell}
       /usr/bin/killall Finder 2>/dev/null || true
       /usr/bin/open -a Finder 2>/dev/null || true
 
@@ -1340,8 +1354,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
           # are loaded (e.g., "Open in Terminal") and sidebar display names are updated.
           # Also restart sharedfilelistd so sidebar state refreshes without
           # requiring a full macOS reboot.
-          /usr/bin/killall sharedfilelistd 2>/dev/null || true
-          /usr/bin/killall cfprefsd 2>/dev/null || true
+          ${finderRefreshDaemonsShell}
 
           open -a Finder 2>/dev/null &
           sleep 1
@@ -1374,9 +1387,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
           # Re-apply managed favorites to keep deterministic output.
           MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
           if [ -x "$MYSIDES_BIN" ]; then
-            ${finderSidebarClearShell}
-            ${finderSidebarAddManagedBestEffortShell}
-            ${finderSidebarRemoveDefaultExtrasShell}
+            ${finderSidebarRebuildBestEffortShell}
           fi
         '';
 
