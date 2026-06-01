@@ -77,13 +77,9 @@ in
   # ---------------------------------------------------------------------------
   system.activationScripts =
     if pkgs.stdenv.isDarwin then
-      {
-        postActivation.text = lib.mkBefore deriveHostAgeKeyText;
-      }
+      { postActivation.text = lib.mkBefore deriveHostAgeKeyText; }
     else
-      {
-        deriveHostAgeKey.text = deriveHostAgeKeyText;
-      };
+      { deriveHostAgeKey.text = deriveHostAgeKeyText; };
 
   sops = {
     age = {
@@ -96,7 +92,15 @@ in
     };
 
     # GnuPG fallback path differs by platform home directory convention.
-    gnupg.home =
-      if pkgs.stdenv.isDarwin then "/Users/${username}/.gnupg" else "/home/${username}/.gnupg";
+    # sshKeyPaths must be explicitly emptied when gnupg.home is set per sops-nix
+    # docs; the sops-nix default imports RSA SSH host keys via
+    # defaultImportKeys "rsa", which causes the assertion
+    #   "Exactly one of sops.gnupg.home and sops.gnupg.sshKeyPaths must be set"
+    # on NixOS where services.openssh is enabled.  macOS avoids the conflict
+    # because nix-darwin's OpenSSH setup often lacks RSA host-key definitions.
+    gnupg = {
+      home = if pkgs.stdenv.isDarwin then "/Users/${username}/.gnupg" else "/home/${username}/.gnupg";
+      sshKeyPaths = [ ];
+    };
   };
 }
