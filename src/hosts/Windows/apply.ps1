@@ -282,6 +282,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-CaddyLocalCA.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinAccount.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinHttpsProxy.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-LiteLLMScheduledTask.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-ReplicaSyncScheduledTask.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSSHServer.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-PowerPolicy.ps1")
@@ -589,6 +590,7 @@ Sync-JellyfinHttpsProxy -RepoRoot $repoRoot -Enabled:$true
 Sync-CaddyLocalCA -RepoRoot $repoRoot -Enabled:$true
 Sync-JellyfinAccount -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRecords $selectedUserRecords
+Sync-LiteLLMScheduledTask -RepoRoot $repoRoot -Enabled:$true
 Sync-ReplicaSyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
 Sync-OpenSSHServer -Enabled:$EnableRemoteAccessParity
 # Re-run host age key registration after Sync-OpenSSHServer has started

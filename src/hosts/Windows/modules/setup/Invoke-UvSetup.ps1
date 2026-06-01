@@ -31,11 +31,20 @@ function Invoke-UvSetup {
 
   # Declarative desired-state list.  Add a package name here to install it;
   # remove it to trigger uninstall on the next apply.  Use the exact PyPI
-  # package name.  Only add packages absent from WinGet, Scoop, and
-  # cargo-binstall.
+  # package name (without extras).  Only add packages absent from WinGet,
+  # Scoop, and cargo-binstall.
   $desiredPackages = @(
-    # No uv-managed tools yet.  Add entries here as needed.
+    # LiteLLM AI gateway proxy.  Installed with the [proxy] extra for
+    # OpenAI-compatible server functionality.  The tool name in `uv tool list`
+    # is `litellm` (extras are stripped from the tool registry).
+    'litellm'
   )
+
+  # Packages that need extras syntax during install (e.g. 'litellm[proxy]').
+  # Keyed by tool name (as it appears in uv tool list).
+  $packageExtras = @{
+    'litellm' = '[proxy]'
+  }
 
   # uv tool install places binaries in ~\.local\bin by default (UV_TOOL_BIN_DIR).
   $uvBinDir = Join-Path $HOME ".local\bin"
@@ -94,13 +103,14 @@ function Invoke-UvSetup {
       Write-Output "uv: skipping invalid install token '$pkg'"
       continue
     }
-    Write-Output "uv: installing tool '$pkg'"
-    uv tool install $pkg
+    $installSpec = if ($packageExtras.ContainsKey($pkg)) { "$pkg$($packageExtras[$pkg])" } else { $pkg }
+    Write-Output "uv: installing tool '$installSpec'"
+    uv tool install $installSpec
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "uv: 'uv tool install $pkg' failed (exit $LASTEXITCODE)"
+      Write-Error "uv: 'uv tool install $installSpec' failed (exit $LASTEXITCODE)"
       return
     }
-    Write-Output "uv: '$pkg' installed successfully"
+    Write-Output "uv: '$installSpec' installed successfully"
   }
 
   if ($toInstall.Count -eq 0 -and $toRemove.Count -eq 0) {

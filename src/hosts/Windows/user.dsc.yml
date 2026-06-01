@@ -226,14 +226,14 @@ properties:
       id: ollamaHostEnvVar
       directives:
         description: >-
-          Bind Ollama client tools (ollama CLI, oterm) to the loopback address
-          so API calls never cross to LAN peers.  Mirrors OLLAMA_HOST set in
-          home.sessionVariables on macOS and NixOS; explicit declaration guards
-          against upstream Ollama default changes (source:
-          https://docs.ollama.com/faq#how-can-i-expose-ollama-on-my-network).
+          Point clients at the LiteLLM proxy (127.0.0.1:4000) instead of Ollama
+          directly so that oterm, ollama run, and any other OpenAI-compatible
+          client gets unified routing to both local and remote models.  Sync
+          scripts override this back to :11434 for direct model management.
+          Mirrors OLLAMA_HOST set in home.sessionVariables on macOS and NixOS.
       settings:
         name: OLLAMA_HOST
-        value: "127.0.0.1:11434"
+        value: "127.0.0.1:4000"
         scope: User
 
     - resource: Microsoft.Windows.Environment/Variable
