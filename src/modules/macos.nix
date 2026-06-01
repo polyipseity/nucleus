@@ -610,15 +610,13 @@ let
   finderSidebarPreRemoveShell = ''
     ${builtins.concatStringsSep "\n" (
       map
-        (favorite: ''"$MYSIDES_BIN" remove ${lib.escapeShellArg favorite.name} >/dev/null 2>&1 || true'')
+        (favoriteName: ''"$MYSIDES_BIN" remove ${lib.escapeShellArg favoriteName} >/dev/null 2>&1 || true'')
         (
-          let
-            allManagedDefaultNames = (map (f: f.name) finderSidebarManagedFavorites) ++ [
-              "/"
-              ".Trash"
-            ];
-          in
-          allManagedDefaultNames
+          (map (f: f.name) finderSidebarManagedFavorites)
+          ++ [
+            "/"
+            ".Trash"
+          ]
         )
     )}
     "$MYSIDES_BIN" remove "$(id -un)" >/dev/null 2>&1 || true
