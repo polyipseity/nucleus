@@ -36,7 +36,7 @@
 		"models": [
 			{
 				"id": "deepseek/deepseek-v4-flash",
-				"maxInputTokens": 131072,
+				"maxInputTokens": 98304,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Flash",
 				"toolCalling": true,
@@ -46,7 +46,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-pro",
-				"maxInputTokens": 131072,
+				"maxInputTokens": 98304,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Pro",
 				"toolCalling": true,

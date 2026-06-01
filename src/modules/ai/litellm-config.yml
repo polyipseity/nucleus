@@ -42,11 +42,11 @@ model_list:
       model: openrouter/deepseek/deepseek-v4-flash
       api_key: os.environ/OPENROUTER_API_KEY
       model_info:
-        max_input_tokens: 131072
+        max_input_tokens: 98304
 
   - model_name: deepseek/deepseek-v4-pro
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-pro
       api_key: os.environ/OPENROUTER_API_KEY
       model_info:
-        max_input_tokens: 131072
+        max_input_tokens: 98304
