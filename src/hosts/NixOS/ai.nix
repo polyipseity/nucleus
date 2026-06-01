@@ -1,12 +1,52 @@
-# hosts/NixOS/ai.nix — NixOS system-level Ollama inference service.
+# hosts/NixOS/ai.nix — NixOS system-level AI inference stack.
 #
-# Enables Ollama as a systemd system service so the inference server starts
-# at boot and survives user session boundaries (required for headless and
-# remote-desktop use cases).  The Home Manager module modules/ai/default.nix
-# provides the ollama CLI binary and OLLAMA_HOST session variable on all
-# POSIX hosts including this one.
-{ pkgs, ... }:
+# Provides:
+#   • Ollama — local LLM inference server on 127.0.0.1:11434
+#   • LiteLLM — AI gateway proxy on 127.0.0.1:4000 that routes client requests
+#     to Ollama and OpenRouter.
+#
+# The Home Manager module modules/ai/default.nix provides the ollama CLI binary,
+# OLLAMA_HOST session variable, and the oterm client on all POSIX hosts
+# including this one.
+{ config, pkgs, ... }:
+let
+  litellmConfig = pkgs.writeText "litellm-config.yml" (
+    builtins.readFile ../../modules/ai/litellm-config.yml
+  );
+in
 {
+  # LiteLLM AI gateway — systemd service on 127.0.0.1:4000.
+  # Since nixpkgs has no services.litellm module yet, we define the service
+  # manually.  ExecStart uses a shell wrapper that reads the SOPS-decrypted
+  # OpenRouter key and exports it before launching LiteLLM — systemd's
+  # EnvironmentFile expects KEY=VALUE format, but sops-nix writes the raw value.
+  systemd.services.litellm = {
+    description = "LiteLLM AI Gateway Proxy";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network.target" ];
+    path = [ pkgs.litellm ];
+    serviceConfig = {
+      Type = "simple";
+      ExecStart = "${pkgs.writeShellScript "litellm-wrapper" ''
+        _keyfile="${config.sops.secrets."ai_openrouter_api_key".path}"
+        if [ -f "$_keyfile" ]; then
+          export OPENROUTER_API_KEY="$(cat "$_keyfile")"
+        fi
+        exec ${pkgs.litellm}/bin/litellm \
+          --config ${litellmConfig} \
+          --port 4000 \
+          --host 127.0.0.1 \
+          --drop_params
+      ''}";
+      Restart = "on-failure";
+      RestartSec = 5;
+      # Protect against resource exhaustion and information leaks.
+      PrivateTmp = true;
+      NoNewPrivileges = true;
+      MemoryMax = "2G";
+    };
+  };
+
   services.ollama = {
     enable = true;
     # Bind to loopback so the unauthenticated Ollama REST API is only
