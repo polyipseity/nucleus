@@ -649,6 +649,7 @@ in
         mkdir -p "$(dirname "$_comp_file")"
         eval "$_gen_cmd" > "$_comp_file" 2>/dev/null || {
           echo "  (failed, skipping)" >&2
+          rm -f "$_comp_file"
           return 1
         }
       }
@@ -669,11 +670,6 @@ in
         "${pkgs.bat}/bin/bat" \
         "$_zsh_comp_dir/_bat" \
         "'${pkgs.bat}/bin/bat' --completion zsh"
-
-      _generate_if_stale \
-        "${pkgs.bottom}/bin/btm" \
-        "$_zsh_comp_dir/_btm" \
-        "'${pkgs.bottom}/bin/btm' --generate=zsh"
 
       _generate_if_stale \
         "${pkgs.bun}/bin/bun" \
