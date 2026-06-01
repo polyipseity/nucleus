@@ -25,6 +25,7 @@
 #            qwen3:8b               — same as NixOS; tool-calling NOT yet
 #                                     curl-tested on Windows.
 {
+  config,
   lib,
   nixpkgs,
   pkgs,
@@ -67,7 +68,11 @@ lib.mkMerge [
     # and guards against upstream default changes (Ollama defaults vary by
     # version).
     home.sessionVariables = {
-      OLLAMA_HOST = "127.0.0.1:11434";
+      # Point clients at the LiteLLM proxy (127.0.0.1:4000) instead of Ollama
+      # directly so that oterm, ollama run, and any other OpenAI-compatible
+      # client gets unified routing to both local and remote models.  Sync
+      # scripts override this back to :11434 for direct model management.
+      OLLAMA_HOST = "127.0.0.1:4000";
     };
   }
 
@@ -77,6 +82,35 @@ lib.mkMerge [
   # The launchd option is Darwin-only in Home Manager so the entire block
   # must be guarded to avoid "unknown option" errors on Linux.
   (lib.mkIf pkgs.stdenv.isDarwin {
+    launchd.agents."litellm" = {
+      enable = true;
+      config = {
+        Label = "local.litellm";
+        # Wrapper script reads the SOPS-decrypted OpenRouter key file
+        # (KEY=VALUE format) and exports it before launching LiteLLM because
+        # launchd EnvironmentVariables does not support file sourcing.
+        ProgramArguments = [
+          "/bin/sh"
+          "-c"
+          ''
+            if [ -f "${config.sops.secrets."ai_openrouter_api_key".path}" ]; then
+              export OPENROUTER_API_KEY="$(cat "${config.sops.secrets."ai_openrouter_api_key".path}")"
+            fi
+            exec ${pkgs.litellm}/bin/litellm \
+              --config ${pkgs.writeText "litellm-config.yml" (builtins.readFile ./litellm-config.yml)} \
+              --port 4000 \
+              --host 127.0.0.1 \
+              --drop_params
+          ''
+        ];
+        KeepAlive = true;
+        RunAtLoad = true;
+        # Suppress request logs; LiteLLM is verbose per-request.
+        StandardOutPath = "/dev/null";
+        StandardErrorPath = "/dev/null";
+      };
+    };
+
     launchd.agents."ollama" = {
       enable = true;
       config = {
