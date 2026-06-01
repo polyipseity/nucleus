@@ -61,12 +61,14 @@ function Sync-LiteLLMScheduledTask {
     "$($env:USERDOMAIN)\$($env:USERNAME)"
   }
 
-  # OpenRouter API key is read from the SOPS-decrypted system secret.
+  # Secrets are read from the SOPS-decrypted system secrets directory.
   $decryptedDir = Join-Path -Path $env:USERPROFILE -ChildPath ".config\nucleus\secrets"
   $openrouterKeyFile = Join-Path -Path $decryptedDir -ChildPath "ai_openrouter_api_key"
+  $litellmMasterKeyFile = Join-Path -Path $decryptedDir -ChildPath "litellm_master_key"
 
   $actionCommand = @"
 `$env:OPENROUTER_API_KEY = if (Test-Path '$openrouterKeyFile') { Get-Content '$openrouterKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
+`$env:LITELLM_MASTER_KEY = if (Test-Path '$litellmMasterKeyFile') { Get-Content '$litellmMasterKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
 & "$litellmBin" --config "$configPath" --port 4000 --host 127.0.0.1 --drop_params
 "@
 

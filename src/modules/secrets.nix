@@ -194,13 +194,16 @@ lib.mkIf isPrimaryUser {
   };
 
   # --------------------------------------------------------------------------
-  # LiteLLM OpenRouter API key — system-level secret shared across all hosts.
-  # Used by the LiteLLM AI gateway proxy to route requests to OpenRouter
-  # models.  The sops-nix module writes the raw key; service wrappers in
-  # default.nix (macOS) and hosts/NixOS/ai.nix (NixOS) read it and set the
-  # OPENROUTER_API_KEY environment variable.
+  # System-wide secrets — decrypted from the ``system`` SOPS file.
+  #   - ``ai_openrouter_api_key``: OpenRouter API key, exported as
+  #     OPENROUTER_API_KEY for the LiteLLM proxy.
+  #   - ``litellm_master_key``: LiteLLM proxy master key, exported as
+  #     LITELLM_MASTER_KEY.
   # --------------------------------------------------------------------------
   sops.secrets."ai_openrouter_api_key" = {
+    sopsFile = ../secrets/system.yml;
+  };
+  sops.secrets."litellm_master_key" = {
     sopsFile = ../secrets/system.yml;
   };
 
