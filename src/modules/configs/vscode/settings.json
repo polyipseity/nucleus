@@ -22,6 +22,10 @@
     ".agents/hooks": true,
     "~/.agents/hooks": true
   },
+  "chat.implicitContext.enabled": {
+    "editor": "never",
+    "panel": "never"
+  },
   "chat.implicitContext.suggestedContext": false,
   "chat.includeReferencedInstructions": true,
   "chat.instructionsFilesLocations": {
@@ -112,6 +116,7 @@
   "git.supportCancellation": true,
   "github.codespaces.showPerformanceExplorer": true,
   "github.copilot.chat.agent.backgroundTodoAgent.enabled": true,
+  "github.copilot.chat.agent.currentEditorContext.enabled": false,
   "github.copilot.chat.alternateGeminiModelFPrompt.enabled": true,
   "github.copilot.chat.alternateGptPrompt.enabled": true,
   "github.copilot.chat.anthropic.tools.websearch.enabled": true,
