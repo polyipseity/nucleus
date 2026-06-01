@@ -22,12 +22,13 @@ function Sync-VSCodeConfig {
     (Code - Insiders) channels, creates a symlink from the VS Code User data
     directory into $RepoRoot\src\modules\configs\vscode\.
 
-    Both chatLanguageModels and keybindings use Windows-specific repo source
-    files (chatLanguageModels.windows.json and keybindings.windows.json) so
-    that Windows model budgets (Ctrl-key shortcuts) are tracked independently
-    from macOS (chatLanguageModels.mac.json / keybindings.mac.json) and NixOS
-    (chatLanguageModels.nixos.json / keybindings.nixos.json) without
-    cross-host pollution in a shared file.
+    keybindings uses a Windows-specific repo source file
+    (keybindings.windows.json) so that Windows key shortcuts are tracked
+    independently from macOS (keybindings.mac.json) and NixOS
+    (keybindings.nixos.json) without cross-host pollution in a shared file.
+    chatLanguageModels.windows.json is managed by a name-keyed merge-overwrite
+    (Merge-VSChatLanguageModel) instead of a symlink, so that VS Code can
+    write model updates back without breaking the repo link.
 
     Migration safety applied to each item:
       Correct symlink     — no-op.
@@ -146,11 +147,9 @@ function Sync-VSCodeConfig {
   )
 
   # Managed single files: ordered hashtable of repo file name -> channel-side
-  # file name.  Per-host chatLanguageModels and keybindings use Windows-specific
-  # repo sources so that each host's model budget and key shortcuts are tracked
-  # independently without cross-host pollution.
+  # file name.  chatLanguageModels is managed separately via
+  # Merge-VSChatLanguageModel (name-keyed merge, not a symlink).
   $managedFiles = [ordered]@{
-    "chatLanguageModels.windows.json" = "chatLanguageModels.json"
     "keybindings.windows.json"        = "keybindings.json"
     "mcp.json"                        = "mcp.json"
     "settings.json"                   = "settings.json"
@@ -166,6 +165,52 @@ function Sync-VSCodeConfig {
     "profiles"         = "profiles"
     "prompts"          = "prompts"
     "snippets"         = "snippets"
+  }
+
+  function Merge-VSChatLanguageModel {
+    <#
+    .SYNOPSIS
+      Name-keyed merge-overwrite of chatLanguageModels from repo source to VS Code dest.
+
+    .DESCRIPTION
+      Reads the repo source and destination JSON arrays, then for each object in the
+      repo source, replaces a destination object with the same .name (or appends if
+      not found).  Written back to $DestFile so VS Code can save new model entries
+      that survive the next sync.
+    #>
+    param(
+      [Parameter(Mandatory)]
+      [string]$RepoFile,
+      [Parameter(Mandatory)]
+      [string]$DestFile
+    )
+
+    $repoContent = Get-Content -LiteralPath $RepoFile -Raw | ConvertFrom-Json
+    $existingContent = @()
+    if (Test-Path -LiteralPath $DestFile -PathType Leaf) {
+      $raw = Get-Content -LiteralPath $DestFile -Raw -ErrorAction SilentlyContinue
+      if (-not [string]::IsNullOrWhiteSpace($raw)) {
+        $existingContent = $raw | ConvertFrom-Json
+      }
+    }
+
+    $existing = [System.Collections.ArrayList]::new($existingContent)
+
+    foreach ($repoItem in $repoContent) {
+      $match = $existing | Where-Object { $_.name -eq $repoItem.name } | Select-Object -First 1
+      if ($null -ne $match) {
+        $idx = $existing.IndexOf($match)
+        if ($idx -ge 0) {
+          $existing[$idx] = $repoItem
+        }
+      } else {
+        $null = $existing.Add($repoItem)
+      }
+    }
+
+    $json = $existing | ConvertTo-Json -Depth 10
+    Set-Content -LiteralPath $DestFile -Value $json -Encoding UTF8 -NoNewline
+    Write-Output "vscode-config: merged chatLanguageModels from $RepoFile to $DestFile"
   }
 
   foreach ($channelDir in $channelDirs) {
@@ -278,6 +323,26 @@ function Sync-VSCodeConfig {
       New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget | Out-Null
       Set-ManagedSymlinkDeleteProtection -Path $linkPath
       Write-Output "vscode-config: linked VS Code config dir: $linkPath -> $repoTarget"
+    }
+
+    # --- chatLanguageModels (regular file, managed by merge) ---
+    $chatLmPath = Join-Path -Path $channelDir -ChildPath "chatLanguageModels.json"
+    if (-not $Enabled) {
+      if (Test-Path -LiteralPath $chatLmPath) {
+        Write-Warning "vscode-config: chatLanguageModels.json at ${chatLmPath} was previously managed. Delete manually if no longer needed."
+      }
+    } else {
+      # Remove any old symlink before merge so Set-Content writes a regular file.
+      if (Test-Path -LiteralPath $chatLmPath) {
+        $item = Get-Item -LiteralPath $chatLmPath
+        $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+        if ($isSymlink) {
+          Remove-ManagedSymlinkDeleteProtection -Path $chatLmPath -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $chatLmPath -Force
+        }
+      }
+      $repoFile = Join-Path -Path $vsConfigDir -ChildPath "chatLanguageModels.windows.json"
+      Merge-VSChatLanguageModel -RepoFile $repoFile -DestFile $chatLmPath
     }
   }
 }
