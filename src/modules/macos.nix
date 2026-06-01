@@ -555,35 +555,35 @@ let
     }
     {
       name = "Downloads";
-      url = "file://$HOME/Downloads";
+      url = "file://${config.home.homeDirectory}/Downloads";
     }
     {
       name = "clouds";
-      url = "file://$HOME/clouds";
+      url = "file://${config.home.homeDirectory}/clouds";
     }
     {
       name = "dev";
-      url = "file://$HOME/dev";
+      url = "file://${config.home.homeDirectory}/dev";
     }
     {
       name = "Desktop";
-      url = "file://$HOME/Desktop";
+      url = "file://${config.home.homeDirectory}/Desktop";
     }
     {
       name = "Documents";
-      url = "file://$HOME/Documents";
+      url = "file://${config.home.homeDirectory}/Documents";
     }
     {
       name = "Music";
-      url = "file://$HOME/Music";
+      url = "file://${config.home.homeDirectory}/Music";
     }
     {
       name = "Movies";
-      url = "file://$HOME/Movies";
+      url = "file://${config.home.homeDirectory}/Movies";
     }
     {
       name = "Pictures";
-      url = "file://$HOME/Pictures";
+      url = "file://${config.home.homeDirectory}/Pictures";
     }
   ];
 
@@ -598,9 +598,39 @@ let
     mkdir -p "$HOME/Desktop" "$HOME/Documents" "$HOME/Downloads" "$HOME/Movies" "$HOME/Music" "$HOME/Pictures"
   '';
 
+  # Pre-remove managed favorites and default extras by name before any
+  # `mysides list` call.  `mysides remove <name>` works by name lookup and
+  # never needs to parse the sidebar list, so it safely removes corrupted
+  # entries that would cause `mysides list` to segfault (e.g. bookmarks with
+  # unexpanded literal `$HOME` URLs from a previous version of this config).
+  #
+  # Sources for default extras: ``/`` reappears after daemon restarts, the
+  # user's home-directory alias shows up on new macOS versions, and `.Trash`
+  # is a legacy Finder sidebar entry that can re-emerge on macOS upgrades.
+  finderSidebarPreRemoveShell = ''
+    ${builtins.concatStringsSep "\n" (
+      map
+        (favorite: ''"$MYSIDES_BIN" remove ${lib.escapeShellArg favorite.name} >/dev/null 2>&1 || true'')
+        (
+          let
+            allManagedDefaultNames = (map (f: f.name) finderSidebarManagedFavorites) ++ [
+              "/"
+              ".Trash"
+            ];
+          in
+          allManagedDefaultNames
+        )
+    )}
+    "$MYSIDES_BIN" remove "$(id -un)" >/dev/null 2>&1 || true
+  '';
+
   # Clear all current sidebar favorites so managed order can be rebuilt.
+  # `mysides list` output is captured with `|| true` so a segfault in the
+  # mysides binary (e.g. from corrupted bookmarks) terminates only the
+  # subshell, not the activation script.
   finderSidebarClearShell = ''
-    "$MYSIDES_BIN" list 2>/dev/null | while IFS= read -r _sidebar_line; do
+    _sidebar_lines="$("$MYSIDES_BIN" list 2>/dev/null || true)"
+    echo "$_sidebar_lines" | while IFS= read -r _sidebar_line; do
       _sidebar_name="''${_sidebar_line%% -> *}"
       [ -n "$_sidebar_name" ] || continue
       "$MYSIDES_BIN" remove "$_sidebar_name" >/dev/null 2>&1 || true
@@ -630,7 +660,10 @@ let
   '';
 
   # Shared strict-mode sidebar reconciliation used during activation.
+  # Pre-remove known favorites first so corrupted entries are always cleared
+  # even if `mysides list` segfaults on them.
   finderSidebarRebuildStrictShell = ''
+    ${finderSidebarPreRemoveShell}
     ${finderSidebarClearShell}
     ${finderSidebarAddManagedStrictShell}
     ${finderSidebarRemoveDefaultExtrasShell}
@@ -638,6 +671,7 @@ let
 
   # Shared best-effort sidebar reconciliation used after Finder restarts.
   finderSidebarRebuildBestEffortShell = ''
+    ${finderSidebarPreRemoveShell}
     ${finderSidebarClearShell}
     ${finderSidebarAddManagedBestEffortShell}
     ${finderSidebarRemoveDefaultExtrasShell}
@@ -1314,7 +1348,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
       ${finderSidebarRebuildStrictShell}
 
       _finder_expected_order="${finderSidebarExpectedOrder}"
-      _finder_actual_order="$($MYSIDES_BIN list 2>/dev/null | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n 9 | /usr/bin/paste -sd'|' -)"
+      _finder_list_output=$("$MYSIDES_BIN" list 2>/dev/null || true)
+      _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n 9 | /usr/bin/paste -sd'|' -)"
       if [ "$_finder_actual_order" != "$_finder_expected_order" ]; then
         echo "macos: warning — mysides reported sidebar order mismatch (expected: $_finder_expected_order, actual: $_finder_actual_order)." >&2
         _finder_sidebar_failed=1
