@@ -89,9 +89,7 @@ let
     # IgnoreUnknown keeps one shared ~/.ssh/config usable across clients.
     IgnoreUnknown = "UseKeychain";
   }
-  // lib.optionalAttrs pkgs.stdenv.isDarwin {
-    UseKeychain = "yes";
-  };
+  // lib.optionalAttrs pkgs.stdenv.isDarwin { UseKeychain = "yes"; };
 
   # Git identity is sourced from the managed decrypted payload so name/email/
   # signing key follow the same SOPS lifecycle as SSH/GPG material.
@@ -193,6 +191,17 @@ lib.mkIf isPrimaryUser {
   # --------------------------------------------------------------------------
   sops.secrets."${gitIdentitySecretName}" = {
     sopsFile = ../secrets/git-identities.yml;
+  };
+
+  # --------------------------------------------------------------------------
+  # LiteLLM OpenRouter API key — system-level secret shared across all hosts.
+  # Used by the LiteLLM AI gateway proxy to route requests to OpenRouter
+  # models.  The sops-nix module writes the raw key; service wrappers in
+  # default.nix (macOS) and hosts/NixOS/ai.nix (NixOS) read it and set the
+  # OPENROUTER_API_KEY environment variable.
+  # --------------------------------------------------------------------------
+  sops.secrets."ai_openrouter_api_key" = {
+    sopsFile = ../secrets/system.yml;
   };
 
   programs.ssh = {

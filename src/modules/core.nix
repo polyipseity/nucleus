@@ -82,6 +82,12 @@ let
   #                    agent and Linux systemd user service; Windows parity uses
   #                    the Jellyfin.Server WinGet package
   #   jq             — JSON processor used by activation scripts
+  #   litellm        — LiteLLM AI gateway proxy (OpenAI-API-compatible server)
+  #                    that routes client requests to Ollama and OpenRouter.
+  #                    Installed on all POSIX hosts; Windows uses `uv tool install
+  #                    'litellm[proxy]'` (see system.dsc.yml / Invoke-LiteLLMSetup.ps1).
+  #                    On NixOS managed as a systemd service (hosts/NixOS/ai.nix);
+  #                    on macOS managed as a launchd user agent (modules/ai/default.nix).
   #   dotnetCorePackages.runtime_6_0 — .NET 6 runtime required by EIDE and legacy tooling parity
   #   llvmPackages_18.clang    — unified C/C++ compiler frontend
   #   llvmPackages_18.lldb     — LLVM debugger (`lldb`) for cross-host debug parity
@@ -136,6 +142,7 @@ let
     pkgs.imagemagick
     pkgs.jellyfin
     pkgs.jq
+    pkgs.litellm
     pkgs.llvmPackages_18.clang
     pkgs.llvmPackages_18.lldb
     pkgs.llvmPackages_18.lld

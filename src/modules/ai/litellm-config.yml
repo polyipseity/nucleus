@@ -1,0 +1,52 @@
+# LiteLLM proxy configuration — shared across all hosts.
+#
+# Ollama models are proxied via ollama_chat/<model> pointing at the local
+# Ollama daemon on 127.0.0.1:11434.  OpenRouter models use the API key
+# provided via the OPENROUTER_API_KEY environment variable (sourced from
+# a SOPS-decrypted secret at runtime).
+#
+# litellm_settings.drop_params prevents errors when clients send parameters
+# (e.g. max_tokens) that a particular model endpoint does not support.
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+litellm_settings:
+  drop_params: true
+
+model_list:
+  # ---- Ollama models ----
+  - model_name: ollama_chat/devstral-small-2:24b
+    litellm_params:
+      model: ollama_chat/devstral-small-2:24b
+      api_base: http://127.0.0.1:11434
+
+  - model_name: ollama_chat/magistral:24b
+    litellm_params:
+      model: ollama_chat/magistral:24b
+      api_base: http://127.0.0.1:11434
+
+  - model_name: ollama_chat/qwen2.5:1.5b
+    litellm_params:
+      model: ollama_chat/qwen2.5:1.5b
+      api_base: http://127.0.0.1:11434
+
+  - model_name: ollama_chat/qwen3:8b
+    litellm_params:
+      model: ollama_chat/qwen3:8b
+      api_base: http://127.0.0.1:11434
+
+  # ---- OpenRouter models ----
+  - model_name: deepseek/deepseek-v4-flash
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+      model_info:
+        max_input_tokens: 131072
+
+  - model_name: deepseek/deepseek-v4-pro
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4-pro
+      api_key: os.environ/OPENROUTER_API_KEY
+      model_info:
+        max_input_tokens: 131072
