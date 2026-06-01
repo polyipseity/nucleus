@@ -170,11 +170,37 @@ in
     # so they can emit multi-line guidance via heredoc and pass through when in a
     # devShell (DIRENV_DIR set) or via the managed default toolchain.
     initContent = ''
-            # pay-respects: register the shell hook so `f` replays the last failed
-            # command with the corrected invocation suggested by pay-respects.
-            # The generated function captures shell history and runs the corrected
-            # command via eval so the fix is both executed and saved to shell history.
-            eval "$(pay-respects zsh --alias)"
+            # ---------------------------------------------------------------
+            # Writable user-local completion directory
+            # ---------------------------------------------------------------
+            # Home Manager's fpath points to Nix store paths (read-only).
+            # Tools like `gh completion -s zsh > file` cannot write there, so
+            # provide a writable XDG-compliant fallback.
+            typeset -g ZSH_COMPLETION_DIR="$HOME/.local/share/zsh/completions"
+            mkdir -p "$ZSH_COMPLETION_DIR"
+            fpath+=("$ZSH_COMPLETION_DIR")
+
+            # Refresh completion cache so the new fpath entry is recognised.
+            # -C: skip full rebuild if dump is current (fast path).
+            # -i: silently ignore "insecure" user-writable dirs (expected).
+            compinit -C -i -d "$HOME/.zcompdump"
+
+            # ---------------------------------------------------------------
+            # pay-respects shell hook
+            # ---------------------------------------------------------------
+            # Only initialise in interactive shells. In non-interactive shells
+            # (agent-spawned terminals, CI), pay-respects would block on its
+            # interactive prompt with no user to respond.
+            #
+            # pay-respects is initialised here rather than via a shell alias because
+            # `eval "$(pay-respects zsh --alias)"` creates a zsh FUNCTION named `f`
+            # that captures shell history and auto-executes the corrected command via
+            # eval.  A plain alias (aliases.nix) would shadow the function -- aliases
+            # expand before functions in zsh -- leaving `f` as a bare binary invocation
+            # that neither executes the fix nor records it in history.
+            if [[ -o interactive ]]; then
+              eval "$(pay-respects zsh --alias)"
+            fi
 
             # home.sessionVariables does not reliably populate plain interactive
             # `zsh -i` sessions in every launch path, so export the fallback tool

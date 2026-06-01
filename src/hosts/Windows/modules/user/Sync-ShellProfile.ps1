@@ -118,7 +118,9 @@ function Sync-ShellProfile {
     '    }'
     '  }'
     '}'
-    # pay-respects: register correction hook when the binary is present.
+    # pay-respects: register correction hook in interactive sessions only.
+    # WHY non-interactive guard: agent-spawned or scripted PowerShell sessions
+    # would block on the interactive prompt with no user to respond.
     # -ErrorAction SilentlyContinue is intentional: pay-respects may be absent
     # on first-provision before cargo-binstall setup has run; the if-guard
     # checks the result immediately so no failure is silently swallowed.
@@ -126,7 +128,7 @@ function Sync-ShellProfile {
     # lookup, so the `f` function defined by pay-respects --alias is not
     # shadowed by any alias of the same name (unlike zsh where aliases shadow
     # functions).
-    'if (Get-Command pay-respects -ErrorAction SilentlyContinue) {'
+    'if ([Environment]::UserInteractive -and (Get-Command pay-respects -ErrorAction SilentlyContinue)) {'
     '  iex (& pay-respects pwsh --alias | Out-String)'
     '}'
     # prek: install repository-local Git hooks automatically the first time a
