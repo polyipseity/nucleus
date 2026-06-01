@@ -26,5 +26,6 @@ assert containsRegex "127.0.0.1:11434" aiSyncText;
 assert containsRegex "OLLAMA_HOST.*127.0.0.1:4000" defaultAiText;
 assert containsRegex "local.litellm" defaultAiText;
 assert containsRegex "ai_openrouter_api_key" secretsText;
+assert containsRegex "litellm_master_key" secretsText;
 assert containsRegex "systemd.services.litellm" nixosAiText;
 true

@@ -36,7 +36,12 @@ model_list:
       model: ollama_chat/qwen3:8b
       api_base: http://127.0.0.1:11434
 
-  # ---- OpenRouter models ----
+  # ---- OpenRouter models (with thinking-effort variants) ----
+  # DeepSeek V4 Flash and V4 Pro support reasoning.effort = high | xhigh
+  # (xhigh maps to max reasoning).  Each effort level gets a separate model
+  # entry so clients can select the desired effort level by model name.
+  #
+  # Base variant (no reasoning param — lets the client decide).
   - model_name: deepseek/deepseek-v4-flash
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-flash
@@ -44,9 +49,45 @@ model_list:
       model_info:
         max_input_tokens: 98304
 
+  - model_name: deepseek/deepseek-v4-flash/reasoning_high
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+      reasoning:
+        effort: high
+      model_info:
+        max_input_tokens: 98304
+
+  - model_name: deepseek/deepseek-v4-flash/reasoning_xhigh
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+      reasoning:
+        effort: xhigh
+      model_info:
+        max_input_tokens: 98304
+
   - model_name: deepseek/deepseek-v4-pro
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-pro
       api_key: os.environ/OPENROUTER_API_KEY
+      model_info:
+        max_input_tokens: 98304
+
+  - model_name: deepseek/deepseek-v4-pro/reasoning_high
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4-pro
+      api_key: os.environ/OPENROUTER_API_KEY
+      reasoning:
+        effort: high
+      model_info:
+        max_input_tokens: 98304
+
+  - model_name: deepseek/deepseek-v4-pro/reasoning_xhigh
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4-pro
+      api_key: os.environ/OPENROUTER_API_KEY
+      reasoning:
+        effort: xhigh
       model_info:
         max_input_tokens: 98304
