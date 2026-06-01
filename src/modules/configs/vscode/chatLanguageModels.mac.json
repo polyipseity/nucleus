@@ -2,34 +2,60 @@
 	{
 		"models": [
 			{
-				"id": "devstral-small-2:24b",
+				"id": "ollama_chat/devstral-small-2:24b",
 				"maxInputTokens": 32768,
 				"maxOutputTokens": 8192,
 				"name": "Devstral Small 2 24B",
 				"toolCalling": true,
-				"url": "http://localhost:11434/v1",
+				"url": "http://127.0.0.1:4000/v1",
 				"vision": false
 			},
 			{
-				"id": "magistral:24b",
+				"id": "ollama_chat/magistral:24b",
 				"maxInputTokens": 32768,
 				"maxOutputTokens": 8192,
 				"name": "Magistral 24B",
 				"toolCalling": true,
-				"url": "http://localhost:11434/v1",
+				"url": "http://127.0.0.1:4000/v1",
 				"vision": false
 			},
 			{
-				"id": "qwen2.5:1.5b",
+				"id": "ollama_chat/qwen2.5:1.5b",
 				"maxInputTokens": 32768,
 				"maxOutputTokens": 8192,
 				"name": "Qwen 2.5 1.5B",
 				"toolCalling": false,
-				"url": "http://localhost:11434/v1",
+				"url": "http://127.0.0.1:4000/v1",
 				"vision": false
 			}
 		],
-		"name": "Ollama",
+		"name": "Ollama (via LiteLLM)",
+		"vendor": "customoai"
+	},
+	{
+		"models": [
+			{
+				"id": "deepseek/deepseek-v4-flash",
+				"maxInputTokens": 131072,
+				"maxOutputTokens": 8192,
+				"name": "DeepSeek V4 Flash",
+				"toolCalling": true,
+				"url": "http://127.0.0.1:4000/v1",
+				"vendor": "openrouter",
+				"vision": false
+			},
+			{
+				"id": "deepseek/deepseek-v4-pro",
+				"maxInputTokens": 131072,
+				"maxOutputTokens": 8192,
+				"name": "DeepSeek V4 Pro",
+				"toolCalling": true,
+				"url": "http://127.0.0.1:4000/v1",
+				"vendor": "openrouter",
+				"vision": false
+			}
+		],
+		"name": "OpenRouter (via LiteLLM)",
 		"vendor": "customoai"
 	}
 ]
