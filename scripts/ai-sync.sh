@@ -1,4 +1,10 @@
 #!/usr/bin/env sh
+# Override OLLAMA_HOST to point directly at Ollama (not LiteLLM) so that
+# model list/pull/rm commands talk to the inference backend directly instead
+# of routing through the AI gateway proxy.  The default session variable in
+# modules/ai/default.nix points at LiteLLM (127.0.0.1:4000).
+export OLLAMA_HOST="127.0.0.1:11434"
+
 # Synchronises locally installed Ollama models with the declarative manifest
 # at src/modules/ai/models.json.
 #

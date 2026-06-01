@@ -90,6 +90,12 @@ function Invoke-AISync {
   $resolvedRepoRoot = (Resolve-Path -Path $RepoRoot).Path
   $manifestPath     = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\ai\models.json"
 
+  # Override OLLAMA_HOST to point directly at Ollama (not LiteLLM) so that
+  # model list/pull/rm commands talk to the inference backend directly instead
+  # of routing through the AI gateway proxy.  The default user env var in
+  # user.dsc.yml points at LiteLLM (127.0.0.1:4000).
+  $env:OLLAMA_HOST = "127.0.0.1:11434"
+
   # Windows always uses the `Windows` profile — the `MacBook` profile is
   # tuned for Apple Silicon unified-memory hardware and is not applicable.
   $profileName = "Windows"
