@@ -445,7 +445,7 @@ in
     # appears immediately as an unstaged git diff.
     #
     # Files managed: settings.json, keybindings.<host>.json (linked as
-    #   keybindings.json), chatLanguageModels.<host>.json (linked as
+    #   keybindings.json), chatLanguageModels.<host>.json (merge-copied as
     #   chatLanguageModels.json), mcp.json, tasks.json.
     # Directories managed: snippets/, prompts/, profiles/,
     #   and globalStorage/github.copilot-chat/memory-tool/memories/
@@ -590,7 +590,31 @@ in
       for _vsym_base_dir in "${stableBaseDir}" "${insidersBaseDir}"; do
         ensure_file_symlink "$_vsym_config_dir/settings.json"    "$_vsym_base_dir/settings.json"
         ensure_file_symlink "$_vsym_config_dir/${vsCodeKeybindingsFile}" "$_vsym_base_dir/keybindings.json"
-        ensure_file_symlink "$_vsym_config_dir/${vsCodeChatLanguageModelsFile}" "$_vsym_base_dir/chatLanguageModels.json"
+
+        # chatLanguageModels is merge-copied rather than symlinked so that
+        # per-machine Ollama model entries added by VS Code directly are
+        # preserved across activations while repo-source entries are refreshed.
+        _chat_lm_repo="$_vsym_config_dir/${vsCodeChatLanguageModelsFile}"
+        _chat_lm_path="$_vsym_base_dir/chatLanguageModels.json"
+        if [ -L "$_chat_lm_path" ]; then
+          _nucleus_unprotect_symlink "$_chat_lm_path"
+          rm "$_chat_lm_path"
+        fi
+        if [ -s "$_chat_lm_path" ] 2>/dev/null; then
+          if ! ${pkgs.jq}/bin/jq -s \
+            '.[0] as $existing | reduce .[1][] as $item ($existing; (map(.name) | index($item.name)) as $idx | if $idx then .[$idx] = $item else . + [$item] end)' \
+            "$_chat_lm_path" "$_chat_lm_repo" > "$_chat_lm_path.tmp" 2>"$_chat_lm_path.jqerr"; then
+            echo "VS Code: warning — jq merge failed for $_chat_lm_path, keeping existing." >&2
+            cat "$_chat_lm_path.jqerr" >&2
+            rm -f "$_chat_lm_path.tmp" "$_chat_lm_path.jqerr"
+          else
+            mv "$_chat_lm_path.tmp" "$_chat_lm_path"
+            rm -f "$_chat_lm_path.jqerr"
+          fi
+        else
+          cp "$_chat_lm_repo" "$_chat_lm_path"
+        fi
+
         ensure_file_symlink "$_vsym_config_dir/mcp.json"         "$_vsym_base_dir/mcp.json"
         ensure_file_symlink "$_vsym_config_dir/tasks.json"       "$_vsym_base_dir/tasks.json"
         ensure_dir_symlink  "$_vsym_config_dir/snippets"         "$_vsym_base_dir/snippets"
