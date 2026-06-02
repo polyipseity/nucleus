@@ -197,8 +197,14 @@ lib.mkIf isPrimaryUser {
   # System-wide secrets — decrypted from the ``system`` SOPS file.
   #   - ``ai_openrouter_api_key``: OpenRouter API key, exported as
   #     OPENROUTER_API_KEY for the LiteLLM proxy.
+  #   - ``ai_opencode_api_key``: OpenCode Go API key, exported as
+  #     OPENCODE_GO_API_KEY for the LiteLLM proxy.
   # --------------------------------------------------------------------------
   sops.secrets."ai_openrouter_api_key" = {
+    sopsFile = ../secrets/system.yml;
+  };
+
+  sops.secrets."ai_opencode_api_key" = {
     sopsFile = ../secrets/system.yml;
   };
 
