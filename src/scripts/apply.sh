@@ -660,6 +660,329 @@ run_jellyfin_account_sync() {
   rm -f "$_rjas_resolved_file"
 }
 
+run_jellyfin_library_sync() {
+  # Converge Jellyfin library folders declared in src/modules/users.json.
+  # Each user can declare jellyfin.libraries (default empty).  Libraries are
+  # merged by name (first writer wins).  ~/ paths are resolved against each
+  # user's homeDirectory at sync time.
+  #
+  # Idempotent: missing libraries created, existing ones updated, undecorated
+  # libraries left untouched.  Reuses the api-request helpers defined by
+  # run_jellyfin_account_sync.
+
+  _rjls_users_json="$REPO_ROOT/src/modules/users.json"
+  if [ ! -f "$_rjls_users_json" ]; then
+    return
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    printf '%s\n' "jellyfin/library: curl is not available; skipping library sync"
+    return
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    printf '%s\n' "jellyfin/library: jq is not available; skipping library sync"
+    return
+  fi
+  if ! command -v sops >/dev/null 2>&1; then
+    printf '%s\n' "jellyfin/library: sops is not available; skipping library sync"
+    return
+  fi
+
+  # Build library specs and collect auth credentials from all users.
+  _rjls_specs_file="$(mktemp)"
+  _rjls_creds_file="$(mktemp)"
+
+  jq -cr '
+    to_entries[]
+    | . as $u
+    | (($u.value.jellyfin.libraries // []) | sort_by(.name)[])
+    | {
+        owner: $u.key,
+        home: $u.value.homeDirectory,
+        name: .name,
+        collectionType: .collectionType,
+        paths: (.paths // []),
+        options: .options
+      }
+  ' "$_rjls_users_json" > "$_rjls_specs_file"
+
+  # Collect auth credentials from all users with library declarations.
+  while IFS= read -r _rjls_spec; do
+    _rjls_owner="$(printf '%s' "$_rjls_spec" | jq -r '.owner')"
+    _rjls_secret_file="$REPO_ROOT/src/secrets/users-${_rjls_owner}.yml"
+    if [ ! -f "$_rjls_secret_file" ]; then
+      continue
+    fi
+
+    if ! _rjls_secret_json="$(sops --decrypt --output-type json "$_rjls_secret_file")"; then
+      continue
+    fi
+
+    # Look up jellyfin accounts for this user to get credentials.
+    jq -cr --arg owner "$_rjls_owner" '
+      .[$owner].jellyfin.accounts // [] | .[]
+      | {owner: $owner} + .
+    ' "$_rjls_users_json" 2>/dev/null | while IFS= read -r _rjls_account; do
+      _rjls_user_key="$(printf '%s' "$_rjls_account" | jq -r '.usernameSecretKey // empty')"
+      _rjls_pass_key="$(printf '%s' "$_rjls_account" | jq -r '.passwordSecretKey // empty')"
+      if [ -z "$_rjls_user_key" ] || [ -z "$_rjls_pass_key" ]; then
+        continue
+      fi
+      _rjls_username="$(printf '%s' "$_rjls_secret_json" | jq -r --arg key "$_rjls_user_key" '.[$key] // empty')"
+      _rjls_password="$(printf '%s' "$_rjls_secret_json" | jq -r --arg key "$_rjls_pass_key" '.[$key] // empty')"
+      if [ -z "$_rjls_username" ] || [ -z "$_rjls_password" ]; then
+        continue
+      fi
+      printf '%s\n' "$(jq -cn --arg owner "$_rjls_owner" --arg username "$_rjls_username" --arg password "$_rjls_password" '{owner:$owner,username:$username,password:$password}')"
+    done
+  done < "$_rjls_specs_file" > "$_rjls_creds_file"
+
+  if [ ! -s "$_rjls_specs_file" ]; then
+    rm -f "$_rjls_specs_file" "$_rjls_creds_file"
+    return
+  fi
+
+  # Resolve ~ paths against each user's homeDirectory.
+  _rjls_resolved_file="$(mktemp)"
+  while IFS= read -r _rjls_spec; do
+    _rjls_owner="$(printf '%s' "$_rjls_spec" | jq -r '.owner')"
+    _rjls_home="$(printf '%s' "$_rjls_spec" | jq -r '.home')"
+    _rjls_name="$(printf '%s' "$_rjls_spec" | jq -r '.name')"
+    _rjls_collection_type="$(printf '%s' "$_rjls_spec" | jq -r '.collectionType')"
+    _rjls_options="$(printf '%s' "$_rjls_spec" | jq -c '.options')"
+
+    _rjls_paths_json="$(printf '%s' "$_rjls_spec" | jq -c '.paths')"
+    _rjls_resolved_paths_json="$(printf '%s' "$_rjls_paths_json" | jq -c --arg home "$_rjls_home" '
+      map(if startswith("~/") then ($home + .[1:]) else . end)
+    ')"
+
+    jq -cn \
+      --arg owner "$_rjls_owner" \
+      --arg name "$_rjls_name" \
+      --arg collectionType "$_rjls_collection_type" \
+      --argjson paths "$_rjls_resolved_paths_json" \
+      --argjson options "$_rjls_options" \
+      '{owner:$owner,name:$name,collectionType:$collectionType,paths:$paths,options:$options}' >> "$_rjls_resolved_file"
+  done < "$_rjls_specs_file"
+
+  rm -f "$_rjls_specs_file"
+
+  if [ ! -s "$_rjls_resolved_file" ]; then
+    rm -f "$_rjls_resolved_file" "$_rjls_creds_file"
+    return
+  fi
+
+  # Merge by name (first writer wins).
+  _rjls_merged_file="$(mktemp)"
+  _rjls_merge_input="$(mktemp)"
+  while IFS= read -r _rjls_line; do printf '%s\n' "$_rjls_line"; done < "$_rjls_resolved_file" > "$_rjls_merge_input"
+  jq -s '
+    group_by(.name | ascii_downcase)
+    | map(.[0])
+    | to_entries
+    | map(.value)
+  ' "$_rjls_merge_input" > "$_rjls_merged_file" 2>/dev/null || cat "$_rjls_resolved_file" > "$_rjls_merged_file"
+  rm -f "$_rjls_merge_input"
+
+  rm -f "$_rjls_resolved_file"
+
+  # Probe readiness (API may already be up from account sync, but be safe).
+  _rjls_waited=0
+  while [ "$_rjls_waited" -lt 60 ]; do
+    if curl -fsS --max-time 5 "$_rjas_base_url/System/Info/Public" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+    _rjls_waited=$((_rjls_waited + 1))
+  done
+
+  if [ "$_rjls_waited" -ge 60 ]; then
+    printf '%s\n' "jellyfin/library: API at $_rjas_base_url is not reachable; skipping library sync"
+    rm -f "$_rjls_merged_file" "$_rjls_creds_file"
+    return
+  fi
+
+  # Acquire admin token (try each credentialed user).
+  _rjls_admin_token=""
+  while IFS= read -r _rjls_cred; do
+    _rjls_username="$(printf '%s' "$_rjls_cred" | jq -r '.username')"
+    _rjls_password="$(printf '%s' "$_rjls_cred" | jq -r '.password')"
+
+    _rjls_auth_payload="$(jq -cn --arg username "$_rjls_username" --arg password "$_rjls_password" '{Username:$username,Pw:$password}')"
+    _rjls_auth_response="$(_rjas_api_request POST '/Users/AuthenticateByName' '' "$_rjls_auth_payload")"
+    _rjls_auth_status="$(_rjas_status_from_response "$_rjls_auth_response")"
+    if [ "$_rjls_auth_status" != "200" ]; then
+      continue
+    fi
+
+    _rjls_token="$(printf '%s' "$(_rjas_body_from_response "$_rjls_auth_response")" | jq -r '.AccessToken // empty')"
+    if [ -z "$_rjls_token" ]; then
+      continue
+    fi
+
+    _rjls_me_response="$(_rjas_api_request GET '/Users/Me' "$_rjls_token" '')"
+    _rjls_me_status="$(_rjas_status_from_response "$_rjls_me_response")"
+    if [ "$_rjls_me_status" != "200" ]; then
+      continue
+    fi
+
+    _rjls_is_admin="$(printf '%s' "$(_rjas_body_from_response "$_rjls_me_response")" | jq -r '.Policy.IsAdministrator // false')"
+    if [ "$_rjls_is_admin" = "true" ]; then
+      _rjls_admin_token="$_rjls_token"
+      break
+    fi
+  done < "$_rjls_creds_file"
+
+  if [ -z "$_rjls_admin_token" ]; then
+    _rjls_bootstrap_cred="$(head -n 1 "$_rjls_creds_file")"
+    if [ -n "$_rjls_bootstrap_cred" ]; then
+      _rjls_bootstrap_username="$(printf '%s' "$_rjls_bootstrap_cred" | jq -r '.username')"
+      _rjls_bootstrap_password="$(printf '%s' "$_rjls_bootstrap_cred" | jq -r '.password')"
+      _rjls_startup_payload="$(jq -cn --arg name "$_rjls_bootstrap_username" --arg password "$_rjls_bootstrap_password" '{Name:$name,Password:$password}')"
+      _rjls_startup_response="$(_rjas_api_request POST '/Startup/User' '' "$_rjls_startup_payload")"
+      _rjls_startup_status="$(_rjas_status_from_response "$_rjls_startup_response")"
+      if [ "$_rjls_startup_status" = "204" ]; then
+        _rjas_complete_response="$(_rjas_api_request POST '/Startup/Complete' '' '')"
+      fi
+
+      _rjls_bootstrap_attempt=0
+      while [ "$_rjls_bootstrap_attempt" -lt 15 ] && [ -z "$_rjls_admin_token" ]; do
+        _rjls_bootstrap_auth_response="$(_rjas_api_request POST '/Users/AuthenticateByName' '' "$_rjls_startup_payload")"
+        _rjls_bootstrap_auth_status="$(_rjas_status_from_response "$_rjls_bootstrap_auth_response")"
+        if [ "$_rjls_bootstrap_auth_status" = "200" ]; then
+          _rjls_bootstrap_token="$(printf '%s' "$(_rjas_body_from_response "$_rjls_bootstrap_auth_response")" | jq -r '.AccessToken // empty')"
+          if [ -n "$_rjls_bootstrap_token" ]; then
+            _rjls_bootstrap_me_response="$(_rjas_api_request GET '/Users/Me' "$_rjls_bootstrap_token" '')"
+            _rjls_bootstrap_is_admin="$(printf '%s' "$(_rjas_body_from_response "$_rjls_bootstrap_me_response")" | jq -r '.Policy.IsAdministrator // false')"
+            if [ "$_rjls_bootstrap_is_admin" = "true" ]; then
+              _rjls_admin_token="$_rjls_bootstrap_token"
+              break
+            fi
+          fi
+        fi
+        sleep 1
+        _rjls_bootstrap_attempt=$((_rjls_bootstrap_attempt + 1))
+      done
+    fi
+  fi
+
+  if [ -z "$_rjls_admin_token" ]; then
+    printf '%s\n' "jellyfin/library: no elevated account credentials available; skipping library sync"
+    rm -f "$_rjls_merged_file" "$_rjls_creds_file"
+    return
+  fi
+
+  rm -f "$_rjls_creds_file"
+
+  # GET /Library/VirtualFolders — list existing folders.
+  _rjls_folders_response="$(_rjas_api_request GET '/Library/VirtualFolders' "$_rjls_admin_token" '')"
+  _rjls_folders_status="$(_rjas_status_from_response "$_rjls_folders_response")"
+  if [ "$_rjls_folders_status" != "200" ]; then
+    printf '%s\n' "jellyfin/library: failed to list virtual folders (HTTP $_rjls_folders_status); skipping"
+    rm -f "$_rjls_merged_file"
+    return
+  fi
+  _rjls_folders_body="$(_rjas_body_from_response "$_rjls_folders_response")"
+
+  # For each declared library: create if missing, update options if exists.
+  _rjls_libs="$(cat "$_rjls_merged_file")"
+  rm -f "$_rjls_merged_file"
+
+  printf '%s' "$_rjls_libs" | jq -c '.[]' | while IFS= read -r _rjls_lib; do
+    _rjls_name="$(printf '%s' "$_rjls_lib" | jq -r '.name')"
+    _rjls_collection_type="$(printf '%s' "$_rjls_lib" | jq -r '.collectionType')"
+    _rjls_paths="$(printf '%s' "$_rjls_lib" | jq -c '.paths')"
+    _rjls_options="$(printf '%s' "$_rjls_lib" | jq -c '.options')"
+
+    # Build LibraryOptions payload matching the JSON schema in users.json.
+    _rjls_backdrop_limit="$(printf '%s' "$_rjls_options" | jq -r '.imageOptions.Backdrop.limit // 1')"
+    _rjls_backdrop_minwidth="$(printf '%s' "$_rjls_options" | jq -r '.imageOptions.Backdrop.minWidth // 1280')"
+    _rjls_logo_limit="$(printf '%s' "$_rjls_options" | jq -r '.imageOptions.Logo.limit // 1')"
+    _rjls_primary_limit="$(printf '%s' "$_rjls_options" | jq -r '.imageOptions.Primary.limit // 1')"
+    _rjls_image_fetchers="$(printf '%s' "$_rjls_options" | jq -c '.imageFetchers // ["Embedded Image Extractor","Screen Grabber"]')"
+
+    _rjls_library_options="$(jq -cn \
+      --argjson enabled "$(printf '%s' "$_rjls_options" | jq '.enabled // true')" \
+      --argjson enableRealtimeMonitor "$(printf '%s' "$_rjls_options" | jq '.enableRealtimeMonitor // true')" \
+      --argjson enableEmbeddedTitles "$(printf '%s' "$_rjls_options" | jq '.enableEmbeddedTitles // true')" \
+      --argjson enableEmbeddedExtrasTitles "$(printf '%s' "$_rjls_options" | jq '.enableEmbeddedExtrasTitles // false')" \
+      --arg allowEmbeddedSubtitles "$(printf '%s' "$_rjls_options" | jq -r '.allowEmbeddedSubtitles // "AllowAll"')" \
+      --argjson saveLocalMetadata "$(printf '%s' "$_rjls_options" | jq '.saveLocalMetadata // false')" \
+      --argjson enableChapterImageExtraction "$(printf '%s' "$_rjls_options" | jq '.enableChapterImageExtraction // true')" \
+      --argjson extractChapterImagesDuringLibraryScan "$(printf '%s' "$_rjls_options" | jq '.extractChapterImagesDuringLibraryScan // false')" \
+      --argjson enableTrickplayImageExtraction "$(printf '%s' "$_rjls_options" | jq '.enableTrickplayImageExtraction // true')" \
+      --argjson extractTrickplayImagesDuringLibraryScan "$(printf '%s' "$_rjls_options" | jq '.extractTrickplayImagesDuringLibraryScan // false')" \
+      --argjson saveTrickplayWithMedia "$(printf '%s' "$_rjls_options" | jq '.saveTrickplayWithMedia // false')" \
+      --argjson imageFetchers "$_rjls_image_fetchers" \
+      --argjson backdropLimit "$_rjls_backdrop_limit" \
+      --argjson backdropMinWidth "$_rjls_backdrop_minwidth" \
+      --argjson logoLimit "$_rjls_logo_limit" \
+      --argjson primaryLimit "$_rjls_primary_limit" \
+      '{
+        Enabled: $enabled,
+        EnableRealtimeMonitor: $enableRealtimeMonitor,
+        EnableEmbeddedTitles: $enableEmbeddedTitles,
+        EnableEmbeddedExtrasTitles: $enableEmbeddedExtrasTitles,
+        AllowEmbeddedSubtitles: $allowEmbeddedSubtitles,
+        MetadataSavers: [],
+        SaveLocalMetadata: $saveLocalMetadata,
+        EnableChapterImageExtraction: $enableChapterImageExtraction,
+        ExtractChapterImagesDuringLibraryScan: $extractChapterImagesDuringLibraryScan,
+        EnableTrickplayImageExtraction: $enableTrickplayImageExtraction,
+        ExtractTrickplayImagesDuringLibraryScan: $extractTrickplayImagesDuringLibraryScan,
+        SaveTrickplayWithMedia: $saveTrickplayWithMedia,
+        TypeOptions: [
+          {
+            Type: "MusicVideo",
+            ImageFetchers: $imageFetchers,
+            ImageFetcherOrder: $imageFetchers,
+            MetadataFetchers: [],
+            ImageOptions: [
+              {Type: "Backdrop", Limit: $backdropLimit, MinWidth: $backdropMinWidth},
+              {Type: "Logo", Limit: $logoLimit},
+              {Type: "Primary", Limit: $primaryLimit}
+            ]
+          }
+        ]
+      }')"
+
+    # Check if this library already exists.
+    _rjls_existing_item_id="$(printf '%s' "$_rjls_folders_body" | jq -r --arg name "$_rjls_name" '
+      map(select(.Name == $name))
+      | .[0]
+      | (.ItemId // .Id // empty)
+    ')"
+
+    if [ -z "$_rjls_existing_item_id" ]; then
+      # Create new library.
+      _rjls_query_params="name=$(printf '%s' "$_rjls_name" | jq -sRr @uri)&collectionType=$(printf '%s' "$_rjls_collection_type" | jq -sRr @uri)"
+      _rjls_paths_file="$(mktemp)"
+      printf '%s' "$_rjls_paths" | jq -r '.[]' > "$_rjls_paths_file"
+      while IFS= read -r _rjls_path; do
+        _rjls_query_params="$_rjls_query_params&paths=$(printf '%s' "$_rjls_path" | jq -sRr @uri)"
+      done < "$_rjls_paths_file"
+      rm -f "$_rjls_paths_file"
+      _rjls_create_response="$(_rjas_api_request POST "/Library/VirtualFolders?${_rjls_query_params}" "$_rjls_admin_token" "$_rjls_library_options")"
+      _rjls_create_status="$(_rjas_status_from_response "$_rjls_create_response")"
+      if [ "$_rjls_create_status" = "204" ]; then
+        printf '%s\n' "jellyfin/library: created library '$_rjls_name' ($_rjls_collection_type)"
+      else
+        printf '%s\n' "jellyfin/library: failed to create library '$_rjls_name' (HTTP $_rjls_create_status)" >&2
+      fi
+    else
+      # Update existing library options.
+      _rjls_update_payload="$(jq -cn --arg id "$_rjls_existing_item_id" --argjson options "$_rjls_library_options" '{Id:$id,LibraryOptions:$options}')"
+      _rjls_update_response="$(_rjas_api_request POST '/Library/VirtualFolders/LibraryOptions' "$_rjls_admin_token" "$_rjls_update_payload")"
+      _rjls_update_status="$(_rjas_status_from_response "$_rjls_update_response")"
+      if [ "$_rjls_update_status" = "204" ]; then
+        printf '%s\n' "jellyfin/library: updated library options for '$_rjls_name'"
+      else
+        printf '%s\n' "jellyfin/library: failed to update library options for '$_rjls_name' (HTTP $_rjls_update_status)" >&2
+      fi
+    fi
+  done
+}
+
 run_caddy_local_ca_trust() {
   # Trust Caddy's local CA so certificates from tls internal are recognized by
   # local TLS clients. This applies generally to every local reverse proxy that
@@ -907,6 +1230,7 @@ case "$(uname -s)" in
     ensure_prek_hooks_installed "$REPO_ROOT"
     run_caddy_local_ca_trust sudo
     run_jellyfin_account_sync
+    run_jellyfin_library_sync
     run_ai_sync
     run_replica_sync
     run_vm_setup
@@ -927,6 +1251,7 @@ case "$(uname -s)" in
       ensure_prek_hooks_installed "$REPO_ROOT"
       run_caddy_local_ca_trust sudo
       run_jellyfin_account_sync
+      run_jellyfin_library_sync
       run_ai_sync
       run_replica_sync
       run_vm_setup
@@ -942,6 +1267,7 @@ case "$(uname -s)" in
       ensure_prek_hooks_installed "$REPO_ROOT"
       run_caddy_local_ca_trust user
       run_jellyfin_account_sync
+      run_jellyfin_library_sync
       run_ai_sync
       run_replica_sync
       run_vm_setup
