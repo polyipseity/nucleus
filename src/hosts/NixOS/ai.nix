@@ -32,10 +32,6 @@ in
         if [ -f "$_keyfile" ]; then
           export OPENROUTER_API_KEY="$(cat "$_keyfile")"
         fi
-        _mkeyfile="${config.sops.secrets."litellm_master_key".path}"
-        if [ -f "$_mkeyfile" ]; then
-          export LITELLM_MASTER_KEY="$(cat "$_mkeyfile")"
-        fi
         exec ${pkgs.litellm}/bin/litellm \
           --config ${litellmConfig} \
           --port 4000 \

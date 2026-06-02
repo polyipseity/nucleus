@@ -96,9 +96,6 @@ lib.mkMerge [
             if [ -f "${config.sops.secrets."ai_openrouter_api_key".path}" ]; then
               export OPENROUTER_API_KEY="$(cat "${config.sops.secrets."ai_openrouter_api_key".path}")"
             fi
-            if [ -f "${config.sops.secrets."litellm_master_key".path}" ]; then
-              export LITELLM_MASTER_KEY="$(cat "${config.sops.secrets."litellm_master_key".path}")"
-            fi
             exec ${pkgs.litellm}/bin/litellm \
               --config ${pkgs.writeText "litellm-config.yml" (builtins.readFile ./litellm-config.yml)} \
               --port 4000 \
