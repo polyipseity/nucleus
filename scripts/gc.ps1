@@ -48,6 +48,9 @@
 .PARAMETER SkipVMPrune
   Skip stale VM artifact removal.
 
+.PARAMETER SkipRecycleBinPurge
+  Skip Windows Recycle Bin 30-day auto-purge.
+
 .EXAMPLE
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus"
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -SkipToolCachePrune
@@ -62,7 +65,8 @@ param(
   [switch]$SkipOllamaPrune,
   [switch]$SkipScoopCleanup,
   [switch]$SkipWallpaperPrune,
-  [switch]$SkipVMPrune
+  [switch]$SkipVMPrune,
+  [switch]$SkipRecycleBinPurge
 )
 
 $ErrorActionPreference = "Stop"
@@ -118,6 +122,71 @@ function Remove-VMPruneItem {
   catch {
     Write-Warning "gc: failed to remove $Label '$($Item.FullName)' — $($_.Exception.Message)"
   }
+}
+
+function Clear-RecycleBinItemsOlderThanDays {
+  <#
+  .SYNOPSIS
+    Permanently delete Recycle Bin items older than a specified age threshold.
+
+  .DESCRIPTION
+    Uses the Shell.Application COM object to enumerate items in the Recycle Bin
+    and permanently deletes those whose deletion date exceeds the age limit.
+    Provides cross-host parity with the macOS 30-day Finder Trash auto-prune.
+
+  .PARAMETER Days
+    Age threshold in days. Default: 30.
+  #>
+  [CmdletBinding(SupportsShouldProcess = $true)]
+  param(
+    [Parameter()]
+    [int]$Days = 30
+  )
+
+  $cutoff = (Get-Date).AddDays(-$Days)
+
+  try {
+    $shell = New-Object -ComObject Shell.Application
+  } catch {
+    Write-Warning "gc: failed to create Shell.Application COM object — skipping Recycle Bin purge"
+    return
+  }
+
+  $rb = $shell.NameSpace(0xa)  # 0xa = Recycle Bin
+  if ($null -eq $rb) {
+    Write-Output "gc: Recycle Bin not accessible; skipping purge"
+    return
+  }
+
+  $removedCount = 0
+  $totalCount   = 0
+
+  foreach ($item in $rb.Items()) {
+    $totalCount++
+
+    # GetDetailsOf index 4 = modification/deletion date
+    $detail = $rb.GetDetailsOf($item, 4)
+    if (-not $detail) { continue }
+
+    try {
+      $itemDate = [DateTime]::Parse($detail, [CultureInfo]::InvariantCulture)
+    } catch {
+      continue
+    }
+
+    if ($itemDate -lt $cutoff) {
+      if ($PSCmdlet.ShouldProcess($item.Path, "Permanently delete stale Recycle Bin item")) {
+        try {
+          Remove-Item -LiteralPath $item.Path -Force -ErrorAction Stop
+          $removedCount++
+        } catch {
+          Write-Warning "gc: failed to delete '$($item.Name)' — $($_.Exception.Message)"
+        }
+      }
+    }
+  }
+
+  Write-Output "gc: Recycle Bin purge — removed $removedCount of $totalCount items older than $Days days"
 }
 
 # Load only the modules required by this script.
@@ -209,7 +278,14 @@ if (-not $SkipOllamaPrune) {
   }
 }
 
-# ---- Step 5: stale VM artifact removal ------________________________________
+# ---- Step 5: Recycle Bin 30-day auto-purge ----------------------------------
+# Permanently deletes Recycle Bin items older than 30 days for cross-host parity
+# with the macOS Finder 30-day Trash auto-prune (FXRemoveOldTrashItems).
+if (-not $SkipRecycleBinPurge) {
+  Clear-RecycleBinItemsOlderThanDays -Days 30
+}
+
+# ---- Step 6: stale VM artifact removal ------________________________________
 # Removes temporary Packer build directories, cached Windows installers, and
 # pre-built disk images for VMs no longer declared in src/modules/VMs.json.
 # WHY: VM disk images and installer caches are large (multi-gigabyte);
