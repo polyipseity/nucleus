@@ -30,6 +30,7 @@ let
   windowsCaddyTrustText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyLocalCA.ps1;
   windowsJellyfinHttpsProxyText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinHttpsProxy.ps1;
   windowsJellyfinAccountText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinAccount.ps1;
+  windowsJellyfinLibraryText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinLibrary.ps1;
   windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
   windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
   windowsSystemText = builtins.readFile ../../src/hosts/Windows/system.dsc.yml;
@@ -116,6 +117,34 @@ let
     && containsRegex ''caddy.*trust --address 127\.0\.0\.1:2019'' windowsCaddyTrustText
   ) "Caddy local CA trust must be automated across POSIX and Windows apply flows";
 
+  test_posix_library_sync_function_exists = assert' (
+    containsRegex "run_jellyfin_library_sync" applyScriptText
+    && containsRegex "Library/VirtualFolders" applyScriptText
+    && containsRegex "LibraryOptions" applyScriptText
+  ) "apply.sh must contain the run_jellyfin_library_sync function with Jellyfin API calls";
+
+  test_posix_library_sync_wired_in_all_branches = assert' (containsRegex "run_jellyfin_library_sync" applyScriptText) "POSIX library sync must appear in apply.sh after account sync in Darwin, NixOS, and Linux branches";
+
+  test_posix_polyipseity_library_declared_in_users_json = assert' (
+    (builtins.length (usersRegistry.polyipseity.jellyfin.libraries or [ ])) > 0
+    &&
+      ((builtins.head (usersRegistry.polyipseity.jellyfin.libraries or [ { } ])).name or "")
+      == "music videos"
+  ) "polyipseity must declare at least one jellyfin library in POSIX users.json";
+
+  test_windows_polyipseity_library_declared_in_users_json = assert' (
+    (builtins.length (windowsUsersRegistry.users.polyipseity.jellyfin.libraries or [ ])) > 0
+    &&
+      ((builtins.head (windowsUsersRegistry.users.polyipseity.jellyfin.libraries or [ { } ])).name or "")
+      == "music videos"
+  ) "polyipseity must declare at least one jellyfin library in Windows users.json";
+
+  test_windows_library_module_wired = assert' (
+    containsRegex "Sync-JellyfinLibrary" windowsApplyText
+    && containsRegex "function Sync-JellyfinLibrary" windowsJellyfinLibraryText
+    && containsRegex "Library/VirtualFolders" windowsJellyfinLibraryText
+  ) "Windows apply flow must import and call Sync-JellyfinLibrary module";
+
   allTests = [
     test_core_installs_jellyfin
     test_nixos_imports_host_jellyfin_module
@@ -133,6 +162,11 @@ let
     test_jellyfin_admin_flag_defaults_false_in_sync_logic
     test_jellyfin_admin_policy_is_converged
     test_caddy_local_ca_trust_is_automated
+    test_posix_library_sync_function_exists
+    test_posix_library_sync_wired_in_all_branches
+    test_posix_polyipseity_library_declared_in_users_json
+    test_windows_polyipseity_library_declared_in_users_json
+    test_windows_library_module_wired
   ];
 in
 {
