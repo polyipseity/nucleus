@@ -414,6 +414,14 @@ in
     withRuby = false;
   };
 
+  # Defense-in-depth: ensure EDITOR/VISUAL resolve to nvim even on hosts where
+  # the system-level default (e.g. NixOS nano) would otherwise win the global
+  # environment namespace over the home-manager user-level setting.
+  home.sessionVariables = {
+    EDITOR = "nvim";
+    VISUAL = "nvim";
+  };
+
   # Keep Neovim in native init.lua format and route managed defaults through a
   # single generated file so per-user overrides remain declarative.
   xdg.configFile."nvim/init.lua".text = neovimInitLua;

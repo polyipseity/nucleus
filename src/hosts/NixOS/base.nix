@@ -1,6 +1,5 @@
 # NixOS/base.nix — Fundamental NixOS settings common to this host.
-{ lib, pkgs, ... }:
-{
+{ lib, pkgs, ... }: {
   # Keep device firmware update support enabled (parity with the
   # "automatic critical updates" posture on macOS).
   # Source: NixOS fwupd option reference.
@@ -31,4 +30,8 @@
   # Source: OpenCode CLI env var table (`OPENCODE_DISABLE_AUTOUPDATE`)
   # https://opencode.ai/docs/zh-tw/cli/#環境變數
   environment.variables.OPENCODE_DISABLE_AUTOUPDATE = "true";
+
+  # Disable nano to prevent its default EDITOR assignment from overriding
+  # home-manager's neovim defaultEditor at the system level.
+  programs.nano.enable = false;
 }
