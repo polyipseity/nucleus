@@ -299,6 +299,31 @@ let
     && !(lib.hasInfix "boot.initrd.availableKernelModules = [ \\\"virtio_fs\\\" ];" nixos_packer_text)
   ) "NixOS guest generation must not force virtio_fs into the initrd on current kernels";
 
+  # NixOS guest must enable the QEMU guest agent for host-guest communication
+  # (VM lifecycle events, ballooning, clipboard sharing, etc.)
+  test_nixos_guest_qemu_guest_enabled = assert'
+    (lib.hasInfix "services.qemuGuest.enable = true;" guest_nix_text)
+    "NixOS guest.nix must enable services.qemuGuest.enable";
+
+  # NixOS guest must enable OpenSSH for remote access and credential-free
+  # host-guest communication via the QEMU SSH port forward.
+  test_nixos_guest_openssh_enabled = assert'
+    (lib.hasInfix "services.openssh.enable = true;" guest_nix_text)
+    "NixOS guest.nix must enable services.openssh.enable";
+
+  # NixOS guest must declare the nucleus-rebuild oneshot systemd service for
+  # converging the guest to the latest flake-defined state.
+  test_nixos_guest_nucleus_rebuild_service = assert'
+    (lib.hasInfix "systemd.services.nucleus-rebuild" guest_nix_text)
+    "NixOS guest.nix must declare the nucleus-rebuild systemd service";
+
+  # NixOS guest must accept the SSH public key via the
+  # NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY environment variable so the host can
+  # authenticate to the guest without interactive password entry.
+  test_nixos_guest_ssh_authorized_keys = assert'
+    (lib.hasInfix "NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY" guest_nix_text)
+    "NixOS guest.nix must reference NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY in authorized keys";
+
   # ---------------------------------------------------------------------------
   # Homebrew dependency tests
   # ---------------------------------------------------------------------------
@@ -841,6 +866,10 @@ let
     test_vm_setup_scripts_exist
     test_guest_nix_nonempty
     test_nixos_guest_virtiofs_not_forced
+    test_nixos_guest_qemu_guest_enabled
+    test_nixos_guest_openssh_enabled
+    test_nixos_guest_nucleus_rebuild_service
+    test_nixos_guest_ssh_authorized_keys
     test_tart_in_homebrew
     test_macbook_linux_builder_enabled
     test_macbook_linux_builder_machines_file
@@ -917,6 +946,10 @@ in
     test_vm_setup_scripts_exist
     test_guest_nix_nonempty
     test_nixos_guest_virtiofs_not_forced
+    test_nixos_guest_qemu_guest_enabled
+    test_nixos_guest_openssh_enabled
+    test_nixos_guest_nucleus_rebuild_service
+    test_nixos_guest_ssh_authorized_keys
     test_tart_in_homebrew
     test_macbook_linux_builder_enabled
     test_macbook_linux_builder_machines_file
