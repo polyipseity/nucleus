@@ -184,6 +184,7 @@ let
         && containsRegex "\\$MYSIDES_BIN add \"Music\" \"file://\\$HOME/Music\"" macosText
         && containsRegex "\\$MYSIDES_BIN add \"Movies\" \"file://\\$HOME/Movies\"" macosText
         && containsRegex "\\$MYSIDES_BIN add \"Pictures\" \"file://\\$HOME/Pictures\"" macosText
+        && containsRegex "\\$MYSIDES_BIN add \"virtual machines\" \"file://\\$HOME/virtual machines\"" macosText
         && containsRegex "\\$MYSIDES_BIN remove \"/\"" macosText
         && containsRegex "\\$MYSIDES_BIN remove \"\\$\\(id -un\\)\"" macosText
         && containsRegex "\\$MYSIDES_BIN remove \\\"\\.Trash\\\"" macosText

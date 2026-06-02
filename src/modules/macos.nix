@@ -585,6 +585,10 @@ let
       name = "Pictures";
       url = "file://${config.home.homeDirectory}/Pictures";
     }
+    {
+      name = "virtual machines";
+      url = "file://${config.home.homeDirectory}/virtual machines";
+    }
   ];
 
   # Keep expected sidebar order derivable from the managed favorites list.
@@ -598,6 +602,7 @@ let
       mkdir -p "$HOME/data"
     fi
     mkdir -p "$HOME/dev"
+    mkdir -p "$HOME/virtual machines"
     mkdir -p "$HOME/Desktop" "$HOME/Documents" "$HOME/Downloads" "$HOME/Movies" "$HOME/Music" "$HOME/Pictures"
   '';
 
