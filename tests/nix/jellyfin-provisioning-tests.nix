@@ -127,6 +127,8 @@ let
 
   test_posix_library_sync_wired_in_all_branches = assert' (containsRegex "jellyfin-sync\.sh" applyScriptText) "POSIX library sync dispatch must appear in apply.sh for Darwin, NixOS, and Linux branches";
 
+  test_posix_library_sync_passes_repo_root = assert' (containsRegex "NUCLEUS_REPO_ROOT=.*sh.*jellyfin-sync\\.sh" applyScriptText) "apply.sh must pass NUCLEUS_REPO_ROOT environment variable to jellyfin-sync.sh";
+
   test_posix_polyipseity_library_declared_in_users_json = assert' (
     (builtins.length (usersRegistry.polyipseity.jellyfin.libraries or [ ])) > 0
     &&
@@ -166,6 +168,7 @@ let
     test_caddy_local_ca_trust_is_automated
     test_posix_library_sync_function_exists
     test_posix_library_sync_wired_in_all_branches
+    test_posix_library_sync_passes_repo_root
     test_posix_polyipseity_library_declared_in_users_json
     test_windows_polyipseity_library_declared_in_users_json
     test_windows_library_module_wired
