@@ -665,7 +665,7 @@ in
       FXDefaultSearchScope = "SCcf"; # default search scope: current folder
       FXEnableExtensionChangeWarning = false; # suppress extension-change dialog friction for power workflows
       FXPreferredViewStyle = "clmv"; # default view: column view
-      FXRemoveOldTrashItems = true; # auto-prune Trash after 30 days to reduce maintenance clutter
+      FXRemoveOldTrashItems = true; # auto-prune Trash; Apple default is 30 days (non-configurable boolean)
       ShowPathbar = true; # show path breadcrumb bar at bottom
       ShowStatusBar = true; # show item count / available space bar
     };
