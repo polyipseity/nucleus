@@ -11,6 +11,7 @@
 let
   # Read the live files so this test catches wiring drift in the real repo.
   applyScriptText = builtins.readFile ../../src/scripts/apply.sh;
+  installPrekHooksText = builtins.readFile ../../src/scripts/install-prek-hooks.sh;
   coreModuleText = builtins.readFile ../../src/modules/core.nix;
   flakeText = builtins.readFile ../../src/flake.nix;
   posixPwshText = builtins.readFile ../../src/modules/pwsh.nix;
@@ -32,8 +33,8 @@ let
   ) "mkApplyApp runtimeInputs must bundle pkgs.prek for first-run apply hook installation";
 
   test_posix_apply_installs_hooks = assert' (
-    (lib.hasInfix "ensure_prek_hooks_installed()" applyScriptText)
-    && (lib.hasInfix "prek install" applyScriptText)
+    (lib.hasInfix "install-prek-hooks.sh" applyScriptText)
+    && (lib.hasInfix "prek install" installPrekHooksText)
   ) "POSIX apply flow must install prek hooks for the live repository";
 
   test_zsh_hook_installs_hooks = assert' (
@@ -61,11 +62,11 @@ let
     && (lib.hasInfix "function global:prompt" windowsShellProfileText)
   ) "Windows shell profile must auto-install prek hooks when pwsh enters a repo";
 
-  test_posix_prek_uses_git_rev_parse = assert' ((lib.hasInfix "git rev-parse --git-dir" applyScriptText)) "POSIX apply.sh must use 'git rev-parse --git-dir' to handle .git as file (submodules, worktrees)";
+  test_posix_prek_uses_git_rev_parse = assert' ((lib.hasInfix "git rev-parse --git-dir" installPrekHooksText)) "POSIX install-prek-hooks.sh must use 'git rev-parse --git-dir' to handle .git as file (submodules, worktrees)";
 
   test_windows_prek_uses_git_rev_parse = assert' ((lib.hasInfix "git rev-parse --git-dir" posixPwshText)) "Windows pwsh Test-PrekHooksInstalled must use 'git rev-parse --git-dir' to handle .git as file (submodules, worktrees)";
 
-  test_posix_prek_handles_relative_git_dir = assert' ((lib.hasInfix "_ephi_git_dir=" applyScriptText)) "POSIX apply.sh must store git-dir output and construct hook path dynamically";
+  test_posix_prek_handles_relative_git_dir = assert' ((lib.hasInfix "_ephi_git_dir=" installPrekHooksText)) "POSIX install-prek-hooks.sh must store git-dir output and construct hook path dynamically";
 
   test_windows_prek_handles_relative_git_dir = assert' ((lib.hasInfix "IsPathRooted" posixPwshText)) "Windows pwsh must handle relative paths from git rev-parse --git-dir using IsPathRooted check";
 
