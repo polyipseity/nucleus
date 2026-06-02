@@ -1,7 +1,7 @@
     - resource: Microsoft.Windows.Settings/TaskScheduler
       directives:
         description: >-
-          Schedule weekly garbage collection on Sunday at 00:00 UTC to reclaim stale
+          Schedule weekly garbage collection on Sunday at 12:00 local time to reclaim stale
           VM artifacts, build outputs, and tool caches (mirrors macOS launchd and NixOS
           systemd timers for cross-host gc parity). The task discovers nucleus repo root
           via %USERPROFILE%\.config\nucleus\repo-root fallback git discovery,
@@ -25,41 +25,7 @@
           & $GcScript -ModuleDir $ModuleDir -RepoRoot $RepoRoot
         Trigger: Weekly
         DaysOfWeek: Sunday
-        AtTime: 00:00
-        Enabled: true
-        RunWithHighestPrivileges: false
-        RunOnlyWhenNetworkAvailable: false
-        RunOnlyIfLoggedOn: true
-
-    - resource: Microsoft.Windows.Settings/TaskScheduler
-      directives:
-        description: >-
-          Schedule daily Recycle Bin 30-day auto-purge at 00:00 to remove stale
-          items for cross-host parity with macOS Finder 30-day Trash auto-prune.
-      settings:
-        TaskPath: \nucleus\
-        TaskName: recycle-bin-purge
-        TaskDescriptionLiteral: Daily Recycle Bin 30-day auto-purge
-        Action: |
-          $cutoff = (Get-Date).AddDays(-30)
-          try {
-            $shell = New-Object -ComObject Shell.Application
-            $rb = $shell.NameSpace(0xa)
-            if ($rb) {
-              $rb.Items() | ForEach-Object {
-                try {
-                  $detail = $rb.GetDetailsOf($_, 4)
-                  if ($detail -and ([DateTime]::Parse($detail, [CultureInfo]::InvariantCulture) -lt $cutoff)) {
-                    Remove-Item -LiteralPath $_.Path -Force -ErrorAction Stop
-                  }
-                } catch {}
-              }
-            }
-          } catch {
-            exit 0
-          }
-        Trigger: Daily
-        AtTime: 00:00
+        AtTime: 12:00
         Enabled: true
         RunWithHighestPrivileges: false
         RunOnlyWhenNetworkAvailable: false
@@ -691,6 +657,45 @@ properties:
         valueName: Times New Roman
         valueData: Source Serif 4
         valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Enable Storage Sense for automatic disk cleanup (Microsoft Policy CSP
+          Storage/AllowStorageSenseGlobal). Storage Sense natively handles
+          Recycle Bin, temporary files, and Downloads cleanup at the configured
+          cadence, replacing the previous COM-based Recycle Bin scheduled task
+          with a first-party Windows mechanism.
+      settings:
+        keyPath: HKLM\Software\Policies\Microsoft\Windows\StorageSense
+        valueName: AllowStorageSenseGlobal
+        valueData: 1
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Run Storage Sense daily at 12:00 local time (Microsoft Policy CSP
+          Storage/ConfigStorageSenseGlobalCadence). Daily execution provides
+          prompt cleanup while avoiding the overhead of continuous monitoring.
+      settings:
+        keyPath: HKLM\Software\Policies\Microsoft\Windows\StorageSense
+        valueName: ConfigStorageSenseGlobalCadence
+        valueData: 1
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Set Recycle Bin cleanup threshold to 30 days (Microsoft Policy CSP
+          Storage/ConfigStorageSenseRecycleBinCleanupThreshold). Cross-host
+          parity with the macOS Finder 30-day Trash auto-prune
+          (FXRemoveOldTrashItems).
+      settings:
+        keyPath: HKLM\Software\Policies\Microsoft\Windows\StorageSense
+        valueName: ConfigStorageSenseRecycleBinCleanupThreshold
+        valueData: 30
+        valueType: DWord
 
     - resource: Microsoft.Windows.Settings/Firewall
       directives:

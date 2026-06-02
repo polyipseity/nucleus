@@ -43,8 +43,8 @@ in
     (lib.optionalAttrs (!hasLaunchdDaemonsOption) {
       nix.gc = {
         automatic = true;
-        # Run store collection at local midnight every day.
-        dates = "00:00";
+        # Run store collection at local noon every day.
+        dates = "12:00";
         # Keep rollback headroom for one week while capping long-term store
         # growth from iterative host/application rebuilds.
         options = "--delete-older-than 7d";
@@ -63,7 +63,7 @@ in
           ];
           StartCalendarInterval = [
             {
-              Hour = 0;
+              Hour = 12;
               Minute = 0;
             }
           ];

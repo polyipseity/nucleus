@@ -326,11 +326,11 @@ let
       Label = "local.gc-weekly";
       ProgramArguments = [ "${gcWeekly}" ];
       # Do not run on every agent reload during apply/bootstrap apply; weekly
-      # Sunday maintenance at midnight is sufficient for accumulated artifact cleanup.
+      # Sunday maintenance at noon is sufficient for accumulated artifact cleanup.
       RunAtLoad = false;
       StartCalendarInterval = [
         {
-          Hour = 0;
+          Hour = 12;
           Minute = 0;
           Weekday = 0; # Sunday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
         }
@@ -1709,11 +1709,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
       Label = "local.dev-ds-store-cleanup";
       ProgramArguments = [ "${devDsStoreCleanup}" ];
       # Do not run on every agent reload during apply/bootstrap apply; daily
-      # midnight maintenance is sufficient for repository hygiene.
+      # noon maintenance is sufficient for repository hygiene.
       RunAtLoad = false;
       StartCalendarInterval = [
         {
-          Hour = 0;
+          Hour = 12;
           Minute = 0;
         }
       ];
@@ -1729,11 +1729,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
       Label = "local.dev-spotlight-exclusions";
       ProgramArguments = [ "${devSpotlightExclusions}" ];
       # Do not run on every agent reload during apply/bootstrap apply; daily
-      # midnight maintenance is sufficient for dev-tree indexing hygiene.
+      # noon maintenance is sufficient for dev-tree indexing hygiene.
       RunAtLoad = false;
       StartCalendarInterval = [
         {
-          Hour = 0;
+          Hour = 12;
           Minute = 0;
         }
       ];
@@ -1770,11 +1770,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
       # DB is absent or stale gets an immediate rebuild rather than waiting
       # for the next daily calendar window.
       RunAtLoad = true;
-      # Daily 00:00 rebuild keeps the index fresh without waiting a full week
+      # Daily 12:00 rebuild keeps the index fresh without waiting a full week
       # after package additions or nixpkgs updates.
       StartCalendarInterval = [
         {
-          Hour = 0;
+          Hour = 12;
           Minute = 0;
         }
       ];
@@ -1786,7 +1786,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
   # --------------------------------------------------------------------------
   # iCloud exclusion LaunchAgent
-  # Runs the iCloud directory exclusion logic daily (00:00) so that newly
+  # Runs the iCloud directory exclusion logic daily (12:00) so that newly
   # created build/cache directories inside iCloud-managed trees are marked
   # with com.apple.fileprovider.ignore#P without waiting for the next
   # home-manager switch.  configureICloudExclusions handles the immediate
@@ -1808,7 +1808,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       RunAtLoad = false;
       StartCalendarInterval = [
         {
-          Hour = 0;
+          Hour = 12;
           Minute = 0;
         }
       ];

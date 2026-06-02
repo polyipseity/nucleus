@@ -283,11 +283,11 @@ lib.mkIf pkgs.stdenv.isLinux {
       Description = "Daily nix-index database refresh";
     };
     Timer = {
-      # Fire daily at 00:00 local time.  Persistent=true ensures the timer
+      # Fire daily at 12:00 local time.  Persistent=true ensures the timer
       # catches up on the next login when the machine was off at the
       # scheduled time, preventing the DB from going stale on laptops that
       # are not powered on overnight every day.
-      OnCalendar = "00:00:00";
+      OnCalendar = "12:00:00";
       Persistent = true;
       Unit = "nix-index-update.service";
     };
@@ -316,10 +316,10 @@ lib.mkIf pkgs.stdenv.isLinux {
       Description = "Weekly garbage collection timer";
     };
     Timer = {
-      # Fire every Sunday at 00:00 local time. Persistent=true ensures the timer
+      # Fire every Sunday at 12:00 local time. Persistent=true ensures the timer
       # catches up on the next login when the machine was off at the scheduled
       # time, preventing stale artifacts from accumulating indefinitely.
-      OnCalendar = "Sun *-*-* 00:00:00";
+      OnCalendar = "Sun *-*-* 12:00:00";
       Persistent = true;
       Unit = "gc-weekly.service";
     };
