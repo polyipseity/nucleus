@@ -18,13 +18,7 @@
 				"toolCalling": true,
 				"url": "http://127.0.0.1:4000/v1",
 				"vision": false
-			}
-		],
-		"name": "Ollama (via LiteLLM)",
-		"vendor": "customoai"
-	},
-	{
-		"models": [
+			},
 			{
 				"id": "deepseek/deepseek-v4-flash",
 				"maxInputTokens": 65536,
@@ -32,7 +26,6 @@
 				"name": "DeepSeek V4 Flash",
 				"toolCalling": true,
 				"url": "http://127.0.0.1:4000/v1",
-				"vendor": "openrouter",
 				"vision": false
 			},
 			{
@@ -42,7 +35,6 @@
 				"name": "DeepSeek V4 Flash (High)",
 				"toolCalling": true,
 				"url": "http://127.0.0.1:4000/v1",
-				"vendor": "openrouter",
 				"vision": false
 			},
 			{
@@ -52,7 +44,6 @@
 				"name": "DeepSeek V4 Flash (X-High)",
 				"toolCalling": true,
 				"url": "http://127.0.0.1:4000/v1",
-				"vendor": "openrouter",
 				"vision": false
 			},
 			{
@@ -62,7 +53,6 @@
 				"name": "DeepSeek V4 Pro",
 				"toolCalling": true,
 				"url": "http://127.0.0.1:4000/v1",
-				"vendor": "openrouter",
 				"vision": false
 			},
 			{
@@ -72,7 +62,6 @@
 				"name": "DeepSeek V4 Pro (High)",
 				"toolCalling": true,
 				"url": "http://127.0.0.1:4000/v1",
-				"vendor": "openrouter",
 				"vision": false
 			},
 			{
@@ -82,11 +71,9 @@
 				"name": "DeepSeek V4 Pro (X-High)",
 				"toolCalling": true,
 				"url": "http://127.0.0.1:4000/v1",
-				"vendor": "openrouter",
 				"vision": false
 			}
 		],
-		"name": "OpenRouter (via LiteLLM)",
-		"vendor": "customoai"
+		"name": "LiteLLM"
 	}
 ]
