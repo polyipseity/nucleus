@@ -547,61 +547,42 @@ run_with_backoff() {
   return 1
 }
 
-# ensure_windows_winrm_port_ready
-#   Prevents immediate QEMU launch failures caused by stale builders that still
-#   hold host WinRM forward port 5985.  Only auto-terminates known stale
-#   qemu/packer listeners; for any other listener, fail fast with diagnostics.
-ensure_windows_winrm_port_ready() {
-  _ewpr_port='5985'
+# Wait for a guest to become reachable via QEMU GA or SSH.
+# Returns 0 if guest is ready, 1 on timeout.
+wait_for_guest() {
+  _wg_name="$1"
+  _wg_type="$2"
+  _wg_timeout="${3:-150}"
+  _wg_elapsed=0
 
-  if ! command -v lsof >/dev/null 2>&1; then
-    return 0
-  fi
-
-  _ewpr_pids="$(lsof -nP -t -iTCP:"$_ewpr_port" -sTCP:LISTEN 2>/dev/null | tr '\n' ' ' | awk '{$1=$1; print}')"
-  [ -n "$_ewpr_pids" ] || return 0
-
-  _ewpr_stale_pids=''
-  _ewpr_nonstale=''
-  for _ewpr_pid in $_ewpr_pids; do
-    _ewpr_cmd="$(ps -p "$_ewpr_pid" -o command= 2>/dev/null || true)"
-    case "$_ewpr_cmd" in
-      *qemu-system-x86_64*hostfwd=tcp::5985-:5985*|*packer\ build*|*packer-plugin-qemu*)
-        _ewpr_stale_pids="$_ewpr_stale_pids $_ewpr_pid"
-        ;;
-      *)
-        _ewpr_nonstale="$_ewpr_nonstale $_ewpr_pid"
-        ;;
-    esac
-  done
-
-  if [ -n "$(printf '%s' "$_ewpr_stale_pids" | awk '{$1=$1; print}')" ]; then
-    printf 'vm-setup: detected stale Windows builder listener(s) on tcp/%s; terminating pid(s):%s\n' \
-      "$_ewpr_port" "$_ewpr_stale_pids" >&2
-    # shellcheck disable=SC2086
-    kill $_ewpr_stale_pids 2>/dev/null || true
-    _ewpr_stale_still="$(lsof -nP -t -iTCP:"$_ewpr_port" -sTCP:LISTEN 2>/dev/null | tr '\n' ' ' | awk '{$1=$1; print}')"
-    if [ -n "$_ewpr_stale_still" ]; then
-      printf 'vm-setup: forcing termination of stale listener pid(s): %s\n' "$_ewpr_stale_still" >&2
-      # shellcheck disable=SC2086
-      kill -9 $_ewpr_stale_still 2>/dev/null || true
+  if [ "$_wg_type" = "NixOS" ]; then
+    # Try QEMU GA via socat first
+    if command -v socat >/dev/null 2>&1; then
+      while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
+        echo '{"execute":"guest-ping"}' | socat - "PIPE:\\\\.\\pipe\\qga-$_wg_name" 2>/dev/null && return 0
+        sleep 5
+        _wg_elapsed=$((_wg_elapsed + 5))
+      done
     fi
-  fi
-
-  if [ -n "$(printf '%s' "$_ewpr_nonstale" | awk '{$1=$1; print}')" ]; then
-    printf 'vm-setup: tcp/%s is in use by non-builder pid(s):%s\n' "$_ewpr_port" "$_ewpr_nonstale" >&2
-    printf 'vm-setup: stop that process (or reconfigure it) and retry; cannot launch QEMU with hostfwd=tcp::5985-:5985\n' >&2
+    # Fallback: SSH
+    while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
+      ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p 2222 "$_wg_name@localhost" true 2>/dev/null && return 0
+      sleep 5
+      _wg_elapsed=$((_wg_elapsed + 5))
+    done
+    return 1
+  elif [ "$_wg_type" = "Windows" ]; then
+    # QEMU GA via socat
+    if command -v socat >/dev/null 2>&1; then
+      while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
+        echo '{"execute":"guest-ping"}' | socat - "PIPE:\\\\.\\pipe\\qga-$_wg_name" 2>/dev/null && return 0
+        sleep 5
+        _wg_elapsed=$((_wg_elapsed + 5))
+      done
+    fi
     return 1
   fi
-
-  _ewpr_after="$(lsof -nP -t -iTCP:"$_ewpr_port" -sTCP:LISTEN 2>/dev/null | tr '\n' ' ' | awk '{$1=$1; print}')"
-  if [ -n "$_ewpr_after" ]; then
-    printf 'vm-setup: tcp/%s still busy after stale-listener cleanup; retry after clearing pid(s): %s\n' \
-      "$_ewpr_port" "$_ewpr_after" >&2
-    return 1
-  fi
-
-  return 0
+  return 1
 }
 
 # write_start_script NAME DISPLAY TYPE HOST_KIND
@@ -1256,7 +1237,7 @@ build_windows_image() {
 
   _packer_dir="$VMS_DIR/windows"
   _tmp_out="$IMAGES_DIR/${_name}-build"
-  _winrm_timeout='3h'
+  _ssh_timeout='3h'
   if [ "$accelerator" = 'tcg' ]; then
     # WHY: x86_64 Windows setup under software emulation can take much longer
     # than hardware-accelerated paths.  On Apple Silicon (arm64 host emulating
@@ -1264,7 +1245,7 @@ build_windows_image() {
     # Windows PE load + installation + OOBE + FirstLogonCommands can take
     # 10-30 real hours.  Use a very generous timeout that covers even the
     # slowest realistic tcg speed.
-    _winrm_timeout='72h'
+    _ssh_timeout='72h'
   fi
 
   printf 'vm-setup: building Windows 11 image (disk=%s GiB, accelerator=%s)...\n' \
@@ -1351,18 +1332,18 @@ bios legacy 3h'
       [ -n "$_firmware_mode" ] || continue
       if [ "$_firmware_mode" = 'efi' ]; then
         if [ "$windows_headless" = 'false' ]; then
-          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var display_backend=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
+          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var ssh_timeout=%s -var headless=%s -var display_backend=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
             "$_packer_dir" "$_iso" "$vm_guest_username" "$VMS_DIR/windows/Autounattend.xml" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_display_backend" "$_efi_code" "$_efi_vars" "$_disk_gib" "$_tmp_out"
         else
-          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
+          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var ssh_timeout=%s -var headless=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
             "$_packer_dir" "$_iso" "$vm_guest_username" "$VMS_DIR/windows/Autounattend.xml" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_efi_code" "$_efi_vars" "$_disk_gib" "$_tmp_out"
         fi
       else
         if [ "$windows_headless" = 'false' ]; then
-          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var display_backend=%s -var disk_size=%sG -var output_directory=%s .\n' \
+          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var ssh_timeout=%s -var headless=%s -var display_backend=%s -var disk_size=%sG -var output_directory=%s .\n' \
             "$_packer_dir" "$_iso" "$vm_guest_username" "$VMS_DIR/windows/Autounattend.xml" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_display_backend" "$_disk_gib" "$_tmp_out"
         else
-          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var winrm_timeout=%s -var headless=%s -var disk_size=%sG -var output_directory=%s .\n' \
+          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var ssh_timeout=%s -var headless=%s -var disk_size=%sG -var output_directory=%s .\n' \
             "$_packer_dir" "$_iso" "$vm_guest_username" "$VMS_DIR/windows/Autounattend.xml" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_disk_gib" "$_tmp_out"
         fi
       fi
@@ -1392,7 +1373,7 @@ EOF
   while IFS=' ' read -r _firmware_mode _boot_strategy _attempt_timeout; do
     [ -n "$_firmware_mode" ] || continue
 
-    printf 'vm-setup: Windows Packer attempt using firmware_mode=%s boot_strategy=%s (winrm_timeout=%s)...\n' \
+    printf 'vm-setup: Windows Packer attempt using firmware_mode=%s boot_strategy=%s (ssh_timeout=%s)...\n' \
       "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout"
 
     # WHY: Packer qemu builder requires a non-existent output_directory.
@@ -1406,12 +1387,6 @@ EOF
       "$VMS_DIR/windows/Autounattend.xml" >"$_autounattend_rendered"
     printf 'vm-setup: writing Packer debug log for this attempt: %s\n' "$_packer_log"
 
-    if ! ensure_windows_winrm_port_ready; then
-      _packer_status=1
-      rm -rf "$_attempt_tmpdir"
-      break
-    fi
-
     _attempt_status=0
     if [ "$_firmware_mode" = 'efi' ]; then
       (
@@ -1424,7 +1399,7 @@ EOF
           -var "accelerator=$accelerator" \
           -var "firmware_mode=$_firmware_mode" \
           -var "boot_strategy=$_boot_strategy" \
-          -var "winrm_timeout=$_attempt_timeout" \
+          -var "ssh_timeout=$_attempt_timeout" \
           -var "headless=$windows_headless" \
           ${_display_backend:+-var "display_backend=$_display_backend"} \
           -var "efi_firmware_code=$_efi_code" \
@@ -1444,7 +1419,7 @@ EOF
           -var "accelerator=$accelerator" \
           -var "firmware_mode=$_firmware_mode" \
           -var "boot_strategy=$_boot_strategy" \
-          -var "winrm_timeout=$_attempt_timeout" \
+          -var "ssh_timeout=$_attempt_timeout" \
           -var "headless=$windows_headless" \
           ${_display_backend:+-var "display_backend=$_display_backend"} \
           -var "disk_size=${_disk_gib}G" \
