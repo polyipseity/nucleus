@@ -618,7 +618,8 @@ _jfs_sync_libraries() {
         _jfsl_query_params="$_jfsl_query_params&paths=$(printf '%s' "$_jfsl_path" | jq -sRr @uri)"
       done < "$_jfsl_paths_file"
       rm -f "$_jfsl_paths_file"
-      _jfsl_create_response="$(_jfs_api_request POST "/Library/VirtualFolders?${_jfsl_query_params}" "$_jfsl_admin_token" "$_jfsl_library_options")"
+      _jfsl_create_payload="$(jq -cn --argjson options "$_jfsl_library_options" '{LibraryOptions:$options}')"
+      _jfsl_create_response="$(_jfs_api_request POST "/Library/VirtualFolders?${_jfsl_query_params}" "$_jfsl_admin_token" "$_jfsl_create_payload")"
       _jfsl_create_status="$(_jfs_status_from_response "$_jfsl_create_response")"
       if [ "$_jfsl_create_status" = "204" ]; then
         printf '%s\n' "jellyfin/library: created library '$_jfsl_name' ($_jfsl_collection_type)"
