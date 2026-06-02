@@ -244,19 +244,14 @@
           # Sibling scripts under src/scripts/ that apply.sh delegates to via
           # $_ash_script_dir at runtime.  Bundled into the same bin/ directory so
           # dirname-based resolution finds them.
-          siblingScripts = pkgs.runCommand "nucleus-apply-siblings" { } (
-            builtins.concatStringsSep "\n" (
-              map
-                (f: ''
-                  install -m755 "${f}" "$out/bin/$(basename "${f}")"
-                '')
-                [
-                  ./scripts/generate-ssh-host-key.sh
-                  ./scripts/register-host-age-key.sh
-                  ./scripts/install-prek-hooks.sh
-                ]
-            )
-          );
+          # Explicit target names avoid hash-prefixed basenames from Nix single-
+          # file store paths (e.g. /nix/store/hash-generate-ssh-host-key.sh).
+          siblingScripts = pkgs.runCommand "nucleus-apply-siblings" { } ''
+            mkdir -p "$out/bin"
+            install -m755 "${./scripts/generate-ssh-host-key.sh}" "$out/bin/generate-ssh-host-key.sh"
+            install -m755 "${./scripts/register-host-age-key.sh}" "$out/bin/register-host-age-key.sh"
+            install -m755 "${./scripts/install-prek-hooks.sh}" "$out/bin/install-prek-hooks.sh"
+          '';
           applyDrv = pkgs.symlinkJoin {
             name = "nucleus-apply";
             paths = [
