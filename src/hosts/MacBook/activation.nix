@@ -377,7 +377,7 @@
           echo "finder: failed to clear cached state at $finder_cache_dir (non-fatal; user may need manual restart)." >&2
         fi
       fi
-      # Finder restart handled by Home Manager's relaunchFinder step.
+      # Process restarts handled by Home Manager's relaunchDesktopServices step.
     fi
 
     # ---- disableSpotlight -------------------------------------------------------

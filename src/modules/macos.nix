@@ -5,7 +5,7 @@
 #
 # Activation order (Home Manager DAG):
 #   writeBoundary / linkGeneration
-#     → clearDesktop, configureInputAndSiri, provisionDevDirectory,
+#     → configureInputAndSiri, provisionDevDirectory,
 #       reloadDockPreferenceState
 #     → preflightPrivacyPermissions
 #       → configureSafariDefaults, configureUniversalAccessDefaults
@@ -750,7 +750,7 @@ let
     "agentsSymlink"
     "checkFilesChanged"
     "checkLinkTargets"
-    "clearDesktop"
+    "relaunchDesktopServices"
     "cloudDrivesICloudRefresh"
     "cloudDrivesSetup"
     "configureDisplayResolutions"
@@ -845,23 +845,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   '';
 
   home.activation = {
-    # -------------------------------------------------------------------------
-    # clearDesktop
-    # Restarts the three system UI processes that cache defaults values so that
-    # settings written earlier in the activation chain take effect immediately
-    # without requiring a full logout/reboot.
-    #   Finder         — file manager and Desktop drawing
-    #   WindowManager  — manages Spaces and Stage Manager
-    #   SystemUIServer — menu-bar icons (clock, input source, etc.)
-    # -------------------------------------------------------------------------
-    clearDesktop = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      for proc in Finder SystemUIServer WindowManager; do
-        if ! /usr/bin/killall "$proc"; then
-          echo "macos: $proc was not running (or could not be restarted)." >&2
-        fi
-      done
-    '';
-
     # -------------------------------------------------------------------------
     # configureDisplayResolutions
     # Uses displayplacer to match all external monitors to the MacBook's built-in
@@ -1430,26 +1413,38 @@ lib.mkIf pkgs.stdenv.isDarwin {
         '';
 
     # -------------------------------------------------------------------------
-    # relaunchFinder
-    # Single dedicated Finder restart after all Finder-related changes complete.
-    # Uses launchctl kickstart (launchd-mediated restart) for the cleanest
-    # reload without losing window state. Re-applies sidebar favorites after
-    # restart since Finder may restore default ordering.
+    # relaunchDesktopServices
+    # Single dedicated restart for desktop-related system processes (Finder,
+    # SystemUIServer, WindowManager) after all configuration changes complete.
+    # Uses launchctl kickstart for Finder (launchd-mediated, preserves window
+    # state) and killall for SystemUIServer/WindowManager (no launchd service).
+    # Re-applies sidebar favorites after restart since Finder may restore
+    # default ordering.
     # -------------------------------------------------------------------------
-    relaunchFinder = lib.hm.dag.entryAfter [ "configureFinderSidebar" "refreshFinderServices" ] ''
-      ${finderRefreshDaemonsShell}
+    relaunchDesktopServices =
+      lib.hm.dag.entryAfter [ "configureFinderSidebar" "refreshFinderServices" ]
+        ''
+          ${finderRefreshDaemonsShell}
 
-      if ! /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
-        echo "macos: relaunchFinder — launchctl Finder restart failed; restart Finder manually if sidebar/Services are stale." >&2
-      fi
+          # Restart Finder via launchd (preserves window state, cleanest method).
+          if ! /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
+            echo "macos: relaunchDesktopServices — launchctl Finder restart failed; restart Finder manually." >&2
+          fi
 
-      # Finder restarts can reintroduce default favorites ordering.
-      # Re-apply managed favorites to keep deterministic output.
-      MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
-      if [ -x "$MYSIDES_BIN" ]; then
-        ${finderSidebarRebuildBestEffortShell}
-      fi
-    '';
+          # Restart SystemUIServer (menu bar icons) and WindowManager (Spaces).
+          for proc in SystemUIServer WindowManager; do
+            if ! /usr/bin/killall "$proc"; then
+              echo "macos: $proc was not running (or could not be restarted)." >&2
+            fi
+          done
+
+          # Finder restarts can reintroduce default favorites ordering.
+          # Re-apply managed favorites to keep deterministic output.
+          MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
+          if [ -x "$MYSIDES_BIN" ]; then
+            ${finderSidebarRebuildBestEffortShell}
+          fi
+        '';
 
     # -------------------------------------------------------------------------
     # verifyArchivingStack
