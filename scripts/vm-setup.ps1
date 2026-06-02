@@ -42,7 +42,7 @@ param(
     [string]$Accelerator = 'tcg',
 
     # Run Windows image builds headful (headless=false) for interactive
-    # debugging of installer/WinRM readiness issues.
+    # debugging of installer/SSH readiness issues.
     [switch]$DebugHeadful,
 
     # Print planned actions without executing.

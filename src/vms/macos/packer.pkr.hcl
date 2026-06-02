@@ -66,6 +66,18 @@ variable "guest_password" {
   description = "Primary guest login password to provision."
 }
 
+variable "ssh_username" {
+  type        = string
+  default     = "admin"
+  description = "SSH username for Packer communicator (matches Cirrus CI base image default)."
+}
+
+variable "ssh_password" {
+  type        = string
+  default     = "admin"
+  description = "SSH password for Packer communicator (matches Cirrus CI base image default)."
+}
+
 packer {
   required_plugins {
     tart = {
@@ -86,9 +98,11 @@ source "tart-cli" "macos" {
   memory_gb    = var.memory_gib
   disk_size_gb = var.disk_size_gib
 
+  communicator = "ssh"
+
   # Default credentials for all Cirrus CI base macOS images.
-  ssh_username = "admin"
-  ssh_password = "admin"
+  ssh_username = var.ssh_username
+  ssh_password = var.ssh_password
   ssh_timeout  = "120s"
 }
 
@@ -104,6 +118,13 @@ build {
       "sudo scutil --set LocalHostName MacBook",
       "if id -u '${var.guest_username}' >/dev/null 2>&1; then sudo dscl . -passwd '/Users/${var.guest_username}' '${var.guest_password}'; else sudo sysadminctl -addUser '${var.guest_username}' -fullName '${var.guest_username}' -password '${var.guest_password}' -admin; fi",
       "echo 'macOS VM provisioned via Packer Tart'",
+    ]
+  }
+
+  # Bootstrap the nucleus configuration (apply mode).
+  provisioner "shell" {
+    inline = [
+      "cd ~/dev/nucleus && ./scripts/bootstrap.sh apply",
     ]
   }
 }

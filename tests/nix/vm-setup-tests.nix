@@ -412,18 +412,18 @@ let
   test_windows_packer_failure_message = assert' (lib.hasInfix "Packer build for Windows VM" vm_setup_sh_text) "scripts/vm-setup.sh must print a failure message for a failed Windows Packer build";
 
   # Windows QEMU builds must:
-  # 1. Pin WinRM to 5985 with explicit port forward (not random NAT mapping)
+  # 1. Use SSH communicator with explicit port forward (not random NAT mapping)
   # 2. Keep boot_wait=5s and pause_before_connecting=120s
   # 3. Expose selectable firmware_mode and boot_strategy in packer.pkr.hcl
   # 4. Retry packer builds in vm-setup wrappers with EFI-first + BIOS fallback
   #    before giving up, so installer timing changes do not hard-lock on one
   #    brittle keying pattern.
-  test_windows_packer_winrm_port_forward =
+  test_windows_packer_ssh_port_forward =
     assert'
       (
-        (lib.hasInfix "winrm_port     = 5985" vms_windows_packer_text)
+        (lib.hasInfix "communicator = \"ssh\"" vms_windows_packer_text)
         && (lib.hasInfix "skip_nat_mapping = true" vms_windows_packer_text)
-        && (lib.hasInfix "hostfwd=tcp::5985-:5985" vms_windows_packer_text)
+        && (lib.hasInfix "hostfwd=tcp::2222-:22" vms_windows_packer_text)
         && (lib.hasInfix "boot_wait    = \"5s\"" vms_windows_packer_text)
         && (lib.hasInfix "pause_before_connecting = \"120s\"" vms_windows_packer_text)
         && (lib.hasInfix "variable \"firmware_mode\"" vms_windows_packer_text)
@@ -439,18 +439,18 @@ let
         && (lib.hasInfix "skip_compaction  = true" vms_windows_packer_text)
         && (lib.hasInfix "disk_compression = false" vms_windows_packer_text)
       )
-      "Windows VM packer template must pin WinRM communicator wiring and expose controlled firmware/debug knobs";
+      "Windows VM packer template must use SSH communicator with port 2222 forwarding and expose controlled firmware/debug knobs";
 
-  # Autounattend.xml must configure WinRM before VirtIO driver scan to prevent blocking.
-  test_windows_autounattend_winrm_before_virtio =
+  # Autounattend.xml must configure OpenSSH before VirtIO driver scan to prevent blocking.
+  test_windows_autounattend_ssh_before_virtio =
     assert'
       (
         (lib.hasInfix "<Order>1</Order>" vms_windows_autounattend_text)
-        && (lib.hasInfix "winrm quickconfig" vms_windows_autounattend_text)
-        && (lib.hasInfix "<Order>7</Order>" vms_windows_autounattend_text)
+        && (lib.hasInfix "Add-WindowsCapability -Online -Name OpenSSH.Server" vms_windows_autounattend_text)
+        && (lib.hasInfix "<Order>3</Order>" vms_windows_autounattend_text)
         && (lib.hasInfix "VirtIO" vms_windows_autounattend_text)
       )
-      "src/vms/windows/Autounattend.xml must configure WinRM in Orders 1–6 before VirtIO driver scan in Order 7 so WinRM is ready even if driver scan is slow";
+      "src/vms/windows/Autounattend.xml must configure OpenSSH in Orders 1–3 before VirtIO driver scan so SSH is ready even if driver scan is slow";
   # BIOS installs need a normal NTFS partition type for the active system
   # partition. TypeID 0x27 is a recovery/hidden partition type and can leave
   # SeaBIOS stuck at "Booting from Hard Disk...".
@@ -559,11 +559,11 @@ let
         (lib.hasInfix "variable \"guest_username\"" vms_windows_packer_text)
         && (lib.hasInfix "variable \"guest_password\"" vms_windows_packer_text)
         && (lib.hasInfix "variable \"autounattend_path\"" vms_windows_packer_text)
-        && (lib.hasInfix "winrm_username = var.guest_username" vms_windows_packer_text)
-        && (lib.hasInfix "winrm_password = var.guest_password" vms_windows_packer_text)
+        && (lib.hasInfix "ssh_username = var.guest_username" vms_windows_packer_text)
+        && (lib.hasInfix "ssh_password = var.guest_password" vms_windows_packer_text)
         && (lib.hasInfix "var.autounattend_path" vms_windows_packer_text)
       )
-      "src/vms/windows/packer.pkr.hcl must wire guest credentials into WinRM and consume a rendered Autounattend path";
+      "src/vms/windows/packer.pkr.hcl must wire guest credentials into SSH communicator and consume a rendered Autounattend path";
 
   test_guest_credentials_policy_in_windows_autounattend =
     assert'
@@ -882,8 +882,8 @@ let
     test_nixos_image_resize_to_manifest_disk
     test_macos_packer_failure_message
     test_windows_packer_failure_message
-    test_windows_packer_winrm_port_forward
-    test_windows_autounattend_winrm_before_virtio
+    test_windows_packer_ssh_port_forward
+    test_windows_autounattend_ssh_before_virtio
     test_windows_autounattend_bios_system_partition_type
     test_guest_credentials_policy_in_user_registries
     test_guest_credentials_policy_in_user_secrets
@@ -962,8 +962,8 @@ in
     test_nixos_image_resize_to_manifest_disk
     test_macos_packer_failure_message
     test_windows_packer_failure_message
-    test_windows_packer_winrm_port_forward
-    test_windows_autounattend_winrm_before_virtio
+    test_windows_packer_ssh_port_forward
+    test_windows_autounattend_ssh_before_virtio
     test_windows_autounattend_bios_system_partition_type
     test_guest_credentials_policy_in_user_registries
     test_guest_credentials_policy_in_user_secrets
