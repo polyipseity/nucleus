@@ -372,11 +372,11 @@ function Sync-JellyfinLibrary {
       $createResponse = Invoke-JellyfinApi -Method POST -Path "/Library/VirtualFolders?$queryParams" -Token $adminToken -Body @{
         LibraryOptions = $libraryOptions
         Paths          = [string[]]@($spec.paths | ForEach-Object { $_ })
-        RefreshLibrary = $false
+        RefreshLibrary = $true
       }
       if ($createResponse.StatusCode -eq 204) {
         Write-Output "jellyfin/library: created library '$($spec.name)' ($($spec.collectionType))."
-        $null = Invoke-JellyfinApi -Method POST -Path '/Library/VirtualFolders/Refresh' -Token $adminToken
+        $null = Invoke-JellyfinApi -Method POST -Path '/Library/Refresh' -Token $adminToken
       }
       else {
         Write-Warning "jellyfin/library: failed to create library '$($spec.name)' (HTTP $($createResponse.StatusCode))."
@@ -394,6 +394,7 @@ function Sync-JellyfinLibrary {
       }
       if ($updateResponse.StatusCode -eq 204) {
         Write-Output "jellyfin/library: updated library options for '$($spec.name)'."
+        $null = Invoke-JellyfinApi -Method POST -Path '/Library/Refresh' -Token $adminToken
       }
       else {
         Write-Warning "jellyfin/library: failed to update library options for '$($spec.name)' (HTTP $($updateResponse.StatusCode))."

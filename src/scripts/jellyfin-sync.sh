@@ -618,12 +618,12 @@ _jfs_sync_libraries() {
         _jfsl_query_params="$_jfsl_query_params&paths=$(printf '%s' "$_jfsl_path" | jq -sRr @uri)"
       done < "$_jfsl_paths_file"
       rm -f "$_jfsl_paths_file"
-      _jfsl_create_payload="$(jq -cn --argjson options "$_jfsl_library_options" --argjson paths "$_jfsl_paths" '{LibraryOptions:$options,Paths:$paths,RefreshLibrary:false}')"
+      _jfsl_create_payload="$(jq -cn --argjson options "$_jfsl_library_options" --argjson paths "$_jfsl_paths" '{LibraryOptions:$options,Paths:$paths,RefreshLibrary:true}')"
       _jfsl_create_response="$(_jfs_api_request POST "/Library/VirtualFolders?${_jfsl_query_params}" "$_jfsl_admin_token" "$_jfsl_create_payload")"
       _jfsl_create_status="$(_jfs_status_from_response "$_jfsl_create_response")"
       if [ "$_jfsl_create_status" = "204" ]; then
         printf '%s\n' "jellyfin/library: created library '$_jfsl_name' ($_jfsl_collection_type)"
-        _jfs_api_request POST '/Library/VirtualFolders/Refresh' "$_jfsl_admin_token" '' >/dev/null 2>&1 || true
+        _jfs_api_request POST '/Library/Refresh' "$_jfsl_admin_token" '' >/dev/null 2>&1 || true
       else
         printf '%s\n' "jellyfin/library: failed to create library '$_jfsl_name' (HTTP $_jfsl_create_status)" >&2
       fi
@@ -633,6 +633,7 @@ _jfs_sync_libraries() {
       _jfsl_update_status="$(_jfs_status_from_response "$_jfsl_update_response")"
       if [ "$_jfsl_update_status" = "204" ]; then
         printf '%s\n' "jellyfin/library: updated library options for '$_jfsl_name'"
+        _jfs_api_request POST '/Library/Refresh' "$_jfsl_admin_token" '' >/dev/null 2>&1 || true
       else
         printf '%s\n' "jellyfin/library: failed to update library options for '$_jfsl_name' (HTTP $_jfsl_update_status)" >&2
       fi
