@@ -82,6 +82,8 @@ in
     assert containsRegex "\"\\$MYSIDES_BIN\" add \"dev\"" macosText;
     assert !containsRegex "sfltool add-item" macosText;
     assert !containsRegex "sfltool remove-item" macosText;
+    assert containsRegex "! -d \"\\\\$HOME" macosText;
+    assert containsRegex "! -L \"\\\\$HOME" macosText;
     true;
 
   # =========================================================================

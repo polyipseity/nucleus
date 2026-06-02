@@ -268,7 +268,7 @@ let
   test_finder_sidebar_paths_created = assert' (
     containsRegex "mkdir -p" macosText
     && containsRegex "\\$HOME/dev" macosText
-    && containsRegex "\\$HOME/clouds" macosText
+    && containsRegex "\\\\$HOME" macosText
     && !containsRegex "\\$HOME/clouds/GoogleDrive" macosText
     && !containsRegex "\\$HOME/clouds/iCloud" macosText
     && !containsRegex "\\$HOME/clouds/OneDrive" macosText

@@ -596,15 +596,30 @@ let
     map (favorite: favorite.name) finderSidebarManagedFavorites
   );
 
+  # Paths guaranteed by macOS to exist under $HOME — skip symlink guard.
+  finderSidebarAlwaysExist = [
+    "Applications"
+    "Desktop"
+    "Documents"
+    "Downloads"
+    "Music"
+    "Movies"
+    "Pictures"
+  ];
+
   # Ensure directories referenced by managed Finder favorites exist before add.
-  finderSidebarEnsureDirectoriesShell = ''
-    if [ ! -d "$HOME/data" ] && [ ! -L "$HOME/data" ]; then
-      mkdir -p "$HOME/data"
-    fi
-    mkdir -p "$HOME/dev"
-    mkdir -p "$HOME/virtual machines"
-    mkdir -p "$HOME/Desktop" "$HOME/Documents" "$HOME/Downloads" "$HOME/Movies" "$HOME/Music" "$HOME/Pictures"
-  '';
+  finderSidebarEnsureDirectoriesShell = builtins.concatStringsSep "\n" (
+    map (
+      favorite:
+      let
+        safeName = lib.escapeShellArg favorite.name;
+      in
+      if builtins.elem favorite.name finderSidebarAlwaysExist then
+        "# ${favorite.name}: system-owned, always exists\nmkdir -p \"$HOME/${safeName}\""
+      else
+        "# ${favorite.name}: managed favorite — symlink-safe guard\nif [ ! -d \"$HOME/${safeName}\" ] && [ ! -L \"$HOME/${safeName}\" ]; then\n  mkdir -p \"$HOME/${safeName}\"\nfi"
+    ) finderSidebarManagedFavorites
+  );
 
   # Pre-remove managed favorites and default extras by name before any
   # `mysides list` call.  `mysides remove <name>` works by name lookup and
