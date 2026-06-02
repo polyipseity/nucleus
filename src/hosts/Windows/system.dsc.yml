@@ -30,6 +30,41 @@
         RunWithHighestPrivileges: false
         RunOnlyWhenNetworkAvailable: false
         RunOnlyIfLoggedOn: true
+
+    - resource: Microsoft.Windows.Settings/TaskScheduler
+      directives:
+        description: >-
+          Schedule daily Recycle Bin 30-day auto-purge at 00:00 to remove stale
+          items for cross-host parity with macOS Finder 30-day Trash auto-prune.
+      settings:
+        TaskPath: \nucleus\
+        TaskName: recycle-bin-purge
+        TaskDescriptionLiteral: Daily Recycle Bin 30-day auto-purge
+        Action: |
+          $cutoff = (Get-Date).AddDays(-30)
+          try {
+            $shell = New-Object -ComObject Shell.Application
+            $rb = $shell.NameSpace(0xa)
+            if ($rb) {
+              $rb.Items() | ForEach-Object {
+                try {
+                  $detail = $rb.GetDetailsOf($_, 4)
+                  if ($detail -and ([DateTime]::Parse($detail, [CultureInfo]::InvariantCulture) -lt $cutoff)) {
+                    Remove-Item -LiteralPath $_.Path -Force -ErrorAction Stop
+                  }
+                } catch {}
+              }
+            }
+          } catch {
+            exit 0
+          }
+        Trigger: Daily
+        AtTime: 00:00
+        Enabled: true
+        RunWithHighestPrivileges: false
+        RunOnlyWhenNetworkAvailable: false
+        RunOnlyIfLoggedOn: true
+
 # WinGet DSC v3 - system-level baseline for Windows host
 # Package ID policy: prefer human-readable named IDs (for example
 # `Microsoft.PowerToys`) over opaque Microsoft Store-generated IDs. Use
