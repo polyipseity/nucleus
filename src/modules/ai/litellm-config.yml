@@ -8,9 +8,6 @@
 # litellm_settings.drop_params prevents errors when clients send parameters
 # (e.g. max_tokens) that a particular model endpoint does not support.
 
-general_settings:
-  master_key: os.environ/LITELLM_MASTER_KEY
-
 litellm_settings:
   drop_params: true
 

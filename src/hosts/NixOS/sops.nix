@@ -8,7 +8,4 @@
   sops.secrets."ai_openrouter_api_key" = {
     sopsFile = ../../secrets/system.yml;
   };
-  sops.secrets."litellm_master_key" = {
-    sopsFile = ../../secrets/system.yml;
-  };
 }
