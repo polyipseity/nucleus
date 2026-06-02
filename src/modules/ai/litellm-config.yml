@@ -13,6 +13,12 @@
 litellm_settings:
   drop_params: true
 
+# Set the proxy log level to WARNING to suppress per-request INFO chatter
+# while still capturing errors, warnings, and startup diagnostics.
+general_settings:
+  environment_variables:
+    LITELLM_LOG: WARNING
+
 model_list:
   # ---- Ollama models ----
   - model_name: ollama_chat/devstral-small-2:24b
