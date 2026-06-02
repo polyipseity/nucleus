@@ -1,6 +1,20 @@
 #!/usr/bin/env sh
 # src/scripts/apply.sh — Dispatch the Nix apply command for the current host.
 #
+# This is a thin orchestrator: its responsibility is OS detection, lifecycle
+# ordering (pre-apply checks → rebuild → post-apply provisioning), and
+# error-boundary handling. All heavy logic lives in dedicated sibling scripts
+# under src/scripts/ and scripts/ so each concern can be validated, tested,
+# and reused independently.
+#
+# Post-apply provisioning order:
+#   1. Local CA trust (caddy-trust.sh)
+#   2. Jellyfin sync (jellyfin-sync.sh)
+#   3. AI model sync (ai-sync.sh)
+#   4. Cloud replica sync (replica-sync.sh)
+#   5. VM setup (vm-setup.sh)
+#   6. Garbage collection (gc.sh)
+#
 # Detects the operating system and invokes the appropriate flake output:
 #   Darwin  → darwin-rebuild switch  (nix-darwin; manages system + home-manager)
 #   NixOS   → nixos-rebuild switch   (requires sudo; detected via /etc/NIXOS)
