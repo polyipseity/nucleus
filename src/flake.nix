@@ -212,19 +212,23 @@
       vsCodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
       # Build the `nix run .#apply` app for a given package set.
-      # Wraps scripts/apply.sh in a shell application that has git, jq,
+      # Wraps src/scripts/apply.sh in a shell application that has git, jq,
       # openssh, prek, sops, and ssh-to-age on PATH so the machine age key
       # auto-registration step can derive the age public key and rewrap all
       # SOPS-encrypted files, the post-apply AI sync can parse models.json,
       # and the apply flow can install repository-local prek hooks on the
       # first successful run.
-      # openssh provides ssh-keygen for the generate_ssh_host_key_if_needed step
-      # that creates /etc/ssh/ssh_host_ed25519_key on first-provision machines.
+      # openssh provides ssh-keygen for the former generate_ssh_host_key_if_needed
+      # step (now generate-ssh-host-key.sh) that creates /etc/ssh/ssh_host_ed25519_key
+      # on first-provision machines.
+      # Sibling scripts (generate-ssh-host-key.sh, register-host-age-key.sh,
+      # install-prek-hooks.sh) are bundled into the same bin/ directory via
+      # symlinkJoin so apply.sh can find them through $_ash_script_dir resolution.
 
-      mkApplyApp = pkgs: {
-        type = "app";
-        program = "${
-          pkgs.writeShellApplication {
+      mkApplyApp =
+        pkgs:
+        let
+          baseApply = pkgs.writeShellApplication {
             name = "nucleus-apply";
             runtimeInputs = [
               pkgs.curl
@@ -236,9 +240,35 @@
               pkgs.ssh-to-age
             ];
             text = builtins.readFile ./scripts/apply.sh;
-          }
-        }/bin/nucleus-apply";
-      };
+          };
+          # Sibling scripts under src/scripts/ that apply.sh delegates to via
+          # $_ash_script_dir at runtime.  Bundled into the same bin/ directory so
+          # dirname-based resolution finds them.
+          siblingScripts = pkgs.runCommand "nucleus-apply-siblings" { } (
+            builtins.concatStringsSep "\n" (
+              map
+                (f: ''
+                  install -m755 "${f}" "$out/bin/$(basename "${f}")"
+                '')
+                [
+                  ./scripts/generate-ssh-host-key.sh
+                  ./scripts/register-host-age-key.sh
+                  ./scripts/install-prek-hooks.sh
+                ]
+            )
+          );
+          applyDrv = pkgs.symlinkJoin {
+            name = "nucleus-apply";
+            paths = [
+              baseApply
+              siblingScripts
+            ];
+          };
+        in
+        {
+          type = "app";
+          program = "${applyDrv}/bin/nucleus-apply";
+        };
 
       # Build the PowerShell syntax validation app for a given package set.
       # Runtime dependencies are bundled from this flake so CI and local runs do
