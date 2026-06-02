@@ -1,7 +1,7 @@
 # src/vms/windows/packer.pkr.hcl — Packer template for building a Windows 11 QCOW2 image.
 #
 # Builds an unattended Windows 11 installation using QEMU.  The resulting
-# QCOW2 disk image is pre-configured with VirtIO drivers and WinRM disabled,
+# QCOW2 disk image is pre-configured with VirtIO drivers, OpenSSH, and qemu-ga,
 # ready for use as the Windows VM guest declared in src/modules/VMs.json.
 #
 # Usage (from repo root):
@@ -25,9 +25,9 @@
 #
 # Build strategy:
 #   1. Boot with SATA disk so Windows Setup does not need VirtIO drivers.
-#   2. Autounattend.xml partitions, installs, and enables WinRM.
-#   3. Packer connects via WinRM and installs VirtIO drivers from the internet.
-#   4. WinRM is disabled at the end; the image boots as a standard Windows 11 VM.
+#   2. Autounattend.xml partitions, installs, and enables SSH.
+#   3. Packer connects via SSH and installs VirtIO drivers + qemu-ga from the internet.
+#   4. The image boots as a standard Windows 11 VM with OpenSSH and qemu-ga ready.
 #
 # Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
 
@@ -72,12 +72,6 @@ variable "cpus" {
   description = "vCPUs during the build (match VMs.json cpus)."
 }
 
-variable "winrm_timeout" {
-  type        = string
-  default     = "3h"
-  description = "Timeout for WinRM communicator readiness (for slow emulation paths use a larger value such as 8h)."
-}
-
 variable "boot_strategy" {
   type        = string
   default     = "spacebar"
@@ -117,13 +111,13 @@ variable "display_backend" {
 variable "guest_username" {
   type        = string
   default     = "packer"
-  description = "Primary login username for the guest and WinRM communicator."
+  description = "Primary login username for the guest and SSH communicator."
 }
 
 variable "guest_password" {
   type        = string
   default     = "packer"
-  description = "Primary login password for the guest and WinRM communicator."
+  description = "Primary login password for the guest and SSH communicator."
 }
 
 variable "autounattend_path" {
@@ -244,16 +238,14 @@ source "qemu" "windows11" {
     EOF
   }
 
-  # WinRM communicator: Autounattend.xml enables WinRM during oobeSystem.
-  communicator   = "winrm"
-  winrm_username = var.guest_username
-  winrm_password = var.guest_password
-  winrm_port     = 5985
-  winrm_timeout  = var.winrm_timeout
+  # SSH communicator: Autounattend.xml installs OpenSSH during specialize pass.
+  communicator = "ssh"
+  ssh_username = var.guest_username
+  ssh_password = var.guest_password
+  ssh_timeout  = "3h"
 
-  # WHY: QEMU's automatic communicator NAT mapping can select a port mapping
-  # that never reaches the guest on slow Windows boots.  Pin the host-forwarded
-  # WinRM port explicitly so Packer and QEMU agree on 5985.
+  # WHY: Forward SSH (22) through QEMU's user-mode networking so Packer can
+  # connect without needing a routable IP on the guest.
   skip_nat_mapping = true
 
   # WHY: Force CD-ROM first so fresh builds always reach Windows Setup even when
@@ -263,16 +255,16 @@ source "qemu" "windows11" {
   boot_wait    = "5s"
   boot_command = local.bootPromptByStrategy
 
-  # WHY: Packer's WinRM communicator starts probing as soon as boot_command
-  # completes.  Even with 8h timeout, excessive early retries during Windows
+  # WHY: Packer's SSH communicator starts probing as soon as boot_command
+  # completes.  Even with 3h ssh_timeout, excessive early retries during Windows
   # PE / first-install / OOBE waste log space and obscure real errors.
   # 120s gives Windows time to complete the OOBE AutoLogon and reach a usable
-  # shell before probes begin; the 8h winrm_timeout handles the rest.
+  # shell before probes begin; the 3h ssh_timeout handles the rest.
   pause_before_connecting = "120s"
 
   qemuargs = [
     ["-boot", "order=d"],
-    ["-netdev", "user,id=user.0,hostfwd=tcp::5985-:5985"],
+    ["-netdev", "user,id=user.0,hostfwd=tcp::2222-:22"],
   ]
 
   headless = var.headless
@@ -291,9 +283,10 @@ source "qemu" "windows11" {
 build {
   sources = ["source.qemu.windows11"]
 
-  # Install VirtIO drivers so the finished image boots with the virtio disk
-  # interface used in the vm-setup configurations (libvirt XML, UTM plist, and
-  # QEMU start scripts).  Drivers are downloaded from the stable Fedora mirror.
+  # Install VirtIO drivers and QEMU guest agent (qemu-ga) from the stable
+  # Fedora virtio-win guest-tools bundle.  This single installer packages both
+  # the VirtIO storage/network/balloon drivers and the QEMU guest agent,
+  # replacing the prior two-step ISO download + separate qemu-ga setup.
   #
   # pnputil /add-driver with /install pre-stages the driver in the Windows
   # driver store; it takes effect when the device appears (i.e. when the image
@@ -301,34 +294,18 @@ build {
   #
   # Source: https://fedorapeople.org/groups/virt/virtio-win/
   provisioner "powershell" {
-    # Pause to let Windows fully settle after first logon.
     pause_before = "90s"
     inline = [
       "$ErrorActionPreference = 'Stop'",
-      "$virtioUrl = 'https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso'",
-      "$virtioIso = \"$env:TEMP\\virtio-win.iso\"",
-      "Write-Host 'VM-build: downloading virtio-win.iso...'",
-      "Invoke-WebRequest -Uri $virtioUrl -OutFile $virtioIso -UseBasicParsing",
-      "$mountResult = Mount-DiskImage -ImagePath $virtioIso -PassThru",
-      "$drive = ($mountResult | Get-Volume).DriveLetter + ':'",
-      "Write-Host \"VM-build: installing VirtIO drivers from $drive\"",
-      "pnputil /add-driver \"$drive\\viostor\\w11\\amd64\\viostor.inf\" /install",
-      "pnputil /add-driver \"$drive\\NetKVM\\w11\\amd64\\netkvm.inf\" /install",
-      "pnputil /add-driver \"$drive\\Balloon\\w11\\amd64\\balloon.inf\" /install",
-      "Dismount-DiskImage -ImagePath $virtioIso",
-      "Remove-Item $virtioIso -Force",
-      "Write-Host 'VM-build: VirtIO drivers installed; image is VirtIO-disk ready'",
+      "$toolsUrl = 'https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win-guest-tools.exe'",
+      "$toolsExe = \"$env:TEMP\\virtio-win-guest-tools.exe\"",
+      "Write-Host 'VM-build: downloading virtio-win-guest-tools.exe...'",
+      "Invoke-WebRequest -Uri $toolsUrl -OutFile $toolsExe -UseBasicParsing",
+      "Write-Host 'VM-build: installing VirtIO drivers + qemu-ga...'",
+      "Start-Process -Wait -FilePath $toolsExe -ArgumentList '/quiet /install /norestart'",
+      "Remove-Item $toolsExe -Force",
+      "Write-Host 'VM-build: VirtIO drivers and qemu-ga installed'",
     ]
   }
 
-  # Disable WinRM and clean up Packer build artefacts before finalising.
-  provisioner "powershell" {
-    inline = [
-      "Write-Host 'VM-build: disabling WinRM'",
-      "winrm set winrm/config/service @{AllowUnencrypted='false'}",
-      "winrm set winrm/config/service/auth @{Basic='false'}",
-      "netsh advfirewall firewall set rule group='windows remote management' new enable=no",
-      "Write-Host 'VM-build: Windows 11 image finalised'",
-    ]
-  }
 }
