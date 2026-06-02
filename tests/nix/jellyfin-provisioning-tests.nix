@@ -34,6 +34,8 @@ let
   windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
   windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
   windowsSystemText = builtins.readFile ../../src/hosts/Windows/system.dsc.yml;
+  jellyfinSyncScript = builtins.readFile ../../src/scripts/jellyfin-sync.sh;
+  macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
 
   assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
 
@@ -100,12 +102,12 @@ let
   ) "polyipseity Jellyfin account must be declared as admin on POSIX and Windows user registries";
 
   test_jellyfin_admin_flag_defaults_false_in_sync_logic = assert' (
-    containsRegex ''isAdmin: \(\.isAdmin // false\)'' applyScriptText
+    containsRegex ''isAdmin: \(\.isAdmin // false\)'' jellyfinSyncScript
     && containsRegex ''isAdmin = if \(\$null -eq \$account\.isAdmin\) \{ \$false \}'' windowsJellyfinAccountText
   ) "Jellyfin account sync logic must default isAdmin to false when omitted";
 
   test_jellyfin_admin_policy_is_converged = assert' (
-    containsRegex ''/Users/\$\{_rjas_user_id\}/Policy'' applyScriptText
+    containsRegex ''/Users/\$\{_jfsa_user_id\}/Policy'' jellyfinSyncScript
     && containsRegex ''/Users/\$\(\$matchingUser\.Id\)/Policy'' windowsJellyfinAccountText
   ) "Jellyfin account sync must converge admin policy on POSIX and Windows";
 
@@ -118,12 +120,12 @@ let
   ) "Caddy local CA trust must be automated across POSIX and Windows apply flows";
 
   test_posix_library_sync_function_exists = assert' (
-    containsRegex "run_jellyfin_library_sync" applyScriptText
-    && containsRegex "Library/VirtualFolders" applyScriptText
-    && containsRegex "LibraryOptions" applyScriptText
-  ) "apply.sh must contain the run_jellyfin_library_sync function with Jellyfin API calls";
+    containsRegex "_jfs_sync_libraries" jellyfinSyncScript
+    && containsRegex "Library/VirtualFolders" jellyfinSyncScript
+    && containsRegex "LibraryOptions" jellyfinSyncScript
+  ) "jellyfin-sync.sh must contain the _jfs_sync_libraries function with Jellyfin API calls";
 
-  test_posix_library_sync_wired_in_all_branches = assert' (containsRegex "run_jellyfin_library_sync" applyScriptText) "POSIX library sync must appear in apply.sh after account sync in Darwin, NixOS, and Linux branches";
+  test_posix_library_sync_wired_in_all_branches = assert' (containsRegex "jellyfin-sync\.sh" applyScriptText) "POSIX library sync dispatch must appear in apply.sh for Darwin, NixOS, and Linux branches";
 
   test_posix_polyipseity_library_declared_in_users_json = assert' (
     (builtins.length (usersRegistry.polyipseity.jellyfin.libraries or [ ])) > 0
