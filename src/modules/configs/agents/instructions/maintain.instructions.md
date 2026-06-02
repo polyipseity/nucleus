@@ -36,7 +36,8 @@ Guidance-file rule (`AGENTS.md`, `.agents/**`):
 
 Safety rules:
 
-- Never revert/reset/cherry-pick earlier than the captured baseline hash.
+- NEVER use `git reset` (especially `--hard` or `--keep`) under any circumstance. It destroys uncommitted work and can wipe days of progress. Use `git revert` or `git restore` instead.
+- Never revert or cherry-pick earlier than the captured baseline hash.
 - Do not mix unrelated concerns in the same commit.
 
 Final check:
