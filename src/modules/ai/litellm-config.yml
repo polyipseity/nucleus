@@ -1,9 +1,11 @@
 # LiteLLM proxy configuration — shared across all hosts.
 #
 # Ollama models are proxied via ollama_chat/<model> pointing at the local
-# Ollama daemon on 127.0.0.1:11434.  OpenRouter models use the API key
-# provided via the OPENROUTER_API_KEY environment variable (sourced from
-# a SOPS-decrypted secret at runtime).
+# Ollama daemon on 127.0.0.1:11434.  DeepSeek V4 models use a fallback chain:
+#   primary (order: 1) — OpenCode Go (https://opencode.ai/zen/go/v1),
+#                         OPENCODE_GO_API_KEY env var
+#   fallback (order: 2) — OpenRouter, OPENROUTER_API_KEY env var
+# Both env vars are sourced from SOPS-decrypted secrets at runtime.
 #
 # litellm_settings.drop_params prevents errors when clients send parameters
 # (e.g. max_tokens) that a particular model endpoint does not support.
@@ -33,23 +35,44 @@ model_list:
       model: ollama_chat/qwen3:8b
       api_base: http://127.0.0.1:11434
 
-  # ---- OpenRouter models (with thinking-effort variants) ----
-  # DeepSeek V4 Flash and V4 Pro support reasoning.effort = high | xhigh
+  # ---- DeepSeek V4 models with fallback chain ----
+  # Primary: OpenCode Go (order: 1), Fallback: OpenRouter (order: 2).
+  # Both V4 Flash and V4 Pro support reasoning.effort = high | xhigh
   # (xhigh maps to max reasoning).  Each effort level gets a separate model
   # entry so clients can select the desired effort level by model name.
   #
   # Base variant (no reasoning param — lets the client decide).
   - model_name: deepseek/deepseek-v4-flash
     litellm_params:
+      model: openai/deepseek-v4-flash
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: os.environ/OPENCODE_GO_API_KEY
+      order: 1
+      model_info:
+        max_input_tokens: 65536
+  - model_name: deepseek/deepseek-v4-flash
+    litellm_params:
       model: openrouter/deepseek/deepseek-v4-flash
       api_key: os.environ/OPENROUTER_API_KEY
+      order: 2
       model_info:
         max_input_tokens: 65536
 
   - model_name: deepseek/deepseek-v4-flash/reasoning_high
     litellm_params:
+      model: openai/deepseek-v4-flash
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: os.environ/OPENCODE_GO_API_KEY
+      order: 1
+      reasoning:
+        effort: high
+      model_info:
+        max_input_tokens: 65536
+  - model_name: deepseek/deepseek-v4-flash/reasoning_high
+    litellm_params:
       model: openrouter/deepseek/deepseek-v4-flash
       api_key: os.environ/OPENROUTER_API_KEY
+      order: 2
       reasoning:
         effort: high
       model_info:
@@ -57,8 +80,19 @@ model_list:
 
   - model_name: deepseek/deepseek-v4-flash/reasoning_xhigh
     litellm_params:
+      model: openai/deepseek-v4-flash
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: os.environ/OPENCODE_GO_API_KEY
+      order: 1
+      reasoning:
+        effort: xhigh
+      model_info:
+        max_input_tokens: 65536
+  - model_name: deepseek/deepseek-v4-flash/reasoning_xhigh
+    litellm_params:
       model: openrouter/deepseek/deepseek-v4-flash
       api_key: os.environ/OPENROUTER_API_KEY
+      order: 2
       reasoning:
         effort: xhigh
       model_info:
@@ -66,15 +100,35 @@ model_list:
 
   - model_name: deepseek/deepseek-v4-pro
     litellm_params:
+      model: openai/deepseek-v4-pro
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: os.environ/OPENCODE_GO_API_KEY
+      order: 1
+      model_info:
+        max_input_tokens: 65536
+  - model_name: deepseek/deepseek-v4-pro
+    litellm_params:
       model: openrouter/deepseek/deepseek-v4-pro
       api_key: os.environ/OPENROUTER_API_KEY
+      order: 2
       model_info:
         max_input_tokens: 65536
 
   - model_name: deepseek/deepseek-v4-pro/reasoning_high
     litellm_params:
+      model: openai/deepseek-v4-pro
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: os.environ/OPENCODE_GO_API_KEY
+      order: 1
+      reasoning:
+        effort: high
+      model_info:
+        max_input_tokens: 65536
+  - model_name: deepseek/deepseek-v4-pro/reasoning_high
+    litellm_params:
       model: openrouter/deepseek/deepseek-v4-pro
       api_key: os.environ/OPENROUTER_API_KEY
+      order: 2
       reasoning:
         effort: high
       model_info:
@@ -82,8 +136,19 @@ model_list:
 
   - model_name: deepseek/deepseek-v4-pro/reasoning_xhigh
     litellm_params:
+      model: openai/deepseek-v4-pro
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: os.environ/OPENCODE_GO_API_KEY
+      order: 1
+      reasoning:
+        effort: xhigh
+      model_info:
+        max_input_tokens: 65536
+  - model_name: deepseek/deepseek-v4-pro/reasoning_xhigh
+    litellm_params:
       model: openrouter/deepseek/deepseek-v4-pro
       api_key: os.environ/OPENROUTER_API_KEY
+      order: 2
       reasoning:
         effort: xhigh
       model_info:
