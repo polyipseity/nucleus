@@ -26,7 +26,7 @@
 #     com.apple.fileprovider.ignore#P xattr daily at 12:00 to prevent iCloud
 #     from syncing build/cache trees across devices.
 #   local.nix-index-update — rebuilds the nix-index file database daily
-#     (00:00) and on every agent load; a freshness check makes
+#     (12:00) and on every agent load; a freshness check makes
 #     reloads a fast no-op when the DB was updated within the past 6 days.
 args@{
   config,
@@ -315,7 +315,7 @@ let
 
   # --------------------------------------------------------------------------
   # Weekly garbage collection LaunchAgent
-  # Performs bounded GC on every Sunday at midnight to reclaim stale VM
+  # Performs bounded GC on every Sunday at noon to reclaim stale VM
   # artifacts, build outputs, and tool caches that accumulate across weeks.
   launchd.agents."gc-weekly" = {
     enable = true;

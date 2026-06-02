@@ -4,7 +4,7 @@
 #
 # Systemd user units managed by this module:
 #   nix-index-update.service — rebuilds the nix-index file database on demand.
-#   nix-index-update.timer   — fires daily (00:00) with Persistent=true.
+#   nix-index-update.timer   — fires daily (12:00) with Persistent=true.
 {
   config,
   lib,
@@ -261,7 +261,7 @@ lib.mkIf pkgs.stdenv.isLinux {
   # Keeps the nix-index file database current so pay-respects can suggest
   # `nix profile install` commands when an unknown command is typed.
   #
-  # The timer fires daily (00:00, Persistent=true) so the DB stays fresh even
+  # The timer fires daily (12:00, Persistent=true) so the DB stays fresh even
   # after mid-week package installs on intermittently used machines.
   # buildNixIndex handles the
   # first-provision case so the DB is available before the timer first fires.
@@ -297,7 +297,7 @@ lib.mkIf pkgs.stdenv.isLinux {
   };
 
   # --------------------------------------------------------------------------
-  # Weekly garbage collection — runs on Sunday at midnight to reclaim stale VM
+  # Weekly garbage collection — runs on Sunday at noon to reclaim stale VM
   # artifacts, build outputs, and tool caches that accumulate across weeks.
   systemd.user.services."gc-weekly" = {
     Unit = {
