@@ -371,6 +371,8 @@ function Sync-JellyfinLibrary {
       }
       $createResponse = Invoke-JellyfinApi -Method POST -Path "/Library/VirtualFolders?$queryParams" -Token $adminToken -Body @{
         LibraryOptions = $libraryOptions
+        Paths          = [string[]]@($spec.paths | ForEach-Object { $_ })
+        RefreshLibrary = $false
       }
       if ($createResponse.StatusCode -eq 204) {
         Write-Output "jellyfin/library: created library '$($spec.name)' ($($spec.collectionType))."
