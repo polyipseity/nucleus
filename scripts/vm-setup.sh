@@ -685,7 +685,8 @@ EOF
 # Args:
 #   $1 — VM machine name (manifest .name)
 #   $2 — VM type (macOS/NixOS/Windows/...)
-# Writes a host-side helper script that prints the guest-side converge command.
+# Writes a host-side helper script that auto-configures the guest via QEMU GA,
+# SSH (NixOS only), or prints manual instructions.
 write_configure_script() {
   _wcs_name="$1"
   _wcs_type="$2"
@@ -697,34 +698,127 @@ write_configure_script() {
     return 0
   fi
 
+  # Set up per-type command strings.
   case "$_wcs_type" in
     NixOS)
-      _wcs_cmd="sudo nixos-rebuild switch --flake \"\$HOME/dev/nucleus/src#NixOS\""
+      _wcs_qemu_json='{"execute":"guest-exec","arguments":{"path":"/bin/sh","arg":["/bin/sh","-c","sudo nixos-rebuild switch --flake \"$HOME/dev/nucleus/src#NixOS\""],"capture-output":false}}'
+      _wcs_ssh_cmd='systemctl start nucleus-rebuild'
+      _wcs_manual_cmd='sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"'
       ;;
     Windows)
-      _wcs_cmd='.\src\hosts\Windows\apply.ps1'
+      _wcs_qemu_json='{"execute":"guest-exec","arguments":{"path":"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe","arg":["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe","-NoProfile","-Command","& .\\src\\hosts\\Windows\\apply.ps1"],"capture-output":false}}'
+      _wcs_ssh_cmd=''
+      _wcs_manual_cmd='.\src\hosts\Windows\apply.ps1'
       ;;
     macOS)
-      _wcs_cmd="\$HOME/dev/nucleus/scripts/bootstrap.sh apply"
+      _wcs_qemu_json=''
+      _wcs_ssh_cmd=''
+      _wcs_manual_cmd=''
       ;;
     *)
-      _wcs_cmd='No guest converge command is defined for this VM type.'
+      _wcs_qemu_json=''
+      _wcs_ssh_cmd=''
+      _wcs_manual_cmd='No guest converge command is defined for this VM type.'
       ;;
   esac
 
-  cat >"$_wcs_path_sh" <<EOF
+  cat >"$_wcs_path_sh" <<WCS_EOF
 #!/usr/bin/env sh
 set -eu
-printf 'Guest configuration is not automatic. Run inside the guest:\n\n'
-printf '%s\n' '$_wcs_cmd'
-EOF
 
-  cat >"$_wcs_path_ps1" <<EOF
-# configure-$_wcs_name.ps1 — Show guest converge command for '$_wcs_name'.
-Write-Host 'Guest configuration is not automatic. Run inside the guest:'
-Write-Host ''
-Write-Host '$_wcs_cmd'
-EOF
+# Auto-configure script for ${_wcs_name} (${_wcs_type})
+# Tries QEMU GA guest-exec, then SSH (NixOS only), then prints manual instructions.
+
+_WCS_TYPE='${_wcs_type}'
+_WCS_PIPE='PIPE:\\\\\\.\\\\pipe\\\\qga-${_wcs_name}'
+_WCS_MANUAL='${_wcs_manual_cmd}'
+
+# ----- QEMU GA via socat -----
+if command -v socat >/dev/null 2>&1 && [ -n '${_wcs_qemu_json}' ]; then
+  printf 'Trying QEMU GA guest-exec for %s...\\n' "\$_WCS_TYPE"
+  _WCS_RESPONSE=\$(printf '%s' '${_wcs_qemu_json}' | socat - "\$_WCS_PIPE" 2>/dev/null) || true
+  if [ -n "\$_WCS_RESPONSE" ]; then
+    _WCS_PID=\$(printf '%s' "\$_WCS_RESPONSE" | sed -n 's/.*"pid":\\([0-9]*\\).*/\\1/p')
+    if [ -n "\$_WCS_PID" ]; then
+      printf 'guest-exec started (PID: %s). Waiting...\\n' "\$_WCS_PID"
+      _WCS_TIMEOUT=600
+      _WCS_ELAPSED=0
+      while [ "\$_WCS_ELAPSED" -lt "\$_WCS_TIMEOUT" ]; do
+        _WCS_STATUS=\$(echo '{"execute":"guest-exec-status","arguments":{"pid":'"\$_WCS_PID"'}}' | socat - "\$_WCS_PIPE" 2>/dev/null) || true
+        if printf '%s' "\$_WCS_STATUS" | grep -q '"exited":true'; then
+          _WCS_EXITCODE=\$(printf '%s' "\$_WCS_STATUS" | sed -n 's/.*"exitcode":\\([0-9]*\\).*/\\1/p')
+          if [ "\$_WCS_EXITCODE" = "0" ]; then
+            printf 'Configuration completed via QEMU GA.\\n'
+            exit 0
+          fi
+          printf 'QEMU GA guest-exec failed (exit %s). Trying fallback...\\n' "\$_WCS_EXITCODE"
+          break
+        fi
+        sleep 10
+        _WCS_ELAPSED=\$((_WCS_ELAPSED + 10))
+      done
+      if [ "\$_WCS_ELAPSED" -ge "\$_WCS_TIMEOUT" ]; then
+        printf 'QEMU GA timed out. Trying fallback...\\n'
+      fi
+    fi
+  fi
+fi
+
+# ----- SSH (NixOS only) -----
+if [ "\$_WCS_TYPE" = "NixOS" ] && [ -n '${_wcs_ssh_cmd}' ]; then
+  printf 'Trying SSH...\\n'
+  if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 "${vm_guest_username}@localhost" '${_wcs_ssh_cmd}' 2>/dev/null; then
+    printf 'Configuration triggered via SSH.\\n'
+    exit 0
+  fi
+  printf 'SSH failed.\\n'
+fi
+
+# ----- Manual fallback -----
+if [ -n "\$_WCS_MANUAL" ]; then
+  printf 'Could not auto-configure. Run this command inside the guest:\\n\\n  %s\\n\\n' "\$_WCS_MANUAL"
+else
+  printf 'Configuration is not supported for this guest type.\\n'
+fi
+exit 1
+WCS_EOF
+
+  cat >"$_wcs_path_ps1" <<WCS_EOF
+# configure-${_wcs_name}.ps1 — Auto-configure helper for '${_wcs_name}' (${_wcs_type})
+# Tries QEMU GA guest-exec via .NET NamedPipeClientStream, then prints manual instructions.
+
+\$vmName = '${_wcs_name}'
+\$vmType = '${_wcs_type}'
+\$manualCmd = '${_wcs_manual_cmd}'
+
+if ('${_wcs_qemu_json}' -ne '') {
+  Write-Host "Trying QEMU GA guest-exec for \$vmName..."
+  try {
+    \$pipe = New-Object System.IO.Pipes.NamedPipeClientStream('.', "qga-\$vmName", [System.IO.Pipes.PipeDirection]::InOut)
+    \$pipe.Connect(5000)
+    \$writer = New-Object System.IO.StreamWriter(\$pipe)
+    \$reader = New-Object System.IO.StreamReader(\$pipe)
+    \$writer.WriteLine('${_wcs_qemu_json}')
+    \$writer.Flush()
+    \$response = \$reader.ReadLine()
+    Write-Host "QEMU GA response: \$response"
+    \$pipe.Dispose()
+    Write-Host 'Command sent to guest. Check guest for completion.'
+    exit 0
+  } catch {
+    Write-Host "QEMU GA failed: \$(\$_ | Out-String)"
+  }
+}
+
+if ([string]::IsNullOrEmpty(\$manualCmd)) {
+  Write-Host 'Configuration is not supported for this guest type.'
+} else {
+  Write-Host 'Could not auto-configure. Run this command inside the guest:'
+  Write-Host ''
+  Write-Host "  \$manualCmd"
+}
+exit 1
+WCS_EOF
 
   chmod 755 "$_wcs_path_sh"
   chmod 755 "$_wcs_path_ps1"
