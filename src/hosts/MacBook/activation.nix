@@ -460,6 +460,12 @@
     # Converge Jellyfin accounts and libraries declared in src/modules/users.json
     # with a running Jellyfin server.
     #
+    # WHY a separate script instead of inline shell: the sync logic performs
+    # runtime imperative operations (SOPS decryption, API polling, token auth,
+    # diff-and-converge) that Nix's declarative model cannot express.  Keeping
+    # it in src/scripts/jellyfin-sync.sh avoids duplicating 600+ lines of shell
+    # across hosts and keeps the activation file scoped to macOS-specific hooks.
+    #
     # REPO_ROOT is inherited from the activation runner's environment (written by
     # apply.sh at $HOME/.config/nucleus/repo-root).  If unset, skip gracefully.
     jellyfin_repo_root="$NUCLEUS_REPO_ROOT"

@@ -2,6 +2,16 @@
 # jellyfin-sync.sh — Converge Jellyfin accounts and libraries declared in
 # src/modules/users.json with a running Jellyfin server.
 #
+# WHY a separate .sh file instead of inline Nix activationScript shell:
+#   This script performs runtime imperative convergence against a live REST API:
+#   SOPS decryption (needs host SSH keys at activation time), server readiness
+#   polling, token-based auth handshake, and diff-and-converge against Jellyfin's
+#   current state.  Nix's declarative, build-time model cannot express these
+#   operations; embedding 600+ lines of shell in a Nix indented string would harm
+#   readability, defeat independent testing, and duplicate the logic across hosts.
+#   The script stays invocable from apply.sh, darwin-rebuild (postActivation),
+#   and nixos-rebuild (activationScripts) with no per-host duplication.
+#
 # Designed to be invoked from both apply.sh and Nix activation scripts (Darwin
 # postActivation, NixOS activationScripts).  The repo root must be passed via
 # --repo-root or the NUCLEUS_REPO_ROOT environment variable.

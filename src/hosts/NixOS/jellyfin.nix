@@ -38,6 +38,10 @@ in
   # Activation script: converge Jellyfin accounts and libraries after the
   # Jellyfin service is running.  Mirrors the Darwin postActivation fragment but
   # uses a named script (nixos-specific option).
+  #
+  # WHY a separate script instead of inline shell: see the rationale in
+  # src/scripts/jellyfin-sync.sh header — this is runtime imperative API
+  # convergence that Nix's build-time model cannot express.
   system.activationScripts.jellyfin-sync = lib.mkAfter ''
     jellyfin_repo_root="''${NUCLEUS_REPO_ROOT:-}"
     if [ -z "$jellyfin_repo_root" ]; then
