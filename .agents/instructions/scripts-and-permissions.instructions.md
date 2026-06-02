@@ -39,6 +39,16 @@ applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
   it is embedded in the flake as `apps.apply`; it follows the same doc and
   line-ending rules as `scripts/` shell scripts.
 
+## Argument convention for extracted scripts
+
+- **All extracted inline scripts must accept inputs via positional arguments,
+  not environment variables.** This keeps reasoning local, avoids hidden
+  coupling between source and consumer, and makes each script independently
+  testable.
+- `src/scripts/caddy-trust.sh` historically uses `NUCLEUS_REPO_ROOT` (an
+  environment variable) for backward compatibility. New scripts must use
+  positional arguments instead.
+
 ## PowerShell file naming
 
 When adding or renaming standalone PowerShell entry points, use PascalCase and

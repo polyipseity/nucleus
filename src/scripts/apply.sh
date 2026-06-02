@@ -1,19 +1,31 @@
 #!/usr/bin/env sh
 # src/scripts/apply.sh — Dispatch the Nix apply command for the current host.
 #
-# This is a thin orchestrator: its responsibility is OS detection, lifecycle
-# ordering (pre-apply checks → rebuild → post-apply provisioning), and
+# This is a thin orchestrator: OS detection, lifecycle ordering
+# (pre-apply checks → rebuild → post-apply provisioning), and
 # error-boundary handling. All heavy logic lives in dedicated sibling scripts
-# under src/scripts/ and scripts/ so each concern can be validated, tested,
-# and reused independently.
+# so each concern can be validated, tested, and reused independently.
+#
+# Script location convention:
+#   scripts/        — Cross-platform scripts also consumed as Nix app inputs
+#                     via builtins.readFile (ai-sync, vm-setup, gc, replica-sync).
+#   src/scripts/    — Apply-only internal scripts executed by this dispatcher
+#                     only.  Resolved at runtime via $_ash_script_dir.
+#
+# Pre-apply lifecycle (order is significant):
+#   1. SSH host key generation             (generate-ssh-host-key.sh)
+#   2. SOPS machine key registration       (register-host-age-key.sh)
+#   3. Nix health check                    (nix run .#health-check)
+#   4. System rebuild                      (darwin-rebuild / nixos-rebuild / home-manager)
+#   5. Prek hooks installation             (install-prek-hooks.sh)
 #
 # Post-apply provisioning order:
-#   1. Local CA trust (caddy-trust.sh)
-#   2. Jellyfin sync (jellyfin-sync.sh)
-#   3. AI model sync (ai-sync.sh)
-#   4. Cloud replica sync (replica-sync.sh)
-#   5. VM setup (vm-setup.sh)
-#   6. Garbage collection (gc.sh)
+#   1. Local CA trust                      (caddy-trust.sh)
+#   2. Jellyfin sync                       (jellyfin-sync.sh)
+#   3. AI model sync                       (ai-sync.sh)
+#   4. Cloud replica sync                  (replica-sync.sh)
+#   5. VM setup                            (vm-setup.sh)
+#   6. Garbage collection                  (gc.sh)
 #
 # Detects the operating system and invokes the appropriate flake output:
 #   Darwin  → darwin-rebuild switch  (nix-darwin; manages system + home-manager)
