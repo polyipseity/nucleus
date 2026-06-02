@@ -143,7 +143,16 @@ let
                 <key>Mode</key>
                 <string>Shared</string>
               <key>PortForward</key>
-              <array/>
+              <array>
+                <dict>
+                  <key>Protocol</key>
+                  <string>TCP</string>
+                  <key>GuestPort</key>
+                  <integer>22</integer>
+                  <key>HostPort</key>
+                  <integer>2222</integer>
+                </dict>
+              </array>
             </dict>
         </array>
         <key>Serial</key>
@@ -160,7 +169,14 @@ let
         <key>QEMU</key>
         <dict>
           <key>AdditionalArguments</key>
-          <array/>
+          <array>
+            <string>-chardev</string>
+            <string>socket,id=qga,path=/tmp/qga-${vm.name}.sock,server=on,wait=off</string>
+            <string>-device</string>
+            <string>virtio-serial</string>
+            <string>-device</string>
+            <string>virtserialport,chardev=qga,name=org.qemu.guest_agent.0</string>
+          </array>
           <key>BalloonDevice</key>
           <false/>
           <key>DebugLog</key>
