@@ -108,9 +108,13 @@ lib.mkMerge [
         ];
         KeepAlive = true;
         RunAtLoad = true;
-        # Suppress request logs; LiteLLM is verbose per-request.
+        # LiteLLM sends operational logging to stderr at the level set by
+        # LITELLM_LOG (WARNING by default via litellm-config.yml).  Route
+        # stderr to a file so errors and warnings are visible; stdout carries
+        # no operational value and is discarded.
+        # The parent directory is created automatically by launchd.
         StandardOutPath = "/dev/null";
-        StandardErrorPath = "/dev/null";
+        StandardErrorPath = "${config.home.homeDirectory}/Library/Logs/litellm/proxy.log";
       };
     };
 
