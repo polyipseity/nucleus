@@ -359,38 +359,22 @@ run_gc() {
 }
 
 run_caddy_local_ca_trust() {
-  # Trust Caddy's local CA so certificates from tls internal are recognized by
-  # local TLS clients. This applies generally to every local reverse proxy that
-  # uses the same Caddy PKI authority, not just Jellyfin.
+  # Delegate to src/scripts/caddy-trust.sh for Caddy local CA trust
+  # (retry loop with caddy --address 127.0.0.1:2019).
   #
-  # Arguments:
-  #   $1 — either "sudo" (run trust with sudo) or "user" (run as current user)
-  _rclct_mode="$1"
-
-  if ! command -v caddy >/dev/null 2>&1; then
-    printf '%s\n' 'caddy-trust: caddy not found in PATH; skipping local CA trust'
+  # Why a separate file:
+  #   The extracted script can be validated independently (shellcheck),
+  #   called from multiple privilege contexts (sudo/user), and reused
+  #   outside apply.sh if needed.
+  _rclct_script="$REPO_ROOT/src/scripts/caddy-trust.sh"
+  if [ ! -f "$_rclct_script" ]; then
+    printf '%s\n' "caddy-trust: caddy-trust.sh not found at $_rclct_script; skipping local CA trust"
     return
   fi
 
-  _rclct_attempt=0
-  while [ "$_rclct_attempt" -lt 20 ]; do
-    if [ "$_rclct_mode" = "sudo" ]; then
-      if sudo env "PATH=$PATH" caddy trust --address 127.0.0.1:2019; then
-        printf '%s\n' 'caddy-trust: local CA trusted successfully'
-        return
-      fi
-    else
-      if caddy trust --address 127.0.0.1:2019; then
-        printf '%s\n' 'caddy-trust: local CA trusted successfully'
-        return
-      fi
-    fi
-
-    _rclct_attempt=$((_rclct_attempt + 1))
-    sleep 1
-  done
-
-  printf '%s\n' 'caddy-trust: failed to trust local CA from admin endpoint 127.0.0.1:2019; continuing without failing apply' >&2
+  if ! sh "$_rclct_script" "$1"; then
+    printf '%s\n' 'caddy-trust: delegated trust script exited with an error (continuing without failing apply)' >&2
+  fi
 }
 
 run_replica_sync() {

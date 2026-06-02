@@ -28,6 +28,7 @@ let
   usersRegistry = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   windowsCaddyTrustText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyLocalCA.ps1;
+  caddyTrustScriptText = builtins.readFile ../../src/scripts/caddy-trust.sh;
   windowsJellyfinHttpsProxyText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinHttpsProxy.ps1;
   windowsJellyfinAccountText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinAccount.ps1;
   windowsJellyfinLibraryText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinLibrary.ps1;
@@ -113,7 +114,8 @@ let
 
   test_caddy_local_ca_trust_is_automated = assert' (
     containsRegex "run_caddy_local_ca_trust" applyScriptText
-    && containsRegex ''caddy trust --address 127\.0\.0\.1:2019'' applyScriptText
+    && containsRegex ''caddy-trust\.sh'' applyScriptText
+    && containsRegex ''caddy trust --address 127\.0\.0\.1:2019'' caddyTrustScriptText
     && containsRegex "Sync-CaddyLocalCA" windowsApplyText
     && containsRegex "function Sync-CaddyLocalCA" windowsCaddyTrustText
     && containsRegex ''caddy.*trust --address 127\.0\.0\.1:2019'' windowsCaddyTrustText
