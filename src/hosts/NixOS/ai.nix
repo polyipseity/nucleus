@@ -28,9 +28,13 @@ in
     serviceConfig = {
       Type = "simple";
       ExecStart = "${pkgs.writeShellScript "litellm-wrapper" ''
-        _keyfile="${config.sops.secrets."ai_openrouter_api_key".path}"
-        if [ -f "$_keyfile" ]; then
-          export OPENROUTER_API_KEY="$(cat "$_keyfile")"
+        _keyfile_oru="${config.sops.secrets."ai_openrouter_api_key".path}"
+        if [ -f "$_keyfile_oru" ]; then
+          export OPENROUTER_API_KEY="$(cat "$_keyfile_oru")"
+        fi
+        _keyfile_oc="${config.sops.secrets."ai_opencode_api_key".path}"
+        if [ -f "$_keyfile_oc" ]; then
+          export OPENCODE_GO_API_KEY="$(cat "$_keyfile_oc")"
         fi
         exec ${pkgs.litellm}/bin/litellm \
           --config ${litellmConfig} \
