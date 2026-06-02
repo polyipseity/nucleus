@@ -17,13 +17,13 @@
 #
 # LaunchAgents managed by this module:
 #   local.dev-ds-store-cleanup — removes Finder metadata files from ~/dev
-#     daily at 00:00 so apply runs do not block on large tree scans.
+#     daily at 12:00 so apply runs do not block on large tree scans.
 #   local.dev-spotlight-exclusions — refreshes Spotlight exclusion markers
-#     under ~/dev daily at 00:00 so apply runs do not block on large tree scans.
+#     under ~/dev daily at 12:00 so apply runs do not block on large tree scans.
 #   local.betterdisplay-heartbeat — polls HeadlessDisplay every 30 s and
 #     reconnects it if BetterDisplay drops the virtual screen connection.
 #   local.icloud-exclusions — marks large/transient directories with the
-#     com.apple.fileprovider.ignore#P xattr daily at 00:00 to prevent iCloud
+#     com.apple.fileprovider.ignore#P xattr daily at 12:00 to prevent iCloud
 #     from syncing build/cache trees across devices.
 #   local.nix-index-update — rebuilds the nix-index file database daily
 #     (00:00) and on every agent load; a freshness check makes
