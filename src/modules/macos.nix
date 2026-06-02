@@ -558,8 +558,8 @@ let
       url = "file://${config.home.homeDirectory}/Downloads";
     }
     {
-      name = "clouds";
-      url = "file://${config.home.homeDirectory}/clouds";
+      name = "data";
+      url = "file://${config.home.homeDirectory}/data";
     }
     {
       name = "dev";
@@ -594,7 +594,10 @@ let
 
   # Ensure directories referenced by managed Finder favorites exist before add.
   finderSidebarEnsureDirectoriesShell = ''
-    mkdir -p "$HOME/dev" "$HOME/clouds"
+    if [ ! -d "$HOME/data" ] && [ ! -L "$HOME/data" ]; then
+      mkdir -p "$HOME/data"
+    fi
+    mkdir -p "$HOME/dev"
     mkdir -p "$HOME/Desktop" "$HOME/Documents" "$HOME/Downloads" "$HOME/Movies" "$HOME/Music" "$HOME/Pictures"
   '';
 

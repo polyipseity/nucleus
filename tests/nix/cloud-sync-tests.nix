@@ -177,7 +177,7 @@ let
         && containsRegex "add_favorite" macosText
         && containsRegex "\\$MYSIDES_BIN add \"Applications\" \"file:///Applications\"" macosText
         && containsRegex "\\$MYSIDES_BIN add \"Downloads\" \"file://\\$HOME/Downloads\"" macosText
-        && containsRegex "\\$MYSIDES_BIN add \"clouds\" \"file://\\$HOME/clouds\"" macosText
+        && containsRegex "\\$MYSIDES_BIN add \"data\" \"file://\\$HOME/data\"" macosText
         && containsRegex "\\$MYSIDES_BIN add \"dev\" \"file://\\$HOME/dev\"" macosText
         && containsRegex "\\$MYSIDES_BIN add \"Desktop\" \"file://\\$HOME/Desktop\"" macosText
         && containsRegex "\\$MYSIDES_BIN add \"Documents\" \"file://\\$HOME/Documents\"" macosText
