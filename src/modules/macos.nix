@@ -1387,11 +1387,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
         _finder_sidebar_failed=1
       fi
 
-      # Refresh finder-related daemons in-session. If the sidebar still shows
-      # stale entries due to macOS caching, a logout/login may be required.
+      # Refresh finder-related daemons in-session (sharedfilelistd, cfprefsd).
       ${finderRefreshDaemonsShell}
-      /usr/bin/killall Finder 2>/dev/null || true
-      /usr/bin/open -a Finder 2>/dev/null || true
 
       if [ "$_finder_sidebar_failed" -eq 1 ]; then
         echo "macos: Finder favorites were partially updated; if stale entries persist, log out and log back in once." >&2
@@ -1402,29 +1399,15 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # refreshFinderServices
-    # Restart Finder to refresh available Services in context menu after
-    # installation and preference changes. This ensures "Open in Terminal",
-    # "Open in iTerm", and other services are visible without a manual restart.
+    # Register Services with LaunchServices so they appear in context menus.
+    # lsregister -r is sufficient; no Finder restart is needed for Services.
     # Source: https://developer.apple.com/documentation/coreservices/launch_services
     # -------------------------------------------------------------------------
     refreshFinderServices =
       lib.hm.dag.entryAfter [ "configureFinderSidebar" "installPackages" "configureLaunchServices" ]
         ''
-          if ! /usr/bin/killall Finder 2>/dev/null; then
-            echo "macos: Finder was not running; skipping restart." >&2
-          else
-            echo "macos: Finder terminated to refresh Services." >&2
-          fi
-
-          # Restart Finder to reload Services and apply sidebar configuration.
-          # This ensures services registered for both file and directory contexts
-          # are loaded (e.g., "Open in Terminal") and sidebar display names are updated.
-          # Also restart sharedfilelistd so sidebar state refreshes without
-          # requiring a full macOS reboot.
+          # Refresh finder-related daemons (sharedfilelistd, cfprefsd).
           ${finderRefreshDaemonsShell}
-
-          open -a Finder 2>/dev/null &
-          sleep 1
 
           # Enable Services to appear in Finder context menu for both files and
           # empty space. Set NSServicesMinimumItemCountForContextSubmenu to 0 to show
@@ -1444,19 +1427,29 @@ lib.mkIf pkgs.stdenv.isDarwin {
               fi
             fi
           fi
-
-          # Reload Finder Services to pick up the changes immediately.
-          if ! /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
-            echo "macos: launchctl Finder restart failed; restart Finder manually if Services do not appear in context menus." >&2
-          fi
-
-          # Finder restarts can reintroduce default favorites ordering.
-          # Re-apply managed favorites to keep deterministic output.
-          MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
-          if [ -x "$MYSIDES_BIN" ]; then
-            ${finderSidebarRebuildBestEffortShell}
-          fi
         '';
+
+    # -------------------------------------------------------------------------
+    # relaunchFinder
+    # Single dedicated Finder restart after all Finder-related changes complete.
+    # Uses launchctl kickstart (launchd-mediated restart) for the cleanest
+    # reload without losing window state. Re-applies sidebar favorites after
+    # restart since Finder may restore default ordering.
+    # -------------------------------------------------------------------------
+    relaunchFinder = lib.hm.dag.entryAfter [ "configureFinderSidebar" "refreshFinderServices" ] ''
+      ${finderRefreshDaemonsShell}
+
+      if ! /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
+        echo "macos: relaunchFinder — launchctl Finder restart failed; restart Finder manually if sidebar/Services are stale." >&2
+      fi
+
+      # Finder restarts can reintroduce default favorites ordering.
+      # Re-apply managed favorites to keep deterministic output.
+      MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
+      if [ -x "$MYSIDES_BIN" ]; then
+        ${finderSidebarRebuildBestEffortShell}
+      fi
+    '';
 
     # -------------------------------------------------------------------------
     # verifyArchivingStack

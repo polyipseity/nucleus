@@ -12,8 +12,7 @@
 #   and postActivation (after homebrew, last before the gc-root symlink).
 #   lib.mkBefore ensures these fragments are prepended before home-manager's
 #   HM activation call, which is also appended to postActivation.text.
-{ lib, ... }:
-{
+{ lib, ... }: {
   # ---------------------------------------------------------------------------
   # Declarative power-management settings handled by nix-darwin's power module.
   # These translate to systemsetup / pmset calls at activation time.
@@ -378,9 +377,7 @@
           echo "finder: failed to clear cached state at $finder_cache_dir (non-fatal; user may need manual restart)." >&2
         fi
       fi
-      # Relaunch Finder so it picks up the cleared cache and current defaults.
-      # Use killall to terminate the process; macOS will auto-relaunch it.
-      /usr/bin/killall -9 Finder 2>/dev/null || true
+      # Finder restart handled by Home Manager's relaunchFinder step.
     fi
 
     # ---- disableSpotlight -------------------------------------------------------
