@@ -20,6 +20,9 @@ in
   # manually.  ExecStart uses a shell wrapper that reads the SOPS-decrypted
   # OpenRouter key and exports it before launching LiteLLM — systemd's
   # EnvironmentFile expects KEY=VALUE format, but sops-nix writes the raw value.
+  # systemd captures service stdout/stderr to journald by default; access
+  # logs with: journalctl -u litellm.  The log level is set to WARNING by
+  # general_settings.environment_variables.LITELLM_LOG in the shared config.
   systemd.services.litellm = {
     description = "LiteLLM AI Gateway Proxy";
     wantedBy = [ "multi-user.target" ];
