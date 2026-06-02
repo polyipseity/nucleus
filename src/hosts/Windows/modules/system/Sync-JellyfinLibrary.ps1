@@ -376,6 +376,7 @@ function Sync-JellyfinLibrary {
       }
       if ($createResponse.StatusCode -eq 204) {
         Write-Output "jellyfin/library: created library '$($spec.name)' ($($spec.collectionType))."
+        $null = Invoke-JellyfinApi -Method POST -Path '/Library/VirtualFolders/Refresh' -Token $adminToken
       }
       else {
         Write-Warning "jellyfin/library: failed to create library '$($spec.name)' (HTTP $($createResponse.StatusCode))."
