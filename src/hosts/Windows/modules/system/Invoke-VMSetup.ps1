@@ -214,9 +214,10 @@ function Invoke-VMSetup {
     }
 
     $vmDef     = Get-Content $manifest -Raw | ConvertFrom-Json
-    $vmsDir    = Join-Path $RepoRoot 'src\vms'
-    $vmDir     = Join-Path $env:USERPROFILE 'virtual machines'
-    $imagesDir = Join-Path $vmDir 'images'
+    $vmsDir      = Join-Path $RepoRoot 'src\vms'
+    $templatesDir = Join-Path $vmsDir 'templates'
+    $vmDir       = Join-Path $env:USERPROFILE 'virtual machines'
+    $imagesDir   = Join-Path $vmDir 'images'
     try {
         $guestCredential = Resolve-VMGuestCredential -RepoRoot $RepoRoot
     }
@@ -240,88 +241,24 @@ function Invoke-VMSetup {
     }
 
     $vmReadmePath = Join-Path $vmDir 'README.md'
-    $vmReadmeContent = @'
+    $vmReadmeTemplate = Join-Path $templatesDir 'README.md'
+    if ($DryRun) {
+        Write-Information "vm-setup: [dry-run] Write VM directory guide: $vmReadmePath"
+    } elseif (Test-Path -LiteralPath $vmReadmeTemplate -PathType Leaf) {
+        $vmDirShort = '%USERPROFILE%\virtual machines'
+        $imagesDirShort = "$vmDirShort\images"
+        (Get-Content -Path $vmReadmeTemplate -Raw) `
+            -replace '\{\{VM_DIR_DISPLAY\}\}', $vmDirShort `
+            -replace '\{\{IMAGES_DIR_DISPLAY\}\}', $imagesDirShort `
+            | Set-Content -Path $vmReadmePath -Encoding UTF8
+        Write-Information "vm-setup: VM directory guide written: $vmReadmePath (template)"
+    } else {
+        Write-Warning "vm-setup: README template not found at $vmReadmeTemplate; writing minimal guide"
+        @"
 # virtual machines
 
 This directory stores VM artifacts managed by `nucleus-vm-setup`.
-
-## Layout
-
-- `images/` — build outputs, temporary build directories, and installer cache.
-- `images/<name>.qcow2` — pre-built guest images produced in build phase.
-- `images/<name>-build/` — temporary Packer output directory used during builds.
-- `images/<name>-installer.iso` — cached Windows installer ISO used by rebuilds.
-- `<name>.utm/` — UTM bundle directory on macOS hosts.
-- `<name>.qcow2` — libvirt/QEMU runtime disk on Linux/Windows hosts.
-
-## Start commands
-
-- macOS guest (Tart): run `start-<name>.sh` or `start-<name>.ps1` from `~/virtual machines`
-- NixOS/Windows guests on macOS (UTM): run `start-<name>.sh` or `start-<name>.ps1` from `~/virtual machines`
-- NixOS/Windows guests on NixOS (libvirt): run `start-<name>.sh` or `start-<name>.ps1` from `~/virtual machines`
-- NixOS/Windows guests on Windows (QEMU): run `start-<name>.ps1` (or `start-<name>.sh` in Git Bash/MSYS)
-
-## UTM bundle portability
-
-`*.utm` is a folder bundle (not a single opaque file). It contains VM metadata
-plus disk data (typically `Data/disk-main.qcow2`).
-
-To move a UTM VM to another macOS host:
-
-1. Copy the entire `<name>.utm` directory.
-2. Place it under `~/virtual machines/` on the target host.
-3. Open it in UTM (or re-run `nucleus-vm-setup` to refresh the managed registration).
-
-Copying only `config.plist` or only `disk-main.qcow2` is not sufficient for a
-portable UTM VM transfer.
-
-## Guest configuration
-
-Guest OS configuration is **partially automatic** after first boot.
-The generated configure scripts attempt to trigger the converge
-command automatically via:
-
-1. SSH port forwarding (NixOS only — connects to `localhost:2222`)
-2. QEMU guest agent (QEMU GA — via named pipe, all QEMU-based VMs)
-3. Falls back to printing the manual command to run inside the guest
-
-- `%USERPROFILE%\virtual machines\configure-<name>.ps1` (primary Windows)
-- `%USERPROFILE%\virtual machines\configure-<name>.sh` (POSIX shells)
-
-Manual converge commands if automation fails:
-
-- NixOS guest: `sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"`
-- Windows guest: `.\src\hosts\Windows\apply.ps1` (from `%USERPROFILE%\dev\nucleus`)
-- macOS guest: `~/dev/nucleus/scripts/bootstrap.sh apply`
-
-## Safe cleanup
-
-Temporary files/directories that are safe to remove when builds fail, are
-interrupted, or when reclaiming space:
-
-- `%USERPROFILE%\virtual machines\images\<name>-build\`
-- `%USERPROFILE%\virtual machines\images\<name>-installer.iso`
-
-Persistent VM artifacts (remove only when intentionally deleting a VM):
-
-- `%USERPROFILE%\virtual machines\images\<name>.qcow2`
-- `%USERPROFILE%\virtual machines\<name>.utm\`
-- `%USERPROFILE%\virtual machines\<name>.qcow2`
-
-If the installer cache is removed, `nucleus-vm-setup` re-downloads it on the
-next run.
-
-## Notes
-
-- Keep this directory managed by `nucleus-vm-setup`; avoid hand-editing generated artifacts.
-- Re-run `nucleus-vm-setup` after changing `src/modules/VMs.json`.
-- macOS guest images are built and run with Tart today; automated Tart→UTM runtime handoff is not yet supported.
-'@
-    if ($DryRun) {
-        Write-Information "vm-setup: [dry-run] Write VM directory guide: $vmReadmePath"
-    } else {
-        Set-Content -Path $vmReadmePath -Value $vmReadmeContent -Encoding UTF8
-        Write-Information "vm-setup: VM directory guide written: $vmReadmePath"
+"@ | Set-Content -Path $vmReadmePath -Encoding UTF8
     }
 
     # Auto-detect WHPX when the user has not specified a non-default accelerator.
@@ -427,8 +364,6 @@ next run.
         $diskCredentialMarker = Get-VMGuestSecretMarkerPath -BasePath $diskPath
         $startScriptPs1 = Join-Path $vmDir "start-$($vm.name).ps1"
         $startScriptSh = Join-Path $vmDir "start-$($vm.name).sh"
-        $configureScriptPs1 = Join-Path $vmDir "configure-$($vm.name).ps1"
-        $configureScriptSh = Join-Path $vmDir "configure-$($vm.name).sh"
         $prebuilt    = Join-Path $imagesDir "$($vm.name).qcow2"
 
         Write-Information "vm-setup: configuring VM '$($vm.display)'..."
@@ -527,33 +462,26 @@ next run.
         }
 
         # Write a self-contained QEMU start script for this VM.
-        $startContentPs1 = @"
-    # start-$($vm.name).ps1 — Start the '$($vm.display)' QEMU virtual machine.
-# Generated by Invoke-VMSetup; re-run ``nucleus-vm-setup`` to regenerate.
-#
-# Source: https://www.qemu.org/docs/master/system/invocation.html
-#
-# SSH port forwarding (hostfwd) exposes host:2222 → guest:22 for SSH-based provisioning.
-# QEMU GA (chardev pipe + virtio-serial) enables guest-agent commands via named pipe.
-$virtiofsArgs
-& '$qemuSystem' ``
-    -name '$($vm.display)' ``
-    -machine $machine ``
-    -cpu $cpu ``
-    -smp $($vm.cpus) ``
-    -m $ramMib ``
-    -drive file='$diskPath',format=qcow2,if=virtio ``
-    -netdev user,id=net0,hostfwd=tcp::2222-:22 ``
-    -device virtio-net-pci,netdev=net0 ``
-    -vga $vga ``
-    -display $display ``
-    -rtc base=localtime ``
-    -chardev pipe,id=qga,path=\\.\pipe\qga-$($vm.name) ``
-    -device virtio-serial ``
-    -device virtserialport,chardev=qga,name=org.qemu.guest_agent.0 ``
-    -usb -device usb-tablet
-"@
+        $startContentPs1Template = Join-Path $templatesDir 'start-windows.ps1'
+        if (Test-Path -LiteralPath $startContentPs1Template -PathType Leaf) {
+            $ps1Template = Get-Content -Path $startContentPs1Template -Raw
+            $startContentPs1 = $ps1Template.Replace('{{QEMU_SYSTEM}}', $qemuSystem) `
+                .Replace('{{VM_NAME}}', $vm.name) `
+                .Replace('{{VM_DISPLAY}}', $vm.display) `
+                .Replace('{{MACHINE}}', $machine) `
+                .Replace('{{CPU}}', $cpu) `
+                .Replace('{{CPUS}}', [string]$vm.cpus) `
+                .Replace('{{RAM_MIB}}', [string]$ramMib) `
+                .Replace('{{DISK_PATH}}', $diskPath) `
+                .Replace('{{VGA}}', $vga) `
+                .Replace('{{DISPLAY_BACKEND}}', $display) `
+                .Replace('{{VIRTIOFS_ARGS}}', $virtiofsArgs)
+        } else {
+            Write-Warning "vm-setup: start-windows.ps1 template not found at $startContentPs1Template; writing minimal script"
+            $startContentPs1 = "Write-Host 'start-$($vm.name).ps1 — Start VM $($vm.display)'"
+        }
 
+        # Keep .sh start script inline (QEMU invocation for Git Bash/MSYS).
         $startContentSh = @"
 #!/usr/bin/env sh
 # start-$($vm.name).sh — Start the '$($vm.display)' QEMU virtual machine.
@@ -590,191 +518,10 @@ set -eu
             Write-Information "vm-setup: start scripts written: $startScriptPs1, $startScriptSh"
         }
 
-        # Write a helper script that auto-executes the guest-side converge
-        # command via QEMU GA (primary) or SSH (NixOS only), with manual
-        # fallback. Re-run `nucleus-vm-setup` to regenerate.
-        switch ($vm.type) {
-            'NixOS' { $configureCommand = 'sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"' }
-            'Windows' { $configureCommand = '.\src\hosts\Windows\apply.ps1' }
-            'macOS' { $configureCommand = '~/dev/nucleus/scripts/bootstrap.sh apply' }
-            default { $configureCommand = 'No guest converge command is defined for this VM type.' }
-        }
-
-        $configureContentPs1 = @"
-# configure-$($vm.name).ps1 — Configure '$($vm.display)' VM.
-# Generated by Invoke-VMSetup; re-run nucleus-vm-setup to regenerate.
-
-function Wait-GuestReady {
-    param(`$VmName)
-    `$pipe = '\\.\pipe\qga-' + `$VmName
-    `$timer = [System.Diagnostics.Stopwatch]::StartNew()
-    while (`$timer.Elapsed.TotalSeconds -lt 150) {
-        try {
-            `$sock = New-Object System.IO.Pipes.NamedPipeClientStream('.', `$pipe, [System.IO.Pipes.PipeDirection]::InOut)
-            `$sock.Connect(1000)
-            `$writer = New-Object System.IO.StreamWriter(`$sock)
-            `$reader = New-Object System.IO.StreamReader(`$sock)
-            `$writer.WriteLine('{"execute":"guest-ping"}')
-            `$writer.Flush()
-            `$response = `$reader.ReadLine()
-            if (`$response -match '"return"\s*:\s*{}') { return `$true }
-        } catch {}
-        Start-Sleep -Seconds 5
-    }
-    return `$false
-}
-
-Write-Host "Waiting for $($vm.display) to be ready via QEMU GA..."
-if (-not (Wait-GuestReady -VmName '$($vm.name)')) {
-    Write-Warning "Guest not reachable via QEMU GA. Trying SSH..."
-}
-
-switch ('$($vm.type)') {
-    'NixOS' {
-        # Primary: SSH trigger via PortForward (localhost:2222)
-        # Requires Posh-SSH module: Install-Module -Name Posh-SSH -Force
-        try {
-            `$cred = New-Object System.Management.Automation.PSCredential('$guestUsername', (ConvertTo-SecureString '$guestPassword' -AsPlainText -Force))
-            `$session = New-SSHSession -ComputerName localhost -Port 2222 -Credential `$cred -AcceptKey -ErrorAction Stop
-            Invoke-SSHCommand -SessionId `$session.SessionId -Command "sudo systemctl start nucleus-rebuild"
-            Write-Host "Converge triggered via SSH."
-            return
-        } catch {
-            Write-Warning "SSH trigger failed, trying QEMU GA..."
-        }
-
-        # Fallback: QEMU GA guest-exec
-        try {
-            `$pipe = '\\.\pipe\qga-$($vm.name)'
-            `$sock = New-Object System.IO.Pipes.NamedPipeClientStream('.', `$pipe, [System.IO.Pipes.PipeDirection]::InOut)
-            `$sock.Connect(5000)
-            `$writer = New-Object System.IO.StreamWriter(`$sock)
-            `$reader = New-Object System.IO.StreamReader(`$sock)
-            `$cmd = '{"execute":"guest-exec","arguments":{"path":"/run/current-system/sw/bin/sudo","arg":["/run/current-system/sw/bin/nixos-rebuild","switch","--flake","/home/$guestUsername/dev/nucleus/src#NixOS"],"capture-output":true}}'
-            `$writer.WriteLine(`$cmd)
-            `$writer.Flush()
-            `$response = `$reader.ReadLine()
-            Write-Host "Converge triggered via QEMU GA: `$response"
-            return
-        } catch {
-            Write-Warning "QEMU GA trigger failed."
-        }
-    }
-    'Windows' {
-        # Primary: QEMU GA guest-exec
-        try {
-            `$pipe = '\\.\pipe\qga-$($vm.name)'
-            `$sock = New-Object System.IO.Pipes.NamedPipeClientStream('.', `$pipe, [System.IO.Pipes.PipeDirection]::InOut)
-            `$sock.Connect(5000)
-            `$writer = New-Object System.IO.StreamWriter(`$sock)
-            `$reader = New-Object System.IO.StreamReader(`$sock)
-            `$cmd = '{"execute":"guest-exec","arguments":{"path":"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe","arg":["-File","C:\\Users\\$guestUsername\\dev\\nucleus\\src\\hosts\\Windows\\apply.ps1"],"capture-output":true}}'
-            `$writer.WriteLine(`$cmd)
-            `$writer.Flush()
-            `$response = `$reader.ReadLine()
-            Write-Host "Converge triggered via QEMU GA: `$response"
-            return
-        } catch {
-            Write-Warning "QEMU GA trigger failed."
-        }
-    }
-    'macOS' {
-        Write-Host "macOS guest configuration not supported from Windows host."
-    }
-}
-
-Write-Host ''
-Write-Host 'Could not connect automatically. Run inside the guest:'
-switch ('$($vm.type)') {
-    'NixOS' { Write-Host 'sudo nixos-rebuild switch --flake "`$HOME/dev/nucleus/src#NixOS"' }
-    'Windows' { Write-Host '.\src\hosts\Windows\apply.ps1' }
-    'macOS' { Write-Host '~/dev/nucleus/scripts/bootstrap.sh apply' }
-}
-"@
-
-        $configureContentSh = @"
-#!/usr/bin/env sh
-# configure-$($vm.name).sh — Configure '$($vm.display)' VM.
-# Generated by Invoke-VMSetup; re-run nucleus-vm-setup to regenerate.
-
-set -eu
-
-case '$($vm.type)' in
-  NixOS)
-    # Primary: SSH via PortForward
-    if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 $guestUsername@localhost "sudo systemctl start nucleus-rebuild" 2>/dev/null; then
-      echo "Converge triggered via SSH."
-      exit 0
-    fi
-    echo "SSH failed, trying QEMU GA..."
-
-    # Fallback: QEMU GA via socat + named pipe
-    if command -v socat >/dev/null 2>&1; then
-      echo '{"execute":"guest-exec","arguments":{"path":"/run/current-system/sw/bin/sudo","arg":["/run/current-system/sw/bin/nixos-rebuild","switch","--flake","/home/$guestUsername/dev/nucleus/src#NixOS"],"capture-output":true}}' | socat - PIPE:\\\\.\\pipe\\qga-$($vm.name) 2>/dev/null && echo "Converge triggered via QEMU GA." && exit 0
-    fi
-    ;;
-  Windows)
-    # Primary: QEMU GA via socat
-    if command -v socat >/dev/null 2>&1; then
-      echo '{"execute":"guest-exec","arguments":{"path":"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe","arg":["-File","C:\\Users\\$guestUsername\\dev\\nucleus\\src\\hosts\\Windows\\apply.ps1"],"capture-output":true}}' | socat - PIPE:\\\\.\\pipe\\qga-$($vm.name) 2>/dev/null && echo "Converge triggered via QEMU GA." && exit 0
-    fi
-    ;;
-  macOS)
-    echo "macOS guest configuration not supported from Windows host."
-    ;;
-esac
-
-echo ""
-echo "Could not connect automatically. Run inside the guest:"
-case '$($vm.type)' in
-  NixOS) echo 'sudo nixos-rebuild switch --flake "`$HOME/dev/nucleus/src#NixOS"' ;;
-  Windows) echo '.\src\hosts\Windows\apply.ps1' ;;
-  macOS) echo '~/dev/nucleus/scripts/bootstrap.sh apply' ;;
-esac
-exit 1
-"@
-
-        if ($DryRun) {
-            Write-Information "vm-setup: [dry-run] Write configure scripts: $configureScriptPs1, $configureScriptSh"
-        } else {
-            Set-Content -Path $configureScriptPs1 -Value $configureContentPs1 -Encoding UTF8
-            Set-Content -Path $configureScriptSh -Value $configureContentSh -Encoding UTF8
-            Write-Information "vm-setup: configure helpers written: $configureScriptPs1, $configureScriptSh"
-        }
-
-        # Remove legacy helper scripts from %USERPROFILE%\virtual machines now
-        # that helper scripts are regenerated with start-/configure- naming.
-        $legacyHelpers = @(
-            (Join-Path $vmDir "Start-$($vm.display).ps1"),
-            (Join-Path $vmDir "Start-$($vm.display).sh"),
-            (Join-Path $vmDir "$($vm.name)-configure.ps1"),
-            (Join-Path $vmDir "$($vm.name)-configure.sh")
-        )
-        if (-not $DryRun) {
-            foreach ($legacyHelper in $legacyHelpers) {
-                if (Test-Path $legacyHelper) {
-                    $legacyHelperNormalized = $legacyHelper.ToLowerInvariant()
-                    $collidesWithModernHelper = @(
-                        $startScriptPs1,
-                        $startScriptSh
-                    ) | Where-Object { $_.ToLowerInvariant() -eq $legacyHelperNormalized } | Select-Object -First 1
-                    if ($collidesWithModernHelper) {
-                        Write-Information "vm-setup: skipping legacy cleanup due case-insensitive filename collision: $legacyHelper"
-                        continue
-                    }
-                    Remove-Item $legacyHelper -Force
-                    Write-Information "vm-setup: removed legacy helper script: $legacyHelper"
-                }
-            }
-        }
+        # NOTE: Configure script generation was removed. Guest-side converge
+        # is handled by the guest itself or via manual invocation.
 
         Write-Information "vm-setup: VM '$($vm.display)' setup complete"
-    }
-
-    $legacyConfigureDir = Join-Path $env:LOCALAPPDATA 'nucleus\vms\configure'
-    if (-not $DryRun -and (Test-Path $legacyConfigureDir)) {
-        Remove-Item $legacyConfigureDir -Recurse -Force
-        Write-Information "vm-setup: removed legacy helper directory: $legacyConfigureDir"
     }
 
     Write-Information 'vm-setup: Windows VM setup complete'

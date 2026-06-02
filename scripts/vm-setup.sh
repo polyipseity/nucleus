@@ -54,6 +54,7 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 MANIFEST="$REPO_ROOT/src/modules/VMs.json"
 VMS_DIR="$REPO_ROOT/src/vms"
+TEMPLATES_DIR="$VMS_DIR/templates"
 
 dry_run=false
 nixos_only=false
@@ -250,82 +251,21 @@ write_vm_directory_readme() {
     return 0
   fi
 
-  cat >"$_wvdr_readme" <<'EOF'
-# virtual machines
-
-This directory stores VM artifacts managed by `nucleus-vm-setup`.
-
-## Layout
-
-- `.tart/` — Tart VM store on macOS hosts (symlinked from `~/.tart`).
-- `images/` — build outputs, temporary build directories, and installer cache.
-- `images/<name>.qcow2` — pre-built guest images produced in build phase.
-- `images/<name>-build/` — temporary Packer output directory used during builds.
-- `images/<name>-installer.iso` — cached Windows installer ISO used by rebuilds.
-- `<name>.utm/` — UTM bundle directory on macOS hosts.
-- `<name>.qcow2` — libvirt/QEMU runtime disk on Linux/Windows hosts.
-
-## Start commands
-
-- macOS guest (Tart): run `~/virtual machines/start-<name>.sh` or `~/virtual machines/start-<name>.ps1`
-- NixOS/Windows guests on macOS (UTM): run `~/virtual machines/start-<name>.sh` or `~/virtual machines/start-<name>.ps1`
-- NixOS/Windows guests on NixOS (libvirt): run `~/virtual machines/start-<name>.sh` or `~/virtual machines/start-<name>.ps1`
-- NixOS/Windows guests on Windows (QEMU): run `start-<name>.ps1` (or `start-<name>.sh` in Git Bash/MSYS)
-
-## UTM bundle portability
-
-`*.utm` is a folder bundle (not a single opaque file). It contains VM metadata
-plus disk data (typically `Data/disk-main.qcow2`).
-
-To move a UTM VM to another macOS host:
-
-1. Copy the entire `<name>.utm` directory.
-2. Place it under `~/virtual machines/` on the target host.
-3. Open it in UTM (or re-run `nucleus-vm-setup` to refresh the managed registration).
-
-Copying only `config.plist` or only `disk-main.qcow2` is not sufficient for a
-portable UTM VM transfer.
-
-## Guest configuration
-
-Guest OS configuration is **not automatic** after first boot.
-Run the generated helper script in `~/virtual machines/` to print the exact
-guest-side converge command:
-
-- `~/virtual machines/configure-<name>.sh`
-- `~/virtual machines/configure-<name>.ps1`
-
-The converge commands are run inside each guest:
-
-- NixOS guest: `sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"`
-- Windows guest: `.\src\hosts\Windows\apply.ps1` (from `%USERPROFILE%\dev\nucleus`)
-- macOS guest: `~/dev/nucleus/scripts/bootstrap.sh apply`
-
-## Safe cleanup
-
-Temporary files/directories that are safe to remove when builds fail, are
-interrupted, or when reclaiming space:
-
-- `~/virtual machines/images/<name>-build/`
-- `~/virtual machines/images/<name>-installer.iso`
-
-Persistent VM artifacts (remove only when intentionally deleting a VM):
-
-- `~/virtual machines/images/<name>.qcow2`
-- `~/virtual machines/.tart/`
-- `~/virtual machines/<name>.utm/`
-- `~/virtual machines/<name>.qcow2`
-
-If the installer cache is removed, `nucleus-vm-setup` re-downloads it on the
-next run.
-
-## Notes
-
-- Keep this directory managed by `nucleus-vm-setup`; avoid hand-editing generated artifacts.
-- Re-run `nucleus-vm-setup` after changing `src/modules/VMs.json`.
-- macOS guest images are built and run with Tart today; automated Tart→UTM runtime handoff is not yet supported.
-EOF
-  printf 'vm-setup: wrote VM directory guide: %s\n' "$_wvdr_readme"
+  _wvdr_vm_dir_short='~/virtual machines'
+  _wvdr_images_dir_short='~/virtual machines/images'
+  if [ -f "$TEMPLATES_DIR/README.md" ]; then
+    sed -e "s|{{VM_DIR_DISPLAY}}|$_wvdr_vm_dir_short|g" \
+        -e "s|{{IMAGES_DIR_DISPLAY}}|$_wvdr_images_dir_short|g" \
+        "$TEMPLATES_DIR/README.md" >"$_wvdr_readme"
+    printf 'vm-setup: wrote VM directory guide: %s (template)\n' "$_wvdr_readme"
+  else
+    printf 'vm-setup: WARNING — README template not found at %s; writing minimal guide\n' \
+      "$TEMPLATES_DIR/README.md" >&2
+    {
+      printf '# virtual machines\n\n'
+      printf 'This directory stores VM artifacts managed by `nucleus-vm-setup`.\n'
+    } >"$_wvdr_readme"
+  fi
 }
 
 # ensure_utm_default_vm_location
@@ -605,31 +545,30 @@ write_start_script() {
     return 0
   fi
 
+  # Render .sh from template.
+  if [ -f "$TEMPLATES_DIR/start-posix.sh" ]; then
+    sed -e "s|{{VM_NAME}}|$_wss_name|g" \
+        -e "s|{{VM_DISPLAY}}|$_wss_display|g" \
+        -e "s|{{VM_TYPE}}|$_wss_type|g" \
+        -e "s|{{HOST_KIND}}|$_wss_host_kind|g" \
+        -e "s|{{VM_DIR}}|$VM_DIR|g" \
+        "$TEMPLATES_DIR/start-posix.sh" >"$_wss_path_sh"
+  else
+    printf 'vm-setup: WARNING — start-posix.sh template not found at %s\n' \
+      "$TEMPLATES_DIR/start-posix.sh" >&2
+    printf '#!/usr/bin/env sh\nset -eu\necho "VM start script for %s"\n' "$_wss_name" >"$_wss_path_sh"
+  fi
+  chmod 755 "$_wss_path_sh"
+
+  # Render .ps1 inline (macOS/Unix-specific PowerShell wrappers).
   case "$_wss_host_kind" in
     darwin-tart)
-      cat >"$_wss_path_sh" <<EOF
-#!/usr/bin/env sh
-set -eu
-tart run "$_wss_name"
-EOF
       cat >"$_wss_path_ps1" <<EOF
 # start-$_wss_name.ps1 — Start VM '$_wss_name' on macOS via Tart.
 & tart run '$_wss_name'
 EOF
       ;;
     darwin-utm)
-      cat >"$_wss_path_sh" <<EOF
-#!/usr/bin/env sh
-set -eu
-if [ -x '/Applications/UTM.app/Contents/MacOS/utmctl' ]; then
-  '/Applications/UTM.app/Contents/MacOS/utmctl' start "$_wss_name" || {
-    printf 'vm-setup: utmctl start failed for %s; opening bundle instead\n' "$_wss_name" >&2
-    open "$VM_DIR/$_wss_name.utm"
-  }
-else
-  open "$VM_DIR/$_wss_name.utm"
-fi
-EOF
       cat >"$_wss_path_ps1" <<EOF
 # start-$_wss_name.ps1 — Start VM '$_wss_name' on macOS via UTM.
 if (Test-Path '/Applications/UTM.app/Contents/MacOS/utmctl') {
@@ -644,18 +583,6 @@ if (Test-Path '/Applications/UTM.app/Contents/MacOS/utmctl') {
 EOF
       ;;
     nixos-libvirt)
-      cat >"$_wss_path_sh" <<EOF
-#!/usr/bin/env sh
-set -eu
-if ! virsh start "$_wss_name" >/dev/null; then
-  printf 'vm-setup: virsh start failed (or VM already running): %s\n' "$_wss_name" >&2
-fi
-if command -v virt-viewer >/dev/null 2>&1; then
-  exec virt-viewer --connect qemu:///system "$_wss_name"
-fi
-printf 'vm-setup: VM started: %s\n' "$_wss_name"
-printf 'vm-setup: install virt-viewer to open a console automatically\n'
-EOF
       cat >"$_wss_path_ps1" <<EOF
 # start-$_wss_name.ps1 — Start VM '$_wss_name' with libvirt.
 & virsh start '$_wss_name' | Out-Null
@@ -675,154 +602,9 @@ EOF
       return 1
       ;;
   esac
-
-  chmod 755 "$_wss_path_sh"
   chmod 755 "$_wss_path_ps1"
+
   printf 'vm-setup: wrote start helper scripts: %s, %s\n' "$_wss_path_sh" "$_wss_path_ps1"
-}
-
-# write_configure_script NAME TYPE
-# Args:
-#   $1 — VM machine name (manifest .name)
-#   $2 — VM type (macOS/NixOS/Windows/...)
-# Writes a host-side helper script that auto-configures the guest via QEMU GA,
-# SSH (NixOS only), or prints manual instructions.
-write_configure_script() {
-  _wcs_name="$1"
-  _wcs_type="$2"
-  _wcs_path_sh="$VM_DIR/configure-${_wcs_name}.sh"
-  _wcs_path_ps1="$VM_DIR/configure-${_wcs_name}.ps1"
-
-  if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] write configure helper scripts: %s, %s\n' "$_wcs_path_sh" "$_wcs_path_ps1"
-    return 0
-  fi
-
-  # Set up per-type command strings.
-  case "$_wcs_type" in
-    NixOS)
-      _wcs_qemu_json='{"execute":"guest-exec","arguments":{"path":"/bin/sh","arg":["/bin/sh","-c","sudo nixos-rebuild switch --flake \"$HOME/dev/nucleus/src#NixOS\""],"capture-output":false}}'
-      _wcs_ssh_cmd='systemctl start nucleus-rebuild'
-      _wcs_manual_cmd='sudo nixos-rebuild switch --flake "$HOME/dev/nucleus/src#NixOS"'
-      ;;
-    Windows)
-      _wcs_qemu_json='{"execute":"guest-exec","arguments":{"path":"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe","arg":["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe","-NoProfile","-Command","& .\\src\\hosts\\Windows\\apply.ps1"],"capture-output":false}}'
-      _wcs_ssh_cmd=''
-      _wcs_manual_cmd='.\src\hosts\Windows\apply.ps1'
-      ;;
-    macOS)
-      _wcs_qemu_json=''
-      _wcs_ssh_cmd=''
-      _wcs_manual_cmd=''
-      ;;
-    *)
-      _wcs_qemu_json=''
-      _wcs_ssh_cmd=''
-      _wcs_manual_cmd='No guest converge command is defined for this VM type.'
-      ;;
-  esac
-
-  cat >"$_wcs_path_sh" <<WCS_EOF
-#!/usr/bin/env sh
-set -eu
-
-# Auto-configure script for ${_wcs_name} (${_wcs_type})
-# Tries QEMU GA guest-exec, then SSH (NixOS only), then prints manual instructions.
-
-_WCS_TYPE='${_wcs_type}'
-_WCS_PIPE='PIPE:\\\\\\.\\\\pipe\\\\qga-${_wcs_name}'
-_WCS_MANUAL='${_wcs_manual_cmd}'
-
-# ----- QEMU GA via socat -----
-if command -v socat >/dev/null 2>&1 && [ -n '${_wcs_qemu_json}' ]; then
-  printf 'Trying QEMU GA guest-exec for %s...\\n' "\$_WCS_TYPE"
-  _WCS_RESPONSE=\$(printf '%s' '${_wcs_qemu_json}' | socat - "\$_WCS_PIPE" 2>/dev/null) || true
-  if [ -n "\$_WCS_RESPONSE" ]; then
-    _WCS_PID=\$(printf '%s' "\$_WCS_RESPONSE" | sed -n 's/.*"pid":\\([0-9]*\\).*/\\1/p')
-    if [ -n "\$_WCS_PID" ]; then
-      printf 'guest-exec started (PID: %s). Waiting...\\n' "\$_WCS_PID"
-      _WCS_TIMEOUT=600
-      _WCS_ELAPSED=0
-      while [ "\$_WCS_ELAPSED" -lt "\$_WCS_TIMEOUT" ]; do
-        _WCS_STATUS=\$(echo '{"execute":"guest-exec-status","arguments":{"pid":'"\$_WCS_PID"'}}' | socat - "\$_WCS_PIPE" 2>/dev/null) || true
-        if printf '%s' "\$_WCS_STATUS" | grep -q '"exited":true'; then
-          _WCS_EXITCODE=\$(printf '%s' "\$_WCS_STATUS" | sed -n 's/.*"exitcode":\\([0-9]*\\).*/\\1/p')
-          if [ "\$_WCS_EXITCODE" = "0" ]; then
-            printf 'Configuration completed via QEMU GA.\\n'
-            exit 0
-          fi
-          printf 'QEMU GA guest-exec failed (exit %s). Trying fallback...\\n' "\$_WCS_EXITCODE"
-          break
-        fi
-        sleep 10
-        _WCS_ELAPSED=\$((_WCS_ELAPSED + 10))
-      done
-      if [ "\$_WCS_ELAPSED" -ge "\$_WCS_TIMEOUT" ]; then
-        printf 'QEMU GA timed out. Trying fallback...\\n'
-      fi
-    fi
-  fi
-fi
-
-# ----- SSH (NixOS only) -----
-if [ "\$_WCS_TYPE" = "NixOS" ] && [ -n '${_wcs_ssh_cmd}' ]; then
-  printf 'Trying SSH...\\n'
-  if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 "${vm_guest_username}@localhost" '${_wcs_ssh_cmd}' 2>/dev/null; then
-    printf 'Configuration triggered via SSH.\\n'
-    exit 0
-  fi
-  printf 'SSH failed.\\n'
-fi
-
-# ----- Manual fallback -----
-if [ -n "\$_WCS_MANUAL" ]; then
-  printf 'Could not auto-configure. Run this command inside the guest:\\n\\n  %s\\n\\n' "\$_WCS_MANUAL"
-else
-  printf 'Configuration is not supported for this guest type.\\n'
-fi
-exit 1
-WCS_EOF
-
-  cat >"$_wcs_path_ps1" <<WCS_EOF
-# configure-${_wcs_name}.ps1 — Auto-configure helper for '${_wcs_name}' (${_wcs_type})
-# Tries QEMU GA guest-exec via .NET NamedPipeClientStream, then prints manual instructions.
-
-\$vmName = '${_wcs_name}'
-\$vmType = '${_wcs_type}'
-\$manualCmd = '${_wcs_manual_cmd}'
-
-if ('${_wcs_qemu_json}' -ne '') {
-  Write-Host "Trying QEMU GA guest-exec for \$vmName..."
-  try {
-    \$pipe = New-Object System.IO.Pipes.NamedPipeClientStream('.', "qga-\$vmName", [System.IO.Pipes.PipeDirection]::InOut)
-    \$pipe.Connect(5000)
-    \$writer = New-Object System.IO.StreamWriter(\$pipe)
-    \$reader = New-Object System.IO.StreamReader(\$pipe)
-    \$writer.WriteLine('${_wcs_qemu_json}')
-    \$writer.Flush()
-    \$response = \$reader.ReadLine()
-    Write-Host "QEMU GA response: \$response"
-    \$pipe.Dispose()
-    Write-Host 'Command sent to guest. Check guest for completion.'
-    exit 0
-  } catch {
-    Write-Host "QEMU GA failed: \$(\$_ | Out-String)"
-  }
-}
-
-if ([string]::IsNullOrEmpty(\$manualCmd)) {
-  Write-Host 'Configuration is not supported for this guest type.'
-} else {
-  Write-Host 'Could not auto-configure. Run this command inside the guest:'
-  Write-Host ''
-  Write-Host "  \$manualCmd"
-}
-exit 1
-WCS_EOF
-
-  chmod 755 "$_wcs_path_sh"
-  chmod 755 "$_wcs_path_ps1"
-  printf 'vm-setup: wrote configure helper scripts: %s, %s\n' "$_wcs_path_sh" "$_wcs_path_ps1"
 }
 
 # ---------------------------------------------------------------------------
@@ -1718,60 +1500,6 @@ build_images() {
   done
 }
 
-# cleanup_vm_directory_artifacts
-#   Removes obsolete helper artifacts from ~/virtual machines now that converge
-#   guidance is centralized in ~/virtual machines/README.md.
-cleanup_vm_directory_artifacts() {
-  _cls_count="$(jq '.VMs | length' "$MANIFEST")"
-  _cls_i=0
-  while [ "$_cls_i" -lt "$_cls_count" ]; do
-    _cls_name="$(jq -r ".VMs[$_cls_i].name" "$MANIFEST")"
-    _cls_display="$(jq -r ".VMs[$_cls_i].display" "$MANIFEST")"
-    for _cls_legacy in \
-      "$VM_DIR/Start-${_cls_display}.sh" \
-      "$VM_DIR/Start-${_cls_display}.ps1" \
-      "$VM_DIR/${_cls_name}-configure.sh" \
-      "$VM_DIR/${_cls_name}-configure.ps1"
-    do
-      if [ -f "$_cls_legacy" ]; then
-        case "$_cls_legacy" in
-          "$VM_DIR/Start-"*.sh)
-            _cls_modern="$VM_DIR/start-${_cls_name}.sh"
-            # WHY: default macOS APFS is case-insensitive, so Start-*.sh and
-            # start-*.sh resolve to the same path. Removing the legacy variant
-            # would delete the newly generated helper script.
-            if [ -f "$_cls_modern" ]; then
-              printf 'vm-setup: skipping legacy cleanup due case-insensitive filename collision: %s\n' "$_cls_legacy"
-              continue
-            fi
-            ;;
-          "$VM_DIR/Start-"*.ps1)
-            _cls_modern="$VM_DIR/start-${_cls_name}.ps1"
-            if [ -f "$_cls_modern" ]; then
-              printf 'vm-setup: skipping legacy cleanup due case-insensitive filename collision: %s\n' "$_cls_legacy"
-              continue
-            fi
-            ;;
-        esac
-        rm -f "$_cls_legacy"
-        printf 'vm-setup: removed legacy helper script: %s\n' "$_cls_legacy"
-      fi
-    done
-    _cls_i=$((_cls_i + 1))
-  done
-
-  _cls_legacy_dir="$HOME/.local/share/nucleus/vms/configure"
-  if [ -d "$_cls_legacy_dir" ]; then
-    rm -rf "$_cls_legacy_dir"
-    printf 'vm-setup: removed legacy helper directory: %s\n' "$_cls_legacy_dir"
-  fi
-
-  if [ -f "$VM_DIR/.DS_Store" ]; then
-    rm -f "$VM_DIR/.DS_Store"
-    printf 'vm-setup: removed Finder metadata file: %s\n' "$VM_DIR/.DS_Store"
-  fi
-}
-
 # ---------------------------------------------------------------------------
 # macOS / Tart (macOS guests)
 # ---------------------------------------------------------------------------
@@ -1823,7 +1551,6 @@ setup_tart_vms() {
     if [ "$dry_run" = false ]; then
       printf 'vm-setup: tart VM ready: %s (start with: tart run %s)\n' "$vm_name" "$vm_name"
       write_start_script "$vm_name" "$vm_name" "$vm_type" 'darwin-tart'
-      write_configure_script "$vm_name" "$vm_type"
     else
       printf 'vm-setup: [dry-run] verify tart VM registration: %s\n' "$vm_name"
     fi
@@ -2029,7 +1756,6 @@ setup_utm_vms() {
     fi
 
     write_start_script "$vm_name" "$vm_display" "$vm_type" 'darwin-utm'
-    write_configure_script "$vm_name" "$vm_type"
 
     if [ "$dry_run" = false ]; then
       mkdir -p "$data_dir"
@@ -2205,7 +1931,6 @@ setup_libvirt_vms() {
       if virsh define "$_xml_file"; then
         printf 'vm-setup: VM "%s" defined/updated in libvirt\n' "$vm_name"
         write_start_script "$vm_name" "$vm_display" "$vm_type" 'nixos-libvirt'
-        write_configure_script "$vm_name" "$vm_type"
       else
         printf 'vm-setup: WARNING — virsh define failed for "%s"; check libvirtd status\n' "$vm_name" >&2
       fi
@@ -2261,9 +1986,5 @@ case "$_os" in
     printf 'vm-setup: unsupported OS "%s"; nothing to do\n' "$_os"
     ;;
 esac
-
-if [ "$dry_run" = false ]; then
-  cleanup_vm_directory_artifacts
-fi
 
 printf 'vm-setup: done\n'

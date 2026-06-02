@@ -265,6 +265,28 @@ let
     in
     assert' (builtins.all (r: r == null) results) "Packer template file existence check failed";
 
+  # VM setup templates (standalone files extracted from inline HERE-docs/strings)
+  # must exist for orchestrator rendering.
+  test_vm_templates_exist =
+    let
+      checks = [
+        {
+          cond = builtins.pathExists ../../src/vms/templates/README.md;
+          msg = "src/vms/templates/README.md must exist for cross-host VM directory guide";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/start-posix.sh;
+          msg = "src/vms/templates/start-posix.sh must exist for POSIX VM start scripts";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/start-windows.ps1;
+          msg = "src/vms/templates/start-windows.ps1 must exist for Windows VM start scripts";
+        }
+      ];
+      results = builtins.map (c: assert' c.cond c.msg) checks;
+    in
+    assert' (builtins.all (r: r == null) results) "VM template file existence check failed";
+
   # vm-setup scripts must exist for both POSIX and Windows hosts.
   test_vm_setup_scripts_exist =
     let
@@ -301,28 +323,20 @@ let
 
   # NixOS guest must enable the QEMU guest agent for host-guest communication
   # (VM lifecycle events, ballooning, clipboard sharing, etc.)
-  test_nixos_guest_qemu_guest_enabled = assert'
-    (lib.hasInfix "services.qemuGuest.enable = true;" guest_nix_text)
-    "NixOS guest.nix must enable services.qemuGuest.enable";
+  test_nixos_guest_qemu_guest_enabled = assert' (lib.hasInfix "services.qemuGuest.enable = true;" guest_nix_text) "NixOS guest.nix must enable services.qemuGuest.enable";
 
   # NixOS guest must enable OpenSSH for remote access and credential-free
   # host-guest communication via the QEMU SSH port forward.
-  test_nixos_guest_openssh_enabled = assert'
-    (lib.hasInfix "services.openssh.enable = true;" guest_nix_text)
-    "NixOS guest.nix must enable services.openssh.enable";
+  test_nixos_guest_openssh_enabled = assert' (lib.hasInfix "services.openssh.enable = true;" guest_nix_text) "NixOS guest.nix must enable services.openssh.enable";
 
   # NixOS guest must declare the nucleus-rebuild oneshot systemd service for
   # converging the guest to the latest flake-defined state.
-  test_nixos_guest_nucleus_rebuild_service = assert'
-    (lib.hasInfix "systemd.services.nucleus-rebuild" guest_nix_text)
-    "NixOS guest.nix must declare the nucleus-rebuild systemd service";
+  test_nixos_guest_nucleus_rebuild_service = assert' (lib.hasInfix "systemd.services.nucleus-rebuild" guest_nix_text) "NixOS guest.nix must declare the nucleus-rebuild systemd service";
 
   # NixOS guest must accept the SSH public key via the
   # NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY environment variable so the host can
   # authenticate to the guest without interactive password entry.
-  test_nixos_guest_ssh_authorized_keys = assert'
-    (lib.hasInfix "NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY" guest_nix_text)
-    "NixOS guest.nix must reference NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY in authorized keys";
+  test_nixos_guest_ssh_authorized_keys = assert' (lib.hasInfix "NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY" guest_nix_text) "NixOS guest.nix must reference NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY in authorized keys";
 
   # ---------------------------------------------------------------------------
   # Homebrew dependency tests
@@ -374,6 +388,9 @@ let
   vm_setup_sh_text = builtins.readFile ../../scripts/vm-setup.sh;
   windows_vm_setup_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-VMSetup.ps1;
   windows_vm_setup_wrapper_ps1_text = builtins.readFile ../../scripts/vm-setup.ps1;
+  readmeTemplateText = builtins.readFile ../../src/vms/templates/README.md;
+  startPosixTemplateText = builtins.readFile ../../src/vms/templates/start-posix.sh;
+  startWindowsTemplateText = builtins.readFile ../../src/vms/templates/start-windows.ps1;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
   users_json_text = builtins.readFile ../../src/modules/users.json;
@@ -542,16 +559,6 @@ let
         && (lib.hasInfix "-var \"disk_size=\${DiskGib}G\"" windows_vm_setup_ps1_text)
       )
       "Invoke-VMSetup.ps1 must pass the manifest-derived disk size into Windows-host NixOS Packer builds";
-
-  test_windows_helper_cleanup_collision_guard =
-    assert'
-      (
-        (lib.hasInfix "case-insensitive filename collision" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "$legacyHelper.ToLowerInvariant()" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "$startScriptPs1" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "$startScriptSh" windows_vm_setup_ps1_text)
-      )
-      "Invoke-VMSetup.ps1 must not delete freshly generated start-* helpers when cleaning up legacy Start-* names on Windows";
 
   test_guest_credentials_policy_in_windows_packer =
     assert'
@@ -745,48 +752,95 @@ let
         && (lib.hasInfix "repairing stale UTM runtime registration" vm_setup_sh_text)
       )
       "scripts/vm-setup.sh must re-register UTM VMs when legacy display configs or template drift are detected so refreshed config.plist values take effect";
+  test_vm_readme_template_content =
+    assert'
+      (
+        (lib.hasInfix "nucleus-vm-setup" readmeTemplateText)
+        && (lib.hasInfix "## Layout" readmeTemplateText)
+        && (lib.hasInfix "images/<name>-build/" readmeTemplateText)
+        && (lib.hasInfix "images/<name>-installer.iso" readmeTemplateText)
+        && (lib.hasInfix "## Start commands" readmeTemplateText)
+        && (lib.hasInfix "start-<name>.sh" readmeTemplateText)
+        && (lib.hasInfix "start-<name>.ps1" readmeTemplateText)
+        && (lib.hasInfix "## UTM bundle portability" readmeTemplateText)
+        && (lib.hasInfix "Copying only \`config.plist\`" readmeTemplateText)
+        && (lib.hasInfix "## Guest configuration" readmeTemplateText)
+        && (lib.hasInfix "## Lifecycle" readmeTemplateText)
+        && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
+        && (lib.hasInfix "## Troubleshooting" readmeTemplateText)
+        && (lib.hasInfix "{{VM_DIR_DISPLAY}}" readmeTemplateText)
+        && (lib.hasInfix "{{IMAGES_DIR_DISPLAY}}" readmeTemplateText)
+        && (lib.hasInfix "## Notes" readmeTemplateText)
+      )
+      "src/vms/templates/README.md must contain all expected documentation sections and placeholders";
+
+  test_vm_start_posix_template_content =
+    assert'
+      (
+        (lib.hasInfix "{{VM_NAME}}" startPosixTemplateText)
+        && (lib.hasInfix "{{VM_DISPLAY}}" startPosixTemplateText)
+        && (lib.hasInfix "{{HOST_KIND}}" startPosixTemplateText)
+        && (lib.hasInfix "{{VM_DIR}}" startPosixTemplateText)
+        && (lib.hasInfix "darwin-tart" startPosixTemplateText)
+        && (lib.hasInfix "darwin-utm" startPosixTemplateText)
+        && (lib.hasInfix "nixos-libvirt" startPosixTemplateText)
+        && (lib.hasInfix "tart run" startPosixTemplateText)
+        && (lib.hasInfix "utmctl" startPosixTemplateText)
+        && (lib.hasInfix "virsh start" startPosixTemplateText)
+        && (lib.hasInfix "virt-viewer" startPosixTemplateText)
+      )
+      "src/vms/templates/start-posix.sh must contain all expected placeholders and runtime branches";
+
+  test_vm_start_windows_template_content =
+    assert'
+      (
+        (lib.hasInfix "{{QEMU_SYSTEM}}" startWindowsTemplateText)
+        && (lib.hasInfix "{{VM_DISPLAY}}" startWindowsTemplateText)
+        && (lib.hasInfix "{{MACHINE}}" startWindowsTemplateText)
+        && (lib.hasInfix "{{CPU}}" startWindowsTemplateText)
+        && (lib.hasInfix "{{CPUS}}" startWindowsTemplateText)
+        && (lib.hasInfix "{{RAM_MIB}}" startWindowsTemplateText)
+        && (lib.hasInfix "{{DISK_PATH}}" startWindowsTemplateText)
+        && (lib.hasInfix "{{VGA}}" startWindowsTemplateText)
+        && (lib.hasInfix "{{DISPLAY_BACKEND}}" startWindowsTemplateText)
+        && (lib.hasInfix "{{VIRTIOFS_ARGS}}" startWindowsTemplateText)
+        && (lib.hasInfix "org.qemu.guest_agent.0" startWindowsTemplateText)
+        && (lib.hasInfix "hostfwd=tcp::2222-:22" startWindowsTemplateText)
+        && (lib.hasInfix "chardev pipe" startWindowsTemplateText)
+      )
+      "src/vms/templates/start-windows.ps1 must contain all expected placeholders and QEMU arguments";
+
   test_vm_directory_readme_generation =
     assert'
       (
         (lib.hasInfix "write_vm_directory_readme" vm_setup_sh_text)
         && (lib.hasInfix "wrote VM directory guide" vm_setup_sh_text)
-        && (lib.hasInfix "## Start commands" vm_setup_sh_text)
-        && (lib.hasInfix "images/<name>-build/" vm_setup_sh_text)
-        && (lib.hasInfix "images/<name>-installer.iso" vm_setup_sh_text)
-        && (lib.hasInfix "## Safe cleanup" vm_setup_sh_text)
-        && (lib.hasInfix "start-<name>.sh" vm_setup_sh_text)
-        && (lib.hasInfix "configure-<name>.sh" vm_setup_sh_text)
-        && (lib.hasInfix "configure-<name>.ps1" vm_setup_sh_text)
-        && (lib.hasInfix "Guest OS configuration is **not automatic**" vm_setup_sh_text)
-        && (lib.hasInfix "Copying only `config.plist` or only `disk-main.qcow2` is not sufficient" vm_setup_sh_text)
+        && (lib.hasInfix "TEMPLATES_DIR/README.md" vm_setup_sh_text)
+        && (lib.hasInfix "{{VM_DIR_DISPLAY}}" readmeTemplateText)
+        && (lib.hasInfix "{{IMAGES_DIR_DISPLAY}}" readmeTemplateText)
+        && (lib.hasInfix "## Start commands" readmeTemplateText)
+        && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
+        && (lib.hasInfix "UTM bundle" readmeTemplateText)
       )
-      "scripts/vm-setup.sh must write ~/virtual machines/README.md with explicit .utm bundle transfer guidance";
+      "scripts/vm-setup.sh must write ~/virtual machines/README.md using the cross-host README template with placeholder substitution";
   test_windows_vm_directory_readme_generation =
     assert'
       (
         (lib.hasInfix "$vmReadmePath = Join-Path $vmDir 'README.md'" windows_vm_setup_ps1_text)
         && (lib.hasInfix "VM directory guide written" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "## Start commands" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "images/<name>-build/" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "images/<name>-installer.iso" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "## Safe cleanup" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "configure-<name>.ps1" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "configure-<name>.sh" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "Guest OS configuration is **not automatic**" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "Copying only `config.plist` or only `disk-main.qcow2` is not sufficient" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "templatesDir" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "nucleus-vm-setup" readmeTemplateText)
+        && (lib.hasInfix "## Start commands" readmeTemplateText)
+        && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
+        && (lib.hasInfix "UTM bundle" readmeTemplateText)
       )
-      "Invoke-VMSetup.ps1 must write %USERPROFILE%\\virtual machines\\README.md with .utm bundle transfer instructions";
+      "Invoke-VMSetup.ps1 must write %USERPROFILE%\\virtual machines\\README.md using the cross-host README template with placeholder substitution";
   test_vm_setup_generates_helper_scripts =
     assert'
       (
         (lib.hasInfix "write_start_script" vm_setup_sh_text)
-        && (lib.hasInfix "write_configure_script" vm_setup_sh_text)
-        && (lib.hasInfix "wrote configure helper scripts" vm_setup_sh_text)
-        && (lib.hasInfix "case-insensitive filename collision" vm_setup_sh_text)
-        && (lib.hasInfix "configure helpers written" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "removed legacy helper script" windows_vm_setup_ps1_text)
       )
-      "VM setup flows must generate discoverable start/config helper scripts while removing legacy .sh helpers on Windows";
+      "VM setup flows must generate discoverable start helper scripts";
   test_macbook_utm_default_location_link =
     assert'
       (
@@ -863,6 +917,7 @@ let
     test_domain_xml_memory_unit
     test_domain_xml_disk_path_lowercase
     test_packer_templates_exist
+    test_vm_templates_exist
     test_vm_setup_scripts_exist
     test_guest_nix_nonempty
     test_nixos_guest_virtiofs_not_forced
@@ -893,7 +948,6 @@ let
     test_guest_credentials_policy_in_nixos_guest
     test_guest_credentials_policy_in_nixos_packer
     test_windows_nixos_build_honors_manifest_disk_size
-    test_windows_helper_cleanup_collision_guard
     test_guest_credentials_policy_in_windows_packer
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
@@ -913,6 +967,9 @@ let
     test_macbook_utm_refreshes_existing_bundle
     test_macbook_utm_stale_template_guard
     test_macbook_utm_legacy_display_reregistration
+    test_vm_readme_template_content
+    test_vm_start_posix_template_content
+    test_vm_start_windows_template_content
     test_vm_directory_readme_generation
     test_windows_vm_directory_readme_generation
     test_vm_setup_generates_helper_scripts
@@ -943,6 +1000,7 @@ in
     test_domain_xml_memory_unit
     test_domain_xml_disk_path_lowercase
     test_packer_templates_exist
+    test_vm_templates_exist
     test_vm_setup_scripts_exist
     test_guest_nix_nonempty
     test_nixos_guest_virtiofs_not_forced
@@ -973,7 +1031,6 @@ in
     test_guest_credentials_policy_in_nixos_guest
     test_guest_credentials_policy_in_nixos_packer
     test_windows_nixos_build_honors_manifest_disk_size
-    test_windows_helper_cleanup_collision_guard
     test_guest_credentials_policy_in_windows_packer
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
@@ -993,6 +1050,9 @@ in
     test_macbook_utm_refreshes_existing_bundle
     test_macbook_utm_stale_template_guard
     test_macbook_utm_legacy_display_reregistration
+    test_vm_readme_template_content
+    test_vm_start_posix_template_content
+    test_vm_start_windows_template_content
     test_vm_directory_readme_generation
     test_windows_vm_directory_readme_generation
     test_vm_setup_generates_helper_scripts
