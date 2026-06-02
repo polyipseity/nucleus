@@ -550,8 +550,9 @@ let
   # URI-encode a string for use in file:// URLs consumed by `mysides add`.
   # `mysides` expects properly encoded URIs; raw spaces cause silent failures.
   # Source: https://en.wikipedia.org/wiki/Percent-encoding
-  # Extend as needed for other characters requiring encoding.
-  uriEncode = builtins.replaceStrings [ " " ] [ "%20" ];
+  # Uses nixpkgs lib.escapeURL (RFC 3986) then decodes structural characters
+  # (: and /) back so file:// URIs remain valid.
+  uriEncode = url: builtins.replaceStrings [ "%3A" "%2F" ] [ ":" "/" ] (lib.escapeURL url);
 
   # Single source of truth for managed Finder favorites and ordering.
   finderSidebarManagedFavorites = [
