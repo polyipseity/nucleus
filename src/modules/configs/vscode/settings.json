@@ -220,6 +220,7 @@
   "ty.importStrategy": "fromEnvironment",
   "update.mode": "none",
   "window.autoDetectColorScheme": true,
+  "workbench.browser.agentHostChatToolsEnabled": true,
   "workbench.browser.enableChatTools": true,
   "workbench.colorTheme": "Solarized Light",
   "workbench.editor.showTabs": "single",
