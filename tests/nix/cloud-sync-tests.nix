@@ -267,8 +267,9 @@ let
   # Test 36: macOS Finder sidebar setup creates only canonical local directories and excludes cloud mount subpaths
   test_finder_sidebar_paths_created = assert' (
     containsRegex "mkdir -p" macosText
+    && containsRegex "\\$HOME/data" macosText
     && containsRegex "\\$HOME/dev" macosText
-    && containsRegex "\\\\$HOME" macosText
+    && !containsRegex "\\$HOME/clouds" macosText
     && !containsRegex "\\$HOME/clouds/GoogleDrive" macosText
     && !containsRegex "\\$HOME/clouds/iCloud" macosText
     && !containsRegex "\\$HOME/clouds/OneDrive" macosText

@@ -47,6 +47,9 @@ favorites behavior on macOS.
   1. Ensure canonical directories exist (`~/dev`, `~/clouds`, and standard user
      folders referenced by favorites).
   2. Use `mysides` in activation to enforce an exact ordered favorites list.
+     - `mysides add` expects properly URI-encoded URLs. Spaces must be `%20`.
+     - Encode all `file://` URLs using Nix's `builtins.replaceStrings` before
+       passing to `mysides`. Do not rely on shell-level encoding.
   3. Restart Finder/sharedfilelistd/cfprefsd in-session after updates; if
      sidebar cache remains stale, emit a one-line logout/login hint in logs.
 

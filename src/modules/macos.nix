@@ -547,49 +547,59 @@ let
     echo "Managed preference domains purged. Run your apply flow to re-assert declarative defaults."
   '';
 
+  # URI-encode a string for use in file:// URLs consumed by `mysides add`.
+  # `mysides` expects properly encoded URIs; raw spaces cause silent failures.
+  # Source: https://en.wikipedia.org/wiki/Percent-encoding
+  # Extend as needed for other characters requiring encoding.
+  uriEncode = builtins.replaceStrings [ " " ] [ "%20" ];
+
   # Single source of truth for managed Finder favorites and ordering.
   finderSidebarManagedFavorites = [
     {
       name = "Applications";
-      url = "file:///Applications";
+      url = uriEncode "file:///Applications";
     }
     {
       name = "Downloads";
-      url = "file://${config.home.homeDirectory}/Downloads";
+      url = uriEncode "file://${config.home.homeDirectory}/Downloads";
     }
     {
       name = "data";
-      url = "file://${config.home.homeDirectory}/data";
+      url = uriEncode "file://${config.home.homeDirectory}/data";
     }
     {
       name = "dev";
-      url = "file://${config.home.homeDirectory}/dev";
+      url = uriEncode "file://${config.home.homeDirectory}/dev";
     }
     {
       name = "Desktop";
-      url = "file://${config.home.homeDirectory}/Desktop";
+      url = uriEncode "file://${config.home.homeDirectory}/Desktop";
     }
     {
       name = "Documents";
-      url = "file://${config.home.homeDirectory}/Documents";
+      url = uriEncode "file://${config.home.homeDirectory}/Documents";
     }
     {
       name = "Music";
-      url = "file://${config.home.homeDirectory}/Music";
+      url = uriEncode "file://${config.home.homeDirectory}/Music";
     }
     {
       name = "Movies";
-      url = "file://${config.home.homeDirectory}/Movies";
+      url = uriEncode "file://${config.home.homeDirectory}/Movies";
     }
     {
       name = "Pictures";
-      url = "file://${config.home.homeDirectory}/Pictures";
+      url = uriEncode "file://${config.home.homeDirectory}/Pictures";
     }
     {
       name = "virtual machines";
-      url = "file://${config.home.homeDirectory}/virtual machines";
+      url = uriEncode "file://${config.home.homeDirectory}/virtual machines";
     }
   ];
+
+  # Number of managed favorites; used to scope the sidebar-order comparison
+  # to the exact count of expected entries.
+  finderSidebarManagedCount = builtins.length finderSidebarManagedFavorites;
 
   # Keep expected sidebar order derivable from the managed favorites list.
   finderSidebarExpectedOrder = builtins.concatStringsSep "|" (
@@ -1370,7 +1380,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       _finder_expected_order="${finderSidebarExpectedOrder}"
       _finder_list_output=$("$MYSIDES_BIN" list 2>/dev/null || true)
-      _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n 9 | /usr/bin/paste -sd'|' -)"
+      _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n ${toString finderSidebarManagedCount} | /usr/bin/paste -sd'|' -)"
       if [ "$_finder_actual_order" != "$_finder_expected_order" ]; then
         echo "macos: warning — mysides reported sidebar order mismatch (expected: $_finder_expected_order, actual: $_finder_actual_order)." >&2
         _finder_sidebar_failed=1
