@@ -6,7 +6,7 @@
      Key choices:
        - BIOS/MBR partition layout (avoids OVMF/UEFI complexity in QEMU builds)
        - Windows 11 hardware checks bypassed via HKLM\SYSTEM\Setup\LabConfig
-       - WinRM enabled for Packer SSH communicator to connect after install
+       - SSH enabled for Packer communicator to connect after install
        - Default local admin user: packer / packer (change after first boot)
 
      Source: https://learn.microsoft.com/windows-hardware/manufacture/desktop/unattended-windows-setup-reference
@@ -152,9 +152,9 @@
       <ComputerName>Windows</ComputerName>
       <TimeZone>UTC</TimeZone>
     </component>
-    <!-- Configure WinRM during specialize as a pre-logon baseline.
+    <!-- Install OpenSSH during specialize as a pre-logon baseline.
          WHY: some install paths can delay or skip first-logon command timing;
-         setting WinRM here improves Packer communicator reliability. -->
+         installing OpenSSH here improves Packer communicator reliability. -->
     <component name="Microsoft-Windows-Deployment"
                processorArchitecture="amd64"
                publicKeyToken="31bf3856ad364e35"
@@ -164,19 +164,7 @@
       <RunSynchronous>
         <RunSynchronousCommand wcm:action="add">
           <Order>1</Order>
-          <Path>cmd /c winrm quickconfig -q</Path>
-        </RunSynchronousCommand>
-        <RunSynchronousCommand wcm:action="add">
-          <Order>2</Order>
-          <Path>cmd /c winrm set winrm/config/service @{AllowUnencrypted=&quot;true&quot;}</Path>
-        </RunSynchronousCommand>
-        <RunSynchronousCommand wcm:action="add">
-          <Order>3</Order>
-          <Path>cmd /c winrm set winrm/config/service/auth @{Basic=&quot;true&quot;}</Path>
-        </RunSynchronousCommand>
-        <RunSynchronousCommand wcm:action="add">
-          <Order>4</Order>
-          <Path>cmd /c netsh advfirewall firewall set rule group=&quot;windows remote management&quot; new enable=yes</Path>
+          <Path>powershell -Command "Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0; Set-Service -Name sshd -StartupType 'Automatic'"</Path>
         </RunSynchronousCommand>
       </RunSynchronous>
     </component>
@@ -184,7 +172,7 @@
 
   <!-- ================================================================
        oobeSystem pass: runs during first-user setup (OOBE).
-       Creates the default admin account and enables WinRM for Packer.
+       Creates the default admin account and enables SSH for Packer.
        ================================================================ -->
   <settings pass="oobeSystem">
     <component name="Microsoft-Windows-Shell-Setup"
@@ -211,7 +199,7 @@
           <Value>__NUCLEUS_GUEST_PASSWORD__</Value>
           <PlainText>true</PlainText>
         </AdministratorPassword>
-        <!-- Local Packer account used by the Packer WinRM communicator. -->
+        <!-- Local Packer account used by the Packer SSH communicator. -->
         <LocalAccounts>
           <LocalAccount wcm:action="add">
             <Password>
@@ -226,7 +214,7 @@
         </LocalAccounts>
       </UserAccounts>
       <!-- Ensure FirstLogonCommands execute in a fully unattended build.
-           Without AutoLogon, some installer paths can leave WinRM setup
+           Without AutoLogon, some installer paths can leave SSH setup
            waiting on an interactive sign-in, which causes Packer timeouts. -->
       <AutoLogon>
         <Enabled>true</Enabled>
@@ -237,55 +225,35 @@
         </Password>
         <LogonCount>1</LogonCount>
       </AutoLogon>
-      <!-- Enable WinRM so Packer can connect after Windows boots.
+      <!-- Enable SSH so Packer can connect after Windows boots.
            Commands run synchronously at first logon before the desktop appears. -->
       <FirstLogonCommands>
-        <!-- WHY: Configure WinRM before VirtIO driver scan (Order 8 below).
+        <!-- WHY: Start SSH server before VirtIO driver scan (Order 3 below).
              VirtIO driver installation is a blocking operation that can take
              30–60+ seconds on slow emulation (QEMU tcg). If we scan first,
-             WinRM configuration is delayed until the scan completes, and Packer
-             times out waiting.  By configuring WinRM first (Orders 1–7), even
-             if the VirtIO scan is slow, WinRM is already ready for Packer. -->
+             SSH setup is delayed until the scan completes, and Packer
+             times out waiting.  By starting SSH first (Orders 1–2), even
+             if the VirtIO scan is slow, SSH is already ready for Packer. -->
         <SynchronousCommand wcm:action="add">
           <Order>1</Order>
-          <CommandLine>cmd /c winrm quickconfig -q</CommandLine>
+          <CommandLine>powershell -Command "Start-Service -Name sshd"</CommandLine>
           <RequiresUserInput>false</RequiresUserInput>
         </SynchronousCommand>
         <SynchronousCommand wcm:action="add">
           <Order>2</Order>
-          <CommandLine>cmd /c winrm set winrm/config/winrs @{MaxMemoryPerShellMB="512"}</CommandLine>
-          <RequiresUserInput>false</RequiresUserInput>
-        </SynchronousCommand>
-        <SynchronousCommand wcm:action="add">
-          <Order>3</Order>
-          <CommandLine>cmd /c winrm set winrm/config @{MaxTimeoutms="1800000"}</CommandLine>
-          <RequiresUserInput>false</RequiresUserInput>
-        </SynchronousCommand>
-        <SynchronousCommand wcm:action="add">
-          <Order>4</Order>
-          <CommandLine>cmd /c winrm set winrm/config/service @{AllowUnencrypted="true"}</CommandLine>
-          <RequiresUserInput>false</RequiresUserInput>
-        </SynchronousCommand>
-        <SynchronousCommand wcm:action="add">
-          <Order>5</Order>
-          <CommandLine>cmd /c winrm set winrm/config/service/auth @{Basic="true"}</CommandLine>
-          <RequiresUserInput>false</RequiresUserInput>
-        </SynchronousCommand>
-        <SynchronousCommand wcm:action="add">
-          <Order>6</Order>
-          <CommandLine>cmd /c netsh advfirewall firewall set rule group="windows remote management" new enable=yes</CommandLine>
+          <CommandLine>netsh advfirewall firewall add rule name="SSH" dir=in action=allow protocol=TCP localport=22</CommandLine>
           <RequiresUserInput>false</RequiresUserInput>
         </SynchronousCommand>
         <!-- Scan all CD-ROM drives for VirtIO drivers and install any found.
-             WHY: Runs AFTER WinRM is fully configured (Orders 1–6 complete).
+             WHY: Runs AFTER SSH is started (Orders 1–2 complete).
              VirtIO driver installation is a blocking operation (pnputil /install).
              Under slow emulation (tcg), this can take 30–60+ seconds. However,
-             because WinRM is already configured, Packer can connect even if
+             because SSH is already started, Packer can connect even if
              this scan is ongoing or hangs.  A fallback driver install also
              runs in the PowerShell provisioner with a 90s pause.
              Source: https://fedorapeople.org/groups/virt/virtio-win/ -->
         <SynchronousCommand wcm:action="add">
-          <Order>7</Order>
+          <Order>3</Order>
           <CommandLine>cmd /c powershell -NonInteractive -Command "Get-Volume | Where-Object {$_.DriveType -eq 'CD-ROM'} | ForEach-Object { $d = $_.DriveLetter + ':'; if (Test-Path ($d + '\viostor\w11\amd64')) { pnputil /add-driver ($d + '\viostor\w11\amd64\*.inf') /install; pnputil /add-driver ($d + '\NetKVM\w11\amd64\*.inf') /install; pnputil /add-driver ($d + '\Balloon\w11\amd64\*.inf') /install } }" &gt;nul 2&gt;&amp;1</CommandLine>
           <RequiresUserInput>false</RequiresUserInput>
         </SynchronousCommand>
