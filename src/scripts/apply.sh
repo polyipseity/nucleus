@@ -604,7 +604,7 @@ case "$(uname -s)" in
     run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
     ensure_prek_hooks_installed "$REPO_ROOT"
     run_caddy_local_ca_trust sudo
-    sh "$REPO_ROOT/src/scripts/jellyfin-sync.sh"
+    NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/jellyfin-sync.sh"
     run_ai_sync
     run_replica_sync
     run_vm_setup
@@ -624,7 +624,7 @@ case "$(uname -s)" in
       run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
       ensure_prek_hooks_installed "$REPO_ROOT"
       run_caddy_local_ca_trust sudo
-      sh "$REPO_ROOT/src/scripts/jellyfin-sync.sh"
+      NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/jellyfin-sync.sh"
       run_ai_sync
       run_replica_sync
       run_vm_setup
@@ -639,7 +639,7 @@ case "$(uname -s)" in
       run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
       ensure_prek_hooks_installed "$REPO_ROOT"
       run_caddy_local_ca_trust user
-      sh "$REPO_ROOT/src/scripts/jellyfin-sync.sh"
+      NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/jellyfin-sync.sh"
       run_ai_sync
       run_replica_sync
       run_vm_setup
