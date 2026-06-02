@@ -86,6 +86,10 @@ let
         </graphics>
         <channel type='spicevmc'>
           <target type='virtio' name='com.redhat.spice.0'/>
+        </channel>
+        <channel type='unix'>
+          <source mode='bind'/>
+          <target type='virtio' name='org.qemu.guest_agent.0'/>
         </channel>${virtiofsDev vm}
         <memballoon model='virtio'/>
         <rng model='virtio'>
