@@ -89,8 +89,8 @@ done
 expire_hm_generations_if_available() {
   # Home Manager generations are GC roots: nix-collect-garbage cannot reclaim
   # store paths still referenced by live generations.  Expiring generations
-  # older than 30 days before running Nix store GC releases those roots so
-  # the subsequent collection can reclaim more.  30 days matches the
+  # older than 7 days before running Nix store GC releases those roots so
+  # the subsequent collection can reclaim more.  7 days matches the
   # --delete-older-than window used for Nix store GC below.
   # Best-effort: hosts without a managed Home Manager profile will not have
   # home-manager in PATH.
@@ -100,7 +100,7 @@ expire_hm_generations_if_available() {
     return 0
   fi
 
-  home-manager expire-generations "-30 days"
+  home-manager expire-generations "-7 days"
 }
 
 run_nix_gc_if_available() {
@@ -112,7 +112,7 @@ run_nix_gc_if_available() {
     return 0
   fi
 
-  nix-collect-garbage --delete-older-than 30d
+  nix-collect-garbage --delete-older-than 7d
 }
 
 prune_stale_wallpapers() {

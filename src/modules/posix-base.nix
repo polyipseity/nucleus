@@ -45,9 +45,9 @@ in
         automatic = true;
         # Run store collection at local midnight every day.
         dates = "00:00";
-        # Keep rollback headroom for one month while capping long-term store
+        # Keep rollback headroom for one week while capping long-term store
         # growth from iterative host/application rebuilds.
-        options = "--delete-older-than 30d";
+        options = "--delete-older-than 7d";
       };
     })
 
@@ -59,7 +59,7 @@ in
           ProgramArguments = [
             "/run/current-system/sw/bin/nix-collect-garbage"
             "--delete-older-than"
-            "30d"
+            "7d"
           ];
           StartCalendarInterval = [
             {
