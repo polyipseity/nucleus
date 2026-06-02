@@ -61,15 +61,22 @@ function Sync-LiteLLMScheduledTask {
     "$($env:USERDOMAIN)\$($env:USERNAME)"
   }
 
+  $logDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "nucleus\logs"
+  $logFile = Join-Path -Path $logDir -ChildPath "litellm.log"
+
   # Secrets are read from the SOPS-decrypted system secrets directory.
   $decryptedDir = Join-Path -Path $env:USERPROFILE -ChildPath ".config\nucleus\secrets"
   $openrouterKeyFile = Join-Path -Path $decryptedDir -ChildPath "ai_openrouter_api_key"
   $opencodeKeyFile = Join-Path -Path $decryptedDir -ChildPath "ai_opencode_api_key"
 
+  # Ensure the log directory exists.
+  $null = New-Item -Path $logDir -ItemType Directory -Force
+
   $actionCommand = @"
+`$env:LITELLM_LOG = 'WARNING'
 `$env:OPENROUTER_API_KEY = if (Test-Path '$openrouterKeyFile') { Get-Content '$openrouterKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
 `$env:OPENCODE_GO_API_KEY = if (Test-Path '$opencodeKeyFile') { Get-Content '$opencodeKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
-& "$litellmBin" --config "$configPath" --port 4000 --host 127.0.0.1 --drop_params
+& "$litellmBin" --config "$configPath" --port 4000 --host 127.0.0.1 --drop_params *>> "$logFile"
 "@
 
   $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-NoLogo -ExecutionPolicy Bypass -Command `"$actionCommand`""
