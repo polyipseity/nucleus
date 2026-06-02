@@ -68,7 +68,31 @@ in
     isNormalUser = true;
     extraGroups = [ "wheel" ];
     initialPassword = guestPassword;
+    openssh.authorizedKeys.keys = [ (builtins.getEnv "NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY") ];
   };
+
+  services.qemuGuest.enable = true;
+  services.openssh.enable = true;
+
+  systemd.services.nucleus-rebuild =
+    let
+      flakeDir = "/home/${guestUsername}/dev/nucleus/src";
+    in
+    {
+      description = "Rebuild NixOS system from nucleus flake";
+      wantedBy = [ ];
+      after = [ "network.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = guestUsername;
+        Group = "users";
+        Environment = "HOME=/home/${guestUsername}";
+      };
+      script = ''
+        ${pkgs.nixos-rebuild}/bin/nixos-rebuild switch --flake ${flakeDir}#NixOS
+      '';
+    };
 
   system.stateVersion = "25.05";
 }
