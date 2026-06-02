@@ -80,7 +80,7 @@ function Invoke-VMSetup {
         [string]$Accelerator = 'tcg',
 
         # Run Windows image builds headful (headless=false) for interactive
-        # debugging of installer/WinRM readiness issues.
+        # debugging of installer issues.
         [switch]$DebugHeadful,
 
         # Print planned actions without modifying any state.
@@ -1176,10 +1176,6 @@ function Invoke-BuildWindowsImage {
 
     $packerDir = Join-Path $VmsDir 'windows'
     $tmpOutput = Join-Path $ImagesDir "${VmName}-build"
-    # WHY: Under tcg software emulation, Windows setup + OOBE can take
-    # substantially longer than hardware-accelerated paths. Keep timeout parity
-    # with scripts/vm-setup.sh so long-running builds do not fail prematurely.
-    $winrmTimeout = if ($Accelerator -eq 'tcg') { '72h' } else { '3h' }
 
     # WHY: This repository currently standardizes Windows guest runtime on BIOS
     # (for example src/hosts/MacBook/vms.nix keeps UEFIBoot=false and
@@ -1198,17 +1194,17 @@ function Invoke-BuildWindowsImage {
 
     $buildAttempts = if ($Accelerator -eq 'tcg') {
         @(
-            @{ Firmware = 'bios'; Boot = 'none'; Timeout = '8h' },
-            @{ Firmware = 'bios'; Boot = 'spacebar'; Timeout = '8h' },
-            @{ Firmware = 'bios'; Boot = 'alpha'; Timeout = '8h' },
-            @{ Firmware = 'bios'; Boot = 'legacy'; Timeout = '72h' }
+            @{ Firmware = 'bios'; Boot = 'none' },
+            @{ Firmware = 'bios'; Boot = 'spacebar' },
+            @{ Firmware = 'bios'; Boot = 'alpha' },
+            @{ Firmware = 'bios'; Boot = 'legacy' }
         )
     } else {
         @(
-            @{ Firmware = 'bios'; Boot = 'none'; Timeout = '30m' },
-            @{ Firmware = 'bios'; Boot = 'spacebar'; Timeout = '2h' },
-            @{ Firmware = 'bios'; Boot = 'alpha'; Timeout = '2h' },
-            @{ Firmware = 'bios'; Boot = 'legacy'; Timeout = $winrmTimeout }
+            @{ Firmware = 'bios'; Boot = 'none' },
+            @{ Firmware = 'bios'; Boot = 'spacebar' },
+            @{ Firmware = 'bios'; Boot = 'alpha' },
+            @{ Firmware = 'bios'; Boot = 'legacy' }
         )
     }
 
@@ -1257,61 +1253,22 @@ function Invoke-BuildWindowsImage {
         foreach ($attempt in $buildAttempts) {
             if ($attempt.Firmware -eq 'efi') {
                 if ($DebugHeadful) {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
                 } else {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
                 }
             } else {
                 if ($DebugHeadful) {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
                 } else {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var winrm_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
                 }
             }
         }
         return
     }
 
-    function Test-WindowsWinRmPortReady {
-        param(
-            [int]$Port = 5985
-        )
 
-        $listeners = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-        if (-not $listeners) {
-            return $true
-        }
-
-        $stalePids = @()
-        $nonStalePids = @()
-        foreach ($listener in $listeners) {
-            $listenerPid = [int]$listener.OwningProcess
-            $process = Get-Process -Id $listenerPid -ErrorAction SilentlyContinue
-            $name = if ($process) { $process.ProcessName } else { '' }
-            if ($name -match '^(qemu-system-x86_64|packer|packer-plugin-qemu)') {
-                $stalePids += $listenerPid
-            } else {
-                $nonStalePids += $listenerPid
-            }
-        }
-
-        if ($stalePids.Count -gt 0) {
-            $stalePids = $stalePids | Sort-Object -Unique
-            Write-Warning "vm-setup: detected stale Windows builder listener(s) on tcp/$Port; terminating pid(s): $($stalePids -join ', ')"
-            foreach ($stalePid in $stalePids) {
-                Stop-Process -Id $stalePid -Force -ErrorAction SilentlyContinue
-            }
-        }
-
-        $remaining = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-        if (-not $remaining) {
-            return $true
-        }
-
-        $remainingPids = ($remaining | Select-Object -ExpandProperty OwningProcess | Sort-Object -Unique)
-        Write-Warning "vm-setup: tcp/$Port is still in use by pid(s): $($remainingPids -join ', '); cannot launch QEMU with hostfwd=tcp::5985-:5985"
-        return $false
-    }
 
     Push-Location $packerDir
     try {
@@ -1323,7 +1280,7 @@ function Invoke-BuildWindowsImage {
         $buildSucceeded = $false
         $builtTempDir = $null
         foreach ($attempt in $buildAttempts) {
-            Write-Information "vm-setup: Windows Packer attempt using firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (winrm_timeout=$($attempt.Timeout))..."
+            Write-Information "vm-setup: Windows Packer attempt using firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (ssh_timeout=$($attempt.Timeout))..."
 
             # WHY: Packer qemu builder requires output_directory to not already exist.
             # Use a fresh temp tree per attempt so a failed try cannot poison the
@@ -1340,12 +1297,6 @@ function Invoke-BuildWindowsImage {
             Set-Content -Path $autounattendRendered -Value $autounattendContent -Encoding UTF8
             Write-Information "vm-setup: writing Packer debug log for this attempt: $packerLog"
 
-            if (-not (Test-WindowsWinRmPortReady -Port 5985)) {
-                Remove-Item $attemptTempDir -Recurse -Force -ErrorAction SilentlyContinue
-                Write-Warning 'vm-setup: aborting Windows build attempts because WinRM host port preflight failed'
-                return
-            }
-
             $packerArgs = @(
                 '-var', "windows_iso=$WindowsIso",
                 '-var', "guest_username=$GuestAccountName",
@@ -1354,7 +1305,7 @@ function Invoke-BuildWindowsImage {
                 '-var', "accelerator=$Accelerator",
                 '-var', "firmware_mode=$($attempt.Firmware)",
                 '-var', "boot_strategy=$($attempt.Boot)",
-                '-var', "winrm_timeout=$($attempt.Timeout)",
+                '-var', "ssh_timeout=$($attempt.Timeout)",
                 '-var', "headless=$packerHeadless",
                 '-var', "disk_size=${DiskGib}G",
                 '-var', "output_directory=$tmpOutput",
@@ -1369,7 +1320,7 @@ function Invoke-BuildWindowsImage {
                     '-var', "accelerator=$Accelerator",
                     '-var', "firmware_mode=$($attempt.Firmware)",
                     '-var', "boot_strategy=$($attempt.Boot)",
-                    '-var', "winrm_timeout=$($attempt.Timeout)",
+                    '-var', "ssh_timeout=$($attempt.Timeout)",
                     '-var', "headless=$packerHeadless",
                     '-var', "display_backend=$packerDisplayBackend",
                     '-var', "disk_size=${DiskGib}G",
@@ -1386,7 +1337,7 @@ function Invoke-BuildWindowsImage {
                     '-var', "accelerator=$Accelerator",
                     '-var', "firmware_mode=$($attempt.Firmware)",
                     '-var', "boot_strategy=$($attempt.Boot)",
-                    '-var', "winrm_timeout=$($attempt.Timeout)",
+                    '-var', "ssh_timeout=$($attempt.Timeout)",
                     '-var', "headless=$packerHeadless",
                     '-var', "efi_firmware_code=$efiCode",
                     '-var', "efi_firmware_vars=$efiVars",
@@ -1403,7 +1354,7 @@ function Invoke-BuildWindowsImage {
                         '-var', "accelerator=$Accelerator",
                         '-var', "firmware_mode=$($attempt.Firmware)",
                         '-var', "boot_strategy=$($attempt.Boot)",
-                        '-var', "winrm_timeout=$($attempt.Timeout)",
+                        '-var', "ssh_timeout=$($attempt.Timeout)",
                         '-var', "headless=$packerHeadless",
                         '-var', "display_backend=$packerDisplayBackend",
                         '-var', "efi_firmware_code=$efiCode",
