@@ -455,5 +455,19 @@
     fi
 
     echo "spotlight: disable sequence complete. Cmd+Space should now open Raycast (or fail silently if no alternate launcher is running)."
+
+    # ---- jellyfin-sync -----------------------------------------------------------
+    # Converge Jellyfin accounts and libraries declared in src/modules/users.json
+    # with a running Jellyfin server.
+    #
+    # REPO_ROOT is inherited from the activation runner's environment (written by
+    # apply.sh at $HOME/.config/nucleus/repo-root).  If unset, skip gracefully.
+    jellyfin_repo_root="$NUCLEUS_REPO_ROOT"
+    if [ -z "$jellyfin_repo_root" ] && [ -f "$HOME/.config/nucleus/repo-root" ]; then
+      read -r jellyfin_repo_root < "$HOME/.config/nucleus/repo-root"
+    fi
+    if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh" ]; then
+      NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh"
+    fi
   '';
 }

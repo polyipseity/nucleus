@@ -10,7 +10,7 @@
 # - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
 # - https://caddyserver.com/docs/caddyfile/directives/reverse_proxy
 # - https://caddyserver.com/docs/caddyfile/directives/tls
-{ ... }:
+{ lib, config, ... }:
 let
   jellyfinHttpPort = 8096;
   jellyfinHttpsPort = 8920;
@@ -34,4 +34,17 @@ in
       reverse_proxy 127.0.0.1:${toString jellyfinHttpPort}
     '';
   };
+
+  # Activation script: converge Jellyfin accounts and libraries after the
+  # Jellyfin service is running.  Mirrors the Darwin postActivation fragment but
+  # uses a named script (nixos-specific option).
+  system.activationScripts.jellyfin-sync = lib.mkAfter ''
+    jellyfin_repo_root="''${NUCLEUS_REPO_ROOT:-}"
+    if [ -z "$jellyfin_repo_root" ]; then
+      read -r jellyfin_repo_root < "$HOME/.config/nucleus/repo-root" 2>/dev/null || true
+    fi
+    if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh" ]; then
+      NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh"
+    fi
+  '';
 }
