@@ -14,6 +14,7 @@ Keep this mode file concise and execution-focused to avoid policy drift.
 
 ## Working rules
 
+- Never ask subagents to run git commit. Only the MAIN agent may commit changes.
 - Prefer deletion over abstraction.
 - Prefer explicit/local logic over indirection.
 - Keep one source of truth; remove duplicated policy text.

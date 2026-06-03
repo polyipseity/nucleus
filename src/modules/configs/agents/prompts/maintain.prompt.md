@@ -30,6 +30,7 @@ Aggressively remove unnecessary complexity across code, docs, and AI customizati
 
 ## Constraints
 
+- NEVER ask subagents to run git commit. Commit MUST be done by the MAIN agent to prevent race conditions.
 - No speculative refactors.
 - Preserve behavior and repository conventions.
 - Keep commits small, coherent, and reversible.

@@ -36,9 +36,49 @@ Guidance-file rule (`AGENTS.md`, `.agents/**`):
 
 Safety rules:
 
+- NEVER ask subagents to run git commit. Commit MUST be done by the MAIN agent to prevent race conditions.
 - NEVER use `git reset` (especially `--hard` or `--keep`) under any circumstance. It destroys uncommitted work and can wipe days of progress. Use `git revert` or `git restore` instead.
 - Never revert or cherry-pick earlier than the captured baseline hash.
 - Do not mix unrelated concerns in the same commit.
+
+## Atomic commit workflow (unstaged changes → multiple commits)
+
+When you have a set of unstaged changes and need to split them into multiple
+atomic commits, use this stash-first workflow:
+
+1. `git stash` — save everything, get a clean working tree.
+2. `git stash list` — note the stash reference (e.g. `stash@{0}`).
+3. For each atomic commit you want to create:
+   a. `git stash pop` — restore all remaining stashed changes to the
+   working tree.
+   b. `git add -p` (or `git add <specific-files>`) — stage **only** the
+   changes that belong to this commit. Use interactive hunk selection
+   if a single file contains changes for multiple commits.
+   c. `git stash -u --keep-index` — stash everything that remains
+   unstaged while keeping staged changes intact, so the pre-commit
+   hook sees a clean working tree.
+   d. `git commit -m "type(scope): precise message"` — commit only
+   staged changes in a clean tree.
+   - **If the commit fails because hooks modified staged files** (e.g.,
+     `cargo fmt` auto-fixed formatting): the hook-produced changes are
+     now unstaged modifications. Stage them (`git add <modified-files>`)
+     and retry step 3d. Do NOT retry without staging first — the hook
+     will produce the same modifications and fail identically.
+     e. `git stash list` — verify stash state is as expected.
+4. After all commits are created, `git stash pop` any remaining leftovers.
+
+### Hard rules
+
+- **NEVER** rely on staged vs unstaged to separate changes across multiple
+  commits. Pre-commit hooks (fmt, commitlint) may stash and pop,
+  destroying the staged/unstaged boundary mid-flight.
+- **NEVER** use `git commit --amend` while combining changes from multiple
+  sources — it re-opens the last commit and interacts catastrophically with
+  hook-driven stash/pop cycles.
+- **ALWAYS** keep explicit track of the stash stack (`git stash list`) after
+  every stash operation.
+- **ALWAYS** use `git add -p` for fine-grained separation when one file has
+  changes belonging to multiple commits.
 
 Final check:
 
