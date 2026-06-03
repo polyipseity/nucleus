@@ -15,8 +15,27 @@
 #   - Exits non-zero on any ShellCheck finding at error/warning level.
 set -eu
 
+usage() {
+  cat <<'USAGE_EOF'
+Usage: check-sh.sh [path ...]
+
+Validate shell script syntax and lint quality with ShellCheck.
+
+With no arguments, checks all tracked *.sh files from Git.
+With arguments, checks only the provided paths.
+
+Options:
+  -h, --help  Show this help message and exit
+USAGE_EOF
+  exit 0
+}
+
 # --source-path=SCRIPTDIR lets shellcheck resolve `# shellcheck source=` directives
 # relative to each script's own directory (e.g. bootstrap-versions.env alongside bootstrap.sh).
+case "${1:-}" in
+  -h|--help) usage ;;
+esac
+
 if [ "$#" -gt 0 ]; then
   printf '%s\0' "$@" | xargs -0 shellcheck --source-path=SCRIPTDIR -x
   count="$#"

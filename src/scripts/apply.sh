@@ -60,6 +60,26 @@
 set -eu
 
 # ---------------------------------------------------------------------------
+# Usage
+# ---------------------------------------------------------------------------
+usage() {
+  cat <<'USAGE_EOF'
+Usage: apply.sh [--skip-ai-sync] [--replica-sync] [--vm-setup] [--target-user=<name>]
+
+Dispatch the Nix apply command for the current host.
+
+Options:
+  -h, --help         Show this help message and exit
+  --skip-ai-sync     Skip the post-apply Ollama model sync step
+  --replica-sync     Run the post-apply cloud replica sync step (opt-in)
+  --vm-setup         Run the post-apply VM setup step (opt-in)
+  --target-user      Select the Home Manager flake profile key on standalone
+                     Linux hosts (ignored on Darwin and NixOS system rebuilds)
+USAGE_EOF
+  exit 0
+}
+
+# ---------------------------------------------------------------------------
 # Flag parsing
 # ---------------------------------------------------------------------------
 skip_ai_sync=false
@@ -106,6 +126,9 @@ for _arg in "$@"; do
         printf '%s\n' "apply: --target-user requires a non-empty value" >&2
         exit 1
       fi
+      ;;
+    -h|--help)
+      usage
       ;;
     *)
       printf '%s\n' "apply: unsupported argument '$_arg'" >&2
