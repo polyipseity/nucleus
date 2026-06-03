@@ -24,7 +24,10 @@
 }:
 let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
-  enabledVms = builtins.filter (vm: vm.enabled) vmsData.VMs;
+  nucleusHost = "NixOS";
+  enabledVms = builtins.filter (
+    vm: vm.enabled && (!vm ? hosts || vm.hosts == null || builtins.elem nucleusHost vm.hosts)
+  ) vmsData.VMs;
 
   isArm = pkgs.stdenv.hostPlatform.isAarch64;
   arch = if isArm then "aarch64" else "x86_64";

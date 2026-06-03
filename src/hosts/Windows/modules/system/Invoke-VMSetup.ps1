@@ -210,6 +210,28 @@ function Invoke-VMSetup {
         return [bool]$Vm.enabled
     }
 
+    function Test-VMHostMatch {
+        param(
+            [Parameter(Mandatory)]
+            $Vm
+        )
+
+        # NUCLEUS_HOST env var identifies the current host.  The Vm.hosts
+        # field (null = all hosts, or a string array of host names) determines
+        # whether this VM should run here.
+        $nucleusHost = [string]$env:NUCLEUS_HOST
+        if ([string]::IsNullOrWhiteSpace($nucleusHost)) {
+            $nucleusHost = 'Windows'
+        }
+
+        $hosts = $Vm.hosts
+        if ($null -eq $hosts -or $hosts.Length -eq 0) {
+            return $true  # null/empty means all hosts
+        }
+
+        return ($hosts -contains $nucleusHost)
+    }
+
     $manifest = Join-Path $RepoRoot 'src\modules\VMs.json'
     if (-not (Test-Path $manifest)) {
         Write-Information "vm-setup: manifest not found at $manifest; skipping"
@@ -307,6 +329,13 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
             continue
         }
 
+        # Apply host-scoping filter.  VMs that list a hosts array that does
+        # not include the current NUCLEUS_HOST are skipped.
+        if (-not (Test-VMHostMatch -Vm $vm)) {
+            Write-Information "vm-setup: VM '$($vm.name)' is not available on host '$env:NUCLEUS_HOST'; skipping"
+            continue
+        }
+
         # Apply -NixosOnly / -WindowsOnly filter.
         if ($NixosOnly   -and $vm.type -ne 'NixOS')   { continue }
         if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
@@ -371,6 +400,13 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
     foreach ($vm in $vmDef.VMs) {
         if (-not (Test-VMEnabled -Vm $vm)) {
             Write-Information "vm-setup: VM '$($vm.name)' is disabled in manifest; skipping"
+            continue
+        }
+
+        # Apply host-scoping filter.  VMs that list a hosts array that does
+        # not include the current NUCLEUS_HOST are skipped.
+        if (-not (Test-VMHostMatch -Vm $vm)) {
+            Write-Information "vm-setup: VM '$($vm.name)' is not available on host '$env:NUCLEUS_HOST'; skipping"
             continue
         }
 

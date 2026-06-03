@@ -13,7 +13,10 @@
 { config, pkgs, ... }:
 let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
-  enabledVms = builtins.filter (vm: vm.enabled) vmsData.VMs;
+  nucleusHost = "MacBook";
+  enabledVms = builtins.filter (
+    vm: vm.enabled && (!vm ? hosts || vm.hosts == null || builtins.elem nucleusHost vm.hosts)
+  ) vmsData.VMs;
   lib = pkgs.lib;
 
   isArm = pkgs.stdenv.hostPlatform.isAarch64;

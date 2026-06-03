@@ -25,6 +25,9 @@
   environment.etc."inputrc".text =
     builtins.readFile "${pkgs.path}/nixos/modules/programs/bash/inputrc";
 
+  # Identify this host for VM host-scoping and other host-aware consumers.
+  environment.variables.NUCLEUS_HOST = "NixOS";
+
   # Disable OpenCode auto-update globally to avoid version skew across machines.
   # Updates are controlled via flake updates and managed environment versioning.
   # Source: OpenCode CLI env var table (`OPENCODE_DISABLE_AUTOUPDATE`)

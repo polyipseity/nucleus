@@ -453,6 +453,15 @@
 
     echo "spotlight: disable sequence complete. Cmd+Space should now open Raycast (or fail silently if no alternate launcher is running)."
 
+    # ---- NUCLEUS_HOST ------------------------------------------------------------
+    # Export the canonical host name for downstream VM host-scoping and Host
+    # module consumers (e.g. src/modules/VMs.json hosts field filtering).
+    console_user="${console_user:-$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)}"
+    if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
+      /bin/launchctl asuser "$(/usr/bin/id -u "$console_user" 2>/dev/null || echo 0)" \
+        /bin/launchctl setenv NUCLEUS_HOST MacBook 2>/dev/null || true
+    fi
+
     # ---- jellyfin-sync -----------------------------------------------------------
     # Converge Jellyfin accounts and libraries declared in src/modules/users.json
     # with a running Jellyfin server.

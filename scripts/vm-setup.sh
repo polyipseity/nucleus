@@ -121,6 +121,20 @@ if [ -z "$accelerator" ]; then
   esac
 fi
 
+# ---------------------------------------------------------------------------
+# NUCLEUS_HOST detection — identify the current host for VM host-scoping.
+# NUCLEUS_HOST env var overrides auto-detection.  Fallback maps uname -s to
+# the canonical host name used in VMs.json "hosts" arrays.
+# ---------------------------------------------------------------------------
+if [ -z "${NUCLEUS_HOST:-}" ]; then
+  case "$(uname -s)" in
+    Darwin) NUCLEUS_HOST='MacBook' ;;
+    Linux)  NUCLEUS_HOST='NixOS' ;;
+    *)      NUCLEUS_HOST='' ;;
+  esac
+fi
+export NUCLEUS_HOST
+
 if [ ! -f "$MANIFEST" ]; then
   printf 'vm-setup: manifest not found at %s; skipping\n' "$MANIFEST" >&2
   exit 0
@@ -346,6 +360,18 @@ should_include() {
     return 1
   fi
   return 0
+}
+
+# should_include_host HOSTS_JSON — returns 0 if the VM should run on the
+# current host.  HOSTS_JSON is the raw JSON value of the VM's "hosts" field
+# (null or a string array of host names).  A null value means the VM is
+# available on all hosts.
+should_include_host() {
+  _sjh_json="$1"
+  if [ "$_sjh_json" = "null" ] || [ -z "$_sjh_json" ]; then
+    return 0
+  fi
+  printf '%s' "$_sjh_json" | jq -e --arg host "$NUCLEUS_HOST" 'contains([$host])' >/dev/null 2>&1
 }
 
 # ---------------------------------------------------------------------------
@@ -1484,6 +1510,13 @@ build_images() {
       continue
     fi
 
+    _vm_hosts="$(jq -c ".VMs[$_i].hosts" "$MANIFEST")"
+    if ! should_include_host "$_vm_hosts"; then
+      printf 'vm-setup: VM "%s" is not available on host "%s" (hosts: %s); skipping\n' "$_vm_name" "$NUCLEUS_HOST" "$_vm_hosts"
+      _i=$((_i + 1))
+      continue
+    fi
+
     if should_include "$_vm_type"; then
       case "$_vm_type" in
         NixOS)
@@ -1553,6 +1586,13 @@ setup_tart_vms() {
 
     if [ "$vm_enabled" != "true" ]; then
       printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$vm_name"
+      i=$((i + 1))
+      continue
+    fi
+
+    vm_hosts=$(jq -c ".VMs[$i].hosts" "$MANIFEST")
+    if ! should_include_host "$vm_hosts"; then
+      printf 'vm-setup: VM "%s" is not available on host "%s" (hosts: %s); skipping\n' "$vm_name" "$NUCLEUS_HOST" "$vm_hosts"
       i=$((i + 1))
       continue
     fi
@@ -1656,6 +1696,13 @@ setup_utm_vms() {
 
     if [ "$vm_enabled" != "true" ]; then
       printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$vm_name"
+      i=$((i + 1))
+      continue
+    fi
+
+    vm_hosts=$(jq -c ".VMs[$i].hosts" "$MANIFEST")
+    if ! should_include_host "$vm_hosts"; then
+      printf 'vm-setup: VM "%s" is not available on host "%s" (hosts: %s); skipping\n' "$vm_name" "$NUCLEUS_HOST" "$vm_hosts"
       i=$((i + 1))
       continue
     fi
@@ -1886,6 +1933,13 @@ setup_libvirt_vms() {
 
     if [ "$vm_enabled" != "true" ]; then
       printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$vm_name"
+      i=$((i + 1))
+      continue
+    fi
+
+    vm_hosts=$(jq -c ".VMs[$i].hosts" "$MANIFEST")
+    if ! should_include_host "$vm_hosts"; then
+      printf 'vm-setup: VM "%s" is not available on host "%s" (hosts: %s); skipping\n' "$vm_name" "$NUCLEUS_HOST" "$vm_hosts"
       i=$((i + 1))
       continue
     fi

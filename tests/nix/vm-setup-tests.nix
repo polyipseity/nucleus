@@ -149,6 +149,34 @@ let
         builtins.toString (builtins.map (v: v.name) badEditions)
       }";
 
+  # hosts must be absent, null, or a non-empty array of valid host names
+  # (["MacBook", "NixOS", "Windows"]). This enables host-scoped VM availability
+  # so different machines see only their intended VMs.
+  validHosts = [
+    "MacBook"
+    "NixOS"
+    "Windows"
+  ];
+  test_hosts_field =
+    let
+      badHosts = builtins.filter (
+        vm:
+        let
+          h = vm.hosts or null;
+        in
+        h != null
+        && (
+          !builtins.isList h
+          || builtins.length h == 0
+          || !builtins.all (host: builtins.elem host validHosts) h
+        )
+      ) manifest.VMs;
+    in
+    assert' (badHosts == [ ])
+      "hosts must be null, absent, or a non-empty list of valid host names (MacBook, NixOS, Windows); bad entries: ${
+        builtins.toString (builtins.map (v: "${v.name}: ${builtins.toString (v.hosts or null)}") badHosts)
+      }";
+
   # ---------------------------------------------------------------------------
   # Declarative config generation tests
   # ---------------------------------------------------------------------------
@@ -752,63 +780,54 @@ let
         && (lib.hasInfix "repairing stale UTM runtime registration" vm_setup_sh_text)
       )
       "scripts/vm-setup.sh must re-register UTM VMs when legacy display configs or template drift are detected so refreshed config.plist values take effect";
-  test_vm_readme_template_content =
-    assert'
-      (
-        (lib.hasInfix "nucleus-vm-setup" readmeTemplateText)
-        && (lib.hasInfix "## Layout" readmeTemplateText)
-        && (lib.hasInfix "images/<name>-build/" readmeTemplateText)
-        && (lib.hasInfix "images/<name>-installer.iso" readmeTemplateText)
-        && (lib.hasInfix "## Start commands" readmeTemplateText)
-        && (lib.hasInfix "start-<name>.sh" readmeTemplateText)
-        && (lib.hasInfix "start-<name>.ps1" readmeTemplateText)
-        && (lib.hasInfix "## UTM bundle portability" readmeTemplateText)
-        && (lib.hasInfix "Copying only \`config.plist\`" readmeTemplateText)
-        && (lib.hasInfix "## Guest configuration" readmeTemplateText)
-        && (lib.hasInfix "## Lifecycle" readmeTemplateText)
-        && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
-        && (lib.hasInfix "## Troubleshooting" readmeTemplateText)
-        && (lib.hasInfix "{{VM_DIR_DISPLAY}}" readmeTemplateText)
-        && (lib.hasInfix "{{IMAGES_DIR_DISPLAY}}" readmeTemplateText)
-        && (lib.hasInfix "## Notes" readmeTemplateText)
-      )
-      "src/vms/templates/README.md must contain all expected documentation sections and placeholders";
+  test_vm_readme_template_content = assert' (
+    (lib.hasInfix "nucleus-vm-setup" readmeTemplateText)
+    && (lib.hasInfix "## Layout" readmeTemplateText)
+    && (lib.hasInfix "images/<name>-build/" readmeTemplateText)
+    && (lib.hasInfix "images/<name>-installer.iso" readmeTemplateText)
+    && (lib.hasInfix "## Start commands" readmeTemplateText)
+    && (lib.hasInfix "start-<name>.sh" readmeTemplateText)
+    && (lib.hasInfix "start-<name>.ps1" readmeTemplateText)
+    && (lib.hasInfix "## UTM bundle portability" readmeTemplateText)
+    && (lib.hasInfix "Copying only \`config.plist\`" readmeTemplateText)
+    && (lib.hasInfix "## Guest configuration" readmeTemplateText)
+    && (lib.hasInfix "## Lifecycle" readmeTemplateText)
+    && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
+    && (lib.hasInfix "## Troubleshooting" readmeTemplateText)
+    && (lib.hasInfix "{{VM_DIR_DISPLAY}}" readmeTemplateText)
+    && (lib.hasInfix "{{IMAGES_DIR_DISPLAY}}" readmeTemplateText)
+    && (lib.hasInfix "## Notes" readmeTemplateText)
+  ) "src/vms/templates/README.md must contain all expected documentation sections and placeholders";
 
-  test_vm_start_posix_template_content =
-    assert'
-      (
-        (lib.hasInfix "{{VM_NAME}}" startPosixTemplateText)
-        && (lib.hasInfix "{{VM_DISPLAY}}" startPosixTemplateText)
-        && (lib.hasInfix "{{HOST_KIND}}" startPosixTemplateText)
-        && (lib.hasInfix "{{VM_DIR}}" startPosixTemplateText)
-        && (lib.hasInfix "darwin-tart" startPosixTemplateText)
-        && (lib.hasInfix "darwin-utm" startPosixTemplateText)
-        && (lib.hasInfix "nixos-libvirt" startPosixTemplateText)
-        && (lib.hasInfix "tart run" startPosixTemplateText)
-        && (lib.hasInfix "utmctl" startPosixTemplateText)
-        && (lib.hasInfix "virsh start" startPosixTemplateText)
-        && (lib.hasInfix "virt-viewer" startPosixTemplateText)
-      )
-      "src/vms/templates/start-posix.sh must contain all expected placeholders and runtime branches";
+  test_vm_start_posix_template_content = assert' (
+    (lib.hasInfix "{{VM_NAME}}" startPosixTemplateText)
+    && (lib.hasInfix "{{VM_DISPLAY}}" startPosixTemplateText)
+    && (lib.hasInfix "{{HOST_KIND}}" startPosixTemplateText)
+    && (lib.hasInfix "{{VM_DIR}}" startPosixTemplateText)
+    && (lib.hasInfix "darwin-tart" startPosixTemplateText)
+    && (lib.hasInfix "darwin-utm" startPosixTemplateText)
+    && (lib.hasInfix "nixos-libvirt" startPosixTemplateText)
+    && (lib.hasInfix "tart run" startPosixTemplateText)
+    && (lib.hasInfix "utmctl" startPosixTemplateText)
+    && (lib.hasInfix "virsh start" startPosixTemplateText)
+    && (lib.hasInfix "virt-viewer" startPosixTemplateText)
+  ) "src/vms/templates/start-posix.sh must contain all expected placeholders and runtime branches";
 
-  test_vm_start_windows_template_content =
-    assert'
-      (
-        (lib.hasInfix "{{QEMU_SYSTEM}}" startWindowsTemplateText)
-        && (lib.hasInfix "{{VM_DISPLAY}}" startWindowsTemplateText)
-        && (lib.hasInfix "{{MACHINE}}" startWindowsTemplateText)
-        && (lib.hasInfix "{{CPU}}" startWindowsTemplateText)
-        && (lib.hasInfix "{{CPUS}}" startWindowsTemplateText)
-        && (lib.hasInfix "{{RAM_MIB}}" startWindowsTemplateText)
-        && (lib.hasInfix "{{DISK_PATH}}" startWindowsTemplateText)
-        && (lib.hasInfix "{{VGA}}" startWindowsTemplateText)
-        && (lib.hasInfix "{{DISPLAY_BACKEND}}" startWindowsTemplateText)
-        && (lib.hasInfix "{{VIRTIOFS_ARGS}}" startWindowsTemplateText)
-        && (lib.hasInfix "org.qemu.guest_agent.0" startWindowsTemplateText)
-        && (lib.hasInfix "hostfwd=tcp::2222-:22" startWindowsTemplateText)
-        && (lib.hasInfix "chardev pipe" startWindowsTemplateText)
-      )
-      "src/vms/templates/start-windows.ps1 must contain all expected placeholders and QEMU arguments";
+  test_vm_start_windows_template_content = assert' (
+    (lib.hasInfix "{{QEMU_SYSTEM}}" startWindowsTemplateText)
+    && (lib.hasInfix "{{VM_DISPLAY}}" startWindowsTemplateText)
+    && (lib.hasInfix "{{MACHINE}}" startWindowsTemplateText)
+    && (lib.hasInfix "{{CPU}}" startWindowsTemplateText)
+    && (lib.hasInfix "{{CPUS}}" startWindowsTemplateText)
+    && (lib.hasInfix "{{RAM_MIB}}" startWindowsTemplateText)
+    && (lib.hasInfix "{{DISK_PATH}}" startWindowsTemplateText)
+    && (lib.hasInfix "{{VGA}}" startWindowsTemplateText)
+    && (lib.hasInfix "{{DISPLAY_BACKEND}}" startWindowsTemplateText)
+    && (lib.hasInfix "{{VIRTIOFS_ARGS}}" startWindowsTemplateText)
+    && (lib.hasInfix "org.qemu.guest_agent.0" startWindowsTemplateText)
+    && (lib.hasInfix "hostfwd=tcp::2222-:22" startWindowsTemplateText)
+    && (lib.hasInfix "chardev pipe" startWindowsTemplateText)
+  ) "src/vms/templates/start-windows.ps1 must contain all expected placeholders and QEMU arguments";
 
   test_vm_directory_readme_generation =
     assert'
@@ -835,12 +854,7 @@ let
         && (lib.hasInfix "UTM bundle" readmeTemplateText)
       )
       "Invoke-VMSetup.ps1 must write %USERPROFILE%\\virtual machines\\README.md using the cross-host README template with placeholder substitution";
-  test_vm_setup_generates_helper_scripts =
-    assert'
-      (
-        (lib.hasInfix "write_start_script" vm_setup_sh_text)
-      )
-      "VM setup flows must generate discoverable start helper scripts";
+  test_vm_setup_generates_helper_scripts = assert' ((lib.hasInfix "write_start_script" vm_setup_sh_text)) "VM setup flows must generate discoverable start helper scripts";
   test_macbook_utm_default_location_link =
     assert'
       (
@@ -911,6 +925,7 @@ let
     test_windows_iso_url_type
     test_macos_version_type
     test_windows_edition_type
+    test_hosts_field
     test_plist_uuid_format
     test_plist_uuid_uniqueness
     test_domain_xml_kvm_type
@@ -994,6 +1009,7 @@ in
     test_windows_iso_url_type
     test_macos_version_type
     test_windows_edition_type
+    test_hosts_field
     test_plist_uuid_format
     test_plist_uuid_uniqueness
     test_domain_xml_kvm_type
