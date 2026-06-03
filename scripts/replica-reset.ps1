@@ -31,7 +31,8 @@ function Resolve-NucleusRepoRoot {
 
   # git rev-parse stderr is suppressed because non-repo CWD is expected and
   # benign here; the result is validated before use.
-  $gitRoot = (& git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Out-String).Trim()
+  # Use $PSScriptRoot so resolution works from any CWD.
+  $gitRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null | Out-String).Trim()
   if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and (Test-Path -Path $gitRoot -PathType Container)) {
     return $gitRoot
   }
