@@ -268,7 +268,12 @@ source "qemu" "windows11" {
   # shell before probes begin; the 3h ssh_timeout handles the rest.
   pause_before_connecting = "120s"
 
+  # WHY: Default "qemu64" CPU lacks SSE4.2, POPCNT, x2APIC, MOVBE and other
+  # features Windows 11 PE requires — causing an illegal instruction fault
+  # and immediate boot-loop. "max" enables all features the accelerator
+  # (TCG, hvf, kvm, whpx) can provide.
   qemuargs = [
+    ["-cpu", "max"],
     ["-boot", "order=d"],
     ["-netdev", "user,id=user.0,hostfwd=tcp::2222-:22"],
   ]
