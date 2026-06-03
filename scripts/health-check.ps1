@@ -26,13 +26,17 @@
 [CmdletBinding()]
 param(
   [Parameter()]
-  [int]$MinFreeGB = 10,
+  [int]$MinFreeGB = 0,
 
   [Parameter()]
   [switch]$SkipSecretHealth
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($MinFreeGB -eq 0) {
+  $MinFreeGB = if ($env:NUCLEUS_MIN_FREE_GB) { [int]$env:NUCLEUS_MIN_FREE_GB } else { 10 }
+}
 
 function Test-DiskSpace {
   <#

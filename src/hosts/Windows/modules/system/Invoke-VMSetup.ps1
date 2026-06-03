@@ -70,7 +70,7 @@ function Invoke-VMSetup {
         # Auto: windowsIsoUrl cache/download first, then Fido fallback.
         # Url:  use only -WindowsIso or windowsIsoUrl (no downloader fallback).
         # Fido: use only local cache/Fido when -WindowsIso is omitted.
-        [ValidateSet('Auto', 'Url', 'Fido')]
+        [ValidateSet('auto', 'url', 'fido')]
         [string]$WindowsIsoSource = 'Auto',
 
         # Retry attempts for Windows ISO network downloads.
@@ -855,7 +855,7 @@ function Invoke-BuildWindowsImage {
         # Optional URL to auto-download the Windows installer ISO when -WindowsIso
         # is not provided.  Set via the windowsIsoUrl field in VMs.json.
         [string]$WindowsIsoUrl = '',
-        [ValidateSet('Auto', 'Url', 'Fido')]
+        [ValidateSet('auto', 'url', 'fido')]
         [string]$WindowsIsoSource = 'Auto',
         [int]$WindowsIsoRetries = 0,
         [string]$Accelerator,

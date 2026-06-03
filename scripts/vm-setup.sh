@@ -73,7 +73,7 @@ usage: vm-setup.sh [options]
   --nixos-only               Build and provision only the NixOS guest.
   --windows-only             Build and provision only the Windows guest.
   --windows-iso PATH         Path to the Windows 11 ISO.
-  --windows-iso-source S     ISO auto-resolution: auto|url|mido.
+  --windows-iso-source S     ISO auto-resolution: auto|url|fido.
   --windows-iso-retries N    Retry attempts for network downloads.
   --debug-headful            Show QEMU GUI window during Windows builds.
   --accelerator TYPE         QEMU accelerator (hvf/kvm/tcg).
@@ -104,10 +104,10 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$windows_iso_source" in
-  auto|url|mido) ;;
+  auto|url|fido) ;;
   *)
     printf 'vm-setup: invalid --windows-iso-source value: %s\n' "$windows_iso_source" >&2
-    printf 'vm-setup: expected one of: auto, url, mido\n' >&2
+    printf 'vm-setup: expected one of: auto, url, fido\n' >&2
     exit 1
     ;;
 esac
@@ -284,8 +284,8 @@ write_vm_directory_readme() {
     return 0
   fi
 
-  _wvdr_vm_dir_short='~/virtual machines'
-  _wvdr_images_dir_short='~/virtual machines/images'
+  _wvdr_vm_dir_short="$HOME/virtual machines"
+  _wvdr_images_dir_short="$HOME/virtual machines/images"
   if [ -f "$TEMPLATES_DIR/README.md" ]; then
     sed -e "s|{{VM_DIR_DISPLAY}}|$_wvdr_vm_dir_short|g" \
         -e "s|{{IMAGES_DIR_DISPLAY}}|$_wvdr_images_dir_short|g" \
@@ -296,6 +296,7 @@ write_vm_directory_readme() {
       "$TEMPLATES_DIR/README.md" >&2
     {
       printf '# virtual machines\n\n'
+      # shellcheck disable=SC2016 # single quotes intentional — backticks must not expand
       printf 'This directory stores VM artifacts managed by `nucleus-vm-setup`.\n'
     } >"$_wvdr_readme"
   fi

@@ -37,7 +37,8 @@
 param(
   [switch]$DryRun,
   [switch]$PruneOnly,
-  [int]$ServerReadyTimeoutSeconds = 60
+  [int]$ServerReadyTimeoutSeconds = 60,
+  [int]$ServerReadyPollSeconds = 2
 )
 
 $ErrorActionPreference = 'Stop'
@@ -51,4 +52,4 @@ if (-not (Test-Path -LiteralPath $modulePath)) {
 
 . $modulePath
 
-Invoke-AISync -RepoRoot $repoRoot -DryRun:$DryRun -PruneOnly:$PruneOnly -ServerReadyTimeoutSeconds $ServerReadyTimeoutSeconds
+Invoke-AISync -RepoRoot $repoRoot -DryRun:$DryRun -PruneOnly:$PruneOnly -ServerReadyTimeoutSeconds $ServerReadyTimeoutSeconds -ServerReadyPollSeconds $ServerReadyPollSeconds
