@@ -72,7 +72,6 @@ Temporary files/directories that are safe to remove when builds fail, are
 interrupted, or when reclaiming space:
 
 - `{{IMAGES_DIR_DISPLAY}}/<name>-build/` — Packer temp files (~10–30 GB)
-- `{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso` — cached Windows ISO (~5–6 GB)
 
 Persistent VM artifacts (remove only when intentionally deleting a VM):
 
@@ -81,8 +80,15 @@ Persistent VM artifacts (remove only when intentionally deleting a VM):
 - `{{VM_DIR_DISPLAY}}/<name>.utm/` — UTM bundle
 - `{{VM_DIR_DISPLAY}}/<name>.qcow2` — runtime disk
 
-If the installer cache is removed, `nucleus-vm-setup` re-downloads it on the
-next run.
+## Manual cleanup
+
+These artifacts are preserved by `nucleus-gc` because they are expensive to
+reproduce. Delete them manually when you need to reclaim space:
+
+- `{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso` — cached Windows ISO (~5–6 GB).
+  Remove with `rm "{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso"` (POSIX) or
+  `Remove-Item "{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso"` (Windows).
+  `nucleus-vm-setup` re-downloads it on the next build.
 
 ## Troubleshooting
 

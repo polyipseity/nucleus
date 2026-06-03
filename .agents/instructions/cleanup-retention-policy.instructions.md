@@ -53,7 +53,7 @@ applyTo: "src/**/*.nix, scripts/gc.*, src/hosts/Windows/**/*.yml"
 | -------------------------------------------- | ---------------------------- | --------------------------------- |
 | Wallpaper decrypted copies                   | `.sops` source files in repo | `scripts/gc.sh`, `scripts/gc.ps1` |
 | Ollama models                                | `src/modules/ai/models.json` | `Invoke-AISync -PruneOnly`        |
-| VM artifacts                                 | `src/modules/VMs.json`       | `scripts/gc.sh`, `scripts/gc.ps1` |
+| VM artifacts (except Windows installer ISOs) | `src/modules/VMs.json`       | `scripts/gc.sh`, `scripts/gc.ps1` |
 | VS Code extensions                           | Nix-managed extension set    | `src/modules/editors.nix`         |
 | Agent/Skills                                 | Declared skills inventory    | `src/modules/agents.nix`          |
 | GPG managed keys                             | SOPS secret key fingerprint  | `src/modules/secrets.nix`         |
