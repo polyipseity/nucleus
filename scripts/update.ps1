@@ -8,43 +8,43 @@
     2. winget package upgrades (when available)
     3. SOPS recipient rewrap for managed secret files
 
-.PARAMETER SkipFlake
+.PARAMETER WithoutFlake
   Do not run nix flake update.
 
-.PARAMETER SkipBrew
+.PARAMETER WithoutBrew
   Do not run Homebrew update/upgrade (macOS only; ignored on Windows).
 
-.PARAMETER SkipWinget
+.PARAMETER WithoutWinget
   Do not run winget upgrade.
 
-.PARAMETER SkipSops
+.PARAMETER WithoutSops
   Do not run sops updatekeys.
 
 .EXAMPLE
   .\update.ps1
 
 .EXAMPLE
-  .\update.ps1 -SkipFlake
+  .\update.ps1 -WithoutFlake
 
 .EXAMPLE
-  .\update.ps1 -SkipFlake -SkipWinget -SkipSops
+  .\update.ps1 -WithoutFlake -WithoutWinget -WithoutSops
 #>
 [CmdletBinding()]
 param(
-  [switch]$SkipFlake,
-  [switch]$SkipBrew,
-  [switch]$SkipWinget,
-  [switch]$SkipSops
+  [switch]$WithoutFlake,
+  [switch]$WithoutBrew,
+  [switch]$WithoutWinget,
+  [switch]$WithoutSops
 )
 
 $ErrorActionPreference = 'Stop'
 
 # macOS-only parameter; accepted for interface compatibility.
-$SkipBrew | Out-Null
+$WithoutBrew | Out-Null
 
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
 
-if (-not $SkipFlake -and (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue)) {
+if (-not $WithoutFlake -and (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue)) {
   $flakeOutput = & nix.exe --option warn-dirty false flake update --flake (Join-Path -Path $repoRoot -ChildPath 'src') 2>&1
   if ($LASTEXITCODE -ne 0) {
     $joined = ($flakeOutput | Out-String)
@@ -57,11 +57,11 @@ if (-not $SkipFlake -and (Get-Command -Name 'nix.exe' -ErrorAction SilentlyConti
   }
 }
 
-if (-not $SkipWinget -and (Get-Command -Name 'winget.exe' -ErrorAction SilentlyContinue)) {
+if (-not $WithoutWinget -and (Get-Command -Name 'winget.exe' -ErrorAction SilentlyContinue)) {
   winget upgrade --all --accept-package-agreements --accept-source-agreements --disable-interactivity
 }
 
-if (-not $SkipSops -and -not (Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue)) {
+if (-not $WithoutSops -and -not (Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue)) {
   throw 'nucleus: sops.exe is required for update secret rewrap step.'
 }
 
@@ -73,7 +73,7 @@ $secretFiles = @(
   (Join-Path -Path $repoRoot -ChildPath 'src\secrets\ssh-personal.yml')
 )
 
-if (-not $SkipSops) {
+if (-not $WithoutSops) {
 foreach ($secretFile in $secretFiles) {
   & sops --config $sopsConfig updatekeys --yes $secretFile
   if ($LASTEXITCODE -ne 0) {
@@ -91,7 +91,7 @@ foreach ($secretFile in $secretFiles) {
     }
   }
 
-  # Close if (-not $SkipSops).
+  # Close if (-not $WithoutSops).
 }
 
 Write-Output "$($PSStyle.Foreground.Green)nucleus: update workflow completed$($PSStyle.Reset)"

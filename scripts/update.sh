@@ -8,10 +8,10 @@
 #   4. rewrap all SOPS-managed files for current recipients
 #
 # Arguments:
-#   --skip-flake       do not run nix flake update
-#   --skip-brew        do not run Homebrew update/upgrade (macOS only)
-#   --skip-winget      do not run winget upgrade (Windows only)
-#   --skip-sops        do not run sops updatekeys
+#   --without-flake       do not run nix flake update
+#   --without-brew        do not run Homebrew update/upgrade (macOS only)
+#   --without-winget      do not run winget upgrade (Windows only)
+#   --without-sops        do not run sops updatekeys
 #
 # Environment variables:
 #   NIX_CONFIG  merged with required flake feature flags for nix commands
@@ -28,19 +28,19 @@ usage() {
   cat <<'EOF'
 usage: update.sh [options]
 
-  --skip-flake    Do not run nix flake update.
-  --skip-brew     Do not run Homebrew update/upgrade (macOS only).
-  --skip-winget   Do not run winget upgrade (Windows only).
-  --skip-sops     Do not run sops updatekeys.
+  --without-flake    Do not run nix flake update.
+  --without-brew     Do not run Homebrew update/upgrade (macOS only).
+  --without-winget   Do not run winget upgrade (Windows only).
+  --without-sops     Do not run sops updatekeys.
 EOF
 }
 
 REPO_ROOT="$(resolve_nucleus_root)"
 
-skip_flake=false
-skip_brew=false
-skip_winget=false
-skip_sops=false
+do_flake=true
+do_brew=true
+do_winget=true
+do_sops=true
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -48,17 +48,17 @@ while [ "$#" -gt 0 ]; do
       usage
       exit 0
       ;;
-    --skip-flake)
-      skip_flake=true
+    --without-flake)
+      do_flake=false
       ;;
-    --skip-brew)
-      skip_brew=true
+    --without-brew)
+      do_brew=false
       ;;
-    --skip-winget)
-      skip_winget=true
+    --without-winget)
+      do_winget=false
       ;;
-    --skip-sops)
-      skip_sops=true
+    --without-sops)
+      do_sops=false
       ;;
     *)
       printf '%s\n' "update: unsupported argument '$1'" >&2
@@ -159,19 +159,19 @@ rewrap_sops_files() {
   fi
 }
 
-if [ "$skip_flake" = false ]; then
+if [ "$do_flake" = true ]; then
   update_flake_inputs
 fi
 
-if [ "$skip_brew" = false ]; then
+if [ "$do_brew" = true ]; then
   update_homebrew_if_available
 fi
 
-if [ "$skip_winget" = false ]; then
+if [ "$do_winget" = true ]; then
   update_windows_packages_if_available
 fi
 
-if [ "$skip_sops" = false ]; then
+if [ "$do_sops" = true ]; then
   rewrap_sops_files
 fi
 

@@ -10,13 +10,13 @@
 #
 # Arguments:
 #   --repo-root <path>     override the detected repository root path
-#   --skip-tool-cache-prune skip bun/cargo/rustc/uv and repo-local .direnv cache cleanup
-#   --skip-hm-gc           skip home-manager expire-generations
-#   --skip-nix-gc          skip nix-collect-garbage
-#   --skip-ollama-prune    skip stale Ollama model removal
-#   --skip-scoop-cleanup   accepted but ignored on POSIX (Windows-only)
-#   --skip-wallpaper-prune skip stale wallpaper cleanup
-#   --skip-vm-prune        skip stale VM artifact removal
+#   --without-tool-cache-prune skip bun/cargo/rustc/uv and repo-local .direnv cache cleanup
+#   --without-hm-gc           skip home-manager expire-generations
+#   --without-nix-gc          skip nix-collect-garbage
+#   --without-ollama-prune    skip stale Ollama model removal
+#   --without-scoop-cleanup   accepted but ignored on POSIX (Windows-only)
+#   --without-wallpaper-prune skip stale wallpaper cleanup
+#   --without-vm-prune        skip stale VM artifact removal
 #
 # Environment variables:
 #   (none)
@@ -34,25 +34,25 @@ usage() {
 usage: gc.sh [options]
 
   --repo-root <path>       Override the detected repository root path.
-  --skip-tool-cache-prune  Skip bun/cargo/rustc/uv cache cleanup.
-  --skip-hm-gc             Skip home-manager generation expiration.
-  --skip-nix-gc            Skip nix-collect-garbage.
-  --skip-ollama-prune      Skip stale Ollama model removal.
-  --skip-scoop-cleanup     Accepted but ignored on POSIX (Windows-only).
-  --skip-wallpaper-prune   Skip stale wallpaper cleanup.
-  --skip-vm-prune          Skip stale VM artifact removal.
+  --without-tool-cache-prune  Skip bun/cargo/rustc/uv cache cleanup.
+  --without-hm-gc             Skip home-manager generation expiration.
+  --without-nix-gc            Skip nix-collect-garbage.
+  --without-ollama-prune      Skip stale Ollama model removal.
+  --without-scoop-cleanup     Accepted but ignored on POSIX (Windows-only).
+  --without-wallpaper-prune   Skip stale wallpaper cleanup.
+  --without-vm-prune          Skip stale VM artifact removal.
 EOF
 }
 
 REPO_ROOT="$(resolve_nucleus_root)"
 
-skip_tool_cache_prune=false
-skip_hm_gc=false
-skip_nix_gc=false
-skip_ollama_prune=false
-skip_scoop_cleanup=false
-skip_wallpaper_prune=false
-skip_vm_prune=false
+do_tool_cache_prune=true
+do_hm_gc=true
+do_nix_gc=true
+do_ollama_prune=true
+do_scoop_cleanup=true
+do_wallpaper_prune=true
+do_vm_prune=true
 repo_root_override=""
 
 while [ "$#" -gt 0 ]; do
@@ -65,27 +65,27 @@ while [ "$#" -gt 0 ]; do
       usage
       exit 0
       ;;
-    --skip-tool-cache-prune)
-      skip_tool_cache_prune=true
+    --without-tool-cache-prune)
+      do_tool_cache_prune=false
       ;;
-    --skip-hm-gc)
-      skip_hm_gc=true
+    --without-hm-gc)
+      do_hm_gc=false
       ;;
-    --skip-nix-gc)
-      skip_nix_gc=true
+    --without-nix-gc)
+      do_nix_gc=false
       ;;
-    --skip-ollama-prune)
-      skip_ollama_prune=true
+    --without-ollama-prune)
+      do_ollama_prune=false
       ;;
-    --skip-scoop-cleanup)
-      skip_scoop_cleanup=true
-      printf '%s\n' "gc: --skip-scoop-cleanup accepted but ignored on POSIX (Windows-only)"
+    --without-scoop-cleanup)
+      do_scoop_cleanup=false
+      printf '%s\n' "gc: --without-scoop-cleanup accepted but ignored on POSIX (Windows-only)"
       ;;
-    --skip-wallpaper-prune)
-      skip_wallpaper_prune=true
+    --without-wallpaper-prune)
+      do_wallpaper_prune=false
       ;;
-    --skip-vm-prune)
-      skip_vm_prune=true
+    --without-vm-prune)
+      do_vm_prune=false
       ;;
     *)
       printf '%s\n' "gc: unsupported argument '$1'" >&2
@@ -366,38 +366,38 @@ prune_vm_artifacts_if_present() {
 
 # Step 1: expire HM generations before Nix store GC so the store can reclaim
 # paths that were previously held alive as generation GC roots.
-if [ "$skip_hm_gc" = false ]; then
+if [ "$do_hm_gc" = true ]; then
   expire_hm_generations_if_available
 fi
 
 # Step 2: Nix store GC.
-if [ "$skip_nix_gc" = false ]; then
+if [ "$do_nix_gc" = true ]; then
   run_nix_gc_if_available
 fi
 
 # Step 3: stale wallpaper cleanup (independent of Nix).
-if [ "$skip_wallpaper_prune" = false ]; then
+if [ "$do_wallpaper_prune" = true ]; then
   prune_stale_wallpapers
 fi
 
 # Step 4: tool cache prune (independent of Nix, runs last).
-if [ "$skip_tool_cache_prune" = false ]; then
+if [ "$do_tool_cache_prune" = true ]; then
   prune_tool_caches_if_available
 fi
 
 # Step 5: remove orphaned Ollama models not declared in the manifest.
-if [ "$skip_ollama_prune" = false ]; then
+if [ "$do_ollama_prune" = true ]; then
   prune_ollama_models_if_available
 fi
 
 # Step 6: remove stale VM artifacts (temporary builds, orphaned images).
-if [ "$skip_vm_prune" = false ]; then
+if [ "$do_vm_prune" = true ]; then
   prune_vm_artifacts_if_present
 fi
 
 # Step 7: Scoop cache cleanup (accepted but ignored on POSIX; Windows-only).
 # This flag exists for cross-platform CLI parity with the Windows gc.ps1 script.
-if [ "$skip_scoop_cleanup" = true ]; then
+if [ "$do_scoop_cleanup" = false ]; then
   :
 fi
 

@@ -59,19 +59,19 @@
 
 .EXAMPLE
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus"
-  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -SkipToolCachePrune
+  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -WithoutToolCachePrune
 #>
 [CmdletBinding()]
 param(
   [string]$ModuleDir = '',
   [string]$RepoRoot = '',
-  [switch]$SkipNixGc,
-  [switch]$SkipHmGc,
-  [switch]$SkipToolCachePrune,
-  [switch]$SkipOllamaPrune,
-  [switch]$SkipScoopCleanup,
-  [switch]$SkipWallpaperPrune,
-  [switch]$SkipVMPrune
+  [switch]$WithoutNixGc,
+  [switch]$WithoutHmGc,
+  [switch]$WithoutToolCachePrune,
+  [switch]$WithoutOllamaPrune,
+  [switch]$WithoutScoopCleanup,
+  [switch]$WithoutWallpaperPrune,
+  [switch]$WithoutVMPrune
 )
 
 $ErrorActionPreference = "Stop"
@@ -90,13 +90,13 @@ if ([string]::IsNullOrWhiteSpace($ModuleDir)) {
   $ModuleDir = Join-Path $RepoRoot 'src\hosts\Windows\modules'
 }
 
-# -SkipNixGc and -SkipHmGc are accepted but ignored on Windows (POSIX-only
+# -WithoutNixGc and -WithoutHmGc are accepted but ignored on Windows (POSIX-only
 # options from gc.sh). Accepted for cross-platform CLI parity.
-if ($SkipNixGc) {
-  Write-Warning "gc: -SkipNixGc accepted but ignored on Windows (POSIX-only)"
+if ($WithoutNixGc) {
+  Write-Warning "gc: -WithoutNixGc accepted but ignored on Windows (POSIX-only)"
 }
-if ($SkipHmGc) {
-  Write-Warning "gc: -SkipHmGc accepted but ignored on Windows (POSIX-only)"
+if ($WithoutHmGc) {
+  Write-Warning "gc: -WithoutHmGc accepted but ignored on Windows (POSIX-only)"
 }
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
@@ -160,7 +160,7 @@ function Remove-VMPruneItem {
 # Keeps the decrypted gallery in sync with declarative source blobs.  Without
 # this, removed or renamed wallpaper assets leave orphaned decrypted files on
 # disk that continue to appear in the rotation.
-if (-not $SkipWallpaperPrune) {
+if (-not $WithoutWallpaperPrune) {
   $wallpaperAssetsDir = Join-Path -Path $resolvedRepoRoot -ChildPath "src\assets\wallpapers"
   $wallpaperOutputDir = Join-Path -Path $env:USERPROFILE   -ChildPath "Pictures\wallpapers"
   Remove-StaleWallpaper -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
@@ -173,7 +173,7 @@ if (-not $SkipWallpaperPrune) {
 # space for both system and devShell use without touching project-managed
 # dependencies. rustc has no standalone cache tree; its transient artifacts are
 # cleaned via cargo-cache and rustup's tmp directory.
-if (-not $SkipToolCachePrune) {
+if (-not $WithoutToolCachePrune) {
   $bunCacheDir = Join-Path $HOME ".bun\install\cache"
   $cargoBinstallCacheDir = Join-Path $env:LOCALAPPDATA "cargo-binstall\cache"
   $rustupTmpDir = Join-Path $HOME ".rustup\tmp"
@@ -210,7 +210,7 @@ if (-not $SkipToolCachePrune) {
 # Scoop retains by default, reclaiming disk space after updates.
 # Guarded by a shim presence check because Scoop may not be installed on
 # minimal setups or before the first apply.ps1 run.
-if (-not $SkipScoopCleanup) {
+if (-not $WithoutScoopCleanup) {
   $scoopShims = Join-Path $env:USERPROFILE "scoop\shims"
   $scoopCmd   = Join-Path $scoopShims "scoop.cmd"
   if (-not (Test-Path $scoopCmd)) {
@@ -232,7 +232,7 @@ if (-not $SkipScoopCleanup) {
 # manifest at src/modules/ai/models.json.  Uses -PruneOnly so GC never
 # triggers multi-GB model pulls — only space reclamation.  Guarded by an
 # ollama presence check so this step is a no-op before Ollama is installed.
-if (-not $SkipOllamaPrune) {
+if (-not $WithoutOllamaPrune) {
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
     Write-Output "gc: ollama not installed; skipping ollama model prune"
@@ -246,7 +246,7 @@ if (-not $SkipOllamaPrune) {
 # no longer declared in src/modules/VMs.json.
 # WHY: VM disk images are large (multi-gigabyte);
 # clearing stale files keeps disk usage bounded and VM provisioning fast.
-if (-not $SkipVMPrune) {
+if (-not $WithoutVMPrune) {
   $vmDir = Join-Path $env:USERPROFILE "virtual machines"
   $imagesDir = Join-Path $vmDir "images"
   $manifest = Join-Path $resolvedRepoRoot "src\modules\VMs.json"
