@@ -217,27 +217,10 @@ param(
   [string]$PrimaryUsername = [System.Environment]::UserName,
   [Parameter(Mandatory)]
   [string[]]$Users,
-  [bool]$EnableAgentsConfigParity = $true,
-  [bool]$EnableAgentsSkillsParity = $true,
-  [bool]$EnableAgentsClawHubSkillsParity = $true,
-  [bool]$EnableSecretsParity = $true,
-  [bool]$EnableBunParity = $true,
-  [bool]$EnableCloudDrivesParity = $true,
-  [bool]$EnableCustomProvisionSymlinkParity = $true,
-  [bool]$EnableGitSshParity = $true,
-  [bool]$EnableHostAgeKeyRegistration = $true,
-  [bool]$EnablePowerParity = $true,
-  [bool]$EnablePicardParity = $true,
-  [bool]$EnableObsidianParity = $true,
-  [bool]$EnableQtPassParity = $true,
-  [bool]$EnableRdpParity = $true,
-  [bool]$EnableRemoteAccessParity = $true,
-  [bool]$EnableShellParity = $true,
-  [bool]$EnableDevDirectoryParity = $true,
-  [bool]$EnableDevReposParity = $null,
-  [bool]$EnableVsCodeExtensionsParity = $true,
-  [bool]$EnableVsCodeSettingsParity = $true,
-  [bool]$EnableVsCodeWorkspaceTrustParity = $true,
+  [switch]$SkipOptionalParity,
+  [switch]$SkipSecretsParity,
+  [switch]$SkipUserStateParity,
+  [switch]$SkipSystemParity,
   [int]$MinFreeDiskGB = 10,
   [switch]$SkipAISync,
   [switch]$ReplicaSync,
@@ -247,6 +230,40 @@ param(
 
 $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
+
+# Compute effective Enable-* values from high-level skip flags.
+# These internal variables preserve backward compatibility with downstream
+# sections that check individual flags while presenting a simpler CLI surface.
+$skipOptionalParity = $SkipOptionalParity
+$skipSecretsParity = $SkipSecretsParity -or $skipOptionalParity
+$skipUserStateParity = $SkipUserStateParity -or $skipOptionalParity
+$skipSystemParity = $SkipSystemParity -or $skipOptionalParity
+
+$EnableSecretsParity = -not $skipSecretsParity
+
+$EnableHostAgeKeyRegistration = -not $skipSystemParity
+$EnableRemoteAccessParity = -not $skipSystemParity
+$EnableRdpParity = -not $skipSystemParity
+$EnablePowerParity = -not $skipSystemParity
+
+$EnableAgentsConfigParity = -not $skipUserStateParity
+$EnableAgentsSkillsParity = -not $skipUserStateParity
+$EnableAgentsClawHubSkillsParity = -not $skipUserStateParity
+$EnableBunParity = -not $skipUserStateParity
+$EnableCloudDrivesParity = -not $skipUserStateParity
+$EnableCustomProvisionSymlinkParity = -not $skipUserStateParity
+$EnableGitSshParity = -not $skipUserStateParity
+$EnablePicardParity = -not $skipUserStateParity
+$EnableObsidianParity = -not $skipUserStateParity
+$EnableQtPassParity = -not $skipUserStateParity
+$EnableShellParity = -not $skipUserStateParity
+$EnableDevDirectoryParity = -not $skipUserStateParity
+# EnableDevReposParity defaults to $null (deferred to devRepos registry).
+# When user-state is skipped, force $false instead.
+$EnableDevReposParity = if ($skipUserStateParity) { $false } else { $null }
+$EnableVsCodeExtensionsParity = -not $skipUserStateParity
+$EnableVsCodeSettingsParity = -not $skipUserStateParity
+$EnableVsCodeWorkspaceTrustParity = -not $skipUserStateParity
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 $secretsModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "secrets"
