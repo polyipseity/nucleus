@@ -39,6 +39,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# macOS-only parameter; accepted for interface compatibility.
+$SkipBrew | Out-Null
+
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
 
 if (-not $SkipFlake -and (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue)) {
@@ -78,15 +81,17 @@ foreach ($secretFile in $secretFiles) {
   }
 }
 
-$wal-not $SkipSops -and (Test-Path -Path $wallpaperDir)repoRoot -ChildPath 'src\assets\wallpapers'
-if (Test-Path -Path $wallpaperDir) {
-  Get-ChildItem -Path $wallpaperDir -Filter '*.sops' -File | ForEach-Object {
-    & sops --config $sopsConfig updatekeys --yes $_.FullName
-    if ($LASTEXITCODE -ne 0) {
-      throw "nucleus: failed to rewrap wallpaper blob '$($_.FullName)'."
+  $wallpaperDir = Join-Path -Path $repoRoot -ChildPath 'src\assets\wallpapers'
+  if (Test-Path -Path $wallpaperDir) {
+    Get-ChildItem -Path $wallpaperDir -Filter '*.sops' -File | ForEach-Object {
+      & sops --config $sopsConfig updatekeys --yes $_.FullName
+      if ($LASTEXITCODE -ne 0) {
+        throw "nucleus: failed to rewrap wallpaper blob '$($_.FullName)'."
+      }
     }
   }
-  }
+
+  # Close if (-not $SkipSops).
 }
 
 Write-Output "$($PSStyle.Foreground.Green)nucleus: update workflow completed$($PSStyle.Reset)"
