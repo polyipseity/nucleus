@@ -466,6 +466,16 @@
         }/bin/nucleus-vm-setup";
       };
 
+      mkBootstrapApp = pkgs: {
+        type = "app";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-bootstrap";
+            text = builtins.readFile ../scripts/bootstrap.sh;
+          }
+        }/bin/nucleus-bootstrap";
+      };
+
     in
     {
       # -----------------------------------------------------------------------
@@ -480,6 +490,7 @@
         "${systems.mac}" = {
           ai-sync = mkAiSyncApp pkgsMac;
           apply = mkApplyApp pkgsMac;
+          bootstrap = mkBootstrapApp pkgsMac;
           darwin-rebuild = {
             type = "app";
             program = "${darwin.packages.${systems.mac}.darwin-rebuild}/bin/darwin-rebuild";
@@ -497,6 +508,7 @@
         "${systems.linux}" = {
           ai-sync = mkAiSyncApp pkgsLinux;
           apply = mkApplyApp pkgsLinux;
+          bootstrap = mkBootstrapApp pkgsLinux;
           home-manager = {
             type = "app";
             program = "${home-manager.packages.${systems.linux}.home-manager}/bin/home-manager";
