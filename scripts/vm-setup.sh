@@ -1992,11 +1992,10 @@ build_images
 
 printf 'vm-setup: phase 2 \u2014 provisioning VMs...\n'
 if [ -d "$VM_DIR/scripts" ]; then
-  for _prune_f in "$VM_DIR/scripts"/start-* "$VM_DIR/scripts"/configure-*; do
-    if [ -f "$_prune_f" ]; then
-      rm -f "$_prune_f"
-      printf 'vm-setup: removed stale start script: %s\n' "$_prune_f"
-    fi
+  for _prune_f in "$VM_DIR/scripts"/*.sh "$VM_DIR/scripts"/*.ps1; do
+    [ -f "$_prune_f" ] || continue
+    printf 'vm-setup: removed stale script: %s\n' "$_prune_f"
+    rm -f "$_prune_f"
   done
 fi
 _os=$(uname -s)

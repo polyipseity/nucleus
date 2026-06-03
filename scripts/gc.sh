@@ -327,22 +327,19 @@ prune_vm_artifacts_if_present() {
 
   # Prune stale start/configure scripts from scripts/ subfolder.
   if [ -d "$vm_dir/scripts" ]; then
-    for _gc_script in "$vm_dir"/scripts/start-* "$vm_dir"/scripts/configure-*; do
+    for _gc_script in "$vm_dir"/scripts/*.sh "$vm_dir"/scripts/*.ps1; do
       [ -f "$_gc_script" ] || continue
-      _gc_script_name="${_gc_script#*/start-}"
-      _gc_script_name="${_gc_script_name%.sh}"
-      _gc_script_name="${_gc_script_name%.ps1}"
-      if echo "$_gc_script" | grep -q '/configure-'; then
-        _gc_script_name="${_gc_script#*/configure-}"
-        _gc_script_name="${_gc_script_name%.sh}"
-        _gc_script_name="${_gc_script_name%.ps1}"
-      fi
-      if ! grep -Fxq "$_gc_script_name" "$declared_names_tmp"; then
-        printf '%s\n' "gc: removed stale VM script '$(basename "$_gc_script")'"
+      _gc_base="$(basename "$_gc_script")"
+      _gc_name="${_gc_base%.sh}"
+      _gc_name="${_gc_name%.ps1}"
+      _gc_name="${_gc_name#start-}"
+      _gc_name="${_gc_name#configure-}"
+      if ! grep -Fxq "$_gc_name" "$declared_names_tmp"; then
+        printf '%s\n' "gc: removed stale VM script '$_gc_base'"
         rm -f "$_gc_script"
       fi
     done
-    unset _gc_script _gc_script_name
+    unset _gc_script _gc_base _gc_name
   fi
 
   rm -f "$declared_names_tmp"

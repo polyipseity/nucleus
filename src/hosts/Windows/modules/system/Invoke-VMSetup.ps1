@@ -362,7 +362,7 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
     # Prune stale start scripts so removed VMs leave no orphaned files.
     $scriptsDir = Join-Path $vmDir 'scripts'
     if (Test-Path $scriptsDir) {
-        Remove-Item -Path (Join-Path $scriptsDir 'start-*'), (Join-Path $scriptsDir 'configure-*') -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path (Join-Path $scriptsDir '*.sh'), (Join-Path $scriptsDir '*.ps1') -Force -ErrorAction SilentlyContinue
     }
 
     foreach ($vm in $vmDef.VMs) {
