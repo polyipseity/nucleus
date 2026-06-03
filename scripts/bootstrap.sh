@@ -61,7 +61,7 @@ for _bsh_arg in "$@"; do
     --without-ai-sync)
       # Model pulls are 2–20 GB; suppress post-apply sync in CI or on
       # low-bandwidth connections.
-      do_ai_sync=true
+      do_ai_sync=false
       ;;
     --replica-sync)
       # Replica sync is skipped by default after apply; allow explicit opt-in.
