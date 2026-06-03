@@ -147,12 +147,12 @@
   the folder opens without a trust prompt.  False skips the write; no cleanup
   is needed because VS Code manages its own trust DB state.
 
-.PARAMETER SkipAISync
+.PARAMETER WithoutAISync
   When specified, suppresses the post-apply Ollama model sync step.  Useful in
   CI or on low-bandwidth connections where model pulls (2-20 GB each) are
   undesirable.
 
-.PARAMETER SkipReplicaSync
+.PARAMETER WithoutReplicaSync
   When specified, suppresses the post-apply cloud replica sync step.
 
 .PARAMETER ReplicaSync
@@ -185,11 +185,11 @@
 
 .EXAMPLE
   # Apply while skipping the post-apply Ollama model sync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -SkipAISync
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -WithoutAISync
 
 .EXAMPLE
   # Apply while skipping the post-apply replica sync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -SkipReplicaSync
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -WithoutReplicaSync
 
 .EXAMPLE
   # Apply and opt in to immediate post-apply replica sync:
@@ -217,14 +217,14 @@ param(
   [string]$PrimaryUsername = [System.Environment]::UserName,
   [Parameter(Mandatory)]
   [string[]]$Users,
-  [switch]$SkipOptionalParity,
-  [switch]$SkipSecretsParity,
-  [switch]$SkipUserStateParity,
-  [switch]$SkipSystemParity,
+  [switch]$WithoutOptionalParity,
+  [switch]$WithoutSecretsParity,
+  [switch]$WithoutUserStateParity,
+  [switch]$WithoutSystemParity,
   [int]$MinFreeDiskGB = 10,
-  [switch]$SkipAISync,
+  [switch]$WithoutAISync,
   [switch]$ReplicaSync,
-  [switch]$SkipReplicaSync,
+  [switch]$WithoutReplicaSync,
   [switch]$VMSetup
 )
 
@@ -234,36 +234,36 @@ if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 # Compute effective Enable-* values from high-level skip flags.
 # These internal variables preserve backward compatibility with downstream
 # sections that check individual flags while presenting a simpler CLI surface.
-$skipOptionalParity = $SkipOptionalParity
-$skipSecretsParity = $SkipSecretsParity -or $skipOptionalParity
-$skipUserStateParity = $SkipUserStateParity -or $skipOptionalParity
-$skipSystemParity = $SkipSystemParity -or $skipOptionalParity
+$withoutOptionalParity = $WithoutOptionalParity
+$withoutSecretsParity = $WithoutSecretsParity -or $withoutOptionalParity
+$withoutUserStateParity = $WithoutUserStateParity -or $withoutOptionalParity
+$withoutSystemParity = $WithoutSystemParity -or $withoutOptionalParity
 
-$EnableSecretsParity = -not $skipSecretsParity
+$EnableSecretsParity = -not $withoutSecretsParity
 
-$EnableHostAgeKeyRegistration = -not $skipSystemParity
-$EnableRemoteAccessParity = -not $skipSystemParity
-$EnableRdpParity = -not $skipSystemParity
-$EnablePowerParity = -not $skipSystemParity
+$EnableHostAgeKeyRegistration = -not $withoutSystemParity
+$EnableRemoteAccessParity = -not $withoutSystemParity
+$EnableRdpParity = -not $withoutSystemParity
+$EnablePowerParity = -not $withoutSystemParity
 
-$EnableAgentsConfigParity = -not $skipUserStateParity
-$EnableAgentsSkillsParity = -not $skipUserStateParity
-$EnableAgentsClawHubSkillsParity = -not $skipUserStateParity
-$EnableBunParity = -not $skipUserStateParity
-$EnableCloudDrivesParity = -not $skipUserStateParity
-$EnableCustomProvisionSymlinkParity = -not $skipUserStateParity
-$EnableGitSshParity = -not $skipUserStateParity
-$EnablePicardParity = -not $skipUserStateParity
-$EnableObsidianParity = -not $skipUserStateParity
-$EnableQtPassParity = -not $skipUserStateParity
-$EnableShellParity = -not $skipUserStateParity
-$EnableDevDirectoryParity = -not $skipUserStateParity
+$EnableAgentsConfigParity = -not $withoutUserStateParity
+$EnableAgentsSkillsParity = -not $withoutUserStateParity
+$EnableAgentsClawHubSkillsParity = -not $withoutUserStateParity
+$EnableBunParity = -not $withoutUserStateParity
+$EnableCloudDrivesParity = -not $withoutUserStateParity
+$EnableCustomProvisionSymlinkParity = -not $withoutUserStateParity
+$EnableGitSshParity = -not $withoutUserStateParity
+$EnablePicardParity = -not $withoutUserStateParity
+$EnableObsidianParity = -not $withoutUserStateParity
+$EnableQtPassParity = -not $withoutUserStateParity
+$EnableShellParity = -not $withoutUserStateParity
+$EnableDevDirectoryParity = -not $withoutUserStateParity
 # EnableDevReposParity defaults to $null (deferred to devRepos registry).
 # When user-state is skipped, force $false instead.
-$EnableDevReposParity = if ($skipUserStateParity) { $false } else { $null }
-$EnableVsCodeExtensionsParity = -not $skipUserStateParity
-$EnableVsCodeSettingsParity = -not $skipUserStateParity
-$EnableVsCodeWorkspaceTrustParity = -not $skipUserStateParity
+$EnableDevReposParity = if ($withoutUserStateParity) { $false } else { $null }
+$EnableVsCodeExtensionsParity = -not $withoutUserStateParity
+$EnableVsCodeSettingsParity = -not $withoutUserStateParity
+$EnableVsCodeWorkspaceTrustParity = -not $withoutUserStateParity
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 $secretsModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "secrets"
@@ -335,7 +335,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $wallpapersModuleDir -ChildPath "Sync-Wallpaper.ps1")
 $healthCheckScript = Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\scripts\health-check.ps1"
 if (Test-Path -Path $healthCheckScript) {
-  & $healthCheckScript -MinFreeGB $MinFreeDiskGB -SkipSecretTooling
+  & $healthCheckScript -MinFreeGB $MinFreeDiskGB -WithoutSecretHealth
 }
 
 # Load the user registry from src/hosts/Windows/users.json. This declarative
@@ -646,8 +646,8 @@ Write-Output "-------------------------------------------"
 # avoid blocking earlier configuration steps.  The sync is best-effort: a
 # missing or unreachable ollama binary is informational, not a hard failure,
 # because the system configuration has already been applied successfully.
-if ($SkipAISync) {
-  Write-Output "ai-sync: -SkipAISync set; skipping post-apply model sync"
+if ($WithoutAISync) {
+  Write-Output "ai-sync: -WithoutAISync set; skipping post-apply model sync"
 } else {
   $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaOnPath) {
@@ -661,9 +661,9 @@ if ($SkipAISync) {
 # Converge enabled cloud replicas from users.json as the final post-apply step.
 # This is best-effort: replica sync can be long-running and should not
 # retroactively fail a completed configuration convergence.
-$runReplicaSync = $ReplicaSync -and (-not $SkipReplicaSync)
-if ($ReplicaSync -and $SkipReplicaSync) {
-  throw "Conflicting arguments: -ReplicaSync and -SkipReplicaSync cannot be used together."
+$runReplicaSync = $ReplicaSync -and (-not $WithoutReplicaSync)
+if ($ReplicaSync -and $WithoutReplicaSync) {
+  throw "Conflicting arguments: -ReplicaSync and -WithoutReplicaSync cannot be used together."
 }
 
 if (-not $runReplicaSync) {

@@ -41,13 +41,13 @@
 #
 # After the main apply command succeeds, scripts/ai-sync.sh is called to
 # converge locally installed Ollama models with the declarative manifest.
-# Pass --skip-ai-sync to suppress the model sync step — useful in CI or on
+# Pass --without-ai-sync to suppress the model sync step — useful in CI or on
 # low-bandwidth connections where model pulls (2–20 GB each) are undesirable.
 #
 # Arguments:
-#   --skip-ai-sync  skip the post-apply Ollama model sync step
-#   --replica-sync  run the post-apply cloud replica sync step (opt-in)
-#   --vm-setup      run the post-apply VM setup step (opt-in)
+#   --without-ai-sync  skip the post-apply Ollama model sync step
+#   --replica-sync     run the post-apply cloud replica sync step (opt-in)
+#   --vm-setup         run the post-apply VM setup step (opt-in)
 #   --target-user   select the Home Manager flake profile key on standalone
 #                   Linux hosts (ignored on Darwin and NixOS system rebuilds)
 #
@@ -66,15 +66,15 @@ set -eu
 # ---------------------------------------------------------------------------
 usage() {
   cat <<'USAGE_EOF'
-Usage: apply.sh [--skip-ai-sync] [--replica-sync] [--vm-setup] [--target-user=<name>]
+Usage: apply.sh [--without-ai-sync] [--replica-sync] [--vm-setup] [--target-user=<name>]
 
 Dispatch the Nix apply command for the current host.
 
 Options:
-  -h, --help         Show this help message and exit
-  --skip-ai-sync     Skip the post-apply Ollama model sync step
-  --replica-sync     Run the post-apply cloud replica sync step (opt-in)
-  --vm-setup         Run the post-apply VM setup step (opt-in)
+  -h, --help            Show this help message and exit
+  --without-ai-sync     Skip the post-apply Ollama model sync step
+  --replica-sync        Run the post-apply cloud replica sync step (opt-in)
+  --vm-setup            Run the post-apply VM setup step (opt-in)
   --target-user      Select the Home Manager flake profile key on standalone
                      Linux hosts (ignored on Darwin and NixOS system rebuilds)
 USAGE_EOF
@@ -84,8 +84,8 @@ USAGE_EOF
 # ---------------------------------------------------------------------------
 # Flag parsing
 # ---------------------------------------------------------------------------
-skip_ai_sync=false
-skip_replica_sync=true
+do_ai_sync=true
+do_replica_sync=false
 vm_setup=false
 target_user=""
 _aas_expect_target_user=false
@@ -102,15 +102,15 @@ for _arg in "$@"; do
   fi
 
   case "$_arg" in
-    --skip-ai-sync)
+    --without-ai-sync)
       # Model pulls are 2–20 GB and may be undesirable in CI or on
       # low-bandwidth connections; this flag opts out of the post-apply sync.
-      skip_ai_sync=true
+      do_ai_sync=false
       ;;
     --replica-sync)
       # Replica sync is slow for large trees and skipped by default after
       # apply; this flag opts in to immediate post-apply convergence.
-      skip_replica_sync=false
+      do_replica_sync=true
       ;;
 
     --vm-setup)
@@ -274,8 +274,8 @@ run_ai_sync() {
   #   bundled into the app closure via siblingScripts in mkApplyApp.  The
   #   script's runtimeInputs (jq) are resolved at build time, so apply.sh
   #   does not need to know the repository layout.
-  if [ "$skip_ai_sync" = true ]; then
-    printf '%s\n' "ai-sync: --skip-ai-sync set; skipping post-apply model sync"
+  if [ "$do_ai_sync" = false ]; then
+    printf '%s\n' "ai-sync: --without-ai-sync set; skipping post-apply model sync"
     return
   fi
 
@@ -381,7 +381,7 @@ run_replica_sync() {
   # Why best-effort: replica convergence is additive and may involve large
   # transfers. A replica error should not retroactively fail a completed
   # system apply.
-  if [ "$skip_replica_sync" = true ]; then
+  if [ "$do_replica_sync" = false ]; then
     printf '%s\n' "replica-sync: skipping post-apply replica sync (default; pass --replica-sync to run now)"
     return
   fi
