@@ -301,6 +301,16 @@ prune_vm_artifacts_if_present() {
     fi
   done
 
+  # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
+  if [ -d "$images_dir" ]; then
+    for _gc_packer_tmp in "$images_dir"/.??*; do
+      [ -d "$_gc_packer_tmp" ] || continue
+      printf 'gc: removing stale Packer temporary build directory: %s\n' "${_gc_packer_tmp##*/}" >&2
+      rm -rf "$_gc_packer_tmp"
+    done
+    unset _gc_packer_tmp
+  fi
+
   # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
   for qcow2_file in "$images_dir"/*.qcow2; do
     if [ -f "$qcow2_file" ]; then

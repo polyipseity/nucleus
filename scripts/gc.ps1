@@ -244,6 +244,13 @@ if (-not $SkipVMPrune) {
         Remove-VMPruneItem -Item $_ -Label "temporary VM build directory" -Recurse
       }
 
+      # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
+      if (Test-Path -LiteralPath $imagesDir -PathType Container) {
+        Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^\..+' } | ForEach-Object {
+          Remove-VMPruneItem -Item $_ -Label "stale Packer temporary build directory" -Recurse
+        }
+      }
+
       # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*.qcow2" -File -ErrorAction SilentlyContinue | ForEach-Object {
         $imageName = $_.BaseName
