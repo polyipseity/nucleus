@@ -286,6 +286,16 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
     # Phase 1 — Build images (if absent)
     # -------------------------------------------------------------------------
 
+    # Prune orphaned dot-prefixed Packer build temp dirs from the images dir.
+    if (Test-Path -LiteralPath $imagesDir -PathType Container) {
+        Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like '.*' } |
+            ForEach-Object {
+                Remove-Item $_.FullName -Recurse -Force
+                Write-Information "vm-setup: removing stale temporary build directory: $($_.Name)"
+            }
+    }
+
     foreach ($vm in $vmDef.VMs) {
         if (-not (Test-VMEnabled -Vm $vm)) {
             Write-Information "vm-setup: VM '$($vm.name)' is disabled in manifest; skipping"

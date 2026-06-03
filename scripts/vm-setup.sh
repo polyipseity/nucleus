@@ -1436,7 +1436,27 @@ build_macos_image() {
   printf 'vm-setup: macOS VM "%s" built and registered in tart\n' "$_name"
 }
 
+# prune_stale_build_dirs
+#   Removes orphaned dot-prefixed Packer build temporary directories that may
+#   have been left behind by interrupted or crashed builds.
+prune_stale_build_dirs() {
+  if [ ! -d "$IMAGES_DIR" ]; then
+    return 0
+  fi
+
+  for _dir in "$IMAGES_DIR"/.??*; do
+    if [ "$_dir" = "$IMAGES_DIR/." ] || [ "$_dir" = "$IMAGES_DIR/.." ]; then
+      continue
+    fi
+    if [ -d "$_dir" ]; then
+      printf 'vm-setup: removing stale temporary build directory: %s\n' "$_dir"
+      rm -rf "$_dir"
+    fi
+  done
+}
+
 build_images() {
+  prune_stale_build_dirs
   _count="$(jq '.VMs | length' "$MANIFEST")"
   _i=0
   while [ "$_i" -lt "$_count" ]; do
