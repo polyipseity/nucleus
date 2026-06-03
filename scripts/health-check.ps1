@@ -11,7 +11,7 @@
 .PARAMETER MinFreeGB
   Minimum free disk space (GiB) required on the system drive.
 
-.PARAMETER SkipSecretHealth
+.PARAMETER WithoutSecretHealth
   Skip validation of sops/gpg executable availability.
 
 .EXAMPLE
@@ -21,7 +21,7 @@
   .\health-check.ps1 -MinFreeGB 20
 
 .EXAMPLE
-  .\health-check.ps1 -SkipSecretHealth
+  .\health-check.ps1 -WithoutSecretHealth
 #>
 [CmdletBinding()]
 param(
@@ -29,7 +29,7 @@ param(
   [int]$MinFreeGB = 10,
 
   [Parameter()]
-  [switch]$SkipSecretHealth
+  [switch]$WithoutSecretHealth
 )
 
 $ErrorActionPreference = 'Stop'
@@ -105,7 +105,7 @@ function Test-SecretTooling {
 
 Test-DiskSpace -RequiredGiB $MinFreeGB
 Test-Connectivity
-if (-not $SkipSecretHealth) {
+if (-not $WithoutSecretHealth) {
   Test-SecretTooling
 }
 

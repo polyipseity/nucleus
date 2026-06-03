@@ -14,9 +14,9 @@
 .PARAMETER ApplyArgs
   Optional arguments passed through to src/hosts/Windows/apply.ps1.
 
-.PARAMETER SkipAISync
+.PARAMETER WithoutAISync
   Suppresses the post-apply Ollama model sync step. Forwarded to apply.ps1 as
-  -SkipAISync when -Apply is used. Also accepted on POSIX as --skip-ai-sync.
+  -WithoutAISync when -Apply is used. Also accepted on POSIX as --without-ai-sync.
 
 .PARAMETER ReplicaSync
   Run the post-apply cloud replica sync step. Forwarded to apply.ps1 as
@@ -43,7 +43,7 @@
   Install dependencies, then show help for the apply script.
 
 .EXAMPLE
-  .\bootstrap.ps1 -Apply -SkipAISync
+  .\bootstrap.ps1 -Apply -WithoutAISync
   Install dependencies and run apply, skipping AI model sync.
 #>
 [CmdletBinding()]
@@ -56,7 +56,7 @@ param(
   [string[]]$ApplyArgs,
 
   [Parameter()]
-  [switch]$SkipAISync,
+  [switch]$WithoutAISync,
 
   [Parameter()]
   [switch]$ReplicaSync,
@@ -315,7 +315,7 @@ if ($Apply) {
   }
 
   # Cross-platform CLI parity: forward flags that apply.ps1 accepts.
-  if ($SkipAISync) { $effectiveApplyArgs += "-SkipAISync" }
+  if ($WithoutAISync) { $effectiveApplyArgs += "-WithoutAISync" }
   if ($ReplicaSync) { $effectiveApplyArgs += "-ReplicaSync" }
   # TargetUser is POSIX-only (nix apply --target-user); accepted but not
   # forwarded on Windows since apply.ps1 does not implement this param.
