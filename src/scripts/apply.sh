@@ -260,26 +260,25 @@ run_ai_sync() {
   #   a missing model does not break any declared system state.  Treating a
   #   sync failure as fatal would roll back a successful system apply.
   #
-  # Why resolve from REPO_ROOT rather than $SCRIPT_DIR:
-  #   When running via `nix run .#apply`, $SCRIPT_DIR points into the Nix
-  #   store where scripts/ai-sync.sh does not exist.  REPO_ROOT is derived
-  #   from `git rev-parse --show-toplevel` and always refers to the live
-  #   working tree.
-  #
   # Why detect ollama from $PATH rather than adding it to runtimeInputs:
   #   ollama is a user-installed daemon managed declaratively by the AI
   #   module (src/modules/ai/default.nix and hosts/NixOS/ai.nix).  Bundling
   #   it in runtimeInputs would create a second, potentially different binary
   #   that could mismatch the running server's version.  PATH detection keeps
   #   the sync aligned with the actual runtime binary.
+  #
+  # Why lookup nucleus-ai-sync from $PATH rather than REPO_ROOT:
+  #   When running via `nix run .#apply`, the nucleus-ai-sync command is
+  #   bundled into the app closure via siblingScripts in mkApplyApp.  The
+  #   script's runtimeInputs (jq) are resolved at build time, so apply.sh
+  #   does not need to know the repository layout.
   if [ "$skip_ai_sync" = true ]; then
     printf '%s\n' "ai-sync: --skip-ai-sync set; skipping post-apply model sync"
     return
   fi
 
-  _ras_script="$REPO_ROOT/scripts/ai-sync.sh"
-  if [ ! -f "$_ras_script" ]; then
-    printf '%s\n' "ai-sync: scripts/ai-sync.sh not found at $_ras_script; skipping model sync"
+  if ! command -v nucleus-ai-sync >/dev/null 2>&1; then
+    printf '%s\n' "ai-sync: nucleus-ai-sync not found in PATH; skipping model sync"
     return
   fi
 
@@ -289,8 +288,8 @@ run_ai_sync() {
   fi
 
   printf '%s\n' "ai-sync: running post-apply AI model sync..."
-  if ! sh "$_ras_script"; then
-    printf '%s\n' "ai-sync: ai-sync.sh exited with an error; model sync incomplete (system apply succeeded)" >&2
+  if ! nucleus-ai-sync; then
+    printf '%s\n' "ai-sync: nucleus-ai-sync exited with an error; model sync incomplete (system apply succeeded)" >&2
   fi
 }
 
@@ -307,20 +306,25 @@ run_vm_setup() {
   # Why best-effort:
   #   A VM disk or registration error should not retroactively fail a completed
   #   system apply.
+  #
+  # Why lookup nucleus-vm-setup from $PATH rather than REPO_ROOT:
+  #   When running via `nix run .#apply`, the nucleus-vm-setup command is
+  #   bundled into the app closure via siblingScripts in mkApplyApp.  The
+  #   script's runtimeInputs (jq) are resolved at build time, so apply.sh
+  #   does not need to know the repository layout.
   if [ "$vm_setup" = false ]; then
     printf '%s\n' "vm-setup: --vm-setup not set; skipping post-apply VM provisioning"
     return
   fi
 
-  _rvs_script="$REPO_ROOT/scripts/vm-setup.sh"
-  if [ ! -f "$_rvs_script" ]; then
-    printf '%s\n' "vm-setup: scripts/vm-setup.sh not found at $_rvs_script; skipping VM setup"
+  if ! command -v nucleus-vm-setup >/dev/null 2>&1; then
+    printf '%s\n' "vm-setup: nucleus-vm-setup not found in PATH; skipping VM setup"
     return
   fi
 
   printf '%s\n' "vm-setup: running post-apply VM provisioning..."
-  if ! sh "$_rvs_script"; then
-    printf '%s\n' "vm-setup: vm-setup.sh exited with an error; VM setup incomplete (system apply succeeded)" >&2
+  if ! nucleus-vm-setup; then
+    printf '%s\n' "vm-setup: nucleus-vm-setup exited with an error; VM setup incomplete (system apply succeeded)" >&2
   fi
 }
 

@@ -246,11 +246,26 @@
           # dirname-based resolution finds them.
           # Explicit target names avoid hash-prefixed basenames from Nix single-
           # file store paths (e.g. /nix/store/hash-generate-ssh-host-key.sh).
+          # ai-sync and vm-setup commands bundled as writeShellApplication so
+          # apply.sh can call `nucleus-ai-sync` / `nucleus-vm-setup` from PATH
+          # with their runtimeInputs (jq) resolved at build time.
+          aiSyncDrv = pkgs.writeShellApplication {
+            name = "nucleus-ai-sync";
+            runtimeInputs = [ pkgs.jq ];
+            text = builtins.readFile ../scripts/ai-sync.sh;
+          };
+          vmSetupDrv = pkgs.writeShellApplication {
+            name = "nucleus-vm-setup";
+            runtimeInputs = [ pkgs.jq ];
+            text = builtins.readFile ../scripts/vm-setup.sh;
+          };
           siblingScripts = pkgs.runCommand "apply-siblings" { } ''
             mkdir -p "$out/bin"
             install -m755 "${./scripts/generate-ssh-host-key.sh}" "$out/bin/generate-ssh-host-key.sh"
             install -m755 "${./scripts/register-host-age-key.sh}" "$out/bin/register-host-age-key.sh"
             install -m755 "${./scripts/install-prek-hooks.sh}" "$out/bin/install-prek-hooks.sh"
+            install -m755 "${aiSyncDrv}/bin/nucleus-ai-sync" "$out/bin/nucleus-ai-sync"
+            install -m755 "${vmSetupDrv}/bin/nucleus-vm-setup" "$out/bin/nucleus-vm-setup"
           '';
           applyDrv = pkgs.symlinkJoin {
             name = "nucleus-apply";
@@ -416,6 +431,41 @@
         }/bin/nucleus-replica-reset";
       };
 
+      # Build AI model sync app for POSIX hosts.
+      # Resolves the active model profile from the host OS, pulls manifest models
+      # not yet installed, and removes models absent from the manifest.
+      # jq is bundled so the manifest JSON is always parseable regardless of
+      # host PATH.
+      mkAiSyncApp = pkgs: {
+        type = "app";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-ai-sync";
+            runtimeInputs = [
+              pkgs.jq
+            ];
+            text = builtins.readFile ../scripts/ai-sync.sh;
+          }
+        }/bin/nucleus-ai-sync";
+      };
+
+      # Build VM setup app for POSIX hosts.
+      # Builds VM disk images (if absent) and registers VMs for the current
+      # host.
+      # jq is bundled so the VMs manifest JSON is always parseable.
+      mkVMSetupApp = pkgs: {
+        type = "app";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-vm-setup";
+            runtimeInputs = [
+              pkgs.jq
+            ];
+            text = builtins.readFile ../scripts/vm-setup.sh;
+          }
+        }/bin/nucleus-vm-setup";
+      };
+
     in
     {
       # -----------------------------------------------------------------------
@@ -428,6 +478,7 @@
       # -----------------------------------------------------------------------
       apps = {
         "${systems.mac}" = {
+          ai-sync = mkAiSyncApp pkgsMac;
           apply = mkApplyApp pkgsMac;
           darwin-rebuild = {
             type = "app";
@@ -441,8 +492,10 @@
           replica-sync = mkReplicaSyncApp pkgsMac;
           replica-reset = mkReplicaResetApp pkgsMac;
           update = mkUpdateApp pkgsMac;
+          vm-setup = mkVMSetupApp pkgsMac;
         };
         "${systems.linux}" = {
+          ai-sync = mkAiSyncApp pkgsLinux;
           apply = mkApplyApp pkgsLinux;
           home-manager = {
             type = "app";
@@ -460,6 +513,7 @@
           replica-sync = mkReplicaSyncApp pkgsLinux;
           replica-reset = mkReplicaResetApp pkgsLinux;
           update = mkUpdateApp pkgsLinux;
+          vm-setup = mkVMSetupApp pkgsLinux;
         };
       };
 
