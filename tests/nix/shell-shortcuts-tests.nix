@@ -84,9 +84,13 @@ let
       && lib.hasInfix "`-nx` — run `bun x`." text
       && lib.hasInfix "`nucleus-ai-sync` — run the managed AI model sync flow." text
       && lib.hasInfix "`nucleus-apply` — run the managed apply flow." text
+      && lib.hasInfix "`nucleus-cloud-setup` — configure required cloud remotes and re-run apply." text
       && lib.hasInfix "`nucleus-gc` — run the managed Nix garbage-collection flow." text
       && lib.hasInfix "`nucleus-health-check` — run the managed repository health checks." text
+      && lib.hasInfix "`nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas." text
+      && lib.hasInfix "`nucleus-replica-reset` — clear local replica state without touching remote data." text
       && lib.hasInfix "`nucleus-update` — run the managed repository update flow." text
+      && lib.hasInfix "`nucleus-vm-setup` — build (if needed) and provision" text
     )
     [
       macManualText
