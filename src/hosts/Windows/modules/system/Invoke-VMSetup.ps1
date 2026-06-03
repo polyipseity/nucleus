@@ -241,7 +241,7 @@ function Invoke-VMSetup {
     $vmDef     = Get-Content $manifest -Raw | ConvertFrom-Json
     $vmsDir      = Join-Path $RepoRoot 'src\vms'
     $templatesDir = Join-Path $vmsDir 'templates'
-    $vmDir       = Join-Path $env:USERPROFILE 'virtual machines'
+    $vmDir       = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
     $imagesDir   = Join-Path $vmDir 'images'
     try {
         $guestCredential = Resolve-VMGuestCredential -RepoRoot $RepoRoot
@@ -272,7 +272,7 @@ function Invoke-VMSetup {
     if ($DryRun) {
         Write-Information "vm-setup: [dry-run] Write VM directory guide: $vmReadmePath"
     } elseif (Test-Path -LiteralPath $vmReadmeTemplate -PathType Leaf) {
-        $vmDirShort = '%USERPROFILE%\virtual machines'
+        $vmDirShort = $vmDir -replace [regex]::Escape($env:USERPROFILE), '%USERPROFILE%'
         $imagesDirShort = "$vmDirShort\images"
         (Get-Content -Path $vmReadmeTemplate -Raw) `
             -replace '\{\{VM_DIR_DISPLAY\}\}', $vmDirShort `
