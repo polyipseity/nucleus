@@ -165,7 +165,7 @@ let
   # consume the exact same extension payload via per-extension symlinks in the
   # vsCodeExtensionBridge activation.
   extensionStore = pkgs.symlinkJoin {
-    name = "nucleus-vscode-extensions";
+    name = "vscode-extensions";
     paths = sharedExtensions;
   };
 

@@ -41,7 +41,7 @@ in
         # macOS app frameworks discover user fonts in ~/Library/Fonts. Linking
         # this directory to the Nix-managed aggregate keeps typography
         # declarative while avoiding per-font imperative installs.
-        "Library/Fonts/nucleus-open-source".source = "${darwinFontStore}/share/fonts";
+        "Library/Fonts/open-source-fonts".source = "${darwinFontStore}/share/fonts";
       };
     }
 

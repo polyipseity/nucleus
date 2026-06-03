@@ -246,7 +246,7 @@
           # dirname-based resolution finds them.
           # Explicit target names avoid hash-prefixed basenames from Nix single-
           # file store paths (e.g. /nix/store/hash-generate-ssh-host-key.sh).
-          siblingScripts = pkgs.runCommand "nucleus-apply-siblings" { } ''
+          siblingScripts = pkgs.runCommand "apply-siblings" { } ''
             mkdir -p "$out/bin"
             install -m755 "${./scripts/generate-ssh-host-key.sh}" "$out/bin/generate-ssh-host-key.sh"
             install -m755 "${./scripts/register-host-age-key.sh}" "$out/bin/register-host-age-key.sh"
