@@ -46,7 +46,6 @@
 # Arguments:
 #   --skip-ai-sync  skip the post-apply Ollama model sync step
 #   --replica-sync  run the post-apply cloud replica sync step (opt-in)
-#   --skip-replica-sync  skip the post-apply cloud replica sync step
 #   --target-user   select the Home Manager flake profile key on standalone
 #                   Linux hosts (ignored on Darwin and NixOS system rebuilds)
 #
@@ -91,11 +90,7 @@ for _arg in "$@"; do
       # apply; this flag opts in to immediate post-apply convergence.
       skip_replica_sync=false
       ;;
-    --skip-replica-sync)
-      # Replica sync can be time-consuming for large datasets; this flag opts
-      # out of the post-apply replica convergence step.
-      skip_replica_sync=true
-      ;;
+
     --vm-setup)
       # VM setup provisions QEMU disk images and registers VMs (UTM on macOS,
       # libvirt on NixOS).  Skipped by default after apply because disk
