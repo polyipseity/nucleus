@@ -152,15 +152,12 @@
   CI or on low-bandwidth connections where model pulls (2-20 GB each) are
   undesirable.
 
-.PARAMETER WithoutReplicaSync
-  When specified, suppresses the post-apply cloud replica sync step.
-
-.PARAMETER ReplicaSync
+.PARAMETER WithReplicaSync
   Run the post-apply cloud replica sync step. By default apply skips replica
   sync to avoid long blocking runs; a scheduled daily sync already converges
   replicas.
 
-.PARAMETER VMSetup
+.PARAMETER WithVMSetup
   When specified, runs the post-apply VM provisioning step to create QCOW2
   disk images and QEMU start scripts for VMs declared in src/modules/VMs.json.
   Skipped by default because disk pre-allocation is slow and only required on
@@ -188,12 +185,8 @@
   .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -WithoutAISync
 
 .EXAMPLE
-  # Apply while skipping the post-apply replica sync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -WithoutReplicaSync
-
-.EXAMPLE
   # Apply and opt in to immediate post-apply replica sync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -ReplicaSync
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -WithReplicaSync
 
 .EXAMPLE
   # Apply while disabling machine age key auto-registration in .sops.yaml:
@@ -223,9 +216,8 @@ param(
   [switch]$WithoutSystemParity,
   [int]$MinFreeDiskGB = 10,
   [switch]$WithoutAISync,
-  [switch]$ReplicaSync,
-  [switch]$WithoutReplicaSync,
-  [switch]$VMSetup
+  [switch]$WithReplicaSync,
+  [switch]$WithVMSetup
 )
 
 $ErrorActionPreference = "Stop"
@@ -661,13 +653,9 @@ if ($WithoutAISync) {
 # Converge enabled cloud replicas from users.json as the final post-apply step.
 # This is best-effort: replica sync can be long-running and should not
 # retroactively fail a completed configuration convergence.
-$runReplicaSync = $ReplicaSync -and (-not $WithoutReplicaSync)
-if ($ReplicaSync -and $WithoutReplicaSync) {
-  throw "Conflicting arguments: -ReplicaSync and -WithoutReplicaSync cannot be used together."
-}
 
-if (-not $runReplicaSync) {
-  Write-Output "replica-sync: skipping post-apply replica sync (default; pass -ReplicaSync to run now)"
+if (-not $WithReplicaSync) {
+  Write-Output "replica-sync: skipping post-apply replica sync (default; pass -WithReplicaSync to run now)"
 } else {
   # Presence probe: rclone may be absent on first-provision hosts.
   $rcloneOnPath = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
@@ -686,8 +674,8 @@ if (-not $runReplicaSync) {
 # Provision VM disk images and QEMU start scripts for VMs declared in VMs.json.
 # This is best-effort: a VM setup failure should not retroactively fail a
 # completed configuration apply.
-if (-not $VMSetup) {
-  Write-Output "vm-setup: -VMSetup not set; skipping post-apply VM provisioning"
+if (-not $WithVMSetup) {
+  Write-Output "vm-setup: -WithVMSetup not set; skipping post-apply VM provisioning"
 } else {
   Write-Output "vm-setup: running post-apply VM provisioning..."
   try {
