@@ -204,6 +204,7 @@
 param(
   [string]$ConfigDir = $PSScriptRoot,
   [string[]]$ConfigFiles = @("system.dsc.yml", "user.dsc.yml"),
+  [Alias("h")]
   [switch]$Help,
   [Parameter(Mandatory)]
   [string]$ModuleDir,
