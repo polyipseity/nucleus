@@ -14,6 +14,19 @@
 .PARAMETER ApplyArgs
   Optional arguments passed through to src/hosts/Windows/apply.ps1.
 
+.PARAMETER SkipAISync
+  Suppresses the post-apply Ollama model sync step. Forwarded to apply.ps1 as
+  -SkipAISync when -Apply is used. Also accepted on POSIX as --skip-ai-sync.
+
+.PARAMETER ReplicaSync
+  Run the post-apply cloud replica sync step. Forwarded to apply.ps1 as
+  -ReplicaSync when -Apply is used. Also accepted on POSIX as --replica-sync.
+
+.PARAMETER TargetUser
+  Accepted for cross-platform CLI parity. Only effective on the POSIX apply
+  path (nix run .#apply -- --target-user=<name>). On Windows this flag is
+  accepted but ignored.
+
 .PARAMETER Help
   Show this help message and exit.
 
@@ -28,6 +41,10 @@
 .EXAMPLE
   .\bootstrap.ps1 -Apply -ApplyArgs -Help
   Install dependencies, then show help for the apply script.
+
+.EXAMPLE
+  .\bootstrap.ps1 -Apply -SkipAISync
+  Install dependencies and run apply, skipping AI model sync.
 #>
 [CmdletBinding()]
 param(
@@ -37,6 +54,15 @@ param(
 
   [Parameter()]
   [string[]]$ApplyArgs,
+
+  [Parameter()]
+  [switch]$SkipAISync,
+
+  [Parameter()]
+  [switch]$ReplicaSync,
+
+  [Parameter()]
+  [string]$TargetUser,
 
   [Alias("h")]
   [Parameter()]
@@ -286,6 +312,15 @@ if ($Apply) {
   if ($applyArgsText -notmatch "(?i)(^|\s)-ModuleDir(\s|$)") {
     $defaultModuleDir = Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\Windows\modules"
     $effectiveApplyArgs += @("-ModuleDir", $defaultModuleDir)
+  }
+
+  # Cross-platform CLI parity: forward flags that apply.ps1 accepts.
+  if ($SkipAISync) { $effectiveApplyArgs += "-SkipAISync" }
+  if ($ReplicaSync) { $effectiveApplyArgs += "-ReplicaSync" }
+  # TargetUser is POSIX-only (nix apply --target-user); accepted but not
+  # forwarded on Windows since apply.ps1 does not implement this param.
+  if ($TargetUser) {
+    Write-Debug "bootstrap: -TargetUser accepted but ignored on Windows (POSIX-only)"
   }
 
   $healthCheckPath = Join-Path -Path $PSScriptRoot -ChildPath "health-check.ps1"
