@@ -147,17 +147,17 @@
   the folder opens without a trust prompt.  False skips the write; no cleanup
   is needed because VS Code manages its own trust DB state.
 
-.PARAMETER WithoutAISync
+.PARAMETER NoAISync
   When specified, suppresses the post-apply Ollama model sync step.  Useful in
   CI or on low-bandwidth connections where model pulls (2-20 GB each) are
   undesirable.
 
-.PARAMETER WithReplicaSync
-  Run the post-apply cloud replica sync step. By default apply skips replica
-  sync to avoid long blocking runs; a scheduled daily sync already converges
-  replicas.
+.PARAMETER ReplicaSync
+  When specified, runs the post-apply cloud replica sync step.  By default
+  apply skips replica sync to avoid long blocking runs; a scheduled daily sync
+  already converges replicas.
 
-.PARAMETER WithVMSetup
+.PARAMETER VMSetup
   When specified, runs the post-apply VM provisioning step to create QCOW2
   disk images and QEMU start scripts for VMs declared in src/modules/VMs.json.
   Skipped by default because disk pre-allocation is slow and only required on
@@ -182,11 +182,11 @@
 
 .EXAMPLE
   # Apply while skipping the post-apply Ollama model sync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -WithoutAISync
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -NoAISync
 
 .EXAMPLE
   # Apply and opt in to immediate post-apply replica sync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -WithReplicaSync
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -ReplicaSync
 
 .EXAMPLE
   # Apply while disabling machine age key auto-registration in .sops.yaml:
@@ -211,14 +211,14 @@ param(
   [string]$PrimaryUsername = [System.Environment]::UserName,
   [Parameter(Mandatory)]
   [string[]]$Users,
-  [switch]$WithoutOptionalParity,
-  [switch]$WithoutSecretsParity,
-  [switch]$WithoutUserStateParity,
-  [switch]$WithoutSystemParity,
+  [switch]$NoOptionalParity,
+  [switch]$NoSecretsParity,
+  [switch]$NoUserStateParity,
+  [switch]$NoSystemParity,
   [int]$MinFreeDiskGB = 10,
-  [switch]$WithoutAISync,
-  [switch]$WithReplicaSync,
-  [switch]$WithVMSetup
+  [switch]$NoAISync,
+  [switch]$ReplicaSync,
+  [switch]$VMSetup
 )
 
 $ErrorActionPreference = "Stop"
@@ -227,36 +227,36 @@ if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 # Compute effective Enable-* values from high-level skip flags.
 # These internal variables preserve backward compatibility with downstream
 # sections that check individual flags while presenting a simpler CLI surface.
-$withoutOptionalParity = $WithoutOptionalParity
-$withoutSecretsParity = $WithoutSecretsParity -or $withoutOptionalParity
-$withoutUserStateParity = $WithoutUserStateParity -or $withoutOptionalParity
-$withoutSystemParity = $WithoutSystemParity -or $withoutOptionalParity
+$noOptionalParity = $NoOptionalParity
+$noSecretsParity = $NoSecretsParity -or $noOptionalParity
+$noUserStateParity = $NoUserStateParity -or $noOptionalParity
+$noSystemParity = $NoSystemParity -or $noOptionalParity
 
-$EnableSecretsParity = -not $withoutSecretsParity
+$EnableSecretsParity = -not $noSecretsParity
 
-$EnableHostAgeKeyRegistration = -not $withoutSystemParity
-$EnableRemoteAccessParity = -not $withoutSystemParity
-$EnableRdpParity = -not $withoutSystemParity
-$EnablePowerParity = -not $withoutSystemParity
+$EnableHostAgeKeyRegistration = -not $noSystemParity
+$EnableRemoteAccessParity = -not $noSystemParity
+$EnableRdpParity = -not $noSystemParity
+$EnablePowerParity = -not $noSystemParity
 
-$EnableAgentsConfigParity = -not $withoutUserStateParity
-$EnableAgentsSkillsParity = -not $withoutUserStateParity
-$EnableAgentsClawHubSkillsParity = -not $withoutUserStateParity
-$EnableBunParity = -not $withoutUserStateParity
-$EnableCloudDrivesParity = -not $withoutUserStateParity
-$EnableCustomProvisionSymlinkParity = -not $withoutUserStateParity
-$EnableGitSshParity = -not $withoutUserStateParity
-$EnablePicardParity = -not $withoutUserStateParity
-$EnableObsidianParity = -not $withoutUserStateParity
-$EnableQtPassParity = -not $withoutUserStateParity
-$EnableShellParity = -not $withoutUserStateParity
-$EnableDevDirectoryParity = -not $withoutUserStateParity
+$EnableAgentsConfigParity = -not $noUserStateParity
+$EnableAgentsSkillsParity = -not $noUserStateParity
+$EnableAgentsClawHubSkillsParity = -not $noUserStateParity
+$EnableBunParity = -not $noUserStateParity
+$EnableCloudDrivesParity = -not $noUserStateParity
+$EnableCustomProvisionSymlinkParity = -not $noUserStateParity
+$EnableGitSshParity = -not $noUserStateParity
+$EnablePicardParity = -not $noUserStateParity
+$EnableObsidianParity = -not $noUserStateParity
+$EnableQtPassParity = -not $noUserStateParity
+$EnableShellParity = -not $noUserStateParity
+$EnableDevDirectoryParity = -not $noUserStateParity
 # EnableDevReposParity defaults to $null (deferred to devRepos registry).
 # When user-state is skipped, force $false instead.
-$EnableDevReposParity = if ($withoutUserStateParity) { $false } else { $null }
-$EnableVsCodeExtensionsParity = -not $withoutUserStateParity
-$EnableVsCodeSettingsParity = -not $withoutUserStateParity
-$EnableVsCodeWorkspaceTrustParity = -not $withoutUserStateParity
+$EnableDevReposParity = if ($noUserStateParity) { $false } else { $null }
+$EnableVsCodeExtensionsParity = -not $noUserStateParity
+$EnableVsCodeSettingsParity = -not $noUserStateParity
+$EnableVsCodeWorkspaceTrustParity = -not $noUserStateParity
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 $secretsModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "secrets"
@@ -328,7 +328,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $wallpapersModuleDir -ChildPath "Sync-Wallpaper.ps1")
 $healthCheckScript = Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\scripts\health-check.ps1"
 if (Test-Path -Path $healthCheckScript) {
-  & $healthCheckScript -MinFreeGB $MinFreeDiskGB -WithoutSecretHealth
+  & $healthCheckScript -MinFreeGB $MinFreeDiskGB -NoSecretHealth
 }
 
 # Load the user registry from src/hosts/Windows/users.json. This declarative
@@ -639,8 +639,8 @@ Write-Output "-------------------------------------------"
 # avoid blocking earlier configuration steps.  The sync is best-effort: a
 # missing or unreachable ollama binary is informational, not a hard failure,
 # because the system configuration has already been applied successfully.
-if ($WithoutAISync) {
-  Write-Output "ai-sync: -WithoutAISync set; skipping post-apply model sync"
+if ($NoAISync) {
+  Write-Output "ai-sync: -NoAISync set; skipping post-apply model sync"
 } else {
   $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaOnPath) {
@@ -655,8 +655,8 @@ if ($WithoutAISync) {
 # This is best-effort: replica sync can be long-running and should not
 # retroactively fail a completed configuration convergence.
 
-if (-not $WithReplicaSync) {
-  Write-Output "replica-sync: skipping post-apply replica sync (default; pass -WithReplicaSync to run now)"
+if (-not $ReplicaSync) {
+  Write-Output "replica-sync: skipping post-apply replica sync (default; pass -ReplicaSync to run now)"
 } else {
   # Presence probe: rclone may be absent on first-provision hosts.
   $rcloneOnPath = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
@@ -675,8 +675,8 @@ if (-not $WithReplicaSync) {
 # Provision VM disk images and QEMU start scripts for VMs declared in VMs.json.
 # This is best-effort: a VM setup failure should not retroactively fail a
 # completed configuration apply.
-if (-not $WithVMSetup) {
-  Write-Output "vm-setup: -WithVMSetup not set; skipping post-apply VM provisioning"
+if (-not $VMSetup) {
+  Write-Output "vm-setup: -VMSetup not set; skipping post-apply VM provisioning"
 } else {
   Write-Output "vm-setup: running post-apply VM provisioning..."
   try {

@@ -41,13 +41,13 @@
 #
 # After the main apply command succeeds, scripts/ai-sync.sh is called to
 # converge locally installed Ollama models with the declarative manifest.
-# Pass --without-ai-sync to suppress the model sync step — useful in CI or on
+# Pass --no-ai-sync to suppress the model sync step — useful in CI or on
 # low-bandwidth connections where model pulls (2–20 GB each) are undesirable.
 #
 # Arguments:
-#   --without-ai-sync  skip the post-apply Ollama model sync step
-#   --with-replica-sync  run the post-apply cloud replica sync step (opt-in)
-#   --with-vm-setup      run the post-apply VM setup step (opt-in)
+#   --ai-sync|--no-ai-sync    control the post-apply Ollama model sync step
+#   --replica-sync|--no-replica-sync  control the post-apply cloud replica sync step
+#   --vm-setup|--no-vm-setup  control the post-apply VM setup step
 #   --target-user   select the Home Manager flake profile key on standalone
 #                   Linux hosts (ignored on Darwin and NixOS system rebuilds)
 #
@@ -66,15 +66,18 @@ set -eu
 # ---------------------------------------------------------------------------
 usage() {
   cat <<'USAGE_EOF'
-Usage: apply.sh [--without-ai-sync] [--with-replica-sync] [--with-vm-setup] [--target-user=<name>]
+Usage: apply.sh [--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--vm-setup|--no-vm-setup] [--target-user=<name>]
 
 Dispatch the Nix apply command for the current host.
 
 Options:
   -h, --help            Show this help message and exit
-  --without-ai-sync     Skip the post-apply Ollama model sync step
-  --with-replica-sync   Run the post-apply cloud replica sync step (opt-in)
-  --with-vm-setup       Run the post-apply VM setup step (opt-in)
+  --ai-sync             Run the post-apply Ollama model sync step (default)
+  --no-ai-sync          Skip the post-apply Ollama model sync step
+  --replica-sync        Run the post-apply cloud replica sync step (opt-in)
+  --no-replica-sync     Skip the post-apply cloud replica sync step
+  --vm-setup            Run the post-apply VM setup step (opt-in)
+  --no-vm-setup         Skip the post-apply VM setup step
   --target-user      Select the Home Manager flake profile key on standalone
                      Linux hosts (ignored on Darwin and NixOS system rebuilds)
 USAGE_EOF
@@ -84,9 +87,9 @@ USAGE_EOF
 # ---------------------------------------------------------------------------
 # Flag parsing
 # ---------------------------------------------------------------------------
-do_ai_sync=true
-with_replica_sync=false
-with_vm_setup=false
+ai_sync=true
+replica_sync=false
+vm_setup=false
 target_user=""
 _aas_expect_target_user=false
 
@@ -102,22 +105,37 @@ for _arg in "$@"; do
   fi
 
   case "$_arg" in
-    --without-ai-sync)
+    --ai-sync)
+      # Model pulls are 2–20 GB and may be undesirable in CI or on
+      # low-bandwidth connections; this flag opts in to the post-apply sync.
+      ai_sync=true
+      ;;
+    --no-ai-sync)
       # Model pulls are 2–20 GB and may be undesirable in CI or on
       # low-bandwidth connections; this flag opts out of the post-apply sync.
-      do_ai_sync=false
+      ai_sync=false
       ;;
-    --with-replica-sync)
+    --replica-sync)
       # Replica sync is slow for large trees and skipped by default after
       # apply; this flag opts in to immediate post-apply convergence.
-      with_replica_sync=true
+      replica_sync=true
       ;;
-
-    --with-vm-setup)
+    --no-replica-sync)
+      # Replica sync is slow for large trees and skipped by default after
+      # apply; this flag opts out of immediate post-apply convergence.
+      replica_sync=false
+      ;;
+    --vm-setup)
       # VM setup provisions QEMU disk images and registers VMs (UTM on macOS,
       # libvirt on NixOS).  Skipped by default after apply because disk
       # pre-allocation and VM registration are large, slow, and idempotent.
-      with_vm_setup=true
+      vm_setup=true
+      ;;
+    --no-vm-setup)
+      # VM setup provisions QEMU disk images and registers VMs (UTM on macOS,
+      # libvirt on NixOS).  Skipped by default after apply because disk
+      # pre-allocation and VM registration are large, slow, and idempotent.
+      vm_setup=false
       ;;
     --target-user)
       _aas_expect_target_user=true
@@ -274,8 +292,8 @@ run_ai_sync() {
   #   bundled into the app closure via siblingScripts in mkApplyApp.  The
   #   script's runtimeInputs (jq) are resolved at build time, so apply.sh
   #   does not need to know the repository layout.
-  if [ "$do_ai_sync" = false ]; then
-    printf '%s\n' "ai-sync: --without-ai-sync set; skipping post-apply model sync"
+  if [ "$ai_sync" = false ]; then
+    printf '%s\n' "ai-sync: --no-ai-sync set; skipping post-apply model sync"
     return
   fi
 
@@ -299,7 +317,7 @@ run_vm_setup() {
   # Call scripts/vm-setup.sh to provision virtual machine disk images and
   # register VMs after the system configuration has been applied.
   #
-  # Why opt-in (--with-vm-setup required):
+  # Why opt-in (--vm-setup|--no-vm-setup):
   #   Disk pre-allocation is slow (up to 128 GB) and only needed on the first
   #   provision of a new machine.  Subsequent applies do not re-create existing
   #   disks; the guard is in the script itself.  Still, running it on every
@@ -314,8 +332,8 @@ run_vm_setup() {
   #   bundled into the app closure via siblingScripts in mkApplyApp.  The
   #   script's runtimeInputs (jq) are resolved at build time, so apply.sh
   #   does not need to know the repository layout.
-  if [ "$with_vm_setup" = false ]; then
-    printf '%s\n' "vm-setup: --with-vm-setup not set; skipping post-apply VM provisioning"
+  if [ "$vm_setup" = false ]; then
+    printf '%s\n' "vm-setup: --vm-setup not set; skipping post-apply VM provisioning"
     return
   fi
 
@@ -381,8 +399,8 @@ run_replica_sync() {
   # Why best-effort: replica convergence is additive and may involve large
   # transfers. A replica error should not retroactively fail a completed
   # system apply.
-  if [ "$with_replica_sync" = false ]; then
-    printf '%s\n' "replica-sync: skipping post-apply replica sync (default; pass --with-replica-sync to run now)"
+  if [ "$replica_sync" = false ]; then
+    printf '%s\n' "replica-sync: skipping post-apply replica sync (default; pass --replica-sync to run now)"
     return
   fi
 
