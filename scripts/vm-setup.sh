@@ -537,8 +537,9 @@ write_start_script() {
   _wss_display="$2"
   _wss_type="$3"
   _wss_host_kind="$4"
-  _wss_path_sh="$VM_DIR/start-${_wss_name}.sh"
-  _wss_path_ps1="$VM_DIR/start-${_wss_name}.ps1"
+  mkdir -p "$VM_DIR/scripts"
+  _wss_path_sh="$VM_DIR/scripts/start-${_wss_name}.sh"
+  _wss_path_ps1="$VM_DIR/scripts/start-${_wss_name}.ps1"
 
   if [ "$dry_run" = true ]; then
     printf 'vm-setup: [dry-run] write start helper scripts: %s, %s\n' "$_wss_path_sh" "$_wss_path_ps1"
@@ -1977,6 +1978,7 @@ fi
 if [ "$dry_run" = false ]; then
   mkdir -p "$VM_DIR"
   mkdir -p "$IMAGES_DIR"
+  mkdir -p "$VM_DIR/scripts"
   write_vm_directory_readme
 
   if [ "$(uname -s)" = "Darwin" ]; then
@@ -1989,6 +1991,14 @@ printf 'vm-setup: phase 1 \u2014 building images...\n'
 build_images
 
 printf 'vm-setup: phase 2 \u2014 provisioning VMs...\n'
+if [ -d "$VM_DIR/scripts" ]; then
+  for _prune_f in "$VM_DIR/scripts"/start-* "$VM_DIR/scripts"/configure-*; do
+    if [ -f "$_prune_f" ]; then
+      rm -f "$_prune_f"
+      printf 'vm-setup: removed stale start script: %s\n' "$_prune_f"
+    fi
+  done
+fi
 _os=$(uname -s)
 case "$_os" in
   Darwin)

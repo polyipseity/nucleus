@@ -235,9 +235,11 @@ function Invoke-VMSetup {
     if (-not $DryRun) {
         New-Item -ItemType Directory -Path $vmDir     -Force | Out-Null
         New-Item -ItemType Directory -Path $imagesDir -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $vmDir 'scripts') -Force | Out-Null
     } else {
         Write-Information "vm-setup: [dry-run] New-Item Directory $vmDir"
         Write-Information "vm-setup: [dry-run] New-Item Directory $imagesDir"
+        Write-Information "vm-setup: [dry-run] New-Item Directory $(Join-Path $vmDir 'scripts')"
     }
 
     $vmReadmePath = Join-Path $vmDir 'README.md'
@@ -357,6 +359,12 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
         }
     }
 
+    # Prune stale start scripts so removed VMs leave no orphaned files.
+    $scriptsDir = Join-Path $vmDir 'scripts'
+    if (Test-Path $scriptsDir) {
+        Remove-Item -Path (Join-Path $scriptsDir 'start-*'), (Join-Path $scriptsDir 'configure-*') -Force -ErrorAction SilentlyContinue
+    }
+
     foreach ($vm in $vmDef.VMs) {
         if (-not (Test-VMEnabled -Vm $vm)) {
             Write-Information "vm-setup: VM '$($vm.name)' is disabled in manifest; skipping"
@@ -372,8 +380,8 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
         $ramMib      = [long](($vm.ramBytes + 524288) / 1048576)
         $diskPath    = Join-Path $vmDir "$($vm.name).qcow2"
         $diskCredentialMarker = Get-VMGuestSecretMarkerPath -BasePath $diskPath
-        $startScriptPs1 = Join-Path $vmDir "start-$($vm.name).ps1"
-        $startScriptSh = Join-Path $vmDir "start-$($vm.name).sh"
+        $startScriptPs1 = Join-Path $vmDir "scripts" "start-$($vm.name).ps1"
+        $startScriptSh = Join-Path $vmDir "scripts" "start-$($vm.name).sh"
         $prebuilt    = Join-Path $imagesDir "$($vm.name).qcow2"
 
         Write-Information "vm-setup: configuring VM '$($vm.display)'..."
@@ -537,7 +545,7 @@ set -eu
     Write-Information 'vm-setup: Windows VM setup complete'
     Write-Information "vm-setup: Disk images at: $vmDir"
     Write-Information "vm-setup: VM directory guide at: $vmReadmePath"
-    Write-Information 'vm-setup: Run the generated start-<name>.ps1 (or start-<name>.sh) scripts to launch VMs'
+    Write-Information "vm-setup: Run the generated scripts/start-<name>.ps1 (or scripts/start-<name>.sh) scripts to launch VMs"
 }
 
 # Test-Qcow2Image — Validates a QCOW2 image file before reuse.

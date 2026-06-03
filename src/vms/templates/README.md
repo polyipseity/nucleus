@@ -12,6 +12,7 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
   - `images/<name>.qcow2` — pre-built guest images produced in build phase.
   - `images/<name>-build/` — temporary Packer output directory used during builds.
   - `images/<name>-installer.iso` — cached Windows installer ISO used by rebuilds.
+- `scripts/` — generated start and configure helper scripts for each VM.
 - `<name>.utm/` — UTM bundle directory on macOS hosts.
 - `<name>.qcow2` — libvirt/QEMU runtime disk on Linux/Windows hosts.
 
@@ -19,12 +20,12 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
 
 | Host OS | Guest type | Hypervisor | Command |
 |---|---|---|---|
-| macOS | macOS | Tart | `start-<name>.sh` or `start-<name>.ps1` |
-| macOS | NixOS / Windows | UTM | `start-<name>.sh` or `start-<name>.ps1` |
-| NixOS | NixOS / Windows | libvirt | `start-<name>.sh` or `start-<name>.ps1` |
-| Windows | NixOS / Windows | QEMU | `start-<name>.ps1` (`start-<name>.sh` in Git Bash) |
+| macOS | macOS | Tart | `scripts/start-<name>.sh` or `scripts/start-<name>.ps1` |
+| macOS | NixOS / Windows | UTM | `scripts/start-<name>.sh` or `scripts/start-<name>.ps1` |
+| NixOS | NixOS / Windows | libvirt | `scripts/start-<name>.sh` or `scripts/start-<name>.ps1` |
+| Windows | NixOS / Windows | QEMU | `scripts/start-<name>.ps1` (`scripts/start-<name>.sh` in Git Bash) |
 
-Run from `{{VM_DIR_DISPLAY}}`.
+Run from `{{VM_DIR_DISPLAY}}/scripts/`.
 
 ## Guest configuration
 
@@ -79,6 +80,8 @@ Persistent VM artifacts (remove only when intentionally deleting a VM):
 - `{{VM_DIR_DISPLAY}}/.tart/` — Tart VM store
 - `{{VM_DIR_DISPLAY}}/<name>.utm/` — UTM bundle
 - `{{VM_DIR_DISPLAY}}/<name>.qcow2` — runtime disk
+- `{{VM_DIR_DISPLAY}}/scripts/start-<name>.sh` — POSIX start helper
+- `{{VM_DIR_DISPLAY}}/scripts/start-<name>.ps1` — PowerShell start helper
 
 ## Manual cleanup
 
