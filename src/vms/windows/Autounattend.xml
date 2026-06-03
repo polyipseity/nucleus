@@ -128,8 +128,13 @@
       </ImageInstall>
 
       <UserData>
-        <!-- No product key: evaluation mode.  Apply a key or KMS after first
-             boot if a licence is required. -->
+        <!-- Generic installation key for Windows 11 Pro: suppresses the
+             product-key prompt during OOBE.  Does NOT activate Windows — the
+             user must apply a valid license after provisioning. -->
+        <ProductKey>
+          <WillShowUI>Never</WillShowUI>
+          <Key>VK7JG-NPHTM-C97JM-9MPGT-3V66T</Key>
+        </ProductKey>
         <AcceptEula>true</AcceptEula>
         <FullName>User</FullName>
         <Organization/>
