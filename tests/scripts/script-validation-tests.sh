@@ -130,13 +130,13 @@ test_no_dangerous_patterns() {
     # Check for unquoted variables in potentially dangerous contexts
     # shellcheck disable=SC2016  # $ chars are literal regex metacharacters, not shell expansions.
     if grep -E '\$[A-Za-z_][A-Za-z0-9_]*\s+(&&|;|\||>)' "$script" | grep -v '\$([^)]*' | grep -v '${' >/dev/null 2>&1; then
-        ((dangerous++))
+        dangerous=$((dangerous + 1))
         echo -e "${YELLOW}⚠${NC}  Potential unquoted variable: $(basename "$script")"
     fi
 
     # Check for rm -rf without safeguards
     if grep -E 'rm\s+-rf' "$script" | grep -v 'HOME\|TMPDIR\|/tmp' >/dev/null 2>&1; then
-        ((dangerous++))
+        dangerous=$((dangerous + 1))
         echo -e "${YELLOW}⚠${NC}  Potentially unsafe rm -rf: $(basename "$script")"
     fi
 
@@ -164,6 +164,37 @@ test_bootstrap_direnv_scope() {
     assert_pass "Bootstrap direnv scope: $(basename "$script")"
 }
 
+# Test 10: Verify strict shell mode (set -euo pipefail)
+# Ensures scripts fail fast on undefined variables and pipe errors.
+test_strict_shell_mode() {
+    local script="$1"
+    if grep -q 'set -euo pipefail' "$script"; then
+        assert_pass "Strict shell mode: $(basename "$script")"
+    else
+        assert_fail "Strict shell mode: $(basename "$script")" "Missing set -euo pipefail"
+    fi
+}
+
+# Test 11: Verify usage_std function is defined (either local or via lib.sh)
+test_usage_std_present() {
+    local script="$1"
+    if grep -Eq '^\s*usage_std\(\)' "$script" || grep -Eq '^\s*\.\s+.*lib\.sh' "$script"; then
+        assert_pass "usage_std present: $(basename "$script")"
+    else
+        echo -e "${YELLOW}⚠${NC}  No usage_std found in $(basename "$script")"
+    fi
+}
+
+# Test 12: Verify -h|--help handler is present
+test_help_handler() {
+    local script="$1"
+    if grep -Eq '\s+-h\||--help\)' "$script"; then
+        assert_pass "Help handler present: $(basename "$script")"
+    else
+        assert_fail "Help handler present: $(basename "$script")" "Missing -h|--help case"
+    fi
+}
+
 # ============================================================================
 # Run Tests on All Scripts
 # ============================================================================
@@ -177,8 +208,13 @@ if [[ -f "$VM_SETUP_SH" ]]; then
     test_bash_syntax "$VM_SETUP_SH"
     test_has_shebang "$VM_SETUP_SH"
     test_is_executable "$VM_SETUP_SH"
+    test_dependencies_available "$VM_SETUP_SH" qemu-system-aarch64 qemu-system-x86_64 rsync
     test_error_handling "$VM_SETUP_SH"
     test_has_documentation "$VM_SETUP_SH"
+    test_no_dangerous_patterns "$VM_SETUP_SH"
+    test_strict_shell_mode "$VM_SETUP_SH"
+    test_usage_std_present "$VM_SETUP_SH"
+    test_help_handler "$VM_SETUP_SH"
 
     # Verify Apple Silicon arm64 tcg fallback: HVF on arm64 macOS only
     # accelerates AArch64 guests; x86_64 Windows QEMU builds must use tcg.
@@ -192,8 +228,8 @@ if [[ -f "$VM_SETUP_SH" ]]; then
     fi
 fi
 
-# Test scripts/apply.sh
-APPLY_SH="scripts/apply.sh"
+# Test scripts/apply.sh → src/scripts/apply.sh
+APPLY_SH="src/scripts/apply.sh"
 if [[ -f "$APPLY_SH" ]]; then
     test_bash_syntax "$APPLY_SH"
     test_has_shebang "$APPLY_SH"
@@ -202,6 +238,9 @@ if [[ -f "$APPLY_SH" ]]; then
     test_error_handling "$APPLY_SH"
     test_has_documentation "$APPLY_SH"
     test_no_dangerous_patterns "$APPLY_SH"
+    test_strict_shell_mode "$APPLY_SH"
+    test_usage_std_present "$APPLY_SH"
+    test_help_handler "$APPLY_SH"
 fi
 
 # Test scripts/bootstrap.sh
@@ -215,6 +254,9 @@ if [[ -f "$BOOTSTRAP_SH" ]]; then
     test_bootstrap_direnv_scope "$BOOTSTRAP_SH"
     test_has_documentation "$BOOTSTRAP_SH"
     test_no_dangerous_patterns "$BOOTSTRAP_SH"
+    test_strict_shell_mode "$BOOTSTRAP_SH"
+    test_usage_std_present "$BOOTSTRAP_SH"
+    test_help_handler "$BOOTSTRAP_SH"
 fi
 
 # Test scripts/health-check.sh
@@ -226,6 +268,9 @@ if [[ -f "$HEALTH_CHECK_SH" ]]; then
     test_dependencies_available "$HEALTH_CHECK_SH" git curl
     test_error_handling "$HEALTH_CHECK_SH"
     test_has_documentation "$HEALTH_CHECK_SH"
+    test_strict_shell_mode "$HEALTH_CHECK_SH"
+    test_usage_std_present "$HEALTH_CHECK_SH"
+    test_help_handler "$HEALTH_CHECK_SH"
 fi
 
 # Test scripts/update.sh
@@ -237,6 +282,98 @@ if [[ -f "$UPDATE_SH" ]]; then
     test_dependencies_available "$UPDATE_SH" nix sops
     test_error_handling "$UPDATE_SH"
     test_has_documentation "$UPDATE_SH"
+    test_strict_shell_mode "$UPDATE_SH"
+    test_usage_std_present "$UPDATE_SH"
+    test_help_handler "$UPDATE_SH"
+fi
+
+# Test scripts/ai-sync.sh
+AI_SYNC_SH="scripts/ai-sync.sh"
+if [[ -f "$AI_SYNC_SH" ]]; then
+    test_bash_syntax "$AI_SYNC_SH"
+    test_has_shebang "$AI_SYNC_SH"
+    test_is_executable "$AI_SYNC_SH"
+    test_error_handling "$AI_SYNC_SH"
+    test_has_documentation "$AI_SYNC_SH"
+    test_no_dangerous_patterns "$AI_SYNC_SH"
+    test_strict_shell_mode "$AI_SYNC_SH"
+    test_usage_std_present "$AI_SYNC_SH"
+    test_help_handler "$AI_SYNC_SH"
+fi
+
+# Test scripts/cloud-setup.sh
+CLOUD_SETUP_SH="scripts/cloud-setup.sh"
+if [[ -f "$CLOUD_SETUP_SH" ]]; then
+    test_bash_syntax "$CLOUD_SETUP_SH"
+    test_has_shebang "$CLOUD_SETUP_SH"
+    test_is_executable "$CLOUD_SETUP_SH"
+    test_dependencies_available "$CLOUD_SETUP_SH" git rsync
+    test_error_handling "$CLOUD_SETUP_SH"
+    test_has_documentation "$CLOUD_SETUP_SH"
+    test_no_dangerous_patterns "$CLOUD_SETUP_SH"
+    test_strict_shell_mode "$CLOUD_SETUP_SH"
+    test_usage_std_present "$CLOUD_SETUP_SH"
+    test_help_handler "$CLOUD_SETUP_SH"
+fi
+
+# Test scripts/gc.sh
+GC_SH="scripts/gc.sh"
+if [[ -f "$GC_SH" ]]; then
+    test_bash_syntax "$GC_SH"
+    test_has_shebang "$GC_SH"
+    test_is_executable "$GC_SH"
+    test_dependencies_available "$GC_SH" git nix
+    test_error_handling "$GC_SH"
+    test_has_documentation "$GC_SH"
+    test_no_dangerous_patterns "$GC_SH"
+    test_strict_shell_mode "$GC_SH"
+    test_usage_std_present "$GC_SH"
+    test_help_handler "$GC_SH"
+fi
+
+# Test scripts/replica-reset.sh
+REPLICA_RESET_SH="scripts/replica-reset.sh"
+if [[ -f "$REPLICA_RESET_SH" ]]; then
+    test_bash_syntax "$REPLICA_RESET_SH"
+    test_has_shebang "$REPLICA_RESET_SH"
+    test_is_executable "$REPLICA_RESET_SH"
+    test_dependencies_available "$REPLICA_RESET_SH" git rsync
+    test_error_handling "$REPLICA_RESET_SH"
+    test_has_documentation "$REPLICA_RESET_SH"
+    test_no_dangerous_patterns "$REPLICA_RESET_SH"
+    test_strict_shell_mode "$REPLICA_RESET_SH"
+    test_usage_std_present "$REPLICA_RESET_SH"
+    test_help_handler "$REPLICA_RESET_SH"
+fi
+
+# Test scripts/replica-sync.sh
+REPLICA_SYNC_SH="scripts/replica-sync.sh"
+if [[ -f "$REPLICA_SYNC_SH" ]]; then
+    test_bash_syntax "$REPLICA_SYNC_SH"
+    test_has_shebang "$REPLICA_SYNC_SH"
+    test_is_executable "$REPLICA_SYNC_SH"
+    test_dependencies_available "$REPLICA_SYNC_SH" git rsync
+    test_error_handling "$REPLICA_SYNC_SH"
+    test_has_documentation "$REPLICA_SYNC_SH"
+    test_no_dangerous_patterns "$REPLICA_SYNC_SH"
+    test_strict_shell_mode "$REPLICA_SYNC_SH"
+    test_usage_std_present "$REPLICA_SYNC_SH"
+    test_help_handler "$REPLICA_SYNC_SH"
+fi
+
+# Test scripts/check-sh.sh
+CHECK_SH_SH="scripts/check-sh.sh"
+if [[ -f "$CHECK_SH_SH" ]]; then
+    test_bash_syntax "$CHECK_SH_SH"
+    test_has_shebang "$CHECK_SH_SH"
+    test_is_executable "$CHECK_SH_SH"
+    test_dependencies_available "$CHECK_SH_SH" shellcheck
+    test_error_handling "$CHECK_SH_SH"
+    test_has_documentation "$CHECK_SH_SH"
+    test_no_dangerous_patterns "$CHECK_SH_SH"
+    test_strict_shell_mode "$CHECK_SH_SH"
+    test_usage_std_present "$CHECK_SH_SH"
+    test_help_handler "$CHECK_SH_SH"
 fi
 
 # ============================================================================
