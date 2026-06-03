@@ -36,25 +36,25 @@
   so they are aware of which repository's assets and manifests will be accessed
   and modified.
 
-.PARAMETER SkipNixGc
+.PARAMETER WithoutNixGc
   Accepted but ignored on Windows (POSIX-only).
 
-.PARAMETER SkipHmGc
+.PARAMETER WithoutHmGc
   Accepted but ignored on Windows (POSIX-only).
 
-.PARAMETER SkipToolCachePrune
+.PARAMETER WithoutToolCachePrune
   Skip bun/cargo/rustc/uv and repo-local .direnv cache cleanup.
 
-.PARAMETER SkipOllamaPrune
+.PARAMETER WithoutOllamaPrune
   Skip Ollama orphaned model removal even when ollama is installed.
 
-.PARAMETER SkipScoopCleanup
+.PARAMETER WithoutScoopCleanup
   Skip Scoop cache and old-version cleanup even when Scoop is installed.
 
-.PARAMETER SkipWallpaperPrune
+.PARAMETER WithoutWallpaperPrune
   Skip stale wallpaper file cleanup.
 
-.PARAMETER SkipVMPrune
+.PARAMETER WithoutVMPrune
   Skip stale VM artifact removal.
 
 .EXAMPLE
