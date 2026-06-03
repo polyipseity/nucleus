@@ -7,10 +7,10 @@
 #      repo-configured backend defaults, then prompt for authentication
 #      (no manual menu navigation required)
 #   3. validate each remote's credentials work (via rclone lsd)
-#   4. optionally run nucleus apply if --apply flag provided
+#   4. optionally run nucleus apply if --with-apply flag provided
 #
 # Arguments:
-#   --apply       run nucleus apply to converge cloud mount services
+#   --with-apply  run nucleus apply to converge cloud mount services
 #                 (default: setup/validate only; user can run nucleus apply later)
 #
 # Exit conditions:
@@ -201,19 +201,19 @@ usage() {
   cat <<'EOF'
 usage: cloud-setup.sh [options]
 
-  --apply  Run nucleus apply to converge cloud mount services.
+  --with-apply  Run nucleus apply to converge cloud mount services.
 EOF
 }
 
-do_apply=false
+with_apply=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help)
       usage
       exit 0
       ;;
-    --apply)
-      do_apply=true
+    --with-apply)
+      with_apply=true
       ;;
     *)
       printf '%s\n' "cloud-setup: unsupported argument '$1'" >&2
@@ -437,7 +437,7 @@ if [ -f "$USERS_JSON" ]; then
   restart_cloud_mount_services "$USERS_JSON"
 fi
 
-if [ "$do_apply" = true ]; then
+if [ "$with_apply" = true ]; then
   printf '%s\n' "cloud-setup: running nucleus apply to converge cloud mount services..."
   nix --option warn-dirty false run "$repo_root/src#apply"
 fi
