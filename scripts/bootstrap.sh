@@ -7,12 +7,16 @@
 #   apply         Install bootstrap dependencies, then run the src apply flow
 #
 # Options:
-#   --without-ai-sync  Pass through to nix run .#apply; suppresses the post-apply
+#   --ai-sync          Pass through to nix run .#apply; opt in to the post-apply
+#                      Ollama model sync step (default).
+#   --no-ai-sync       Pass through to nix run .#apply; suppresses the post-apply
 #                      Ollama model sync step.  Useful in CI or on low-bandwidth
 #                      connections where model pulls (2–20 GB) are undesirable.
-#   --with-replica-sync  Pass through to nix run .#apply; opt in to immediate
-#                        post-apply replica sync. By default apply skips replica
-#                   sync because a scheduled daily sync already converges.
+#   --replica-sync     Pass through to nix run .#apply; opt in to immediate
+#                      post-apply replica sync. By default apply skips replica
+#                      sync because a scheduled daily sync already converges.
+#   --no-replica-sync  Pass through to nix run .#apply; opt out of immediate
+#                      post-apply replica sync.
 #   --target-user   Pass through to src/scripts/apply.sh; selects the Home
 #                   Manager flake profile on standalone Linux hosts.
 set -eu
@@ -20,14 +24,14 @@ set -eu
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 VERSIONS_FILE="$SCRIPT_DIR/bootstrap-versions.env"
-with_apply=false
+apply=false
 NIX_FEATURES_CONFIG="experimental-features = nix-command flakes"
 
 # ---------------------------------------------------------------------------
 # Flag parsing — collect extra flags to pass through to apply
 # ---------------------------------------------------------------------------
-do_ai_sync=true
-with_replica_sync=false
+ai_sync=true
+replica_sync=false
 target_user=""
 _apply_args=""
 _bsh_expect_target_user=false
@@ -54,18 +58,30 @@ for _bsh_arg in "$@"; do
   fi
 
   case "$_bsh_arg" in
-    --with-apply)
+    --apply)
       # Install dependencies, then run the apply flow.
-      with_apply=true
+      apply=true
       ;;
-    --without-ai-sync)
+    --no-apply)
+      # Install dependencies only (default); explicit opt-out.
+      apply=false
+      ;;
+    --ai-sync)
+      # Model pulls are 2–20 GB; opt in to the post-apply sync.
+      ai_sync=true
+      ;;
+    --no-ai-sync)
       # Model pulls are 2–20 GB; suppress post-apply sync in CI or on
       # low-bandwidth connections.
-      do_ai_sync=false
+      ai_sync=false
       ;;
-    --with-replica-sync)
+    --replica-sync)
       # Replica sync is skipped by default after apply; allow explicit opt-in.
-      with_replica_sync=true
+      replica_sync=true
+      ;;
+    --no-replica-sync)
+      # Replica sync is skipped by default after apply; explicit opt-out.
+      replica_sync=false
       ;;
     --target-user)
       # Standalone Linux parity: explicitly select which HM profile key to
@@ -85,19 +101,22 @@ for _bsh_arg in "$@"; do
       ;;
     -h|--help)
       cat <<'EOF'
-Usage: bootstrap.sh [--with-apply] [--without-ai-sync] [--with-replica-sync] [--target-user=<name>] [-- <apply-args>...]
+Usage: bootstrap.sh [--apply|--no-apply] [--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--target-user=<name>] [-- <apply-args>...]
 
 Installs Nix (if absent) and the Nix-managed bootstrap dependencies
 (gnupg, sops, ssh-to-age) for this host.
 
-By default bootstrap installs dependencies only.  Pass --with-apply to also
+By default bootstrap installs dependencies only.  Pass --apply to also
 run the apply flow.
 
 Options:
   -h, --help            Show this help message and exit
-  --with-apply          After installing dependencies, run the apply flow
-  --without-ai-sync     Suppress the post-apply Ollama model sync step
-  --with-replica-sync   Opt in to immediate post-apply replica sync
+  --apply               After installing dependencies, run the apply flow
+  --no-apply            Install dependencies only (default)
+  --ai-sync             Opt in to the post-apply Ollama model sync step (default)
+  --no-ai-sync          Suppress the post-apply Ollama model sync step
+  --replica-sync        Opt in to immediate post-apply replica sync
+  --no-replica-sync     Opt out of immediate post-apply replica sync
   --target-user         Select the Home Manager flake profile key for standalone
                         Linux apply runs
   --                    Remaining arguments are passed through to the apply command
@@ -331,16 +350,16 @@ fi
 
 allow_repo_direnv_if_available
 
-if [ "$with_apply" = true ]; then
+if [ "$apply" = true ]; then
   printf '%s\n' "Running apply flow via src#apply..."
   # Health-check is already invoked by apply.sh for each OS branch; calling it
   # here too would print "health checks passed" twice and slow bootstrap down.
   set --
-  if [ "$do_ai_sync" = false ]; then
-    set -- "$@" --without-ai-sync
+  if [ "$ai_sync" = false ]; then
+    set -- "$@" --no-ai-sync
   fi
-  if [ "$with_replica_sync" = true ]; then
-    set -- "$@" --with-replica-sync
+  if [ "$replica_sync" = true ]; then
+    set -- "$@" --replica-sync
   fi
   if [ -n "$target_user" ]; then
     set -- "$@" --target-user "$target_user"

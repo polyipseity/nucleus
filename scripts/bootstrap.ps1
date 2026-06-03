@@ -5,23 +5,23 @@
 .DESCRIPTION
   Installs GnuPG and SOPS via winget using pinned versions from
   scripts/bootstrap-versions.env.
-  Runs a pre-flight health check before invoking apply when -WithApply is used.
-  Use -WithApply to run the Windows apply script after dependency installation.
+  Runs a pre-flight health check before invoking apply when -Apply is used.
+  Use -Apply to run the Windows apply script after dependency installation.
 
-.PARAMETER WithApply
+.PARAMETER Apply
   Install dependencies, then run src/hosts/Windows/apply.ps1.
 
 .PARAMETER ApplyArgs
   Optional arguments passed through to src/hosts/Windows/apply.ps1.
-  Use -- before positional passthrough args (e.g., .\bootstrap.ps1 -WithApply -- -DryRun).
+  Use -- before positional passthrough args (e.g., .\bootstrap.ps1 -Apply -- -DryRun).
 
-.PARAMETER WithoutAISync
+.PARAMETER NoAISync
   Suppresses the post-apply Ollama model sync step. Forwarded to apply.ps1 as
-  -WithoutAISync when -WithApply is used. Also accepted on POSIX as --without-ai-sync.
+  -NoAISync when -Apply is used.
 
-.PARAMETER WithReplicaSync
+.PARAMETER ReplicaSync
   Run the post-apply cloud replica sync step. Forwarded to apply.ps1 as
-  -WithReplicaSync when -WithApply is used. Also accepted on POSIX as --with-replica-sync.
+  -ReplicaSync when -Apply is used.
 
 .PARAMETER TargetUser
   Accepted for cross-platform CLI parity. Only effective on the POSIX apply
@@ -36,31 +36,31 @@
   Install bootstrap dependencies only.
 
 .EXAMPLE
-  .\bootstrap.ps1 -WithApply
+  .\bootstrap.ps1 -Apply
   Install dependencies, then run the apply flow.
 
 .EXAMPLE
-  .\bootstrap.ps1 -WithApply -- -Help
+  .\bootstrap.ps1 -Apply -- -Help
   Install dependencies, then show help for the apply script (using -- passthrough).
 
 .EXAMPLE
-  .\bootstrap.ps1 -WithApply -WithoutAISync
+  .\bootstrap.ps1 -Apply -NoAISync
   Install dependencies and run apply, skipping AI model sync.
 #>
 [CmdletBinding()]
 param(
   [Alias("a")]
   [Parameter()]
-  [switch]$WithApply,
+  [switch]$Apply,
 
   [Parameter(ValueFromRemainingArguments)]
   [string[]]$ApplyArgs,
 
   [Parameter()]
-  [switch]$WithoutAISync,
+  [switch]$NoAISync,
 
   [Parameter()]
-  [switch]$WithReplicaSync,
+  [switch]$ReplicaSync,
 
   [Parameter()]
   [string]$TargetUser,
@@ -299,7 +299,7 @@ foreach ($package in $BootstrapPackageVersions.GetEnumerator()) {
 
 Invoke-RepositoryDirenvAllowIfAvailable
 
-if ($WithApply) {
+if ($Apply) {
   $applyScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\Windows\apply.ps1"
   if (-not (Test-Path -Path $applyScriptPath)) {
     throw "Apply script not found: $applyScriptPath"
@@ -316,8 +316,8 @@ if ($WithApply) {
   }
 
   # Cross-platform CLI parity: forward flags that apply.ps1 accepts.
-  if ($WithoutAISync) { $effectiveApplyArgs += "-WithoutAISync" }
-  if ($WithReplicaSync) { $effectiveApplyArgs += "-WithReplicaSync" }
+  if ($NoAISync) { $effectiveApplyArgs += "-NoAISync" }
+  if ($ReplicaSync) { $effectiveApplyArgs += "-ReplicaSync" }
   # TargetUser is POSIX-only (nix apply --target-user); accepted but not
   # forwarded on Windows since apply.ps1 does not implement this param.
   if ($TargetUser) {

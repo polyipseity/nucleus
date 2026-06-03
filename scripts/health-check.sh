@@ -8,7 +8,8 @@
 #
 # Arguments:
 #   --min-free-gb <int>         minimum free disk space in GiB (default: 10)
-#   --without-secret-health     skip SOPS decryption identity verification
+#   --secret-health             enable SOPS decryption identity verification (default)
+#   --no-secret-health          skip SOPS decryption identity verification
 #
 # Environment variables:
 #   NUCLEUS_MIN_FREE_GB  alternate source for minimum free space threshold
@@ -26,14 +27,15 @@ usage() {
 usage: health-check.sh [options]
 
   --min-free-gb <int>         Minimum free disk space in GiB (default: 10).
-  --without-secret-health     Skip SOPS decryption identity verification.
+  --secret-health             Enable SOPS decryption identity verification (default).
+  --no-secret-health          Skip SOPS decryption identity verification.
 EOF
 }
 
 REPO_ROOT="$(resolve_nucleus_root)"
 
 min_free_gb="${NUCLEUS_MIN_FREE_GB:-10}"
-do_secret_health=true
+secret_health=true
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -50,8 +52,12 @@ while [ "$#" -gt 0 ]; do
       min_free_gb="$2"
       shift 2
       ;;
-    --without-secret-health)
-      do_secret_health=false
+    --secret-health)
+      secret_health=true
+      shift
+      ;;
+    --no-secret-health)
+      secret_health=false
       shift
       ;;
     *)
@@ -133,7 +139,7 @@ check_secret_health() {
 
 check_disk_space
 check_connectivity
-if [ "$do_secret_health" = true ]; then
+if [ "$secret_health" = true ]; then
   check_secret_health
 fi
 
