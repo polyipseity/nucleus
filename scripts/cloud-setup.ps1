@@ -23,7 +23,7 @@
 #>
 [CmdletBinding()]
 param(
-  [switch]$Apply
+  [switch]$Apply = $(if ($env:NUCLEUS_APPLY -eq 'true') { $true } else { $false })
 )
 
 $ErrorActionPreference = 'Stop'

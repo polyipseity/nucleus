@@ -1,8 +1,40 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # src/scripts/register-host-age-key.sh — Register machine age key in .sops.yaml
-# Args: $1 — absolute repo root path
 # Exit: 0 success, 1 error
-set -eu
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+
+if [ -f "$SCRIPT_DIR/lib.sh" ]; then
+  . "$SCRIPT_DIR/lib.sh"
+else
+  usage_std() {
+    printf 'usage: %s %s\n' "$1" "${2:-}"
+    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
+  }
+  resolve_nucleus_root() {
+    [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ] && { printf '%s\n' "$NUCLEUS_REPO_ROOT"; return 0; }
+    printf '%s\n' "${HOME}/dev/nucleus"
+  }
+fi
+
+_rak_repo_root=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --repo-root)
+      _rak_repo_root="$2"
+      shift 2
+      ;;
+    *)
+      usage_std "$(basename "$0")" "[--repo-root <path>]" "Register machine age key in .sops.yaml"
+      exit 2
+      ;;
+  esac
+done
+
+if [ -z "$_rak_repo_root" ]; then
+  _rak_repo_root="$(resolve_nucleus_root)"
+fi
 
 # Derive this machine's age public key from its SSH host public key and
 # register it in .sops.yaml as a new recipient, then rewrap every
@@ -26,7 +58,7 @@ set -eu
 #   - .sops.yaml must contain the marker comment on its own line:
 #       "    # -- machine keys end; personal SSH backup key below --"
 _rak_host_pub="/etc/ssh/ssh_host_ed25519_key.pub"
-_rak_sops_yaml="$1/.sops.yaml"
+_rak_sops_yaml="$_rak_repo_root/.sops.yaml"
 
 if [ ! -f "$_rak_host_pub" ]; then
   printf 'sops: %s not found; skipping machine age key auto-registration.\n' \
@@ -82,10 +114,10 @@ fi
 # them.  Requires the primary GPG key in the keyring for re-encryption.
 # The --yes flag skips the interactive "update recipients" confirmation.
 for _rak_secret in \
-    "$1/src/secrets/users-"*.yml \
-    "$1/src/secrets/git-identities.yml" \
-    "$1/src/secrets/gpg-personal.yml" \
-    "$1/src/secrets/ssh-personal.yml"; do
+    "$_rak_repo_root/src/secrets/users-"*.yml \
+    "$_rak_repo_root/src/secrets/git-identities.yml" \
+    "$_rak_repo_root/src/secrets/gpg-personal.yml" \
+    "$_rak_repo_root/src/secrets/ssh-personal.yml"; do
   if [ ! -f "$_rak_secret" ]; then
     continue
   fi
@@ -101,9 +133,9 @@ done
 # parse time).  Read from a temp-file list rather than a pipe so that a
 # `sops updatekeys` failure exits the outer script via set -eu; exit 1
 # inside a pipe subshell would be silently swallowed.
-if [ -d "$1/src/assets/wallpapers" ]; then
+if [ -d "$_rak_repo_root/src/assets/wallpapers" ]; then
   _rak_wallpaper_list="$(mktemp)"
-  find "$1/src/assets/wallpapers" -name "*.sops" -type f \
+  find "$_rak_repo_root/src/assets/wallpapers" -name "*.sops" -type f \
     > "$_rak_wallpaper_list"
   while IFS= read -r _rak_wallpaper; do
     if ! sops updatekeys --yes "$_rak_wallpaper"; then

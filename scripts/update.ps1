@@ -31,10 +31,10 @@
 #>
 [CmdletBinding()]
 param(
-  [switch]$NoFlake,
-  [switch]$NoBrew,
-  [switch]$NoWinget,
-  [switch]$NoSops,
+  [switch]$NoFlake = $(if ($env:NUCLEUS_NO_FLAKE -eq 'true') { $true } else { $false }),
+  [switch]$NoBrew = $(if ($env:NUCLEUS_NO_BREW -eq 'true') { $true } else { $false }),
+  [switch]$NoWinget = $(if ($env:NUCLEUS_NO_WINGET -eq 'true') { $true } else { $false }),
+  [switch]$NoSops = $(if ($env:NUCLEUS_NO_SOPS -eq 'true') { $true } else { $false }),
   [Alias("h")]
   [switch]$Help
 )

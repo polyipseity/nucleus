@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # scripts/vm-setup.sh — Build VM images (if needed) and provision VMs.
 #
 # Combines the former nucleus-VM-build and nucleus-vm-setup into one command.
@@ -49,10 +49,35 @@
 #         https://github.com/cirruslabs/packer-plugin-tart
 #         https://github.com/pbatard/Fido
 
-set -eu
+set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
+
+# Source shared library when available; fall back to inline helpers for
+# standalone execution (e.g. Nix pre-commit hooks where the script is
+# copied to a flat store path).
+if [ -f "$SCRIPT_DIR/../src/scripts/lib.sh" ]; then
+  . "$SCRIPT_DIR/../src/scripts/lib.sh"
+else
+  usage_std() {
+    printf 'usage: %s %s\n' "$1" "${2:-}"
+    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
+  }
+  resolve_nucleus_root() {
+    [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ] && { printf '%s\n' "$NUCLEUS_REPO_ROOT"; return 0; }
+    printf '%s\n' "${HOME}/dev/nucleus"
+  }
+  resolve_nucleus_host() {
+    [ -n "${NUCLEUS_HOST:-}" ] && { printf '%s\n' "$NUCLEUS_HOST"; return 0; }
+    case "$(uname -s)" in
+      Darwin) printf '%s\n' "MacBook" ;;
+      Linux)  printf '%s\n' "NixOS" ;;
+      *)      printf '%s\n' "" ;;
+    esac
+  }
+fi
+
+REPO_ROOT="$(resolve_nucleus_root)"
 MANIFEST="$REPO_ROOT/src/modules/VMs.json"
 VMS_DIR="$REPO_ROOT/src/vms"
 TEMPLATES_DIR="$VMS_DIR/templates"
@@ -67,9 +92,8 @@ windows_headless='true'
 accelerator=''
 
 usage() {
+  usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
-usage: vm-setup.sh [options]
-
   --dry-run                  Print planned actions without executing (default: off).
   --nixos-only               Build and provision only the NixOS guest (default: off).
   --windows-only             Build and provision only the Windows guest (default: off).
@@ -78,6 +102,7 @@ usage: vm-setup.sh [options]
   --windows-iso-retries N    Retry attempts for network downloads (default: 0).
   --debug-headful            Show QEMU GUI window during Windows builds (default: off).
   --accelerator TYPE         QEMU accelerator (hvf/kvm/tcg) (default: auto).
+  --repo-root PATH           Override the detected repository root path.
 EOF
 }
 
@@ -94,6 +119,7 @@ while [ "$#" -gt 0 ]; do
     --windows-iso-source) windows_iso_source="$2"; shift ;;
     --windows-iso-retries) windows_iso_retries="$2"; shift ;;
     --debug-headful) windows_headless='false' ;;
+    --repo-root)    REPO_ROOT="$2"; shift ;;
     --accelerator)  accelerator="$2"; shift ;;
     *)
       printf '%s\n' "vm-setup: unsupported argument '$1'" >&2
@@ -141,18 +167,7 @@ if [ -z "$accelerator" ]; then
   esac
 fi
 
-# ---------------------------------------------------------------------------
-# NUCLEUS_HOST detection — identify the current host for VM host-scoping.
-# NUCLEUS_HOST env var overrides auto-detection.  Fallback maps uname -s to
-# the canonical host name used in VMs.json "hosts" arrays.
-# ---------------------------------------------------------------------------
-if [ -z "${NUCLEUS_HOST:-}" ]; then
-  case "$(uname -s)" in
-    Darwin) NUCLEUS_HOST='MacBook' ;;
-    Linux)  NUCLEUS_HOST='NixOS' ;;
-    *)      NUCLEUS_HOST='' ;;
-  esac
-fi
+NUCLEUS_HOST="$(resolve_nucleus_host)"
 export NUCLEUS_HOST
 
 if [ ! -f "$MANIFEST" ]; then

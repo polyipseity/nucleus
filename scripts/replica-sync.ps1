@@ -14,8 +14,8 @@
 #>
 [CmdletBinding()]
 param(
-  [switch]$DryRun,
-  [string]$ReplicaId
+  [switch]$DryRun = $(if ($env:NUCLEUS_DRY_RUN -eq 'true') { $true } else { $false }),
+  [string]$ReplicaId = $(if ($env:NUCLEUS_REPLICA_ID) { $env:NUCLEUS_REPLICA_ID } else { '' })
 )
 
 $ErrorActionPreference = 'Stop'

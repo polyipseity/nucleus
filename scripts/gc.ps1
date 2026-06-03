@@ -63,8 +63,8 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$ModuleDir = '',
-  [string]$RepoRoot = '',
+  [string]$ModuleDir = $(if ($env:NUCLEUS_GC_MODULE_DIR) { $env:NUCLEUS_GC_MODULE_DIR } else { '' }),
+  [string]$RepoRoot = $(if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { '' }),
   [switch]$NoNixGc,
   [switch]$NoHmGc,
   [switch]$NoToolCachePrune,
@@ -76,7 +76,7 @@ param(
   [switch]$Help
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
 if ($Help) {
   Get-Help $PSCommandPath -Detailed

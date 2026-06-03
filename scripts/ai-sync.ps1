@@ -38,7 +38,7 @@
 #>
 [CmdletBinding()]
 param(
-  [switch]$DryRun,
+  [switch]$DryRun = $(if ($env:NUCLEUS_DRY_RUN -eq 'true') { $true } else { $false }),
   [switch]$PruneOnly,
   [int]$ServerReadyTimeoutSeconds = 60,
   [int]$ServerReadyPollSeconds = 2

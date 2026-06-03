@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # jellyfin-sync.sh — Converge Jellyfin accounts and libraries declared in
 # src/modules/users.json with a running Jellyfin server.
 #
@@ -13,12 +13,14 @@
 #   and nixos-rebuild (activationScripts) with no per-host duplication.
 #
 # Designed to be invoked from both apply.sh and Nix activation scripts (Darwin
-# postActivation, NixOS activationScripts).  The repo root must be passed via
-# --repo-root or the NUCLEUS_REPO_ROOT environment variable.
+# postActivation, NixOS activationScripts).  The repo root is discovered via
+# resolve_nucleus_root (Hybrid Precedence: NUCLEUS_REPO_ROOT env var →
+# ~/.config/nucleus/repo-root → git rev-parse → ~/dev/nucleus).  Pass
+# --repo-root /path to override the env var for this invocation.
 #
 # Usage:
-#   NUCLEUS_REPO_ROOT=/path/to/repo sh scripts/jellyfin-sync.sh
-#   sh scripts/jellyfin-sync.sh --repo-root /path/to/repo
+#   NUCLEUS_REPO_ROOT=/path/to/repo bash src/scripts/jellyfin-sync.sh
+#   src/scripts/jellyfin-sync.sh --repo-root /path/to/repo
 #
 # Dependencies: curl, jq, sops.
 #
@@ -28,17 +30,27 @@
 # - Startup bootstrap endpoints (/Startup/User, /Startup/Complete):
 #   https://raw.githubusercontent.com/jellyfin/jellyfin/0beb07c40756aca5ab6a6ba4f8494bc5147e3c2b/Jellyfin.Api/Controllers/StartupController.cs
 
-set -eu
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+
+# Source shared library; fall back to inline definitions when running from
+# Nix store where sibling paths don't resolve.
+if [ -f "$SCRIPT_DIR/lib.sh" ]; then
+  . "$SCRIPT_DIR/lib.sh"
+else
+  usage_std() {
+    printf 'usage: %s %s\n' "$1" "${2:-}"
+    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
+  }
+  resolve_nucleus_root() {
+    [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ] && { printf '%s\n' "$NUCLEUS_REPO_ROOT"; return 0; }
+    printf '%s\n' "${HOME}/dev/nucleus"
+  }
+fi
 
 # ---- Resolve repo root ----------------------------------------------------------
-if [ "${1:-}" = "--repo-root" ] && [ -n "${2:-}" ]; then
-  NUCLEUS_REPO_ROOT="$2"
-fi
-if [ -z "${NUCLEUS_REPO_ROOT:-}" ]; then
-  printf '%s\n' "jellyfin-sync: NUCLEUS_REPO_ROOT is not set; skipping sync" >&2
-  exit 0
-fi
-REPO_ROOT="$NUCLEUS_REPO_ROOT"
+REPO_ROOT="$(resolve_nucleus_root)"
 
 # ---- Prerequisite checks -------------------------------------------------------
 if ! command -v curl >/dev/null 2>&1; then

@@ -1,15 +1,45 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # src/scripts/install-prek-hooks.sh — Install prek Git hooks for a repository
-# Args: $1 — absolute path to the repository root
 # Exit: 0 success, 1 error
-set -eu
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+
+if [ -f "$SCRIPT_DIR/lib.sh" ]; then
+  . "$SCRIPT_DIR/lib.sh"
+else
+  usage_std() {
+    printf 'usage: %s %s\n' "$1" "${2:-}"
+    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
+  }
+  resolve_nucleus_root() {
+    [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ] && { printf '%s\n' "$NUCLEUS_REPO_ROOT"; return 0; }
+    printf '%s\n' "${HOME}/dev/nucleus"
+  }
+fi
 
 # Install repository-local Git hooks for repos that opt into prek.
 # mkApplyApp bundles pkgs.prek in runtimeInputs so first-run `nix run .#apply`
 # can install hooks without depending on host-global PATH state.
 # WHY git rev-parse: handles .git as file (submodules, worktrees) + directory
 # (normal repos). Avoids silent failure in workspace-variant scenarios.
-_ephi_repo_root="$1"
+_ephi_repo_root=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --repo-root)
+      _ephi_repo_root="$2"
+      shift 2
+      ;;
+    *)
+      usage_std "$(basename "$0")" "[--repo-root <path>]" "Install prek Git hooks for a repository"
+      exit 2
+      ;;
+  esac
+done
+
+if [ -z "$_ephi_repo_root" ]; then
+  _ephi_repo_root="$(resolve_nucleus_root)"
+fi
 _ephi_config_path="$_ephi_repo_root/prek.toml"
 
 if [ ! -f "$_ephi_config_path" ]; then

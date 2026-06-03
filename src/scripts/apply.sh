@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # src/scripts/apply.sh — Dispatch the Nix apply command for the current host.
 #
 # This is a thin orchestrator: OS detection, lifecycle ordering
@@ -59,28 +59,29 @@
 #
 # Prerequisites: Nix installed; caller's environment must allow reaching the
 # nix binary.
-set -eu
+set -euo pipefail
+
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+
+if [ -f "$SCRIPT_DIR/lib.sh" ]; then
+  . "$SCRIPT_DIR/lib.sh"
+else
+  usage_std() {
+    printf 'usage: %s %s\n' "$1" "${2:-}"
+    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
+  }
+  resolve_nucleus_root() {
+    [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ] && { printf '%s\n' "$NUCLEUS_REPO_ROOT"; return 0; }
+    printf '%s\n' "${HOME}/dev/nucleus"
+  }
+fi
 
 # ---------------------------------------------------------------------------
 # Usage
 # ---------------------------------------------------------------------------
 usage() {
-  cat <<'USAGE_EOF'
-Usage: apply.sh [--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--vm-setup|--no-vm-setup] [--target-user=<name>]
-
-Dispatch the Nix apply command for the current host.
-
-Options:
-  -h, --help            Show this help message and exit
-  --ai-sync             Run the post-apply Ollama model sync step (default)
-  --no-ai-sync          Skip the post-apply Ollama model sync step
-  --replica-sync        Run the post-apply cloud replica sync step (opt-in)
-  --no-replica-sync     Skip the post-apply cloud replica sync step
-  --vm-setup            Run the post-apply VM setup step (opt-in)
-  --no-vm-setup         Skip the post-apply VM setup step
-  --target-user      Select the Home Manager flake profile key on standalone
-                     Linux hosts (ignored on Darwin and NixOS system rebuilds)
-USAGE_EOF
+  usage_std 'apply.sh' '[--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--vm-setup|--no-vm-setup] [--target-user=<name>]' \
+    'Dispatch the Nix apply command for the current host.'
   exit 0
 }
 
@@ -91,20 +92,9 @@ ai_sync=true
 replica_sync=false
 vm_setup=false
 target_user=""
-_aas_expect_target_user=false
 
-for _arg in "$@"; do
-  if [ "$_aas_expect_target_user" = true ]; then
-    if [ -z "$_arg" ]; then
-      printf '%s\n' "apply: --target-user requires a non-empty value" >&2
-      exit 1
-    fi
-    target_user="$_arg"
-    _aas_expect_target_user=false
-    continue
-  fi
-
-  case "$_arg" in
+while [ "$#" -gt 0 ]; do
+  case "$1" in
     --ai-sync)
       # Model pulls are 2–20 GB and may be undesirable in CI or on
       # low-bandwidth connections; this flag opts in to the post-apply sync.
@@ -138,10 +128,14 @@ for _arg in "$@"; do
       vm_setup=false
       ;;
     --target-user)
-      _aas_expect_target_user=true
+      target_user="$2"; shift
+      if [ -z "$target_user" ]; then
+        printf '%s\n' "apply: --target-user requires a non-empty value" >&2
+        exit 1
+      fi
       ;;
     --target-user=*)
-      target_user="${_arg#--target-user=}"
+      target_user="${1#--target-user=}"
       if [ -z "$target_user" ]; then
         printf '%s\n' "apply: --target-user requires a non-empty value" >&2
         exit 1
@@ -151,18 +145,14 @@ for _arg in "$@"; do
       usage
       ;;
     *)
-      printf '%s\n' "apply: unsupported argument '$_arg'" >&2
+      printf '%s\n' "apply: unsupported argument '$1'" >&2
       exit 1
       ;;
   esac
+  shift
 done
 
-if [ "$_aas_expect_target_user" = true ]; then
-  printf '%s\n' "apply: --target-user requires a value" >&2
-  exit 1
-fi
-
-REPO_ROOT=$(git rev-parse --show-toplevel)
+REPO_ROOT="$(resolve_nucleus_root)"
 
 # Augment PATH with the user Nix profile bin directory so Nix-managed binaries
 # (e.g. ssh-to-age, sops) are available when the script is invoked directly

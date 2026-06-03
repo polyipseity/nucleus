@@ -51,19 +51,19 @@
 param(
   [Alias("a")]
   [Parameter()]
-  [switch]$Apply,
+  [switch]$Apply = $(if ($env:NUCLEUS_APPLY -eq 'true') { $true } else { $false }),
 
   [Parameter(ValueFromRemainingArguments)]
   [string[]]$ApplyArgs,
 
   [Parameter()]
-  [switch]$NoAISync,
+  [switch]$NoAISync = $(if ($env:NUCLEUS_AI_SYNC -eq 'false') { $true } else { $false }),
 
   [Parameter()]
-  [switch]$ReplicaSync,
+  [switch]$ReplicaSync = $(if ($env:NUCLEUS_REPLICA_SYNC -eq 'true') { $true } else { $false }),
 
   [Parameter()]
-  [string]$TargetUser,
+  [string]$TargetUser = $(if ($env:NUCLEUS_TARGET_USER) { $env:NUCLEUS_TARGET_USER } else { '' }),
 
   [Alias("h")]
   [Parameter()]

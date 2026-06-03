@@ -1,7 +1,18 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # src/scripts/generate-ssh-host-key.sh — Ensure /etc/ssh/ssh_host_ed25519_key exists
 # Exit: 0 success, 1 error
-set -eu
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+
+if [ -f "$SCRIPT_DIR/lib.sh" ]; then
+  . "$SCRIPT_DIR/lib.sh"
+else
+  usage_std() {
+    printf 'usage: %s %s\n' "$1" "${2:-}"
+    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
+  }
+fi
 
 # Ensure /etc/ssh/ssh_host_ed25519_key exists before
 # register_host_age_key_if_needed tries to derive the machine age public key

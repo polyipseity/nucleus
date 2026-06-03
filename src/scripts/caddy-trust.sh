@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # caddy-trust.sh — Trust Caddy's local CA for local TLS clients.
 #
 # This script trusts Caddy's locally-managed CA root certificate so that
@@ -24,10 +24,21 @@
 #   1 — caddy not found in PATH
 #   2 — all 20 retry attempts exhausted
 
-set -eu
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+
+if [ -f "$SCRIPT_DIR/lib.sh" ]; then
+  . "$SCRIPT_DIR/lib.sh"
+else
+  usage_std() {
+    printf 'usage: %s %s\n' "$1" "${2:-}"
+    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
+  }
+fi
 
 if [ $# -ne 1 ]; then
-  printf '%s\n' "Usage: $(basename "$0") sudo|user" >&2
+  usage_std "$(basename "$0")" "sudo|user" "Arguments: sudo — run caddy trust with sudo; user — run caddy trust as the current user"
   exit 2
 fi
 _ct_mode="$1"

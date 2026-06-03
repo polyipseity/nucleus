@@ -48,7 +48,7 @@ param(
     [switch]$DebugHeadful,
 
     # Print planned actions without executing (default: $false).
-    [switch]$DryRun,
+    [switch]$DryRun = $(if ($env:NUCLEUS_DRY_RUN -eq 'true') { $true } else { $false }),
 
     [Alias("h")]
     [switch]$Help
