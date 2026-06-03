@@ -13,6 +13,7 @@
 
 .PARAMETER ApplyArgs
   Optional arguments passed through to src/hosts/Windows/apply.ps1.
+  Use -- before positional passthrough args (e.g., .\bootstrap.ps1 -WithApply -- -DryRun).
 
 .PARAMETER WithoutAISync
   Suppresses the post-apply Ollama model sync step. Forwarded to apply.ps1 as
@@ -39,8 +40,8 @@
   Install dependencies, then run the apply flow.
 
 .EXAMPLE
-  .\bootstrap.ps1 -WithApply -ApplyArgs -Help
-  Install dependencies, then show help for the apply script.
+  .\bootstrap.ps1 -WithApply -- -Help
+  Install dependencies, then show help for the apply script (using -- passthrough).
 
 .EXAMPLE
   .\bootstrap.ps1 -WithApply -WithoutAISync
@@ -52,7 +53,7 @@ param(
   [Parameter()]
   [switch]$WithApply,
 
-  [Parameter()]
+  [Parameter(ValueFromRemainingArguments)]
   [string[]]$ApplyArgs,
 
   [Parameter()]
