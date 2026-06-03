@@ -50,6 +50,9 @@ let
   test_posix_shell_exposes_managed_commands = assert' (
     lib.hasInfix ''"nucleus-ai-sync"'' shellText
     && lib.hasInfix ''"nucleus-apply"'' shellText
+    && lib.hasInfix ''"nucleus-bootstrap"'' shellText
+    && lib.hasInfix ''"nucleus-check-pwsh"'' shellText
+    && lib.hasInfix ''"nucleus-check-sh"'' shellText
     && lib.hasInfix ''"nucleus-cloud-setup"'' shellText
     && lib.hasInfix ''"nucleus-gc"'' shellText
     && lib.hasInfix ''"nucleus-health-check"'' shellText
@@ -62,6 +65,9 @@ let
   test_windows_shell_exposes_managed_commands = assert' (
     lib.hasInfix "function nucleus-ai-sync" windowsShellProfileText
     && lib.hasInfix "function nucleus-apply" windowsShellProfileText
+    && lib.hasInfix "function nucleus-bootstrap" windowsShellProfileText
+    && lib.hasInfix "function nucleus-check-pwsh" windowsShellProfileText
+    && lib.hasInfix "function nucleus-check-sh" windowsShellProfileText
     && lib.hasInfix "function nucleus-cloud-setup" windowsShellProfileText
     && lib.hasInfix "function nucleus-gc" windowsShellProfileText
     && lib.hasInfix "function nucleus-health-check" windowsShellProfileText
@@ -84,6 +90,9 @@ let
       && lib.hasInfix "`-nx` — run `bun x`." text
       && lib.hasInfix "`nucleus-ai-sync` — run the managed AI model sync flow." text
       && lib.hasInfix "`nucleus-apply` — run the managed apply flow." text
+      && lib.hasInfix "`nucleus-bootstrap` — run the managed bootstrap flow." text
+      && lib.hasInfix "`nucleus-check-pwsh` — run PowerShell syntax checks." text
+      && lib.hasInfix "`nucleus-check-sh` — run POSIX shell syntax checks." text
       && lib.hasInfix "`nucleus-cloud-setup` — configure required cloud remotes and re-run apply." text
       && lib.hasInfix "`nucleus-gc` — run the managed Nix garbage-collection flow." text
       && lib.hasInfix "`nucleus-health-check` — run the managed repository health checks." text
