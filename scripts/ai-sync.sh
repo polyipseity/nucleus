@@ -23,10 +23,6 @@ export OLLAMA_HOST="127.0.0.1:11434"
 #   OLLAMA_PROFILE  override profile selection (MacBook|NixOS|Windows); detected
 #                   automatically when unset (Darwin → MacBook, Linux → NixOS)
 #   OLLAMA_HOST     Ollama server address; defaults to 127.0.0.1:11434
-#   OLLAMA_READY_TIMEOUT_SECONDS  bounded wait for server readiness before a
-#                   benign skip (default: 60; set to 0 to disable waiting)
-#   OLLAMA_READY_POLL_SECONDS     poll interval while waiting for readiness
-#                   (default: 2)
 #
 # Exit conditions:
 #   0 on success or when ollama is unavailable (benign skip).
@@ -40,33 +36,18 @@ MANIFEST="$REPO_ROOT/src/modules/ai/models.json"
 
 dry_run=false
 prune_only=false
-ready_timeout_seconds="${OLLAMA_READY_TIMEOUT_SECONDS:-60}"
-ready_poll_seconds="${OLLAMA_READY_POLL_SECONDS:-2}"
-
-case "$ready_timeout_seconds" in
-  ''|*[!0-9]*)
-    printf '%s\n' "ai-sync: OLLAMA_READY_TIMEOUT_SECONDS must be a non-negative integer" >&2
-    exit 1
-    ;;
-esac
-
-case "$ready_poll_seconds" in
-  ''|*[!0-9]*)
-    printf '%s\n' "ai-sync: OLLAMA_READY_POLL_SECONDS must be a positive integer" >&2
-    exit 1
-    ;;
-  0)
-    printf '%s\n' "ai-sync: OLLAMA_READY_POLL_SECONDS must be greater than zero" >&2
-    exit 1
-    ;;
-esac
+ready_timeout_seconds=60
+ready_poll_seconds=2
 
 usage() {
   cat <<'EOF'
-usage: ai-sync.sh [--dry-run] [--prune-only]
+usage: ai-sync.sh [options]
 
-  --dry-run      Print planned actions without executing them.
-  --prune-only   Skip pulls; only remove unlisted models.
+  --dry-run                          Print planned actions without executing them.
+  --prune-only                       Skip pulls; only remove unlisted models.
+  --server-ready-timeout-seconds N   Bounded wait for server readiness (default: 60).
+                                     Set to 0 to disable waiting.
+  --server-ready-poll-seconds N      Poll interval while waiting (default: 2).
 EOF
 }
 
@@ -81,6 +62,22 @@ while [ "$#" -gt 0 ]; do
       ;;
     --prune-only)
       prune_only=true
+      ;;
+    --server-ready-timeout-seconds)
+      if [ -z "${2-}" ] || ! [ "$2" -eq "$2" ] 2>/dev/null || [ "$2" -lt 0 ]; then
+        printf '%s\n' "ai-sync: --server-ready-timeout-seconds requires a non-negative integer" >&2
+        exit 1
+      fi
+      ready_timeout_seconds="$2"
+      shift
+      ;;
+    --server-ready-poll-seconds)
+      if [ -z "${2-}" ] || ! [ "$2" -eq "$2" ] 2>/dev/null || [ "$2" -le 0 ]; then
+        printf '%s\n' "ai-sync: --server-ready-poll-seconds requires a positive integer" >&2
+        exit 1
+      fi
+      ready_poll_seconds="$2"
+      shift
       ;;
     *)
       printf '%s\n' "ai-sync: unsupported argument '$1'" >&2

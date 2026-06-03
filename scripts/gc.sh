@@ -253,7 +253,7 @@ prune_ollama_models_if_available() {
 
   # GC must stay space-reclaim only; do not wait for a cold Ollama daemon to
   # start because that would stall GC on hosts where the AI service is idle.
-  OLLAMA_READY_TIMEOUT_SECONDS=0 "$REPO_ROOT/scripts/ai-sync.sh" --prune-only
+  "$REPO_ROOT/scripts/ai-sync.sh" --prune-only --server-ready-timeout-seconds 0
 }
 
 prune_vm_artifacts_if_present() {
