@@ -257,9 +257,9 @@ let
   # Test 35: apply script keeps replica sync as an opt-in post-apply step
   test_apply_runs_replica_sync = assert' (
     containsRegex "run_replica_sync" applyScriptText
-    && containsRegex "skip_replica_sync=true" applyScriptText
+    && containsRegex "do_replica_sync=false" applyScriptText
     && containsRegex "--replica-sync" applyScriptText
-    && containsRegex "--skip-replica-sync" applyScriptText
+    && containsRegex "--without-replica-sync" applyScriptText
     && containsRegex "default; pass --replica-sync" applyScriptText
     && containsRegex "scripts/replica-sync\\.sh" applyScriptText
   ) "apply flow must keep replica sync opt-in with an explicit post-apply hook";
