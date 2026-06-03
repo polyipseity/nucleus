@@ -258,6 +258,23 @@ if (-not $SkipVMPrune) {
           Remove-VMPruneItem -Item $_ -Label "stale VM disk image"
         }
       }
+
+      # Prune stale start/configure scripts from scripts/ subfolder.
+      $scriptsDir = Join-Path $vmDir 'scripts'
+      if (Test-Path -LiteralPath $scriptsDir -PathType Container) {
+        Get-ChildItem -LiteralPath $scriptsDir -Filter 'start-*' -File -ErrorAction SilentlyContinue | ForEach-Object {
+          $scriptName = $_.Name -replace '^start-', '' -replace '\.(sh|ps1)$', ''
+          if ($scriptName -and $scriptName -notin $declaredVMNames) {
+            Remove-VMPruneItem -Item $_ -Label "stale start script"
+          }
+        }
+        Get-ChildItem -LiteralPath $scriptsDir -Filter 'configure-*' -File -ErrorAction SilentlyContinue | ForEach-Object {
+          $scriptName = $_.Name -replace '^configure-', '' -replace '\.(sh|ps1)$', ''
+          if ($scriptName -and $scriptName -notin $declaredVMNames) {
+            Remove-VMPruneItem -Item $_ -Label "stale configure script"
+          }
+        }
+      }
     }
   }
 }
