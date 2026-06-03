@@ -259,19 +259,20 @@ if (-not $SkipVMPrune) {
         }
       }
 
-      # Prune stale start/configure scripts from scripts/ subfolder.
+      # Prune stale VM scripts from scripts/ subfolder.
       $scriptsDir = Join-Path $vmDir 'scripts'
       if (Test-Path -LiteralPath $scriptsDir -PathType Container) {
-        Get-ChildItem -LiteralPath $scriptsDir -Filter '*.sh' -File -ErrorAction SilentlyContinue | ForEach-Object {
-          $scriptName = $_.Name -replace '\.sh$', '' -replace '^(start-|configure-)', ''
-          if ($scriptName -and $scriptName -notin $declaredVMNames) {
-            Remove-VMPruneItem -Item $_ -Label "stale VM script"
+        $scripts = Get-ChildItem -LiteralPath $scriptsDir -Include '*.sh', '*.ps1' -File -ErrorAction SilentlyContinue
+        foreach ($script in $scripts) {
+          $isDeclared = $false
+          foreach ($vmName in $declaredVMNames) {
+            if ($script.Name -like "*-$vmName.sh" -or $script.Name -like "*-$vmName.ps1") {
+              $isDeclared = $true
+              break
+            }
           }
-        }
-        Get-ChildItem -LiteralPath $scriptsDir -Filter '*.ps1' -File -ErrorAction SilentlyContinue | ForEach-Object {
-          $scriptName = $_.Name -replace '\.ps1$', '' -replace '^(start-|configure-)', ''
-          if ($scriptName -and $scriptName -notin $declaredVMNames) {
-            Remove-VMPruneItem -Item $_ -Label "stale VM script"
+          if (-not $isDeclared) {
+            Remove-VMPruneItem -Item $script -Label "stale VM script"
           }
         }
       }
