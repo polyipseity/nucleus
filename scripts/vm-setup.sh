@@ -17,7 +17,7 @@
 #                          guest builds). Download from:
 #                          https://www.microsoft.com/software-download/windows11
 #   --windows-iso-source S Source for Windows ISO auto-resolution when
-#                          --windows-iso is omitted: auto|url|mido.
+#                          --windows-iso is omitted: auto|url|fido.
 #   --windows-iso-retries N Retry attempts for Windows ISO network downloads
 #                          (default: 0, which means a single attempt).
 #   --debug-headful        Run Windows Packer QEMU builds with a visible GUI
