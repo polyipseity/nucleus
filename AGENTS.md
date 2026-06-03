@@ -70,6 +70,7 @@
   `-ErrorAction SilentlyContinue`) unless failure is expected, explicitly justified,
   and still checked.
 - Keep canonical hostnames and display names aligned: `MacBook`, `NixOS`, `Windows`.
+- Use positive option names (see `.agents/instructions/positive-options.instructions.md`).
 - Prefer preview/beta/canary channels when viable; if stable is required, add a short `# WHY`.
 
 ## Security and Activation Invariants

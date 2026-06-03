@@ -9,7 +9,7 @@
 # Model management is NOT part of Home Manager activation — model pulls are
 # 2–20 GB and would make `nix run .#apply` hang indefinitely if run inline.
 # Instead, apply.sh and apply.ps1 call scripts/ai-sync.sh / Invoke-AISync as
-# the final step of every apply run.  Pass --skip-ai-sync (-SkipAISync on
+# the final step of every apply run.  Pass --without-ai-sync (-WithoutAISync on
 # Windows) to suppress the sync step in CI or on low-bandwidth connections.
 #
 # Model manifest: src/modules/ai/models.json
