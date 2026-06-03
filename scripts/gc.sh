@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Performs bounded garbage collection on POSIX hosts.
 #
 # Operations:
@@ -24,15 +24,14 @@
 # Exit conditions:
 #   0 on success; non-zero on failure.
 
-set -eu
+set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 usage() {
+  usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
-usage: gc.sh [options]
-
   --repo-root <path>          Override the detected repository root path.
   --tool-cache-prune|--no-tool-cache-prune  Control bun/cargo/rustc/uv cache cleanup (default: --tool-cache-prune).
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).

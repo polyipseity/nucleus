@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Synchronize enabled cloud replicas declared in src/modules/users.json.
 #
 # Replica policy in this repository is pull-only:
@@ -9,22 +9,15 @@
 #   - Post-apply best-effort convergence from src/scripts/apply.sh
 #   - Manual invocation via `nucleus-replica-sync`
 
-set -eu
+set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
-REPO_ROOT="$(resolve_nucleus_root)"
-USERS_JSON="$REPO_ROOT/src/modules/users.json"
-REPLICA_CLEANUP_CONFIG_JSON="$REPO_ROOT/src/modules/configs/cloud/replica-cleanup.json"
+repo_root="${NUCLEUS_REPO_ROOT:-}"
 
 usage() {
-  cat <<'EOF'
-usage: replica-sync.sh [--dry-run] [--replica-id ID]
-
-  --dry-run         Print planned rclone commands without executing them (default: off).
-  --replica-id ID   Restrict execution to a single replica id (default: none; all replicas run).
-EOF
+  usage_std "replica-sync.sh" "[--dry-run] [--replica-id ID] [--repo-root PATH]" "Synchronize enabled cloud replicas declared in src/modules/users.json. Pull-only: remote -> local."
 }
 
 dry_run=false
@@ -43,6 +36,21 @@ while [ "$#" -gt 0 ]; do
       fi
       replica_id_filter="$1"
       ;;
+    --repo-root)
+      shift
+      if [ "$#" -eq 0 ] || [ -z "$1" ]; then
+        printf '%s\n' "replica-sync: --repo-root requires a value" >&2
+        exit 1
+      fi
+      repo_root="$1"
+      ;;
+    --repo-root=*)
+      repo_root="${1#--repo-root=}"
+      if [ -z "$repo_root" ]; then
+        printf '%s\n' "replica-sync: --repo-root requires a non-empty value" >&2
+        exit 1
+      fi
+      ;;
     -h|--help)
       usage
       exit 0
@@ -55,6 +63,14 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+
+if [ -z "$repo_root" ]; then
+  REPO_ROOT="$(resolve_nucleus_root)"
+else
+  REPO_ROOT="$repo_root"
+fi
+USERS_JSON="$REPO_ROOT/src/modules/users.json"
+REPLICA_CLEANUP_CONFIG_JSON="$REPO_ROOT/src/modules/configs/cloud/replica-cleanup.json"
 
 if [ ! -f "$USERS_JSON" ]; then
   printf '%s\n' "replica-sync: users registry not found at $USERS_JSON" >&2

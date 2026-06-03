@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Checks pre-flight readiness before bootstrap/apply/update operations.
 #
 # Validates:
@@ -16,18 +16,13 @@
 # Exit conditions:
 #   0 on success; non-zero if any check fails.
 
-set -eu
+set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 usage() {
-  cat <<'EOF'
-usage: health-check.sh [options]
-
-  --min-free-gb <int>                  Minimum free disk space in GiB (default: 10).
-  --secret-health|--no-secret-health   Enable or skip SOPS decryption identity verification (default: --secret-health).
-EOF
+  usage_std "health-check.sh" "[options]" "Checks pre-flight readiness before bootstrap/apply/update operations."
 }
 
 REPO_ROOT="$(resolve_nucleus_root)"
@@ -48,15 +43,13 @@ while [ "$#" -gt 0 ]; do
         exit 1
       fi
       min_free_gb="$2"
-      shift 2
+      shift
       ;;
     --secret-health)
       secret_health=true
-      shift
       ;;
     --no-secret-health)
       secret_health=false
-      shift
       ;;
     *)
       printf '%s\n' "health: unsupported argument '$1'" >&2
@@ -64,6 +57,7 @@ while [ "$#" -gt 0 ]; do
       exit 1
       ;;
   esac
+  shift
 done
 
 check_disk_space() {

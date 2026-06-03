@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Reset local cloud replica sync state for manual troubleshooting.
 #
 # This command is intentionally local-only: it never modifies remote data.
@@ -9,26 +9,15 @@
 #   - Manual troubleshooting via `nucleus-replica-reset`
 #   - Repro steps before validating `nucleus-replica-sync`
 
-set -eu
+set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
-REPO_ROOT="$(resolve_nucleus_root)"
-USERS_JSON="$REPO_ROOT/src/modules/users.json"
+repo_root="${NUCLEUS_REPO_ROOT:-}"
 
 usage() {
-  cat <<'EOF'
-usage: replica-reset.sh [--dry-run] [--replica-id ID]
-
-  --dry-run         Print planned reset actions without modifying local state (default: off).
-  --replica-id ID   Restrict marker/RCLONE_TEST cleanup to one replica id (default: none; all replicas reset).
-
-Notes:
-  - This command resets LOCAL replica state only; remotes are never modified.
-  - Legacy marker/cache cleanup is global because old rclone state files are
-    not reliably attributable to a single replica id.
-EOF
+  usage_std "replica-reset.sh" "[--dry-run] [--replica-id ID] [--repo-root PATH]" "Reset local cloud replica sync state for manual troubleshooting. Local-only: never modifies remote data."
 }
 
 dry_run=false
@@ -47,6 +36,21 @@ while [ "$#" -gt 0 ]; do
       fi
       replica_id_filter="$1"
       ;;
+    --repo-root)
+      shift
+      if [ "$#" -eq 0 ] || [ -z "$1" ]; then
+        printf '%s\n' "replica-reset: --repo-root requires a value" >&2
+        exit 1
+      fi
+      repo_root="$1"
+      ;;
+    --repo-root=*)
+      repo_root="${1#--repo-root=}"
+      if [ -z "$repo_root" ]; then
+        printf '%s\n' "replica-reset: --repo-root requires a non-empty value" >&2
+        exit 1
+      fi
+      ;;
     -h|--help)
       usage
       exit 0
@@ -59,6 +63,13 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+
+if [ -z "$repo_root" ]; then
+  REPO_ROOT="$(resolve_nucleus_root)"
+else
+  REPO_ROOT="$repo_root"
+fi
+USERS_JSON="$REPO_ROOT/src/modules/users.json"
 
 if [ ! -f "$USERS_JSON" ]; then
   printf '%s\n' "replica-reset: users registry not found at $USERS_JSON" >&2

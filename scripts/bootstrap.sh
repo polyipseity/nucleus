@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Install Nix (if absent) and the Nix-managed bootstrap dependencies.
 # After running this script, apply the configuration with: nix run ./src#apply
 #
@@ -11,117 +11,79 @@
 #   --ai-sync|--no-ai-sync   pass through to nix run .#apply; control the post-apply Ollama model sync step (default: --ai-sync)
 #   --replica-sync|--no-replica-sync  pass through to nix run .#apply; control immediate post-apply replica sync (default: --no-replica-sync)
 #   --target-user            pass through to src/scripts/apply.sh; selects the Home Manager flake profile on standalone Linux hosts
-set -eu
+set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
+. "$SCRIPT_DIR/../src/scripts/lib.sh"
+REPO_ROOT="$(resolve_nucleus_root)"
 VERSIONS_FILE="$SCRIPT_DIR/bootstrap-versions.env"
-apply=false
+apply="${NUCLEUS_APPLY:-false}"
 NIX_FEATURES_CONFIG="experimental-features = nix-command flakes"
 
 # ---------------------------------------------------------------------------
-# Flag parsing — collect extra flags to pass through to apply
+# Flag parsing
 # ---------------------------------------------------------------------------
-ai_sync=true
-replica_sync=false
-target_user=""
+ai_sync="${NUCLEUS_AI_SYNC:-true}"
+replica_sync="${NUCLEUS_REPLICA_SYNC:-false}"
+target_user="${NUCLEUS_TARGET_USER:-}"
 _apply_args=""
-_bsh_expect_target_user=false
-_bsh_double_dash=false
-for _bsh_arg in "$@"; do
-  if [ "$_bsh_double_dash" = true ]; then
-    # Everything after -- is passthrough for the apply command.
-    if [ -z "$_apply_args" ]; then
-      _apply_args="$_bsh_arg"
-    else
-      _apply_args="$_apply_args $_bsh_arg"
-    fi
-    continue
-  fi
 
-  if [ "$_bsh_expect_target_user" = true ]; then
-    if [ -z "$_bsh_arg" ]; then
-      printf '%s\n' "error: --target-user requires a non-empty value" >&2
-      exit 1
-    fi
-    target_user="$_bsh_arg"
-    _bsh_expect_target_user=false
-    continue
-  fi
+usage() {
+  usage_std "bootstrap.sh" "[--apply|--no-apply] [--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--target-user=<name>] [-- <apply-args>...]" "Installs Nix (if absent) and the Nix-managed bootstrap dependencies. By default installs dependencies only. Pass --apply to also run the apply flow."
+}
 
-  case "$_bsh_arg" in
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
     --apply)
-      # Install dependencies, then run the apply flow.
       apply=true
       ;;
     --no-apply)
-      # Install dependencies only (default); explicit opt-out.
       apply=false
       ;;
     --ai-sync)
-      # Model pulls are 2–20 GB; opt in to the post-apply sync.
       ai_sync=true
       ;;
     --no-ai-sync)
-      # Model pulls are 2–20 GB; suppress post-apply sync in CI or on
-      # low-bandwidth connections.
       ai_sync=false
       ;;
     --replica-sync)
-      # Replica sync is skipped by default after apply; allow explicit opt-in.
       replica_sync=true
       ;;
     --no-replica-sync)
-      # Replica sync is skipped by default after apply; explicit opt-out.
       replica_sync=false
       ;;
     --target-user)
-      # Standalone Linux parity: explicitly select which HM profile key to
-      # activate instead of relying on the local account name.
-      _bsh_expect_target_user=true
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+        printf '%s\n' "error: --target-user requires a non-empty value" >&2
+        exit 1
+      fi
+      target_user="$2"
+      shift
       ;;
     --target-user=*)
-      target_user="${_bsh_arg#--target-user=}"
+      target_user="${1#--target-user=}"
       if [ -z "$target_user" ]; then
         printf '%s\n' "error: --target-user requires a non-empty value" >&2
         exit 1
       fi
       ;;
     --)
-      # Remaining args are passthrough to the apply command.
-      _bsh_double_dash=true
-      ;;
-    -h|--help)
-      cat <<'EOF'
-Usage: bootstrap.sh [--apply|--no-apply] [--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--target-user=<name>] [-- <apply-args>...]
-
-Installs Nix (if absent) and the Nix-managed bootstrap dependencies
-(gnupg, sops, ssh-to-age) for this host.
-
-By default bootstrap installs dependencies only.  Pass --apply to also
-run the apply flow.
-
-Options:
-  -h, --help                  Show this help message and exit
-  --apply|--no-apply          After installing dependencies, run the apply flow (default: --no-apply)
-  --ai-sync|--no-ai-sync      Opt in to the post-apply Ollama model sync step (default: --ai-sync)
-  --replica-sync|--no-replica-sync  Opt in to immediate post-apply replica sync (default: --no-replica-sync)
-  --target-user               Select the Home Manager flake profile key for standalone
-                              Linux apply runs
-  --                          Remaining arguments are passed through to the apply command
-EOF
-      exit 0
+      shift
+      _apply_args="$*"
+      break
       ;;
     *)
-      printf '%s\n' "error: unsupported argument '$_bsh_arg'" >&2
+      printf '%s\n' "error: unsupported argument '$1'" >&2
+      usage >&2
       exit 1
       ;;
   esac
+  shift
 done
-if [ "$_bsh_expect_target_user" = true ]; then
-  printf '%s\n' "error: --target-user requires a value" >&2
-  exit 1
-fi
 
 merge_nix_config() {
   # Merge caller-provided NIX_CONFIG (if any) with required flake settings so

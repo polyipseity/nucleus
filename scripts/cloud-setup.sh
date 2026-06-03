@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Guides one-time cloud remote setup and validates cloud mount automation.
 #
 # Operations:
@@ -17,7 +17,7 @@
 #   0 on success; non-zero when required remotes are still missing or credential
 #   validation fails after a recreation attempt.
 
-set -eu
+set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
@@ -198,9 +198,8 @@ EOF
 }
 
 usage() {
+  usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
-usage: cloud-setup.sh [options]
-
   --apply|--no-apply  Run nucleus apply to converge cloud mount services (default: --no-apply).
 EOF
 }

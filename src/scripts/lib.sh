@@ -9,13 +9,36 @@
 #   SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 #   . "${SCRIPT_DIR}/../src/scripts/lib.sh"
 
+# usage_std — Emit standardized usage text and exit.
+#
+# Usage: usage_std "script_name" "[options]" ["description"]
+#
+# Output format:
+#   usage: script_name [options]
+#   description (indented)
+usage_std() {
+  _us_name="$1"
+  _us_opts="${2:-}"
+  shift 2 2>/dev/null || true
+
+  printf 'usage: %s %s\n' "$_us_name" "$_us_opts"
+  if [ "$#" -gt 0 ]; then
+    printf '  %s\n' "$1"
+  fi
+}
+
 # resolve_nucleus_root — Print the absolute path of the nucleus repository root.
 #
-# Resolution order:
-#   1. $HOME/.config/nucleus/repo-root file (first line, if directory exists)
-#   2. git rev-parse --show-toplevel (if inside a git working tree)
-#   3. $HOME/dev/nucleus (fallback)
+# Resolution order (Hybrid Precedence):
+#   1. $NUCLEUS_REPO_ROOT environment variable (if non-empty and directory exists)
+#   2. $HOME/.config/nucleus/repo-root file (first line, if directory exists)
+#   3. git rev-parse --show-toplevel (if inside a git working tree)
+#   4. $HOME/dev/nucleus (fallback)
 resolve_nucleus_root() {
+  if [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ]; then
+    printf '%s\n' "$NUCLEUS_REPO_ROOT"
+    return 0
+  fi
   _rnr_config_file="$HOME/.config/nucleus/repo-root"
   if [ -f "$_rnr_config_file" ]; then
     _rnr_root="$(cat "$_rnr_config_file")"
@@ -31,4 +54,21 @@ resolve_nucleus_root() {
     fi
   fi
   printf '%s\n' "$HOME/dev/nucleus"
+}
+
+# resolve_nucleus_host — Print the canonical host name.
+#
+# Resolution order (Hybrid Precedence):
+#   1. $NUCLEUS_HOST environment variable (if non-empty)
+#   2. Auto-detection from uname (Darwin → MacBook, Linux → NixOS)
+resolve_nucleus_host() {
+  if [ -n "${NUCLEUS_HOST:-}" ]; then
+    printf '%s\n' "$NUCLEUS_HOST"
+    return 0
+  fi
+  case "$(uname -s)" in
+    Darwin) printf '%s\n' "MacBook" ;;
+    Linux)  printf '%s\n' "NixOS" ;;
+    *)      printf '%s\n' "Unknown" ;;
+  esac
 }

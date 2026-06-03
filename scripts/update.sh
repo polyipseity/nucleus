@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Orchestrates repository-wide update tasks in one deterministic sequence.
 #
 # Operations:
@@ -12,6 +12,7 @@
 #   --brew|--no-brew      control Homebrew update/upgrade (macOS only) (default: --brew)
 #   --winget|--no-winget  control winget upgrade (Windows only) (default: --winget)
 #   --sops|--no-sops      control sops updatekeys (default: --sops)
+#   --repo-root <path>    override the detected repository root path
 #
 # Environment variables:
 #   NIX_CONFIG  merged with required flake feature flags for nix commands
@@ -19,19 +20,19 @@
 # Exit conditions:
 #   0 on success; non-zero on first failed step.
 
-set -eu
+set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 usage() {
+  usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
-usage: update.sh [options]
-
   --flake|--no-flake    Control nix flake update (default: --flake).
   --brew|--no-brew      Control Homebrew update/upgrade (macOS only) (default: --brew).
   --winget|--no-winget  Control winget upgrade (Windows only) (default: --winget).
   --sops|--no-sops      Control sops updatekeys (default: --sops).
+  --repo-root <path>    Override the detected repository root path.
 EOF
 }
 
@@ -71,6 +72,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-sops)
       sops=false
+      ;;
+    --repo-root)
+      REPO_ROOT="$2"
+      shift
       ;;
 
     *)

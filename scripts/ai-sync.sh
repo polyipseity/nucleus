@@ -1,9 +1,5 @@
-#!/usr/bin/env sh
-# Override OLLAMA_HOST to point directly at Ollama (not LiteLLM) so that
-# model list/pull/rm commands talk to the inference backend directly instead
-# of routing through the AI gateway proxy.  The default session variable in
-# modules/ai/default.nix points at LiteLLM (127.0.0.1:4000).
-export OLLAMA_HOST="127.0.0.1:11434"
+#!/usr/bin/env bash
+set -euo pipefail
 
 # Synchronises locally installed Ollama models with the declarative manifest
 # at src/modules/ai/models.json.
@@ -18,6 +14,7 @@ export OLLAMA_HOST="127.0.0.1:11434"
 # Arguments:
 #   --dry-run                            print planned actions without executing them (default: off)
 #   --prune-only                         skip pulls; only remove unlisted models (default: off)
+#   --repo-root <path>                   override the detected repository root path
 #   --server-ready-timeout-seconds N     bounded wait for server readiness (default: 60)
 #   --server-ready-poll-seconds N        poll interval while waiting (default: 2)
 #
@@ -30,10 +27,16 @@ export OLLAMA_HOST="127.0.0.1:11434"
 #   0 on success or when ollama is unavailable (benign skip).
 #   Non-zero when jq is unavailable or when a pull/remove step fails.
 
-set -eu
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+. "$SCRIPT_DIR/../src/scripts/lib.sh"
 
-SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
+# Override OLLAMA_HOST to point directly at Ollama (not LiteLLM) so that
+# model list/pull/rm commands talk to the inference backend directly instead
+# of routing through the AI gateway proxy.  The default session variable in
+# modules/ai/default.nix points at LiteLLM (127.0.0.1:4000).
+export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"
+
+REPO_ROOT="$(resolve_nucleus_root)"
 MANIFEST="$REPO_ROOT/src/modules/ai/models.json"
 
 dry_run=false
@@ -42,11 +45,11 @@ ready_timeout_seconds=60
 ready_poll_seconds=2
 
 usage() {
+  usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
-usage: ai-sync.sh [options]
-
   --dry-run                          Print planned actions without executing them (default: off).
   --prune-only                       Skip pulls; only remove unlisted models (default: off).
+  --repo-root <path>                 Override the detected repository root path.
   --server-ready-timeout-seconds N   Bounded wait for server readiness (default: 60).
                                      Set to 0 to disable waiting.
   --server-ready-poll-seconds N      Poll interval while waiting (default: 2).
@@ -64,6 +67,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --prune-only)
       prune_only=true
+      ;;
+    --repo-root)
+      REPO_ROOT="$2"
+      shift
       ;;
     --server-ready-timeout-seconds)
       if [ -z "${2-}" ] || ! [ "$2" -eq "$2" ] 2>/dev/null || [ "$2" -lt 0 ]; then
