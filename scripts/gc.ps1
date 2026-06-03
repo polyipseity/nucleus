@@ -19,8 +19,8 @@
        at src/modules/ai/models.json.  Uses Invoke-AISync -PruneOnly so no new
        model pulls are triggered — GC only reclaims space.  Guarded by an ollama
        presence check so the step is a no-op when Ollama is not installed.
-    5. Remove stale VM build artifacts (Packer directories, cached installers,
-       pre-built disk images) for VMs no longer declared in src/modules/VMs.json.
+    5. Remove stale VM build artifacts (Packer directories, pre-built disk
+       images) for VMs no longer declared in src/modules/VMs.json.
        Guarded by the SkipVMPrune switch.
 
   All file operations are scoped to the primary user profile.  The script is
@@ -213,9 +213,9 @@ if (-not $SkipOllamaPrune) {
 }
 
 # ---- Step 5: stale VM artifact removal ------________________________________
-# Removes temporary Packer build directories, cached Windows installers, and
-# pre-built disk images for VMs no longer declared in src/modules/VMs.json.
-# WHY: VM disk images and installer caches are large (multi-gigabyte);
+# Removes temporary Packer build directories and pre-built disk images for VMs
+# no longer declared in src/modules/VMs.json.
+# WHY: VM disk images are large (multi-gigabyte);
 # clearing stale files keeps disk usage bounded and VM provisioning fast.
 if (-not $SkipVMPrune) {
   $vmDir = Join-Path $env:USERPROFILE "virtual machines"
@@ -242,11 +242,6 @@ if (-not $SkipVMPrune) {
       # Remove temporary Packer build directories.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*-build" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
         Remove-VMPruneItem -Item $_ -Label "temporary VM build directory" -Recurse
-      }
-
-      # Remove cached Windows installer ISOs.
-      Get-ChildItem -LiteralPath $imagesDir -Filter "*-installer.iso" -File -ErrorAction SilentlyContinue | ForEach-Object {
-        Remove-VMPruneItem -Item $_ -Label "cached Windows installer"
       }
 
       # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.

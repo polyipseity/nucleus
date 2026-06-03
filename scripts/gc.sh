@@ -244,12 +244,12 @@ prune_ollama_models_if_available() {
 
 prune_vm_artifacts_if_present() {
   # Remove stale VM artifacts from ~/virtual machines that accumulate across
-  # provisioning cycles. This includes temporary Packer build directories,
-  # cached installers, and pre-built images for VMs no longer declared in the
-  # manifest at src/modules/VMs.json.
+  # provisioning cycles. This includes temporary Packer build directories and
+  # pre-built images for VMs no longer declared in the manifest at
+  # src/modules/VMs.json.
   #
-  # WHY: VM disk images and installer caches are large (multi-gigabyte);
-  # clearing stale files keeps disk usage bounded and VM provisioning fast.
+  # WHY: VM disk images are large (multi-gigabyte); clearing stale files keeps
+  # disk usage bounded and VM provisioning fast.
   if ! command -v jq >/dev/null 2>&1; then
     # jq is required to parse the manifest.
     printf '%s\n' "gc: jq unavailable; skipping VM artifact prune"
@@ -301,17 +301,6 @@ prune_vm_artifacts_if_present() {
     fi
   done
 
-  # Remove cached Windows installer ISOs (will be re-downloaded if needed).
-  for iso_file in "$images_dir"/*-installer.iso; do
-    if [ -f "$iso_file" ]; then
-      if rm -f "$iso_file" 2>/dev/null; then
-        printf '%s\n' "gc: removed cached Windows installer '$(basename "$iso_file")'"
-      else
-        printf '%s\n' "gc: warning: failed to remove cached Windows installer '$iso_file'" >&2
-      fi
-    fi
-  done
-
   # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
   for qcow2_file in "$images_dir"/*.qcow2; do
     if [ -f "$qcow2_file" ]; then
@@ -355,7 +344,7 @@ if [ "$skip_ollama_prune" = false ]; then
   prune_ollama_models_if_available
 fi
 
-# Step 6: remove stale VM artifacts (temporary builds, cached installers, orphaned images).
+# Step 6: remove stale VM artifacts (temporary builds, orphaned images).
 if [ "$skip_vm_prune" = false ]; then
   prune_vm_artifacts_if_present
 fi
