@@ -27,9 +27,9 @@
   idempotent and safe to re-run.
 
 .PARAMETER ModuleDir
-  Path to the Windows helper module directory. Mandatory: caller must
-  explicitly pass the module directory so they are aware of which modules
-  will be loaded and executed.
+  Path to the Windows helper module directory. When omitted, auto-derives
+  from RepoRoot as src\hosts\Windows\modules so callers can skip it when
+  RepoRoot is provided.
 
 .PARAMETER RepoRoot
   Root of the repository. Mandatory: caller must explicitly pass the repo root
