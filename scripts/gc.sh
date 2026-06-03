@@ -9,6 +9,7 @@
 #   5. remove locally installed Ollama models absent from the manifest (if ollama is available)
 #
 # Arguments:
+#   --repo-root <path>     override the detected repository root path
 #   --skip-tool-cache-prune skip bun/cargo/rustc/uv and repo-local .direnv cache cleanup
 #   --skip-hm-gc           skip home-manager expire-generations
 #   --skip-nix-gc          skip nix-collect-garbage
@@ -32,6 +33,7 @@ usage() {
   cat <<'EOF'
 usage: gc.sh [options]
 
+  --repo-root <path>       Override the detected repository root path.
   --skip-tool-cache-prune  Skip bun/cargo/rustc/uv cache cleanup.
   --skip-hm-gc             Skip home-manager generation expiration.
   --skip-nix-gc            Skip nix-collect-garbage.
@@ -51,9 +53,14 @@ skip_ollama_prune=false
 skip_scoop_cleanup=false
 skip_wallpaper_prune=false
 skip_vm_prune=false
+repo_root_override=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --repo-root)
+      repo_root_override="$2"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -88,6 +95,10 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+
+if [ -n "$repo_root_override" ]; then
+  REPO_ROOT="$repo_root_override"
+fi
 
 expire_hm_generations_if_available() {
   # Home Manager generations are GC roots: nix-collect-garbage cannot reclaim
