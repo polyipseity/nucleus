@@ -29,10 +29,19 @@ param(
   [int]$MinFreeGB = 10,
 
   [Parameter()]
-  [switch]$WithoutSecretHealth
+  [switch]$WithoutSecretHealth,
+
+  [Alias("h")]
+  [Parameter()]
+  [switch]$Help
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($Help) {
+  Get-Help $PSCommandPath -Detailed
+  return
+}
 
 function Test-DiskSpace {
   <#

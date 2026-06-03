@@ -71,10 +71,17 @@ param(
   [switch]$WithoutOllamaPrune,
   [switch]$WithoutScoopCleanup,
   [switch]$WithoutWallpaperPrune,
-  [switch]$WithoutVMPrune
+  [switch]$WithoutVMPrune,
+  [Alias("h")]
+  [switch]$Help
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($Help) {
+  Get-Help $PSCommandPath -Detailed
+  return
+}
 
 if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
   $RepoRoot = & {

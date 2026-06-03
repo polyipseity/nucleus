@@ -46,10 +46,18 @@ param(
     [switch]$DebugHeadful,
 
     # Print planned actions without executing.
-    [switch]$DryRun
+    [switch]$DryRun,
+
+    [Alias("h")]
+    [switch]$Help
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($Help) {
+  Get-Help $PSCommandPath -Detailed
+  return
+}
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..') |
     Select-Object -ExpandProperty Path

@@ -34,10 +34,17 @@ param(
   [switch]$WithoutFlake,
   [switch]$WithoutBrew,
   [switch]$WithoutWinget,
-  [switch]$WithoutSops
+  [switch]$WithoutSops,
+  [Alias("h")]
+  [switch]$Help
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($Help) {
+  Get-Help $PSCommandPath -Detailed
+  return
+}
 
 # macOS-only parameter; accepted for interface compatibility.
 $WithoutBrew | Out-Null
