@@ -20,7 +20,7 @@ set -eu
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/.." && pwd)
 VERSIONS_FILE="$SCRIPT_DIR/bootstrap-versions.env"
-COMMAND="${1:-install-deps}"
+apply=false
 NIX_FEATURES_CONFIG="experimental-features = nix-command flakes"
 
 # ---------------------------------------------------------------------------
@@ -29,12 +29,17 @@ NIX_FEATURES_CONFIG="experimental-features = nix-command flakes"
 skip_ai_sync=false
 replica_sync=false
 target_user=""
-_bsh_first=true
+_apply_args=""
 _bsh_expect_target_user=false
+_bsh_double_dash=false
 for _bsh_arg in "$@"; do
-  # Skip the first argument (the command word) so subsequent flags are parsed.
-  if [ "$_bsh_first" = true ]; then
-    _bsh_first=false
+  if [ "$_bsh_double_dash" = true ]; then
+    # Everything after -- is passthrough for the apply command.
+    if [ -z "$_apply_args" ]; then
+      _apply_args="$_bsh_arg"
+    else
+      _apply_args="$_apply_args $_bsh_arg"
+    fi
     continue
   fi
 
@@ -49,6 +54,10 @@ for _bsh_arg in "$@"; do
   fi
 
   case "$_bsh_arg" in
+    --apply)
+      # Install dependencies, then run the apply flow.
+      apply=true
+      ;;
     --skip-ai-sync)
       # Model pulls are 2–20 GB; suppress post-apply sync in CI or on
       # low-bandwidth connections.
@@ -69,6 +78,31 @@ for _bsh_arg in "$@"; do
         printf '%s\n' "error: --target-user requires a non-empty value" >&2
         exit 1
       fi
+      ;;
+    --)
+      # Remaining args are passthrough to the apply command.
+      _bsh_double_dash=true
+      ;;
+    -h|--help)
+      cat <<'EOF'
+Usage: bootstrap.sh [--apply] [--skip-ai-sync] [--replica-sync] [--target-user=<name>] [-- <apply-args>...]
+
+Installs Nix (if absent) and the Nix-managed bootstrap dependencies
+(gnupg, sops, ssh-to-age) for this host.
+
+By default bootstrap installs dependencies only.  Pass --apply to also
+run the apply flow.
+
+Options:
+  -h, --help       Show this help message and exit
+  --apply          After installing dependencies, run the apply flow
+  --skip-ai-sync   Suppress the post-apply Ollama model sync step
+  --replica-sync   Opt in to immediate post-apply replica sync
+  --target-user    Select the Home Manager flake profile key for standalone
+                   Linux apply runs
+  --               Remaining arguments are passed through to the apply command
+EOF
+      exit 0
       ;;
     *)
       printf '%s\n' "error: unsupported argument '$_bsh_arg'" >&2
@@ -97,37 +131,6 @@ run_nix() {
   # actionable failures instead of identical VCS status noise.
   NIX_CONFIG="$(merge_nix_config)" nix --option warn-dirty false "$@"
 }
-
-if [ "$COMMAND" = "-h" ] || [ "$COMMAND" = "--help" ] || [ "$COMMAND" = "help" ]; then
-  cat <<'EOF'
-Usage: bootstrap.sh [install-deps|apply] [--skip-ai-sync] [--target-user=<name>]
-
-Installs Nix (if absent) and the Nix-managed bootstrap dependencies
-(gnupg, sops, ssh-to-age) for this host.
-
-Commands:
-  install-deps  Install bootstrap dependencies only (default)
-  apply         Install bootstrap dependencies, then run src apply flow
-
-Options:
-  --skip-ai-sync  Suppress the post-apply Ollama model sync step.  Useful in
-                  CI or on low-bandwidth connections where model pulls
-                  (2–20 GB each) are undesirable.
-  --replica-sync  Opt in to immediate post-apply replica sync. By default
-                  apply skips replica sync because scheduled daily sync
-                  converges replicas.
-  --target-user   Select the Home Manager flake profile key for standalone
-                  Linux apply runs (parity with Windows per-user config
-                  selection). Ignored on Darwin/NixOS system rebuild flows.
-  -h, --help    Show this help message
-EOF
-  exit 0
-fi
-
-if [ "$COMMAND" != "apply" ] && [ "$COMMAND" != "install-deps" ]; then
-  printf '%s\n' "error: unsupported command '$COMMAND' (supported: apply, install-deps)" >&2
-  exit 1
-fi
 
 load_bootstrap_versions() {
   # Dot-sources bootstrap-versions.env into the current shell with `set -a`
@@ -328,7 +331,7 @@ fi
 
 allow_repo_direnv_if_available
 
-if [ "$COMMAND" = "apply" ]; then
+if [ "$apply" = true ]; then
   printf '%s\n' "Running apply flow via src#apply..."
   # Health-check is already invoked by apply.sh for each OS branch; calling it
   # here too would print "health checks passed" twice and slow bootstrap down.
@@ -341,6 +344,10 @@ if [ "$COMMAND" = "apply" ]; then
   fi
   if [ -n "$target_user" ]; then
     set -- "$@" --target-user "$target_user"
+  fi
+  if [ -n "$_apply_args" ]; then
+    # shellcheck disable=SC2086  # word splitting is intentional for passthrough
+    set -- "$@" $_apply_args
   fi
 
   run_nix run "$REPO_ROOT/src#apply" -- "$@"
