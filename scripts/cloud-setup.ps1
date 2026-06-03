@@ -12,7 +12,7 @@
        remote with stale auth tokens to avoid manual config deletion
     4. optionally runs `nix run <repo>/src#apply` if -Apply switch provided
 
-.PARAMETER WithApply
+.PARAMETER Apply
   Run nucleus apply to converge cloud mount services.
   (default: setup/validate only; user can run nucleus apply later)
 
@@ -20,11 +20,11 @@
   .\cloud-setup.ps1
 
 .EXAMPLE
-  .\cloud-setup.ps1 -WithApply
+  .\cloud-setup.ps1 -Apply
 #>
 [CmdletBinding()]
 param(
-  [switch]$WithApply
+  [switch]$Apply
 )
 
 $ErrorActionPreference = 'Stop'
@@ -304,7 +304,7 @@ if ($staleRemotes.Count -gt 0) {
 
 Write-Output 'cloud-setup: all credentials valid.'
 
-if ($WithApply) {
+if ($Apply) {
   Write-Output 'cloud-setup: running nucleus apply to converge cloud mount services...'
   & nix --option warn-dirty false run "$repoRoot/src#apply"
   if ($LASTEXITCODE -ne 0) {

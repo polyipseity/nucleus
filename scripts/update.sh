@@ -8,10 +8,10 @@
 #   4. rewrap all SOPS-managed files for current recipients
 #
 # Arguments:
-#   --without-flake       do not run nix flake update
-#   --without-brew        do not run Homebrew update/upgrade (macOS only)
-#   --without-winget      do not run winget upgrade (Windows only)
-#   --without-sops        do not run sops updatekeys
+#   --flake|--no-flake    control nix flake update
+#   --brew|--no-brew      control Homebrew update/upgrade (macOS only)
+#   --winget|--no-winget  control winget upgrade (Windows only)
+#   --sops|--no-sops      control sops updatekeys
 #
 # Environment variables:
 #   NIX_CONFIG  merged with required flake feature flags for nix commands
@@ -28,19 +28,19 @@ usage() {
   cat <<'EOF'
 usage: update.sh [options]
 
-  --without-flake    Do not run nix flake update.
-  --without-brew     Do not run Homebrew update/upgrade (macOS only).
-  --without-winget   Do not run winget upgrade (Windows only).
-  --without-sops     Do not run sops updatekeys.
+  --flake|--no-flake    Control nix flake update.
+  --brew|--no-brew      Control Homebrew update/upgrade (macOS only).
+  --winget|--no-winget  Control winget upgrade (Windows only).
+  --sops|--no-sops      Control sops updatekeys.
 EOF
 }
 
 REPO_ROOT="$(resolve_nucleus_root)"
 
-do_flake=true
-do_brew=true
-do_winget=true
-do_sops=true
+flake=true
+brew=true
+winget=true
+sops=true
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -48,18 +48,31 @@ while [ "$#" -gt 0 ]; do
       usage
       exit 0
       ;;
-    --without-flake)
-      do_flake=false
+    --flake)
+      flake=true
       ;;
-    --without-brew)
-      do_brew=false
+    --no-flake)
+      flake=false
       ;;
-    --without-winget)
-      do_winget=false
+    --brew)
+      brew=true
       ;;
-    --without-sops)
-      do_sops=false
+    --no-brew)
+      brew=false
       ;;
+    --winget)
+      winget=true
+      ;;
+    --no-winget)
+      winget=false
+      ;;
+    --sops)
+      sops=true
+      ;;
+    --no-sops)
+      sops=false
+      ;;
+
     *)
       printf '%s\n' "update: unsupported argument '$1'" >&2
       usage >&2
@@ -159,19 +172,19 @@ rewrap_sops_files() {
   fi
 }
 
-if [ "$do_flake" = true ]; then
+if [ "$flake" = true ]; then
   update_flake_inputs
 fi
 
-if [ "$do_brew" = true ]; then
+if [ "$brew" = true ]; then
   update_homebrew_if_available
 fi
 
-if [ "$do_winget" = true ]; then
+if [ "$winget" = true ]; then
   update_windows_packages_if_available
 fi
 
-if [ "$do_sops" = true ]; then
+if [ "$sops" = true ]; then
   rewrap_sops_files
 fi
 
