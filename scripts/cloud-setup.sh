@@ -205,7 +205,7 @@ usage: cloud-setup.sh [options]
 EOF
 }
 
-skip_apply=true
+do_apply=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help)
@@ -213,7 +213,7 @@ while [ "$#" -gt 0 ]; do
       exit 0
       ;;
     --apply)
-      skip_apply=false
+      do_apply=true
       ;;
     *)
       printf '%s\n' "cloud-setup: unsupported argument '$1'" >&2
@@ -437,7 +437,7 @@ if [ -f "$USERS_JSON" ]; then
   restart_cloud_mount_services "$USERS_JSON"
 fi
 
-if [ "$skip_apply" = false ]; then
+if [ "$do_apply" = true ]; then
   printf '%s\n' "cloud-setup: running nucleus apply to converge cloud mount services..."
   nix --option warn-dirty false run "$repo_root/src#apply"
 fi
