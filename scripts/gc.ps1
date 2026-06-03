@@ -92,8 +92,12 @@ if ([string]::IsNullOrWhiteSpace($ModuleDir)) {
 
 # -SkipNixGc and -SkipHmGc are accepted but ignored on Windows (POSIX-only
 # options from gc.sh). Accepted for cross-platform CLI parity.
-$null = $SkipNixGc
-$null = $SkipHmGc
+if ($SkipNixGc) {
+  Write-Warning "gc: -SkipNixGc accepted but ignored on Windows (POSIX-only)"
+}
+if ($SkipHmGc) {
+  Write-Warning "gc: -SkipHmGc accepted but ignored on Windows (POSIX-only)"
+}
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 $resolvedRepoRoot  = (Resolve-Path -Path $RepoRoot).Path

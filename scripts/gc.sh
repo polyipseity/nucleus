@@ -72,6 +72,7 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-scoop-cleanup)
       skip_scoop_cleanup=true
+      printf '%s\n' "gc: --skip-scoop-cleanup accepted but ignored on POSIX (Windows-only)"
       ;;
     --skip-wallpaper-prune)
       skip_wallpaper_prune=true
