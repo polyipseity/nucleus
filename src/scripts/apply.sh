@@ -46,8 +46,8 @@
 #
 # Arguments:
 #   --without-ai-sync  skip the post-apply Ollama model sync step
-#   --replica-sync     run the post-apply cloud replica sync step (opt-in)
-#   --vm-setup         run the post-apply VM setup step (opt-in)
+#   --with-replica-sync  run the post-apply cloud replica sync step (opt-in)
+#   --with-vm-setup      run the post-apply VM setup step (opt-in)
 #   --target-user   select the Home Manager flake profile key on standalone
 #                   Linux hosts (ignored on Darwin and NixOS system rebuilds)
 #
@@ -66,15 +66,15 @@ set -eu
 # ---------------------------------------------------------------------------
 usage() {
   cat <<'USAGE_EOF'
-Usage: apply.sh [--without-ai-sync] [--replica-sync] [--vm-setup] [--target-user=<name>]
+Usage: apply.sh [--without-ai-sync] [--with-replica-sync] [--with-vm-setup] [--target-user=<name>]
 
 Dispatch the Nix apply command for the current host.
 
 Options:
   -h, --help            Show this help message and exit
   --without-ai-sync     Skip the post-apply Ollama model sync step
-  --replica-sync        Run the post-apply cloud replica sync step (opt-in)
-  --vm-setup            Run the post-apply VM setup step (opt-in)
+  --with-replica-sync   Run the post-apply cloud replica sync step (opt-in)
+  --with-vm-setup       Run the post-apply VM setup step (opt-in)
   --target-user      Select the Home Manager flake profile key on standalone
                      Linux hosts (ignored on Darwin and NixOS system rebuilds)
 USAGE_EOF
@@ -85,8 +85,8 @@ USAGE_EOF
 # Flag parsing
 # ---------------------------------------------------------------------------
 do_ai_sync=true
-do_replica_sync=false
-vm_setup=false
+with_replica_sync=false
+with_vm_setup=false
 target_user=""
 _aas_expect_target_user=false
 
@@ -107,17 +107,17 @@ for _arg in "$@"; do
       # low-bandwidth connections; this flag opts out of the post-apply sync.
       do_ai_sync=false
       ;;
-    --replica-sync)
+    --with-replica-sync)
       # Replica sync is slow for large trees and skipped by default after
       # apply; this flag opts in to immediate post-apply convergence.
-      do_replica_sync=true
+      with_replica_sync=true
       ;;
 
-    --vm-setup)
+    --with-vm-setup)
       # VM setup provisions QEMU disk images and registers VMs (UTM on macOS,
       # libvirt on NixOS).  Skipped by default after apply because disk
       # pre-allocation and VM registration are large, slow, and idempotent.
-      vm_setup=true
+      with_vm_setup=true
       ;;
     --target-user)
       _aas_expect_target_user=true
@@ -299,7 +299,7 @@ run_vm_setup() {
   # Call scripts/vm-setup.sh to provision virtual machine disk images and
   # register VMs after the system configuration has been applied.
   #
-  # Why opt-in (--vm-setup required):
+  # Why opt-in (--with-vm-setup required):
   #   Disk pre-allocation is slow (up to 128 GB) and only needed on the first
   #   provision of a new machine.  Subsequent applies do not re-create existing
   #   disks; the guard is in the script itself.  Still, running it on every
@@ -314,8 +314,8 @@ run_vm_setup() {
   #   bundled into the app closure via siblingScripts in mkApplyApp.  The
   #   script's runtimeInputs (jq) are resolved at build time, so apply.sh
   #   does not need to know the repository layout.
-  if [ "$vm_setup" = false ]; then
-    printf '%s\n' "vm-setup: --vm-setup not set; skipping post-apply VM provisioning"
+  if [ "$with_vm_setup" = false ]; then
+    printf '%s\n' "vm-setup: --with-vm-setup not set; skipping post-apply VM provisioning"
     return
   fi
 
@@ -381,8 +381,8 @@ run_replica_sync() {
   # Why best-effort: replica convergence is additive and may involve large
   # transfers. A replica error should not retroactively fail a completed
   # system apply.
-  if [ "$do_replica_sync" = false ]; then
-    printf '%s\n' "replica-sync: skipping post-apply replica sync (default; pass --replica-sync to run now)"
+  if [ "$with_replica_sync" = false ]; then
+    printf '%s\n' "replica-sync: skipping post-apply replica sync (default; pass --with-replica-sync to run now)"
     return
   fi
 
