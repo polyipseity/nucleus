@@ -56,6 +56,7 @@ let
     && lib.hasInfix ''"nucleus-replica-reset"'' shellText
     && lib.hasInfix ''"nucleus-replica-sync"'' shellText
     && lib.hasInfix ''"nucleus-update"'' shellText
+    && lib.hasInfix ''"nucleus-vm-setup"'' shellText
   ) "shell.nix must expose the managed nucleus command set";
 
   test_windows_shell_exposes_managed_commands = assert' (
@@ -67,6 +68,7 @@ let
     && lib.hasInfix "function nucleus-replica-reset" windowsShellProfileText
     && lib.hasInfix "function nucleus-replica-sync" windowsShellProfileText
     && lib.hasInfix "function nucleus-update" windowsShellProfileText
+    && lib.hasInfix "function nucleus-vm-setup" windowsShellProfileText
   ) "Windows shell profile must expose the managed nucleus command set";
 
   test_manuals_document_curated_shortcuts_and_commands = assert' (builtins.all
