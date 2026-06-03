@@ -700,7 +700,7 @@ in
       _scs_jq_bin='${pkgs.jq}/bin/jq'
       ${repoRootResolver}
 
-      _scs_skip_sync=false
+      _scs_do_sync=true
 
       # Prepend ~/.bun/bin so the ClawHub binary installed by installBunPackages
       # is on PATH for this activation step.
@@ -719,16 +719,16 @@ in
       _scs_manifest="$_scs_repo_root/${clawhubManifestRelativePath}"
       if [ ! -f "$_scs_manifest" ]; then
         echo "clawhub: manifest not found at $_scs_manifest; skipping fetched skill sync"
-        _scs_skip_sync=true
+        _scs_do_sync=false
       fi
 
       _scs_slugs_file="$(mktemp)"
-      if [ "$_scs_skip_sync" = false ]; then
+      if [ "$_scs_do_sync" = true ]; then
         "$_scs_jq_bin" -r '.skills[]?' "$_scs_manifest" > "$_scs_slugs_file"
 
         if [ ! -s "$_scs_slugs_file" ]; then
           echo "clawhub: no fetched skills in manifest; skipping"
-          _scs_skip_sync=true
+          _scs_do_sync=false
         fi
       fi
 
@@ -744,12 +744,12 @@ in
       # Probe for the ClawHub CLI.  ClawHub must be pre-installed by the
       # installBunPackages activation before this step is called; this step
       # never installs ClawHub itself.
-      if [ "$_scs_skip_sync" = false ] && ! command -v clawhub >/dev/null 2>&1; then
+      if [ "$_scs_do_sync" = true ] && ! command -v clawhub >/dev/null 2>&1; then
         echo "clawhub: clawhub not found in PATH; installBunPackages must complete before fetched skill sync; skipping" >&2
-        _scs_skip_sync=true
+        _scs_do_sync=false
       fi
 
-      if [ "$_scs_skip_sync" = false ]; then
+      if [ "$_scs_do_sync" = true ]; then
         echo "clawhub: running fetched skill sync..."
 
         # Install or update each skill from the manifest.
