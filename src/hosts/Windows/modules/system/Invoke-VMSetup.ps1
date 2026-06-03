@@ -39,7 +39,10 @@ function Wait-GuestReady {
             $writer.Flush()
             $response = $reader.ReadLine()
             if ($response -match '"return"\s*:\s*{}') { return $true }
-        } catch { }
+        } catch {
+            # Guest ping timeout is expected in retry loop.
+            $null = $_
+        }
         Start-Sleep -Seconds 5
     }
     return $false
@@ -483,17 +486,17 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
         $startContentPs1Template = Join-Path $templatesDir 'start-windows.ps1'
         if (Test-Path -LiteralPath $startContentPs1Template -PathType Leaf) {
             $ps1Template = Get-Content -Path $startContentPs1Template -Raw
-            $startContentPs1 = $ps1Template.Replace('{{QEMU_SYSTEM}}', $qemuSystem) `
-                .Replace('{{VM_NAME}}', $vm.name) `
-                .Replace('{{VM_DISPLAY}}', $vm.display) `
-                .Replace('{{MACHINE}}', $machine) `
-                .Replace('{{CPU}}', $cpu) `
-                .Replace('{{CPUS}}', [string]$vm.cpus) `
-                .Replace('{{RAM_MIB}}', [string]$ramMib) `
-                .Replace('{{DISK_PATH}}', $diskPath) `
-                .Replace('{{VGA}}', $vga) `
-                .Replace('{{DISPLAY_BACKEND}}', $display) `
-                .Replace('{{VIRTIOFS_ARGS}}', $virtiofsArgs)
+            $startContentPs1 = $ps1Template.Replace('{{QEMU_SYSTEM}}', $qemuSystem)
+            $startContentPs1 = $startContentPs1.Replace('{{VM_NAME}}', $vm.name)
+            $startContentPs1 = $startContentPs1.Replace('{{VM_DISPLAY}}', $vm.display)
+            $startContentPs1 = $startContentPs1.Replace('{{MACHINE}}', $machine)
+            $startContentPs1 = $startContentPs1.Replace('{{CPU}}', $cpu)
+            $startContentPs1 = $startContentPs1.Replace('{{CPUS}}', [string]$vm.cpus)
+            $startContentPs1 = $startContentPs1.Replace('{{RAM_MIB}}', [string]$ramMib)
+            $startContentPs1 = $startContentPs1.Replace('{{DISK_PATH}}', $diskPath)
+            $startContentPs1 = $startContentPs1.Replace('{{VGA}}', $vga)
+            $startContentPs1 = $startContentPs1.Replace('{{DISPLAY_BACKEND}}', $display)
+            $startContentPs1 = $startContentPs1.Replace('{{VIRTIOFS_ARGS}}', $virtiofsArgs)
         } else {
             Write-Warning "vm-setup: start-windows.ps1 template not found at $startContentPs1Template; writing minimal script"
             $startContentPs1 = "Write-Host 'start-$($vm.name).ps1 — Start VM $($vm.display)'"
@@ -957,19 +960,23 @@ function Invoke-BuildWindowsImage {
     $efiCode = $efiCodeCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
     $efiVars = $efiVarsCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 
+    # WHY: Software emulation (tcg) runs at 2-5% native speed, so Windows PE
+    # load + installation + OOBE can take 10-30 real hours.  Use much longer
+    # SSH timeouts for tcg compared to hardware-accelerated (whpx) builds.
+    # These match the shell script vm-setup.sh build strategy matrix.
     $buildAttempts = if ($Accelerator -eq 'tcg') {
         @(
-            @{ Firmware = 'bios'; Boot = 'none' },
-            @{ Firmware = 'bios'; Boot = 'spacebar' },
-            @{ Firmware = 'bios'; Boot = 'alpha' },
-            @{ Firmware = 'bios'; Boot = 'legacy' }
+            @{ Firmware = 'bios'; Boot = 'none'; Timeout = '8h' },
+            @{ Firmware = 'bios'; Boot = 'spacebar'; Timeout = '8h' },
+            @{ Firmware = 'bios'; Boot = 'alpha'; Timeout = '8h' },
+            @{ Firmware = 'bios'; Boot = 'legacy'; Timeout = '72h' }
         )
     } else {
         @(
-            @{ Firmware = 'bios'; Boot = 'none' },
-            @{ Firmware = 'bios'; Boot = 'spacebar' },
-            @{ Firmware = 'bios'; Boot = 'alpha' },
-            @{ Firmware = 'bios'; Boot = 'legacy' }
+            @{ Firmware = 'bios'; Boot = 'none'; Timeout = '30m' },
+            @{ Firmware = 'bios'; Boot = 'spacebar'; Timeout = '2h' },
+            @{ Firmware = 'bios'; Boot = 'alpha'; Timeout = '2h' },
+            @{ Firmware = 'bios'; Boot = 'legacy'; Timeout = '3h' }
         )
     }
 
