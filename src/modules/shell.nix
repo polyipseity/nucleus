@@ -112,24 +112,6 @@ let
       exec nix --option warn-dirty false run ${config.home.homeDirectory}/dev/nucleus/src#${app} -- "$@"
     '';
 
-  # Keep direct script wrappers available for repo utilities that intentionally
-  # use the host runtime environment instead of a flake app wrapper.
-  mkRepoScriptCommand =
-    name: scriptRelativePath:
-    pkgs.writeShellScriptBin name ''
-      set -eu
-
-      # Export rclone config passphrase from SOPS-managed secret so rclone
-      # transparently uses config file encryption in all interactive and
-      # scripted invocations (e.g. nucleus-ai-sync, nucleus-vm-setup).
-      ${lib.optionalString config.nucleus.rclone.configPassEnabled ''
-        if [ -s "${config.nucleus.rclone.configPassSecretPath}" ]; then
-          export RCLONE_CONFIG_PASS="$(cat "${config.nucleus.rclone.configPassSecretPath}")"
-        fi
-      ''}
-
-      exec "${config.home.homeDirectory}/dev/nucleus/${scriptRelativePath}" "$@"
-    '';
 in
 {
   home.packages = [
@@ -144,6 +126,7 @@ in
     (mkNucleusCommand "nucleus-replica-sync" "replica-sync")
     (mkNucleusCommand "nucleus-update" "update")
     (mkNucleusCommand "nucleus-vm-setup" "vm-setup")
+    (mkNucleusCommand "nucleus-bootstrap" "bootstrap")
   ];
 
   # direnv: automatically loads/unloads per-directory environments.
