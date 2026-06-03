@@ -8,17 +8,40 @@
     2. winget package upgrades (when available)
     3. SOPS recipient rewrap for managed secret files
 
+.PARAMETER SkipFlake
+  Do not run nix flake update.
+
+.PARAMETER SkipBrew
+  Do not run Homebrew update/upgrade (macOS only; ignored on Windows).
+
+.PARAMETER SkipWinget
+  Do not run winget upgrade.
+
+.PARAMETER SkipSops
+  Do not run sops updatekeys.
+
 .EXAMPLE
   .\update.ps1
+
+.EXAMPLE
+  .\update.ps1 -SkipFlake
+
+.EXAMPLE
+  .\update.ps1 -SkipFlake -SkipWinget -SkipSops
 #>
 [CmdletBinding()]
-param()
+param(
+  [switch]$SkipFlake,
+  [switch]$SkipBrew,
+  [switch]$SkipWinget,
+  [switch]$SkipSops
+)
 
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
 
-if (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue) {
+if (-not $SkipFlake -and (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue)) {
   $flakeOutput = & nix.exe --option warn-dirty false flake update --flake (Join-Path -Path $repoRoot -ChildPath 'src') 2>&1
   if ($LASTEXITCODE -ne 0) {
     $joined = ($flakeOutput | Out-String)
@@ -31,11 +54,11 @@ if (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue) {
   }
 }
 
-if (Get-Command -Name 'winget.exe' -ErrorAction SilentlyContinue) {
+if (-not $SkipWinget -and (Get-Command -Name 'winget.exe' -ErrorAction SilentlyContinue)) {
   winget upgrade --all --accept-package-agreements --accept-source-agreements --disable-interactivity
 }
 
-if (-not (Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue)) {
+if (-not $SkipSops -and -not (Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue)) {
   throw 'nucleus: sops.exe is required for update secret rewrap step.'
 }
 
@@ -47,6 +70,7 @@ $secretFiles = @(
   (Join-Path -Path $repoRoot -ChildPath 'src\secrets\ssh-personal.yml')
 )
 
+if (-not $SkipSops) {
 foreach ($secretFile in $secretFiles) {
   & sops --config $sopsConfig updatekeys --yes $secretFile
   if ($LASTEXITCODE -ne 0) {
@@ -54,13 +78,14 @@ foreach ($secretFile in $secretFiles) {
   }
 }
 
-$wallpaperDir = Join-Path -Path $repoRoot -ChildPath 'src\assets\wallpapers'
+$wal-not $SkipSops -and (Test-Path -Path $wallpaperDir)repoRoot -ChildPath 'src\assets\wallpapers'
 if (Test-Path -Path $wallpaperDir) {
   Get-ChildItem -Path $wallpaperDir -Filter '*.sops' -File | ForEach-Object {
     & sops --config $sopsConfig updatekeys --yes $_.FullName
     if ($LASTEXITCODE -ne 0) {
       throw "nucleus: failed to rewrap wallpaper blob '$($_.FullName)'."
     }
+  }
   }
 }
 
