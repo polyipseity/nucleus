@@ -13,8 +13,7 @@
     4. optionally runs `nix run <repo>/src#apply` if -Apply switch provided
 
 .PARAMETER Apply
-  Run nucleus apply to converge cloud mount services.
-  (default: setup/validate only; user can run nucleus apply later)
+  Run nucleus apply to converge cloud mount services (default: $false).
 
 .EXAMPLE
   .\cloud-setup.ps1

@@ -7,10 +7,10 @@
   `src/hosts/Windows/modules/system/Invoke-ReplicaReset.ps1`.
 
 .PARAMETER DryRun
-  Print planned reset actions without modifying local state.
+  Print planned reset actions without modifying local state (default: $false).
 
 .PARAMETER ReplicaId
-  Optional replica id filter.
+  Optional replica id filter (default: none; all replicas reset).
 #>
 [CmdletBinding()]
 param(

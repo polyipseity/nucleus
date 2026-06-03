@@ -9,10 +9,10 @@
     3. presence of decrypt-capable tooling (sops + gpg) when available
 
 .PARAMETER MinFreeGB
-  Minimum free disk space (GiB) required on the system drive.
+  Minimum free disk space (GiB) required on the system drive (default: 10).
 
 .PARAMETER NoSecretHealth
-  Skip validation of sops/gpg executable availability.
+  Skip validation of sops/gpg executable availability (default: $false).
 
 .EXAMPLE
   .\health-check.ps1

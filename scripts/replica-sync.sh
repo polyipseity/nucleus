@@ -22,8 +22,8 @@ usage() {
   cat <<'EOF'
 usage: replica-sync.sh [--dry-run] [--replica-id ID]
 
-  --dry-run         Print planned rclone commands without executing them.
-  --replica-id ID   Restrict execution to a single replica id.
+  --dry-run         Print planned rclone commands without executing them (default: off).
+  --replica-id ID   Restrict execution to a single replica id (default: none; all replicas run).
 EOF
 }
 

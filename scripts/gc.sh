@@ -10,13 +10,13 @@
 #
 # Arguments:
 #   --repo-root <path>          override the detected repository root path
-#   --tool-cache-prune|--no-tool-cache-prune  control bun/cargo/rustc/uv and repo-local .direnv cache cleanup
-#   --hm-gc|--no-hm-gc                        control home-manager expire-generations
-#   --nix-gc|--no-nix-gc                      control nix-collect-garbage
-#   --ollama-prune|--no-ollama-prune          control stale Ollama model removal
-#   --scoop-cleanup|--no-scoop-cleanup        accepted but ignored on POSIX (Windows-only)
-#   --wallpaper-prune|--no-wallpaper-prune    control stale wallpaper cleanup
-#   --vm-prune|--no-vm-prune                  control stale VM artifact removal
+#   --tool-cache-prune|--no-tool-cache-prune  control bun/cargo/rustc/uv and repo-local .direnv cache cleanup (default: --tool-cache-prune)
+#   --hm-gc|--no-hm-gc                        control home-manager expire-generations (default: --hm-gc)
+#   --nix-gc|--no-nix-gc                      control nix-collect-garbage (default: --nix-gc)
+#   --ollama-prune|--no-ollama-prune          control stale Ollama model removal (default: --ollama-prune)
+#   --scoop-cleanup|--no-scoop-cleanup        accepted but ignored on POSIX (Windows-only) (default: --scoop-cleanup)
+#   --wallpaper-prune|--no-wallpaper-prune    control stale wallpaper cleanup (default: --wallpaper-prune)
+#   --vm-prune|--no-vm-prune                  control stale VM artifact removal (default: --vm-prune)
 #
 # Environment variables:
 #   (none)
@@ -34,13 +34,13 @@ usage() {
 usage: gc.sh [options]
 
   --repo-root <path>          Override the detected repository root path.
-  --tool-cache-prune|--no-tool-cache-prune  Control bun/cargo/rustc/uv cache cleanup.
-  --hm-gc|--no-hm-gc                        Control home-manager generation expiration.
-  --nix-gc|--no-nix-gc                      Control nix-collect-garbage.
-  --ollama-prune|--no-ollama-prune          Control stale Ollama model removal.
-  --scoop-cleanup|--no-scoop-cleanup        Accepted but ignored on POSIX (Windows-only).
-  --wallpaper-prune|--no-wallpaper-prune    Control stale wallpaper cleanup.
-  --vm-prune|--no-vm-prune                  Control stale VM artifact removal.
+  --tool-cache-prune|--no-tool-cache-prune  Control bun/cargo/rustc/uv cache cleanup (default: --tool-cache-prune).
+  --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
+  --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
+  --ollama-prune|--no-ollama-prune          Control stale Ollama model removal (default: --ollama-prune).
+  --scoop-cleanup|--no-scoop-cleanup        Accepted but ignored on POSIX (Windows-only) (default: --scoop-cleanup).
+  --wallpaper-prune|--no-wallpaper-prune    Control stale wallpaper cleanup (default: --wallpaper-prune).
+  --vm-prune|--no-vm-prune                  Control stale VM artifact removal (default: --vm-prune).
 EOF
 }
 

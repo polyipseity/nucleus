@@ -11,17 +11,17 @@
   model convergence directly from `scripts/` on any platform.
 
 .PARAMETER DryRun
-  Print planned actions without executing pulls or removals.
+  Print planned actions without executing pulls or removals (default: $false).
 
 .PARAMETER PruneOnly
-  Skip model pulls; only remove local models absent from the manifest.
+  Skip model pulls; only remove local models absent from the manifest (default: $false).
 
 .PARAMETER ServerReadyTimeoutSeconds
   Bounded wait time for the Ollama server to become responsive before sync
-  exits with a benign skip. Use 0 to disable waiting.
+  exits with a benign skip. Use 0 to disable waiting (default: 60).
 
 .PARAMETER ServerReadyPollSeconds
-  Poll interval while waiting for server readiness. Defaults to 2 when unset.
+  Poll interval while waiting for server readiness (default: 2).
 
 
 .EXAMPLE

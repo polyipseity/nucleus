@@ -29,33 +29,33 @@
 .PARAMETER ModuleDir
   Path to the Windows helper module directory. When omitted, auto-derives
   from RepoRoot as src\hosts\Windows\modules so callers can skip it when
-  RepoRoot is provided.
+  RepoRoot is provided (default: '').
 
 .PARAMETER RepoRoot
   Root of the repository. Mandatory: caller must explicitly pass the repo root
   so they are aware of which repository's assets and manifests will be accessed
-  and modified.
+  and modified (default: '').
 
 .PARAMETER NoNixGc
-  Accepted but ignored on Windows (POSIX-only).
+  Accepted but ignored on Windows (POSIX-only) (default: $false).
 
 .PARAMETER NoHmGc
-  Accepted but ignored on Windows (POSIX-only).
+  Accepted but ignored on Windows (POSIX-only) (default: $false).
 
 .PARAMETER NoToolCachePrune
-  Skip bun/cargo/rustc/uv and repo-local .direnv cache cleanup.
+  Skip bun/cargo/rustc/uv and repo-local .direnv cache cleanup (default: $false).
 
 .PARAMETER NoOllamaPrune
-  Skip Ollama orphaned model removal even when ollama is installed.
+  Skip Ollama orphaned model removal even when ollama is installed (default: $false).
 
 .PARAMETER NoScoopCleanup
-  Skip Scoop cache and old-version cleanup even when Scoop is installed.
+  Skip Scoop cache and old-version cleanup even when Scoop is installed (default: $false).
 
 .PARAMETER NoWallpaperPrune
-  Skip stale wallpaper file cleanup.
+  Skip stale wallpaper file cleanup (default: $false).
 
 .PARAMETER NoVMPrune
-  Skip stale VM artifact removal.
+  Skip stale VM artifact removal (default: $false).
 
 .EXAMPLE
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus"

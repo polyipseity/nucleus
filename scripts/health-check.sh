@@ -7,9 +7,8 @@
 #   3. SOPS secret decryptability for repository-managed secret files
 #
 # Arguments:
-#   --min-free-gb <int>         minimum free disk space in GiB (default: 10)
-#   --secret-health             enable SOPS decryption identity verification (default)
-#   --no-secret-health          skip SOPS decryption identity verification
+#   --min-free-gb <int>                  minimum free disk space in GiB (default: 10)
+#   --secret-health|--no-secret-health    enable or skip SOPS decryption identity verification (default: --secret-health)
 #
 # Environment variables:
 #   NUCLEUS_MIN_FREE_GB  alternate source for minimum free space threshold
@@ -26,9 +25,8 @@ usage() {
   cat <<'EOF'
 usage: health-check.sh [options]
 
-  --min-free-gb <int>         Minimum free disk space in GiB (default: 10).
-  --secret-health             Enable SOPS decryption identity verification (default).
-  --no-secret-health          Skip SOPS decryption identity verification.
+  --min-free-gb <int>                  Minimum free disk space in GiB (default: 10).
+  --secret-health|--no-secret-health   Enable or skip SOPS decryption identity verification (default: --secret-health).
 EOF
 }
 

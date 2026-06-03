@@ -7,18 +7,10 @@
 #   apply         Install bootstrap dependencies, then run the src apply flow
 #
 # Options:
-#   --ai-sync          Pass through to nix run .#apply; opt in to the post-apply
-#                      Ollama model sync step (default).
-#   --no-ai-sync       Pass through to nix run .#apply; suppresses the post-apply
-#                      Ollama model sync step.  Useful in CI or on low-bandwidth
-#                      connections where model pulls (2–20 GB) are undesirable.
-#   --replica-sync     Pass through to nix run .#apply; opt in to immediate
-#                      post-apply replica sync. By default apply skips replica
-#                      sync because a scheduled daily sync already converges.
-#   --no-replica-sync  Pass through to nix run .#apply; opt out of immediate
-#                      post-apply replica sync.
-#   --target-user   Pass through to src/scripts/apply.sh; selects the Home
-#                   Manager flake profile on standalone Linux hosts.
+#   --apply|--no-apply       pass through to nix run .#apply; control whether to run the apply flow after installing dependencies (default: --no-apply)
+#   --ai-sync|--no-ai-sync   pass through to nix run .#apply; control the post-apply Ollama model sync step (default: --ai-sync)
+#   --replica-sync|--no-replica-sync  pass through to nix run .#apply; control immediate post-apply replica sync (default: --no-replica-sync)
+#   --target-user            pass through to src/scripts/apply.sh; selects the Home Manager flake profile on standalone Linux hosts
 set -eu
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -110,16 +102,13 @@ By default bootstrap installs dependencies only.  Pass --apply to also
 run the apply flow.
 
 Options:
-  -h, --help            Show this help message and exit
-  --apply               After installing dependencies, run the apply flow
-  --no-apply            Install dependencies only (default)
-  --ai-sync             Opt in to the post-apply Ollama model sync step (default)
-  --no-ai-sync          Suppress the post-apply Ollama model sync step
-  --replica-sync        Opt in to immediate post-apply replica sync
-  --no-replica-sync     Opt out of immediate post-apply replica sync
-  --target-user         Select the Home Manager flake profile key for standalone
-                        Linux apply runs
-  --                    Remaining arguments are passed through to the apply command
+  -h, --help                  Show this help message and exit
+  --apply|--no-apply          After installing dependencies, run the apply flow (default: --no-apply)
+  --ai-sync|--no-ai-sync      Opt in to the post-apply Ollama model sync step (default: --ai-sync)
+  --replica-sync|--no-replica-sync  Opt in to immediate post-apply replica sync (default: --no-replica-sync)
+  --target-user               Select the Home Manager flake profile key for standalone
+                              Linux apply runs
+  --                          Remaining arguments are passed through to the apply command
 EOF
       exit 0
       ;;

@@ -22,7 +22,7 @@
 
 .PARAMETER Paths
   Optional file paths to check. When omitted, all tracked `*.ps1` files from
-  `git ls-files` are checked.
+  `git ls-files` are checked (default: none; all tracked .ps1 files).
 
 .EXAMPLE
   nix run ./src#check-pwsh

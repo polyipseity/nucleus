@@ -8,10 +8,10 @@
 #   4. rewrap all SOPS-managed files for current recipients
 #
 # Arguments:
-#   --flake|--no-flake    control nix flake update
-#   --brew|--no-brew      control Homebrew update/upgrade (macOS only)
-#   --winget|--no-winget  control winget upgrade (Windows only)
-#   --sops|--no-sops      control sops updatekeys
+#   --flake|--no-flake    control nix flake update (default: --flake)
+#   --brew|--no-brew      control Homebrew update/upgrade (macOS only) (default: --brew)
+#   --winget|--no-winget  control winget upgrade (Windows only) (default: --winget)
+#   --sops|--no-sops      control sops updatekeys (default: --sops)
 #
 # Environment variables:
 #   NIX_CONFIG  merged with required flake feature flags for nix commands
@@ -28,10 +28,10 @@ usage() {
   cat <<'EOF'
 usage: update.sh [options]
 
-  --flake|--no-flake    Control nix flake update.
-  --brew|--no-brew      Control Homebrew update/upgrade (macOS only).
-  --winget|--no-winget  Control winget upgrade (Windows only).
-  --sops|--no-sops      Control sops updatekeys.
+  --flake|--no-flake    Control nix flake update (default: --flake).
+  --brew|--no-brew      Control Homebrew update/upgrade (macOS only) (default: --brew).
+  --winget|--no-winget  Control winget upgrade (Windows only) (default: --winget).
+  --sops|--no-sops      Control sops updatekeys (default: --sops).
 EOF
 }
 

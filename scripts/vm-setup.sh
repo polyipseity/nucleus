@@ -10,18 +10,18 @@
 #   scripts/vm-setup.sh [options]
 #
 # Options:
-#   --dry-run              Print planned actions without executing.
-#   --nixos-only           Build and provision only the NixOS guest.
-#   --windows-only         Build and provision only the Windows 11 guest.
+#   --dry-run              Print planned actions without executing (default: off).
+#   --nixos-only           Build and provision only the NixOS guest (default: off).
+#   --windows-only         Build and provision only the Windows 11 guest (default: off).
 #   --windows-iso PATH     Path to the Windows 11 ISO (required for Windows
 #                          guest builds). Download from:
 #                          https://www.microsoft.com/software-download/windows11
 #   --windows-iso-source S Source for Windows ISO auto-resolution when
-#                          --windows-iso is omitted: auto|url|fido.
+#                          --windows-iso is omitted: auto|url|fido (default: auto).
 #   --windows-iso-retries N Retry attempts for Windows ISO network downloads
 #                          (default: 0, which means a single attempt).
 #   --debug-headful        Run Windows Packer QEMU builds with a visible GUI
-#                          window (headless=false) for interactive debugging.
+#                          window (headless=false) for interactive debugging (default: off).
 #   --accelerator TYPE     QEMU accelerator for image builds (hvf/kvm/tcg).
 #                          Defaults: hvf on macOS, kvm on Linux (auto).
 #                          Windows defaults to tcg with WHPX auto-upgrade.
@@ -70,14 +70,14 @@ usage() {
   cat <<'EOF'
 usage: vm-setup.sh [options]
 
-  --dry-run                  Print planned actions without executing.
-  --nixos-only               Build and provision only the NixOS guest.
-  --windows-only             Build and provision only the Windows guest.
+  --dry-run                  Print planned actions without executing (default: off).
+  --nixos-only               Build and provision only the NixOS guest (default: off).
+  --windows-only             Build and provision only the Windows guest (default: off).
   --windows-iso PATH         Path to the Windows 11 ISO.
-  --windows-iso-source S     ISO auto-resolution: auto|url|fido.
-  --windows-iso-retries N    Retry attempts for network downloads.
-  --debug-headful            Show QEMU GUI window during Windows builds.
-  --accelerator TYPE         QEMU accelerator (hvf/kvm/tcg).
+  --windows-iso-source S     ISO auto-resolution: auto|url|fido (default: auto).
+  --windows-iso-retries N    Retry attempts for network downloads (default: 0).
+  --debug-headful            Show QEMU GUI window during Windows builds (default: off).
+  --accelerator TYPE         QEMU accelerator (hvf/kvm/tcg) (default: auto).
 EOF
 }
 

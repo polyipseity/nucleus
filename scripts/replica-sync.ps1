@@ -7,10 +7,10 @@
   `src/hosts/Windows/modules/system/Invoke-ReplicaSync.ps1`.
 
 .PARAMETER DryRun
-  Print planned actions without executing rclone commands.
+  Print planned actions without executing rclone commands (default: $false).
 
 .PARAMETER ReplicaId
-  Optional replica id filter; when provided only the matching replica runs.
+  Optional replica id filter; when provided only the matching replica runs (default: none; all replicas run).
 #>
 [CmdletBinding()]
 param(

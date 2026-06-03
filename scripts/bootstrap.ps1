@@ -9,24 +9,24 @@
   Use -Apply to run the Windows apply script after dependency installation.
 
 .PARAMETER Apply
-  Install dependencies, then run src/hosts/Windows/apply.ps1.
+  Install dependencies, then run src/hosts/Windows/apply.ps1 (default: $false).
 
 .PARAMETER ApplyArgs
-  Optional arguments passed through to src/hosts/Windows/apply.ps1.
+  Optional arguments passed through to src/hosts/Windows/apply.ps1 (default: empty).
   Use -- before positional passthrough args (e.g., .\bootstrap.ps1 -Apply -- -DryRun).
 
 .PARAMETER NoAISync
   Suppresses the post-apply Ollama model sync step. Forwarded to apply.ps1 as
-  -NoAISync when -Apply is used.
+  -NoAISync when -Apply is used (default: $false).
 
 .PARAMETER ReplicaSync
   Run the post-apply cloud replica sync step. Forwarded to apply.ps1 as
-  -ReplicaSync when -Apply is used.
+  -ReplicaSync when -Apply is used (default: $false).
 
 .PARAMETER TargetUser
   Accepted for cross-platform CLI parity. Only effective on the POSIX apply
   path (nix run .#apply -- --target-user=<name>). On Windows this flag is
-  accepted but ignored.
+  accepted but ignored (default: none).
 
 .PARAMETER Help
   Show this help message and exit.

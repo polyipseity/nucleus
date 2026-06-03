@@ -21,8 +21,8 @@ usage() {
   cat <<'EOF'
 usage: replica-reset.sh [--dry-run] [--replica-id ID]
 
-  --dry-run         Print planned reset actions without modifying local state.
-  --replica-id ID   Restrict marker/RCLONE_TEST cleanup to one replica id.
+  --dry-run         Print planned reset actions without modifying local state (default: off).
+  --replica-id ID   Restrict marker/RCLONE_TEST cleanup to one replica id (default: none; all replicas reset).
 
 Notes:
   - This command resets LOCAL replica state only; remotes are never modified.

@@ -9,16 +9,16 @@
     3. SOPS recipient rewrap for managed secret files
 
 .PARAMETER NoFlake
-  Do not run nix flake update.
+  Do not run nix flake update (default: $false).
 
 .PARAMETER NoBrew
-  Do not run Homebrew update/upgrade (macOS only; ignored on Windows).
+  Do not run Homebrew update/upgrade (macOS only; ignored on Windows) (default: $false).
 
 .PARAMETER NoWinget
-  Do not run winget upgrade.
+  Do not run winget upgrade (default: $false).
 
 .PARAMETER NoSops
-  Do not run sops updatekeys.
+  Do not run sops updatekeys (default: $false).
 
 .EXAMPLE
   .\update.ps1

@@ -201,7 +201,7 @@ usage() {
   cat <<'EOF'
 usage: cloud-setup.sh [options]
 
-  --apply|--no-apply  Run nucleus apply to converge cloud mount services.
+  --apply|--no-apply  Run nucleus apply to converge cloud mount services (default: --no-apply).
 EOF
 }
 

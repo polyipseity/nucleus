@@ -16,8 +16,10 @@ export OLLAMA_HOST="127.0.0.1:11434"
 #      (--prune-only skips step 2 so only removals happen.)
 #
 # Arguments:
-#   --dry-run      print planned actions without executing them
-#   --prune-only   skip pulls; only remove unlisted models
+#   --dry-run                            print planned actions without executing them (default: off)
+#   --prune-only                         skip pulls; only remove unlisted models (default: off)
+#   --server-ready-timeout-seconds N     bounded wait for server readiness (default: 60)
+#   --server-ready-poll-seconds N        poll interval while waiting (default: 2)
 #
 # Environment variables:
 #   OLLAMA_PROFILE  override profile selection (MacBook|NixOS|Windows); detected
@@ -43,8 +45,8 @@ usage() {
   cat <<'EOF'
 usage: ai-sync.sh [options]
 
-  --dry-run                          Print planned actions without executing them.
-  --prune-only                       Skip pulls; only remove unlisted models.
+  --dry-run                          Print planned actions without executing them (default: off).
+  --prune-only                       Skip pulls; only remove unlisted models (default: off).
   --server-ready-timeout-seconds N   Bounded wait for server readiness (default: 60).
                                      Set to 0 to disable waiting.
   --server-ready-poll-seconds N      Poll interval while waiting (default: 2).

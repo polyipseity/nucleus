@@ -17,20 +17,20 @@
 # Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
 [CmdletBinding()]
 param(
-    # Path to Windows 11 ISO. Optional when windowsIsoUrl is set in VMs.json.
+    # Path to Windows 11 ISO. Optional when windowsIsoUrl is set in VMs.json (default: '').
     # Download from: https://www.microsoft.com/software-download/windows11
     [string]$WindowsIso = '',
 
-    # Build and provision only the NixOS guest.
+    # Build and provision only the NixOS guest (default: $false).
     [switch]$NixosOnly,
 
-    # Build and provision only the Windows 11 guest.
+    # Build and provision only the Windows 11 guest (default: $false).
     [switch]$WindowsOnly,
 
     # Windows installer ISO resolution strategy.
     # Auto: windowsIsoUrl cache/download first, then Fido fallback.
     # Url:  use only -WindowsIso or windowsIsoUrl (no downloader fallback).
-    # Fido: use only local cache/Fido when -WindowsIso is omitted.
+    # Fido: use only local cache/Fido when -WindowsIso is omitted (default: Auto).
     [ValidateSet('Auto', 'Url', 'Fido')]
     [string]$WindowsIsoSource = 'Auto',
 
@@ -44,10 +44,10 @@ param(
     [string]$Accelerator = 'tcg',
 
     # Run Windows image builds headful (headless=false) for interactive
-    # debugging of installer/SSH readiness issues.
+    # debugging of installer/SSH readiness issues (default: $false).
     [switch]$DebugHeadful,
 
-    # Print planned actions without executing.
+    # Print planned actions without executing (default: $false).
     [switch]$DryRun,
 
     [Alias("h")]
