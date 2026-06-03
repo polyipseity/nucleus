@@ -37,8 +37,10 @@ param(
     # Retry attempts for Windows ISO network downloads (default: 0).
     [int]$WindowsIsoRetries = 0,
 
-    # QEMU accelerator for image builds (default: tcg, auto-upgraded to whpx
-    # when Windows Hypervisor Platform is detected).
+    # QEMU accelerator for image builds. Defaults to tcg (always works on
+    # Windows; WHPX auto-detected and upgraded when available). POSIX
+    # defaults to auto (hvf on macOS, kvm on Linux, tcg otherwise) —
+    # intentional platform-appropriate defaults.
     [string]$Accelerator = 'tcg',
 
     # Run Windows image builds headful (headless=false) for interactive

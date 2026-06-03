@@ -23,7 +23,8 @@
 #   --debug-headful        Run Windows Packer QEMU builds with a visible GUI
 #                          window (headless=false) for interactive debugging.
 #   --accelerator TYPE     QEMU accelerator for image builds (hvf/kvm/tcg).
-#                          Defaults: hvf on macOS, kvm on Linux.
+#                          Defaults: hvf on macOS, kvm on Linux (auto).
+#                          Windows defaults to tcg with WHPX auto-upgrade.
 #
 # Environment variables:
 #   VM_DIR_OVERRIDE  override the default ~/virtual machines path
