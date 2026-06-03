@@ -63,10 +63,8 @@
 #>
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory)]
-  [string]$ModuleDir,
-  [Parameter(Mandatory)]
-  [string]$RepoRoot,
+  [string]$ModuleDir = '',
+  [string]$RepoRoot = '',
   [switch]$SkipNixGc,
   [switch]$SkipHmGc,
   [switch]$SkipToolCachePrune,
@@ -77,6 +75,20 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+  $RepoRoot = & {
+    $gitRoot = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Out-String
+    $gitRoot = $gitRoot.Trim()
+    if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and (Test-Path -Path $gitRoot -PathType Container)) {
+      return $gitRoot
+    }
+    return (Join-Path $HOME 'dev\nucleus')
+  }
+}
+if ([string]::IsNullOrWhiteSpace($ModuleDir)) {
+  $ModuleDir = Join-Path $RepoRoot 'src\hosts\Windows\modules'
+}
 
 # -SkipNixGc and -SkipHmGc are accepted but ignored on Windows (POSIX-only
 # options from gc.sh). Accepted for cross-platform CLI parity.
