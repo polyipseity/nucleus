@@ -120,10 +120,16 @@ variable "guest_password" {
   description = "Primary login password for the guest and SSH communicator."
 }
 
+variable "ssh_timeout" {
+  type        = string
+  default     = "3h"
+  description = "Maximum time to wait for SSH communicator.  Wrapper scripts set this per build attempt firmware/boot strategy."
+}
+
 variable "autounattend_path" {
   type        = string
-  default     = "${path.root}/Autounattend.xml"
-  description = "Path to the rendered Autounattend.xml consumed by Windows Setup."
+  default     = "./Autounattend.xml"
+  description = "Path to the rendered Autounattend.xml consumed by Windows Setup.  Wrapper scripts pass the full resolved path."
 }
 
 packer {
@@ -242,7 +248,7 @@ source "qemu" "windows11" {
   communicator = "ssh"
   ssh_username = var.guest_username
   ssh_password = var.guest_password
-  ssh_timeout  = "3h"
+  ssh_timeout  = var.ssh_timeout
 
   # WHY: Forward SSH (22) through QEMU's user-mode networking so Packer can
   # connect without needing a routable IP on the guest.
