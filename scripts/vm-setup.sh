@@ -65,8 +65,27 @@ windows_iso_retries='0'
 windows_headless='true'
 accelerator=''
 
+usage() {
+  cat <<'EOF'
+usage: vm-setup.sh [options]
+
+  --dry-run                  Print planned actions without executing.
+  --nixos-only               Build and provision only the NixOS guest.
+  --windows-only             Build and provision only the Windows guest.
+  --windows-iso PATH         Path to the Windows 11 ISO.
+  --windows-iso-source S     ISO auto-resolution: auto|url|mido.
+  --windows-iso-retries N    Retry attempts for network downloads.
+  --debug-headful            Show QEMU GUI window during Windows builds.
+  --accelerator TYPE         QEMU accelerator (hvf/kvm/tcg).
+EOF
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
     --dry-run)      dry_run=true ;;
     --nixos-only)   nixos_only=true ;;
     --windows-only) windows_only=true ;;
@@ -76,8 +95,8 @@ while [ "$#" -gt 0 ]; do
     --debug-headful) windows_headless='false' ;;
     --accelerator)  accelerator="$2"; shift ;;
     *)
-      printf 'vm-setup: unknown argument: %s\n' "$1" >&2
-      printf 'vm-setup: usage: %s [--dry-run] [--nixos-only|--windows-only] [--windows-iso PATH] [--windows-iso-source auto|url|mido] [--windows-iso-retries N] [--debug-headful] [--accelerator TYPE]\n' "$0" >&2
+      printf '%s\n' "vm-setup: unsupported argument '$1'" >&2
+      usage >&2
       exit 1
       ;;
   esac

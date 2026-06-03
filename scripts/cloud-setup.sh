@@ -19,23 +19,8 @@
 
 set -eu
 
-resolve_nucleus_root() {
-  _rnr_config_file="$HOME/.config/nucleus/repo-root"
-  if [ -f "$_rnr_config_file" ]; then
-    _rnr_root="$(cat "$_rnr_config_file")"
-    if [ -n "$_rnr_root" ] && [ -d "$_rnr_root" ]; then
-      printf '%s\n' "$_rnr_root"
-      return 0
-    fi
-  fi
-  # Stderr suppressed: git failure outside a repository is expected and benign;
-  # the exit code is checked via the conditional.
-  if _rnr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
-    printf '%s\n' "$_rnr_git_root"
-    return 0
-  fi
-  printf '%s\n' "$HOME/dev/nucleus"
-}
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+. "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 # Reads the configured iCloud service for a remote from src/modules/users.json.
 # Args: $1 — repo root; $2 — remote name.
@@ -212,14 +197,27 @@ EOF
   esac
 }
 
+usage() {
+  cat <<'EOF'
+usage: cloud-setup.sh [options]
+
+  --apply  Run nucleus apply to converge cloud mount services.
+EOF
+}
+
 skip_apply=true
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
     --apply)
       skip_apply=false
       ;;
     *)
       printf '%s\n' "cloud-setup: unsupported argument '$1'" >&2
+      usage >&2
       exit 1
       ;;
   esac

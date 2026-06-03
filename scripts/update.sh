@@ -21,31 +21,20 @@
 
 set -eu
 
-# Locate the nucleus repository root.  Resolution order:
-#   1. ~/.config/nucleus/repo-root — written by apply.sh; reliable from
-#      anywhere once apply has been run at least once.
-#   2. git rev-parse --show-toplevel — works when CWD is inside the repo.
-#      Stderr is suppressed because a non-repo CWD is expected and benign;
-#      the exit code is checked via the conditional.
-#   3. ~/dev/nucleus — canonical clone location declared in devRepos config.
-resolve_nucleus_root() {
-  _rnr_config_file="$HOME/.config/nucleus/repo-root"
-  if [ -f "$_rnr_config_file" ]; then
-    _rnr_root="$(cat "$_rnr_config_file")"
-    if [ -n "$_rnr_root" ] && [ -d "$_rnr_root" ]; then
-      printf '%s\n' "$_rnr_root"
-      return 0
-    fi
-  fi
-  # Stderr suppressed: git failure when CWD is not inside a repository is
-  # expected and benign; the exit code is checked via the conditional.
-  if _rnr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
-    printf '%s\n' "$_rnr_git_root"
-    return 0
-  fi
-  # Final fallback: canonical clone location declared in devRepos config.
-  printf '%s\n' "$HOME/dev/nucleus"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+. "$SCRIPT_DIR/../src/scripts/lib.sh"
+
+usage() {
+  cat <<'EOF'
+usage: update.sh [options]
+
+  --skip-flake    Do not run nix flake update.
+  --skip-brew     Do not run Homebrew update/upgrade (macOS only).
+  --skip-winget   Do not run winget upgrade (Windows only).
+  --skip-sops     Do not run sops updatekeys.
+EOF
 }
+
 REPO_ROOT="$(resolve_nucleus_root)"
 
 skip_flake=false
@@ -55,6 +44,10 @@ skip_sops=false
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
     --skip-flake)
       skip_flake=true
       ;;
@@ -69,6 +62,7 @@ while [ "$#" -gt 0 ]; do
       ;;
     *)
       printf '%s\n' "update: unsupported argument '$1'" >&2
+      usage >&2
       exit 1
       ;;
   esac

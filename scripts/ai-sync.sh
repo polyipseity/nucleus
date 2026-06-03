@@ -61,8 +61,21 @@ case "$ready_poll_seconds" in
     ;;
 esac
 
+usage() {
+  cat <<'EOF'
+usage: ai-sync.sh [--dry-run] [--prune-only]
+
+  --dry-run      Print planned actions without executing them.
+  --prune-only   Skip pulls; only remove unlisted models.
+EOF
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
     --dry-run)
       dry_run=true
       ;;
@@ -71,6 +84,7 @@ while [ "$#" -gt 0 ]; do
       ;;
     *)
       printf '%s\n' "ai-sync: unsupported argument '$1'" >&2
+      usage >&2
       exit 1
       ;;
   esac

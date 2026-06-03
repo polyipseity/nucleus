@@ -11,23 +11,8 @@
 
 set -eu
 
-resolve_nucleus_root() {
-  _rnr_config_file="$HOME/.config/nucleus/repo-root"
-  if [ -f "$_rnr_config_file" ]; then
-    _rnr_root="$(cat "$_rnr_config_file")"
-    if [ -n "$_rnr_root" ] && [ -d "$_rnr_root" ]; then
-      printf '%s\n' "$_rnr_root"
-      return 0
-    fi
-  fi
-  if _rnr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
-    if [ -n "$_rnr_git_root" ] && [ -d "$_rnr_git_root" ]; then
-      printf '%s\n' "$_rnr_git_root"
-      return 0
-    fi
-  fi
-  printf '%s\n' "$HOME/dev/nucleus"
-}
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+. "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 REPO_ROOT="$(resolve_nucleus_root)"
 USERS_JSON="$REPO_ROOT/src/modules/users.json"
