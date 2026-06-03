@@ -13,6 +13,7 @@
 #   --skip-hm-gc           skip home-manager expire-generations
 #   --skip-nix-gc          skip nix-collect-garbage
 #   --skip-ollama-prune    skip stale Ollama model removal
+#   --skip-scoop-cleanup   accepted but ignored on POSIX (Windows-only)
 #   --skip-wallpaper-prune skip stale wallpaper cleanup
 #   --skip-vm-prune        skip stale VM artifact removal
 #
@@ -35,6 +36,7 @@ usage: gc.sh [options]
   --skip-hm-gc             Skip home-manager generation expiration.
   --skip-nix-gc            Skip nix-collect-garbage.
   --skip-ollama-prune      Skip stale Ollama model removal.
+  --skip-scoop-cleanup     Accepted but ignored on POSIX (Windows-only).
   --skip-wallpaper-prune   Skip stale wallpaper cleanup.
   --skip-vm-prune          Skip stale VM artifact removal.
 EOF
@@ -46,6 +48,7 @@ skip_tool_cache_prune=false
 skip_hm_gc=false
 skip_nix_gc=false
 skip_ollama_prune=false
+skip_scoop_cleanup=false
 skip_wallpaper_prune=false
 skip_vm_prune=false
 
@@ -66,6 +69,9 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-ollama-prune)
       skip_ollama_prune=true
+      ;;
+    --skip-scoop-cleanup)
+      skip_scoop_cleanup=true
       ;;
     --skip-wallpaper-prune)
       skip_wallpaper_prune=true
@@ -375,6 +381,12 @@ fi
 # Step 6: remove stale VM artifacts (temporary builds, orphaned images).
 if [ "$skip_vm_prune" = false ]; then
   prune_vm_artifacts_if_present
+fi
+
+# Step 7: Scoop cache cleanup (accepted but ignored on POSIX; Windows-only).
+# This flag exists for cross-platform CLI parity with the Windows gc.ps1 script.
+if [ "$skip_scoop_cleanup" = true ]; then
+  :
 fi
 
 printf '%s\n' "gc: gc workflow completed"

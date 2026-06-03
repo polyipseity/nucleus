@@ -36,6 +36,12 @@
   so they are aware of which repository's assets and manifests will be accessed
   and modified.
 
+.PARAMETER SkipNixGc
+  Accepted but ignored on Windows (POSIX-only).
+
+.PARAMETER SkipHmGc
+  Accepted but ignored on Windows (POSIX-only).
+
 .PARAMETER SkipToolCachePrune
   Skip bun/cargo/rustc/uv and repo-local .direnv cache cleanup.
 
@@ -61,6 +67,8 @@ param(
   [string]$ModuleDir,
   [Parameter(Mandatory)]
   [string]$RepoRoot,
+  [switch]$SkipNixGc,
+  [switch]$SkipHmGc,
   [switch]$SkipToolCachePrune,
   [switch]$SkipOllamaPrune,
   [switch]$SkipScoopCleanup,
@@ -69,6 +77,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# -SkipNixGc and -SkipHmGc are accepted but ignored on Windows (POSIX-only
+# options from gc.sh). Accepted for cross-platform CLI parity.
+$null = $SkipNixGc
+$null = $SkipHmGc
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 $resolvedRepoRoot  = (Resolve-Path -Path $RepoRoot).Path

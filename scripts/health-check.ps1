@@ -14,9 +14,6 @@
 .PARAMETER SkipSecretHealth
   Skip validation of sops/gpg executable availability.
 
-.PARAMETER SkipSecretTooling
-  Obsolete alias for SkipSecretHealth.
-
 .EXAMPLE
   .\health-check.ps1
 
@@ -32,10 +29,7 @@ param(
   [int]$MinFreeGB = 10,
 
   [Parameter()]
-  [switch]$SkipSecretHealth,
-
-  [Parameter()]
-  [switch]$SkipSecretTooling
+  [switch]$SkipSecretHealth
 )
 
 $ErrorActionPreference = 'Stop'
@@ -111,7 +105,7 @@ function Test-SecretTooling {
 
 Test-DiskSpace -RequiredGiB $MinFreeGB
 Test-Connectivity
-if (-not ($SkipSecretHealth -or $SkipSecretTooling)) {
+if (-not $SkipSecretHealth) {
   Test-SecretTooling
 }
 
