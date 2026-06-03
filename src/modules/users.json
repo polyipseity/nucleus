@@ -61,9 +61,9 @@
       "replicas": [
         {
           "direction": "pull",
-          "enable": true,
+          "enable": false,
           "fallbackTimer": {
-            "enable": true,
+            "enable": false,
             "interval": "daily"
           },
           "id": "GoogleDrive",
@@ -71,7 +71,7 @@
           "provider": "GoogleDrive",
           "realtime": {
             "debounceSeconds": 5,
-            "enable": true
+            "enable": false
           },
           "remoteName": "GoogleDrive",
           "remotePath": "/"
