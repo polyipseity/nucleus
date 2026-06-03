@@ -47,6 +47,7 @@
 # Arguments:
 #   --skip-ai-sync  skip the post-apply Ollama model sync step
 #   --replica-sync  run the post-apply cloud replica sync step (opt-in)
+#   --vm-setup      run the post-apply VM setup step (opt-in)
 #   --target-user   select the Home Manager flake profile key on standalone
 #                   Linux hosts (ignored on Darwin and NixOS system rebuilds)
 #
