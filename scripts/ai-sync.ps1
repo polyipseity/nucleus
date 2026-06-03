@@ -19,6 +19,11 @@
 .PARAMETER ServerReadyTimeoutSeconds
   Bounded wait time for the Ollama server to become responsive before sync
   exits with a benign skip. Use 0 to disable waiting.
+  Falls back to $env:OLLAMA_READY_TIMEOUT_SECONDS when unset.
+
+.PARAMETER ServerReadyPollSeconds
+  Poll interval while waiting for server readiness. Defaults to 2 when unset.
+  Falls back to $env:OLLAMA_READY_POLL_SECONDS when unset.
 
 
 .EXAMPLE
@@ -42,6 +47,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Environment variable fallback (cross-platform parity with ai-sync.sh).
+if (-not $PSBoundParameters.ContainsKey('ServerReadyTimeoutSeconds') -and $env:OLLAMA_READY_TIMEOUT_SECONDS) {
+  $ServerReadyTimeoutSeconds = [int]$env:OLLAMA_READY_TIMEOUT_SECONDS
+}
+if (-not $PSBoundParameters.ContainsKey('ServerReadyPollSeconds') -and $env:OLLAMA_READY_POLL_SECONDS) {
+  $ServerReadyPollSeconds = [int]$env:OLLAMA_READY_POLL_SECONDS
+}
 
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
 $modulePath = Join-Path -Path $repoRoot -ChildPath 'src\hosts\Windows\modules\Invoke-AISync.ps1'
