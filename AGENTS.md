@@ -39,7 +39,7 @@
   - WinGet DSC what-if: `winget configure --what-if .\src\hosts\Windows\system.dsc.yml`
     and `winget configure --what-if .\src\hosts\Windows\user.dsc.yml`
 - All `nucleus-*` commands are expected to run from any directory:
-  `nucleus-ai-sync`, `nucleus-apply`, `nucleus-check-pwsh`, `nucleus-check-sh`,
+  `nucleus-ai-sync`, `nucleus-apply`, `nucleus-bootstrap`, `nucleus-check-pwsh`, `nucleus-check-sh`,
   `nucleus-cloud-setup`, `nucleus-gc`, `nucleus-health-check`, `nucleus-replica-reset`,
   `nucleus-replica-sync`, `nucleus-update`, `nucleus-vm-setup`.
 - Known upstream caveat: `builtins.derivation`/`options.json` contextless-source warning is upstream,
