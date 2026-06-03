@@ -7,8 +7,9 @@
 # so each concern can be validated, tested, and reused independently.
 #
 # Script location convention:
-#   scripts/        — Cross-platform scripts also consumed as Nix app inputs
-#                     via builtins.readFile (ai-sync, vm-setup, gc, replica-sync).
+#   scripts/        — Cross-platform scripts consumed as flake apps via
+#                     writeShellApplication (ai-sync, vm-setup) or as repo
+#                     script inputs (gc, replica-sync, and others).
 #   src/scripts/    — Apply-only internal scripts executed by this dispatcher
 #                     only.  Resolved at runtime via $_ash_script_dir.
 #

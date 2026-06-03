@@ -38,7 +38,10 @@
   - PowerShell parse checks: `nix shell nixpkgs#powershell -c pwsh ...`
   - WinGet DSC what-if: `winget configure --what-if .\src\hosts\Windows\system.dsc.yml`
     and `winget configure --what-if .\src\hosts\Windows\user.dsc.yml`
-- `nucleus-gc`, `nucleus-health-check`, and `nucleus-update` are expected to run from any directory.
+- All `nucleus-*` commands are expected to run from any directory:
+  `nucleus-ai-sync`, `nucleus-apply`, `nucleus-check-pwsh`, `nucleus-check-sh`,
+  `nucleus-cloud-setup`, `nucleus-gc`, `nucleus-health-check`, `nucleus-replica-reset`,
+  `nucleus-replica-sync`, `nucleus-update`, `nucleus-vm-setup`.
 - Known upstream caveat: `builtins.derivation`/`options.json` contextless-source warning is upstream,
   not a local regression unless concrete local breakage is shown.
 - Treat Dependabot `package-ecosystem: "nix"` as valid even when `check-dependabot` lags schema support.
