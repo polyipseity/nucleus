@@ -19,33 +19,33 @@
 param(
     # Path to Windows 11 ISO. Optional when windowsIsoUrl is set in VMs.json (default: '').
     # Download from: https://www.microsoft.com/software-download/windows11
-    [string]$WindowsIso = '',
+    [string]$WindowsIso = $(if ($env:NUCLEUS_VM_WINDOWS_ISO) { $env:NUCLEUS_VM_WINDOWS_ISO } else { '' }),
 
     # Build and provision only the NixOS guest (default: $false).
-    [switch]$NixosOnly,
+    [switch]$NixosOnly = { $env:NUCLEUS_VM_NIXOS_ONLY -eq 'true' }.Invoke(),
 
     # Build and provision only the Windows 11 guest (default: $false).
-    [switch]$WindowsOnly,
+    [switch]$WindowsOnly = { $env:NUCLEUS_VM_WINDOWS_ONLY -eq 'true' }.Invoke(),
 
     # Windows installer ISO resolution strategy.
     # Auto: windowsIsoUrl cache/download first, then Fido fallback.
     # Url:  use only -WindowsIso or windowsIsoUrl (no downloader fallback).
     # Fido: use only local cache/Fido when -WindowsIso is omitted (default: Auto).
     [ValidateSet('Auto', 'Url', 'Fido')]
-    [string]$WindowsIsoSource = 'Auto',
+    [string]$WindowsIsoSource = $(if ($env:NUCLEUS_VM_WINDOWS_ISO_SOURCE) { $env:NUCLEUS_VM_WINDOWS_ISO_SOURCE } else { 'Auto' }),
 
     # Retry attempts for Windows ISO network downloads (default: 0).
-    [int]$WindowsIsoRetries = 0,
+    [int]$WindowsIsoRetries = $(if ($env:NUCLEUS_VM_WINDOWS_ISO_RETRIES) { [int]$env:NUCLEUS_VM_WINDOWS_ISO_RETRIES } else { 0 }),
 
     # QEMU accelerator for image builds. Defaults to tcg (always works on
     # Windows; WHPX auto-detected and upgraded when available). POSIX
     # defaults to auto (hvf on macOS, kvm on Linux, tcg otherwise) —
     # intentional platform-appropriate defaults.
-    [string]$Accelerator = 'tcg',
+    [string]$Accelerator = $(if ($env:NUCLEUS_VM_ACCELERATOR) { $env:NUCLEUS_VM_ACCELERATOR } else { 'tcg' }),
 
     # Run Windows image builds headful (headless=false) for interactive
     # debugging of installer/SSH readiness issues (default: $false).
-    [switch]$DebugHeadful,
+    [switch]$DebugHeadful = { $env:NUCLEUS_VM_DEBUG_HEADFUL -eq 'true' }.Invoke(),
 
     # Print planned actions without executing (default: $false).
     [switch]$DryRun = $(if ($env:NUCLEUS_DRY_RUN -eq 'true') { $true } else { $false }),

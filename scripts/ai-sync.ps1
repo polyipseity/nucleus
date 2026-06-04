@@ -39,9 +39,9 @@
 [CmdletBinding()]
 param(
   [switch]$DryRun = $(if ($env:NUCLEUS_DRY_RUN -eq 'true') { $true } else { $false }),
-  [switch]$PruneOnly,
-  [int]$ServerReadyTimeoutSeconds = 60,
-  [int]$ServerReadyPollSeconds = 2
+  [switch]$PruneOnly = { $env:NUCLEUS_AI_SYNC_PRUNE_ONLY -eq 'true' }.Invoke(),
+  [int]$ServerReadyTimeoutSeconds = $(if ($env:NUCLEUS_AI_SYNC_TIMEOUT) { [int]$env:NUCLEUS_AI_SYNC_TIMEOUT } else { 60 }),
+  [int]$ServerReadyPollSeconds = $(if ($env:NUCLEUS_AI_SYNC_POLL) { [int]$env:NUCLEUS_AI_SYNC_POLL } else { 2 })
 )
 
 $ErrorActionPreference = 'Stop'

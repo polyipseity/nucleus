@@ -65,13 +65,13 @@
 param(
   [string]$ModuleDir = $(if ($env:NUCLEUS_GC_MODULE_DIR) { $env:NUCLEUS_GC_MODULE_DIR } else { '' }),
   [string]$RepoRoot = $(if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { '' }),
-  [switch]$NoNixGc,
-  [switch]$NoHmGc,
-  [switch]$NoToolCachePrune,
-  [switch]$NoOllamaPrune,
-  [switch]$NoScoopCleanup,
-  [switch]$NoWallpaperPrune,
-  [switch]$NoVMPrune,
+  [switch]$NoNixGc = { $env:NUCLEUS_GC_NO_NIX -eq 'true' }.Invoke(),
+  [switch]$NoHmGc = { $env:NUCLEUS_GC_NO_HM -eq 'true' }.Invoke(),
+  [switch]$NoToolCachePrune = { $env:NUCLEUS_GC_NO_TOOL_CACHE_PRUNE -eq 'true' }.Invoke(),
+  [switch]$NoOllamaPrune = { $env:NUCLEUS_GC_NO_OLLAMA_PRUNE -eq 'true' }.Invoke(),
+  [switch]$NoScoopCleanup = { $env:NUCLEUS_GC_NO_SCOOP_CLEANUP -eq 'true' }.Invoke(),
+  [switch]$NoWallpaperPrune = { $env:NUCLEUS_GC_NO_WALLPAPER_PRUNE -eq 'true' }.Invoke(),
+  [switch]$NoVMPrune = { $env:NUCLEUS_GC_NO_VM_PRUNE -eq 'true' }.Invoke(),
   [Alias("h")]
   [switch]$Help
 )

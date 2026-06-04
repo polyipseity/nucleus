@@ -33,7 +33,7 @@
 [CmdletBinding()]
 param(
   [Parameter(ValueFromRemainingArguments = $true)]
-  [string[]]$Paths
+  [string[]]$Paths = @($env:NUCLEUS_CHECK_PATHS -split ';' | Where-Object { $_ })
 )
 
 $ErrorActionPreference = 'Stop'
