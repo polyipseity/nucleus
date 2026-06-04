@@ -1,10 +1,10 @@
 ---
-description: "Use when reviewing or modifying cleanup/retention timings in Nix modules, GC scripts, or host DSC configs. Single source of truth for all expiry intervals."
-name: "Cleanup and Retention Policy"
+description: "Use when reviewing or modifying GC/retention timings in Nix modules, GC scripts, or host DSC configs. Single source of truth for all expiry intervals."
+name: "GC and Retention Policy"
 applyTo: "src/**/*.nix, scripts/gc.*, src/hosts/Windows/**/*.yml"
 ---
 
-# Cleanup and Retention Policy
+# GC and Retention Policy
 
 ## Time-Based Retention
 
@@ -47,12 +47,12 @@ applyTo: "src/**/*.nix, scripts/gc.*, src/hosts/Windows/**/*.yml"
 | **At logon + 1min restart** | LiteLLM proxy                                                 | Windows               | `Sync-LiteLLMScheduledTask.ps1`                                                         |
 | **Every activation**        | Homebrew zap + VS Code extensions prune + agent skills prune  | All POSIX             | Various module files                                                                    |
 
-## Declarative-Diff Cleanups (Not Time-Based)
+## Declarative-Diff GC (Not Time-Based)
 
-| What it prunes                               | Source of truth              | Files                             |
+| What it gc's                                 | Source of truth              | Files                             |
 | -------------------------------------------- | ---------------------------- | --------------------------------- |
 | Wallpaper decrypted copies                   | `.sops` source files in repo | `scripts/gc.sh`, `scripts/gc.ps1` |
-| Ollama models                                | `src/modules/ai/models.json` | `Invoke-AISync -PruneOnly`        |
+| Ollama models                                | `src/modules/ai/models.json` | `Invoke-AISync -GcOnly`           |
 | VM artifacts (except Windows installer ISOs) | `src/modules/VMs.json`       | `scripts/gc.sh`, `scripts/gc.ps1` |
 | VS Code extensions                           | Nix-managed extension set    | `src/modules/editors.nix`         |
 | Agent/Skills                                 | Declared skills inventory    | `src/modules/agents.nix`          |
