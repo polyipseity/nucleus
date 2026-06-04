@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
-# Orchestrates repository-wide update tasks in one deterministic sequence.
+# update.sh — Orchestrate repository-wide update tasks in one deterministic sequence.
 #
-# Operations:
-#   1. update flake inputs (src/flake.lock)
-#   2. optionally update macOS packages via Homebrew (when available)
-#   3. optionally update Windows packages via winget (when available)
-#   4. rewrap all SOPS-managed files for current recipients
+# Updates flake inputs, optionally updates macOS packages via Homebrew and
+# Windows packages via winget, and rewraps all SOPS-managed files for current
+# recipients.
 #
 # Arguments:
-#   --flake|--no-flake    control nix flake update (default: --flake)
-#   --brew|--no-brew      control Homebrew update/upgrade (macOS only) (default: --brew)
-#   --winget|--no-winget  control winget upgrade (Windows only) (default: --winget)
-#   --sops|--no-sops      control sops updatekeys (default: --sops)
+#   --flake|--no-flake      Control nix flake update (default: --flake).
+#   --brew|--no-brew        Control Homebrew update/upgrade (macOS only) (default: --brew).
+#   --winget|--no-winget    Control winget upgrade (Windows only) (default: --winget).
+#   --sops|--no-sops        Control sops updatekeys (default: --sops).
 #
 # Environment variables:
-#   NIX_CONFIG  merged with required flake feature flags for nix commands
+#   NIX_CONFIG  Merged with required flake feature flags for nix commands.
 #
 # Exit conditions:
 #   0 on success; non-zero on first failed step.
-
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"

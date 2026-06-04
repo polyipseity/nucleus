@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
-# Install Nix (if absent) and the Nix-managed bootstrap dependencies.
-# After running this script, apply the configuration with: nix run ./src#apply
+# bootstrap.sh — Install Nix (if absent) and run the Nix-managed bootstrap/apply flow.
 #
-# Commands:
-#   install-deps  Install bootstrap dependencies only (default)
-#   apply         Install bootstrap dependencies, then run the src apply flow
+# Installs Nix if not already present, then optionally runs the apply flow to
+# converge the full system configuration. By default installs dependencies only.
+# Pass --apply to also run the apply flow.
 #
-# Options:
-#   --apply|--no-apply       pass through to nix run .#apply; control whether to run the apply flow after installing dependencies (default: --no-apply)
-#   --ai-sync|--no-ai-sync   pass through to nix run .#apply; control the post-apply Ollama model sync step (default: --ai-sync)
-#   --replica-sync|--no-replica-sync  pass through to nix run .#apply; control immediate post-apply replica sync (default: --no-replica-sync)
-#   --target-user            pass through to src/scripts/apply.sh; selects the Home Manager flake profile on standalone Linux hosts
+# Arguments:
+#   --apply|--no-apply             Run the apply flow after installing dependencies (default: --no-apply).
+#   --ai-sync|--no-ai-sync         Control post-apply Ollama model sync (default: --ai-sync).
+#   --replica-sync|--no-replica-sync  Control immediate post-apply replica sync (default: --no-replica-sync).
+#   --target-user <name>           Select the Home Manager flake profile on standalone Linux hosts.
+#
+# Environment variables:
+#   NUCLEUS_APPLY        Override the --apply default (default: false).
+#   NUCLEUS_AI_SYNC      Override the --ai-sync default (default: true).
+#   NUCLEUS_REPLICA_SYNC Override the --replica-sync default (default: false).
+#   NUCLEUS_TARGET_USER  Override the --target-user default (default: unset).
+#
+# Exit conditions:
+#   0 on success; non-zero if any step fails.
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)

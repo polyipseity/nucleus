@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-# scripts/check-sh.sh — Validate shell script syntax and lint quality with ShellCheck.
+# check-sh.sh — Validate shell script syntax and lint quality with ShellCheck.
 #
-# Usage:
-#   check-sh.sh [path ...]
+# With no arguments, checks all tracked *.sh files from Git. With arguments,
+# checks only the provided paths.
 #
-# Behavior:
-#   - With no arguments, checks all tracked `*.sh` files from Git.
-#   - With arguments, checks only the provided paths.
+# Arguments:
+#   (none)        No flags accepted; paths may be provided as positional arguments.
 #
-# Environment:
-#   - Requires `git` and `shellcheck` in PATH (provided by flake app wrapper).
+# Environment variables:
+#   (none)        Requires git and shellcheck in PATH.
 #
 # Exit conditions:
-#   - Exits non-zero on any ShellCheck finding at error/warning level.
+#   0 on success; non-zero on any ShellCheck finding at error/warning level.
 set -euo pipefail
 
 # Source shared library when available; fall back to inline helpers for

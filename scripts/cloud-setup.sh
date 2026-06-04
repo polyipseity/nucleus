@@ -1,22 +1,19 @@
 #!/usr/bin/env bash
-# Guides one-time cloud remote setup and validates cloud mount automation.
+# cloud-setup.sh — Guide one-time cloud remote setup and validate cloud mount automation.
 #
-# Operations:
-#   1. verify required rclone remotes exist (GoogleDrive, iCloud, OneDrive)
-#   2. if any are missing, create each with the correct provider type and
-#      repo-configured backend defaults, then prompt for authentication
-#      (no manual menu navigation required)
-#   3. validate each remote's credentials work (via rclone lsd)
-#   4. optionally run nucleus apply if --apply flag provided
+# Verifies required rclone remotes exist (GoogleDrive, iCloud, OneDrive),
+# creates missing remotes with correct provider types, validates credentials,
+# and optionally runs nucleus apply to converge cloud mount services.
 #
 # Arguments:
-#   --apply|--no-apply  run nucleus apply to converge cloud mount services
-#                       (default: --no-apply; setup/validate only; user can run nucleus apply later)
+#   --apply|--no-apply  Run nucleus apply to converge cloud mount services (default: --no-apply).
+#
+# Environment variables:
+#   (none)
 #
 # Exit conditions:
 #   0 on success; non-zero when required remotes are still missing or credential
 #   validation fails after a recreation attempt.
-
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"

@@ -1,30 +1,26 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
-# Synchronises locally installed Ollama models with the declarative manifest
-# at src/modules/ai/models.json.
+# ai-sync.sh — Synchronise locally installed Ollama models with the declarative manifest.
 #
-# Operations:
-#   1. Determine the active profile (mac or pc) from the current OS or
-#      NUCLEUS_AI_SYNC_PROFILE override.
-#   2. Pull any model in the manifest that is not already installed.
-#   3. Remove any locally installed model that is not in the manifest.
-#      (--prune-only skips step 2 so only removals happen.)
+# Pulls models listed in src/modules/ai/models.json that are not yet installed
+# and removes locally installed models absent from the manifest, keeping the
+# Ollama server in sync with the repository's declarative model selection.
 #
 # Arguments:
-#   --dry-run                            print planned actions without executing them (default: off)
-#   --prune-only                         skip pulls; only remove unlisted models (default: off)
+#   --dry-run                  Print planned actions without executing (default: off).
+#   --ollama-host <address>    Ollama server address (default: 127.0.0.1:11434).
+#   --ollama-profile <name>    Override profile selection (MacBook|NixOS|Windows) (default: auto-detect).
+#   --prune-only               Skip pulls; only remove unlisted models (default: off).
 #
 # Environment variables:
-#   NUCLEUS_AI_SYNC_TIMEOUT  bounded wait for server readiness (default: 60); set to 0 to disable
-#   NUCLEUS_AI_SYNC_POLL     poll interval while waiting (default: 2)
-#   NUCLEUS_AI_SYNC_PROFILE  override profile selection (MacBook|NixOS|Windows); detected
-#                            automatically when unset (Darwin → MacBook, Linux → NixOS)
-#   OLLAMA_HOST              Ollama server address; defaults to 127.0.0.1:11434
+#   NUCLEUS_AI_SYNC_TIMEOUT  Bounded wait for server readiness in seconds (default: 60).
+#   NUCLEUS_AI_SYNC_POLL     Poll interval while waiting in seconds (default: 2).
+#   NUCLEUS_AI_SYNC_PROFILE  Override profile selection; auto-detected when unset.
+#   OLLAMA_HOST              Ollama server address (default: 127.0.0.1:11434).
 #
 # Exit conditions:
 #   0 on success or when ollama is unavailable (benign skip).
 #   Non-zero when jq is unavailable or when a pull/remove step fails.
+set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib.sh"

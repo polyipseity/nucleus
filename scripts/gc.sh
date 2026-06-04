@@ -1,28 +1,24 @@
 #!/usr/bin/env bash
-# Performs bounded garbage collection on POSIX hosts.
+# gc.sh — Perform bounded garbage collection on POSIX hosts.
 #
-# Operations:
-#   1. expire Home Manager generations older than 30 days (if home-manager is available)
-#   2. run nix store garbage collection (if nix is available)
-#   3. remove stale decrypted wallpaper files under ~/Pictures/wallpapers
-#   4. prune bun/cargo/rustc/uv caches and the repo-local .direnv environment
-#   5. remove locally installed Ollama models absent from the manifest (if ollama is available)
+# Expires old Home Manager generations, runs nix store GC, removes stale
+# decrypted wallpapers, prunes tool caches, and removes locally installed
+# Ollama models absent from the manifest.
 #
 # Arguments:
-#   --tool-cache-prune|--no-tool-cache-prune  control bun/cargo/rustc/uv and repo-local .direnv cache cleanup (default: --tool-cache-prune)
-#   --hm-gc|--no-hm-gc                        control home-manager expire-generations (default: --hm-gc)
-#   --nix-gc|--no-nix-gc                      control nix-collect-garbage (default: --nix-gc)
-#   --ollama-prune|--no-ollama-prune          control stale Ollama model removal (default: --ollama-prune)
-#   --scoop-cleanup|--no-scoop-cleanup        accepted but ignored on POSIX (Windows-only) (default: --scoop-cleanup)
-#   --wallpaper-prune|--no-wallpaper-prune    control stale wallpaper cleanup (default: --wallpaper-prune)
-#   --vm-prune|--no-vm-prune                  control stale VM artifact removal (default: --vm-prune)
+#   --tool-cache-prune|--no-tool-cache-prune  Control bun/cargo/rustc/uv cache cleanup (default: --tool-cache-prune).
+#   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
+#   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
+#   --ollama-prune|--no-ollama-prune          Control stale Ollama model removal (default: --ollama-prune).
+#   --scoop-cleanup|--no-scoop-cleanup        Accepted but ignored on POSIX (Windows-only) (default: --scoop-cleanup).
+#   --wallpaper-prune|--no-wallpaper-prune    Control stale wallpaper cleanup (default: --wallpaper-prune).
+#   --vm-prune|--no-vm-prune                  Control stale VM artifact removal (default: --vm-prune).
 #
 # Environment variables:
 #   (none)
 #
 # Exit conditions:
 #   0 on success; non-zero on failure.
-
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
