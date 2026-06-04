@@ -12,7 +12,6 @@
 #   --brew|--no-brew      control Homebrew update/upgrade (macOS only) (default: --brew)
 #   --winget|--no-winget  control winget upgrade (Windows only) (default: --winget)
 #   --sops|--no-sops      control sops updatekeys (default: --sops)
-#   --repo-root <path>    override the detected repository root path
 #
 # Environment variables:
 #   NIX_CONFIG  merged with required flake feature flags for nix commands
@@ -32,7 +31,6 @@ usage() {
   --brew|--no-brew      Control Homebrew update/upgrade (macOS only) (default: --brew).
   --winget|--no-winget  Control winget upgrade (Windows only) (default: --winget).
   --sops|--no-sops      Control sops updatekeys (default: --sops).
-  --repo-root <path>    Override the detected repository root path.
 EOF
 }
 
@@ -72,10 +70,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-sops)
       sops=false
-      ;;
-    --repo-root)
-      REPO_ROOT="$2"
-      shift
       ;;
 
     *)

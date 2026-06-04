@@ -8,6 +8,9 @@
     2. winget package upgrades (when available)
     3. SOPS recipient rewrap for managed secret files
 
+  Uses the NUCLEUS_REPO_ROOT environment variable to locate the repository
+  root; falls back to the parent of the script directory.
+
 .PARAMETER NoFlake
   Do not run nix flake update (default: $false).
 
@@ -49,7 +52,7 @@ if ($Help) {
 # macOS-only parameter; accepted for interface compatibility.
 $NoBrew | Out-Null
 
-$repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
+$repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path }
 
 if (-not $NoFlake -and (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue)) {
   $flakeOutput = & nix.exe --option warn-dirty false flake update --flake (Join-Path -Path $repoRoot -ChildPath 'src') 2>&1

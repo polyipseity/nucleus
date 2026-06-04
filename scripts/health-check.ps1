@@ -26,7 +26,7 @@
 [CmdletBinding()]
 param(
   [Parameter()]
-  [int]$MinFreeGB = $(if ($env:NUCLEUS_MIN_FREE_GB) { [int]$env:NUCLEUS_MIN_FREE_GB } else { 10 }),
+  [int]$MinFreeGB = 10,
 
   [Parameter()]
   [switch]$NoSecretHealth = $(if ($env:NUCLEUS_HEALTH_CHECK_NO_SECRET_HEALTH -eq 'true') { $true } else { $false }),

@@ -9,7 +9,6 @@
 #   5. remove locally installed Ollama models absent from the manifest (if ollama is available)
 #
 # Arguments:
-#   --repo-root <path>          override the detected repository root path
 #   --tool-cache-prune|--no-tool-cache-prune  control bun/cargo/rustc/uv and repo-local .direnv cache cleanup (default: --tool-cache-prune)
 #   --hm-gc|--no-hm-gc                        control home-manager expire-generations (default: --hm-gc)
 #   --nix-gc|--no-nix-gc                      control nix-collect-garbage (default: --nix-gc)
@@ -32,7 +31,6 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
-  --repo-root <path>          Override the detected repository root path.
   --tool-cache-prune|--no-tool-cache-prune  Control bun/cargo/rustc/uv cache cleanup (default: --tool-cache-prune).
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
@@ -52,14 +50,9 @@ ollama_prune=true
 scoop_cleanup=true
 wallpaper_prune=true
 vm_prune=true
-repo_root_override=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --repo-root)
-      repo_root_override="$2"
-      shift
-      ;;
     -h|--help)
       usage
       exit 0
@@ -115,10 +108,6 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
-
-if [ -n "$repo_root_override" ]; then
-  REPO_ROOT="$repo_root_override"
-fi
 
 expire_hm_generations_if_available() {
   # Home Manager generations are GC roots: nix-collect-garbage cannot reclaim
@@ -273,7 +262,7 @@ prune_ollama_models_if_available() {
 
   # GC must stay space-reclaim only; do not wait for a cold Ollama daemon to
   # start because that would stall GC on hosts where the AI service is idle.
-  "$REPO_ROOT/scripts/ai-sync.sh" --prune-only --server-ready-timeout-seconds 0
+  NUCLEUS_AI_SYNC_TIMEOUT=0 "$REPO_ROOT/scripts/ai-sync.sh" --prune-only
 }
 
 prune_vm_artifacts_if_present() {

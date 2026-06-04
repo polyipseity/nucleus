@@ -31,11 +31,6 @@
   from RepoRoot as src\hosts\Windows\modules so callers can skip it when
   RepoRoot is provided (default: '').
 
-.PARAMETER RepoRoot
-  Root of the repository. Mandatory: caller must explicitly pass the repo root
-  so they are aware of which repository's assets and manifests will be accessed
-  and modified (default: '').
-
 .PARAMETER NoNixGc
   Accepted but ignored on Windows (POSIX-only) (default: $false).
 
@@ -64,7 +59,6 @@
 [CmdletBinding()]
 param(
   [string]$ModuleDir = $(if ($env:NUCLEUS_GC_MODULE_DIR) { $env:NUCLEUS_GC_MODULE_DIR } else { '' }),
-  [string]$RepoRoot = $(if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { '' }),
   [switch]$NoNixGc = { $env:NUCLEUS_GC_NO_NIX -eq 'true' }.Invoke(),
   [switch]$NoHmGc = { $env:NUCLEUS_GC_NO_HM -eq 'true' }.Invoke(),
   [switch]$NoToolCachePrune = { $env:NUCLEUS_GC_NO_TOOL_CACHE_PRUNE -eq 'true' }.Invoke(),
@@ -83,14 +77,15 @@ if ($Help) {
   return
 }
 
-if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
-  $RepoRoot = & {
-    $gitRoot = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Out-String
-    $gitRoot = $gitRoot.Trim()
-    if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and (Test-Path -Path $gitRoot -PathType Container)) {
-      return $gitRoot
-    }
-    return (Join-Path $HOME 'dev\nucleus')
+$RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
+  $env:NUCLEUS_REPO_ROOT
+} else {
+  $gitRoot = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Out-String
+  $gitRoot = $gitRoot.Trim()
+  if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and (Test-Path -Path $gitRoot -PathType Container)) {
+    $gitRoot
+  } else {
+    Join-Path $HOME 'dev\nucleus'
   }
 }
 if ([string]::IsNullOrWhiteSpace($ModuleDir)) {

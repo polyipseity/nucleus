@@ -10,9 +10,6 @@
 #   --min-free-gb <int>                  minimum free disk space in GiB (default: 10)
 #   --secret-health|--no-secret-health    enable or skip SOPS decryption identity verification (default: --secret-health)
 #
-# Environment variables:
-#   NUCLEUS_MIN_FREE_GB  alternate source for minimum free space threshold
-#
 # Exit conditions:
 #   0 on success; non-zero if any check fails.
 
@@ -27,7 +24,7 @@ usage() {
 
 REPO_ROOT="$(resolve_nucleus_root)"
 
-min_free_gb="${NUCLEUS_MIN_FREE_GB:-10}"
+min_free_gb=10
 secret_health=true
 
 while [ "$#" -gt 0 ]; do
