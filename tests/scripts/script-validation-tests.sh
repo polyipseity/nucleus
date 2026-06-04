@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
-# tests/scripts/script-validation-tests.sh — Smoke tests for shell scripts.
+# script-validation-tests.sh — Smoke tests for shell scripts in the nucleus repository.
 #
-# Validates that critical scripts are syntactically correct and functionally sound.
-# Tests check:
-#   - Shell syntax validity (no parse errors)
-#   - Required dependencies are available
-#   - Script exit codes on various conditions
-#   - Critical paths/variables are defined
+# Validates that critical shell scripts in scripts/ and src/scripts/ are
+# syntactically correct, follow best practices (shebang, executable bit, strict
+# mode, error handling, documentation), and have required dependencies available.
+# Runs a suite of test functions (test_bash_syntax, test_has_shebang, etc.)
+# against each discovered script and reports pass/fail counts.
 #
-# Run with: bash tests/scripts/script-validation-tests.sh
+# Arguments:
+#   (none)        No arguments accepted.
+#
+# Environment variables:
+#   (none)        No environment variables used.
+#
+# Exit conditions:
+#   0 on success (all tests pass); non-zero if any test fails.
 
 set -euo pipefail
 
