@@ -8,8 +8,8 @@
 
     1. Remove stale decrypted wallpaper files under %USERPROFILE%\Pictures\wallpapers
        that no longer have a matching *.sops blob in src/assets/wallpapers/.
-    2. Prune bun/cargo/rustc/uv caches and the nucleus repo-local .direnv
-       environment. cargo-cache remains the authoritative cleanup path for the
+    2. GC bun/cargo/rustc/uv caches and the nucleus repo-local .direnv
+       environment. cargo-cache remains the authoritative gc path for the
        Cargo registry/git/advisory-db cache when present; rustc-specific temp
        state is cleared via rustup's tmp directory.
     3. Remove old Scoop app versions and installer caches via `scoop cleanup *`.
@@ -38,7 +38,7 @@
   Accepted but ignored on Windows (POSIX-only) (default: $false).
 
 .PARAMETER NoToolCacheGc
-  Skip bun/cargo/rustc/uv and repo-local .direnv cache cleanup (default: $false).
+  Skip bun/cargo/rustc/uv and repo-local .direnv cache gc (default: $false).
 
 .PARAMETER NoOllamaGc
   Skip Ollama orphaned model removal even when ollama is installed (default: $false).
@@ -47,7 +47,7 @@
   Skip Scoop cache and old-version gc even when Scoop is installed (default: $false).
 
 .PARAMETER NoWallpaperGc
-  Skip stale wallpaper file cleanup (default: $false).
+  Skip stale wallpaper file gc (default: $false).
 
 .PARAMETER NoVMGc
   Skip stale VM artifact removal (default: $false).
@@ -162,7 +162,7 @@ function Remove-VMGcItem {
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
 
-# ---- Step 1: stale wallpaper cleanup ----------------------------------------
+# ---- Step 1: stale wallpaper gc ----------------------------------------
 # Keeps the decrypted gallery in sync with declarative source blobs.  Without
 # this, removed or renamed wallpaper assets leave orphaned decrypted files on
 # disk that continue to appear in the rotation.
@@ -294,7 +294,7 @@ if (-not $NoVMGc) {
         }
       }
 
-      # Prune stale VM scripts from scripts/ subfolder.
+      # GC stale VM scripts from scripts/ subfolder.
       $scriptsDir = Join-Path $vmDir 'scripts'
       if (Test-Path -LiteralPath $scriptsDir -PathType Container) {
         $scripts = Get-ChildItem -LiteralPath $scriptsDir -Include '*.sh', '*.ps1' -File -ErrorAction SilentlyContinue

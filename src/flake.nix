@@ -358,7 +358,7 @@
       };
 
       # Build garbage-collection app for POSIX hosts.
-      # This combines Nix store GC and stale wallpaper cleanup in one bounded
+      # This combines Nix store GC and stale wallpaper gc in one bounded
       # operation without touching unmanaged user content outside declarative
       # scopes. jq is included so the Ollama gc step can parse models.json
       # even when the host shell PATH does not already contain jq.

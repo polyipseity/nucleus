@@ -12,7 +12,7 @@
 # separate user.  Home Manager activation for each user runs the provision
 # script to their own ~/Pictures/wallpapers/ directory.
 #
-# Stale cleanup: any file in ~/Pictures/wallpapers/ that no longer has a
+# Stale gc: any file in ~/Pictures/wallpapers/ that no longer has a
 # matching *.sops source is removed so the gallery stays current.
 #
 # This activation runs after gpgImport so the keyring import has already
@@ -205,7 +205,7 @@ in
       fi
     '') wallpaperItemsForCurrentUser}
 
-    # Stale cleanup: remove decrypted files that no longer have a matching
+    # Stale gc: remove decrypted files that no longer have a matching
     # .sops source so the gallery does not show deleted assets.
     for decryptedFile in "$picturesDir"/*; do
       [ -e "$decryptedFile" ] || continue

@@ -2,16 +2,16 @@
 # gc.sh — Perform bounded garbage collection on POSIX hosts.
 #
 # Expires old Home Manager generations, runs nix store GC, removes stale
-# decrypted wallpapers, prunes tool caches, and removes locally installed
+# decrypted wallpapers, gc's tool caches, and removes locally installed
 # Ollama models absent from the manifest.
 #
 # Arguments:
-#   --tool-cache-gc|--no-tool-cache-gc  Control bun/cargo/rustc/uv cache cleanup (default: --tool-cache-gc).
+#   --tool-cache-gc|--no-tool-cache-gc  Control bun/cargo/rustc/uv cache gc (default: --tool-cache-gc).
 #   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
 #   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
 #   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
 #   --scoop-gc|--no-scoop-gc        Accepted but ignored on POSIX (Windows-only) (default: --scoop-gc).
-#   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper cleanup (default: --wallpaper-gc).
+#   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
 #   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
 #
 # Environment variables:
@@ -27,12 +27,12 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
-  --tool-cache-gc|--no-tool-cache-gc  Control bun/cargo/rustc/uv cache cleanup (default: --tool-cache-gc).
+  --tool-cache-gc|--no-tool-cache-gc  Control bun/cargo/rustc/uv cache gc (default: --tool-cache-gc).
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
   --scoop-gc|--no-scoop-gc        Accepted but ignored on POSIX (Windows-only) (default: --scoop-gc).
-  --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper cleanup (default: --wallpaper-gc).
+  --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
 EOF
 }
@@ -123,7 +123,7 @@ expire_hm_generations_if_available() {
 }
 
 run_nix_gc_if_available() {
-  # Store cleanup is best-effort because this helper also runs on hosts where
+  # Store gc is best-effort because this helper also runs on hosts where
   # Nix may not be installed (for example minimal CI images).
   if ! command -v nix-collect-garbage >/dev/null 2>&1; then
     # Existence probe — tool absent is expected and benign on some hosts.
@@ -192,7 +192,7 @@ gc_tool_caches_if_available() {
   # devShell.  Clearing those shared cache locations reclaims space for both
   # system and devShell use without touching project-managed dependencies.
   # rustc has no standalone cache tree; its heavy artifacts live in cargo and
-  # rustup-managed directories, which are pruned below.
+  # rustup-managed directories, which are gc'd below.
 
   cargo_home_dir="${CARGO_HOME:-$HOME/.cargo}"
   rustup_home_dir="${RUSTUP_HOME:-$HOME/.rustup}"
@@ -214,7 +214,7 @@ gc_tool_caches_if_available() {
 
   # cargo-cache (github.com/matthiaskrgr/cargo-cache) reclaims space from
   # ~/.cargo/registry, ~/.cargo/git, and advisory-db clones.  This remains the
-  # authoritative cleanup path when the binary is available.
+  # authoritative gc path when the binary is available.
   if ! command -v cargo-cache >/dev/null 2>&1; then
     printf '%s\n' "gc: cargo-cache unavailable; skipping cargo cache gc"
   elif [ ! -d "$cargo_home_dir" ]; then
@@ -344,7 +344,7 @@ gc_vm_artifacts_if_present() {
     fi
   done
 
-  # Prune stale VM scripts from scripts/ subfolder.
+  # GC stale VM scripts from scripts/ subfolder.
   if [ -d "$vm_dir/scripts" ]; then
     for _gc_script in "$vm_dir"/scripts/*.sh "$vm_dir"/scripts/*.ps1; do
       [ -f "$_gc_script" ] || continue
@@ -380,7 +380,7 @@ if [ "$nix_gc" = true ]; then
   run_nix_gc_if_available
 fi
 
-# Step 3: stale wallpaper cleanup (independent of Nix).
+# Step 3: stale wallpaper gc (independent of Nix).
 if [ "$wallpaper_gc" = true ]; then
   gc_stale_wallpapers
 fi
