@@ -1,7 +1,3 @@
-# modules/Windows/provision-devdirectory.ps1 — Create %USERPROFILE%\dev when absent.
-# Mirrors the macOS configureSystemHardening and NixOS provisionDevDirectory
-# activations that create ~/dev on all POSIX hosts.
-
 function Initialize-DevDirectory {
 <#
 .SYNOPSIS
@@ -25,6 +21,10 @@ function Initialize-DevDirectory {
 .EXAMPLE
   Initialize-DevDirectory -Enabled:$false
   # No-op; skips directory creation.
+
+.NOTES
+  Environment variables: (none)
+  Exit codes: 0 on success; non-zero on failure.
 #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(

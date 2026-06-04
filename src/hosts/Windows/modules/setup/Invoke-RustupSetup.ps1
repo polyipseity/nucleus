@@ -1,12 +1,3 @@
-# modules/Windows/rustup-setup.ps1 — Declarative rustup toolchain management.
-#
-# Ensures only the declared set of Rust toolchains is installed via rustup.
-# Uses zap-style pruning: any toolchain whose channel is not in the desired
-# list is removed, mirroring homebrew's cleanup = "zap" behaviour.
-#
-# rustup itself is installed from WinGet (Rustlang.Rustup in system.dsc.yml).
-# This module must run after the WinGet DSC step.
-
 function Invoke-RustupSetup {
   <#
   .SYNOPSIS
@@ -27,6 +18,10 @@ function Invoke-RustupSetup {
 
   .EXAMPLE
     Invoke-RustupSetup
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
   param()

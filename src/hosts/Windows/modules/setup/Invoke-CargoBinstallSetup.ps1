@@ -1,12 +1,3 @@
-# modules/Windows/cargo-binstall-setup.ps1 — Declarative cargo-binstall package management.
-#
-# Installs and removes Rust CLI binaries via cargo-binstall for tools that are
-# not available in WinGet or Scoop (the preferred channels per the repository
-# install preference hierarchy: winget > scoop > cargo binstall > bun > uv).
-#
-# cargo-binstall itself is installed from the Scoop main bucket by
-# Invoke-ScoopSetup; this module must run after that step.
-
 function Invoke-CargoBinstallSetup {
   <#
   .SYNOPSIS
@@ -36,6 +27,10 @@ function Invoke-CargoBinstallSetup {
 
   .EXAMPLE
     Invoke-CargoBinstallSetup
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
   param()

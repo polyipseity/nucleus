@@ -1,13 +1,3 @@
-# modules/Windows/uv-setup.ps1 — Declarative uv tool management for Windows.
-#
-# Installs and removes Python CLI tools via `uv tool install` for tools that are
-# not available in WinGet, Scoop, cargo-binstall, or bun.  uv occupies the last
-# tier of the repository install preference hierarchy:
-#   nixpkgs/winget > scoop > cargo binstall > bun > uv
-# uv itself is installed from WinGet (astral-sh.uv in system.dsc.yml).
-#
-# Mirrors the installUvTools POSIX activation in agents.nix.
-
 function Invoke-UvSetup {
   <#
   .SYNOPSIS
@@ -19,12 +9,18 @@ function Invoke-UvSetup {
     removes anything installed but absent from the desired list (zap-style),
     and installs any desired tools that are missing.
 
+    Mirrors the installUvTools POSIX activation in agents.nix.
+
     Requires uv to be on PATH (installed from WinGet by system.dsc.yml).
     Prepends %USERPROFILE%\.local\bin to PATH internally so uv-installed
     binaries are accessible in subsequent steps of the same apply session.
 
   .EXAMPLE
     Invoke-UvSetup
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
   param()

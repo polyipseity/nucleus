@@ -1,8 +1,3 @@
-# modules/Windows/install-prek-hook.ps1 — Repository-local prek hook installer.
-#
-# Ensures repositories that opt into prek via prek.toml have their Git hooks
-# installed during the Windows apply flow.
-
 function Install-PrekHook {
   <#
   .SYNOPSIS
@@ -13,6 +8,9 @@ function Install-PrekHook {
     does, runs `prek install` from that repository root. This keeps the live
     nucleus checkout protected during the same provision run that installs or
     updates the prek binary.
+
+    Ensures repositories that opt into prek via prek.toml have their Git hooks
+    installed during the Windows apply flow.
 
     The operation is idempotent because `prek install` safely re-writes the
     managed hook shims when they already exist.
@@ -31,6 +29,10 @@ function Install-PrekHook {
 
   .EXAMPLE
     Install-PrekHook -RepositoryRoot 'C:\Users\admin\dev\nucleus' -PrekExecutablePath 'C:\Users\admin\AppData\Local\Microsoft\WinGet\Packages\j178.Prek\prek.exe'
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
   param(

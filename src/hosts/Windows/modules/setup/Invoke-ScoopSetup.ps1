@@ -1,10 +1,3 @@
-# modules/Windows/scoop-setup.ps1 — Declarative Scoop bucket and app management.
-#
-# Idempotently converges the declared set of Scoop apps using zap-style pruning:
-# reads the Scoop apps directory for the actually installed set and removes
-# anything not in the desired list.  Mirrors the declarative install+prune
-# approach used by Invoke-BunSetup and the installBunPackages POSIX activation.
-
 function Invoke-ScoopSetup {
   <#
   .SYNOPSIS
@@ -15,6 +8,9 @@ function Invoke-ScoopSetup {
     reads the Scoop apps directory for the actually installed set and removes
     anything not in the desired list (zap-style), then installs any desired
     apps that are missing.
+
+    Mirrors the declarative install+prune approach used by Invoke-BunSetup and
+    the installBunPackages POSIX activation.
 
     This function must run after the WinGet DSC step that installs Scoop.Scoop,
     because Scoop shims are written to %USERPROFILE%\scoop\shims which is not
@@ -31,6 +27,10 @@ function Invoke-ScoopSetup {
 
   .EXAMPLE
     Invoke-ScoopSetup
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
   param()

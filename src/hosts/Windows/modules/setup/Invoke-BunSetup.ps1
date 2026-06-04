@@ -1,13 +1,3 @@
-# modules/Windows/bun-setup.ps1 — Declarative bun global package management.
-#
-# Installs and removes JS CLI tools via `bun install -g` for packages that are
-# not available in WinGet, Scoop, or cargo-binstall.  Bun occupies the fourth
-# tier of the repository install preference hierarchy:
-#   nixpkgs/winget > scoop > cargo binstall > bun > uv
-#
-# Bun itself is installed from WinGet (Oven-sh.Bun in system.dsc.yml).
-# This module must run after the WinGet DSC step.
-
 function Invoke-BunSetup {
   <#
   .SYNOPSIS
@@ -42,6 +32,10 @@ function Invoke-BunSetup {
 
   .EXAMPLE
     Invoke-BunSetup
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
   param()
