@@ -1,7 +1,15 @@
-# modules/Windows/resolve-executable.ps1 — Managed executable resolver.
-#
-# Ensures Windows apply scripts use deterministic executable resolution without
-# relying on PATH ordering drift.
+<#
+.SYNOPSIS
+  Returns the first candidate path that exists on disk.
+
+.DESCRIPTION
+  Ensures Windows apply scripts use deterministic executable resolution without
+  relying on PATH ordering drift.
+
+.NOTES
+  Environment variables: (none)
+  Exit codes: 0 on success; non-zero on failure (throws when no candidate found)
+#>
 
 function Resolve-Executable {
   <#

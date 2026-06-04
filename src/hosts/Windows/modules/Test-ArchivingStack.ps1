@@ -17,6 +17,10 @@
 .EXAMPLE
   # Run archiving stack health check:
   Test-ArchivingStack
+
+.NOTES
+  Environment variables: PATH, ProgramFiles
+  Exit codes: 0 on success; non-zero on failure
 #>
 function Test-ArchivingStack {
   [CmdletBinding()]

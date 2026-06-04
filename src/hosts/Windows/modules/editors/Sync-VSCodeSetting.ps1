@@ -1,7 +1,15 @@
-# modules/Windows/sync-vscodesetting.ps1 — VS Code settings parity helper.
-#
-# Converges managed settings keys across stable and insiders while preserving
-# unmanaged user-defined keys.
+<#
+.SYNOPSIS
+  Converges managed VS Code user settings for stable and insiders channels.
+
+.DESCRIPTION
+  Converges managed settings keys across stable and insiders while preserving
+  unmanaged user-defined keys.
+
+.NOTES
+  Environment variables: APPDATA
+  Exit codes: 0 on success; non-zero on failure
+#>
 
 function Sync-VSCodeSetting {
   <#

@@ -1,7 +1,15 @@
-# hosts/Windows/modules/wallpapers/Remove-StaleWallpaper.ps1 — Managed wallpaper stale-file cleanup.
-#
-# Removes only decrypted files without matching source blobs so gallery state
-# stays aligned with declarative assets.
+<#
+.SYNOPSIS
+  Removes decrypted wallpaper files that no longer have a matching SOPS source blob.
+
+.DESCRIPTION
+  Removes only decrypted files without matching source blobs so gallery state
+  stays aligned with declarative assets.
+
+.NOTES
+  Environment variables: (none)
+  Exit codes: 0 on success; non-zero on failure
+#>
 
 function Remove-StaleWallpaper {
   <#

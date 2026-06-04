@@ -31,6 +31,10 @@
   if ($registry.primaryUser) {
     Write-Host "Materializing secrets for: $($registry.primaryUser.name)"
   }
+
+.NOTES
+  Environment variables: (none)
+  Exit codes: 0 on success; 1 on failure (missing file, invalid JSON, validation error)
 #>
 [CmdletBinding()]
 param(

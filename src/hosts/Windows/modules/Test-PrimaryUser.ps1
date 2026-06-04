@@ -1,7 +1,15 @@
-# modules/Windows/test-primaryuser.ps1 — Primary-user guard helper.
-#
-# Keeps secret and user-scoped parity mutations restricted to the configured
-# primary account.
+<#
+.SYNOPSIS
+  Primary-user guard to restrict secret and user-scoped operations.
+
+.DESCRIPTION
+  Keeps secret and user-scoped parity mutations restricted to the configured
+  primary account.
+
+.NOTES
+  Environment variables: (none)
+  Exit codes: 0 on success; non-zero on failure
+#>
 
 function Test-PrimaryUser {
   <#

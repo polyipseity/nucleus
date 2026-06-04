@@ -1,7 +1,15 @@
-# modules/Windows/sync-vscodeextension.ps1 — VS Code extension parity helper.
-#
-# Converges a managed extension baseline across stable and insiders channels
-# without touching unmanaged extension installs.
+<#
+.SYNOPSIS
+  Converges managed VS Code extension parity for stable and insiders.
+
+.DESCRIPTION
+  Converges a managed extension baseline across stable and insiders channels
+  without touching unmanaged extension installs.
+
+.NOTES
+  Environment variables: USERPROFILE
+  Exit codes: 0 on success; non-zero on failure
+#>
 
 function Sync-VSCodeExtension {
   <#

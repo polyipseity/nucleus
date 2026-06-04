@@ -1,14 +1,22 @@
-# hosts/Windows/modules/Sync-VSCodeConfig.ps1 — VS Code git-backed config symlinks.
-#
-# Replaces VS Code's per-channel config files and directories with symlinks
-# into the live repo tree (src/modules/configs/vscode/) so every VS Code write
-# appears immediately as an unstaged git diff rather than being silently managed
-# away by a deployment layer.
-#
-# Supersedes sync-vscodesettings.ps1, which used a managed-key merge
-# approach that prevented VS Code from owning its own settings file.  The
-# symlink approach gives the repo complete, transparent ownership of all VS
-# Code config while still allowing VS Code to write through the link freely.
+<#
+.SYNOPSIS
+  Symlinks VS Code config files and directories to the live repo tree.
+
+.DESCRIPTION
+  Replaces VS Code's per-channel config files and directories with symlinks
+  into the live repo tree (src/modules/configs/vscode/) so every VS Code write
+  appears immediately as an unstaged git diff rather than being silently managed
+  away by a deployment layer.
+
+  Supersedes sync-vscodesettings.ps1, which used a managed-key merge
+  approach that prevented VS Code from owning its own settings file.  The
+  symlink approach gives the repo complete, transparent ownership of all VS
+  Code config while still allowing VS Code to write through the link freely.
+
+.NOTES
+  Environment variables: USERDOMAIN, USERNAME
+  Exit codes: 0 on success; non-zero on failure
+#>
 
 function Sync-VSCodeConfig {
   <#
