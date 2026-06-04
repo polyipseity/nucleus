@@ -73,6 +73,16 @@
 - Use positive option names (see `.agents/instructions/positive-options.instructions.md`).
 - Prefer preview/beta/canary channels when viable; if stable is required, add a short `# WHY`.
 
+## No Backwards Compatibility
+
+- This codebase has zero tolerance for backwards-compatibility shims, deprecation
+  layers, or migration glue. When renaming, restructuring, or removing something,
+  do it in one commit — no aliases, no fallbacks, no compat wrappers.
+- Broken downstream consumers (own configs, templates, scripts) are fixed in the
+  same commit, not patched later.
+- If a change would be painful without a compat layer, the correct response is to
+  make the change smaller and more local, not to add a compat shim.
+
 ## Security and Activation Invariants
 
 - macOS lock hardening stays enabled: `askForPassword = true` and `askForPasswordDelay = 0`.
@@ -97,16 +107,6 @@
 - When adding new fragments (`.json`, `.md`, `.nix`, `.ps1`), verify wiring (`imports`, `readFile`, dot-sourcing).
 - Keep reusable Windows PowerShell logic in `src/hosts/Windows/modules/`; keep
   `src/hosts/Windows/apply.ps1` orchestration-focused.
-
-## No Backwards Compatibility
-
-Breaking changes are accepted and expected. Do not preserve, wrap, or
-polyfill old behavior when renaming, restructuring, or removing code.
-Remove the old path entirely in the same change. If a caller needs
-updating, update it — do not leave a compatibility shim.
-
-This applies to all files in this repository: Nix, PowerShell, shell
-scripts, DSC YAML, agent instructions, and tests.
 
 ## Key References
 
