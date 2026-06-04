@@ -96,9 +96,9 @@ function Invoke-AISync {
   # user.dsc.yml points at LiteLLM (127.0.0.1:4000).
   $env:OLLAMA_HOST = "127.0.0.1:11434"
 
-  # Determine the active model profile.  OLLAMA_PROFILE env var overrides
+  # Determine the active model profile.  NUCLEUS_AI_SYNC_PROFILE env var overrides
   # the default Windows profile, enabling cross-platform testing on Windows.
-  $profileName = if ($env:OLLAMA_PROFILE) { $env:OLLAMA_PROFILE } else { "Windows" }
+  $profileName = if ($env:NUCLEUS_AI_SYNC_PROFILE) { $env:NUCLEUS_AI_SYNC_PROFILE } else { "Windows" }
 
   # Skip gracefully when ollama is not installed or not on PATH.
   # Existence probe — absent binary is expected and benign before Ollama

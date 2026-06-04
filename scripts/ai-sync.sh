@@ -6,7 +6,7 @@ set -euo pipefail
 #
 # Operations:
 #   1. Determine the active profile (mac or pc) from the current OS or
-#      OLLAMA_PROFILE override.
+#      NUCLEUS_AI_SYNC_PROFILE override.
 #   2. Pull any model in the manifest that is not already installed.
 #   3. Remove any locally installed model that is not in the manifest.
 #      (--prune-only skips step 2 so only removals happen.)
@@ -18,7 +18,7 @@ set -euo pipefail
 # Environment variables:
 #   NUCLEUS_AI_SYNC_TIMEOUT  bounded wait for server readiness (default: 60); set to 0 to disable
 #   NUCLEUS_AI_SYNC_POLL     poll interval while waiting (default: 2)
-#   OLLAMA_PROFILE           override profile selection (MacBook|NixOS|Windows); detected
+#   NUCLEUS_AI_SYNC_PROFILE  override profile selection (MacBook|NixOS|Windows); detected
 #                            automatically when unset (Darwin → MacBook, Linux → NixOS)
 #   OLLAMA_HOST              Ollama server address; defaults to 127.0.0.1:11434
 #
@@ -67,7 +67,7 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --ollama-profile)
-      OLLAMA_PROFILE="$2"
+      NUCLEUS_AI_SYNC_PROFILE="$2"
       shift
       ;;
     --prune-only)
@@ -82,10 +82,10 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-# Determine the active model profile.  OLLAMA_PROFILE env var overrides
+# Determine the active model profile.  NUCLEUS_AI_SYNC_PROFILE env var overrides
 # auto-detection so callers can test a non-native profile without changing OS.
-if [ -n "${OLLAMA_PROFILE:-}" ]; then
-  profile="$OLLAMA_PROFILE"
+if [ -n "${NUCLEUS_AI_SYNC_PROFILE:-}" ]; then
+  profile="$NUCLEUS_AI_SYNC_PROFILE"
 else
   case "$(uname)" in
     Darwin) profile="MacBook" ;;
