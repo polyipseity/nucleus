@@ -37,7 +37,7 @@ param(
     # intentional platform-appropriate defaults.
     [string]$Accelerator = $(if ($env:NUCLEUS_VM_ACCELERATOR) { $env:NUCLEUS_VM_ACCELERATOR } else { 'tcg' }),
 
-    # Run Windows image builds headful (headless=false) for interactive
+    # Run guest image builds headful (headless=false) for interactive
     # debugging of installer/SSH readiness issues (default: $false).
     [switch]$DebugHeadful = { $env:NUCLEUS_VM_DEBUG_HEADFUL -eq 'true' }.Invoke(),
 

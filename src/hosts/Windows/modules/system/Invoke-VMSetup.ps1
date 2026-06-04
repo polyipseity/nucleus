@@ -82,7 +82,7 @@ function Invoke-VMSetup {
         # Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
         [string]$Accelerator = 'tcg',
 
-        # Run Windows image builds headful (headless=false) for interactive
+        # Run guest image builds headful (headless=false) for interactive
         # debugging of installer issues.
         [switch]$Headful,
 

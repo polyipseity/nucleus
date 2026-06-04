@@ -18,9 +18,8 @@
 #                          --windows-iso is omitted: auto|url|fido (default: auto).
 #   --windows-iso-retries N Retry attempts for Windows ISO network downloads
 #                          (default: 0, which means a single attempt).
-#   --headful              Run Windows Packer QEMU builds with a visible GUI
-#                          window (headless=false) for interactive debugging (default: off).
-#   --no-headful           Run Windows Packer QEMU builds headless (default: on).
+#   --headful|--no-headful  Run guest builds with visible GUI (--headful) or
+#                           headless (--no-headful, default: on).
 #   --accelerator TYPE     QEMU accelerator for image builds (hvf/kvm/tcg).
 #                          Defaults: hvf on macOS, kvm on Linux (auto).
 #                          Windows defaults to tcg with WHPX auto-upgrade.
@@ -97,8 +96,7 @@ usage() {
   --windows-iso PATH         Path to the Windows 11 ISO.
   --windows-iso-source S     ISO auto-resolution: auto|url|fido (default: auto).
   --windows-iso-retries N    Retry attempts for network downloads (default: 0).
-  --headful                  Show QEMU GUI window during Windows builds (default: off).
-  --no-headful               Run Windows builds headless (default: on
+  --headful|--no-headful     Run guest builds with visible GUI (--headful) or headless (--no-headful, default: on).
   --vm-dir-override PATH     Override the default ~/virtual machines path.
 EOF
 }
