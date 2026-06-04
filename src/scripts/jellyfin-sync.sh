@@ -19,8 +19,9 @@
 # --repo-root /path to override the env var for this invocation.
 #
 # Usage:
-#   NUCLEUS_REPO_ROOT=/path/to/repo bash src/scripts/jellyfin-sync.sh
-#   src/scripts/jellyfin-sync.sh --repo-root /path/to/repo
+#   src/scripts/jellyfin-sync.sh [options]
+#   src/scripts/jellyfin-sync.sh --help
+#   src/scripts/jellyfin-sync.sh --repo-root /path/to/repo --jellyfin-base-url http://127.0.0.1:8096
 #
 # Dependencies: curl, jq, sops.
 #
@@ -48,6 +49,38 @@ else
     printf '%s\n' "${HOME}/dev/nucleus"
   }
 fi
+
+usage() {
+  usage_std "$(basename "$0")" "[options]"
+  cat <<'EOF'
+  --repo-root <path>           Override the detected repository root path.
+  --jellyfin-base-url <url>    Jellyfin server base URL (default: http://127.0.0.1:8096).
+  -h, --help                   Show this help message and exit
+EOF
+}
+
+# ---- CLI argument parsing -------------------------------------------------------
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --repo-root)
+      NUCLEUS_REPO_ROOT="$2"
+      shift 2
+      ;;
+    --jellyfin-base-url)
+      JELLYFIN_BASE_URL="$2"
+      shift 2
+      ;;
+    *)
+      printf '%s: unknown argument: %s\n' "$(basename "$0")" "$1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
 
 # ---- Resolve repo root ----------------------------------------------------------
 REPO_ROOT="$(resolve_nucleus_root)"
