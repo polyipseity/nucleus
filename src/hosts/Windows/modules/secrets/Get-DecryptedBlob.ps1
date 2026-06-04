@@ -1,7 +1,15 @@
-# modules/Windows/get-decryptedblob.ps1 — Binary blob decryption helper.
-#
-# Decrypts SOPS binary payloads with the same key precedence chain used for
-# structured secrets and writes plaintext directly to disk.
+<#
+.SYNOPSIS
+    Binary blob decryption helper for SOPS-encrypted assets.
+
+.DESCRIPTION
+    Decrypts SOPS binary payloads with the same key precedence chain used for
+    structured secrets and writes plaintext directly to disk.
+
+.NOTES
+    Environment variables: SOPS_AGE_SSH_PRIVATE_KEY_FILE — set temporarily during decryption, cleaned up in finally block.
+    Exit codes: N/A — library script; functions use throw on failure.
+#>
 
 function Get-DecryptedBlob {
   <#
@@ -39,6 +47,10 @@ function Get-DecryptedBlob {
     -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
     -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" `
     -OutputPath 'C:\Users\admin\Pictures\wallpaper.jpg' -SopsExe 'sops.exe'
+
+  .NOTES
+    Environment variables: SOPS_AGE_SSH_PRIVATE_KEY_FILE — set temporarily during decryption, cleaned up in finally block.
+    Exit codes: N/A — library function; throws on failure.
   #>
   param(
     [Parameter(Mandatory = $true)]

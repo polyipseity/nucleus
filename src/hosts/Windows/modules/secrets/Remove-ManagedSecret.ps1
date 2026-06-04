@@ -1,7 +1,15 @@
-# modules/Windows/remove-managedsecret.ps1 — Managed secret cleanup helper.
-#
-# Removes only repository-managed SSH key material, Git identity payload, and
-# key-manifest files so disable paths stay idempotent and scoped.
+<#
+.SYNOPSIS
+    Managed secret cleanup helper for repository-scoped key removal.
+
+.DESCRIPTION
+    Removes only repository-managed SSH key material, Git identity payload, and
+    key-manifest files so disable paths stay idempotent and scoped.
+
+.NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library script; functions use throw on failure.
+#>
 
 function Remove-ManagedSecret {
   <#
@@ -24,6 +32,10 @@ function Remove-ManagedSecret {
 
   .EXAMPLE
     Remove-NucleusManagedSecrets -Users @('admin', 'guest')
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library function; supports -WhatIf for dry-run.
   #>
   [CmdletBinding(SupportsShouldProcess = $true)]
   param(

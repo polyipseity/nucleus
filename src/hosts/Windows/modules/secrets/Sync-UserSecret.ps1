@@ -1,18 +1,26 @@
-# modules/Windows/secrets/Sync-UserSecret.ps1 — Per-user SOPS secret materialization.
-#
-# Reads src/secrets/users-<username>.yml (if present) and writes individual secret
-# values to the user-scoped secret directory
-# $HOME\.config\nucleus\secrets\.
-#
-# Secrets materialized:
-#   rclone_config_pass
-#     Written to $HOME\.config\nucleus\secrets\rclone-config-pass.
-#     The rclone config passphrase encrypts the entire rclone.conf so stored
-#     cloud credentials are protected at rest.  shell profile and
-#     Sync-CloudDrive both read this file automatically.
-#
-# No-op when the per-user secrets file does not exist; machines that have not
-# yet created it continue to work without interruption.
+<#
+.SYNOPSIS
+    Per-user SOPS secret materialization for user-scoped secret values.
+
+.DESCRIPTION
+    Reads src/secrets/users-<username>.yml (if present) and writes individual secret
+    values to the user-scoped secret directory
+    $HOME\.config\nucleus\secrets\.
+
+    Secrets materialized:
+      rclone_config_pass
+        Written to $HOME\.config\nucleus\secrets\rclone-config-pass.
+        The rclone config passphrase encrypts the entire rclone.conf so stored
+        cloud credentials are protected at rest.  shell profile and
+        Sync-CloudDrive both read this file automatically.
+
+    No-op when the per-user secrets file does not exist; machines that have not
+    yet created it continue to work without interruption.
+
+.NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library script; functions use throw on failure.
+#>
 
 function Sync-UserSecret {
   <#
@@ -43,6 +51,10 @@ function Sync-UserSecret {
 
   .PARAMETER PrimaryUsername
     Username whose per-user secrets file to materialize.
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library function; uses throw on failure.
   #>
   param(
     [Parameter(Mandatory = $true)]

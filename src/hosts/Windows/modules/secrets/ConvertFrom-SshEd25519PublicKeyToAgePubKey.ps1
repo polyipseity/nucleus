@@ -1,10 +1,18 @@
-# modules/Windows/convert-sshpublickeytoage.ps1 — SSH Ed25519 to age public key conversion.
-#
-# Provides ConvertFrom-SshEd25519PublicKeyToAgePubKey, a pure-PowerShell
-# implementation of the ssh-to-age public-key conversion path.  Used by both
-# invoke-secretverification.ps1 (SOPS recipient checks) and
-# register-hostagekey.ps1 (machine age key auto-registration) so a
-# single authoritative implementation is shared across both call sites.
+<#
+.SYNOPSIS
+    SSH Ed25519 to age public key conversion for SOPS age recipient management.
+
+.DESCRIPTION
+    Provides ConvertFrom-SshEd25519PublicKeyToAgePubKey, a pure-PowerShell
+    implementation of the ssh-to-age public-key conversion path.  Used by both
+    invoke-secretverification.ps1 (SOPS recipient checks) and
+    register-hostagekey.ps1 (machine age key auto-registration) so a
+    single authoritative implementation is shared across both call sites.
+
+.NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library script; functions use throw on failure.
+#>
 
 function ConvertFrom-SshEd25519PublicKeyToAgePubKey {
   <#
@@ -33,6 +41,10 @@ function ConvertFrom-SshEd25519PublicKeyToAgePubKey {
 
   .EXAMPLE
     ConvertFrom-SshEd25519PublicKeyToAgePubKey "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5..."
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library function; throws on failure.
   #>
   [CmdletBinding()]
   param(

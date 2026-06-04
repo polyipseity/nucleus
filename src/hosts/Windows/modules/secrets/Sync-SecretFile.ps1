@@ -1,9 +1,17 @@
-# modules/Windows/sync-secretfile.ps1 — Per-file secret materialization.
-#
-# Decrypts one SOPS file and converges only managed SSH/GPG payloads for the
-# configured primary user.  Also maintains managed-key manifest files in
-# ~/.config/nucleus/ to enable rotation detection and agent flush on rotation,
-# mirroring the POSIX gpgImport and sshKeyAdopt Home Manager activations.
+<#
+.SYNOPSIS
+    Per-file SOPS secret materialization for managed SSH/GPG payloads.
+
+.DESCRIPTION
+    Decrypts one SOPS file and converges only managed SSH/GPG payloads for the
+    configured primary user.  Also maintains managed-key manifest files in
+    ~/.config/nucleus/ to enable rotation detection and agent flush on rotation,
+    mirroring the POSIX gpgImport and sshKeyAdopt Home Manager activations.
+
+.NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library script; functions use throw on failure.
+#>
 
 function Sync-SecretFile {
   <#
@@ -74,6 +82,10 @@ function Sync-SecretFile {
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
       -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe' `
       -PrimaryUsername 'admin'
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library function; uses throw on failure.
   #>
   param(
     [Parameter(Mandatory = $true)]

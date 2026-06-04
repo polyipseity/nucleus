@@ -1,13 +1,21 @@
-# modules/Windows/register-hostagekey.ps1 — Machine age key auto-registration.
-#
-# Mirrors register_host_age_key_if_needed in src/scripts/apply.sh.
-# Derives the machine age public key from the Windows SSH host public key,
-# inserts it into .sops.yaml if not already present, and rewraps every
-# SOPS-encrypted file so this machine can decrypt them.
-#
-# ConvertFrom-SshEd25519PublicKeyToAgePubKey is provided by
-# convert-sshpublickeytoage.ps1, which apply.ps1 dot-sources before this file
-# (alphabetical order ensures 'c' < 'r').
+<#
+.SYNOPSIS
+    Machine age key auto-registration for SOPS decryption on this host.
+
+.DESCRIPTION
+    Mirrors register_host_age_key_if_needed in src/scripts/apply.sh.
+    Derives the machine age public key from the Windows SSH host public key,
+    inserts it into .sops.yaml if not already present, and rewraps every
+    SOPS-encrypted file so this machine can decrypt them.
+
+    ConvertFrom-SshEd25519PublicKeyToAgePubKey is provided by
+    convert-sshpublickeytoage.ps1, which apply.ps1 dot-sources before this file
+    (alphabetical order ensures 'c' < 'r').
+
+.NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library script; functions use throw on failure.
+#>
 
 function Register-HostAgeKey {
   <#
@@ -63,6 +71,10 @@ function Register-HostAgeKey {
       -SopsYamlPath 'C:\...\nucleus\.sops.yaml' `
       -SecretsDir 'C:\...\nucleus\src\secrets' `
       -WallpaperAssetsDir 'C:\...\nucleus\src\assets\wallpapers'
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library function; throws on failure.
   #>
   [CmdletBinding()]
   param(

@@ -1,6 +1,14 @@
-# modules/Windows/sync-secret.ps1 — Baseline managed secret sync entrypoint.
-#
-# Materializes the fixed secret inventory expected by Windows host orchestration.
+<#
+.SYNOPSIS
+    Baseline managed secret sync entrypoint for Windows host orchestration.
+
+.DESCRIPTION
+    Materializes the fixed secret inventory expected by Windows host orchestration.
+
+.NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library script; functions use throw on failure.
+#>
 
 function Sync-Secret {
   <#
@@ -46,6 +54,10 @@ function Sync-Secret {
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
       -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe' `
       -Users @('admin', 'guest')
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library function; uses throw on failure.
   #>
   param(
     [Parameter(Mandatory = $true)]

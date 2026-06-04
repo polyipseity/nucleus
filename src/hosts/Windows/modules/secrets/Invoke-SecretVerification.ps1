@@ -1,13 +1,21 @@
-# modules/Windows/invoke-secretverification.ps1 — Post-apply secret health check.
-#
-# Mirrors the POSIX verifySecretDecryption Home Manager activation in secrets.nix.
-# Verifies that all SOPS files have the correct recipients registered and that
-# managed secret artefacts are present on disk.  Uses metadata inspection rather
-# than live decryption so passphrase-protected keys do not cause false failures.
-#
-# ConvertFrom-SshEd25519PublicKeyToAgePubKey is provided by
-# convert-sshpublickeytoage.ps1, which apply.ps1 dot-sources before this file
-# (alphabetical order ensures 'c' < 'i').
+<#
+.SYNOPSIS
+    Post-apply secret health check for SOPS file recipient verification.
+
+.DESCRIPTION
+    Mirrors the POSIX verifySecretDecryption Home Manager activation in secrets.nix.
+    Verifies that all SOPS files have the correct recipients registered and that
+    managed secret artefacts are present on disk.  Uses metadata inspection rather
+    than live decryption so passphrase-protected keys do not cause false failures.
+
+    ConvertFrom-SshEd25519PublicKeyToAgePubKey is provided by
+    convert-sshpublickeytoage.ps1, which apply.ps1 dot-sources before this file
+    (alphabetical order ensures 'c' < 'i').
+
+.NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library script; functions use throw on failure.
+#>
 
 function Invoke-SecretVerification {
   <#
@@ -70,6 +78,10 @@ function Invoke-SecretVerification {
       -PrimaryUsername 'admin' `
       -SecretsDir '.\src\secrets' `
       -WallpaperAssetsDir '.\src\assets\wallpapers'
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library function; throws on failure.
   #>
   [CmdletBinding()]
   param(

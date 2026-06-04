@@ -1,7 +1,15 @@
-# modules/Windows/get-secret.ps1 — Structured secret decryption helper.
-#
-# Decrypts SOPS YAML and returns JSON-decoded secret objects using the shared
-# machine-ssh -> gpg -> primary-ssh fallback chain.
+<#
+.SYNOPSIS
+    Structured secret decryption helper for SOPS-encrypted YAML files.
+
+.DESCRIPTION
+    Decrypts SOPS YAML and returns JSON-decoded secret objects using the shared
+    machine-ssh -> gpg -> primary-ssh fallback chain.
+
+.NOTES
+    Environment variables: SOPS_AGE_SSH_PRIVATE_KEY_FILE — set temporarily during decryption, cleaned up in finally block.
+    Exit codes: N/A — library script; functions use throw on failure.
+#>
 
 function Get-Secret {
   <#
@@ -48,6 +56,10 @@ function Get-Secret {
         -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
         -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe'
     $secrets.ssh_keys
+
+  .NOTES
+    Environment variables: SOPS_AGE_SSH_PRIVATE_KEY_FILE — set temporarily during decryption, cleaned up in finally block.
+    Exit codes: N/A — library function; throws on failure.
   #>
   param(
     [Parameter(Mandatory = $true)]

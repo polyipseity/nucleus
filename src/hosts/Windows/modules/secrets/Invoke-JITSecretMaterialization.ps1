@@ -1,7 +1,15 @@
-# modules/Windows/invoke-jitsecretmaterialization.ps1 — Targeted JIT secret sync helper.
-#
-# Allows modules to request only specific secret files instead of running the
-# full baseline sync.
+<#
+.SYNOPSIS
+    Targeted JIT (just-in-time) secret materialization for specific modules.
+
+.DESCRIPTION
+    Allows modules to request only specific secret files instead of running the
+    full baseline sync.
+
+.NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library script; functions use throw on failure.
+#>
 
 function Invoke-JITSecretMaterialization {
   <#
@@ -44,6 +52,10 @@ function Invoke-JITSecretMaterialization {
       -GpgExe 'gpg.exe' -HostKeyPath '...\ssh_host_ed25519_key' `
       -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe' `
       -PrimaryUsername 'admin'
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: N/A — library function; throws on failure.
   #>
   param(
     [Parameter(Mandatory = $true)]
