@@ -13,7 +13,7 @@
 .PARAMETER DryRun
   Print planned actions without executing pulls or removals (default: $false).
 
-.PARAMETER PruneOnly
+.PARAMETER GcOnly
   Skip model pulls; only remove local models absent from the manifest (default: $false).
 
 
@@ -24,16 +24,16 @@
   .\scripts\ai-sync.ps1 -DryRun
 
 .EXAMPLE
-  .\scripts\ai-sync.ps1 -PruneOnly
+  .\scripts\ai-sync.ps1 -GcOnly
 
 .NOTES
-  Environment variables: NUCLEUS_DRY_RUN, NUCLEUS_AI_SYNC_PRUNE_ONLY, NUCLEUS_REPO_ROOT, NUCLEUS_AI_SYNC_TIMEOUT, NUCLEUS_AI_SYNC_POLL.
+  Environment variables: NUCLEUS_DRY_RUN, NUCLEUS_AI_SYNC_GC_ONLY, NUCLEUS_REPO_ROOT, NUCLEUS_AI_SYNC_TIMEOUT, NUCLEUS_AI_SYNC_POLL.
   Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(
   [switch]$DryRun = $(if ($env:NUCLEUS_DRY_RUN -eq 'true') { $true } else { $false }),
-  [switch]$PruneOnly = { $env:NUCLEUS_AI_SYNC_PRUNE_ONLY -eq 'true' }.Invoke()
+  [switch]$GcOnly = { $env:NUCLEUS_AI_SYNC_GC_ONLY -eq 'true' }.Invoke()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -47,4 +47,4 @@ if (-not (Test-Path -LiteralPath $modulePath)) {
 
 . $modulePath
 
-Invoke-AISync -RepoRoot $repoRoot -DryRun:$DryRun -PruneOnly:$PruneOnly -ServerReadyTimeoutSeconds $(if ($env:NUCLEUS_AI_SYNC_TIMEOUT) { [int]$env:NUCLEUS_AI_SYNC_TIMEOUT } else { 60 }) -ServerReadyPollSeconds $(if ($env:NUCLEUS_AI_SYNC_POLL) { [int]$env:NUCLEUS_AI_SYNC_POLL } else { 2 })
+Invoke-AISync -RepoRoot $repoRoot -DryRun:$DryRun -GcOnly:$GcOnly -ServerReadyTimeoutSeconds $(if ($env:NUCLEUS_AI_SYNC_TIMEOUT) { [int]$env:NUCLEUS_AI_SYNC_TIMEOUT } else { 60 }) -ServerReadyPollSeconds $(if ($env:NUCLEUS_AI_SYNC_POLL) { [int]$env:NUCLEUS_AI_SYNC_POLL } else { 2 })

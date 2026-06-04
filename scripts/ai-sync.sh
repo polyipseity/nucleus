@@ -9,7 +9,7 @@
 #   --dry-run                  Print planned actions without executing (default: off).
 #   --ollama-host <address>    Ollama server address (default: 127.0.0.1:11434).
 #   --ollama-profile <name>    Override profile selection (MacBook|NixOS|Windows) (default: auto-detect).
-#   --prune-only               Skip pulls; only remove unlisted models (default: off).
+#   --gc-only               Skip pulls; only remove unlisted models (default: off).
 #
 # Environment variables:
 #   NUCLEUS_AI_SYNC_TIMEOUT  Bounded wait for server readiness in seconds (default: 60).
@@ -35,7 +35,7 @@ REPO_ROOT="$(resolve_nucleus_root)"
 MANIFEST="$REPO_ROOT/src/modules/ai/models.json"
 
 dry_run=false
-prune_only=false
+gc_only=false
 ready_timeout_seconds="${NUCLEUS_AI_SYNC_TIMEOUT:-60}"
 ready_poll_seconds="${NUCLEUS_AI_SYNC_POLL:-2}"
 
@@ -45,7 +45,7 @@ usage() {
   --dry-run                          Print planned actions without executing them (default: off).
   --ollama-host <address>            Ollama server address (default: 127.0.0.1:11434).
   --ollama-profile <name>            Override profile selection (MacBook|NixOS|Windows) (default: auto-detect).
-  --prune-only                       Skip pulls; only remove unlisted models (default: off).
+  --gc-only                          Skip pulls; only remove unlisted models (default: off).
 EOF
 }
 
@@ -66,8 +66,8 @@ while [ "$#" -gt 0 ]; do
       NUCLEUS_AI_SYNC_PROFILE="$2"
       shift
       ;;
-    --prune-only)
-      prune_only=true
+    --gc-only)
+      gc_only=true
       ;;
     *)
       printf '%s\n' "ai-sync: unsupported argument '$1'" >&2
@@ -148,7 +148,7 @@ desired_models=$(jq -r --arg profile "$profile" '.models[$profile][]' "$MANIFEST
 installed_models=$(ollama list | awk 'NR>1 && $1!="" {print $1}')
 
 # Pull models present in the manifest but not locally installed.
-if [ "$prune_only" = false ]; then
+if [ "$gc_only" = false ]; then
   printf '%s\n' "$desired_models" | while IFS= read -r model; do
     if [ -z "$model" ]; then
       continue
@@ -187,8 +187,8 @@ _summary_flags=""
 if [ "$dry_run" = true ]; then
   _summary_flags=", not actually running due to --dry-run"
 fi
-if [ "$prune_only" = true ]; then
-  _summary_flags="${_summary_flags}, prune-only mode (no pulls)"
+if [ "$gc_only" = true ]; then
+    _summary_flags="${_summary_flags}, gc-only mode (no pulls)"
 fi
 
 printf '%s\n' "ai-sync: sync completed (profile=$profile${_summary_flags})"

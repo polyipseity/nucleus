@@ -6,13 +6,13 @@
 # Ollama models absent from the manifest.
 #
 # Arguments:
-#   --tool-cache-prune|--no-tool-cache-prune  Control bun/cargo/rustc/uv cache cleanup (default: --tool-cache-prune).
+#   --tool-cache-gc|--no-tool-cache-gc  Control bun/cargo/rustc/uv cache cleanup (default: --tool-cache-gc).
 #   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
 #   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
-#   --ollama-prune|--no-ollama-prune          Control stale Ollama model removal (default: --ollama-prune).
-#   --scoop-cleanup|--no-scoop-cleanup        Accepted but ignored on POSIX (Windows-only) (default: --scoop-cleanup).
-#   --wallpaper-prune|--no-wallpaper-prune    Control stale wallpaper cleanup (default: --wallpaper-prune).
-#   --vm-prune|--no-vm-prune                  Control stale VM artifact removal (default: --vm-prune).
+#   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
+#   --scoop-gc|--no-scoop-gc        Accepted but ignored on POSIX (Windows-only) (default: --scoop-gc).
+#   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper cleanup (default: --wallpaper-gc).
+#   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
 #
 # Environment variables:
 #   (none)
@@ -27,25 +27,25 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
-  --tool-cache-prune|--no-tool-cache-prune  Control bun/cargo/rustc/uv cache cleanup (default: --tool-cache-prune).
+  --tool-cache-gc|--no-tool-cache-gc  Control bun/cargo/rustc/uv cache cleanup (default: --tool-cache-gc).
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
-  --ollama-prune|--no-ollama-prune          Control stale Ollama model removal (default: --ollama-prune).
-  --scoop-cleanup|--no-scoop-cleanup        Accepted but ignored on POSIX (Windows-only) (default: --scoop-cleanup).
-  --wallpaper-prune|--no-wallpaper-prune    Control stale wallpaper cleanup (default: --wallpaper-prune).
-  --vm-prune|--no-vm-prune                  Control stale VM artifact removal (default: --vm-prune).
+  --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
+  --scoop-gc|--no-scoop-gc        Accepted but ignored on POSIX (Windows-only) (default: --scoop-gc).
+  --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper cleanup (default: --wallpaper-gc).
+  --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
 EOF
 }
 
 REPO_ROOT="$(resolve_nucleus_root)"
 
-tool_cache_prune=true
+tool_cache_gc=true
 hm_gc=true
 nix_gc=true
-ollama_prune=true
-scoop_cleanup=true
-wallpaper_prune=true
-vm_prune=true
+ollama_gc=true
+scoop_gc=true
+wallpaper_gc=true
+vm_gc=true
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -53,11 +53,11 @@ while [ "$#" -gt 0 ]; do
       usage
       exit 0
       ;;
-    --tool-cache-prune)
-      tool_cache_prune=true
+    --tool-cache-gc)
+      tool_cache_gc=true
       ;;
-    --no-tool-cache-prune)
-      tool_cache_prune=false
+    --no-tool-cache-gc)
+      tool_cache_gc=false
       ;;
     --hm-gc)
       hm_gc=true
@@ -71,30 +71,30 @@ while [ "$#" -gt 0 ]; do
     --no-nix-gc)
       nix_gc=false
       ;;
-    --ollama-prune)
-      ollama_prune=true
+    --ollama-gc)
+      ollama_gc=true
       ;;
-    --no-ollama-prune)
-      ollama_prune=false
+    --no-ollama-gc)
+      ollama_gc=false
       ;;
-    --scoop-cleanup)
-      scoop_cleanup=true
+    --scoop-gc)
+      scoop_gc=true
       ;;
-    --no-scoop-cleanup)
-      scoop_cleanup=false
-      printf '%s\n' "gc: --no-scoop-cleanup accepted but ignored on POSIX (Windows-only)"
+    --no-scoop-gc)
+      scoop_gc=false
+      printf '%s\n' "gc: --no-scoop-gc accepted but ignored on POSIX (Windows-only)"
       ;;
-    --wallpaper-prune)
-      wallpaper_prune=true
+    --wallpaper-gc)
+      wallpaper_gc=true
       ;;
-    --no-wallpaper-prune)
-      wallpaper_prune=false
+    --no-wallpaper-gc)
+      wallpaper_gc=false
       ;;
-    --vm-prune)
-      vm_prune=true
+    --vm-gc)
+      vm_gc=true
       ;;
-    --no-vm-prune)
-      vm_prune=false
+    --no-vm-gc)
+      vm_gc=false
       ;;
     *)
       printf '%s\n' "gc: unsupported argument '$1'" >&2
@@ -134,7 +134,7 @@ run_nix_gc_if_available() {
   nix-collect-garbage --delete-older-than 7d
 }
 
-prune_stale_wallpapers() {
+gc_stale_wallpapers() {
   # Keep the decrypted wallpaper output directory in sync with declarative
   # sources so stale files do not accumulate across apply cycles.
   current_user="${USER:-$(id -un)}"
@@ -168,7 +168,7 @@ prune_stale_wallpapers() {
   done
 }
 
-prune_dir_contents_if_present() {
+gc_dir_contents_if_present() {
   # Clears the contents of a cache directory while preserving the directory
   # itself so future tool invocations do not have to recreate parent paths.
   # Args:
@@ -182,11 +182,11 @@ prune_dir_contents_if_present() {
   fi
 
   if ! find "$cache_dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} +; then
-    printf '%s\n' "gc: warning: failed to prune $cache_label at '$cache_dir'" >&2
+    printf '%s\n' "gc: warning: failed to gc $cache_label at '$cache_dir'" >&2
   fi
 }
 
-prune_tool_caches_if_available() {
+gc_tool_caches_if_available() {
   # bun/cargo/rustc/uv all accumulate user-scoped caches under HOME, regardless
   # of whether the binary came from the system profile or a direnv-loaded
   # devShell.  Clearing those shared cache locations reclaims space for both
@@ -208,22 +208,22 @@ prune_tool_caches_if_available() {
   rustup_tmp_dir="$rustup_home_dir/tmp"
   repo_direnv_dir="$REPO_ROOT/.direnv"
 
-  prune_dir_contents_if_present "$bun_cache_dir" "bun install cache"
-  prune_dir_contents_if_present "$cargo_binstall_cache_dir" "cargo-binstall cache"
-  prune_dir_contents_if_present "$rustup_tmp_dir" "rustup temporary cache"
+  gc_dir_contents_if_present "$bun_cache_dir" "bun install cache"
+  gc_dir_contents_if_present "$cargo_binstall_cache_dir" "cargo-binstall cache"
+  gc_dir_contents_if_present "$rustup_tmp_dir" "rustup temporary cache"
 
   # cargo-cache (github.com/matthiaskrgr/cargo-cache) reclaims space from
   # ~/.cargo/registry, ~/.cargo/git, and advisory-db clones.  This remains the
   # authoritative cleanup path when the binary is available.
   if ! command -v cargo-cache >/dev/null 2>&1; then
-    printf '%s\n' "gc: cargo-cache unavailable; skipping cargo cache prune"
+    printf '%s\n' "gc: cargo-cache unavailable; skipping cargo cache gc"
   elif [ ! -d "$cargo_home_dir" ]; then
-    printf '%s\n' "gc: cargo cache directory '$cargo_home_dir' is missing; skipping cargo cache prune"
+    printf '%s\n' "gc: cargo cache directory '$cargo_home_dir' is missing; skipping cargo cache gc"
   elif ! cargo-cache -r all; then
-    printf '%s\n' "gc: warning: cargo-cache prune failed; continuing GC workflow" >&2
+    printf '%s\n' "gc: warning: cargo-cache gc failed; continuing GC workflow" >&2
   fi
 
-  prune_dir_contents_if_present "$uv_cache_dir" "uv cache"
+  gc_dir_contents_if_present "$uv_cache_dir" "uv cache"
 
   # direnv materializes the current repository's nix devShell under .direnv.
   # Clearing only the nucleus checkout keeps scope bounded to managed content;
@@ -235,10 +235,10 @@ prune_tool_caches_if_available() {
   fi
 }
 
-prune_ollama_models_if_available() {
+gc_ollama_models_if_available() {
   # Remove locally installed Ollama models that are absent from the declarative
   # manifest at src/modules/ai/models.json.  Delegates to ai-sync.sh with
-  # --prune-only so no new pulls are attempted during GC — a GC run should only
+  # --gc-only so no new pulls are attempted during GC — a GC run should only
   # reclaim space, not trigger multi-GB model downloads.
   #
   # The probe below checks for both ollama and jq before delegating; ai-sync.sh
@@ -247,21 +247,21 @@ prune_ollama_models_if_available() {
   if ! command -v ollama >/dev/null 2>&1; then
     # Existence probe — tool absent is expected and benign before Ollama
     # has been provisioned on this host.
-    printf '%s\n' "gc: ollama unavailable; skipping ollama model prune"
+    printf '%s\n' "gc: ollama unavailable; skipping ollama model gc"
     return 0
   fi
   if ! command -v jq >/dev/null 2>&1; then
     # jq is required by ai-sync.sh to parse the JSON manifest.
-    printf '%s\n' "gc: jq unavailable; skipping ollama model prune"
+    printf '%s\n' "gc: jq unavailable; skipping ollama model gc"
     return 0
   fi
 
   # GC must stay space-reclaim only; do not wait for a cold Ollama daemon to
   # start because that would stall GC on hosts where the AI service is idle.
-  NUCLEUS_AI_SYNC_TIMEOUT=0 "$REPO_ROOT/scripts/ai-sync.sh" --prune-only
+  NUCLEUS_AI_SYNC_TIMEOUT=0 "$REPO_ROOT/scripts/ai-sync.sh" --gc-only
 }
 
-prune_vm_artifacts_if_present() {
+gc_vm_artifacts_if_present() {
   # Remove stale VM artifacts from ~/virtual machines that accumulate across
   # provisioning cycles. This includes temporary Packer build directories and
   # pre-built images for VMs no longer declared in the manifest at
@@ -271,7 +271,7 @@ prune_vm_artifacts_if_present() {
   # disk usage bounded and VM provisioning fast.
   if ! command -v jq >/dev/null 2>&1; then
     # jq is required to parse the manifest.
-    printf '%s\n' "gc: jq unavailable; skipping VM artifact prune"
+    printf '%s\n' "gc: jq unavailable; skipping VM artifact gc"
     return 0
   fi
 
@@ -291,7 +291,7 @@ prune_vm_artifacts_if_present() {
 
   # Load the list of VMs declared in the manifest.
   if [ ! -f "$manifest" ]; then
-    printf '%s\n' "gc: manifest '$manifest' not found; skipping VM artifact prune" >&2
+    printf '%s\n' "gc: manifest '$manifest' not found; skipping VM artifact gc" >&2
     return 1
   fi
 
@@ -305,7 +305,7 @@ prune_vm_artifacts_if_present() {
 
   if ! jq -r '.VMs[] | select(.enabled == true) | .name' "$manifest" >"$declared_names_tmp" 2>/dev/null; then
     rm -f "$declared_names_tmp"
-    printf '%s\n' "gc: failed to parse enabled VM names from '$manifest'; skipping VM artifact prune" >&2
+    printf '%s\n' "gc: failed to parse enabled VM names from '$manifest'; skipping VM artifact gc" >&2
     return 1
   fi
 
@@ -381,28 +381,28 @@ if [ "$nix_gc" = true ]; then
 fi
 
 # Step 3: stale wallpaper cleanup (independent of Nix).
-if [ "$wallpaper_prune" = true ]; then
-  prune_stale_wallpapers
+if [ "$wallpaper_gc" = true ]; then
+  gc_stale_wallpapers
 fi
 
-# Step 4: tool cache prune (independent of Nix, runs last).
-if [ "$tool_cache_prune" = true ]; then
-  prune_tool_caches_if_available
+# Step 4: tool cache gc (independent of Nix, runs last).
+if [ "$tool_cache_gc" = true ]; then
+  gc_tool_caches_if_available
 fi
 
 # Step 5: remove orphaned Ollama models not declared in the manifest.
-if [ "$ollama_prune" = true ]; then
-  prune_ollama_models_if_available
+if [ "$ollama_gc" = true ]; then
+  gc_ollama_models_if_available
 fi
 
 # Step 6: remove stale VM artifacts (temporary builds, orphaned images).
-if [ "$vm_prune" = true ]; then
-  prune_vm_artifacts_if_present
+if [ "$vm_gc" = true ]; then
+  gc_vm_artifacts_if_present
 fi
 
-# Step 7: Scoop cache cleanup (accepted but ignored on POSIX; Windows-only).
+# Step 7: Scoop cache gc (accepted but ignored on POSIX; Windows-only).
 # This flag exists for cross-platform CLI parity with the Windows gc.ps1 script.
-if [ "$scoop_cleanup" = false ]; then
+if [ "$scoop_gc" = false ]; then
   :
 fi
 

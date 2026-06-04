@@ -17,7 +17,7 @@ assert containsRegex "pkgs.litellm" coreText;
 assert containsRegex "NUCLEUS_AI_SYNC_TIMEOUT" aiSyncText;
 assert containsRegex "waiting up to" aiSyncText;
 assert containsRegex "dry_run=false" aiSyncText;
-assert containsRegex "prune_only=false" aiSyncText;
+assert containsRegex "gc_only=false" aiSyncText;
 assert containsRegex "NUCLEUS_AI_SYNC_TIMEOUT=0" gcText;
 # LiteLLM gateway assertions
 assert containsRegex "litellm" coreText;

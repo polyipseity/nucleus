@@ -16,12 +16,12 @@
        Guarded by a Scoop presence check so the step is a no-op when Scoop is
        not yet installed (e.g. before the first apply.ps1 run).
     4. Remove locally installed Ollama models absent from the declarative manifest
-       at src/modules/ai/models.json.  Uses Invoke-AISync -PruneOnly so no new
+       at src/modules/ai/models.json.  Uses Invoke-AISync -GcOnly so no new
        model pulls are triggered — GC only reclaims space.  Guarded by an ollama
        presence check so the step is a no-op when Ollama is not installed.
     5. Remove stale VM build artifacts (Packer directories, pre-built disk
        images) for VMs no longer declared in src/modules/VMs.json.
-       Guarded by the SkipVMPrune switch.
+       Guarded by the SkipVMGc switch.
 
   All file operations are scoped to the primary user profile.  The script is
   idempotent and safe to re-run.
@@ -37,27 +37,27 @@
 .PARAMETER NoHmGc
   Accepted but ignored on Windows (POSIX-only) (default: $false).
 
-.PARAMETER NoToolCachePrune
+.PARAMETER NoToolCacheGc
   Skip bun/cargo/rustc/uv and repo-local .direnv cache cleanup (default: $false).
 
-.PARAMETER NoOllamaPrune
+.PARAMETER NoOllamaGc
   Skip Ollama orphaned model removal even when ollama is installed (default: $false).
 
-.PARAMETER NoScoopCleanup
-  Skip Scoop cache and old-version cleanup even when Scoop is installed (default: $false).
+.PARAMETER NoScoopGc
+  Skip Scoop cache and old-version gc even when Scoop is installed (default: $false).
 
-.PARAMETER NoWallpaperPrune
+.PARAMETER NoWallpaperGc
   Skip stale wallpaper file cleanup (default: $false).
 
-.PARAMETER NoVMPrune
+.PARAMETER NoVMGc
   Skip stale VM artifact removal (default: $false).
 
 .EXAMPLE
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus"
-  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -NoToolCachePrune
+  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -NoToolCacheGc
 
 .NOTES
-  Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_PRUNE, NUCLEUS_GC_NO_OLLAMA_PRUNE, NUCLEUS_GC_NO_SCOOP_CLEANUP, NUCLEUS_GC_NO_WALLPAPER_PRUNE, NUCLEUS_GC_NO_VM_PRUNE, NUCLEUS_REPO_ROOT.
+  Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_GC, NUCLEUS_GC_NO_OLLAMA_GC, NUCLEUS_GC_NO_SCOOP_GC, NUCLEUS_GC_NO_WALLPAPER_GC, NUCLEUS_GC_NO_VM_GC, NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
@@ -65,11 +65,11 @@ param(
   [string]$ModuleDir = $(if ($env:NUCLEUS_GC_MODULE_DIR) { $env:NUCLEUS_GC_MODULE_DIR } else { '' }),
   [switch]$NoNixGc = { $env:NUCLEUS_GC_NO_NIX -eq 'true' }.Invoke(),
   [switch]$NoHmGc = { $env:NUCLEUS_GC_NO_HM -eq 'true' }.Invoke(),
-  [switch]$NoToolCachePrune = { $env:NUCLEUS_GC_NO_TOOL_CACHE_PRUNE -eq 'true' }.Invoke(),
-  [switch]$NoOllamaPrune = { $env:NUCLEUS_GC_NO_OLLAMA_PRUNE -eq 'true' }.Invoke(),
-  [switch]$NoScoopCleanup = { $env:NUCLEUS_GC_NO_SCOOP_CLEANUP -eq 'true' }.Invoke(),
-  [switch]$NoWallpaperPrune = { $env:NUCLEUS_GC_NO_WALLPAPER_PRUNE -eq 'true' }.Invoke(),
-  [switch]$NoVMPrune = { $env:NUCLEUS_GC_NO_VM_PRUNE -eq 'true' }.Invoke(),
+  [switch]$NoToolCacheGc = { $env:NUCLEUS_GC_NO_TOOL_CACHE_GC -eq 'true' }.Invoke(),
+  [switch]$NoOllamaGc = { $env:NUCLEUS_GC_NO_OLLAMA_GC -eq 'true' }.Invoke(),
+  [switch]$NoScoopGc = { $env:NUCLEUS_GC_NO_SCOOP_GC -eq 'true' }.Invoke(),
+  [switch]$NoWallpaperGc = { $env:NUCLEUS_GC_NO_WALLPAPER_GC -eq 'true' }.Invoke(),
+  [switch]$NoVMGc = { $env:NUCLEUS_GC_NO_VM_GC -eq 'true' }.Invoke(),
   [Alias("h")]
   [switch]$Help
 )
@@ -125,11 +125,11 @@ function Clear-DirectoryContentsIfPresent {
     Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop | Remove-Item -Recurse -Force -ErrorAction Stop
   }
   catch {
-    Write-Warning "gc: failed to prune $Label at '$Path' — $($_.Exception.Message)"
+    Write-Warning "gc: failed to gc $Label at '$Path' — $($_.Exception.Message)"
   }
 }
 
-function Remove-VMPruneItem {
+function Remove-VMGcItem {
   [CmdletBinding(SupportsShouldProcess = $true)]
   param(
     [Parameter(Mandatory = $true)]
@@ -166,20 +166,20 @@ function Remove-VMPruneItem {
 # Keeps the decrypted gallery in sync with declarative source blobs.  Without
 # this, removed or renamed wallpaper assets leave orphaned decrypted files on
 # disk that continue to appear in the rotation.
-if (-not $NoWallpaperPrune) {
+if (-not $NoWallpaperGc) {
   $wallpaperAssetsDir = Join-Path -Path $resolvedRepoRoot -ChildPath "src\assets\wallpapers"
   $wallpaperOutputDir = Join-Path -Path $env:USERPROFILE   -ChildPath "Pictures\wallpapers"
   Remove-StaleWallpaper -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
 }
 
-# ---- Step 2: tool cache prune -----------------------------------------------
+# ---- Step 2: tool cache gc -------------------------------------------------
 # bun/cargo/rustc/uv all accumulate user-scoped caches under the Windows user
 # profile, regardless of whether the binary came from the system install path
 # or a direnv-loaded shell. Clearing those shared cache locations reclaims
 # space for both system and devShell use without touching project-managed
 # dependencies. rustc has no standalone cache tree; its transient artifacts are
 # cleaned via cargo-cache and rustup's tmp directory.
-if (-not $NoToolCachePrune) {
+if (-not $NoToolCacheGc) {
   $bunCacheDir = Join-Path $HOME ".bun\install\cache"
   $cargoBinstallCacheDir = Join-Path $env:LOCALAPPDATA "cargo-binstall\cache"
   $rustupTmpDir = Join-Path $HOME ".rustup\tmp"
@@ -192,7 +192,7 @@ if (-not $NoToolCachePrune) {
 
   $cargoCacheCmd = Get-Command -Name "cargo-cache" -ErrorAction SilentlyContinue
   if ($null -eq $cargoCacheCmd) {
-    Write-Output "nucleus: cargo-cache unavailable; skipping cargo cache prune"
+    Write-Output "nucleus: cargo-cache unavailable; skipping cargo cache gc"
   } else {
     & $cargoCacheCmd.Source -r all
   }
@@ -216,11 +216,11 @@ if (-not $NoToolCachePrune) {
 # Scoop retains by default, reclaiming disk space after updates.
 # Guarded by a shim presence check because Scoop may not be installed on
 # minimal setups or before the first apply.ps1 run.
-if (-not $NoScoopCleanup) {
+if (-not $NoScoopGc) {
   $scoopShims = Join-Path $env:USERPROFILE "scoop\shims"
   $scoopCmd   = Join-Path $scoopShims "scoop.cmd"
   if (-not (Test-Path $scoopCmd)) {
-    Write-Output "gc: scoop not installed; skipping scoop cleanup"
+    Write-Output "gc: scoop not installed; skipping scoop gc"
   } else {
     if ($env:PATH -notlike "*$scoopShims*") {
       $env:PATH = "$scoopShims;$env:PATH"
@@ -233,17 +233,17 @@ if (-not $NoScoopCleanup) {
   }
 }
 
-# ---- Step 4: Ollama orphaned model prune ------------------------------------
+# ---- Step 4: Ollama orphaned model gc --------------------------------------
 # Removes locally installed Ollama models that are absent from the declarative
-# manifest at src/modules/ai/models.json.  Uses -PruneOnly so GC never
+# manifest at src/modules/ai/models.json.  Uses -GcOnly so GC never
 # triggers multi-GB model pulls — only space reclamation.  Guarded by an
 # ollama presence check so this step is a no-op before Ollama is installed.
-if (-not $NoOllamaPrune) {
+if (-not $NoOllamaGc) {
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
-    Write-Output "gc: ollama not installed; skipping ollama model prune"
+    Write-Output "gc: ollama not installed; skipping ollama model gc"
   } else {
-    Invoke-AISync -PruneOnly -RepoRoot $resolvedRepoRoot -ServerReadyTimeoutSeconds 0
+    Invoke-AISync -GcOnly -RepoRoot $resolvedRepoRoot -ServerReadyTimeoutSeconds 0
   }
 }
 
@@ -252,16 +252,16 @@ if (-not $NoOllamaPrune) {
 # no longer declared in src/modules/VMs.json.
 # WHY: VM disk images are large (multi-gigabyte);
 # clearing stale files keeps disk usage bounded and VM provisioning fast.
-if (-not $NoVMPrune) {
+if (-not $NoVMGc) {
   $vmDir = Join-Path $env:USERPROFILE "virtual machines"
   $imagesDir = Join-Path $vmDir "images"
   $manifest = Join-Path $resolvedRepoRoot "src\modules\VMs.json"
 
   # If VM directories do not exist, there is nothing to clean.
   if (-not (Test-Path -LiteralPath $vmDir -PathType Container)) {
-    Write-Output "gc: VM directory not found; skipping VM artifact prune"
+    Write-Output "gc: VM directory not found; skipping VM artifact gc"
   } elseif (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
-    Write-Warning "gc: manifest '$manifest' not found; skipping VM artifact prune"
+    Write-Warning "gc: manifest '$manifest' not found; skipping VM artifact gc"
   } else {
     # Load the manifest and build a list of enabled VM names.
     try {
@@ -269,20 +269,20 @@ if (-not $NoVMPrune) {
       $declaredVMNames = @($manifestContent.VMs | Where-Object { $_.enabled -eq $true } | ForEach-Object { $_.name })
     }
     catch {
-      Write-Warning "gc: failed to parse manifest '$manifest' — $($_.Exception.Message); skipping VM artifact prune"
+      Write-Warning "gc: failed to parse manifest '$manifest' — $($_.Exception.Message); skipping VM artifact gc"
       $declaredVMNames = @()
     }
 
     if (Test-Path -LiteralPath $imagesDir -PathType Container) {
       # Remove temporary Packer build directories.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*-build" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-        Remove-VMPruneItem -Item $_ -Label "temporary VM build directory" -Recurse
+        Remove-VMGcItem -Item $_ -Label "temporary VM build directory" -Recurse
       }
 
       # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
       if (Test-Path -LiteralPath $imagesDir -PathType Container) {
         Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^\..+' } | ForEach-Object {
-          Remove-VMPruneItem -Item $_ -Label "stale Packer temporary build directory" -Recurse
+          Remove-VMGcItem -Item $_ -Label "stale Packer temporary build directory" -Recurse
         }
       }
 
@@ -290,7 +290,7 @@ if (-not $NoVMPrune) {
       Get-ChildItem -LiteralPath $imagesDir -Filter "*.qcow2" -File -ErrorAction SilentlyContinue | ForEach-Object {
         $imageName = $_.BaseName
         if ($imageName -notin $declaredVMNames) {
-          Remove-VMPruneItem -Item $_ -Label "stale VM disk image"
+          Remove-VMGcItem -Item $_ -Label "stale VM disk image"
         }
       }
 
@@ -307,7 +307,7 @@ if (-not $NoVMPrune) {
             }
           }
           if (-not $isDeclared) {
-            Remove-VMPruneItem -Item $script -Label "stale VM script"
+            Remove-VMGcItem -Item $script -Label "stale VM script"
           }
         }
       }

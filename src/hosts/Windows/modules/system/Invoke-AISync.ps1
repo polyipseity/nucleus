@@ -9,7 +9,7 @@
   Windows), and converges the locally installed Ollama model set:
 
     1. Pull any model in the manifest that is not already installed.
-       (Skipped when -PruneOnly is specified.)
+       (Skipped when -GcOnly is specified.)
     2. Remove any locally installed model absent from the manifest.
        The manifest is the single source of truth; orphaned models are
        removed to reclaim disk space.
@@ -25,7 +25,7 @@
 .PARAMETER DryRun
   Print planned actions without executing pulls or removals.
 
-.PARAMETER PruneOnly
+.PARAMETER GcOnly
   Skip model pulls; only remove locally installed models absent from the
   manifest.  Used by scripts/gc.ps1 for space reclamation without
   downloading new models.
@@ -38,7 +38,7 @@
 .EXAMPLE
   . .\src\hosts\Windows\modules\Invoke-AISync.ps1
   Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -ServerReadyTimeoutSeconds 60
-  Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -PruneOnly -ServerReadyTimeoutSeconds 0
+  Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -GcOnly -ServerReadyTimeoutSeconds 0
   Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -DryRun -ServerReadyTimeoutSeconds 60
 
 .NOTES
@@ -68,7 +68,7 @@ function Invoke-AISync {
   .PARAMETER DryRun
     Print planned actions without executing any ollama commands.
 
-  .PARAMETER PruneOnly
+  .PARAMETER GcOnly
     Skip pulls; remove only locally installed models absent from the manifest.
 
   .PARAMETER ServerReadyTimeoutSeconds
@@ -80,7 +80,7 @@ function Invoke-AISync {
 
   .EXAMPLE
     Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -ServerReadyTimeoutSeconds 60
-    Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -PruneOnly -ServerReadyTimeoutSeconds 0
+    Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -GcOnly -ServerReadyTimeoutSeconds 0
     Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -DryRun -ServerReadyTimeoutSeconds 60
 
   .NOTES
@@ -96,7 +96,7 @@ function Invoke-AISync {
     [Parameter(Mandatory)]
     [string]$RepoRoot,
     [switch]$DryRun,
-    [switch]$PruneOnly,
+    [switch]$GcOnly,
     [Parameter(Mandatory)]
     [int]$ServerReadyTimeoutSeconds
   )
@@ -179,7 +179,7 @@ function Invoke-AISync {
   )
 
   # Pull models present in the manifest but not locally installed.
-  if (-not $PruneOnly) {
+  if (-not $GcOnly) {
     foreach ($model in $desiredModels) {
       if ($installedModels -contains $model) {
         continue
@@ -216,7 +216,7 @@ function Invoke-AISync {
 
   $flags = @()
   if ($DryRun)    { $flags += "dry-run" }
-  if ($PruneOnly) { $flags += "prune-only" }
+  if ($GcOnly) { $flags += "gc-only" }
   $flagStr = if ($flags.Count -gt 0) { " ($($flags -join ', '))" } else { "" }
   Write-Output "ai-sync: sync completed (profile=$profileName$flagStr)"
 }
