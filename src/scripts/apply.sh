@@ -80,7 +80,7 @@ fi
 # Usage
 # ---------------------------------------------------------------------------
 usage() {
-  usage_std 'apply.sh' '[--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--vm-setup|--no-vm-setup] [--target-user=<name>]' \
+  usage_std 'apply.sh' '[--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--target-user=<name>] [--username=<name>] [--vm-setup|--no-vm-setup]' \
     'Dispatch the Nix apply command for the current host.'
   exit 0
 }
@@ -138,6 +138,14 @@ while [ "$#" -gt 0 ]; do
       target_user="${1#--target-user=}"
       if [ -z "$target_user" ]; then
         printf '%s\n' "apply: --target-user requires a non-empty value" >&2
+        exit 1
+      fi
+      ;;
+    --username)
+      NUCLEUS_USERNAME="$2"
+      shift
+      if [ -z "$NUCLEUS_USERNAME" ]; then
+        printf '%s\n' "apply: --username requires a non-empty value" >&2
         exit 1
       fi
       ;;

@@ -95,6 +95,8 @@ usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
   --dry-run                  Print planned actions without executing (default: off).
+  --mido-patch-file PATH     Override runtime patch file path (default: src/vms/windows/patches/mido-iso-link.patch).
+  --mido-script PATH         Override the Mido script path (default: vendored script).
   --nixos-only               Build and provision only the NixOS guest (default: off).
   --windows-only             Build and provision only the Windows guest (default: off).
   --windows-iso PATH         Path to the Windows 11 ISO.
@@ -103,6 +105,7 @@ usage() {
   --debug-headful            Show QEMU GUI window during Windows builds (default: off).
   --accelerator TYPE         QEMU accelerator (hvf/kvm/tcg) (default: auto).
   --repo-root PATH           Override the detected repository root path.
+  --vm-dir-override PATH     Override the default ~/virtual machines path.
 EOF
 }
 
@@ -113,6 +116,8 @@ while [ "$#" -gt 0 ]; do
       exit 0
       ;;
     --dry-run)      dry_run=true ;;
+    --mido-patch-file)    NUCLEUS_MIDO_PATCH_FILE="$2"; shift ;;
+    --mido-script)        NUCLEUS_MIDO_SCRIPT="$2"; shift ;;
     --nixos-only)   nixos_only=true ;;
     --windows-only) windows_only=true ;;
     --windows-iso)  windows_iso="$2"; shift ;;
@@ -120,6 +125,7 @@ while [ "$#" -gt 0 ]; do
     --windows-iso-retries) windows_iso_retries="$2"; shift ;;
     --debug-headful) windows_headless='false' ;;
     --repo-root)    REPO_ROOT="$2"; shift ;;
+    --vm-dir-override)    VM_DIR_OVERRIDE="$2"; shift ;;
     --accelerator)  accelerator="$2"; shift ;;
     *)
       printf '%s\n' "vm-setup: unsupported argument '$1'" >&2

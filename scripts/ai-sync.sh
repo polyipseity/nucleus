@@ -48,6 +48,8 @@ usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
   --dry-run                          Print planned actions without executing them (default: off).
+  --ollama-host <address>            Ollama server address (default: 127.0.0.1:11434).
+  --ollama-profile <name>            Override profile selection (MacBook|NixOS|Windows) (default: auto-detect).
   --prune-only                       Skip pulls; only remove unlisted models (default: off).
   --repo-root <path>                 Override the detected repository root path.
   --server-ready-timeout-seconds N   Bounded wait for server readiness (default: 60).
@@ -64,6 +66,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --dry-run)
       dry_run=true
+      ;;
+    --ollama-host)
+      OLLAMA_HOST="$2"
+      shift
+      ;;
+    --ollama-profile)
+      OLLAMA_PROFILE="$2"
+      shift
       ;;
     --prune-only)
       prune_only=true
