@@ -1,5 +1,3 @@
-# modules/Windows/sync-qtpass-config.ps1 — Declarative QtPass user settings.
-
 function Sync-QtPassConfig {
   <#
   .SYNOPSIS
@@ -33,6 +31,10 @@ function Sync-QtPassConfig {
 
   .EXAMPLE
     Sync-QtPassConfig -Enabled:$false -SettingsPath 'C:\Users\admin\nucleus\settings.json' -Users $userRegistry.users
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; non-zero on failure
   #>
   [CmdletBinding()]
   param(

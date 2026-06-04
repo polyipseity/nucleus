@@ -1,25 +1,39 @@
-# Sync-CloudDrive.ps1 — Provision cloud drive mounts and replicas on Windows.
-#
-# Reads per-user cloud drive configuration from users.json and provisions:
-#   Mounts  — rclone mount processes managed as persistent Servy services.
-#             Requires WinFsp (WinFsp.WinFsp in WinGet), Servy
-#             (aelassas.Servy), and rclone configured via `rclone config`.
-#   Replicas — rclone sync/bisync for full local copies. All replicas default
-#              to disabled; each entry must set "enable": true.
-#
-# iCloud on Windows: handled through the rclone iclouddrive backend when the
-# user config provides a configured remoteName (for example "iCloud").
-#
-# Prerequisites (one-time manual steps):
-#   1. WinFsp installed (WinFsp.WinFsp via WinGet — declared in system.dsc.yml)
-#   2. rclone installed (Rclone.Rclone via WinGet — declared in system.dsc.yml)
-#   3. Servy installed (aelassas.Servy via WinGet — declared in system.dsc.yml)
-#   4. rclone remotes configured: run `rclone config` for each provider
-#
-# Idempotency: mount directories are created if absent; existing mount services
-# are converged by reinstalling the Servy definition to match the desired
-# rclone command.
+<#
+.SYNOPSIS
+  Provision cloud drive mounts and replicas on Windows.
 
+.DESCRIPTION
+  Reads per-user cloud drive configuration from users.json and provisions:
+    Mounts  — rclone mount processes managed as persistent Servy services.
+              Requires WinFsp (WinFsp.WinFsp in WinGet), Servy
+              (aelassas.Servy), and rclone configured via `rclone config`.
+    Replicas — rclone sync/bisync for full local copies. All replicas default
+               to disabled; each entry must set "enable": true.
+
+  iCloud on Windows is handled through the rclone iclouddrive backend when the
+  user config provides a configured remoteName (for example "iCloud").
+
+  Prerequisites (one-time manual steps):
+    1. WinFsp installed (WinFsp.WinFsp via WinGet — declared in system.dsc.yml)
+    2. rclone installed (Rclone.Rclone via WinGet — declared in system.dsc.yml)
+    3. Servy installed (aelassas.Servy via WinGet — declared in system.dsc.yml)
+    4. rclone remotes configured: run `rclone config` for each provider
+
+  Idempotency: mount directories are created if absent; existing mount services
+  are converged by reinstalling the Servy definition to match the desired
+  rclone command.
+
+.PARAMETER UserConfig
+  Per-user configuration hashtable from users.json. Must contain a cloudDrives
+  key with mounts and replicas arrays.
+
+.PARAMETER HomeDirectory
+  Absolute path to the user's home directory.
+
+.NOTES
+  Environment variables: (none)
+  Exit codes: 0 on success; non-zero on failure
+#>
 function Sync-CloudDrive {
     [CmdletBinding()]
     param(

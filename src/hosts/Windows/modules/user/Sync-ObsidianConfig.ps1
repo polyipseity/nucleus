@@ -1,5 +1,3 @@
-# hosts/Windows/modules/Sync-ObsidianConfig.ps1 — Declarative Obsidian app settings.
-
 function Sync-ObsidianConfig {
   <#
   .SYNOPSIS
@@ -28,6 +26,10 @@ function Sync-ObsidianConfig {
 
   .EXAMPLE
     Sync-ObsidianConfig -Enabled:$false -Users $userRegistry.users
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; non-zero on failure
   #>
   [CmdletBinding()]
   param(

@@ -1,8 +1,3 @@
-# modules/Windows/shell.ps1 — Shell parity helpers for Windows.
-#
-# Maintains a managed block in PowerShell profile files for cross-host shell
-# behavior parity (direnv hook and helper aliases).
-
 function Sync-ShellProfile {
   <#
   .SYNOPSIS
@@ -44,6 +39,10 @@ function Sync-ShellProfile {
 
   .EXAMPLE
     Sync-ShellProfile -Enabled:$false
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; non-zero on failure
   #>
   param(
     [Parameter(Mandatory)]

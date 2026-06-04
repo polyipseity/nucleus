@@ -47,6 +47,10 @@
 .EXAMPLE
   # Skip the fetched skill sync without removing any existing downloads:
   Sync-AgentsClawHubSkill -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
+
+.NOTES
+  Environment variables: (none)
+  Exit codes: 0 on success; non-zero on failure
 #>
 function Sync-AgentsClawHubSkill {
   [CmdletBinding()]

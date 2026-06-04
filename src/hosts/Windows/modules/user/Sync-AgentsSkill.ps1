@@ -48,6 +48,10 @@
 .EXAMPLE
   # Remove only managed per-skill symlinks (cleanup path); leave fetched dirs:
   Sync-AgentsSkill -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
+
+.NOTES
+  Environment variables: (none)
+  Exit codes: 0 on success; non-zero on failure
 #>
 function Sync-AgentsSkill {
   [CmdletBinding()]

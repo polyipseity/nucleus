@@ -1,8 +1,3 @@
-# modules/Windows/git-ssh.ps1 — Git and SSH parity helpers for Windows.
-#
-# Keeps user-level Git identity/signing and SSH host rules aligned with the
-# POSIX baseline while preserving cleanup behavior when disabled.
-
 function Sync-GitAndSshConfig {
   <#
   .SYNOPSIS
@@ -36,6 +31,11 @@ function Sync-GitAndSshConfig {
 
   .EXAMPLE
     Sync-GitAndSshConfig -Enabled:$false -Users @('admin', 'guest')
+
+  .NOTES
+    Environment variables: SystemDrive — used to resolve each user's profile
+      directory for per-user Git and SSH configuration.
+    Exit codes: 0 on success; non-zero on failure
   #>
   param(
     [Parameter()]

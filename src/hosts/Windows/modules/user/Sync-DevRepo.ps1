@@ -1,17 +1,3 @@
-# modules/sync-devrepos.ps1 — Provisions development repositories in ~/dev
-# on Windows via PowerShell.
-#
-# Configuration: Per-user dev repository settings are defined in the centralized
-# user registry (users.json). The apply.ps1 script reads that configuration,
-# resolves symlink paths, and passes it to this module for provisioning.
-#
-# Behavior:
-#   • symlinks are created if absent
-#   • repos are cloned only if uninitialized
-#   • direct submodules are individually checked and cloned if absent
-#   • soft-fail on errors (write warnings, do not throw)
-#   • remote URLs are verified and updated if needed
-
 function Sync-DevRepo {
   <#
   .SYNOPSIS
@@ -53,6 +39,10 @@ function Sync-DevRepo {
 
   .EXAMPLE
     Sync-DevRepo -Enabled:$false
+
+  .NOTES
+    Environment variables: USERDOMAIN, USERNAME — used for delete-protection ACLs.
+    Exit codes: 0 on success; non-zero on failure
   #>
   param(
     [Parameter(Mandatory = $true)]

@@ -1,10 +1,3 @@
-# Sync-CustomProvisionSymlink.ps1 — Provision per-user custom symlinks on Windows.
-#
-# Reads the same per-user customProvisionSymlinks registry shape used by POSIX
-# hosts and creates only the Windows-targeted entries. Managed symlinks receive
-# delete-protection ACLs and are reconciled through a per-user manifest so stale
-# links can be unprotected and removed safely on future applies.
-
 function Sync-CustomProvisionSymlink {
   <#
   .SYNOPSIS
@@ -38,6 +31,10 @@ function Sync-CustomProvisionSymlink {
 
   .EXAMPLE
     Sync-CustomProvisionSymlink -Enabled:$false -UserRecords @(@{ name = 'admin'; homeDirectory = 'C:\Users\admin'; customProvisionSymlinks = @() })
+
+  .NOTES
+    Environment variables: USERDOMAIN, USERNAME — used for delete-protection ACLs.
+    Exit codes: 0 on success; non-zero on failure
   #>
   [CmdletBinding()]
   param(

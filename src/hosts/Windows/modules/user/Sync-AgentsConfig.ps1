@@ -48,6 +48,10 @@
 .EXAMPLE
   # Remove all managed per-subdir symlinks (cleanup path):
   Sync-AgentsConfig -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
+
+.NOTES
+  Environment variables: (none)
+  Exit codes: 0 on success; non-zero on failure
 #>
 function Sync-AgentsConfig {
   [CmdletBinding()]

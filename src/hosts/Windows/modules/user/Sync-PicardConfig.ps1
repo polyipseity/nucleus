@@ -1,5 +1,3 @@
-# modules/Windows/Sync-PicardConfig.ps1 — Declarative Picard INI settings convergence.
-
 function Sync-PicardConfig {
   <#
   .SYNOPSIS
@@ -33,6 +31,10 @@ function Sync-PicardConfig {
 
   .EXAMPLE
     Sync-PicardConfig -Enabled:$false -Users $userRegistry.users -DefaultsFilePath 'C:\Users\admin\nucleus\src\modules\configs\picard\Picard.ini'
+
+  .NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; non-zero on failure
   #>
   [CmdletBinding()]
   param(
