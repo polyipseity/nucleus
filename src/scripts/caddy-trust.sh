@@ -37,8 +37,22 @@ else
   }
 fi
 
+usage() {
+  usage_std "$(basename "$0")" "{sudo|user}" "Trust the Caddy CA certificate for the current user or system-wide."
+  cat <<'EOF'
+  -h, --help    Show this help message and exit
+EOF
+}
+
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+esac
+
 if [ $# -ne 1 ]; then
-  usage_std "$(basename "$0")" "sudo|user" "Arguments: sudo — run caddy trust with sudo; user — run caddy trust as the current user"
+  usage >&2
   exit 2
 fi
 _ct_mode="$1"

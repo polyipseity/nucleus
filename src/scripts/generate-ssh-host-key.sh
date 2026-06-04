@@ -14,6 +14,26 @@ else
   }
 fi
 
+usage() {
+  usage_std "$(basename "$0")" "" "Generate SSH host keys if missing. No arguments accepted."
+  cat <<'EOF'
+  -h, --help  Show this help message and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf '%s: unknown argument: %s\n' "$(basename "$0")" "$1" >&2
+      exit 1
+      ;;
+  esac
+done
+
 # Ensure /etc/ssh/ssh_host_ed25519_key exists before
 # register_host_age_key_if_needed tries to derive the machine age public key
 # from it.  On freshly provisioned machines the OS may not have generated host
