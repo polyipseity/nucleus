@@ -1,20 +1,49 @@
-# scripts/vm-setup.ps1 — Build VM images (if needed) and provision VMs on Windows.
-#
-# Combines the former nucleus-VM-build and nucleus-vm-setup into one command.
-# Phase 1 builds pre-built QCOW2 images via Packer (if absent).
-# Phase 2 provisions QEMU start scripts and copies disk images.
-#
-# Thin wrapper that delegates to
-# src\hosts\Windows\modules\system\Invoke-VMSetup.ps1.
-#
-# Usage:
-#   .\scripts\vm-setup.ps1 [-WindowsIso PATH] [-WindowsIsoSource Auto|Url|Fido]
-#                          [-Accelerator TYPE] [-Headful] [-NoHeadful] [-DryRun]
-#
-# Or via the shell alias:
-#   nucleus-vm-setup [same parameters]
-#
-# Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
+<#
+.SYNOPSIS
+  Build VM images (if needed) and provision VMs on Windows.
+
+.DESCRIPTION
+  Combines the former nucleus-VM-build and nucleus-vm-setup into one command.
+  Phase 1 builds pre-built QCOW2 images via Packer (if absent).
+  Phase 2 provisions QEMU start scripts and copies disk images.
+
+.PARAMETER WindowsIso
+  Path to Windows 11 ISO. Optional when windowsIsoUrl is set in VMs.json (default: '').
+
+.PARAMETER WindowsIsoSource
+  Windows installer ISO resolution strategy. Auto: cache/download then Fido fallback. Url: use only WindowsIso or windowsIsoUrl. Fido: use only local cache/Fido (default: Auto).
+
+.PARAMETER WindowsIsoRetries
+  Retry attempts for Windows ISO network downloads (default: 0).
+
+.PARAMETER Accelerator
+  QEMU accelerator for image builds. Defaults to tcg (always works on Windows; WHPX auto-detected when available) (default: tcg).
+
+.PARAMETER DebugHeadful
+  Run guest image builds headful (headless=false) for interactive debugging (default: $false).
+
+.PARAMETER DryRun
+  Print planned actions without executing (default: $false).
+
+.PARAMETER Headful
+  Run Windows image builds headful (default: $false).
+
+.PARAMETER NoHeadful
+  Run Windows image builds headless (default: $true).
+
+.EXAMPLE
+  .\scripts\vm-setup.ps1
+
+.EXAMPLE
+  .\scripts\vm-setup.ps1 -WindowsIso C:\ISOs\Win11.iso
+
+.EXAMPLE
+  .\scripts\vm-setup.ps1 -DryRun
+
+.NOTES
+  Environment variables: NUCLEUS_VM_WINDOWS_ISO, NUCLEUS_VM_WINDOWS_ISO_SOURCE, NUCLEUS_VM_WINDOWS_ISO_RETRIES, NUCLEUS_VM_ACCELERATOR, NUCLEUS_VM_DEBUG_HEADFUL, NUCLEUS_DRY_RUN, NUCLEUS_VM_HEADFUL.
+  Exit codes: 0 on success; 1 on failure (module not found).
+#>
 [CmdletBinding()]
 param(
     # Path to Windows 11 ISO. Optional when windowsIsoUrl is set in VMs.json (default: '').

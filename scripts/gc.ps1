@@ -55,6 +55,10 @@
 .EXAMPLE
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus"
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -NoToolCachePrune
+
+.NOTES
+  Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_PRUNE, NUCLEUS_GC_NO_OLLAMA_PRUNE, NUCLEUS_GC_NO_SCOOP_CLEANUP, NUCLEUS_GC_NO_WALLPAPER_PRUNE, NUCLEUS_GC_NO_VM_PRUNE, NUCLEUS_REPO_ROOT.
+  Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(

@@ -11,6 +11,16 @@
 
 .PARAMETER ReplicaId
   Optional replica id filter; when provided only the matching replica runs (default: none; all replicas run).
+
+.EXAMPLE
+  .\scripts\replica-sync.ps1
+
+.EXAMPLE
+  .\scripts\replica-sync.ps1 -DryRun
+
+.NOTES
+  Environment variables: NUCLEUS_DRY_RUN, NUCLEUS_REPLICA_ID.
+  Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(

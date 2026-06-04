@@ -20,6 +20,10 @@
 
 .EXAMPLE
   .\cloud-setup.ps1 -Apply
+
+.NOTES
+  Environment variables: NUCLEUS_APPLY.
+  Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(

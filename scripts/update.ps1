@@ -31,6 +31,10 @@
 
 .EXAMPLE
   .\update.ps1 -NoFlake -NoWinget -NoSops
+
+.NOTES
+  Environment variables: NUCLEUS_NO_FLAKE, NUCLEUS_NO_BREW, NUCLEUS_NO_WINGET, NUCLEUS_NO_SOPS, NUCLEUS_REPO_ROOT.
+  Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(

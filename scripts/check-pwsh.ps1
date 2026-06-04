@@ -29,6 +29,10 @@
 
 .EXAMPLE
   nix run ./src#check-pwsh -- src/hosts/Windows/apply.ps1
+
+.NOTES
+  Environment variables: NUCLEUS_CHECK_PATHS.
+  Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(

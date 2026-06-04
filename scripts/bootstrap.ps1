@@ -46,6 +46,10 @@
 .EXAMPLE
   .\bootstrap.ps1 -Apply -NoAISync
   Install dependencies and run apply, skipping AI model sync.
+
+.NOTES
+  Environment variables: NUCLEUS_APPLY, NUCLEUS_AI_SYNC, NUCLEUS_REPLICA_SYNC, NUCLEUS_TARGET_USER.
+  Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(

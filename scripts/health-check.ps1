@@ -22,6 +22,10 @@
 
 .EXAMPLE
   .\health-check.ps1 -NoSecretHealth
+
+.NOTES
+  Environment variables: NUCLEUS_HEALTH_CHECK_NO_SECRET_HEALTH.
+  Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(

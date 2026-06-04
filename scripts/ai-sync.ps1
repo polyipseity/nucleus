@@ -25,6 +25,10 @@
 
 .EXAMPLE
   .\scripts\ai-sync.ps1 -PruneOnly
+
+.NOTES
+  Environment variables: NUCLEUS_DRY_RUN, NUCLEUS_AI_SYNC_PRUNE_ONLY, NUCLEUS_REPO_ROOT, NUCLEUS_AI_SYNC_TIMEOUT, NUCLEUS_AI_SYNC_POLL.
+  Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(
