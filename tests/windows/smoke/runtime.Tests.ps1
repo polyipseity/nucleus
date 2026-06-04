@@ -1,5 +1,13 @@
-# tests/windows/smoke/runtime.Tests.ps1 — Pester smoke coverage proving the
-# Windows suite is running on the intended platform and shell runtime.
+<#
+.SYNOPSIS
+    Pester smoke coverage for the Windows test suite runtime.
+.DESCRIPTION
+    Verifies that the test suite executes on the intended platform (Win32NT)
+    with a supported PowerShell version (5.0 or newer).
+.NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; 1 on failure
+#>
 
 Describe "Windows Test Runtime Smoke" {
     It "Should run on Windows" {

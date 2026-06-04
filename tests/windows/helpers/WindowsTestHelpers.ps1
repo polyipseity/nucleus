@@ -1,6 +1,15 @@
-# Shared helper functions for Windows Pester suites.
-# Keep these helpers tiny and declarative so individual test files can stay
-# focused on the managed state they validate.
+<#
+.SYNOPSIS
+    Shared helper functions for Windows Pester suites.
+.DESCRIPTION
+    Exports tiny, declarative helper functions so individual Pester test files
+    can focus on the managed state they validate. Dot-source this file to
+    import Get-NucleusRegistryValue, Get-NucleusUserEnvironmentVariable, and
+    Test-NucleusWingetPackageInstalled.
+.NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; non-zero on failure
+#>
 
 $ProgressPreference = 'SilentlyContinue'
 

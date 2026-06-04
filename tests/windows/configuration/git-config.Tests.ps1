@@ -1,5 +1,14 @@
-# tests/windows/configuration/git-config.Tests.ps1 — Pester coverage for the
-# managed per-user Git baseline on Windows.
+<#
+.SYNOPSIS
+    Pester coverage for the managed per-user Git baseline on Windows.
+.DESCRIPTION
+    Validates managed fetch and push defaults (pruning, tag-follow), cross-host
+    Git parity defaults (signed commits, signed tags, core.autocrlf,
+    core.symlinks, user.useConfigOnly).
+.NOTES
+    Environment variables: USERPROFILE (resolved to locate .gitconfig)
+    Exit codes: 0 on success; 1 on failure
+#>
 
 $script:gitConfigPath = Join-Path -Path $env:USERPROFILE -ChildPath '.gitconfig'
 

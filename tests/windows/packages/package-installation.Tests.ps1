@@ -1,5 +1,14 @@
-# tests/windows/packages/package-installation.Tests.ps1 — Pester coverage for
-# WinGet-managed package parity on Windows.
+<#
+.SYNOPSIS
+    Pester coverage for WinGet-managed package parity on Windows.
+.DESCRIPTION
+    Validates that all cross-host CLI tools, developer runtimes and editors,
+    GUI applications, and additional WinGet packages declared in
+    system.dsc.yml are installed via WinGet.
+.NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; 1 on failure
+#>
 
 BeforeAll {
     . (Join-Path -Path $PSScriptRoot -ChildPath '..\helpers\WindowsTestHelpers.ps1')

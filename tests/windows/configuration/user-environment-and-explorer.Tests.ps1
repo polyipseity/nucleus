@@ -1,5 +1,14 @@
-# tests/windows/configuration/user-environment-and-explorer.Tests.ps1 — Pester
-# coverage for user-scoped DSC registry and environment state.
+<#
+.SYNOPSIS
+    Pester coverage for user-scoped DSC registry and environment state.
+.DESCRIPTION
+    Validates screen saver and wallpaper posture, Explorer visibility and
+    taskbar chrome settings, and user environment variables (EDITOR, VISUAL,
+    HOME, NIX_PATH, Ollama settings, OpenCode auto-update).
+.NOTES
+    Environment variables: USERPROFILE (resolved for wallpaper path checks)
+    Exit codes: 0 on success; 1 on failure
+#>
 
 BeforeAll {
     . (Join-Path -Path $PSScriptRoot -ChildPath '..\helpers\WindowsTestHelpers.ps1')

@@ -1,5 +1,15 @@
-# tests/windows/system/system-policy.Tests.ps1 — Pester coverage for
-# machine-scoped Windows policy and parity invariants.
+<#
+.SYNOPSIS
+    Pester coverage for machine-scoped Windows policy and parity invariants.
+.DESCRIPTION
+    Validates security and remote access settings (firewall, RDP, long-path
+    support), power and network posture (TCP keepalive, lid close action),
+    and managed font substitutions (Courier New → JetBrains Mono, Helvetica →
+    Inter, Times New Roman → Source Serif 4).
+.NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; 1 on failure
+#>
 
 BeforeAll {
     . (Join-Path -Path $PSScriptRoot -ChildPath '..\helpers\WindowsTestHelpers.ps1')

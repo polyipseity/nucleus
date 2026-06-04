@@ -1,3 +1,17 @@
+<#
+.SYNOPSIS
+    Pester coverage for Windows managed symlink delete-protection.
+.DESCRIPTION
+    Validates that every module using managed symlinks (Sync-VSCodeConfig,
+    Sync-AgentsConfig, Sync-AgentsSkill, Sync-DevRepo,
+    Sync-CustomProvisionSymlink) correctly applies and removes delete
+    protection via icacls ACL deny entries, and uses SupportsShouldProcess
+    for all destructive operations.
+.NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; 1 on failure
+#>
+
 BeforeAll {
   # Import test utilities
   $ErrorActionPreference = "Stop"

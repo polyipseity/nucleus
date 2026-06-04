@@ -1,5 +1,14 @@
-# tests/windows/apps/app-parity.Tests.ps1 — Pester coverage for app-specific
-# Windows parity managed outside the DSC registry resources.
+<#
+.SYNOPSIS
+    Pester coverage for app-specific Windows parity outside DSC registry resources.
+.DESCRIPTION
+    Validates QtPass managed registry settings (clipboard, auto-clear, pass
+    template, visibility) and Obsidian advanced settings (auto-updates,
+    native menus, config materialization) on Windows.
+.NOTES
+    Environment variables: (none)
+    Exit codes: 0 on success; 1 on failure
+#>
 
 Describe "Windows Application Parity" {
     Context "QtPass managed registry settings" {
