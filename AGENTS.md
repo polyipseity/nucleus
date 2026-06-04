@@ -98,6 +98,16 @@
 - Keep reusable Windows PowerShell logic in `src/hosts/Windows/modules/`; keep
   `src/hosts/Windows/apply.ps1` orchestration-focused.
 
+## No Backwards Compatibility
+
+Breaking changes are accepted and expected. Do not preserve, wrap, or
+polyfill old behavior when renaming, restructuring, or removing code.
+Remove the old path entirely in the same change. If a caller needs
+updating, update it — do not leave a compatibility shim.
+
+This applies to all files in this repository: Nix, PowerShell, shell
+scripts, DSC YAML, agent instructions, and tests.
+
 ## Key References
 
 - `AGENTS.md` — workspace-wide defaults
