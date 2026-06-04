@@ -8,8 +8,8 @@
     2. outbound HTTPS connectivity to GitHub and cache.nixos.org
     3. presence of decrypt-capable tooling (sops + gpg) when available
 
-.PARAMETER MinFreeGB
-  Minimum free disk space (GiB) required on the system drive (default: 10).
+.PARAMETER MinFreeBytes
+  Minimum free disk space (bytes) required on the system drive (default: 10000000000).
 
 .PARAMETER NoSecretHealth
   Skip validation of sops/gpg executable availability (default: $false).
@@ -26,7 +26,7 @@
 [CmdletBinding()]
 param(
   [Parameter()]
-  [int]$MinFreeGB = 10,
+  [int]$MinFreeBytes = 10000000000,
 
   [Parameter()]
   [switch]$NoSecretHealth = $(if ($env:NUCLEUS_HEALTH_CHECK_NO_SECRET_HEALTH -eq 'true') { $true } else { $false }),
@@ -50,22 +50,22 @@ function Test-DiskSpace {
   .DESCRIPTION
     Prevents long-running operations from starting when disk pressure is likely
     to cause partial downloads, failed extractions, or interrupted apply flows.
-  .PARAMETER RequiredGiB
-    Required free space threshold in GiB.
+  .PARAMETER RequiredBytes
+    Required free space threshold in bytes.
   .EXAMPLE
-    Test-DiskSpace -RequiredGiB 10
+    Test-DiskSpace -RequiredBytes 10000000000
   #>
   param(
     [Parameter(Mandatory = $true)]
-    [int]$RequiredGiB
+    [int]$RequiredBytes
   )
 
   $driveName = ($env:SystemDrive -replace ':', '')
   $drive = Get-PSDrive -Name $driveName -ErrorAction Stop
-  $requiredBytes = [int64]$RequiredGiB * 1GB
+  $requiredBytes = [int64]$RequiredBytes
 
   if ($drive.Free -lt $requiredBytes) {
-    throw "nucleus: insufficient free disk space on $($env:SystemDrive). Required ${RequiredGiB} GiB, found $([math]::Floor($drive.Free / 1GB)) GiB."
+    throw "nucleus: insufficient free disk space on $($env:SystemDrive). Required ${RequiredBytes} bytes, found $($drive.Free) bytes."
   }
 }
 
@@ -112,7 +112,7 @@ function Test-SecretTooling {
   }
 }
 
-Test-DiskSpace -RequiredGiB $MinFreeGB
+Test-DiskSpace -RequiredBytes $MinFreeBytes
 Test-Connectivity
 if (-not $NoSecretHealth) {
   Test-SecretTooling

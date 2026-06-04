@@ -7,7 +7,7 @@
 #   3. SOPS secret decryptability for repository-managed secret files
 #
 # Arguments:
-#   --min-free-gb <int>                  minimum free disk space in GiB (default: 10)
+#   --min-free-bytes <int>               minimum free disk space in bytes (default: 10000000000)
 #   --secret-health|--no-secret-health    enable or skip SOPS decryption identity verification (default: --secret-health)
 #
 # Exit conditions:
@@ -24,7 +24,7 @@ usage() {
 
 REPO_ROOT="$(resolve_nucleus_root)"
 
-min_free_gb=10
+min_free_bytes=10000000000
 secret_health=true
 
 while [ "$#" -gt 0 ]; do
@@ -33,13 +33,13 @@ while [ "$#" -gt 0 ]; do
       usage
       exit 0
       ;;
-    --min-free-gb)
+    --min-free-bytes)
       if [ "$#" -lt 2 ]; then
-        printf '%s\n' "health: --min-free-gb requires a value" >&2
+        printf '%s\n' "health: --min-free-bytes requires a value" >&2
         usage >&2
         exit 1
       fi
-      min_free_gb="$2"
+      min_free_bytes="$2"
       shift
       ;;
     --secret-health)
@@ -60,7 +60,7 @@ done
 check_disk_space() {
   # Fails fast when free disk is below threshold to avoid half-finished
   # rebuilds, package downloads, or decrypt/write operations on low storage.
-  min_kb=$((min_free_gb * 1024 * 1024))
+  min_kb=$((min_free_bytes / 1024))
   available_kb=$(df -Pk "$REPO_ROOT" | awk 'NR == 2 { print $4 }')
 
   if [ -z "$available_kb" ] || [ "$available_kb" -lt "$min_kb" ]; then
