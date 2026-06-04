@@ -1,17 +1,28 @@
-# Sync-JellyfinHttpsProxy.ps1 — Converge local HTTPS ingress for Jellyfin.
-#
-# Creates and maintains a host-local Caddy reverse proxy service that serves
-# Jellyfin on https://localhost:8920 and proxies to http://127.0.0.1:8096.
-# The pattern is reusable for other local services by adding additional Caddy
-# site blocks in the same managed config.
-#
-# Sources:
-# - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
-# - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/caddy/
-# - https://caddyserver.com/docs/caddyfile/directives/reverse_proxy
-# - https://caddyserver.com/docs/caddyfile/directives/tls
-# - https://caddyserver.com/docs/command-line#caddy-trust
+<#
+.SYNOPSIS
+  Converge local HTTPS ingress for Jellyfin via Caddy reverse proxy.
 
+.DESCRIPTION
+  Creates and maintains a host-local Caddy reverse proxy service that serves
+  Jellyfin on https://localhost:8920 and proxies to http://127.0.0.1:8096.
+  The pattern is reusable for other local services by adding additional Caddy
+  site blocks in the same managed config.
+
+  Sources:
+  - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
+  - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/caddy/
+  - https://caddyserver.com/docs/caddyfile/directives/reverse_proxy
+  - https://caddyserver.com/docs/caddyfile/directives/tls
+  - https://caddyserver.com/docs/command-line#caddy-trust
+
+.NOTES
+  Environment variables:
+    NUCLEUS_HOST  Host identifier for TLS binding context.
+    COMPUTERNAME  Local machine name for host-specific behavior.
+
+  Exit codes:
+    This module does not emit exit codes.
+#>
 function Sync-JellyfinHttpsProxy {
   <#
   .SYNOPSIS
@@ -39,6 +50,13 @@ function Sync-JellyfinHttpsProxy {
 
   .EXAMPLE
     Sync-JellyfinHttpsProxy -RepoRoot 'C:\Users\admin\nucleus' -Enabled:$false
+
+  .NOTES
+    Environment variables:
+      (none)    No environment variables used.
+
+    Exit codes:
+      0 on success; 1 on error.
   #>
   [CmdletBinding()]
   param(

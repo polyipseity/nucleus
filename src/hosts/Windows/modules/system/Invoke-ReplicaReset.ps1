@@ -20,6 +20,19 @@
   Optional replica id filter; when provided only matching marker and local
   replica cleanup is applied. Cache reset remains global because old rclone
   cache files are not reliably attributable to one replica id.
+
+.EXAMPLE
+  Invoke-ReplicaReset -RepoRoot 'C:\Users\admin\nucleus' -DryRun
+
+.EXAMPLE
+  Invoke-ReplicaReset -RepoRoot 'C:\Users\admin\nucleus' -ReplicaId 'photos'
+
+.NOTES
+  Environment variables:
+    (none)    No environment variables used.
+
+  Exit codes:
+    0 on success; 1 on error.
 #>
 function Invoke-ReplicaReset {
   [CmdletBinding()]

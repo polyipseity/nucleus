@@ -1,8 +1,18 @@
-# modules/Windows/power.ps1 — Power policy parity helpers for Windows.
-#
-# Applies a remote-access-friendly power profile with an explicit cleanup path
-# when disabled.
+<#
+.SYNOPSIS
+  Power policy parity helpers for Windows.
 
+.DESCRIPTION
+  Applies a remote-access-friendly power profile with an explicit cleanup path
+  when disabled.
+
+.NOTES
+  Environment variables:
+    (none)    No environment variables used.
+
+  Exit codes:
+    This module does not emit exit codes.
+#>
 function Sync-PowerPolicy {
   <#
   .SYNOPSIS
@@ -71,6 +81,13 @@ function Sync-PowerPolicy {
 
   .EXAMPLE
     Sync-PowerPolicy -Enabled:$false
+
+  .NOTES
+    Environment variables:
+      (none)    No environment variables used.
+
+    Exit codes:
+      0 on success; 1 on error.
   #>
   param(
     [Parameter(Mandatory)]

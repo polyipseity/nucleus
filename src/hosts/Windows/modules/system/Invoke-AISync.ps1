@@ -40,6 +40,14 @@
   Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -ServerReadyTimeoutSeconds 60
   Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -PruneOnly -ServerReadyTimeoutSeconds 0
   Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -DryRun -ServerReadyTimeoutSeconds 60
+
+.NOTES
+  Environment variables:
+    OLLAMA_HOST  Ollama API endpoint (default: http://127.0.0.1:11434).
+    NUCLEUS_HOST  Host identifier for model profile selection.
+
+  Exit codes:
+    0 on success; 1 on error.
 #>
 
 function Invoke-AISync {
@@ -74,6 +82,14 @@ function Invoke-AISync {
     Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -ServerReadyTimeoutSeconds 60
     Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -PruneOnly -ServerReadyTimeoutSeconds 0
     Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -DryRun -ServerReadyTimeoutSeconds 60
+
+  .NOTES
+    Environment variables:
+      OLLAMA_HOST  Ollama API endpoint (default: http://127.0.0.1:11434).
+      NUCLEUS_HOST  Host identifier for model profile selection.
+
+    Exit codes:
+      0 on success; 1 on error.
   #>
   [CmdletBinding()]
   param(

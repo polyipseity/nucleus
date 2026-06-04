@@ -1,13 +1,23 @@
-# Sync-CaddyLocalCA.ps1 — Trust Caddy local CA for managed localhost HTTPS ingress.
-#
-# Ensures the local machine trusts certificates issued by Caddy's internal PKI
-# authority served by the admin endpoint (127.0.0.1:2019). This trust is shared
-# across any managed localhost reverse proxies using `tls internal`, not just
-# Jellyfin.
-#
-# Source:
-# - https://caddyserver.com/docs/command-line#caddy-trust
+<#
+.SYNOPSIS
+  Trust Caddy local CA for managed localhost HTTPS ingress.
 
+.DESCRIPTION
+  Ensures the local machine trusts certificates issued by Caddy's internal PKI
+  authority served by the admin endpoint (127.0.0.1:2019). This trust is shared
+  across any managed localhost reverse proxies using `tls internal`, not just
+  Jellyfin.
+
+  Source:
+  - https://caddyserver.com/docs/command-line#caddy-trust
+
+.NOTES
+  Environment variables:
+    (none)    No environment variables used.
+
+  Exit codes:
+    This module does not emit exit codes.
+#>
 function Sync-CaddyLocalCA {
   <#
   .SYNOPSIS
@@ -29,6 +39,13 @@ function Sync-CaddyLocalCA {
 
   .EXAMPLE
     Sync-CaddyLocalCA -RepoRoot 'C:\Users\admin\nucleus' -Enabled:$true
+
+  .NOTES
+    Environment variables:
+      (none)    No environment variables used.
+
+    Exit codes:
+      0 on success; 1 on error.
   #>
   [CmdletBinding()]
   param(

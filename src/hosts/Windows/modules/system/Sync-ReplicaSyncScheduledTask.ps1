@@ -14,6 +14,19 @@
 .PARAMETER Enabled
   Whether the scheduled task should exist. When false, the managed task is
   removed if present.
+
+.EXAMPLE
+  Sync-ReplicaSyncScheduledTask -RepoRoot 'C:\Users\admin\nucleus' -Enabled:$true
+
+.EXAMPLE
+  Sync-ReplicaSyncScheduledTask -RepoRoot 'C:\Users\admin\nucleus' -Enabled:$false
+
+.NOTES
+  Environment variables:
+    (none)    No environment variables used.
+
+  Exit codes:
+    0 on success; 1 on error.
 #>
 function Sync-ReplicaSyncScheduledTask {
   [CmdletBinding()]

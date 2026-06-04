@@ -1,13 +1,23 @@
-# modules/Windows/initialize-sshhostkey.ps1 — SSH host key bootstrap helper.
-#
-# Mirrors generate_ssh_host_key_if_needed in src/scripts/apply.sh.
-# Ensures the Windows SSH host Ed25519 key exists before
-# register-hostagekey.ps1 tries to derive the machine age public key from
-# the corresponding .pub file.  On a fresh machine the key is absent until the
-# OpenSSH Server Windows service first starts; this module starts the service
-# briefly to trigger automatic key generation when the service is already
-# installed but the key file has not yet been written.
+<#
+.SYNOPSIS
+  SSH host key bootstrap helper.
 
+.DESCRIPTION
+  Mirrors generate_ssh_host_key_if_needed in src/scripts/apply.sh.
+  Ensures the Windows SSH host Ed25519 key exists before
+  register-hostagekey.ps1 tries to derive the machine age public key from
+  the corresponding .pub file.  On a fresh machine the key is absent until the
+  OpenSSH Server Windows service first starts; this module starts the service
+  briefly to trigger automatic key generation when the service is already
+  installed but the key file has not yet been written.
+
+.NOTES
+  Environment variables:
+    ProgramData  Path to the ProgramData directory (default: C:\ProgramData).
+
+  Exit codes:
+    This module does not emit exit codes.
+#>
 function Initialize-SSHHostKey {
   <#
   .SYNOPSIS
@@ -42,6 +52,13 @@ function Initialize-SSHHostKey {
 
   .EXAMPLE
     Initialize-SSHHostKey -MachineSshHostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key'
+
+  .NOTES
+    Environment variables:
+      (none)    No environment variables used.
+
+    Exit codes:
+      0 on success; 1 on error.
   #>
   [CmdletBinding()]
   param(

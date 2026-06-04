@@ -1,18 +1,28 @@
-# Sync-JellyfinAccount.ps1 — Converge Jellyfin user accounts from per-user SOPS secrets.
-#
-# Applies the users.json jellyfin.accounts declarations against the host-shared
-# Jellyfin server via its HTTP API. Each account declaration references secret
-# keys inside src/secrets/users-<username>.yml so plaintext credentials never
-# live in users.json.
-#
-# API behavior source (upstream Jellyfin):
-# - POST /Users/AuthenticateByName
-# - POST /Users/New (RequiresElevation)
-# - POST /Users/Password?userId=<id>
-# - Startup bootstrap via /Startup/User + /Startup/Complete when needed
-# Source: https://raw.githubusercontent.com/jellyfin/jellyfin/0beb07c40756aca5ab6a6ba4f8494bc5147e3c2b/Jellyfin.Api/Controllers/UserController.cs
-# Source: https://raw.githubusercontent.com/jellyfin/jellyfin/0beb07c40756aca5ab6a6ba4f8494bc5147e3c2b/Jellyfin.Api/Controllers/StartupController.cs
+<#
+.SYNOPSIS
+  Converge Jellyfin user accounts from per-user SOPS secrets.
 
+.DESCRIPTION
+  Applies the users.json jellyfin.accounts declarations against the host-shared
+  Jellyfin server via its HTTP API. Each account declaration references secret
+  keys inside src/secrets/users-<username>.yml so plaintext credentials never
+  live in users.json.
+
+  API behavior source (upstream Jellyfin):
+  - POST /Users/AuthenticateByName
+  - POST /Users/New (RequiresElevation)
+  - POST /Users/Password?userId=<id>
+  - Startup bootstrap via /Startup/User + /Startup/Complete when needed
+  Source: https://raw.githubusercontent.com/jellyfin/jellyfin/0beb07c40756aca5ab6a6ba4f8494bc5147e3c2b/Jellyfin.Api/Controllers/UserController.cs
+  Source: https://raw.githubusercontent.com/jellyfin/jellyfin/0beb07c40756aca5ab6a6ba4f8494bc5147e3c2b/Jellyfin.Api/Controllers/StartupController.cs
+
+.NOTES
+  Environment variables:
+    NUCLEUS_HOST  Host identifier for context-aware operations.
+
+  Exit codes:
+    This module does not emit exit codes.
+#>
 function Sync-JellyfinAccount {
   <#
   .SYNOPSIS
@@ -59,6 +69,13 @@ function Sync-JellyfinAccount {
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
       -PrimarySshKeyPath 'C:\Users\admin\.ssh\ssh_personal_admin' `
       -SopsExe 'C:\Users\admin\AppData\Local\Microsoft\WinGet\Packages\SecretsOPerationS.SOPS_...\sops.exe'
+
+  .NOTES
+    Environment variables:
+      (none)    No environment variables used.
+
+    Exit codes:
+      0 on success; 1 on error.
   #>
   [CmdletBinding()]
   param(

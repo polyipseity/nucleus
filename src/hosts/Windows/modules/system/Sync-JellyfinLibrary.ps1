@@ -1,17 +1,27 @@
-# Sync-JellyfinLibrary.ps1 — Converge Jellyfin library folders from users.json declarations.
-#
-# Reads per-user jellyfin.libraries declarations, resolves ~ paths against
-# each user's homeDirectory, resolves account credentials from per-user SOPS
-# secrets, merges specs by name (first writer wins), and applies them via the
-# Jellyfin HTTP API.  Runs after Sync-JellyfinAccount so accounts exist before
-# library provisioning attempts authentication.
-#
-# API behavior source (upstream Jellyfin):
-# - GET /Library/VirtualFolders
-# - POST /Library/VirtualFolders?name=X&collectionType=Y
-# - POST /Library/VirtualFolders/LibraryOptions
-# Source: https://raw.githubusercontent.com/jellyfin/jellyfin/0beb07c40756aca5ab6a6ba4f8494bc5147e3c2b/Jellyfin.Api/Controllers/LibraryController.cs
+<#
+.SYNOPSIS
+  Converge Jellyfin library folders from users.json declarations.
 
+.DESCRIPTION
+  Reads per-user jellyfin.libraries declarations, resolves ~ paths against
+  each user's homeDirectory, resolves account credentials from per-user SOPS
+  secrets, merges specs by name (first writer wins), and applies them via the
+  Jellyfin HTTP API.  Runs after Sync-JellyfinAccount so accounts exist before
+  library provisioning attempts authentication.
+
+  API behavior source (upstream Jellyfin):
+  - GET /Library/VirtualFolders
+  - POST /Library/VirtualFolders?name=X&collectionType=Y
+  - POST /Library/VirtualFolders/LibraryOptions
+  Source: https://raw.githubusercontent.com/jellyfin/jellyfin/0beb07c40756aca5ab6a6ba4f8494bc5147e3c2b/Jellyfin.Api/Controllers/LibraryController.cs
+
+.NOTES
+  Environment variables:
+    NUCLEUS_HOST  Host identifier for context-aware operations.
+
+  Exit codes:
+    This module does not emit exit codes.
+#>
 function Sync-JellyfinLibrary {
   <#
   .SYNOPSIS
@@ -60,6 +70,13 @@ function Sync-JellyfinLibrary {
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
       -PrimarySshKeyPath 'C:\Users\admin\.ssh\ssh_personal_admin' `
       -SopsExe 'C:\Users\admin\AppData\Local\Microsoft\WinGet\Packages\SecretsOPerationS.SOPS_...\sops.exe'
+
+  .NOTES
+    Environment variables:
+      (none)    No environment variables used.
+
+    Exit codes:
+      0 on success; 1 on error.
   #>
   [CmdletBinding()]
   param(

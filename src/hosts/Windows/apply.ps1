@@ -199,6 +199,20 @@
 .EXAMPLE
   # Apply while disabling managed remote-access parity (cleanup only):
   .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin', 'guest') -EnableRemoteAccessParity:$false
+
+.NOTES
+  Environment variables:
+    NUCLEUS_REPO   Path to the nucleus repository root (auto-detected from script path).
+    NUCLEUS_HOST   Must be set to "Windows" for apply behavior.
+    USERNAME       Current Windows username.
+    HOME           User home directory.
+    LOCALAPPDATA   Local application data path.
+    ProgramData    System-wide application data path.
+    ProgramFiles   System program files path.
+    USERPROFILE    User profile directory.
+
+  Exit codes:
+    0 on success; 1 on error.
 #>
 [CmdletBinding()]
 param(

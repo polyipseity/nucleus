@@ -1,8 +1,18 @@
-# modules/Windows/invoke-wingetconfiguration.ps1 — DSC apply wrapper.
-#
-# Applies WinGet DSC manifests with managed wallpaper-token replacement while
-# preserving source files untouched.
+<#
+.SYNOPSIS
+  DSC apply wrapper with wallpaper-token substitution.
 
+.DESCRIPTION
+  Applies WinGet DSC manifests with managed wallpaper-token replacement while
+  preserving source files untouched.
+
+.NOTES
+  Environment variables:
+    (none)    No environment variables used.
+
+  Exit codes:
+    This module does not emit exit codes.
+#>
 function Invoke-WingetConfiguration {
   <#
   .SYNOPSIS
@@ -33,6 +43,13 @@ function Invoke-WingetConfiguration {
 
   .EXAMPLE
     Invoke-WingetConfiguration -ConfigPath '.\user.dsc.yml' -WallpaperPath 'C:\Users\primary\Pictures\bg.png'
+
+  .NOTES
+    Environment variables:
+      (none)    No environment variables used.
+
+    Exit codes:
+      0 on success; 1 on error.
   #>
   param(
     [Parameter(Mandatory = $true)]

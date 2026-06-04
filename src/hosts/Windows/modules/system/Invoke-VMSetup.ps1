@@ -1,24 +1,67 @@
-# Invoke-VMSetup.ps1 — Build VM images (if needed) and provision VMs on Windows.
-#
-# Combines the former Invoke-VMBuild and Invoke-VMSetup into one module.
-# Phase 1 (build): builds pre-built QCOW2 images using Packer for each VM
-# declared in src\modules\VMs.json, if absent at
-# %USERPROFILE%\virtual machines\images\<name>.qcow2.  For NixOS guests on
-# Windows, Packer downloads the NixOS ISO automatically (src\vms\nixos\packer.pkr.hcl).
-# For Windows 11 guests, a local ISO is required (-WindowsIso).
-#
-# Phase 2 (provision): creates QEMU start scripts and places disk images for
-# each VM.  Disk images are copied from the built images, eliminating the manual
-# OS installation step previously required with empty disks.
-#
-# Called by scripts\vm-setup.ps1 (alias: nucleus-vm-setup).
-# Not invoked automatically during nucleus apply — run manually when setting
-# up a new machine or rebuilding VM images.
-#
-# Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
-#         https://www.qemu.org/docs/master/system/invocation.html
-#         https://github.com/pbatard/Fido
+<#
+.SYNOPSIS
+  Build VM images (if needed) and provision VMs on Windows.
+
+.DESCRIPTION
+  Combines the former Invoke-VMBuild and Invoke-VMSetup into one module.
+  Phase 1 (build): builds pre-built QCOW2 images using Packer for each VM
+  declared in src\modules\VMs.json, if absent at
+  %USERPROFILE%\virtual machines\images\<name>.qcow2.  For NixOS guests on
+  Windows, Packer downloads the NixOS ISO automatically (src\vms\nixos\packer.pkr.hcl).
+  For Windows 11 guests, a local ISO is required (-WindowsIso).
+
+  Phase 2 (provision): creates QEMU start scripts and places disk images for
+  each VM.  Disk images are copied from the built images, eliminating the manual
+  OS installation step previously required with empty disks.
+
+  Called by scripts\vm-setup.ps1 (alias: nucleus-vm-setup).
+  Not invoked automatically during nucleus apply — run manually when setting
+  up a new machine or rebuilding VM images.
+
+  Source:
+  - https://developer.hashicorp.com/packer/plugins/builders/qemu
+  - https://www.qemu.org/docs/master/system/invocation.html
+  - https://github.com/pbatard/Fido
+
+.NOTES
+  Environment variables:
+    NUCLEUS_HOST                Host identifier for VM selection.
+    NUCLEUS_VM_SECRET_OWNER     SOPS identity for VM guest secrets.
+    USERNAME                    Current user for secret resolution.
+    VM_DIR_OVERRIDE             Optional override for VM storage directory.
+    PROCESSOR_ARCHITECTURE      Used for WHPX auto-detection.
+
+  Exit codes:
+    This module does not emit exit codes.
+#>
 function Wait-GuestReady {
+  <#
+  .SYNOPSIS
+    Wait for a QEMU guest to become ready via the guest agent.
+
+  .DESCRIPTION
+    Polls the QEMU Guest Agent named pipe (qga-<VmName>) with guest-ping
+    commands until the guest responds or the timeout expires.
+
+  .PARAMETER VmName
+    Name of the VM whose guest agent pipe to poll.
+
+  .PARAMETER TimeoutSeconds
+    Maximum seconds to wait before returning $false. Defaults to 150.
+
+  .OUTPUTS
+    System.Boolean.  $true if the guest responded, $false on timeout.
+
+  .EXAMPLE
+    Wait-GuestReady -VmName 'nixos-vm' -TimeoutSeconds 120
+
+  .NOTES
+    Environment variables:
+      (none)    No environment variables used.
+
+    Exit codes:
+      This function does not emit exit codes.
+  #>
     [CmdletBinding()]
     [OutputType([bool])]
     param(
@@ -49,6 +92,68 @@ function Wait-GuestReady {
 }
 
 function Invoke-VMSetup {
+  <#
+  .SYNOPSIS
+    Build VM disk images and provision VMs on Windows.
+
+  .DESCRIPTION
+    Orchestrates VM lifecycle: builds pre-built QCOW2 images using Packer
+    (Phase 1) and creates QEMU start scripts with disk images (Phase 2).
+    Supports NixOS, Windows 11, and macOS guest types.
+
+  .PARAMETER RepoRoot
+    Absolute path to the repository root.
+
+  .PARAMETER WindowsIso
+    Path to the Windows 11 ISO. Optional when windowsIsoUrl is set in VMs.json;
+    the URL is used to auto-download the installer on first run.
+
+  .PARAMETER NixosOnly
+    Build and provision only the NixOS guest.
+
+  .PARAMETER WindowsOnly
+    Build and provision only the Windows 11 guest.
+
+  .PARAMETER WindowsIsoSource
+    Windows installer ISO resolution strategy. Auto: windowsIsoUrl cache/download
+    first, then Fido fallback. Url: use only -WindowsIso or windowsIsoUrl (no
+    downloader fallback). Fido: use only local cache/Fido when -WindowsIso is omitted.
+
+  .PARAMETER WindowsIsoRetries
+    Retry attempts for Windows ISO network downloads.
+
+  .PARAMETER Accelerator
+    QEMU accelerator for image builds. Defaults to tcg (always works).
+    When tcg is used, auto-detects WHPX (Windows Hypervisor Platform) and
+    upgrades to whpx automatically if enabled.
+
+  .PARAMETER Headful
+    Run guest image builds headful (headless=false) for interactive debugging
+    of installer issues.
+
+  .PARAMETER DryRun
+    Print planned actions without modifying any state.
+
+  .EXAMPLE
+    Invoke-VMSetup -RepoRoot 'C:\Users\admin\nucleus'
+
+  .EXAMPLE
+    Invoke-VMSetup -RepoRoot 'C:\Users\admin\nucleus' -NixosOnly -Headful
+
+  .EXAMPLE
+    Invoke-VMSetup -RepoRoot 'C:\Users\admin\nucleus' -WindowsOnly -WindowsIso 'C:\ISOs\Win11_23H2.iso'
+
+  .NOTES
+    Environment variables:
+      NUCLEUS_HOST                Host identifier for VM selection.
+      NUCLEUS_VM_SECRET_OWNER     SOPS identity for VM guest secrets.
+      USERNAME                    Current user for secret resolution.
+      VM_DIR_OVERRIDE             Optional override for VM storage directory.
+      PROCESSOR_ARCHITECTURE      Used for WHPX auto-detection.
+
+    Exit codes:
+      This function does not emit exit codes.
+  #>
     [CmdletBinding()]
     param(
         # Absolute path to the repository root.

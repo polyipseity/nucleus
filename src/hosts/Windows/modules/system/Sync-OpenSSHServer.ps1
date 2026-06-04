@@ -1,7 +1,17 @@
-# modules/Windows/remote-access.ps1 — Remote-access parity helpers for Windows.
-#
-# Applies SSH-server remote access posture with explicit managed cleanup path.
+<#
+.SYNOPSIS
+  Remote-access parity helpers for Windows.
 
+.DESCRIPTION
+  Applies SSH-server remote access posture with explicit managed cleanup path.
+
+.NOTES
+  Environment variables:
+    (none)    No environment variables used.
+
+  Exit codes:
+    This module does not emit exit codes.
+#>
 function Sync-OpenSSHServer {
   <#
   .SYNOPSIS
@@ -39,6 +49,13 @@ function Sync-OpenSSHServer {
 
   .EXAMPLE
     Sync-OpenSSHServer -Enabled:$false
+
+  .NOTES
+    Environment variables:
+      (none)    No environment variables used.
+
+    Exit codes:
+      0 on success; 1 on error.
   #>
   param(
     [Parameter()]

@@ -1,8 +1,18 @@
-# modules/Windows/rdp.ps1 — Windows built-in Remote Desktop Protocol parity helpers.
-#
-# Manages TermService startup, firewall access, and cleanup with an explicit
-# deconfiguration path when disabled.
+<#
+.SYNOPSIS
+  Windows built-in Remote Desktop Protocol parity helpers.
 
+.DESCRIPTION
+  Manages TermService startup, firewall access, and cleanup with an explicit
+  deconfiguration path when disabled.
+
+.NOTES
+  Environment variables:
+    (none)    No environment variables used.
+
+  Exit codes:
+    This module does not emit exit codes.
+#>
 function Sync-WindowsRDP {
   <#
   .SYNOPSIS
@@ -36,6 +46,13 @@ function Sync-WindowsRDP {
 
   .EXAMPLE
     Sync-WindowsRDP -Enabled:$false
+
+  .NOTES
+    Environment variables:
+      (none)    No environment variables used.
+
+    Exit codes:
+      0 on success; 1 on error.
   #>
   param(
     [Parameter(Mandatory)]

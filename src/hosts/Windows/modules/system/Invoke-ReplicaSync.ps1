@@ -20,6 +20,20 @@
 
 .PARAMETER ReplicaId
   Optional replica id filter; when provided only the matching replica runs.
+
+.EXAMPLE
+  Invoke-ReplicaSync -RepoRoot 'C:\Users\admin\nucleus' -DryRun
+
+.EXAMPLE
+  Invoke-ReplicaSync -RepoRoot 'C:\Users\admin\nucleus' -ReplicaId 'photos'
+
+.NOTES
+  Environment variables:
+    NUCLEUS_HOST  Host identifier used for host-matching logic.
+    USERNAME      Current username for principal resolution.
+
+  Exit codes:
+    0 on success; 1 on error.
 #>
 
 function Invoke-ReplicaSync {
