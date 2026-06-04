@@ -198,19 +198,19 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 
 ### Build strategies
 
-**NixOS guest on macOS/NixOS** (`nucleus-vm-setup --nixos-only`):
+**NixOS guest on macOS/NixOS**:
 
 - Uses `nix run github:nix-community/nixos-generators` to build from `src/vms/nixos/guest.nix`.
 - Architecture-aware: `qcow-efi` (UEFI) on aarch64 hosts (UTM on Apple Silicon), `qcow` (BIOS) on x86_64.
 - No Packer required; just `nix` command which is always present.
 
-**NixOS guest on Windows** (`nucleus-vm-setup --nixos-only`):
+**NixOS guest on Windows**:
 
 - Uses Packer with `src/vms/nixos/packer.pkr.hcl` and QEMU builder.
 - Downloads NixOS minimal ISO, boots via QEMU, sets root password, SSH-installs NixOS.
 - `whpx` accelerator strongly recommended (Windows Hypervisor Platform); `tcg` works but is very slow.
 
-**Windows 11 guest (all hosts)** (`nucleus-vm-setup --windows-only --windows-iso /path/to/Win11.iso`):
+**Windows 11 guest (all hosts)** (`nucleus-vm-setup --windows-iso /path/to/Win11.iso`):
 
 - Uses Packer with `src/vms/windows/packer.pkr.hcl` and QEMU builder.
 - Requires a Windows 11 ISO path via `--windows-iso` **or** a `windowsIsoUrl` field in the `VMs.json`

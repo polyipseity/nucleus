@@ -84,7 +84,7 @@ function Invoke-VMSetup {
 
         # Run Windows image builds headful (headless=false) for interactive
         # debugging of installer issues.
-        [switch]$DebugHeadful,
+        [switch]$Headful,
 
         # Print planned actions without modifying any state.
         [switch]$DryRun
@@ -363,7 +363,7 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
                     -Accelerator $Accelerator `
                         -GuestAccountName $guestUsername -GuestSecret $guestPassword `
                         -GuestSecretHash $guestSecretHash `
-                    -DebugHeadful:$DebugHeadful `
+                    -Headful:$Headful `
                     -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
             }
             'macOS' {
@@ -866,7 +866,7 @@ function Invoke-BuildWindowsImage {
         [string]$GuestAccountName,
         [string]$GuestSecret,
         [string]$GuestSecretHash,
-        [switch]$DebugHeadful,
+        [switch]$Headful,
         [switch]$DryRun
     )
 
@@ -1024,9 +1024,9 @@ function Invoke-BuildWindowsImage {
 
     # WHY: Packer HCL bool vars are easiest to pass as explicit true/false
     # strings from wrapper scripts for cross-shell consistency.
-    $packerHeadless = if ($DebugHeadful) { 'false' } else { 'true' }
+    $packerHeadless = if ($Headful) { 'false' } else { 'true' }
     $packerDisplayBackend = ''
-    if ($DebugHeadful) {
+    if ($Headful) {
         # WHY: Packer defaults to gtk for headful builds, but not every QEMU
         # package includes gtk support. Select from backends QEMU advertises.
         try {
@@ -1051,7 +1051,7 @@ function Invoke-BuildWindowsImage {
 
     Write-Information "vm-setup: building Windows 11 image (disk=${DiskGib} GiB, accelerator=$Accelerator)..."
     Write-Information 'vm-setup: this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
-    if ($DebugHeadful) {
+    if ($Headful) {
         Write-Information 'vm-setup: debug mode enabled; running Windows Packer build headful (headless=false)'
         Write-Information "vm-setup: using QEMU display backend for debug run: $packerDisplayBackend"
     }
@@ -1060,13 +1060,13 @@ function Invoke-BuildWindowsImage {
         Write-Information "vm-setup: [dry-run] Remove stale temporary output directory if present: $tmpOutput"
         foreach ($attempt in $buildAttempts) {
             if ($attempt.Firmware -eq 'efi') {
-                if ($DebugHeadful) {
+                if ($Headful) {
                     Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
                 } else {
                     Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
                 }
             } else {
-                if ($DebugHeadful) {
+                if ($Headful) {
                     Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
                 } else {
                     Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
@@ -1119,7 +1119,7 @@ function Invoke-BuildWindowsImage {
                 '-var', "output_directory=$tmpOutput",
                 '.'
             )
-            if ($DebugHeadful) {
+            if ($Headful) {
                 $packerArgs = @(
                     '-var', "windows_iso=$WindowsIso",
                     '-var', "guest_username=$GuestAccountName",
@@ -1153,7 +1153,7 @@ function Invoke-BuildWindowsImage {
                     '-var', "output_directory=$tmpOutput",
                     '.'
                 )
-                if ($DebugHeadful) {
+                if ($Headful) {
                     $packerArgs = @(
                         '-var', "windows_iso=$WindowsIso",
                         '-var', "guest_username=$GuestAccountName",

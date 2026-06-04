@@ -8,8 +8,8 @@
 # src\hosts\Windows\modules\system\Invoke-VMSetup.ps1.
 #
 # Usage:
-#   .\scripts\vm-setup.ps1 [-WindowsIso PATH] [-WindowsIsoSource Auto|Url|Fido] [-NixosOnly] [-WindowsOnly]
-#                          [-Accelerator TYPE] [-DebugHeadful] [-DryRun]
+#   .\scripts\vm-setup.ps1 [-WindowsIso PATH] [-WindowsIsoSource Auto|Url|Fido]
+#                          [-Accelerator TYPE] [-Headful] [-NoHeadful] [-DryRun]
 #
 # Or via the shell alias:
 #   nucleus-vm-setup [same parameters]
@@ -20,12 +20,6 @@ param(
     # Path to Windows 11 ISO. Optional when windowsIsoUrl is set in VMs.json (default: '').
     # Download from: https://www.microsoft.com/software-download/windows11
     [string]$WindowsIso = $(if ($env:NUCLEUS_VM_WINDOWS_ISO) { $env:NUCLEUS_VM_WINDOWS_ISO } else { '' }),
-
-    # Build and provision only the NixOS guest (default: $false).
-    [switch]$NixosOnly = { $env:NUCLEUS_VM_NIXOS_ONLY -eq 'true' }.Invoke(),
-
-    # Build and provision only the Windows 11 guest (default: $false).
-    [switch]$WindowsOnly = { $env:NUCLEUS_VM_WINDOWS_ONLY -eq 'true' }.Invoke(),
 
     # Windows installer ISO resolution strategy.
     # Auto: windowsIsoUrl cache/download first, then Fido fallback.
@@ -51,7 +45,10 @@ param(
     [switch]$DryRun = $(if ($env:NUCLEUS_DRY_RUN -eq 'true') { $true } else { $false }),
 
     [Alias("h")]
-    [switch]$Help
+    [switch]$Headful = { $env:NUCLEUS_VM_HEADFUL -eq 'true' }.Invoke(),
+
+    # Run Windows image builds headless (default: $true).
+    [switch]$NoHeadful
 )
 
 $ErrorActionPreference = 'Stop'
@@ -74,11 +71,10 @@ if (-not (Test-Path $module)) {
 
 $invokeArgs = @{ RepoRoot = $repoRoot; DryRun = $DryRun }
 if ($WindowsIso)  { $invokeArgs['WindowsIso']  = $WindowsIso }
-if ($NixosOnly)   { $invokeArgs['NixosOnly']   = $true }
-if ($WindowsOnly) { $invokeArgs['WindowsOnly'] = $true }
 if ($WindowsIsoSource) { $invokeArgs['WindowsIsoSource'] = $WindowsIsoSource }
 if ($PSBoundParameters.ContainsKey('WindowsIsoRetries')) { $invokeArgs['WindowsIsoRetries'] = $WindowsIsoRetries }
 if ($Accelerator) { $invokeArgs['Accelerator'] = $Accelerator }
-if ($DebugHeadful) { $invokeArgs['DebugHeadful'] = $true }
+if ($Headful) { $invokeArgs['Headful'] = $true }
+if ($NoHeadful) { $invokeArgs['Headful'] = $false }
 
 Invoke-VMSetup @invokeArgs

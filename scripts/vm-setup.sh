@@ -11,8 +11,6 @@
 #
 # Options:
 #   --dry-run              Print planned actions without executing (default: off).
-#   --nixos-only           Build and provision only the NixOS guest (default: off).
-#   --windows-only         Build and provision only the Windows 11 guest (default: off).
 #   --windows-iso PATH     Path to the Windows 11 ISO (required for Windows
 #                          guest builds). Download from:
 #                          https://www.microsoft.com/software-download/windows11
@@ -20,8 +18,9 @@
 #                          --windows-iso is omitted: auto|url|fido (default: auto).
 #   --windows-iso-retries N Retry attempts for Windows ISO network downloads
 #                          (default: 0, which means a single attempt).
-#   --debug-headful        Run Windows Packer QEMU builds with a visible GUI
+#   --headful              Run Windows Packer QEMU builds with a visible GUI
 #                          window (headless=false) for interactive debugging (default: off).
+#   --no-headful           Run Windows Packer QEMU builds headless (default: on).
 #   --accelerator TYPE     QEMU accelerator for image builds (hvf/kvm/tcg).
 #                          Defaults: hvf on macOS, kvm on Linux (auto).
 #                          Windows defaults to tcg with WHPX auto-upgrade.
@@ -83,8 +82,6 @@ VMS_DIR="$REPO_ROOT/src/vms"
 TEMPLATES_DIR="$VMS_DIR/templates"
 
 dry_run=false
-nixos_only=false
-windows_only=false
 windows_iso=''
 windows_iso_source='auto'
 windows_iso_retries='0'
@@ -97,14 +94,11 @@ usage() {
   --dry-run                  Print planned actions without executing (default: off).
   --mido-patch-file PATH     Override runtime patch file path (default: src/vms/windows/patches/mido-iso-link.patch).
   --mido-script PATH         Override the Mido script path (default: vendored script).
-  --nixos-only               Build and provision only the NixOS guest (default: off).
-  --windows-only             Build and provision only the Windows guest (default: off).
   --windows-iso PATH         Path to the Windows 11 ISO.
   --windows-iso-source S     ISO auto-resolution: auto|url|fido (default: auto).
   --windows-iso-retries N    Retry attempts for network downloads (default: 0).
-  --debug-headful            Show QEMU GUI window during Windows builds (default: off).
-  --accelerator TYPE         QEMU accelerator (hvf/kvm/tcg) (default: auto).
-  --repo-root PATH           Override the detected repository root path.
+  --headful                  Show QEMU GUI window during Windows builds (default: off).
+  --no-headful               Run Windows builds headless (default: on
   --vm-dir-override PATH     Override the default ~/virtual machines path.
 EOF
 }
@@ -118,12 +112,11 @@ while [ "$#" -gt 0 ]; do
     --dry-run)      dry_run=true ;;
     --mido-patch-file)    NUCLEUS_MIDO_PATCH_FILE="$2"; shift ;;
     --mido-script)        NUCLEUS_MIDO_SCRIPT="$2"; shift ;;
-    --nixos-only)   nixos_only=true ;;
-    --windows-only) windows_only=true ;;
     --windows-iso)  windows_iso="$2"; shift ;;
     --windows-iso-source) windows_iso_source="$2"; shift ;;
     --windows-iso-retries) windows_iso_retries="$2"; shift ;;
-    --debug-headful) windows_headless='false' ;;
+    --headful)      windows_headless='false' ;;
+    --no-headful)   windows_headless='true' ;;
     --repo-root)    REPO_ROOT="$2"; shift ;;
     --vm-dir-override)    VM_DIR_OVERRIDE="$2"; shift ;;
     --accelerator)  accelerator="$2"; shift ;;
@@ -390,18 +383,6 @@ ensure_tart_vm_dir() {
 
   ln -s "$_etd_target" "$_etd_default"
   printf 'vm-setup: linked tart storage: %s -> %s\n' "$_etd_default" "$_etd_target"
-}
-
-# should_include TYPE — returns 0 if a VM of the given type should be processed.
-should_include() {
-  _type="$1"
-  if [ "$nixos_only" = true ] && [ "$_type" != "NixOS" ]; then
-    return 1
-  fi
-  if [ "$windows_only" = true ] && [ "$_type" != "Windows" ]; then
-    return 1
-  fi
-  return 0
 }
 
 # should_include_host HOSTS_JSON — returns 0 if the VM should run on the
@@ -1559,38 +1540,36 @@ build_images() {
       continue
     fi
 
-    if should_include "$_vm_type"; then
-      case "$_vm_type" in
-        NixOS)
-          # WHY: best-effort — a prerequisite-missing or build failure for one
-          # VM type must not abort builds for the remaining VMs; the build
-          # function prints a specific error before returning non-zero.
-          build_nixos_image "$_vm_name" "$_vm_disk_gib" \
-            || printf 'vm-setup: NixOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
-          ;;
-        Windows)
-          _vm_edition="$(jq -r ".VMs[$_i].windowsEdition // \"Pro\"" "$MANIFEST")"
-          # WHY: best-effort — see NixOS branch above.
-          build_windows_image "$_vm_name" "$_vm_disk_gib" "$_vm_edition" \
-            || printf 'vm-setup: Windows image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
-          ;;
-        macOS)
-          _vm_macos_ver="$(jq -r ".VMs[$_i].macOSVersion // \"tahoe\"" "$MANIFEST")"
-          _vm_ram_bytes="$(jq -r ".VMs[$_i].ramBytes" "$MANIFEST")"
-          # Convert SI bytes to nearest binary MiB for hypervisor tools.
-          # Uses (n + 2^19) / 2^20 for round-half-up in POSIX integer arithmetic.
-          _vm_ram_mib="$(( (_vm_ram_bytes + 524288) / 1048576 ))"
-          _vm_cpus="$(jq -r ".VMs[$_i].cpus" "$MANIFEST")"
-          # WHY: best-effort — see NixOS branch above.
-          build_macos_image "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver" \
-            || printf 'vm-setup: macOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
-          ;;
-        *)
-          printf 'vm-setup: skipping build for "%s" (unsupported type: %s)\n' \
-            "$_vm_name" "$_vm_type"
-          ;;
-      esac
-    fi
+    case "$_vm_type" in
+      NixOS)
+        # WHY: best-effort — a prerequisite-missing or build failure for one
+        # VM type must not abort builds for the remaining VMs; the build
+        # function prints a specific error before returning non-zero.
+        build_nixos_image "$_vm_name" "$_vm_disk_gib" \
+          || printf 'vm-setup: NixOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
+        ;;
+      Windows)
+        _vm_edition="$(jq -r ".VMs[$_i].windowsEdition // \"Pro\"" "$MANIFEST")"
+        # WHY: best-effort — see NixOS branch above.
+        build_windows_image "$_vm_name" "$_vm_disk_gib" "$_vm_edition" \
+          || printf 'vm-setup: Windows image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
+        ;;
+      macOS)
+        _vm_macos_ver="$(jq -r ".VMs[$_i].macOSVersion // \"tahoe\"" "$MANIFEST")"
+        _vm_ram_bytes="$(jq -r ".VMs[$_i].ramBytes" "$MANIFEST")"
+        # Convert SI bytes to nearest binary MiB for hypervisor tools.
+        # Uses (n + 2^19) / 2^20 for round-half-up in POSIX integer arithmetic.
+        _vm_ram_mib="$(( (_vm_ram_bytes + 524288) / 1048576 ))"
+        _vm_cpus="$(jq -r ".VMs[$_i].cpus" "$MANIFEST")"
+        # WHY: best-effort — see NixOS branch above.
+        build_macos_image "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver" \
+          || printf 'vm-setup: macOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
+        ;;
+      *)
+        printf 'vm-setup: skipping build for "%s" (unsupported type: %s)\n' \
+          "$_vm_name" "$_vm_type"
+        ;;
+    esac
 
     _i=$((_i + 1))
   done
@@ -1639,7 +1618,7 @@ setup_tart_vms() {
       continue
     fi
 
-    if [ "$vm_type" != "macOS" ] || ! should_include "$vm_type"; then
+    if [ "$vm_type" != "macOS" ]; then
       i=$((i + 1))
       continue
     fi
@@ -1745,11 +1724,6 @@ setup_utm_vms() {
     vm_hosts=$(jq -c ".VMs[$i].hosts" "$MANIFEST")
     if ! should_include_host "$vm_hosts"; then
       printf 'vm-setup: VM "%s" is not available on host "%s" (hosts: %s); skipping\n' "$vm_name" "$NUCLEUS_HOST" "$vm_hosts"
-      i=$((i + 1))
-      continue
-    fi
-
-    if ! should_include "$vm_type"; then
       i=$((i + 1))
       continue
     fi
@@ -1982,11 +1956,6 @@ setup_libvirt_vms() {
     vm_hosts=$(jq -c ".VMs[$i].hosts" "$MANIFEST")
     if ! should_include_host "$vm_hosts"; then
       printf 'vm-setup: VM "%s" is not available on host "%s" (hosts: %s); skipping\n' "$vm_name" "$NUCLEUS_HOST" "$vm_hosts"
-      i=$((i + 1))
-      continue
-    fi
-
-    if ! should_include "$vm_type"; then
       i=$((i + 1))
       continue
     fi
