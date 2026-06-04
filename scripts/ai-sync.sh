@@ -14,14 +14,13 @@ set -euo pipefail
 # Arguments:
 #   --dry-run                            print planned actions without executing them (default: off)
 #   --prune-only                         skip pulls; only remove unlisted models (default: off)
-#   --repo-root <path>                   override the detected repository root path
-#   --server-ready-timeout-seconds N     bounded wait for server readiness (default: 60)
-#   --server-ready-poll-seconds N        poll interval while waiting (default: 2)
 #
 # Environment variables:
-#   OLLAMA_PROFILE  override profile selection (MacBook|NixOS|Windows); detected
-#                   automatically when unset (Darwin → MacBook, Linux → NixOS)
-#   OLLAMA_HOST     Ollama server address; defaults to 127.0.0.1:11434
+#   NUCLEUS_AI_SYNC_TIMEOUT  bounded wait for server readiness (default: 60); set to 0 to disable
+#   NUCLEUS_AI_SYNC_POLL     poll interval while waiting (default: 2)
+#   OLLAMA_PROFILE           override profile selection (MacBook|NixOS|Windows); detected
+#                            automatically when unset (Darwin → MacBook, Linux → NixOS)
+#   OLLAMA_HOST              Ollama server address; defaults to 127.0.0.1:11434
 #
 # Exit conditions:
 #   0 on success or when ollama is unavailable (benign skip).
@@ -41,8 +40,8 @@ MANIFEST="$REPO_ROOT/src/modules/ai/models.json"
 
 dry_run=false
 prune_only=false
-ready_timeout_seconds=60
-ready_poll_seconds=2
+ready_timeout_seconds="${NUCLEUS_AI_SYNC_TIMEOUT:-60}"
+ready_poll_seconds="${NUCLEUS_AI_SYNC_POLL:-2}"
 
 usage() {
   usage_std "$(basename "$0")" "[options]"
@@ -51,10 +50,6 @@ usage() {
   --ollama-host <address>            Ollama server address (default: 127.0.0.1:11434).
   --ollama-profile <name>            Override profile selection (MacBook|NixOS|Windows) (default: auto-detect).
   --prune-only                       Skip pulls; only remove unlisted models (default: off).
-  --repo-root <path>                 Override the detected repository root path.
-  --server-ready-timeout-seconds N   Bounded wait for server readiness (default: 60).
-                                     Set to 0 to disable waiting.
-  --server-ready-poll-seconds N      Poll interval while waiting (default: 2).
 EOF
 }
 
@@ -77,26 +72,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --prune-only)
       prune_only=true
-      ;;
-    --repo-root)
-      REPO_ROOT="$2"
-      shift
-      ;;
-    --server-ready-timeout-seconds)
-      if [ -z "${2-}" ] || ! [ "$2" -eq "$2" ] 2>/dev/null || [ "$2" -lt 0 ]; then
-        printf '%s\n' "ai-sync: --server-ready-timeout-seconds requires a non-negative integer" >&2
-        exit 1
-      fi
-      ready_timeout_seconds="$2"
-      shift
-      ;;
-    --server-ready-poll-seconds)
-      if [ -z "${2-}" ] || ! [ "$2" -eq "$2" ] 2>/dev/null || [ "$2" -le 0 ]; then
-        printf '%s\n' "ai-sync: --server-ready-poll-seconds requires a positive integer" >&2
-        exit 1
-      fi
-      ready_poll_seconds="$2"
-      shift
       ;;
     *)
       printf '%s\n' "ai-sync: unsupported argument '$1'" >&2

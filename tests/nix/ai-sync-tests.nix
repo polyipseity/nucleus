@@ -14,11 +14,11 @@ let
 in
 assert containsRegex "pkgs.jq" flakeText;
 assert containsRegex "pkgs.litellm" coreText;
-assert containsRegex "server-ready-timeout-seconds" aiSyncText;
+assert containsRegex "NUCLEUS_AI_SYNC_TIMEOUT" aiSyncText;
 assert containsRegex "waiting up to" aiSyncText;
 assert containsRegex "dry_run=false" aiSyncText;
 assert containsRegex "prune_only=false" aiSyncText;
-assert containsRegex "server-ready-timeout-seconds 0" gcText;
+assert containsRegex "NUCLEUS_AI_SYNC_TIMEOUT=0" gcText;
 # LiteLLM gateway assertions
 assert containsRegex "litellm" coreText;
 assert containsRegex "OPENROUTER_API_KEY" litellmConfigText;

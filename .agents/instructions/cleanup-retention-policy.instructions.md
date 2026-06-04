@@ -28,9 +28,9 @@ applyTo: "src/**/*.nix, scripts/gc.*, src/hosts/Windows/**/*.yml"
 | **5 seconds**      | VS Code extensions DB SQLite lock timeout                               | `src/modules/editors.nix`                                   | `sqlite3.connect(timeout=5)`                                                   |
 | **30 seconds**     | Picard network transfer timeout                                         | `src/modules/configs/picard/Picard.ini`                     | `network_transfer_timeout_seconds=30`                                          |
 | **150 seconds**    | VM setup network wait timeout                                           | `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1`       | `$TimeoutSeconds = 150`                                                        |
-| **60 seconds**     | Ollama server readiness wait                                            | `scripts/ai-sync.sh`                                        | `--server-ready-timeout-seconds 60`                                            |
-| **0 seconds**      | Ollama readiness wait during GC                                         | `scripts/gc.sh`                                             | `--server-ready-timeout-seconds 0`                                             |
-| **2 seconds**      | Ollama readiness poll interval                                          | `scripts/ai-sync.sh`                                        | `--server-ready-poll-seconds 2`                                                |
+| **60 seconds**     | Ollama server readiness wait                                            | `scripts/ai-sync.sh`                                        | `NUCLEUS_AI_SYNC_TIMEOUT=60`                                                   |
+| **0 seconds**      | Ollama readiness wait during GC                                         | `scripts/gc.sh`                                             | `NUCLEUS_AI_SYNC_TIMEOUT=0`                                                    |
+| **2 seconds**      | Ollama readiness poll interval                                          | `scripts/ai-sync.sh`                                        | `NUCLEUS_AI_SYNC_POLL=2`                                                       |
 
 ## Scheduled Timer Frequencies
 

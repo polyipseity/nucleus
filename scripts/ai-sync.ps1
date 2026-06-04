@@ -16,13 +16,6 @@
 .PARAMETER PruneOnly
   Skip model pulls; only remove local models absent from the manifest (default: $false).
 
-.PARAMETER ServerReadyTimeoutSeconds
-  Bounded wait time for the Ollama server to become responsive before sync
-  exits with a benign skip. Use 0 to disable waiting (default: 60).
-
-.PARAMETER ServerReadyPollSeconds
-  Poll interval while waiting for server readiness (default: 2).
-
 
 .EXAMPLE
   .\scripts\ai-sync.ps1
@@ -32,21 +25,16 @@
 
 .EXAMPLE
   .\scripts\ai-sync.ps1 -PruneOnly
-
-.EXAMPLE
-  .\scripts\ai-sync.ps1 -ServerReadyTimeoutSeconds 60
 #>
 [CmdletBinding()]
 param(
   [switch]$DryRun = $(if ($env:NUCLEUS_DRY_RUN -eq 'true') { $true } else { $false }),
-  [switch]$PruneOnly = { $env:NUCLEUS_AI_SYNC_PRUNE_ONLY -eq 'true' }.Invoke(),
-  [int]$ServerReadyTimeoutSeconds = $(if ($env:NUCLEUS_AI_SYNC_TIMEOUT) { [int]$env:NUCLEUS_AI_SYNC_TIMEOUT } else { 60 }),
-  [int]$ServerReadyPollSeconds = $(if ($env:NUCLEUS_AI_SYNC_POLL) { [int]$env:NUCLEUS_AI_SYNC_POLL } else { 2 })
+  [switch]$PruneOnly = { $env:NUCLEUS_AI_SYNC_PRUNE_ONLY -eq 'true' }.Invoke()
 )
 
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
+$repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path }
 $modulePath = Join-Path -Path $repoRoot -ChildPath 'src\hosts\Windows\modules\Invoke-AISync.ps1'
 
 if (-not (Test-Path -LiteralPath $modulePath)) {
@@ -55,4 +43,4 @@ if (-not (Test-Path -LiteralPath $modulePath)) {
 
 . $modulePath
 
-Invoke-AISync -RepoRoot $repoRoot -DryRun:$DryRun -PruneOnly:$PruneOnly -ServerReadyTimeoutSeconds $ServerReadyTimeoutSeconds -ServerReadyPollSeconds $ServerReadyPollSeconds
+Invoke-AISync -RepoRoot $repoRoot -DryRun:$DryRun -PruneOnly:$PruneOnly -ServerReadyTimeoutSeconds $(if ($env:NUCLEUS_AI_SYNC_TIMEOUT) { [int]$env:NUCLEUS_AI_SYNC_TIMEOUT } else { 60 }) -ServerReadyPollSeconds $(if ($env:NUCLEUS_AI_SYNC_POLL) { [int]$env:NUCLEUS_AI_SYNC_POLL } else { 2 })
