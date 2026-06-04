@@ -596,6 +596,10 @@ let
       name = "virtual machines";
       url = uriEncode "file://${config.home.homeDirectory}/virtual machines";
     }
+    {
+      name = "clouds";
+      url = uriEncode "file://${config.home.homeDirectory}/clouds";
+    }
   ];
 
   # Number of managed favorites; used to scope the sidebar-order comparison
