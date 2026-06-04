@@ -1,28 +1,27 @@
 #!/usr/bin/env bash
-# caddy-trust.sh — Trust Caddy's local CA for local TLS clients.
+# src/scripts/caddy-trust.sh — Trust Caddy's local CA for local TLS clients.
 #
-# This script trusts Caddy's locally-managed CA root certificate so that
-# `tls internal` reverse proxy targets are recognized without client-side
-# certificate warnings. It applies generally to every local reverse proxy
-# using the same Caddy PKI authority (not just Jellyfin).
+# Trusts Caddy's locally-managed CA root certificate so that `tls internal`
+# reverse proxy targets are recognized without client-side certificate
+# warnings. Applies generally to every local reverse proxy using the same
+# Caddy PKI authority.
 #
-# WHY a separate .sh file instead of inline shell in apply.sh:
-#   The function is needed by multiple call sites, each with a different
-#   privilege context (sudo on Darwin/NixOS system apply, user on
-#   standalone Home Manager).  Extracting it avoids duplication and allows
-#   independent shellcheck validation.
-#
-# Usage:
-#   src/scripts/caddy-trust.sh sudo|user
+# WHY a separate .sh file: needed by multiple call sites with different
+# privilege contexts (sudo on Darwin/NixOS, user on standalone Home Manager).
+# Extracting it avoids duplication and allows independent shellcheck
+# validation.
 #
 # Arguments:
-#   sudo — run `caddy trust` with sudo
-#   user — run `caddy trust` as the current user
+#   sudo          Run `caddy trust` with sudo.
+#   user          Run `caddy trust` as the current user.
 #
-# Exit codes:
-#   0 — CA trusted successfully
-#   1 — caddy not found in PATH
-#   2 — all 20 retry attempts exhausted
+# Environment variables:
+#   (none)        No environment variables used.
+#
+# Exit conditions:
+#   0 — CA trusted successfully.
+#   1 — caddy not found in PATH.
+#   2 — all 20 retry attempts exhausted.
 
 set -euo pipefail
 

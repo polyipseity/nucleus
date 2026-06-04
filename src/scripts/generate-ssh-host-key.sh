@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
-# src/scripts/generate-ssh-host-key.sh — Ensure /etc/ssh/ssh_host_ed25519_key exists
-# Exit: 0 success, 1 error
+# src/scripts/generate-ssh-host-key.sh — Ensure SSH host key exists before SOPS registration.
+#
+# Ensures /etc/ssh/ssh_host_ed25519_key exists so that
+# register-host-age-key.sh can derive the machine age public key from it.
+# On freshly provisioned machines the OS may not have generated host keys
+# yet; ssh-keygen -A creates all standard host key types.
+#
+# Arguments:
+#   (none)        No arguments accepted.
+#
+# Environment variables:
+#   (none)        No environment variables used.
+#
+# Exit conditions:
+#   0 on success; 1 on error.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"

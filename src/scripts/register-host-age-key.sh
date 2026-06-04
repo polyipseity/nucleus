@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
-# src/scripts/register-host-age-key.sh — Register machine age key in .sops.yaml
-# Exit: 0 success, 1 error
+# src/scripts/register-host-age-key.sh — Register machine age key in .sops.yaml for SOPS access.
+#
+# Derives this machine's age public key from its SSH host public key and
+# registers it in .sops.yaml as a new recipient, then rewraps every
+# SOPS-encrypted file so the machine can decrypt them on first apply.
+# Must run before Nix activation (darwin-rebuild / nixos-rebuild) because
+# deriveHostAgeKey writes /etc/sops/age/machine.txt only during activation.
+#
+# Arguments:
+#   --repo-root <path>  Override detected repository root (default: auto-detected via resolve_nucleus_root).
+#
+# Environment variables:
+#   NUCLEUS_REPO_ROOT  Override the detected repository root path (default: auto-detected).
+#
+# Exit conditions:
+#   0 on success; 1 on error.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"

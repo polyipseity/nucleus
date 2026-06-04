@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
 # src/scripts/apply.sh — Dispatch the Nix apply command for the current host.
 #
-# This is a thin orchestrator: OS detection, lifecycle ordering
-# (pre-apply checks → rebuild → post-apply provisioning), and
-# error-boundary handling. All heavy logic lives in dedicated sibling scripts
-# so each concern can be validated, tested, and reused independently.
+# Thin orchestrator: OS detection, lifecycle ordering (pre-apply checks →
+# rebuild → post-apply provisioning), and error-boundary handling. All heavy
+# logic lives in dedicated sibling scripts so each concern can be validated,
+# tested, and reused independently.
 #
 # Script location convention:
 #   scripts/        — Cross-platform scripts consumed as flake apps via
-#                     writeShellApplication (ai-sync, vm-setup) or as repo
-#                     script inputs (gc, replica-sync, and others).
+#                     writeShellApplication or as repo script inputs.
 #   src/scripts/    — Apply-only internal scripts executed by this dispatcher
-#                     only.  Resolved at runtime via $_ash_script_dir.
+#                     only. Resolved at runtime via $_ash_script_dir.
 #
 # Pre-apply lifecycle (order is significant):
 #   1. SSH host key generation             (generate-ssh-host-key.sh)
@@ -35,19 +34,19 @@
 #
 # For Darwin and NixOS, the script prompts for the sudo password once upfront
 # via `sudo -v`, then maintains the sudo session with a background keepalive
-# loop for the duration of the rebuild (which can take many minutes).
-# Standalone Linux (plain Linux / WSL) runs home-manager without sudo and
-# skips the keepalive entirely.
-#
-# After the main apply command succeeds, scripts/ai-sync.sh is called to
-# converge locally installed Ollama models with the declarative manifest.
-# Pass --no-ai-sync to suppress the model sync step — useful in CI or on
-# low-bandwidth connections where model pulls (2–20 GB each) are undesirable.
+# loop for the duration of the rebuild. Standalone Linux runs home-manager
+# without sudo and skips the keepalive entirely.
 #
 # Arguments:
-#   --ai-sync|--no-ai-sync    control the post-apply Ollama model sync step
-#   --replica-sync|--no-replica-sync  control the post-apply cloud replica sync step
-#   --vm-setup|--no-vm-setup  control the post-apply VM setup step
+#   --ai-sync|--no-ai-sync          Control post-apply Ollama model sync (default: --ai-sync).
+#   --replica-sync|--no-replica-sync  Control post-apply cloud replica sync (default: --replica-sync).
+#   --vm-setup|--no-vm-setup        Control post-apply VM setup (default: --vm-setup).
+#
+# Environment variables:
+#   (none)        Repository root discovered via resolve_nucleus_root().
+#
+# Exit conditions:
+#   0 on success; non-zero on failure.
 #   --target-user   select the Home Manager flake profile key on standalone
 #                   Linux hosts (ignored on Darwin and NixOS system rebuilds)
 #

@@ -1,35 +1,32 @@
 #!/usr/bin/env bash
-# jellyfin-sync.sh — Converge Jellyfin accounts and libraries declared in
-# src/modules/users.json with a running Jellyfin server.
+# src/scripts/jellyfin-sync.sh — Converge Jellyfin accounts and libraries with a running server.
 #
-# WHY a separate .sh file instead of inline Nix activationScript shell:
-#   This script performs runtime imperative convergence against a live REST API:
-#   SOPS decryption (needs host SSH keys at activation time), server readiness
-#   polling, token-based auth handshake, and diff-and-converge against Jellyfin's
-#   current state.  Nix's declarative, build-time model cannot express these
-#   operations; embedding 600+ lines of shell in a Nix indented string would harm
-#   readability, defeat independent testing, and duplicate the logic across hosts.
-#   The script stays invocable from apply.sh, darwin-rebuild (postActivation),
-#   and nixos-rebuild (activationScripts) with no per-host duplication.
+# Reads per-user jellyfin declarations from src/modules/users.json, resolves
+# credentials from SOPS secrets, and applies them to a running Jellyfin server
+# via its HTTP API. Invocable from apply.sh and Nix activation scripts (Darwin
+# postActivation, NixOS activationScripts) with no per-host duplication.
 #
-# Designed to be invoked from both apply.sh and Nix activation scripts (Darwin
-# postActivation, NixOS activationScripts).  The repo root is discovered via
-# resolve_nucleus_root (Hybrid Precedence: NUCLEUS_REPO_ROOT env var →
-# ~/.config/nucleus/repo-root → git rev-parse → ~/dev/nucleus).  Pass
-# --repo-root /path to override the env var for this invocation.
-#
-# Usage:
-#   src/scripts/jellyfin-sync.sh [options]
-#   src/scripts/jellyfin-sync.sh --help
-#   src/scripts/jellyfin-sync.sh --repo-root /path/to/repo --jellyfin-base-url http://127.0.0.1:8096
+# WHY a separate file: imperative runtime convergence against a live REST API
+# (SOPS decryption, server readiness polling, token auth, diff-and-converge)
+# cannot be expressed declaratively in Nix.
 #
 # Dependencies: curl, jq, sops.
 #
 # Upstream Jellyfin API sources:
-# - User endpoints (/Users/AuthenticateByName, /Users/New, /Users/Password):
-#   https://raw.githubusercontent.com/jellyfin/jellyfin/0beb07c40756aca5ab6a6ba4f8494bc5147e3c2b/Jellyfin.Api/Controllers/UserController.cs
-# - Startup bootstrap endpoints (/Startup/User, /Startup/Complete):
-#   https://raw.githubusercontent.com/jellyfin/jellyfin/0beb07c40756aca5ab6a6ba4f8494bc5147e3c2b/Jellyfin.Api/Controllers/StartupController.cs
+#   https://raw.githubusercontent.com/jellyfin/jellyfin/.../Jellyfin.Api/Controllers/UserController.cs
+#   https://raw.githubusercontent.com/jellyfin/jellyfin/.../Jellyfin.Api/Controllers/StartupController.cs
+#
+# Arguments:
+#   --repo-root <path>             Override detected repository root (default: auto-detected via resolve_nucleus_root).
+#   --jellyfin-base-url <url>      Jellyfin server base URL (default: http://127.0.0.1:8096).
+#   -h, --help                     Show this help message and exit.
+#
+# Environment variables:
+#   NUCLEUS_REPO_ROOT  Override the detected repository root path (default: auto-detected).
+#   JELLYFIN_BASE_URL  Jellyfin server base URL (default: http://127.0.0.1:8096).
+#
+# Exit conditions:
+#   0 on success; non-zero on failure.
 
 set -euo pipefail
 

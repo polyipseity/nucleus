@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
-# src/scripts/install-prek-hooks.sh — Install prek Git hooks for a repository
-# Exit: 0 success, 1 error
+# src/scripts/install-prek-hooks.sh — Install prek Git hooks for a repository.
+#
+# Installs repository-local Git hooks for repos that opt into prek via
+# prek.toml. mkApplyApp bundles pkgs.prek in runtimeInputs so first-run
+# `nix run .#apply` can install hooks without host-global PATH state.
+#
+# Arguments:
+#   --repo-root <path>  Override detected repository root (default: auto-detected via resolve_nucleus_root).
+#
+# Environment variables:
+#   NUCLEUS_REPO_ROOT  Override the detected repository root path (default: auto-detected).
+#
+# Exit conditions:
+#   0 on success (hooks installed or already present); 1 on error.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"

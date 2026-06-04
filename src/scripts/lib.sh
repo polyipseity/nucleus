@@ -5,9 +5,22 @@
 # src/scripts/ after setting SCRIPT_DIR so REPO_ROOT can be derived
 # automatically when needed.
 #
+# This file is a library meant to be sourced, not executed directly.
+# Provides shared functions (usage_std, resolve_nucleus_root) for other
+# scripts.
+#
 # Usage:
 #   SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 #   . "${SCRIPT_DIR}/../src/scripts/lib.sh"
+#
+# Arguments:
+#   (none)        This is a library; source it, do not execute.
+#
+# Environment variables:
+#   NUCLEUS_REPO_ROOT  Override the detected repository root path (default: auto-detected via resolve_nucleus_root).
+#
+# Exit conditions:
+#   N/A           This is a library; exit codes apply to the sourcing script.
 
 # usage_std — Emit standardized usage text and exit.
 #
