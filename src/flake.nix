@@ -308,11 +308,12 @@
           pkgs.writeShellApplication {
             name = "nucleus-check-sh";
             runtimeInputs = [
+              pkgs.bash
               pkgs.git
               pkgs.shellcheck
             ];
             text = ''
-              exec sh "${../scripts/check-sh.sh}" "$@"
+              exec bash "${../scripts/check-sh.sh}" "$@"
             '';
           }
         }/bin/nucleus-check-sh";
@@ -327,10 +328,11 @@
           pkgs.writeShellApplication {
             name = "nucleus-check-packer";
             runtimeInputs = [
+              pkgs.bash
               pkgs.packer
             ];
             text = ''
-              exec sh "${../scripts/check-packer.sh}" "$@"
+              exec bash "${../scripts/check-packer.sh}" "$@"
             '';
           }
         }/bin/nucleus-check-packer";
