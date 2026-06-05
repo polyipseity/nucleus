@@ -11,7 +11,7 @@ in
 assert lib.hasInfix ''"com.lwouis.alt-tab-macos"'' defaultsText;
 
 # Appearance
-assert lib.hasInfix ''appearanceStyle = "0";'' defaultsText;
+assert lib.hasInfix ''appearanceStyle = "2";'' defaultsText;
 assert lib.hasInfix ''appearanceSize = "3";'' defaultsText;
 assert lib.hasInfix ''appearanceTheme = "2";'' defaultsText;
 assert lib.hasInfix ''shortcutStyle = "0";'' defaultsText;

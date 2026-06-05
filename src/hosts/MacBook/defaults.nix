@@ -509,7 +509,7 @@ in
       # strings explicit for declarative intent and convergence.
       "com.lwouis.alt-tab-macos" = {
         # --- Requested appearance ---
-        appearanceStyle = "0"; # thumbnails
+        appearanceStyle = "2"; # titles
         appearanceSize = "3"; # auto
         appearanceTheme = "2"; # system
         shortcutStyle = "0"; # focus on release
