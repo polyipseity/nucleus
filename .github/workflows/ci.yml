@@ -91,7 +91,7 @@ jobs:
 
       - name: Check for dead Nix code
         if: runner.os != 'Windows'
-        run: nix run nixpkgs#deadnix -- --fail-on-changes src/
+        run: nix run nixpkgs#deadnix -- --fail src/
 
       - name: Check shell scripts
         if: runner.os != 'Windows'
