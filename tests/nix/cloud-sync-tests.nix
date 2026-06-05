@@ -27,7 +27,7 @@ let
   windowsReplicaModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-ReplicaSync.ps1;
   windowsReplicaResetModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-ReplicaReset.ps1;
   windowsReplicaScheduleModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-ReplicaSyncScheduledTask.ps1;
-  replicaCleanupConfigText = builtins.readFile ../../src/modules/configs/cloud/replica-cleanup.json;
+  replicaGcConfigText = builtins.readFile ../../src/modules/configs/cloud/replica-gc.json;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
@@ -311,13 +311,13 @@ let
   # Test 41: OneDrive replica runners must exclude Personal Vault on both platforms
   test_onedrive_personal_vault_excluded = assert' (
     containsRegex "build_onedrive_root_filter_file" replicaSyncShellText
-    && containsRegex "blockedRoots" replicaCleanupConfigText
+    && containsRegex "blockedRoots" replicaGcConfigText
     && containsRegex "skipping inaccessible OneDrive root entry" replicaSyncShellText
     && containsRegex "--disable ListR" replicaSyncShellText
     && containsRegex "--dirs-only --disable ListR --log-level ERROR" replicaSyncShellText
     && containsRegex "--timeout 30s --contimeout 10s" replicaSyncShellText
     && containsRegex "--max-duration 1m" replicaSyncShellText
-    && containsRegex "Get-ReplicaCleanupConfig" windowsReplicaModuleText
+    && containsRegex "Get-ReplicaGcConfig" windowsReplicaModuleText
     && containsRegex "remoteExcludes" windowsReplicaModuleText
     && containsRegex "BlockedRoots" windowsReplicaModuleText
     && containsRegex "Get-OneDriveRootFilterFile" windowsReplicaModuleText
@@ -415,21 +415,21 @@ let
   ) "replica-reset command must exist with parity on POSIX and Windows";
 
   # Test 48: Shared cleanup config must drive replica metadata cleanup behavior
-  test_replica_cleanup_config_centralized = assert' (
-    containsRegex ''"GoogleDrive"'' replicaCleanupConfigText
-    && containsRegex ''"iCloud"'' replicaCleanupConfigText
-    && containsRegex ''"OneDrive"'' replicaCleanupConfigText
-    && containsRegex ''"files"'' replicaCleanupConfigText
-    && containsRegex ''"dirs"'' replicaCleanupConfigText
-    && containsRegex ''"remoteExcludes"'' replicaCleanupConfigText
-    && containsRegex ''"blockedRoots"'' replicaCleanupConfigText
-    && !containsRegex ''"macOSMetadata"'' replicaCleanupConfigText
-    && !containsRegex ''"oneDrive"'' replicaCleanupConfigText
-    && containsRegex ''replica-cleanup\.json'' replicaSyncShellText
-    && containsRegex "load_provider_cleanup_entries" replicaSyncShellText
-    && containsRegex ''replica-cleanup\.json'' windowsReplicaModuleText
-    && containsRegex "Get-ReplicaCleanupConfig" windowsReplicaModuleText
-  ) "replica metadata exclusion and cleanup patterns must be centralized in one shared config";
+  test_replica_gc_config_centralized = assert' (
+    containsRegex ''"GoogleDrive"'' replicaGcConfigText
+    && containsRegex ''"iCloud"'' replicaGcConfigText
+    && containsRegex ''"OneDrive"'' replicaGcConfigText
+    && containsRegex ''"files"'' replicaGcConfigText
+    && containsRegex ''"dirs"'' replicaGcConfigText
+    && containsRegex ''"remoteExcludes"'' replicaGcConfigText
+    && containsRegex ''"blockedRoots"'' replicaGcConfigText
+    && !containsRegex ''"macOSMetadata"'' replicaGcConfigText
+    && !containsRegex ''"oneDrive"'' replicaGcConfigText
+    && containsRegex ''replica-gc\.json'' replicaSyncShellText
+    && containsRegex "load_provider_gc_entries" replicaSyncShellText
+    && containsRegex ''replica-gc\.json'' windowsReplicaModuleText
+    && containsRegex "Get-ReplicaGcConfig" windowsReplicaModuleText
+  ) "replica metadata exclusion and GC patterns must be centralized in one shared config";
 
   # Test 49: Replica runners lock local replica trees as read-only between sync runs
   test_replica_read_only_permissions = assert' (
@@ -509,7 +509,7 @@ let
     test_replica_fallback_timer_wiring
     test_macos_launchd_inventory_is_declared
     test_replica_reset_command_parity
-    test_replica_cleanup_config_centralized
+    test_replica_gc_config_centralized
     test_replica_read_only_permissions
     test_mounts_read_write_matrix
     test_macbook_google_drive_replica_exception

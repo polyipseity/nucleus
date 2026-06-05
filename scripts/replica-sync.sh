@@ -76,15 +76,15 @@ else
   REPO_ROOT="$repo_root"
 fi
 USERS_JSON="$REPO_ROOT/src/modules/users.json"
-REPLICA_CLEANUP_CONFIG_JSON="$REPO_ROOT/src/modules/configs/cloud/replica-cleanup.json"
+REPLICA_GC_CONFIG_JSON="$REPO_ROOT/src/modules/configs/cloud/replica-gc.json"
 
 if [ ! -f "$USERS_JSON" ]; then
   printf '%s\n' "replica-sync: users registry not found at $USERS_JSON" >&2
   exit 1
 fi
 
-if [ ! -f "$REPLICA_CLEANUP_CONFIG_JSON" ]; then
-  printf '%s\n' "replica-sync: cleanup config not found at $REPLICA_CLEANUP_CONFIG_JSON" >&2
+if [ ! -f "$REPLICA_GC_CONFIG_JSON" ]; then
+  printf '%s\n' "replica-sync: gc config not found at $REPLICA_GC_CONFIG_JSON" >&2
   exit 1
 fi
 
@@ -104,11 +104,11 @@ if [ -s "$rclone_pass_path" ]; then
   export RCLONE_CONFIG_PASS="$rclone_config_pass_value"
 fi
 
-load_provider_cleanup_entries() {
+load_provider_gc_entries() {
   _provider="$1"
   _field="$2"
 
-  jq -r --arg provider "$_provider" --arg field "$_field" '((.[$provider] // {})[$field] // [])[]' "$REPLICA_CLEANUP_CONFIG_JSON"
+  jq -r --arg provider "$_provider" --arg field "$_field" '((.[$provider] // {})[$field] // [])[]' "$REPLICA_GC_CONFIG_JSON"
 }
 
 username="$(id -un)"
@@ -289,7 +289,7 @@ build_onedrive_root_filter_file() {
   printf '%s\n' "$_filter_file"
 }
 
-cleanup_local_macos_artifacts() {
+gc_local_macos_artifacts() {
   _target_dir="$1"
   _file_globs="$2"
   _dir_names="$3"
@@ -299,7 +299,7 @@ cleanup_local_macos_artifacts() {
   fi
 
   if [ "$dry_run" = true ]; then
-    printf '%s\n' "replica-sync: [dry-run] local metadata cleanup in $_target_dir"
+    printf '%s\n' "replica-sync: [dry-run] local metadata gc in $_target_dir"
     return 0
   fi
 
@@ -430,10 +430,10 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
     continue
   fi
 
-  provider_file_globs="$(load_provider_cleanup_entries "$provider" "files")"
-  provider_dir_names="$(load_provider_cleanup_entries "$provider" "dirs")"
-  provider_remote_excludes="$(load_provider_cleanup_entries "$provider" "remoteExcludes")"
-  provider_blocked_roots="$(load_provider_cleanup_entries "$provider" "blockedRoots")"
+  provider_file_globs="$(load_provider_gc_entries "$provider" "files")"
+  provider_dir_names="$(load_provider_gc_entries "$provider" "dirs")"
+  provider_remote_excludes="$(load_provider_gc_entries "$provider" "remoteExcludes")"
+  provider_blocked_roots="$(load_provider_gc_entries "$provider" "blockedRoots")"
 
   if [ "$direction" != "pull" ]; then
     printf '%s\n' "replica-sync: [$id] unsupported direction '$direction'; replicas are pull-only by policy" >&2
@@ -464,7 +464,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
     continue
   fi
 
-  cleanup_local_macos_artifacts "$local_dir" "$provider_file_globs" "$provider_dir_names"
+  gc_local_macos_artifacts "$local_dir" "$provider_file_globs" "$provider_dir_names"
 
   set -- --log-level ERROR
   if [ "$provider" = "iCloud" ]; then

@@ -53,12 +53,12 @@ function Invoke-ReplicaSync {
 
   $resolvedRepoRoot = (Resolve-Path -Path $RepoRoot).Path
   $usersJsonPath = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\users.json"
-  $cleanupConfigPath = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\configs\cloud\replica-cleanup.json"
+  $gcConfigPath = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\configs\cloud\replica-gc.json"
   if (-not (Test-Path -Path $usersJsonPath -PathType Leaf)) {
     throw "replica-sync: users registry not found at '$usersJsonPath'."
   }
-  if (-not (Test-Path -Path $cleanupConfigPath -PathType Leaf)) {
-    throw "replica-sync: cleanup config not found at '$cleanupConfigPath'."
+  if (-not (Test-Path -Path $gcConfigPath -PathType Leaf)) {
+    throw "replica-sync: gc config not found at '$gcConfigPath'."
   }
 
   $rcloneCmd = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
@@ -76,7 +76,7 @@ function Invoke-ReplicaSync {
   }
 
   $usersConfig = Get-Content -Raw -Path $usersJsonPath | ConvertFrom-Json
-  $cleanupConfig = Get-Content -Raw -Path $cleanupConfigPath | ConvertFrom-Json
+  $gcConfig = Get-Content -Raw -Path $gcConfigPath | ConvertFrom-Json
   $isWindowsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)
   $icaclsCmd = Get-Command -Name "icacls" -ErrorAction SilentlyContinue
   $attribCmd = Get-Command -Name "attrib" -ErrorAction SilentlyContinue
@@ -133,10 +133,10 @@ function Invoke-ReplicaSync {
     return (Join-Path -Path $HOME -ChildPath $Candidate)
   }
 
-  function Get-ReplicaCleanupConfig {
+  function Get-ReplicaGcConfig {
     param([Parameter(Mandatory)][string]$Provider)
 
-    $providerProperty = $cleanupConfig.PSObject.Properties | Where-Object { $_.Name -eq $Provider } | Select-Object -First 1
+    $providerProperty = $gcConfig.PSObject.Properties | Where-Object { $_.Name -eq $Provider } | Select-Object -First 1
     if ($null -eq $providerProperty) {
       return [pscustomobject]@{
         Files = @()
@@ -353,7 +353,7 @@ function Invoke-ReplicaSync {
     }
 
     if ($IsDryRun) {
-      Write-Output "replica-sync: [dry-run] local metadata cleanup in '$TargetDir'"
+      Write-Output "replica-sync: [dry-run] local metadata gc in '$TargetDir'"
       return
     }
 
@@ -475,7 +475,7 @@ function Invoke-ReplicaSync {
       $iCloudService = 'drive'
     }
 
-    $cleanupValues = Get-ReplicaCleanupConfig -Provider $provider
+    $gcValues = Get-ReplicaGcConfig -Provider $provider
 
     $localDir = Join-Path -Path $HOME -ChildPath $localPath
     if (-not (Test-Path -Path $localDir -PathType Container)) {
@@ -503,7 +503,7 @@ function Invoke-ReplicaSync {
       continue
     }
 
-    Clear-LocalMacOSMetadataArtifact -TargetDir $localDir -FileGlobs $cleanupValues.Files -DirectoryNames $cleanupValues.Directories -IsDryRun:$DryRun
+    Clear-LocalMacOSMetadataArtifact -TargetDir $localDir -FileGlobs $gcValues.Files -DirectoryNames $gcValues.Directories -IsDryRun:$DryRun
 
     $commonArgs = @('--log-level', 'ERROR')
     if ($provider -eq 'iCloud') {
@@ -515,7 +515,7 @@ function Invoke-ReplicaSync {
         # but let the real sync use OneDrive's default recursive listing path.
         # For full-root pull replicas, forcing --disable ListR makes syncs
         # pathologically slow.
-        $runtimeFilterPath = Get-OneDriveRootFilterFile -ReplicaId $id -LocalDir $localDir -RemoteRef $remoteRef -RemoteExcludes $cleanupValues.RemoteExcludes -BlockedRoots $cleanupValues.BlockedRoots -IsDryRun:$DryRun
+        $runtimeFilterPath = Get-OneDriveRootFilterFile -ReplicaId $id -LocalDir $localDir -RemoteRef $remoteRef -RemoteExcludes $gcValues.RemoteExcludes -BlockedRoots $gcValues.BlockedRoots -IsDryRun:$DryRun
         if ($null -ne $resolvedFilterPath) {
           $commonArgs += @('--filter-from', $resolvedFilterPath)
         }
@@ -524,7 +524,7 @@ function Invoke-ReplicaSync {
         $commonArgs += @('--filter-from', $resolvedFilterPath)
       }
     } else {
-      foreach ($pattern in $cleanupValues.RemoteExcludes) {
+      foreach ($pattern in $gcValues.RemoteExcludes) {
         $commonArgs += @('--exclude', $pattern)
       }
       if ($null -ne $resolvedFilterPath) {
