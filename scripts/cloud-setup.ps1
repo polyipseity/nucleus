@@ -197,6 +197,7 @@ function Get-ProviderCreateArgument {
   )
 
   switch ($ProviderType) {
+    'drive' { return @('acknowledge_abuse', 'true') }
     'iclouddrive' {
       $iCloudService = Resolve-ICloudServiceForRemote -RepoRoot $RepoRoot -RemoteName $RemoteName
       return @('service', $iCloudService, '--all')
@@ -306,6 +307,37 @@ if ($staleRemotes.Count -gt 0) {
 }
 
 Write-Output 'cloud-setup: all credentials valid.'
+
+# Ensure acknowledge_abuse is set on GoogleDrive to prevent 403 errors on
+# publicly-shared files. This is required for rclone to download files shared
+# via Google Drive links with "anyone with the link" permissions.
+# WHY: rclone defaults acknowledge_abuse=false, which blocks downloads from
+# shared links on new Drive API versions.
+$gdListed = & rclone listremotes 2>$null
+if ($LASTEXITCODE -eq 0 -and ($gdListed -contains 'GoogleDrive:')) {
+  $gdAckAlreadySet = $false
+  try {
+    $gdDump = & rclone config dump 2>$null | Out-String | ConvertFrom-Json
+    if ($gdDump.GoogleDrive.acknowledge_abuse -eq 'true') {
+      $gdAckAlreadySet = $true
+    }
+  } catch {
+    # config dump failed; proceed with update anyway
+    Write-Debug "cloud-setup: rclone config dump failed: $_"
+  }
+  if (-not $gdAckAlreadySet) {
+    & rclone config update GoogleDrive acknowledge_abuse true
+    if ($LASTEXITCODE -eq 0) {
+      Write-Output 'cloud-setup: acknowledge_abuse set for GoogleDrive'
+    } else {
+      Write-Warning "cloud-setup: failed to set acknowledge_abuse for GoogleDrive (exit code $LASTEXITCODE)"
+    }
+  } else {
+    Write-Output 'cloud-setup: acknowledge_abuse already set for GoogleDrive, skipping'
+  }
+} else {
+  Write-Warning 'cloud-setup: GoogleDrive remote not found, skipping acknowledge_abuse configuration'
+}
 
 if ($Apply) {
   Write-Output 'cloud-setup: running nucleus apply to converge cloud mount services...'
