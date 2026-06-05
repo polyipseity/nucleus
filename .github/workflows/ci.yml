@@ -37,8 +37,15 @@ permissions:
 
 jobs:
   build:
-    name: "Build & Test"
-    runs-on: ubuntu-latest
+    name: "Build & Test (${{ matrix.os }})"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
     env:
       # Keep flake support centralized at the job level so individual commands
       # stay readable while still working on fresh CI environments.
@@ -48,12 +55,15 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@4a754ab0c192f4d12cf88b5954b9dd13fd2d612e
+        if: runner.os != 'Windows'
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
 
       - name: Check Nix flake evaluation
+        if: runner.os != 'Windows'
         run: cd src && nix flake check
 
       - name: Run comprehensive Nix test suite
+        if: runner.os != 'Windows'
         run: |
           echo "Running Nix unit tests..."
           # Auto-discover and run all *.nix test files under tests/nix/
@@ -63,10 +73,17 @@ jobs:
           done
 
       - name: Run shell script validation tests
+        shell: bash
         run: bash tests/scripts/script-validation-tests.sh
 
       - name: Check PowerShell syntax and lint
+        if: runner.os != 'Windows'
         run: nix run ./src#check-pwsh
 
+      - name: Check PowerShell syntax (Windows)
+        if: runner.os == 'Windows'
+        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1
+
       - name: Check shell scripts
+        if: runner.os != 'Windows'
         run: nix run ./src#check-sh
