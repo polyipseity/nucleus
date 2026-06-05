@@ -196,6 +196,17 @@ in
             }
 
             # ---------------------------------------------------------------
+            # Interactive-feature suppression in AI agent sessions
+            # ---------------------------------------------------------------
+            # When an AI agent is detected, disable multi-line editing features
+            # that clutter agent output and serve no purpose in non-human sessions.
+            if __nucleus_is_agent_session; then
+              unsetopt ZLE
+              PS2=""
+              PS1="%% "
+            fi
+
+            # ---------------------------------------------------------------
             # pay-respects shell hook
             # ---------------------------------------------------------------
             # Only initialise in interactive shells. In non-interactive or AI
