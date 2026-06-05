@@ -538,18 +538,19 @@
           ai-sync = mkAiSyncApp pkgsMac;
           apply = mkApplyApp pkgsMac;
           bootstrap = mkBootstrapApp pkgsMac;
+          check = mkCheckApp pkgsMac;
+          check-packer = mkCheckPackerApp pkgsMac;
+          check-pwsh = mkCheckPwshApp pkgsMac;
+          check-sh = mkCheckShApp pkgsMac;
+          cloud-setup = mkCloudSetupApp pkgsMac;
           darwin-rebuild = {
             type = "app";
             program = "${darwin.packages.${systems.mac}.darwin-rebuild}/bin/darwin-rebuild";
           };
-          check-packer = mkCheckPackerApp pkgsMac;
-          check-sh = mkCheckShApp pkgsMac;
-          check-pwsh = mkCheckPwshApp pkgsMac;
-          cloud-setup = mkCloudSetupApp pkgsMac;
           gc = mkGcApp pkgsMac;
           health-check = mkHealthCheckApp pkgsMac;
-          replica-sync = mkReplicaSyncApp pkgsMac;
           replica-reset = mkReplicaResetApp pkgsMac;
+          replica-sync = mkReplicaSyncApp pkgsMac;
           update = mkUpdateApp pkgsMac;
           vm-setup = mkVMSetupApp pkgsMac;
         };
@@ -557,6 +558,13 @@
           ai-sync = mkAiSyncApp pkgsLinux;
           apply = mkApplyApp pkgsLinux;
           bootstrap = mkBootstrapApp pkgsLinux;
+          check = mkCheckApp pkgsLinux;
+          check-packer = mkCheckPackerApp pkgsLinux;
+          check-pwsh = mkCheckPwshApp pkgsLinux;
+          check-sh = mkCheckShApp pkgsLinux;
+          cloud-setup = mkCloudSetupApp pkgsLinux;
+          gc = mkGcApp pkgsLinux;
+          health-check = mkHealthCheckApp pkgsLinux;
           home-manager = {
             type = "app";
             program = "${home-manager.packages.${systems.linux}.home-manager}/bin/home-manager";
@@ -565,14 +573,8 @@
             type = "app";
             program = "${pkgsLinux.nixos-rebuild}/bin/nixos-rebuild";
           };
-          check-packer = mkCheckPackerApp pkgsLinux;
-          check-sh = mkCheckShApp pkgsLinux;
-          check-pwsh = mkCheckPwshApp pkgsLinux;
-          cloud-setup = mkCloudSetupApp pkgsLinux;
-          gc = mkGcApp pkgsLinux;
-          health-check = mkHealthCheckApp pkgsLinux;
-          replica-sync = mkReplicaSyncApp pkgsLinux;
           replica-reset = mkReplicaResetApp pkgsLinux;
+          replica-sync = mkReplicaSyncApp pkgsLinux;
           update = mkUpdateApp pkgsLinux;
           vm-setup = mkVMSetupApp pkgsLinux;
         };

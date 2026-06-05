@@ -40,6 +40,7 @@ param(
   [string[]]$Paths = @($env:NUCLEUS_CHECK_PATHS -split ';' | Where-Object { $_ })
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 if (-not $Paths -or $Paths.Count -eq 0) {
@@ -102,8 +103,10 @@ else {
     $lintResults += Invoke-ScriptAnalyzer -Path $path -Severity @('Error', 'Warning', 'Information') -ExcludeRule @('PSUseBOMForUnicodeEncodedFile')
   }
 
-  # Filter results to only non-Info lints for failure determination
-  $nonInfoLints = $lintResults | Where-Object { $_.Severity -ne 'Information' }
+  # Filter results to only non-Info lints for failure determination.
+  # Wrap in @() so $nonInfoLints is always an array — with Set-StrictMode,
+  # accessing .Count on $null would throw.
+  $nonInfoLints = @($lintResults | Where-Object { $_.Severity -ne 'Information' })
 
   if ($lintResults.Count -gt 0) {
     $lintResults | ForEach-Object {
