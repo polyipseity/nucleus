@@ -10,7 +10,7 @@
 # - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
 # - https://caddyserver.com/docs/caddyfile/directives/reverse_proxy
 # - https://caddyserver.com/docs/caddyfile/directives/tls
-{ lib, config, ... }:
+{ lib, ... }:
 let
   jellyfinHttpPort = 8096;
   jellyfinHttpsPort = 8920;

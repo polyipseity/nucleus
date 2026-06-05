@@ -16,7 +16,6 @@
 # /etc/nucleus/vms/<name>-domain.xml so vm-setup.sh can call virsh define
 # without needing to inline the XML at provisioning time.
 {
-  config,
   lib,
   pkgs,
   username,

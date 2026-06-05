@@ -10,14 +10,13 @@
 # so re-provisioning from scratch always produces the same UTM identity.
 #
 # Source: https://github.com/utmapp/UTM/blob/main/Configuration/UTMQemuConfiguration.swift
-{ config, pkgs, ... }:
+{ pkgs, ... }:
 let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
   nucleusHost = "MacBook";
   enabledVms = builtins.filter (
     vm: vm.enabled && (!vm ? hosts || vm.hosts == null || builtins.elem nucleusHost vm.hosts)
   ) vmsData.VMs;
-  lib = pkgs.lib;
 
   isArm = pkgs.stdenv.hostPlatform.isAarch64;
 

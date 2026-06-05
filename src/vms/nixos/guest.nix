@@ -26,12 +26,7 @@
 # - src/hosts/NixOS/jellyfin.nix — singleton media server not guest-appropriate
 #
 # Source: https://github.com/nix-community/nixos-generators
-{
-  lib,
-  modulesPath,
-  pkgs,
-  ...
-}:
+{ modulesPath, pkgs, ... }:
 let
   guestUsername = builtins.getEnv "NUCLEUS_VM_GUEST_USERNAME";
   guestPassword = builtins.getEnv "NUCLEUS_VM_GUEST_PASSWORD";

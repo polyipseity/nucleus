@@ -28,7 +28,7 @@
 #   local.nix-index-update — rebuilds the nix-index file database daily
 #     (12:00) and on every agent load; a freshness check makes
 #     reloads a fast no-op when the DB was updated within the past 6 days.
-args@{
+{
   config,
   lib,
   pkgs,
@@ -311,31 +311,6 @@ let
 
       ${icloudExclusionsShellBody}
     '';
-  };
-
-  # --------------------------------------------------------------------------
-  # Weekly garbage collection LaunchAgent
-  # Performs bounded GC on every Sunday at noon to reclaim stale VM
-  # artifacts, build outputs, and tool caches that accumulate across weeks.
-  launchd.agents."gc-weekly" = {
-    enable = true;
-    config = {
-      # launchd Label is a reverse-DNS-style unique identifier.
-      # Source: launchd.plist(5) Label key semantics.
-      # https://www.manpagez.com/man/5/launchd.plist/
-      Label = "local.gc-weekly";
-      ProgramArguments = [ "${gcWeekly}" ];
-      # Do not run on every agent reload during apply/bootstrap apply; weekly
-      # Sunday maintenance at noon is sufficient for accumulated artifact cleanup.
-      RunAtLoad = false;
-      StartCalendarInterval = [
-        {
-          Hour = 12;
-          Minute = 0;
-          Weekday = 0; # Sunday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
-        }
-      ];
-    };
   };
 
   betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" ''
@@ -1658,6 +1633,31 @@ lib.mkIf pkgs.stdenv.isDarwin {
         fi
       fi
     '';
+  };
+
+  # --------------------------------------------------------------------------
+  # Weekly garbage collection LaunchAgent
+  # Performs bounded GC on every Sunday at noon to reclaim stale VM
+  # artifacts, build outputs, and tool caches that accumulate across weeks.
+  launchd.agents."gc-weekly" = {
+    enable = true;
+    config = {
+      # launchd Label is a reverse-DNS-style unique identifier.
+      # Source: launchd.plist(5) Label key semantics.
+      # https://www.manpagez.com/man/5/launchd.plist/
+      Label = "local.gc-weekly";
+      ProgramArguments = [ "${gcWeekly}" ];
+      # Do not run on every agent reload during apply/bootstrap apply; weekly
+      # Sunday maintenance at noon is sufficient for accumulated artifact cleanup.
+      RunAtLoad = false;
+      StartCalendarInterval = [
+        {
+          Hour = 12;
+          Minute = 0;
+          Weekday = 0; # Sunday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+        }
+      ];
+    };
   };
 
   # --------------------------------------------------------------------------
