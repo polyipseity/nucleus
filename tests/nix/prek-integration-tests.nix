@@ -70,6 +70,16 @@ let
 
   test_windows_prek_handles_relative_git_dir = assert' ((lib.hasInfix "IsPathRooted" posixPwshText)) "Windows pwsh must handle relative paths from git rev-parse --git-dir using IsPathRooted check";
 
+  test_zsh_agent_session_detection = assert' (
+    (lib.hasInfix "__nucleus_is_agent_session" posixShellText)
+    && (lib.hasInfix "! __nucleus_is_agent_session" posixShellText)
+  ) "zsh initContent must define __nucleus_is_agent_session and guard pay-respects behind it";
+
+  test_windows_agent_session_detection = assert' (
+    (lib.hasInfix "Test-NucleusAgentSession" windowsShellProfileText)
+    && (lib.hasInfix "-not (Test-NucleusAgentSession)" windowsShellProfileText)
+  ) "Windows shell profile must define Test-NucleusAgentSession and guard pay-respects behind it";
+
   allTests = [
     test_posix_binary_baseline
     test_windows_binary_baseline
@@ -84,6 +94,8 @@ let
     test_windows_prek_uses_git_rev_parse
     test_posix_prek_handles_relative_git_dir
     test_windows_prek_handles_relative_git_dir
+    test_zsh_agent_session_detection
+    test_windows_agent_session_detection
   ];
 in
 {
@@ -104,5 +116,7 @@ in
     "11: Windows prek uses git rev-parse --git-dir"
     "12: POSIX prek handles relative git-dir paths"
     "13: Windows prek handles relative git-dir paths"
+    "14: zsh defines __nucleus_is_agent_session and guards pay-respects"
+    "15: Windows defines Test-NucleusAgentSession and guards pay-respects"
   ];
 }
