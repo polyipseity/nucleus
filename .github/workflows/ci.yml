@@ -75,7 +75,7 @@ jobs:
 
       - name: Check Nix flake inputs freshness
         if: runner.os != 'Windows'
-        uses: DeterminateSystems/flake-checker-action@3164002371bc90729c68af0e24d5aacf20d7c9f6 # v12
+        uses: DeterminateSystems/flake-checker-action@89c01715e5d0dfdc0a1bfe9d59891ee4945c1483 # node24
         with:
           fail-mode: false
 
