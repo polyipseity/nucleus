@@ -96,6 +96,18 @@ let
         }
 
         # ---------------------------------------------------------------
+        # Interactive-feature suppression in AI agent sessions
+        # ---------------------------------------------------------------
+        # When an AI agent is detected, disable PSReadLine and other interactive
+        # features that serve no purpose and clutter output in non-human sessions.
+        if (Test-NucleusAgentSession) {
+          Remove-Module PSReadLine -ErrorAction SilentlyContinue
+          $ConfirmPreference = 'None'
+          $WarningActionPreference = 'SilentlyContinue'
+          function prompt { "PS> " }
+        }
+
+        # ---------------------------------------------------------------
         # pay-respects shell hook
         # ---------------------------------------------------------------
         # Only initialise in interactive, non-agent, and available sessions.

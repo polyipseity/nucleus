@@ -141,6 +141,14 @@ function Sync-ShellProfile {
     '  if (Test-Path "C:\opt\.devin") { return $true }'
     '  return $false'
     '}'
+    # Interactive-feature suppression in AI agent sessions:
+    # disable PSReadLine, flatten prompt, suppress confirm/warn prompts.
+    'if (Test-NucleusAgentSession) {'
+    '  Remove-Module PSReadLine -ErrorAction SilentlyContinue'
+    '  $ConfirmPreference = ''None'''
+    '  $WarningActionPreference = ''SilentlyContinue'''
+    '  function prompt { "PS> " }'
+    '}'
     # pay-respects: register correction hook in interactive and non-agent
     # sessions only.
     # WHY non-interactive guard: agent-spawned or scripted PowerShell sessions
