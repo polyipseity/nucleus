@@ -4,17 +4,24 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
 
 ## Layout
 
-- `.tart/` — Tart VM store on macOS hosts (symlinked from `~/.tart`).
-- `images/` — build outputs, temporary build directories, and installer cache.
-  Build artifacts are separated from runtime disks so you can safely delete and
-  rebuild images without affecting VM state, and to keep `images/` rsync-friendly
-  for CI cache seeding.
-  - `images/<name>.qcow2` — pre-built guest images produced in build phase.
-  - `images/<name>-build/` — temporary Packer output directory used during builds.
-  - `images/<name>-installer.iso` — cached Windows installer ISO used by rebuilds.
-- `scripts/` — generated start and configure helper scripts for each VM.
-- `<name>.utm/` — UTM bundle directory on macOS hosts.
-- `<name>.qcow2` — libvirt/QEMU runtime disk on Linux/Windows hosts.
+```
+{{VM_DIR_DISPLAY}}/
+├── .tart/                              — Tart VM store (macOS only; symlinked from ~/.tart)
+├── images/                             — build outputs, temporary build dirs, installer cache
+│   ├── <name>.qcow2                    — pre-built guest image
+│   ├── <name>-build/                   — temporary Packer build output (safe to delete)
+│   ├── <name>-installer.iso            — cached Windows installer ISO
+│   └── <name>.vm-guest-credentials-sha256 — guest credential fingerprint for build image
+├── scripts/                            — generated start helper scripts
+│   ├── start-<name>.sh                 — POSIX start helper
+│   └── start-<name>.ps1                — PowerShell start helper
+├── <name>.utm/                         — UTM bundle directory (macOS only)
+│   ├── config.plist                    — UTM VM configuration
+│   └── Data/disk-main.qcow2            — UTM runtime disk
+├── <name>.qcow2                        — libvirt/QEMU runtime disk (Linux/Windows only)
+├── <name>.qcow2.vm-guest-credentials-sha256 — guest credential fingerprint for runtime disk
+└── README.md                           — this file
+```
 
 ## Start commands
 
@@ -72,16 +79,26 @@ build → provision → run → rebuild
 Temporary files/directories that are safe to remove when builds fail, are
 interrupted, or when reclaiming space:
 
-- `{{IMAGES_DIR_DISPLAY}}/<name>-build/` — Packer temp files (~10–30 GB)
+```
+{{IMAGES_DIR_DISPLAY}}/
+└── <name>-build/           — Packer temp files (~10–30 GB)
+```
 
 Persistent VM artifacts (remove only when intentionally deleting a VM):
 
-- `{{IMAGES_DIR_DISPLAY}}/<name>.qcow2` — pre-built guest image (~2–20 GB)
-- `{{VM_DIR_DISPLAY}}/.tart/` — Tart VM store
-- `{{VM_DIR_DISPLAY}}/<name>.utm/` — UTM bundle
-- `{{VM_DIR_DISPLAY}}/<name>.qcow2` — runtime disk
-- `{{VM_DIR_DISPLAY}}/scripts/start-<name>.sh` — POSIX start helper
-- `{{VM_DIR_DISPLAY}}/scripts/start-<name>.ps1` — PowerShell start helper
+```
+{{IMAGES_DIR_DISPLAY}}/
+├── <name>.qcow2                    — pre-built guest image (~2–20 GB)
+└── <name>.vm-guest-credentials-sha256 — credential marker for build image
+{{VM_DIR_DISPLAY}}/
+├── .tart/                          — Tart VM store
+├── <name>.utm/                     — UTM bundle
+├── <name>.qcow2                    — runtime disk
+├── <name>.qcow2.vm-guest-credentials-sha256 — credential marker for runtime disk
+└── scripts/
+    ├── start-<name>.sh             — POSIX start helper
+    └── start-<name>.ps1            — PowerShell start helper
+```
 
 ## Manual cleanup
 
