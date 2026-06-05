@@ -101,3 +101,7 @@ jobs:
       - name: Check shell scripts
         if: runner.os != 'Windows'
         run: nix run ./src#check-sh
+
+      - name: Check for dead Nix code
+        if: runner.os != 'Windows'
+        run: nix run nixpkgs#deadnix -- --fail-on-changes src/
