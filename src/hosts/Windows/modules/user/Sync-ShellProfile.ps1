@@ -117,9 +117,35 @@ function Sync-ShellProfile {
     '    }'
     '  }'
     '}'
-    # pay-respects: register correction hook in interactive sessions only.
+    # AI agent session detection: suppress pay-respects when VSCODE_AGENT,
+    # CLAUDECODE, etc. are set.
+    'function Test-NucleusAgentSession {'
+    '  # Standard AI agent environment variables'
+    '  if (Test-Path env:AGENT) { return $true }'
+    '  if (Test-Path env:AI_AGENT) { return $true }'
+    '  # Tool-specific environment variables'
+    '  if (Test-Path env:VSCODE_AGENT) { return $true }'
+    '  if (Test-Path env:CLAUDECODE) { return $true }'
+    '  if (Test-Path env:CLAUDE_CODE) { return $true }'
+    '  if (Test-Path env:CURSOR_AGENT) { return $true }'
+    '  if (Test-Path env:GOOSE_TERMINAL) { return $true }'
+    '  if (Test-Path env:CLINE_ACTIVE) { return $true }'
+    '  if (Test-Path env:GEMINI_CLI) { return $true }'
+    '  if (Test-Path env:CODEX_SANDBOX) { return $true }'
+    '  if (Test-Path env:TRAE_AI_SHELL_ID) { return $true }'
+    '  if (Test-Path env:AUGMENT_AGENT) { return $true }'
+    '  if (Test-Path env:OPENCODE_CLIENT) { return $true }'
+    '  # Devin filesystem marker'
+    '  if (Test-Path "/opt/.devin") { return $true }'
+    '  if (Test-Path "C:\opt\.devin") { return $true }'
+    '  return $false'
+    '}'
+    # pay-respects: register correction hook in interactive and non-agent
+    # sessions only.
     # WHY non-interactive guard: agent-spawned or scripted PowerShell sessions
     # would block on the interactive prompt with no user to respond.
+    # WHY AI agent guard: AI coding agents spawn PowerShell sessions that are
+    # technically UserInteractive but cannot respond to prompts.
     # -ErrorAction SilentlyContinue is intentional: pay-respects may be absent
     # on first-provision before cargo-binstall setup has run; the if-guard
     # checks the result immediately so no failure is silently swallowed.
@@ -127,7 +153,7 @@ function Sync-ShellProfile {
     # lookup, so the `f` function defined by pay-respects --alias is not
     # shadowed by any alias of the same name (unlike zsh where aliases shadow
     # functions).
-    'if ([Environment]::UserInteractive -and (Get-Command pay-respects -ErrorAction SilentlyContinue)) {'
+    'if ([Environment]::UserInteractive -and -not (Test-NucleusAgentSession) -and (Get-Command pay-respects -ErrorAction SilentlyContinue)) {'
     '  iex (& pay-respects pwsh --alias | Out-String)'
     '}'
     # prek: install repository-local Git hooks automatically the first time a
