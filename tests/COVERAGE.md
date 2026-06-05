@@ -143,9 +143,16 @@ Located in `tests/scripts/script-validation-tests.sh`, run via bash in CI.
 7. **Dangerous Patterns**: Detect unquoted variables, unsafe `rm -rf`, unescaped globs
 8. **Shell Portability**: Validate scripts work on macOS (zsh/bash) and Linux
 
-**Scripts Tested**: `bootstrap.sh`, `apply.sh`, `health-check.sh`, `update.sh`
+**Scripts Tested**: `bootstrap.sh`, `apply.sh`, `health-check.sh`, `update.sh`, `check.sh`
 
 **Shell Test Totals**: **8 validation categories** covering all deployment scripts
+
+#### ✅ **Consolidated check scripts** (NEW)
+
+- `scripts/check.sh` (POSIX): Runs all 6 check categories (Nix tests, deadnix, shellcheck, PowerShell lint, Packer validation, script validation tests)
+- `scripts/check.ps1` (Windows): Runs Windows-compatible checks (PowerShell lint, Packer validation)
+- Both delegate to existing individual checkers; no logic duplication
+- Path-scoped mode skips whole-repo checks when arguments provided
 
 ---
 
@@ -156,10 +163,8 @@ Located in `tests/scripts/script-validation-tests.sh`, run via bash in CI.
 All tests are automatically run on every commit:
 
 1. **Nix Parse** (`nix flake check`): Verify all `.nix` files parse
-2. **Nix Unit Tests**: Run `tests/nix/*.nix` via `nix-instantiate --eval`
-3. **Shell Script Validation**: Run 8 test categories on deployment scripts
-4. **PowerShell Syntax**: Validate all `.ps1` files via PSScriptAnalyzer
-5. **Shell Linting**: Validate all `.sh` files via `shellcheck`
+2. **Consolidated POSIX Checks** (`nix run ./src#check`): Runs Nix tests, deadnix, shellcheck, PowerShell lint, Packer validation, and script validation tests in one step (macOS/Linux)
+3. **Consolidated Windows Checks** (`pwsh -File scripts/check.ps1`): Runs PowerShell lint and Packer validation (Windows)
 
 ---
 
