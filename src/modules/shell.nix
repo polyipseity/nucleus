@@ -180,11 +180,32 @@ in
             compinit -C -i -d "$HOME/.zcompdump"
 
             # ---------------------------------------------------------------
+            # AI agent session detection
+            # ---------------------------------------------------------------
+            __nucleus_is_agent_session() {
+              [[ -n "''${AGENT:-}" ]] && return 0
+              [[ -n "''${AI_AGENT:-}" ]] && return 0
+              [[ -n "''${VSCODE_AGENT:-}" ]] && return 0
+              [[ -n "''${CLAUDECODE:-}" ]] && return 0
+              [[ -n "''${CLAUDE_CODE:-}" ]] && return 0
+              [[ -n "''${CURSOR_AGENT:-}" ]] && return 0
+              [[ -n "''${GOOSE_TERMINAL:-}" ]] && return 0
+              [[ -n "''${CLINE_ACTIVE:-}" ]] && return 0
+              [[ -n "''${GEMINI_CLI:-}" ]] && return 0
+              [[ -n "''${CODEX_SANDBOX:-}" ]] && return 0
+              [[ -n "''${TRAE_AI_SHELL_ID:-}" ]] && return 0
+              [[ -n "''${AUGMENT_AGENT:-}" ]] && return 0
+              [[ -n "''${OPENCODE_CLIENT:-}" ]] && return 0
+              [[ -d /opt/.devin ]] && return 0
+              return 1
+            }
+
+            # ---------------------------------------------------------------
             # pay-respects shell hook
             # ---------------------------------------------------------------
-            # Only initialise in interactive shells. In non-interactive shells
-            # (agent-spawned terminals, CI), pay-respects would block on its
-            # interactive prompt with no user to respond.
+            # Only initialise in interactive shells. In non-interactive or AI
+            # agent sessions, pay-respects would block on its interactive prompt
+            # with no user to respond.
             #
             # pay-respects is initialised here rather than via a shell alias because
             # `eval "$(pay-respects zsh --alias)"` creates a zsh FUNCTION named `f`
@@ -192,7 +213,7 @@ in
             # eval.  A plain alias (aliases.nix) would shadow the function -- aliases
             # expand before functions in zsh -- leaving `f` as a bare binary invocation
             # that neither executes the fix nor records it in history.
-            if [[ -o interactive ]]; then
+            if [[ -o interactive ]] && ! __nucleus_is_agent_session; then
               eval "$(pay-respects zsh --alias)"
             fi
 
