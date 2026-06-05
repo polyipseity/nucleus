@@ -318,6 +318,24 @@
         }/bin/nucleus-check-sh";
       };
 
+      # Build the Packer template validation app for a given package set.
+      # Runtime dependencies are bundled from this flake so CI and local runs do
+      # not depend on host-global packer installations.
+      mkCheckPackerApp = pkgs: {
+        type = "app";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-check-packer";
+            runtimeInputs = [
+              pkgs.packer
+            ];
+            text = ''
+              exec sh "${../scripts/check-packer.sh}" "$@"
+            '';
+          }
+        }/bin/nucleus-check-packer";
+      };
+
       # Build pre-flight health checks as a runnable app that fails fast before
       # apply/bootstrap flows attempt large downloads or secret-dependent work.
       mkHealthCheckApp = pkgs: {
@@ -495,6 +513,7 @@
             type = "app";
             program = "${darwin.packages.${systems.mac}.darwin-rebuild}/bin/darwin-rebuild";
           };
+          check-packer = mkCheckPackerApp pkgsMac;
           check-sh = mkCheckShApp pkgsMac;
           check-pwsh = mkCheckPwshApp pkgsMac;
           cloud-setup = mkCloudSetupApp pkgsMac;
@@ -517,6 +536,7 @@
             type = "app";
             program = "${pkgsLinux.nixos-rebuild}/bin/nixos-rebuild";
           };
+          check-packer = mkCheckPackerApp pkgsLinux;
           check-sh = mkCheckShApp pkgsLinux;
           check-pwsh = mkCheckPwshApp pkgsLinux;
           cloud-setup = mkCloudSetupApp pkgsLinux;

@@ -55,26 +55,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - name: Setup Packer CLI
-        uses: hashicorp/setup-packer@3286471d6cc6756d056a0b199fea5e0becdbc189 # v3.3.0
-        with:
-          version: "latest"
-
-      - name: Check Packer formatting
-        run: packer fmt -check -recursive src/vms/
-
-      - name: Validate Packer templates (NixOS, Windows)
-        run: |
-          for dir in src/vms/nixos src/vms/windows; do
-            echo "Validating $dir..."
-            (cd "$dir" && packer init . && packer validate .)
-          done
-
-      - name: Validate macOS Packer template
-        if: runner.os == 'macOS'
-        run: |
-          (cd src/vms/macos && packer init . && packer validate .)
-
       - name: Install Nix
         if: runner.os != 'Windows'
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
@@ -82,6 +62,12 @@ jobs:
       - name: Cache Nix store
         if: runner.os != 'Windows'
         uses: DeterminateSystems/magic-nix-cache-action@908b263ff629f4cc17666315b7fd3ec127c6244d # v14
+
+      - name: Setup Packer CLI
+        if: runner.os == 'Windows'
+        uses: hashicorp/setup-packer@3286471d6cc6756d056a0b199fea5e0becdbc189 # v3.3.0
+        with:
+          version: "latest"
 
       - name: Check Nix flake inputs freshness
         if: runner.os != 'Windows'
@@ -103,22 +89,30 @@ jobs:
             nix-instantiate --eval "$test" || exit 1
           done
 
-      - name: Run shell script validation tests
-        shell: bash
-        run: bash tests/scripts/script-validation-tests.sh
-
-      - name: Check PowerShell syntax and lint
+      - name: Check for dead Nix code
         if: runner.os != 'Windows'
-        run: nix run ./src#check-pwsh
-
-      - name: Check PowerShell syntax (Windows)
-        if: runner.os == 'Windows'
-        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1
+        run: nix run nixpkgs#deadnix -- --fail-on-changes src/
 
       - name: Check shell scripts
         if: runner.os != 'Windows'
         run: nix run ./src#check-sh
 
-      - name: Check for dead Nix code
+      - name: Check PowerShell syntax and lint
         if: runner.os != 'Windows'
-        run: nix run nixpkgs#deadnix -- --fail-on-changes src/
+        run: nix run ./src#check-pwsh
+
+      - name: Check PowerShell syntax and lint (Windows)
+        if: runner.os == 'Windows'
+        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1
+
+      - name: Check Packer formatting and validate templates
+        if: runner.os != 'Windows'
+        run: nix run ./src#check-packer
+
+      - name: Check Packer formatting and validate templates (Windows)
+        if: runner.os == 'Windows'
+        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-packer.ps1
+
+      - name: Run shell script validation tests
+        shell: bash
+        run: bash tests/scripts/script-validation-tests.sh

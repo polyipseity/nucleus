@@ -60,6 +60,8 @@ hooks = [
   { id = "check-sh", name = "check shell scripts", language = "system", files = "\\.sh$", entry = "env NIX_CONFIG=experimental-features\\ =\\ nix-command\\ flakes nix run ./src#check-sh --" },
   # PowerShell parse-only syntax validation using the built-in parser.
   { id = "check-pwsh", name = "check PowerShell scripts", language = "system", files = "\\.ps1$", entry = "env NIX_CONFIG=experimental-features\\ =\\ nix-command\\ flakes nix run ./src#check-pwsh --" },
+  # Packer template validation using nixpkgs-packaged packer.
+  { id = "check-packer", name = "check Packer templates", language = "system", files = "\\.pkr\\.hcl$", entry = "env NIX_CONFIG=experimental-features\\ =\\ nix-command\\ flakes nix run ./src#check-packer --" },
   # Nix file formatting using nixfmt for consistent code style.
   { id = "format-nix", name = "format Nix files", language = "system", files = "\\.nix$", entry = "env NIX_CONFIG=experimental-features\\ =\\ nix-command\\ flakes nix run nixpkgs#nixfmt -- -s --verify" },
 ]

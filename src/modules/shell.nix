@@ -121,6 +121,7 @@ in
   home.packages = [
     (mkNucleusCommand "nucleus-ai-sync" "ai-sync")
     (mkNucleusCommand "nucleus-apply" "apply")
+    (mkNucleusCommand "nucleus-check-packer" "check-packer")
     (mkNucleusCommand "nucleus-check-pwsh" "check-pwsh")
     (mkNucleusCommand "nucleus-check-sh" "check-sh")
     (mkNucleusCommand "nucleus-cloud-setup" "cloud-setup")
