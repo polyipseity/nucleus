@@ -15,6 +15,10 @@ let
   shellAliases = import ./shell/aliases.nix { };
   sessionVariables = import ./shell/env.nix;
 
+  # Single source of truth for AI agent session detection.  Shared with
+  # pwsh.nix and Sync-ShellProfile.ps1 (Windows).
+  agentEnv = import ./agent-env-vars.nix;
+
   # Keep a user-scoped baseline toolchain available even in repositories that do
   # not ship direnv or Nix metadata. This preserves the "no direct system tool
   # invocation" policy while still giving unmanaged projects a predictable bun /
@@ -182,21 +186,12 @@ in
             # ---------------------------------------------------------------
             # AI agent session detection
             # ---------------------------------------------------------------
+            # Environment variable names sourced from src/modules/agent-env-vars.nix.
             __nucleus_is_agent_session() {
-              [[ -n "''${AGENT:-}" ]] && return 0
-              [[ -n "''${AI_AGENT:-}" ]] && return 0
-              [[ -n "''${VSCODE_AGENT:-}" ]] && return 0
-              [[ -n "''${CLAUDECODE:-}" ]] && return 0
-              [[ -n "''${CLAUDE_CODE:-}" ]] && return 0
-              [[ -n "''${CURSOR_AGENT:-}" ]] && return 0
-              [[ -n "''${GOOSE_TERMINAL:-}" ]] && return 0
-              [[ -n "''${CLINE_ACTIVE:-}" ]] && return 0
-              [[ -n "''${GEMINI_CLI:-}" ]] && return 0
-              [[ -n "''${CODEX_SANDBOX:-}" ]] && return 0
-              [[ -n "''${TRAE_AI_SHELL_ID:-}" ]] && return 0
-              [[ -n "''${AUGMENT_AGENT:-}" ]] && return 0
-              [[ -n "''${OPENCODE_CLIENT:-}" ]] && return 0
-              [[ -d /opt/.devin ]] && return 0
+              ${lib.concatStringsSep "\n" (
+                map (v: "              [[ -n \"\${${v}:-}\" ]] && return 0") agentEnv.agentEnvVarNames
+              )}
+              [[ -d ${agentEnv.devinPosixPath} ]] && return 0
               return 1
             }
 
