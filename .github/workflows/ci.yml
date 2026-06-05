@@ -107,10 +107,14 @@ jobs:
 
       - name: Check Packer formatting and validate templates
         if: runner.os != 'Windows'
+        env:
+          PACKER_GITHUB_API_TOKEN: ${{ github.token }}
         run: nix run ./src#check-packer
 
       - name: Check Packer formatting and validate templates (Windows)
         if: runner.os == 'Windows'
+        env:
+          PACKER_GITHUB_API_TOKEN: ${{ github.token }}
         run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-packer.ps1
 
       - name: Run shell script validation tests
