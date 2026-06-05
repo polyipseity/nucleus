@@ -86,6 +86,23 @@ done
 HAS_ARGS=false
 [ "$#" -gt 0 ] && HAS_ARGS=true
 
+# When paths are provided, group them by extension so each sub-checker
+# receives only the files it understands. This allows prek (or other
+# pre-commit tools) to invoke the consolidated check with a combined
+# files pattern matching multiple extensions.
+SH_FILES=()
+PS1_FILES=()
+PKR_FILES=()
+if $HAS_ARGS; then
+  for _f in "$@"; do
+    case "$_f" in
+      *.sh)      SH_FILES+=("$_f") ;;
+      *.ps1)     PS1_FILES+=("$_f") ;;
+      *.pkr.hcl) PKR_FILES+=("$_f") ;;
+    esac
+  done
+fi
+
 # ---------------------------------------------------------------------------
 # 1. Nix test suite — auto-discover and run all *.nix test files
 # ---------------------------------------------------------------------------
@@ -121,30 +138,36 @@ fi
 # 3. Shell script linting (shellcheck)
 # ---------------------------------------------------------------------------
 printf '\n=== [3/6] Shell script linting ===\n'
-if $HAS_ARGS; then
-  bash scripts/check-sh.sh "$@"
-else
+if [ "${#SH_FILES[@]}" -gt 0 ]; then
+  bash scripts/check-sh.sh "${SH_FILES[@]}"
+elif ! $HAS_ARGS; then
   bash scripts/check-sh.sh
+else
+  echo "Skipping (no shell scripts to check)."
 fi
 
 # ---------------------------------------------------------------------------
 # 4. PowerShell syntax validation
 # ---------------------------------------------------------------------------
 printf '\n=== [4/6] PowerShell syntax validation ===\n'
-if $HAS_ARGS; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 "$@"
-else
+if [ "${#PS1_FILES[@]}" -gt 0 ]; then
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 "${PS1_FILES[@]}"
+elif ! $HAS_ARGS; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1
+else
+  echo "Skipping (no PowerShell scripts to check)."
 fi
 
 # ---------------------------------------------------------------------------
 # 5. Packer template validation
 # ---------------------------------------------------------------------------
 printf '\n=== [5/6] Packer template validation ===\n'
-if $HAS_ARGS; then
-  bash scripts/check-packer.sh "$@"
-else
+if [ "${#PKR_FILES[@]}" -gt 0 ]; then
+  bash scripts/check-packer.sh "${PKR_FILES[@]}"
+elif ! $HAS_ARGS; then
   bash scripts/check-packer.sh
+else
+  echo "Skipping (no Packer templates to check)."
 fi
 
 # ---------------------------------------------------------------------------
