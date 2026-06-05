@@ -382,6 +382,21 @@ if [[ -f "$CHECK_SH_SH" ]]; then
     test_help_handler "$CHECK_SH_SH"
 fi
 
+# Test scripts/check.sh
+CHECK_SH="scripts/check.sh"
+if [[ -f "$CHECK_SH" ]]; then
+    test_bash_syntax "$CHECK_SH"
+    test_has_shebang "$CHECK_SH"
+    test_is_executable "$CHECK_SH"
+    test_dependencies_available "$CHECK_SH" shellcheck pwsh packer nix deadnix
+    test_error_handling "$CHECK_SH"
+    test_has_documentation "$CHECK_SH"
+    test_no_dangerous_patterns "$CHECK_SH"
+    test_strict_shell_mode "$CHECK_SH"
+    test_usage_std_present "$CHECK_SH"
+    test_help_handler "$CHECK_SH"
+fi
+
 # ============================================================================
 # Summary
 # ============================================================================
