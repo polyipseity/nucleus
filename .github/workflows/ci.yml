@@ -107,8 +107,6 @@ jobs:
 
       - name: Check Packer formatting and validate templates
         if: runner.os != 'Windows'
-        env:
-          NUCLEUS_REPO_ROOT: ${{ github.workspace }}
         run: nix run ./src#check-packer
 
       - name: Check Packer formatting and validate templates (Windows)
