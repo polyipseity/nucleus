@@ -63,6 +63,12 @@ jobs:
         if: runner.os != 'Windows'
         uses: DeterminateSystems/magic-nix-cache-action@908b263ff629f4cc17666315b7fd3ec127c6244d # v14
 
+      - name: Check Nix flake inputs freshness
+        if: runner.os != 'Windows'
+        uses: DeterminateSystems/flake-checker-action@3164002371bc90729c68af0e24d5aacf20d7c9f6 # v12
+        with:
+          fail-mode: true
+
       - name: Check Nix flake evaluation
         if: runner.os != 'Windows'
         run: cd src && nix flake check
