@@ -338,6 +338,33 @@
         }/bin/nucleus-check-packer";
       };
 
+      # Build the consolidated repository check app for a given package set.
+      # Runs all repository checks in sequence: Nix test suite, deadnix,
+      # shellcheck, PowerShell lint, Packer validation, and script validation
+      # tests.  Runtime dependencies are bundled so CI and local runs do not
+      # depend on host-global tool installations.
+      mkCheckApp = pkgs: {
+        type = "app";
+        program = "${
+          pkgs.writeShellApplication {
+            name = "nucleus-check";
+            runtimeInputs = [
+              pkgs.bash
+              pkgs.deadnix
+              pkgs.git
+              pkgs.gnugrep
+              pkgs.nix
+              pkgs.packer
+              pkgs.powershell
+              pkgs.shellcheck
+            ];
+            text = ''
+              exec bash "${../scripts/check.sh}" "$@"
+            '';
+          }
+        }/bin/nucleus-check";
+      };
+
       # Build pre-flight health checks as a runnable app that fails fast before
       # apply/bootstrap flows attempt large downloads or secret-dependent work.
       mkHealthCheckApp = pkgs: {
