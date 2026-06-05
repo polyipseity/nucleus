@@ -21,6 +21,7 @@ let
   windowsInstallModuleText = builtins.readFile ../../src/hosts/Windows/modules/setup/Install-PrekHook.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
   windowsSystemDscText = builtins.readFile ../../src/hosts/Windows/system.dsc.yml;
+  windowsUserDscText = builtins.readFile ../../src/hosts/Windows/user.dsc.yml;
 
   # Simple assertion helper with descriptive errors.
   assert' = cond: msg: if !cond then builtins.throw msg else null;
@@ -90,6 +91,29 @@ let
     var: lib.hasInfix "env:${var}" windowsShellProfileText
   ) agentEnvVarNames) "Windows shell profile must check all env vars listed in agent-env-vars.nix";
 
+  test_zsh_agent_session_suppression = assert' (
+    (lib.hasInfix "if __nucleus_is_agent_session; then" posixShellText)
+    && (lib.hasInfix "unsetopt ZLE" posixShellText)
+    && (lib.hasInfix "PS1=\"%% \"" posixShellText)
+  ) "zsh initContent must suppress ZLE and flatten prompt in AI agent sessions";
+
+  test_posix_pwsh_agent_session_suppression = assert' (
+    (lib.hasInfix "Remove-Module PSReadLine" posixPwshText)
+    && (lib.hasInfix "function prompt { \"PS> \" }" posixPwshText)
+    && (lib.hasInfix "if (Test-NucleusAgentSession)" posixPwshText)
+  ) "POSIX pwsh profile must suppress PSReadLine and flatten prompt in AI agent sessions";
+
+  test_windows_pwsh_agent_session_suppression = assert' (
+    (lib.hasInfix "Remove-Module PSReadLine -ErrorAction SilentlyContinue" windowsShellProfileText)
+    && (lib.hasInfix "function prompt { \"PS> \" }" windowsShellProfileText)
+  ) "Windows pwsh profile must suppress PSReadLine and flatten prompt in AI agent sessions";
+
+  test_windows_cmd_autorun_agent_detection = assert' (
+    (lib.hasInfix "cmdAutoRun" windowsUserDscText)
+    && (lib.hasInfix "AutoRun" windowsUserDscText)
+    && lib.all (var: lib.hasInfix "if not defined ${var}" windowsUserDscText) agentEnvVarNames
+  ) "Windows user.dsc.yml must define cmdAutoRun RegistryValue that checks all agent env vars";
+
   allTests = [
     test_posix_binary_baseline
     test_windows_binary_baseline
@@ -108,6 +132,10 @@ let
     test_windows_agent_session_detection
     test_posix_pwsh_agent_session_detection
     test_windows_agent_env_vars_complete
+    test_zsh_agent_session_suppression
+    test_posix_pwsh_agent_session_suppression
+    test_windows_pwsh_agent_session_suppression
+    test_windows_cmd_autorun_agent_detection
   ];
 in
 {
@@ -132,5 +160,9 @@ in
     "15: Windows defines Test-NucleusAgentSession and guards pay-respects"
     "16: POSIX pwsh defines Test-NucleusAgentSession and guards pay-respects"
     "17: Windows profile checks all env vars from agent-env-vars.nix"
+    "18: zsh suppresses ZLE and flattens prompt in agent sessions"
+    "19: POSIX pwsh suppresses PSReadLine and flattens prompt in agent sessions"
+    "20: Windows pwsh suppresses PSReadLine and flattens prompt in agent sessions"
+    "21: Windows cmd.exe AutoRun registry checks all agent env vars"
   ];
 }
