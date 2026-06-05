@@ -115,7 +115,7 @@ WHY comment near the decision point.
 - Do not add a new managed domain without updating the purge list; that creates
   preference drift where manual user overrides can survive declarative rebuilds.
 - `resetUserPreferenceDomains` drives the manual drift-reset command
-  `purge-managed-user-preferences` and must not be wired into automatic
+  `gc-managed-user-preferences` and must not be wired into automatic
   `home.activation.*` execution.
 
 ## nix-darwin activation scripts

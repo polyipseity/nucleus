@@ -501,7 +501,7 @@ let
   # This is intentionally a user-invoked command instead of an automatic
   # activation phase so destructive purge operations cannot race with
   # writeBoundary defaults application.
-  managedPreferencesPurgeScript = pkgs.writeShellScriptBin "purge-managed-user-preferences" ''
+  managedPreferencesGcScript = pkgs.writeShellScriptBin "gc-managed-user-preferences" ''
     set -eu
 
     # Verify Nix store integrity before running destructive preference cleanup.
@@ -817,7 +817,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   ];
 
   home.packages = [
-    managedPreferencesPurgeScript
+    managedPreferencesGcScript
     pkgs.mysides
   ];
 
