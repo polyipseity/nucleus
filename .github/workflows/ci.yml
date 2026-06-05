@@ -34,6 +34,7 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write # Needed by magic-nix-cache-action for GHA cache API
 
 jobs:
   build:
@@ -57,6 +58,10 @@ jobs:
       - name: Install Nix
         if: runner.os != 'Windows'
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+
+      - name: Cache Nix store
+        if: runner.os != 'Windows'
+        uses: DeterminateSystems/magic-nix-cache-action@908b263ff629f4cc17666315b7fd3ec127c6244d # v14
 
       - name: Check Nix flake evaluation
         if: runner.os != 'Windows'
