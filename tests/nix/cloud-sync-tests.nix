@@ -461,6 +461,24 @@ let
     && containsRegex "enable = false" macbookCloudOverrideText
   ) "MacBook cloud override must disable only GoogleDrive replica with a list-based transform";
 
+  # Test 52: POSIX cloud-setup.sh passes acknowledge_abuse in create args and runs config update for existing remotes
+  test_cloud_setup_acknowledge_abuse =
+    assert'
+      (
+        containsRegex "drive.*printf.*acknowledge_abuse.*true" shellScriptText
+        && containsRegex "rclone config update GoogleDrive acknowledge_abuse true" shellScriptText
+      )
+      "cloud-setup.sh must configure acknowledge_abuse=true for GoogleDrive during creation and existing remote update";
+
+  # Test 53: Windows cloud-setup.ps1 passes acknowledge_abuse in create args and runs config update for existing remotes
+  test_cloud_setup_pwsh_acknowledge_abuse =
+    assert'
+      (
+        containsRegex "drive.*return.*acknowledge_abuse.*true" pwshScriptText
+        && containsRegex "rclone config update GoogleDrive acknowledge_abuse true" pwshScriptText
+      )
+      "cloud-setup.ps1 must configure acknowledge_abuse=true for GoogleDrive during creation and existing remote update";
+
   allTests = [
     test_options_exist
     test_mounts_are_list
@@ -513,6 +531,8 @@ let
     test_replica_read_only_permissions
     test_mounts_read_write_matrix
     test_macbook_google_drive_replica_exception
+    test_cloud_setup_acknowledge_abuse
+    test_cloud_setup_pwsh_acknowledge_abuse
   ];
 in
 {
