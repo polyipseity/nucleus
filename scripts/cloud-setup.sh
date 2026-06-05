@@ -248,6 +248,9 @@ remote_provider_create_args() {
   _rpca_repo_root="$3"
 
   case "$_rpca_provider_type" in
+    drive)
+      printf '%s\n' 'acknowledge_abuse' 'true'
+      ;;
     iclouddrive)
       _rpca_service="$(resolve_icloud_service_for_remote "$_rpca_repo_root" "$_rpca_remote_name")"
       printf '%s\n' 'service' "$_rpca_service" '--all'
@@ -373,6 +376,23 @@ if [ -n "$_stale_remotes" ]; then
 fi
 
 printf '%s\n' "cloud-setup: all credentials valid."
+
+# Acknowledge Google Drive abuse flag so rclone can download flagged files.
+# WHY: Google Drive flags some files (e.g., zips, executables) as
+# "potentially abusive" and requires explicit acknowledgment before rclone
+# can download them. This is standard for all Google Drive remotes.
+if rclone listremotes | grep -Fxq 'GoogleDrive:'; then
+  _current_abuse="$({
+    rclone config dump | jq -r '.GoogleDrive.acknowledge_abuse // "false"'
+  } 2>/dev/null || true)"
+  if [ "$_current_abuse" != "true" ]; then
+    if rclone config update GoogleDrive acknowledge_abuse true; then
+      printf '%s\n' "cloud-setup: enabled acknowledge_abuse on GoogleDrive"
+    else
+      printf '%s\n' "cloud-setup: warning: failed to enable acknowledge_abuse on GoogleDrive" >&2
+    fi
+  fi
+fi
 
 # Sync display names from users.json to rclone config descriptions.
 # WHY: rclone description field drives Finder labels and desktop display names.
