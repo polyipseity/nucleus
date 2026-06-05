@@ -73,7 +73,15 @@ function Test-PackerDir {
     if ($LASTEXITCODE -ne 0) {
       throw "packer init failed in $Dir"
     }
-    & packer validate .
+    # Required -var flags depend on the template directory
+    $varArgs = switch -Wildcard ($Dir) {
+      '*nixos'   { @('guest_username=dummy', 'guest_password=dummy') }
+      '*windows' { @('windows_iso=dummy.iso') }
+      '*macos'   { @('macos_version=14.0', 'vm_name=dummy', 'cpus=2', 'memory_gib=4', 'disk_size_gib=40', 'guest_username=dummy', 'guest_password=dummy', 'ssh_username=dummy', 'ssh_password=dummy') }
+      default    { @() }
+    }
+    $validateArgs = @('validate') + ($varArgs | ForEach-Object { @('-var', $_) }) + @('.')
+    & packer $validateArgs
     if ($LASTEXITCODE -ne 0) {
       throw "packer validate failed in $Dir"
     }

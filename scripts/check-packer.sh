@@ -67,10 +67,23 @@ fi
 
 # Validate each Packer template in its own directory (needed for plugin
 # resolution and relative path references).
+# Each template may require different -var flags for required variables.
 validate_dir() {
   local dir="$1"
   printf 'Validating %s...\n' "$dir"
-  (cd "$dir" && packer init . && packer validate .)
+  local vars=()
+  case "$dir" in
+    *nixos)
+      vars=(-var guest_username=dummy -var guest_password=dummy)
+      ;;
+    *windows)
+      vars=(-var windows_iso=dummy.iso)
+      ;;
+    *macos)
+      vars=(-var macos_version=14.0 -var vm_name=dummy -var cpus=2 -var memory_gib=4 -var disk_size_gib=40 -var guest_username=dummy -var guest_password=dummy -var ssh_username=dummy -var ssh_password=dummy)
+      ;;
+  esac
+  (cd "$dir" && packer init . && packer validate "${vars[@]}" .)
 }
 
 validate_dir src/vms/nixos
