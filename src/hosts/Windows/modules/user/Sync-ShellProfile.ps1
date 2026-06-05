@@ -119,6 +119,7 @@ function Sync-ShellProfile {
     '}'
     # AI agent session detection: suppress pay-respects when VSCODE_AGENT,
     # CLAUDECODE, etc. are set.
+    # Source of truth for env var names: src/modules/agent-env-vars.nix.
     'function Test-NucleusAgentSession {'
     '  # Standard AI agent environment variables'
     '  if (Test-Path env:AGENT) { return $true }'

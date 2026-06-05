@@ -17,6 +17,7 @@ let
   posixPwshText = builtins.readFile ../../src/modules/pwsh.nix;
   posixShellText = builtins.readFile ../../src/modules/shell.nix;
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
+  agentEnvVarNames = (import ../../src/modules/agent-env-vars.nix).agentEnvVarNames;
   windowsInstallModuleText = builtins.readFile ../../src/hosts/Windows/modules/setup/Install-PrekHook.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
   windowsSystemDscText = builtins.readFile ../../src/hosts/Windows/system.dsc.yml;
@@ -80,6 +81,15 @@ let
     && (lib.hasInfix "-not (Test-NucleusAgentSession)" windowsShellProfileText)
   ) "Windows shell profile must define Test-NucleusAgentSession and guard pay-respects behind it";
 
+  test_posix_pwsh_agent_session_detection = assert' (
+    (lib.hasInfix "Test-NucleusAgentSession" posixPwshText)
+    && (lib.hasInfix "-not (Test-NucleusAgentSession)" posixPwshText)
+  ) "POSIX pwsh profile must define Test-NucleusAgentSession and guard pay-respects behind it";
+
+  test_windows_agent_env_vars_complete = assert' (lib.all (
+    var: lib.hasInfix "env:${var}" windowsShellProfileText
+  ) agentEnvVarNames) "Windows shell profile must check all env vars listed in agent-env-vars.nix";
+
   allTests = [
     test_posix_binary_baseline
     test_windows_binary_baseline
@@ -96,6 +106,8 @@ let
     test_windows_prek_handles_relative_git_dir
     test_zsh_agent_session_detection
     test_windows_agent_session_detection
+    test_posix_pwsh_agent_session_detection
+    test_windows_agent_env_vars_complete
   ];
 in
 {
@@ -118,5 +130,7 @@ in
     "13: Windows prek handles relative git-dir paths"
     "14: zsh defines __nucleus_is_agent_session and guards pay-respects"
     "15: Windows defines Test-NucleusAgentSession and guards pay-respects"
+    "16: POSIX pwsh defines Test-NucleusAgentSession and guards pay-respects"
+    "17: Windows profile checks all env vars from agent-env-vars.nix"
   ];
 }
