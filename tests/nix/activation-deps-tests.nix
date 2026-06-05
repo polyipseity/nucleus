@@ -330,11 +330,11 @@ let
 
   # === TEST: macOS dev-tree maintenance is scheduled, not activation-bound ===
   test_macos_dev_maintenance_is_scheduled = assert' (
-    (lib.hasInfix "launchd.agents.\"dev-ds-store-cleanup\"" macosModuleText)
+    (lib.hasInfix "launchd.agents.\"dev-ds-store-gc\"" macosModuleText)
     && (lib.hasInfix "launchd.agents.\"dev-spotlight-exclusions\"" macosModuleText)
-    && (lib.hasInfix "Label = \"local.dev-ds-store-cleanup\";" macosModuleText)
+    && (lib.hasInfix "Label = \"local.dev-ds-store-gc\";" macosModuleText)
     && (lib.hasInfix "Label = \"local.dev-spotlight-exclusions\";" macosModuleText)
-    && (lib.hasInfix "ProgramArguments = [ \"\${devDsStoreCleanup}\" ];" macosModuleText)
+    && (lib.hasInfix "ProgramArguments = [ \"\${devDsStoreGc}\" ];" macosModuleText)
     && (lib.hasInfix "ProgramArguments = [ \"\${devSpotlightExclusions}\" ];" macosModuleText)
     && !(lib.hasInfix "cleanDevDsStore = lib.hm.dag.entryAfter" macosModuleText)
     && !(lib.hasInfix "configureDevSpotlightExclusions = lib.hm.dag.entryAfter" macosModuleText)

@@ -16,7 +16,7 @@
 #           → displayHostManualInstructions
 #
 # LaunchAgents managed by this module:
-#   local.dev-ds-store-cleanup — removes Finder metadata files from ~/dev
+#   local.dev-ds-store-gc — removes Finder metadata files from ~/dev
 #     daily at 12:00 so apply runs do not block on large tree scans.
 #   local.dev-spotlight-exclusions — refreshes Spotlight exclusion markers
 #     under ~/dev daily at 12:00 so apply runs do not block on large tree scans.
@@ -464,7 +464,7 @@ let
   # Kept out of Home Manager activation for the same reason as Spotlight marker
   # maintenance: deleting stale .DS_Store files can take noticeable time on a
   # large checkout and should not slow synchronous apply/bootstrap flows.
-  devDsStoreCleanup = pkgs.writeShellScript "dev-ds-store-cleanup" ''
+  devDsStoreGc = pkgs.writeShellScript "dev-ds-store-gc" ''
     set -eu
 
     DEV_ROOT="$HOME/dev"
@@ -1704,14 +1704,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # hooks so `nix run .#apply` and bootstrap apply stay synchronous only for
   # configuration work that must happen immediately.
   # --------------------------------------------------------------------------
-  launchd.agents."dev-ds-store-cleanup" = {
+  launchd.agents."dev-ds-store-gc" = {
     enable = true;
     config = {
       # launchd Label is a reverse-DNS-style unique identifier.
       # Source: launchd.plist(5) Label key semantics.
       # https://www.manpagez.com/man/5/launchd.plist/
-      Label = "local.dev-ds-store-cleanup";
-      ProgramArguments = [ "${devDsStoreCleanup}" ];
+      Label = "local.dev-ds-store-gc";
+      ProgramArguments = [ "${devDsStoreGc}" ];
       # Do not run on every agent reload during apply/bootstrap apply; daily
       # noon maintenance is sufficient for repository hygiene.
       RunAtLoad = false;
