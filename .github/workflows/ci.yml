@@ -81,44 +81,14 @@ jobs:
         if: runner.os != 'Windows'
         run: cd src && nix flake check
 
-      - name: Run comprehensive Nix test suite
-        if: runner.os != 'Windows'
-        run: |
-          echo "Running Nix unit tests..."
-          # Auto-discover and run all *.nix test files under tests/nix/
-          find tests/nix -maxdepth 1 -name '*.nix' -type f | sort | while read test; do
-            echo "Running: $test"
-            nix-instantiate --eval "$test" || exit 1
-          done
-
-      - name: Check for dead Nix code
-        if: runner.os != 'Windows'
-        run: nix run nixpkgs#deadnix -- --fail src/
-
-      - name: Check shell scripts
-        if: runner.os != 'Windows'
-        run: nix run ./src#check-sh
-
-      - name: Check PowerShell syntax and lint
-        if: runner.os != 'Windows'
-        run: nix run ./src#check-pwsh
-
-      - name: Check PowerShell syntax and lint (Windows)
-        if: runner.os == 'Windows'
-        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1
-
-      - name: Check Packer formatting and validate templates
+      - name: Run consolidated repository checks (POSIX)
         if: runner.os != 'Windows'
         env:
           PACKER_GITHUB_API_TOKEN: ${{ github.token }}
-        run: nix run ./src#check-packer
+        run: nix run ./src#check
 
-      - name: Check Packer formatting and validate templates (Windows)
+      - name: Run consolidated repository checks (Windows)
         if: runner.os == 'Windows'
         env:
           PACKER_GITHUB_API_TOKEN: ${{ github.token }}
-        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-packer.ps1
-
-      - name: Run shell script validation tests
-        shell: bash
-        run: bash tests/scripts/script-validation-tests.sh
+        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check.ps1
