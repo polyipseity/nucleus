@@ -153,8 +153,8 @@ locals {
   #   legacy   — extended dense+slow coverage for worst-case tcg timing
   #
   # Packer HCL range() is capped at 1024 values per expression.
-  bootPromptSpacebarPhase   = [for _ in range(0, 240) : "<spacebar><wait>"]
-  bootPromptAlphaPhase      = [for _ in range(0, 240) : "a<wait>"]
+  bootPromptSpacebarPhase    = [for _ in range(0, 240) : "<spacebar><wait>"]
+  bootPromptAlphaPhase       = [for _ in range(0, 240) : "a<wait>"]
   bootPromptAnyKeyDensePhase = [for _ in range(0, 1024) : "a<wait>"]
   bootPromptAnyKeySlowPhase  = [for _ in range(0, 1024) : "a<wait20>"]
 
@@ -214,7 +214,7 @@ source "qemu" "windows11" {
   skip_compaction  = true
   disk_compression = false
 
-  machine_type   = "q35"
+  machine_type = "q35"
 
   efi_boot          = local.efiEnabled
   efi_firmware_code = local.efiCodeResolved

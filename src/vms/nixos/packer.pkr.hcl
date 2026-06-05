@@ -98,10 +98,10 @@ source "qemu" "nixos" {
 
   # SSH communicator: root login is available by default on the NixOS minimal
   # ISO once sshd is started and a root password is set via boot_command.
-  communicator  = "ssh"
-  ssh_username  = "root"
-  ssh_password  = "packer"
-  ssh_timeout   = "20m"
+  communicator = "ssh"
+  ssh_username = "root"
+  ssh_password = "packer"
+  ssh_timeout  = "20m"
 
   # headless = true suppresses the QEMU window; use false for debugging.
   headless = true
@@ -147,7 +147,7 @@ build {
       "cat > /mnt/etc/nixos/configuration.nix << 'NIXEOF'",
       "{ modulesPath, ... }:",
       "{",
-      "  imports = [ ./hardware-configuration.nix \"${modulesPath}/profiles/qemu-guest.nix\" ];",
+      "  imports = [ ./hardware-configuration.nix \"$${modulesPath}/profiles/qemu-guest.nix\" ];",
       "  boot.loader.grub.enable = true;",
       "  boot.loader.grub.device = \"/dev/vda\";",
       "  networking.hostName = \"NixOS\";",
