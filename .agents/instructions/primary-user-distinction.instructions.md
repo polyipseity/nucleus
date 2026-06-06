@@ -1,7 +1,7 @@
 ---
 description: "Use when authoring or modifying modules that interact with user-specific configuration. Explains the distinction between SOPS-aware primary user checks and hardcoded primary user logic for agent/feature provisioning."
 name: "Primary User Distinction"
-applyTo: "src/**/*.nix, src/**/*.ps1"
+applyTo: "src/modules/secrets.nix, src/modules/home.nix, src/modules/wallpapers.nix, src/modules/ai/default.nix"
 ---
 
 # Primary User Distinction

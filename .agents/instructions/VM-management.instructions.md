@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing virtual machine provisioning across hosts, VM manifests, or VM test files."
 name: "VM Management"
-applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/MacBook/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, tests/src/vm-setup-tests.nix, src/vms/nixos/guest.nix, src/vms/nixos/packer.pkr.hcl, src/vms/windows/packer.pkr.hcl, src/vms/windows/Autounattend.xml, src/vms/macos/packer.pkr.hcl"
+applyTo: "scripts/vm-setup.*, src/hosts/*/vms.nix, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, tests/src/vm-setup-tests.nix, src/vms/**"
 ---
 
 # VM Management

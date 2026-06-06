@@ -85,13 +85,7 @@
 - Keep SOPS recipients real and shared across encrypted files; rewrap encrypted files with
   `sops updatekeys` after recipient changes.
 
-## Package and Editor Policies
-
-- macOS package selection:
-  - CLI tools: prefer `nixpkgs`.
-  - GUI apps and hardware/deep-integration tools: use Homebrew where required.
-- Keep VS Code backend-selectable by OS, with shared settings source and
-  Darwin extension-bridge behavior intact.
+See `.agents/instructions/package-installation-scope.instructions.md` for package installation policies.
 
 ## Refactoring Guardrails
 
