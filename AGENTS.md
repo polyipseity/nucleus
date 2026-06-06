@@ -8,8 +8,9 @@
   `hosts/` (per-machine configs), and `modules/` (shared logic).
 - Prefer single-file modules in `src/modules/*.nix` unless a module truly needs
   nested sub-components.
-- `scripts/` contains bootstrap automation: `bootstrap.sh` (Unix) and
-  `bootstrap.ps1` (Windows).
+- `scripts/` contains automation helpers with paired `.sh`/`.ps1` entry points:
+  bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset,
+  update, vm-setup, ai-sync, and others.
 - `tests/` contains automated tests: `tests/src/` for Nix logic tests,
   `tests/src/hosts/Windows/` for Pester DSC validation. All changes require corresponding
   tests; see `.agents/instructions/testing.instructions.md`.
@@ -107,23 +108,3 @@
 - When adding new fragments (`.json`, `.md`, `.nix`, `.ps1`), verify wiring (`imports`, `readFile`, dot-sourcing).
 - Keep reusable Windows PowerShell logic in `src/hosts/Windows/modules/`; keep
   `src/hosts/Windows/apply.ps1` orchestration-focused.
-
-## Key References
-
-- `AGENTS.md` — workspace-wide defaults
-- `.agents/instructions/*.instructions.md` — focused authoring rules by file type
-- `.agents/instructions/cloud-drives-and-finder.instructions.md` — cloud-drive
-  mount/replica invariants, macOS Finder favorites policy, and related testing/doc coupling
-- `.agents/prompts/commit-staged.prompt.md` and
-  `.opencode/commands/commit-staged.prompt.md` — mirrored commit workflow prompt
-- `opencode.jsonc` — instruction and skill discovery
-- `.vscode/settings.json` — terminal auto-approve and editor behavior
-- `.github/workflows/ci.yml`, `.github/dependabot.yml`, `.commitlintrc.mjs` —
-  automation and policy
-- `.editorconfig`, `.gitattributes`, `.markdownlint.jsonc`,
-  `.agents/.markdownlint.jsonc` — formatting and line-ending rules
-- `src/flake.nix` — Nix flake entrypoint (hosts + home-manager outputs)
-- `src/hosts/` — per-machine configurations (`MacBook`, `NixOS`, `Windows`)
-- `src/modules/` — shared Nix modules (`*.nix`) and Windows helper modules
-  (`windows/*.ps1`)
-- `scripts/bootstrap.sh`, `scripts/bootstrap.ps1` — one-command setup wrappers
