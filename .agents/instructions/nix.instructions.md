@@ -60,12 +60,9 @@ non-Nix paths (apply.sh, Windows PowerShell modules).
 
 See `src/scripts/jellyfin-sync.sh` for an example of this pattern.
 
-## No Backwards Compatibility Code
+## No Backwards Compatibility
 
-Backward compatibility is opt-in only. When restructuring a Nix feature,
-remove old paths in the same change unless the user explicitly requests a
-transition path. Keep only the new implementation and add a short WHY comment
-when behavior may be non-obvious.
+See the [No Backwards Compatibility](../../../AGENTS.md#no-backwards-compatibility) section in AGENTS.md. This codebase has zero tolerance for compat shims — remove old paths in the same change, no aliases, no fallbacks.
 
 ## Cross-host parity expectations
 

@@ -14,9 +14,7 @@ The guiding principle is **document the WHY, not the WHAT**: record the
 rationale, security implication, or design tradeoff behind a decision — not a
 restatement of what the code already says. Avoid obvious comments.
 
-- **No compatibility shims by default**: if a document or code comment refers
-  to a replaced path or call pattern, keep the new path only unless the user
-  explicitly asked to preserve backward compatibility.
+- **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
 
 ## Provenance for non-validated external identifiers
 
@@ -63,9 +61,7 @@ the documentation mechanism.
 - **Cite non-validated external keys**: for externally-defined keys/identifiers
   not covered by automated checks, add an inline `# Source:` comment with at
   least one verification URL adjacent to the setting.
-- **No compatibility shims by default**: if a Nix module used to expose a
-  replaced setting, document the new path only unless the user explicitly asked
-  for backward compatibility.
+- **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
 
 ## PowerShell files (`src/**/*.ps1`)
 
@@ -92,9 +88,7 @@ PowerShell and is required on every function and entry-point script.
 - **Document the WHY**: record the rationale behind security-sensitive patterns
   (e.g. "env var cleared in `finally` so it is never left in the environment on
   failure") and any non-obvious fallback behaviour or error handling choices.
-- **No compatibility shims by default**: if a PowerShell script or function
-  changes calling conventions, remove the old path unless the user explicitly
-  requested backward compatibility.
+- **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
 
 ### Explicit Parameter Passing Requirement (PowerShell)
 
@@ -113,11 +107,7 @@ All PowerShell functions and scripts must enforce explicit parameter passing:
 - **Explicit user context**: functions that operate on user profiles or home
   directories must have explicit `-Username` or `-Users` parameters. Never
   assume the current user or auto-discover users from filesystem locations.
-- **No backwards compatibility code**: remove deprecated parameters, conditional
-  fallback logic, and migration shims. If a feature no longer exists or has been
-  restructured, document the change clearly in examples and breaking change
-  notes. Repository history is preserved in Git; code does not need to support
-  old incompatible configurations.
+- **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
 - **Documentation examples must be complete**: every `.EXAMPLE` block must show
   all mandatory parameters. Use canonical usernames in examples: `admin` for
   primary/elevated user, `guest` for secondary/unprivileged users. This ensures
@@ -129,13 +119,7 @@ All PowerShell functions and scripts must enforce explicit parameter passing:
 
 All Nix modules must enforce explicit configuration and avoid implicit assumptions:
 
-- **No backwards compatibility code**: remove deprecated options, conditional
-  fallback logic, and migration shims. If a feature has been restructured or
-  moved (e.g. old symlink schemes replaced with modern layouts), document the
-  change clearly in comments. Repository history is preserved in Git; code does
-  not need to support old incompatible configurations. Add a clear WHY comment
-  explaining what changed and when if the current implementation diverged from
-  a previous approach.
+- **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
 - **Explicit option defaults**: when defining `lib.mkOption`, provide
   meaningful default values only when the default is obvious (e.g. `false` for
   feature flags, `[ ]` for lists). For complex or context-dependent defaults,
@@ -192,6 +176,4 @@ the documentation mechanism.
   "`set -a` exports all variables so child processes inherit version pins") and
   document any behaviour that a future reader might otherwise change
   incorrectly.
-- **No compatibility shims by default**: if a shell script or helper changes
-  behavior, remove the old path unless the user explicitly asked to preserve
-  it for compatibility.
+- **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
