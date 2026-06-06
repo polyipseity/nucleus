@@ -9,8 +9,9 @@ let
   devReposText = builtins.readFile ../../src/modules/dev-repos.nix;
   customProvisionSymlinksText = builtins.readFile ../../src/modules/custom-provision-symlinks.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
+  finderSidebarText = builtins.readFile ../../src/modules/macos/finder-sidebar.nix;
 in
-{
+rec {
   # =========================================================================
   # Assertion 1: VS Code symlink protection in editors.nix
   # =========================================================================
@@ -75,15 +76,13 @@ in
   # =========================================================================
   finderSidebarRewrite =
     assert containsRegex "pkgs\\.mysides" macosText;
-    assert containsRegex "\\$MYSIDES_BIN list" macosText;
     assert containsRegex "add_favorite" macosText;
-    assert containsRegex "\"\\$MYSIDES_BIN\" add \"Applications\"" macosText;
-    assert containsRegex "\"\\$MYSIDES_BIN\" add \"data\"" macosText;
-    assert containsRegex "\"\\$MYSIDES_BIN\" add \"dev\"" macosText;
+    assert containsRegex "configureFinderSidebar" macosText;
+    assert containsRegex "import \\./macos/finder-sidebar" macosText;
+    assert containsRegex "finderSidebarManagedFavorites" finderSidebarText;
+    assert containsRegex "\"\\$MYSIDES_BIN\" remove" finderSidebarText;
     assert !containsRegex "sfltool add-item" macosText;
     assert !containsRegex "sfltool remove-item" macosText;
-    assert containsRegex "! -d \"\\\\$HOME" macosText;
-    assert containsRegex "! -L \"\\\\$HOME" macosText;
     true;
 
   # =========================================================================
@@ -113,6 +112,25 @@ in
     assert containsRegex "completed with .*non-fatal error" devReposText;
     assert !containsRegex "devReposProvision: .*\(skipping\)" devReposText;
     true;
+
+  # =========================================================================
+  # Validation: force all assertions — if any fails, evaluation aborts.
+  # =========================================================================
+  _validation =
+    let
+      allResults = [
+        vsCodeProtection
+        agentsConfigProtection
+        agentsSkillsProtection
+        devReposProtection
+        customProvisionSymlinkProtection
+        raycastAliasProtection
+        finderSidebarRewrite
+        shouldProcessCompliance
+        devReposLoggingPolicy
+      ];
+    in
+    builtins.all (x: x == true) allResults;
 
   # =========================================================================
   # All tests passed

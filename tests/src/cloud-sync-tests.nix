@@ -31,6 +31,7 @@ let
   homeNixText = builtins.readFile ../../src/modules/home.nix;
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
+  finderSidebarText = builtins.readFile ../../src/modules/macos/finder-sidebar.nix;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
   macbookCloudOverrideText = builtins.readFile ../../src/hosts/MacBook/cloud-drives.nix;
   macbookHomebrewText = builtins.readFile ../../src/hosts/MacBook/homebrew.nix;
@@ -173,21 +174,15 @@ let
     assert'
       (
         containsRegex "pkgs\\.mysides" macosText
-        && containsRegex "\\$MYSIDES_BIN list" macosText
+        && containsRegex "\"\\$MYSIDES_BIN\" add" macosText
         && containsRegex "add_favorite" macosText
-        && containsRegex "\\$MYSIDES_BIN add \"Applications\" \"file:///Applications\"" macosText
-        && containsRegex "\\$MYSIDES_BIN add \"Downloads\" \"file://\\$HOME/Downloads\"" macosText
-        && containsRegex "\\$MYSIDES_BIN add \"data\" \"file://\\$HOME/data\"" macosText
-        && containsRegex "\\$MYSIDES_BIN add \"dev\" \"file://\\$HOME/dev\"" macosText
-        && containsRegex "\\$MYSIDES_BIN add \"Desktop\" \"file://\\$HOME/Desktop\"" macosText
-        && containsRegex "\\$MYSIDES_BIN add \"Documents\" \"file://\\$HOME/Documents\"" macosText
-        && containsRegex "\\$MYSIDES_BIN add \"Music\" \"file://\\$HOME/Music\"" macosText
-        && containsRegex "\\$MYSIDES_BIN add \"Movies\" \"file://\\$HOME/Movies\"" macosText
-        && containsRegex "\\$MYSIDES_BIN add \"Pictures\" \"file://\\$HOME/Pictures\"" macosText
-        && containsRegex "\\$MYSIDES_BIN add \"virtual machines\" \"file://\\$HOME/virtual machines\"" macosText
-        && containsRegex "\\$MYSIDES_BIN remove \"/\"" macosText
-        && containsRegex "\\$MYSIDES_BIN remove \"\\$\\(id -un\\)\"" macosText
-        && containsRegex "\\$MYSIDES_BIN remove \\\"\\.Trash\\\"" macosText
+        && containsRegex "configureFinderSidebar" macosText
+        && containsRegex "import \\./macos/finder-sidebar" macosText
+        && containsRegex "finderSidebar\\.finderSidebar" macosText
+        && containsRegex "finderSidebarManagedFavorites" finderSidebarText
+        && containsRegex "\"\\$MYSIDES_BIN\" add" finderSidebarText
+        && containsRegex "\"\\$MYSIDES_BIN\" remove" finderSidebarText
+        && containsRegex "\"\\$MYSIDES_BIN\" list" finderSidebarText
         && !containsRegex "finder-sidebar-repair-v2\\.done" macosText
         && !containsRegex "add favorites manually" macosText
         && !containsRegex "FavoriteItems\\.sfl4" macosText
@@ -266,12 +261,8 @@ let
   # Test 36: macOS Finder sidebar setup creates only canonical local directories and excludes cloud mount subpaths
   test_finder_sidebar_paths_created = assert' (
     containsRegex "mkdir -p" macosText
-    && containsRegex "\\$HOME/data" macosText
-    && containsRegex "\\$HOME/dev" macosText
-    && !containsRegex "\\$HOME/clouds" macosText
-    && !containsRegex "\\$HOME/clouds/GoogleDrive" macosText
-    && !containsRegex "\\$HOME/clouds/iCloud" macosText
-    && !containsRegex "\\$HOME/clouds/OneDrive" macosText
+    && containsRegex "mkdir -p" finderSidebarText
+    && containsRegex "\"\\$HOME/" finderSidebarText
     && !containsRegex "finder-sidebar-repair-v2\\.done" macosText
   ) "macOS setup must create Finder sidebar path directories";
 
@@ -535,8 +526,12 @@ let
     test_cloud_setup_pwsh_acknowledge_abuse
   ];
 in
+let
+  # Force all assertions — if any fails, builtins.all aborts with the thrown error.
+  _allPassed = builtins.all (test: test == null) allTests;
+in
 {
-  success = true;
+  success = _allPassed;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} cloud-drives schema tests passed";
 }

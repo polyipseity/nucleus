@@ -43,59 +43,9 @@ let
   liveICloudDownloads = "${config.home.homeDirectory}/Library/Mobile Documents/com~apple~CloudDocs/Downloads";
   liveLinearmouseConfig = "${liveRepoRoot}/src/modules/configs/linearmouse/linearmouse.json";
 
-  # Domains intentionally reset before each Home Manager write pass so stale
-  # manual overrides do not survive forever in ~/Library/Preferences.
-  #
-  # This list mirrors domains explicitly managed by this repository across:
-  #   - system.defaults typed options (dock/finder/screencapture/trackpad/...)
-  #   - system.defaults.CustomUserPreferences payloads
-  #   - user activation defaults hooks (Safari/universalaccess/symbolichotkeys)
-  #
-  # Keep this list alphabetically sorted for easy drift reviews.
-  # Source for preference-domain write semantics: defaults(1).
-  # https://www.manpagez.com/man/1/defaults/
-  resetUserPreferenceDomains = [
-    "NSGlobalDomain"
-    "com.apple.ActivityMonitor"
-    "com.apple.AdLib"
-    "com.apple.AppleMultitouchTrackpad"
-    "com.apple.BezelServices"
-    "com.apple.CloudDocs"
-    "com.apple.HIToolbox"
-    "com.apple.LaunchServices"
-    "com.apple.Photos"
-    "com.apple.Safari"
-    "com.apple.Siri"
-    "com.apple.SoftwareUpdate"
-    "com.apple.Spotlight"
-    "com.apple.SubmitDiagInfo"
-    "com.apple.TextEdit"
-    "com.apple.TextInput.Kybd"
-    "com.apple.TextInputMenu"
-    "com.apple.VoiceMemos"
-    "com.apple.WindowManager"
-    "com.apple.assistant.support"
-    "com.apple.commerce"
-    "com.apple.controlcenter"
-    "com.apple.desktopservices"
-    "com.apple.dock"
-    "com.apple.finder"
-    "com.apple.iokit.AmbientLightSensor"
-    "com.apple.loginwindow"
-    "com.apple.menuextra.clock"
-    "com.apple.screencapture"
-    "com.apple.screensaver"
-    "com.apple.speech.recognition.AppleSpeechRecognition.prefs"
-    "com.apple.spaces"
-    "com.apple.spotlight"
-    "com.apple.symbolichotkeys"
-    "com.apple.terminal"
-    "com.apple.universalaccess"
-    "com.apple.universalcontrol"
-    "pro.betterdisplay.BetterDisplay"
-    "com.googlecode.iterm2"
-    "com.raycast.macos"
-  ];
+  # Sub-module imports extracted from this file for focused maintainability.
+  finderSidebar = import ./macos/finder-sidebar.nix { inherit config lib pkgs; };
+  preferenceGc = import ./macos/preference-gc.nix { inherit config lib pkgs; };
 
   # UTI list for Chrome: set as the default handler for HTML and XHTML documents.
   # Source: Apple Uniform Type Identifiers.
@@ -471,228 +421,6 @@ let
     sha256 = "0yhfnaigim95sk1idrc3hpwii8hfhjl5m3lyc0ip3vi1a9npq0li";
   };
 
-  # Manual drift-reset helper for managed macOS preference domains.
-  # This is intentionally a user-invoked command instead of an automatic
-  # activation phase so destructive purge operations cannot race with
-  # writeBoundary defaults application.
-  managedPreferencesGcScript = pkgs.writeShellScriptBin "gc-managed-user-preferences" ''
-    set -eu
-
-    # Verify Nix store integrity before running destructive preference cleanup.
-    # If verification fails we skip purge so an unrelated store issue cannot be
-    # compounded by deleting user preference state in the same maintenance run.
-    if ! ${pkgs.nix}/bin/nix-store --verify --check-contents >/dev/null 2>&1; then
-      echo "macos: store integrity check failed; skipping managed preference purge for safety." >&2
-      exit 0
-    fi
-
-    prefs_root="$HOME/Library/Preferences"
-    byhost_root="$prefs_root/ByHost"
-
-    purge_domain_variants() {
-      domain="$1"
-      domain_variants="$domain"
-
-      if [ "$domain" = "NSGlobalDomain" ]; then
-        domain_variants="$domain .GlobalPreferences"
-      fi
-
-      for variant in $domain_variants; do
-        # Clear in-memory registration first, then remove persisted payloads.
-        /usr/bin/defaults delete "$variant" >/dev/null 2>&1 || true
-
-        if [ -d "$prefs_root" ]; then
-          /usr/bin/find "$prefs_root" -maxdepth 1 -type f -name "$variant.plist" -delete
-        fi
-
-        if [ -d "$byhost_root" ]; then
-          /usr/bin/find "$byhost_root" -maxdepth 1 -type f -name "$variant.*.plist" -delete
-        fi
-      done
-    }
-
-    for domain in ${builtins.concatStringsSep " " resetUserPreferenceDomains}; do
-      purge_domain_variants "$domain"
-    done
-
-    /usr/bin/killall cfprefsd >/dev/null 2>&1 || true
-    /bin/sleep 2
-
-    echo "Managed preference domains purged. Run your apply flow to re-assert declarative defaults."
-  '';
-
-  # URI-encode a string for use in file:// URLs consumed by `mysides add`.
-  # `mysides` expects properly encoded URIs; raw spaces cause silent failures.
-  # Source: https://en.wikipedia.org/wiki/Percent-encoding
-  # Uses nixpkgs lib.escapeURL (RFC 3986) then decodes structural characters
-  # (: and /) back so file:// URIs remain valid.
-  uriEncode = url: builtins.replaceStrings [ "%3A" "%2F" ] [ ":" "/" ] (lib.escapeURL url);
-
-  # Single source of truth for managed Finder favorites and ordering.
-  finderSidebarManagedFavorites = [
-    {
-      name = "Applications";
-      url = uriEncode "file:///Applications";
-    }
-    {
-      name = "Downloads";
-      url = uriEncode "file://${config.home.homeDirectory}/Downloads";
-    }
-    {
-      name = "data";
-      url = uriEncode "file://${config.home.homeDirectory}/data";
-    }
-    {
-      name = "dev";
-      url = uriEncode "file://${config.home.homeDirectory}/dev";
-    }
-    {
-      name = "Desktop";
-      url = uriEncode "file://${config.home.homeDirectory}/Desktop";
-    }
-    {
-      name = "Documents";
-      url = uriEncode "file://${config.home.homeDirectory}/Documents";
-    }
-    {
-      name = "Music";
-      url = uriEncode "file://${config.home.homeDirectory}/Music";
-    }
-    {
-      name = "Movies";
-      url = uriEncode "file://${config.home.homeDirectory}/Movies";
-    }
-    {
-      name = "Pictures";
-      url = uriEncode "file://${config.home.homeDirectory}/Pictures";
-    }
-    {
-      name = "virtual machines";
-      url = uriEncode "file://${config.home.homeDirectory}/virtual machines";
-    }
-    {
-      name = "clouds";
-      url = uriEncode "file://${config.home.homeDirectory}/clouds";
-    }
-  ];
-
-  # Number of managed favorites; used to scope the sidebar-order comparison
-  # to the exact count of expected entries.
-  finderSidebarManagedCount = builtins.length finderSidebarManagedFavorites;
-
-  # Keep expected sidebar order derivable from the managed favorites list.
-  finderSidebarExpectedOrder = builtins.concatStringsSep "|" (
-    map (favorite: favorite.name) finderSidebarManagedFavorites
-  );
-
-  # Paths guaranteed by macOS to exist under $HOME — skip symlink guard.
-  finderSidebarAlwaysExist = [
-    "Applications"
-    "Desktop"
-    "Documents"
-    "Downloads"
-    "Music"
-    "Movies"
-    "Pictures"
-  ];
-
-  # Ensure directories referenced by managed Finder favorites exist before add.
-  finderSidebarEnsureDirectoriesShell = builtins.concatStringsSep "\n" (
-    map (
-      favorite:
-      let
-        safeName = lib.escapeShellArg favorite.name;
-      in
-      if builtins.elem favorite.name finderSidebarAlwaysExist then
-        "# ${favorite.name}: system-owned, always exists\nmkdir -p \"$HOME/${safeName}\""
-      else
-        "# ${favorite.name}: managed favorite — symlink-safe guard\nif [ ! -d \"$HOME/${safeName}\" ] && [ ! -L \"$HOME/${safeName}\" ]; then\n  mkdir -p \"$HOME/${safeName}\"\nfi"
-    ) finderSidebarManagedFavorites
-  );
-
-  # Pre-remove managed favorites and default extras by name before any
-  # `mysides list` call.  `mysides remove <name>` works by name lookup and
-  # never needs to parse the sidebar list, so it safely removes corrupted
-  # entries that would cause `mysides list` to segfault (e.g. bookmarks with
-  # unexpanded literal `$HOME` URLs from a previous version of this config).
-  #
-  # Sources for default extras: ``/`` reappears after daemon restarts, the
-  # user's home-directory alias shows up on new macOS versions, and `.Trash`
-  # re-emerges on macOS upgrades.
-  finderSidebarPreRemoveShell = ''
-    ${builtins.concatStringsSep "\n" (
-      map
-        (favoriteName: ''"$MYSIDES_BIN" remove ${lib.escapeShellArg favoriteName} >/dev/null 2>&1 || true'')
-        (
-          (map (f: f.name) finderSidebarManagedFavorites)
-          ++ [
-            "/"
-            ".Trash"
-          ]
-        )
-    )}
-    "$MYSIDES_BIN" remove "$(id -un)" >/dev/null 2>&1 || true
-  '';
-
-  # Clear all current sidebar favorites so managed order can be rebuilt.
-  # `mysides list` output is captured with `|| true` so a segfault in the
-  # mysides binary (e.g. from corrupted bookmarks) terminates only the
-  # subshell, not the activation script.
-  finderSidebarClearShell = ''
-    _sidebar_lines="$("$MYSIDES_BIN" list 2>/dev/null || true)"
-    echo "$_sidebar_lines" | while IFS= read -r _sidebar_line; do
-      _sidebar_name="''${_sidebar_line%% -> *}"
-      [ -n "$_sidebar_name" ] || continue
-      "$MYSIDES_BIN" remove "$_sidebar_name" >/dev/null 2>&1 || true
-    done
-  '';
-
-  # Strict add mode for configureFinderSidebar: preserve per-item failure logs.
-  finderSidebarAddManagedStrictShell = builtins.concatStringsSep "\n" (
-    map (
-      favorite: "add_favorite ${lib.escapeShellArg favorite.name} ${lib.escapeShellArg favorite.url}"
-    ) finderSidebarManagedFavorites
-  );
-
-  # Best-effort add mode for refreshFinderServices: preserve soft-fail behavior.
-  finderSidebarAddManagedBestEffortShell = builtins.concatStringsSep "\n" (
-    map (
-      favorite:
-      ''"$MYSIDES_BIN" add ${lib.escapeShellArg favorite.name} ${lib.escapeShellArg favorite.url} >/dev/null 2>&1 || true''
-    ) finderSidebarManagedFavorites
-  );
-
-  # Remove Finder defaults that can reappear after daemon restarts.
-  finderSidebarRemoveDefaultExtrasShell = ''
-    "$MYSIDES_BIN" remove "/" >/dev/null 2>&1 || true
-    "$MYSIDES_BIN" remove "$(id -un)" >/dev/null 2>&1 || true
-    "$MYSIDES_BIN" remove ".Trash" >/dev/null 2>&1 || true
-  '';
-
-  # Shared strict-mode sidebar reconciliation used during activation.
-  # Pre-remove known favorites first so corrupted entries are always cleared
-  # even if `mysides list` segfaults on them.
-  finderSidebarRebuildStrictShell = ''
-    ${finderSidebarPreRemoveShell}
-    ${finderSidebarClearShell}
-    ${finderSidebarAddManagedStrictShell}
-    ${finderSidebarRemoveDefaultExtrasShell}
-  '';
-
-  # Shared best-effort sidebar reconciliation used after Finder restarts.
-  finderSidebarRebuildBestEffortShell = ''
-    ${finderSidebarPreRemoveShell}
-    ${finderSidebarClearShell}
-    ${finderSidebarAddManagedBestEffortShell}
-    ${finderSidebarRemoveDefaultExtrasShell}
-  '';
-
-  # Shared refresh for Finder sidebar/cache daemons.
-  finderRefreshDaemonsShell = ''
-    /usr/bin/killall sharedfilelistd 2>/dev/null || true
-    /usr/bin/killall cfprefsd 2>/dev/null || true
-  '';
-
   gcWeekly = pkgs.writeShellScript "gc-weekly" ''
     set -eu
 
@@ -794,7 +522,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   ];
 
   home.packages = [
-    managedPreferencesGcScript
+    preferenceGc.managedPreferencesGcScript
     pkgs.mysides
   ];
 
@@ -1309,7 +1037,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       set -eu
 
-      ${finderSidebarEnsureDirectoriesShell}
+      ${finderSidebar.finderSidebarEnsureDirectoriesShell}
 
       MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
 
@@ -1333,18 +1061,18 @@ lib.mkIf pkgs.stdenv.isDarwin {
       # Clear current favorites first so the final list order is deterministic.
       # `mysides list` is now considered healthy in this environment.
       # Rebuild the exact managed order requested for Finder favorites.
-      ${finderSidebarRebuildStrictShell}
+      ${finderSidebar.finderSidebarRebuildStrictShell}
 
-      _finder_expected_order="${finderSidebarExpectedOrder}"
+      _finder_expected_order="${finderSidebar.finderSidebarExpectedOrder}"
       _finder_list_output=$("$MYSIDES_BIN" list 2>/dev/null || true)
-      _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n ${toString finderSidebarManagedCount} | /usr/bin/paste -sd'|' -)"
+      _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n ${toString finderSidebar.finderSidebarManagedCount} | /usr/bin/paste -sd'|' -)"
       if [ "$_finder_actual_order" != "$_finder_expected_order" ]; then
         echo "macos: warning — mysides reported sidebar order mismatch (expected: $_finder_expected_order, actual: $_finder_actual_order)." >&2
         _finder_sidebar_failed=1
       fi
 
       # Refresh finder-related daemons in-session (sharedfilelistd, cfprefsd).
-      ${finderRefreshDaemonsShell}
+      ${finderSidebar.finderRefreshDaemonsShell}
 
       if [ "$_finder_sidebar_failed" -eq 1 ]; then
         echo "macos: Finder favorites were partially updated; if stale entries persist, log out and log back in once." >&2
@@ -1363,7 +1091,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       lib.hm.dag.entryAfter [ "configureFinderSidebar" "installPackages" "configureLaunchServices" ]
         ''
           # Refresh finder-related daemons (sharedfilelistd, cfprefsd).
-          ${finderRefreshDaemonsShell}
+          ${finderSidebar.finderRefreshDaemonsShell}
 
           # Enable Services to appear in Finder context menu for both files and
           # empty space. Set NSServicesMinimumItemCountForContextSubmenu to 0 to show
@@ -1397,7 +1125,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     relaunchDesktopServices =
       lib.hm.dag.entryAfter [ "configureFinderSidebar" "refreshFinderServices" ]
         ''
-          ${finderRefreshDaemonsShell}
+          ${finderSidebar.finderRefreshDaemonsShell}
 
           # Restart Finder via launchd (preserves window state, cleanest method).
           if ! /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
@@ -1415,7 +1143,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
           # Re-apply managed favorites to keep deterministic output.
           MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
           if [ -x "$MYSIDES_BIN" ]; then
-            ${finderSidebarRebuildBestEffortShell}
+            ${finderSidebar.finderSidebarRebuildBestEffortShell}
           fi
         '';
 
