@@ -16,14 +16,10 @@
 let
   pkg = pkgs.darwin.linux-builder;
   workDir = "/var/lib/linux-builder";
-  # Nix 2.34.x currently fails to start ssh-ng master sessions against the
-  # nix-darwin linux-builder on this host, while the legacy ssh:// builder path
-  # works for the same derivations. Keep the builder registration on ssh:// so
-  # distributed builds remain functional until upstream ssh-ng/master startup is
-  # fixed.
-  # For the legacy ssh:// path, rely on the managed Host/HostKeyAlias/
-  # UserKnownHostsFile config below instead of Nix's inline host-key field; the
-  # inline field bypasses that alias handling and breaks host verification here.
+  # Nix 2.34.x ssh-ng master sessions fail against darwin linux-builder; the
+  # ssh:// builder path works. Keep registration on ssh:// until upstream
+  # ssh-ng/master startup is fixed. Rely on managed Host/HostKeyAlias/
+  # UserKnownHostsFile config below instead of Nix's inline host-key field.
   builderMachine = "ssh://builder@linux-builder aarch64-linux /etc/nix/builder_ed25519 4 1 benchmark,big-parallel,kvm - -";
   userSshDir = "/Users/${username}/.ssh";
   userBuilderKeyPath = "${userSshDir}/linux-builder_ed25519";

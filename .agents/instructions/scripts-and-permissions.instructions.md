@@ -122,12 +122,10 @@ that describes the shared purpose of the file.
   directories must have explicit `-Username` or `-Users` parameters. Never
   silently default to the current user or auto-discover users from the
   filesystem.
-- **Remove backwards compatibility code**: this repository does not require
-  support for deprecated parameters, conditional migration paths, or old
-  configuration formats unless the user explicitly asks for compatibility.
-  If a feature has changed, remove the old path completely and document the
-  breaking change clearly in examples and commit messages. Git preserves all
-  history; archived code does not need to live alongside the current
+- **Remove dead paths**: this repository does not carry deprecated parameters,
+  conditional migration paths, or old configuration formats. Remove the old path
+  entirely and document the breaking change in examples and commit messages.
+  Git preserves all history; archived code need not live alongside current
   implementation.
 - **Complete function signatures**: every function signature must show all
   mandatory parameters in its `.SYNOPSIS` and `.EXAMPLE` sections so callers

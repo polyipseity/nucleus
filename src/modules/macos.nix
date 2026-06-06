@@ -166,10 +166,8 @@ let
   # set +e at the top makes all operations fully soft-fail so launchd never
   # marks the agent as failed and throttles future invocations.
   #
-  # iCloud exclusion roots are constrained to subpaths under
-  # ~/Library/Mobile Documents. This keeps the File Provider ignore xattr scoped
-  # to native iCloud storage only; legacy aliases like ~/Downloads/iCloud and
-  # ~/clouds/iCloud must never be traversed by this hook.
+  # Restrict iCloud exclusion to ~/Library/Mobile Documents subpaths.
+  # Never traverse symlinks like ~/Downloads/iCloud or ~/clouds/iCloud.
   sanitizeICloudManagedRoots =
     roots:
     let
@@ -619,7 +617,7 @@ let
   #
   # Sources for default extras: ``/`` reappears after daemon restarts, the
   # user's home-directory alias shows up on new macOS versions, and `.Trash`
-  # is a legacy Finder sidebar entry that can re-emerge on macOS upgrades.
+  # re-emerges on macOS upgrades.
   finderSidebarPreRemoveShell = ''
     ${builtins.concatStringsSep "\n" (
       map
@@ -1304,9 +1302,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # configureFinderSidebar
-    # Configure Finder favorites automatically with mysides using a deterministic
-    # ordered list. This avoids legacy archive rewrite workarounds and keeps the
-    # sidebar convergeable from declarative activation.
+    # Configure Finder favorites via mysides using a deterministic ordered list.
+    # Avoids archive-rewrite workarounds; sidebar converges from activation.
     # NOTE: mysides writes to the SFLSharedFileList via com.apple.sharedfilelistd.
     # The daemon caches sidebar state; changes are fully visible in Finder only
     # after a macOS logout/reboot. The daemon restarts below provide a partial
@@ -1468,8 +1465,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         echo "macos: warning — AltTab menu bar hide failed (app may not be installed)." >&2
       fi
 
-      # BetterDisplay: hide app icon in menu UI and keep legacy menu-bar key
-      # off for compatibility across BetterDisplay releases.
+      # BetterDisplay: hide app icon and deprecated menu-bar key.
       # Source: BetterDisplay preference domain and menu-bar options.
       # https://github.com/waydabber/BetterDisplay/wiki
       if /usr/bin/defaults write pro.betterdisplay.BetterDisplay hideMenuIcon -bool true; then
