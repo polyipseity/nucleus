@@ -21,12 +21,31 @@ def get_repo_root() -> Path:
 
     The script lives at <repo_root>/scripts/prek-hooks.py, so the repo root
     is two levels up from __file__.
+
+    Returns:
+        Absolute path to the repository root directory.
     """
     return Path(__file__).resolve().parent.parent
 
 
 def run_check(files: list[str], repo_root: Path) -> int:
-    """Run the check hook."""
+    """Run the check hook.
+
+    On POSIX, delegates entirely to ``nix run ./src#check`` with optional
+    file arguments.  On Windows, dispatches to ``check-pwsh.ps1`` and/or
+    ``check-packer.ps1`` depending on which file extensions are present, or
+    runs all available checks when no files are given.
+
+    Args:
+        files: List of file paths (relative or absolute) to check.  May be
+            empty, in which case all available checks are run.
+        repo_root: Absolute path to the repository root, used to locate
+            the check scripts.
+
+    Returns:
+        Exit code from the underlying check process(es).  0 on success,
+        non-zero on failure.
+    """
     if sys.platform != "win32":
         # POSIX: delegate entirely to nix
         env = os.environ.copy()
@@ -114,7 +133,19 @@ def run_check(files: list[str], repo_root: Path) -> int:
 
 
 def run_format_nix(files: list[str], repo_root: Path) -> int:
-    """Run the format-nix hook."""
+    """Run the format-nix hook.
+
+    Runs ``nixfmt`` on the given Nix files using ``--sort`` and ``--verify``
+    flags.  Skipped on Windows (nixfmt is not available).
+
+    Args:
+        files: List of ``.nix`` file paths to format.
+        repo_root: Absolute path to the repository root, used as the working
+            directory for the nix command.
+
+    Returns:
+        Exit code from the nixfmt process.  0 on success, non-zero on failure.
+    """
     if sys.platform == "win32":
         print("scripts/prek-hooks.py: nixfmt skipped (not available on Windows)")
         return 0
@@ -134,6 +165,12 @@ def run_format_nix(files: list[str], repo_root: Path) -> int:
 
 
 def main() -> None:
+    """Entry point for the prek hook wrapper.
+
+    Parses command-line arguments, resolves the repository root, and
+    dispatches to the appropriate hook implementation (``check`` or
+    ``format-nix``).  Exits with the hook's return code.
+    """
     parser = argparse.ArgumentParser(
         description="Cross-platform prek hook wrapper",
     )
