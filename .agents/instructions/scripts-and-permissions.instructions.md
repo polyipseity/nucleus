@@ -8,8 +8,9 @@ applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
 
 ## Scope
 
-- Keep repo-level helper scripts in `scripts/`. Current contents: `bootstrap.sh`
-  (Unix), `bootstrap.ps1` (Windows), and `bootstrap-versions.env` (version pins).
+- Keep repo-level helper scripts in `scripts/`. Contents include paired `.sh`/`.ps1`
+  entry points for bootstrap, check, cloud-setup, gc, health-check, replica-sync,
+  replica-reset, update, vm-setup, ai-sync, and other automation tasks.
 - Do not scatter contributor-facing or CI-facing automation across random
   folders when `scripts/` is the intended home.
 
