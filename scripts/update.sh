@@ -78,16 +78,6 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-merge_nix_config() {
-  # Keep flake feature flags centralized so every nix call in this script works
-  # on hosts where those features are not globally enabled yet.
-  if [ -n "${NIX_CONFIG:-}" ]; then
-    printf '%s\n%s' "$NIX_CONFIG" "experimental-features = nix-command flakes"
-  else
-    printf '%s' "experimental-features = nix-command flakes"
-  fi
-}
-
 run_nix() {
   NIX_CONFIG="$(merge_nix_config)" nix --option warn-dirty false "$@"
 }

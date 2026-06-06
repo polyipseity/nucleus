@@ -26,7 +26,6 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT="$(resolve_nucleus_root)"
 VERSIONS_FILE="$SCRIPT_DIR/bootstrap-versions.env"
 apply="${NUCLEUS_APPLY:-false}"
-NIX_FEATURES_CONFIG="experimental-features = nix-command flakes"
 
 # ---------------------------------------------------------------------------
 # Flag parsing
@@ -92,16 +91,6 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
-
-merge_nix_config() {
-  # Merge caller-provided NIX_CONFIG (if any) with required flake settings so
-  # bootstrap commands stay portable without repeating feature flags.
-  if [ -n "${NIX_CONFIG:-}" ]; then
-    printf '%s\n%s' "$NIX_CONFIG" "$NIX_FEATURES_CONFIG"
-  else
-    printf '%s' "$NIX_FEATURES_CONFIG"
-  fi
-}
 
 run_nix() {
   # Execute nix with the merged config for this script invocation.
@@ -262,38 +251,6 @@ ensure_macos_nix_mount() {
 
   printf '%s\n' "Reboot once to materialize /nix, then re-run bootstrap.sh."
   exit 1
-}
-
-require_command() {
-  # Asserts that a command is available in PATH.
-  # Prints an error to stderr and exits 1 if the command is missing.
-  # Args: $1 — name of the command to check
-  if ! command -v "$1" >/dev/null 2>&1; then
-    printf '%s\n' "error: $1 is required but was not found in PATH" >&2
-    exit 1
-  fi
-}
-
-sha256_of_file() {
-  # Computes the SHA-256 hex digest of a file and prints it to stdout.
-  # Tries sha256sum (Linux coreutils), then shasum -a 256 (macOS BSD tools),
-  # then openssl dgst -sha256 as a last resort.
-  # Calls require_command to abort with a clear error if none are available.
-  # Args: $1 — path to the file to hash
-  file_path="$1"
-
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$file_path" | awk '{ print $1 }'
-    return
-  fi
-
-  if command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$file_path" | awk '{ print $1 }'
-    return
-  fi
-
-  require_command openssl
-  openssl dgst -sha256 "$file_path" | awk '{ print $2 }'
 }
 
 load_bootstrap_versions
