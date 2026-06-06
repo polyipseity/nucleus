@@ -1,24 +1,25 @@
 # LiteLLM proxy configuration — shared across all hosts.
 #
-# Ollama models are proxied via ollama_chat/<model> pointing at the local
-# Ollama daemon on 127.0.0.1:11434.  DeepSeek V4 models use a fallback chain:
-#   primary (order: 1) — OpenCode Go (https://opencode.ai/zen/go/v1),
-#                         OPENCODE_GO_API_KEY env var
-#   fallback (order: 2) — OpenRouter, OPENROUTER_API_KEY env var
-# Both env vars are sourced from SOPS-decrypted secrets at runtime.
+# AI gateway on 127.0.0.1:4000 routing to:
+#   - Local Ollama daemon (127.0.0.1:11434) for offline models
+#   - DeepSeek V4 via OpenCode Go (primary, order: 1) with
+#     OpenRouter fallback (order: 2).  API keys from SOPS secrets.
 #
-# litellm_settings.drop_params prevents errors when clients send parameters
-# (e.g. max_tokens) that a particular model endpoint does not support.
+# router_settings.num_retries=3 exhausts the primary tier before
+# falling back; simple-shuffle randomizes endpoint selection.
 
 litellm_settings:
+  # Drop unsupported client params (e.g. max_tokens) per-endpoint.
   drop_params: true
 
-# Set the proxy log level to WARNING to suppress per-request INFO chatter
-# while still capturing errors, warnings, and startup diagnostics.
+# WARNING suppresses per-request INFO chatter while still capturing
+# errors, warnings, and startup diagnostics.
 general_settings:
   environment_variables:
     LITELLM_LOG: WARNING
 
+# Retry the primary tier (order: 1) up to 3 times before falling back
+# to order: 2.  simple-shuffle randomizes selection within a tier.
 router_settings:
   num_retries: 3
   routing_strategy: simple-shuffle
