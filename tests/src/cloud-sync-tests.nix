@@ -35,7 +35,7 @@ let
   macbookCloudOverrideText = builtins.readFile ../../src/hosts/MacBook/cloud-drives.nix;
   macbookHomebrewText = builtins.readFile ../../src/hosts/MacBook/homebrew.nix;
 
-  assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
+  inherit (import ../lib.nix) assert';
 
   # Test 1: Module defines both mounts and replicas option lists
   test_options_exist =

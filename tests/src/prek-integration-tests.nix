@@ -23,8 +23,7 @@ let
   windowsSystemDscText = builtins.readFile ../../src/hosts/Windows/system.dsc.yml;
   windowsUserDscText = builtins.readFile ../../src/hosts/Windows/user.dsc.yml;
 
-  # Simple assertion helper with descriptive errors.
-  assert' = cond: msg: if !cond then builtins.throw msg else null;
+  inherit (import ../lib.nix) assert';
 
   test_posix_binary_baseline = assert' (lib.hasInfix "pkgs.prek" coreModuleText) "POSIX shared package baseline must include pkgs.prek";
 

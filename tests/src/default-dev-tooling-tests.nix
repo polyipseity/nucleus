@@ -31,8 +31,7 @@ let
   uvSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-UvSetup.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
 
-  # Simple assertion helper with descriptive errors.
-  assert' = cond: msg: if !cond then throw msg else null;
+  inherit (import ../lib.nix) assert';
 
   test_posix_shell_exports_fallback_bundle = assert' (
     (lib.hasInfix "default-dev-tools" posixShellText)

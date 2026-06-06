@@ -17,8 +17,7 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   cloudDrivesModuleText = builtins.readFile ../../src/modules/cloud-drives.nix;
 
-  # Assertion helper with detailed error messages.
-  assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
+  inherit (import ../lib.nix) assert';
 
   # Test 1: Verify home.username option exists and is a string
   test_home_username_type = assert' (

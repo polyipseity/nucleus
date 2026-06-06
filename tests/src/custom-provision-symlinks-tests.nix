@@ -19,7 +19,7 @@ let
   windowsRegistryLoaderText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
 
-  assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
+  inherit (import ../lib.nix) assert';
 
   test_home_imports_custom_module = assert' (containsRegex ''\.\/custom-provision-symlinks\.nix'' homeText) "home.nix must import the custom provision symlink module";
 

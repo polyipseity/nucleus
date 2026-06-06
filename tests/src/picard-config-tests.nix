@@ -13,7 +13,7 @@ let
   usersRegistry = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
   windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
 
-  assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
+  inherit (import ../lib.nix) assert';
 
   test_posix_picard_ini_merge_overwrite_wiring = assert' (
     containsRegex "configurePicardSettings" homeText

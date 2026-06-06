@@ -13,7 +13,7 @@ let
   shellModuleText = builtins.readFile ../../src/modules/shell.nix;
   users = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
 
-  assert' = cond: msg: if !cond then throw msg else null;
+  inherit (import ../lib.nix) assert';
 
   user = users.polyipseity;
   excludedDirNames = user.iCloudExclusions.excludedDirNames;

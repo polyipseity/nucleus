@@ -20,8 +20,7 @@ let
     optionalAttrs
     ;
 
-  # Assertion helper with descriptive errors.
-  assert' = cond: msg: if !cond then builtins.throw msg else null;
+  inherit (import ../lib.nix) assert';
 
   # === TEST: mkIf prevents unconditional conflicts ===
   test_mkif_prevents_conflicts =

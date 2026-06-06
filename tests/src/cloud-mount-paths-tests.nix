@@ -10,7 +10,7 @@ let
 
   moduleText = builtins.readFile ../../src/modules/cloud-drives.nix;
 
-  assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
+  inherit (import ../lib.nix) assert';
 
   test_mount_paths_replace_symlinks = assert' (
     containsRegex "replaced legacy symlink" moduleText

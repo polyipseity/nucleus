@@ -6,7 +6,7 @@ let
   nixosDesktopText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
   windowsSystemText = builtins.readFile ../../src/hosts/Windows/system.dsc.yml;
 
-  assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
+  inherit (import ../lib.nix) assert';
 
   test_macos_routes_picard_to_homebrew = assert' (
     containsRegex ''"musicbrainz-picard" = \{'' coreText

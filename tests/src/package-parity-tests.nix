@@ -11,7 +11,7 @@
   lib ? import <nixpkgs/lib>,
 }:
 let
-  assert' = cond: msg: if !cond then builtins.throw "PARITY FAILED: ${msg}" else null;
+  inherit (import ../lib.nix) assert';
 
   # Critical packages that should exist on all three platforms.
   # Format: { name, nixpkgs, homebrew, winget }

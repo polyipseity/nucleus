@@ -15,7 +15,7 @@ let
   nixosManualText = builtins.readFile ../../src/hosts/NixOS/MANUAL.md;
   windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
 
-  assert' = cond: msg: if !cond then throw msg else null;
+  inherit (import ../lib.nix) assert';
 
   test_zsh_aliases_include_curated_git_shortcuts = assert' (
     lib.hasInfix ''"-gb" = "git branch";'' aliasesText

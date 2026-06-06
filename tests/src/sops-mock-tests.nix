@@ -20,8 +20,7 @@ let
     all
     ;
 
-  # Assertion helper.
-  assert' = cond: msg: if !cond then throw msg else null;
+  inherit (import ../lib.nix) assert';
 
   # Mock SOPS configuration matching .sops.yaml structure.
   mockSopsConfig = {

@@ -13,7 +13,7 @@ let
   linuxText = builtins.readFile ../../src/modules/linux.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
 
-  assert' = cond: msg: if !cond then throw "ASSERTION FAILED: ${msg}" else null;
+  inherit (import ../lib.nix) assert';
 
   test_linux_nix_index_is_daily = assert' (
     containsRegex ''Description = "Daily nix-index database refresh";'' linuxText

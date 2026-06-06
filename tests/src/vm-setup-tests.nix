@@ -8,7 +8,7 @@
   lib ? import <nixpkgs/lib>,
 }:
 let
-  assert' = cond: msg: if !cond then builtins.throw msg else null;
+  inherit (import ../lib.nix) assert';
 
   manifest = builtins.fromJSON (builtins.readFile ../../src/modules/VMs.json);
 

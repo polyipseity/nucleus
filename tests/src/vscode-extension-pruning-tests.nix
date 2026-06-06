@@ -10,7 +10,7 @@
   lib ? import <nixpkgs/lib>,
 }:
 let
-  assert' = cond: msg: if !cond then builtins.throw "ASSERTION FAILED: ${msg}" else null;
+  inherit (import ../lib.nix) assert';
 
   posixEditors = builtins.readFile ../../src/modules/editors.nix;
   windowsExtensions = builtins.readFile ../../src/hosts/Windows/modules/editors/Sync-VSCodeExtension.ps1;

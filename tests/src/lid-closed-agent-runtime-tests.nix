@@ -17,7 +17,7 @@ let
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   windowsPowerPolicyText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-PowerPolicy.ps1;
 
-  assert' = cond: msg: if !cond then throw msg else null;
+  inherit (import ../lib.nix) assert';
 
   test_macos_keeps_remote_session_pmset_posture =
     assert'

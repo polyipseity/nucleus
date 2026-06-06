@@ -24,8 +24,7 @@ let
   windowsGitSshModuleText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1;
   sharedGitModuleText = builtins.readFile ../../src/modules/git.nix;
 
-  # Assertion helper.
-  assert' = cond: msg: if !cond then builtins.throw msg else null;
+  inherit (import ../lib.nix) assert';
 
   # === TEST: Secret materialization before dev repo provision ===
   test_secrets_before_devrepo =

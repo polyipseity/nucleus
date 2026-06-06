@@ -22,7 +22,7 @@ let
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   nixosDefaultText = builtins.readFile ../../src/hosts/NixOS/default.nix;
 
-  assert' = cond: msg: if !cond then throw "COMPOSITION FAILED: ${msg}" else null;
+  inherit (import ../lib.nix) assert';
 
   # Test 1: Verify all POSIX hosts import core.nix
   test_posix_hosts_import_core = assert' (

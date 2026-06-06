@@ -7,8 +7,7 @@
   lib ? import <nixpkgs/lib>,
 }:
 let
-  # Simple assertion helper with descriptive errors.
-  assert' = cond: msg: if !cond then builtins.throw msg else null;
+  inherit (import ../lib.nix) assert';
 
   # === BACKEND SELECTION RESOLUTION LOGIC ===
   # Mimics core.nix resolveBackend: check overrides → check policy → fall back to global backend.
