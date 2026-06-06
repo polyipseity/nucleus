@@ -165,10 +165,10 @@ Before applying DSC changes, preview them without modifying system state:
 
 ```powershell
 # Preview system-level changes
-winget configure --what-if .\src\hosts\windows\system.dsc.yml
+winget configure --what-if .\src\hosts\Windows\system.dsc.yml
 
 # Preview user-level changes
-winget configure --what-if .\src\hosts\windows\user.dsc.yml
+winget configure --what-if .\src\hosts\Windows\user.dsc.yml
 ```
 
 ---
@@ -300,7 +300,7 @@ Tests run automatically on:
 
 **Fix:**
 
-1. Verify DSC syntax: `winget configure --what-if .\src\hosts\windows\*.dsc.yml`
+1. Verify DSC syntax: `winget configure --what-if .\src\hosts\Windows\*.dsc.yml`
 2. Run apply manually: `.\src\scripts\bootstrap.ps1`
 3. Wait for package manager to finish installing
 4. Re-run Pester: `Invoke-Pester tests/src/hosts/Windows/`
