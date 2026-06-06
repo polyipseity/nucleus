@@ -60,8 +60,8 @@
   `.agents/instructions/*.instructions.md` files.
 - Prefer declarative state (`src/modules/*.nix`, WinGet DSC YAML) over imperative scripts.
 - Keep POSIX shared behavior in shared modules, not duplicated per-host.
-- For cross-host capabilities, design for parity across macOS, NixOS, and Windows first;
-  document any platform exception with a short `WHY` comment.
+- Design for cross-host parity first; see
+  `.agents/instructions/cross-host-feature-parity.instructions.md` for the full policy.
 - Sort unordered lists/blocks alphabetically; preserve semantic/load order where required.
 - Use `.yml` for YAML files (except required `.sops.yaml`).
 - Script files (`.sh`, `.ps1`, `.bat`) must be executable in Git (`100755`);
