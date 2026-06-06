@@ -7,33 +7,36 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   editorsText = builtins.readFile ../../src/modules/editors.nix;
   homeText = builtins.readFile ../../src/modules/home.nix;
+  qtpassText = builtins.readFile ../../src/modules/configs/qtpass.nix;
   loadUserRegistryText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
   syncQtPassText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-QtPassConfig.ps1;
   usersRegistryText = builtins.readFile ../../src/modules/users.json;
   windowsUsers = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
 in
-# Verify QtPass settings are now stored in home.nix (not separate JSON)
-assert containsRegex "qtPassDefaultSettings = " homeText;
-assert containsRegex "addGPGId = true" homeText;
-assert containsRegex "alwaysOnTop = true" homeText;
-assert containsRegex "autoclearPanelSeconds = 5" homeText;
-assert containsRegex "autoclearSeconds = 10" homeText;
-assert containsRegex "clipBoardType = 2" homeText;
-assert containsRegex "hideOnClose = true" homeText;
-assert containsRegex "hidePassword = true" homeText;
-assert containsRegex "passTemplate = " homeText;
-assert containsRegex "passwordCharsselection = 0" homeText;
-assert containsRegex "passwordLength = 15" homeText;
-assert containsRegex "templateAllFields = true" homeText;
-assert containsRegex "useAutoclear = true" homeText;
-assert containsRegex "useAutoclearPanel = true" homeText;
-assert containsRegex "useGit = true" homeText;
-assert containsRegex "useOtp = true" homeText;
-assert containsRegex "usePwgen = true" homeText;
-assert containsRegex "useTemplate = true" homeText;
-assert containsRegex "useTrayIcon = true" homeText;
+# Verify QtPass settings are now stored in configs/qtpass.nix (not home.nix)
+assert containsRegex "qtPassDefaultSettings = " qtpassText;
+assert containsRegex "addGPGId = true" qtpassText;
+assert containsRegex "alwaysOnTop = true" qtpassText;
+assert containsRegex "autoclearPanelSeconds = 5" qtpassText;
+assert containsRegex "autoclearSeconds = 10" qtpassText;
+assert containsRegex "clipBoardType = 2" qtpassText;
+assert containsRegex "hideOnClose = true" qtpassText;
+assert containsRegex "hidePassword = true" qtpassText;
+assert containsRegex "passTemplate = " qtpassText;
+assert containsRegex "passwordCharsselection = 0" qtpassText;
+assert containsRegex "passwordLength = 15" qtpassText;
+assert containsRegex "templateAllFields = true" qtpassText;
+assert containsRegex "useAutoclear = true" qtpassText;
+assert containsRegex "useAutoclearPanel = true" qtpassText;
+assert containsRegex "useGit = true" qtpassText;
+assert containsRegex "useOtp = true" qtpassText;
+assert containsRegex "usePwgen = true" qtpassText;
+assert containsRegex "useTemplate = true" qtpassText;
+assert containsRegex "useTrayIcon = true" qtpassText;
 # Verify platform override (macOS sets hideOnClose = false)
-assert containsRegex "hideOnClose = false" homeText;
+assert containsRegex "hideOnClose = false" qtpassText;
+# Verify home.nix still imports and wires the module
+assert containsRegex "qtpassModule = import ./configs/qtpass.nix" homeText;
 # Verify integration points
 assert containsRegex "Sync-QtPassConfig -Enabled:" applyText;
 assert containsRegex "qtPassSettingsPath" applyText;
