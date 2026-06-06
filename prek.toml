@@ -60,7 +60,7 @@ hooks = [
   # Consolidated repository check — runs shell, PowerShell, and Packer
   # validation in sequence via check.sh. The files pattern catches all
   # three types; check.sh routes each file to the right sub-checker.
-  { id = "check", name = "consolidated repository checks", language = "python", files = "(\\.sh|\\.ps1|\\.pkr\\.hcl)$", entry = "python scripts/prek-hook.py check" },
+  { id = "check", name = "consolidated repository checks", language = "python", files = "(\\.sh|\\.ps1|\\.pkr\\.hcl)$", entry = "python scripts/prek-hooks.py check" },
   # Nix file formatting using nixfmt for consistent code style.
-  { id = "format-nix", name = "format Nix files", language = "python", files = "\\.nix$", entry = "python scripts/prek-hook.py format-nix" },
+  { id = "format-nix", name = "format Nix files", language = "python", files = "\\.nix$", entry = "python scripts/prek-hooks.py format-nix" },
 ]
