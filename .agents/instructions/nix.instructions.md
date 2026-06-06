@@ -62,7 +62,7 @@ See `src/scripts/jellyfin-sync.sh` for an example of this pattern.
 
 ## No Backwards Compatibility
 
-See the [No Backwards Compatibility](../../../AGENTS.md#no-backwards-compatibility) section in AGENTS.md. This codebase has zero tolerance for compat shims — remove old paths in the same change, no aliases, no fallbacks.
+See [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility) for the canonical policy.
 
 ## Cross-host parity expectations
 
