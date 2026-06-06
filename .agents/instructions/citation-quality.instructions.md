@@ -1,7 +1,7 @@
 ---
 description: "Use when adding external citations/source references to code, documentation, or configuration files. Enforces URL quality, developer vs. user documentation preference, and deprecation hygiene."
 name: "Citation Quality Standards"
-applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, src/scripts/**, src/hosts/**/MANUAL.md, README.md, AGENTS.md, .agents/**/*.md"
+applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, src/scripts/**"
 ---
 
 ## Citation quality standards

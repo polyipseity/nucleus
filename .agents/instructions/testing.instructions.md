@@ -1,6 +1,6 @@
 ---
 description: "Use when implementing new features, modules, or changes that require test coverage. Mandates test-driven development (TDD) practices for Nix and Windows DSC configurations. Covers test structure, CI integration, and validation patterns."
-applyTo: "src/**/*.nix, src/hosts/Windows/**/*.yml, src/hosts/Windows/modules/*.ps1, tests/**, .github/workflows/**"
+applyTo: "tests/**, src/hosts/Windows/**/*.yml, src/hosts/Windows/modules/*.ps1, .github/workflows/**"
 ---
 
 # Test-Driven Development Practices

@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or changing capabilities that may apply to multiple hosts (macOS, NixOS, Windows). Enforces cross-host parity-first design and explicit rationale for platform-specific exceptions."
 name: "Cross-Host Feature Parity"
-applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, src/scripts/**, AGENTS.md, .agents/instructions/**/*.md"
+applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml"
 ---
 
 # Cross-Host Feature Parity
