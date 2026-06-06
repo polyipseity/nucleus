@@ -32,14 +32,28 @@ if ($args.Count -gt 0 -and ($args[0] -eq '-h' -or $args[0] -eq '--help')) {
   exit 0
 }
 
+$HAS_ARGS = $args.Count -gt 0
+
+# Group paths by extension — each sub-checker receives only files it understands.
+$PS1_FILES = @()
+$PKR_FILES = @()
+if ($HAS_ARGS) {
+  foreach ($_f in $args) {
+    if ($_f -like '*.ps1')     { $PS1_FILES += $_f }
+    if ($_f -like '*.pkr.hcl') { $PKR_FILES += $_f }
+  }
+}
+
 # ---------------------------------------------------------------------------
 # 1. PowerShell syntax validation
 # ---------------------------------------------------------------------------
 Write-Output "`n=== [1/2] PowerShell syntax validation ==="
-if ($args.Count -gt 0) {
-  & "$RepoRoot\scripts\check-pwsh.ps1" $args
-} else {
+if ($PS1_FILES.Count -gt 0) {
+  & "$RepoRoot\scripts\check-pwsh.ps1" $PS1_FILES
+} elseif (-not $HAS_ARGS) {
   & "$RepoRoot\scripts\check-pwsh.ps1"
+} else {
+  Write-Output "Skipping (no PowerShell scripts to check)."
 }
 if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 
@@ -47,10 +61,12 @@ if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 # 2. Packer template validation
 # ---------------------------------------------------------------------------
 Write-Output "`n=== [2/2] Packer template validation ==="
-if ($args.Count -gt 0) {
-  & "$RepoRoot\scripts\check-packer.ps1" $args
-} else {
+if ($PKR_FILES.Count -gt 0) {
+  & "$RepoRoot\scripts\check-packer.ps1" $PKR_FILES
+} elseif (-not $HAS_ARGS) {
   & "$RepoRoot\scripts\check-packer.ps1"
+} else {
+  Write-Output "Skipping (no Packer templates to check)."
 }
 if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 
