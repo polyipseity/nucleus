@@ -474,7 +474,7 @@ in
       # Screenshot configurations:
       #   - LaunchAtLogin: true (app auto-starts at login)
       #   - hideMenuIcon: true (hide app icon in BetterDisplay menu UI)
-      #   - showInMenuBar: false (legacy key kept for backward compatibility)
+      #   - showInMenuBar: false (deprecated key, kept for cross-release compat)
       #   - sendCrashReports: true (auto-send crash logs to developers)
       #   - enableProfessionalFeatures: false (disable pro/licensing management)
       #   - SUEnableAutomaticChecks: false (disable automatic update checking)

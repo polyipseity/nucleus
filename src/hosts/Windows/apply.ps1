@@ -38,8 +38,7 @@
 
 .PARAMETER PrimaryUsername
   Username allowed to materialize user-scoped secrets. Defaults to the
-  current interactive user for legacy compatibility, but -Users is the
-  preferred way to specify configured users. Deprecated: use -Users instead.
+  current interactive user. Deprecated: use -Users instead.
 
 .PARAMETER Users
   Array of usernames to configure. Mandatory: each user in this list gets
@@ -238,9 +237,7 @@ param(
 $ErrorActionPreference = "Stop"
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 
-# Compute effective Enable-* values from high-level skip flags.
-# These internal variables preserve backward compatibility with downstream
-# sections that check individual flags while presenting a simpler CLI surface.
+# Compose internal Enable-* flags from high-level -No* switches for downstream guards.
 $noOptionalParity = $NoOptionalParity
 $noSecretsParity = $NoSecretsParity -or $noOptionalParity
 $noUserStateParity = $NoUserStateParity -or $noOptionalParity
