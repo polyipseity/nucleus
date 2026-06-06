@@ -25,7 +25,6 @@
 - Agent customization is file-driven:
   - `opencode.jsonc` registers `.agents/instructions/**/*.md` and `.agents/skills/`.
   - `.opencode/commands/` mirrors prompt workflows for OpenCode consumers.
-  - `.vscode/settings.json` defines terminal auto-approve patterns and editor behavior.
 - Repository automation lives in `.github/workflows/ci.yml`,
   `.github/dependabot.yml`, and `.commitlintrc.mjs`.
 - Formatting and newline behavior comes from `.editorconfig`, `.gitattributes`,
@@ -50,9 +49,6 @@
 ## Testing
 
 - Tests are required for feature additions and breaking changes.
-- Nix tests: `tests/src/*.nix` plus `nix flake check`.
-- Windows tests: `tests/src/hosts/Windows/**/*.Tests.ps1` (run locally on Windows).
-- Follow TDD flow: write failing test → implement → pass → commit atomically.
 - Detailed testing guidance lives in `.agents/instructions/testing.instructions.md`.
 
 ## Core Conventions
@@ -63,13 +59,10 @@
   `.agents/instructions/cross-host-feature-parity.instructions.md` for the full policy.
 - Sort unordered lists/blocks alphabetically; preserve semantic/load order where required.
 - Use `.yml` for YAML files (except required `.sops.yaml`).
-- Script files (`.sh`, `.ps1`, `.bat`) must be executable in Git (`100755`);
-  non-script files remain `100644`.
 - Do not hide meaningful errors (`2>/dev/null`, unconditional `|| true`,
   `-ErrorAction SilentlyContinue`) unless failure is expected, explicitly justified,
   and still checked.
 - Keep canonical hostnames and display names aligned: `MacBook`, `NixOS`, `Windows`.
-- Use positive option names (see `.agents/instructions/positive-options.instructions.md`).
 - Prefer preview/beta/canary channels when viable; if stable is required, add a short `# WHY`.
 
 ## No Backwards Compatibility
