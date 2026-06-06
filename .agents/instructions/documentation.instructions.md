@@ -54,7 +54,6 @@ the documentation mechanism.
 - **Cite non-validated external keys**: for externally-defined keys/identifiers
   not covered by automated checks, add an inline `# Source:` comment with at
   least one verification URL adjacent to the setting.
-- **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
 
 ## PowerShell files (`src/**/*.ps1`)
 
@@ -81,7 +80,6 @@ PowerShell and is required on every function and entry-point script.
 - **Document the WHY**: record the rationale behind security-sensitive patterns
   (e.g. "env var cleared in `finally` so it is never left in the environment on
   failure") and any non-obvious fallback behaviour or error handling choices.
-- **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
 
 ### Explicit Parameter Passing Requirement (PowerShell)
 
@@ -100,7 +98,6 @@ All PowerShell functions and scripts must enforce explicit parameter passing:
 - **Explicit user context**: functions that operate on user profiles or home
   directories must have explicit `-Username` or `-Users` parameters. Never
   assume the current user or auto-discover users from filesystem locations.
-- **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
 - **Documentation examples must be complete**: every `.EXAMPLE` block must show
   all mandatory parameters. Use canonical usernames in examples: `admin` for
   primary/elevated user, `guest` for secondary/unprivileged users. This ensures
@@ -112,7 +109,6 @@ All PowerShell functions and scripts must enforce explicit parameter passing:
 
 All Nix modules must enforce explicit configuration and avoid implicit assumptions:
 
-- **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
 - **Explicit option defaults**: when defining `lib.mkOption`, provide
   meaningful default values only when the default is obvious (e.g. `false` for
   feature flags, `[ ]` for lists). For complex or context-dependent defaults,
