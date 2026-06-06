@@ -75,24 +75,6 @@ PowerShell and is required on every function and entry-point script.
   (e.g. "env var cleared in `finally` so it is never left in the environment on
   failure") and any non-obvious fallback behaviour or error handling choices.
 
-### Explicit Parameter Passing Requirement (Nix)
-
-**No implicit defaults, no auto-derived paths, no backwards compatibility code.**
-
-All Nix modules must enforce explicit configuration and avoid implicit assumptions:
-
-- **Explicit option defaults**: when defining `lib.mkOption`, provide
-  meaningful default values only when the default is obvious (e.g. `false` for
-  feature flags, `[ ]` for lists). For complex or context-dependent defaults,
-  require the user to specify them; use `description` to explain the choice.
-- **Documentation examples must use canonical usernames**: any `.example` field
-  in module options or inline code examples must use `admin` for primary/elevated
-  users and `guest` for secondary/unprivileged users. Paths should reference
-  `/home/admin` or `/Users/admin` rather than real usernames from the repo
-  history. This ensures examples are portable and immediately understandable.
-
-For Nix module conventions (platform guards, `with` avoidance, etc.), see
-[nix.instructions.md](nix.instructions.md).
 
 ## WinGet DSC YAML (`src/hosts/Windows/**/*.yml`)
 

@@ -4,6 +4,8 @@ name: "Citation Quality Standards"
 applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, src/scripts/**"
 ---
 
+# Citation Quality
+
 ## Citation quality standards
 
 When citing external sources (APIs, documentation, vendor settings, support articles), maintain URL and content correctness to prevent drift and ensure maintainability.

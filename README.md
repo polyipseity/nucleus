@@ -12,29 +12,6 @@ It manages:
 Contributor policy and invariants live in `AGENTS.md` and
 `.agents/instructions/*.instructions.md`.
 
-## Repository layout
-
-```text
-nucleus/
-├── src/
-│   ├── flake.nix
-│   ├── assets/wallpapers/
-│   ├── hosts/
-│   │   ├── MacBook/
-│   │   ├── NixOS/
-│   │   └── Windows/
-│   ├── modules/
-│   ├── scripts/apply.sh
-│   └── secrets/
-├── tests/
-│   ├── nix/
-│   ├── scripts/
-│   └── windows/
-└── scripts/
-    ├── bootstrap.sh
-    └── bootstrap.ps1
-```
-
 ## Apply
 
 ### macOS
@@ -61,40 +38,6 @@ sudo nixos-rebuild switch --flake ./src#NixOS
 winget configure .\src\hosts\Windows\system.dsc.yml
 winget configure .\src\hosts\Windows\user.dsc.yml
 ```
-
-## Validate changes
-
-```bash
-# Nix syntax/eval
-nix-instantiate --parse src/modules/core.nix
-nix flake check ./src
-```
-
-```powershell
-# Windows DSC dry-run checks
-winget configure --what-if .\src\hosts\Windows\system.dsc.yml
-winget configure --what-if .\src\hosts\Windows\user.dsc.yml
-```
-
-## Secrets and wallpapers
-
-- Secrets and wallpaper assets are encrypted with SOPS.
-- Managed encrypted inputs live under `src/secrets/` and `src/assets/wallpapers/`.
-- Recipient policy lives in `.sops.yaml`.
-- When recipients change, rewrap encrypted files with `sops updatekeys`.
-
-## Virtual machines
-
-`nucleus-vm-setup` (script entrypoint: `scripts/vm-setup.sh` / `scripts/vm-setup.ps1`)
-provisions guests from `src/modules/VMs.json`.
-
-Use a dry run first:
-
-```bash
-nucleus-vm-setup --dry-run
-```
-
-Guest converge steps are documented in `~/virtual machines/README.md`.
 
 ## Notes
 

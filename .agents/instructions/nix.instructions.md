@@ -72,14 +72,7 @@ WHY comment near the decision point.
 
 ## Minimal-chrome UI defaults
 
-- For desktop/UI settings managed in Nix modules, prefer reducing persistent
-  chrome when equivalent keyboard/command access remains (for example auto-hide
-  dock/panel behavior, hidden optional status controls, and trimmed recents).
-- Preserve high-signal visibility defaults (for example hidden files,
-  file extensions, status/path bars, and explicit metadata) unless there is a
-  concrete reason to reduce visibility.
-- If a hide/auto-hide configuration is used, add a short WHY comment beside the
-  setting and name the alternate access path.
+See `.agents/instructions/cross-host-feature-parity.instructions.md` for the minimal-chrome UI defaults policy.
 
 ## Open-source typography baseline
 
@@ -97,6 +90,22 @@ WHY comment near the decision point.
   traceable.
 - Home Manager `home.file` entries should use `lib.optionalAttrs` with a
   `builtins.pathExists` guard so missing dotfile sources don't break evaluation.
+
+### Explicit parameter passing requirements
+
+**No implicit defaults, no auto-derived paths, no backwards compatibility code.**
+
+All Nix modules must enforce explicit configuration and avoid implicit assumptions:
+
+- **Explicit option defaults**: when defining `lib.mkOption`, provide
+  meaningful default values only when the default is obvious (e.g. `false` for
+  feature flags, `[ ]` for lists). For complex or context-dependent defaults,
+  require the user to specify them; use `description` to explain the choice.
+- **Documentation examples must use canonical usernames**: any `.example` field
+  in module options or inline code examples must use `admin` for primary/elevated
+  users and `guest` for secondary/unprivileged users. Paths should reference
+  `/home/admin` or `/Users/admin` rather than real usernames from the repo
+  history. This ensures examples are portable and immediately understandable.
 
 ## macOS defaults domain synchronization
 
