@@ -204,34 +204,11 @@ lib.mkIf pkgs.stdenv.isLinux {
     # document after secrets/wallpaper activation work so operators get one
     # consolidated, post-automation checklist.
     # -----------------------------------------------------------------------
-    displayHostManualInstructions = lib.hm.dag.entryAfter [
-      "agentsSkills"
-      "agentsSymlink"
-      "buildNixIndex"
-      "configureObsidianSettings"
-      "ensureCustomProvisionSymlinkTargets"
-      "finalizeCustomProvisionSymlinks"
-      # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
-      # are defined in secrets.nix (shared module) but run as Home Manager
-      # activations on this host; include them here so manual instructions
-      # are always the final output after all activation work.
-      "gitIdentityFromSops"
-      "gitIgnoreAssemble"
-      "gpgImport"
-      "installBunPackages"
-      "installPwshScriptAnalyzer"
-      "installUvTools"
-      "prepareCustomProvisionSymlinks"
-      "provisionDevDirectory"
-      "sshKeyAdopt"
-      "syncClawHubSkills"
-      "verifySecretDecryption"
-      "vsCodeExtensionBridge"
-      "vsCodeSymlinks"
-      "vsCodeWorkspaceTrust"
-      "waitForSopsSecrets"
-      "wallpaperProvision"
-    ] displayHostManualInstructionsBody;
+    # Shared activation entries from src/modules/lib/activation-dag.nix;
+    # keep Linux-specific entries below.
+    displayHostManualInstructions = lib.hm.dag.entryAfter (
+      (import ../lib/activation-dag.nix) ++ [ "buildNixIndex" ]
+    ) displayHostManualInstructionsBody;
   };
 
   # --------------------------------------------------------------------------

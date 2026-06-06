@@ -19,6 +19,7 @@ let
   # instead of relying only on mocked activation maps.
   agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
+  activationDagModuleText = builtins.readFile ../../src/modules/lib/activation-dag.nix;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   windowsGitSshModuleText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1;
@@ -252,10 +253,13 @@ let
     ) "Before/after lists should be bidirectionally consistent";
 
   # === TEST: syncClawHubSkills dependency name stays aligned across modules ===
-  test_sync_clawhub_dependency_name_alignment = assert' (
-    (lib.hasInfix "syncClawHubSkills = lib.hm.dag.entryAfter" agentsModuleText)
-    && (lib.hasInfix "\"syncClawHubSkills\"" macosModuleText)
-  ) "syncClawHubSkills activation name must match between agents.nix and macos.nix dependency list";
+  test_sync_clawhub_dependency_name_alignment =
+    assert'
+      (
+        (lib.hasInfix "syncClawHubSkills = lib.hm.dag.entryAfter" agentsModuleText)
+        && (lib.hasInfix "\"syncClawHubSkills\"" activationDagModuleText)
+      )
+      "syncClawHubSkills activation name must match between agents.nix and activation-dag.nix dependency list";
 
   # === TEST: syncClawHubSkills must not short-circuit activation ===
   test_sync_clawhub_does_not_exit_activation =

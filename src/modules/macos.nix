@@ -451,9 +451,9 @@ let
   # step.
   # Any new activation entry added to this module should be appended here so
   # manual instructions remain the last script to run.
-  displayHostManualInstructionDeps = [
-    "agentsSkills"
-    "agentsSymlink"
+  # Shared activation entries defined in src/modules/lib/activation-dag.nix;
+  # keep macOS-specific entries below so cross-host additions are single-sourced.
+  displayHostManualInstructionDeps = (import ../lib/activation-dag.nix) ++ [
     "checkFilesChanged"
     "checkLinkTargets"
     "relaunchDesktopServices"
@@ -466,47 +466,22 @@ let
     "configureLaunchServices"
     "configureRaycastApplicationAliases"
     "configureNightlight"
-    "configureObsidianSettings"
     "configureSafariDefaults"
     "configureUniversalAccessDefaults"
-    "ensureCustomProvisionSymlinkTargets"
     "ensureHeadlessDisplay"
-    "finalizeCustomProvisionSymlinks"
-    # gitIdentityFromSops, gpgImport, sshKeyAdopt, and verifySecretDecryption
-    # are defined in secrets.nix (shared module) but run as Home Manager
-    # activations on this host; they must all complete before the manual
-    # instructions are printed so the final output is complete.
-    "gitIdentityFromSops"
-    "gitIgnoreAssemble"
-    "gpgImport"
     "hideMenuBarIcons"
-    "installBunPackages"
     "initRustup"
     "installCargoBinstallPackages"
     "installPackages"
-    "installPwshScriptAnalyzer"
-    "installUvTools"
     "linkGeneration"
     "onFilesChange"
-    "prepareCustomProvisionSymlinks"
     "preflightPrivacyPermissions"
-    "provisionDevDirectory"
     "refreshFinderServices"
     "reloadDockPreferenceState"
     "reloadUserPreferenceState"
     "setupLaunchAgents"
     "sops-nix"
-    "sshKeyAdopt"
-    # Keep exact activation name casing aligned with agents.nix
-    # (`syncClawHubSkills`) so manual instructions remain the terminal node.
-    "syncClawHubSkills"
     "verifyArchivingStack"
-    "verifySecretDecryption"
-    "vsCodeExtensionBridge"
-    "vsCodeSymlinks"
-    "vsCodeWorkspaceTrust"
-    "waitForSopsSecrets"
-    "wallpaperProvision"
     "writeBoundary"
   ];
   displayHostManualInstructionsBody = import ../lib/manual-instructions.nix {
