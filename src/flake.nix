@@ -308,6 +308,9 @@
             name = "nucleus-vm-setup";
             runtimeInputs = [ pkgs.jq ];
             text = builtins.readFile ../scripts/vm-setup.sh;
+            extraBin = {
+              "vm-setup/lib.sh" = ../scripts/vm-setup/lib.sh;
+            };
           };
           siblingScripts = pkgs.runCommand "apply-siblings" { } ''
             mkdir -p "$out/bin"
@@ -479,6 +482,9 @@
         mkApp pkgs {
           name = "vm-setup";
           runtimeInputs = [ pkgs.jq ];
+          extraBin = {
+            "vm-setup/lib.sh" = ../scripts/vm-setup/lib.sh;
+          };
         };
 
       mkBootstrapApp =
