@@ -42,6 +42,17 @@ let
   # Option type definitions
   # ---------------------------------------------------------------------------
 
+  # Shared enum type aliases — used by both mount and replica submodules.
+  providerEnum = lib.types.enum [
+    "GoogleDrive"
+    "iCloud"
+    "OneDrive"
+  ];
+  iCloudServiceEnum = lib.types.enum [
+    "drive"
+    "photos"
+  ];
+
   replicaRealtimeSubmodule = lib.types.submodule {
     options = {
       debounceSeconds = lib.mkOption {
@@ -94,10 +105,7 @@ let
         description = "Unique identifier for this mount entry. Used as part of the launchd / systemd service label.";
       };
       iCloudService = lib.mkOption {
-        type = lib.types.enum [
-          "drive"
-          "photos"
-        ];
+        type = iCloudServiceEnum;
         default = "drive";
         description = "Which Apple service to expose for iCloud entries. Mount commands always pass this explicitly so entry behavior stays aligned with user config even if the shared remote was initially created with a different default service.";
       };
@@ -106,11 +114,7 @@ let
         description = "Mount target path relative to the user's home directory (e.g. 'clouds/iCloud').";
       };
       provider = lib.mkOption {
-        type = lib.types.enum [
-          "GoogleDrive"
-          "iCloud"
-          "OneDrive"
-        ];
+        type = providerEnum;
         description = "Cloud storage provider. All providers use rclone remotes and require remoteName for active mounts.";
       };
       readWrite = lib.mkOption {
@@ -162,10 +166,7 @@ let
         description = "Unique identifier for this replica entry. Used as part of service labels.";
       };
       iCloudService = lib.mkOption {
-        type = lib.types.enum [
-          "drive"
-          "photos"
-        ];
+        type = iCloudServiceEnum;
         default = "drive";
         description = "Which Apple service this replica should target for iCloud entries. Keeping it in the shared schema preserves per-user intent even before all replica backends consume the value directly.";
       };
@@ -174,11 +175,7 @@ let
         description = "Local replica root path relative to the user's home directory. For iCloud on macOS this documents the native CloudDocs area managed by brctl; for rclone replicas it is the directory rclone syncs into.";
       };
       provider = lib.mkOption {
-        type = lib.types.enum [
-          "GoogleDrive"
-          "iCloud"
-          "OneDrive"
-        ];
+        type = providerEnum;
         description = "Cloud storage provider. rclone-backed replica scheduling is configured per entry.";
       };
       realtime = lib.mkOption {
