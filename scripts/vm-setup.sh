@@ -8,7 +8,9 @@
 # Arguments:
 #   --dry-run                  Print planned actions without executing (default: off).
 #   --windows-iso PATH         Path to the Windows 11 ISO (required for Windows guest builds).
+#   --no-windows-iso           Skip using a Windows ISO (default: off).
 #   --windows-iso-source S     Source for Windows ISO auto-resolution: auto|url|fido (default: auto).
+#   --no-windows-iso-source    Skip Windows ISO auto-resolution (default: off).
 #   --windows-iso-retries N    Retry attempts for Windows ISO network downloads (default: 0).
 #   --headful|--no-headful     Run guest builds with visible GUI (--headful) or headless (default: --no-headful).
 #   --accelerator TYPE         QEMU accelerator for image builds (hvf/kvm/tcg) (default: auto-detected).
@@ -81,7 +83,9 @@ usage() {
   --mido-patch-file PATH     Override runtime patch file path (default: src/vms/windows/patches/mido-iso-link.patch).
   --mido-script PATH         Override the Mido script path (default: vendored script).
   --windows-iso PATH         Path to the Windows 11 ISO.
+  --no-windows-iso           Skip using a Windows ISO (default: off).
   --windows-iso-source S     ISO auto-resolution: auto|url|fido (default: auto).
+  --no-windows-iso-source    Skip Windows ISO auto-resolution (default: off).
   --windows-iso-retries N    Retry attempts for network downloads (default: 0).
   --headful|--no-headful     Run guest builds with visible GUI (--headful) or headless (--no-headful, default: on).
   --vm-dir-override PATH     Override the default ~/virtual machines path.
@@ -98,7 +102,9 @@ while [ "$#" -gt 0 ]; do
     --mido-patch-file)    NUCLEUS_MIDO_PATCH_FILE="$2"; shift ;;
     --mido-script)        NUCLEUS_MIDO_SCRIPT="$2"; shift ;;
     --windows-iso)  windows_iso="$2"; shift ;;
+    --no-windows-iso)     windows_iso='' ;;
     --windows-iso-source) windows_iso_source="$2"; shift ;;
+    --no-windows-iso-source) windows_iso_source='' ;;
     --windows-iso-retries) windows_iso_retries="$2"; shift ;;
     --headful)      windows_headless='false' ;;
     --no-headful)   windows_headless='true' ;;
@@ -115,7 +121,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$windows_iso_source" in
-  auto|url|fido) ;;
+  auto|url|fido|'') ;;
   *)
     printf 'vm-setup: invalid --windows-iso-source value: %s\n' "$windows_iso_source" >&2
     printf 'vm-setup: expected one of: auto, url, fido\n' >&2
