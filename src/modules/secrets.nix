@@ -7,57 +7,8 @@
 #   - sshKeyAdopt:            tracks the SSH key fingerprint; flushes agent on rotation
 #   - verifySecretDecryption: post-activation health check for each decryption backend
 #
-# Required SOPS file format (flat top-level keys):
-#
-#   ssh-personal.yml:
-#     ssh_personal_<username>: |
-#       -----BEGIN NOT OPENSSH PRIVATE KEY-----
-#       ...
-#       -----END NOT OPENSSH PRIVATE KEY-----
-#     ssh_personal_<username>_pub: |
-#       ssh-ed25519 AAAA... user@host
-#     ssh_personal_<username>_rsa: |
-#       -----BEGIN NOT OPENSSH PRIVATE KEY-----
-#       ...
-#       -----END NOT OPENSSH PRIVATE KEY-----
-#     ssh_personal_<username>_rsa_pub: |
-#       ssh-rsa AAAA... user@host
-#
-#   gpg-personal.yml:
-#     gpg_personal_<username>: |
-#       -----BEGIN NOT PGP PRIVATE KEY BLOCK-----
-#       ...
-#       -----END NOT PGP PRIVATE KEY BLOCK-----
-#
-#   git-identities.yml:
-#     git_identity_<username>: |
-#       name=Your Name
-#       email=your@email.example
-#       signingKey=YOUR_GPG_SIGNING_KEY!
-#
-# To flatten the existing nested-array format, run on a machine with the GPG
-# key already in the keyring:
-#   sops edit src/secrets/ssh-personal.yml     # restructure to flat format above
-#   sops edit src/secrets/gpg-personal.yml     # restructure to flat format above
-#   sops edit src/secrets/git-identities.yml   # restructure to flat format above
-#
-# Bootstrap (once per fresh machine):
-#   1. Import your GPG private key so sops updatekeys can re-encrypt secrets
-#      for the new machine age recipient:
-#        gpg --import <backup-key-file>
-#   2. Run: ./scripts/bootstrap.sh apply   (or darwin-rebuild / nixos-rebuild)
-#      apply.sh calls register_host_age_key_if_needed which automatically:
-#        a. Derives the machine age public key from /etc/ssh/ssh_host_ed25519_key.pub.
-#        b. Inserts it into .sops.yaml before the machine-keys-end marker comment.
-#        c. Rewraps every encrypted file so this machine can decrypt them.
-#      The system activation script deriveHostAgeKey (posix-sops.nix) then writes
-#      the machine age private key to /etc/sops/age/machine.txt.  HM sops-nix
-#      uses this file to decrypt all SOPS secrets without a pre-imported GPG key.
-#      The gpgImport activation (below) imports the managed GPG key automatically
-#      from the decrypted SOPS payload.
-#      After apply completes, commit the updated .sops.yaml and rewrapped secrets:
-#        git add .sops.yaml src/secrets src/assets/wallpapers
-#        git commit -m "chore: register <hostname> machine age key"
+# SOPS file format and bootstrap: see scripts/bootstrap.sh and
+# .agents/instructions/primary-user-distinction.instructions.md.
 {
   config,
   lib,
