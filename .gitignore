@@ -340,4 +340,5 @@ __marimo__/
 # }
 
 # self {
+!/src/modules/lib/
 # }
