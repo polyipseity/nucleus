@@ -85,3 +85,63 @@ resolve_nucleus_host() {
     *)      printf '%s\n' "Unknown" ;;
   esac
 }
+
+# merge_nix_config — Merge caller's NIX_CONFIG with required flake feature flags.
+#
+# Usage: merge_nix_config [features]
+#
+# Arguments:
+#   features  Nix features string (default: "experimental-features = nix-command flakes").
+#
+# Environment:
+#   NIX_CONFIG  Optional caller-provided nix configuration to merge.
+merge_nix_config() {
+  _mnc_features="${1:-experimental-features = nix-command flakes}"
+  if [ -n "${NIX_CONFIG:-}" ]; then
+    printf '%s\n%s' "$NIX_CONFIG" "$_mnc_features"
+  else
+    printf '%s' "$_mnc_features"
+  fi
+}
+
+# require_command — Assert that a command exists in PATH.
+#
+# Usage: require_command command_name
+#
+# Arguments:
+#   command_name  Name of the command to check.
+#
+# Exit conditions:
+#   0 if found; prints error to stderr and exits 1 if missing.
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    printf '%s\n' "error: $1 is required but was not found in PATH" >&2
+    exit 1
+  fi
+}
+
+# sha256_of_file — Compute SHA-256 hex digest of a file.
+#
+# Usage: sha256_of_file file_path
+#
+# Tries sha256sum, then shasum -a 256, then openssl dgst -sha256.
+# Calls require_command if no tool is available.
+#
+# Arguments:
+#   file_path  Path to the file to hash.
+sha256_of_file() {
+  _sof_file="$1"
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$_sof_file" | awk '{ print $1 }'
+    return
+  fi
+
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$_sof_file" | awk '{ print $1 }'
+    return
+  fi
+
+  require_command openssl
+  openssl dgst -sha256 "$_sof_file" | awk '{ print $2 }'
+}
