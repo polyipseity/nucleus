@@ -627,6 +627,447 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# VM iteration helper
+# ---------------------------------------------------------------------------
+
+# for_each_vm CALLBACK [ARGS...]
+#   Iterates VMs in MANIFEST, skipping disabled or host-mismatched entries.
+#   For each enabled VM, calls CALLBACK with positional args:
+#     vm_name vm_type vm_hosts vm_index [ARGS...]
+for_each_vm() {
+  local _callback="$1"
+  shift
+  local _count _i _vm_name _vm_type _vm_enabled _vm_hosts
+  _count="$(jq '.VMs | length' "$MANIFEST")"
+  _i=0
+  while [ "$_i" -lt "$_count" ]; do
+    _vm_name="$(jq -r ".VMs[$_i].name" "$MANIFEST")"
+    _vm_type="$(jq -r ".VMs[$_i].type" "$MANIFEST")"
+    _vm_enabled="$(jq -r ".VMs[$_i].enabled" "$MANIFEST")"
+
+    case "$_vm_enabled" in
+      true|false) ;;
+      *)
+        printf 'vm-setup: WARNING — VM "%s" has invalid enabled value "%s"; expected boolean true/false in manifest\n' "$_vm_name" "$_vm_enabled" >&2
+        _i=$((_i + 1))
+        continue
+        ;;
+    esac
+
+    if [ "$_vm_enabled" != "true" ]; then
+      printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$_vm_name"
+      _i=$((_i + 1))
+      continue
+    fi
+
+    _vm_hosts="$(jq -c ".VMs[$_i].hosts" "$MANIFEST")"
+    if ! should_include_host "$_vm_hosts"; then
+      printf 'vm-setup: VM "%s" is not available on host "%s" (hosts: %s); skipping\n' "$_vm_name" "$NUCLEUS_HOST" "$_vm_hosts"
+      _i=$((_i + 1))
+      continue
+    fi
+
+    "$_callback" "$_vm_name" "$_vm_type" "$_vm_hosts" "$_i" "$@"
+    _i=$((_i + 1))
+  done
+}
+
+# ---------------------------------------------------------------------------
+# UTM re-registration helper
+# ---------------------------------------------------------------------------
+
+UTMCTL="/Applications/UTM.app/Contents/MacOS/utmctl"
+
+# re_register_utm_bundle NAME BUNDLE
+#   Force UTM to reload bundle config by temporarily preserving the bundle,
+#   deleting the registered VM entry, then reopening the preserved bundle.
+#   WHY: UTM can keep stale runtime config for already-registered VMs even
+#   after config.plist is refreshed in-place.
+re_register_utm_bundle() {
+  local _rr_name="$1" _rr_bundle="$2" _rr_backup
+  _rr_backup="${_rr_bundle}.reimport"
+
+  rm -rf "$_rr_backup"
+  if ! cp -R "$_rr_bundle" "$_rr_backup"; then
+    printf 'vm-setup: WARNING — failed to stage re-registration backup for %s; keeping current registration\n' "$_rr_name" >&2
+    return 1
+  fi
+
+  if ! "$UTMCTL" delete "$_rr_name"; then
+    printf 'vm-setup: WARNING — failed to delete stale UTM registration for %s; keeping current registration\n' "$_rr_name" >&2
+    rm -rf "$_rr_backup"
+    return 1
+  fi
+
+  if [ -d "$_rr_bundle" ]; then
+    rm -rf "$_rr_bundle"
+  fi
+
+  if ! mv "$_rr_backup" "$_rr_bundle"; then
+    printf 'vm-setup: WARNING — failed to restore bundle after re-registration delete for %s\n' "$_rr_name" >&2
+    return 1
+  fi
+
+  printf 'vm-setup: re-opening UTM bundle to refresh registration: %s\n' "$_rr_bundle"
+  if ! open "$_rr_bundle"; then
+    printf 'vm-setup: WARNING — opening %s failed after re-registration; open it manually in UTM\n' "$_rr_bundle" >&2
+    return 1
+  fi
+
+  if ! wait_for_utm_registration "$_rr_name"; then
+    printf 'vm-setup: WARNING — UTM did not re-register VM "%s" within timeout after stale-config repair\n' "$_rr_name" >&2
+    return 1
+  fi
+
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Credential marker helper
+# ---------------------------------------------------------------------------
+
+# resize_and_mark_image IMAGE_PATH MARKER_PATH [DISK_GIB]
+#   Writes the current guest credential fingerprint to MARKER_PATH for drift
+#   detection.  When DISK_GIB is specified, also resizes IMAGE_PATH via
+#   qemu-img before marking.
+resize_and_mark_image() {
+  local _rmi_file="$1" _rmi_marker="$2" _rmi_disk_gib="${3:-}"
+
+  if [ -n "$_rmi_disk_gib" ]; then
+    if command -v qemu-img >/dev/null 2>&1; then
+      if ! qemu-img resize "$_rmi_file" "${_rmi_disk_gib}G" >/dev/null; then
+        printf 'vm-setup: failed to resize %s to %s GiB\n' "$_rmi_file" "$_rmi_disk_gib" >&2
+        return 1
+      fi
+    else
+      printf 'vm-setup: qemu-img not found; cannot resize %s to %s GiB\n' "$_rmi_file" "$_rmi_disk_gib" >&2
+      return 1
+    fi
+  fi
+  printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_rmi_marker"
+}
+
+# ---------------------------------------------------------------------------
+# Image build callback for for_each_vm
+# ---------------------------------------------------------------------------
+
+build_one_image() {
+  local _vm_name="$1" _vm_type="$2" _vm_hosts="$3" _vm_index="$4"
+  local _vm_disk_bytes _vm_disk_gib
+  _vm_disk_bytes="$(jq ".VMs[$_vm_index].diskBytes" "$MANIFEST")"
+  # Convert SI bytes to nearest binary GiB for hypervisor tools.
+  # Uses (n + 2^29) / 2^30 for round-half-up in POSIX integer arithmetic.
+  _vm_disk_gib="$(( (_vm_disk_bytes + 536870912) / 1073741824 ))"
+
+  case "$_vm_type" in
+    NixOS)
+      # WHY: best-effort — a prerequisite-missing or build failure for one
+      # VM type must not abort builds for the remaining VMs; the build
+      # function prints a specific error before returning non-zero.
+      build_nixos_image "$_vm_name" "$_vm_disk_gib" \
+        || printf 'vm-setup: NixOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
+      ;;
+    Windows)
+      _vm_edition="$(jq -r ".VMs[$_vm_index].windowsEdition // \"Pro\"" "$MANIFEST")"
+      # WHY: best-effort — see NixOS branch above.
+      build_windows_image "$_vm_name" "$_vm_disk_gib" "$_vm_edition" \
+        || printf 'vm-setup: Windows image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
+      ;;
+    macOS)
+      _vm_macos_ver="$(jq -r ".VMs[$_vm_index].macOSVersion // \"tahoe\"" "$MANIFEST")"
+      _vm_ram_bytes="$(jq -r ".VMs[$_vm_index].ramBytes" "$MANIFEST")"
+      # Convert SI bytes to nearest binary MiB for hypervisor tools.
+      # Uses (n + 2^19) / 2^20 for round-half-up in POSIX integer arithmetic.
+      _vm_ram_mib="$(( (_vm_ram_bytes + 524288) / 1048576 ))"
+      _vm_cpus="$(jq -r ".VMs[$_vm_index].cpus" "$MANIFEST")"
+      # WHY: best-effort — see NixOS branch above.
+      build_macos_image "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver" \
+        || printf 'vm-setup: macOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
+      ;;
+    *)
+      printf 'vm-setup: skipping build for "%s" (unsupported type: %s)\n' \
+        "$_vm_name" "$_vm_type"
+      ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
+# Tart VM setup callback for for_each_vm
+# ---------------------------------------------------------------------------
+
+setup_tart_vm() {
+  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+
+  if [ "$vm_type" != "macOS" ]; then
+    return
+  fi
+
+  # Verify the tart VM was created in phase 1.
+  if ! tart list 2>/dev/null | awk 'NR > 1 { print $2 }' | grep -qxF "$vm_name"; then
+    printf 'vm-setup: WARNING — tart VM "%s" not found; Packer build may have failed or was skipped\n' "$vm_name" >&2
+    return
+  fi
+
+  if [ "$dry_run" = false ]; then
+    printf 'vm-setup: tart VM ready: %s (start with: tart run %s)\n' "$vm_name" "$vm_name"
+    write_start_script "$vm_name" "$vm_name" "$vm_type" 'darwin-tart'
+  else
+    printf 'vm-setup: [dry-run] verify tart VM registration: %s\n' "$vm_name"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# UTM VM setup callback for for_each_vm
+# ---------------------------------------------------------------------------
+
+setup_utm_vm() {
+  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+  local vm_display bundle data_dir disk_file
+  local disk_credential_marker config_plist bundle_exists legacy_display_config
+  local template_drift_config _plist_template _prebuilt _prebuilt_valid
+
+  vm_display=$(jq -r ".VMs[$vm_index].display" "$MANIFEST")
+
+  # macOS guests are provisioned via tart (setup_tart_vms), not UTM.
+  if [ "$vm_type" = "macOS" ]; then
+    printf 'vm-setup: macOS guest "%s" stays on Tart runtime; skipping UTM bundle provisioning for this VM\n' "$vm_name"
+    return
+  fi
+
+  bundle="$VM_DIR/${vm_name}.utm"
+  data_dir="$bundle/Data"
+  disk_file="$data_dir/disk-main.qcow2"
+  disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_file")"
+  config_plist="$bundle/config.plist"
+  bundle_exists=false
+  legacy_display_config=false
+  template_drift_config=false
+
+  printf 'vm-setup: configuring UTM VM "%s"...\n' "$vm_display"
+
+  if [ -d "$bundle" ]; then
+    bundle_exists=true
+    printf 'vm-setup: UTM bundle already exists: %s; refreshing config.plist\n' "$bundle"
+    if [ -f "$config_plist" ] && grep -qE '<string>(vga|std|virtio-ramfb|virtio-ramfb-gl)</string>' "$config_plist"; then
+      legacy_display_config=true
+      printf 'vm-setup: detected legacy display config in existing bundle; VM will be re-registered to refresh runtime state: %s\n' "$vm_name"
+    fi
+  fi
+
+  # Use the Nix-generated UTM config.plist written to ~/.local/share/nucleus/
+  # at Home Manager activation time (run nucleus-apply first).
+  _plist_template="${HOME}/.local/share/nucleus/vms/${vm_name}-config.plist"
+  if [ ! -f "$_plist_template" ]; then
+    printf 'vm-setup: WARNING \u2014 UTM config template not found at %s; apply the macOS config first\n' "$_plist_template" >&2
+    return
+  fi
+  # Detect stale templates from older schema/value generations and fail fast
+  # with a concrete action instead of copying a known-invalid plist.
+  if grep -qE 'virtio-ramfb-gl|<key>DirectorySharing</key>|<key>ReadOnlySharing</key>|<key>SharedDirectories</key>' "$_plist_template"; then
+    printf 'vm-setup: WARNING — stale UTM template detected at %s; run home-manager switch (or nucleus apply) before vm-setup\n' "$_plist_template" >&2
+    return
+  fi
+  _required_utm_keys='
+<key>IconCustom</key>
+<key>Sound</key>
+<key>ClipboardSharing</key>
+<key>DirectoryShareReadOnly</key>
+<key>DownscalingFilter</key>
+<key>UpscalingFilter</key>
+<key>NativeResolution</key>
+<key>MacAddress</key>
+<key>IsolateFromHost</key>
+<key>PortForward</key>
+<key>AdditionalArguments</key>
+<key>BalloonDevice</key>
+<key>DebugLog</key>
+<key>PS2Controller</key>
+<key>RNGDevice</key>
+<key>RTCLocalTime</key>
+<key>TPMDevice</key>
+<key>MaximumUsbShare</key>
+<key>UsbBusSupport</key>
+<key>UsbSharing</key>
+<key>CPUFlagsAdd</key>
+<key>CPUFlagsRemove</key>
+<key>ForceMulticore</key>
+<key>JITCacheSize</key>'
+  _missing_utm_keys=''
+  for _required_utm_key in $_required_utm_keys; do
+    if ! grep -Fq "$_required_utm_key" "$_plist_template"; then
+      _missing_utm_keys="$_missing_utm_keys ${_required_utm_key#<key>}"
+    fi
+  done
+  if [ -n "$_missing_utm_keys" ]; then
+    printf 'vm-setup: WARNING — stale or incomplete UTM template detected at %s (missing key(s):%s); run home-manager switch (or nucleus apply) before vm-setup\n' \
+      "$_plist_template" "$_missing_utm_keys" >&2
+    return
+  fi
+  # Detect config drift in already-registered bundles. UTM can keep runtime
+  # state from the registered entry, so we re-register when the on-disk
+  # bundle config no longer matches the managed template.
+  if [ "$bundle_exists" = true ] && [ -f "$config_plist" ] && ! cmp -s "$_plist_template" "$config_plist"; then
+    template_drift_config=true
+    printf 'vm-setup: detected config drift in existing bundle; VM will be re-registered to refresh runtime state: %s\n' "$vm_name"
+  fi
+  # Require a pre-built image only when the bundle does not already have a
+  # disk. Existing bundles can refresh config.plist in-place.
+  _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
+  _prebuilt_valid=false
+  if [ ! -f "$disk_file" ] && [ ! -f "$_prebuilt" ]; then
+    _build_tmp="$IMAGES_DIR/${vm_name}-build"
+    if [ -d "$_build_tmp" ]; then
+      printf 'vm-setup: WARNING — image not ready for %s; build appears in progress at %s\n' "$vm_name" "$_build_tmp" >&2
+    else
+      printf 'vm-setup: WARNING — image not found: %s; build failed or type not supported\n' "$_prebuilt" >&2
+    fi
+    return
+  fi
+
+  if [ -f "$_prebuilt" ]; then
+    if validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
+      _prebuilt_valid=true
+    else
+      printf 'vm-setup: WARNING — pre-built image is invalid for %s: %s\n' "$vm_name" "$_prebuilt" >&2
+      return
+    fi
+  fi
+
+  write_start_script "$vm_name" "$vm_display" "$vm_type" 'darwin-utm'
+
+  if [ "$dry_run" = false ]; then
+    mkdir -p "$data_dir"
+    _replace_runtime=false
+    if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}"; then
+      printf 'vm-setup: existing runtime disk is invalid for %s; replacing from pre-built image\n' "$vm_name" >&2
+      rm -f "$disk_file"
+      _replace_runtime=true
+    fi
+    if [ -f "$disk_file" ] && ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
+      printf 'vm-setup: %s runtime disk guest credential drift detected; replacing runtime disk from pre-built image\n' "$vm_name" >&2
+      rm -f "$disk_file"
+      _replace_runtime=true
+    fi
+    if [ ! -f "$disk_file" ]; then
+      if [ "$_prebuilt_valid" != true ]; then
+        printf 'vm-setup: WARNING — cannot replace the %s runtime disk because no valid pre-built image is available: %s\n' "$vm_name" "$_prebuilt" >&2
+        return
+      fi
+      cp "$_prebuilt" "$disk_file"
+      printf 'vm-setup: copied pre-built disk image: %s\n' "$disk_file"
+      resize_and_mark_image '' "$disk_credential_marker"
+    elif [ "$_replace_runtime" = true ]; then
+      printf 'vm-setup: WARNING — replacement was requested for %s but the runtime disk still exists; leaving it untouched\n' "$vm_name" >&2
+    else
+      printf 'vm-setup: preserving existing disk image: %s\n' "$disk_file"
+    fi
+    cp "$_plist_template" "$config_plist"
+    # Nix store files are read-only (mode 0444).  Make the bundle-local copy
+    # writable so UTM can update the plist after import if needed.
+    chmod +w "$config_plist"
+    if [ "$bundle_exists" = true ]; then
+      printf 'vm-setup: refreshed UTM bundle config: %s\n' "$bundle"
+    else
+      printf 'vm-setup: UTM bundle created: %s\n' "$bundle"
+    fi
+    if ! "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$vm_name"; then
+      printf 'vm-setup: opening UTM bundle in place: %s\n' "$bundle"
+      if open "$bundle"; then
+        if wait_for_utm_registration "$vm_name"; then
+          printf 'vm-setup: UTM VM opened and registered: %s\n' "$vm_name"
+        else
+          printf 'vm-setup: WARNING — UTM did not register VM "%s" within timeout; open UTM and retry vm-setup\n' "$vm_name" >&2
+        fi
+      else
+        printf 'vm-setup: WARNING — opening %s failed; ensure UTM can access the managed VM directory and retry\n' "$bundle" >&2
+      fi
+    elif [ "$legacy_display_config" = true ] || [ "$template_drift_config" = true ]; then
+      printf 'vm-setup: repairing stale UTM runtime registration for %s\n' "$vm_name"
+      if re_register_utm_bundle "$vm_name" "$bundle"; then
+        printf 'vm-setup: stale UTM registration repaired: %s\n' "$vm_name"
+      fi
+    else
+      printf 'vm-setup: UTM VM already registered: %s\n' "$vm_name"
+    fi
+  else
+    printf 'vm-setup: [dry-run] create UTM bundle %s from %s\n' "$bundle" "$_plist_template"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Libvirt VM setup callback for for_each_vm
+# ---------------------------------------------------------------------------
+
+setup_libvirt_vm() {
+  # shellcheck disable=SC2034 # vm_hosts is part of the callback protocol
+  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+  local vm_display disk_path disk_credential_marker _prebuilt
+
+  vm_display=$(jq -r ".VMs[$vm_index].display" "$MANIFEST")
+
+  disk_path="$VM_DIR/${vm_name}.qcow2"
+  disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_path")"
+
+  printf 'vm-setup: configuring libvirt VM "%s"...\n' "$vm_display"
+
+  # Require a pre-built image (built in phase 1).
+  _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
+  if [ ! -f "$_prebuilt" ]; then
+    printf 'vm-setup: WARNING \u2014 image not found: %s; skipping "%s"\n' "$_prebuilt" "$vm_name" >&2
+    return
+  fi
+  if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
+    printf 'vm-setup: WARNING — pre-built image is invalid for %s: %s\n' "$vm_name" "$_prebuilt" >&2
+    return
+  fi
+
+  if [ "$dry_run" = false ]; then
+    mkdir -p "$VM_DIR"
+    _replace_runtime=false
+    if [ ! -f "$disk_path" ]; then
+      _replace_runtime=true
+    elif ! validate_qcow2_image "$disk_path" "existing libvirt runtime disk for ${vm_name}"; then
+      printf 'vm-setup: existing libvirt runtime disk is invalid for %s; replacing from pre-built image\n' "$vm_name" >&2
+      rm -f "$disk_path"
+      _replace_runtime=true
+    elif ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
+      printf 'vm-setup: %s runtime disk guest credential drift detected; replacing runtime disk from pre-built image\n' "$vm_name" >&2
+      rm -f "$disk_path"
+      _replace_runtime=true
+    fi
+
+    if [ "$_replace_runtime" = true ]; then
+      cp "$_prebuilt" "$disk_path"
+      printf 'vm-setup: disk image placed: %s\n' "$disk_path"
+      resize_and_mark_image '' "$disk_credential_marker"
+    else
+      printf 'vm-setup: disk already exists: %s\n' "$disk_path"
+    fi
+  else
+    printf 'vm-setup: [dry-run] copy %s to %s\n' "$_prebuilt" "$disk_path"
+  fi
+
+  # Define/update the libvirt domain from the Nix-generated XML (idempotent).
+  # The file is installed at apply time by environment.etc in vms.nix.
+  _xml_file="/etc/nucleus/vms/${vm_name}-domain.xml"
+  if [ ! -f "$_xml_file" ]; then
+    printf 'vm-setup: WARNING — domain XML not found at %s; apply the NixOS config first\n' "$_xml_file" >&2
+    return
+  fi
+
+  if [ "$dry_run" = false ]; then
+    if virsh define "$_xml_file"; then
+      printf 'vm-setup: VM "%s" defined/updated in libvirt\n' "$vm_name"
+      write_start_script "$vm_name" "$vm_display" "$vm_type" 'nixos-libvirt'
+    else
+      printf 'vm-setup: WARNING — virsh define failed for "%s"; check libvirtd status\n' "$vm_name" >&2
+    fi
+  else
+    printf 'vm-setup: [dry-run] virsh define %s\n' "$_xml_file"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Phase 1 — Build images (if absent)
 # ---------------------------------------------------------------------------
 
@@ -719,20 +1160,12 @@ build_nixos_image() {
   # outputs, but this repository declares guest disk sizes in VMs.json.
   # Resize here so the pre-built image matches the manifest contract used by
   # all runtime backends (UTM/libvirt/QEMU).
-  if command -v qemu-img >/dev/null 2>&1; then
-    if ! qemu-img resize "$_out" "${_disk_gib}G" >/dev/null; then
-      printf 'vm-setup: failed to resize NixOS image to %s GiB: %s\n' "$_disk_gib" "$_out" >&2
-      rm -rf "$_tmpdir"
-      return 1
-    fi
-  else
-    printf 'vm-setup: qemu-img not found; cannot resize NixOS image to %s GiB\n' "$_disk_gib" >&2
+  if ! resize_and_mark_image "$_out" "$_marker" "$_disk_gib"; then
     rm -rf "$_tmpdir"
     return 1
   fi
 
   rm -rf "$_tmpdir"
-  printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_marker"
   printf 'vm-setup: NixOS image ready: %s\n' "$_out"
 }
 
@@ -1225,23 +1658,19 @@ bios legacy 3h'
     printf 'vm-setup: [dry-run] remove stale temporary output directory (if present): %s\n' "$_tmp_out"
     while IFS=' ' read -r _firmware_mode _boot_strategy _attempt_timeout; do
       [ -n "$_firmware_mode" ] || continue
-      if [ "$_firmware_mode" = 'efi' ]; then
-        if [ "$windows_headless" = 'false' ]; then
-          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var ssh_timeout=%s -var headless=%s -var display_backend=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
-            "$_packer_dir" "$_iso" "$vm_guest_username" "$VMS_DIR/windows/Autounattend.xml" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_display_backend" "$_efi_code" "$_efi_vars" "$_disk_gib" "$_tmp_out"
-        else
-          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var ssh_timeout=%s -var headless=%s -var efi_firmware_code=%s -var efi_firmware_vars=%s -var disk_size=%sG -var output_directory=%s .\n' \
-            "$_packer_dir" "$_iso" "$vm_guest_username" "$VMS_DIR/windows/Autounattend.xml" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_efi_code" "$_efi_vars" "$_disk_gib" "$_tmp_out"
-        fi
-      else
-        if [ "$windows_headless" = 'false' ]; then
-          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var ssh_timeout=%s -var headless=%s -var display_backend=%s -var disk_size=%sG -var output_directory=%s .\n' \
-            "$_packer_dir" "$_iso" "$vm_guest_username" "$VMS_DIR/windows/Autounattend.xml" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_display_backend" "$_disk_gib" "$_tmp_out"
-        else
-          printf 'vm-setup: [dry-run] cd %s && packer build -var windows_iso=%s -var guest_username=%s -var guest_password=<redacted> -var autounattend_path=%s -var accelerator=%s -var firmware_mode=%s -var boot_strategy=%s -var ssh_timeout=%s -var headless=%s -var disk_size=%sG -var output_directory=%s .\n' \
-            "$_packer_dir" "$_iso" "$vm_guest_username" "$VMS_DIR/windows/Autounattend.xml" "$accelerator" "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout" "$windows_headless" "$_disk_gib" "$_tmp_out"
-        fi
+      _pv="-var windows_iso=$_iso -var guest_username=$vm_guest_username -var guest_password=<redacted>"
+      _pv="$_pv -var autounattend_path=$VMS_DIR/windows/Autounattend.xml"
+      _pv="$_pv -var accelerator=$accelerator"
+      _pv="$_pv -var firmware_mode=$_firmware_mode -var boot_strategy=$_boot_strategy"
+      _pv="$_pv -var ssh_timeout=$_attempt_timeout -var headless=$windows_headless"
+      if [ "$windows_headless" = 'false' ]; then
+        _pv="$_pv -var display_backend=$_display_backend"
       fi
+      if [ "$_firmware_mode" = 'efi' ] && [ -n "$_efi_code" ] && [ -n "$_efi_vars" ]; then
+        _pv="$_pv -var efi_firmware_code=$_efi_code -var efi_firmware_vars=$_efi_vars"
+      fi
+      _pv="$_pv -var disk_size=${_disk_gib}G -var output_directory=$_tmp_out"
+      printf 'vm-setup: [dry-run] cd %s && packer build %s .\n' "$_packer_dir" "$_pv"
     done <<EOF
 $_build_attempts
 EOF
@@ -1368,7 +1797,7 @@ EOF
     return 1
   fi
 
-  printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_marker"
+  resize_and_mark_image '' "$_marker"
   printf 'vm-setup: Windows 11 image ready: %s\n' "$_out"
 }
 
@@ -1451,7 +1880,7 @@ build_macos_image() {
     printf 'vm-setup: Packer build for macOS VM "%s" failed (exit %s)\n' "$_name" "$_packer_status" >&2
     return "$_packer_status"
   fi
-  printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_marker"
+  resize_and_mark_image '' "$_marker"
   printf 'vm-setup: macOS VM "%s" built and registered in tart\n' "$_name"
 }
 
@@ -1476,72 +1905,7 @@ prune_stale_build_dirs() {
 
 build_images() {
   prune_stale_build_dirs
-  _count="$(jq '.VMs | length' "$MANIFEST")"
-  _i=0
-  while [ "$_i" -lt "$_count" ]; do
-    _vm_name="$(jq -r ".VMs[$_i].name" "$MANIFEST")"
-    _vm_type="$(jq -r ".VMs[$_i].type" "$MANIFEST")"
-    _vm_enabled="$(jq -r ".VMs[$_i].enabled" "$MANIFEST")"
-    _vm_disk_bytes="$(jq -r ".VMs[$_i].diskBytes" "$MANIFEST")"
-    # Convert SI bytes to nearest binary GiB for hypervisor tools.
-    # Uses (n + 2^29) / 2^30 for round-half-up in POSIX integer arithmetic.
-    _vm_disk_gib="$(( (_vm_disk_bytes + 536870912) / 1073741824 ))"
-
-    case "$_vm_enabled" in
-      true|false) ;;
-      *)
-        printf 'vm-setup: WARNING — VM "%s" has invalid enabled value "%s"; expected boolean true/false in manifest\n' "$_vm_name" "$_vm_enabled" >&2
-        _i=$((_i + 1))
-        continue
-        ;;
-    esac
-
-    if [ "$_vm_enabled" != "true" ]; then
-      printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$_vm_name"
-      _i=$((_i + 1))
-      continue
-    fi
-
-    _vm_hosts="$(jq -c ".VMs[$_i].hosts" "$MANIFEST")"
-    if ! should_include_host "$_vm_hosts"; then
-      printf 'vm-setup: VM "%s" is not available on host "%s" (hosts: %s); skipping\n' "$_vm_name" "$NUCLEUS_HOST" "$_vm_hosts"
-      _i=$((_i + 1))
-      continue
-    fi
-
-    case "$_vm_type" in
-      NixOS)
-        # WHY: best-effort — a prerequisite-missing or build failure for one
-        # VM type must not abort builds for the remaining VMs; the build
-        # function prints a specific error before returning non-zero.
-        build_nixos_image "$_vm_name" "$_vm_disk_gib" \
-          || printf 'vm-setup: NixOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
-        ;;
-      Windows)
-        _vm_edition="$(jq -r ".VMs[$_i].windowsEdition // \"Pro\"" "$MANIFEST")"
-        # WHY: best-effort — see NixOS branch above.
-        build_windows_image "$_vm_name" "$_vm_disk_gib" "$_vm_edition" \
-          || printf 'vm-setup: Windows image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
-        ;;
-      macOS)
-        _vm_macos_ver="$(jq -r ".VMs[$_i].macOSVersion // \"tahoe\"" "$MANIFEST")"
-        _vm_ram_bytes="$(jq -r ".VMs[$_i].ramBytes" "$MANIFEST")"
-        # Convert SI bytes to nearest binary MiB for hypervisor tools.
-        # Uses (n + 2^19) / 2^20 for round-half-up in POSIX integer arithmetic.
-        _vm_ram_mib="$(( (_vm_ram_bytes + 524288) / 1048576 ))"
-        _vm_cpus="$(jq -r ".VMs[$_i].cpus" "$MANIFEST")"
-        # WHY: best-effort — see NixOS branch above.
-        build_macos_image "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver" \
-          || printf 'vm-setup: macOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
-        ;;
-      *)
-        printf 'vm-setup: skipping build for "%s" (unsupported type: %s)\n' \
-          "$_vm_name" "$_vm_type"
-        ;;
-    esac
-
-    _i=$((_i + 1))
-  done
+  for_each_vm build_one_image
 }
 
 # ---------------------------------------------------------------------------
@@ -1558,56 +1922,7 @@ setup_tart_vms() {
     return
   fi
 
-  vm_count=$(jq '.VMs | length' "$MANIFEST")
-  i=0
-  while [ "$i" -lt "$vm_count" ]; do
-    vm_name=$(jq -r ".VMs[$i].name" "$MANIFEST")
-    vm_type=$(jq -r ".VMs[$i].type" "$MANIFEST")
-    vm_enabled=$(jq -r ".VMs[$i].enabled" "$MANIFEST")
-
-    case "$vm_enabled" in
-      true|false) ;;
-      *)
-        printf 'vm-setup: WARNING — VM "%s" has invalid enabled value "%s"; expected boolean true/false in manifest\n' "$vm_name" "$vm_enabled" >&2
-        i=$((i + 1))
-        continue
-        ;;
-    esac
-
-    if [ "$vm_enabled" != "true" ]; then
-      printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$vm_name"
-      i=$((i + 1))
-      continue
-    fi
-
-    vm_hosts=$(jq -c ".VMs[$i].hosts" "$MANIFEST")
-    if ! should_include_host "$vm_hosts"; then
-      printf 'vm-setup: VM "%s" is not available on host "%s" (hosts: %s); skipping\n' "$vm_name" "$NUCLEUS_HOST" "$vm_hosts"
-      i=$((i + 1))
-      continue
-    fi
-
-    if [ "$vm_type" != "macOS" ]; then
-      i=$((i + 1))
-      continue
-    fi
-
-    # Verify the tart VM was created in phase 1.
-    if ! tart list 2>/dev/null | awk 'NR > 1 { print $2 }' | grep -qxF "$vm_name"; then
-      printf 'vm-setup: WARNING — tart VM "%s" not found; Packer build may have failed or was skipped\n' "$vm_name" >&2
-      i=$((i + 1))
-      continue
-    fi
-
-    if [ "$dry_run" = false ]; then
-      printf 'vm-setup: tart VM ready: %s (start with: tart run %s)\n' "$vm_name" "$vm_name"
-      write_start_script "$vm_name" "$vm_name" "$vm_type" 'darwin-tart'
-    else
-      printf 'vm-setup: [dry-run] verify tart VM registration: %s\n' "$vm_name"
-    fi
-
-    i=$((i + 1))
-  done
+  for_each_vm setup_tart_vm
 }
 
 # ---------------------------------------------------------------------------
@@ -1615,262 +1930,12 @@ setup_tart_vms() {
 # ---------------------------------------------------------------------------
 
 setup_utm_vms() {
-  UTMCTL="/Applications/UTM.app/Contents/MacOS/utmctl"
-
-  # re_register_utm_bundle NAME BUNDLE
-  #   Force UTM to reload bundle config by temporarily preserving the bundle,
-  #   deleting the registered VM entry, then reopening the preserved bundle.
-  #   WHY: UTM can keep stale runtime config for already-registered VMs even
-  #   after config.plist is refreshed in-place.
-  re_register_utm_bundle() {
-    _rr_name="$1"
-    _rr_bundle="$2"
-    _rr_backup="${_rr_bundle}.reimport"
-
-    rm -rf "$_rr_backup"
-    if ! cp -R "$_rr_bundle" "$_rr_backup"; then
-      printf 'vm-setup: WARNING — failed to stage re-registration backup for %s; keeping current registration\n' "$_rr_name" >&2
-      return 1
-    fi
-
-    if ! "$UTMCTL" delete "$_rr_name"; then
-      printf 'vm-setup: WARNING — failed to delete stale UTM registration for %s; keeping current registration\n' "$_rr_name" >&2
-      rm -rf "$_rr_backup"
-      return 1
-    fi
-
-    if [ -d "$_rr_bundle" ]; then
-      rm -rf "$_rr_bundle"
-    fi
-
-    if ! mv "$_rr_backup" "$_rr_bundle"; then
-      printf 'vm-setup: WARNING — failed to restore bundle after re-registration delete for %s\n' "$_rr_name" >&2
-      return 1
-    fi
-
-    printf 'vm-setup: re-opening UTM bundle to refresh registration: %s\n' "$_rr_bundle"
-    if ! open "$_rr_bundle"; then
-      printf 'vm-setup: WARNING — opening %s failed after re-registration; open it manually in UTM\n' "$_rr_bundle" >&2
-      return 1
-    fi
-
-    if ! wait_for_utm_registration "$_rr_name"; then
-      printf 'vm-setup: WARNING — UTM did not re-register VM "%s" within timeout after stale-config repair\n' "$_rr_name" >&2
-      return 1
-    fi
-
-    return 0
-  }
-
   if [ ! -d /Applications/UTM.app ]; then
     printf 'vm-setup: UTM not found at /Applications/UTM.app; skipping macOS VM provisioning\n'
     return
   fi
 
-  vm_count=$(jq '.VMs | length' "$MANIFEST")
-  i=0
-  while [ "$i" -lt "$vm_count" ]; do
-    vm_name=$(jq -r ".VMs[$i].name" "$MANIFEST")
-    vm_display=$(jq -r ".VMs[$i].display" "$MANIFEST")
-    vm_type=$(jq -r ".VMs[$i].type" "$MANIFEST")
-    vm_enabled=$(jq -r ".VMs[$i].enabled" "$MANIFEST")
-
-    case "$vm_enabled" in
-      true|false) ;;
-      *)
-        printf 'vm-setup: WARNING — VM "%s" has invalid enabled value "%s"; expected boolean true/false in manifest\n' "$vm_name" "$vm_enabled" >&2
-        i=$((i + 1))
-        continue
-        ;;
-    esac
-
-    if [ "$vm_enabled" != "true" ]; then
-      printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$vm_name"
-      i=$((i + 1))
-      continue
-    fi
-
-    vm_hosts=$(jq -c ".VMs[$i].hosts" "$MANIFEST")
-    if ! should_include_host "$vm_hosts"; then
-      printf 'vm-setup: VM "%s" is not available on host "%s" (hosts: %s); skipping\n' "$vm_name" "$NUCLEUS_HOST" "$vm_hosts"
-      i=$((i + 1))
-      continue
-    fi
-
-    # macOS guests are provisioned via tart (setup_tart_vms), not UTM.
-    if [ "$vm_type" = "macOS" ]; then
-      printf 'vm-setup: macOS guest "%s" stays on Tart runtime; skipping UTM bundle provisioning for this VM\n' "$vm_name"
-      i=$((i + 1))
-      continue
-    fi
-
-    bundle="$VM_DIR/${vm_name}.utm"
-    data_dir="$bundle/Data"
-    disk_file="$data_dir/disk-main.qcow2"
-    disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_file")"
-    config_plist="$bundle/config.plist"
-    bundle_exists=false
-    legacy_display_config=false
-    template_drift_config=false
-
-    printf 'vm-setup: configuring UTM VM "%s"...\n' "$vm_display"
-
-    if [ -d "$bundle" ]; then
-      bundle_exists=true
-      printf 'vm-setup: UTM bundle already exists: %s; refreshing config.plist\n' "$bundle"
-      if [ -f "$config_plist" ] && grep -qE '<string>(vga|std|virtio-ramfb|virtio-ramfb-gl)</string>' "$config_plist"; then
-        legacy_display_config=true
-        printf 'vm-setup: detected legacy display config in existing bundle; VM will be re-registered to refresh runtime state: %s\n' "$vm_name"
-      fi
-    fi
-
-    # Use the Nix-generated UTM config.plist written to ~/.local/share/nucleus/
-    # at Home Manager activation time (run nucleus-apply first).
-    _plist_template="${HOME}/.local/share/nucleus/vms/${vm_name}-config.plist"
-    if [ ! -f "$_plist_template" ]; then
-      printf 'vm-setup: WARNING \u2014 UTM config template not found at %s; apply the macOS config first\n' "$_plist_template" >&2
-      i=$((i + 1))
-      continue
-    fi
-    # Detect stale templates from older schema/value generations and fail fast
-    # with a concrete action instead of copying a known-invalid plist.
-    if grep -qE 'virtio-ramfb-gl|<key>DirectorySharing</key>|<key>ReadOnlySharing</key>|<key>SharedDirectories</key>' "$_plist_template"; then
-      printf 'vm-setup: WARNING — stale UTM template detected at %s; run home-manager switch (or nucleus apply) before vm-setup\n' "$_plist_template" >&2
-      i=$((i + 1))
-      continue
-    fi
-    _required_utm_keys='
-<key>IconCustom</key>
-<key>Sound</key>
-<key>ClipboardSharing</key>
-<key>DirectoryShareReadOnly</key>
-<key>DownscalingFilter</key>
-<key>UpscalingFilter</key>
-<key>NativeResolution</key>
-<key>MacAddress</key>
-<key>IsolateFromHost</key>
-<key>PortForward</key>
-<key>AdditionalArguments</key>
-<key>BalloonDevice</key>
-<key>DebugLog</key>
-<key>PS2Controller</key>
-<key>RNGDevice</key>
-<key>RTCLocalTime</key>
-<key>TPMDevice</key>
-<key>MaximumUsbShare</key>
-<key>UsbBusSupport</key>
-<key>UsbSharing</key>
-<key>CPUFlagsAdd</key>
-<key>CPUFlagsRemove</key>
-<key>ForceMulticore</key>
-<key>JITCacheSize</key>'
-    _missing_utm_keys=''
-    for _required_utm_key in $_required_utm_keys; do
-      if ! grep -Fq "$_required_utm_key" "$_plist_template"; then
-        _missing_utm_keys="$_missing_utm_keys ${_required_utm_key#<key>}"
-      fi
-    done
-    if [ -n "$_missing_utm_keys" ]; then
-      printf 'vm-setup: WARNING — stale or incomplete UTM template detected at %s (missing key(s):%s); run home-manager switch (or nucleus apply) before vm-setup\n' \
-        "$_plist_template" "$_missing_utm_keys" >&2
-      i=$((i + 1))
-      continue
-    fi
-    # Detect config drift in already-registered bundles. UTM can keep runtime
-    # state from the registered entry, so we re-register when the on-disk
-    # bundle config no longer matches the managed template.
-    if [ "$bundle_exists" = true ] && [ -f "$config_plist" ] && ! cmp -s "$_plist_template" "$config_plist"; then
-      template_drift_config=true
-      printf 'vm-setup: detected config drift in existing bundle; VM will be re-registered to refresh runtime state: %s\n' "$vm_name"
-    fi
-    # Require a pre-built image only when the bundle does not already have a
-    # disk. Existing bundles can refresh config.plist in-place.
-    _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
-    _prebuilt_valid=false
-    if [ ! -f "$disk_file" ] && [ ! -f "$_prebuilt" ]; then
-      _build_tmp="$IMAGES_DIR/${vm_name}-build"
-      if [ -d "$_build_tmp" ]; then
-        printf 'vm-setup: WARNING — image not ready for %s; build appears in progress at %s\n' "$vm_name" "$_build_tmp" >&2
-      else
-        printf 'vm-setup: WARNING — image not found: %s; build failed or type not supported\n' "$_prebuilt" >&2
-      fi
-      i=$((i + 1))
-      continue
-    fi
-
-    if [ -f "$_prebuilt" ]; then
-      if validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
-        _prebuilt_valid=true
-      else
-        printf 'vm-setup: WARNING — pre-built image is invalid for %s: %s\n' "$vm_name" "$_prebuilt" >&2
-        i=$((i + 1))
-        continue
-      fi
-    fi
-
-    write_start_script "$vm_name" "$vm_display" "$vm_type" 'darwin-utm'
-
-    if [ "$dry_run" = false ]; then
-      mkdir -p "$data_dir"
-      _replace_runtime=false
-      if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}"; then
-        printf 'vm-setup: existing runtime disk is invalid for %s; replacing from pre-built image\n' "$vm_name" >&2
-        rm -f "$disk_file"
-        _replace_runtime=true
-      fi
-      if [ -f "$disk_file" ] && ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
-        printf 'vm-setup: %s runtime disk guest credential drift detected; replacing runtime disk from pre-built image\n' "$vm_name" >&2
-        rm -f "$disk_file"
-        _replace_runtime=true
-      fi
-      if [ ! -f "$disk_file" ]; then
-        if [ "$_prebuilt_valid" != true ]; then
-          printf 'vm-setup: WARNING — cannot replace the %s runtime disk because no valid pre-built image is available: %s\n' "$vm_name" "$_prebuilt" >&2
-          i=$((i + 1))
-          continue
-        fi
-        cp "$_prebuilt" "$disk_file"
-        printf 'vm-setup: copied pre-built disk image: %s\n' "$disk_file"
-        printf '%s\n' "$vm_guest_credentials_fingerprint" >"$disk_credential_marker"
-      elif [ "$_replace_runtime" = true ]; then
-        printf 'vm-setup: WARNING — replacement was requested for %s but the runtime disk still exists; leaving it untouched\n' "$vm_name" >&2
-      else
-        printf 'vm-setup: preserving existing disk image: %s\n' "$disk_file"
-      fi
-      cp "$_plist_template" "$config_plist"
-      # Nix store files are read-only (mode 0444).  Make the bundle-local copy
-      # writable so UTM can update the plist after import if needed.
-      chmod +w "$config_plist"
-      if [ "$bundle_exists" = true ]; then
-        printf 'vm-setup: refreshed UTM bundle config: %s\n' "$bundle"
-      else
-        printf 'vm-setup: UTM bundle created: %s\n' "$bundle"
-      fi
-      if ! "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$vm_name"; then
-        printf 'vm-setup: opening UTM bundle in place: %s\n' "$bundle"
-        if open "$bundle"; then
-          if wait_for_utm_registration "$vm_name"; then
-            printf 'vm-setup: UTM VM opened and registered: %s\n' "$vm_name"
-          else
-            printf 'vm-setup: WARNING — UTM did not register VM "%s" within timeout; open UTM and retry vm-setup\n' "$vm_name" >&2
-          fi
-        else
-          printf 'vm-setup: WARNING — opening %s failed; ensure UTM can access the managed VM directory and retry\n' "$bundle" >&2
-        fi
-      elif [ "$legacy_display_config" = true ] || [ "$template_drift_config" = true ]; then
-        printf 'vm-setup: repairing stale UTM runtime registration for %s\n' "$vm_name"
-        if re_register_utm_bundle "$vm_name" "$bundle"; then
-          printf 'vm-setup: stale UTM registration repaired: %s\n' "$vm_name"
-        fi
-      else
-        printf 'vm-setup: UTM VM already registered: %s\n' "$vm_name"
-      fi
-    else
-      printf 'vm-setup: [dry-run] create UTM bundle %s from %s\n' "$bundle" "$_plist_template"
-    fi
-
-    i=$((i + 1))
-  done
+  for_each_vm setup_utm_vm
 
   printf 'vm-setup: macOS VM setup complete\n'
 }
@@ -1899,102 +1964,7 @@ setup_libvirt_vms() {
     fi
   fi
 
-  vm_count=$(jq '.VMs | length' "$MANIFEST")
-  i=0
-  while [ "$i" -lt "$vm_count" ]; do
-    vm_name=$(jq -r ".VMs[$i].name" "$MANIFEST")
-    vm_display=$(jq -r ".VMs[$i].display" "$MANIFEST")
-    vm_type=$(jq -r ".VMs[$i].type" "$MANIFEST")
-    vm_enabled=$(jq -r ".VMs[$i].enabled" "$MANIFEST")
-
-    case "$vm_enabled" in
-      true|false) ;;
-      *)
-        printf 'vm-setup: WARNING — VM "%s" has invalid enabled value "%s"; expected boolean true/false in manifest\n' "$vm_name" "$vm_enabled" >&2
-        i=$((i + 1))
-        continue
-        ;;
-    esac
-
-    if [ "$vm_enabled" != "true" ]; then
-      printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$vm_name"
-      i=$((i + 1))
-      continue
-    fi
-
-    vm_hosts=$(jq -c ".VMs[$i].hosts" "$MANIFEST")
-    if ! should_include_host "$vm_hosts"; then
-      printf 'vm-setup: VM "%s" is not available on host "%s" (hosts: %s); skipping\n' "$vm_name" "$NUCLEUS_HOST" "$vm_hosts"
-      i=$((i + 1))
-      continue
-    fi
-
-    disk_path="$VM_DIR/${vm_name}.qcow2"
-    disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_path")"
-
-    printf 'vm-setup: configuring libvirt VM "%s"...\n' "$vm_display"
-
-    # Require a pre-built image (built in phase 1).
-    _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
-    if [ ! -f "$_prebuilt" ]; then
-      printf 'vm-setup: WARNING \u2014 image not found: %s; skipping "%s"\n' "$_prebuilt" "$vm_name" >&2
-      i=$((i + 1))
-      continue
-    fi
-    if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
-      printf 'vm-setup: WARNING — pre-built image is invalid for %s: %s\n' "$vm_name" "$_prebuilt" >&2
-      i=$((i + 1))
-      continue
-    fi
-
-    if [ "$dry_run" = false ]; then
-      mkdir -p "$VM_DIR"
-      _replace_runtime=false
-      if [ ! -f "$disk_path" ]; then
-        _replace_runtime=true
-      elif ! validate_qcow2_image "$disk_path" "existing libvirt runtime disk for ${vm_name}"; then
-        printf 'vm-setup: existing libvirt runtime disk is invalid for %s; replacing from pre-built image\n' "$vm_name" >&2
-        rm -f "$disk_path"
-        _replace_runtime=true
-      elif ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
-        printf 'vm-setup: %s runtime disk guest credential drift detected; replacing runtime disk from pre-built image\n' "$vm_name" >&2
-        rm -f "$disk_path"
-        _replace_runtime=true
-      fi
-
-      if [ "$_replace_runtime" = true ]; then
-        cp "$_prebuilt" "$disk_path"
-        printf 'vm-setup: disk image placed: %s\n' "$disk_path"
-        printf '%s\n' "$vm_guest_credentials_fingerprint" >"$disk_credential_marker"
-      else
-        printf 'vm-setup: disk already exists: %s\n' "$disk_path"
-      fi
-    else
-      printf 'vm-setup: [dry-run] copy %s to %s\n' "$_prebuilt" "$disk_path"
-    fi
-
-    # Define/update the libvirt domain from the Nix-generated XML (idempotent).
-    # The file is installed at apply time by environment.etc in vms.nix.
-    _xml_file="/etc/nucleus/vms/${vm_name}-domain.xml"
-    if [ ! -f "$_xml_file" ]; then
-      printf 'vm-setup: WARNING — domain XML not found at %s; apply the NixOS config first\n' "$_xml_file" >&2
-      i=$((i + 1))
-      continue
-    fi
-
-    if [ "$dry_run" = false ]; then
-      if virsh define "$_xml_file"; then
-        printf 'vm-setup: VM "%s" defined/updated in libvirt\n' "$vm_name"
-        write_start_script "$vm_name" "$vm_display" "$vm_type" 'nixos-libvirt'
-      else
-        printf 'vm-setup: WARNING — virsh define failed for "%s"; check libvirtd status\n' "$vm_name" >&2
-      fi
-    else
-      printf 'vm-setup: [dry-run] virsh define %s\n' "$_xml_file"
-    fi
-
-    i=$((i + 1))
-  done
+  for_each_vm setup_libvirt_vm
 
   printf 'vm-setup: NixOS VM setup complete; use the generated start-<name> helpers (or virt-manager) to start VMs\n'
 }
