@@ -40,7 +40,7 @@ and focused `.agents/instructions/*.instructions.md` files.
 - `commit-staged.prompt.md` is mirrored between:
   - `.agents/prompts/commit-staged.prompt.md`
   - `.opencode/commands/commit-staged.prompt.md`
-  Update both in the same change unless intentional divergence is documented.
+    Update both in the same change unless intentional divergence is documented.
 - Do not add `.github/copilot-instructions.md`; root `AGENTS.md` is canonical.
 - Avoid broad cosmetic rename sweeps unless all dependent references are updated
   atomically.

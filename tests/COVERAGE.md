@@ -15,86 +15,10 @@ scripts.
 
 Located in `tests/src/`, run via `nix-instantiate --eval` in CI.
 
-#### ✅ **core-tests.nix** (10 tests)
-- Expanded backend selection decision tree validation
-- Per-package override precedence (overrides > policy > global)
-- Policy-based categorization (CLI→nixpkgs, GUI→homebrew)
-- Global backend fallback
-- Multiple overrides and selective overrides
-- **Status**: All 10 tests passing
-- **Coverage**: All branches of `resolveBackend` logic from core.nix
-
-#### ✅ **module-imports-tests.nix** (17 tests)
-- Verifies 15+ shared modules import without circular dependencies
-- Tests: `core.nix`, `home.nix`, `shell.nix`, `git.nix`, `secrets.nix`, `wallpapers.nix`, and others
-- **Status**: All module presence checks passing
-- **Coverage**: Module initialization and dependency order
-
-#### ✅ **module-options-tests.nix** (12 tests)
-- Module option types, defaults, descriptions
-- Tests home.username, home.homeDirectory, editor extensions
-- Security and shell option validation
-- SOPS keys structure validation
-- **Status**: Placeholder assertions ready for real validation as modules evolve
-- **Coverage**: Option definition structure and type safety
-
-#### ✅ **config-composition-tests.nix** (12 tests)
-- Host configurations compose correctly (macOS, NixOS, standalone)
-- Module import order validation
-- specialArgs passing verification
-- Home Manager embedding tests
-- Security parity checks across platforms
-- **Status**: All composition paths validated
-- **Coverage**: Multi-host configuration merging
-
-#### ✅ **package-parity-tests.nix** (7 tests)
-- Cross-platform package presence validation
-- Essential packages: git, zsh, direnv, bat, fzf, ripgrep, python, nodejs
-- **Status**: 7 tests verifying platform-specific package IDs
-- **Coverage**: nixpkgs ↔ Homebrew ↔ WinGet equivalence
-
-#### ✅ **option-conflict-tests.nix** (11 tests - NEW)
-- Module option merge safety validation
-- mkIf/mkDefault precedence patterns
-- Type consistency across modules
-- Home Manager stateVersion parity
-- Security option parity across platforms
-- Package list concatenation without conflict
-- Activation hook name uniqueness
-- Module import graph acyclic validation
-- **Status**: All 11 tests passing
-- **Coverage**: Configuration conflict prevention patterns
-
-#### ✅ **activation-deps-tests.nix** (12 tests - NEW)
-- Activation dependency ordering validation
-- Secret materialization before dev repos
-- SSH keys before Git clone
-- GPG keys before commits
-- Manual instructions as final step
-- Windows DSC execution order (Git→Secrets→DevRepos)
-- Agent skills and wallpaper timing
-- Bidirectional before/after consistency
-- **Status**: All 12 tests passing
-- **Coverage**: Activation DAG correctness and invariants
-
-#### ✅ **sops-mock-tests.nix** (15 tests - NEW)
-- SOPS configuration structure validation
-- Age key format and presence
-- GPG backup key verification
-- Creation rules completeness
-- Secret file mappings
-- Recipient structure validation
-- Materialization path format
-- **Status**: All 15 tests passing
-- **Coverage**: SOPS structure without requiring encryption
-
-#### ✅ **vscode-extension-pruning-tests.nix** (2 tests - NEW)
-- VS Code extension directory pruning validation
-- Managed extension folders only; derived metadata cleanup (`extensions.json`, `.obsolete`)
-- **Status**: All 2 tests passing
-- **Coverage**: VS Code extension provisioning cleanup across POSIX and Windows
-
-**Nix Test Totals**: 16 focused test files under `tests/src/`
+**Coverage**: 31 test files covering module options, import graphs, config
+composition, package parity, option conflict detection, activation dependency
+ordering, SOPS structure validation, and VS Code extension pruning. Run
+`ls tests/src/*.nix` for the current authoritative list.
 
 ---
 

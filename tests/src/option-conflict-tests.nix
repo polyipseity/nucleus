@@ -79,10 +79,10 @@ let
     let
       # Multiple modules setting stateVersion (should not conflict if merged with mkMerge)
       config1 = {
-        home.stateVersion = "23.05";
+        home.stateVersion = "24.11";
       };
       config2 = {
-        home.stateVersion = "23.05";
+        home.stateVersion = "24.11";
       };
     in
     assert' (

@@ -19,12 +19,14 @@ This repository manages configurations for multiple potential users, but most fe
 ### When to Use isPrimaryUser Check
 
 Use `isPrimaryUser` only in `src/modules/secrets.nix` for:
+
 - SOPS secret decryption and materialization
 - GPG key imports
 - SSH key adoption
 - Secret verification
 
 Example:
+
 ```nix
 lib.mkIf isPrimaryUser {
   # Secret materialization for the primary user only
@@ -36,6 +38,7 @@ lib.mkIf isPrimaryUser {
 ### When to Hardcode "polyipseity"
 
 Use hardcoded `"polyipseity"` check in modules that implement features available only to the primary user:
+
 - AI model provisioning (src/modules/ai/default.nix)
 - Agent configuration (src/modules/agents.nix)
 - ClawHub skill syncing
@@ -45,6 +48,7 @@ Use hardcoded `"polyipseity"` check in modules that implement features available
 **Important**: Even when using hardcoded checks, always read the feature configuration from the **centralized user registry** (flake.nix users.<username>). Only the primary user ("polyipseity") has these features enabled in the registry.
 
 Example:
+
 ```nix
 # In agents.nix:
 agentsConfig = users.${currentUsername}.agents or { enable = false; };
@@ -59,11 +63,13 @@ lib.mkIf (config.home.username == "polyipseity" && agentsConfig.enable) {
 ### Multi-User Aware Modules
 
 Modules that are designed to support multiple users:
+
 - `src/modules/dev-repos.nix` — reads per-user devRepos config from the user registry
 - `src/modules/home.nix` — uses effectiveUsername to apply common settings to any user
 - `src/modules/shell.nix` — applies shell aliases and env to any user
 
 These modules should:
+
 - Use `config.home.username` or `effectiveUsername` for dynamic user references
 - Respect per-user configuration from the user registry (flake.nix users.<username>)
 - NOT hardcode usernames (except in comments explaining the constraint)
@@ -80,6 +86,7 @@ Before committing changes that affect users:
 ## Common Patterns
 
 ### Pattern 1: Primary-User-Only Feature (Registry-Driven + Hardcoded Guard)
+
 ```nix
 # In agents.nix:
 agentsConfig = users.${currentUsername}.agents or { enable = false; };
@@ -94,6 +101,7 @@ lib.mkIf (config.home.username == "polyipseity" && agentsConfig.enable) {
 **Explanation**: Always read from the registry first. The hardcoded `"polyipseity"` check is a safety gate that prevents accidental feature activation for non-primary users.
 
 ### Pattern 2: Multi-User Feature (Registry-Driven)
+
 ```nix
 # In dev-repos.nix:
 userConfig = users.${currentUsername}.devRepos or {
@@ -104,6 +112,7 @@ userConfig = users.${currentUsername}.devRepos or {
 ```
 
 ### Pattern 3: Secrets (Primary User Only, SOPS-Aware)
+
 ```nix
 # In secrets.nix:
 isPrimaryUser = config.home.username == primaryUsername;
