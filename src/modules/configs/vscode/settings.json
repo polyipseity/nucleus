@@ -42,12 +42,13 @@
     "cursor-workspace": true,
     "windsurf": true
   },
-  "chat.planAgent.defaultModel": "",
+  "chat.planAgent.defaultModel": "DeepSeek V4 Flash (High) (customoai)",
   "chat.promptFilesLocations": {
     ".agents/prompts": true,
     "~/.agents/prompts": true
   },
   "chat.restoreLastPanelSession": true,
+  "chat.tools.compressOutput.enabled": true,
   "chat.tools.riskAssessment.model": "DeepSeek V4 Flash (High) (customoai)",
   "chat.tools.terminal.outputLocation": "chat",
   "chat.useClaudeHooks": true,
@@ -132,6 +133,7 @@
   "github.copilot.chat.codesearch.enabled": true,
   "github.copilot.chat.copilotMemory.enabled": true,
   "github.copilot.chat.editRecording.enabled": true,
+  "github.copilot.chat.edits.gemini3MultiReplaceString": true,
   "github.copilot.chat.enableUserPreferences": true,
   "github.copilot.chat.executionSubagent.enabled": true,
   "github.copilot.chat.executionSubagent.model": "DeepSeek V4 Flash (High) (customoai)",
