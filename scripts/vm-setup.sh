@@ -53,6 +53,7 @@ windows_iso_source='auto'
 windows_iso_retries='0'
 windows_headless='true'
 accelerator=''
+gc=false
 
 usage() {
   usage_std "$(basename "$0")" "[options]"
@@ -67,6 +68,7 @@ usage() {
   --windows-iso-retries N    Retry attempts for network downloads (default: 0).
   --headful|--no-headful     Run guest builds with visible GUI (--headful) or headless (--no-headful, default: on).
   --vm-dir-override PATH     Override the default ~/virtual machines path.
+  --gc|--no-gc               Remove non-provisioned VM artifacts (default: --no-gc).
 EOF
 }
 
@@ -89,6 +91,8 @@ while [ "$#" -gt 0 ]; do
     --repo-root)    REPO_ROOT="$2"; shift ;;
     --vm-dir-override)    VM_DIR_OVERRIDE="$2"; shift ;;
     --accelerator)  accelerator="$2"; shift ;;
+    --gc)           gc=true ;;
+    --no-gc)        gc=false ;;
     *)
       printf '%s\n' "vm-setup: unsupported argument '$1'" >&2
       usage >&2
@@ -312,5 +316,9 @@ case "$_os" in
     printf 'vm-setup: unsupported OS "%s"; nothing to do\n' "$_os"
     ;;
 esac
+
+if [ "$gc" = true ]; then
+  gc_vms
+fi
 
 printf 'vm-setup: done\n'

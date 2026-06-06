@@ -73,6 +73,8 @@ param(
     # Print planned actions without executing (default: $false).
     [switch]$DryRun = $(if ($env:NUCLEUS_DRY_RUN -eq 'true') { $true } else { $false }),
 
+    [switch]$Gc,
+
     [Alias("h")]
     [switch]$Headful = { $env:NUCLEUS_VM_HEADFUL -eq 'true' }.Invoke(),
 
@@ -98,7 +100,7 @@ if (-not (Test-Path $module)) {
 
 . $module
 
-$invokeArgs = @{ RepoRoot = $repoRoot; DryRun = $DryRun }
+$invokeArgs = @{ RepoRoot = $repoRoot; DryRun = $DryRun; Gc = $Gc }
 if ($WindowsIso)  { $invokeArgs['WindowsIso']  = $WindowsIso }
 if ($WindowsIsoSource) { $invokeArgs['WindowsIsoSource'] = $WindowsIsoSource }
 if ($PSBoundParameters.ContainsKey('WindowsIsoRetries')) { $invokeArgs['WindowsIsoRetries'] = $WindowsIsoRetries }

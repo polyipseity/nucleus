@@ -428,6 +428,19 @@ for_each_vm() {
   done
 }
 
+# get_expected_vm_names
+#   Prints a newline-separated list of VM names from the manifest that are
+#   enabled and match the current host.  Reuses the same filter logic as
+#   for_each_vm but without the callback dispatch.
+get_expected_vm_names() {
+  jq -r --arg host "$NUCLEUS_HOST" '
+    .VMs[] |
+    select(.enabled == true) |
+    select(.hosts == null or (.hosts | length == 0) or (.hosts | contains([$host]))) |
+    .name
+  ' "$MANIFEST"
+}
+
 # ---------------------------------------------------------------------------
 # UTM re-registration helper
 # ---------------------------------------------------------------------------
@@ -1723,4 +1736,126 @@ setup_libvirt_vms() {
   for_each_vm setup_libvirt_vm
 
   printf 'vm-setup: NixOS VM setup complete; use the generated start-<name> helpers (or virt-manager) to start VMs\n'
+}
+
+# ---------------------------------------------------------------------------
+# Garbage collection for non-provisioned VM artifacts
+# ---------------------------------------------------------------------------
+
+# gc_vms — Top-level GC dispatcher.  Called from the vm-setup.sh main flow
+#   when --gc is passed.  Removes VM artifacts (Tart VMs, UTM bundles,
+#   libvirt domains, disk images, credential markers) for VMs that are not
+#   in the enabled-and-host-matched set.
+gc_vms() {
+  _gcv_expected="$(get_expected_vm_names)" || return
+
+  printf 'vm-setup: GC — scanning for non-provisioned VM artifacts...\n'
+  if [ "$dry_run" = true ]; then
+    printf 'vm-setup: [dry-run] GC mode enabled — inspecting artifacts...\n'
+  fi
+
+  case "$(uname -s)" in
+    Darwin)
+      gc_tart_vms "$_gcv_expected"
+      gc_utm_bundles "$_gcv_expected"
+      ;;
+    Linux)
+      if [ -f /etc/NIXOS ]; then
+        gc_libvirt_vms "$_gcv_expected"
+      fi
+      ;;
+  esac
+
+  gc_orphan_disks "$_gcv_expected"
+  gc_orphan_markers "$_gcv_expected"
+
+  printf 'vm-setup: GC — done\n'
+}
+
+# gc_tart_vms EXPECTED_NAMES — Remove Tart VMs not in the expected set.
+gc_tart_vms() {
+  _gct_expected="$1"
+  command -v tart >/dev/null 2>&1 || return
+
+  tart list 2>/dev/null | awk 'NR>1{print $2}' | while IFS= read -r _gct_name; do
+    [ -z "$_gct_name" ] && continue
+    if ! printf '%s\n' "$_gct_expected" | grep -qxF "$_gct_name"; then
+      printf 'vm-setup: GC — removing non-provisioned Tart VM: %s\n' "$_gct_name"
+      if [ "$dry_run" = false ]; then
+        tart delete "$_gct_name"
+      fi
+    fi
+  done
+}
+
+# gc_utm_bundles EXPECTED_NAMES — Remove UTM bundles not in the expected set.
+gc_utm_bundles() {
+  _gcu_expected="$1"
+  [ -d /Applications/UTM.app ] || return
+
+  for _gcu_bundle in "$VM_DIR"/*.utm/; do
+    [ -d "$_gcu_bundle" ] || continue
+    _gcu_name="$(basename "$_gcu_bundle" .utm)"
+    if ! printf '%s\n' "$_gcu_expected" | grep -qxF "$_gcu_name"; then
+      printf 'vm-setup: GC — removing non-provisioned UTM bundle: %s\n' "$_gcu_bundle"
+      if [ "$dry_run" = false ]; then
+        rm -rf "$_gcu_bundle"
+      fi
+    fi
+  done
+}
+
+# gc_libvirt_vms EXPECTED_NAMES — Remove libvirt domains not in the expected set.
+gc_libvirt_vms() {
+  _gcl_expected="$1"
+  command -v virsh >/dev/null 2>&1 || return
+
+  virsh list --all --name 2>/dev/null | while IFS= read -r _gcl_name; do
+    [ -z "$_gcl_name" ] && continue
+    if ! printf '%s\n' "$_gcl_expected" | grep -qxF "$_gcl_name"; then
+      printf 'vm-setup: GC — removing non-provisioned libvirt domain: %s\n' "$_gcl_name"
+      if [ "$dry_run" = false ]; then
+        virsh undefine "$_gcl_name" 2>/dev/null || true
+      fi
+    fi
+  done
+}
+
+# gc_orphan_disks EXPECTED_NAMES — Remove disk images not in the expected set.
+gc_orphan_disks() {
+  _gcod_expected="$1"
+
+  for _gcod_dir in "$VM_DIR" "$IMAGES_DIR"; do
+    [ -d "$_gcod_dir" ] || continue
+    for _gcod_path in "$_gcod_dir"/*.qcow2; do
+      [ -f "$_gcod_path" ] || continue
+      _gcod_name="$(basename "$_gcod_path" .qcow2)"
+      if ! printf '%s\n' "$_gcod_expected" | grep -qxF "$_gcod_name"; then
+        printf 'vm-setup: GC — removing non-provisioned disk image: %s\n' "$_gcod_path"
+        if [ "$dry_run" = false ]; then
+          rm -f "$_gcod_path"
+        fi
+      fi
+    done
+  done
+}
+
+# gc_orphan_markers EXPECTED_NAMES — Remove credential markers whose disk
+#   image no longer exists.
+gc_orphan_markers() {
+  _gcom_expected="$1"
+
+  for _gcom_dir in "$VM_DIR" "$IMAGES_DIR"; do
+    [ -d "$_gcom_dir" ] || continue
+    for _gcom_marker in "$_gcom_dir"/*.vm-guest-credentials-sha256; do
+      [ -f "$_gcom_marker" ] || continue
+      _gcom_base="${_gcom_marker%.vm-guest-credentials-sha256}"
+      if [ ! -f "$_gcom_base" ]; then
+        printf 'vm-setup: GC — removing orphaned credential marker: %s\n' "$_gcom_marker"
+        if [ "$dry_run" = false ]; then
+          rm -f "$_gcom_marker"
+        fi
+      fi
+    done
+  done
 }

@@ -332,6 +332,22 @@ let
     in
     assert' (builtins.all (r: r == null) results) "VM setup script existence check failed";
 
+  # Every enabled VM must be reachable by at least one known host (MacBook,
+  # NixOS, Windows).  An orphaned VM (enabled but with a hosts list that
+  # excludes all known hosts) would never be provisioned by any machine.
+  # This mirrors the get_expected_vm_names filter logic used by vm-setup GC.
+  test_enabled_vm_not_orphaned =
+    let
+      hostFilter = vm: builtins.any (host: builtins.elem host (vm.hosts or null)) validHosts;
+      orphaned = builtins.filter (
+        vm: vm.enabled && !(builtins.isNull (vm.hosts or null)) && !hostFilter vm
+      ) manifest.VMs;
+    in
+    assert' (orphaned == [ ])
+      "Every enabled VM must be reachable by at least one known host; orphaned: ${
+        builtins.toString (builtins.map (v: v.name) orphaned)
+      }";
+
   # guest.nix must be non-empty (parseable as a Nix expression).
   test_guest_nix_nonempty =
     let

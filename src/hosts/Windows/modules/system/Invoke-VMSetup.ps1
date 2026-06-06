@@ -192,10 +192,44 @@ function Invoke-VMSetup {
         [switch]$Headful,
 
         # Print planned actions without modifying any state.
-        [switch]$DryRun
+        [switch]$DryRun,
+
+        # Remove orphaned VM disk images and credential markers.
+        [switch]$Gc
     )
 
     $ErrorActionPreference = 'Stop'
+
+    function Invoke-GcOrphanDisk {
+        param([string[]] $ExpectedNames)
+        $dirs = @($vmDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
+        foreach ($dir in $dirs) {
+            foreach ($disk in Get-ChildItem "$dir\*.qcow2" -ErrorAction SilentlyContinue) {
+                $name = [System.IO.Path]::GetFileNameWithoutExtension($disk.Name)
+                if ($name -notin $ExpectedNames) {
+                    Write-Information "vm-setup: GC — removing non-provisioned disk image: $($disk.FullName)"
+                    if (-not $DryRun) {
+                        Remove-Item -Path $disk.FullName -Force -ErrorAction Continue
+                    }
+                }
+            }
+        }
+    }
+
+    function Invoke-GcOrphanMarker {
+        $dirs = @($vmDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
+        foreach ($dir in $dirs) {
+            foreach ($marker in Get-ChildItem "$dir\*.vm-guest-credentials-sha256" -ErrorAction SilentlyContinue) {
+                $basePath = $marker.FullName -replace '\.vm-guest-credentials-sha256$'
+                if (-not (Test-Path $basePath -PathType Leaf)) {
+                    Write-Information "vm-setup: GC — removing orphaned credential marker: $($marker.FullName)"
+                    if (-not $DryRun) {
+                        Remove-Item -Path $marker.FullName -Force -ErrorAction Continue
+                    }
+                }
+            }
+        }
+    }
 
     function Get-VMGuestSecretHash {
         param(
@@ -684,6 +718,20 @@ set -eu
         # is handled by the guest itself or via manual invocation.
 
         Write-Information "vm-setup: VM '$($vm.display)' setup complete"
+    }
+
+    if ($Gc) {
+        Write-Information 'vm-setup: GC — scanning for non-provisioned VM artifacts...'
+        $expectedNames = @(
+            foreach ($vm in $vmDef.VMs) {
+                if ((Test-VMEnabled $vm) -and (Test-VMHostMatch $vm)) {
+                    $vm.name
+                }
+            }
+        )
+        Invoke-GcOrphanDisk -ExpectedNames $expectedNames
+        Invoke-GcOrphanMarker
+        Write-Information 'vm-setup: GC — done'
     }
 
     Write-Information 'vm-setup: Windows VM setup complete'
