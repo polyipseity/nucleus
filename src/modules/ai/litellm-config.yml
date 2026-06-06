@@ -19,6 +19,10 @@ general_settings:
   environment_variables:
     LITELLM_LOG: WARNING
 
+router_settings:
+  num_retries: 3
+  routing_strategy: simple-shuffle
+
 model_list:
   # ---- Ollama models ----
   - model_name: ollama_chat/devstral-small-2:24b
