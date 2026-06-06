@@ -24,6 +24,10 @@ let
   # shell.nix and Sync-ShellProfile.ps1 (Windows).
   agentEnv = import ./agent-env-vars.nix;
 
+  # Shared shell environment variable values (CC, CXX, LD) defined in one place.
+  # Source of truth: ./shell/env.nix — update there, not here.
+  shellEnv = import ./shell/env.nix;
+
   # Profile content mirroring the Windows managed block in shell.ps1.
   # Using a Nix ''...'' string so the file is written verbatim; single
   # dollar signs and PowerShell variables ($line, $cursor, etc.) do not
@@ -79,9 +83,10 @@ let
         }
 
         # LLVM/Clang toolchain defaults for cross-host compiler parity.
-        $env:CC = "clang"
-        $env:CXX = "clang++"
-        $env:LD = "ld.lld"
+        # Values sourced from src/modules/shell/env.nix.
+        $env:CC = "${shellEnv.CC}"
+        $env:CXX = "${shellEnv.CXX}"
+        $env:LD = "${shellEnv.LD}"
 
         # ---------------------------------------------------------------
         # AI agent session detection
