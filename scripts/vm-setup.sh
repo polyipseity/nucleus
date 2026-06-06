@@ -39,10 +39,6 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-
-# Source shared library when available; fall back to inline helpers for
-# standalone execution (e.g. Nix pre-commit hooks where the script is
-# copied to a flat store path).
 if [ -f "$SCRIPT_DIR/../src/scripts/lib.sh" ]; then
   . "$SCRIPT_DIR/../src/scripts/lib.sh"
 else

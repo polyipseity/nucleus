@@ -9,7 +9,7 @@
 #   --dry-run                  Print planned actions without executing (default: off).
 #   --ollama-host <address>    Ollama server address (default: 127.0.0.1:11434).
 #   --ollama-profile <name>    Override profile selection (MacBook|NixOS|Windows) (default: auto-detect).
-#   --gc-only               Skip pulls; only remove unlisted models (default: off).
+#   --gc-only|--no-gc-only  Skip pulls (--gc-only) or allow pulls (--no-gc-only) (default: off, i.e. pulls allowed).
 #
 # Environment variables:
 #   NUCLEUS_AI_SYNC_TIMEOUT  Bounded wait for server readiness in seconds (default: 60).
@@ -45,7 +45,7 @@ usage() {
   --dry-run                          Print planned actions without executing them (default: off).
   --ollama-host <address>            Ollama server address (default: 127.0.0.1:11434).
   --ollama-profile <name>            Override profile selection (MacBook|NixOS|Windows) (default: auto-detect).
-  --gc-only                          Skip pulls; only remove unlisted models (default: off).
+  --gc-only|--no-gc-only            Skip pulls (--gc-only) or allow pulls (--no-gc-only) (default: off, i.e. pulls allowed).
 EOF
 }
 
@@ -68,6 +68,9 @@ while [ "$#" -gt 0 ]; do
       ;;
     --gc-only)
       gc_only=true
+      ;;
+    --no-gc-only)
+      gc_only=false
       ;;
     *)
       printf '%s\n' "ai-sync: unsupported argument '$1'" >&2

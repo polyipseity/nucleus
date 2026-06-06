@@ -10,7 +10,6 @@
 #   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
 #   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
 #   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
-#   --scoop-gc|--no-scoop-gc        Accepted but ignored on POSIX (Windows-only) (default: --scoop-gc).
 #   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
 #   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
 #
@@ -31,7 +30,6 @@ usage() {
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
-  --scoop-gc|--no-scoop-gc        Accepted but ignored on POSIX (Windows-only) (default: --scoop-gc).
   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
 EOF
@@ -43,7 +41,6 @@ tool_cache_gc=true
 hm_gc=true
 nix_gc=true
 ollama_gc=true
-scoop_gc=true
 wallpaper_gc=true
 vm_gc=true
 
@@ -76,13 +73,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-ollama-gc)
       ollama_gc=false
-      ;;
-    --scoop-gc)
-      scoop_gc=true
-      ;;
-    --no-scoop-gc)
-      scoop_gc=false
-      printf '%s\n' "gc: --no-scoop-gc accepted but ignored on POSIX (Windows-only)"
       ;;
     --wallpaper-gc)
       wallpaper_gc=true
@@ -402,8 +392,5 @@ fi
 
 # Step 7: Scoop cache gc (accepted but ignored on POSIX; Windows-only).
 # This flag exists for cross-platform CLI parity with the Windows gc.ps1 script.
-if [ "$scoop_gc" = false ]; then
-  :
-fi
 
 printf '%s\n' "gc: gc workflow completed"
