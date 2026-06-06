@@ -1,7 +1,7 @@
 ---
 description: "Use when modifying, debugging, or troubleshooting the Spotlight (cmd+space) disable mechanism on macOS. Covers the proven 6-stage strategy, why single-hotkey approaches fail, and the critical role of each disable stage."
 name: "Spotlight Disable Strategy (macOS)"
-applyTo: "src/hosts/MacBook/activation.nix, src/hosts/MacBook/MANUAL.md, tests/nix/*spotlight*, tests/nix/activation-deps-tests.nix, src/hosts/MacBook/defaults.nix"
+applyTo: "src/hosts/MacBook/activation.nix, src/hosts/MacBook/MANUAL.md, tests/src/*spotlight*, tests/src/activation-deps-tests.nix, src/hosts/MacBook/defaults.nix"
 ---
 
 # Spotlight Disable Strategy for macOS
@@ -316,7 +316,7 @@ After applying the Spotlight disable strategy, verify:
 ## Related Files
 
 - **Implementation**: [src/hosts/MacBook/activation.nix](src/hosts/MacBook/activation.nix#L363) — the `disableSpotlight` section
-- **Testing**: `tests/nix/*spotlight*.nix` — test cases validating the disable
+- **Testing**: `tests/src/*spotlight*.nix` — test cases validating the disable
 - **Manual Steps**: [src/hosts/MacBook/MANUAL.md](src/hosts/MacBook/MANUAL.md) — note if any manual steps are required post-activation
 - **Defaults Configuration**: [src/hosts/MacBook/defaults.nix](src/hosts/MacBook/defaults.nix) — ensure no conflicting `com.apple.spotlight` plist settings re-enable it
 

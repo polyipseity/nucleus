@@ -1,7 +1,7 @@
 ---
 description: "Use when editing cloud-drive mounts/replicas, cloud setup scripts, Finder favorites behavior, or related tests/manual docs."
 name: "Cloud Drives and Finder Favorites"
-applyTo: "src/modules/cloud-drives.nix, src/modules/macos.nix, src/hosts/Windows/modules/user/Sync-CloudDrive.ps1, src/hosts/Windows/modules/system/Invoke-ReplicaSync.ps1, scripts/cloud-setup.sh, scripts/cloud-setup.ps1, scripts/replica-sync.sh, scripts/replica-sync.ps1, src/hosts/MacBook/MANUAL.md, src/hosts/NixOS/MANUAL.md, src/hosts/Windows/MANUAL.md, tests/nix/cloud-sync-tests.nix"
+applyTo: "src/modules/cloud-drives.nix, src/modules/macos.nix, src/hosts/Windows/modules/user/Sync-CloudDrive.ps1, src/hosts/Windows/modules/system/Invoke-ReplicaSync.ps1, scripts/cloud-setup.sh, scripts/cloud-setup.ps1, scripts/replica-sync.sh, scripts/replica-sync.ps1, src/hosts/MacBook/MANUAL.md, src/hosts/NixOS/MANUAL.md, src/hosts/Windows/MANUAL.md, tests/src/cloud-sync-tests.nix"
 ---
 
 # Cloud Drives and Finder Favorites
@@ -99,7 +99,7 @@ iCloud Drive, Google Drive).
 When changing cloud-drive/Finder behavior, update all of the following in the
 same change:
 
-- `tests/nix/cloud-sync-tests.nix` expectations and test names.
+- `tests/src/cloud-sync-tests.nix` expectations and test names.
 - Inline WHY comments for every platform-specific exception.
 
 Avoid stale assertions that refer to removed flags or deprecated implementation

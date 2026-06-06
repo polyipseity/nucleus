@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or modifying application settings and configurations. Covers storage location selection, per-user override patterns, cross-platform parity, and testing requirements."
 name: "App Configuration Management"
-applyTo: "src/modules/**/*.nix, src/modules/configs/**, src/hosts/Windows/modules/*.ps1, src/flake.nix, src/hosts/Windows/users.json, tests/nix/*-tests.nix"
+applyTo: "src/modules/**/*.nix, src/modules/configs/**, src/hosts/Windows/modules/*.ps1, src/flake.nix, src/hosts/Windows/users.json, tests/src/*-tests.nix"
 ---
 
 # App Configuration Management
@@ -142,7 +142,7 @@ function Sync-AppConfig {
 Add assertions to ensure override fields exist and are wired correctly:
 
 ```nix
-# tests/nix/app-config-tests.nix
+# tests/src/app-config-tests.nix
 assert builtins.hasAttr "app" windowsUsers.users.polyipseity;
 assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.app;
 assert containsRegex "app =" flakeText;  # Verify flake.nix defines overrides
@@ -200,12 +200,12 @@ BREAKING CHANGE: <app> settings now stored in [native format] instead of JSON.
 
 All app configs must have corresponding tests:
 
-1. **Nix tests** (`tests/nix/<app>-config-tests.nix`):
+1. **Nix tests** (`tests/src/<app>-config-tests.nix`):
    - Assert default values are present and correct.
    - Assert user override fields exist in flake.nix and users.json.
    - Assert platform overrides are correctly wired.
 
-2. **Windows tests** (`tests/windows/**/*.Tests.ps1` or a dedicated module):
+2. **Windows tests** (`tests/src/hosts/Windows/**/*.Tests.ps1` or a dedicated module):
    - Assert registry values are correctly written post-sync.
    - Assert user-specific overrides take precedence over defaults.
 

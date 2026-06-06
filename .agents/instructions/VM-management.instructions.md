@@ -1,7 +1,7 @@
 ---
 description: "Use when adding, editing, or reviewing virtual machine provisioning in scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, src/vms/nixos/, src/vms/windows/, or src/vms/macos/."
 name: "VM Management"
-applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/MacBook/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, tests/nix/vm-setup-tests.nix, src/vms/nixos/guest.nix, src/vms/nixos/packer.pkr.hcl, src/vms/windows/packer.pkr.hcl, src/vms/windows/Autounattend.xml, src/vms/macos/packer.pkr.hcl"
+applyTo: "scripts/vm-setup.sh, scripts/vm-setup.ps1, src/hosts/NixOS/vms.nix, src/hosts/MacBook/vms.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, tests/src/vm-setup-tests.nix, src/vms/nixos/guest.nix, src/vms/nixos/packer.pkr.hcl, src/vms/windows/packer.pkr.hcl, src/vms/windows/Autounattend.xml, src/vms/macos/packer.pkr.hcl"
 ---
 
 # VM Management
@@ -74,7 +74,7 @@ Required wiring and parity checks:
   refreshes the guest image/runtime instead of silently reusing stale disks.
 
 When changing credential policy behavior, update
-`tests/nix/vm-setup-tests.nix` in the same commit.
+`tests/src/vm-setup-tests.nix` in the same commit.
 
 ## VM Manifest
 
@@ -177,7 +177,7 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 
 1. Add an entry to `src/modules/VMs.json` with all required fields.
 2. Run `nucleus-vm-setup` on all three host platforms.
-3. Add a test in `tests/nix/vm-setup-tests.nix` if the new VM has platform-specific constraints.
+3. Add a test in `tests/src/vm-setup-tests.nix` if the new VM has platform-specific constraints.
 4. Update `src/hosts/<platform>/MANUAL.md` if the VM requires manual steps.
 
 ## VM Image Building

@@ -24,10 +24,10 @@ Tests must accompany every feature or breaking change. Ensure tests pass locally
 
 ```bash
 # Evaluate core module logic tests
-nix-instantiate --eval tests/nix/core-tests.nix
+nix-instantiate --eval tests/src/core-tests.nix
 
 # Evaluate module import tests
-nix-instantiate --eval tests/nix/module-imports-tests.nix
+nix-instantiate --eval tests/src/module-imports-tests.nix
 
 # Full flake check (all configs parse)
 cd src && nix flake check
@@ -37,7 +37,7 @@ cd src && nix flake check
 
 ```powershell
 # Run Pester tests for DSC validation
-Invoke-Pester -Path tests/windows/ -Verbose
+Invoke-Pester -Path tests/src/hosts/Windows/ -Verbose
 ```
 
 **CI validation:**
@@ -47,7 +47,7 @@ Invoke-Pester -Path tests/windows/ -Verbose
 nix run ./src#check-sh  # Shell syntax
 nix run ./src#check-pwsh  # PowerShell syntax
 cd src && nix flake check  # Nix evaluation
-nix-instantiate --eval tests/nix/*.nix  # Nix unit tests
+nix-instantiate --eval tests/src/*.nix  # Nix unit tests
 ```
 
 ---
@@ -68,7 +68,7 @@ nix-instantiate --eval tests/nix/*.nix  # Nix unit tests
 
 ### Layer 2: Pure Logic Tests
 
-**File location:** `tests/nix/*.nix`
+**File location:** `tests/src/*.nix`
 
 **What to test:**
 
@@ -83,7 +83,7 @@ nix-instantiate --eval tests/nix/*.nix  # Nix unit tests
 **Example:**
 
 ```nix
-# tests/nix/package-parity-tests.nix (excerpt)
+# tests/src/package-parity-tests.nix (excerpt)
 {
   lib ? import <nixpkgs/lib>,
 }:
@@ -101,11 +101,11 @@ in
 }
 ```
 
-**Run:** `nix-instantiate --eval tests/nix/package-parity-tests.nix`
+**Run:** `nix-instantiate --eval tests/src/package-parity-tests.nix`
 
 ### Layer 3: Module Import Validation
 
-**File location:** `tests/nix/module-imports-tests.nix`
+**File location:** `tests/src/module-imports-tests.nix`
 
 **What to test:**
 
@@ -121,7 +121,7 @@ in
 
 ### Pester Test Structure
 
-**File location:** `tests/windows/**/*.Tests.ps1`
+**File location:** `tests/src/hosts/Windows/**/*.Tests.ps1`
 
 **Test categories:**
 
@@ -153,10 +153,10 @@ Describe "Security Settings" {
 
 ```powershell
 # Run all Windows tests (requires admin)
-Invoke-Pester -Path tests/windows/ -Verbose
+Invoke-Pester -Path tests/src/hosts/Windows/ -Verbose
 
 # Run a single test file
-Invoke-Pester -Path tests/windows/packages/package-installation.Tests.ps1
+Invoke-Pester -Path tests/src/hosts/Windows/packages/package-installation.Tests.ps1
 ```
 
 ### DSC Dry-Run Validation
@@ -177,8 +177,8 @@ winget configure --what-if .\src\hosts\windows\user.dsc.yml
 
 ### When to Write Tests
 
-- **New Nix module:** Add unit tests to `tests/nix/` for any logic beyond simple declarations
-- **New DSC resource:** Add Pester test to `tests/windows/` to verify state after apply
+- **New Nix module:** Add unit tests to `tests/src/` for any logic beyond simple declarations
+- **New DSC resource:** Add Pester test to `tests/src/hosts/Windows/` to verify state after apply
 - **Module changes:** Update existing tests if logic changes
 - **Bug fix:** Add a test case that reproduces the bug, then verify the fix passes
 
@@ -194,13 +194,13 @@ winget configure --what-if .\src\hosts\windows\user.dsc.yml
 
 **Nix tests:**
 
-- `tests/nix/<module>-tests.nix` — logic tests for a specific module
-- Example: `tests/nix/core-tests.nix` for core.nix logic
+- `tests/src/<module>-tests.nix` — logic tests for a specific module
+- Example: `tests/src/core-tests.nix` for core.nix logic
 
 **Pester tests:**
 
-- `tests/windows/<area>/<feature>.Tests.ps1` — tests for a feature or DSC resource group
-- Example: `tests/windows/system/system-policy.Tests.ps1` for machine-scoped DSC invariants
+- `tests/src/hosts/Windows/<area>/<feature>.Tests.ps1` — tests for a feature or DSC resource group
+- Example: `tests/src/hosts/Windows/system/system-policy.Tests.ps1` for machine-scoped DSC invariants
 
 ### Example: Add a Test for a New Package
 
@@ -209,7 +209,7 @@ winget configure --what-if .\src\hosts\windows\user.dsc.yml
 **Step 1: Add the Pester assertion** (on Windows)
 
 ```powershell
-# tests/windows/packages/package-installation.Tests.ps1 (excerpt)
+# tests/src/hosts/Windows/packages/package-installation.Tests.ps1 (excerpt)
 Describe "Windows Package Installation" {
   It "Should have ripgrep installed" {
     $pkg = winget list --exact -q "BurntSushi.ripgrep"
@@ -221,7 +221,7 @@ Describe "Windows Package Installation" {
 **Step 2: Run the test and watch it fail**
 
 ```powershell
-Invoke-Pester tests/windows/packages/package-installation.Tests.ps1
+Invoke-Pester tests/src/hosts/Windows/packages/package-installation.Tests.ps1
 # Test fails: ripgrep not found
 ```
 
@@ -239,14 +239,14 @@ Invoke-Pester tests/windows/packages/package-installation.Tests.ps1
 **Step 4: Run the test again (should pass after `apply.ps1`)**
 
 ```powershell
-Invoke-Pester tests/windows/packages/package-installation.Tests.ps1
+Invoke-Pester tests/src/hosts/Windows/packages/package-installation.Tests.ps1
 # Test passes: ripgrep found
 ```
 
 **Step 5: Commit atomically**
 
 ```bash
-git add tests/windows/packages/package-installation.Tests.ps1 src/hosts/Windows/system.dsc.yml
+git add tests/src/hosts/Windows/packages/package-installation.Tests.ps1 src/hosts/Windows/system.dsc.yml
 git commit -S -m "feat(windows): add ripgrep for fast text search
 
 - Add ripgrep to system.dsc.yml for cross-host CLI parity
@@ -303,7 +303,7 @@ Tests run automatically on:
 1. Verify DSC syntax: `winget configure --what-if .\src\hosts\windows\*.dsc.yml`
 2. Run apply manually: `.\src\scripts\bootstrap.ps1`
 3. Wait for package manager to finish installing
-4. Re-run Pester: `Invoke-Pester tests/windows/`
+4. Re-run Pester: `Invoke-Pester tests/src/hosts/Windows/`
 
 ### Test Failure: "Permission denied" (Pester)
 
@@ -328,11 +328,11 @@ Tests run automatically on:
 
 Before committing changes, verify:
 
-- [ ] All Nix tests pass: `nix-instantiate --eval tests/nix/*.nix`
+- [ ] All Nix tests pass: `nix-instantiate --eval tests/src/*.nix`
 - [ ] Flake checks pass: `cd src && nix flake check`
 - [ ] Shell syntax passes: `nix run ./src#check-sh`
 - [ ] PowerShell syntax passes: `nix run ./src#check-pwsh`
-- [ ] (Windows only) Pester tests pass: `Invoke-Pester tests/windows/`
+- [ ] (Windows only) Pester tests pass: `Invoke-Pester tests/src/hosts/Windows/`
 - [ ] Commit message follows conventional commits (e.g., `test(nix): ...`, `feat(windows): ...`)
 - [ ] Commit is atomic (one logical change, not a mix of unrelated changes)
 - [ ] No `--no-verify` bypasses; pre-commit hooks must pass
