@@ -19,8 +19,8 @@ from pathlib import Path
 def get_repo_root() -> Path:
     """Return the repository root directory.
 
-    The script lives at <repo_root>/scripts/prek-hooks.py, so the repo root
-    is two levels up from __file__.
+    The script lives at ``<repo_root>/scripts/prek-hooks.py``, so the repo
+    root is two levels up from the script file.
 
     Returns:
         Absolute path to the repository root directory.
@@ -164,12 +164,16 @@ def run_format_nix(files: list[str], repo_root: Path) -> int:
     return 0
 
 
-def main() -> None:
+def main() -> int:
     """Entry point for the prek hook wrapper.
 
     Parses command-line arguments, resolves the repository root, and
     dispatches to the appropriate hook implementation (``check`` or
-    ``format-nix``).  Exits with the hook's return code.
+    ``format-nix``).
+
+    Returns:
+        Exit code from the dispatched hook.  0 on success, non-zero on
+        failure.  Returns 1 for an unrecognized hook name.
     """
     parser = argparse.ArgumentParser(
         description="Cross-platform prek hook wrapper",
@@ -189,13 +193,27 @@ def main() -> None:
     repo_root = get_repo_root()
 
     if args.hook == "check":
-        sys.exit(run_check(args.files, repo_root))
+        return run_check(args.files, repo_root)
     elif args.hook == "format-nix":
-        sys.exit(run_format_nix(args.files, repo_root))
+        return run_format_nix(args.files, repo_root)
+    else:
+        print(
+            f"scripts/prek-hooks.py: error: unknown hook '{args.hook}'", file=sys.stderr
+        )
+        return 1
+
+
+def __main__() -> None:
+    """Run the main entry point and translate the return code to an exit.
+
+    Wraps ``main()`` so that its integer return value becomes the process
+    exit code.  Catches ``KeyboardInterrupt`` and exits with code 2.
+    """
+    try:
+        exit(main())
+    except KeyboardInterrupt:
+        exit(2)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        sys.exit(2)
+    __main__()
