@@ -10,8 +10,8 @@
   nested sub-components.
 - `scripts/` contains bootstrap automation: `bootstrap.sh` (Unix) and
   `bootstrap.ps1` (Windows).
-- `tests/` contains automated tests: `tests/nix/` for Nix logic tests,
-  `tests/windows/` for Pester DSC validation. All changes require corresponding
+- `tests/` contains automated tests: `tests/src/` for Nix logic tests,
+  `tests/src/hosts/Windows/` for Pester DSC validation. All changes require corresponding
   tests; see `.agents/instructions/testing.instructions.md`.
 - Keep this file short and durable. Put file-type and workflow-specific rules
   in `.agents/instructions/*.instructions.md`, reusable workflows in
@@ -49,8 +49,8 @@
 ## Testing
 
 - Tests are required for feature additions and breaking changes.
-- Nix tests: `tests/nix/*.nix` plus `nix flake check`.
-- Windows tests: `tests/windows/**/*.Tests.ps1` (run locally on Windows).
+- Nix tests: `tests/src/*.nix` plus `nix flake check`.
+- Windows tests: `tests/src/hosts/Windows/**/*.Tests.ps1` (run locally on Windows).
 - Follow TDD flow: write failing test → implement → pass → commit atomically.
 - Detailed testing guidance lives in `.agents/instructions/testing.instructions.md`.
 

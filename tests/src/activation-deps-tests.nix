@@ -1,4 +1,4 @@
-# tests/nix/activation-deps-tests.nix — Validate activation dependency ordering.
+# tests/src/activation-deps-tests.nix — Validate activation dependency ordering.
 #
 # Tests verify that Home Manager activation hooks and Windows DSC steps are
 # ordered correctly so dependencies are satisfied before dependents run.
@@ -7,7 +7,7 @@
 # - SSH keys loaded before git clones over SSH
 # - GPG keys imported before signed commits
 #
-# Run with: nix-instantiate --eval tests/nix/activation-deps-tests.nix
+# Run with: nix-instantiate --eval tests/src/activation-deps-tests.nix
 
 {
   lib ? import <nixpkgs/lib>,

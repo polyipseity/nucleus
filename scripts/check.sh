@@ -2,7 +2,7 @@
 # check.sh — Consolidated repository validation script.
 #
 # Runs all repository checks in sequence:
-#   1. Nix test suite (tests/nix/*.nix)
+#   1. Nix test suite (tests/src/*.nix)
 #   2. Dead Nix code detection (deadnix)
 #   3. Shell script linting (shellcheck)
 #   4. PowerShell syntax validation
@@ -113,7 +113,7 @@ if ! $HAS_ARGS; then
   while IFS= read -r test; do
     echo "Running: $test"
     nix-instantiate --eval "$test" || FAILED=1
-  done < <(find tests/nix -maxdepth 1 -name '*.nix' -type f | sort)
+  done < <(find tests/src -maxdepth 1 -name '*.nix' -type f | sort)
   if [ "$FAILED" -ne 0 ]; then
     printf '\nNix test suite FAILED.\n' >&2
     exit 1

@@ -1,7 +1,7 @@
-# tests/nix/core-tests.nix — Comprehensive tests for backend selection and package resolution.
+# tests/src/core-tests.nix — Comprehensive tests for backend selection and package resolution.
 #
 # Tests the resolveBackend decision tree, package categorization, and Home Manager integration.
-# Run via: nix-instantiate --eval tests/nix/core-tests.nix
+# Run via: nix-instantiate --eval tests/src/core-tests.nix
 
 {
   lib ? import <nixpkgs/lib>,

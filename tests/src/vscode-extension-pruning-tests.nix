@@ -1,10 +1,10 @@
-# tests/nix/vscode-extension-pruning-tests.nix — Verify VS Code extension pruning logic.
+# tests/src/vscode-extension-pruning-tests.nix — Verify VS Code extension pruning logic.
 #
 # This regression test checks the source text for the POSIX and Windows VS Code
 # extension provisioning paths to ensure they prune non-managed extensions and
 # remove VS Code's derived metadata files (`extensions.json` and `.obsolete`).
 #
-# Run with: nix-instantiate --eval tests/nix/vscode-extension-pruning-tests.nix
+# Run with: nix-instantiate --eval tests/src/vscode-extension-pruning-tests.nix
 
 {
   lib ? import <nixpkgs/lib>,

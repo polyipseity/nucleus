@@ -1,9 +1,9 @@
-# tests/nix/nix-index-schedule-tests.nix — Validate nix-index refresh cadence.
+# tests/src/nix-index-schedule-tests.nix — Validate nix-index refresh cadence.
 #
 # Ensures both POSIX hosts keep nix-index refreshes on the repository-standard
 # daily midnight schedule instead of drifting to a less frequent cadence.
 #
-# Run with: nix-instantiate --eval tests/nix/nix-index-schedule-tests.nix
+# Run with: nix-instantiate --eval tests/src/nix-index-schedule-tests.nix
 
 { }:
 let

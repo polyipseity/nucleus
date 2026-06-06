@@ -13,7 +13,7 @@ scripts.
 
 ### Nix Tests (Pure Evaluation Layer)
 
-Located in `tests/nix/`, run via `nix-instantiate --eval` in CI.
+Located in `tests/src/`, run via `nix-instantiate --eval` in CI.
 
 #### ✅ **core-tests.nix** (10 tests)
 - Expanded backend selection decision tree validation
@@ -94,13 +94,13 @@ Located in `tests/nix/`, run via `nix-instantiate --eval` in CI.
 - **Status**: All 2 tests passing
 - **Coverage**: VS Code extension provisioning cleanup across POSIX and Windows
 
-**Nix Test Totals**: 16 focused test files under `tests/nix/`
+**Nix Test Totals**: 16 focused test files under `tests/src/`
 
 ---
 
 ### Windows Tests (PowerShell + DSC Layer)
 
-Located in `tests/windows/`, organised by concern (`apps/`, `configuration/`,
+Located in `tests/src/hosts/Windows/`, organised by concern (`apps/`, `configuration/`,
 `packages/`, `smoke/`, `system/`) and run via Pester locally on Windows.
 
 #### ✅ **Windows Pester suites**
@@ -266,12 +266,12 @@ live system state, actual deployments, or ephemeral VMs:
 **Run all Nix tests:**
 ```bash
 nix flake check src/
-nix-instantiate --eval tests/nix/*.nix
+nix-instantiate --eval tests/src/*.nix
 ```
 
 **Run Windows Pester tests:**
 ```powershell
-pwsh -Command "Invoke-Pester tests/windows/"
+pwsh -Command "Invoke-Pester tests/src/hosts/Windows/"
 ```
 
 **Run shell script validation:**
@@ -292,7 +292,7 @@ act push --job test  # Requires 'act' (https://github.com/nektos/act)
 
 ## Test Maintenance Guidelines
 
-1. **Add tests for new modules**: Every `.nix` file in `src/modules/` should have corresponding tests in `tests/nix/module-imports-tests.nix`
+1. **Add tests for new modules**: Every `.nix` file in `src/modules/` should have corresponding tests in `tests/src/module-imports-tests.nix`
 2. **Update parity tests**: When adding a new package, add it to `package-parity-tests.nix` across all platforms
 3. **Validate security policies**: All invariants in `AGENTS.md` must have corresponding tests
 4. **Document untested areas**: Update this file when adding test coverage
@@ -319,6 +319,6 @@ act push --job test  # Requires 'act' (https://github.com/nektos/act)
 ---
 
 **Last Updated**: Continuous (update this file whenever suite structure changes)
-**Nix Suite Status**: 16 `tests/nix/*.nix` files tracked in-repo
-**Windows Suite Status**: hierarchical Pester suites under `tests/windows/**`
+**Nix Suite Status**: 16 `tests/src/*.nix` files tracked in-repo
+**Windows Suite Status**: hierarchical Pester suites under `tests/src/hosts/Windows/**`
 **Shell Suite Status**: script validation checks in `tests/scripts/`

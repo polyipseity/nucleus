@@ -1,4 +1,4 @@
-# tests/nix/git-settings-tests.nix — Validate shared Git defaults across POSIX and Windows.
+# tests/src/git-settings-tests.nix — Validate shared Git defaults across POSIX and Windows.
 #
 # Locks the declarative Git baseline in both src/modules/git.nix and the
 # Windows Sync-GitAndSshConfig module so cross-host parity regressions are

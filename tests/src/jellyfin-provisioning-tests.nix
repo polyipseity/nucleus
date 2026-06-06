@@ -1,9 +1,9 @@
-# tests/nix/jellyfin-provisioning-tests.nix — Validate Jellyfin provisioning parity.
+# tests/src/jellyfin-provisioning-tests.nix — Validate Jellyfin provisioning parity.
 #
 # Ensures Jellyfin is provisioned declaratively on both Nix hosts and through
 # WinGet on Windows so the media-server baseline stays aligned across hosts.
 #
-# Run with: nix-instantiate --eval tests/nix/jellyfin-provisioning-tests.nix
+# Run with: nix-instantiate --eval tests/src/jellyfin-provisioning-tests.nix
 
 { }:
 let

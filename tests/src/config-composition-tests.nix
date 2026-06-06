@@ -1,4 +1,4 @@
-# tests/nix/config-composition-tests.nix — Verify host configurations compose correctly.
+# tests/src/config-composition-tests.nix — Verify host configurations compose correctly.
 #
 # Tests validate that:
 #   - macOS, NixOS, and standalone HM configs don't have conflicting options
@@ -6,7 +6,7 @@
 #   - Cross-module dependencies are satisfied
 #   - Parity settings exist on supported hosts
 #
-# Run with: nix-instantiate --eval tests/nix/config-composition-tests.nix
+# Run with: nix-instantiate --eval tests/src/config-composition-tests.nix
 
 { }:
 let
