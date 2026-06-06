@@ -19,9 +19,7 @@ let
     && containsRegex "managed directory" moduleText
   ) "cloud-drives activation must replace symlinked mount paths with real managed directories";
 
-  allTests = [
-    test_mount_paths_replace_symlinks
-  ];
+  allTests = [ test_mount_paths_replace_symlinks ];
 in
 {
   success = true;

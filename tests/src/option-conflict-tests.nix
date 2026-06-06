@@ -187,9 +187,7 @@ let
   test_platform_gating =
     let
       isDarwin = true;
-      config = lib.optionalAttrs isDarwin {
-        nucleus.macos.homebrew.enable = true;
-      };
+      config = lib.optionalAttrs isDarwin { nucleus.macos.homebrew.enable = true; };
     in
     assert' (
       (isDarwin -> (builtins.hasAttr "nucleus" config))
