@@ -101,11 +101,9 @@ All Nix modules must enforce explicit configuration and avoid implicit assumptio
   users and `guest` for secondary/unprivileged users. Paths should reference
   `/home/admin` or `/Users/admin` rather than real usernames from the repo
   history. This ensures examples are portable and immediately understandable.
-- **Avoid `with` statements in module-level code**: explicit `pkgs.name` or
-  `lib.name` references keep derivations traceable and prevent naming conflicts.
-- **Guard platform-specific options**: shared modules that reference NixOS-only
-  or nix-darwin-only options must use `lib.mkIf` checks to avoid evaluation
-  errors on incompatible platforms.
+
+For Nix module conventions (platform guards, `with` avoidance, etc.), see
+[nix.instructions.md](nix.instructions.md).
 
 ## WinGet DSC YAML (`src/hosts/Windows/**/*.yml`)
 
