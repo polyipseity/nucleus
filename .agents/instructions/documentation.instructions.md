@@ -83,25 +83,8 @@ PowerShell and is required on every function and entry-point script.
 
 ### Explicit Parameter Passing Requirement (PowerShell)
 
-**No implicit defaults, no auto-derived paths, no backwards compatibility code.**
-
-All PowerShell functions and scripts must enforce explicit parameter passing:
-
-- **Mandatory behavioral parameters**: all parameters that control system state
-  changes (e.g. `Enabled`, `Users`, `Activated`) must be `[Parameter(Mandatory)]`.
-  Callers must explicitly choose `$true` or `$false` — never default to "enabled"
-  or "process current user."
-- **No path auto-derivation**: do not auto-derive paths from `$PSScriptRoot` or
-  current working directory. All path parameters must be explicitly passed by
-  callers so they are aware of which repository, module directory, or user
-  home will be modified.
-- **Explicit user context**: functions that operate on user profiles or home
-  directories must have explicit `-Username` or `-Users` parameters. Never
-  assume the current user or auto-discover users from filesystem locations.
-- **Documentation examples must be complete**: every `.EXAMPLE` block must show
-  all mandatory parameters. Use canonical usernames in examples: `admin` for
-  primary/elevated user, `guest` for secondary/unprivileged users. This ensures
-  examples are copy-paste-ready and reflect the actual calling convention.
+See the canonical version in
+[`scripts-and-permissions.instructions.md`](scripts-and-permissions.instructions.md#explicit-parameter-passing-powershell).
 
 ### Explicit Parameter Passing Requirement (Nix)
 
