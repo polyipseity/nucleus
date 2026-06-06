@@ -102,7 +102,7 @@ function Invoke-ReplicaSync {
   }
 
   $replicas = @($userConfigProperty.Value.cloudDrives.replicas | Where-Object {
-      $_.enable -eq $true -and -not [string]::IsNullOrWhiteSpace($_.remoteName)
+      $_.enable -eq $true
     })
 
   if ($replicas.Count -eq 0) {
@@ -463,11 +463,13 @@ function Invoke-ReplicaSync {
     }
 
     $localPath = [string]$replica.localPath
-    $remoteName = [string]$replica.remoteName
     $remotePath = [string]$replica.remotePath
     if ([string]::IsNullOrWhiteSpace($remotePath)) {
       $remotePath = '/'
     }
+
+    $readWrite = if ($null -ne $replica.readWrite) { [bool]$replica.readWrite } else { $false }
+    $displayName = if ($null -ne $replica.displayName) { [string]$replica.displayName } else { $id }
 
     $provider = [string]$replica.provider
     $iCloudService = [string]$replica.iCloudService
@@ -489,15 +491,17 @@ function Invoke-ReplicaSync {
       continue
     }
 
-    $remoteRef = "${remoteName}:${remotePath}"
+    $remoteRef = "${id}:${remotePath}"
     $resolvedFilterPath = Resolve-ReplicaFilterPath -Candidate ([string]$replica.filtersFile)
     $runtimeFilterPath = $null
     if ($null -ne $resolvedFilterPath -and -not (Test-Path -Path $resolvedFilterPath -PathType Leaf)) {
       Write-Error "replica-sync: filters file '$resolvedFilterPath' not found for replica '$id'" -ErrorAction Continue
-      $lockedAfterFilterFailure = Invoke-ReplicaTreeReadOnly -TargetDir $localDir -IsDryRun:$DryRun
-      if (-not $lockedAfterFilterFailure) {
-        Write-Error "replica-sync: [$id] failed to re-lock replica tree '$localDir' after filter validation failure" -ErrorAction Continue
-        $failureCount += 1
+      if (-not $readWrite) {
+        $lockedAfterFilterFailure = Invoke-ReplicaTreeReadOnly -TargetDir $localDir -IsDryRun:$DryRun
+        if (-not $lockedAfterFilterFailure) {
+          Write-Error "replica-sync: [$displayName] failed to re-lock replica tree '$localDir' after filter validation failure" -ErrorAction Continue
+          $failureCount += 1
+        }
       }
       $failureCount += 1
       continue
@@ -532,7 +536,7 @@ function Invoke-ReplicaSync {
       }
     }
 
-    Write-Output "replica-sync: [$id] pull $remoteRef -> $localDir"
+    Write-Output "replica-sync: [$displayName] pull $remoteRef -> $localDir"
     $ok = Invoke-ReplicaRcloneCommand -Arguments (@('sync', $remoteRef, $localDir) + $commonArgs) -IsDryRun:$DryRun
     if (-not $ok) {
       $failureCount += 1
@@ -542,10 +546,12 @@ function Invoke-ReplicaSync {
       Remove-Item -Path $runtimeFilterPath -Force
     }
 
-    $locked = Invoke-ReplicaTreeReadOnly -TargetDir $localDir -IsDryRun:$DryRun
-    if (-not $locked) {
-      Write-Error "replica-sync: [$id] failed to lock replica tree '$localDir'" -ErrorAction Continue
-      $failureCount += 1
+    if (-not $readWrite) {
+      $locked = Invoke-ReplicaTreeReadOnly -TargetDir $localDir -IsDryRun:$DryRun
+      if (-not $locked) {
+        Write-Error "replica-sync: [$displayName] failed to lock replica tree '$localDir'" -ErrorAction Continue
+        $failureCount += 1
+      }
     }
   }
 

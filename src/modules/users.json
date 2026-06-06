@@ -61,6 +61,7 @@
       "replicas": [
         {
           "direction": "pull",
+          "displayName": "Google Drive",
           "enable": false,
           "fallbackTimer": {
             "enable": false,
@@ -69,11 +70,6 @@
           "id": "GoogleDrive",
           "localPath": "clouds/GoogleDriveReplica",
           "provider": "GoogleDrive",
-          "realtime": {
-            "debounceSeconds": 5,
-            "enable": false
-          },
-          "remoteName": "GoogleDrive",
           "remotePath": "/"
         },
         {
@@ -87,11 +83,7 @@
           "iCloudService": "drive",
           "localPath": "clouds/iCloudReplica",
           "provider": "iCloud",
-          "realtime": {
-            "debounceSeconds": 5,
-            "enable": true
-          },
-          "remoteName": "iCloud",
+          "readWrite": true,
           "remotePath": "/"
         },
         {
@@ -104,11 +96,6 @@
           "id": "OneDrive",
           "localPath": "clouds/OneDriveReplica",
           "provider": "OneDrive",
-          "realtime": {
-            "debounceSeconds": 5,
-            "enable": true
-          },
-          "remoteName": "OneDrive",
           "remotePath": "/"
         }
       ]

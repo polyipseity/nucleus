@@ -118,17 +118,18 @@ current_os="$(uname -s)"
 replica_lines="$({
   jq -r --arg username "$username" '
     .[$username].cloudDrives.replicas // []
-    | map(select(.enable == true and .remoteName != null))
+    | map(select(.enable == true))
     | .[]
     | [
         (.id // ""),
         (.direction // "pull"),
         (.localPath // ""),
-        (.remoteName // ""),
         (.remotePath // "/"),
         (.provider // ""),
         (.iCloudService // "drive"),
-        (.filtersFile // "")
+        (.filtersFile // ""),
+        (.readWrite // false),
+        (.displayName // .id)
       ]
     | @tsv
   ' "$USERS_JSON"
@@ -418,7 +419,7 @@ replica_lines_file="$(mktemp)"
 printf '%s\n' "$replica_lines" > "$replica_lines_file"
 
 # shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
-while IFS="$(printf '\t')" read id direction local_path remote_name remote_path provider icloud_service filters_file; do
+while IFS="$(printf '\t')" read id direction local_path remote_path provider icloud_service filters_file read_write display_name; do
   if [ -n "$replica_id_filter" ] && [ "$id" != "$replica_id_filter" ]; then
     continue
   fi
@@ -427,7 +428,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
     if ! ensure_macos_icloud_replica_symlink "$local_path"; then
       failures=$((failures + 1))
     fi
-    printf '%s\n' "replica-sync: [$id] skipping on macOS (native iCloud handles sync)"
+    printf '%s\n' "replica-sync: [$display_name] skipping on macOS (native iCloud handles sync)"
     continue
   fi
 
@@ -437,29 +438,31 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
   provider_blocked_roots="$(load_provider_gc_entries "$provider" "blockedRoots")"
 
   if [ "$direction" != "pull" ]; then
-    printf '%s\n' "replica-sync: [$id] unsupported direction '$direction'; replicas are pull-only by policy" >&2
+    printf '%s\n' "replica-sync: [$display_name] unsupported direction '$direction'; replicas are pull-only by policy" >&2
     failures=$((failures + 1))
     continue
   fi
 
   local_dir="$HOME/$local_path"
-  remote_ref="$remote_name:$remote_path"
+  remote_ref="$id:$remote_path"
   resolved_filters="$(resolve_filter_path "$filters_file")"
   runtime_filter_file=""
 
   mkdir -p "$local_dir"
 
   if ! set_replica_tree_writable "$local_dir"; then
-    printf '%s\n' "replica-sync: [$id] failed to unlock replica tree '$local_dir'" >&2
+    printf '%s\n' "replica-sync: [$display_name] failed to unlock replica tree '$local_dir'" >&2
     failures=$((failures + 1))
     continue
   fi
 
   if [ -n "$resolved_filters" ] && [ ! -f "$resolved_filters" ]; then
-    printf '%s\n' "replica-sync: filters file '$resolved_filters' not found for replica '$id'" >&2
-    if ! set_replica_tree_read_only "$local_dir"; then
-      printf '%s\n' "replica-sync: [$id] failed to re-lock replica tree '$local_dir' after filter validation failure" >&2
-      failures=$((failures + 1))
+    printf '%s\n' "replica-sync: filters file '$resolved_filters' not found for replica '$display_name'" >&2
+    if [ "$read_write" != "true" ]; then
+      if ! set_replica_tree_read_only "$local_dir"; then
+        printf '%s\n' "replica-sync: [$display_name] failed to re-lock replica tree '$local_dir' after filter validation failure" >&2
+        failures=$((failures + 1))
+      fi
     fi
     failures=$((failures + 1))
     continue
@@ -477,7 +480,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
       # let the real sync use OneDrive's default recursive listing path. For
       # full-root pull replicas, forcing --disable ListR makes syncs
       # pathologically slow.
-      runtime_filter_file="$(build_onedrive_root_filter_file "$id" "$local_dir" "$remote_ref" "$provider_remote_excludes" "$provider_blocked_roots")"
+      runtime_filter_file="$(build_onedrive_root_filter_file "$display_name" "$local_dir" "$remote_ref" "$provider_remote_excludes" "$provider_blocked_roots")"
       if [ -n "$resolved_filters" ]; then
         set -- "$@" --filter-from "$resolved_filters"
       fi
@@ -494,7 +497,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
     fi
   fi
 
-  printf '%s\n' "replica-sync: [$id] pull $remote_ref -> $local_dir"
+  printf '%s\n' "replica-sync: [$display_name] pull $remote_ref -> $local_dir"
   if ! run_cmd rclone sync "$remote_ref" "$local_dir" "$@"; then
     failures=$((failures + 1))
   fi
@@ -503,9 +506,11 @@ while IFS="$(printf '\t')" read id direction local_path remote_name remote_path 
     rm -f "$runtime_filter_file"
   fi
 
-  if ! set_replica_tree_read_only "$local_dir"; then
-    printf '%s\n' "replica-sync: [$id] failed to lock replica tree '$local_dir'" >&2
-    failures=$((failures + 1))
+  if [ "$read_write" != "true" ]; then
+    if ! set_replica_tree_read_only "$local_dir"; then
+      printf '%s\n' "replica-sync: [$display_name] failed to lock replica tree '$local_dir'" >&2
+      failures=$((failures + 1))
+    fi
   fi
 done < "$replica_lines_file"
 

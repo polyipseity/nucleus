@@ -47,11 +47,7 @@
             "id": "GoogleDrive",
             "localPath": "clouds\\GoogleDriveReplica",
             "provider": "GoogleDrive",
-            "realtime": {
-              "debounceSeconds": 5,
-              "enable": true
-            },
-            "remoteName": "GoogleDrive",
+            "displayName": "Google Drive",
             "remotePath": "/"
           },
           {
@@ -65,11 +61,6 @@
             "id": "iCloud",
             "localPath": "clouds\\iCloudReplica",
             "provider": "iCloud",
-            "realtime": {
-              "debounceSeconds": 5,
-              "enable": true
-            },
-            "remoteName": "iCloud",
             "remotePath": "/"
           },
           {
@@ -82,11 +73,6 @@
             "id": "OneDrive",
             "localPath": "clouds\\OneDriveReplica",
             "provider": "OneDrive",
-            "realtime": {
-              "debounceSeconds": 5,
-              "enable": true
-            },
-            "remoteName": "OneDrive",
             "remotePath": "/"
           }
         ]

@@ -53,21 +53,6 @@ let
     "photos"
   ];
 
-  replicaRealtimeSubmodule = lib.types.submodule {
-    options = {
-      debounceSeconds = lib.mkOption {
-        type = lib.types.int;
-        default = 5;
-        description = "Seconds to wait after the last filesystem event before triggering a sync run.";
-      };
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Whether to enable filesystem-event-driven near-realtime sync.";
-      };
-    };
-  };
-
   replicaFallbackTimerSubmodule = lib.types.submodule {
     options = {
       enable = lib.mkOption {
@@ -138,13 +123,14 @@ let
   replicaSubmodule = lib.types.submodule {
     options = {
       direction = lib.mkOption {
-        type = lib.types.enum [
-          "bidirectional"
-          "pull"
-          "push"
-        ];
+        type = lib.types.enum [ "pull" ];
         default = "pull";
         description = "Replica direction. Pull is the supported policy (remote -> local); non-pull values are rejected by replica-sync runners.";
+      };
+      displayName = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Optional human-readable display label for log messages and UI surfaces (e.g., \"Google Drive\"). When null, the replica `id` is used.";
       };
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -170,6 +156,11 @@ let
         default = "drive";
         description = "Which Apple service this replica should target for iCloud entries. Keeping it in the shared schema preserves per-user intent even before all replica backends consume the value directly.";
       };
+      readWrite = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Whether the replica directory is read-write. When false (the default), the runner locks the local tree as read-only between sync runs. Set true for macOS iCloud where the replica is a symlink to native CloudDocs.";
+      };
       localPath = lib.mkOption {
         type = lib.types.str;
         description = "Local replica root path relative to the user's home directory. For iCloud on macOS this documents the native CloudDocs area managed by brctl; for rclone replicas it is the directory rclone syncs into.";
@@ -177,16 +168,6 @@ let
       provider = lib.mkOption {
         type = providerEnum;
         description = "Cloud storage provider. rclone-backed replica scheduling is configured per entry.";
-      };
-      realtime = lib.mkOption {
-        type = replicaRealtimeSubmodule;
-        default = { };
-        description = "Near-realtime filesystem-event-driven sync settings.";
-      };
-      remoteName = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = "rclone remote name.";
       };
       remotePath = lib.mkOption {
         type = lib.types.str;
@@ -365,11 +346,11 @@ in
       enabledMounts = builtins.filter (m: m.enable) config.nucleus.cloudDrives.mounts;
       enabledReplicas = builtins.filter (r: r.enable) config.nucleus.cloudDrives.replicas;
       scheduledSyncReplicas = builtins.filter (
-        r: r.enable && r.remoteName != null && (r.fallbackTimer.enable or true)
+        r: r.enable && (r.fallbackTimer.enable or true)
       ) config.nucleus.cloudDrives.replicas;
       declaredMountAgents = builtins.filter (m: m.remoteName != null) config.nucleus.cloudDrives.mounts;
       declaredScheduledSyncReplicas = builtins.filter (
-        r: r.remoteName != null && (r.fallbackTimer.enable or true)
+        r: (r.fallbackTimer.enable or true)
       ) config.nucleus.cloudDrives.replicas;
 
       # Mounts require rclone plus an explicit configured remote.
@@ -377,9 +358,7 @@ in
         m: m.enable && m.remoteName != null
       ) config.nucleus.cloudDrives.mounts;
 
-      hasRcloneProvider =
-        rcloneMounts != [ ]
-        || builtins.any (r: r.enable && r.remoteName != null) config.nucleus.cloudDrives.replicas;
+      hasRcloneProvider = rcloneMounts != [ ] || enabledReplicas != [ ];
     in
     lib.mkMerge [
       # -----------------------------------------------------------------------
@@ -435,16 +414,22 @@ in
                         _legacy_target="$(readlink "$_icloud_replica_path")"
                         rm "$_icloud_replica_path"
                         ln -s "$_icloud_native_target" "$_icloud_replica_path"
-                        printf '%s\n' "cloud-drives: updated iCloudReplica symlink $_icloud_replica_path -> $_icloud_native_target (was $_legacy_target)."
+                        printf '%s\n' "cloud-drives (${
+                          if r.displayName != null then r.displayName else r.id
+                        }): updated iCloudReplica symlink $_icloud_replica_path -> $_icloud_native_target (was $_legacy_target)."
                       fi
                     elif [ -e "$_icloud_replica_path" ]; then
                       _migration_backup="$_icloud_replica_path.pre-native-icloud.$(date +%Y%m%d%H%M%S)"
                       mv "$_icloud_replica_path" "$_migration_backup"
                       ln -s "$_icloud_native_target" "$_icloud_replica_path"
-                      printf '%s\n' "cloud-drives: migrated $_icloud_replica_path to native iCloud symlink target $_icloud_native_target (backup: $_migration_backup)."
+                      printf '%s\n' "cloud-drives (${
+                        if r.displayName != null then r.displayName else r.id
+                      }): migrated $_icloud_replica_path to native iCloud symlink target $_icloud_native_target (backup: $_migration_backup)."
                     else
                       ln -s "$_icloud_native_target" "$_icloud_replica_path"
-                      printf '%s\n' "cloud-drives: linked $_icloud_replica_path -> $_icloud_native_target (native iCloud replica path)."
+                      printf '%s\n' "cloud-drives (${
+                        if r.displayName != null then r.displayName else r.id
+                      }): linked $_icloud_replica_path -> $_icloud_native_target (native iCloud replica path)."
                     fi
                   ''
                 else
@@ -455,7 +440,9 @@ in
                       _legacy_target="$(readlink "$HOME/${r.localPath}")"
                       rm "$HOME/${r.localPath}"
                       mkdir -p "$HOME/${r.localPath}"
-                      printf '%s\n' "cloud-drives: replaced legacy symlink $HOME/${r.localPath} -> $_legacy_target with a managed directory."
+                      printf '%s\n' "cloud-drives (${
+                        if r.displayName != null then r.displayName else r.id
+                      }): replaced legacy symlink $HOME/${r.localPath} -> $_legacy_target with a managed directory."
                     else
                       mkdir -p "$HOME/${r.localPath}"
                     fi
