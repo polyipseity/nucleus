@@ -33,80 +33,10 @@ let
   agentsSkillsRelativePath = "${agentsConfigRelativePath}/skills";
   clawhubManifestRelativePath = "${agentsConfigRelativePath}/clawhub-skills.json";
 
-  # Shared shell helpers used by activation entries that manage symlink targets.
-  symlinkProtectionHelpers = ''
-    _nucleus_protect_symlink() {
-      _nps_context="$1"
-      _nps_path="$2"
-      case "$(uname -s)" in
-        Darwin)
-          if ! /usr/bin/chflags -h uchg "$_nps_path"; then
-            echo "$_nps_context: warning — could not protect symlink $_nps_path with uchg." >&2
-          fi
-          ;;
-        Linux)
-          if command -v chattr >/dev/null; then
-            if ! chattr -h +i "$_nps_path"; then
-              echo "$_nps_context: warning — could not protect symlink $_nps_path with chattr +i." >&2
-            fi
-          fi
-          ;;
-      esac
-    }
-
-    _nucleus_unprotect_symlink() {
-      _nus_context="$1"
-      _nus_path="$2"
-      case "$(uname -s)" in
-        Darwin)
-          if ! /usr/bin/chflags -h nouchg "$_nus_path"; then
-            echo "$_nus_context: warning — could not clear uchg from symlink $_nus_path before update." >&2
-          fi
-          ;;
-        Linux)
-          if command -v chattr >/dev/null; then
-            if ! chattr -h -i "$_nus_path"; then
-              echo "$_nus_context: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
-            fi
-          fi
-          ;;
-      esac
-    }
-  '';
-
-  # Resolve the active repo root from apply-time environment, falling back to
-  # the persisted marker that survives sudo/rebuild boundaries.
-  repoRootResolver = ''
-    _nucleus_resolve_repo_root() {
-      _nrr_context="$1"
-      _nrr_repo_root_file="$HOME/.config/nucleus/repo-root"
-      if [ -n "''${NUCLEUS_REPO:-}" ]; then
-        printf '%s\n' "$NUCLEUS_REPO"
-      elif [ -f "$_nrr_repo_root_file" ]; then
-        cat "$_nrr_repo_root_file"
-      else
-        echo "$_nrr_context: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
-        return 1
-      fi
-    }
-  '';
-
-  # Reuse one PATH-probing helper so activation entries share the same
-  # executable-discovery behavior without repeating near-identical loops.
-  executablePathProbeHelpers = ''
-    _nucleus_prepend_first_executable_dir() {
-      _nped_executable="$1"
-      shift
-      for _nped_dir in "$@"; do
-        if [ -x "$_nped_dir/$_nped_executable" ]; then
-          PATH="$_nped_dir:$PATH"
-          export PATH
-          return 0
-        fi
-      done
-      return 1
-    }
-  '';
+  # Inline shell helpers from the shared library file at build time so
+  # activation scripts can use _nucleus_protect_symlink, _nucleus_unprotect_symlink,
+  # _nucleus_resolve_repo_root, and _nucleus_prepend_first_executable_dir.
+  agentHelpersSh = builtins.readFile ../scripts/agent-helpers.sh;
 in
 {
   home.file = {
@@ -129,8 +59,7 @@ in
     agentsSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
 
-      ${symlinkProtectionHelpers}
-      ${repoRootResolver}
+      ${agentHelpersSh}
 
       # Resolve the repo root so the activation can construct an absolute path
       # to src/modules/configs/agents/ regardless of where the repo is checked
@@ -229,8 +158,7 @@ in
     agentsSkills = lib.hm.dag.entryAfter [ "agentsSymlink" ] ''
       set -eu
 
-      ${symlinkProtectionHelpers}
-      ${repoRootResolver}
+      ${agentHelpersSh}
 
       # Resolve the repo root (same mechanism as agentsSymlink above).
       _ask_repo_root="$(_nucleus_resolve_repo_root "agents-skills")"
@@ -316,7 +244,7 @@ in
       set -eu
 
       _ibp_jq_bin='${pkgs.jq}/bin/jq'
-      ${executablePathProbeHelpers}
+      ${agentHelpersSh}
 
       # Prepend ~/.bun/bin so binaries installed by previous apply runs and
       # by this activation are discoverable in subsequent activation steps
@@ -536,7 +464,7 @@ in
     # -------------------------------------------------------------------------
     initRustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
-      ${executablePathProbeHelpers}
+      ${agentHelpersSh}
 
       # Locate pkgs.rustup in the newly linked home-manager profile.  The
       # activation shell PATH has not yet been updated to reflect the profile, so
@@ -590,7 +518,7 @@ in
     # -------------------------------------------------------------------------
     installCargoBinstallPackages = lib.hm.dag.entryAfter [ "initRustup" ] ''
       set -eu
-      ${executablePathProbeHelpers}
+      ${agentHelpersSh}
 
       # Declarative desired-state list.  On POSIX hosts this list is
       # intentionally empty because all managed Rust tools are provided by
@@ -698,7 +626,7 @@ in
       set -eu
 
       _scs_jq_bin='${pkgs.jq}/bin/jq'
-      ${repoRootResolver}
+      ${agentHelpersSh}
 
       _scs_do_sync=true
 

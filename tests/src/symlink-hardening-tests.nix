@@ -10,6 +10,7 @@ let
   customProvisionSymlinksText = builtins.readFile ../../src/modules/custom-provision-symlinks.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   finderSidebarText = builtins.readFile ../../src/modules/macos/finder-sidebar.nix;
+  agentsHelpersText = builtins.readFile ../../src/scripts/agent-helpers.sh;
 in
 rec {
   # =========================================================================
@@ -24,21 +25,23 @@ rec {
     true;
 
   # =========================================================================
-  # Assertion 2: Agents config symlink protection in agents.nix
+  # Assertion 2: Agents config symlink protection — function def in agent-helpers.sh,
+  #               symlink target name in agents.nix
   # =========================================================================
   agentsConfigProtection =
-    assert containsRegex "_nucleus_protect_symlink" agentsText;
+    assert containsRegex "_nucleus_protect_symlink" agentsHelpersText;
     assert containsRegex "agents-config" agentsText;
-    assert containsRegex "chflags -h uchg" agentsText;
+    assert containsRegex "chflags -h uchg" agentsHelpersText;
     true;
 
   # =========================================================================
-  # Assertion 3: Agents skills symlink protection in agents.nix
+  # Assertion 3: Agents skills symlink protection — function def in agent-helpers.sh,
+  #               context string in agents.nix
   # =========================================================================
   agentsSkillsProtection =
     assert containsRegex "agents-skills" agentsText;
-    assert containsRegex "_nucleus_protect_symlink" agentsText;
-    assert containsRegex "_nucleus_unprotect_symlink" agentsText;
+    assert containsRegex "_nucleus_protect_symlink" agentsHelpersText;
+    assert containsRegex "_nucleus_unprotect_symlink" agentsHelpersText;
     true;
 
   # =========================================================================
