@@ -27,14 +27,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
-if [ -f "$SCRIPT_DIR/lib.sh" ]; then
-  . "$SCRIPT_DIR/lib.sh"
-else
-  usage_std() {
-    printf 'usage: %s %s\n' "$1" "${2:-}"
-    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
-  }
-fi
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/lib.sh"
 
 usage() {
   usage_std "$(basename "$0")" "{sudo|user}" "Trust the Caddy CA certificate for the current user or system-wide."

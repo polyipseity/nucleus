@@ -22,6 +22,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck disable=SC1091
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 REPO_ROOT="$(resolve_nucleus_root)"
 VERSIONS_FILE="$SCRIPT_DIR/bootstrap-versions.env"
@@ -118,6 +119,7 @@ load_bootstrap_versions() {
 
   set -a
   # shellcheck source=./bootstrap-versions.env
+  # shellcheck disable=SC1091
   . "$VERSIONS_FILE"
   set +a
 

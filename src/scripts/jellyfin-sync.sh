@@ -32,20 +32,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
-# Source shared library; fall back to inline definitions when running from
-# Nix store where sibling paths don't resolve.
-if [ -f "$SCRIPT_DIR/lib.sh" ]; then
-  . "$SCRIPT_DIR/lib.sh"
-else
-  usage_std() {
-    printf 'usage: %s %s\n' "$1" "${2:-}"
-    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
-  }
-  resolve_nucleus_root() {
-    [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ] && { printf '%s\n' "$NUCLEUS_REPO_ROOT"; return 0; }
-    printf '%s\n' "${HOME}/dev/nucleus"
-  }
-fi
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/lib.sh"
 
 usage() {
   usage_std "$(basename "$0")" "[options]"

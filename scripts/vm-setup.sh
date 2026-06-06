@@ -39,26 +39,8 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-if [ -f "$SCRIPT_DIR/../src/scripts/lib.sh" ]; then
-  . "$SCRIPT_DIR/../src/scripts/lib.sh"
-else
-  usage_std() {
-    printf 'usage: %s %s\n' "$1" "${2:-}"
-    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
-  }
-  resolve_nucleus_root() {
-    [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ] && { printf '%s\n' "$NUCLEUS_REPO_ROOT"; return 0; }
-    printf '%s\n' "${HOME}/dev/nucleus"
-  }
-  resolve_nucleus_host() {
-    [ -n "${NUCLEUS_HOST:-}" ] && { printf '%s\n' "$NUCLEUS_HOST"; return 0; }
-    case "$(uname -s)" in
-      Darwin) printf '%s\n' "MacBook" ;;
-      Linux)  printf '%s\n' "NixOS" ;;
-      *)      printf '%s\n' "" ;;
-    esac
-  }
-fi
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 REPO_ROOT="$(resolve_nucleus_root)"
 MANIFEST="$REPO_ROOT/src/modules/VMs.json"

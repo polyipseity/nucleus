@@ -15,18 +15,8 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-if [ -f "$SCRIPT_DIR/../src/scripts/lib.sh" ]; then
-  . "$SCRIPT_DIR/../src/scripts/lib.sh"
-else
-  usage_std() {
-    printf 'usage: %s %s\n' "$1" "${2:-}"
-    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
-  }
-  resolve_nucleus_root() {
-    [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ] && { printf '%s\n' "$NUCLEUS_REPO_ROOT"; return 0; }
-    printf '%s\n' "${HOME}/dev/nucleus"
-  }
-fi
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 REPO_ROOT=$(resolve_nucleus_root)
 cd "$REPO_ROOT"

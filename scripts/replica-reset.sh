@@ -18,6 +18,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck disable=SC1091
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 repo_root="${NUCLEUS_REPO_ROOT:-}"

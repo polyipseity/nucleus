@@ -15,14 +15,8 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-if [ -f "$SCRIPT_DIR/../src/scripts/lib.sh" ]; then
-  . "$SCRIPT_DIR/../src/scripts/lib.sh"
-else
-  usage_std() {
-    printf 'usage: %s %s\n' "$1" "${2:-}"
-    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
-  }
-fi
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 usage() {
   usage_std "check-sh.sh" "[path ...]" "Validate shell script syntax and lint quality with ShellCheck. With no arguments, checks all tracked *.sh files from Git. With arguments, checks only the provided paths."

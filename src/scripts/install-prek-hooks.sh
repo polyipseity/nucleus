@@ -17,18 +17,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
-if [ -f "$SCRIPT_DIR/lib.sh" ]; then
-  . "$SCRIPT_DIR/lib.sh"
-else
-  usage_std() {
-    printf 'usage: %s %s\n' "$1" "${2:-}"
-    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
-  }
-  resolve_nucleus_root() {
-    [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ] && { printf '%s\n' "$NUCLEUS_REPO_ROOT"; return 0; }
-    printf '%s\n' "${HOME}/dev/nucleus"
-  }
-fi
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/lib.sh"
 
 # Install repository-local Git hooks for repos that opt into prek.
 # mkApplyApp bundles pkgs.prek in runtimeInputs so first-run `nix run .#apply`

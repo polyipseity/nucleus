@@ -62,18 +62,8 @@ set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
-if [ -f "$SCRIPT_DIR/lib.sh" ]; then
-  . "$SCRIPT_DIR/lib.sh"
-else
-  usage_std() {
-    printf 'usage: %s %s\n' "$1" "${2:-}"
-    [ "$#" -gt 2 ] && printf '  %s\n' "$3"
-  }
-  resolve_nucleus_root() {
-    [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ] && { printf '%s\n' "$NUCLEUS_REPO_ROOT"; return 0; }
-    printf '%s\n' "${HOME}/dev/nucleus"
-  }
-fi
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/lib.sh"
 
 # ---------------------------------------------------------------------------
 # Usage
@@ -187,20 +177,6 @@ _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 # invoke, so a stable file path is the safe transport mechanism.
 mkdir -p "$HOME/.config/nucleus"
 printf '%s\n' "$REPO_ROOT" > "$HOME/.config/nucleus/repo-root"
-
-# Keep one centralized Nix config fragment for this script so every `nix` call
-# gets flake support without repeating CLI flags.
-NIX_FEATURES_CONFIG="experimental-features = nix-command flakes"
-
-merge_nix_config() {
-  # Merge caller-provided NIX_CONFIG (if any) with the required flake features
-  # so user-level overrides remain intact while the apply flow stays portable.
-  if [ -n "${NIX_CONFIG:-}" ]; then
-    printf '%s\n%s' "$NIX_CONFIG" "$NIX_FEATURES_CONFIG"
-  else
-    printf '%s' "$NIX_FEATURES_CONFIG"
-  fi
-}
 
 run_nix() {
   # Execute nix with the merged config for non-root operations.
