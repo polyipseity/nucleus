@@ -6,47 +6,7 @@
 # options-probe via lib.mkMerge + lib.mkIf lets this single module work in all
 # three contexts without the caller having to know which option is appropriate.
 #
-# === SYSTEM BUILD TOOL POLICY ===
-# Several build tools are installed globally for system package management ONLY:
-#   python / pip — BANNED entirely; see Python section below.
-#   bun          — installs global Node/JS ecosystem system packages via
-#                  `bun add -g`.  Direct developer use is forbidden.
-#   cargo        — system cargo comes from the rustup stable toolchain; used only
-#                  by cargo-binstall / cargo install for system Rust binary
-#                  packages.  Direct developer use is forbidden.
-#                  All platforms: via rustup (pkgs.rustup on POSIX; Rustlang.Rustup on Windows).
-#   rustup       — manages per-project Rust toolchains; default is set to none
-#                  so rust-toolchain.toml is always authoritative.
-#                  All platforms: pkgs.rustup on POSIX; Rustlang.Rustup on Windows.
-#   uv           — installs system-level Python tooling (e.g. `uv tool install`).
-#                  Direct developer use is forbidden.
-# All of the above are blocked at the interactive shell level (shell.nix zsh
-# functions; pwsh.nix / Sync-ShellProfile.ps1 PowerShell functions) so that
-# direct invocations in a user session are intercepted and redirected.
-# The block passes through when a project direnv/devShell is active or when the
-# managed default dev environment is active for repositories without `.envrc`.
-# On POSIX that fallback points at a dedicated Nix-built tool bundle; on
-# Windows it reuses the managed user PATH entries because there is no separate
-# nix-direnv-backed fallback root in the PowerShell workflow yet.
-#
-# For project-specific development, prefer the repository devShell:
-#   - POSIX: direnv auto-loads .envrc (`use flake "./src"`) on directory entry.
-#   - POSIX manual: run `nix develop` from the repo root.
-#   - Windows: run the equivalent `nix develop` or use WSL with direnv.
-# For repositories without direnv/Nix metadata, the managed default shell
-# environment provides the same baseline bun/uv/prek inventory.
-#
-# === PYTHON POLICY ===
-# System-wide Python is explicitly banned across all platforms. This prevents:
-#   - Accidental `pip install` modifying system-managed dependencies
-#   - Breakage of system packages that depend on vendored Python
-#   - Pollution of system environment with user packages
-# Python availability is scoped to:
-#   - Project-specific nix devShells (nix develop)
-#   - Per-project venv or uv-managed environments
-#   - Tools that bundle Python (e.g., ansible, pipx-installed CLIs)
-# uv (installed here) is the blessed package/project manager for when
-# project-specific Python is needed.
+# System build tool policy: see AGENTS.md and .agents/instructions/package-installation-scope.instructions.md.
 {
   config,
   lib,
@@ -78,16 +38,11 @@ let
   #                    and CLI parity with Windows (ArtifexSoftware.GhostScript)
   #   imagemagick    — image conversion and processing CLI (`convert`, `magick`)
   #                    and CLI parity with Windows (ImageMagick.ImageMagick)
-  #   jellyfin       — self-hosted media server binary used by the macOS launchd
-  #                    agent and Linux systemd user service; Windows parity uses
-  #                    the Jellyfin.Server WinGet package
+  #   jellyfin       — self-hosted media server (macOS launchd agent, Linux systemd service)
+  #                    (Windows: Jellyfin.Server WinGet package)
   #   jq             — JSON processor used by activation scripts
   #   litellm        — LiteLLM AI gateway proxy (OpenAI-API-compatible server)
-  #                    that routes client requests to Ollama and OpenRouter.
-  #                    Installed on all POSIX hosts; Windows uses `uv tool install
-  #                    'litellm[proxy]'` (see system.dsc.yml / Invoke-LiteLLMSetup.ps1).
-  #                    On NixOS managed as a systemd service (hosts/NixOS/ai.nix);
-  #                    on macOS managed as a launchd user agent (modules/ai/default.nix).
+  #                    NixOS: systemd (hosts/NixOS/ai.nix); macOS: launchd (modules/ai/default.nix); Windows: uv tool install 'litellm[proxy]'
   #   dotnetCorePackages.runtime_6_0 — .NET 6 runtime required by EIDE and legacy tooling parity
   #   llvmPackages_18.clang    — unified C/C++ compiler frontend
   #   llvmPackages_18.lldb     — LLVM debugger (`lldb`) for cross-host debug parity
@@ -110,8 +65,7 @@ let
   #   prek           — pre-commit hook manager used by prek.toml
   #   ripgrep        — fast grep replacement
   #   ruff           — fast Python linter/formatter CLI
-  #   rustup         — Rust toolchain manager; default set to none so rust-toolchain.toml is
-  #                    authoritative; stable toolchain installed for cargo-binstall fallback
+  #   rustup         — Rust toolchain manager; default set to none (rust-toolchain.toml authoritative)
   #                    (all platforms: pkgs.rustup on POSIX; Rustlang.Rustup via WinGet on Windows)
   #   shellcheck     — shell linter used by CI and pre-commit validation
   #   sops           — secret encryption/decryption tool
@@ -258,14 +212,8 @@ let
       nixpkgsAttr = "picard";
     };
     qemu = {
-      # QEMU is a CLI tool; `category = "cli"` routes to nixpkgs on all
-      # platforms per the repository package selection policy.  The Homebrew
-      # formula is listed for completeness but the policy function
-      # (defaultBackendFor) will always select nixpkgs for "cli" category.
-      # On POSIX hosts this provides qemu-img for QCOW2 disk management
-      # (used by scripts/vm-setup.sh).  On Windows, qemu is managed via Scoop
-      # (see Invoke-ScoopSetup.ps1).
-      # Source: https://formulae.brew.sh/formula/qemu
+      # QEMU CLI tool for QCOW2 disk management (scripts/vm-setup.sh).
+      # POSIX: nixpkgs; Windows: Scoop (Invoke-ScoopSetup.ps1).
       category = "cli";
       homebrew = {
         kind = "formula";

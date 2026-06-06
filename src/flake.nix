@@ -105,15 +105,8 @@
 
           overlays = [
             (_final: prev: {
-              # Disable test suites for codec libraries that are ffmpeg-full
-              # dependencies.  Their tests invoke ffmpeg or run encoder workloads
-              # that get SIGKILL'd (exit 137) in the Nix sandbox's memory
-              # constraints on Apple Silicon.  These are all specialized or
-              # regional-standard codecs (AVS2/3, HEVC/VVC variants, LCEVC, APV)
-              # that are not present in the aarch64-darwin binary cache, so they
-              # must be built from source.  Suppressing the test phase does not
-              # affect codec correctness; the libraries themselves are exercised
-              # end-to-end by the ffmpeg-full test suite.
+              # Disable tests for codec libs that are ffmpeg-full deps (tests OOM
+              # on aarch64-darwin Nix sandbox). ffmpeg-full's tests cover them.
               chromaprint = prev.chromaprint.overrideAttrs (_: {
                 doCheck = false;
               });
