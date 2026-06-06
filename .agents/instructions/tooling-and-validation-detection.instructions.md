@@ -1,5 +1,5 @@
 ---
-description: "Use when creating or updating instructions for repository tooling, build commands, tests, CI, editor automation, or validation workflows. Detect the real setup from config files before documenting or prescribing commands."
+description: "Use when creating or updating instructions for repository tooling, build commands, tests, CI, editor automation, or validation workflows. Also covers detecting the repository's programming languages, frameworks, runtimes, package managers, and setup from concrete files before writing detailed guidance."
 name: "Tooling and Validation Detection"
 applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/settings.json, .github/workflows/**/*.yml, .github/dependabot.yml, .editorconfig, .gitattributes"
 ---
@@ -8,13 +8,50 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
 
 ## Discovery before prescription
 
-- Before documenting build, test, lint, format, type-check, packaging, release,
-  or automation workflows, inspect the files that define them.
-- Treat workflow files, scripts, editor settings, manifests, lockfiles, and
-  config files as the primary evidence for how the repo actually works.
+- Treat stack and tooling discovery as an evidence-based process.
+- Before you write language-specific, framework-specific, runtime-specific, or
+  automation-specific instructions, determine what the repository actually uses.
+- Inspect the files that define the repository's actual setup: dependency
+  manifests, lockfiles, build/test/linter/formatter configs, CI workflows,
+  scripts, editor settings, automation configs, source directories, file
+  extensions, and representative entrypoints.
 - If the repository is still a sparse template, describe the workflow as
   conditional or not yet initialized instead of pretending commands already
   exist.
+
+## Detection order
+
+- Start with the highest-signal files and directories:
+  - workspace-wide guidance such as `AGENTS.md`
+  - dependency manifests and lockfiles
+  - build, test, formatter, linter, and compiler configs
+  - CI workflows and repo scripts
+  - source directories, file extensions, and representative entrypoints
+  - editor settings and automation configs
+- Prefer multiple signals over a single clue when deciding that a stack is
+  truly in use.
+- If evidence conflicts, document the ambiguity and avoid inventing hard rules
+  until the repository structure clarifies the intended setup.
+
+## What to detect
+
+- Programming languages in active use, not merely hinted at by empty folders.
+- Frameworks, build systems, package managers, test runners, linters,
+  formatters, type checkers, documentation generators, and release tooling.
+- Directory boundaries that deserve their own instructions because they follow
+  different conventions.
+- Canonical commands, if any, and where they are defined.
+- Platform-specific constraints such as line endings, executable bits, or shell
+  assumptions.
+
+## Evidence standards
+
+- A single empty directory is weak evidence.
+- A real config file, lockfile, script, workflow step, or representative source
+  file is strong evidence.
+- Comments in docs are weaker than executable config unless the docs are clearly
+  the source of truth.
+- Prefer on-disk facts over habits carried from similar repositories.
 
 ## Command discovery
 
@@ -55,6 +92,21 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
 - In instruction examples, prefer real in-repo file names over hypothetical
   names unless the example is explicitly labeled as illustrative.
 
+## How to write follow-up instructions
+
+- When a stack is detected or a repository gains a clearly defined language or
+  framework setup, create or refine a focused instruction file whose `name`,
+  `description`, and `applyTo` clearly target that stack.
+- Keep repo-wide discovery rules in `AGENTS.md` and stack details in dedicated
+  files; do not overload the root guidance.
+- Make the instruction thorough and evidence-backed: code structure, tests,
+  commands, key config files, source locations, testing expectations, common
+  failure modes, and validation workflow for that stack.
+- Keep `applyTo` globs narrow so the detailed instruction only loads for the
+  files it truly governs.
+- Link to canonical config files instead of copying long option lists unless a
+  short inline summary is critical to agent behavior.
+
 ## Validation guidance
 
 - For every detected stack, document how agents should validate changes:
@@ -78,12 +130,11 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
 - When no runnable validation exists yet, say that explicitly and point to the
   files that would need to be added before validation can be automated.
 
-## Adding new detailed instructions
+## What to avoid
 
-- If a repository gains a clearly defined language or framework setup, add a
-  dedicated instruction file for it rather than overloading generic tooling
-  guidance.
-- Make the added instruction thorough and evidence-backed: commands, key config
-  files, source locations, testing expectations, and common failure modes.
-- Keep `applyTo` globs narrow so the detailed instruction only loads for the
-  files it truly governs.
+- Do not assume a default language or task runner just because a similar repo
+  used one.
+- Do not keep stale stack-specific files after the repo has been generalized or
+  reoriented.
+- Do not leave broad placeholders such as "follow standard best practices" when
+  concrete repository evidence can support sharper guidance.
