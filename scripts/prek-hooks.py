@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+# /// script
+# dependencies = []
+# requires-python = ">=3.9.0"
+# ///
 """Cross-platform Python wrapper for prek hooks.
 
 Detects the OS and dispatches to the appropriate check/format commands.
