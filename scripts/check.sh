@@ -23,38 +23,17 @@
 #   0 on success; non-zero on any check failure.
 set -euo pipefail
 
-# Source shared library when available; fall back to inline helpers for
-# standalone execution.
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 if [ -f "$SCRIPT_DIR/../src/scripts/lib.sh" ]; then
   . "$SCRIPT_DIR/../src/scripts/lib.sh"
 else
-  # inline usage_std — emit standardized usage text
   usage_std() {
     printf 'usage: %s %s\n' "$1" "${2:-}"
     [ "$#" -gt 2 ] && printf '  %s\n' "$3"
   }
-  # inline resolve_nucleus_root (mirrors src/scripts/lib.sh)
   resolve_nucleus_root() {
-    if [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ]; then
-      printf '%s\n' "$NUCLEUS_REPO_ROOT"
-      return 0
-    fi
-    _rnr_config_file="$HOME/.config/nucleus/repo-root"
-    if [ -f "$_rnr_config_file" ]; then
-      _rnr_root="$(cat "$_rnr_config_file")"
-      if [ -n "$_rnr_root" ] && [ -d "$_rnr_root" ]; then
-        printf '%s\n' "$_rnr_root"
-        return 0
-      fi
-    fi
-    if _rnr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
-      if [ -n "$_rnr_git_root" ] && [ -d "$_rnr_git_root" ]; then
-        printf '%s\n' "$_rnr_git_root"
-        return 0
-      fi
-    fi
-    printf '%s\n' "$HOME/dev/nucleus"
+    [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ] && { printf '%s\n' "$NUCLEUS_REPO_ROOT"; return 0; }
+    printf '%s\n' "${HOME}/dev/nucleus"
   }
 fi
 

@@ -14,22 +14,13 @@
 #   0 on success; non-zero on any ShellCheck finding at error/warning level.
 set -euo pipefail
 
-# Source shared library when available; fall back to inline helpers for
-# standalone execution (e.g. Nix pre-commit hooks where the script is
-# copied to a flat store path).
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 if [ -f "$SCRIPT_DIR/../src/scripts/lib.sh" ]; then
   . "$SCRIPT_DIR/../src/scripts/lib.sh"
 else
-  # inline usage_std — emit standardized usage text
   usage_std() {
     printf 'usage: %s %s\n' "$1" "${2:-}"
     [ "$#" -gt 2 ] && printf '  %s\n' "$3"
-  }
-  # inline resolve_nucleus_root
-  resolve_nucleus_root() {
-    [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ] && { printf '%s\n' "$NUCLEUS_REPO_ROOT"; return 0; }
-    printf '%s\n' "${HOME}/dev/nucleus"
   }
 fi
 
