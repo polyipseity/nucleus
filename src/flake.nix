@@ -204,6 +204,37 @@
       vsCodeMarketplaceMac = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
       vsCodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
+      # writeShellApplicationWithLib — Like writeShellApplication but bundles
+      # lib.sh so scripts that source it work in both repo-direct and nix-store
+      # contexts.  Places lib.sh at both $out/bin/lib.sh (sibling pattern) and
+      # $out/src/scripts/lib.sh (parent-path pattern) so both convention sites
+      # resolve without runtime fallbacks.
+      writeShellApplicationWithLib =
+        pkgs: args:
+        let
+          name = args.name;
+          baseDrv = pkgs.writeShellApplication (builtins.removeAttrs args [ "extraBin" ]);
+          extraBin = args.extraBin or { };
+          libShDrv = pkgs.runCommand "${name}-lib-sh" { } ''
+            mkdir -p "$out/bin" "$out/src/scripts"
+            cp "${./scripts/lib.sh}" "$out/src/scripts/lib.sh"
+            chmod +x "$out/src/scripts/lib.sh"
+            ln -s ../src/scripts/lib.sh "$out/bin/lib.sh"
+            ${pkgs.lib.concatStringsSep "\n" (
+              pkgs.lib.mapAttrsToList (target: src: ''
+                cp "${src}" "$out/bin/${target}"
+              '') extraBin
+            )}
+          '';
+        in
+        pkgs.symlinkJoin {
+          name = "${name}-with-lib";
+          paths = [
+            baseDrv
+            libShDrv
+          ];
+        };
+
       # Build the `nix run .#apply` app for a given package set.
       # Wraps src/scripts/apply.sh in a shell application that has git, jq,
       # openssh, prek, sops, and ssh-to-age on PATH so the machine age key
@@ -221,7 +252,7 @@
       mkApplyApp =
         pkgs:
         let
-          baseApply = pkgs.writeShellApplication {
+          baseApply = writeShellApplicationWithLib pkgs {
             name = "nucleus-apply";
             runtimeInputs = [
               pkgs.curl
@@ -242,12 +273,12 @@
           # ai-sync and vm-setup commands bundled as writeShellApplication so
           # apply.sh can call `nucleus-ai-sync` / `nucleus-vm-setup` from PATH
           # with their runtimeInputs (jq) resolved at build time.
-          aiSyncDrv = pkgs.writeShellApplication {
+          aiSyncDrv = writeShellApplicationWithLib pkgs {
             name = "nucleus-ai-sync";
             runtimeInputs = [ pkgs.jq ];
             text = builtins.readFile ../scripts/ai-sync.sh;
           };
-          vmSetupDrv = pkgs.writeShellApplication {
+          vmSetupDrv = writeShellApplicationWithLib pkgs {
             name = "nucleus-vm-setup";
             runtimeInputs = [ pkgs.jq ];
             text = builtins.readFile ../scripts/vm-setup.sh;
@@ -298,16 +329,14 @@
       mkCheckShApp = pkgs: {
         type = "app";
         program = "${
-          pkgs.writeShellApplication {
+          writeShellApplicationWithLib pkgs {
             name = "nucleus-check-sh";
             runtimeInputs = [
               pkgs.bash
               pkgs.git
               pkgs.shellcheck
             ];
-            text = ''
-              exec bash "${../scripts/check-sh.sh}" "$@"
-            '';
+            text = builtins.readFile ../scripts/check-sh.sh;
           }
         }/bin/nucleus-check-sh";
       };
@@ -318,15 +347,13 @@
       mkCheckPackerApp = pkgs: {
         type = "app";
         program = "${
-          pkgs.writeShellApplication {
+          writeShellApplicationWithLib pkgs {
             name = "nucleus-check-packer";
             runtimeInputs = [
               pkgs.bash
               pkgs.packer
             ];
-            text = ''
-              exec bash "${../scripts/check-packer.sh}" "$@"
-            '';
+            text = builtins.readFile ../scripts/check-packer.sh;
           }
         }/bin/nucleus-check-packer";
       };
@@ -339,7 +366,7 @@
       mkCheckApp = pkgs: {
         type = "app";
         program = "${
-          pkgs.writeShellApplication {
+          writeShellApplicationWithLib pkgs {
             name = "nucleus-check";
             runtimeInputs = [
               pkgs.bash
@@ -351,9 +378,7 @@
               pkgs.powershell
               pkgs.shellcheck
             ];
-            text = ''
-              exec bash "${../scripts/check.sh}" "$@"
-            '';
+            text = builtins.readFile ../scripts/check.sh;
           }
         }/bin/nucleus-check";
       };
@@ -363,7 +388,7 @@
       mkHealthCheckApp = pkgs: {
         type = "app";
         program = "${
-          pkgs.writeShellApplication {
+          writeShellApplicationWithLib pkgs {
             name = "nucleus-health-check";
             runtimeInputs = [
               pkgs.curl
@@ -382,7 +407,7 @@
       mkUpdateApp = pkgs: {
         type = "app";
         program = "${
-          pkgs.writeShellApplication {
+          writeShellApplicationWithLib pkgs {
             name = "nucleus-update";
             runtimeInputs = [
               pkgs.gnupg
@@ -405,7 +430,7 @@
       mkGcApp = pkgs: {
         type = "app";
         program = "${
-          pkgs.writeShellApplication {
+          writeShellApplicationWithLib pkgs {
             name = "nucleus-gc";
             runtimeInputs = [
               pkgs.jq
@@ -423,7 +448,7 @@
       mkCloudSetupApp = pkgs: {
         type = "app";
         program = "${
-          pkgs.writeShellApplication {
+          writeShellApplicationWithLib pkgs {
             name = "nucleus-cloud-setup";
             runtimeInputs = [
               pkgs.git
@@ -442,7 +467,7 @@
       mkReplicaSyncApp = pkgs: {
         type = "app";
         program = "${
-          pkgs.writeShellApplication {
+          writeShellApplicationWithLib pkgs {
             name = "nucleus-replica-sync";
             runtimeInputs = [
               pkgs.git
@@ -460,7 +485,7 @@
       mkReplicaResetApp = pkgs: {
         type = "app";
         program = "${
-          pkgs.writeShellApplication {
+          writeShellApplicationWithLib pkgs {
             name = "nucleus-replica-reset";
             runtimeInputs = [
               pkgs.git
@@ -479,7 +504,7 @@
       mkAiSyncApp = pkgs: {
         type = "app";
         program = "${
-          pkgs.writeShellApplication {
+          writeShellApplicationWithLib pkgs {
             name = "nucleus-ai-sync";
             runtimeInputs = [
               pkgs.jq
@@ -496,7 +521,7 @@
       mkVMSetupApp = pkgs: {
         type = "app";
         program = "${
-          pkgs.writeShellApplication {
+          writeShellApplicationWithLib pkgs {
             name = "nucleus-vm-setup";
             runtimeInputs = [
               pkgs.jq
@@ -509,9 +534,12 @@
       mkBootstrapApp = pkgs: {
         type = "app";
         program = "${
-          pkgs.writeShellApplication {
+          writeShellApplicationWithLib pkgs {
             name = "nucleus-bootstrap";
             text = builtins.readFile ../scripts/bootstrap.sh;
+            extraBin = {
+              "bootstrap-versions.env" = ../scripts/bootstrap-versions.env;
+            };
           }
         }/bin/nucleus-bootstrap";
       };
