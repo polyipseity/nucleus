@@ -18,7 +18,7 @@
 }:
 let
   applyScriptText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
-  buildToolsPolicyText = builtins.readFile ../../.agents/instructions/build-tools-policy.instructions.md;
+  buildToolsPolicyText = builtins.readFile ../../.agents/instructions/package-installation-scope.instructions.md;
   cargoBinstallSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-CargoBinstallSetup.ps1;
   ciWorkflowText = builtins.readFile ../../.github/workflows/ci.yml;
   coreNixText = builtins.readFile ../../src/modules/core.nix;

@@ -297,7 +297,7 @@ agent when the managed key is newer.
 
 ## Shell module authoring rules
 
-See `.agents/instructions/build-tools-policy.instructions.md` for the full
+See `.agents/instructions/package-installation-scope.instructions.md` for the full
 system-install-only policy for `bun`, `cargo`, `rustc`, `uv`, `python`, and
 related tools, and for guidance on adding new blocked tools to the shell profile.
 
