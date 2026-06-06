@@ -220,9 +220,13 @@ let
   # Shared shell body for iCloud exclusion convergence, used by both the
   # synchronous activation hook and the daily launchd maintenance script.
   # Keep this as one source of truth so behavior stays aligned.
-  icloudExclusionsShellBody = ''
+  icloudExclusionsShellBody = excludedDirs: managedRoots: ''
+    excluded_dirs=${lib.escapeShellArg excludedDirs}
+    managed_roots=${lib.escapeShellArg managedRoots}
+
     if [ "$excluded_dirs" = "[]" ]; then
-      exit 0
+      echo "macos: iCloud exclusions skipped (no excluded directory names configured)." >&2
+      return 0 2>/dev/null || exit 0
     fi
 
     apply_exclusions() {
@@ -304,10 +308,7 @@ let
       #!${pkgs.bash}/bin/bash
       set -eu
 
-      excluded_dirs=${lib.escapeShellArg icloudExcludedDirsJson}
-      managed_roots=${lib.escapeShellArg icloudManagedRootsJson}
-
-      ${icloudExclusionsShellBody}
+      ${icloudExclusionsShellBody icloudExcludedDirsJson icloudManagedRootsJson}
     '';
   };
 
@@ -1147,14 +1148,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Source: https://developer.apple.com/documentation/fileprovider
     # -------------------------------------------------------------------------
     configureICloudExclusions = lib.hm.dag.entryAfter [ "cloudDrivesSetup" ] ''
-      excluded_dirs=${lib.escapeShellArg icloudExcludedDirsJson}
-      managed_roots=${lib.escapeShellArg icloudManagedRootsJson}
-
-      if [ "$excluded_dirs" = "[]" ]; then
-        echo "macos: iCloud exclusions skipped (no excluded directory names configured)." >&2
-      else
-        ${icloudExclusionsShellBody}
-      fi
+      ${icloudExclusionsShellBody icloudExcludedDirsJson icloudManagedRootsJson}
     '';
 
     # -------------------------------------------------------------------------

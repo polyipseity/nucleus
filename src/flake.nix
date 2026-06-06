@@ -235,6 +235,32 @@
           ];
         };
 
+      # mkApp — Factored helper for defining `nix run .#<name>` apps.
+      # Wraps writeShellApplicationWithLib with uniform type/program boilerplate.
+      # Defaults to ../scripts/${name}.sh; pass explicit script for non-default paths.
+      mkApp =
+        pkgs:
+        {
+          name,
+          runtimeInputs,
+          extraBin ? { },
+          script ? ../scripts/${name}.sh,
+        }:
+        let
+          appName = "nucleus-${name}";
+        in
+        {
+          type = "app";
+          program = "${
+            writeShellApplicationWithLib pkgs {
+              name = appName;
+              runtimeInputs = runtimeInputs;
+              text = builtins.readFile script;
+              inherit extraBin;
+            }
+          }/bin/${appName}";
+        };
+
       # Build the `nix run .#apply` app for a given package set.
       # Wraps src/scripts/apply.sh in a shell application that has git, jq,
       # openssh, prek, sops, and ssh-to-age on PATH so the machine age key
@@ -324,225 +350,146 @@
       };
 
       # Build the shell script lint app for a given package set.
-      # Runtime dependencies are bundled from this flake so CI and local runs do
-      # not depend on host-global shellcheck/git installations.
-      mkCheckShApp = pkgs: {
-        type = "app";
-        program = "${
-          writeShellApplicationWithLib pkgs {
-            name = "nucleus-check-sh";
-            runtimeInputs = [
-              pkgs.bash
-              pkgs.git
-              pkgs.shellcheck
-            ];
-            text = builtins.readFile ../scripts/check-sh.sh;
-          }
-        }/bin/nucleus-check-sh";
-      };
+      mkCheckShApp =
+        pkgs:
+        mkApp pkgs {
+          name = "check-sh";
+          runtimeInputs = [
+            pkgs.bash
+            pkgs.git
+            pkgs.shellcheck
+          ];
+        };
 
       # Build the Packer template validation app for a given package set.
-      # Runtime dependencies are bundled from this flake so CI and local runs do
-      # not depend on host-global packer installations.
-      mkCheckPackerApp = pkgs: {
-        type = "app";
-        program = "${
-          writeShellApplicationWithLib pkgs {
-            name = "nucleus-check-packer";
-            runtimeInputs = [
-              pkgs.bash
-              pkgs.packer
-            ];
-            text = builtins.readFile ../scripts/check-packer.sh;
-          }
-        }/bin/nucleus-check-packer";
-      };
+      mkCheckPackerApp =
+        pkgs:
+        mkApp pkgs {
+          name = "check-packer";
+          runtimeInputs = [
+            pkgs.bash
+            pkgs.packer
+          ];
+        };
 
       # Build the consolidated repository check app for a given package set.
-      # Runs all repository checks in sequence: Nix test suite, deadnix,
-      # shellcheck, PowerShell lint, Packer validation, and script validation
-      # tests.  Runtime dependencies are bundled so CI and local runs do not
-      # depend on host-global tool installations.
-      mkCheckApp = pkgs: {
-        type = "app";
-        program = "${
-          writeShellApplicationWithLib pkgs {
-            name = "nucleus-check";
-            runtimeInputs = [
-              pkgs.bash
-              pkgs.deadnix
-              pkgs.git
-              pkgs.gnugrep
-              pkgs.nix
-              pkgs.packer
-              pkgs.powershell
-              pkgs.shellcheck
-            ];
-            text = builtins.readFile ../scripts/check.sh;
-          }
-        }/bin/nucleus-check";
-      };
+      mkCheckApp =
+        pkgs:
+        mkApp pkgs {
+          name = "check";
+          runtimeInputs = [
+            pkgs.bash
+            pkgs.deadnix
+            pkgs.git
+            pkgs.gnugrep
+            pkgs.nix
+            pkgs.packer
+            pkgs.powershell
+            pkgs.shellcheck
+          ];
+        };
 
       # Build pre-flight health checks as a runnable app that fails fast before
       # apply/bootstrap flows attempt large downloads or secret-dependent work.
-      mkHealthCheckApp = pkgs: {
-        type = "app";
-        program = "${
-          writeShellApplicationWithLib pkgs {
-            name = "nucleus-health-check";
-            runtimeInputs = [
-              pkgs.curl
-              pkgs.git
-              pkgs.gnupg
-              pkgs.sops
-            ];
-            text = builtins.readFile ../scripts/health-check.sh;
-          }
-        }/bin/nucleus-health-check";
-      };
+      mkHealthCheckApp =
+        pkgs:
+        mkApp pkgs {
+          name = "health-check";
+          runtimeInputs = [
+            pkgs.curl
+            pkgs.git
+            pkgs.gnupg
+            pkgs.sops
+          ];
+        };
 
       # Build a cross-host update orchestration app.
-      # It updates flake inputs, optionally upgrades Windows packages, and then
-      # rewraps SOPS files for all declared recipients in one bounded workflow.
-      mkUpdateApp = pkgs: {
-        type = "app";
-        program = "${
-          writeShellApplicationWithLib pkgs {
-            name = "nucleus-update";
-            runtimeInputs = [
-              pkgs.gnupg
-              pkgs.sops
-            ];
-            # Intentionally do not inject nixpkgs `pkgs.nix` into PATH here.
-            # update.sh should use the host nix binary so host-specific nix.conf
-            # settings (e.g. Determinate Nix keys like eval-cores/lazy-trees)
-            # are interpreted by the matching implementation without warnings.
-            text = builtins.readFile ../scripts/update.sh;
-          }
-        }/bin/nucleus-update";
-      };
+      # Intentionally does not inject nixpkgs `pkgs.nix` into PATH — update.sh
+      # should use the host nix binary so host-specific nix.conf settings
+      # (eval-cores, lazy-trees) are interpreted without warnings.
+      mkUpdateApp =
+        pkgs:
+        mkApp pkgs {
+          name = "update";
+          runtimeInputs = [
+            pkgs.gnupg
+            pkgs.sops
+          ];
+        };
 
       # Build garbage-collection app for POSIX hosts.
-      # This combines Nix store GC and stale wallpaper gc in one bounded
-      # operation without touching unmanaged user content outside declarative
-      # scopes. jq is included so the Ollama gc step can parse models.json
-      # even when the host shell PATH does not already contain jq.
-      mkGcApp = pkgs: {
-        type = "app";
-        program = "${
-          writeShellApplicationWithLib pkgs {
-            name = "nucleus-gc";
-            runtimeInputs = [
-              pkgs.jq
-              pkgs.gnugrep
-              pkgs.home-manager
-            ];
-            text = builtins.readFile ../scripts/gc.sh;
-          }
-        }/bin/nucleus-gc";
-      };
+      mkGcApp =
+        pkgs:
+        mkApp pkgs {
+          name = "gc";
+          runtimeInputs = [
+            pkgs.jq
+            pkgs.gnugrep
+            pkgs.home-manager
+          ];
+        };
 
       # Build cloud setup helper app for POSIX hosts.
-      # Guides one-time rclone remote bootstrap and then runs apply so mount
-      # services/units converge immediately after credentials are configured.
-      mkCloudSetupApp = pkgs: {
-        type = "app";
-        program = "${
-          writeShellApplicationWithLib pkgs {
-            name = "nucleus-cloud-setup";
-            runtimeInputs = [
-              pkgs.git
-              pkgs.jq
-              pkgs.nix
-              pkgs.rclone
-            ];
-            text = builtins.readFile ../scripts/cloud-setup.sh;
-          }
-        }/bin/nucleus-cloud-setup";
-      };
+      mkCloudSetupApp =
+        pkgs:
+        mkApp pkgs {
+          name = "cloud-setup";
+          runtimeInputs = [
+            pkgs.git
+            pkgs.jq
+            pkgs.nix
+            pkgs.rclone
+          ];
+        };
 
       # Build cloud replica sync helper app for POSIX hosts.
-      # Runs declarative replica pull actions declared in users.json for the
-      # current user.
-      mkReplicaSyncApp = pkgs: {
-        type = "app";
-        program = "${
-          writeShellApplicationWithLib pkgs {
-            name = "nucleus-replica-sync";
-            runtimeInputs = [
-              pkgs.git
-              pkgs.jq
-              pkgs.rclone
-            ];
-            text = builtins.readFile ../scripts/replica-sync.sh;
-          }
-        }/bin/nucleus-replica-sync";
-      };
+      mkReplicaSyncApp =
+        pkgs:
+        mkApp pkgs {
+          name = "replica-sync";
+          runtimeInputs = [
+            pkgs.git
+            pkgs.jq
+            pkgs.rclone
+          ];
+        };
 
       # Build cloud replica state reset helper app for POSIX hosts.
-      # Clears local bisync seed/cache state so manual bisync validation can
-      # start from a deterministic baseline without modifying remotes.
-      mkReplicaResetApp = pkgs: {
-        type = "app";
-        program = "${
-          writeShellApplicationWithLib pkgs {
-            name = "nucleus-replica-reset";
-            runtimeInputs = [
-              pkgs.git
-              pkgs.jq
-            ];
-            text = builtins.readFile ../scripts/replica-reset.sh;
-          }
-        }/bin/nucleus-replica-reset";
-      };
+      mkReplicaResetApp =
+        pkgs:
+        mkApp pkgs {
+          name = "replica-reset";
+          runtimeInputs = [
+            pkgs.git
+            pkgs.jq
+          ];
+        };
 
       # Build AI model sync app for POSIX hosts.
-      # Resolves the active model profile from the host OS, pulls manifest models
-      # not yet installed, and removes models absent from the manifest.
-      # jq is bundled so the manifest JSON is always parseable regardless of
-      # host PATH.
-      mkAiSyncApp = pkgs: {
-        type = "app";
-        program = "${
-          writeShellApplicationWithLib pkgs {
-            name = "nucleus-ai-sync";
-            runtimeInputs = [
-              pkgs.jq
-            ];
-            text = builtins.readFile ../scripts/ai-sync.sh;
-          }
-        }/bin/nucleus-ai-sync";
-      };
+      mkAiSyncApp =
+        pkgs:
+        mkApp pkgs {
+          name = "ai-sync";
+          runtimeInputs = [ pkgs.jq ];
+        };
 
       # Build VM setup app for POSIX hosts.
-      # Builds VM disk images (if absent) and registers VMs for the current
-      # host.
-      # jq is bundled so the VMs manifest JSON is always parseable.
-      mkVMSetupApp = pkgs: {
-        type = "app";
-        program = "${
-          writeShellApplicationWithLib pkgs {
-            name = "nucleus-vm-setup";
-            runtimeInputs = [
-              pkgs.jq
-            ];
-            text = builtins.readFile ../scripts/vm-setup.sh;
-          }
-        }/bin/nucleus-vm-setup";
-      };
+      mkVMSetupApp =
+        pkgs:
+        mkApp pkgs {
+          name = "vm-setup";
+          runtimeInputs = [ pkgs.jq ];
+        };
 
-      mkBootstrapApp = pkgs: {
-        type = "app";
-        program = "${
-          writeShellApplicationWithLib pkgs {
-            name = "nucleus-bootstrap";
-            text = builtins.readFile ../scripts/bootstrap.sh;
-            extraBin = {
-              "bootstrap-versions.env" = ../scripts/bootstrap-versions.env;
-            };
-          }
-        }/bin/nucleus-bootstrap";
-      };
+      mkBootstrapApp =
+        pkgs:
+        mkApp pkgs {
+          name = "bootstrap";
+          runtimeInputs = [ ];
+          extraBin = {
+            "bootstrap-versions.env" = ../scripts/bootstrap-versions.env;
+          };
+        };
 
     in
     {
