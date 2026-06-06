@@ -19,16 +19,9 @@ restatement of what the code already says. Avoid obvious comments.
 ## Provenance for non-validated external identifiers
 
 When a setting cannot be automatically validated by the repository's current
-tests or schema checks (for example bundle IDs, app IDs, launchd labels,
-registry paths, environment-variable names, preference domains, or vendor
-setting keys), include at least one inline source citation near the setting.
-
-- Prefer official vendor docs, schemas, or manpages.
-- If official docs are unavailable, use the best stable upstream source
-  (project wiki, upstream code path, or package metadata) and note why.
-- Keep citations local to the exact setting block
-- For **URL quality, developer-vs-user documentation preference, and deprecation hygiene**, see `.agents/instructions/citation-quality.instructions.md`.
-- Keep citations local to each setting block so reviewers can verify identifiers one-by-one without hunting through external docs.
+tests or schema checks, include at least one inline source citation near the
+setting. Follow the citation quality standards in
+`.agents/instructions/citation-quality.instructions.md`.
 
 ## Nix files (`src/**/*.nix`)
 
