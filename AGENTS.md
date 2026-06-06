@@ -57,8 +57,6 @@
 
 ## Core Conventions
 
-- Keep this file concise; move file-type-specific rules into focused
-  `.agents/instructions/*.instructions.md` files.
 - Prefer declarative state (`src/modules/*.nix`, WinGet DSC YAML) over imperative scripts.
 - Keep POSIX shared behavior in shared modules, not duplicated per-host.
 - Design for cross-host parity first; see
