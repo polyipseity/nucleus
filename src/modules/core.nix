@@ -15,66 +15,11 @@
   ...
 }:
 let
-  # Packages installed on every host regardless of OS.
-  #   bat            — syntax-highlighted cat replacement
-  #   bottom         — cross-platform system monitor (btm)
-  #   bun            — high-speed all-in-one JS toolkit (runtime, package manager, bundler); global runtime for JS ecosystem tasks
-  #                    (Windows: Oven-sh.Bun in system.dsc.yml; fourth tier in install hierarchy: nixpkgs/winget > scoop > cargo binstall > bun > uv)
-  #   caddy          — HTTPS reverse proxy used as a shared TLS front door for
-  #                    Jellyfin (and future local services) on POSIX hosts
-  #   cargo-binstall — Rust crate binary installer; second-to-last-resort fallback when a package is absent from nixpkgs/WinGet/Scoop
-  #   cargo-cache    — reclaim disk space from ~/.cargo registry, git, and advisory-db clones
-  #   direnv         — per-directory env loader (shell integration in shell.nix)
-  #   eza            — modern ls with colour and icons
-  #   fd             — fast find replacement
-  #   ffmpeg-full    — multimedia processing and transcoding (GPL codecs; pre-built in nixos.org binary cache)
-  #   fzf            — fuzzy finder used by shell widgets and neovim
-  #   gemini-cli     — Google Gemini terminal agent CLI
-  #                    DO NOT REMOVE THIS COMMENT: intentionally disabled for now per user request.
-  #   gh             — GitHub CLI for repository and issue management
-  #   gitFull        — version control (includes Tcl/Tk tools like `gitk`)
-  #   gnupg          — GPG for secret management and signing
-  #   ghostscript    — PostScript/PDF interpreter (`gs`) for document workflows
-  #                    and CLI parity with Windows (ArtifexSoftware.GhostScript)
-  #   imagemagick    — image conversion and processing CLI (`convert`, `magick`)
-  #                    and CLI parity with Windows (ImageMagick.ImageMagick)
-  #   jellyfin       — self-hosted media server (macOS launchd agent, Linux systemd service)
-  #                    (Windows: Jellyfin.Server WinGet package)
-  #   jq             — JSON processor used by activation scripts
-  #   litellm        — LiteLLM AI gateway proxy (OpenAI-API-compatible server)
-  #                    NixOS: systemd (hosts/NixOS/ai.nix); macOS: launchd (modules/ai/default.nix); Windows: uv tool install 'litellm[proxy]'
-  #   dotnetCorePackages.runtime_6_0 — .NET 6 runtime required by EIDE and legacy tooling parity
-  #   llvmPackages_18.clang    — unified C/C++ compiler frontend
-  #   llvmPackages_18.lldb     — LLVM debugger (`lldb`) for cross-host debug parity
-  #   llvmPackages_18.lld      — LLVM linker (`ld.lld`) for cross-host link parity
-  #   nixd           — Nix language server (LSP) for nix-ide in VS Code on POSIX hosts
-  #   nickel         — Nickel configuration language CLI; also used via the tweag.vscode-nickel VS Code extension
-  #   nixfmt         — Nix formatter used by nix-ide/VS Code formatting pipeline
-  #   nix-index      — provides nix-locate; required by pay-respects to suggest nixpkgs packages for unknown commands
-  #                    (run `nix-index` once after first activation to build the file-index database)
-  #   nls            — Nickel Language Server; provides language intelligence for the tweag.vscode-nickel VS Code extension
-  #                    (Windows: cargo-binstall nickel-lang-lsp in Invoke-CargoBinstallSetup.ps1)
-  #   opencode       — AI-native coding agent and assistant
-  #   p7zip          — 7z compression and archive extraction utility
-  #   packer         — HashiCorp Packer for automated VM image building (scripts/vm-setup.sh)
-  #                    (Windows: HashiCorp.Packer in system.dsc.yml)
-  #   pay-respects    — corrects errors in previous console commands; actively maintained fork of thefuck
-  #   pi-coding-agent — coding agent CLI with read, bash, edit, write tools and session management
-  #                     (Windows parity not practical: no WinGet/Scoop/cargo-binstall package; npm-only install)
-  #   powershell      — cross-platform PowerShell runtime (`pwsh`)
-  #   prek           — pre-commit hook manager used by prek.toml
-  #   ripgrep        — fast grep replacement
-  #   ruff           — fast Python linter/formatter CLI
-  #   rustup         — Rust toolchain manager; default set to none (rust-toolchain.toml authoritative)
-  #                    (all platforms: pkgs.rustup on POSIX; Rustlang.Rustup via WinGet on Windows)
-  #   shellcheck     — shell linter used by CI and pre-commit validation
-  #   sops           — secret encryption/decryption tool
-  #   ssh-to-age     — derives age public/private keys from SSH keys; required by
-  #                    apply.sh when invoked directly (not via nix run .#apply)
-  #   ty             — Astral ty Python type checker / language server CLI
-  #   typst          — modern document-composition compiler; pairs with the Tinymist LSP in editors.nix
-  #   uv             — fast Python package/project manager
-  #   zoxide         — smart cd (shell integration in shell.nix)
+  # Packages installed on every host regardless of OS. Shared cross-platform
+  # tool set: CLI utilities, language runtimes, and developer tooling common
+  # to every managed host. See also darwinSharedPackages and
+  # overlappingPackages for platform-specific additions.
+  # pkgs.gemini-cli — DO NOT REMOVE THIS COMMENT: intentionally disabled for now per user request.
   baseSharedPackages = [
     pkgs.bat
     pkgs.bottom
