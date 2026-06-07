@@ -234,19 +234,22 @@
     "env": {
       "NUCLEUS_AGENT_SESSION": "1",
       "VSCODE_AGENT": "1"
-    }
+    },
+    "path": "bash"
   },
-  "terminal.integrated.automationProfile.macOS": {
+  "terminal.integrated.automationProfile.osx": {
     "env": {
       "NUCLEUS_AGENT_SESSION": "1",
       "VSCODE_AGENT": "1"
-    }
+    },
+    "path": "zsh"
   },
   "terminal.integrated.automationProfile.windows": {
     "env": {
       "NUCLEUS_AGENT_SESSION": "1",
       "VSCODE_AGENT": "1"
-    }
+    },
+    "path": "pwsh.exe"
   },
   "terminal.integrated.enableMultiLinePasteWarning": "never",
   "terminal.integrated.fontSize": 14,
