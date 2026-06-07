@@ -87,8 +87,16 @@ jobs:
           PACKER_GITHUB_API_TOKEN: ${{ github.token }}
         run: nix run ./src#check
 
+      - name: Run repository test suite (POSIX)
+        if: runner.os != 'Windows'
+        run: nix run ./src#test
+
       - name: Run consolidated repository checks (Windows)
         if: runner.os == 'Windows'
         env:
           PACKER_GITHUB_API_TOKEN: ${{ github.token }}
         run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check.ps1
+
+      - name: Run repository test suite (Windows)
+        if: runner.os == 'Windows'
+        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/test.ps1
