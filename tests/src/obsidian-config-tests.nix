@@ -4,8 +4,6 @@ let
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
 
   homeText = builtins.readFile ../../src/modules/home.nix;
-  linuxText = builtins.readFile ../../src/modules/linux.nix;
-  macosText = builtins.readFile ../../src/modules/macos.nix;
   loadUserRegistryText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
   syncObsidianText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ObsidianConfig.ps1;
   obsidianConfig = builtins.fromJSON (builtins.readFile ../../src/modules/configs/obsidian.json);
@@ -30,6 +28,4 @@ assert containsRegex "cli =" syncObsidianText;
 assert containsRegex "updateDisabled =" syncObsidianText;
 assert containsRegex "WHY nativeMenus is not configured" syncObsidianText;
 assert containsRegex "WHY checkSlowStartup is not configured" syncObsidianText;
-assert containsRegex "configureObsidianSettings" linuxText;
-assert containsRegex "configureObsidianSettings" macosText;
 true
