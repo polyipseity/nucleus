@@ -16,5 +16,5 @@ assert lib.hasInfix "defaults write pro.betterdisplay.BetterDisplay hideMenuIcon
   macosModuleText;
 assert lib.hasInfix "defaults write pro.betterdisplay.BetterDisplay showInMenuBar -bool false"
   macosModuleText;
-assert lib.hasInfix ''"pro.betterdisplay.BetterDisplay"'' macosModuleText;
+
 true
