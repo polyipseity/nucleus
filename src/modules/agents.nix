@@ -387,10 +387,6 @@ in
       # uninstall on the next apply.  Only add tools absent from nixpkgs and
       # cargo-binstall and bun (install preference: nixpkgs > cargo binstall > bun > uv).
       _iut_desired="$(mktemp)"
-      # PaddleOCR: cross-platform OCR with GPU auto-detection.  uv for
-      # cross-host version consistency (nixpkgs v3.5.0, PyPI v3.6.0).
-      printf '%s\n' 'paddleocr' >> "$_iut_desired"
-
       # Get actually installed uv tools from `uv tool list` (zap-style: remove
       # any installed tool absent from the desired list, regardless of prior
       # managed state).  Parse only lines that match the documented

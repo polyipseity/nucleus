@@ -30,9 +30,6 @@ function Invoke-UvSetup {
   # package name (without extras).  Only add packages absent from WinGet,
   # Scoop, and cargo-binstall.
   $desiredPackages = @(
-    # PaddleOCR: cross-platform OCR with GPU auto-detection.
-    # Managed via uv for version consistency across all hosts.
-    'paddleocr'
     # LiteLLM AI gateway proxy.  Installed with the [proxy] extra for
     # OpenAI-compatible server functionality.  The tool name in `uv tool list`
     # is `litellm` (extras are stripped from the tool registry).
