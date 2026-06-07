@@ -384,11 +384,19 @@
             pkgs.bash
             pkgs.deadnix
             pkgs.git
-            pkgs.gnugrep
-            pkgs.nix
             pkgs.packer
             pkgs.powershell
             pkgs.shellcheck
+          ];
+        };
+
+      mkTestApp =
+        pkgs:
+        mkApp pkgs {
+          name = "test";
+          runtimeInputs = [
+            pkgs.findutils
+            pkgs.nix
           ];
         };
 
@@ -513,6 +521,7 @@
           apply = mkApplyApp pkgsMac;
           bootstrap = mkBootstrapApp pkgsMac;
           check = mkCheckApp pkgsMac;
+          test = mkTestApp pkgsMac;
           check-packer = mkCheckPackerApp pkgsMac;
           check-pwsh = mkCheckPwshApp pkgsMac;
           check-sh = mkCheckShApp pkgsMac;
@@ -533,6 +542,7 @@
           apply = mkApplyApp pkgsLinux;
           bootstrap = mkBootstrapApp pkgsLinux;
           check = mkCheckApp pkgsLinux;
+          test = mkTestApp pkgsLinux;
           check-packer = mkCheckPackerApp pkgsLinux;
           check-pwsh = mkCheckPwshApp pkgsLinux;
           check-sh = mkCheckShApp pkgsLinux;
