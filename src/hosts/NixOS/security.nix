@@ -1,6 +1,5 @@
 # NixOS/security.nix — Privilege-escalation hardening for the NixOS host.
-{ ... }:
-{
+{ ... }: {
   # Enable SSH for remote access while restricting authentication to public
   # keys only.  Both password mechanisms are disabled so the attack surface is
   # limited to key material, which cannot be brute-forced over the network.

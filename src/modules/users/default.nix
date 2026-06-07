@@ -7,8 +7,7 @@
 # This registry replaces hardcoded username strings in flake.nix, enabling
 # the same configuration to serve multiple users across macOS, NixOS, and
 # Windows hosts.
-{ lib, ... }:
-{
+{ lib, ... }: {
   options.nucleus.users = lib.mkOption {
     type = lib.types.attrsOf (
       lib.types.submodule {

@@ -1,6 +1,5 @@
 # MacBook/security.nix — Authentication and privilege-escalation hardening.
-{ ... }:
-{
+{ ... }: {
   # Allow Touch ID to satisfy sudo authentication prompts via PAM.
   #
   # The service name is `sudo_local`, not `sudo`, for two reasons:

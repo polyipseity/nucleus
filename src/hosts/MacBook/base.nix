@@ -1,6 +1,5 @@
 # MacBook/base.nix — Fundamental nix-darwin settings for the MacBook host.
-{ username, ... }:
-{
+{ username, ... }: {
   # Determinate Nix manages the daemon and installation lifecycle itself.
   # Disabling nix-darwin's Nix management avoids activation conflicts.
   nix.enable = false;

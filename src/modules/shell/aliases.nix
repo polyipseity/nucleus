@@ -2,8 +2,7 @@
 #
 # Keep keys strictly alphabetical so diffs stay deterministic and accidental
 # duplicate alias intent is easy to detect during review.
-{ }:
-{
+{ }: {
   "-g" = "git";
   "-ga" = "git add";
   "-gb" = "git branch";

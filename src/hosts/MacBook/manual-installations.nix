@@ -8,8 +8,7 @@
 #   scripts into the activate binary; custom names are silently ignored.
 #   postActivation is the correct extension point for scripts that must run
 #   after openssh.  lib.mkBefore prepends before the HM activation call.
-{ lib, ... }:
-{
+{ lib, ... }: {
   # ---------------------------------------------------------------------------
   # configureRosetta (postActivation fragment)
   # Installs Rosetta 2 once on Apple Silicon hosts if it is not already

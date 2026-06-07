@@ -5,8 +5,7 @@
 #   scripts into the activate binary; custom names are silently ignored.
 #   postActivation is the correct extension point for scripts that must run
 #   after openssh.  lib.mkBefore prepends before the HM activation call.
-{ lib, ... }:
-{
+{ lib, ... }: {
   # Application-level firewall: block unsigned inbound connections while
   # allowing binaries that are code-signed by a trusted authority.
   networking.applicationFirewall = {

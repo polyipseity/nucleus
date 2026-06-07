@@ -2,8 +2,7 @@
 #
 # Keep initrd module ordering intact because early-boot probing depends on load
 # sequence; this list is intentionally not alphabetized.
-{ ... }:
-{
+{ ... }: {
   # Kernel modules to include in the initial ramdisk so block devices and USB
   # input are available before the root filesystem mounts.
   # xhci_pci: USB 3.x host controller | nvme: NVMe SSD | usbhid: USB HID input

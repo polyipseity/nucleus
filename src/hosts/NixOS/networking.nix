@@ -1,6 +1,5 @@
 # NixOS/networking.nix — Hostname and network management for the NixOS host.
-{ ... }:
-{
+{ ... }: {
   # mDNS/Bonjour discovery parity with macOS for easier local host discovery.
   # Source: NixOS Avahi service option.
   # https://mynixos.com/nixpkgs/option/services.avahi.enable

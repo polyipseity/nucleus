@@ -9,8 +9,7 @@
 # Power management is declared here alongside the desktop services because
 # all three concerns (desktop environment, remote access, power posture) share
 # the same NixOS services layer.
-{ lib, pkgs, ... }:
-{
+{ lib, pkgs, ... }: {
   # Load the virtual KMS (vkms) kernel module to provide a software-only
   # display device when no physical monitor is connected.  This mirrors the
   # BetterDisplay HeadlessDisplay virtual screen on macOS: remote-desktop
