@@ -44,11 +44,22 @@ Safety rules:
 ## Atomic commit workflow (unstaged changes → multiple commits)
 
 When you have a set of unstaged changes and need to split them into multiple
-atomic commits, use this stash-first workflow:
+atomic commits, use this stash-first workflow.
 
-1. `git stash` — save everything, get a clean working tree.
-2. `git stash list` — note the stash reference (e.g. `stash@{0}`).
-3. For each atomic commit you want to create:
+1. **Format first** — Run the repo formatter so the working tree matches what
+   the pre-commit hook will produce during `git commit`. This prevents merge
+   conflicts when the stash (pre-format snapshot) is popped against hook-
+   formatted files.
+   ```bash
+   prek run --all-files
+   ```
+   If that is unavailable, run formatters manually:
+   ```bash
+   cargo fmt && prek run end-of-file-fixer trailing-whitespace rumdl-fmt --all-files
+   ```
+2. `git stash` — save everything, get a clean working tree.
+3. `git stash list` — note the stash reference (e.g. `stash@{0}`).
+4. For each atomic commit you want to create:
    a. `git stash pop` — restore all remaining stashed changes to the
    working tree.
    b. `git add -p` (or `git add <specific-files>`) — stage **only** the
@@ -62,10 +73,10 @@ atomic commits, use this stash-first workflow:
    - **If the commit fails because hooks modified staged files** (e.g.,
      `cargo fmt` auto-fixed formatting): the hook-produced changes are
      now unstaged modifications. Stage them (`git add <modified-files>`)
-     and retry step 3d. Do NOT retry without staging first — the hook
+     and retry step 4d. Do NOT retry without staging first — the hook
      will produce the same modifications and fail identically.
      e. `git stash list` — verify stash state is as expected.
-4. After all commits are created, `git stash pop` any remaining leftovers.
+5. After all commits are created, `git stash pop` any remaining leftovers.
 
 ### Hard rules
 
