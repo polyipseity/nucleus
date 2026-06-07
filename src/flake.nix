@@ -230,6 +230,7 @@
             ln -s ../src/scripts/lib.sh "$out/bin/lib.sh"
             ${pkgs.lib.concatStringsSep "\n" (
               pkgs.lib.mapAttrsToList (target: src: ''
+                mkdir -p "$(dirname "$out/bin/${target}")"
                 cp "${src}" "$out/bin/${target}"
               '') extraBin
             )}
