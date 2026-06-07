@@ -672,7 +672,6 @@ in
         eval "$_gen_cmd" > "$_comp_file" 2>/dev/null || {
           echo "  (failed, skipping)" >&2
           rm -f "$_comp_file"
-          return 1
         }
       }
 
