@@ -2,16 +2,15 @@
 # check.sh — Consolidated repository validation script.
 #
 # Runs all repository checks in sequence:
-#   1. Nix test suite (tests/src/*.nix)
-#   2. Dead Nix code detection (deadnix)
-#   3. Shell script linting (shellcheck)
-#   4. PowerShell syntax validation
-#   5. Packer template validation
-#   6. Shell script validation tests
+#   1. Dead Nix code detection (deadnix)
+#   2. Shell script linting (shellcheck)
+#   3. PowerShell syntax validation
+#   4. Packer template validation
+#   5. Shell script validation tests
 #
 # With arguments, passes them through to individual checkers that support
 # path filtering (check-sh.sh, check-pwsh.ps1, check-packer.sh) and skips
-# whole-repo checks (Nix tests, deadnix, script validation).
+# whole-repo checks (deadnix, script validation).
 #
 # Arguments:
 #   (none)        No flags accepted; paths may be provided as positional arguments.
@@ -31,7 +30,7 @@ REPO_ROOT=$(resolve_nucleus_root)
 cd "$REPO_ROOT"
 
 usage() {
-  usage_std "check.sh" "[path ...]" "Run all repository validation checks in sequence. With arguments, passes paths through to supporting checkers and skips whole-repo checks (Nix tests, deadnix, script validation)."
+  usage_std "check.sh" "[path ...]" "Run all repository validation checks in sequence. With arguments, passes paths through to supporting checkers and skips whole-repo checks (deadnix, script validation)."
 }
 
 while [ "$#" -gt 0 ]; do
@@ -72,30 +71,11 @@ if $HAS_ARGS; then
   done
 fi
 
-# ---------------------------------------------------------------------------
-# 1. Nix test suite — auto-discover and run all *.nix test files
-# ---------------------------------------------------------------------------
-printf '\n=== [1/6] Nix test suite ===\n'
-if ! $HAS_ARGS; then
-  echo "Running Nix unit tests..."
-  FAILED=0
-  while IFS= read -r test; do
-    echo "Running: $test"
-    nix-instantiate --eval "$test" || FAILED=1
-  done < <(find tests/src -maxdepth 1 -name '*.nix' -type f | sort)
-  if [ "$FAILED" -ne 0 ]; then
-    printf '\nNix test suite FAILED.\n' >&2
-    exit 1
-  fi
-  echo "All Nix tests passed."
-else
-  echo "Skipping Nix test suite (path-scoped mode)."
-fi
 
 # ---------------------------------------------------------------------------
-# 2. Dead Nix code detection
+# 1. Dead Nix code detection
 # ---------------------------------------------------------------------------
-printf '\n=== [2/6] Dead Nix code ===\n'
+printf '\n=== [1/5] Dead Nix code ===\n'
 if ! $HAS_ARGS; then
   deadnix --fail src/
   echo "No dead Nix code found."
@@ -104,9 +84,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Shell script linting (shellcheck)
+# 2. Shell script linting (shellcheck)
 # ---------------------------------------------------------------------------
-printf '\n=== [3/6] Shell script linting ===\n'
+printf '\n=== [2/5] Shell script linting ===\n'
 if [ "${#SH_FILES[@]}" -gt 0 ]; then
   bash scripts/check-sh.sh "${SH_FILES[@]}"
 elif ! $HAS_ARGS; then
@@ -116,9 +96,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 4. PowerShell syntax validation
+# 3. PowerShell syntax validation
 # ---------------------------------------------------------------------------
-printf '\n=== [4/6] PowerShell syntax validation ===\n'
+printf '\n=== [3/5] PowerShell syntax validation ===\n'
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 "${PS1_FILES[@]}"
 elif ! $HAS_ARGS; then
@@ -128,9 +108,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Packer template validation
+# 4. Packer template validation
 # ---------------------------------------------------------------------------
-printf '\n=== [5/6] Packer template validation ===\n'
+printf '\n=== [4/5] Packer template validation ===\n'
 if [ "${#PKR_FILES[@]}" -gt 0 ]; then
   bash scripts/check-packer.sh "${PKR_FILES[@]}"
 elif ! $HAS_ARGS; then
@@ -140,9 +120,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Shell script validation tests
+# 5. Shell script validation tests
 # ---------------------------------------------------------------------------
-printf '\n=== [6/6] Shell script validation tests ===\n'
+printf '\n=== [5/5] Shell script validation tests ===\n'
 if ! $HAS_ARGS; then
   bash tests/scripts/script-validation-tests.sh
 else

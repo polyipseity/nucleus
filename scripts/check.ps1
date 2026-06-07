@@ -4,7 +4,8 @@
 #   1. PowerShell syntax validation
 #   2. Packer template validation
 #
-# Nix tests, deadnix, shellcheck, and script validation tests are skipped
+# Tests (Nix test suite) are run separately via scripts/test.ps1.
+# deadnix, shellcheck, and script validation tests are skipped
 # on Windows (Nix/ShellCheck not available on Windows runners).
 #
 # Arguments:
