@@ -5,7 +5,7 @@
 # ///
 """Cross-platform Python wrapper for prek hooks.
 
-Detects the OS and dispatches to the appropriate check/format commands.
+Detects the OS and dispatches to the appropriate check/format/test commands.
 On POSIX, uses nix run. On Windows, uses pwsh for PowerShell-based checks.
 """
 
@@ -164,6 +164,52 @@ def run_format_nix(files: list[str], repo_root: Path) -> int:
     return 0
 
 
+def run_test(files: list[str], repo_root: Path) -> int:
+    """Run the test suite.
+
+    On POSIX, delegates to ``nix run ./src#test``.  On Windows, runs
+    ``scripts/test.ps1`` as a placeholder (future Windows test support).
+
+    Args:
+        files: List of file paths (ignored — tests always run full suite).
+        repo_root: Absolute path to the repository root.
+
+    Returns:
+        Exit code from the underlying test process.  0 on success, non-zero
+        on failure.
+    """
+    if sys.platform != "win32":
+        env = os.environ.copy()
+        env["NIX_CONFIG"] = "experimental-features = nix-command flakes"
+        cmd = ["nix", "run", "./src#test"]
+        result = subprocess.run(cmd, env=env, cwd=repo_root, shell=False)
+        if result.returncode != 0:
+            print(
+                f"scripts/prek-hooks.py: error: test failed (exit {result.returncode})",
+                file=sys.stderr,
+            )
+            return result.returncode
+        return 0
+
+    # Windows: placeholder
+    cmd = [
+        "pwsh",
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        str(repo_root / "scripts" / "test.ps1"),
+    ]
+    result = subprocess.run(cmd, shell=False)
+    if result.returncode != 0:
+        print(
+            f"scripts/prek-hooks.py: error: test failed (exit {result.returncode})",
+            file=sys.stderr,
+        )
+        return result.returncode
+    return 0
+
+
 def main() -> int:
     """Entry point for the prek hook wrapper.
 
@@ -180,7 +226,7 @@ def main() -> int:
     )
     parser.add_argument(
         "hook",
-        choices=["check", "format-nix"],
+        choices=["check", "format-nix", "test"],
         help="Hook to run",
     )
     parser.add_argument(
@@ -196,6 +242,8 @@ def main() -> int:
         return run_check(args.files, repo_root)
     elif args.hook == "format-nix":
         return run_format_nix(args.files, repo_root)
+    elif args.hook == "test":
+        return run_test(args.files, repo_root)
     else:
         print(
             f"scripts/prek-hooks.py: error: unknown hook '{args.hook}'", file=sys.stderr
