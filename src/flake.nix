@@ -42,6 +42,13 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # scripts: automation helpers (.sh entry points) that live outside the flake
+    # root (src/).  Included as a non-flake input so builtins.readFile works in
+    # pure evaluation mode (e.g. `nix flake check`).
+    scripts = {
+      url = "path:../scripts";
+      flake = false;
+    };
   };
 
   outputs =
@@ -51,6 +58,7 @@
       nix-vscode-extensions,
       nixpkgs,
       rust-overlay,
+      scripts,
       sops-nix,
       ...
     }:
@@ -244,7 +252,7 @@
           name,
           runtimeInputs,
           extraBin ? { },
-          script ? ../scripts/${name}.sh,
+          script ? scripts + "/${name}.sh",
         }:
         let
           appName = "nucleus-${name}";
@@ -302,14 +310,14 @@
           aiSyncDrv = writeShellApplicationWithLib pkgs {
             name = "nucleus-ai-sync";
             runtimeInputs = [ pkgs.jq ];
-            text = builtins.readFile ../scripts/ai-sync.sh;
+            text = builtins.readFile (scripts + "/ai-sync.sh");
           };
           vmSetupDrv = writeShellApplicationWithLib pkgs {
             name = "nucleus-vm-setup";
             runtimeInputs = [ pkgs.jq ];
-            text = builtins.readFile ../scripts/vm-setup.sh;
+            text = builtins.readFile (scripts + "/vm-setup.sh");
             extraBin = {
-              "vm-setup/lib.sh" = ../scripts/vm-setup/lib.sh;
+              "vm-setup/lib.sh" = scripts + "/vm-setup/lib.sh";
             };
           };
           siblingScripts = pkgs.runCommand "apply-siblings" { } ''
@@ -346,7 +354,7 @@
               pkgs.powershell
             ];
             text = ''
-              exec pwsh -NoLogo -NoProfile -NonInteractive -File "${../scripts/check-pwsh.ps1}" "$@"
+              exec pwsh -NoLogo -NoProfile -NonInteractive -File "${scripts + "/check-pwsh.ps1"}" "$@"
             '';
           }
         }/bin/nucleus-check-pwsh";
@@ -491,7 +499,7 @@
           name = "vm-setup";
           runtimeInputs = [ pkgs.jq ];
           extraBin = {
-            "vm-setup/lib.sh" = ../scripts/vm-setup/lib.sh;
+            "vm-setup/lib.sh" = scripts + "/vm-setup/lib.sh";
           };
         };
 
@@ -501,7 +509,7 @@
           name = "bootstrap";
           runtimeInputs = [ ];
           extraBin = {
-            "bootstrap-versions.env" = ../scripts/bootstrap-versions.env;
+            "bootstrap-versions.env" = scripts + "/bootstrap-versions.env";
           };
         };
 

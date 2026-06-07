@@ -83,6 +83,7 @@
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixpkgs": "nixpkgs",
         "rust-overlay": "rust-overlay",
+        "scripts": "scripts",
         "sops-nix": "sops-nix"
       }
     },
@@ -105,6 +106,18 @@
         "repo": "rust-overlay",
         "type": "github"
       }
+    },
+    "scripts": {
+      "flake": false,
+      "locked": {
+        "path": "../scripts",
+        "type": "path"
+      },
+      "original": {
+        "path": "../scripts",
+        "type": "path"
+      },
+      "parent": []
     },
     "sops-nix": {
       "inputs": {
