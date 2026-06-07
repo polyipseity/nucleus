@@ -73,9 +73,10 @@ Located in `tests/scripts/script-validation-tests.sh`, run via bash in CI.
 
 #### ✅ **Consolidated check scripts** (NEW)
 
-- `scripts/check.sh` (POSIX): Runs all 6 check categories (Nix tests, deadnix, shellcheck, PowerShell lint, Packer validation, script validation tests)
+- `scripts/check.sh` (POSIX): Runs all 5 check categories (deadnix, shellcheck, PowerShell lint, Packer validation, script validation tests)
 - `scripts/check.ps1` (Windows): Runs Windows-compatible checks (PowerShell lint, Packer validation)
-- Both delegate to existing individual checkers; no logic duplication
+- `scripts/test.sh` / `scripts/test.ps1`: Separate test suite runner (Nix eval on POSIX, placeholder on Windows)
+- Both check scripts delegate to existing individual checkers; no logic duplication
 - Path-scoped mode skips whole-repo checks when arguments provided
 
 ---
@@ -87,8 +88,10 @@ Located in `tests/scripts/script-validation-tests.sh`, run via bash in CI.
 All tests are automatically run on every commit:
 
 1. **Nix Parse** (`nix flake check`): Verify all `.nix` files parse
-2. **Consolidated POSIX Checks** (`nix run ./src#check`): Runs Nix tests, deadnix, shellcheck, PowerShell lint, Packer validation, and script validation tests in one step (macOS/Linux)
-3. **Consolidated Windows Checks** (`pwsh -File scripts/check.ps1`): Runs PowerShell lint and Packer validation (Windows)
+2. **Consolidated POSIX Checks** (`nix run ./src#check`): Runs deadnix, shellcheck, PowerShell lint, Packer validation, and script validation tests in one step (macOS/Linux)
+3. **Repository test suite (POSIX)** (`nix run ./src#test`): Evaluates all `tests/src/*.nix` test files (macOS/Linux)
+4. **Consolidated Windows Checks** (`pwsh -File scripts/check.ps1`): Runs PowerShell lint and Packer validation (Windows)
+5. **Repository test suite (Windows)** (`pwsh -File scripts/test.ps1`): Placeholder for future Windows test support
 
 ---
 
