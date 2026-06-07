@@ -135,6 +135,7 @@ function Sync-ShellProfile {
     '  if (Test-Path env:CODEX_SANDBOX) { return $true }'
     '  if (Test-Path env:TRAE_AI_SHELL_ID) { return $true }'
     '  if (Test-Path env:AUGMENT_AGENT) { return $true }'
+    '  if (Test-Path env:NUCLEUS_AGENT_SESSION) { return $true }'
     '  if (Test-Path env:OPENCODE_CLIENT) { return $true }'
     '  # Devin filesystem marker'
     '  if (Test-Path "/opt/.devin") { return $true }'

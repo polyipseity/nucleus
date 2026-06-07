@@ -308,6 +308,6 @@ properties:
           if not defined CURSOR_AGENT if not defined GOOSE_TERMINAL if not
           defined CLINE_ACTIVE if not defined GEMINI_CLI if not defined
           CODEX_SANDBOX if not defined TRAE_AI_SHELL_ID if not defined
-          OPENCODE_CLIENT if not defined VSCODE_AGENT if not exist
+          OPENCODE_CLIENT if not defined NUCLEUS_AGENT_SESSION if not defined VSCODE_AGENT if not exist
           "C:\opt\.devin" (@echo off & prompt $g)
         valueType: String

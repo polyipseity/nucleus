@@ -113,6 +113,14 @@ let
     && lib.all (var: lib.hasInfix "if not defined ${var}" windowsUserDscText) agentEnvVarNames
   ) "Windows user.dsc.yml must define cmdAutoRun RegistryValue that checks all agent env vars";
 
+  test_zsh_agent_env_vars_complete = assert' (lib.all (
+    var: lib.hasInfix "[[ -n \"\${${var}:-}\" ]] && return 0" posixShellText
+  ) agentEnvVarNames) "zsh initContent must check all env vars listed in agent-env-vars.nix";
+
+  test_posix_pwsh_agent_env_vars_complete = assert' (lib.all (
+    var: lib.hasInfix "env:${var}" posixPwshText
+  ) agentEnvVarNames) "POSIX pwsh profile must check all env vars listed in agent-env-vars.nix";
+
   allTests = [
     test_posix_binary_baseline
     test_windows_binary_baseline
@@ -135,6 +143,8 @@ let
     test_posix_pwsh_agent_session_suppression
     test_windows_pwsh_agent_session_suppression
     test_windows_cmd_autorun_agent_detection
+    test_zsh_agent_env_vars_complete
+    test_posix_pwsh_agent_env_vars_complete
   ];
 in
 {
@@ -163,5 +173,7 @@ in
     "19: POSIX pwsh suppresses PSReadLine and flattens prompt in agent sessions"
     "20: Windows pwsh suppresses PSReadLine and flattens prompt in agent sessions"
     "21: Windows cmd.exe AutoRun registry checks all agent env vars"
+    "22: zsh initContent checks all env vars from agent-env-vars.nix"
+    "23: POSIX pwsh profile checks all env vars from agent-env-vars.nix"
   ];
 }
