@@ -453,7 +453,7 @@ let
   # manual instructions remain the last script to run.
   # Shared activation entries defined in src/modules/lib/activation-dag.nix;
   # keep macOS-specific entries below so cross-host additions are single-sourced.
-  displayHostManualInstructionDeps = (import ../lib/activation-dag.nix) ++ [
+  displayHostManualInstructionDeps = (import ./lib/activation-dag.nix) ++ [
     "checkFilesChanged"
     "checkLinkTargets"
     "relaunchDesktopServices"
@@ -484,7 +484,7 @@ let
     "verifyArchivingStack"
     "writeBoundary"
   ];
-  displayHostManualInstructionsBody = import ../lib/manual-instructions.nix {
+  displayHostManualInstructionsBody = import ./lib/manual-instructions.nix {
     inherit (config.nucleus) hostManualFile;
   } "macos";
 in
