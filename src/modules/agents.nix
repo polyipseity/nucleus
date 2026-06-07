@@ -389,7 +389,24 @@ in
       _iut_desired="$(mktemp)"
       # PaddleOCR: cross-platform OCR with GPU auto-detection.  uv for
       # cross-host version consistency (nixpkgs v3.5.0, PyPI v3.6.0).
+      # Pinned to Python 3.11 via --python flag because its dependency
+      # opencv-contrib-python cannot build on Python >=3.12 (distutils removed).
       printf '%s\n' 'paddleocr' >> "$_iut_desired"
+
+      # Per-tool Python version requirements.  Empty string = use default.
+      _iut_python_for_tool() {
+        case "$1" in
+          paddleocr) echo "3.11" ;;
+          *) echo "" ;;
+        esac
+      }
+
+      # Install required Python versions before attempting tool installs.
+      while IFS= read -r _iut_tool; do
+        [ -z "$_iut_tool" ] && continue
+        _iut_python=$(_iut_python_for_tool "$_iut_tool")
+        [ -n "$_iut_python" ] && "$_iut_uv_bin" python install "$_iut_python"
+      done < "$_iut_desired"
 
       # Get actually installed uv tools from `uv tool list` (zap-style: remove
       # any installed tool absent from the desired list, regardless of prior
@@ -440,8 +457,14 @@ in
           echo "uv: skipping invalid install token '$_iut_tool'"
           continue
         fi
-        echo "uv: installing tool '$_iut_tool'"
-        "$_iut_uv_bin" tool install "$_iut_tool"
+        _iut_python=$(_iut_python_for_tool "$_iut_tool")
+        if [ -n "$_iut_python" ]; then
+          echo "uv: installing tool '$_iut_tool' with Python $_iut_python"
+          "$_iut_uv_bin" tool install --python "$_iut_python" "$_iut_tool"
+        else
+          echo "uv: installing tool '$_iut_tool'"
+          "$_iut_uv_bin" tool install "$_iut_tool"
+        fi
       done < "$_iut_to_install"
 
       if [ ! -s "$_iut_to_install" ] && [ ! -s "$_iut_to_remove" ]; then

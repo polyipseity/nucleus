@@ -48,12 +48,23 @@ function Invoke-UvSetup {
   # uv tool install places binaries in ~\.local\bin by default (UV_TOOL_BIN_DIR).
   $uvBinDir = Join-Path $HOME ".local\bin"
 
+  # Per-tool Python version requirements.  Empty/null = use default.
+  $toolPythonVersion = @{
+    'paddleocr' = '3.11'
+  }
+
   # Guard: uv must be accessible after WinGet DSC has installed astral-sh.uv.
   if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     # -ErrorAction SilentlyContinue is intentional: absence of uv is an
     # expected probe condition; the if-guard checks the result immediately.
     Write-Error "Invoke-UvSetup: uv not found on PATH; ensure astral-sh.uv was installed by WinGet DSC before calling this function"
     return
+  }
+
+  # Ensure required Python versions are available before installing tools.
+  $pythonVersions = $toolPythonVersion.Values | Where-Object { $_ } | Sort-Object -Unique
+  foreach ($ver in $pythonVersions) {
+    uv python install $ver
   }
 
   # Prepend ~/.local/bin so binaries installed during this apply run are
@@ -103,8 +114,14 @@ function Invoke-UvSetup {
       continue
     }
     $installSpec = if ($packageExtras.ContainsKey($pkg)) { "$pkg$($packageExtras[$pkg])" } else { $pkg }
-    Write-Output "uv: installing tool '$installSpec'"
-    uv tool install $installSpec
+    $pythonVersion = if ($toolPythonVersion.ContainsKey($pkg)) { $toolPythonVersion[$pkg] } else { $null }
+    $pythonArg = if ($pythonVersion) { @('--python', $pythonVersion) } else { @() }
+    if ($pythonVersion) {
+      Write-Output "uv: installing tool '$installSpec' with Python $pythonVersion"
+    } else {
+      Write-Output "uv: installing tool '$installSpec'"
+    }
+    uv tool install @pythonArg $installSpec
     if ($LASTEXITCODE -ne 0) {
       Write-Error "uv: 'uv tool install $installSpec' failed (exit $LASTEXITCODE)"
       return
