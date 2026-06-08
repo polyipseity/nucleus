@@ -223,34 +223,38 @@ fi
 # ---------------------------------------------------------------------------
 printf '\n=== [7/8] Locked DSC validation ===\n'
 if ! $HAS_ARGS; then
-  _dsc_locked="src/hosts/Windows/system-locked.dsc.yml"
+  _dsc_system="src/hosts/Windows/system.dsc.yml"
   _lockfile="src/lockfiles/lockfile.json"
-
-  if [ ! -f "$_dsc_locked" ]; then
-    echo "ERROR: $_dsc_locked not found — run generate-winget-locked-dsc.sh first"
-    exit 1
-  fi
-
   _lf_errors=0
 
-  # For each winget Package resource in the locked DSC, verify the version
-  # matches the lockfile entry (if one exists).
+  # Generate locked DSC in-memory from system.dsc.yml + lockfile.
+  _locked_json=$(jq --argjson locked "$(jq -c '.winget // {}' "$_lockfile")" '
+    .properties.resources |= [
+      .[] | if .resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and ($locked[.settings.id] | length > 0) then
+        .settings.version = $locked[.settings.id]
+      else
+        .
+      end
+    ]
+  ' <(yq eval -o=j '.' "$_dsc_system"))
+
+  # For each pinned resource, verify version matches lockfile.
   while IFS=$'\t' read -r _id _pinned_ver; do
     _lf_ver=$(jq -r --arg id "$_id" '.winget[$id] // ""' "$_lockfile")
     if [ -z "$_lf_ver" ]; then
-      echo "ERROR: $_dsc_locked: $_id has version $_pinned_ver but no lockfile entry"
+      echo "ERROR: $_dsc_system: $_id has version $_pinned_ver but no lockfile entry"
       _lf_errors=$((_lf_errors + 1))
     elif [ "$_pinned_ver" != "$_lf_ver" ]; then
-      echo "ERROR: $_dsc_locked: $_id pinned $_pinned_ver but lockfile has $_lf_ver"
+      echo "ERROR: $_dsc_system: $_id pinned $_pinned_ver but lockfile has $_lf_ver"
       _lf_errors=$((_lf_errors + 1))
     fi
-  done < <(yq eval -o=j '.properties.resources[] | select(.resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and .settings.version != null) | {id: .settings.id, version: .settings.version}' "$_dsc_locked" | jq -r '[.id, .version] | @tsv')
+  done < <(echo "$_locked_json" | jq -r '.properties.resources[] | select(.resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and .settings.version != null) | [.settings.id, .settings.version] | @tsv')
 
-  # Check for winget packages in the lockfile that are NOT pinned in the locked DSC
+  # Check for lockfile entries missing version pins in generated output.
   while IFS=$'\t' read -r _id _lf_ver; do
-    _dsc_ver=$(yq eval ".properties.resources[] | select(.resource == \"Microsoft.WinGet.Client/Package\" and .settings.source == \"winget\" and .settings.id == \"$_id\") | .settings.version // \"\"" "$_dsc_locked")
-    if [ -z "$_dsc_ver" ]; then
-      echo "ERROR: $_dsc_locked: $_id ($_lf_ver) is in lockfile but missing version pin in locked DSC"
+    _pinned=$(echo "$_locked_json" | jq -r --arg id "$_id" '.properties.resources[] | select(.resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and .settings.id == $id) | .settings.version // ""')
+    if [ -z "$_pinned" ]; then
+      echo "ERROR: $_id ($_lf_ver) is in lockfile but missing version pin after generation"
       _lf_errors=$((_lf_errors + 1))
     fi
   done < <(jq -r '.winget // {} | to_entries[] | [.key, .value] | @tsv' "$_lockfile")

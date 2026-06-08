@@ -170,64 +170,68 @@ if ($exitCode -ne 0) { /* propagated below */ }
 # ---------------------------------------------------------------------------
 Write-Output "`n=== [4/5] Locked DSC validation ==="
 if (-not $HAS_ARGS) {
-  $_dscLocked = Join-Path $RepoRoot 'src\hosts\Windows\system-locked.dsc.yml'
+  $_dscSystem = Join-Path $RepoRoot 'src\hosts\Windows\system.dsc.yml'
   $_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
+  $_lfErrors = 0
 
-  if (-not (Test-Path $_dscLocked)) {
-    Write-Error "$_dscLocked not found - run generate-winget-locked-dsc.ps1 first"
-    $exitCode = 1
-  } else {
-    $_lfErrors = 0
+  # Generate locked DSC in-memory from system.dsc.yml + lockfile.
+  $_lockfileData = Get-Content $_lockfilePath -Raw | ConvertFrom-Json -AsHashtable
+  $_dscYaml = Get-Content $_dscSystem -Raw
+  $_dsc = $_dscYaml | ConvertFrom-Yaml -AsHashtable
 
-    $_lockfileData = Get-Content $_lockfilePath -Raw | ConvertFrom-Json -AsHashtable
-    $_dscYaml = Get-Content $_dscLocked -Raw
-    $_dsc = $_dscYaml | ConvertFrom-Yaml -AsHashtable
-
-    # For each winget Package resource with a version pin, verify it matches the lockfile
-    foreach ($_resource in $_dsc.properties.resources) {
-      if ($_resource.resource -eq 'Microsoft.WinGet.Client/Package' `
-          -and $_resource.settings.source -eq 'winget' `
-          -and $_resource.settings.version) {
-        $_id = $_resource.settings.id
-        $_pinnedVer = $_resource.settings.version
-        $_lfVer = if ($_lockfileData.winget.ContainsKey($_id)) { $_lockfileData.winget[$_id] } else { '' }
-
-        if ([string]::IsNullOrEmpty($_lfVer)) {
-          Write-Output "ERROR: $_dscLocked: $_id has version $_pinnedVer but no lockfile entry"
-          $_lfErrors++
-        } elseif ($_pinnedVer -ne $_lfVer) {
-          Write-Output "ERROR: $_dscLocked: $_id pinned $_pinnedVer but lockfile has $_lfVer"
-          $_lfErrors++
-        }
+  foreach ($_resource in $_dsc.properties.resources) {
+    if ($_resource.resource -eq 'Microsoft.WinGet.Client/Package' -and $_resource.settings.source -eq 'winget') {
+      $_id = $_resource.settings.id
+      if ($_lockfileData.winget.ContainsKey($_id) -and $_lockfileData.winget[$_id]) {
+        $_resource.settings.version = $_lockfileData.winget[$_id]
       }
     }
+  }
 
-    # Check for lockfile entries missing version pins in locked DSC
-    foreach ($_entry in $_lockfileData.winget.GetEnumerator()) {
-      $_id = $_entry.Key
-      $_lfVer = $_entry.Value
-      $_foundPin = $false
-      foreach ($_resource in $_dsc.properties.resources) {
-        if ($_resource.resource -eq 'Microsoft.WinGet.Client/Package' `
-            -and $_resource.settings.source -eq 'winget' `
-            -and $_resource.settings.id -eq $_id `
-            -and $_resource.settings.version) {
-          $_foundPin = $true
-          break
-        }
-      }
-      if (-not $_foundPin) {
-        Write-Output "ERROR: $_dscLocked: $_id ($_lfVer) is in lockfile but missing version pin in locked DSC"
+  # Validate generated pins match lockfile entries.
+  foreach ($_resource in $_dsc.properties.resources) {
+    if ($_resource.resource -eq 'Microsoft.WinGet.Client/Package' `
+        -and $_resource.settings.source -eq 'winget' `
+        -and $_resource.settings.version) {
+      $_id = $_resource.settings.id
+      $_pinnedVer = $_resource.settings.version
+      $_lfVer = if ($_lockfileData.winget.ContainsKey($_id)) { $_lockfileData.winget[$_id] } else { '' }
+
+      if ([string]::IsNullOrEmpty($_lfVer)) {
+        Write-Output "ERROR: $_dscSystem: $_id has version $_pinnedVer but no lockfile entry"
+        $_lfErrors++
+      } elseif ($_pinnedVer -ne $_lfVer) {
+        Write-Output "ERROR: $_dscSystem: $_id pinned $_pinnedVer but lockfile has $_lfVer"
         $_lfErrors++
       }
     }
+  }
 
-    if ($_lfErrors -gt 0) {
-      Write-Output "ERROR: locked DSC validation failed with $_lfErrors error(s)"
-      $exitCode = 1
-    } else {
-      Write-Output 'Locked DSC validation passed'
+  # Check for lockfile entries missing version pins in generated output.
+  foreach ($_entry in $_lockfileData.winget.GetEnumerator()) {
+    $_id = $_entry.Key
+    $_lfVer = $_entry.Value
+    $_foundPin = $false
+    foreach ($_resource in $_dsc.properties.resources) {
+      if ($_resource.resource -eq 'Microsoft.WinGet.Client/Package' `
+          -and $_resource.settings.source -eq 'winget' `
+          -and $_resource.settings.id -eq $_id `
+          -and $_resource.settings.version) {
+        $_foundPin = $true
+        break
+      }
     }
+    if (-not $_foundPin) {
+      Write-Output "ERROR: $_id ($_lfVer) is in lockfile but missing version pin after generation"
+      $_lfErrors++
+    }
+  }
+
+  if ($_lfErrors -gt 0) {
+    Write-Output "ERROR: locked DSC validation failed with $_lfErrors error(s)"
+    $exitCode = 1
+  } else {
+    Write-Output 'Locked DSC validation passed'
   }
 } else {
   Write-Output 'Skipping locked DSC validation (path-scoped mode).'
