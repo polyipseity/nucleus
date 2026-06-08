@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Nucleus Lockfile",
+  "description": "Pinned versions for all package managers used across nucleus hosts.",
+  "type": "object",
+  "required": ["version", "updated", "scoop", "cargo-binstall", "bun", "uv", "rustup", "winget", "vscode", "pwsh", "ollama"],
+  "properties": {
+    "version": {
+      "description": "Lockfile schema version (monotonically increasing integer).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "updated": {
+      "description": "Last update timestamp in ISO-8601 format.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "scoop": {
+      "description": "Scoop package versions. Package name → version string.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "cargo-binstall": {
+      "description": "cargo-binstall crate versions. Crate name → version string.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "bun": {
+      "description": "Bun-installed global package versions. Package name → version string.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "uv": {
+      "description": "uv (pip) tool versions. Tool name → version string.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "rustup": {
+      "description": "Rustup toolchain versions. Channel name → date string.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "winget": {
+      "description": "WinGet package identifiers and versions. Package ID → version string.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "vscode": {
+      "description": "VS Code extension versions. Extension ID → version string.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "pwsh": {
+      "description": "PowerShell module versions. Module name → version string.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "ollama": {
+      "description": "Ollama model pins per host. Host name → array of model specs.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["name", "tag"],
+          "properties": {
+            "name": { "type": "string" },
+            "tag": { "type": "string" },
+            "digest": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
