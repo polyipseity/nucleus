@@ -75,7 +75,7 @@ fi
 # ---------------------------------------------------------------------------
 # 1. Dead Nix code detection
 # ---------------------------------------------------------------------------
-printf '\n=== [1/5] Dead Nix code ===\n'
+printf '\n=== [1/6] Dead Nix code ===\n'
 if ! $HAS_ARGS; then
   deadnix --fail src/
   echo "No dead Nix code found."
@@ -86,7 +86,7 @@ fi
 # ---------------------------------------------------------------------------
 # 2. Shell script linting (shellcheck)
 # ---------------------------------------------------------------------------
-printf '\n=== [2/5] Shell script linting ===\n'
+printf '\n=== [2/6] Shell script linting ===\n'
 if [ "${#SH_FILES[@]}" -gt 0 ]; then
   bash scripts/check-sh.sh "${SH_FILES[@]}"
 elif ! $HAS_ARGS; then
@@ -98,7 +98,7 @@ fi
 # ---------------------------------------------------------------------------
 # 3. PowerShell syntax validation
 # ---------------------------------------------------------------------------
-printf '\n=== [3/5] PowerShell syntax validation ===\n'
+printf '\n=== [3/6] PowerShell syntax validation ===\n'
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 "${PS1_FILES[@]}"
 elif ! $HAS_ARGS; then
@@ -110,7 +110,7 @@ fi
 # ---------------------------------------------------------------------------
 # 4. Packer template validation
 # ---------------------------------------------------------------------------
-printf '\n=== [4/5] Packer template validation ===\n'
+printf '\n=== [4/6] Packer template validation ===\n'
 if [ "${#PKR_FILES[@]}" -gt 0 ]; then
   bash scripts/check-packer.sh "${PKR_FILES[@]}"
 elif ! $HAS_ARGS; then
@@ -122,11 +122,44 @@ fi
 # ---------------------------------------------------------------------------
 # 5. Shell script validation tests
 # ---------------------------------------------------------------------------
-printf '\n=== [5/5] Shell script validation tests ===\n'
+printf '\n=== [5/6] Shell script validation tests ===\n'
 if ! $HAS_ARGS; then
   bash tests/scripts/script-validation-tests.sh
 else
   echo "Skipping validation tests (path-scoped mode)."
+fi
+
+# ---------------------------------------------------------------------------
+# 6. Package manager usage enforcement
+# ---------------------------------------------------------------------------
+printf '\n=== [6/6] Package manager usage enforcement ===\n'
+# Ban bare `pip install` and `npm install` — these bypass the lockfile and
+# produce non-reproducible environments.  `uv pip install` is allowed (uv
+# respects the lockfile).  Exclude self-references and help-text mentions.
+if ! $HAS_ARGS; then
+  _violations=0
+  if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
+       --exclude='check.sh' --exclude='check.ps1' \
+       -E '(^|[^a-z])pip install([^-]|$)' \
+       scripts/ src/ tests/ 2>/dev/null \
+       | grep -v 'uv pip install' \
+       | grep . >/dev/null 2>&1; then
+    echo "ERROR: bare pip install detected (use uv pip install instead)"
+    _violations=$((_violations + 1))
+  fi
+  if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
+       -E '(^|[^a-z])npm install([^-]|$)' \
+       scripts/ src/ tests/ 2>/dev/null \
+       | grep . >/dev/null 2>&1; then
+    echo "ERROR: bare npm install detected (use bun or nix instead)"
+    _violations=$((_violations + 1))
+  fi
+  if [ "$_violations" -gt 0 ]; then
+    exit 1
+  fi
+  echo "No package manager violations found."
+else
+  echo "Skipping (path-scoped mode)."
 fi
 
 printf '\nAll checks passed.\n'

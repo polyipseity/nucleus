@@ -48,7 +48,7 @@ if ($HAS_ARGS) {
 # ---------------------------------------------------------------------------
 # 1. PowerShell syntax validation
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [1/2] PowerShell syntax validation ==="
+Write-Output "`n=== [1/3] PowerShell syntax validation ==="
 if ($PS1_FILES.Count -gt 0) {
   & "$RepoRoot\scripts\check-pwsh.ps1" $PS1_FILES
 } elseif (-not $HAS_ARGS) {
@@ -61,7 +61,7 @@ if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 # ---------------------------------------------------------------------------
 # 2. Packer template validation
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [2/2] Packer template validation ==="
+Write-Output "`n=== [2/3] Packer template validation ==="
 if ($PKR_FILES.Count -gt 0) {
   & "$RepoRoot\scripts\check-packer.ps1" $PKR_FILES
 } elseif (-not $HAS_ARGS) {
@@ -70,6 +70,43 @@ if ($PKR_FILES.Count -gt 0) {
   Write-Output "Skipping (no Packer templates to check)."
 }
 if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
+
+# ---------------------------------------------------------------------------
+# 3. Package manager usage enforcement
+# ---------------------------------------------------------------------------
+Write-Output "`n=== [3/3] Package manager usage enforcement ==="
+if (-not $HAS_ARGS) {
+  $_violations = 0
+  # Ban bare pip install and npm install — these bypass the lockfile.
+  # uv pip install is allowed.  Exclude self-references.
+  $_pipViolations = Select-String -Path @(
+    Get-ChildItem -Recurse -Path "$RepoRoot\scripts","$RepoRoot\src","$RepoRoot\tests" `
+      -Include *.sh,*.ps1,*.nix `
+      -Exclude check.sh,check.ps1 `
+      | ForEach-Object { $_.FullName }
+    ) -Pattern '(^|[^a-z])pip install([^-]|$)' `
+    | Where-Object { $_.Line -notmatch 'uv pip install' }
+  if ($_pipViolations) {
+    Write-Output "ERROR: bare pip install detected (use uv pip install instead)"
+    $_violations++
+  }
+  $_npmViolations = Select-String -Path @(
+    Get-ChildItem -Recurse -Path "$RepoRoot\scripts","$RepoRoot\src","$RepoRoot\tests" `
+      -Include *.sh,*.ps1,*.nix `
+      | ForEach-Object { $_.FullName }
+    ) -Pattern '(^|[^a-z])npm install([^-]|$)'
+  if ($_npmViolations) {
+    Write-Output "ERROR: bare npm install detected (use bun or nix instead)"
+    $_violations++
+  }
+  if ($_violations -gt 0) {
+    $exitCode = $_violations
+  } else {
+    Write-Output "No package manager violations found."
+  }
+} else {
+  Write-Output "Skipping (path-scoped mode)."
+}
 
 if ($exitCode -ne 0) {
   Write-Output "`nSome checks failed with exit code $exitCode."
