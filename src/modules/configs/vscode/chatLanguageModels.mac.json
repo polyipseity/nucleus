@@ -1,5 +1,6 @@
 [
 	{
+		"apiType": "chat-completions",
 		"models": [
 			{
 				"id": "ollama_chat/devstral-small-2:24b",
@@ -84,6 +85,6 @@
 			}
 		],
 		"name": "LiteLLM",
-		"vendor": "customoai"
+		"vendor": "customendpoint"
 	}
 ]

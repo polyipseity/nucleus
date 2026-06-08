@@ -1,5 +1,6 @@
 [
 	{
+		"apiType": "chat-completions",
 		"models": [
 			{
 				"id": "ollama_chat/qwen2.5:1.5b",
@@ -75,6 +76,6 @@
 			}
 		],
 		"name": "LiteLLM",
-		"vendor": "customoai"
+		"vendor": "customendpoint"
 	}
 ]
