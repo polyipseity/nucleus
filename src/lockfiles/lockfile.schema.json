@@ -1,75 +1,179 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
-  "title": "Nucleus Lockfile",
+  "definitions": {
+    "versionOrHash": {
+      "description": "A version string or a VCS hash pin with source URL and optional fallback version.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "rev": {
+              "description": "VCS commit hash (git rev, etc.)",
+              "type": "string"
+            },
+            "source": {
+              "description": "VCS repository URL",
+              "format": "uri",
+              "type": "string"
+            },
+            "version": {
+              "description": "Optional fallback version when rev is unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "rev",
+            "source"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
   "description": "Pinned versions for all package managers used across nucleus hosts.",
-  "type": "object",
-  "required": ["version", "updated", "scoop", "cargo-binstall", "bun", "uv", "rustup", "winget", "vscode", "pwsh", "ollama"],
   "properties": {
-    "version": {
-      "description": "Lockfile schema version (monotonically increasing integer).",
-      "type": "integer",
-      "minimum": 1
+    "bun": {
+      "additionalProperties": {
+        "$ref": "#/definitions/versionOrHash"
+      },
+      "description": "Bun-installed global package versions. Package name → version string or VCS hash pin.",
+      "type": "object"
+    },
+    "cargo-binstall": {
+      "additionalProperties": {
+        "$ref": "#/definitions/versionOrHash"
+      },
+      "description": "cargo-binstall crate versions. Crate name → version string or VCS hash pin.",
+      "type": "object"
+    },
+    "ollama": {
+      "additionalProperties": {
+        "items": {
+          "properties": {
+            "digest": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "tag"
+          ],
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "description": "Ollama model pins per host. Host name → array of model specs.",
+      "type": "object"
+    },
+    "pwsh": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "PowerShell module versions. Module name → version string.",
+      "type": "object"
+    },
+    "rustup": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Rustup toolchain versions. Channel name → date string.",
+      "type": "object"
+    },
+    "scoop": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Scoop package versions. Package name → version string.",
+      "type": "object"
     },
     "updated": {
       "description": "Last update timestamp in ISO-8601 format.",
-      "type": "string",
-      "format": "date-time"
-    },
-    "scoop": {
-      "description": "Scoop package versions. Package name → version string.",
-      "type": "object",
-      "additionalProperties": { "type": "string" }
-    },
-    "cargo-binstall": {
-      "description": "cargo-binstall crate versions. Crate name → version string.",
-      "type": "object",
-      "additionalProperties": { "type": "string" }
-    },
-    "bun": {
-      "description": "Bun-installed global package versions. Package name → version string.",
-      "type": "object",
-      "additionalProperties": { "type": "string" }
+      "format": "date-time",
+      "type": "string"
     },
     "uv": {
-      "description": "uv (pip) tool versions. Tool name → version string.",
-      "type": "object",
-      "additionalProperties": { "type": "string" }
+      "additionalProperties": {
+        "$ref": "#/definitions/versionOrHash"
+      },
+      "description": "uv (pip) tool versions. Tool name → version string or VCS hash pin.",
+      "type": "object"
     },
-    "rustup": {
-      "description": "Rustup toolchain versions. Channel name → date string.",
-      "type": "object",
-      "additionalProperties": { "type": "string" }
-    },
-    "winget": {
-      "description": "WinGet package identifiers and versions. Package ID → version string.",
-      "type": "object",
-      "additionalProperties": { "type": "string" }
+    "version": {
+      "description": "Lockfile schema version (monotonically increasing integer).",
+      "minimum": 1,
+      "type": "integer"
     },
     "vscode": {
-      "description": "VS Code extension versions. Extension ID → version string.",
-      "type": "object",
-      "additionalProperties": { "type": "string" }
-    },
-    "pwsh": {
-      "description": "PowerShell module versions. Module name → version string.",
-      "type": "object",
-      "additionalProperties": { "type": "string" }
-    },
-    "ollama": {
-      "description": "Ollama model pins per host. Host name → array of model specs.",
-      "type": "object",
       "additionalProperties": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "required": ["name", "tag"],
-          "properties": {
-            "name": { "type": "string" },
-            "tag": { "type": "string" },
-            "digest": { "type": "string" }
-          }
+        "type": "string"
+      },
+      "description": "VS Code extension versions. Extension ID → version string.",
+      "type": "object"
+    },
+    "winget": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "WinGet package identifiers and versions. Package ID → version string.",
+      "type": "object"
+    },
+    "homebrew": {
+      "additionalProperties": false,
+      "description": "Homebrew formula, cask, and Mac App Store version pins for macOS.",
+      "properties": {
+        "brews": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Homebrew formula versions. Formula name → version string.",
+          "type": "object"
+        },
+        "casks": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Homebrew cask versions. Cask name → version string.",
+          "type": "object"
+        },
+        "masApps": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Mac App Store app identifiers. App name → App Store ID string.",
+          "type": "object"
         }
-      }
+      },
+      "required": [
+        "brews",
+        "casks",
+        "masApps"
+      ],
+      "type": "object"
     }
-  }
+  },
+  "required": [
+    "version",
+    "updated",
+    "scoop",
+    "cargo-binstall",
+    "bun",
+    "uv",
+    "rustup",
+    "winget",
+    "vscode",
+    "pwsh",
+    "homebrew",
+    "ollama"
+  ],
+  "title": "Nucleus Lockfile",
+  "type": "object"
 }
