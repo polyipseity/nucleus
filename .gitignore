@@ -341,8 +341,5 @@ __marimo__/
 
 # self {
 !/src/modules/lib/
-# }
-
-# Generated artifacts {
-src/hosts/Windows/system-locked.dsc.yml
+/src/hosts/Windows/system-locked.dsc.yml
 # }
