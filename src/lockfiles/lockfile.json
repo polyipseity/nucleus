@@ -1,7 +1,7 @@
 {
   "$schema": "lockfile.schema.json",
   "version": 2,
-  "updated": "2026-06-09T00:00:00Z",
+  "updated": "2026-06-08T09:23:58Z",
   "scoop": {
     "cargo-binstall": "1.10.0",
     "gopass": "1.15.0",
@@ -24,32 +24,62 @@
     "stable": "2024-12-01"
   },
   "winget": {
-    "7zip.7zip": "25.01",
-    "aelassas.Servy": "7.7",
+    "7zip.7zip": "26.01",
+    "aelassas.Servy": "8.4",
     "ajeetdsouza.zoxide": "0.9.9",
-    "astral-sh.ruff": "0.11.10",
-    "astral-sh.ty": "0.0.42",
-    "astral-sh.uv": "0.9.30",
+    "astral-sh.ruff": "0.15.16",
+    "astral-sh.ty": "0.0.44",
+    "astral-sh.uv": "0.11.19",
     "BlenderFoundation.Blender": "5.1.2",
     "BurntSushi.ripgrep": "15.1.0",
     "CaddyServer.Caddy": "2.11.4",
-    "Clement.bottom": "0.12.0",
+    "Clement.bottom": "0.12.3",
     "DEVCOM.JetBrainsMonoNerdFont": "3.3.0",
-    "direnv.direnv": "2.37.0",
-    "Discord.Discord.Canary": "1.0.55",
+    "direnv.direnv": "2.37.1",
+    "Discord.Discord.Canary": "1.0.982",
     "eza-community.eza": "0.23.4",
     "GIMP.GIMP": "3.2.4",
-    "Git.Git": "2.50.0",
-    "GitHub.cli": "2.43.1",
+    "Git.Git": "2.54.0",
+    "GitHub.cli": "2.93.0",
     "GnuPG.Gpg4win": "5.0.2",
     "Google.Chrome": "149.0.7827.54",
     "Google.Chrome.Canary": "151.0.7878.0",
     "Google.ChromeRemoteDesktopHost": "149.0.7827.18",
     "Gyan.FFmpeg": "8.1.1",
     "HashiCorp.Packer": "1.15.4",
-    "IJHack.QtPass": "1.4.0",
-    "ImageMagick.ImageMagick": "7.1.2.16",
-    "j178.Prek": "0.4.0"
+    "IJHack.QtPass": "1.7.0",
+    "ImageMagick.ImageMagick": "7.1.2.25",
+    "j178.Prek": "0.4.4",
+    "jqlang.jq": "1.8.1",
+    "Jellyfin.Server": "10.11.11",
+    "junegunn.fzf": "0.73.1",
+    "KDE.Krita": "5.3.2.1",
+    "LLVM.LLVM": "22.1.6",
+    "Microsoft.DotNet.Runtime.6": "6.0.36",
+    "Microsoft.PowerShell": "7.6.2.0",
+    "Microsoft.PowerToys": "0.99.1",
+    "Microsoft.VisualStudioCode": "1.123.0",
+    "Microsoft.VisualStudioCode.Insiders": "1.124.0",
+    "Microsoft.WindowsTerminal.Preview": "1.25.1322.0",
+    "MusicBrainz.Picard": "2.13.3",
+    "Neovim.Neovim": "0.12.2",
+    "Obsidian.Obsidian": "1.12.7",
+    "Ollama.Ollama": "0.30.6",
+    "Oven-sh.Bun": "1.3.14",
+    "Parsec.Parsec": "150.101.0.0",
+    "Rclone.Rclone": "1.74.3",
+    "Rustlang.Rustup": "1.29.0",
+    "SecretsOPerationS.SOPS": "3.12.2",
+    "sharkdp.bat": "0.26.1",
+    "sharkdp.fd": "10.4.2",
+    "SST.opencode": "1.16.2",
+    "Valve.Steam": "2.10.91.91",
+    "Telegram.TelegramDesktop.Beta": "4.6.4",
+    "TheDocumentFoundation.LibreOffice": "26.2.3.2",
+    "Typst.Typst": "0.14.2",
+    "VideoLAN.VLC": "3.0.23",
+    "WinFsp.WinFsp": "2.1.25156",
+    "Zoom.Zoom": "7.0.38856"
   },
   "vscode": {
     "arrterian.nix-env-selector": "1.2.0",
@@ -171,17 +201,45 @@
   },
   "ollama": {
     "MacBook": [
-      { "name": "devstral-small-2", "tag": "24b", "digest": "sha256:24277f07f62db8f9cb68e9dfc679ea1818a7fbac47a50eff0a701d3f645b63c8" },
-      { "name": "magistral", "tag": "24b", "digest": "sha256:27bcbbf6d32417d3a8a12d5eb9bd55fda6e5591807e2b02aaaf4423899925afc" },
-      { "name": "qwen2.5", "tag": "1.5b", "digest": "sha256:65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b" }
+      {
+        "name": "devstral-small-2",
+        "tag": "24b",
+        "digest": "sha256:24277f07f62db8f9cb68e9dfc679ea1818a7fbac47a50eff0a701d3f645b63c8"
+      },
+      {
+        "name": "magistral",
+        "tag": "24b",
+        "digest": "sha256:27bcbbf6d32417d3a8a12d5eb9bd55fda6e5591807e2b02aaaf4423899925afc"
+      },
+      {
+        "name": "qwen2.5",
+        "tag": "1.5b",
+        "digest": "sha256:65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b"
+      }
     ],
     "NixOS": [
-      { "name": "qwen2.5", "tag": "1.5b", "digest": "sha256:65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b" },
-      { "name": "qwen3", "tag": "8b", "digest": "sha256:500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41" }
+      {
+        "name": "qwen2.5",
+        "tag": "1.5b",
+        "digest": "sha256:65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b"
+      },
+      {
+        "name": "qwen3",
+        "tag": "8b",
+        "digest": "sha256:500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41"
+      }
     ],
     "Windows": [
-      { "name": "qwen2.5", "tag": "1.5b", "digest": "sha256:65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b" },
-      { "name": "qwen3", "tag": "8b", "digest": "sha256:500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41" }
+      {
+        "name": "qwen2.5",
+        "tag": "1.5b",
+        "digest": "sha256:65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b"
+      },
+      {
+        "name": "qwen3",
+        "tag": "8b",
+        "digest": "sha256:500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41"
+      }
     ]
   }
 }
