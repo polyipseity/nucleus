@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "updated": "2025-01-01T00:00:00Z",
+  "scoop": {
+    "cargo-binstall": "1.10.0",
+    "gopass": "1.15.0",
+    "qemu": "9.0.0"
+  },
+  "cargo-binstall": {
+    "cargo-cache": "1.0.0",
+    "nickel-lang-lsp": "1.0.0",
+    "pay-respects": "1.0.0"
+  },
+  "bun": {
+    "@mariozechner/pi-coding-agent": "1.0.0",
+    "clawhub": "1.0.0"
+  },
+  "uv": {
+    "paddleocr": "2.8.0",
+    "litellm": "1.50.0"
+  },
+  "rustup": {
+    "stable": "2024-12-01"
+  },
+  "vscode": {},
+  "ollama": {
+    "MacBook": [
+      { "name": "devstral-small-2", "tag": "24b" },
+      { "name": "magistral", "tag": "24b" },
+      { "name": "qwen2.5", "tag": "1.5b" }
+    ],
+    "NixOS": [
+      { "name": "qwen2.5", "tag": "1.5b" },
+      { "name": "qwen3", "tag": "8b" }
+    ],
+    "Windows": [
+      { "name": "qwen2.5", "tag": "1.5b" },
+      { "name": "qwen3", "tag": "8b" }
+    ]
+  }
+}
