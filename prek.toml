@@ -51,7 +51,7 @@ hooks = [
 
 [[repos]]
 repo = "https://github.com/python-jsonschema/check-jsonschema.git"
-rev = "4cec9aea9b0dd197127811e7d29bd48d761a9370"
+rev = "566da04e213ef56343b4c1eb5a303da9cf1c0a8d"
 hooks = [{ id = "check-dependabot" }, { id = "check-github-workflows" }]
 
 [[repos]]

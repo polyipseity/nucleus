@@ -44,7 +44,6 @@
   `nucleus-replica-sync`, `nucleus-update`, `nucleus-vm-setup`.
 - Known upstream caveat: `builtins.derivation`/`options.json` contextless-source warning is upstream,
   not a local regression unless concrete local breakage is shown.
-- Treat Dependabot `package-ecosystem: "nix"` as valid even when `check-dependabot` lags schema support.
 
 ## Testing
 
