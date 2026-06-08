@@ -480,7 +480,12 @@ in
     if [ -x "$_pwsh" ] && [ -n "${pwshAnalyzerVersion}" ]; then
       "$_pwsh" -NoProfile -Command "
         \$requiredVersion = '${pwshAnalyzerVersion}'
-        if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+        \$installed = Get-Module -ListAvailable -Name PSScriptAnalyzer | Select-Object -First 1
+        if (-not \$installed -or \$installed.Version -ne [Version]\$requiredVersion) {
+          if (\$installed) {
+            Write-Host 'installPwshScriptAnalyzer: removing PSScriptAnalyzer version '\$(\$installed.Version)'...' -ForegroundColor Yellow
+            Uninstall-Module -Name PSScriptAnalyzer -AllVersions -Force
+          }
           Write-Host 'installPwshScriptAnalyzer: installing PSScriptAnalyzer version \$requiredVersion...' -ForegroundColor Cyan
           Install-Module -Name PSScriptAnalyzer -RequiredVersion \$requiredVersion -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
         }
