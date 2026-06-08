@@ -20,10 +20,10 @@ let
   cfg = config.nucleus.agentHostShell;
 
   # Resolve the shell binary that the wrapper will exec.
-  # Home Manager sets config.home.shell when programs.zsh.enable or similar
-  # options are set; fall back to pkgs.zsh as a reasonable default.
-  realShell = if config.home.shell or null != null then config.home.shell else pkgs.zsh;
-  realShellExe = lib.getExe realShell;
+  # programs.zsh.enable is always set (shell.nix), so pkgs.zsh is the
+  # canonical shell. Use it directly rather than config.home.shell, which
+  # may resolve to a non-coercible set in certain Home Manager versions.
+  realShellExe = lib.getExe pkgs.zsh;
 
   # Thin wrapper: export agent detection vars, then exec real shell.
   wrapperPkg = pkgs.writeShellScript "agent-host-wrapper.sh" ''
