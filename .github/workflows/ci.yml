@@ -81,6 +81,51 @@ jobs:
         if: runner.os != 'Windows'
         run: cd src && nix flake check
 
+      - name: Validate lockfile
+        shell: bash
+        run: |
+          python3 << 'PYEOF'
+          import json, sys
+
+          with open('src/lockfiles/lockfile.json') as f:
+              lf = json.load(f)
+
+          errors = []
+
+          # Check all version fields for non-empty, non-placeholder values
+          for section in ('scoop', 'cargo-binstall', 'bun', 'uv', 'rustup', 'pwsh'):
+              if section not in lf or not lf[section]:
+                  errors.append(f'{section}: empty or missing')
+              else:
+                  for pkg, ver in lf[section].items():
+                      if not ver or ver == '1.0.0':
+                          errors.append(f'{section}.{pkg}: placeholder version ({ver})')
+
+          # winget and vscode may be empty (not yet populated), but warn if absent
+          if 'winget' not in lf:
+              errors.append('winget: missing section')
+          if 'vscode' not in lf:
+              errors.append('vscode: missing section')
+
+          # ollama must exist with at least one profile
+          if 'ollama' not in lf or not lf['ollama']:
+              errors.append('ollama: empty or missing')
+          else:
+              for profile, models in lf['ollama'].items():
+                  if not models:
+                      errors.append(f'ollama.{profile}: empty model list')
+                  for i, m in enumerate(models):
+                      if not m.get('name') or not m.get('tag'):
+                          errors.append(f'ollama.{profile}[{i}]: missing name or tag')
+
+          if errors:
+              for e in errors:
+                  print(f'ERROR: {e}', file=sys.stderr)
+              sys.exit(1)
+
+          print('lockfile.json validation passed')
+          PYEOF
+
       - name: Run repository checks (POSIX)
         if: runner.os != 'Windows'
         env:
