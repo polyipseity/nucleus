@@ -299,6 +299,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AISync.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-ReplicaSync.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-VMSetup.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AgentHostShellSetup.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "ConvertFrom-WingetLockfileToDsc.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-CaddyLocalCA.ps1")
@@ -642,6 +643,7 @@ if ($EnableHostAgeKeyRegistration) {
 }
 Sync-WindowsRDP -Enabled:$EnableRdpParity
 Sync-PowerPolicy -Enabled:$EnablePowerParity
+Invoke-AgentHostShellSetup
 
 # Health check: verify archiving ecosystem (7-Zip CLI + app) is functional post-apply.
 Test-ArchivingStack | Out-Null

@@ -144,6 +144,7 @@ in
   };
 
   imports = [
+    ./agent-host-shell.nix
     ./agents.nix
     ./ai
     ./cloud-drives.nix

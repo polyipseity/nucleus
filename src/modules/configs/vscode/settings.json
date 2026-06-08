@@ -230,27 +230,6 @@
   "telemetry.editStats.enabled": false,
   "telemetry.feedback.enabled": false,
   "telemetry.telemetryLevel": "off",
-  "terminal.integrated.automationProfile.linux": {
-    "env": {
-      "NUCLEUS_AGENT_SESSION": "1",
-      "VSCODE_AGENT": "1"
-    },
-    "path": "bash"
-  },
-  "terminal.integrated.automationProfile.osx": {
-    "env": {
-      "NUCLEUS_AGENT_SESSION": "1",
-      "VSCODE_AGENT": "1"
-    },
-    "path": "zsh"
-  },
-  "terminal.integrated.automationProfile.windows": {
-    "env": {
-      "NUCLEUS_AGENT_SESSION": "1",
-      "VSCODE_AGENT": "1"
-    },
-    "path": "pwsh.exe"
-  },
   "terminal.integrated.enableMultiLinePasteWarning": "never",
   "terminal.integrated.fontSize": 14,
   "terminal.integrated.initialHintCopilotCli": true,

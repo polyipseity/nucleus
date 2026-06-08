@@ -14,6 +14,7 @@ let
   # List of all shared modules under src/modules/ that should be importable.
   # If any import fails, evaluation will throw an error (causing CI to fail).
   moduleImportTests = [
+    "agent-host-shell"
     "cloud-drives"
     "core"
     "dev-repos"
@@ -43,6 +44,7 @@ let
       # Intentionally not directly importing here to avoid circular dependencies.
       # Instead, we just verify the module name is recognized.
       knownModules = {
+        "agent-host-shell" = true;
         "cloud-drives" = true;
         "core" = true;
         "dev-repos" = true;
