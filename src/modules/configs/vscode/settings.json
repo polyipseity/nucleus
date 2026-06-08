@@ -232,6 +232,15 @@
   "telemetry.editStats.enabled": false,
   "telemetry.feedback.enabled": false,
   "telemetry.telemetryLevel": "off",
+  "terminal.integrated.agentHostProfile.linux": {
+    "path": "${userHome}/.local/bin/nucleus-agent-host-wrapper.sh"
+  },
+  "terminal.integrated.agentHostProfile.osx": {
+    "path": "${userHome}/.local/bin/nucleus-agent-host-wrapper.sh"
+  },
+  "terminal.integrated.agentHostProfile.windows": {
+    "path": "${userHome}\\.local\\bin\\nucleus-agent-host-wrapper.cmd"
+  },
   "terminal.integrated.enableMultiLinePasteWarning": "never",
   "terminal.integrated.fontSize": 14,
   "terminal.integrated.initialHintCopilotCli": true,
