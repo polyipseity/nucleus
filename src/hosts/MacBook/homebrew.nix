@@ -100,9 +100,9 @@ in
   homebrew = {
     enable = true;
 
-    onActivation.autoUpdate = true; # refresh Homebrew itself before bundling
+    onActivation.autoUpdate = false; # pin installed versions (managed via Brewfile.lock.json)
     onActivation.cleanup = "zap"; # remove unlisted formulae/casks and their data
-    onActivation.upgrade = true; # upgrade outdated formulae/casks automatically
+    onActivation.upgrade = false; # pin installed versions (managed via Brewfile.lock.json)
 
     # WHY --force: newer brew-bundle (Homebrew 4.x) requires --force when
     # --cleanup would uninstall packages unattended; activation runs under
