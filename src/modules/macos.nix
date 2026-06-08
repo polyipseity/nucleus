@@ -457,8 +457,6 @@ let
     "checkFilesChanged"
     "checkLinkTargets"
     "relaunchDesktopServices"
-    "cloudDrivesICloudRefresh"
-    "cloudDrivesSetup"
     "configureDisplayResolutions"
     "configureFinderSidebar"
     "configureICloudExclusions"

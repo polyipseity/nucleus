@@ -207,7 +207,19 @@ lib.mkIf pkgs.stdenv.isLinux {
     # Shared activation entries from src/modules/lib/activation-dag.nix;
     # keep Linux-specific entries below.
     displayHostManualInstructions = lib.hm.dag.entryAfter (
-      (import ./lib/activation-dag.nix) ++ [ "buildNixIndex" ]
+      (import ./lib/activation-dag.nix)
+      ++ [
+        "buildNixIndex"
+        "checkFilesChanged"
+        "checkLinkTargets"
+        "initRustup"
+        "installCargoBinstallPackages"
+        "installPackages"
+        "linkGeneration"
+        "onFilesChange"
+        "sops-nix"
+        "writeBoundary"
+      ]
     ) displayHostManualInstructionsBody;
   };
 

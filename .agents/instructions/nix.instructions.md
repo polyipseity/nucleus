@@ -177,20 +177,25 @@ Validation expectation after any pmset change:
 
 ## Home Manager activation DAG invariants
 
-- Both POSIX hosts must keep `home.activation.displayHostManualInstructions`
-  as the **terminal node** of the Home Manager activation DAG, so operators
-  always see one consolidated manual checklist after every automated step.
+- `home.activation.displayHostManualInstructions` MUST remain the **terminal
+  node** of the Home Manager activation DAG on every POSIX host. Nothing
+  — no activation entry, no post-apply task — may execute after it.
   - macOS: defined in `src/modules/macos.nix` via `displayHostManualInstructionDeps`.
   - NixOS/Linux: defined in `src/modules/linux.nix` via its `entryAfter` list.
-- The dependency list must cover **all** activation entries across **all**
-  modules that run on that host — not just entries in the same file. When a
-  shared module (e.g. `secrets.nix`, `wallpapers.nix`) adds a new
-  `home.activation` entry that will run on both POSIX hosts, add that name to
-  the deps in **both** `macos.nix` and `linux.nix` in the same change.
-- Keep `displayHostManualInstructionDeps` (macOS) and the `entryAfter` list
-  (Linux) alphabetically sorted.
+  - Windows: mirror this by keeping manual-display code after all post-apply
+    best-effort tasks in `src/hosts/Windows/apply.ps1`.
+- **Whenever you add a new `home.activation.<name>` entry** (in any module,
+  shared or host-specific), add `<name>` to the display-host-manual-instructions
+  dependency list on **every host that will run it** in the same change. Missing
+  a host creates a silent ordering gap — the DAG has no edge, so topological
+  sort can place the new entry after manual instructions.
+- Shared activation entries (defined in `src/modules/*.nix` and used by both
+  macOS and Linux) belong in `src/modules/lib/activation-dag.nix` so both
+  hosts inherit them automatically. Host-specific entries go in the per-host
+  `++` list in `macos.nix` or `linux.nix`.
+- Keep the dep lists alphabetically sorted for easy diff review.
 - If a feature needs a one-time manual step that cannot be safely automated,
-  update the host manual Markdown file (`src/hosts/MacBook/MANUAL.md`,
+  update the host manual file (`src/hosts/MacBook/MANUAL.md`,
   `src/hosts/NixOS/MANUAL.md`, and/or `src/hosts/Windows/MANUAL.md`) in the
   same change so activation output remains a complete checklist.
 

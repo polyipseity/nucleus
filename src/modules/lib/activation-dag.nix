@@ -13,9 +13,14 @@
 #     "hostSpecificEntry"
 #   ];
 [
+  "agentHostShellConfig"
   "agentsSkills"
   "agentsSymlink"
+  "cloudDrivesSetup"
   "configureObsidianSettings"
+  "configurePicardSettings"
+  "configureQtPassSettings"
+  "devReposProvision"
   "ensureCustomProvisionSymlinkTargets"
   "finalizeCustomProvisionSymlinks"
   "gitIdentityFromSops"
@@ -24,6 +29,7 @@
   "installBunPackages"
   "installPwshScriptAnalyzer"
   "installUvTools"
+  "installZshCompletions"
   "prepareCustomProvisionSymlinks"
   "provisionDevDirectory"
   "sshKeyAdopt"
