@@ -89,18 +89,34 @@ function Invoke-UvSetup {
   # managed state). Parse only "name vX.Y.Z" lines so separators/headers
   # cannot become uninstall candidates.
   $uvListOutput = @(uv tool list 2>&1 | Where-Object { $_ -match '^[A-Za-z0-9][A-Za-z0-9._-]*\s+v\d' })
-  $installedTools = @($uvListOutput | ForEach-Object { ($_ -split '\s+')[0] })
+  $installedVersions = @{}
+  $installedTools = @($uvListOutput | ForEach-Object {
+    $parts = $_ -split '\s+'
+    $version = $parts[1]
+    if ($version) { $installedVersions[$parts[0]] = $version -replace '^v', '' }
+    $parts[0]
+  })
 
   # Tools installed but not desired: zap-style removal.
   # Mirrors homebrew cleanup = "zap": removes anything installed but absent
   # from the declared desired set, regardless of how it was installed.
   $toRemove = @($installedTools | Where-Object { $desiredPackages -notcontains $_ })
 
-  # Desired tools not yet installed.  uv tool install uses the package name
-  # as the binary name by default; fall back to binary-presence check.
+  # Desired tools not yet installed OR installed at a version different from
+  # the lockfile pin (version-aware reconciliation).
   $toInstall = @($desiredPackages | Where-Object {
     $pkg = $_
-    $installedTools -notcontains $pkg
+    $isInstalled = $installedTools -contains $pkg
+    if (-not $isInstalled) { return $true }
+    $entry = $uvVersions.$pkg
+    if ($entry -is [string]) {
+      # Version-pinned entry: reinstall if version mismatch.
+      if (-not $entry) { return $false }
+      $installedVersion = $installedVersions[$pkg]
+      return $installedVersion -ne $entry
+    }
+    # Hash-pinned entry (PSObject with .source/.rev): already installed, skip.
+    return $false
   })
 
   # Prune packages removed from the desired list.
@@ -118,28 +134,48 @@ function Invoke-UvSetup {
     Write-Output "uv: '$pkg' uninstalled"
   }
 
-  # Install additions.
+  # Install additions (fresh installs and version-mismatch reinstalls).
   foreach ($pkg in $toInstall) {
-    if ($pkg -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
-      Write-Output "uv: skipping invalid install token '$pkg'"
-      continue
-    }
-    $version = $uvVersions.$pkg
-    $pkgWithVersion = if ($version) { "${pkg}==${version}" } else { $pkg }
-    $installSpec = if ($packageExtras.ContainsKey($pkg)) { "$pkgWithVersion$($packageExtras[$pkg])" } else { $pkgWithVersion }
-    $pythonVersion = if ($toolPythonVersion.ContainsKey($pkg)) { $toolPythonVersion[$pkg] } else { $null }
-    $pythonArg = if ($pythonVersion) { @('--python', $pythonVersion) } else { @() }
-    if ($pythonVersion) {
-      Write-Output "uv: installing tool '$installSpec' with Python $pythonVersion"
+    $entry = $uvVersions.$pkg
+    if ($entry -is [string]) {
+      # Version-pinned entry: install from PyPI.
+      $version = $entry
+      $pkgWithVersion = if ($version) { "${pkg}==${version}" } else { $pkg }
+      $installSpec = if ($packageExtras.ContainsKey($pkg)) { "$pkgWithVersion$($packageExtras[$pkg])" } else { $pkgWithVersion }
+      $pythonVersion = if ($toolPythonVersion.ContainsKey($pkg)) { $toolPythonVersion[$pkg] } else { $null }
+      $pythonArg = if ($pythonVersion) { @('--python', $pythonVersion) } else { @() }
+      $reinstallArg = if ($installedTools -contains $pkg) { @('--reinstall') } else { @() }
+      if ($pythonVersion) {
+        Write-Output "uv: installing tool '$installSpec' with Python $pythonVersion"
+      } else {
+        Write-Output "uv: installing tool '$installSpec'"
+      }
+      uv tool install @pythonArg $reinstallArg $installSpec
+      if ($LASTEXITCODE -ne 0) {
+        Write-Error "uv: 'uv tool install $installSpec' failed (exit $LASTEXITCODE)"
+        return
+      }
+      Write-Output "uv: '$installSpec' installed successfully"
     } else {
-      Write-Output "uv: installing tool '$installSpec'"
+      # Hash-pinned entry: install from VCS.
+      $source = $entry.source
+      $rev = $entry.rev
+      $installSpec = "${pkg} @ git+$source@$rev"
+      $pythonVersion = if ($toolPythonVersion.ContainsKey($pkg)) { $toolPythonVersion[$pkg] } else { $null }
+      $pythonArg = if ($pythonVersion) { @('--python', $pythonVersion) } else { @() }
+      $reinstallArg = if ($installedTools -contains $pkg) { @('--reinstall') } else { @() }
+      if ($pythonVersion) {
+        Write-Output "uv: installing tool '$installSpec' with Python $pythonVersion"
+      } else {
+        Write-Output "uv: installing tool '$installSpec'"
+      }
+      uv tool install @pythonArg $reinstallArg $installSpec
+      if ($LASTEXITCODE -ne 0) {
+        Write-Error "uv: 'uv tool install $installSpec' failed (exit $LASTEXITCODE)"
+        return
+      }
+      Write-Output "uv: '$installSpec' installed successfully"
     }
-    uv tool install @pythonArg $installSpec
-    if ($LASTEXITCODE -ne 0) {
-      Write-Error "uv: 'uv tool install $installSpec' failed (exit $LASTEXITCODE)"
-      return
-    }
-    Write-Output "uv: '$installSpec' installed successfully"
   }
 
   if ($toInstall.Count -eq 0 -and $toRemove.Count -eq 0) {

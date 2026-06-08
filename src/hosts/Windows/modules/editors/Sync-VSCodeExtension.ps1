@@ -167,12 +167,23 @@ function Sync-VSCodeExtension {
       # Prune the extensions directory so the managed baseline is the sole
       # source of truth.  Extension folders are named publisher.name-version;
       # match against managed IDs (publisher.name) using a prefix check.
+      # For managed extensions with a lockfile pin, also remove folders whose
+      # embedded version does not match (version-aware reconciliation).
       Get-ChildItem -Path $channel.ExtDir -Directory | ForEach-Object {
         $folderName = $_.Name
-        $isManaged = $managedExtensions | Where-Object { $folderName -like "$_-*" -or $folderName -eq $_ }
-        if (-not $isManaged) {
+        $matchedId = $managedExtensions | Where-Object { $folderName -like "$_-*" -or $folderName -eq $_ } | Select-Object -First 1
+        if (-not $matchedId) {
           Remove-Item -Path $_.FullName -Recurse -Force
           Write-Output "vscode-extensions: pruned non-managed folder: $folderName ($($channel.Name))"
+        } elseif ($vscodeVersions.$matchedId -and $folderName -ne $matchedId) {
+          $lastDash = $folderName.LastIndexOf('-')
+          if ($lastDash -gt 0) {
+            $versionFromFolder = $folderName.Substring($lastDash + 1)
+            if ($versionFromFolder -ne ($vscodeVersions.$matchedId -as [string])) {
+              Remove-Item -Path $_.FullName -Recurse -Force
+              Write-Output "vscode-extensions: pruned stale version folder: $folderName ($($channel.Name))"
+            }
+          }
         }
       }
 

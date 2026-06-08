@@ -106,17 +106,30 @@ function Invoke-ScoopSetup {
     )
   }
 
+  # Parse installed versions from `scoop list` for version reconciliation.
+  $installedVersions = @{}
+  $scoopListOutput = @(scoop list 2>&1)
+  $scoopListOutput | Select-String "^'(.+)' \((\S+)\)" | ForEach-Object {
+    $installedVersions[$_.Matches.Groups[1].Value] = $_.Matches.Groups[2].Value
+  }
+
   # Apps installed but not desired: zap-style removal.
   # Mirrors homebrew cleanup = "zap": removes anything installed but absent
   # from the declared desired set, regardless of how it was installed.
   $toRemove = @($installedApps | Where-Object { $desiredPackages -notcontains $_ })
 
-  # Desired apps not yet installed (shim absent from scoopShims or not in
-  # apps directory).  Scoop writes a <name>.cmd shim for most apps; fall back
-  # to <name>.exe for apps (like gopass) that ship a native binary shim.
+  # Desired apps not yet installed OR installed at a version different from
+  # the lockfile pin (version-aware reconciliation).  Scoop writes a
+  # <name>.cmd shim for most apps; fall back to <name>.exe for apps (like
+  # gopass) that ship a native binary shim.
   $toInstall = @($desiredPackages | Where-Object {
     $pkg = $_
-    $installedApps -notcontains $pkg
+    $isInstalled = $installedApps -contains $pkg
+    if (-not $isInstalled) { return $true }
+    $expectedVersion = $scoopVersions.$pkg
+    if (-not $expectedVersion) { return $false }
+    $installedVersion = $installedVersions[$pkg]
+    $installedVersion -ne $expectedVersion
   })
 
   # Prune packages removed from the desired list.

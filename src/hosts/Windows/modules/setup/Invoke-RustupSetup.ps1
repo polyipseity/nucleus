@@ -77,10 +77,14 @@ function Invoke-RustupSetup {
   #   1.75.0-x86_64-pc-windows-msvc  → 1.75.0 (pinned version, not a channel)
   $installedChannels = @($installedToolchains | ForEach-Object { ($_ -split '-')[0] })
 
-  # Toolchains to remove: installed ones whose channel is not in the desired list.
+  # Toolchains to remove: installed ones whose channel is not in the desired
+  # list, OR whose installed version does not match the lockfile pin.
   $toRemove = @($installedToolchains | Where-Object {
     $channel = ($_ -split '-')[0]
-    $desiredChannels -notcontains $channel
+    if ($desiredChannels -notcontains $channel) { return $true }
+    $expectedDate = $rustupVersions.$channel
+    if (-not $expectedDate) { return $false }
+    -not ($_ -match "$channel-$expectedDate-")
   })
 
   # Channels to install: desired ones not currently present in any installed toolchain.

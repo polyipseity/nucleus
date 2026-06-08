@@ -88,11 +88,15 @@ function Invoke-BunSetup {
   # list, regardless of prior managed state).
   $bunGlobalJson = Join-Path $HOME ".bun\install\global\package.json"
   $installedPackages = @()
+  $installedVersions = @{}
   if (Test-Path $bunGlobalJson) {
     try {
       $globalPkg = Get-Content -Path $bunGlobalJson -Raw | ConvertFrom-Json
       if ($null -ne $globalPkg -and $null -ne $globalPkg.dependencies) {
         $installedPackages = @($globalPkg.dependencies.PSObject.Properties.Name)
+        foreach ($prop in $globalPkg.dependencies.PSObject.Properties) {
+          $installedVersions[$prop.Name] = $prop.Value
+        }
       }
     }
     catch {
@@ -108,7 +112,8 @@ function Invoke-BunSetup {
   $toRemove = @($installedPackages | Where-Object { $desiredPackages -notcontains $_ })
 
   # Desired packages not yet in bun's global package.json, or whose binary is
-  # absent from ~\.bun\bin (re-install needed).  Binary name = last path
+  # absent from ~\.bun\bin, or installed at a version different from the
+  # lockfile pin (version-aware reconciliation).  Binary name = last path
   # component after '/' so @scope/name becomes name (bun uses the unscoped
   # name for the bin).
   $toInstall = @($desiredPackages | Where-Object {
@@ -120,7 +125,16 @@ function Invoke-BunSetup {
       (Test-Path (Join-Path $bunBinDir "$binName.exe")) -or
       (Test-Path (Join-Path $bunBinDir "$binName.cmd"))
     )
-    $notInstalled -or $binMissing
+    if ($notInstalled -or $binMissing) { return $true }
+    $entry = $bunVersions.$pkg
+    if ($entry -is [string]) {
+      # Version-pinned entry: reinstall if version mismatch.
+      if (-not $entry) { return $false }
+      $installedVersion = $installedVersions[$pkg]
+      return $installedVersion -ne $entry
+    }
+    # Hash-pinned entry (PSObject with .source/.rev): already installed, skip.
+    return $false
   })
 
   foreach ($pkg in $toRemove) {
@@ -130,17 +144,33 @@ function Invoke-BunSetup {
       Write-Error "bun-setup: 'bun remove -g $pkg' failed (exit $LASTEXITCODE)"
       return
     }
+    Write-Output "bun-setup: $pkg removed"
   }
 
-  # Install additions with version pinning from lockfile.
+  # Install additions (fresh installs and version-mismatch reinstalls).
   foreach ($pkg in $toInstall) {
-    $version = $bunVersions.$pkg
-    $installSpec = if ($version) { "${pkg}@${version}" } else { $pkg }
-    Write-Output "bun-setup: installing $installSpec"
-    bun install -g $installSpec
-    if ($LASTEXITCODE -ne 0) {
-      Write-Error "bun-setup: 'bun install -g $installSpec' failed (exit $LASTEXITCODE)"
-      return
+    $entry = $bunVersions.$pkg
+    if ($entry -is [string]) {
+      # Version-pinned entry: install from npm registry.
+      $version = $entry
+      $installSpec = if ($version) { "${pkg}@${version}" } else { $pkg }
+      Write-Output "bun-setup: installing $installSpec"
+      bun install -g $installSpec
+      if ($LASTEXITCODE -ne 0) {
+        Write-Error "bun-setup: 'bun install -g $installSpec' failed (exit $LASTEXITCODE)"
+        return
+      }
+    } else {
+      # Hash-pinned entry: install directly from VCS.
+      $source = $entry.source
+      $rev = $entry.rev
+      $installSpec = "git+$source#$rev"
+      Write-Output "bun-setup: installing $pkg from $installSpec"
+      bun install -g $installSpec
+      if ($LASTEXITCODE -ne 0) {
+        Write-Error "bun-setup: 'bun install -g $installSpec' failed (exit $LASTEXITCODE)"
+        return
+      }
     }
     $binName = ($pkg -split '/')[-1]
     if (-not (

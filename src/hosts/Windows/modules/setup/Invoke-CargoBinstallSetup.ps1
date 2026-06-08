@@ -91,10 +91,14 @@ function Invoke-CargoBinstallSetup {
   # prior managed state).  `cargo install --list` emits lines of the form
   # "name vX.Y.Z:" for each installed crate.
   $cargoListOutput = @(cargo install --list 2>&1)
+  $installedVersions = @{}
   $installedCrates = @(
     $cargoListOutput |
-      Where-Object { $_ -match '^[a-zA-Z0-9_-]+ v' } |
-      ForEach-Object { ($_ -split '\s+')[0] }
+      Where-Object { $_ -match '^([a-zA-Z0-9_-]+) v(\S+)' } |
+      ForEach-Object {
+        $installedVersions[$matches[1]] = $matches[2] -replace ':', ''
+        $matches[1]
+      }
   )
 
   # Crates installed but not desired: zap-style removal.
@@ -103,9 +107,21 @@ function Invoke-CargoBinstallSetup {
   $desiredCrateNames = @($desiredPackages | ForEach-Object { $_.CrateName })
   $toRemove = @($installedCrates | Where-Object { $desiredCrateNames -notcontains $_ })
 
-  # Desired crates not yet installed (absent from cargo install --list).
+  # Desired crates not yet installed OR installed at a version different from
+  # the lockfile pin (version-aware reconciliation).
   $toInstall = @($desiredPackages | Where-Object {
-    $installedCrates -notcontains $_.CrateName
+    $crateName = $_.CrateName
+    $isInstalled = $installedCrates -contains $crateName
+    if (-not $isInstalled) { return $true }
+    $entry = $cargoBinstallVersions.$crateName
+    if ($entry -is [string]) {
+      # Version-pinned entry: reinstall if version mismatch.
+      if (-not $entry) { return $false }
+      $installedVersion = $installedVersions[$crateName]
+      return $installedVersion -ne $entry
+    }
+    # Hash-pinned entry (PSObject with .source/.rev): already installed, skip.
+    return $false
   })
 
   foreach ($pkg in $toRemove) {
@@ -115,18 +131,33 @@ function Invoke-CargoBinstallSetup {
       Write-Error "cargo-binstall-setup: 'cargo uninstall $pkg' failed (exit $LASTEXITCODE)"
       return
     }
+    Write-Output "cargo-binstall-setup: $pkg uninstalled"
   }
 
-  # Install additions with version pinning from lockfile.
+  # Install additions (fresh installs and version-mismatch reinstalls).
   foreach ($pkg in $toInstall) {
     $crateName = $pkg.CrateName
-    $version = $cargoBinstallVersions.$crateName
-    $installSpec = if ($version) { "$crateName@$version" } else { $crateName }
-    Write-Output "cargo-binstall-setup: installing $installSpec"
-    cargo-binstall --no-confirm $installSpec
-    if ($LASTEXITCODE -ne 0) {
-      Write-Error "cargo-binstall-setup: 'cargo-binstall $installSpec' failed (exit $LASTEXITCODE)"
-      return
+    $entry = $cargoBinstallVersions.$crateName
+    if ($entry -is [string]) {
+      # Version-pinned entry: install via cargo-binstall.
+      $version = $entry
+      $installSpec = if ($version) { "$crateName@$version" } else { $crateName }
+      Write-Output "cargo-binstall-setup: installing $installSpec"
+      cargo-binstall --no-confirm $installSpec
+      if ($LASTEXITCODE -ne 0) {
+        Write-Error "cargo-binstall-setup: 'cargo-binstall $installSpec' failed (exit $LASTEXITCODE)"
+        return
+      }
+    } else {
+      # Hash-pinned entry: install directly from VCS via cargo install.
+      $source = $entry.source
+      $rev = $entry.rev
+      Write-Output "cargo-binstall-setup: installing $crateName from $source @ $rev"
+      cargo install --git $source --rev $rev $crateName
+      if ($LASTEXITCODE -ne 0) {
+        Write-Error "cargo-binstall-setup: 'cargo install --git $source --rev $rev $crateName' failed (exit $LASTEXITCODE)"
+        return
+      }
     }
     if (-not (Test-Path (Join-Path $cargoBinDir "$($pkg.BinaryName).exe"))) {
       Write-Error "cargo-binstall-setup: $crateName installed but $($pkg.BinaryName).exe not found at '$cargoBinDir\$($pkg.BinaryName).exe'"
