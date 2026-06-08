@@ -26,6 +26,17 @@ function Invoke-RustupSetup {
   [CmdletBinding()]
   param()
 
+  # Derive repo root from script location (src/hosts/Windows/modules/setup/ -> repo root is 5 levels up).
+  $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
+  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+
+  # Read version-pinning data from the consolidated lockfile.
+  $lockfile = @{}
+  if (Test-Path $lockfilePath) {
+    $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
+  }
+  $rustupVersions = if ($lockfile -and $lockfile.rustup) { $lockfile.rustup } else { @{} }
+
   # Declarative desired-state list of toolchain channels.  Add a channel name
   # here to install it; remove it to trigger removal on the next apply.  Use
   # the short channel name without the host triple (rustup appends the host
@@ -89,15 +100,17 @@ function Invoke-RustupSetup {
     Write-Output "rustup: '$toolchain' removed"
   }
 
-  # Install desired channels not currently present.
+  # Install desired channels not currently present with version pinning from lockfile.
   foreach ($channel in $toInstall) {
-    Write-Output "rustup: installing toolchain '$channel'"
-    rustup toolchain install $channel
+    $rustupDate = $rustupVersions.$channel
+    $channelSpec = if ($rustupDate) { "${channel}-${rustupDate}" } else { $channel }
+    Write-Output "rustup: installing toolchain '$channelSpec'"
+    rustup toolchain install $channelSpec
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "rustup: 'rustup toolchain install $channel' failed (exit $LASTEXITCODE)"
+      Write-Error "rustup: 'rustup toolchain install $channelSpec' failed (exit $LASTEXITCODE)"
       return
     }
-    Write-Output "rustup: '$channel' installed"
+    Write-Output "rustup: '$channelSpec' installed"
   }
 
   if ($toInstall.Count -eq 0 -and $toRemove.Count -eq 0) {

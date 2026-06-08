@@ -49,6 +49,17 @@ function Sync-VSCodeExtension {
     [bool]$Enabled
   )
 
+  # Derive repo root from script location (src/hosts/Windows/modules/editors/ -> repo root is 5 levels up).
+  $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
+  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+
+  # Read version-pinning data from the consolidated lockfile.
+  $lockfile = @{}
+  if (Test-Path $lockfilePath) {
+    $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
+  }
+  $vscodeVersions = if ($lockfile -and $lockfile.vscode) { $lockfile.vscode } else { @{} }
+
   $managedExtensions = @(
     'arrterian.nix-env-selector',
     'astral-sh.ty',
@@ -131,13 +142,15 @@ function Sync-VSCodeExtension {
 
     foreach ($extensionId in $managedExtensions) {
       if ($Enabled) {
+        $version = $vscodeVersions.$extensionId
+        $installSpec = if ($version) { "${extensionId}@${version}" } else { $extensionId }
         # tinymist: install stable only — pre-release builds have caused
         # editor crashes.  All other extensions use --pre-release; VS Code
         # falls back to stable when a pre-release channel does not exist.
         if ($extensionId -eq 'myriad-dreamin.tinymist') {
-          $output = & $cliPath --install-extension $extensionId --force 2>&1
+          $output = & $cliPath --install-extension $installSpec --force 2>&1
         } else {
-          $output = & $cliPath --install-extension $extensionId --pre-release --force 2>&1
+          $output = & $cliPath --install-extension $installSpec --pre-release --force 2>&1
         }
         if ($LASTEXITCODE -ne 0) {
           Write-Warning "vscode-extensions: VS Code extension install failed: $extensionId (exit $LASTEXITCODE) — $output"

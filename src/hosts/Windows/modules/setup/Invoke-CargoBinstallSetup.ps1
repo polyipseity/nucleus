@@ -7,7 +7,8 @@ function Invoke-CargoBinstallSetup {
     Maintains a managed set of Rust CLI binaries installed via cargo-binstall.
     On each apply it queries `cargo install --list` for the actually installed
     set and removes anything not in the desired list (zap-style), then installs
-    any desired packages that are missing via `cargo-binstall --no-confirm`.
+    any desired packages that are missing via `cargo-binstall --no-confirm` at
+    versions pinned in the repository lockfile.
 
     Only packages absent from both WinGet and Scoop are managed here, following
     the repository preference hierarchy (nixpkgs/winget > scoop > cargo binstall > bun > uv).
@@ -34,6 +35,17 @@ function Invoke-CargoBinstallSetup {
   #>
   [CmdletBinding()]
   param()
+
+  # Derive repo root from script location (src/hosts/Windows/modules/setup/ -> repo root is 5 levels up).
+  $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
+  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+
+  # Read version-pinning data from the consolidated lockfile.
+  $lockfile = @{}
+  if (Test-Path $lockfilePath) {
+    $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
+  }
+  $cargoBinstallVersions = if ($lockfile -and $lockfile.'cargo-binstall') { $lockfile.'cargo-binstall' } else { @{} }
 
   # Structured desired-state list.  Each entry has a CrateName (published on
   # crates.io) and a BinaryName (the executable placed in ~/.cargo/bin).
@@ -105,18 +117,22 @@ function Invoke-CargoBinstallSetup {
     }
   }
 
+  # Install additions with version pinning from lockfile.
   foreach ($pkg in $toInstall) {
-    Write-Output "cargo-binstall-setup: installing $($pkg.CrateName)"
-    cargo-binstall --no-confirm $pkg.CrateName
+    $crateName = $pkg.CrateName
+    $version = $cargoBinstallVersions.$crateName
+    $installSpec = if ($version) { "$crateName@$version" } else { $crateName }
+    Write-Output "cargo-binstall-setup: installing $installSpec"
+    cargo-binstall --no-confirm $installSpec
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "cargo-binstall-setup: 'cargo-binstall $($pkg.CrateName)' failed (exit $LASTEXITCODE)"
+      Write-Error "cargo-binstall-setup: 'cargo-binstall $installSpec' failed (exit $LASTEXITCODE)"
       return
     }
     if (-not (Test-Path (Join-Path $cargoBinDir "$($pkg.BinaryName).exe"))) {
-      Write-Error "cargo-binstall-setup: $($pkg.CrateName) installed but $($pkg.BinaryName).exe not found at '$cargoBinDir\$($pkg.BinaryName).exe'"
+      Write-Error "cargo-binstall-setup: $crateName installed but $($pkg.BinaryName).exe not found at '$cargoBinDir\$($pkg.BinaryName).exe'"
       return
     }
-    Write-Output "cargo-binstall-setup: $($pkg.CrateName) installed successfully"
+    Write-Output "cargo-binstall-setup: $crateName installed successfully"
   }
 
   if ($toRemove.Count -eq 0 -and $toInstall.Count -eq 0) {

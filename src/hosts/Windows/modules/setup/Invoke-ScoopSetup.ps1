@@ -7,7 +7,7 @@ function Invoke-ScoopSetup {
     Ensures the 'extras' and 'main' Scoop buckets are registered, then
     reads the Scoop apps directory for the actually installed set and removes
     anything not in the desired list (zap-style), then installs any desired
-    apps that are missing.
+    apps that are missing at versions pinned in the repository lockfile.
 
     Mirrors the declarative install+prune approach used by Invoke-BunSetup and
     the installBunPackages POSIX activation.
@@ -34,6 +34,17 @@ function Invoke-ScoopSetup {
   #>
   [CmdletBinding()]
   param()
+
+  # Derive repo root from script location (src/hosts/Windows/modules/setup/ -> repo root is 5 levels up).
+  $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
+  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+
+  # Read version-pinning data from the consolidated lockfile.
+  $lockfile = @{}
+  if (Test-Path $lockfilePath) {
+    $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
+  }
+  $scoopVersions = if ($lockfile -and $lockfile.scoop) { $lockfile.scoop } else { @{} }
 
   # Declarative desired-state list.  Add a package name here to install it;
   # remove it to trigger uninstall on the next apply.  Use the exact Scoop
@@ -119,12 +130,14 @@ function Invoke-ScoopSetup {
     Write-Output "scoop: '$pkg' uninstalled"
   }
 
-  # Install additions.
+  # Install additions with version pinning from lockfile.
   foreach ($pkg in $toInstall) {
-    Write-Output "scoop: installing '$pkg'"
-    scoop install $pkg
+    $version = $scoopVersions.$pkg
+    $installSpec = if ($version) { "$pkg@$version" } else { $pkg }
+    Write-Output "scoop: installing '$installSpec'"
+    scoop install $installSpec
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "scoop: 'scoop install $pkg' failed (exit $LASTEXITCODE)"
+      Write-Error "scoop: 'scoop install $installSpec' failed (exit $LASTEXITCODE)"
       return
     }
     if (-not (Test-Path (Join-Path $scoopShims "$pkg.cmd")) -and
@@ -133,6 +146,11 @@ function Invoke-ScoopSetup {
       return
     }
     Write-Output "scoop: '$pkg' installed successfully"
+  }
+
+  # Hold all managed packages at their locked versions (prevents accidental upgrades).
+  foreach ($pkg in $desiredPackages) {
+    scoop hold $pkg 2>&1 | Out-Null
   }
 
   if ($toInstall.Count -eq 0 -and $toRemove.Count -eq 0) {

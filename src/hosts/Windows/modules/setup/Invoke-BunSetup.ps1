@@ -8,7 +8,8 @@ function Invoke-BunSetup {
     On each apply it queries bun's global package.json for the actually
     installed set, removes anything installed but absent from the desired list
     (zap-style, mirroring homebrew's cleanup = "zap"), and installs any
-    desired packages that are missing.
+    desired packages that are missing at versions pinned in the repository
+    lockfile.
 
     Only packages absent from WinGet, Scoop, and cargo-binstall are managed
     here, following the repository preference hierarchy
@@ -39,6 +40,17 @@ function Invoke-BunSetup {
   #>
   [CmdletBinding()]
   param()
+
+  # Derive repo root from script location (src/hosts/Windows/modules/setup/ -> repo root is 5 levels up).
+  $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
+  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+
+  # Read version-pinning data from the consolidated lockfile.
+  $lockfile = @{}
+  if (Test-Path $lockfilePath) {
+    $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
+  }
+  $bunVersions = if ($lockfile -and $lockfile.bun) { $lockfile.bun } else { @{} }
 
   # Declarative desired-state list.  Add a package name here to install it;
   # remove it to trigger uninstall on the next apply.  Use the exact npm
@@ -120,11 +132,14 @@ function Invoke-BunSetup {
     }
   }
 
+  # Install additions with version pinning from lockfile.
   foreach ($pkg in $toInstall) {
-    Write-Output "bun-setup: installing $pkg"
-    bun install -g $pkg
+    $version = $bunVersions.$pkg
+    $installSpec = if ($version) { "${pkg}@${version}" } else { $pkg }
+    Write-Output "bun-setup: installing $installSpec"
+    bun install -g $installSpec
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "bun-setup: 'bun install -g $pkg' failed (exit $LASTEXITCODE)"
+      Write-Error "bun-setup: 'bun install -g $installSpec' failed (exit $LASTEXITCODE)"
       return
     }
     $binName = ($pkg -split '/')[-1]

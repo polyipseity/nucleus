@@ -25,6 +25,17 @@ function Invoke-UvSetup {
   [CmdletBinding()]
   param()
 
+  # Derive repo root from script location (src/hosts/Windows/modules/setup/ -> repo root is 5 levels up).
+  $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
+  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+
+  # Read version-pinning data from the consolidated lockfile.
+  $lockfile = @{}
+  if (Test-Path $lockfilePath) {
+    $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
+  }
+  $uvVersions = if ($lockfile -and $lockfile.uv) { $lockfile.uv } else { @{} }
+
   # Declarative desired-state list.  Add a package name here to install it;
   # remove it to trigger uninstall on the next apply.  Use the exact PyPI
   # package name (without extras).  Only add packages absent from WinGet,
@@ -113,7 +124,9 @@ function Invoke-UvSetup {
       Write-Output "uv: skipping invalid install token '$pkg'"
       continue
     }
-    $installSpec = if ($packageExtras.ContainsKey($pkg)) { "$pkg$($packageExtras[$pkg])" } else { $pkg }
+    $version = $uvVersions.$pkg
+    $pkgWithVersion = if ($version) { "${pkg}==${version}" } else { $pkg }
+    $installSpec = if ($packageExtras.ContainsKey($pkg)) { "$pkgWithVersion$($packageExtras[$pkg])" } else { $pkgWithVersion }
     $pythonVersion = if ($toolPythonVersion.ContainsKey($pkg)) { $toolPythonVersion[$pkg] } else { $null }
     $pythonArg = if ($pythonVersion) { @('--python', $pythonVersion) } else { @() }
     if ($pythonVersion) {
