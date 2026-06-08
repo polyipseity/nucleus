@@ -24,6 +24,11 @@ let
   # shell.nix and Sync-ShellProfile.ps1 (Windows).
   agentEnv = import ./agent-env-vars.nix;
 
+  # Lockfile-powered version pinning.  The consolidated lockfile is the single
+  # source of truth for pinned versions across all package managers.
+  lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
+  pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
+
   # Shared shell environment variable values (CC, CXX, LD) defined in one place.
   # Source of truth: ./shell/env.nix — update there, not here.
   shellEnv = import ./shell/env.nix;
@@ -472,11 +477,12 @@ in
   # This enables the lint phase in scripts/check-pwsh.ps1.
   home.activation.installPwshScriptAnalyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     _pwsh="${pkgs.powershell}/bin/pwsh"
-    if [ -x "$_pwsh" ]; then
+    if [ -x "$_pwsh" ] && [ -n "${pwshAnalyzerVersion}" ]; then
       "$_pwsh" -NoProfile -Command "
+        \$requiredVersion = '${pwshAnalyzerVersion}'
         if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
-          Write-Host 'installPwshScriptAnalyzer: installing PSScriptAnalyzer...' -ForegroundColor Cyan
-          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
+          Write-Host 'installPwshScriptAnalyzer: installing PSScriptAnalyzer version \$requiredVersion...' -ForegroundColor Cyan
+          Install-Module -Name PSScriptAnalyzer -RequiredVersion \$requiredVersion -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
         }
       "
     fi

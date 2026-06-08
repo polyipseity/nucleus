@@ -22,7 +22,11 @@
   "rustup": {
     "stable": "2024-12-01"
   },
+  "winget": {},
   "vscode": {},
+  "pwsh": {
+    "PSScriptAnalyzer": "1.20.0"
+  },
   "ollama": {
     "MacBook": [
       { "name": "devstral-small-2", "tag": "24b" },
