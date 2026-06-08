@@ -105,6 +105,7 @@ function Invoke-AISync {
 
   $resolvedRepoRoot = (Resolve-Path -Path $RepoRoot).Path
   $manifestPath     = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\ai\models.json"
+  $lockfilePath     = Join-Path -Path $resolvedRepoRoot -ChildPath "src\lockfiles\lockfile.json"
 
   # Override OLLAMA_HOST to point directly at Ollama (not LiteLLM) so that
   # model list/pull/rm commands talk to the inference backend directly instead
@@ -191,6 +192,31 @@ function Invoke-AISync {
         & $ollamaCmd.Source pull $model
         if ($LASTEXITCODE -ne 0) {
           Write-Error "ai-sync: ollama pull $model failed with exit code $LASTEXITCODE"
+        } else {
+          # Verify pull succeeded via ollama list
+          $pullCheck = @(& $ollamaCmd.Source list 2>&1 | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[0] } | Where-Object { $_ -ne '' })
+          if ($pullCheck -notcontains $model) {
+            Write-Error "ai-sync: $model was pulled but is not in 'ollama list'"
+          } else {
+            # Lockfile digest verification (optional)
+            if (Test-Path $lockfilePath) {
+              $lockfile = Get-Content -Raw -Path $lockfilePath | ConvertFrom-Json
+              $modelParts = $model -split ':'
+              $_modelName = $modelParts[0]
+              $_modelTag  = if ($modelParts.Count -gt 1) { $modelParts[1] } else { 'latest' }
+              $_lockEntry = @($lockfile.ollama.$profileName | Where-Object { $_.name -eq $_modelName -and $_.tag -eq $_modelTag })
+              if ($_lockEntry -and $_lockEntry[0].digest) {
+                $_expectedDigest = $_lockEntry[0].digest
+                $_showJson = & $ollamaCmd.Source show --format json $model 2>&1 | Out-String
+                $_actualDigest = ($_showJson | ConvertFrom-Json).digest
+                if ($_actualDigest -and $_actualDigest -ne $_expectedDigest) {
+                  Write-Warning "ai-sync: digest mismatch for $model (expected $_expectedDigest, got $_actualDigest)"
+                } elseif ($_actualDigest) {
+                  Write-Output "ai-sync: digest verified for $model"
+                }
+              }
+            }
+          }
         }
       }
     }

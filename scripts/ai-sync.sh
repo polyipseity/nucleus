@@ -34,6 +34,7 @@ export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"
 
 REPO_ROOT="$(resolve_nucleus_root)"
 MANIFEST="$REPO_ROOT/src/modules/ai/models.json"
+LOCKFILE="$REPO_ROOT/src/lockfiles/lockfile.json"
 
 dry_run=false
 gc_only=false
@@ -165,6 +166,27 @@ if [ "$gc_only" = false ]; then
     else
       printf '%s\n' "ai-sync: pulling $model"
       ollama pull "$model"
+      # Verify pull succeeded via ollama list
+      if ! printf '%s\n' "$(ollama list | awk 'NR>1 && \$1!="" {print \$1}')" | grep -Fxq "$model"; then
+        printf '%s\n' "ai-sync: ERROR: $model was pulled but is not in 'ollama list'" >&2
+        exit 1
+      fi
+      # Lockfile digest verification (optional — only when lockfile entry has digest)
+      if [ -f "$LOCKFILE" ]; then
+        _model_name="${model%%:*}"
+        _model_tag="${model#*:}"
+        [ "$_model_tag" = "$model" ] && _model_tag="latest"
+        _expected_digest=$(jq -r --arg p "$profile" --arg n "$_model_name" --arg t "$_model_tag" '
+          .ollama[$p][] | select(.name == $n and .tag == $t) | .digest // empty' "$LOCKFILE" 2>/dev/null || true)
+        if [ -n "$_expected_digest" ]; then
+          _actual_digest=$(ollama show --format json "$model" 2>/dev/null | jq -r '.digest // empty' 2>/dev/null || true)
+          if [ -n "$_actual_digest" ] && [ "$_actual_digest" != "$_expected_digest" ]; then
+            printf '%s\n' "ai-sync: WARNING: digest mismatch for $model (expected $_expected_digest, got $_actual_digest)" >&2
+          elif [ -n "$_actual_digest" ]; then
+            printf '%s\n' "ai-sync: digest verified for $model"
+          fi
+        fi
+      fi
     fi
   done
 fi
