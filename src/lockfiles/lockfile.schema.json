@@ -122,10 +122,10 @@
           "additionalProperties": {
             "type": "object",
             "properties": {
-              "sha256": { "type": "string" },
+              "digest": { "type": "string" },
               "url": { "type": "string", "format": "uri" }
             },
-            "required": ["url", "sha256"],
+            "required": ["url", "digest"],
             "additionalProperties": false
           }
         },
@@ -144,21 +144,27 @@
         },
         "windows": {
           "type": "object",
-          "description": "Windows ISO pins. Empty placeholder — populated when SHA-256 recording is implemented.",
+          "description": "Windows ISO pins. Empty placeholder — populated when digest recording is implemented.",
           "additionalProperties": {
             "type": "object",
             "properties": {
-              "sha256": { "type": "string" },
+              "digest": { "type": "string" },
               "url": { "type": "string", "format": "uri" }
             },
-            "required": ["url", "sha256"],
+            "required": ["url", "digest"],
             "additionalProperties": false
           }
         }
       },
       "additionalProperties": {
         "type": "object",
-        "description": "Future image type. Must be an object; internal shape TBD by its implementation."
+        "description": "Future image type. May contain url, digest, and/or image.",
+        "properties": {
+          "digest": { "type": "string" },
+          "image": { "type": "string" },
+          "url": { "type": "string", "format": "uri" }
+        },
+        "additionalProperties": false
       }
     },
     "vscode": {

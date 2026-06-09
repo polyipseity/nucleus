@@ -377,7 +377,7 @@ if section_enabled vm-setup || section_enabled nixos-iso; then
   while IFS= read -r arch; do
     [ -z "$arch" ] && continue
     old_url=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.vm-setup.nixos-iso // {})[$a].url // empty')
-    old_sha256=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.vm-setup.nixos-iso // {})[$a].sha256 // empty')
+    old_digest=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.vm-setup.nixos-iso // {})[$a].digest // empty')
     [ -z "$old_url" ] && continue
 
     # Resolve the latest- redirect to a specific release URL
@@ -396,11 +396,12 @@ if section_enabled vm-setup || section_enabled nixos-iso; then
       printf 'bump-lockfile: warning: could not fetch checksum for %s (%s)\n' "$arch" "$sha256_url" >&2
       continue
     fi
+    new_digest="sha256:$new_sha256"
 
-    if [ "$old_url" != "$resolved_url" ] || [ "$old_sha256" != "$new_sha256" ]; then
-      log_update "vm-setup.nixos-iso" "$arch" "${old_sha256:0:12}..." "${new_sha256:0:12}..."
-      data=$(printf '%s\n' "$data" | jq --arg a "$arch" --arg u "$resolved_url" --arg s "$new_sha256" '
-        .vm-setup.nixos-iso[$a] = {url: $u, sha256: $s}
+    if [ "$old_url" != "$resolved_url" ] || [ "$old_digest" != "$new_digest" ]; then
+      log_update "vm-setup.nixos-iso" "$arch" "${old_digest##*:}" "${new_sha256:0:12}..."
+      data=$(printf '%s\n' "$data" | jq --arg a "$arch" --arg u "$resolved_url" --arg d "$new_digest" '
+        .vm-setup.nixos-iso[$a] = {url: $u, digest: $d}
       ')
     fi
   done < <(printf '%s\n' "$data" | jq -r '(.vm-setup.nixos-iso // {}) | keys[]')

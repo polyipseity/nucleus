@@ -429,7 +429,7 @@ if ((Test-SectionEnabled 'vm-setup') -or (Test-SectionEnabled 'nixos-iso')) {
     foreach ($arch in $ht['vm-setup']['nixos-iso'].Keys) {
       $entry = $ht['vm-setup']['nixos-iso'][$arch]
       $oldUrl = $entry['url']
-      $oldSha256 = $entry['sha256']
+      $oldDigest = $entry['digest']
 
       $latestUrl = "https://channels.nixos.org/nixos-unstable/latest-nixos-minimal-${arch}.iso"
       try {
@@ -457,10 +457,11 @@ if ((Test-SectionEnabled 'vm-setup') -or (Test-SectionEnabled 'nixos-iso')) {
         Write-Warning "bump-lockfile: could not fetch checksum for ${arch}: $($_.Exception.Message)"
         continue
       }
+      $newDigest = "sha256:${newSha256}"
 
-      if ($oldUrl -ne $resolvedUrl -or $oldSha256 -ne $newSha256) {
-        Write-Update -Section 'vm-setup.nixos-iso' -Key $arch -OldValue "${oldSha256:0:12}..." -NewValue "${newSha256:0:12}..."
-        $ht['vm-setup']['nixos-iso'][$arch] = @{ url = $resolvedUrl; sha256 = $newSha256 }
+      if ($oldUrl -ne $resolvedUrl -or $oldDigest -ne $newDigest) {
+        Write-Update -Section 'vm-setup.nixos-iso' -Key $arch -OldValue ($oldDigest -replace '^sha256:', '') -NewValue "${newSha256:0:12}..."
+        $ht['vm-setup']['nixos-iso'][$arch] = @{ url = $resolvedUrl; digest = $newDigest }
       }
     }
   }
