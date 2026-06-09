@@ -53,6 +53,7 @@
 - `nucleus-ai-sync` — run the managed AI model sync flow.
 - `nucleus-apply` — run the managed apply flow.
 - `nucleus-bootstrap` — run the managed bootstrap flow.
+- `nucleus-bump-lockfile` — update all version pins in the consolidated lockfile (`src/lockfiles/lockfile.json`) from upstream sources; pass `--sections winget,scoop,...` to update specific sections.
 - `nucleus-check-pwsh` — run PowerShell syntax checks.
 - `nucleus-check-sh` — run POSIX shell syntax checks.
 - `nucleus-cloud-setup` — configure required cloud remotes and re-run apply.
