@@ -200,14 +200,11 @@
               xevd = prev.xevd.overrideAttrs (_: {
                 doCheck = false;
               });
-              # npm prune --omit=dev removes the koffi native addon, leaving
-              # broken paths that the postInstall find commands choke on.
-              # Guard the koffi build-dir cleanup: on macOS, koffi/build/koffi
-              # is a file (native binary), not a directory, so the unguarded
-              # `find "$nm/koffi/build/koffi" ...` in postInstall fails with
-              # "No such file or directory".
+              # On macOS, koffi/build/koffi is a native binary, not a
+              # directory, so the unguarded
+              # `find "$nm/koffi/build/koffi" ...` in upstream postInstall
+              # fails with "No such file or directory".
               pi-coding-agent = prev.pi-coding-agent.overrideAttrs (old: {
-                dontNpmPrune = true;
                 postInstall =
                   builtins.replaceStrings
                     [ "find \"$nm/koffi/build/koffi\"" ]
@@ -216,24 +213,15 @@
               });
             })
             (_final: prev: {
-              # llvmPackages_18.compiler-rt-libc fails on Darwin because the
-              # darwin bootstrap stdenv provides libcxx 21 headers that use
-              # __builtin_clzg/__builtin_ctzg (clang 19+ builtins) that clang 18
-              # does not implement.  Use LLVM 21's compiler-rt-libc (already
-              # cached) instead.
-              llvmPackages_18 = prev.llvmPackages_18.overrideScope (
-                _lself: _lsuper: { compiler-rt-libc = prev.llvmPackages_21.compiler-rt-libc; }
-              );
-            })
-            (_final: prev: {
               # ollama's cmake/local.cmake calls ollama_check_metal_toolchain()
               # unconditionally on Apple Silicon when OLLAMA_MLX_BACKENDS is not
               # pre-defined. That check runs `xcrun -sdk macosx metal`, which
               # fails during nix builds because DEVELOPER_DIR points at the Nix
               # apple SDK instead of real Xcode. Pre-empt the check by defining
               # OLLAMA_MLX_BACKENDS early so cmake skips the Metal probe.
-              # This mirrors the upstream fix from
-              # https://github.com/NixOS/nixpkgs/pull/396262.
+              # Upstream fix from
+              # https://github.com/NixOS/nixpkgs/pull/529076.
+              # (PR closed, not merged — still required at this pin)
               ollama = prev.ollama.overrideAttrs (old: {
                 postPatch = (old.postPatch or "") + ''
                   substituteInPlace cmake/local.cmake \

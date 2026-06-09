@@ -42,9 +42,9 @@ let
     pkgs.jellyfin
     pkgs.jq
     pkgs.litellm
-    pkgs.llvmPackages_18.clang
-    pkgs.llvmPackages_18.lldb
-    pkgs.llvmPackages_18.lld
+    pkgs.llvmPackages.clang
+    pkgs.llvmPackages.lldb
+    pkgs.llvmPackages.lld
     pkgs.nickel
     pkgs.nixd
     pkgs.nixfmt
