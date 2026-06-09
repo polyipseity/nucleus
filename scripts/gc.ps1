@@ -52,12 +52,21 @@
 .PARAMETER NoVMGc
   Skip stale VM artifact removal (default: $false).
 
+.PARAMETER Expiry
+  Master expiry override for both HM and Nix GC durations (e.g. "14d", "30d") (default: "7d"). Accepted but ignored on Windows (POSIX-only).
+
+.PARAMETER HmExpiry
+  Home Manager generation expiry duration in nix format (e.g. "7d") (default: "7d"). Accepted but ignored on Windows (POSIX-only).
+
+.PARAMETER NixExpiry
+  Nix store GC --delete-older-than duration (e.g. "7d", "30d") (default: "7d"). Accepted but ignored on Windows (POSIX-only).
+
 .EXAMPLE
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus"
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -NoToolCacheGc
 
 .NOTES
-  Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_GC, NUCLEUS_GC_NO_OLLAMA_GC, NUCLEUS_GC_NO_SCOOP_GC, NUCLEUS_GC_NO_WALLPAPER_GC, NUCLEUS_GC_NO_VM_GC, NUCLEUS_REPO_ROOT.
+  Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_GC, NUCLEUS_GC_NO_OLLAMA_GC, NUCLEUS_GC_NO_SCOOP_GC, NUCLEUS_GC_NO_WALLPAPER_GC, NUCLEUS_GC_NO_VM_GC, NUCLEUS_GC_EXPIRY, NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
@@ -70,6 +79,9 @@ param(
   [switch]$NoScoopGc = { $env:NUCLEUS_GC_NO_SCOOP_GC -eq 'true' }.Invoke(),
   [switch]$NoWallpaperGc = { $env:NUCLEUS_GC_NO_WALLPAPER_GC -eq 'true' }.Invoke(),
   [switch]$NoVMGc = { $env:NUCLEUS_GC_NO_VM_GC -eq 'true' }.Invoke(),
+  [string]$Expiry = $(if ($env:NUCLEUS_GC_EXPIRY) { $env:NUCLEUS_GC_EXPIRY } else { '' }),
+  [string]$HmExpiry = $(if ($env:NUCLEUS_GC_HM_EXPIRY) { $env:NUCLEUS_GC_HM_EXPIRY } else { '' }),
+  [string]$NixExpiry = $(if ($env:NUCLEUS_GC_NIX_EXPIRY) { $env:NUCLEUS_GC_NIX_EXPIRY } else { '' }),
   [Alias("h")]
   [switch]$Help
 )
@@ -103,6 +115,18 @@ if ($NoNixGc) {
 }
 if ($NoHmGc) {
   Write-Warning "gc: -NoHmGc accepted but ignored on Windows (POSIX-only)"
+}
+
+# -Expiry, -HmExpiry, -NixExpiry are accepted but ignored on Windows
+# (POSIX-only options from gc.sh). Accepted for cross-platform CLI parity.
+if ($Expiry) {
+  Write-Warning "gc: -Expiry accepted but ignored on Windows (POSIX-only)"
+}
+if ($HmExpiry) {
+  Write-Warning "gc: -HmExpiry accepted but ignored on Windows (POSIX-only)"
+}
+if ($NixExpiry) {
+  Write-Warning "gc: -NixExpiry accepted but ignored on Windows (POSIX-only)"
 }
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path

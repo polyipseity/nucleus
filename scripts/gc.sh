@@ -12,9 +12,15 @@
 #   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
 #   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
 #   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
+#   --expiry <duration>                       Master expiry override (e.g. "14d", "30d"). Per-tool flags win.
+#   --hm-expiry <duration>                    Home Manager generation expiry duration in nix format (e.g. "7d").
+#   --nix-expiry <duration>                   Nix store GC --delete-older-than duration (e.g. "7d", "30d").
+#   --dry-run|--no-dry-run                    Print actions without executing (default: --no-dry-run).
 #
 # Environment variables:
-#   (none)
+#   NUCLEUS_GC_EXPIRY        Master expiry override (same as --expiry).
+#   NUCLEUS_GC_HM_EXPIRY     HM expiry override (same as --hm-expiry).
+#   NUCLEUS_GC_NIX_EXPIRY    Nix expiry override (same as --nix-expiry).
 #
 # Exit conditions:
 #   0 on success; non-zero on failure.
@@ -33,6 +39,10 @@ usage() {
   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
+  --expiry <duration>                       Master expiry override (e.g. "14d"). Per-tool flags win (default: "7d").
+  --hm-expiry <duration>                    Home Manager generation expiry duration in nix format (e.g. "7d").
+  --nix-expiry <duration>                   Nix store GC --delete-older-than duration (e.g. "7d", "30d").
+  --dry-run|--no-dry-run                    Print actions without executing (default: --no-dry-run).
 EOF
 }
 
@@ -44,6 +54,10 @@ nix_gc=true
 ollama_gc=true
 wallpaper_gc=true
 vm_gc=true
+dry_run=false
+hm_expiry_arg=""
+nix_expiry_arg=""
+expiry_arg=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -87,6 +101,24 @@ while [ "$#" -gt 0 ]; do
     --no-vm-gc)
       vm_gc=false
       ;;
+    --expiry)
+      expiry_arg="$2"
+      shift
+      ;;
+    --hm-expiry)
+      hm_expiry_arg="$2"
+      shift
+      ;;
+    --nix-expiry)
+      nix_expiry_arg="$2"
+      shift
+      ;;
+    --dry-run)
+      dry_run=true
+      ;;
+    --no-dry-run)
+      dry_run=false
+      ;;
     *)
       printf '%s\n' "gc: unsupported argument '$1'" >&2
       usage >&2
@@ -96,12 +128,33 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+nix_expiry_to_hm() {
+  # Convert nix duration format to date format compatible with
+  # home-manager expire-generations.
+  #   "7d"  → "-7 days"
+  #   "14d" → "-14 days"
+  #   "4w"  → "-4 weeks"
+  local input="$1"
+  local num="${input%[a-zA-Z]*}"
+  local unit="${input##*[0-9]}"
+  case "$unit" in
+    d) printf '%s\n' "-${num} days" ;;
+    w) printf '%s\n' "-${num} weeks" ;;
+    *) printf '%s\n' "-${input}" ;;
+  esac
+}
+
+# Resolve expiry values with precedence: CLI flag > per-tool env > master flag > master env > default (7d).
+hm_expiry="${hm_expiry_arg:-${NUCLEUS_GC_HM_EXPIRY:-${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}}}"
+nix_expiry="${nix_expiry_arg:-${NUCLEUS_GC_NIX_EXPIRY:-${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}}}"
+hm_expiry_hm_format="$(nix_expiry_to_hm "$hm_expiry")"
+
 expire_hm_generations_if_available() {
   # Home Manager generations are GC roots: nix-collect-garbage cannot reclaim
   # store paths still referenced by live generations.  Expiring generations
-  # older than 7 days before running Nix store GC releases those roots so
-  # the subsequent collection can reclaim more.  7 days matches the
-  # --delete-older-than window used for Nix store GC below.
+  # before running Nix store GC releases those roots so the subsequent
+  # collection can reclaim more.  The expiry window is controlled by
+  # --hm-expiry / $hm_expiry.
   # Best-effort: hosts without a managed Home Manager profile will not have
   # home-manager in PATH.
   if ! command -v home-manager >/dev/null 2>&1; then
@@ -110,7 +163,7 @@ expire_hm_generations_if_available() {
     return 0
   fi
 
-  home-manager expire-generations "-7 days"
+  home-manager expire-generations "$hm_expiry_hm_format"
 }
 
 run_nix_gc_if_available() {
@@ -122,7 +175,8 @@ run_nix_gc_if_available() {
     return 0
   fi
 
-  nix-collect-garbage --delete-older-than 7d
+  # Expiry controlled by --nix-expiry / $nix_expiry.
+  nix-collect-garbage --delete-older-than "$nix_expiry"
 }
 
 gc_stale_wallpapers() {
@@ -363,32 +417,56 @@ gc_vm_artifacts_if_present() {
 # Step 1: expire HM generations before Nix store GC so the store can reclaim
 # paths that were previously held alive as generation GC roots.
 if [ "$hm_gc" = true ]; then
-  expire_hm_generations_if_available
+  if [ "$dry_run" = true ]; then
+    printf '%s\n' "gc: --dry-run: would expire HM generations older than $hm_expiry_hm_format"
+  else
+    expire_hm_generations_if_available
+  fi
 fi
 
 # Step 2: Nix store GC.
 if [ "$nix_gc" = true ]; then
-  run_nix_gc_if_available
+  if [ "$dry_run" = true ]; then
+    printf '%s\n' "gc: --dry-run: would run nix-collect-garbage --delete-older-than $nix_expiry"
+  else
+    run_nix_gc_if_available
+  fi
 fi
 
 # Step 3: stale wallpaper gc (independent of Nix).
 if [ "$wallpaper_gc" = true ]; then
-  gc_stale_wallpapers
+  if [ "$dry_run" = true ]; then
+    printf '%s\n' "gc: --dry-run: would remove stale wallpapers"
+  else
+    gc_stale_wallpapers
+  fi
 fi
 
 # Step 4: tool cache gc (independent of Nix, runs last).
 if [ "$tool_cache_gc" = true ]; then
-  gc_tool_caches_if_available
+  if [ "$dry_run" = true ]; then
+    printf '%s\n' "gc: --dry-run: would clear tool caches"
+  else
+    gc_tool_caches_if_available
+  fi
 fi
 
 # Step 5: remove orphaned Ollama models not declared in the manifest.
 if [ "$ollama_gc" = true ]; then
-  gc_ollama_models_if_available
+  if [ "$dry_run" = true ]; then
+    printf '%s\n' "gc: --dry-run: would gc stale Ollama models"
+  else
+    gc_ollama_models_if_available
+  fi
 fi
 
 # Step 6: remove stale VM artifacts (temporary builds, orphaned images).
 if [ "$vm_gc" = true ]; then
-  gc_vm_artifacts_if_present
+  if [ "$dry_run" = true ]; then
+    printf '%s\n' "gc: --dry-run: would gc stale VM artifacts"
+  else
+    gc_vm_artifacts_if_present
+  fi
 fi
 
 # Step 7: Scoop cache gc (accepted but ignored on POSIX; Windows-only).

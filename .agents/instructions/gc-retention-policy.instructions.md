@@ -8,7 +8,21 @@ applyTo: "src/**/*.nix, scripts/gc.*, src/hosts/Windows/**/*.yml"
 
 Timing values are specified directly at their point of use — this file does
 not maintain a duplicate table. To find or change a retention interval, look
-in the relevant source file:
+in the relevant source file.
+
+## Overriding expiry values at runtime
+
+| Mechanism | Scope | Example |
+|---|---|---|
+| `--expiry` / `NUCLEUS_GC_EXPIRY` | Master override for both HM and Nix GC durations (gc.sh) | `--expiry 14d` |
+| `--hm-expiry` / `NUCLEUS_GC_HM_EXPIRY` | Home Manager generation expiry (gc.sh) | `--hm-expiry 30d` |
+| `--nix-expiry` / `NUCLEUS_GC_NIX_EXPIRY` | Nix store `--delete-older-than` (gc.sh) | `--nix-expiry 30d` |
+| `modules.gc.expiry` | Master Nix option (posix-base.nix) | `modules.gc.expiry = "14d"` |
+| `modules.gc.nixStoreExpiry` | Per-tool Nix option (posix-base.nix) | `modules.gc.nixStoreExpiry = "30d"` |
+
+Precedence: CLI flag > per-tool env var > master flag/env > Nix config default > `7d`.
+
+Source files:
 
 | Category                  | Source files                                                                 |
 | ------------------------- | ---------------------------------------------------------------------------- |

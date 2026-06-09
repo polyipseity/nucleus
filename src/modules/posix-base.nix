@@ -1,10 +1,29 @@
 # modules/posix-base.nix — Shared system-layer defaults for POSIX hosts.
 # Imported by both nix-darwin and NixOS host entrypoints.
-{ lib, options, ... }:
+{
+  config,
+  lib,
+  options,
+  ...
+}:
 let
   hasLaunchdDaemonsOption = options ? launchd && options.launchd ? daemons;
 in
 {
+  options.modules.gc = {
+    expiry = lib.mkOption {
+      type = lib.types.str;
+      default = "7d";
+      description = "Master expiry override. Per-tool options win.";
+    };
+    nixStoreExpiry = lib.mkOption {
+      type = lib.types.str;
+      default = config.modules.gc.expiry;
+      defaultText = lib.literalExpression "config.modules.gc.expiry";
+      description = "Duration for nix-collect-garbage --delete-older-than. Defaults to the master expiry value.";
+    };
+  };
+
   config = lib.mkMerge [
     {
       nix.settings = {
@@ -45,9 +64,7 @@ in
         automatic = true;
         # Run store collection at local noon every day.
         dates = "12:00";
-        # Keep rollback headroom for one week while capping long-term store
-        # growth from iterative host/application rebuilds.
-        options = "--delete-older-than 7d";
+        options = "--delete-older-than ${config.modules.gc.nixStoreExpiry}";
       };
     })
 
@@ -59,7 +76,7 @@ in
           ProgramArguments = [
             "/run/current-system/sw/bin/nix-collect-garbage"
             "--delete-older-than"
-            "7d"
+            "${config.modules.gc.nixStoreExpiry}"
           ];
           StartCalendarInterval = [
             {
