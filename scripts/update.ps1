@@ -5,8 +5,7 @@
 .DESCRIPTION
   Executes the native Windows update sequence in one command:
     1. flake input updates (when nix is available)
-    2. winget package upgrades (when available)
-    3. SOPS recipient rewrap for managed secret files
+    2. SOPS recipient rewrap for managed secret files
 
   Uses the NUCLEUS_REPO_ROOT environment variable to locate the repository
   root; falls back to the parent of the script directory.
@@ -16,9 +15,6 @@
 
 .PARAMETER NoBrew
   Do not run Homebrew update/upgrade (macOS only; ignored on Windows) (default: $false).
-
-.PARAMETER NoWinget
-  Do not run winget upgrade (default: $false).
 
 .PARAMETER NoSops
   Do not run sops updatekeys (default: $false).
@@ -30,17 +26,16 @@
   .\update.ps1 -NoFlake
 
 .EXAMPLE
-  .\update.ps1 -NoFlake -NoWinget -NoSops
+  .\update.ps1 -NoFlake -NoSops
 
 .NOTES
-  Environment variables: NUCLEUS_NO_FLAKE, NUCLEUS_NO_BREW, NUCLEUS_NO_WINGET, NUCLEUS_NO_SOPS, NUCLEUS_REPO_ROOT.
+  Environment variables: NUCLEUS_NO_FLAKE, NUCLEUS_NO_BREW, NUCLEUS_NO_SOPS, NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(
   [switch]$NoFlake = $(if ($env:NUCLEUS_NO_FLAKE -eq 'true') { $true } else { $false }),
   [switch]$NoBrew = $(if ($env:NUCLEUS_NO_BREW -eq 'true') { $true } else { $false }),
-  [switch]$NoWinget = $(if ($env:NUCLEUS_NO_WINGET -eq 'true') { $true } else { $false }),
   [switch]$NoSops = $(if ($env:NUCLEUS_NO_SOPS -eq 'true') { $true } else { $false }),
   [Alias("h")]
   [switch]$Help
@@ -69,10 +64,6 @@ if (-not $NoFlake -and (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinu
       throw 'nucleus: nix flake update failed.'
     }
   }
-}
-
-if (-not $NoWinget -and (Get-Command -Name 'winget.exe' -ErrorAction SilentlyContinue)) {
-  winget upgrade --all --accept-package-agreements --accept-source-agreements --disable-interactivity
 }
 
 if (-not $NoSops -and -not (Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue)) {

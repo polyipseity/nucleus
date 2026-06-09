@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 # update.sh — Orchestrate repository-wide update tasks in one deterministic sequence.
 #
-# Updates flake inputs, optionally updates macOS packages via Homebrew and
-# Windows packages via winget, and rewraps all SOPS-managed files for current
-# recipients.
+# Updates flake inputs, optionally updates macOS packages via Homebrew, and
+# rewraps all SOPS-managed files for current recipients.
 #
 # Arguments:
 #   --flake|--no-flake      Control nix flake update (default: --flake).
 #   --brew|--no-brew        Control Homebrew update/upgrade (macOS only) (default: --brew).
-#   --winget|--no-winget    Control winget upgrade (Windows only) (default: --winget).
 #   --sops|--no-sops        Control sops updatekeys (default: --sops).
 #
 # Environment variables:
@@ -27,7 +25,6 @@ usage() {
   cat <<'EOF'
   --flake|--no-flake    Control nix flake update (default: --flake).
   --brew|--no-brew      Control Homebrew update/upgrade (macOS only) (default: --brew).
-  --winget|--no-winget  Control winget upgrade (Windows only) (default: --winget).
   --sops|--no-sops      Control sops updatekeys (default: --sops).
 EOF
 }
@@ -36,7 +33,6 @@ REPO_ROOT="$(resolve_nucleus_root)"
 
 flake=true
 brew=true
-winget=true
 sops=true
 
 while [ "$#" -gt 0 ]; do
@@ -57,12 +53,7 @@ while [ "$#" -gt 0 ]; do
     --no-brew)
       brew=false
       ;;
-    --winget)
-      winget=true
-      ;;
-    --no-winget)
-      winget=false
-      ;;
+
     --sops)
       sops=true
       ;;
@@ -120,17 +111,6 @@ update_homebrew_if_available() {
   brew upgrade --cask
 }
 
-update_windows_packages_if_available() {
-  # Winget upgrades are executed only when winget is present, allowing this
-  # script to stay portable across POSIX and Windows hosts.
-  if ! command -v winget >/dev/null 2>&1; then
-    printf '%s\n' "update: winget unavailable on this host, skipping Windows package upgrade step"
-    return 0
-  fi
-
-  winget upgrade --all --accept-package-agreements --accept-source-agreements --disable-interactivity
-}
-
 rewrap_sops_files() {
   # Rewrap every encrypted repository asset so recipients stay in sync with
   # .sops.yaml key declarations after machine additions/removals.
@@ -165,10 +145,6 @@ fi
 
 if [ "$brew" = true ]; then
   update_homebrew_if_available
-fi
-
-if [ "$winget" = true ]; then
-  update_windows_packages_if_available
 fi
 
 if [ "$sops" = true ]; then
