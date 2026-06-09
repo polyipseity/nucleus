@@ -462,6 +462,21 @@
         /bin/launchctl setenv NUCLEUS_HOST MacBook 2>/dev/null || true
     fi
 
+    # ---- verify-homebrew-unpinnable ----------------------------------------------
+    # Warning-only check that installed Homebrew versions match lockfile.  Runs
+    # after homebrew bundle (so the cellar is populated) but before other
+    # post-install scripts.  Never fails activation.
+    #
+    # REPO_ROOT is inherited from the activation runner's environment (written by
+    # apply.sh at $HOME/.config/nucleus/repo-root).  If unset, skip gracefully.
+    hb_repo_root="$NUCLEUS_REPO_ROOT"
+    if [ -z "$hb_repo_root" ] && [ -f "$HOME/.config/nucleus/repo-root" ]; then
+      read -r hb_repo_root < "$HOME/.config/nucleus/repo-root"
+    fi
+    if [ -n "$hb_repo_root" ] && [ -f "$hb_repo_root/src/scripts/verify-homebrew-unpinnable.sh" ]; then
+      NUCLEUS_REPO_ROOT="$hb_repo_root" sh "$hb_repo_root/src/scripts/verify-homebrew-unpinnable.sh" || true
+    fi
+
     # ---- jellyfin-sync -----------------------------------------------------------
     # Converge Jellyfin accounts and libraries declared in src/modules/users.json
     # with a running Jellyfin server.

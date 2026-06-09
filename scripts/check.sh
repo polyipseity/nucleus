@@ -152,7 +152,7 @@ if ! $HAS_ARGS; then
     _placeholders=$(jq -r ".$_section | to_entries[] | select(.value == \"\" or .value == \"CHANGEME\" or .value == \"1.0.0\") | .key" "$_lfpath" 2>/dev/null)
     if [ -n "$_placeholders" ]; then
       echo "ERROR: $_section has placeholder versions for:"
-      echo "$_placeholders" | sed 's/^/  /'
+      echo "  ${_placeholders//$'\n'/$'\n'  }"
       _lf_errors=$((_lf_errors + 1))
     fi
   }
@@ -172,7 +172,7 @@ if ! $HAS_ARGS; then
     _placeholders=$(jq -r '.winget | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' src/lockfiles/lockfile.json 2>/dev/null)
     if [ -n "$_placeholders" ]; then
       echo "ERROR: winget has placeholder versions for:"
-      echo "$_placeholders" | sed 's/^/  /'
+      echo "  ${_placeholders//$'\n'/$'\n'  }"
       _lf_errors=$((_lf_errors + 1))
     fi
   fi
@@ -187,7 +187,7 @@ if ! $HAS_ARGS; then
     _placeholders=$(jq -r '.vscode | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' src/lockfiles/lockfile.json 2>/dev/null)
     if [ -n "$_placeholders" ]; then
       echo "ERROR: vscode has placeholder versions for:"
-      echo "$_placeholders" | sed 's/^/  /'
+      echo "  ${_placeholders//$'\n'/$'\n'  }"
       _lf_errors=$((_lf_errors + 1))
     fi
   fi
