@@ -7,6 +7,12 @@
   config,
   lib,
   pkgs,
+  username,
+  homebrew-core,
+  homebrew-cask,
+  cirruslabs-cli,
+  smudge-smudge,
+  zackelia-formulae,
   ...
 }:
 let
@@ -69,47 +75,41 @@ let
     pkgs.qtpass
     (pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ]))
   ];
-
-  # Extract the tap name from a fully qualified formula/cask reference such as
-  # "owner/repo/formula".  Returns null for unqualified names like "git".
-  extractTap =
-    item:
-    let
-      matches = builtins.match "(.*)/[^/]+" item;
-    in
-    if matches == null then null else builtins.elemAt matches 0;
-
-  # Taps bundled with every Homebrew installation; no explicit `tap` entry needed.
-  defaultTaps = [
-    "homebrew/cask"
-    "homebrew/core"
-  ];
-
-  # Derive the unique set of non-default taps referenced by any brew or cask entry.
-  allTaps =
-    let
-      rawTaps = builtins.filter (x: x != null) (map extractTap (managedBrews ++ managedCasks));
-      filtered = builtins.filter (tap: !(builtins.elem tap defaultTaps)) rawTaps;
-    in
-    # Deduplicate while preserving order.
-    builtins.foldl' (acc: tap: if builtins.elem tap acc then acc else acc ++ [ tap ]) [ ] filtered;
 in
 {
   environment.systemPackages = managedSystemPackages;
 
+  # nix-homebrew pins Homebrew binary and all tap definitions via flake.lock,
+  # making Homebrew fully declarative and supply-chain hardened.
+  # Taps are derived from here rather than auto-derived from package lists.
+  nix-homebrew = {
+    enable = true;
+    user = username;
+    mutableTaps = false;
+    taps = {
+      "homebrew/homebrew-core" = homebrew-core;
+      "homebrew/homebrew-cask" = homebrew-cask;
+      "cirruslabs/homebrew-cli" = cirruslabs-cli;
+      "smudge/homebrew-smudge" = smudge-smudge;
+      "zackelia/homebrew-formulae" = zackelia-formulae;
+    };
+  };
+
   homebrew = {
     enable = true;
 
-    onActivation.autoUpdate = false; # pin installed versions (managed via Brewfile.lock.json)
+    onActivation.autoUpdate = false; # prevent network calls during activation
     onActivation.cleanup = "zap"; # remove unlisted formulae/casks and their data
-    onActivation.upgrade = false; # pin installed versions (managed via Brewfile.lock.json)
+    onActivation.upgrade = false; # prevent network calls during activation
 
     # WHY --force: newer brew-bundle (Homebrew 4.x) requires --force when
     # --cleanup would uninstall packages unattended; activation runs under
     # sudo with no TTY to confirm.
     onActivation.extraFlags = [ "--force" ];
 
-    taps = allTaps;
+    # Derive tap names from nix-homebrew config, which pins each tap's
+    # git commit via flake.lock.
+    taps = builtins.attrNames config.nix-homebrew.taps;
     brews = managedBrews;
     casks = managedCasks;
 

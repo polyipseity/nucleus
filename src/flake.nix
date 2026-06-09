@@ -42,6 +42,34 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # nix-homebrew: pins Homebrew binary and provides declarative tap management
+    # that works alongside nix-darwin's homebrew module.
+    nix-homebrew.url = "github:zhaofengli/nix-homebrew";
+    # homebrew-core: pinned homebrew formula definitions (all managed brews).
+    homebrew-core = {
+      url = "github:homebrew/homebrew-core";
+      flake = false;
+    };
+    # homebrew-cask: pinned cask definitions (all managed casks).
+    homebrew-cask = {
+      url = "github:homebrew/homebrew-cask";
+      flake = false;
+    };
+    # cirruslabs-cli: tap for tart (macOS VM hypervisor).
+    cirruslabs-cli = {
+      url = "github:cirruslabs/homebrew-cli";
+      flake = false;
+    };
+    # smudge-smudge: tap for nightlight (Night Shift control).
+    smudge-smudge = {
+      url = "github:smudge/homebrew-smudge";
+      flake = false;
+    };
+    # zackelia-formulae: tap for bclm (battery charge limit).
+    zackelia-formulae = {
+      url = "github:zackelia/homebrew-formulae";
+      flake = false;
+    };
     # scripts: automation helpers (.sh entry points) that live outside the flake
     # root (src/).  Included as a non-flake input so builtins.readFile works in
     # pure evaluation mode (e.g. `nix flake check`).
@@ -53,13 +81,19 @@
 
   outputs =
     {
+      cirruslabs-cli,
       darwin,
       home-manager,
+      homebrew-cask,
+      homebrew-core,
+      nix-homebrew,
       nix-vscode-extensions,
       nixpkgs,
       rust-overlay,
       scripts,
+      smudge-smudge,
       sops-nix,
+      zackelia-formulae,
       ...
     }:
     let
@@ -582,11 +616,21 @@
         # Reuse the shared package set so allowUnfree policy from mkPkgs is
         # applied consistently to both system and embedded Home Manager evals.
         pkgs = pkgsMac;
-        specialArgs = { inherit username users; };
+        specialArgs = {
+          inherit username users;
+          inherit
+            homebrew-core
+            homebrew-cask
+            cirruslabs-cli
+            smudge-smudge
+            zackelia-formulae
+            ;
+        };
         system = systems.mac;
         modules = [
           ./hosts/MacBook/default.nix
           sops-nix.darwinModules.sops
+          nix-homebrew.darwinModules.nix-homebrew
           home-manager.darwinModules.home-manager
           {
             # Preserve pre-existing dotfiles on first activation instead of
