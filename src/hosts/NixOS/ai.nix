@@ -34,7 +34,7 @@
           export OPENCODE_GO_API_KEY="$(cat "$_keyfile_oc")"
         fi
         exec ${pkgs.litellm}/bin/litellm \
-          --config ${config.users.users.polyipseity.home}/dev/nucleus/src/modules/ai/litellm-config.yml \
+          --config ${config.users.users.polyipseity.home}/.config/nucleus/litellm-config.yml \
           --port 4000 \
           --host 127.0.0.1 \
           --drop_params

@@ -6,20 +6,18 @@
   Registers (or removes) a per-user scheduled task that starts the LiteLLM
   proxy on 127.0.0.1:4000.  LiteLLM is installed via `uv tool install` by
   Invoke-UvSetup; the scheduled task ensures it survives user logoff/reboot.
-  The config file is sourced from the repository share.
-
-.PARAMETER RepoRoot
-  Absolute repository root path used to resolve litellm-config.yml.
+  The config is read from ~\.config\nucleus\litellm-config.yml, a symlink
+  created by apply.ps1 that follows the live source file.
 
 .PARAMETER Enabled
   Whether the LiteLLM task should exist. When false, the managed task is
   removed if present.
 
 .EXAMPLE
-  Sync-LiteLLMScheduledTask -RepoRoot 'C:\Users\admin\nucleus' -Enabled:$true
+  Sync-LiteLLMScheduledTask -Enabled:$true
 
 .EXAMPLE
-  Sync-LiteLLMScheduledTask -RepoRoot 'C:\Users\admin\nucleus' -Enabled:$false
+  Sync-LiteLLMScheduledTask -Enabled:$false
 
 .NOTES
   Environment variables:
@@ -31,8 +29,6 @@
 function Sync-LiteLLMScheduledTask {
   [CmdletBinding()]
   param(
-    [Parameter(Mandatory)]
-    [string]$RepoRoot,
     [Parameter(Mandatory)]
     [bool]$Enabled
   )
@@ -49,10 +45,9 @@ function Sync-LiteLLMScheduledTask {
     return
   }
 
-  $resolvedRepoRoot = (Resolve-Path -Path $RepoRoot).Path
-  $configPath = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\ai\litellm-config.yml"
+  $configPath = Join-Path -Path $env:USERPROFILE -ChildPath ".config\nucleus\litellm-config.yml"
   if (-not (Test-Path -Path $configPath -PathType Leaf)) {
-    throw "litellm: config not found at '$configPath'."
+    throw "litellm: config symlink not found at '$configPath'. Run apply.ps1 first."
   }
 
   # Find the litellm binary installed by uv.  uv tool install places binaries

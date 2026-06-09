@@ -177,6 +177,10 @@ _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 # invoke, so a stable file path is the safe transport mechanism.
 mkdir -p "$HOME/.config/nucleus"
 printf '%s\n' "$REPO_ROOT" > "$HOME/.config/nucleus/repo-root"
+# Symlink the LiteLLM config so edits take effect on service restart without
+# re-running apply.  All host services (macOS launchd, NixOS systemd, Windows
+# scheduled task) reference this well-known path.
+ln -sf "$REPO_ROOT/src/modules/ai/litellm-config.yml" "$HOME/.config/nucleus/litellm-config.yml"
 
 run_nix() {
   # Execute nix with the merged config for non-root operations.

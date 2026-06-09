@@ -626,7 +626,12 @@ Sync-CaddyLocalCA -RepoRoot $repoRoot -Enabled:$true
 Sync-JellyfinAccount -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-JellyfinLibrary -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRecords $selectedUserRecords
-Sync-LiteLLMScheduledTask -RepoRoot $repoRoot -Enabled:$true
+# Symlink the config so edits take effect on service restart without re-running apply.
+$litellmConfigSymlink = Join-Path -Path $env:USERPROFILE -ChildPath ".config\nucleus\litellm-config.yml"
+$null = New-Item -Path (Split-Path -Path $litellmConfigSymlink -Parent) -ItemType Directory -Force
+if (Test-Path -Path $litellmConfigSymlink) { Remove-Item -Path $litellmConfigSymlink -Force }
+New-Item -Path $litellmConfigSymlink -ItemType SymbolicLink -Target (Join-Path -Path $repoRoot -ChildPath "src\modules\ai\litellm-config.yml") -Force | Out-Null
+Sync-LiteLLMScheduledTask -Enabled:`$true
 Sync-ReplicaSyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
 Sync-OpenSSHServer -Enabled:$EnableRemoteAccessParity
 # Re-run host age key registration after Sync-OpenSSHServer has started
