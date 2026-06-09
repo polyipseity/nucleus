@@ -22,7 +22,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-flash",
-				"maxInputTokens": 65536,
+				"maxInputTokens": 81920,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Flash",
 				"toolCalling": true,
@@ -31,7 +31,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-flash/reasoning_high",
-				"maxInputTokens": 65536,
+				"maxInputTokens": 81920,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Flash (High)",
 				"toolCalling": true,
@@ -40,7 +40,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-flash/reasoning_xhigh",
-				"maxInputTokens": 65536,
+				"maxInputTokens": 81920,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Flash (X-High)",
 				"toolCalling": true,
@@ -49,7 +49,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-pro",
-				"maxInputTokens": 65536,
+				"maxInputTokens": 81920,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Pro",
 				"toolCalling": true,
@@ -58,7 +58,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-pro/reasoning_high",
-				"maxInputTokens": 65536,
+				"maxInputTokens": 81920,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Pro (High)",
 				"toolCalling": true,
@@ -67,7 +67,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-pro/reasoning_xhigh",
-				"maxInputTokens": 65536,
+				"maxInputTokens": 81920,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Pro (X-High)",
 				"toolCalling": true,
