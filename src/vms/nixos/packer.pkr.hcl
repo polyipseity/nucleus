@@ -21,17 +21,18 @@
 #
 # Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
 #         https://nixos.org/manual/nixos/stable/index.html#sec-installation-manual
+#
+# ISO URL and checksum are pinned to a specific build.  Run bump-lockfile to
+# update them; the lockfile (src/lockfiles/lockfile.json) is the source of truth.
 
 variable "nixos_iso_url" {
   type        = string
-  default     = "https://channels.nixos.org/nixos-unstable/latest-nixos-minimal-x86_64-linux.iso"
-  description = "URL to the NixOS minimal installation ISO."
+  description = "URL to the NixOS minimal installation ISO (from lockfile nixos-iso section)."
 }
 
 variable "nixos_iso_checksum" {
   type        = string
-  default     = "none"
-  description = "Checksum for the NixOS ISO (sha256:...).  Set to 'none' to skip."
+  description = "Checksum for the NixOS ISO (sha256:...; from lockfile nixos-iso section)."
 }
 
 variable "accelerator" {
@@ -78,7 +79,7 @@ packer {
   required_plugins {
     qemu = {
       source  = "github.com/hashicorp/qemu"
-      version = "~> 1"
+      version = "1.1.4"
     }
   }
 }

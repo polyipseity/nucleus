@@ -23,6 +23,9 @@
 # Source: https://github.com/cirruslabs/packer-plugin-tart
 #         https://github.com/cirruslabs/tart
 #         https://github.com/cirruslabs/macos-image-templates
+#
+# Base image OCI reference is pinned by digest.  Run bump-lockfile to update;
+# the lockfile (src/lockfiles/lockfile.json) is the source of truth.
 
 variable "macos_version" {
   type        = string
@@ -72,6 +75,11 @@ variable "ssh_username" {
   description = "SSH username for Packer communicator (matches Cirrus CI base image default)."
 }
 
+variable "tart_image_ref" {
+  type        = string
+  description = "Full OCI image reference for the tart base image (e.g. 'ghcr.io/cirruslabs/macos-sequoia-base@sha256:...').  Pass from lockfile tart-images section."
+}
+
 variable "ssh_password" {
   type        = string
   default     = "admin"
@@ -82,7 +90,7 @@ packer {
   required_plugins {
     tart = {
       source  = "github.com/cirruslabs/tart"
-      version = "~> 1"
+      version = "1.20.0"
     }
   }
 }
@@ -91,7 +99,8 @@ packer {
 # Base images ship with Xcode, Homebrew, and an admin user (admin/admin).
 # Source: https://github.com/cirruslabs/macos-image-templates
 source "tart-cli" "macos" {
-  vm_base_name = "ghcr.io/cirruslabs/macos-${var.macos_version}-base:latest"
+  # vm_base_name comes from lockfile tart-images section (passed via -var).
+  vm_base_name = var.tart_image_ref
   vm_name      = var.vm_name
 
   cpu_count    = var.cpus
