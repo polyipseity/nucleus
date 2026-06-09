@@ -49,6 +49,28 @@
       "description": "cargo-binstall crate versions. Crate name → version string or VCS hash pin.",
       "type": "object"
     },
+    "nixos-iso": {
+      "additionalProperties": {
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "description": "SHA-256 checksum of the NixOS minimal ISO for this architecture."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the NixOS minimal installation ISO for this architecture."
+          }
+        },
+        "required": [
+          "url",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "description": "NixOS minimal ISO pins per architecture (x86_64-linux, aarch64-linux).  Updated by bump-lockfile.",
+      "type": "object"
+    },
     "ollama": {
       "additionalProperties": {
         "items": {
@@ -119,11 +141,32 @@
       "description": "VS Code extension versions. Extension ID → version string.",
       "type": "object"
     },
+    "tart-images": {
+      "additionalProperties": {
+        "properties": {
+          "digest": {
+            "type": "string",
+            "description": "OCI digest (sha256:...) of the Cirrus CI base image manifest."
+          },
+          "image": {
+            "type": "string",
+            "description": "OCI image reference (without digest)."
+          }
+        },
+        "required": [
+          "image",
+          "digest"
+        ],
+        "type": "object"
+      },
+      "description": "macOS Tart base image OCI digests per macOS version (sequoia, tahoe, etc.).  Updated by bump-lockfile.",
+      "type": "object"
+    },
     "winget": {
       "additionalProperties": {
         "type": "string"
       },
-      "description": "WinGet package identifiers and versions. Package ID → version string.",
+      "description": "WinGet package identifiers and versions. Package ID → version string. Lockfile is the sole version authority — only bump-lockfile may change WinGet versions.",
       "type": "object"
     },
     "homebrew": {
@@ -172,7 +215,9 @@
     "vscode",
     "pwsh",
     "homebrew",
-    "ollama"
+    "ollama",
+    "nixos-iso",
+    "tart-images"
   ],
   "title": "Nucleus Lockfile",
   "type": "object"
