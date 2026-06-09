@@ -14,6 +14,7 @@
 #   NUCLEUS_AI_SYNC_TIMEOUT  Bounded wait for server readiness in seconds (default: 60).
 #   NUCLEUS_AI_SYNC_POLL     Poll interval while waiting in seconds (default: 2).
 #   NUCLEUS_AI_SYNC_PROFILE  Override profile selection; auto-detected when unset.
+#   NUCLEUS_OLLAMA_HOST      Ollama daemon address (host:port) for admin CLI commands (default: 127.0.0.1:11434).
 #
 # Exit conditions:
 #   0 on success or when ollama is unavailable (benign skip).
@@ -32,6 +33,7 @@ dry_run=false
 gc_only=false
 ready_timeout_seconds="${NUCLEUS_AI_SYNC_TIMEOUT:-60}"
 ready_poll_seconds="${NUCLEUS_AI_SYNC_POLL:-2}"
+: "${NUCLEUS_OLLAMA_HOST:=127.0.0.1:11434}"
 
 usage() {
   usage_std "$(basename "$0")" "[options]"
@@ -85,7 +87,7 @@ fi
 # The service process may be installed/registered before the HTTP API is ready,
 # so an immediate `ollama list` can race the daemon startup on all POSIX hosts.
 wait_for_ollama_server() {
-  if OLLAMA_HOST="127.0.0.1:11434" ollama list >/dev/null 2>&1; then
+  if OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama list >/dev/null 2>&1; then
     return 0
   fi
 
@@ -98,7 +100,7 @@ wait_for_ollama_server() {
   while [ "$_waited" -lt "$ready_timeout_seconds" ]; do
     sleep "$ready_poll_seconds"
     _waited=$((_waited + ready_poll_seconds))
-    if OLLAMA_HOST="127.0.0.1:11434" ollama list >/dev/null 2>&1; then
+    if OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama list >/dev/null 2>&1; then
       return 0
     fi
   done
@@ -137,7 +139,7 @@ desired_models=$(jq -r --arg profile "$profile" '.models[$profile][]' "$MANIFEST
 # Build the installed model list from `ollama list` output.
 # Output format: NAME  ID  SIZE  MODIFIED (tab/space separated header + rows).
 # NR>1 skips the header line; $1!="" guards against blank trailing lines.
-installed_models=$(OLLAMA_HOST="127.0.0.1:11434" ollama list | awk 'NR>1 && $1!="" {print $1}')
+installed_models=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama list | awk 'NR>1 && $1!="" {print $1}')
 
 # Pull models present in the manifest but not locally installed.
 if [ "$gc_only" = false ]; then
@@ -152,9 +154,9 @@ if [ "$gc_only" = false ]; then
       printf '%s\n' "ai-sync: would pull $model"
     else
       printf '%s\n' "ai-sync: pulling $model"
-      OLLAMA_HOST="127.0.0.1:11434" ollama pull "$model"
+      OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama pull "$model"
       # Verify pull succeeded via ollama list
-      if ! printf '%s\n' "$(OLLAMA_HOST="127.0.0.1:11434" ollama list | awk 'NR>1 && \$1!="" {print \$1}')" | grep -Fxq "$model"; then
+      if ! printf '%s\n' "$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama list | awk 'NR>1 && \$1!="" {print \$1}')" | grep -Fxq "$model"; then
         printf '%s\n' "ai-sync: ERROR: $model was pulled but is not in 'ollama list'" >&2
         exit 1
       fi
@@ -166,7 +168,7 @@ if [ "$gc_only" = false ]; then
         _expected_digest=$(jq -r --arg p "$profile" --arg n "$_model_name" --arg t "$_model_tag" '
           .ollama[$p][] | select(.name == $n and .tag == $t) | .digest // empty' "$LOCKFILE" 2>/dev/null || true)
         if [ -n "$_expected_digest" ]; then
-          _actual_digest=$(OLLAMA_HOST="127.0.0.1:11434" ollama show --format json "$model" 2>/dev/null | jq -r '.digest // empty' 2>/dev/null || true)
+          _actual_digest=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama show --format json "$model" 2>/dev/null | jq -r '.digest // empty' 2>/dev/null || true)
           if [ -n "$_actual_digest" ] && [ "$_actual_digest" != "$_expected_digest" ]; then
             printf '%s\n' "ai-sync: WARNING: digest mismatch for $model (expected $_expected_digest, got $_actual_digest)" >&2
           elif [ -n "$_actual_digest" ]; then
@@ -192,7 +194,7 @@ printf '%s\n' "$installed_models" | while IFS= read -r model; do
     printf '%s\n' "ai-sync: would remove $model"
   else
     printf '%s\n' "ai-sync: removing $model"
-    OLLAMA_HOST="127.0.0.1:11434" ollama rm "$model"
+    OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama rm "$model"
   fi
 done
 

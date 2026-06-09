@@ -26,6 +26,7 @@
 
 .NOTES
   Environment variable: NUCLEUS_REPO_ROOT (optional, overrides repo root detection).
+  Environment variable: NUCLEUS_OLLAMA_HOST (optional, Ollama daemon address for admin CLI commands; default: 127.0.0.1:11434).
   Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
@@ -379,9 +380,10 @@ if (Test-CommandAvailable 'ollama') {  # Point at the Ollama daemon directly, by
         $hasDigest = $entry.ContainsKey('digest')
         $oldDigest = if ($hasDigest) { $entry['digest'] } else { $null }
 
+        $ollamaHostAddr = if ($env:NUCLEUS_OLLAMA_HOST) { $env:NUCLEUS_OLLAMA_HOST } else { '127.0.0.1:11434' }
         try {
           $oldOllamaHost = $env:OLLAMA_HOST
-          $env:OLLAMA_HOST = '127.0.0.1:11434'
+          $env:OLLAMA_HOST = $ollamaHostAddr
           $ollamaInfo = & ollama show "${name}:${tag}" --format json 2>$null
           $env:OLLAMA_HOST = $oldOllamaHost
           if ($ollamaInfo) {

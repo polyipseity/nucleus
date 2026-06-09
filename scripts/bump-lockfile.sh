@@ -19,7 +19,8 @@
 #                 (skip if ollama unavailable)
 #
 # Environment variables:
-#   NUCLEUS_REPO_ROOT  Override the detected repository root path.
+#   NUCLEUS_REPO_ROOT      Override the detected repository root path.
+#   NUCLEUS_OLLAMA_HOST    Ollama daemon address (host:port) for admin CLI commands (default: 127.0.0.1:11434).
 #
 # Exit conditions:
 #   0 on success; non-zero on failure (missing jq, lockfile not found).
@@ -274,6 +275,7 @@ fi
 # ---------------------------------------------------------------------------
 # ollama — ollama show <name>:<tag> --format json
 # ---------------------------------------------------------------------------
+: "${NUCLEUS_OLLAMA_HOST:=127.0.0.1:11434}"
 if command -v ollama >/dev/null 2>&1; then
   # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
   # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
@@ -294,7 +296,7 @@ if command -v ollama >/dev/null 2>&1; then
       old_digest=$(printf '%s\n' "$entry" | jq -r '.digest // empty')
 
       # Query ollama for current model info
-      ollama_info=$(OLLAMA_HOST="127.0.0.1:11434" ollama show "$name:$tag" --format json 2>/dev/null || true)
+      ollama_info=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama show "$name:$tag" --format json 2>/dev/null || true)
       if [ -n "$ollama_info" ]; then
         new_digest=$(printf '%s\n' "$ollama_info" | jq -r '.digest // empty' 2>/dev/null || true)
         if [ -n "$new_digest" ] && [ "$new_digest" != "$old_digest" ]; then
