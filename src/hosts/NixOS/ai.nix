@@ -8,13 +8,7 @@
 # The Home Manager module modules/ai/default.nix provides the ollama CLI binary,
 # OLLAMA_HOST session variable, and the oterm client on all POSIX hosts
 # including this one.
-{ config, pkgs, ... }:
-let
-  litellmConfig = pkgs.writeText "litellm-config.yml" (
-    builtins.readFile ../../modules/ai/litellm-config.yml
-  );
-in
-{
+{ config, pkgs, ... }: {
   # LiteLLM AI gateway — systemd service on 127.0.0.1:4000.
   # Since nixpkgs has no services.litellm module yet, we define the service
   # manually.  ExecStart uses a shell wrapper that reads the SOPS-decrypted
@@ -40,7 +34,7 @@ in
           export OPENCODE_GO_API_KEY="$(cat "$_keyfile_oc")"
         fi
         exec ${pkgs.litellm}/bin/litellm \
-          --config ${litellmConfig} \
+          --config ${config.users.users.polyipseity.home}/dev/nucleus/src/modules/ai/litellm-config.yml \
           --port 4000 \
           --host 127.0.0.1 \
           --drop_params

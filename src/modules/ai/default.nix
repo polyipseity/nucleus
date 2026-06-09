@@ -100,7 +100,7 @@ lib.mkMerge [
               export OPENCODE_GO_API_KEY="$(cat "${config.sops.secrets."ai_opencode_api_key".path}")"
             fi
             exec ${pkgs.litellm}/bin/litellm \
-              --config ${pkgs.writeText "litellm-config.yml" (builtins.readFile ./litellm-config.yml)} \
+              --config ${config.home.homeDirectory}/dev/nucleus/src/modules/ai/litellm-config.yml \
               --port 4000 \
               --host 127.0.0.1 \
               --drop_params
