@@ -34,13 +34,6 @@ let
   sshRsaPrivateKeyPath = "${config.home.homeDirectory}/.ssh/${sshRsaSecretName}";
   sshRsaPublicKeyPath = "${sshRsaPrivateKeyPath}.pub";
   sshIdentityFile = "~/.ssh/${sshSecretName}";
-  sshExtraOptions = {
-    AddKeysToAgent = "yes";
-    # Non-Apple OpenSSH (for example nixpkgs openssh) rejects UseKeychain.
-    # IgnoreUnknown keeps one shared ~/.ssh/config usable across clients.
-    IgnoreUnknown = "UseKeychain";
-  }
-  // lib.optionalAttrs pkgs.stdenv.isDarwin { UseKeychain = "yes"; };
 
   # Git identity is sourced from the managed decrypted payload so name/email/
   # signing key follow the same SOPS lifecycle as SSH/GPG material.
@@ -162,18 +155,21 @@ lib.mkIf isPrimaryUser {
   programs.ssh = {
     enable = true;
     enableDefaultConfig = false;
-    matchBlocks = {
-      "*" = {
-        identityFile = sshIdentityFile;
-        extraOptions = sshExtraOptions;
+    settings =
+      let
+        baseSshSettings = {
+          IdentityFile = sshIdentityFile;
+          AddKeysToAgent = "yes";
+          IgnoreUnknown = "UseKeychain";
+        }
+        // lib.optionalAttrs pkgs.stdenv.isDarwin { UseKeychain = "yes"; };
+      in
+      {
+        "*" = baseSshSettings;
+        "github.com" = baseSshSettings // {
+          Hostname = "github.com";
+        };
       };
-
-      "github.com" = {
-        hostname = "github.com";
-        identityFile = sshIdentityFile;
-        extraOptions = sshExtraOptions;
-      };
-    };
   };
 
   # --------------------------------------------------------------------------
