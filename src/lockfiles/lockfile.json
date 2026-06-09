@@ -119,13 +119,13 @@
   "version": 2,
   "vm-setup": {
     "nixos-iso": {
-      "x86_64-linux": {
-        "digest": "sha256:b23b81eab44362619f7135a84b352494a95a6701958f1b112a94e5467c6f0268",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1011622.a799d3e3886d/nixos-minimal-26.11pre1011622.a799d3e3886d-x86_64-linux.iso"
-      },
       "aarch64-linux": {
         "digest": "sha256:724965ef8cca51bd56729021b548a598171daea59d3dc2a66e86a46bf7228c18",
         "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1011622.a799d3e3886d/nixos-minimal-26.11pre1011622.a799d3e3886d-aarch64-linux.iso"
+      },
+      "x86_64-linux": {
+        "digest": "sha256:b23b81eab44362619f7135a84b352494a95a6701958f1b112a94e5467c6f0268",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1011622.a799d3e3886d/nixos-minimal-26.11pre1011622.a799d3e3886d-x86_64-linux.iso"
       }
     },
     "tart-images": {

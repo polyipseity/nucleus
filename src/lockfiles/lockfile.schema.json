@@ -49,6 +49,39 @@
       "description": "cargo-binstall crate versions. Crate name → version string or VCS hash pin.",
       "type": "object"
     },
+    "homebrew": {
+      "additionalProperties": false,
+      "description": "Homebrew formula, cask, and Mac App Store version pins for macOS.",
+      "properties": {
+        "brews": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Homebrew formula versions. Formula name → version string.",
+          "type": "object"
+        },
+        "casks": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Homebrew cask versions. Cask name → version string.",
+          "type": "object"
+        },
+        "masApps": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Mac App Store app identifiers. App name → App Store ID string.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "brews",
+        "casks",
+        "masApps"
+      ],
+      "type": "object"
+    },
     "ollama": {
       "additionalProperties": {
         "items": {
@@ -113,59 +146,89 @@
       "type": "integer"
     },
     "vm-setup": {
-      "type": "object",
+      "additionalProperties": {
+        "additionalProperties": false,
+        "description": "Future image type. May contain url, digest, and/or image.",
+        "properties": {
+          "digest": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "description": "VM image artifact pins consumed by vm-setup provisioning.",
       "properties": {
         "nixos-iso": {
-          "type": "object",
-          "description": "NixOS minimal ISO pins per architecture.",
           "additionalProperties": {
-            "type": "object",
+            "additionalProperties": false,
             "properties": {
-              "digest": { "type": "string" },
-              "url": { "type": "string", "format": "uri" }
+              "digest": {
+                "type": "string"
+              },
+              "url": {
+                "format": "uri",
+                "type": "string"
+              }
             },
-            "required": ["url", "digest"],
-            "additionalProperties": false
-          }
+            "required": [
+              "url",
+              "digest"
+            ],
+            "type": "object"
+          },
+          "description": "NixOS minimal ISO pins per architecture.",
+          "type": "object"
         },
         "tart-images": {
-          "type": "object",
-          "description": "macOS Tart base image OCI digests per macOS version.",
           "additionalProperties": {
-            "type": "object",
+            "additionalProperties": false,
             "properties": {
-              "digest": { "type": "string" },
-              "image": { "type": "string" }
+              "digest": {
+                "type": "string"
+              },
+              "image": {
+                "type": "string"
+              }
             },
-            "required": ["image", "digest"],
-            "additionalProperties": false
-          }
+            "required": [
+              "image",
+              "digest"
+            ],
+            "type": "object"
+          },
+          "description": "macOS Tart base image OCI digests per macOS version.",
+          "type": "object"
         },
         "windows": {
-          "type": "object",
-          "description": "Windows ISO pins. Empty placeholder — populated when digest recording is implemented.",
           "additionalProperties": {
-            "type": "object",
+            "additionalProperties": false,
             "properties": {
-              "digest": { "type": "string" },
-              "url": { "type": "string", "format": "uri" }
+              "digest": {
+                "type": "string"
+              },
+              "url": {
+                "format": "uri",
+                "type": "string"
+              }
             },
-            "required": ["url", "digest"],
-            "additionalProperties": false
-          }
+            "required": [
+              "url",
+              "digest"
+            ],
+            "type": "object"
+          },
+          "description": "Windows ISO pins. Empty placeholder — populated when digest recording is implemented.",
+          "type": "object"
         }
       },
-      "additionalProperties": {
-        "type": "object",
-        "description": "Future image type. May contain url, digest, and/or image.",
-        "properties": {
-          "digest": { "type": "string" },
-          "image": { "type": "string" },
-          "url": { "type": "string", "format": "uri" }
-        },
-        "additionalProperties": false
-      }
+      "type": "object"
     },
     "vscode": {
       "additionalProperties": {
@@ -179,39 +242,6 @@
         "type": "string"
       },
       "description": "WinGet package identifiers and versions. Package ID → version string. Lockfile is the sole version authority — only bump-lockfile may change WinGet versions.",
-      "type": "object"
-    },
-    "homebrew": {
-      "additionalProperties": false,
-      "description": "Homebrew formula, cask, and Mac App Store version pins for macOS.",
-      "properties": {
-        "brews": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Homebrew formula versions. Formula name → version string.",
-          "type": "object"
-        },
-        "casks": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Homebrew cask versions. Cask name → version string.",
-          "type": "object"
-        },
-        "masApps": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Mac App Store app identifiers. App name → App Store ID string.",
-          "type": "object"
-        }
-      },
-      "required": [
-        "brews",
-        "casks",
-        "masApps"
-      ],
       "type": "object"
     }
   },
