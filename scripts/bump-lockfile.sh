@@ -275,6 +275,9 @@ fi
 # ollama — ollama show <name>:<tag> --format json
 # ---------------------------------------------------------------------------
 if command -v ollama >/dev/null 2>&1; then
+  # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
+  # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
+  export OLLAMA_HOST="127.0.0.1:11434"
   while IFS= read -r host; do
     [ -z "$host" ] && continue
     # Get the array index to iterate over models for this host

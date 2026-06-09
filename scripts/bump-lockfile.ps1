@@ -363,7 +363,9 @@ if ($vscodeOutput) {
 # ---------------------------------------------------------------------------
 # ollama — ollama show <name>:<tag> --format json
 # ---------------------------------------------------------------------------
-if (Test-CommandAvailable 'ollama') {
+if (Test-CommandAvailable 'ollama') {  # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
+  # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
+  $env:OLLAMA_HOST = '127.0.0.1:11434'
   if ($ht.ContainsKey('ollama') -and $ht['ollama'] -is [hashtable]) {
     foreach ($hostName in $ht['ollama'].Keys) {
       $models = $ht['ollama'][$hostName]

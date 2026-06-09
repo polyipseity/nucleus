@@ -29,8 +29,11 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # Override OLLAMA_HOST to point directly at Ollama (not LiteLLM) so that
 # model list/pull/rm commands talk to the inference backend directly instead
 # of routing through the AI gateway proxy.  The default session variable in
-# modules/ai/default.nix points at LiteLLM (127.0.0.1:4000).
-export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"
+# modules/ai/default.nix points at LiteLLM (127.0.0.1:4000).  Must be
+# unconditional — the `:-` default-only pattern would inherit the session
+# variable and silently send Ollama-protocol requests to LiteLLM, where they
+# fail with an opaque error.
+export OLLAMA_HOST="127.0.0.1:11434"
 
 REPO_ROOT="$(resolve_nucleus_root)"
 MANIFEST="$REPO_ROOT/src/modules/ai/models.json"
