@@ -77,7 +77,7 @@ variable "ssh_username" {
 
 variable "tart_image_ref" {
   type        = string
-  description = "Full OCI image reference for the tart base image (e.g. 'ghcr.io/cirruslabs/macos-sequoia-base@sha256:...').  Pass from lockfile tart-images section."
+  description = "Full OCI image reference for the tart base image (e.g. 'ghcr.io/cirruslabs/macos-sequoia-base@sha256:...').  Pass from lockfile vm-setup.tart-images section."
 }
 
 variable "ssh_password" {
@@ -99,7 +99,7 @@ packer {
 # Base images ship with Xcode, Homebrew, and an admin user (admin/admin).
 # Source: https://github.com/cirruslabs/macos-image-templates
 source "tart-cli" "macos" {
-  # vm_base_name comes from lockfile tart-images section (passed via -var).
+  # vm_base_name comes from lockfile vm-setup.tart-images section (passed via -var).
   vm_base_name = var.tart_image_ref
   vm_name      = var.vm_name
 

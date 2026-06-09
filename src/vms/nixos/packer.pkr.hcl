@@ -27,12 +27,12 @@
 
 variable "nixos_iso_url" {
   type        = string
-  description = "URL to the NixOS minimal installation ISO (from lockfile nixos-iso section)."
+  description = "URL to the NixOS minimal installation ISO (from lockfile vm-setup.nixos-iso section)."
 }
 
 variable "nixos_iso_checksum" {
   type        = string
-  description = "Checksum for the NixOS ISO (sha256:...; from lockfile nixos-iso section)."
+  description = "Checksum for the NixOS ISO (sha256:...; from lockfile vm-setup.nixos-iso section)."
 }
 
 variable "accelerator" {

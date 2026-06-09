@@ -17,8 +17,7 @@
     pwsh          Find-Module via pwsh
     vscode        code / code-insiders --list-extensions --show-versions
     ollama        ollama show <name>:<tag> --format json
-    nixos-iso     Query NixOS channel for latest ISO URL and SHA-256
-    tart-images   Query GHCR OCI registry for Cirrus CI macOS base image digests
+#   vm-setup      VM image artifact pins (nixos-iso, tart-images, windows). Use -Sections nixos-iso etc. for sub-sections.
 
 .PARAMETER Sections
   Comma-separated list of sections to update. If omitted, all sections are updated.
@@ -425,10 +424,10 @@ if ((Test-SectionEnabled 'ollama') -and (Test-CommandAvailable 'ollama')) {  # P
 # ---------------------------------------------------------------------------
 # nixos-iso — Query NixOS channel for latest ISO URL and SHA-256
 # ---------------------------------------------------------------------------
-if (Test-SectionEnabled 'nixos-iso') {
-  if ($ht.ContainsKey('nixos-iso') -and $ht['nixos-iso'] -is [hashtable]) {
-    foreach ($arch in $ht['nixos-iso'].Keys) {
-      $entry = $ht['nixos-iso'][$arch]
+if ((Test-SectionEnabled 'vm-setup') -or (Test-SectionEnabled 'nixos-iso')) {
+  if ($ht.ContainsKey('vm-setup') -and $ht['vm-setup'].ContainsKey('nixos-iso') -and $ht['vm-setup']['nixos-iso'] -is [hashtable]) {
+    foreach ($arch in $ht['vm-setup']['nixos-iso'].Keys) {
+      $entry = $ht['vm-setup']['nixos-iso'][$arch]
       $oldUrl = $entry['url']
       $oldSha256 = $entry['sha256']
 
@@ -460,8 +459,8 @@ if (Test-SectionEnabled 'nixos-iso') {
       }
 
       if ($oldUrl -ne $resolvedUrl -or $oldSha256 -ne $newSha256) {
-        Write-Update -Section 'nixos-iso' -Key $arch -OldValue "${oldSha256:0:12}..." -NewValue "${newSha256:0:12}..."
-        $ht['nixos-iso'][$arch] = @{ url = $resolvedUrl; sha256 = $newSha256 }
+        Write-Update -Section 'vm-setup.nixos-iso' -Key $arch -OldValue "${oldSha256:0:12}..." -NewValue "${newSha256:0:12}..."
+        $ht['vm-setup']['nixos-iso'][$arch] = @{ url = $resolvedUrl; sha256 = $newSha256 }
       }
     }
   }
@@ -470,10 +469,10 @@ if (Test-SectionEnabled 'nixos-iso') {
 # ---------------------------------------------------------------------------
 # tart-images — Query GHCR OCI registry for Cirrus CI macOS base image digests
 # ---------------------------------------------------------------------------
-if (Test-SectionEnabled 'tart-images') {
-  if ($ht.ContainsKey('tart-images') -and $ht['tart-images'] -is [hashtable]) {
-    foreach ($osVersion in $ht['tart-images'].Keys) {
-      $entry = $ht['tart-images'][$osVersion]
+if ((Test-SectionEnabled 'vm-setup') -or (Test-SectionEnabled 'tart-images')) {
+  if ($ht.ContainsKey('vm-setup') -and $ht['vm-setup'].ContainsKey('tart-images') -and $ht['vm-setup']['tart-images'] -is [hashtable]) {
+    foreach ($osVersion in $ht['vm-setup']['tart-images'].Keys) {
+      $entry = $ht['vm-setup']['tart-images'][$osVersion]
       $oldImage = $entry['image']
       $oldDigest = $entry['digest']
       if ([string]::IsNullOrEmpty($oldImage)) { continue }
@@ -506,7 +505,7 @@ if (Test-SectionEnabled 'tart-images') {
         }
 
         if ($oldDigest -ne $newDigest) {
-          Write-Update -Section 'tart-images' -Key $osVersion -OldValue "${oldDigest:0:20}..." -NewValue "${newDigest:0:20}..."
+          Write-Update -Section 'vm-setup.tart-images' -Key $osVersion -OldValue "${oldDigest:0:20}..." -NewValue "${newDigest:0:20}..."
           $entry['digest'] = $newDigest
         }
       } catch {

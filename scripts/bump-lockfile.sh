@@ -17,8 +17,7 @@
 #                 (skip if neither available)
 #   ollama        ollama show <name>:<tag> --format json
 #                 (skip if ollama unavailable)
-#   nixos-iso     Query NixOS channel for latest ISO URL and SHA-256
-#   tart-images   Query GHCR OCI registry for Cirrus CI macOS base image digests
+#   vm-setup      VM image artifact pins (nixos-iso, tart-images, windows). Use --sections nixos-iso etc. for sub-sections.
 #
 # Environment variables:
 #   NUCLEUS_REPO_ROOT      Override the detected repository root path.
@@ -374,11 +373,11 @@ fi
 # ---------------------------------------------------------------------------
 # nixos-iso — Query NixOS channel for latest ISO URL and its SHA-256
 # ---------------------------------------------------------------------------
-if section_enabled nixos-iso; then
+if section_enabled vm-setup || section_enabled nixos-iso; then
   while IFS= read -r arch; do
     [ -z "$arch" ] && continue
-    old_url=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.nixos-iso // {})[$a].url // empty')
-    old_sha256=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.nixos-iso // {})[$a].sha256 // empty')
+    old_url=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.vm-setup.nixos-iso // {})[$a].url // empty')
+    old_sha256=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.vm-setup.nixos-iso // {})[$a].sha256 // empty')
     [ -z "$old_url" ] && continue
 
     # Resolve the latest- redirect to a specific release URL
@@ -399,21 +398,21 @@ if section_enabled nixos-iso; then
     fi
 
     if [ "$old_url" != "$resolved_url" ] || [ "$old_sha256" != "$new_sha256" ]; then
-      log_update "nixos-iso" "$arch" "${old_sha256:0:12}..." "${new_sha256:0:12}..."
+      log_update "vm-setup.nixos-iso" "$arch" "${old_sha256:0:12}..." "${new_sha256:0:12}..."
       data=$(printf '%s\n' "$data" | jq --arg a "$arch" --arg u "$resolved_url" --arg s "$new_sha256" '
-        .nixos-iso[$a] = {url: $u, sha256: $s}
+        .vm-setup.nixos-iso[$a] = {url: $u, sha256: $s}
       ')
     fi
-  done < <(printf '%s\n' "$data" | jq -r '(.nixos-iso // {}) | keys[]')
+  done < <(printf '%s\n' "$data" | jq -r '(.vm-setup.nixos-iso // {}) | keys[]')
 fi
 
 # ---------------------------------------------------------------------------
 # tart-images — Query GHCR OCI registry for Cirrus CI macOS base image digests
 # ---------------------------------------------------------------------------
-if section_enabled tart-images; then
+if section_enabled vm-setup || section_enabled tart-images; then
   while IFS= read -r os_version; do
     [ -z "$os_version" ] && continue
-    entry=$(printf '%s\n' "$data" | jq -c --arg v "$os_version" '(.tart-images // {})[$v] // empty')
+    entry=$(printf '%s\n' "$data" | jq -c --arg v "$os_version" '(.vm-setup.tart-images // {})[$v] // empty')
     [ -z "$entry" ] && continue
 
     old_image=$(printf '%s\n' "$entry" | jq -r '.image // empty')
@@ -447,12 +446,12 @@ if section_enabled tart-images; then
     fi
 
     if [ "$old_digest" != "$new_digest" ]; then
-      log_update "tart-images" "$os_version" "${old_digest:0:20}..." "${new_digest:0:20}..."
+      log_update "vm-setup.tart-images" "$os_version" "${old_digest:0:20}..." "${new_digest:0:20}..."
       data=$(printf '%s\n' "$data" | jq --arg v "$os_version" --arg d "$new_digest" '
-        .tart-images[$v].digest = $d
+        .vm-setup.tart-images[$v].digest = $d
       ')
     fi
-  done < <(printf '%s\n' "$data" | jq -r '(.tart-images // {}) | keys[]')
+  done < <(printf '%s\n' "$data" | jq -r '(.vm-setup.tart-images // {}) | keys[]')
 fi
 
 # ---------------------------------------------------------------------------

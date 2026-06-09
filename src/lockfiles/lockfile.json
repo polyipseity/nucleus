@@ -57,16 +57,6 @@
       "Xcode": "497799835"
     }
   },
-  "nixos-iso": {
-    "x86_64-linux": {
-      "sha256": "b23b81eab44362619f7135a84b352494a95a6701958f1b112a94e5467c6f0268",
-      "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1011622.a799d3e3886d/nixos-minimal-26.11pre1011622.a799d3e3886d-x86_64-linux.iso"
-    },
-    "aarch64-linux": {
-      "sha256": "724965ef8cca51bd56729021b548a598171daea59d3dc2a66e86a46bf7228c18",
-      "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1011622.a799d3e3886d/nixos-minimal-26.11pre1011622.a799d3e3886d-aarch64-linux.iso"
-    }
-  },
   "ollama": {
     "MacBook": [
       {
@@ -110,16 +100,6 @@
       }
     ]
   },
-  "tart-images": {
-    "sequoia": {
-      "digest": "sha256:fdd8b72a6ee46fc8ad35dc1b9f3b1f162b6607b82a584947d20bb28d3dcb99ed",
-      "image": "ghcr.io/cirruslabs/macos-sequoia-base"
-    },
-    "tahoe": {
-      "digest": "sha256:a8e1c8305758643f513fdccdd829c2243687c60791083dea42f73f0b7aeb435c",
-      "image": "ghcr.io/cirruslabs/macos-tahoe-base"
-    }
-  },
   "pwsh": {
     "PSScriptAnalyzer": "1.20.0"
   },
@@ -137,6 +117,29 @@
     "paddleocr": "2.8.0"
   },
   "version": 2,
+  "vm-setup": {
+    "nixos-iso": {
+      "x86_64-linux": {
+        "sha256": "b23b81eab44362619f7135a84b352494a95a6701958f1b112a94e5467c6f0268",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1011622.a799d3e3886d/nixos-minimal-26.11pre1011622.a799d3e3886d-x86_64-linux.iso"
+      },
+      "aarch64-linux": {
+        "sha256": "724965ef8cca51bd56729021b548a598171daea59d3dc2a66e86a46bf7228c18",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1011622.a799d3e3886d/nixos-minimal-26.11pre1011622.a799d3e3886d-aarch64-linux.iso"
+      }
+    },
+    "tart-images": {
+      "sequoia": {
+        "digest": "sha256:fdd8b72a6ee46fc8ad35dc1b9f3b1f162b6607b82a584947d20bb28d3dcb99ed",
+        "image": "ghcr.io/cirruslabs/macos-sequoia-base"
+      },
+      "tahoe": {
+        "digest": "sha256:a8e1c8305758643f513fdccdd829c2243687c60791083dea42f73f0b7aeb435c",
+        "image": "ghcr.io/cirruslabs/macos-tahoe-base"
+      }
+    },
+    "windows": {}
+  },
   "vscode": {
     "arrterian.nix-env-selector": "1.2.0",
     "astral-sh.ty": "2025.71.13500942",

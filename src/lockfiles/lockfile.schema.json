@@ -49,28 +49,6 @@
       "description": "cargo-binstall crate versions. Crate name → version string or VCS hash pin.",
       "type": "object"
     },
-    "nixos-iso": {
-      "additionalProperties": {
-        "properties": {
-          "sha256": {
-            "type": "string",
-            "description": "SHA-256 checksum of the NixOS minimal ISO for this architecture."
-          },
-          "url": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL to the NixOS minimal installation ISO for this architecture."
-          }
-        },
-        "required": [
-          "url",
-          "sha256"
-        ],
-        "type": "object"
-      },
-      "description": "NixOS minimal ISO pins per architecture (x86_64-linux, aarch64-linux).  Updated by bump-lockfile.",
-      "type": "object"
-    },
     "ollama": {
       "additionalProperties": {
         "items": {
@@ -134,32 +112,60 @@
       "minimum": 1,
       "type": "integer"
     },
+    "vm-setup": {
+      "type": "object",
+      "description": "VM image artifact pins consumed by vm-setup provisioning.",
+      "properties": {
+        "nixos-iso": {
+          "type": "object",
+          "description": "NixOS minimal ISO pins per architecture.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "sha256": { "type": "string" },
+              "url": { "type": "string", "format": "uri" }
+            },
+            "required": ["url", "sha256"],
+            "additionalProperties": false
+          }
+        },
+        "tart-images": {
+          "type": "object",
+          "description": "macOS Tart base image OCI digests per macOS version.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "digest": { "type": "string" },
+              "image": { "type": "string" }
+            },
+            "required": ["image", "digest"],
+            "additionalProperties": false
+          }
+        },
+        "windows": {
+          "type": "object",
+          "description": "Windows ISO pins. Empty placeholder — populated when SHA-256 recording is implemented.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "sha256": { "type": "string" },
+              "url": { "type": "string", "format": "uri" }
+            },
+            "required": ["url", "sha256"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "description": "Future image type. Must be an object; internal shape TBD by its implementation."
+      }
+    },
     "vscode": {
       "additionalProperties": {
         "type": "string"
       },
       "description": "VS Code extension versions. Extension ID → version string.",
-      "type": "object"
-    },
-    "tart-images": {
-      "additionalProperties": {
-        "properties": {
-          "digest": {
-            "type": "string",
-            "description": "OCI digest (sha256:...) of the Cirrus CI base image manifest."
-          },
-          "image": {
-            "type": "string",
-            "description": "OCI image reference (without digest)."
-          }
-        },
-        "required": [
-          "image",
-          "digest"
-        ],
-        "type": "object"
-      },
-      "description": "macOS Tart base image OCI digests per macOS version (sequoia, tahoe, etc.).  Updated by bump-lockfile.",
       "type": "object"
     },
     "winget": {
@@ -204,20 +210,19 @@
     }
   },
   "required": [
-    "version",
-    "updated",
-    "scoop",
-    "cargo-binstall",
     "bun",
-    "uv",
-    "rustup",
-    "winget",
-    "vscode",
-    "pwsh",
+    "cargo-binstall",
     "homebrew",
     "ollama",
-    "nixos-iso",
-    "tart-images"
+    "pwsh",
+    "rustup",
+    "scoop",
+    "updated",
+    "uv",
+    "version",
+    "vm-setup",
+    "vscode",
+    "winget"
   ],
   "title": "Nucleus Lockfile",
   "type": "object"
