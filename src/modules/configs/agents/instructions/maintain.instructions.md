@@ -51,7 +51,7 @@ atomic commits, use this stash-first workflow.
    conflicts when the stash (pre-format snapshot) is popped against hook-
    formatted files.
    ```bash
-   prek run --all-files
+   prek run --stage pre-commit --all-files
    ```
    If that is unavailable, run formatters manually:
    ```bash
