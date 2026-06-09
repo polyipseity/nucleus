@@ -132,6 +132,12 @@ if (-not $HAS_ARGS) {
       Write-Output "WARNING: vscode: empty section (not yet populated)"
     }
 
+    # homebrew: must be non-empty
+    if (-not $_lf.ContainsKey('homebrew') -or $_lf.homebrew.Count -eq 0) {
+      Write-Output "ERROR: homebrew: empty or missing section"
+      $_lfErrors++
+    }
+
     # ollama: must have at least one profile with models
     if (-not $_lf.ContainsKey('ollama') -or $_lf.ollama.Count -eq 0) {
       Write-Output "ERROR: ollama: empty or missing section"

@@ -203,6 +203,37 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# homebrew — brew list --versions, brew list --cask --versions
+# ---------------------------------------------------------------------------
+if command -v brew >/dev/null 2>&1; then
+  # brews
+  while IFS= read -r key; do
+    [ -z "$key" ] && continue
+    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.homebrew.brews // {})[$k] // empty')
+    [ -z "$old" ] && continue
+    new=$(brew list --versions 2>/dev/null | awk -v k="$key" '$1 == k {print $2}' | head -1 | tr -d '[:space:]')
+    if [ -n "$new" ] && [ "$new" != "$old" ]; then
+      log_update "homebrew.brews" "$key" "$old" "$new"
+      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.homebrew.brews[$k] = $v')
+    fi
+  done < <(printf '%s\n' "$data" | jq -r '(.homebrew.brews // {}) | keys[]')
+
+  # casks
+  while IFS= read -r key; do
+    [ -z "$key" ] && continue
+    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.homebrew.casks // {})[$k] // empty')
+    [ -z "$old" ] && continue
+    new=$(brew list --cask --versions 2>/dev/null | awk -v k="$key" '$1 == k {print $2}' | head -1 | tr -d '[:space:]')
+    if [ -n "$new" ] && [ "$new" != "$old" ]; then
+      log_update "homebrew.casks" "$key" "$old" "$new"
+      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.homebrew.casks[$k] = $v')
+    fi
+  done < <(printf '%s\n' "$data" | jq -r '(.homebrew.casks // {}) | keys[]')
+else
+  log_skip "brew" "homebrew"
+fi
+
+# ---------------------------------------------------------------------------
 # vscode — code / code-insiders --list-extensions --show-versions
 # ---------------------------------------------------------------------------
 vscode_output=""

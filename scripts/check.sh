@@ -176,7 +176,11 @@ if ! $HAS_ARGS; then
       _lf_errors=$((_lf_errors + 1))
     fi
   fi
-
+  # homebrew: must be non-empty
+  if ! jq -e '.homebrew | type == "object" and length > 0' src/lockfiles/lockfile.json >/dev/null 2>&1; then
+    echo "ERROR: homebrew: empty or missing section"
+    _lf_errors=$((_lf_errors + 1))
+  fi
   # vscode: must be non-null; warn if empty, validate non-placeholder if non-empty
   if ! jq -e '.vscode | type == "object"' src/lockfiles/lockfile.json >/dev/null 2>&1; then
     echo "ERROR: vscode: missing or invalid section"

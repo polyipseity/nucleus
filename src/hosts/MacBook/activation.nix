@@ -12,7 +12,8 @@
 #   and postActivation (after homebrew, last before the gc-root symlink).
 #   lib.mkBefore ensures these fragments are prepended before home-manager's
 #   HM activation call, which is also appended to postActivation.text.
-{ lib, ... }: {
+{ lib, ... }:
+{
   # ---------------------------------------------------------------------------
   # Declarative power-management settings handled by nix-darwin's power module.
   # These translate to systemsetup / pmset calls at activation time.

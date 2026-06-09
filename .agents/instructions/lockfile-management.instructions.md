@@ -50,7 +50,7 @@ Consumed by:
   lockfile provides the audit trail for what versions should be present.
 
 - **check scripts**: `scripts/check.sh` and `scripts/check.ps1` validate the
-  homebrew section existence and non-emptiness.
+  homebrew section existence and non-emptiness in lockfile validation.
 
 To update a specific formula to its latest available version:
 
