@@ -17,12 +17,18 @@
     pwsh          Find-Module via pwsh
     vscode        code / code-insiders --list-extensions --show-versions
     ollama        ollama show <name>:<tag> --format json
+    nixos-iso     Query NixOS channel for latest ISO URL and SHA-256
+    tart-images   Query GHCR OCI registry for Cirrus CI macOS base image digests
+
+.PARAMETER Sections
+  Comma-separated list of sections to update. If omitted, all sections are updated.
 
 .PARAMETER Help
   Show this help message.
 
 .EXAMPLE
   .\bump-lockfile.ps1
+  .\bump-lockfile.ps1 -Sections winget,scoop
 
 .NOTES
   Environment variable: NUCLEUS_REPO_ROOT (optional, overrides repo root detection).
@@ -31,6 +37,8 @@
 #>
 [CmdletBinding()]
 param(
+  [Alias("s")]
+  [string]$Sections,
   [Alias("h")]
   [switch]$Help
 )
@@ -74,6 +82,12 @@ function Write-Skip {
 function Write-SkipAll {
   param([string]$Section)
   Write-Output "bump-lockfile: skipping ${Section} section"
+}
+
+function Test-SectionEnabled {
+  param([string]$Name)
+  if ([string]::IsNullOrEmpty($Sections)) { return $true }
+  return $Sections.Split(',') -contains $Name
 }
 
 function Test-CommandAvailable {
@@ -146,7 +160,7 @@ $ht['updated'] = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC)
 # ---------------------------------------------------------------------------
 # winget — winget show --id <id>
 # ---------------------------------------------------------------------------
-if (Test-CommandAvailable 'winget') {
+if ((Test-SectionEnabled 'winget') -and (Test-CommandAvailable 'winget')) {
   if ($ht.ContainsKey('winget') -and $ht['winget'] -is [hashtable]) {
     foreach ($key in $ht['winget'].Keys) {
       $old = $ht['winget'][$key]
@@ -167,7 +181,7 @@ if (Test-CommandAvailable 'winget') {
 # ---------------------------------------------------------------------------
 # scoop — scoop info <pkg>
 # ---------------------------------------------------------------------------
-if (Test-CommandAvailable 'scoop') {
+if ((Test-SectionEnabled 'scoop') -and (Test-CommandAvailable 'scoop')) {
   if ($ht.ContainsKey('scoop') -and $ht['scoop'] -is [hashtable]) {
     foreach ($key in $ht['scoop'].Keys) {
       $old = $ht['scoop'][$key]
@@ -188,12 +202,14 @@ if (Test-CommandAvailable 'scoop') {
 # ---------------------------------------------------------------------------
 # cargo-binstall — keep current version
 # ---------------------------------------------------------------------------
-Write-SkipAll -Section 'cargo-binstall (no reliable CLI query available)'
+if (Test-SectionEnabled 'cargo-binstall') {
+  Write-SkipAll -Section 'cargo-binstall (no reliable CLI query available)'
+}
 
 # ---------------------------------------------------------------------------
 # bun — npm view <pkg> version, gated on bun availability
 # ---------------------------------------------------------------------------
-if (Test-CommandAvailable 'bun') {
+if ((Test-SectionEnabled 'bun') -and (Test-CommandAvailable 'bun')) {
   if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
     foreach ($key in $ht['bun'].Keys) {
       $old = $ht['bun'][$key]
@@ -214,7 +230,7 @@ if (Test-CommandAvailable 'bun') {
 # ---------------------------------------------------------------------------
 # uv — uv tool list
 # ---------------------------------------------------------------------------
-if (Test-CommandAvailable 'uv') {
+if ((Test-SectionEnabled 'uv') -and (Test-CommandAvailable 'uv')) {
   $uvOutput = & uv tool list 2>$null
   if ($uvOutput) {
     # Build hashtable from uv tool list output.
@@ -261,7 +277,7 @@ if (Test-CommandAvailable 'uv') {
 # ---------------------------------------------------------------------------
 # rustup — rustc +<channel> --version
 # ---------------------------------------------------------------------------
-if (Test-CommandAvailable 'rustup') {
+if ((Test-SectionEnabled 'rustup') -and (Test-CommandAvailable 'rustup')) {
   # Get installed toolchains
   $toolchains = & rustup toolchain list 2>$null
   $toolchainSet = @{}
@@ -301,7 +317,7 @@ if (Test-CommandAvailable 'rustup') {
 # ---------------------------------------------------------------------------
 # pwsh — Find-Module via pwsh -NoProfile
 # ---------------------------------------------------------------------------
-if (Test-CommandAvailable 'pwsh') {
+if ((Test-SectionEnabled 'pwsh') -and (Test-CommandAvailable 'pwsh')) {
   if ($ht.ContainsKey('pwsh') -and $ht['pwsh'] -is [hashtable]) {
     foreach ($key in $ht['pwsh'].Keys) {
       $old = $ht['pwsh'][$key]
@@ -322,7 +338,8 @@ if (Test-CommandAvailable 'pwsh') {
 # ---------------------------------------------------------------------------
 # vscode — code / code-insiders --list-extensions --show-versions
 # ---------------------------------------------------------------------------
-$vscodeOutput = $null
+if (Test-SectionEnabled 'vscode') {
+  $vscodeOutput = $null
 if (Test-CommandAvailable 'code') {
   $vscodeOutput = & code --list-extensions --show-versions 2>$null
 } elseif (Test-CommandAvailable 'code-insiders') {
@@ -358,13 +375,14 @@ if ($vscodeOutput) {
     }
   }
 } else {
-  Write-Skip -Tool 'vscode' -Section 'vscode'
+    Write-Skip -Tool 'vscode' -Section 'vscode'
+  }
 }
 
 # ---------------------------------------------------------------------------
 # ollama — ollama show <name>:<tag> --format json
 # ---------------------------------------------------------------------------
-if (Test-CommandAvailable 'ollama') {  # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
+if ((Test-SectionEnabled 'ollama') -and (Test-CommandAvailable 'ollama')) {  # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
   # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
   if ($ht.ContainsKey('ollama') -and $ht['ollama'] -is [hashtable]) {
     foreach ($hostName in $ht['ollama'].Keys) {
@@ -402,6 +420,100 @@ if (Test-CommandAvailable 'ollama') {  # Point at the Ollama daemon directly, by
   }
 } else {
   Write-Skip -Tool 'ollama' -Section 'ollama'
+}
+
+# ---------------------------------------------------------------------------
+# nixos-iso — Query NixOS channel for latest ISO URL and SHA-256
+# ---------------------------------------------------------------------------
+if (Test-SectionEnabled 'nixos-iso') {
+  if ($ht.ContainsKey('nixos-iso') -and $ht['nixos-iso'] -is [hashtable]) {
+    foreach ($arch in $ht['nixos-iso'].Keys) {
+      $entry = $ht['nixos-iso'][$arch]
+      $oldUrl = $entry['url']
+      $oldSha256 = $entry['sha256']
+
+      $latestUrl = "https://channels.nixos.org/nixos-unstable/latest-nixos-minimal-${arch}.iso"
+      try {
+        $request = [System.Net.WebRequest]::Create($latestUrl)
+        $request.Method = 'HEAD'
+        $request.AllowAutoRedirect = $true
+        $response = $request.GetResponse()
+        $resolvedUrl = $response.ResponseUri.AbsoluteUri
+        $response.Close()
+      } catch {
+        Write-Warning "bump-lockfile: could not resolve ${latestUrl} for ${arch}: $($_.Exception.Message)"
+        continue
+      }
+
+      $sha256Url = "${resolvedUrl}.sha256"
+      try {
+        $sha256Content = (Invoke-WebRequest -Uri $sha256Url -UseBasicParsing).Content
+        if ($sha256Content -match '^([0-9a-f]{64})') {
+          $newSha256 = $Matches[1]
+        } else {
+          Write-Warning "bump-lockfile: could not parse checksum from ${sha256Url}"
+          continue
+        }
+      } catch {
+        Write-Warning "bump-lockfile: could not fetch checksum for ${arch}: $($_.Exception.Message)"
+        continue
+      }
+
+      if ($oldUrl -ne $resolvedUrl -or $oldSha256 -ne $newSha256) {
+        Write-Update -Section 'nixos-iso' -Key $arch -OldValue "${oldSha256:0:12}..." -NewValue "${newSha256:0:12}..."
+        $ht['nixos-iso'][$arch] = @{ url = $resolvedUrl; sha256 = $newSha256 }
+      }
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
+# tart-images — Query GHCR OCI registry for Cirrus CI macOS base image digests
+# ---------------------------------------------------------------------------
+if (Test-SectionEnabled 'tart-images') {
+  if ($ht.ContainsKey('tart-images') -and $ht['tart-images'] -is [hashtable]) {
+    foreach ($osVersion in $ht['tart-images'].Keys) {
+      $entry = $ht['tart-images'][$osVersion]
+      $oldImage = $entry['image']
+      $oldDigest = $entry['digest']
+      if ([string]::IsNullOrEmpty($oldImage)) { continue }
+
+      # Extract OCI repo name from image URI
+      $imageRepo = $oldImage -replace '^ghcr\.io/', ''
+      if ([string]::IsNullOrEmpty($imageRepo)) {
+        Write-Warning "bump-lockfile: no image repo found for ${osVersion}, skipping"
+        continue
+      }
+
+      try {
+        # Get anonymous GHCR token
+        $tokenResp = Invoke-RestMethod -Uri "https://ghcr.io/token?service=ghcr.io&scope=repository:${imageRepo}:pull"
+        $token = $tokenResp.token
+
+        # Query manifest for digest
+        $headers = @{
+          'Authorization' = "Bearer $token"
+          'Accept' = 'application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json'
+        }
+        $manifestResp = Invoke-WebRequest -Uri "https://ghcr.io/v2/${imageRepo}/manifests/latest" -Headers $headers -Method GET
+        $newDigest = if ($manifestResp.Headers['Docker-Content-Digest']) {
+          $manifestResp.Headers['Docker-Content-Digest'][0]
+        } else { $null }
+
+        if ([string]::IsNullOrEmpty($newDigest)) {
+          Write-Warning "bump-lockfile: could not fetch digest for ${oldImage}, skipping"
+          continue
+        }
+
+        if ($oldDigest -ne $newDigest) {
+          Write-Update -Section 'tart-images' -Key $osVersion -OldValue "${oldDigest:0:20}..." -NewValue "${newDigest:0:20}..."
+          $entry['digest'] = $newDigest
+        }
+      } catch {
+        Write-Warning "bump-lockfile: error fetching digest for ${oldImage}: $($_.Exception.Message)"
+      }
+    }
+  }
 }
 
 # ---------------------------------------------------------------------------

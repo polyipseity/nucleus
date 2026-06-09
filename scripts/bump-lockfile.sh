@@ -5,7 +5,7 @@
 # current installed/published version of each pinned item, and writes an
 # updated lockfile atomically.
 #
-# Sections:
+# Sections (pass comma-separated via --sections to update selectively):
 #   winget        winget show --id <id>     (skip if winget unavailable)
 #   scoop         scoop info <pkg>          (skip if scoop unavailable)
 #   cargo-binstall Keep current version     (no reliable CLI query)
@@ -17,10 +17,16 @@
 #                 (skip if neither available)
 #   ollama        ollama show <name>:<tag> --format json
 #                 (skip if ollama unavailable)
+#   nixos-iso     Query NixOS channel for latest ISO URL and SHA-256
+#   tart-images   Query GHCR OCI registry for Cirrus CI macOS base image digests
 #
 # Environment variables:
 #   NUCLEUS_REPO_ROOT      Override the detected repository root path.
 #   NUCLEUS_OLLAMA_HOST    Ollama daemon address (host:port) for admin CLI commands (default: 127.0.0.1:11434).
+#
+# Flags:
+#   --sections <list>  Comma-separated list of sections to update (default: all)
+#   --help             Show this help
 #
 # Exit conditions:
 #   0 on success; non-zero on failure (missing jq, lockfile not found).
@@ -43,6 +49,35 @@ if [ ! -f "$LOCKFILE_ABS" ]; then
   printf '%s\n' "bump-lockfile: error: lockfile not found at $LOCKFILE_ABS" >&2
   exit 1
 fi
+
+# Parse --sections flag (comma-separated, defaults to all)
+SECTIONS=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --sections)
+      shift
+      SECTIONS="$1"
+      ;;
+    --help)
+      grep '^#' "$0" | sed 's/^# \?//' | sed 's/^#//'
+      exit 0
+      ;;
+    *)
+      printf 'bump-lockfile: unknown flag: %s\n' "$1" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+section_enabled() {
+  local name="$1"
+  [ -z "$SECTIONS" ] && return 0  # no filter = all enabled
+  case ",$SECTIONS," in
+    *",$name,"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -70,7 +105,7 @@ data=$(printf '%s\n' "$data" | jq --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.upd
 # ---------------------------------------------------------------------------
 # winget — winget show --id <id>
 # ---------------------------------------------------------------------------
-if command -v winget >/dev/null 2>&1; then
+if section_enabled winget && command -v winget >/dev/null 2>&1; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
     old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.winget // {})[$k] // empty')
@@ -88,7 +123,7 @@ fi
 # ---------------------------------------------------------------------------
 # scoop — scoop info <pkg>
 # ---------------------------------------------------------------------------
-if command -v scoop >/dev/null 2>&1; then
+if section_enabled scoop && command -v scoop >/dev/null 2>&1; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
     old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.scoop // {})[$k] // empty')
@@ -106,12 +141,14 @@ fi
 # ---------------------------------------------------------------------------
 # cargo-binstall — keep current version (no reliable CLI query)
 # ---------------------------------------------------------------------------
-log_skip_all "cargo-binstall (no reliable CLI query available)"
+if section_enabled cargo-binstall; then
+  log_skip_all "cargo-binstall (no reliable CLI query available)"
+fi
 
 # ---------------------------------------------------------------------------
 # bun — npm view <pkg> version, gated on bun availability
 # ---------------------------------------------------------------------------
-if command -v bun >/dev/null 2>&1; then
+if section_enabled bun && command -v bun >/dev/null 2>&1; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
     old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.bun // {})[$k] // empty')
@@ -129,7 +166,7 @@ fi
 # ---------------------------------------------------------------------------
 # uv — uv tool list
 # ---------------------------------------------------------------------------
-if command -v uv >/dev/null 2>&1; then
+if section_enabled uv && command -v uv >/dev/null 2>&1; then
   # Build a map of package-name -> version from uv tool list.
   # Typical output: "pkgname@version" or "pkgname v1.0.0".
   declare -A uv_installed=()
@@ -167,7 +204,7 @@ fi
 # ---------------------------------------------------------------------------
 # rustup — rustc +<channel> --version
 # ---------------------------------------------------------------------------
-if command -v rustup >/dev/null 2>&1; then
+if section_enabled rustup && command -v rustup >/dev/null 2>&1; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
     old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.rustup // {})[$k] // empty')
@@ -188,7 +225,7 @@ fi
 # ---------------------------------------------------------------------------
 # pwsh — Find-Module via pwsh -NoProfile
 # ---------------------------------------------------------------------------
-if command -v pwsh >/dev/null 2>&1; then
+if section_enabled pwsh && command -v pwsh >/dev/null 2>&1; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
     old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.pwsh // {})[$k] // empty')
@@ -206,7 +243,7 @@ fi
 # ---------------------------------------------------------------------------
 # homebrew — brew list --versions, brew list --cask --versions
 # ---------------------------------------------------------------------------
-if command -v brew >/dev/null 2>&1; then
+if section_enabled homebrew && command -v brew >/dev/null 2>&1; then
   # brews
   while IFS= read -r key; do
     [ -z "$key" ] && continue
@@ -237,46 +274,48 @@ fi
 # ---------------------------------------------------------------------------
 # vscode — code / code-insiders --list-extensions --show-versions
 # ---------------------------------------------------------------------------
-vscode_output=""
-if command -v code >/dev/null 2>&1; then
-  vscode_output=$(code --list-extensions --show-versions 2>/dev/null || true)
-elif command -v code-insiders >/dev/null 2>&1; then
-  vscode_output=$(code-insiders --list-extensions --show-versions 2>/dev/null || true)
-fi
+if section_enabled vscode; then
+  vscode_output=""
+  if command -v code >/dev/null 2>&1; then
+    vscode_output=$(code --list-extensions --show-versions 2>/dev/null || true)
+  elif command -v code-insiders >/dev/null 2>&1; then
+    vscode_output=$(code-insiders --list-extensions --show-versions 2>/dev/null || true)
+  fi
 
-if [ -n "$vscode_output" ]; then
-  # Build map: extension-id -> version
-  declare -A vscode_exts=()
-  while IFS= read -r line; do
-    [ -z "$line" ] && continue
-    case "$line" in
-      *@*)
-        pkg="${line%%@*}"
-        ver="${line#*@}"
-        [ -n "$pkg" ] && [ -n "$ver" ] && vscode_exts["$pkg"]="$ver"
-        ;;
-    esac
-  done <<< "$vscode_output"
+  if [ -n "$vscode_output" ]; then
+    # Build map: extension-id -> version
+    declare -A vscode_exts=()
+    while IFS= read -r line; do
+      [ -z "$line" ] && continue
+      case "$line" in
+        *@*)
+          pkg="${line%%@*}"
+          ver="${line#*@}"
+          [ -n "$pkg" ] && [ -n "$ver" ] && vscode_exts["$pkg"]="$ver"
+          ;;
+      esac
+    done <<< "$vscode_output"
 
-  while IFS= read -r key; do
-    [ -z "$key" ] && continue
-    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.vscode // {})[$k] // empty')
-    [ -z "$old" ] && continue
-    new="${vscode_exts[$key]:-}"
-    if [ -n "$new" ] && [ "$new" != "$old" ]; then
-      log_update "vscode" "$key" "$old" "$new"
-      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.vscode[$k] = $v')
-    fi
-  done < <(printf '%s\n' "$data" | jq -r '(.vscode // {}) | keys[]')
-else
-  log_skip "vscode" "vscode"
+    while IFS= read -r key; do
+      [ -z "$key" ] && continue
+      old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.vscode // {})[$k] // empty')
+      [ -z "$old" ] && continue
+      new="${vscode_exts[$key]:-}"
+      if [ -n "$new" ] && [ "$new" != "$old" ]; then
+        log_update "vscode" "$key" "$old" "$new"
+        data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.vscode[$k] = $v')
+      fi
+    done < <(printf '%s\n' "$data" | jq -r '(.vscode // {}) | keys[]')
+  else
+    log_skip "vscode" "vscode"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
 # ollama — ollama show <name>:<tag> --format json
 # ---------------------------------------------------------------------------
 : "${NUCLEUS_OLLAMA_HOST:=127.0.0.1:11434}"
-if command -v ollama >/dev/null 2>&1; then
+if section_enabled ollama && command -v ollama >/dev/null 2>&1; then
   # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
   # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
   while IFS= read -r host; do
@@ -330,6 +369,90 @@ if command -v ollama >/dev/null 2>&1; then
   done < <(printf '%s\n' "$data" | jq -r '(.ollama // {}) | keys[]')
 else
   log_skip "ollama" "ollama"
+fi
+
+# ---------------------------------------------------------------------------
+# nixos-iso — Query NixOS channel for latest ISO URL and its SHA-256
+# ---------------------------------------------------------------------------
+if section_enabled nixos-iso; then
+  while IFS= read -r arch; do
+    [ -z "$arch" ] && continue
+    old_url=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.nixos-iso // {})[$a].url // empty')
+    old_sha256=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.nixos-iso // {})[$a].sha256 // empty')
+    [ -z "$old_url" ] && continue
+
+    # Resolve the latest- redirect to a specific release URL
+    latest_url="https://channels.nixos.org/nixos-unstable/latest-nixos-minimal-${arch}.iso"
+    resolved_url=$(curl -sIL "$latest_url" 2>/dev/null | grep -i "^location:" | tail -1 | tr -d '[:space:]' | sed 's/^location://I')
+    if [ -z "$resolved_url" ]; then
+      printf 'bump-lockfile: warning: could not resolve %s for %s\n' "$latest_url" "$arch" >&2
+      continue
+    fi
+
+    # Fetch the SHA-256 checksum from the .sha256 sidecar
+    sha256_url="${resolved_url}.sha256"
+    sha256_content=$(curl -sL "$sha256_url" 2>/dev/null || true)
+    new_sha256=$(printf '%s\n' "$sha256_content" | grep -oE '^[0-9a-f]{64}' | head -1)
+    if [ -z "$new_sha256" ]; then
+      printf 'bump-lockfile: warning: could not fetch checksum for %s (%s)\n' "$arch" "$sha256_url" >&2
+      continue
+    fi
+
+    if [ "$old_url" != "$resolved_url" ] || [ "$old_sha256" != "$new_sha256" ]; then
+      log_update "nixos-iso" "$arch" "${old_sha256:0:12}..." "${new_sha256:0:12}..."
+      data=$(printf '%s\n' "$data" | jq --arg a "$arch" --arg u "$resolved_url" --arg s "$new_sha256" '
+        .nixos-iso[$a] = {url: $u, sha256: $s}
+      ')
+    fi
+  done < <(printf '%s\n' "$data" | jq -r '(.nixos-iso // {}) | keys[]')
+fi
+
+# ---------------------------------------------------------------------------
+# tart-images — Query GHCR OCI registry for Cirrus CI macOS base image digests
+# ---------------------------------------------------------------------------
+if section_enabled tart-images; then
+  while IFS= read -r os_version; do
+    [ -z "$os_version" ] && continue
+    entry=$(printf '%s\n' "$data" | jq -c --arg v "$os_version" '(.tart-images // {})[$v] // empty')
+    [ -z "$entry" ] && continue
+
+    old_image=$(printf '%s\n' "$entry" | jq -r '.image // empty')
+    old_digest=$(printf '%s\n' "$entry" | jq -r '.digest // empty')
+    [ -z "$old_image" ] && continue
+
+    # Pull the OCI image name from the lockfile entry; extract the short repo name from the full image path
+    image_repo="${old_image#ghcr.io/}"
+    if [ -z "$image_repo" ]; then
+      printf 'bump-lockfile: warning: no image repo found for %s, skipping\n' "$os_version" >&2
+      continue
+    fi
+
+    # Get an anonymous GHCR token and query the manifest
+    ghcr_token=$(curl -s "https://ghcr.io/token?service=ghcr.io\&scope=repository:${image_repo}:pull" 2>/dev/null | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || true)
+    if [ -z "$ghcr_token" ]; then
+      printf 'bump-lockfile: warning: could not get GHCR token for %s, skipping\n' "$old_image" >&2
+      continue
+    fi
+
+    new_digest=$(curl -sL -D - -o /dev/null \
+      -H "Authorization: Bearer $ghcr_token" \
+      -H "Accept: application/vnd.oci.image.index.v1+json" \
+      -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+      -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+      "https://ghcr.io/v2/${image_repo}/manifests/latest" 2>/dev/null | grep -i "^docker-content-digest:" | grep -oE 'sha256:[a-f0-9]{64}' || true)
+
+    if [ -z "$new_digest" ]; then
+      printf 'bump-lockfile: warning: could not fetch digest for %s, skipping\n' "$old_image" >&2
+      continue
+    fi
+
+    if [ "$old_digest" != "$new_digest" ]; then
+      log_update "tart-images" "$os_version" "${old_digest:0:20}..." "${new_digest:0:20}..."
+      data=$(printf '%s\n' "$data" | jq --arg v "$os_version" --arg d "$new_digest" '
+        .tart-images[$v].digest = $d
+      ')
+    fi
+  done < <(printf '%s\n' "$data" | jq -r '(.tart-images // {}) | keys[]')
 fi
 
 # ---------------------------------------------------------------------------
