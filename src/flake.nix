@@ -601,6 +601,13 @@
           };
         };
 
+      mkBumpLockfileApp =
+        pkgs:
+        mkApp pkgs {
+          name = "bump-lockfile";
+          runtimeInputs = [ pkgs.jq ];
+        };
+
     in
     {
       # -----------------------------------------------------------------------
@@ -616,6 +623,7 @@
           ai-sync = mkAiSyncApp pkgsMac;
           apply = mkApplyApp pkgsMac;
           bootstrap = mkBootstrapApp pkgsMac;
+          bump-lockfile = mkBumpLockfileApp pkgsMac;
           check = mkCheckApp pkgsMac;
           test = mkTestApp pkgsMac;
           check-packer = mkCheckPackerApp pkgsMac;
@@ -638,6 +646,7 @@
           ai-sync = mkAiSyncApp pkgsLinux;
           apply = mkApplyApp pkgsLinux;
           bootstrap = mkBootstrapApp pkgsLinux;
+          bump-lockfile = mkBumpLockfileApp pkgsLinux;
           check = mkCheckApp pkgsLinux;
           test = mkTestApp pkgsLinux;
           check-packer = mkCheckPackerApp pkgsLinux;
