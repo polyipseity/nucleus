@@ -365,7 +365,6 @@ if ($vscodeOutput) {
 # ---------------------------------------------------------------------------
 if (Test-CommandAvailable 'ollama') {  # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
   # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
-  $env:OLLAMA_HOST = '127.0.0.1:11434'
   if ($ht.ContainsKey('ollama') -and $ht['ollama'] -is [hashtable]) {
     foreach ($hostName in $ht['ollama'].Keys) {
       $models = $ht['ollama'][$hostName]
@@ -381,7 +380,10 @@ if (Test-CommandAvailable 'ollama') {  # Point at the Ollama daemon directly, by
         $oldDigest = if ($hasDigest) { $entry['digest'] } else { $null }
 
         try {
+          $oldOllamaHost = $env:OLLAMA_HOST
+          $env:OLLAMA_HOST = '127.0.0.1:11434'
           $ollamaInfo = & ollama show "${name}:${tag}" --format json 2>$null
+          $env:OLLAMA_HOST = $oldOllamaHost
           if ($ollamaInfo) {
             $ollamaJson = $ollamaInfo | Out-String | ConvertFrom-Json -Depth 10
             $newDigest = $ollamaJson.digest

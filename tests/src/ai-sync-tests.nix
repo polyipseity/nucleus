@@ -19,6 +19,14 @@ assert containsRegex "waiting up to" aiSyncText;
 assert containsRegex "dry_run=false" aiSyncText;
 assert containsRegex "gc_only=false" aiSyncText;
 assert containsRegex "NUCLEUS_AI_SYNC_TIMEOUT=0" gcText;
+# GC script expiry & dry-run assertions
+assert containsRegex "dry_run=false" gcText;
+assert containsRegex "expiry_arg=\"\"" gcText;
+assert containsRegex "hm_expiry_arg=\"\"" gcText;
+assert containsRegex "nix_expiry_arg=\"\"" gcText;
+assert containsRegex "hm_expiry=" gcText;
+assert containsRegex "nix_expiry=" gcText;
+assert containsRegex "hm_expiry_hm_format" gcText;
 # LiteLLM gateway assertions
 assert containsRegex "litellm" coreText;
 assert containsRegex "OPENROUTER_API_KEY" litellmConfigText;

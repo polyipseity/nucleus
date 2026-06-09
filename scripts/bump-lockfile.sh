@@ -277,7 +277,6 @@ fi
 if command -v ollama >/dev/null 2>&1; then
   # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
   # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
-  export OLLAMA_HOST="127.0.0.1:11434"
   while IFS= read -r host; do
     [ -z "$host" ] && continue
     # Get the array index to iterate over models for this host
@@ -295,7 +294,7 @@ if command -v ollama >/dev/null 2>&1; then
       old_digest=$(printf '%s\n' "$entry" | jq -r '.digest // empty')
 
       # Query ollama for current model info
-      ollama_info=$(ollama show "$name:$tag" --format json 2>/dev/null || true)
+      ollama_info=$(OLLAMA_HOST="127.0.0.1:11434" ollama show "$name:$tag" --format json 2>/dev/null || true)
       if [ -n "$ollama_info" ]; then
         new_digest=$(printf '%s\n' "$ollama_info" | jq -r '.digest // empty' 2>/dev/null || true)
         if [ -n "$new_digest" ] && [ "$new_digest" != "$old_digest" ]; then
