@@ -855,12 +855,13 @@ case "$(uname -m)" in
 esac
 
 # build_nixos_image NAME DISK_GIB
-#   Builds the NixOS guest image via nixos-generators.  On macOS this
-#   requires an aarch64-linux builder; enable nix.linux-builder.enable in the
-#   macOS host config so the Nix daemon delegates Linux derivations to the
-#   Virtualization.framework-backed builder VM created by nix-darwin.
-#   Most derivations are fetched from the binary cache; hostname-specific ones
-#   (e.g. etc-hostname) are configuration-specific and cannot be cached.
+#   Builds the NixOS guest image via nixos-generators (pinned as a flake
+#   input in src/flake.nix).  On macOS this requires an aarch64-linux builder;
+#   enable nix.linux-builder.enable in the macOS host config so the Nix daemon
+#   delegates Linux derivations to the Virtualization.framework-backed builder
+#   VM created by nix-darwin.  Most derivations are fetched from the binary
+#   cache; hostname-specific ones (e.g. etc-hostname) are configuration-specific
+#   and cannot be cached.
 build_nixos_image() {
   _name="$1"
   _disk_gib="$2"
@@ -895,14 +896,14 @@ build_nixos_image() {
     "$_nixos_system" "$_nixos_format"
 
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] nix run github:nix-community/nixos-generators -- --format %s --system %s --configuration %s -o <tmpdir>\n' \
-      "$_nixos_format" "$_nixos_system" "$_guest_nix"
+    printf 'vm-setup: [dry-run] nix run "%s/src#nixos-generators" -- --format %s --system %s --configuration %s -o <tmpdir>\n' \
+      "$REPO_ROOT" "$_nixos_format" "$_nixos_system" "$_guest_nix"
     return 0
   fi
 
   _tmpdir="$(mktemp -d)"
   _out_link="$_tmpdir/result"
-  nix run github:nix-community/nixos-generators -- \
+  nix run "$REPO_ROOT/src#nixos-generators" -- \
     --format "$_nixos_format" \
     --system "$_nixos_system" \
     --configuration "$_guest_nix" \

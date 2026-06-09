@@ -70,6 +70,13 @@
       url = "github:zackelia/homebrew-formulae";
       flake = false;
     };
+    # nixos-generators: builds VM disk images from NixOS configurations.
+    # Pinned via flake.lock so runtime `nix run` invocations in vm-setup
+    # resolve to a fixed revision instead of fetching latest main.
+    nixos-generators = {
+      url = "github:nix-community/nixos-generators";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     # scripts: automation helpers (.sh entry points) that live outside the flake
     # root (src/).  Included as a non-flake input so builtins.readFile works in
     # pure evaluation mode (e.g. `nix flake check`).
@@ -89,6 +96,7 @@
       nix-homebrew,
       nix-vscode-extensions,
       nixpkgs,
+      nixos-generators,
       rust-overlay,
       scripts,
       smudge-smudge,
@@ -620,6 +628,7 @@
           };
           gc = mkGcApp pkgsMac;
           health-check = mkHealthCheckApp pkgsMac;
+          nixos-generators = nixos-generators.apps.${systems.mac}.default;
           replica-reset = mkReplicaResetApp pkgsMac;
           replica-sync = mkReplicaSyncApp pkgsMac;
           update = mkUpdateApp pkgsMac;
@@ -645,6 +654,7 @@
             type = "app";
             program = "${pkgsLinux.nixos-rebuild}/bin/nixos-rebuild";
           };
+          nixos-generators = nixos-generators.apps.${systems.linux}.default;
           replica-reset = mkReplicaResetApp pkgsLinux;
           replica-sync = mkReplicaSyncApp pkgsLinux;
           update = mkUpdateApp pkgsLinux;
