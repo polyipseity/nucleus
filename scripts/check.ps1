@@ -49,14 +49,16 @@ if ($HAS_ARGS) {
   }
 }
 
+$_step = 0
+
 # ---------------------------------------------------------------------------
 # 1. PowerShell syntax validation
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [1/6] PowerShell syntax validation ==="
+Write-Output ("`n=== [{0}] PowerShell syntax validation ===" -f (++$_step))
 if ($PS1_FILES.Count -gt 0) {
-  & "$RepoRoot\scripts\check-pwsh.ps1" $PS1_FILES
+  & "$RepoRoot\scripts\check-pwsh.ps1" -SyntaxOnly $PS1_FILES
 } elseif (-not $HAS_ARGS) {
-  & "$RepoRoot\scripts\check-pwsh.ps1"
+  & "$RepoRoot\scripts\check-pwsh.ps1" -SyntaxOnly
 } else {
   Write-Output "Skipping (no PowerShell scripts to check)."
 }
@@ -65,7 +67,7 @@ if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 # ---------------------------------------------------------------------------
 # 2. Packer template validation
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [2/6] Packer template validation ==="
+Write-Output ("`n=== [{0}] Packer template validation ===" -f (++$_step))
 if ($PKR_FILES.Count -gt 0) {
   & "$RepoRoot\scripts\check-packer.ps1" $PKR_FILES
 } elseif (-not $HAS_ARGS) {
@@ -78,7 +80,7 @@ if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 # ---------------------------------------------------------------------------
 # 3. Service registry validation
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [3/6] Service registry validation ==="
+Write-Output ("`n=== [{0}] Service registry validation ===" -f (++$_step))
 if (-not $HAS_ARGS) {
   $_svcJson = Join-Path $RepoRoot "src\modules\services.json"
   $_svcErrors = 0
@@ -136,7 +138,7 @@ if (-not $HAS_ARGS) {
 # ---------------------------------------------------------------------------
 # 4. Lockfile validation
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [4/6] Lockfile validation ==="
+Write-Output ("`n=== [{0}] Lockfile validation ===" -f (++$_step))
 if (-not $HAS_ARGS) {
   $_lfErrors = 0
   $_lfPath = Join-Path $RepoRoot "src\lockfiles\lockfile.json"
@@ -232,7 +234,7 @@ if (-not $HAS_ARGS) {
 # ---------------------------------------------------------------------------
 # 5. Locked DSC validation
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [5/6] Locked DSC validation ==="
+Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
 if (-not $HAS_ARGS) {
   $_dscSystem = Join-Path $RepoRoot 'src\hosts\Windows\system.dsc.yml'
   $_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
@@ -304,7 +306,7 @@ if (-not $HAS_ARGS) {
 # ---------------------------------------------------------------------------
 # 6. Package manager usage enforcement
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [6/6] Package manager usage enforcement ==="
+Write-Output ("`n=== [{0}] Package manager usage enforcement ===" -f (++$_step))
 if (-not $HAS_ARGS) {
   $_violations = 0
   # Ban bare pip install and npm install — these bypass the lockfile.
