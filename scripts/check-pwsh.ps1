@@ -20,12 +20,19 @@
   `nix run ./src#check-pwsh`, which pins runtime dependencies (`pwsh`, `git`)
   to repository-managed versions.
 
+.PARAMETER SyntaxOnly
+  If specified, skip Phase 2 (PSScriptAnalyzer). Used by check.sh for fast
+  pre-commit validation; full lint runs in test.sh.
+
 .PARAMETER Paths
   Optional file paths to check. When omitted, all tracked `*.ps1` files from
   `git ls-files` are checked (default: none; all tracked .ps1 files).
 
 .EXAMPLE
   nix run ./src#check-pwsh
+
+.EXAMPLE
+  nix run ./src#check-pwsh -- -SyntaxOnly
 
 .EXAMPLE
   nix run ./src#check-pwsh -- src/hosts/Windows/apply.ps1
@@ -36,6 +43,8 @@
 #>
 [CmdletBinding()]
 param(
+  [switch]$SyntaxOnly,
+
   [Parameter(ValueFromRemainingArguments = $true)]
   [string[]]$Paths = @($env:NUCLEUS_CHECK_PATHS -split ';' | Where-Object { $_ })
 )
@@ -85,11 +94,14 @@ Write-Output ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
 
 # ---------------------------------------------------------------------------
 # Phase 2: PSScriptAnalyzer lint (best-effort).
+# Skipped entirely when -SyntaxOnly is set (fast pre-commit path from check.sh).
 # PSScriptAnalyzer is not in nixpkgs; if it is absent the lint phase is
 # skipped so CI is not blocked on machines that lack the module.  Syntax
 # validation in Phase 1 always runs regardless of PSScriptAnalyzer availability.
 # ---------------------------------------------------------------------------
-if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+if ($SyntaxOnly) {
+  Write-Output 'PowerShell lint skipped (-SyntaxOnly).'
+} elseif (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
   Write-Warning 'PSScriptAnalyzer not found; skipping lint phase. Install it with: Install-Module PSScriptAnalyzer'
 }
 else {
