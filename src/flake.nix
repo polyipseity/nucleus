@@ -608,6 +608,14 @@
           runtimeInputs = [ pkgs.jq ];
         };
 
+      # Build unified service management app for POSIX hosts.
+      mkSvcApp =
+        pkgs:
+        mkApp pkgs {
+          name = "svc";
+          runtimeInputs = [ pkgs.jq ];
+        };
+
     in
     {
       # -----------------------------------------------------------------------
@@ -640,6 +648,7 @@
           replica-reset = mkReplicaResetApp pkgsMac;
           replica-sync = mkReplicaSyncApp pkgsMac;
           update = mkUpdateApp pkgsMac;
+          svc = mkSvcApp pkgsMac;
           vm-setup = mkVMSetupApp pkgsMac;
         };
         "${systems.linux}" = {
@@ -667,6 +676,7 @@
           replica-reset = mkReplicaResetApp pkgsLinux;
           replica-sync = mkReplicaSyncApp pkgsLinux;
           update = mkUpdateApp pkgsLinux;
+          svc = mkSvcApp pkgsLinux;
           vm-setup = mkVMSetupApp pkgsLinux;
         };
       };

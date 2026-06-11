@@ -129,6 +129,7 @@ in
     (mkNucleusCommand "nucleus-health-check" "health-check")
     (mkNucleusCommand "nucleus-replica-reset" "replica-reset")
     (mkNucleusCommand "nucleus-replica-sync" "replica-sync")
+    (mkNucleusCommand "nucleus-svc" "svc")
     (mkNucleusCommand "nucleus-update" "update")
     (mkNucleusCommand "nucleus-vm-setup" "vm-setup")
     (mkNucleusCommand "nucleus-bootstrap" "bootstrap")
