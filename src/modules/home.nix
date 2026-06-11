@@ -153,6 +153,7 @@ in
     ./custom-provision-symlinks.nix
     ./dev-repos.nix
     ./editors.nix
+    ./ext-discord-music-rpc.nix
     ./fonts.nix
     ./git.nix
     ./linux.nix
