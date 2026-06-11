@@ -126,6 +126,31 @@
         ],
         "libraries": [
           {
+            "collectionType": "other",
+            "name": "playlists",
+            "options": {
+              "allowEmbeddedSubtitles": "AllowAll",
+              "disabledMetadataSavers": ["Nfo"],
+              "enableChapterImageExtraction": true,
+              "enableEmbeddedExtrasTitles": false,
+              "enableEmbeddedTitles": true,
+              "enableRealtimeMonitor": true,
+              "enableTrickplayImageExtraction": true,
+              "enabled": true,
+              "extractChapterImagesDuringLibraryScan": false,
+              "extractTrickplayImagesDuringLibraryScan": false,
+              "imageFetchers": ["Embedded Image Extractor", "Screen Grabber"],
+              "imageOptions": {
+                "Backdrop": { "limit": 1, "minWidth": 1280 },
+                "Logo": { "limit": 1 },
+                "Primary": { "limit": 1 }
+              },
+              "saveLocalMetadata": false,
+              "saveTrickplayWithMedia": false
+            },
+            "paths": ["~/data/media-catalog/media/playlists"]
+          },
+          {
             "collectionType": "musicvideos",
             "name": "music videos",
             "options": {
