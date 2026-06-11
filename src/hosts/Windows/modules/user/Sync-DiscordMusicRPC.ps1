@@ -1,26 +1,24 @@
 <#
 .SYNOPSIS
-  Ensure discord-music-rpc config and startup task are converged on Windows.
+  Ensure discord-music-rpc startup task is converged on Windows.
 
 .DESCRIPTION
   Manages the discord-music-rpc tray application lifecycle for each managed
   user:
-    1. Writes the declarative config.yaml (all default values explicit) to the
-       app's config directory ($env:LOCALAPPDATA\discord-music-rpc\)
-    2. Creates or removes a logon scheduled task that starts the Rich Presence
+    1. Creates or removes a logon scheduled task that starts the Rich Presence
        tray application in the background.
 
-  The package must be installed separately (for example via `uv tool install`).
+  The config.yaml symlink is managed by apply.ps1 (same pattern as LiteLLM),
+  pointing directly into the repo tree so edits take effect immediately.
+  The package must be installed separately (e.g. via `uv tool install`).
 
 .PARAMETER Enabled
   True applies the config and registers the startup task.  False removes the
-  startup task and warns that the config remains on disk.
-
-.PARAMETER RepoRoot
-  Absolute path to the repository root.  Used to find the tracked config file.
+  startup task and warns that the config remains on disk.  The config symlink
+  is managed by apply.ps1 (same as LiteLLM).
 
 .EXAMPLE
-  Sync-DiscordMusicRPC -RepoRoot $repoRoot -Enabled:$true
+  Sync-DiscordMusicRPC -Enabled:$true
 
 .EXAMPLE
   Sync-DiscordMusicRPC -Enabled:$false
@@ -36,10 +34,7 @@ function Sync-DiscordMusicRPC {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]
-    [bool]$Enabled,
-
-    [Parameter(Mandatory)]
-    [string]$RepoRoot
+    [bool]$Enabled
   )
 
   $ErrorActionPreference = "Stop"
@@ -58,17 +53,8 @@ function Sync-DiscordMusicRPC {
     return
   }
 
-  # Write config file from the tracked copy in the repo.
-  $null = New-Item -Path $configDir -ItemType Directory -Force
-  $configRepoPath = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\discord-music-rpc\config.yaml"
-  if (-not (Test-Path -Path $configRepoPath)) {
-    Write-Error "discord-music-rpc: config not found at '$configRepoPath'"
-    return
-  }
-  Copy-Item -Path $configRepoPath -Destination $configPath -Force
-  Write-Output "discord-music-rpc: wrote config to '$configPath'"
-
-  # Ensure log directory exists.
+  # Config symlink is managed by apply.ps1 (same as LiteLLM).  Ensure log
+  # directory exists.
   $null = New-Item -Path $logDir -ItemType Directory -Force
 
   # Find the discord-music-rpc binary (installed via uv tool install or pip).
