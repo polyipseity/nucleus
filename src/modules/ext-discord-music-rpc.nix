@@ -5,8 +5,9 @@
 #
 # Package: built from the forked repo (forks/polyipseity branch) with pinned
 # pypresence dependency fetched from git instead of resolved by pip.
-# Config: symlinked from the Nix store with all default values written
-# explicitly so the file serves as both configuration and documentation.
+# Config: out-of-store symlink to the tracked file in the live repo checkout
+# so edits take effect without a rebuild.  Assumes the repo is at
+# ~/dev/nucleus.
 # Services: launchd on macOS, systemd user service on NixOS.
 {
   config,
@@ -15,6 +16,11 @@
   ...
 }:
 let
+  # The canonical live checkout path is ~/dev/nucleus.  Use an out-of-store
+  # symlink so config edits are picked up instantly from the mutable working
+  # tree instead of requiring a Nix rebuild.
+  liveConfigFile = "${config.home.homeDirectory}/dev/nucleus/src/modules/configs/discord-music-rpc/config.yaml";
+
   pypresence = pkgs.python3Packages.buildPythonPackage rec {
     pname = "pypresence";
     version = "66f43b72";
@@ -80,9 +86,11 @@ in
     {
       home.packages = [ discord-music-rpc ];
 
-      # Symlinked from the Nix store.  Edit the tracked file directly so
-      # changes take effect on rebuild without touching the module.
-      xdg.configFile."discord-music-rpc/config.yaml".source = ./configs/discord-music-rpc/config.yaml;
+      # Out-of-store symlink to the live repo file — edit config.yaml in the
+      # working tree and the running app sees the change immediately.  The
+      # symlink target is resolved at activation time, not at build time.
+      home.file.".config/discord-music-rpc/config.yaml".source =
+        config.lib.file.mkOutOfStoreSymlink liveConfigFile;
     }
 
     # macOS: launchd agent keeps the tray app running persistently after login.
