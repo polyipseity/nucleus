@@ -1,5 +1,5 @@
 discord:
-  status_type: progress
+  status_type: title
   show_progress: true
   show_source_logo: true
   show_urls: true
