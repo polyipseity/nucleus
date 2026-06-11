@@ -20,10 +20,8 @@ let
   # --- MacBook (nix-darwin) ---
   # Must override the system-level EDITOR=nano default set by nix-darwin's
   # environment.variables (mkDefault "nano") so that set-environment exports
-  # EDITOR=nvim instead of EDITOR=nano. Must use lib.mkForce because a bare
-  # "nvim" has the same priority as mkDefault (1000) and causes a
-  # duplicate-definition error in Nix module system.
-  test_macbook_editor_override = assert' (containsRegex ''environment\.variables\.EDITOR = lib\.mkForce "nvim";'' macbookBase) "MacBook/base.nix must set environment.variables.EDITOR = lib.mkForce \"nvim\" to beat nix-darwin's mkDefault priority";
+  # EDITOR=nvim instead of EDITOR=nano.
+  test_macbook_editor_override = assert' (containsRegex ''environment\.variables\.EDITOR = "nvim";'' macbookBase) "MacBook/base.nix must set environment.variables.EDITOR = \"nvim\" to override nix-darwin's default EDITOR=nano";
 
   # --- NixOS ---
   # Must disable the nano package so NixOS doesn't add an EDITOR=nano default

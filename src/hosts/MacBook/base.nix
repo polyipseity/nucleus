@@ -1,5 +1,5 @@
 # MacBook/base.nix — Fundamental nix-darwin settings for the MacBook host.
-{ lib, username, ... }: {
+{ username, ... }: {
   # Determinate Nix manages the daemon and installation lifecycle itself.
   # Disabling nix-darwin's Nix management avoids activation conflicts.
   nix.enable = false;
@@ -26,9 +26,7 @@
 
   # Override nix-darwin's default EDITOR=nano to prevent it from interfering
   # with home-manager's neovim defaultEditor (which sets $EDITOR and $VISUAL
-  # to nvim). nix-darwin sets EDITOR = mkDefault "nano" in its
-  # modules/environment/default.nix, so a bare "nvim" assignment (same default
-  # priority 1000) causes a duplicate-definition error. lib.mkForce (priority
-  # 50) cleanly beats mkDefault.
-  environment.variables.EDITOR = lib.mkForce "nvim";
+  # to nvim). Without this, nix-darwin's system-level export can override the
+  # home-manager value depending on shell invocation path.
+  environment.variables.EDITOR = "nvim";
 }
