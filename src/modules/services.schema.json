@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://nucleus.local/services.schema.json",
+  "title": "Nucleus Service Registry",
+  "description": "Registry of manageable services for nucleus-svc across macOS, NixOS, and Windows",
+  "type": "object",
+  "additionalProperties": {
+    "type": "object",
+    "properties": {
+      "displayName": { "type": "string" },
+      "description": { "type": "string" },
+      "platforms": {
+        "type": "object",
+        "properties": {
+          "macos": { "$ref": "#/definitions/platformEntry" },
+          "nixos": { "$ref": "#/definitions/platformEntry" },
+          "windows": { "$ref": "#/definitions/platformEntry" }
+        },
+        "additionalProperties": false,
+        "minProperties": 1
+      }
+    },
+    "required": ["displayName", "platforms"]
+  },
+  "definitions": {
+    "platformEntry": {
+      "oneOf": [
+        { "$ref": "#/definitions/launchctlEntry" },
+        { "$ref": "#/definitions/systemctlEntry" },
+        { "$ref": "#/definitions/nativeEntry" },
+        { "$ref": "#/definitions/servyEntry" },
+        { "$ref": "#/definitions/schtaskEntry" }
+      ],
+      "description": "Platform-specific service configuration"
+    },
+    "launchctlEntry": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "launchctl" },
+        "service": { "type": "string", "description": "launchd service label" },
+        "domain": { "type": "string", "enum": ["user", "system"], "description": "launchd domain (user agent or system daemon)" },
+        "prefixMatch": { "type": "boolean", "description": "Match all services with this prefix" }
+      },
+      "required": ["type", "service"]
+    },
+    "systemctlEntry": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "systemctl" },
+        "service": { "type": "string", "description": "systemd unit name" },
+        "scope": { "type": "string", "enum": ["user", "system"], "description": "systemd scope" },
+        "prefixMatch": { "type": "boolean", "description": "Match all units with this prefix" }
+      },
+      "required": ["type", "service"]
+    },
+    "nativeEntry": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "native" },
+        "service": { "type": "string", "description": "Windows service name" },
+        "prefixMatch": { "type": "boolean", "description": "Match all services with this prefix" }
+      },
+      "required": ["type", "service"]
+    },
+    "servyEntry": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "servy" },
+        "service": { "type": "string", "description": "Servy service name" },
+        "prefixMatch": { "type": "boolean", "description": "Match all services with this prefix" }
+      },
+      "required": ["type", "service"]
+    },
+    "schtaskEntry": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "schtask" },
+        "taskPath": { "type": "string", "description": "Scheduled task path (e.g. \\\\NucleusLiteLLM)" },
+        "prefixMatch": { "type": "boolean", "description": "Match all tasks with this prefix" }
+      },
+      "required": ["type", "taskPath"]
+    }
+  }
+}

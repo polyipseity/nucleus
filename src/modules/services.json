@@ -1,0 +1,85 @@
+{
+  "$schema": "./services.schema.json",
+  "ollama": {
+    "displayName": "Ollama",
+    "description": "LLM inference server",
+    "platforms": {
+      "macos": { "type": "launchctl", "service": "local.ollama", "domain": "user" },
+      "nixos": { "type": "systemctl", "service": "ollama.service", "scope": "system" }
+    }
+  },
+  "litellm": {
+    "displayName": "LiteLLM",
+    "description": "AI API gateway for multi-provider routing",
+    "platforms": {
+      "macos": { "type": "launchctl", "service": "local.litellm", "domain": "user" },
+      "nixos": { "type": "systemctl", "service": "litellm.service", "scope": "system" },
+      "windows": { "type": "schtask", "taskPath": "\\NucleusLiteLLM" }
+    }
+  },
+  "jellyfin": {
+    "displayName": "Jellyfin",
+    "description": "Media server",
+    "platforms": {
+      "macos": { "type": "launchctl", "service": "jellyfin", "domain": "system" },
+      "nixos": { "type": "systemctl", "service": "jellyfin.service", "scope": "system" }
+    }
+  },
+  "jellyfin-https": {
+    "displayName": "Jellyfin HTTPS Proxy",
+    "description": "Caddy reverse proxy for Jellyfin",
+    "platforms": {
+      "macos": { "type": "launchctl", "service": "jellyfinHttpsProxy", "domain": "system" },
+      "windows": { "type": "native", "service": "nucleus-jellyfin-https" }
+    }
+  },
+  "discord-music-rpc": {
+    "displayName": "Discord Music RPC",
+    "description": "Discord Rich Presence for music players",
+    "platforms": {
+      "macos": { "type": "launchctl", "service": "local.discord-music-rpc", "domain": "user" },
+      "nixos": { "type": "systemctl", "service": "discord-music-rpc.service", "scope": "user" },
+      "windows": { "type": "schtask", "taskPath": "\\NucleusDiscordMusicRPC" }
+    }
+  },
+  "sshd": {
+    "displayName": "SSH Server",
+    "description": "Remote shell access via SSH",
+    "platforms": {
+      "macos": { "type": "launchctl", "service": "com.openssh.sshd", "domain": "system" },
+      "nixos": { "type": "systemctl", "service": "sshd.service", "scope": "system" },
+      "windows": { "type": "native", "service": "sshd" }
+    }
+  },
+  "ssh-agent": {
+    "displayName": "SSH Agent",
+    "description": "SSH key authentication agent",
+    "platforms": {
+      "macos": { "type": "launchctl", "service": "com.openssh.ssh-agent", "domain": "system" },
+      "windows": { "type": "native", "service": "ssh-agent" }
+    }
+  },
+  "cloud-drive": {
+    "displayName": "Cloud Drive Mounts",
+    "description": "rclone FUSE cloud drive mounts",
+    "platforms": {
+      "macos": { "type": "launchctl", "service": "local.cloud-mount.", "domain": "user", "prefixMatch": true },
+      "nixos": { "type": "systemctl", "service": "cloud-mount-", "scope": "user", "prefixMatch": true },
+      "windows": { "type": "servy", "service": "nucleus-cloud-mount-", "prefixMatch": true }
+    }
+  },
+  "rdp": {
+    "displayName": "Remote Desktop",
+    "description": "Remote Desktop Protocol server",
+    "platforms": {
+      "windows": { "type": "native", "service": "TermService" }
+    }
+  },
+  "linux-builder": {
+    "displayName": "Linux Builder VM",
+    "description": "Nix Linux builder VM on macOS",
+    "platforms": {
+      "macos": { "type": "launchctl", "service": "linux-builder", "domain": "system" }
+    }
+  }
+}
