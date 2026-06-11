@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 # check.sh — Consolidated repository validation script.
 #
-# Runs all repository checks in sequence:
+# Fast pre-commit checks only. Heavy lint (ShellCheck, PSScriptAnalyzer)
+# lives in test.sh.
+#
+# Runs repository checks in sequence:
 #   1. Dead Nix code detection (deadnix)
-#   2. Shell script linting (shellcheck)
-#   3. PowerShell syntax validation
-#   4. Packer template validation
-#   5. Shell script validation tests
-#   6. Lockfile validation
-#   7. Service registry validation
-#   8. Locked DSC validation
-#   9. Package manager usage enforcement
+#   2. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
+#   3. Packer template validation
+#   4. Shell script validation tests
+#   5. Lockfile validation
+#   6. Service registry validation
+#   7. Locked DSC validation
+#   8. Package manager usage enforcement
 #
 # With arguments, passes them through to individual checkers that support
-# path filtering (check-sh.sh, check-pwsh.ps1, check-packer.sh) and skips
-# whole-repo checks (deadnix, script validation, lockfile/locked DSC).
+# path filtering (check-pwsh.ps1, check-packer.sh) and skips whole-repo
+# checks (deadnix, script validation, lockfile/locked DSC).
 #
 # Arguments:
 #   (none)        No flags accepted; paths may be provided as positional arguments.
@@ -62,24 +64,23 @@ HAS_ARGS=false
 # receives only the files it understands. This allows prek (or other
 # pre-commit tools) to invoke the consolidated check with a combined
 # files pattern matching multiple extensions.
-SH_FILES=()
 PS1_FILES=()
 PKR_FILES=()
 if $HAS_ARGS; then
   for _f in "$@"; do
     case "$_f" in
-      *.sh)      SH_FILES+=("$_f") ;;
       *.ps1)     PS1_FILES+=("$_f") ;;
       *.pkr.hcl) PKR_FILES+=("$_f") ;;
     esac
   done
 fi
 
+_step=0
 
 # ---------------------------------------------------------------------------
 # 1. Dead Nix code detection
 # ---------------------------------------------------------------------------
-printf '\n=== [1/9] Dead Nix code ===\n'
+printf '\n=== [%s] Dead Nix code ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   deadnix --fail src/
   echo "No dead Nix code found."
@@ -88,33 +89,21 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Shell script linting (shellcheck)
+# 2. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 # ---------------------------------------------------------------------------
-printf '\n=== [2/9] Shell script linting ===\n'
-if [ "${#SH_FILES[@]}" -gt 0 ]; then
-  bash scripts/check-sh.sh "${SH_FILES[@]}"
-elif ! $HAS_ARGS; then
-  bash scripts/check-sh.sh
-else
-  echo "Skipping (no shell scripts to check)."
-fi
-
-# ---------------------------------------------------------------------------
-# 3. PowerShell syntax validation
-# ---------------------------------------------------------------------------
-printf '\n=== [3/9] PowerShell syntax validation ===\n'
+printf '\n=== [%s] PowerShell syntax validation ===\n' "$((_step += 1))"
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 "${PS1_FILES[@]}"
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly "${PS1_FILES[@]}"
 elif ! $HAS_ARGS; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly
 else
   echo "Skipping (no PowerShell scripts to check)."
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Packer template validation
+# 3. Packer template validation
 # ---------------------------------------------------------------------------
-printf '\n=== [4/9] Packer template validation ===\n'
+printf '\n=== [%s] Packer template validation ===\n' "$((_step += 1))"
 if [ "${#PKR_FILES[@]}" -gt 0 ]; then
   bash scripts/check-packer.sh "${PKR_FILES[@]}"
 elif ! $HAS_ARGS; then
@@ -124,9 +113,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Shell script validation tests
+# 4. Shell script validation tests
 # ---------------------------------------------------------------------------
-printf '\n=== [5/9] Shell script validation tests ===\n'
+printf '\n=== [%s] Shell script validation tests ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   bash tests/scripts/script-validation-tests.sh
 else
@@ -134,9 +123,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Lockfile validation
+# 5. Lockfile validation
 # ---------------------------------------------------------------------------
-printf '\n=== [6/9] Lockfile validation ===\n'
+printf '\n=== [%s] Lockfile validation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   _lf_errors=0
 
@@ -224,9 +213,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Service registry validation
+# 6. Service registry validation
 # ---------------------------------------------------------------------------
-printf '\n=== [7/9] Service registry validation ===\n'
+printf '\n=== [%s] Service registry validation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   _svc_json="src/modules/services.json"
   _svc_errors=0
@@ -301,9 +290,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 8. Locked DSC validation
+# 7. Locked DSC validation
 # ---------------------------------------------------------------------------
-printf '\n=== [8/9] Locked DSC validation ===\n'
+printf '\n=== [%s] Locked DSC validation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   _dsc_system="src/hosts/Windows/system.dsc.yml"
   _lockfile="src/lockfiles/lockfile.json"
@@ -351,9 +340,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 9. Package manager usage enforcement
+# 8. Package manager usage enforcement
 # ---------------------------------------------------------------------------
-printf '\n=== [9/9] Package manager usage enforcement ===\n'
+printf '\n=== [%s] Package manager usage enforcement ===\n' "$((_step += 1))"
 # Ban bare `pip install` and `npm install` — these bypass the lockfile and
 # produce non-reproducible environments.  `uv pip install` is allowed (uv
 # respects the lockfile).  Exclude self-references and help-text mentions.
