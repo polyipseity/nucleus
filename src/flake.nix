@@ -482,7 +482,6 @@
             pkgs.git
             pkgs.packer
             pkgs.powershell
-            pkgs.shellcheck
           ];
         };
 
@@ -491,8 +490,12 @@
         mkApp pkgs {
           name = "test";
           runtimeInputs = [
+            pkgs.bash
             pkgs.findutils
+            pkgs.git
             pkgs.nix
+            pkgs.powershell
+            pkgs.shellcheck
           ];
         };
 

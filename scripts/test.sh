@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # test.sh — Repository test suite runner.
 #
-# Runs Nix test suite: auto-discovers tests/src/*.nix and evaluates each
-# with nix-instantiate --eval. Future test steps (e.g., Pester) go here.
+# Runs Nix test suite, ShellCheck, and PSScriptAnalyzer.
+# Heavy lint moved here from check.sh so pre-commit stays fast.
 #
 # No file arguments accepted — always runs the full test suite.
 #
@@ -41,10 +41,12 @@ if [ "$#" -gt 0 ]; then
   esac
 fi
 
+_step=0
+
 # ---------------------------------------------------------------------------
 # 1. Nix test suite — auto-discover and run all *.nix test files
 # ---------------------------------------------------------------------------
-printf '\n=== [1/1] Nix test suite ===\n'
+printf '\n=== [%s] Nix test suite ===\n' "$((_step += 1))"
 echo "Running Nix unit tests..."
 FAILED=0
 while IFS= read -r test; do
@@ -56,5 +58,17 @@ if [ "$FAILED" -ne 0 ]; then
   exit 1
 fi
 echo "All Nix tests passed."
+
+# ---------------------------------------------------------------------------
+# 2. Shell script linting (ShellCheck)
+# ---------------------------------------------------------------------------
+printf '\n=== [%s] Shell script linting ===\n' "$((_step += 1))"
+bash scripts/check-sh.sh
+
+# ---------------------------------------------------------------------------
+# 3. PowerShell lint (PSScriptAnalyzer)
+# ---------------------------------------------------------------------------
+printf '\n=== [%s] PowerShell lint ===\n' "$((_step += 1))"
+pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1
 
 printf '\nAll tests passed.\n'
