@@ -8,8 +8,9 @@
 #   4. Packer template validation
 #   5. Shell script validation tests
 #   6. Lockfile validation
-#   7. Locked DSC validation
-#   8. Package manager usage enforcement
+#   7. Service registry validation
+#   8. Locked DSC validation
+#   9. Package manager usage enforcement
 #
 # With arguments, passes them through to individual checkers that support
 # path filtering (check-sh.sh, check-pwsh.ps1, check-packer.sh) and skips
@@ -78,7 +79,7 @@ fi
 # ---------------------------------------------------------------------------
 # 1. Dead Nix code detection
 # ---------------------------------------------------------------------------
-printf '\n=== [1/7] Dead Nix code ===\n'
+printf '\n=== [1/9] Dead Nix code ===\n'
 if ! $HAS_ARGS; then
   deadnix --fail src/
   echo "No dead Nix code found."
@@ -89,7 +90,7 @@ fi
 # ---------------------------------------------------------------------------
 # 2. Shell script linting (shellcheck)
 # ---------------------------------------------------------------------------
-printf '\n=== [2/7] Shell script linting ===\n'
+printf '\n=== [2/9] Shell script linting ===\n'
 if [ "${#SH_FILES[@]}" -gt 0 ]; then
   bash scripts/check-sh.sh "${SH_FILES[@]}"
 elif ! $HAS_ARGS; then
@@ -101,7 +102,7 @@ fi
 # ---------------------------------------------------------------------------
 # 3. PowerShell syntax validation
 # ---------------------------------------------------------------------------
-printf '\n=== [3/7] PowerShell syntax validation ===\n'
+printf '\n=== [3/9] PowerShell syntax validation ===\n'
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 "${PS1_FILES[@]}"
 elif ! $HAS_ARGS; then
@@ -113,7 +114,7 @@ fi
 # ---------------------------------------------------------------------------
 # 4. Packer template validation
 # ---------------------------------------------------------------------------
-printf '\n=== [4/7] Packer template validation ===\n'
+printf '\n=== [4/9] Packer template validation ===\n'
 if [ "${#PKR_FILES[@]}" -gt 0 ]; then
   bash scripts/check-packer.sh "${PKR_FILES[@]}"
 elif ! $HAS_ARGS; then
@@ -125,7 +126,7 @@ fi
 # ---------------------------------------------------------------------------
 # 5. Shell script validation tests
 # ---------------------------------------------------------------------------
-printf '\n=== [5/7] Shell script validation tests ===\n'
+printf '\n=== [5/9] Shell script validation tests ===\n'
 if ! $HAS_ARGS; then
   bash tests/scripts/script-validation-tests.sh
 else
@@ -135,7 +136,7 @@ fi
 # ---------------------------------------------------------------------------
 # 6. Lockfile validation
 # ---------------------------------------------------------------------------
-printf '\n=== [6/7] Lockfile validation ===\n'
+printf '\n=== [6/9] Lockfile validation ===\n'
 if ! $HAS_ARGS; then
   _lf_errors=0
 
@@ -223,9 +224,86 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Locked DSC validation
+# 7. Service registry validation
 # ---------------------------------------------------------------------------
-printf '\n=== [7/8] Locked DSC validation ===\n'
+printf '\n=== [7/9] Service registry validation ===\n'
+if ! $HAS_ARGS; then
+  _svc_json="src/modules/services.json"
+  _svc_errors=0
+
+  if [ ! -f "$_svc_json" ]; then
+    echo "ERROR: services.json not found at $_svc_json"
+    _svc_errors=$((_svc_errors + 1))
+  else
+    # Check each entry has displayName and platforms
+    while IFS=$'\t' read -r _name _has_display _has_platforms _platform_count; do
+      if [ "$_has_display" != "true" ]; then
+        echo "ERROR: services.json: '$_name' missing displayName"
+        _svc_errors=$((_svc_errors + 1))
+      fi
+      if [ "$_has_platforms" != "true" ]; then
+        echo "ERROR: services.json: '$_name' missing platforms"
+        _svc_errors=$((_svc_errors + 1))
+      fi
+      if [ "$_platform_count" -lt 1 ]; then
+        echo "ERROR: services.json: '$_name' has no platform entries"
+        _svc_errors=$((_svc_errors + 1))
+      fi
+    done < <(jq -r '
+      to_entries[] |
+      [
+        .key,
+        (.value | has("displayName") and (.value.displayName | type == "string") and (.value.displayName | length > 0)) | tostring,
+        (.value | has("platforms") and (.value.platforms | type == "object")) | tostring,
+        (.value.platforms | if type == "object" then (keys | length) else 0 end) | tostring
+      ] | @tsv' "$_svc_json")
+
+    # Validate each platform entry has valid type and required fields
+    while IFS=$'\t' read -r _name _platform _type _has_required; do
+      case "$_type" in
+        launchctl|systemctl|native|servy|schtask) ;;
+        *)
+          echo "ERROR: services.json: '$_name' platform '$_platform' has invalid type '$_type'"
+          _svc_errors=$((_svc_errors + 1))
+          ;;
+      esac
+      if [ "$_has_required" != "true" ]; then
+        echo "ERROR: services.json: '$_name' platform '$_platform' missing required fields for type '$_type'"
+        _svc_errors=$((_svc_errors + 1))
+      fi
+    done < <(jq -r '
+      to_entries[] |
+      .key as $name |
+      (.value.platforms // {}) | to_entries[] |
+      [
+        $name,
+        .key,
+        (.value.type // "missing"),
+        (
+          if .value.type == "launchctl" then (.value.service | type == "string" and length > 0)
+          elif .value.type == "systemctl" then (.value.service | type == "string" and length > 0)
+          elif .value.type == "native" then (.value.service | type == "string" and length > 0)
+          elif .value.type == "servy" then (.value.service | type == "string" and length > 0)
+          elif .value.type == "schtask" then (.value.taskPath | type == "string" and length > 0)
+          else false
+          end
+        ) | tostring
+      ] | @tsv' "$_svc_json")
+  fi
+
+  if [ "$_svc_errors" -gt 0 ]; then
+    echo "ERROR: services.json validation failed with $_svc_errors error(s)"
+    exit 1
+  fi
+  echo "services.json validation passed"
+else
+  echo "Skipping service registry validation (path-scoped mode)."
+fi
+
+# ---------------------------------------------------------------------------
+# 8. Locked DSC validation
+# ---------------------------------------------------------------------------
+printf '\n=== [8/9] Locked DSC validation ===\n'
 if ! $HAS_ARGS; then
   _dsc_system="src/hosts/Windows/system.dsc.yml"
   _lockfile="src/lockfiles/lockfile.json"
@@ -273,9 +351,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 8. Package manager usage enforcement
+# 9. Package manager usage enforcement
 # ---------------------------------------------------------------------------
-printf '\n=== [8/8] Package manager usage enforcement ===\n'
+printf '\n=== [9/9] Package manager usage enforcement ===\n'
 # Ban bare `pip install` and `npm install` — these bypass the lockfile and
 # produce non-reproducible environments.  `uv pip install` is allowed (uv
 # respects the lockfile).  Exclude self-references and help-text mentions.

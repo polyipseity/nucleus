@@ -3,9 +3,10 @@
 # Runs all Windows-compatible repository checks in sequence:
 #   1. PowerShell syntax validation
 #   2. Packer template validation
-#   3. Lockfile validation
-#   4. Locked DSC validation
-#   5. Package manager usage enforcement
+#   3. Service registry validation
+#   4. Lockfile validation
+#   5. Locked DSC validation
+#   6. Package manager usage enforcement
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
 # deadnix, shellcheck, and script validation tests are skipped
@@ -51,7 +52,7 @@ if ($HAS_ARGS) {
 # ---------------------------------------------------------------------------
 # 1. PowerShell syntax validation
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [1/4] PowerShell syntax validation ==="
+Write-Output "`n=== [1/6] PowerShell syntax validation ==="
 if ($PS1_FILES.Count -gt 0) {
   & "$RepoRoot\scripts\check-pwsh.ps1" $PS1_FILES
 } elseif (-not $HAS_ARGS) {
@@ -64,7 +65,7 @@ if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 # ---------------------------------------------------------------------------
 # 2. Packer template validation
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [2/4] Packer template validation ==="
+Write-Output "`n=== [2/6] Packer template validation ==="
 if ($PKR_FILES.Count -gt 0) {
   & "$RepoRoot\scripts\check-packer.ps1" $PKR_FILES
 } elseif (-not $HAS_ARGS) {
@@ -75,9 +76,67 @@ if ($PKR_FILES.Count -gt 0) {
 if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 
 # ---------------------------------------------------------------------------
-# 3. Lockfile validation
+# 3. Service registry validation
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [3/4] Lockfile validation ==="
+Write-Output "`n=== [3/6] Service registry validation ==="
+if (-not $HAS_ARGS) {
+  $_svcJson = Join-Path $RepoRoot "src\modules\services.json"
+  $_svcErrors = 0
+
+  if (-not (Test-Path $_svcJson)) {
+    Write-Output "ERROR: services.json not found at $_svcJson"
+    $_svcErrors++
+  } else {
+    $_svc = Get-Content $_svcJson -Raw | ConvertFrom-Json -AsHashtable
+
+    foreach ($_svcName in $_svc.Keys) {
+      $_entry = $_svc[$_svcName]
+      if (-not $_entry.ContainsKey('displayName') -or [string]::IsNullOrEmpty($_entry.displayName)) {
+        Write-Output "ERROR: services.json: '$_svcName' missing displayName"
+        $_svcErrors++
+      }
+      if (-not $_entry.ContainsKey('platforms') -or $_entry.platforms.Count -eq 0) {
+        Write-Output "ERROR: services.json: '$_svcName' missing or empty platforms"
+        $_svcErrors++
+      } else {
+        foreach ($_plat in $_entry.platforms.Keys) {
+          $_pEntry = $_entry.platforms[$_plat]
+          $_type = $_pEntry.type
+          if ($_type -notin @('launchctl', 'systemctl', 'native', 'servy', 'schtask')) {
+            Write-Output "ERROR: services.json: '$_svcName' platform '$_plat' has invalid type '$_type'"
+            $_svcErrors++
+          }
+          $_hasRequired = switch ($_type) {
+            'launchctl' { -not [string]::IsNullOrEmpty($_pEntry.service) }
+            'systemctl' { -not [string]::IsNullOrEmpty($_pEntry.service) }
+            'native'    { -not [string]::IsNullOrEmpty($_pEntry.service) }
+            'servy'     { -not [string]::IsNullOrEmpty($_pEntry.service) }
+            'schtask'   { -not [string]::IsNullOrEmpty($_pEntry.taskPath) }
+            default     { $false }
+          }
+          if (-not $_hasRequired) {
+            Write-Output "ERROR: services.json: '$_svcName' platform '$_plat' missing required fields for type '$_type'"
+            $_svcErrors++
+          }
+        }
+      }
+    }
+  }
+
+  if ($_svcErrors -gt 0) {
+    Write-Output "ERROR: services.json validation failed with $_svcErrors error(s)"
+    $exitCode = 1
+  } else {
+    Write-Output "services.json validation passed"
+  }
+} else {
+  Write-Output "Skipping service registry validation (path-scoped mode)."
+}
+
+# ---------------------------------------------------------------------------
+# 4. Lockfile validation
+# ---------------------------------------------------------------------------
+Write-Output "`n=== [4/6] Lockfile validation ==="
 if (-not $HAS_ARGS) {
   $_lfErrors = 0
   $_lfPath = Join-Path $RepoRoot "src\lockfiles\lockfile.json"
@@ -169,12 +228,11 @@ if (-not $HAS_ARGS) {
 } else {
   Write-Output "Skipping lockfile validation (path-scoped mode)."
 }
-if ($exitCode -ne 0) { /* propagated below */ }
 
 # ---------------------------------------------------------------------------
-# 4. Locked DSC validation
+# 5. Locked DSC validation
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [4/5] Locked DSC validation ==="
+Write-Output "`n=== [5/6] Locked DSC validation ==="
 if (-not $HAS_ARGS) {
   $_dscSystem = Join-Path $RepoRoot 'src\hosts\Windows\system.dsc.yml'
   $_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
@@ -204,10 +262,10 @@ if (-not $HAS_ARGS) {
       $_lfVer = if ($_lockfileData.winget.ContainsKey($_id)) { $_lockfileData.winget[$_id] } else { '' }
 
       if ([string]::IsNullOrEmpty($_lfVer)) {
-        Write-Output "ERROR: $_dscSystem: $_id has version $_pinnedVer but no lockfile entry"
+        Write-Output "ERROR: ${_dscSystem}: $_id has version $_pinnedVer but no lockfile entry"
         $_lfErrors++
       } elseif ($_pinnedVer -ne $_lfVer) {
-        Write-Output "ERROR: $_dscSystem: $_id pinned $_pinnedVer but lockfile has $_lfVer"
+        Write-Output "ERROR: ${_dscSystem}: $_id pinned $_pinnedVer but lockfile has $_lfVer"
         $_lfErrors++
       }
     }
@@ -244,9 +302,9 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 5. Package manager usage enforcement
+# 6. Package manager usage enforcement
 # ---------------------------------------------------------------------------
-Write-Output "`n=== [5/5] Package manager usage enforcement ==="
+Write-Output "`n=== [6/6] Package manager usage enforcement ==="
 if (-not $HAS_ARGS) {
   $_violations = 0
   # Ban bare pip install and npm install — these bypass the lockfile.
