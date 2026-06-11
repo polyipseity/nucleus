@@ -817,6 +817,15 @@
               # (ld: library not found for -liconv). It is included in glibc on Linux
               # so no equivalent addition is needed in the Linux devShell.
               buildInputs = [ pkgsDevMac.libiconv ];
+              # Ensure EDITOR/VISUAL are always set to nvim inside the devShell.
+              # When nix-direnv activates via `use flake`, its `nix print-dev-env`
+              # does not inherit the parent shell's variables. If the parent shell
+              # happens to have EDITOR=nano (from nix-darwin's mkDefault), direnv
+              # will not correct it because the devShell derivation does not set
+              # EDITOR.  Explicitly declaring these here makes print-dev-env emit
+              # `export EDITOR="nvim"`, so direnv applies the right value.
+              EDITOR = "nvim";
+              VISUAL = "nvim";
             };
           bootstrap = pkgsMac.mkShell {
             packages = [
@@ -842,6 +851,11 @@
                 rustToolchain
                 pkgsDevLinux.uv
               ];
+              # Same rationale as the macOS devShell: force a correct EDITOR/VISUAL
+              # so that nix-direnv activation does not inherit stale values from
+              # the parent shell (e.g. nix-darwin's /etc/zshenv default).
+              EDITOR = "nvim";
+              VISUAL = "nvim";
             };
           bootstrap = pkgsLinux.mkShell {
             packages = [
