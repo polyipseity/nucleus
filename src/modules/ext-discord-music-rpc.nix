@@ -80,34 +80,9 @@ in
     {
       home.packages = [ discord-music-rpc ];
 
-      # Symlinked from the Nix store.  All default values are written
-      # explicitly so the file serves as both configuration and documentation.
-      xdg.configFile."discord-music-rpc/config.yaml".text = ''
-        discord:
-          status_type: artist
-          show_progress: true
-          show_source_logo: true
-          show_urls: true
-          show_ad: true
-        spotify:
-          enabled: false
-          client_id: null
-          client_secret: null
-          redirect_uri: http://localhost:8888/callback
-        lastfm:
-          enabled: false
-          username: null
-          api_key: null
-        plex:
-          enabled: false
-          server_url: null
-          token: null
-          libraries: []
-        soundcloud:
-          enabled: false
-        youtube:
-          enabled: false
-      '';
+      # Symlinked from the Nix store.  Edit the tracked file directly so
+      # changes take effect on rebuild without touching the module.
+      xdg.configFile."discord-music-rpc/config.yaml".source = ./configs/discord-music-rpc/config.yaml;
     }
 
     # macOS: launchd agent keeps the tray app running persistently after login.

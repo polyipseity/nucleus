@@ -1,0 +1,24 @@
+discord:
+  status_type: artist
+  show_progress: true
+  show_source_logo: true
+  show_urls: true
+  show_ad: true
+spotify:
+  enabled: false
+  client_id: null
+  client_secret: null
+  redirect_uri: http://localhost:8888/callback
+lastfm:
+  enabled: false
+  username: null
+  api_key: null
+plex:
+  enabled: false
+  server_url: null
+  token: null
+  libraries: []
+soundcloud:
+  enabled: false
+youtube:
+  enabled: false

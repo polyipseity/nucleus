@@ -16,8 +16,11 @@
   True applies the config and registers the startup task.  False removes the
   startup task and warns that the config remains on disk.
 
+.PARAMETER RepoRoot
+  Absolute path to the repository root.  Used to find the tracked config file.
+
 .EXAMPLE
-  Sync-DiscordMusicRPC -Enabled:$true
+  Sync-DiscordMusicRPC -RepoRoot $repoRoot -Enabled:$true
 
 .EXAMPLE
   Sync-DiscordMusicRPC -Enabled:$false
@@ -33,7 +36,10 @@ function Sync-DiscordMusicRPC {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]
-    [bool]$Enabled
+    [bool]$Enabled,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot
   )
 
   $ErrorActionPreference = "Stop"
@@ -52,35 +58,14 @@ function Sync-DiscordMusicRPC {
     return
   }
 
-  # Write config file with all default values explicit.
+  # Write config file from the tracked copy in the repo.
   $null = New-Item -Path $configDir -ItemType Directory -Force
-  $configContent = @"
-discord:
-  status_type: artist
-  show_progress: true
-  show_source_logo: true
-  show_urls: true
-  show_ad: true
-spotify:
-  enabled: false
-  client_id: null
-  client_secret: null
-  redirect_uri: http://localhost:8888/callback
-lastfm:
-  enabled: false
-  username: null
-  api_key: null
-plex:
-  enabled: false
-  server_url: null
-  token: null
-  libraries: []
-soundcloud:
-  enabled: false
-youtube:
-  enabled: false
-"@
-  Set-Content -Path $configPath -Value $configContent -NoNewline
+  $configRepoPath = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\discord-music-rpc\config.yaml"
+  if (-not (Test-Path -Path $configRepoPath)) {
+    Write-Error "discord-music-rpc: config not found at '$configRepoPath'"
+    return
+  }
+  Copy-Item -Path $configRepoPath -Destination $configPath -Force
   Write-Output "discord-music-rpc: wrote config to '$configPath'"
 
   # Ensure log directory exists.
