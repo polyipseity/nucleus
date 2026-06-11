@@ -4,9 +4,6 @@
 #   - Local Ollama daemon (127.0.0.1:11434) for offline models
 #   - DeepSeek V4 via OpenCode Go (primary, order: 1) with
 #     OpenRouter fallback (order: 2).  API keys from SOPS secrets.
-#
-# router_settings.num_retries=3 exhausts the primary tier before
-# falling back; simple-shuffle randomizes endpoint selection.
 
 litellm_settings:
   # Drop unsupported client params (e.g. max_tokens) per-endpoint.
@@ -18,10 +15,17 @@ general_settings:
   environment_variables:
     LITELLM_LOG: WARNING
 
-# Retry the primary tier (order: 1) up to 3 times before falling back
-# to order: 2.  simple-shuffle randomizes selection within a tier.
+# enable_pre_call_checks=true is required for the `order` field
+# (primary/fallback tier selection) to be respected.  simple-shuffle
+# randomizes endpoint selection within a tier.  The cooldown combo
+# (allowed_fails/cooldown_time) benches a deployment after 3 failures
+# for 60 s, with 5 s between retries.
 router_settings:
+  enable_pre_call_checks: true
   num_retries: 3
+  retry_after: 5
+  allowed_fails: 3
+  cooldown_time: 60
   routing_strategy: simple-shuffle
 
 model_list:
