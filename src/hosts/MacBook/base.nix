@@ -23,4 +23,10 @@
   # nix-darwin v5+ requires an explicit primary user for single-user tooling.
   system.primaryUser = username;
   system.stateVersion = 4;
+
+  # Override nix-darwin's default EDITOR=nano to prevent it from interfering
+  # with home-manager's neovim defaultEditor (which sets $EDITOR and $VISUAL
+  # to nvim). Without this, nix-darwin's system-level export can override the
+  # home-manager value depending on shell invocation path.
+  environment.variables.EDITOR = "nvim";
 }
