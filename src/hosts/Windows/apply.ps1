@@ -309,7 +309,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-CaddyLocalCA.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinAccount.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinLibrary.ps1")
-. (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinHttpsProxy.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-CaddyService.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-LiteLLMService.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-ReplicaSyncScheduledTask.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSSHServer.ps1")
@@ -655,7 +655,7 @@ if ($EnableCloudDrivesParity) {
     Sync-CloudDrive -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
   }
 }
-Sync-JellyfinHttpsProxy -RepoRoot $repoRoot -Enabled:$true
+Sync-CaddyService -RepoRoot $repoRoot -Enabled:`$true
 Sync-CaddyLocalCA -RepoRoot $repoRoot -Enabled:$true
 Sync-JellyfinAccount -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-JellyfinLibrary -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
