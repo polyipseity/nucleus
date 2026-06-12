@@ -481,7 +481,7 @@ in
                 # WHY not /dev/null: mount failures are actionable (e.g. remote
                 # not configured, network unavailable) and should be inspectable.
                 StandardOutPath = "/dev/null";
-                StandardErrorPath = "${currentUserHome}/Library/Logs/cloud-mount-${mount.id}.log";
+                StandardErrorPath = "${config.nucleus.logging.logDir}/cloud-mount-${mount.id}/stderr.log";
               };
             };
           }) declaredMountAgents
@@ -570,7 +570,7 @@ in
                 # Keep scheduled sync runs on schedule boundaries only.
                 RunAtLoad = false;
                 StandardOutPath = "/dev/null";
-                StandardErrorPath = "${currentUserHome}/Library/Logs/cloud-replica-scheduled-sync-${replica.id}.log";
+                StandardErrorPath = "${config.nucleus.logging.logDir}/replica-sync-${replica.id}/stderr.log";
               };
             };
           }) declaredScheduledSyncReplicas

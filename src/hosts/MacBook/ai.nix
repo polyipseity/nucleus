@@ -40,8 +40,8 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
-      StandardOutPath = "/dev/null";
-      StandardErrorPath = "/Users/Shared/LiteLLM/log/proxy.log";
+      StandardOutPath = "${config.nucleus.logging.systemLogDir}/litellm/stdout.log";
+      StandardErrorPath = "${config.nucleus.logging.systemLogDir}/litellm/stderr.log";
     };
   };
 

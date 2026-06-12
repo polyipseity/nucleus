@@ -14,6 +14,7 @@
     ../../modules/core.nix
     ../../modules/custom-packages.nix
     ../../modules/gnupg.nix
+    ../../modules/logging.nix
     ../../modules/posix-base.nix
     ../../modules/posix-security.nix
     ../../modules/posix-sops.nix

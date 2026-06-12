@@ -105,8 +105,8 @@ in
           ProgramArguments = [ "${discord-music-rpc}/bin/discord-music-rpc" ];
           KeepAlive = true;
           RunAtLoad = true;
-          StandardOutPath = "/dev/null";
-          StandardErrorPath = "${config.home.homeDirectory}/Library/Logs/discord-music-rpc/main.log";
+          StandardOutPath = "${config.nucleus.logging.logDir}/discord-music-rpc/stdout.log";
+          StandardErrorPath = "${config.nucleus.logging.logDir}/discord-music-rpc/stderr.log";
         };
       };
     })

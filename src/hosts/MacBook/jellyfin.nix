@@ -11,7 +11,12 @@
 # - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
 # - https://caddyserver.com/docs/caddyfile/directives/reverse_proxy
 # - https://caddyserver.com/docs/caddyfile/directives/tls
-{ pkgs, username, ... }:
+{
+  config,
+  pkgs,
+  username,
+  ...
+}:
 let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   caddyAdminAddr = "${servicesJSON.caddy.network.admin.host}:${toString servicesJSON.caddy.network.admin.port}";
@@ -77,8 +82,8 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
-      StandardOutPath = "/Users/Shared/Jellyfin/log/launchd.out.log";
-      StandardErrorPath = "/Users/Shared/Jellyfin/log/launchd.err.log";
+      StandardOutPath = "${config.nucleus.logging.systemLogDir}/jellyfin/stdout.log";
+      StandardErrorPath = "${config.nucleus.logging.systemLogDir}/jellyfin/stderr.log";
     };
   };
 
@@ -88,8 +93,8 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
-      StandardOutPath = "/Users/Shared/Jellyfin/log/https-proxy.out.log";
-      StandardErrorPath = "/Users/Shared/Jellyfin/log/https-proxy.err.log";
+      StandardOutPath = "${config.nucleus.logging.systemLogDir}/jellyfin-https/stdout.log";
+      StandardErrorPath = "${config.nucleus.logging.systemLogDir}/jellyfin-https/stderr.log";
     };
   };
 }
