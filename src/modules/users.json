@@ -95,6 +95,15 @@
           "macos": "dev/nucleus/src/modules/configs/camilladsp/config-macos.yml",
           "windows": "dev\\nucleus\\src\\modules\\configs\\camilladsp\\config-windows.yml"
         }
+      },
+      {
+        "createTargetDirectory": true,
+        "path": ".config/camillagui-backend/config.yml",
+        "targets": {
+          "linux": "dev/nucleus/src/modules/configs/camillagui-backend/config-linux.yml",
+          "macos": "dev/nucleus/src/modules/configs/camillagui-backend/config-macos.yml",
+          "windows": "dev\\nucleus\\src\\modules\\configs\\camillagui-backend\\config-windows.yml"
+        }
       }
     ],
     "devRepos": {
