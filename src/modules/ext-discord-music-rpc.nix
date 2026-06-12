@@ -9,13 +9,16 @@
 # so edits take effect without a rebuild.  Assumes the repo is at
 # ~/dev/nucleus.
 # Services: launchd on macOS, systemd user service on NixOS.
-{
+args@{
   config,
   lib,
   pkgs,
   ...
 }:
 let
+  # Per-user service enable flag from users.json (default: enabled).
+  services = args.users.${config.home.username}.services or { };
+  userEnable = services."discord-music-rpc".enable or true;
   # The canonical live checkout path is ~/dev/nucleus.  Use an out-of-store
   # symlink so config edits are picked up instantly from the mutable working
   # tree instead of requiring a Nix rebuild.
@@ -94,7 +97,7 @@ in
     }
 
     # macOS: launchd agent keeps the tray app running persistently after login.
-    (lib.mkIf pkgs.stdenv.isDarwin {
+    (lib.mkIf (pkgs.stdenv.isDarwin && userEnable) {
       launchd.agents."discord-music-rpc" = {
         enable = true;
         config = {
@@ -109,7 +112,7 @@ in
     })
 
     # NixOS: systemd user service for headless operation.
-    (lib.mkIf pkgs.stdenv.isLinux {
+    (lib.mkIf (pkgs.stdenv.isLinux && userEnable) {
       systemd.user.services."discord-music-rpc" = {
         Unit = {
           Description = "discord-music-rpc music presence for Discord";
