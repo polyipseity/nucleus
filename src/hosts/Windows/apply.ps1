@@ -317,6 +317,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $setupModuleDir -ChildPath "Initialize-DevDirectory.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Install-PrekHook.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-BunSetup.ps1")
+. (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CamillaDSPSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CargoBinstallSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-RustupSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-ScoopSetup.ps1")
@@ -580,6 +581,9 @@ if ($EnableBunParity) {
 # uv global tools run after WinGet DSC has installed astral-sh.uv.
 # uv-setup prepends ~/.local/bin to PATH internally for this session.
 Invoke-UvSetup
+# CamillaDSP prebuilt binary runs after PATH is fully configured (no WinGet
+# package available; downloads from GitHub releases).
+Invoke-CamillaDSPSetup
 
 # Ensure the live nucleus checkout installs its own Git hooks during the same
 # provision run that installs or updates prek itself.
