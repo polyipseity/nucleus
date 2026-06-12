@@ -82,6 +82,7 @@
       # pass: Unix password manager (compatible with gopass on Windows).
       # qtpass: Qt GUI frontend for pass/gopass.
       blender
+      easyeffects # graphical PipeWire audio processing GUI
       gimp
       krita
       libreoffice
@@ -199,6 +200,4 @@
   # and select Limiter or Compressor. Community preset vaults (like
   # Digitalone1/EasyEffects-Presets) can be cloned into
   # ~/.local/share/easyeffects/output/.
-  # Source: https://mynixos.com/nixpkgs/option/programs.easyeffects.enable
-  programs.easyeffects.enable = true;
 }
