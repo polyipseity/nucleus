@@ -67,6 +67,10 @@
     },
     "nativeEntry": {
       "properties": {
+        "justification": {
+          "description": "Explanation of platform-specific configuration choices.",
+          "type": "string"
+        },
         "prefixMatch": {
           "description": "Match all services with this prefix",
           "type": "boolean"
@@ -102,11 +106,18 @@
         },
         {
           "$ref": "#/definitions/schtaskEntry"
+        },
+        {
+          "$ref": "#/definitions/omittedEntry"
         }
       ]
     },
     "schtaskEntry": {
       "properties": {
+        "justification": {
+          "description": "Explanation of platform-specific configuration choices.",
+          "type": "string"
+        },
         "prefixMatch": {
           "description": "Match all tasks with this prefix",
           "type": "boolean"
@@ -127,6 +138,10 @@
     },
     "servyEntry": {
       "properties": {
+        "justification": {
+          "description": "Explanation of platform-specific configuration choices.",
+          "type": "string"
+        },
         "prefixMatch": {
           "description": "Match all services with this prefix",
           "type": "boolean"
@@ -142,6 +157,22 @@
       "required": [
         "type",
         "service"
+      ],
+      "type": "object"
+    },
+    "omittedEntry": {
+      "properties": {
+        "justification": {
+          "description": "Why this service is not managed on this platform.",
+          "type": "string"
+        },
+        "type": {
+          "const": "omitted"
+        }
+      },
+      "required": [
+        "type",
+        "justification"
       ],
       "type": "object"
     },

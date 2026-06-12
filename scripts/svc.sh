@@ -70,6 +70,7 @@ read_registry() {
     to_entries | map(
       select(.value | type == "object")
       | select(.value.platforms | has($platform))
+      | select(.value.platforms[$platform].type != "omitted")
       | {key: .key, value: {displayName: .value.displayName, description: .value.description, platform: .value.platforms[$platform]}}
     ) | from_entries
   ' "$SERVICES_JSON"

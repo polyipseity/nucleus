@@ -5,7 +5,8 @@
     "description": "LLM inference server",
     "platforms": {
       "macos": { "type": "launchctl", "service": "org.nixos.local.ollama", "domain": "system" },
-      "nixos": { "type": "systemctl", "service": "ollama.service", "scope": "system" }
+      "nixos": { "type": "systemctl", "service": "ollama.service", "scope": "system" },
+      "windows": { "type": "native", "service": "ollama" }
     }
   },
   "litellm": {
@@ -22,7 +23,8 @@
     "description": "Media server",
     "platforms": {
       "macos": { "type": "launchctl", "service": "org.nixos.jellyfin", "domain": "system" },
-      "nixos": { "type": "systemctl", "service": "jellyfin.service", "scope": "system" }
+      "nixos": { "type": "systemctl", "service": "jellyfin.service", "scope": "system" },
+      "windows": { "type": "native", "service": "JellyfinServer" }
     }
   },
   "jellyfin-https": {
@@ -30,6 +32,7 @@
     "description": "Caddy reverse proxy for Jellyfin",
     "platforms": {
       "macos": { "type": "launchctl", "service": "org.nixos.jellyfinHttpsProxy", "domain": "system" },
+      "nixos": { "type": "omitted", "justification": "Integrated into services.caddy in src/hosts/NixOS/jellyfin.nix; not a separate managed service." },
       "windows": { "type": "native", "service": "nucleus-jellyfin-https" }
     }
   },
@@ -56,6 +59,7 @@
     "description": "SSH key authentication agent",
     "platforms": {
       "macos": { "type": "launchctl", "service": "com.openssh.ssh-agent", "domain": "user", "justification": "User key material in per-user ssh-agent process" },
+      "nixos": { "type": "omitted", "justification": "SSH agent provided by desktop environment keychain (GNOME Keyring / KDE Wallet); no standalone agent to manage." },
       "windows": { "type": "native", "service": "ssh-agent" }
     }
   },
@@ -72,6 +76,8 @@
     "displayName": "Remote Desktop",
     "description": "Remote Desktop Protocol server",
     "platforms": {
+      "macos": { "type": "omitted", "justification": "macOS uses built-in Screen Sharing / VNC protocol instead of RDP." },
+      "nixos": { "type": "omitted", "justification": "Linux hosts typically use VNC or similar remote-access protocols; no RDP server configured." },
       "windows": { "type": "native", "service": "TermService" }
     }
   },
@@ -79,7 +85,9 @@
     "displayName": "Linux Builder VM",
     "description": "Nix Linux builder VM on macOS",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "org.nixos.linux-builder", "domain": "system" }
+      "macos": { "type": "launchctl", "service": "org.nixos.linux-builder", "domain": "system" },
+      "nixos": { "type": "omitted", "justification": "NixOS runs Linux natively; no builder VM required." },
+      "windows": { "type": "omitted", "justification": "Nix is not the primary build platform on Windows." }
     }
   }
 }
