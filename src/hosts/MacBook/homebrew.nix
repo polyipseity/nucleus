@@ -42,6 +42,7 @@ let
     "alt-tab" # Windows-style alt-tab switcher
     "appcleaner" # Thorough app uninstaller
     "battery" # Apple Silicon charge-limit manager (maintains 80% cap)
+    "blackhole-2ch" # Virtual audio driver for system-wide audio loopback (CamillaDSP capture)
     "betterdisplay" # Advanced display management and virtual screens
     "chrome-remote-desktop-host" # Headless remote-desktop receiver
     "coolterm" # Serial terminal
