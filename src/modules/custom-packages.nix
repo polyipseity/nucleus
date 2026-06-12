@@ -28,7 +28,7 @@ let
 
     src = pkgs.fetchurl {
       url = "https://github.com/cvknage/equaliser/releases/download/v${version}/Equaliser-${version}.dmg";
-      hash = "sha256-1cll6cwhb9vrn0wx7rbp2dhm1r7cip4c3dkig3rl8gl31mbvdx9g";
+      hash = "sha256-L/W2Vw2DPkTzeHG2wciN7ORQYRN35dM5sHmnBTkzlLI=";
     };
 
     installPhase = ''
