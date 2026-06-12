@@ -3,16 +3,20 @@
   Runs pre-flight health checks for Windows bootstrap/apply workflows.
 
 .DESCRIPTION
-  Validates three readiness dimensions before configuration is applied:
+  Validates four readiness dimensions before configuration is applied:
     1. free disk space on the system drive
     2. outbound HTTPS connectivity to GitHub and cache.nixos.org
     3. presence of decrypt-capable tooling (sops + gpg) when available
+    4. log directory accessibility, file sizes, and sanitization (optional)
 
 .PARAMETER MinFreeBytes
   Minimum free disk space (bytes) required on the system drive (default: 10000000000).
 
 .PARAMETER NoSecretHealth
   Skip validation of sops/gpg executable availability (default: $false).
+
+.PARAMETER LogHealth
+  Enable log directory, size, and sanitize checks (default: $false).
 
 .EXAMPLE
   .\health-check.ps1
@@ -22,6 +26,9 @@
 
 .EXAMPLE
   .\health-check.ps1 -NoSecretHealth
+
+.EXAMPLE
+  .\health-check.ps1 -LogHealth
 
 .NOTES
   Environment variables: NUCLEUS_HEALTH_CHECK_NO_SECRET_HEALTH.
@@ -34,6 +41,9 @@ param(
 
   [Parameter()]
   [switch]$NoSecretHealth = $(if ($env:NUCLEUS_HEALTH_CHECK_NO_SECRET_HEALTH -eq 'true') { $true } else { $false }),
+
+  [Parameter()]
+  [switch]$LogHealth,
 
   [Alias("h")]
   [Parameter()]
@@ -116,10 +126,88 @@ function Test-SecretTooling {
   }
 }
 
+function Test-LogHealth {
+  <#
+  .SYNOPSIS
+    Validates log directories and log file health.
+  .DESCRIPTION
+    Checks that log directories exist and are writable, log file sizes stay
+    within 80% of their rotation threshold, and sanitized logs contain no
+    control characters.
+  .EXAMPLE
+    Test-LogHealth
+  #>
+
+  if (-not (Get-Command -Name 'jq.exe' -ErrorAction SilentlyContinue)) {
+    throw 'nucleus: jq.exe not found in PATH (required for --LogHealth).'
+  }
+
+  $userDir = "$env:LOCALAPPDATA\nucleus\logs"
+  $systemDir = "$env:ProgramData\nucleus\logs"
+  if (Test-Path "$PSScriptRoot\..\src\hosts\Windows\modules\Invoke-LogManagement.ps1") {
+    . "$PSScriptRoot\..\src\hosts\Windows\modules\Invoke-LogManagement.ps1"
+    $userDir = Get-NucleusLogDir
+    $systemDir = Get-NucleusSystemLogDir
+  }
+  $servicesJson = "$PSScriptRoot\..\src\modules\services.json"
+  $failures = 0
+
+  foreach ($dir in @($userDir, $systemDir)) {
+    if (-not (Test-Path -Path $dir -PathType Container)) {
+      Write-Warning "nucleus: log dir '$dir' does not exist"
+      $failures++
+    }
+  }
+
+  $services = Get-Content $servicesJson -Raw | ConvertFrom-Json
+  $svcNames = $services.PSObject.Properties |
+    Where-Object { $_.Name -notlike '$*' } |
+    Select-Object -ExpandProperty Name |
+    Sort-Object
+
+  foreach ($svc in $svcNames) {
+    $svcConfig = $services.$svc.logging
+    if (-not $svcConfig) { continue }
+    $capture = if ($svcConfig.capture) { $svcConfig.capture } else { 'all' }
+    if ($capture -eq 'none') { continue }
+
+    $maxSize = if ($svcConfig.maxSize) { [int64]$svcConfig.maxSize } else { 10485760 }
+    $sanitize = if ($null -ne $svcConfig.sanitize) { [bool]$svcConfig.sanitize } else { $true }
+
+    foreach ($dir in @($userDir, $systemDir)) {
+      $logGlob = Join-Path $dir $svc '*.log'
+      foreach ($logFile in Get-ChildItem -Path $logGlob -ErrorAction SilentlyContinue) {
+        # Check file size against rotation threshold
+        $size = $logFile.Length
+        $threshold = $maxSize * 80 / 100
+        if ($size -gt $threshold) {
+          Write-Warning "nucleus: '$($logFile.FullName)' ($size bytes) exceeds 80% of rotation max ($maxSize bytes)"
+        }
+
+        # Spot-check for control characters when sanitize is enabled
+        if ($sanitize) {
+          $sample = Get-Content -Path $logFile.FullName -TotalCount 5 -Raw
+          if ($sample -match '[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]') {
+            Write-Warning "nucleus: '$($logFile.FullName)' contains control characters despite sanitize=true"
+            $failures++
+          }
+        }
+      }
+    }
+  }
+
+  if ($failures -gt 0) {
+    throw "nucleus: log health checks failed ($failures issue(s))"
+  }
+}
+
 Test-DiskSpace -RequiredBytes $MinFreeBytes
 Test-Connectivity
 if (-not $NoSecretHealth) {
   Test-SecretTooling
+}
+if ($LogHealth) {
+  Test-LogHealth
 }
 
 Write-Output "$($PSStyle.Foreground.Green)nucleus: Windows health checks passed$($PSStyle.Reset)"

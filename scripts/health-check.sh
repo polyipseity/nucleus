@@ -8,6 +8,7 @@
 # Arguments:
 #   --min-free-bytes <int>            Minimum free disk space in bytes (default: 10000000000).
 #   --secret-health|--no-secret-health  Enable or skip SOPS decryption identity verification (default: --secret-health).
+#   --log-health                       Enable log directory, size, and sanitize checks (default: disabled).
 #
 # Environment variables:
 #   (none)
@@ -28,6 +29,7 @@ REPO_ROOT="$(resolve_nucleus_root)"
 
 min_free_bytes=10000000000
 secret_health=true
+log_health=false
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -49,6 +51,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-secret-health)
       secret_health=false
+      ;;
+    --log-health)
+      log_health=true
+      require_command jq
       ;;
     *)
       printf '%s\n' "health: unsupported argument '$1'" >&2
@@ -128,10 +134,68 @@ check_secret_health() {
   return 0
 }
 
+check_log_health() {
+  # Verify log directories exist, check file sizes against rotation
+  # thresholds, and validate that sanitized logs contain no control chars.
+  log_dir="$(nucleus_log_dir)"
+  system_log_dir="$(nucleus_system_log_dir)"
+  services_json="$REPO_ROOT/src/modules/services.json"
+  failures=0
+
+  for dir in "$log_dir" "$system_log_dir"; do
+    if [ -d "$dir" ]; then
+      if [ ! -w "$dir" ]; then
+        printf '%s\n' "health: log dir '$dir' is not writable" >&2
+        failures=$((failures + 1))
+      fi
+    else
+      printf '%s\n' "health: log dir '$dir' does not exist" >&2
+      failures=$((failures + 1))
+    fi
+  done
+
+  while IFS= read -r svc; do
+    capture=$(jq -r --arg svc "$svc" '.[$svc].logging.capture // "all"' "$services_json")
+    max_size=$(jq -r --arg svc "$svc" '.[$svc].logging.maxSize // 10485760' "$services_json")
+    sanitize=$(jq -r --arg svc "$svc" '.[$svc].logging.sanitize // true' "$services_json")
+
+    if [ "$capture" = "none" ]; then
+      continue
+    fi
+
+    for dir in "$log_dir" "$system_log_dir"; do
+      for log_file in "$dir/$svc"/*.log; do
+        [ -f "$log_file" ] || continue
+
+        # Check file size against rotation threshold
+        size=$(wc -c < "$log_file")
+        threshold=$((max_size * 80 / 100))
+        if [ "$size" -gt "$threshold" ]; then
+          printf '%s\n' "health: warning — '$log_file' ($size bytes) exceeds 80% of rotation max ($max_size bytes)" >&2
+        fi
+
+        # Spot-check for control characters when sanitize is enabled
+        if [ "$sanitize" = "true" ] && head -n 5 "$log_file" | tr -d '[:print:][:space:]' | grep -q .; then
+          printf '%s\n' "health: warning — '$log_file' contains control characters despite sanitize=true" >&2
+          failures=$((failures + 1))
+        fi
+      done
+    done
+  done <<< "$(jq -r 'to_entries[] | select(.key | startswith("$") | not) | .key' "$services_json" | sort)"
+
+  if [ "$failures" -gt 0 ]; then
+    printf '%s\n' "health: log health checks failed ($failures issue(s))" >&2
+    return 1
+  fi
+  return 0
+}
 check_disk_space
 check_connectivity
 if [ "$secret_health" = true ]; then
   check_secret_health
+fi
+if [ "$log_health" = true ]; then
+  check_log_health
 fi
 
 printf '%s\n' "health: health checks passed"
