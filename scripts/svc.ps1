@@ -11,11 +11,11 @@
   Services are defined in src/modules/services.json (the canonical registry).
 
 .PARAMETER Action
-  The operation to perform: list, status, start, stop, restart, enable, disable.
+  The operation to perform: list, status, start, stop, restart, enable, disable, endpoint.
 
 .PARAMETER ServiceName
   One or more service names to target (required for start/stop/restart/enable/disable;
-  optional for status — defaults to all).
+  optional for status — defaults to all). For endpoint, first is service name, second (optional) is endpoint name.
 
 .PARAMETER Json
   Output machine-readable JSON instead of formatted tables.
@@ -28,6 +28,7 @@
   .\svc.ps1 status ollama,sshd
   .\svc.ps1 start ollama
   .\svc.ps1 restart jellyfin
+  .\svc.ps1 endpoint jellyfin http
   .\svc.ps1 list -Json
 
 .NOTES
@@ -37,7 +38,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable')]
+  [ValidateSet('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'endpoint')]
   [string]$Action,
 
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -79,6 +80,7 @@ foreach ($svc in $RegistryRaw.Keys) {
     $Registry[$svc] = @{
       displayName = $entry.displayName
       description = $entry.description
+      network     = if ($entry.PSObject.Properties.Name -contains 'network') { $entry.network } else { $null }
       platform    = $entry.platforms[$Platform]
     }
   }
@@ -327,5 +329,48 @@ switch ($Action) {
       }
     }
     if ($overallExit -ne 0) { exit $overallExit }
+  }
+
+  'endpoint' {
+    if ($ServiceName.Count -eq 0) {
+      throw "svc: missing service name for endpoint"
+    }
+    $svcName = $ServiceName[0]
+    $epName  = if ($ServiceName.Count -ge 2) { $ServiceName[1] } else { $null }
+
+    $Registry = [ordered]@{}
+    $raw = Get-Content -Raw "$RepoRoot/src/modules/services.json" | ConvertFrom-Json
+    if (-not $raw.PSObject.Properties.Name -contains $svcName) {
+      Write-Error "svc: $svcName — service not found in registry"
+      exit 1
+    }
+    $entry = $raw.$svcName
+    if (-not $entry.PSObject.Properties.Name -contains 'network') {
+      Write-Error "svc: $svcName — no network endpoints defined"
+      exit 1
+    }
+    $network = $entry.network
+
+    if ($epName) {
+      if (-not $network.PSObject.Properties.Name -contains $epName) {
+        Write-Error "svc: $svcName — endpoint '$epName' not found"
+        exit 1
+      }
+      $ep = $network.$epName
+      if ($Json) {
+        Write-Output ($ep | ConvertTo-Json -Compress)
+      } else {
+        Write-Output "$($ep.protocol)://$($ep.host):$($ep.port)"
+      }
+    } else {
+      if ($Json) {
+        Write-Output ($network | ConvertTo-Json -Compress)
+      } else {
+        $network.PSObject.Properties | ForEach-Object {
+          $ep = $_.Value
+          Write-Output "$($_.Name)`t$($ep.protocol)://$($ep.host):$($ep.port)"
+        }
+      }
+    }
   }
 }
