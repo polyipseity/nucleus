@@ -10,7 +10,7 @@ args@{
 }:
 
 let
-  services = args.users.${config.home.username}.services or { };
+  services = args.users.${args.username}.services or { };
   userEnable = services."camillagui-backend".enable or true;
 in
 {
@@ -34,7 +34,9 @@ in
       };
       Service = {
         Type = "simple";
-        ExecStart = "${pkgs.bash}/bin/bash -lc 'exec camillagui-backend -c ${config.home.homeDirectory}/.config/camillagui-backend/config.yml'";
+        ExecStart = "${pkgs.bash}/bin/bash -lc 'exec camillagui-backend -c ${
+          config.users.users.${args.username}.home
+        }/.config/camillagui-backend/config.yml'";
         Restart = "on-failure";
       };
       Install = {

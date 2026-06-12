@@ -10,7 +10,7 @@ args@{
 }:
 
 let
-  services = args.users.${config.home.username}.services or { };
+  services = args.users.${args.username}.services or { };
   userEnable = services."camillagui-backend".enable or true;
 in
 {
@@ -21,19 +21,22 @@ in
     };
 
     launchd.agents."camillagui-backend" = {
-      enable = true;
-      config = {
+      serviceConfig = {
         Label = "local.camillagui-backend";
         ProgramArguments = [
           "/usr/bin/env"
           "camillagui-backend"
           "-c"
-          "${config.home.homeDirectory}/.config/camillagui-backend/config.yml"
+          "${config.users.users.${args.username}.home}/.config/camillagui-backend/config.yml"
         ];
         KeepAlive = true;
         RunAtLoad = true;
-        StandardOutPath = "${config.nucleus.logging.logDir}/camillagui-backend/stdout.log";
-        StandardErrorPath = "${config.nucleus.logging.logDir}/camillagui-backend/stderr.log";
+        StandardOutPath = "${
+          config.users.users.${args.username}.home
+        }/Library/Logs/nucleus/camillagui-backend/stdout.log";
+        StandardErrorPath = "${
+          config.users.users.${args.username}.home
+        }/Library/Logs/nucleus/camillagui-backend/stderr.log";
       };
     };
   };

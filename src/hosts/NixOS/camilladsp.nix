@@ -10,7 +10,7 @@ args@{
 }:
 
 let
-  services = args.users.${config.home.username}.services or { };
+  services = args.users.${args.username}.services or { };
   userEnable = services."camilladsp".enable or true;
 in
 {
@@ -29,7 +29,9 @@ in
       };
       Service = {
         Type = "simple";
-        ExecStart = "${pkgs.camilladsp}/bin/camilladsp -o ${config.home.homeDirectory}/.config/camilladsp/config.yml -p 1234 -w";
+        ExecStart = "${pkgs.camilladsp}/bin/camilladsp -o ${
+          config.users.users.${args.username}.home
+        }/.config/camilladsp/config.yml -p 1234 -w";
         Restart = "on-failure";
       };
       Install = {

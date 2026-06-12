@@ -10,27 +10,30 @@ args@{
 }:
 
 let
-  services = args.users.${config.home.username}.services or { };
+  services = args.users.${args.username}.services or { };
   userEnable = services."camilladsp".enable or true;
 in
 {
   config = lib.mkIf (pkgs.stdenv.isDarwin && userEnable) {
     launchd.agents."camilladsp" = {
-      enable = true;
-      config = {
+      serviceConfig = {
         Label = "local.camilladsp";
         ProgramArguments = [
           "${pkgs.camilladsp}/bin/camilladsp"
           "-o"
-          "${config.home.homeDirectory}/.config/camilladsp/config.yml"
+          "${config.users.users.${args.username}.home}/.config/camilladsp/config.yml"
           "-p"
           "1234"
           "-w"
         ];
         KeepAlive = true;
         RunAtLoad = true;
-        StandardOutPath = "${config.nucleus.logging.logDir}/camilladsp/stdout.log";
-        StandardErrorPath = "${config.nucleus.logging.logDir}/camilladsp/stderr.log";
+        StandardOutPath = "${
+          config.users.users.${args.username}.home
+        }/Library/Logs/nucleus/camilladsp/stdout.log";
+        StandardErrorPath = "${
+          config.users.users.${args.username}.home
+        }/Library/Logs/nucleus/camilladsp/stderr.log";
       };
     };
   };
