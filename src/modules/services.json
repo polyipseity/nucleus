@@ -3,6 +3,9 @@
   "caddy": {
     "description": "Local TLS reverse proxy engine",
     "displayName": "Caddy",
+    "logging": {
+      "capture": "none"
+    },
     "network": {
       "admin": { "host": "127.0.0.1", "port": 2019, "protocol": "tcp" }
     },
@@ -25,6 +28,9 @@
   "cloud-drive": {
     "description": "rclone FUSE cloud drive mounts",
     "displayName": "Cloud Drive Mounts",
+    "logging": {
+      "capture": "all"
+    },
     "platforms": {
       "macos": {
         "domain": "user",
@@ -51,6 +57,9 @@
   "discord-music-rpc": {
     "description": "Discord Rich Presence for music players",
     "displayName": "Discord Music RPC",
+    "logging": {
+      "capture": "all"
+    },
     "network": {
       "oauth": { "host": "localhost", "port": 8888, "protocol": "http" }
     },
@@ -76,6 +85,9 @@
   "jellyfin": {
     "description": "Media server",
     "displayName": "Jellyfin",
+    "logging": {
+      "capture": "none"
+    },
     "network": {
       "http": { "host": "127.0.0.1", "port": 8096, "protocol": "http" },
       "https": { "host": "localhost", "port": 8920, "protocol": "https" }
@@ -100,6 +112,9 @@
   "jellyfin-https": {
     "description": "Caddy reverse proxy for Jellyfin",
     "displayName": "Jellyfin HTTPS Proxy",
+    "logging": {
+      "capture": "all"
+    },
     "network": {
       "default": { "host": "localhost", "port": 8920, "protocol": "https" }
     },
@@ -122,6 +137,9 @@
   "linux-builder": {
     "description": "Nix Linux builder VM on macOS",
     "displayName": "Linux Builder VM",
+    "logging": {
+      "capture": "none"
+    },
     "network": {
       "ssh": { "host": "127.0.0.1", "port": 31022, "protocol": "tcp" }
     },
@@ -144,6 +162,10 @@
   "litellm": {
     "description": "AI API gateway for multi-provider routing",
     "displayName": "LiteLLM",
+    "logging": {
+      "capture": "stderr",
+      "level": "WARNING"
+    },
     "network": {
       "default": { "host": "127.0.0.1", "port": 4000, "protocol": "http" }
     },
@@ -168,6 +190,9 @@
   "ollama": {
     "description": "LLM inference server",
     "displayName": "Ollama",
+    "logging": {
+      "capture": "none"
+    },
     "network": {
       "default": { "host": "127.0.0.1", "port": 11434, "protocol": "http" }
     },
@@ -191,6 +216,9 @@
   "rdp": {
     "description": "Remote Desktop Protocol server",
     "displayName": "Remote Desktop",
+    "logging": {
+      "capture": "none"
+    },
     "network": {
       "default": { "host": "0.0.0.0", "port": 3389, "protocol": "tcp" }
     },
@@ -212,6 +240,9 @@
   "ssh-agent": {
     "description": "SSH key authentication agent",
     "displayName": "SSH Agent",
+    "logging": {
+      "capture": "none"
+    },
     "platforms": {
       "macos": {
         "domain": "user",
@@ -233,6 +264,9 @@
   "sshd": {
     "description": "Remote shell access via SSH",
     "displayName": "SSH Server",
+    "logging": {
+      "capture": "none"
+    },
     "network": {
       "default": { "host": "0.0.0.0", "port": 22, "protocol": "tcp" }
     },
