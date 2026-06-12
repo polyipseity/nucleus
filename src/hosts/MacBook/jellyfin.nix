@@ -13,6 +13,9 @@
 # - https://caddyserver.com/docs/caddyfile/directives/tls
 { pkgs, username, ... }:
 let
+  servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
+  caddyAdminAddr = "${servicesJSON.caddy.network.admin.host}:${toString servicesJSON.caddy.network.admin.port}";
+
   jellyfinHttpPort = 8096;
   jellyfinHttpsPort = 8920;
   jellyfinStateRoot = "/Users/Shared/Jellyfin";
@@ -38,7 +41,7 @@ let
   jellyfinHttpsCaddyfile = pkgs.writeText "jellyfin-https.Caddyfile" ''
     {
       # Keep the admin API local-only; manual trust uses this endpoint.
-      admin 127.0.0.1:2019
+      admin ${caddyAdminAddr}
       # Avoid implicit HTTP redirect listener on :80 for localhost-only service.
       auto_https disable_redirects
     }

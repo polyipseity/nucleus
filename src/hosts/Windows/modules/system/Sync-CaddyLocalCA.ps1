@@ -74,15 +74,18 @@ function Sync-CaddyLocalCA {
     return
   }
 
+  $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+  $adminAddr = if ($svc.caddy.network.admin) { "$($svc.caddy.network.admin.host):$($svc.caddy.network.admin.port)" } else { '127.0.0.1:2019' }
+
   for ($attempt = 1; $attempt -le 20; $attempt++) {
     try {
-      & $caddyCommand.Source trust --address 127.0.0.1:2019 | Out-Null
+      & $caddyCommand.Source trust --address $adminAddr | Out-Null
       Write-Output 'caddy-trust: local CA trusted successfully.'
       return
     }
     catch {
       if ($attempt -eq 20) {
-        Write-Warning "caddy-trust: failed to trust local CA from 127.0.0.1:2019 after $attempt attempts: $($_.Exception.Message)"
+        Write-Warning "caddy-trust: failed to trust local CA from $adminAddr after $attempt attempts: $($_.Exception.Message)"
         return
       }
       Start-Sleep -Seconds 1

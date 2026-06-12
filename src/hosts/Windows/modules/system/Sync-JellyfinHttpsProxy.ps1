@@ -90,14 +90,15 @@ function Sync-JellyfinHttpsProxy {
     New-Item -Path $caddyConfigDir -ItemType Directory -Force | Out-Null
     New-Item -Path $caddyDataDir -ItemType Directory -Force | Out-Null
 
-    # Read jellyfin network endpoints from the canonical service registry.
+    # Read jellyfin and caddy network endpoints from the canonical service registry.
     $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
     $jfHttp = if ($svc.jellyfin.network.http) { $svc.jellyfin.network.http } else { @{ host = '127.0.0.1'; port = 8096 } }
     $jfHttps = if ($svc.jellyfin.network.https) { $svc.jellyfin.network.https } else { @{ host = 'localhost'; port = 8920 } }
+    $caddyAdmin = if ($svc.caddy.network.admin) { $svc.caddy.network.admin } else { @{ host = '127.0.0.1'; port = 2019 } }
 
     $caddyfile = @"
 {
-  admin 127.0.0.1:2019
+  admin $($caddyAdmin.host):$($caddyAdmin.port)
   auto_https disable_redirects
 }
 

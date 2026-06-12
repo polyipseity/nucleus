@@ -55,15 +55,18 @@ if ! command -v caddy >/dev/null 2>&1; then
   exit 1
 fi
 
+REPO_ROOT="$(resolve_nucleus_root)"
+_ct_admin_addr="$(jq -r '.caddy.network.admin | "\(.host):\(.port)"' "$REPO_ROOT/src/modules/services.json" 2>/dev/null || echo '127.0.0.1:2019')"
+
 _ct_attempt=0
 while [ "$_ct_attempt" -lt 20 ]; do
   if [ "$_ct_mode" = "sudo" ]; then
-    if sudo env "PATH=$PATH" caddy trust --address 127.0.0.1:2019; then
+    if sudo env "PATH=$PATH" caddy trust --address "$_ct_admin_addr"; then
       printf '%s\n' 'caddy-trust: local CA trusted successfully'
       exit 0
     fi
   else
-    if caddy trust --address 127.0.0.1:2019; then
+    if caddy trust --address "$_ct_admin_addr"; then
       printf '%s\n' 'caddy-trust: local CA trusted successfully'
       exit 0
     fi
@@ -73,5 +76,5 @@ while [ "$_ct_attempt" -lt 20 ]; do
   sleep 1
 done
 
-printf '%s\n' 'caddy-trust: failed to trust local CA from admin endpoint 127.0.0.1:2019; continuing without failing apply' >&2
+printf '%s\n' "caddy-trust: failed to trust local CA from admin endpoint $_ct_admin_addr; continuing without failing apply" >&2
 exit 2

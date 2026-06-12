@@ -1,5 +1,27 @@
 {
   "$schema": "./services.schema.json",
+  "caddy": {
+    "description": "Local TLS reverse proxy engine",
+    "displayName": "Caddy",
+    "network": {
+      "admin": { "host": "127.0.0.1", "port": 2019, "protocol": "tcp" }
+    },
+    "platforms": {
+      "macos": {
+        "domain": "system",
+        "justification": "Managed as part of Jellyfin HTTPS proxy daemon; not a standalone caddy service.",
+        "type": "omitted"
+      },
+      "nixos": {
+        "justification": "Integrated into services.caddy in NixOS host config; not a separate managed service.",
+        "type": "omitted"
+      },
+      "windows": {
+        "justification": "Managed as part of nucleus-jellyfin-https SCM service; not a standalone caddy service.",
+        "type": "omitted"
+      }
+    }
+  },
   "cloud-drive": {
     "description": "rclone FUSE cloud drive mounts",
     "displayName": "Cloud Drive Mounts",
