@@ -102,7 +102,7 @@ resolve_service_names() {
         case "$PLATFORM" in
           macos)
             local matches
-            matches=$(launchctl list 2>/dev/null | awk -v p="$prefix" '$1 ~ p { print $1 }' || true)
+            matches=$(launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)
             if [ -z "$matches" ]; then
               printf '%s\n' "$name	$name	$(echo "$entry" | jq -c '.platform')"
             else
