@@ -31,6 +31,12 @@
   ...
 }:
 let
+  # Read endpoint addresses from the canonical service registry so that
+  # client-side defaults stay in sync with the daemon bind ports defined
+  # in host-level configuration.
+  servicesJSON = builtins.fromJSON (builtins.readFile ../services.json);
+  litellmEndpoint = servicesJSON.litellm.network.default;
+
   # Only Apple Silicon macOS currently needs an opt-in permissive import for
   # oterm's dependency chain. Keeping the import lazy and isolated preserves
   # strict evaluation for the rest of the package set.
@@ -67,11 +73,11 @@ lib.mkMerge [
     # and guards against upstream default changes (Ollama defaults vary by
     # version).
     home.sessionVariables = {
-      # Point clients at the LiteLLM proxy (127.0.0.1:4000) instead of Ollama
-      # directly so that oterm, ollama run, and any other OpenAI-compatible
-      # client gets unified routing to both local and remote models.  Sync
-      # scripts override this back to :11434 for direct model management.
-      OLLAMA_HOST = "127.0.0.1:4000";
+      # Point clients at the LiteLLM proxy instead of Ollama directly so
+      # that oterm, ollama run, and any other OpenAI-compatible client gets
+      # unified routing to both local and remote models.  Sync scripts
+      # override this back to :11434 for direct model management.
+      OLLAMA_HOST = "${litellmEndpoint.host}:${toString litellmEndpoint.port}";
     };
   }
 

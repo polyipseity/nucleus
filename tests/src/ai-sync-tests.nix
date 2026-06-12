@@ -32,7 +32,7 @@ assert containsRegex "hm_expiry_hm_format" gcText;
 assert containsRegex "litellm" coreText;
 assert containsRegex "OPENROUTER_API_KEY" litellmConfigText;
 assert containsRegex "127.0.0.1:11434" aiSyncText;
-assert containsRegex "OLLAMA_HOST.*127.0.0.1:4000" defaultAiText;
+assert containsRegex "OLLAMA_HOST.*litellmEndpoint" defaultAiText;
 assert containsRegex "local.litellm" macbookAiText;
 assert containsRegex "ai_openrouter_api_key" secretsText;
 assert containsRegex "systemd.services.litellm" nixosAiText;
