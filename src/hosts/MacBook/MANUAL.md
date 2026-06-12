@@ -15,7 +15,7 @@
 - Run `nucleus-cloud-setup` and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
 - Open MusicBrainz Picard, then sign in with your MusicBrainz account in `Options > General`.
 - In MusicBrainz Picard, add your AcoustID user API key in `Options > Fingerprinting`, then save.
-- Download and install **Equaliser** from <https://github.com/cvknage/equaliser/releases> — a system-wide parametric equalizer with bundled virtual audio driver. Launch from the menu bar, open the curve window, and toggle level meters / ceiling limits to cap output volume.
+- Open **Equaliser** once, then approve its virtual audio driver system extension in `System Settings > Privacy & Security > Extensions > Audio Extensions` (required after each macOS update that resets extension approval). It is automatically installed to `/Applications` by `nucleus-apply`.
 - Finder sidebar favorites set by `nucleus apply` are visible only after restarting macOS (log out and back in, or reboot).
 
 ## accessible ports
