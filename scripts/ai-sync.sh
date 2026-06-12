@@ -14,7 +14,7 @@
 #   NUCLEUS_AI_SYNC_TIMEOUT  Bounded wait for server readiness in seconds (default: 60).
 #   NUCLEUS_AI_SYNC_POLL     Poll interval while waiting in seconds (default: 2).
 #   NUCLEUS_AI_SYNC_PROFILE  Override profile selection; auto-detected when unset.
-#   NUCLEUS_OLLAMA_HOST      Ollama daemon address (host:port) for admin CLI commands (default: 127.0.0.1:11434).
+#   NUCLEUS_OLLAMA_HOST      Ollama daemon address (host:port) for admin CLI commands (default: read from services.json).
 #
 # Exit conditions:
 #   0 on success or when ollama is unavailable (benign skip).
@@ -33,7 +33,7 @@ dry_run=false
 gc_only=false
 ready_timeout_seconds="${NUCLEUS_AI_SYNC_TIMEOUT:-60}"
 ready_poll_seconds="${NUCLEUS_AI_SYNC_POLL:-2}"
-: "${NUCLEUS_OLLAMA_HOST:=127.0.0.1:11434}"
+: "${NUCLEUS_OLLAMA_HOST:=$(jq -r '.ollama.network.default | "\(.host):\(.port)"' "$REPO_ROOT/src/modules/services.json" 2>/dev/null || echo "127.0.0.1:11434")}"
 
 usage() {
   usage_std "$(basename "$0")" "[options]"

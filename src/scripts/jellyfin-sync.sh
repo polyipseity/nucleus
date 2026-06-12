@@ -39,7 +39,7 @@ usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
   --repo-root <path>           Override the detected repository root path.
-  --jellyfin-base-url <url>    Jellyfin server base URL (default: http://127.0.0.1:8096).
+  --jellyfin-base-url <url>    Jellyfin server base URL (default: read from services.json).
   -h, --help                   Show this help message and exit
 EOF
 }
@@ -87,7 +87,7 @@ fi
 # ---- Shared Jellyfin API helpers ------------------------------------------------
 # These are prefixed _jfs_ (jellyfin-sync) to avoid collisions when sourced.
 
-_jfs_base_url="${JELLYFIN_BASE_URL:-http://127.0.0.1:8096}"
+_jfs_base_url="${JELLYFIN_BASE_URL:-$(jq -r '.jellyfin.network.http | "http://\(.host):\(.port)"' "$REPO_ROOT/src/modules/services.json" 2>/dev/null || echo "http://127.0.0.1:8096")}"
 _jfs_auth_base='MediaBrowser Client="nucleus-apply", DeviceId="posix-apply", Device="POSIX", Version="1.0.0"'
 
 _jfs_api_request() {

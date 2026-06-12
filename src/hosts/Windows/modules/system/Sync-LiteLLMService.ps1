@@ -111,6 +111,12 @@ function Sync-LiteLLMService {
   $openrouterKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_openrouter_api_key"
   $opencodeKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_api_key"
 
+  # Read the litellm endpoint from the canonical service registry.
+  $litellmEndpoint = & {
+    $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+    if ($svc.litellm.network.default) { $svc.litellm.network.default } else { @{ host = '127.0.0.1'; port = 4000 } }
+  }
+
   # Write a PowerShell wrapper script that sets environment variables then
   # launches litellm.  Using a wrapper file avoids the nested-quoting problem
   # that would arise from embedding this logic inline in sc.exe binPath.
@@ -119,14 +125,14 @@ function Sync-LiteLLMService {
 `$env:LITELLM_LOG = 'WARNING'
 `$env:OPENROUTER_API_KEY = if (Test-Path '$openrouterKeyFile') { Get-Content '$openrouterKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
 `$env:OPENCODE_GO_API_KEY = if (Test-Path '$opencodeKeyFile') { Get-Content '$opencodeKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
-& "$litellmBin" --config "$configLink" --port 4000 --host 127.0.0.1 --drop_params *>> "$logFile"
+& "$litellmBin" --config "$configLink" --port $($litellmEndpoint.port) --host $($litellmEndpoint.host) --drop_params *>> "$logFile"
 "@
   [System.IO.File]::WriteAllText($wrapperScript, $wrapperContent, [System.Text.UTF8Encoding]::new($false))
 
   $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
   if ($null -eq $existingService) {
     & sc.exe create $serviceName binPath= "pwsh.exe -NoLogo -ExecutionPolicy Bypass -File `"$wrapperScript`"" start= auto DisplayName= "nucleus LiteLLM AI gateway proxy" | Out-Null
-    & sc.exe description $serviceName "Managed LiteLLM proxy for unified AI model access (http://127.0.0.1:4000)" | Out-Null
+    & sc.exe description $serviceName "Managed LiteLLM proxy for unified AI model access (http://$($litellmEndpoint.host):$($litellmEndpoint.port))" | Out-Null
     Write-Output "litellm: created SCM service '$serviceName'"
   }
   else {

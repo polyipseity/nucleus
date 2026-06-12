@@ -400,7 +400,7 @@ if ((Test-SectionEnabled 'ollama') -and (Test-CommandAvailable 'ollama')) {  # P
         $hasDigest = $entry.ContainsKey('digest')
         $oldDigest = if ($hasDigest) { $entry['digest'] } else { $null }
 
-        $ollamaHostAddr = if ($env:NUCLEUS_OLLAMA_HOST) { $env:NUCLEUS_OLLAMA_HOST } else { '127.0.0.1:11434' }
+        $ollamaHostAddr = if ($env:NUCLEUS_OLLAMA_HOST) { $env:NUCLEUS_OLLAMA_HOST } else { $svc = Get-Content -Raw (Join-Path $repoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue; if ($svc.ollama.network.default) { "$($svc.ollama.network.default.host):$($svc.ollama.network.default.port)" } else { '127.0.0.1:11434' } }
         try {
           $oldOllamaHost = $env:OLLAMA_HOST
           $env:OLLAMA_HOST = $ollamaHostAddr

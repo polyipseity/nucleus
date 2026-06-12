@@ -21,7 +21,7 @@
 #
 # Environment variables:
 #   NUCLEUS_REPO_ROOT      Override the detected repository root path.
-#   NUCLEUS_OLLAMA_HOST    Ollama daemon address (host:port) for admin CLI commands (default: 127.0.0.1:11434).
+#   NUCLEUS_OLLAMA_HOST    Ollama daemon address (host:port) for admin CLI commands (default: read from services.json).
 #
 # Flags:
 #   --sections <list>  Comma-separated list of sections to update (default: all)
@@ -313,7 +313,7 @@ fi
 # ---------------------------------------------------------------------------
 # ollama — ollama show <name>:<tag> --format json
 # ---------------------------------------------------------------------------
-: "${NUCLEUS_OLLAMA_HOST:=127.0.0.1:11434}"
+: "${NUCLEUS_OLLAMA_HOST:=$(jq -r '.ollama.network.default | "\(.host):\(.port)"' "$REPO_ROOT/src/modules/services.json" 2>/dev/null || echo "127.0.0.1:11434")}"
 if section_enabled ollama && command -v ollama >/dev/null 2>&1; then
   # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
   # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
