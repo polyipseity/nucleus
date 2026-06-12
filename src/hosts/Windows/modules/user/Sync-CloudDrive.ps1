@@ -122,8 +122,9 @@ function Sync-CloudDrive {
         # Create working directory for mount wrapper scripts and logs.
         $cloudDriveDir = Join-Path $env:LOCALAPPDATA 'nucleus\cloud-drive'
         $null = New-Item -Path $cloudDriveDir -ItemType Directory -Force
-        $logDir = Join-Path $env:LOCALAPPDATA 'nucleus\logs'
-        $null = New-Item -Path $logDir -ItemType Directory -Force
+        $logDir = Get-NucleusLogDir
+        $mountLogDir = Join-Path $logDir "cloud-drive-mount-$($mount.id)"
+        $null = New-Item -Path $mountLogDir -ItemType Directory -Force
 
         $remoteSpec = "${remoteName}:${remotePath}"
         # Pass the iCloud service explicitly on every mount so entry behavior
@@ -164,7 +165,7 @@ function Sync-CloudDrive {
         # runs as the logged-in user) and invokes rclone mount.
         $taskName = "NucleusCloudMount-$($mount.id)"
         $taskPath = '\NucleusCloudMount\'
-        $logFile = Join-Path $logDir "cloud-drive-mount-$($mount.id).log"
+        $logFile = Join-Path $mountLogDir "combined.log"
         $wrapperPath = Join-Path $cloudDriveDir "mount-$($mount.id).ps1"
         $rclonePassFile = Join-Path $HomeDirectory '.config\nucleus\secrets\rclone-config-pass'
 

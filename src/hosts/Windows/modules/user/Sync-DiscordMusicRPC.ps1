@@ -39,8 +39,10 @@ function Sync-DiscordMusicRPC {
 
   $ErrorActionPreference = "Stop"
   $taskName = "NucleusDiscordMusicRPC"
-  $logDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "nucleus\logs"
-  $logFile = Join-Path -Path $logDir -ChildPath "discord-music-rpc.log"
+  $logDir = Get-NucleusLogDir
+  $serviceLogDir = Join-Path -Path $logDir -ChildPath "discord-music-rpc"
+  $null = New-Item -Path $serviceLogDir -ItemType Directory -Force
+  $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   if (-not $Enabled) {
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue

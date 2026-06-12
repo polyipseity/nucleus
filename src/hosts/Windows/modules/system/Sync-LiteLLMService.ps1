@@ -92,9 +92,10 @@ function Sync-LiteLLMService {
 
   # Prepare ProgramData directories.
   $programDataDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\litellm"
-  $logDir = Join-Path -Path $programDataDir -ChildPath "log"
+  $logDir = Get-NucleusSystemLogDir
+  $serviceLogDir = Join-Path -Path $logDir -ChildPath "litellm"
   $secretsDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\secrets"
-  $null = New-Item -Path $logDir -ItemType Directory -Force
+  $null = New-Item -Path $serviceLogDir -ItemType Directory -Force
   $null = New-Item -Path $secretsDir -ItemType Directory -Force
 
   # Symlink the config so source edits take effect on service restart without
@@ -107,7 +108,7 @@ function Sync-LiteLLMService {
   if (Test-Path -Path $configLink) { Remove-Item -Path $configLink -Force }
   New-Item -Path $configLink -ItemType SymbolicLink -Target $configSource -Force | Out-Null
 
-  $logFile = Join-Path -Path $logDir -ChildPath "litellm.log"
+  $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
   $openrouterKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_openrouter_api_key"
   $opencodeKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_api_key"
 
