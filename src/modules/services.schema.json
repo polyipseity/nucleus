@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://nucleus.local/services.schema.json",
-  "title": "Nucleus Service Registry",
+  "title": "nucleus service registry",
   "description": "Registry of manageable services for nucleus-svc across macOS, NixOS, and Windows",
   "type": "object",
   "additionalProperties": {

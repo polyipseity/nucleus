@@ -260,6 +260,6 @@
     "vscode",
     "winget"
   ],
-  "title": "Nucleus Lockfile",
+  "title": "nucleus lockfile",
   "type": "object"
 }
