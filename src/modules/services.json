@@ -4,7 +4,7 @@
     "displayName": "Ollama",
     "description": "LLM inference server",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "local.ollama", "domain": "user" },
+      "macos": { "type": "launchctl", "service": "local.ollama", "domain": "system" },
       "nixos": { "type": "systemctl", "service": "ollama.service", "scope": "system" }
     }
   },
@@ -12,7 +12,7 @@
     "displayName": "LiteLLM",
     "description": "AI API gateway for multi-provider routing",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "local.litellm", "domain": "user" },
+      "macos": { "type": "launchctl", "service": "local.litellm", "domain": "system" },
       "nixos": { "type": "systemctl", "service": "litellm.service", "scope": "system" },
       "windows": { "type": "schtask", "taskPath": "\\NucleusLiteLLM" }
     }
@@ -37,8 +37,8 @@
     "displayName": "Discord Music RPC",
     "description": "Discord Rich Presence for music players",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "local.discord-music-rpc", "domain": "user" },
-      "nixos": { "type": "systemctl", "service": "discord-music-rpc.service", "scope": "user" },
+      "macos": { "type": "launchctl", "service": "local.discord-music-rpc", "domain": "user", "justification": "Requires GUI session (tray app with NSMenu)" },
+      "nixos": { "type": "systemctl", "service": "discord-music-rpc.service", "scope": "user", "justification": "Requires GUI session (tray app with NSMenu)" },
       "windows": { "type": "schtask", "taskPath": "\\NucleusDiscordMusicRPC" }
     }
   },
@@ -55,7 +55,7 @@
     "displayName": "SSH Agent",
     "description": "SSH key authentication agent",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "com.openssh.ssh-agent", "domain": "user" },
+      "macos": { "type": "launchctl", "service": "com.openssh.ssh-agent", "domain": "user", "justification": "User key material in per-user ssh-agent process" },
       "windows": { "type": "native", "service": "ssh-agent" }
     }
   },
@@ -63,8 +63,8 @@
     "displayName": "Cloud Drive Mounts",
     "description": "rclone FUSE cloud drive mounts",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "local.cloud-mount.", "domain": "user", "prefixMatch": true },
-      "nixos": { "type": "systemctl", "service": "cloud-mount-", "scope": "user", "prefixMatch": true },
+      "macos": { "type": "launchctl", "service": "local.cloud-mount.", "domain": "user", "prefixMatch": true, "justification": "Per-user FUSE mount namespace bound to login session" },
+      "nixos": { "type": "systemctl", "service": "cloud-mount-", "scope": "user", "prefixMatch": true, "justification": "Per-user FUSE mount namespace bound to login session" },
       "windows": { "type": "servy", "service": "nucleus-cloud-mount-", "prefixMatch": true }
     }
   },

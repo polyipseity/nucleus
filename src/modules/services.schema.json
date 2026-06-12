@@ -43,6 +43,10 @@
           ],
           "type": "string"
         },
+        "justification": {
+          "description": "Why this service is user-scoped when the policy default is system-wide. Required when domain=user.",
+          "type": "string"
+        },
         "prefixMatch": {
           "description": "Match all services with this prefix",
           "type": "boolean"
@@ -143,6 +147,10 @@
     },
     "systemctlEntry": {
       "properties": {
+        "justification": {
+          "description": "Why this service is user-scoped when the policy default is system-wide. Required when scope=user.",
+          "type": "string"
+        },
         "prefixMatch": {
           "description": "Match all units with this prefix",
           "type": "boolean"
