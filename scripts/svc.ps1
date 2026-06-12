@@ -172,6 +172,20 @@ function Get-ServiceStatus {
     }
     'schtask' {
       $taskPath = $Platform.taskPath
+      try {
+        $task = Get-ScheduledTask -TaskPath (Split-Path $taskPath -Parent) -TaskName (Split-Path $taskPath -Leaf) -ErrorAction Stop
+        $enabled = $task.State -ne 'Disabled'
+        $running = $task.State -eq 'Running'
+        return @{
+          status  = if ($running) { 'active' } elseif ($enabled) { 'inactive' } else { 'disabled' }
+          running = $running
+          enabled = $enabled
+        }
+      } catch {
+        return @{ status = 'not-found'; running = $false; enabled = $false }
+      }
+    }
+    default {
       return @{ status = 'unknown'; running = $false; enabled = $false; error = "unsupported type: $type" }
     }
   }
@@ -200,6 +214,17 @@ function Invoke-ServiceAction {
     'schtask' {
       $taskPath = $Platform.taskPath
       $taskName = Split-Path $taskPath -Leaf
+      $taskParent = Split-Path $taskPath -Parent
+      switch ($Action) {
+        'status'  { return Get-ServiceStatus -Platform $Platform }
+        'start'   { Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
+        'stop'    { Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
+        'restart' { Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop -ErrorAction SilentlyContinue; Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
+        'enable'  { Enable-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
+        'disable' { Disable-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
+      }
+    }
+    default {
       throw "svc: unsupported service type: $type"
     }
   }

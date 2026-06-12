@@ -125,7 +125,6 @@ function Sync-CloudDrive {
         $logDir = Join-Path $env:LOCALAPPDATA 'nucleus\logs'
         $null = New-Item -Path $logDir -ItemType Directory -Force
 
-        $serviceName = "nucleus-cloud-mount-$($mount.id)"
         $remoteSpec = "${remoteName}:${remotePath}"
         # Pass the iCloud service explicitly on every mount so entry behavior
         # follows users.json even if the shared remote default is different.
