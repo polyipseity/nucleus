@@ -130,6 +130,58 @@ if (-not $HAS_ARGS) {
     $exitCode = 1
   } else {
     Write-Output "services.json validation passed"
+
+    # Validate user-scoped platform entries have justification.
+    foreach ($_svcName in $_svc.Keys) {
+      $_entry = $_svc[$_svcName]
+      if ($_entry.ContainsKey('platforms')) {
+        foreach ($_plat in $_entry.platforms.Keys) {
+          $_pEntry = $_entry.platforms[$_plat]
+          $_domainScope = if ($_pEntry.ContainsKey('domain')) { $_pEntry.domain } elseif ($_pEntry.ContainsKey('scope')) { $_pEntry.scope } else { $null }
+          $_hasJustification = $_pEntry.ContainsKey('justification') -and -not [string]::IsNullOrEmpty($_pEntry.justification)
+          if ($_domainScope -eq 'user' -and -not $_hasJustification) {
+            Write-Output "ERROR: services.json: '$_svcName' platform '$_plat' is user-scoped but missing justification"
+            $_svcErrors++
+          }
+        }
+      }
+    }
+
+    # Validate that service names in users.json services blocks exist in services.json.
+    $_usersJson = Join-Path $RepoRoot "src\modules\users.json"
+    if (Test-Path $_usersJson) {
+      $_users = Get-Content $_usersJson -Raw | ConvertFrom-Json -AsHashtable
+      foreach ($_username in $_users.Keys) {
+        $_userEntry = $_users[$_username]
+        if ($_userEntry.ContainsKey('services')) {
+          foreach ($_svcKey in $_userEntry.services.Keys) {
+            if (-not $_svc.ContainsKey($_svcKey)) {
+              Write-Output "ERROR: ${_usersJson}: user '$_username' references unknown service '$_svcKey'"
+              $_svcErrors++
+            }
+          }
+        }
+      }
+    }
+
+    # Windows users.json
+    $_winUsersJson = Join-Path $RepoRoot "src\hosts\Windows\users.json"
+    if (Test-Path $_winUsersJson) {
+      $_winUsers = (Get-Content $_winUsersJson -Raw | ConvertFrom-Json -AsHashtable).users
+      if ($_winUsers) {
+        foreach ($_username in $_winUsers.Keys) {
+          $_userEntry = $_winUsers[$_username]
+          if ($_userEntry.ContainsKey('services')) {
+            foreach ($_svcKey in $_userEntry.services.Keys) {
+              if (-not $_svc.ContainsKey($_svcKey)) {
+                Write-Output "ERROR: ${_winUsersJson}: user '$_username' references unknown service '$_svcKey'"
+                $_svcErrors++
+              }
+            }
+          }
+        }
+      }
+    }
   }
 } else {
   Write-Output "Skipping service registry validation (path-scoped mode)."

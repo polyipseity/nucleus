@@ -11,6 +11,7 @@ let
   nixosAiText = builtins.readFile ../../src/hosts/NixOS/ai.nix;
   litellmConfigText = builtins.readFile ../../src/modules/ai/litellm-config.yml;
   secretsText = builtins.readFile ../../src/modules/secrets.nix;
+  macbookAiText = builtins.readFile ../../src/hosts/MacBook/ai.nix;
 in
 assert containsRegex "pkgs.jq" flakeText;
 assert containsRegex "pkgs.litellm" coreText;
@@ -32,7 +33,7 @@ assert containsRegex "litellm" coreText;
 assert containsRegex "OPENROUTER_API_KEY" litellmConfigText;
 assert containsRegex "127.0.0.1:11434" aiSyncText;
 assert containsRegex "OLLAMA_HOST.*127.0.0.1:4000" defaultAiText;
-assert containsRegex "local.litellm" defaultAiText;
+assert containsRegex "local.litellm" macbookAiText;
 assert containsRegex "ai_openrouter_api_key" secretsText;
 assert containsRegex "systemd.services.litellm" nixosAiText;
 true

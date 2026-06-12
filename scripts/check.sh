@@ -285,6 +285,57 @@ if ! $HAS_ARGS; then
     exit 1
   fi
   echo "services.json validation passed"
+
+  # Validate user-scoped platform entries have justification.
+  # User-scoped means domain=user (macOS launchctl) or scope=user (Linux systemctl).
+  while IFS=$'\t' read -r _name _platform _domain_scope _value; do
+    if [ "$_domain_scope" = "user" ] && { [ "$_value" = "null" ] || [ -z "$_value" ]; }; then
+      echo "ERROR: services.json: '$_name' platform '$_platform' is user-scoped but missing justification"
+      _svc_errors=$((_svc_errors + 1))
+    fi
+  done < <(jq -r '
+    to_entries[] |
+    .key as $name |
+    (.value.platforms // {}) | to_entries[] |
+    [
+      $name,
+      .key,
+      (.value.domain // .value.scope // ""),
+      (.value.justification | tostring)
+    ] | @tsv' "$_svc_json")
+
+  # Validate that service names in users.json services blocks exist in services.json.
+  _users_json="src/modules/users.json"
+  if [ -f "$_users_json" ]; then
+    _svc_names=$(jq -r 'to_entries[].key' "$_svc_json")
+    while IFS=$'\t' read -r _username _svc_name _has_enable; do
+      if ! echo "$_svc_names" | grep -qxF "$_svc_name"; then
+        echo "ERROR: $_users_json: user '$_username' references unknown service '$_svc_name'"
+        _svc_errors=$((_svc_errors + 1))
+      fi
+    done < <(jq -r '
+      to_entries[] |
+      .key as $user |
+      (.value.services // {}) | to_entries[] |
+      select(.value.enable != null) |
+      [$user, .key, "true"] | @tsv' "$_users_json")
+  fi
+
+  # Windows users.json
+  _win_users_json="src/hosts/Windows/users.json"
+  if [ -f "$_win_users_json" ]; then
+    while IFS=$'\t' read -r _username _svc_name _has_enable; do
+      if ! echo "$_svc_names" | grep -qxF "$_svc_name"; then
+        echo "ERROR: $_win_users_json: user '$_username' references unknown service '$_svc_name'"
+        _svc_errors=$((_svc_errors + 1))
+      fi
+    done < <(jq -r '
+      .users // {} | to_entries[] |
+      .key as $user |
+      (.value.services // {}) | to_entries[] |
+      select(.value.enable != null) |
+      [$user, .key, "true"] | @tsv' "$_win_users_json")
+  fi
 else
   echo "Skipping service registry validation (path-scoped mode)."
 fi

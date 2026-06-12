@@ -77,11 +77,25 @@ assert containsRegex "runtimeInputs.*jq" flakeText;
 assert containsRegex "nucleus-svc" shellNixText;
 assert containsRegex ''mkNucleusCommand "nucleus-svc" "svc"'' shellNixText;
 
+# --- services.json scope assertions ---
+# ollama and litellm are system-wide on macOS.
+assert containsRegex ''"ollama".*"macos".*"system"'' servicesJsonText;
+assert containsRegex ''"litellm".*"macos".*"system"'' servicesJsonText;
+
+# User-scoped entries must have justification.
+assert containsRegex ''"discord-music-rpc".*justification'' servicesJsonText;
+assert containsRegex ''"ssh-agent".*justification'' servicesJsonText;
+assert containsRegex ''"cloud-drive".*justification'' servicesJsonText;
+
 # --- check.sh service registry validation assertions ---
 assert containsRegex "Service registry validation" checkShText;
 assert containsRegex ''services\.json'' checkShText;
+assert containsRegex "justification" checkShText;
+assert containsRegex "users.json" checkShText;
 
 # --- check.ps1 service registry validation assertions ---
 assert containsRegex "Service registry validation" checkPs1Text;
 assert containsRegex ''services\.json'' checkPs1Text;
+assert containsRegex "justification" checkPs1Text;
+assert containsRegex "users.json" checkPs1Text;
 true
