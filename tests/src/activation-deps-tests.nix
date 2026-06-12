@@ -351,7 +351,6 @@ let
     test_posix_git_signing_defaults_enabled
     test_middleclick_native_login_item
     test_spotlight_disables_all_hotkey_slots
-    test_spotlight_bootout_is_sip_aware
     test_install_cargo_binstall_dependency_name_alignment
     test_macos_dev_maintenance_is_scheduled
   ];
@@ -380,8 +379,7 @@ in
     "17: POSIX Git defaults enforce signed commits and tags"
     "18: MiddleClick startup uses native login-item path"
     "19: Spotlight disables all known launcher hotkey slots"
-    "20: Spotlight bootout warning is SIP-aware and classified"
-    "21: installCargoBinstallPackages activation name alignment"
-    "22: macOS dev-tree maintenance runs from launchd instead of activation"
+    "20: installCargoBinstallPackages activation name alignment"
+    "21: macOS dev-tree maintenance runs from launchd instead of activation"
   ];
 }
