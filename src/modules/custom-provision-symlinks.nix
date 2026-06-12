@@ -169,7 +169,7 @@ in
           ${lib.concatMapStringsSep "\n" (
             entry:
             if entry.createTargetDirectory then
-              "mkdir -p ${lib.escapeShellArg entry.targetAbsolutePath}"
+              "mkdir -p \"$(dirname ${lib.escapeShellArg entry.linkAbsolutePath})\""
             else
               ""
           ) selectedSymlinksResolved}

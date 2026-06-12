@@ -196,10 +196,6 @@ function Sync-CustomProvisionSymlink {
     }
 
     foreach ($entry in $desiredEntries) {
-      if ($entry.CreateTargetDirectory) {
-        New-Item -ItemType Directory -Path $entry.TargetPath -Force | Out-Null
-      }
-
       $linkParent = Split-Path -Path $entry.LinkPath -Parent
       if (-not [string]::IsNullOrWhiteSpace($linkParent)) {
         New-Item -ItemType Directory -Path $linkParent -Force | Out-Null
