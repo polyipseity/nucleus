@@ -145,3 +145,51 @@ sha256_of_file() {
   require_command openssl
   openssl dgst -sha256 "$_sof_file" | awk '{ print $2 }'
 }
+
+# nucleus_log_dir — Print the user-level log directory path.
+#
+# Platform-aware: returns the correct path for macOS vs Linux.
+# Environment override: NUCLEUS_LOG_DIR
+nucleus_log_dir() {
+  if [ -n "${NUCLEUS_LOG_DIR:-}" ]; then
+    printf '%s\n' "$NUCLEUS_LOG_DIR"
+    return 0
+  fi
+  case "$(uname -s)" in
+    Darwin) printf '%s\n' "${HOME}/Library/Logs/nucleus" ;;
+    Linux)  printf '%s\n' "${HOME}/.local/state/nucleus/log" ;;
+    *)      printf '%s\n' "${HOME}/.local/state/nucleus/log" ;;
+  esac
+}
+
+# nucleus_system_log_dir — Print the system-level log directory path.
+#
+# Platform-aware: returns the correct path for macOS vs Linux.
+# Environment override: NUCLEUS_SYSTEM_LOG_DIR
+nucleus_system_log_dir() {
+  if [ -n "${NUCLEUS_SYSTEM_LOG_DIR:-}" ]; then
+    printf '%s\n' "$NUCLEUS_SYSTEM_LOG_DIR"
+    return 0
+  fi
+  case "$(uname -s)" in
+    Darwin)  printf '%s\n' "/Library/Logs/nucleus" ;;
+    Linux)   printf '%s\n' "/var/log/nucleus" ;;
+    *)       printf '%s\n' "/var/log/nucleus" ;;
+  esac
+}
+
+# log_sanitize — Strip control characters from stdin to stdout.
+#
+# Removes ANSI escape sequences, carriage returns, and ASCII control
+# characters (except tab and newline).
+#
+# Usage: some_command | log_sanitize
+log_sanitize() {
+  # Strip ANSI escape sequences and OSC sequences, remove \r, strip
+  # control chars except tab (\x09) and newline (\x0A).
+  sed -e 's/\x1b\[[0-9;]*[a-zA-Z]//g' \
+      -e 's/\x1b\][^\x07\x1b]*\x07//g' \
+      -e 's/\x1b[PX^_].*\x1b\\//g' \
+      -e 's/\r//g' \
+      -e "s/[\x00-\x08\x0B\x0C\x0E-\x1F]//g"
+}

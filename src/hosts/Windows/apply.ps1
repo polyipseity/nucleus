@@ -279,6 +279,7 @@ $editorsModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "editors"
 $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers"
 # Root utilities: shared helpers with no single domain affinity.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Resolve-Executable.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Test-ArchivingStack.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Test-PrimaryUser.ps1")
