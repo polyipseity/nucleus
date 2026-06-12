@@ -13,6 +13,7 @@
 #   restart <service>                 Restart a service.
 #   enable <service>                  Enable auto-start.
 #   disable <service>                 Disable auto-start.
+#   endpoint <service> [<name>]       Show network endpoint(s) for a service.
 #
 # Options:
 #   --json        Machine-readable JSON output.
@@ -30,7 +31,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 usage() {
-  usage_std "$(basename "$0")" "list|status|start|stop|restart|enable|disable [service...] [options]"
+  usage_std "$(basename "$0")" "list|status|start|stop|restart|enable|disable|endpoint [service...] [options]"
   cat <<'EOF'
   list                              List all known services with status.
   status [service...]               Show status of specified services (all if omitted).
@@ -39,6 +40,7 @@ usage() {
   restart <service>                 Restart a service.
   enable <service>                  Enable auto-start.
   disable <service>                 Disable auto-start.
+  endpoint <service> [<name>]       Show network endpoint(s) for a service.
   --json                            Machine-readable JSON output.
   -h|--help                         Show usage.
 EOF
@@ -71,7 +73,7 @@ read_registry() {
       select(.value | type == "object")
       | select(.value.platforms | has($platform))
       | select(.value.platforms[$platform].type != "omitted")
-      | {key: .key, value: {displayName: .value.displayName, description: .value.description, platform: .value.platforms[$platform]}}
+      | {key: .key, value: {displayName: .value.displayName, description: .value.description, network: .value.network, platform: .value.platforms[$platform]}}
     ) | from_entries
   ' "$SERVICES_JSON"
 }
@@ -361,6 +363,54 @@ do_action() {
   return "$overall_exit"
 }
 
+# do_endpoint — Show network endpoint(s) for a service.
+#   svc endpoint <service> [<endpoint-name>]
+# Reads the raw services.json (not platform-filtered) since endpoints are universal.
+do_endpoint() {
+  local svc_name="${service_names[0]:-}"
+  local endpoint_name="${service_names[1]:-}"
+
+  if [ -z "$svc_name" ]; then
+    printf '%s\n' "svc: missing service name for endpoint" >&2
+    exit 1
+  fi
+  require_command jq
+
+  local entry
+  entry=$(jq -c --arg name "$svc_name" '.[$name] // empty' "$SERVICES_JSON")
+  if [ -z "$entry" ]; then
+    printf 'svc: %s — service not found in registry\n' "$svc_name" >&2
+    exit 1
+  fi
+
+  local network
+  network=$(echo "$entry" | jq -c '.network // empty')
+  if [ -z "$network" ]; then
+    printf 'svc: %s — no network endpoints defined\n' "$svc_name" >&2
+    exit 1
+  fi
+
+  if [ -n "$endpoint_name" ]; then
+    local ep
+    ep=$(echo "$network" | jq -c --arg ep "$endpoint_name" '.[$ep] // empty')
+    if [ -z "$ep" ]; then
+      printf 'svc: %s — endpoint "%s" not found\n' "$svc_name" "$endpoint_name" >&2
+      exit 1
+    fi
+    if [ "$json_output" = true ]; then
+      printf '%s\n' "$ep"
+    else
+      echo "$ep" | jq -r '[.protocol, "://", .host, ":", (.port|tostring)] | add'
+    fi
+  else
+    if [ "$json_output" = true ]; then
+      printf '%s\n' "$network"
+    else
+      echo "$network" | jq -r 'to_entries[] | [.key, .protocol + "://" + .host + ":" + (.port|tostring)] | @tsv'
+    fi
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -373,6 +423,11 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
     --json) json_output=true; shift ;;
+    endpoint)
+      action="$1"; shift
+      service_names=("$@")
+      break
+      ;;
     list|status|start|stop|restart|enable|disable)
       action="$1"; shift
       service_names=("$@")
@@ -393,10 +448,11 @@ for arg in "${service_names[@]}"; do
 done
 service_names=("${filtered_service_names[@]}")
 
-[ -z "$action" ] && { printf '%s\n' "svc: missing action (list, status, start, stop, restart, enable, disable)" >&2; usage >&2; exit 1; }
+[ -z "$action" ] && { printf '%s\n' "svc: missing action (list, status, start, stop, restart, enable, disable, endpoint)" >&2; usage >&2; exit 1; }
 
 case "$action" in
   list)   do_list ;;
   status) do_status ;;
+  endpoint) do_endpoint ;;
   start|stop|restart|enable|disable) do_action ;;
 esac
