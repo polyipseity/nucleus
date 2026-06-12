@@ -449,6 +449,13 @@ in
       PY
     '';
 
+    # Protect the ~/iCloud symlink (mkOutOfStoreSymlink) against accidental
+    # deletion between rebuilds.
+    home.activation.protectICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      ${builtins.readFile ../scripts/agent-helpers.sh}
+      _nucleus_protect_symlink "home.nix" "$HOME/iCloud"
+    '';
+
     # Override the default logDir (which uses ~) with a proper absolute path.
     # The launchd StandardErrorPath/StandardOutPath option types require an
     # absolute path and do not expand ~.

@@ -509,6 +509,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     "Downloads/iCloud".source = config.lib.file.mkOutOfStoreSymlink liveICloudDownloads;
   };
 
+  home.activation.protectDownloadsICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    ${builtins.readFile ../scripts/agent-helpers.sh}
+    _nucleus_protect_symlink "macos.nix" "$HOME/Downloads/iCloud"
+  '';
+
   # Source iTerm2 shell integration when the script is present.  The test-e
   # guard makes this a no-op in non-iTerm2 terminals (VS Code terminal, SSH,
   # Ghostty, etc.) where the iTerm2 escape sequences produce no useful output

@@ -98,6 +98,22 @@ function Sync-LiteLLMService {
   $null = New-Item -Path $serviceLogDir -ItemType Directory -Force
   $null = New-Item -Path $secretsDir -ItemType Directory -Force
 
+  function Set-ManagedSymlinkDeleteProtection {
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+      [Parameter(Mandatory = $true)]
+      [string]$Path
+    )
+
+    $principal = "$env:USERDOMAIN\$env:USERNAME"
+    if ($PSCmdlet.ShouldProcess($Path, "Apply symlink delete-protection ACL")) {
+      $grantResult = (& icacls $Path /L /deny "${principal}:(D)" 2>&1) | Out-String
+      if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Sync-LiteLLMService: could not apply delete-protection ACL to ${Path} : $grantResult"
+      }
+    }
+  }
+
   # Symlink the config so source edits take effect on service restart without
   # re-running apply.
   $configLink = Join-Path -Path $programDataDir -ChildPath "litellm-config.yml"
@@ -107,6 +123,7 @@ function Sync-LiteLLMService {
   }
   if (Test-Path -Path $configLink) { Remove-Item -Path $configLink -Force }
   New-Item -Path $configLink -ItemType SymbolicLink -Target $configSource -Force | Out-Null
+  Set-ManagedSymlinkDeleteProtection -Path $configLink
 
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
   $openrouterKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_openrouter_api_key"

@@ -5,9 +5,10 @@
 #
 # Package: built from the forked repo (forks/polyipseity branch) with pinned
 # pypresence dependency fetched from git instead of resolved by pip.
-# Config: out-of-store symlink to the tracked file in the live repo checkout
-# so edits take effect without a rebuild.  Assumes the repo is at
-# ~/dev/nucleus.
+# Config: Nix store path (read-only) — discord-music-rpc overwrites its config
+# on startup, so the symlink target must be immutable to prevent the app from
+# discarding managed settings.  The tracked source is at
+# src/modules/configs/discord-music-rpc/config.yaml in the repo.
 # Services: launchd on macOS, systemd user service on NixOS.
 args@{
   config,
@@ -19,10 +20,6 @@ let
   # Per-user service enable flag from users.json (default: enabled).
   services = args.users.${config.home.username}.services or { };
   userEnable = services."discord-music-rpc".enable or true;
-  # The canonical live checkout path is ~/dev/nucleus.  Use an out-of-store
-  # symlink so config edits are picked up instantly from the mutable working
-  # tree instead of requiring a Nix rebuild.
-  liveConfigFile = "${config.home.homeDirectory}/dev/nucleus/src/modules/configs/discord-music-rpc/config.yaml";
 
   pypresence = pkgs.python3Packages.buildPythonPackage rec {
     pname = "pypresence";
@@ -89,11 +86,11 @@ in
     {
       home.packages = [ discord-music-rpc ];
 
-      # Out-of-store symlink to the live repo file — edit config.yaml in the
-      # working tree and the running app sees the change immediately.  The
-      # symlink target is resolved at activation time, not at build time.
-      home.file.".config/discord-music-rpc/config.yaml".source =
-        config.lib.file.mkOutOfStoreSymlink liveConfigFile;
+      # Nix store path for the config file — the app overwrites its config on
+      # startup, so the target must be immutable to preserve managed settings.
+      # Source the file relative to this module at build time.  # WHY: read-only
+      # deviation — see symlink-policy.instructions.md.
+      home.file.".config/discord-music-rpc/config.yaml".source = ./configs/discord-music-rpc/config.yaml;
     }
 
     # macOS: launchd agent keeps the tray app running persistently after login.

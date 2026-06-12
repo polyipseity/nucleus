@@ -45,6 +45,12 @@ in
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
   };
 
+  home.activation.protectOpencodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    ${agentHelpersSh}
+    _nucleus_protect_symlink "agents.nix" "$HOME/.config/opencode/agents"
+    _nucleus_protect_symlink "agents.nix" "$HOME/.config/opencode/commands"
+  '';
+
   home.activation = {
     # -------------------------------------------------------------------------
     # agentsSymlink
