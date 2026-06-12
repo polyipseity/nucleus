@@ -4,6 +4,8 @@
 - Run `nucleus-cloud-setup` in PowerShell and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
 - Open MusicBrainz Picard, then sign in with your MusicBrainz account in `Options > General`.
 - In MusicBrainz Picard, add your AcoustID user API key in `Options > Fingerprinting`, then save.
+- Run the **Equalizer APO** configurator once to select your playback device, then reboot.
+- Launch **Peace Equalizer APO** (Peace GUI). Click the Effects button and use the visual Limiter sliders or pre-amplification dial to cap the system output threshold.
 
 ## accessible ports
 

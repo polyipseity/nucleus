@@ -6,6 +6,7 @@
 - Run `nucleus-cloud-setup` and complete `rclone config` for `GoogleDrive`, `iCloud`, and `OneDrive` when prompted.
 - Open MusicBrainz Picard, then sign in with your MusicBrainz account in `Options > General`.
 - In MusicBrainz Picard, add your AcoustID user API key in `Options > Fingerprinting`, then save.
+- Open **EasyEffects** from the app grid. Navigate to `Effects > Output > Add Effect` and select Limiter or Compressor to cap volume. For one-click presets, clone <https://github.com/Digitalone1/EasyEffects-Presets> into `~/.local/share/easyeffects/output/`.
 
 ## accessible ports
 

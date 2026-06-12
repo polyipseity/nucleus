@@ -159,6 +159,17 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          Equalizer APO — system-wide parametric equalizer for Windows.
+          Provides the driver-level audio processing backend; paired with the
+          Peace GUI for visual slider-based control.
+          Cross-platform parity: EasyEffects (NixOS), Equaliser (macOS).
+        settings:
+          id: EqualizerAPO.EqualizerAPO
+          source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure eza is installed for cross-host shell listing parity with macOS and NixOS
       settings:
         id: eza-community.eza
@@ -425,6 +436,17 @@ properties:
       settings:
         id: Parsec.Parsec
         source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Peace Equalizer APO — graphical user interface for Equalizer APO.
+          Provides point-and-click sliders, effect toggles, and preset management
+          so volume limits can be configured without editing config files.
+          Cross-platform parity: EasyEffects (NixOS), Equaliser (macOS).
+        settings:
+          id: PeterVerbeek.PeaceEqualizerAPO
+          source: winget
 
     - resource: Microsoft.WinGet.Client/Package
       directives:

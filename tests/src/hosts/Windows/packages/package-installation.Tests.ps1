@@ -102,6 +102,7 @@ Describe "Windows Package Installation" {
             @{ id = 'CaddyServer.Caddy'; displayName = 'Caddy' }
             @{ id = 'Clement.bottom'; displayName = 'bottom' }
             @{ id = 'DEVCOM.JetBrainsMonoNerdFont'; displayName = 'JetBrains Mono Nerd Font' }
+            @{ id = 'EqualizerAPO.EqualizerAPO'; displayName = 'Equalizer APO' }
             @{ id = 'eza-community.eza'; displayName = 'eza' }
             @{ id = 'GIMP.GIMP'; displayName = 'GIMP' }
             @{ id = 'GnuPG.Gpg4win'; displayName = 'Gpg4win' }
@@ -119,6 +120,7 @@ Describe "Windows Package Installation" {
             @{ id = 'Microsoft.DotNet.Runtime.6'; displayName = '.NET Runtime 6' }
             @{ id = 'Microsoft.PowerToys'; displayName = 'PowerToys' }
             @{ id = 'Parsec.Parsec'; displayName = 'Parsec' }
+            @{ id = 'PeterVerbeek.PeaceEqualizerAPO'; displayName = 'Peace Equalizer APO' }
             @{ id = 'Rclone.Rclone'; displayName = 'rclone' }
             @{ id = 'Scoop.Scoop'; displayName = 'Scoop' }
             @{ id = 'SST.opencode'; displayName = 'OpenCode' }

@@ -192,4 +192,13 @@
   # https://mynixos.com/nixpkgs/option/programs.steam.enable
   hardware.graphics.enable32Bit = true;
   programs.steam.enable = true;
+
+  # EasyEffects: graphical PipeWire audio processing GUI with plugin-based
+  # limiter, compressor, equalizer, and other DSP effects.
+  # Usage: open the EasyEffects GUI, navigate to Effects > Output > Add Effect,
+  # and select Limiter or Compressor. Community preset vaults (like
+  # Digitalone1/EasyEffects-Presets) can be cloned into
+  # ~/.local/share/easyeffects/output/.
+  # Source: https://mynixos.com/nixpkgs/option/programs.easyeffects.enable
+  programs.easyeffects.enable = true;
 }
