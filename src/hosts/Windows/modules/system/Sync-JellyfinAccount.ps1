@@ -61,7 +61,7 @@ function Sync-JellyfinAccount {
     Absolute path to sops.exe.
 
   .PARAMETER BaseUrl
-    Jellyfin API base URL. Defaults to http://127.0.0.1:8096.
+    Jellyfin API base URL. Defaults to http://127.0.0.1:8096 (or read from services.json).
 
   .EXAMPLE
     Sync-JellyfinAccount -RepoRoot 'C:\Users\admin\nucleus' -UserRecords $records `
@@ -97,8 +97,13 @@ function Sync-JellyfinAccount {
     [Parameter(Mandatory)]
     [string]$SopsExe,
 
-    [string]$BaseUrl = 'http://127.0.0.1:8096'
+    [string]$BaseUrl
   )
+
+  if ([string]::IsNullOrEmpty($BaseUrl)) {
+    $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $BaseUrl = if ($svc.jellyfin.network.http) { "http://$($svc.jellyfin.network.http.host):$($svc.jellyfin.network.http.port)" } else { 'http://127.0.0.1:8096' }
+  }
 
   $accountSpecs = @()
   foreach ($userRecord in @($UserRecords)) {

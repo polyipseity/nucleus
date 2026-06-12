@@ -90,18 +90,23 @@ function Sync-JellyfinHttpsProxy {
     New-Item -Path $caddyConfigDir -ItemType Directory -Force | Out-Null
     New-Item -Path $caddyDataDir -ItemType Directory -Force | Out-Null
 
-    $caddyfile = @'
+    # Read jellyfin network endpoints from the canonical service registry.
+    $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $jfHttp = if ($svc.jellyfin.network.http) { $svc.jellyfin.network.http } else { @{ host = '127.0.0.1'; port = 8096 } }
+    $jfHttps = if ($svc.jellyfin.network.https) { $svc.jellyfin.network.https } else { @{ host = 'localhost'; port = 8920 } }
+
+    $caddyfile = @"
 {
   admin 127.0.0.1:2019
   auto_https disable_redirects
 }
 
-https://localhost:8920 {
+https://$($jfHttps.host):$($jfHttps.port) {
   bind 127.0.0.1 ::1
   tls internal
-  reverse_proxy 127.0.0.1:8096
+  reverse_proxy $($jfHttp.host):$($jfHttp.port)
 }
-'@
+"@
     [System.IO.File]::WriteAllText($caddyfilePath, $caddyfile, [System.Text.UTF8Encoding]::new($false))
 
     $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
@@ -109,7 +114,7 @@ https://localhost:8920 {
 
     if ($null -eq $existingService) {
       & sc.exe create $serviceName binPath= $serviceCommand start= auto DisplayName= "nucleus Jellyfin HTTPS proxy" | Out-Null
-      & sc.exe description $serviceName "Managed local Caddy TLS ingress for Jellyfin (https://localhost:8920 -> http://127.0.0.1:8096)" | Out-Null
+      & sc.exe description $serviceName "Managed local Caddy TLS ingress for Jellyfin (https://$($jfHttps.host):$($jfHttps.port) -> http://$($jfHttp.host):$($jfHttp.port))" | Out-Null
     }
     else {
       if ($existingService.Status -ne 'Stopped') {

@@ -62,7 +62,7 @@ function Sync-JellyfinLibrary {
     Absolute path to sops.exe.
 
   .PARAMETER BaseUrl
-    Jellyfin API base URL. Defaults to http://127.0.0.1:8096.
+    Jellyfin API base URL. Defaults to http://127.0.0.1:8096 (or read from services.json).
 
   .EXAMPLE
     Sync-JellyfinLibrary -RepoRoot 'C:\Users\admin\nucleus' -UserRecords $records `
@@ -98,8 +98,13 @@ function Sync-JellyfinLibrary {
     [Parameter(Mandatory)]
     [string]$SopsExe,
 
-    [string]$BaseUrl = 'http://127.0.0.1:8096'
+    [string]$BaseUrl
   )
+
+  if ([string]::IsNullOrEmpty($BaseUrl)) {
+    $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $BaseUrl = if ($svc.jellyfin.network.http) { "http://$($svc.jellyfin.network.http.host):$($svc.jellyfin.network.http.port)" } else { 'http://127.0.0.1:8096' }
+  }
 
   # 1. Build library specs and collect auth credentials from all users.
   $librarySpecs = @()
