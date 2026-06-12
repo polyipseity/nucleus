@@ -4,7 +4,7 @@
     "description": "Local TLS reverse proxy engine",
     "displayName": "Caddy",
     "logging": {
-      "capture": "none"
+      "capture": "all"
     },
     "network": {
       "admin": { "host": "127.0.0.1", "port": 2019, "protocol": "tcp" }
@@ -12,16 +12,16 @@
     "platforms": {
       "macos": {
         "domain": "system",
-        "justification": "Managed as part of Jellyfin HTTPS proxy daemon; not a standalone caddy service.",
-        "type": "omitted"
+        "service": "org.nixos.httpsProxy",
+        "type": "launchctl"
       },
       "nixos": {
-        "justification": "Integrated into services.caddy in NixOS host config; not a separate managed service.",
+        "justification": "Integrated into services.caddy in NixOS host config via nucleus.httpsProxy.virtualHosts; not a separate managed service.",
         "type": "omitted"
       },
       "windows": {
-        "justification": "Managed as part of nucleus-jellyfin-https SCM service; not a standalone caddy service.",
-        "type": "omitted"
+        "service": "nucleus-caddy",
+        "type": "native"
       }
     }
   },
@@ -168,31 +168,7 @@
       }
     }
   },
-  "jellyfin-https": {
-    "description": "Caddy reverse proxy for Jellyfin",
-    "displayName": "Jellyfin HTTPS Proxy",
-    "logging": {
-      "capture": "all"
-    },
-    "network": {
-      "default": { "host": "localhost", "port": 8920, "protocol": "https" }
-    },
-    "platforms": {
-      "macos": {
-        "domain": "system",
-        "service": "org.nixos.jellyfinHttpsProxy",
-        "type": "launchctl"
-      },
-      "nixos": {
-        "justification": "Integrated into services.caddy in src/hosts/NixOS/jellyfin.nix; not a separate managed service.",
-        "type": "omitted"
-      },
-      "windows": {
-        "service": "nucleus-jellyfin-https",
-        "type": "native"
-      }
-    }
-  },
+
   "linux-builder": {
     "description": "Nix Linux builder VM on macOS",
     "displayName": "Linux Builder VM",
