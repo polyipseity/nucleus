@@ -1,0 +1,12 @@
+devices:
+  capture:
+    type: Wasapi
+    channels: 2
+    device: "Speakers (Realtek Audio)"
+    loopback: true
+    format: F32
+  playback:
+    type: Wasapi
+    channels: 2
+    device: "Speakers (Realtek Audio)"
+    format: F32
