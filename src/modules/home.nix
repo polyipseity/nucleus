@@ -449,6 +449,14 @@ in
       PY
     '';
 
+    # Override the default logDir (which uses ~) with a proper absolute path.
+    # The launchd StandardErrorPath/StandardOutPath option types require an
+    # absolute path and do not expand ~.
+    nucleus.logging.logDir = lib.mkDefault (
+      if pkgs.stdenv.isDarwin then "${config.home.homeDirectory}/Library/Logs/nucleus"
+      else "${config.home.homeDirectory}/.local/state/nucleus/log"
+    );
+
     # Allow Home Manager to manage its own activation and generation GC.
     programs.home-manager.enable = true;
 
