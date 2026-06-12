@@ -9,6 +9,9 @@
       "displayName": {
         "type": "string"
       },
+      "logging": {
+        "$ref": "#/definitions/loggingEntry"
+      },
       "network": {
         "additionalProperties": {
           "$ref": "#/definitions/endpoint"
@@ -40,6 +43,45 @@
     "type": "object"
   },
   "definitions": {
+    "loggingEntry": {
+      "description": "Logging configuration for a service. Per-platform entry overrides the top-level logging block.",
+      "properties": {
+        "capture": {
+          "description": "Which streams to capture: all, stdout, stderr, or none.",
+          "type": "string",
+          "enum": [ "all", "stdout", "stderr", "none" ],
+          "default": "all"
+        },
+        "compress": {
+          "description": "Compress rotated archives with gzip.",
+          "type": "boolean",
+          "default": true
+        },
+        "level": {
+          "description": "App-level log severity hint (passed as env var to the service if supported).",
+          "type": "string",
+          "default": null
+        },
+        "maxFiles": {
+          "description": "Number of rotated archives to keep.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 4
+        },
+        "maxSize": {
+          "description": "Maximum log file size in bytes before rotation.",
+          "type": "integer",
+          "minimum": 1024,
+          "default": 10485760
+        },
+        "sanitize": {
+          "description": "Strip control characters (ANSI escapes, \\r) from log output.",
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "type": "object"
+    },
     "launchctlEntry": {
       "properties": {
         "domain": {
@@ -53,6 +95,9 @@
         "justification": {
           "description": "Why this service is user-scoped when the policy default is system-wide. Required when domain=user.",
           "type": "string"
+        },
+        "logging": {
+          "$ref": "#/definitions/loggingEntry"
         },
         "prefixMatch": {
           "description": "Match all services with this prefix",
@@ -77,6 +122,9 @@
         "justification": {
           "description": "Explanation of platform-specific configuration choices.",
           "type": "string"
+        },
+        "logging": {
+          "$ref": "#/definitions/loggingEntry"
         },
         "prefixMatch": {
           "description": "Match all services with this prefix",
@@ -168,6 +216,9 @@
           "description": "Explanation of platform-specific configuration choices.",
           "type": "string"
         },
+        "logging": {
+          "$ref": "#/definitions/loggingEntry"
+        },
         "prefixMatch": {
           "description": "Match all tasks with this prefix",
           "type": "boolean"
@@ -191,6 +242,9 @@
         "justification": {
           "description": "Why this service is user-scoped when the policy default is system-wide. Required when scope=user.",
           "type": "string"
+        },
+        "logging": {
+          "$ref": "#/definitions/loggingEntry"
         },
         "prefixMatch": {
           "description": "Match all units with this prefix",

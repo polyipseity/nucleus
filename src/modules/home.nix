@@ -157,6 +157,7 @@ in
     ./fonts.nix
     ./git.nix
     ./linux.nix
+    ./logging.nix
     ./macos.nix
     ./pwsh.nix
     ./secrets.nix
