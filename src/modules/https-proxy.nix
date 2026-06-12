@@ -36,7 +36,9 @@ let
           bind 127.0.0.1 ::1
           tls internal
           reverse_proxy ${vh.upstreamHost}:${toString vh.upstreamPort}
-        ${lib.optionalString (vh.extraConfig != "") (lib.concatMapStringsSep "\n" (line: "  ${line}") (lib.splitString "\n" vh.extraConfig))}
+        ${lib.optionalString (vh.extraConfig != "") (
+          lib.concatMapStringsSep "\n" (line: "  ${line}") (lib.splitString "\n" vh.extraConfig)
+        )}
         }
       '') cfg.virtualHosts;
     in
@@ -63,37 +65,39 @@ in
 {
   options.nucleus.httpsProxy = {
     virtualHosts = mkOption {
-      type = types.attrsOf (types.submodule {
-        options = {
-          hostname = mkOption {
-            type = types.str;
-            default = "localhost";
-            description = "Hostname the virtual host responds to.";
-          };
+      type = types.attrsOf (
+        types.submodule {
+          options = {
+            hostname = mkOption {
+              type = types.str;
+              default = "localhost";
+              description = "Hostname the virtual host responds to.";
+            };
 
-          listenPort = mkOption {
-            type = types.port;
-            description = "Local HTTPS listen port.";
-          };
+            listenPort = mkOption {
+              type = types.port;
+              description = "Local HTTPS listen port.";
+            };
 
-          upstreamHost = mkOption {
-            type = types.str;
-            default = "127.0.0.1";
-            description = "Upstream HTTP host.";
-          };
+            upstreamHost = mkOption {
+              type = types.str;
+              default = "127.0.0.1";
+              description = "Upstream HTTP host.";
+            };
 
-          upstreamPort = mkOption {
-            type = types.port;
-            description = "Upstream HTTP port.";
-          };
+            upstreamPort = mkOption {
+              type = types.port;
+              description = "Upstream HTTP port.";
+            };
 
-          extraConfig = mkOption {
-            type = types.lines;
-            default = "";
-            description = "Extra Caddyfile directives for this virtual host.";
+            extraConfig = mkOption {
+              type = types.lines;
+              default = "";
+              description = "Extra Caddyfile directives for this virtual host.";
+            };
           };
-        };
-      });
+        }
+      );
       default = { };
       description = "Virtual hosts for the local Caddy HTTPS proxy.";
     };

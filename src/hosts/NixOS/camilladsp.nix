@@ -18,8 +18,14 @@ in
     systemd.user.services."camilladsp" = {
       Unit = {
         Description = "CamillaDSP audio processor with websocket API";
-        After = [ "network-online.target" "sound.target" ];
-        Wants = [ "network-online.target" "sound.target" ];
+        After = [
+          "network-online.target"
+          "sound.target"
+        ];
+        Wants = [
+          "network-online.target"
+          "sound.target"
+        ];
       };
       Service = {
         Type = "simple";

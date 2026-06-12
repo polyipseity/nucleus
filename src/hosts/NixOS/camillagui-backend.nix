@@ -15,13 +15,22 @@ let
 in
 {
   config = lib.mkIf (pkgs.stdenv.isLinux && userEnable) {
-    nucleus.httpsProxy.virtualHosts.camillagui = { listenPort = 5006; upstreamPort = 5005; };
+    nucleus.httpsProxy.virtualHosts.camillagui = {
+      listenPort = 5006;
+      upstreamPort = 5005;
+    };
 
     systemd.user.services."camillagui-backend" = {
       Unit = {
         Description = "CamillaDSP web GUI";
-        After = [ "network-online.target" "camilladsp.service" ];
-        Wants = [ "network-online.target" "camilladsp.service" ];
+        After = [
+          "network-online.target"
+          "camilladsp.service"
+        ];
+        Wants = [
+          "network-online.target"
+          "camilladsp.service"
+        ];
       };
       Service = {
         Type = "simple";

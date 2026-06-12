@@ -64,13 +64,13 @@ let
   test_macbook_declares_https_proxy_virtual_host = assert' (
     containsRegex ''nucleus\.httpsProxy\.virtualHosts\.jellyfin'' macbookJellyfinText
     && containsRegex "listenPort = 8920" macbookJellyfinText
-    && containsRegex ''upstreamPort = jellyfinHttpPort'' macbookJellyfinText
+    && containsRegex "upstreamPort = jellyfinHttpPort" macbookJellyfinText
   ) "macOS must declare Jellyfin HTTPS proxy virtual host via nucleus.httpsProxy";
 
   test_nixos_declares_https_proxy_virtual_host = assert' (
     containsRegex ''nucleus\.httpsProxy\.virtualHosts\.jellyfin'' nixosJellyfinText
     && containsRegex "listenPort = 8920" nixosJellyfinText
-    && containsRegex ''upstreamPort = jellyfinHttpPort'' nixosJellyfinText
+    && containsRegex "upstreamPort = jellyfinHttpPort" nixosJellyfinText
   ) "NixOS must declare Jellyfin HTTPS proxy virtual host via nucleus.httpsProxy";
 
   test_no_per_user_jellyfin_units = assert' (

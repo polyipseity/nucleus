@@ -15,7 +15,10 @@ let
 in
 {
   config = lib.mkIf (pkgs.stdenv.isDarwin && userEnable) {
-    nucleus.httpsProxy.virtualHosts.camillagui = { listenPort = 5006; upstreamPort = 5005; };
+    nucleus.httpsProxy.virtualHosts.camillagui = {
+      listenPort = 5006;
+      upstreamPort = 5005;
+    };
 
     launchd.agents."camillagui-backend" = {
       enable = true;
