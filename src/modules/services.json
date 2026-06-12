@@ -15,7 +15,7 @@
     "platforms": {
       "macos": { "type": "launchctl", "service": "org.nixos.local.litellm", "domain": "system" },
       "nixos": { "type": "systemctl", "service": "litellm.service", "scope": "system" },
-      "windows": { "type": "schtask", "taskPath": "\\NucleusLiteLLM" }
+      "windows": { "type": "native", "service": "nucleus-litellm", "justification": "Native Windows SCM service runs as SYSTEM; SOPS-decrypted API keys stored in %ProgramData%\\nucleus\\secrets\\ for SYSTEM access." }
     }
   },
   "jellyfin": {
@@ -60,7 +60,7 @@
     "platforms": {
       "macos": { "type": "launchctl", "service": "com.openssh.ssh-agent", "domain": "user", "justification": "User key material in per-user ssh-agent process" },
       "nixos": { "type": "omitted", "justification": "SSH agent provided by desktop environment keychain (GNOME Keyring / KDE Wallet); no standalone agent to manage." },
-      "windows": { "type": "native", "service": "ssh-agent" }
+      "windows": { "type": "native", "service": "ssh-agent", "justification": "Runs as SYSTEM SCM service; per-user isolation handled by OpenSSH's per-user ssh-agent.exe spawned on demand." }
     }
   },
   "cloud-drive": {
@@ -69,7 +69,7 @@
     "platforms": {
       "macos": { "type": "launchctl", "service": "local.cloud-mount.", "domain": "user", "prefixMatch": true, "justification": "Per-user FUSE mount namespace bound to login session" },
       "nixos": { "type": "systemctl", "service": "cloud-mount-", "scope": "user", "prefixMatch": true, "justification": "Per-user FUSE mount namespace bound to login session" },
-      "windows": { "type": "servy", "service": "nucleus-cloud-mount-", "prefixMatch": true }
+      "windows": { "type": "schtask", "taskPath": "\\NucleusCloudMount", "prefixMatch": true, "justification": "Per-user FUSE mount via scheduled task at logon; replaced Servy for user-context isolation." }
     }
   },
   "rdp": {
