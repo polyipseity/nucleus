@@ -89,7 +89,8 @@
       "capture": "all"
     },
     "network": {
-      "default": { "host": "127.0.0.1", "port": 5005, "protocol": "http" }
+      "default": { "host": "127.0.0.1", "port": 5005, "protocol": "http" },
+      "https": { "host": "localhost", "port": 5006, "protocol": "https" }
     },
     "platforms": {
       "macos": {
