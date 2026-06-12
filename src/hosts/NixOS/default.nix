@@ -28,6 +28,10 @@
     ./vms.nix
   ];
 
+  # snd-aloop provides virtual ALSA loopback devices for audio capture
+  # (CamillaDSP uses hw:Loopback,1 as capture source).
+  boot.kernelModules = [ "snd-aloop" ];
+
   # Journald retention: cap total journal size so disk-bound systemd services
   # (all managed nucleus services on NixOS) don't grow unbounded.
   services.journald.extraConfig = ''
