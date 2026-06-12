@@ -9,6 +9,7 @@
     ../../modules/core.nix
     ../../modules/custom-packages.nix
     ../../modules/gnupg.nix
+    ../../modules/logging.nix
     ../../modules/posix-base.nix
     ../../modules/posix-security.nix
     ../../modules/posix-sops.nix
@@ -26,4 +27,10 @@
     ./users.nix
     ./vms.nix
   ];
+
+  # Journald retention: cap total journal size so disk-bound systemd services
+  # (all managed nucleus services on NixOS) don't grow unbounded.
+  services.journald.extraConfig = ''
+    SystemMaxUse=500M
+  '';
 }
