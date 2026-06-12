@@ -100,18 +100,22 @@ in
   # breaking the builder after a long sleep.  Use a dedicated /run path that
   # we own and clean ourselves instead.
   launchd.daemons.linux-builder = {
-    environment = { inherit (config.environment.variables) NIX_SSL_CERT_FILE; };
-    script = ''
-      export TMPDIR=/run/org.nixos.linux-builder USE_TMPDIR=1
-      rm -rf $TMPDIR
-      mkdir -p $TMPDIR
-      trap "rm -rf $TMPDIR" EXIT
-      ${pkg}/bin/create-builder
-    '';
     serviceConfig = {
+      ProgramArguments = [
+        "${pkgs.writeShellScript "linux-builder-daemon" ''
+          export TMPDIR=/run/org.nixos.linux-builder USE_TMPDIR=1
+          rm -rf $TMPDIR
+          mkdir -p $TMPDIR
+          trap "rm -rf $TMPDIR" EXIT
+          exec ${pkg}/bin/create-builder
+        ''}"
+      ];
       KeepAlive = true;
       RunAtLoad = true;
       WorkingDirectory = workDir;
+      EnvironmentVariables = {
+        NIX_SSL_CERT_FILE = config.environment.variables.NIX_SSL_CERT_FILE;
+      };
     };
   };
 

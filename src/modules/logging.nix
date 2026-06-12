@@ -25,8 +25,8 @@ in
 
     systemLogDir = mkOption {
       type = types.str;
-      default = if pkgs.stdenv.isDarwin then "/Library/Logs/nucleus" else "/var/log/nucleus";
-      defaultText = lib.literalExpression ''if pkgs.stdenv.isDarwin then "/Library/Logs/nucleus" else "/var/log/nucleus"'';
+      default = if pkgs.stdenv.isDarwin then "/Users/Shared/nucleus/logs" else "/var/log/nucleus";
+      defaultText = lib.literalExpression ''if pkgs.stdenv.isDarwin then "/Users/Shared/nucleus/logs" else "/var/log/nucleus"'';
       description = "System-level log directory for nucleus services.";
     };
 

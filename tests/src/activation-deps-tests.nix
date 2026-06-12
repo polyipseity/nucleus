@@ -307,9 +307,7 @@ let
   ) "MiddleClick startup on macOS must use native Login Items (no custom LaunchAgent)";
 
   # === TEST: Spotlight disables all known launcher hotkey slots ===
-  test_spotlight_disables_all_hotkey_slots = assert' (
-    (lib.hasInfix "for hotkey in 61 64 65; do" macbookActivationText)
-  ) "Spotlight disable flow must cover symbolic hotkey IDs 61, 64, and 65";
+  test_spotlight_disables_all_hotkey_slots = assert' ((lib.hasInfix "for hotkey in 61 64 65; do" macbookActivationText)) "Spotlight disable flow must cover symbolic hotkey IDs 61, 64, and 65";
 
   # === TEST: installCargoBinstallPackages activation name aligned across modules ===
   test_install_cargo_binstall_dependency_name_alignment =

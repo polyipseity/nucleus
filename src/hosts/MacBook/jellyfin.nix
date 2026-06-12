@@ -77,8 +77,8 @@ let
 in
 {
   launchd.daemons.jellyfin = {
-    command = "${jellyfinDaemon}";
     serviceConfig = {
+      ProgramArguments = [ "${jellyfinDaemon}" ];
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
@@ -88,8 +88,8 @@ in
   };
 
   launchd.daemons.jellyfinHttpsProxy = {
-    command = "${jellyfinHttpsProxyDaemon}";
     serviceConfig = {
+      ProgramArguments = [ "${jellyfinHttpsProxyDaemon}" ];
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;

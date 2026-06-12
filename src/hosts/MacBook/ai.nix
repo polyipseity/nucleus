@@ -21,22 +21,24 @@ let
 in
 {
   launchd.daemons."local.litellm" = {
-    command = pkgs.writeShellScript "litellm-daemon" ''
-      _keyfile_oru="${config.sops.secrets."ai_openrouter_api_key".path}"
-      if [ -f "$_keyfile_oru" ]; then
-        export OPENROUTER_API_KEY="$(cat "$_keyfile_oru")"
-      fi
-      _keyfile_oc="${config.sops.secrets."ai_opencode_api_key".path}"
-      if [ -f "$_keyfile_oc" ]; then
-        export OPENCODE_GO_API_KEY="$(cat "$_keyfile_oc")"
-      fi
-      exec ${pkgs.litellm}/bin/litellm \
-        --config ${litellmConfig} \
-        --port 4000 \
-        --host 127.0.0.1 \
-        --drop_params
-    '';
     serviceConfig = {
+      ProgramArguments = [
+        "${pkgs.writeShellScript "litellm-daemon" ''
+          _keyfile_oru="${config.sops.secrets."ai_openrouter_api_key".path}"
+          if [ -f "$_keyfile_oru" ]; then
+            export OPENROUTER_API_KEY="$(cat "$_keyfile_oru")"
+          fi
+          _keyfile_oc="${config.sops.secrets."ai_opencode_api_key".path}"
+          if [ -f "$_keyfile_oc" ]; then
+            export OPENCODE_GO_API_KEY="$(cat "$_keyfile_oc")"
+          fi
+          exec ${pkgs.litellm}/bin/litellm \
+            --config ${litellmConfig} \
+            --port 4000 \
+            --host 127.0.0.1 \
+            --drop_params
+        ''}"
+      ];
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
@@ -46,8 +48,11 @@ in
   };
 
   launchd.daemons."local.ollama" = {
-    command = "${pkgs.ollama}/bin/ollama serve";
     serviceConfig = {
+      ProgramArguments = [
+        "${pkgs.ollama}/bin/ollama"
+        "serve"
+      ];
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;

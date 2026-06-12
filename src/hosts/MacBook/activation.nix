@@ -12,7 +12,7 @@
 #   and postActivation (after homebrew, last before the gc-root symlink).
 #   lib.mkBefore ensures these fragments are prepended before home-manager's
 #   HM activation call, which is also appended to postActivation.text.
-{ lib, ... }: {
+{ config, lib, ... }: {
   # ---------------------------------------------------------------------------
   # Declarative power-management settings handled by nix-darwin's power module.
   # These translate to systemsetup / pmset calls at activation time.
@@ -422,6 +422,16 @@
     fi
 
     echo "spotlight: done."
+
+    # ---- ensureSystemLogDirs ----------------------------------------------------
+    # Create system log directories for all nucleus launchd daemons before they
+    # start, so launchd can open StandardOutPath / StandardErrorPath files.
+    system_log_dir="${config.nucleus.logging.systemLogDir}"
+    for subdir in jellyfin jellyfin-https litellm; do
+      if ! /bin/mkdir -p "$system_log_dir/$subdir"; then
+        echo "logging: failed to create $system_log_dir/$subdir." >&2
+      fi
+    done
 
     # ---- NUCLEUS_HOST ------------------------------------------------------------
     # Export the canonical host name for downstream VM host-scoping and Host
