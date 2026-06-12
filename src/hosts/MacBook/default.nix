@@ -19,6 +19,7 @@
     ../../modules/posix-sops.nix
     ../../modules/posix-user-shell.nix
     ./activation.nix
+    ./ai.nix
     ./base.nix
     ./defaults.nix
     ./homebrew.nix

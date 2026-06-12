@@ -4,7 +4,6 @@
 #   • pkgs.ollama — inference server and CLI (GPU-enabled where host runtime supports it)
 #   • pkgs.oterm  — terminal chat client for interactive LLM sessions
 #   • OLLAMA_HOST session variable that binds client tools to the loopback address
-#   • macOS: launchd user agent that keeps the Ollama server running persistently
 #
 # Model management is NOT part of Home Manager activation — model pulls are
 # 2–20 GB and would make `nix run .#apply` hang indefinitely if run inline.
@@ -53,10 +52,10 @@ in
 lib.mkMerge [
   {
     home.packages = [
-      # Inference server and CLI.  On NixOS the server is managed by the
-      # system-level services.ollama unit (hosts/NixOS/ai.nix); the package
-      # here provides the `ollama` CLI for user-facing pulls, queries, and
-      # model management.  On macOS the launchd agent below starts the server.
+      # Inference server and CLI.  On NixOS and macOS the server is managed
+      # by system-level services (hosts/NixOS/ai.nix, hosts/MacBook/ai.nix);
+      # the package here provides the `ollama` CLI for user-facing pulls,
+      # queries, and model management.
       pkgs.ollama
       # Terminal-native chat frontend for interactive sessions.  Speaks the
       # Ollama HTTP API directly; works against any running Ollama server.
@@ -76,92 +75,4 @@ lib.mkMerge [
     };
   }
 
-  # macOS-only: user launchd agent for the Ollama inference server.
-  # On NixOS the equivalent is the system-level services.ollama unit in
-  # hosts/NixOS/ai.nix; no Home Manager unit is needed there.
-  # The launchd option is Darwin-only in Home Manager so the entire block
-  # must be guarded to avoid "unknown option" errors on Linux.
-  (lib.mkIf pkgs.stdenv.isDarwin {
-    launchd.agents."litellm" = {
-      enable = true;
-      config = {
-        Label = "local.litellm";
-        # Wrapper script reads the SOPS-decrypted OpenRouter key file
-        # (KEY=VALUE format) and exports it before launching LiteLLM because
-        # launchd EnvironmentVariables does not support file sourcing.
-        ProgramArguments = [
-          "/bin/sh"
-          "-c"
-          ''
-            if [ -f "${config.sops.secrets."ai_openrouter_api_key".path}" ]; then
-              export OPENROUTER_API_KEY="$(cat "${config.sops.secrets."ai_openrouter_api_key".path}")"
-            fi
-            if [ -f "${config.sops.secrets."ai_opencode_api_key".path}" ]; then
-              export OPENCODE_GO_API_KEY="$(cat "${config.sops.secrets."ai_opencode_api_key".path}")"
-            fi
-            exec ${pkgs.litellm}/bin/litellm \
-              --config ${config.home.homeDirectory}/.config/nucleus/litellm-config.yml \
-              --port 4000 \
-              --host 127.0.0.1 \
-              --drop_params
-          ''
-        ];
-        KeepAlive = true;
-        RunAtLoad = true;
-        # LiteLLM sends operational logging to stderr at the level set by
-        # LITELLM_LOG (WARNING by default via litellm-config.yml).  Route
-        # stderr to a file so errors and warnings are visible; stdout carries
-        # no operational value and is discarded.
-        # The parent directory is created automatically by launchd.
-        StandardOutPath = "/dev/null";
-        StandardErrorPath = "${config.home.homeDirectory}/Library/Logs/litellm/proxy.log";
-      };
-    };
-
-    launchd.agents."ollama" = {
-      enable = true;
-      config = {
-        Label = "local.ollama";
-        ProgramArguments = [
-          "${pkgs.ollama}/bin/ollama"
-          "serve"
-        ];
-        # Bind the server to loopback so the unauthenticated Ollama REST API
-        # is never reachable from LAN peers.  0.0.0.0 binding (the historic
-        # Ollama default on some versions) would expose model inference to
-        # anyone on the local network without any authentication requirement.
-        EnvironmentVariables = {
-          # Compress the KV cache with 4-bit quantisation to halve the
-          # KV-cache RAM footprint so larger context windows fit in unified
-          # memory without evicting model weights from the metal buffer pool.
-          OLLAMA_FLASH_ATTENTION = "1";
-          OLLAMA_HOST = "127.0.0.1:11434";
-          # q4_0 compression paired with flash attention achieves a good
-          # quality/memory tradeoff; switch to f16 if accuracy regressions
-          # appear on specific models.
-          OLLAMA_KV_CACHE_TYPE = "q4_0";
-          # Set a 32 k token default context window so models that default to
-          # 2 k or 4 k do not silently truncate long conversations.  Individual
-          # `ollama run` calls can still override with --ctx=N.
-          # Source: Ollama environment variable reference.
-          # https://docs.ollama.com/faq#how-can-i-specify-the-context-window-size
-          OLLAMA_CONTEXT_LENGTH = "32768";
-        };
-        # Restart the server automatically after crashes or macOS restarts
-        # so the inference endpoint is always available without manual
-        # intervention.
-        KeepAlive = true;
-        RunAtLoad = true;
-        # Suppress per-request log lines; Ollama emits one entry per
-        # inference request which floods the system log under normal use.
-        # This suppression is intentional: (1) request logs are verbose and
-        # not actionable for routine operator review, (2) this comment
-        # explains why, and (3) startup failures surface via launchd
-        # exit-status tracking — check with:
-        #   launchctl list | grep local.ollama
-        StandardOutPath = "/dev/null";
-        StandardErrorPath = "/dev/null";
-      };
-    };
-  })
 ]
