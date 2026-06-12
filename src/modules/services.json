@@ -4,7 +4,7 @@
     "displayName": "Ollama",
     "description": "LLM inference server",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "local.ollama", "domain": "system" },
+      "macos": { "type": "launchctl", "service": "org.nixos.local.ollama", "domain": "system" },
       "nixos": { "type": "systemctl", "service": "ollama.service", "scope": "system" }
     }
   },
@@ -12,7 +12,7 @@
     "displayName": "LiteLLM",
     "description": "AI API gateway for multi-provider routing",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "local.litellm", "domain": "system" },
+      "macos": { "type": "launchctl", "service": "org.nixos.local.litellm", "domain": "system" },
       "nixos": { "type": "systemctl", "service": "litellm.service", "scope": "system" },
       "windows": { "type": "schtask", "taskPath": "\\NucleusLiteLLM" }
     }
