@@ -427,7 +427,7 @@
     # Create system log directories for all nucleus launchd daemons before they
     # start, so launchd can open StandardOutPath / StandardErrorPath files.
     system_log_dir="${config.nucleus.logging.systemLogDir}"
-    for subdir in jellyfin jellyfin-https litellm; do
+    for subdir in jellyfin https-proxy litellm; do
       if ! /bin/mkdir -p "$system_log_dir/$subdir"; then
         echo "logging: failed to create $system_log_dir/$subdir." >&2
       fi
