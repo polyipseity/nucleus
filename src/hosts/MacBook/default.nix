@@ -22,6 +22,8 @@
     ./activation.nix
     ./ai.nix
     ./base.nix
+    ./camilladsp.nix
+    ./camillagui-backend.nix
     ./defaults.nix
     ./homebrew.nix
     ./jellyfin.nix
