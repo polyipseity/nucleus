@@ -22,10 +22,9 @@
   ...
 }:
 let
-  # The canonical live checkout path is ~/dev/nucleus.  Use out-of-store
-  # symlinks so user-level OpenCode config stays pointed at the mutable working
-  # tree rather than a read-only Nix store snapshot.
-  liveRepoRoot = "${config.home.homeDirectory}/dev/nucleus";
+  # Activation scripts resolve the repo root dynamically from the apply-time
+  # marker (~/.config/nucleus/repo-root), so out-of-store symlinks survive repo
+  # relocations and rebuilds without stale store paths.
 
   # Keep path fragments centralized so activation entries reference one source
   # of truth for the repo-hosted agents configuration tree.
@@ -44,8 +43,6 @@ in
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/agents";
     ".config/opencode/commands".source =
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
-    ".config/opencode/opencode.jsonc".source =
-      config.lib.file.mkOutOfStoreSymlink "${liveRepoRoot}/${agentsConfigRelativePath}/opencode.user.jsonc";
   };
 
   home.activation = {
@@ -133,6 +130,26 @@ in
           echo "agents-config: linked $HOME/.agents/$_as_name -> $_as_entry"
         fi
       done
+
+      # Create the ~/.config/opencode/opencode.jsonc symlink to the repo-hosted
+      # user config. Resolved at activation time (rather than via Nix-level
+      # mkOutOfStoreSymlink) so the link still works after the repo root path
+      # changes between rebuilds.
+      mkdir -p "$HOME/.config/opencode"
+      _as_opencode_source="$_as_repo_root/${agentsConfigRelativePath}/opencode.user.jsonc"
+      _as_opencode_link="$HOME/.config/opencode/opencode.jsonc"
+      if [ -L "$_as_opencode_link" ]; then
+        if [ "$(readlink "$_as_opencode_link")" != "$_as_opencode_source" ]; then
+          rm "$_as_opencode_link"
+        fi
+      elif [ -e "$_as_opencode_link" ]; then
+        echo "agents-config: $_as_opencode_link exists and is not a managed symlink — remove or back it up, then re-run apply." >&2
+        exit 1
+      fi
+      if [ ! -e "$_as_opencode_link" ]; then
+        ln -s "$_as_opencode_source" "$_as_opencode_link"
+        echo "agents-config: linked $HOME/.config/opencode/opencode.jsonc"
+      fi
     '';
 
     # -------------------------------------------------------------------------

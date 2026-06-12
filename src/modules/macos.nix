@@ -36,12 +36,10 @@
   ...
 }:
 let
-  # The canonical live checkout path is ~/dev/nucleus.  Use out-of-store
-  # symlinks so app-managed config writes land in the mutable working tree
-  # instead of a read-only Nix store snapshot.
-  liveRepoRoot = "${config.home.homeDirectory}/dev/nucleus";
+  # Activation scripts resolve the repo root dynamically from the apply-time
+  # marker (~/.config/nucleus/repo-root), so out-of-store symlinks survive repo
+  # relocations and rebuilds without stale store paths.
   liveICloudDownloads = "${config.home.homeDirectory}/Library/Mobile Documents/com~apple~CloudDocs/Downloads";
-  liveLinearmouseConfig = "${liveRepoRoot}/src/modules/configs/linearmouse/linearmouse.json";
 
   # Sub-module imports extracted from this file for focused maintainability.
   finderSidebar = import ./macos/finder-sidebar.nix { inherit config lib pkgs; };
@@ -506,13 +504,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # the script version tracks the pinned hash in iterm2ZshIntegration above.
     ".iterm2_shell_integration.zsh".source = iterm2ZshIntegration;
 
-    # Keep both LinearMouse runtime config paths pointed at the canonical
-    # repo-backed JSON so app writes appear immediately as working-tree diffs.
-    ".config/linearmouse/linearmouse.json".source =
-      config.lib.file.mkOutOfStoreSymlink liveLinearmouseConfig;
-    "Library/Application Support/linearmouse/linearmouse.json".source =
-      config.lib.file.mkOutOfStoreSymlink liveLinearmouseConfig;
-
     # Keep iCloud Downloads reachable from a short stable path without
     # replacing ~/Downloads itself.
     "Downloads/iCloud".source = config.lib.file.mkOutOfStoreSymlink liveICloudDownloads;
@@ -693,6 +684,31 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # handled declaratively in defaults.nix via
     # system.defaults.CustomUserPreferences."com.googlecode.iterm2".
     # -------------------------------------------------------------------------
+
+    # -------------------------------------------------------------------------
+    # configureLinearmouseConfig
+    # Creates out-of-store symlinks for LinearMouse's runtime config files
+    # pointing into the repository tree. Resolves the repo root at activation
+    # time so the link survives repo relocations and rebuilds without stale
+    # store paths.
+    # -------------------------------------------------------------------------
+    configureLinearmouseConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      set -eu
+
+      _ll_repo_root=""
+      if [ -f "$HOME/.config/nucleus/repo-root" ]; then
+        _ll_repo_root="$(cat "$HOME/.config/nucleus/repo-root")"
+      fi
+      if [ -z "$_ll_repo_root" ]; then
+        _ll_repo_root="$HOME/dev/nucleus"
+      fi
+      _ll_source="$_ll_repo_root/src/modules/configs/linearmouse/linearmouse.json"
+
+      mkdir -p "$HOME/.config/linearmouse"
+      mkdir -p "$HOME/Library/Application Support/linearmouse"
+      ln -sf "$_ll_source" "$HOME/.config/linearmouse/linearmouse.json"
+      ln -sf "$_ll_source" "$HOME/Library/Application Support/linearmouse/linearmouse.json"
+    '';
 
     # -------------------------------------------------------------------------
     # configureLaunchServices

@@ -12,6 +12,24 @@
   ...
 }:
 let
+  # Wrapper that resolves the nucleus repo root at runtime so the systemd unit
+  # works regardless of the checkout location. Uses the same resolution chain as
+  # apply.sh: $NUCLEUS_REPO_ROOT env → ~/.config/nucleus/repo-root file →
+  # $HOME/dev/nucleus fallback.
+  gcWeekly = pkgs.writeShellScript "gc-weekly" ''
+    set -eu
+
+    _repo_root=""
+    if [ -f "$HOME/.config/nucleus/repo-root" ]; then
+      _repo_root="$(cat "$HOME/.config/nucleus/repo-root")"
+    fi
+    if [ -z "$_repo_root" ]; then
+      _repo_root="$HOME/dev/nucleus"
+    fi
+
+    exec "$_repo_root/scripts/gc.sh"
+  '';
+
   displayHostManualInstructionsBody = import ./lib/manual-instructions.nix {
     inherit (config.nucleus) hostManualFile;
   } "linux";
@@ -274,7 +292,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     };
     Service = {
       Type = "oneshot";
-      ExecStart = "${pkgs.bash}/bin/bash $HOME/dev/nucleus/scripts/gc.sh";
+      ExecStart = "${gcWeekly}";
     };
   };
 
