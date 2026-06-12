@@ -1312,9 +1312,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   launchd.agents."gc-weekly" = {
     enable = true;
     config = {
-      # launchd Label is a reverse-DNS-style unique identifier.
-      # Source: launchd.plist(5) Label key semantics.
-      # https://www.manpagez.com/man/5/launchd.plist/
       Label = "local.gc-weekly";
       ProgramArguments = [ "${gcWeekly}" ];
       # Do not run on every agent reload during apply/bootstrap apply; weekly
@@ -1348,9 +1345,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   launchd.agents."betterdisplay-heartbeat" = {
     enable = true;
     config = {
-      # launchd Label is a reverse-DNS-style unique identifier.
-      # Source: launchd.plist(5) Label key semantics.
-      # https://www.manpagez.com/man/5/launchd.plist/
       Label = "local.betterdisplay-heartbeat";
       ProgramArguments = [ "${betterdisplayHeartbeat}" ];
       # Poll interval in seconds; 30 s keeps the display available for
@@ -1377,9 +1371,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   launchd.agents."dev-ds-store-gc" = {
     enable = true;
     config = {
-      # launchd Label is a reverse-DNS-style unique identifier.
-      # Source: launchd.plist(5) Label key semantics.
-      # https://www.manpagez.com/man/5/launchd.plist/
       Label = "local.dev-ds-store-gc";
       ProgramArguments = [ "${devDsStoreGc}" ];
       # Do not run on every agent reload during apply/bootstrap apply; daily
@@ -1397,9 +1388,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   launchd.agents."dev-spotlight-exclusions" = {
     enable = true;
     config = {
-      # launchd Label is a reverse-DNS-style unique identifier.
-      # Source: launchd.plist(5) Label key semantics.
-      # https://www.manpagez.com/man/5/launchd.plist/
       Label = "local.dev-spotlight-exclusions";
       ProgramArguments = [ "${devSpotlightExclusions}" ];
       # Do not run on every agent reload during apply/bootstrap apply; daily
@@ -1435,9 +1423,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   launchd.agents."nix-index-update" = {
     enable = true;
     config = {
-      # launchd Label is a reverse-DNS-style unique identifier.
-      # Source: launchd.plist(5) Label key semantics.
-      # https://www.manpagez.com/man/5/launchd.plist/
       Label = "local.nix-index-update";
       ProgramArguments = [ "${nixIndexUpdate}" ];
       # Run once at load so a freshly provisioned machine or a machine whose
@@ -1470,9 +1455,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   launchd.agents."icloud-exclusions" = {
     enable = true;
     config = {
-      # launchd Label is a reverse-DNS-style unique identifier.
-      # Source: launchd.plist(5) Label key semantics.
-      # https://www.manpagez.com/man/5/launchd.plist/
       Label = "local.icloud-exclusions";
       ProgramArguments = [ "${icloudExclusionsScript}" ];
       # Do not run on every agent reload during apply/bootstrap apply; the

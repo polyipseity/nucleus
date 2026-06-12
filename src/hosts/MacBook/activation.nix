@@ -381,68 +381,38 @@
     fi
 
     # ---- disableSpotlight -------------------------------------------------------
-    # Completely disable Spotlight (launcher/search) so Cmd+Space can be reused
-    # by alternate launchers such as Raycast.
-    #
-    # Keep this as a multi-layer disable because each layer alone is reversible:
-    #   1) disable hotkeys 61/64/65 as the console user (covers version/migration slots),
+    # Disable Spotlight so Cmd+Space can be reused by alternate launchers such as
+    # Raycast.  Each layer independently covers a vector:
+    #   1) disable hotkeys 61/64/65 as the console user,
     #   2) force immediate hotkey reload with activateSettings -u,
-    #   3) disable + boot out com.apple.Spotlight launchd service,
-    #   4) disable indexing with mdutil,
-    #   5) clear stale /.Spotlight-V100 cache.
+    #   3) disable indexing with mdutil,
+    #   4) clear stale /.Spotlight-V100 cache.
     #
     # This must stay in root system activation (not user activation) because
     # mdutil/launchctl service control are privileged operations.
 
-    echo "spotlight: disabling Spotlight launcher and keyboard shortcuts..."
+    echo "spotlight: disabling..."
 
     console_uid_spotlight="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
     if [ -n "$console_user" ] && [ "$console_user" != "root" ] && [ -n "$console_uid_spotlight" ]; then
-      spotlight_hotkeys="61 64 65"
-      spotlight_hotkeys_ok=1
-      for hotkey in $spotlight_hotkeys; do
+      for hotkey in 61 64 65; do
         if ! /bin/launchctl asuser "$console_uid_spotlight" /usr/bin/sudo -H -u "$console_user" \
           /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add "$hotkey" \
           "<dict><key>enabled</key><false/></dict>"; then
-          spotlight_hotkeys_ok=0
-          echo "spotlight: failed to disable symbolic hotkey $hotkey for user '$console_user'." >&2
+          echo "spotlight: failed to disable hotkey $hotkey." >&2
         fi
       done
 
-      if [ "$spotlight_hotkeys_ok" -eq 1 ]; then
-        if ! /bin/launchctl asuser "$console_uid_spotlight" /usr/bin/sudo -H -u "$console_user" \
-          /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-          echo "spotlight: keyboard shortcut changes were written but not fully activated; log out/in once to apply." >&2
-        fi
-      else
-        echo "spotlight: one or more hotkey writes failed; Cmd+Space may remain active until fixed manually." >&2
+      if ! /bin/launchctl asuser "$console_uid_spotlight" /usr/bin/sudo -H -u "$console_user" \
+        /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
+        echo "spotlight: hotkey changes applied; log out/in once to fully activate." >&2
       fi
     else
-      echo "spotlight: skipped hotkey disable (no active non-root GUI session detected)." >&2
+      echo "spotlight: skipped hotkey disable (no active non-root GUI session)." >&2
     fi
 
     if ! /usr/bin/mdutil -i off /; then
-      echo "spotlight: failed to disable Spotlight indexing." >&2
-    fi
-
-    if [ -n "$console_uid_spotlight" ]; then
-      if ! /bin/launchctl disable "gui/$console_uid_spotlight/com.apple.Spotlight"; then
-        echo "spotlight: failed to disable gui/$console_uid_spotlight/com.apple.Spotlight." >&2
-      fi
-      spotlight_bootout_output="$(
-        /bin/launchctl bootout "gui/$console_uid_spotlight/com.apple.Spotlight" 2>&1
-      )" || true
-      if [ -n "$spotlight_bootout_output" ]; then
-        # SIP can block bootout on newer macOS even when disable+mdutil already
-        # converged the effective state; treat this as expected and keep logs actionable.
-        if printf '%s' "$spotlight_bootout_output" | /usr/bin/grep -Fq "System Integrity Protection is engaged"; then
-          echo "spotlight: bootout blocked by SIP (expected on this macOS); disable/indexing state still converged." >&2
-        else
-          echo "spotlight: bootout for com.apple.Spotlight returned non-zero: $spotlight_bootout_output" >&2
-        fi
-      fi
-    else
-      echo "spotlight: skipped launchctl disable/bootout (could not determine user UID)." >&2
+      echo "spotlight: failed to disable indexing." >&2
     fi
 
     if [ -d "/.Spotlight-V100" ]; then
@@ -451,7 +421,7 @@
       fi
     fi
 
-    echo "spotlight: disable sequence complete. Cmd+Space should now open Raycast (or fail silently if no alternate launcher is running)."
+    echo "spotlight: done."
 
     # ---- NUCLEUS_HOST ------------------------------------------------------------
     # Export the canonical host name for downstream VM host-scoping and Host

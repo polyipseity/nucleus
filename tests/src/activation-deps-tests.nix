@@ -308,19 +308,8 @@ let
 
   # === TEST: Spotlight disables all known launcher hotkey slots ===
   test_spotlight_disables_all_hotkey_slots = assert' (
-    (lib.hasInfix "spotlight_hotkeys=\"61 64 65\"" macbookActivationText)
-    && (lib.hasInfix "for hotkey in $spotlight_hotkeys; do" macbookActivationText)
+    (lib.hasInfix "for hotkey in 61 64 65; do" macbookActivationText)
   ) "Spotlight disable flow must cover symbolic hotkey IDs 61, 64, and 65";
-
-  # === TEST: Spotlight bootout warning is SIP-aware and classified ===
-  test_spotlight_bootout_is_sip_aware =
-    assert'
-      (
-        (lib.hasInfix "spotlight_bootout_output=\"$(" macbookActivationText)
-        && (lib.hasInfix "System Integrity Protection is engaged" macbookActivationText)
-        && (lib.hasInfix "bootout blocked by SIP" macbookActivationText)
-      )
-      "Spotlight bootout handling must classify SIP-blocked failures to avoid noisy raw launchctl warnings";
 
   # === TEST: installCargoBinstallPackages activation name aligned across modules ===
   test_install_cargo_binstall_dependency_name_alignment =

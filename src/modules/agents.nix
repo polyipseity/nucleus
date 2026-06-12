@@ -402,10 +402,13 @@ in
       }
 
       # Install required Python versions before attempting tool installs.
+      # Stderr suppressed: uv emits a cosmetic "Failed to patch install name"
+      # warning on macOS 15+ when installing older CPython that does not affect
+      # functionality.  Real failures surface at tool-install time below.
       while IFS= read -r _iut_tool; do
         [ -z "$_iut_tool" ] && continue
         _iut_python=$(_iut_python_for_tool "$_iut_tool")
-        [ -n "$_iut_python" ] && "$_iut_uv_bin" python install "$_iut_python"
+        [ -n "$_iut_python" ] && "$_iut_uv_bin" python install "$_iut_python" 2>/dev/null
       done < "$_iut_desired"
 
       # Get actually installed uv tools from `uv tool list` (zap-style: remove
