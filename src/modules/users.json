@@ -86,6 +86,15 @@
           "macos": "Library/Mobile Documents/com~apple~CloudDocs/data",
           "windows": "clouds\\GoogleDrive\\data"
         }
+      },
+      {
+        "createTargetDirectory": true,
+        "path": ".config/camilladsp/config.yml",
+        "targets": {
+          "linux": "dev/nucleus/src/modules/configs/camilladsp/config-linux.yml",
+          "macos": "dev/nucleus/src/modules/configs/camilladsp/config-macos.yml",
+          "windows": "dev\\nucleus\\src\\modules\\configs\\camilladsp\\config-windows.yml"
+        }
       }
     ],
     "devRepos": {
