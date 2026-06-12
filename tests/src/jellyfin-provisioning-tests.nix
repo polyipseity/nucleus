@@ -29,7 +29,7 @@ let
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   windowsCaddyTrustText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyLocalCA.ps1;
   caddyTrustScriptText = builtins.readFile ../../src/scripts/caddy-trust.sh;
-  windowsJellyfinHttpsProxyText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinHttpsProxy.ps1;
+  windowsCaddyServiceText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyService.ps1;
   windowsJellyfinAccountText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinAccount.ps1;
   windowsJellyfinLibraryText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinLibrary.ps1;
   windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
@@ -44,6 +44,11 @@ let
 
   test_nixos_imports_host_jellyfin_module = assert' (containsRegex ''\./jellyfin\.nix'' nixosDefaultText) "NixOS host entrypoint must import ./jellyfin.nix";
 
+  test_nixos_imports_https_proxy_modules = assert' (
+    containsRegex ''\./https-proxy\.nix'' nixosDefaultText
+    && containsRegex ''\.\./\.\./modules/https-proxy\.nix'' nixosDefaultText
+  ) "NixOS host entrypoint must import https-proxy mapping modules";
+
   test_nixos_runs_shared_jellyfin_service = assert' (
     containsRegex ''services\.jellyfin'' nixosJellyfinText
     && containsRegex "enable = true" nixosJellyfinText
@@ -56,21 +61,17 @@ let
     && containsRegex ''state_root="/Users/Shared/Jellyfin"'' macbookJellyfinText
   ) "macOS must provision Jellyfin as a host-level shared launchd daemon";
 
-  test_macbook_runs_local_https_proxy = assert' (
-    containsRegex ''launchd\.daemons\.jellyfinHttpsProxy'' macbookJellyfinText
-    && containsRegex "https://localhost:8920" macbookJellyfinText
-    && containsRegex "auto_https disable_redirects" macbookJellyfinText
-    && containsRegex "tls internal" macbookJellyfinText
-    && containsRegex ''reverse_proxy 127\.0\.0\.1:8096'' macbookJellyfinText
-  ) "macOS must provision a local HTTPS reverse proxy for Jellyfin";
+  test_macbook_declares_https_proxy_virtual_host = assert' (
+    containsRegex ''nucleus\.httpsProxy\.virtualHosts\.jellyfin'' macbookJellyfinText
+    && containsRegex "listenPort = 8920" macbookJellyfinText
+    && containsRegex ''upstreamPort = jellyfinHttpPort'' macbookJellyfinText
+  ) "macOS must declare Jellyfin HTTPS proxy virtual host via nucleus.httpsProxy";
 
-  test_nixos_runs_local_https_proxy = assert' (
-    containsRegex ''services\.caddy'' nixosJellyfinText
-    && containsRegex "auto_https disable_redirects" nixosJellyfinText
-    && containsRegex "tls internal" nixosJellyfinText
-    && containsRegex ''reverse_proxy 127\.0\.0\.1:8096'' nixosJellyfinText
-    && containsRegex "8920" nixosJellyfinText
-  ) "NixOS must provision a local HTTPS reverse proxy for Jellyfin";
+  test_nixos_declares_https_proxy_virtual_host = assert' (
+    containsRegex ''nucleus\.httpsProxy\.virtualHosts\.jellyfin'' nixosJellyfinText
+    && containsRegex "listenPort = 8920" nixosJellyfinText
+    && containsRegex ''upstreamPort = jellyfinHttpPort'' nixosJellyfinText
+  ) "NixOS must declare Jellyfin HTTPS proxy virtual host via nucleus.httpsProxy";
 
   test_no_per_user_jellyfin_units = assert' (
     !containsRegex "jellyfin-media-server" linuxText && !containsRegex "jellyfin-media-server" macosText
@@ -81,12 +82,11 @@ let
   test_windows_installs_caddy_for_https_proxy = assert' (containsRegex ''id: CaddyServer\.Caddy'' windowsSystemText) "Windows DSC must install Caddy for Jellyfin HTTPS proxy";
 
   test_windows_wires_https_proxy_module = assert' (
-    containsRegex "Sync-JellyfinHttpsProxy" windowsApplyText
-    && containsRegex "function Sync-JellyfinHttpsProxy" windowsJellyfinHttpsProxyText
-    && containsRegex "https://localhost:8920" windowsJellyfinHttpsProxyText
-    && containsRegex "auto_https disable_redirects" windowsJellyfinHttpsProxyText
-    && containsRegex "tls internal" windowsJellyfinHttpsProxyText
-  ) "Windows apply flow must converge Jellyfin HTTPS proxy service";
+    containsRegex "Sync-CaddyService" windowsApplyText
+    && containsRegex "function Sync-CaddyService" windowsCaddyServiceText
+    && containsRegex "auto_https disable_redirects" windowsCaddyServiceText
+    && containsRegex "tls internal" windowsCaddyServiceText
+  ) "Windows apply flow must converge Caddy HTTPS proxy service";
 
   test_host_manuals_document_jellyfin_endpoints = assert' (
     containsRegex "https://localhost:8920" macbookManualText
@@ -166,8 +166,9 @@ let
     test_nixos_runs_shared_jellyfin_service
     test_macbook_imports_host_jellyfin_module
     test_macbook_runs_shared_jellyfin_daemon
-    test_macbook_runs_local_https_proxy
-    test_nixos_runs_local_https_proxy
+    test_nixos_imports_https_proxy_modules
+    test_macbook_declares_https_proxy_virtual_host
+    test_nixos_declares_https_proxy_virtual_host
     test_no_per_user_jellyfin_units
     test_windows_installs_jellyfin_server
     test_windows_installs_caddy_for_https_proxy
