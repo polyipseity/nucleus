@@ -16,6 +16,8 @@
     ../../modules/posix-user-shell.nix
     ./ai.nix
     ./base.nix
+    ./camilladsp.nix
+    ./camillagui-backend.nix
     ./desktop.nix
     ./hardware/cpu.nix
     ./hardware/disks.nix
