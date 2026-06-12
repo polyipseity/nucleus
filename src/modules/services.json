@@ -29,6 +29,9 @@
   "discord-music-rpc": {
     "description": "Discord Rich Presence for music players",
     "displayName": "Discord Music RPC",
+    "network": {
+      "oauth": { "host": "localhost", "port": 8888, "protocol": "http" }
+    },
     "platforms": {
       "macos": {
         "domain": "user",
@@ -51,6 +54,10 @@
   "jellyfin": {
     "description": "Media server",
     "displayName": "Jellyfin",
+    "network": {
+      "http": { "host": "127.0.0.1", "port": 8096, "protocol": "http" },
+      "https": { "host": "localhost", "port": 8920, "protocol": "https" }
+    },
     "platforms": {
       "macos": {
         "domain": "system",
@@ -71,6 +78,9 @@
   "jellyfin-https": {
     "description": "Caddy reverse proxy for Jellyfin",
     "displayName": "Jellyfin HTTPS Proxy",
+    "network": {
+      "default": { "host": "localhost", "port": 8920, "protocol": "https" }
+    },
     "platforms": {
       "macos": {
         "domain": "system",
@@ -90,6 +100,9 @@
   "linux-builder": {
     "description": "Nix Linux builder VM on macOS",
     "displayName": "Linux Builder VM",
+    "network": {
+      "ssh": { "host": "127.0.0.1", "port": 31022, "protocol": "tcp" }
+    },
     "platforms": {
       "macos": {
         "domain": "system",
@@ -109,6 +122,9 @@
   "litellm": {
     "description": "AI API gateway for multi-provider routing",
     "displayName": "LiteLLM",
+    "network": {
+      "default": { "host": "127.0.0.1", "port": 4000, "protocol": "http" }
+    },
     "platforms": {
       "macos": {
         "domain": "system",
@@ -130,6 +146,9 @@
   "ollama": {
     "description": "LLM inference server",
     "displayName": "Ollama",
+    "network": {
+      "default": { "host": "127.0.0.1", "port": 11434, "protocol": "http" }
+    },
     "platforms": {
       "macos": {
         "domain": "system",
@@ -150,6 +169,9 @@
   "rdp": {
     "description": "Remote Desktop Protocol server",
     "displayName": "Remote Desktop",
+    "network": {
+      "default": { "host": "0.0.0.0", "port": 3389, "protocol": "tcp" }
+    },
     "platforms": {
       "macos": {
         "justification": "macOS uses built-in Screen Sharing / VNC protocol instead of RDP.",
@@ -189,6 +211,9 @@
   "sshd": {
     "description": "Remote shell access via SSH",
     "displayName": "SSH Server",
+    "network": {
+      "default": { "host": "0.0.0.0", "port": 22, "protocol": "tcp" }
+    },
     "platforms": {
       "macos": {
         "domain": "system",

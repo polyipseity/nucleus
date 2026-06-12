@@ -9,6 +9,13 @@
       "displayName": {
         "type": "string"
       },
+      "network": {
+        "additionalProperties": {
+          "$ref": "#/definitions/endpoint"
+        },
+        "description": "Named network endpoints exposed by this service (omit for services with no network interface, e.g. Unix-socket-only).",
+        "type": "object"
+      },
       "platforms": {
         "additionalProperties": false,
         "minProperties": 1,
@@ -86,6 +93,36 @@
       "required": [
         "type",
         "service"
+      ],
+      "type": "object"
+    },
+    "endpoint": {
+      "description": "A single network endpoint with host, port, and protocol.",
+      "properties": {
+        "host": {
+          "description": "IP address or hostname the service binds to or is reachable at.",
+          "type": "string"
+        },
+        "port": {
+          "description": "TCP port number.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "protocol": {
+          "description": "Application-layer protocol.",
+          "enum": [
+            "http",
+            "https",
+            "tcp"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "port",
+        "protocol"
       ],
       "type": "object"
     },
