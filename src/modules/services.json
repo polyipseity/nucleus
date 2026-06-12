@@ -54,6 +54,62 @@
       }
     }
   },
+  "camilladsp": {
+    "description": "Audio processor with websocket API for camillagui-backend",
+    "displayName": "CamillaDSP",
+    "logging": {
+      "capture": "all"
+    },
+    "network": {
+      "websocket": { "host": "127.0.0.1", "port": 1234, "protocol": "tcp" }
+    },
+    "platforms": {
+      "macos": {
+        "domain": "user",
+        "justification": "Per-user audio processing bound to login session",
+        "service": "local.camilladsp",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "justification": "Per-user audio processing bound to login session",
+        "scope": "user",
+        "service": "camilladsp.service",
+        "type": "systemctl"
+      },
+      "windows": {
+        "taskPath": "\\NucleusCamillaDSP",
+        "type": "schtask"
+      }
+    }
+  },
+  "camillagui-backend": {
+    "description": "Web configuration interface for CamillaDSP",
+    "displayName": "CamillaDSP GUI",
+    "logging": {
+      "capture": "all"
+    },
+    "network": {
+      "default": { "host": "127.0.0.1", "port": 5005, "protocol": "http" }
+    },
+    "platforms": {
+      "macos": {
+        "domain": "user",
+        "justification": "Per-user web GUI daemon bound to login session",
+        "service": "local.camillagui-backend",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "justification": "Per-user web GUI daemon bound to login session",
+        "scope": "user",
+        "service": "camillagui-backend.service",
+        "type": "systemctl"
+      },
+      "windows": {
+        "taskPath": "\\NucleusCamillaGUI",
+        "type": "schtask"
+      }
+    }
+  },
   "discord-music-rpc": {
     "description": "Discord Rich Presence for music players",
     "displayName": "Discord Music RPC",
