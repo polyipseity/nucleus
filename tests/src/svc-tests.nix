@@ -57,6 +57,16 @@ assert containsRegex "Get-Service" svcPs1Text;
 assert containsRegex "servy-cli" svcPs1Text;
 assert containsRegex "ScheduledTask" svcPs1Text;
 
+# --- svc.sh bug-fix assertions ---
+assert containsRegex ''type == "object"'' svcShText;
+assert containsRegex "value: .displayName" svcShText;
+assert containsRegex "awk -v label=" svcShText;
+assert containsRegex "jq -c '.platform'" svcShText;
+assert containsRegex "filtered_service_names" svcShText;
+
+# --- svc.ps1 bug-fix assertions ---
+assert containsRegex "entry -is " svcPs1Text;
+
 # --- flake.nix wiring assertions ---
 assert containsRegex "mkSvcApp" flakeText;
 assert containsRegex "svc = mkSvcApp pkgsMac" flakeText;

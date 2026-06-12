@@ -397,6 +397,52 @@ if [[ -f "$CHECK_SH" ]]; then
     test_help_handler "$CHECK_SH"
 fi
 
+# Test scripts/svc.sh (macOS-only: launchctl-based service management)
+SVC_SH="scripts/svc.sh"
+if [[ -f "$SVC_SH" ]]; then
+    test_bash_syntax "$SVC_SH"
+    test_has_shebang "$SVC_SH"
+    test_is_executable "$SVC_SH"
+    test_dependencies_available "$SVC_SH" jq
+    test_error_handling "$SVC_SH"
+    test_has_documentation "$SVC_SH"
+    test_no_dangerous_patterns "$SVC_SH"
+    test_strict_shell_mode "$SVC_SH"
+    test_usage_std_present "$SVC_SH"
+    test_help_handler "$SVC_SH"
+
+    # Runtime sanity: svc list produces expected table headers
+    SVC_LIST_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list 2>&1 || true)
+    if echo "$SVC_LIST_OUTPUT" | grep -q "Service.*Status.*Running.*PID"; then
+        assert_pass "svc list: table headers present"
+    else
+        assert_fail "svc list: table headers present" "Missing expected table header line"
+    fi
+    if echo "$SVC_LIST_OUTPUT" | grep -qE "ollama|litellm|jellyfin"; then
+        assert_pass "svc list: known services listed"
+    else
+        assert_fail "svc list: known services listed" "No expected service names found in output"
+    fi
+    if ! echo "$SVC_LIST_OUTPUT" | grep -q "unknown"; then
+        assert_pass "svc list: no unknown services"
+    else
+        assert_fail "svc list: no unknown services" "Output contains 'unknown' (likely jq parse failure)"
+    fi
+
+    # Runtime sanity: svc list --json produces valid JSON
+    SVC_JSON_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list --json 2>&1 || true)
+    if echo "$SVC_JSON_OUTPUT" | jq -e '.svc_version == "1"' >/dev/null 2>&1; then
+        assert_pass "svc list --json: valid JSON with version"
+    else
+        assert_fail "svc list --json: valid JSON with version" "Output is not valid JSON or missing svc_version"
+    fi
+    if echo "$SVC_JSON_OUTPUT" | jq -e 'has("services")' >/dev/null 2>&1; then
+        assert_pass "svc list --json: services key present"
+    else
+        assert_fail "svc list --json: services key present" "Missing services key in JSON output"
+    fi
+fi
+
 # ============================================================================
 # Summary
 # ============================================================================
