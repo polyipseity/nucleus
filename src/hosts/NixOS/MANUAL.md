@@ -14,6 +14,8 @@
 - `https://localhost:8920` — Jellyfin HTTPS endpoint (Caddy local reverse proxy).
 - `http://127.0.0.1:8096` — Jellyfin internal loopback HTTP API (automation upstream).
 - `http://127.0.0.1:11434` — Ollama local API.
+- `tcp/1234` — CamillaDSP websocket API (loopback, for camillagui-backend).
+- `http://127.0.0.1:5005` — CamillaDSP web GUI.
 - `tcp/3389` — XRDP Remote Desktop.
 
 ## HTTPS certificate trust (one-time)
