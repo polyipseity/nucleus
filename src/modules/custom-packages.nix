@@ -43,6 +43,55 @@ let
       platforms = [ "aarch64-darwin" ];
     };
   };
+
+  camillagui-backend = pkgs.stdenv.mkDerivation rec {
+    pname = "camillagui-backend";
+    version = "4.1.0";
+
+    # Select the platform-specific prebuilt PyInstaller bundle.
+    src =
+      if pkgs.stdenv.isDarwin then
+        if pkgs.stdenv.isAarch64 then
+          pkgs.fetchurl {
+            url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_macos_aarch64.tar.gz";
+            hash = "sha256-CdoLZUrvqhyYPwIIUk2av3aOihOuRnDWm8ZcF/1LT2M=";
+          }
+        else
+          pkgs.fetchurl {
+            url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_macos_intel.tar.gz";
+            hash = "sha256-RUDHi8Bbhpdydr6lGI+TCNTMqtlUyoJgtH0rG2x01kE=";
+          }
+      else if pkgs.stdenv.isAarch64 then
+        pkgs.fetchurl {
+          url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_linux_aarch64.tar.gz";
+          hash = "sha256-mlQVtE3aWEePGN6f1XLt8JL2Wf1eRcvoCG/1ZI3Aidc=";
+        }
+      else
+        pkgs.fetchurl {
+          url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_linux_amd64.tar.gz";
+          hash = "sha256-hv083ldQOPMS7ee60JENxeRrl0yvwEjCYRXsPLn1R5I=";
+        };
+
+    sourceRoot = "camillagui_backend";
+
+    installPhase = ''
+      mkdir -p $out/libexec/camillagui-backend $out/bin
+      cp -r * $out/libexec/camillagui-backend/
+      ln -s $out/libexec/camillagui-backend/camillagui_backend $out/bin/camillagui-backend
+    '';
+
+    meta = {
+      description = "Web GUI for CamillaDSP";
+      homepage = "https://github.com/HEnquist/camillagui-backend";
+      license = lib.licenses.mit;
+      platforms = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "aarch64-darwin"
+      ];
+    };
+  };
 in
 {
   config = lib.mkMerge [
@@ -51,6 +100,12 @@ in
     })
     (lib.optionalAttrs (options ? home && options.home ? packages) {
       home.packages = lib.optionals pkgs.stdenv.isDarwin [ equaliser ];
+    })
+    (lib.optionalAttrs (options ? environment && options.environment ? systemPackages) {
+      environment.systemPackages = [ camillagui-backend ];
+    })
+    (lib.optionalAttrs (options ? home && options.home ? packages) {
+      home.packages = [ camillagui-backend ];
     })
   ];
 }
