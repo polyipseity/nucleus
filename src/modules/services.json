@@ -86,7 +86,10 @@
     "description": "Media server",
     "displayName": "Jellyfin",
     "logging": {
-      "capture": "none"
+      "capture": "none",
+      "eventLog": {
+        "provider": "Jellyfin"
+      }
     },
     "network": {
       "http": { "host": "127.0.0.1", "port": 8096, "protocol": "http" },
@@ -191,7 +194,10 @@
     "description": "LLM inference server",
     "displayName": "Ollama",
     "logging": {
-      "capture": "none"
+      "capture": "none",
+      "eventLog": {
+        "provider": "Ollama"
+      }
     },
     "network": {
       "default": { "host": "127.0.0.1", "port": 11434, "protocol": "http" }
@@ -217,7 +223,10 @@
     "description": "Remote Desktop Protocol server",
     "displayName": "Remote Desktop",
     "logging": {
-      "capture": "none"
+      "capture": "none",
+      "eventLog": {
+        "provider": "Microsoft-Windows-TerminalServices-RemoteConnectionManager"
+      }
     },
     "network": {
       "default": { "host": "0.0.0.0", "port": 3389, "protocol": "tcp" }
@@ -241,7 +250,10 @@
     "description": "SSH key authentication agent",
     "displayName": "SSH Agent",
     "logging": {
-      "capture": "none"
+      "capture": "none",
+      "eventLog": {
+        "provider": "OpenSSH"
+      }
     },
     "platforms": {
       "macos": {
@@ -265,7 +277,10 @@
     "description": "Remote shell access via SSH",
     "displayName": "SSH Server",
     "logging": {
-      "capture": "none"
+      "capture": "none",
+      "eventLog": {
+        "provider": "OpenSSH"
+      }
     },
     "network": {
       "default": { "host": "0.0.0.0", "port": 22, "protocol": "tcp" }

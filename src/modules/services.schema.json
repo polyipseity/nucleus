@@ -57,6 +57,22 @@
           "type": "boolean",
           "default": true
         },
+        "eventLog": {
+          "description": "Windows Event Log query config for native services (ignored on other platforms).",
+          "properties": {
+            "logName": {
+              "description": "Event Log name to query via Get-WinEvent (default: Application).",
+              "type": "string",
+              "default": "Application"
+            },
+            "provider": {
+              "description": "Event Log provider name registered by the service.",
+              "type": "string"
+            }
+          },
+          "required": [ "provider" ],
+          "type": "object"
+        },
         "level": {
           "description": "App-level log severity hint (passed as env var to the service if supported).",
           "type": "string",
