@@ -6,6 +6,7 @@
 - In MusicBrainz Picard, add your AcoustID user API key in `Options > Fingerprinting`, then save.
 - Run the **Equalizer APO** configurator once to select your playback device, then reboot.
 - Launch **Peace Equalizer APO** (Peace GUI). Click the Effects button and use the visual Limiter sliders or pre-amplification dial to cap the system output threshold.
+- Run `camilladsp --list-devices` to list WASAPI device names. If the default device name in `src/modules/configs/camilladsp/config-windows.yml` does not match your output device, update it.
 
 ## accessible ports
 

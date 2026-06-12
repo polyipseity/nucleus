@@ -16,6 +16,7 @@
 - Open MusicBrainz Picard, then sign in with your MusicBrainz account in `Options > General`.
 - In MusicBrainz Picard, add your AcoustID user API key in `Options > Fingerprinting`, then save.
 - Open **Equaliser** once, then approve its virtual audio driver system extension in `System Settings > Privacy & Security > Extensions > Audio Extensions` (required after each macOS update that resets extension approval). It is automatically installed to `/Applications` by `nucleus-apply`.
+- Open CamillaDSP once (CamillaDSP runs headlessly, so launch `camilladsp --version` in a terminal), then approve the **BlackHole** virtual audio driver system extension in `System Settings > Privacy & Security` (required after each macOS update that resets extension approval). Also grant Microphone permission to CamillaDSP in `System Settings > Privacy & Security > Microphone`.
 - Finder sidebar favorites set by `nucleus apply` are visible only after restarting macOS (log out and back in, or reboot).
 
 ## accessible ports
