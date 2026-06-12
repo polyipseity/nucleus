@@ -120,7 +120,7 @@ if (-not (Get-Command "Get-NucleusLogDir" -ErrorAction SilentlyContinue)) {
 $services = Get-Content $servicesJson -Raw | ConvertFrom-Json
 
 # Get list of Windows services
-function Get-PlatformServices {
+function Get-PlatformService {
   $result = @()
   foreach ($prop in $services.PSObject.Properties) {
     if ($prop.Name -like '$*') { continue }
@@ -175,7 +175,7 @@ function Get-WindowsServiceName {
 }
 
 # Find log files for a service
-function Get-ServiceLogFiles {
+function Get-ServiceLogFile {
   param([string]$ServiceName)
   $files = @()
   $userDir = Join-Path (Get-NucleusLogDir) $ServiceName
@@ -191,13 +191,13 @@ function Get-ServiceLogFiles {
 }
 
 # Check if a service has accessible logs
-function Test-ServiceHasLogs {
+function Test-ServiceHasLog {
   param([string]$ServiceName)
   $capture = Get-CaptureMode $ServiceName
 
   # File-based check
   if ($capture -ne "none") {
-    $files = Get-ServiceLogFiles $ServiceName
+    $files = Get-ServiceLogFile $ServiceName
     if ($files.Count -gt 0) { return $true }
   }
 
@@ -208,7 +208,8 @@ function Test-ServiceHasLogs {
       $events = Get-WinEvent -ProviderName $provider -MaxEvents 1 -ErrorAction Stop
       if ($events) { return $true }
     } catch {
-      # Provider may not exist or no events yet
+      # Provider may not exist or no events yet; skip silently
+      Write-Debug "Event log query failed for $($ServiceName): $_"
     }
   }
 
@@ -217,9 +218,9 @@ function Test-ServiceHasLogs {
 
 # --- Display functions ---
 
-function Show-FileLogs {
-  param([string]$ServiceName)
-  $files = Get-ServiceLogFiles $ServiceName
+function Show-FileLog {
+  param([string]$ServiceName, [switch]$Paths, [switch]$Raw, [int]$Lines)
+  $files = Get-ServiceLogFile $ServiceName
 
   if ($files.Count -eq 0) {
     Write-Warning "logs: $ServiceName — no log files found"
@@ -242,7 +243,7 @@ function Show-FileLogs {
 }
 
 function Show-EventLog {
-  param([string]$ServiceName)
+  param([string]$ServiceName, [switch]$Raw, [int]$Lines)
   $provider = Get-EventLogProvider $ServiceName
 
   if (-not $provider) {
@@ -265,27 +266,28 @@ function Show-EventLog {
   }
 }
 
-function Show-ServiceLogs {
-  param([string]$ServiceName)
+function Show-ServiceLog {
+  param([string]$ServiceName, [switch]$Paths, [switch]$Raw, [int]$Lines)
   $capture = Get-CaptureMode $ServiceName
   $provider = Get-EventLogProvider $ServiceName
 
   if ($provider) {
-    Show-EventLog $ServiceName
+    Show-EventLog $ServiceName -Raw:$Raw -Lines $Lines
   } elseif ($capture -ne "none") {
-    Show-FileLogs $ServiceName
+    Show-FileLog $ServiceName -Paths:$Paths -Raw:$Raw -Lines $Lines
   } else {
     Write-Warning "logs: $ServiceName — no log source configured (capture=none, no Event Log)"
   }
 }
 
-function Show-Paths {
-  $services_list = Get-PlatformServices
+function Show-Path {
+  param([string[]]$Service)
+  $services_list = Get-PlatformService
   if ($Service.Count -gt 0) {
     $services_list = $Service | Where-Object { $_ -in $services_list }
   }
   foreach ($svc in $services_list) {
-    $files = Get-ServiceLogFiles $svc
+    $files = Get-ServiceLogFile $svc
     if ($files.Count -gt 0) {
       $files | ForEach-Object { Write-Output $_ }
     }
@@ -293,7 +295,8 @@ function Show-Paths {
 }
 
 function Show-ServiceList {
-  $services_list = Get-PlatformServices
+  param([switch]$Json)
+  $services_list = Get-PlatformService
   if ($Json) {
     $services_list | ConvertTo-Json -Compress
     return
@@ -302,7 +305,7 @@ function Show-ServiceList {
   Write-Output "Available services:`n"
   foreach ($svc in $services_list) {
     $capture = Get-CaptureMode $svc
-    $hasLogs = Test-ServiceHasLogs $svc
+    $hasLogs = Test-ServiceHasLog $svc
     $status = if ($hasLogs) { "" } else { " (no logs yet)" }
     Write-Output ("  {0,-25} capture={1,-7}{2}" -f $svc, $capture, $status)
   }
@@ -310,21 +313,21 @@ function Show-ServiceList {
 
 # --- Main ---
 if ($Paths) {
-  Show-Paths
+  Show-Path -Service $Service
   exit 0
 }
 
 if ($Service.Count -eq 0) {
-  Show-ServiceList
+  Show-ServiceList -Json:$Json
   exit 0
 }
 
 # Validate and show logs for requested services
-$platformServices = Get-PlatformServices
+$platformServices = Get-PlatformService
 foreach ($svc in $Service) {
   if ($svc -notin $platformServices) {
     Write-Error "logs: unknown service '$svc' for Windows platform"
     exit 1
   }
-  Show-ServiceLogs $svc
+  Show-ServiceLog $svc -Paths:$Paths -Raw:$Raw -Lines $Lines
 }

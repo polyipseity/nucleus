@@ -49,6 +49,7 @@ function Invoke-CamillaDSPSetup {
       }
     } catch {
       # Binary exists but is broken — will reinstall.
+      Write-Debug "camilladsp-setup: existing binary check failed: $_"
     }
   }
 

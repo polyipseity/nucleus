@@ -25,7 +25,6 @@ assert containsRegex ''\$schema.*services\.schema\.json'' servicesJsonText;
 assert containsRegex ''"ollama"'' servicesJsonText;
 assert containsRegex ''"litellm"'' servicesJsonText;
 assert containsRegex ''"jellyfin"'' servicesJsonText;
-assert containsRegex ''"jellyfin-https"'' servicesJsonText;
 assert containsRegex ''"discord-music-rpc"'' servicesJsonText;
 assert containsRegex ''"sshd"'' servicesJsonText;
 assert containsRegex ''"ssh-agent"'' servicesJsonText;

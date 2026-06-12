@@ -119,7 +119,7 @@ function Invoke-LogRotation {
     [string]$Path,
     [int]$MaxSize = 10485760,
     [int]$MaxFiles = 4,
-    [switch]$Compress = $true
+    [bool]$Compress = $true
   )
 
   if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return }
