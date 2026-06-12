@@ -21,7 +21,7 @@
     "displayName": "Jellyfin",
     "description": "Media server",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "jellyfin", "domain": "system" },
+      "macos": { "type": "launchctl", "service": "org.nixos.jellyfin", "domain": "system" },
       "nixos": { "type": "systemctl", "service": "jellyfin.service", "scope": "system" }
     }
   },
@@ -29,7 +29,7 @@
     "displayName": "Jellyfin HTTPS Proxy",
     "description": "Caddy reverse proxy for Jellyfin",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "jellyfinHttpsProxy", "domain": "system" },
+      "macos": { "type": "launchctl", "service": "org.nixos.jellyfinHttpsProxy", "domain": "system" },
       "windows": { "type": "native", "service": "nucleus-jellyfin-https" }
     }
   },
@@ -55,7 +55,7 @@
     "displayName": "SSH Agent",
     "description": "SSH key authentication agent",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "com.openssh.ssh-agent", "domain": "system" },
+      "macos": { "type": "launchctl", "service": "com.openssh.ssh-agent", "domain": "user" },
       "windows": { "type": "native", "service": "ssh-agent" }
     }
   },
@@ -79,7 +79,7 @@
     "displayName": "Linux Builder VM",
     "description": "Nix Linux builder VM on macOS",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "linux-builder", "domain": "system" }
+      "macos": { "type": "launchctl", "service": "org.nixos.linux-builder", "domain": "system" }
     }
   }
 }
