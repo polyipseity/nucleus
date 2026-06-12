@@ -41,6 +41,7 @@
       ''}";
       Restart = "on-failure";
       RestartSec = 5;
+      User = "litellm";
       # Protect against resource exhaustion and information leaks.
       PrivateTmp = true;
       NoNewPrivileges = true;
@@ -86,4 +87,13 @@
   # Source: systemd resource-control MemoryMax semantics.
   # https://man7.org/linux/man-pages/man5/systemd.resource-control.5.html
   systemd.services.ollama.serviceConfig.MemoryMax = "16G";
+
+  # Dedicated system user for the LiteLLM service. Required for privilege
+  # separation — runs as non-root with access only to its own SOPS secrets.
+  users.users.litellm = {
+    isSystemUser = true;
+    group = "litellm";
+    description = "LiteLLM AI gateway service user";
+  };
+  users.groups.litellm = { };
 }

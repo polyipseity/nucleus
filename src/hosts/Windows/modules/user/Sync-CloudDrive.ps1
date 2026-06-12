@@ -4,24 +4,23 @@
 
 .DESCRIPTION
   Reads per-user cloud drive configuration from users.json and provisions:
-    Mounts  — rclone mount processes managed as persistent Servy services.
-              Requires WinFsp (WinFsp.WinFsp in WinGet), Servy
-              (aelassas.Servy), and rclone configured via `rclone config`.
+    Mounts  — rclone mount processes managed as logon scheduled tasks under
+              \NucleusCloudMount\. Requires WinFsp (WinFsp.WinFsp in WinGet)
+              and rclone configured via `rclone config`.
     Replicas — rclone sync/bisync for full local copies. All replicas default
                to disabled; each entry must set "enable": true.
 
   iCloud on Windows is handled through the rclone iclouddrive backend when the
   user config provides a configured remoteName (for example "iCloud").
 
+  Each enabled mount gets a generated wrapper script at
+  %LOCALAPPDATA%\nucleus\cloud-drive\mount-<id>.ps1 that sets
+  $env:RCLONE_CONFIG_PASS from the secrets file and invokes rclone mount.
+
   Prerequisites (one-time manual steps):
     1. WinFsp installed (WinFsp.WinFsp via WinGet — declared in system.dsc.yml)
     2. rclone installed (Rclone.Rclone via WinGet — declared in system.dsc.yml)
-    3. Servy installed (aelassas.Servy via WinGet — declared in system.dsc.yml)
-    4. rclone remotes configured: run `rclone config` for each provider
-
-  Idempotency: mount directories are created if absent; existing mount services
-  are converged by reinstalling the Servy definition to match the desired
-  rclone command.
+    3. rclone remotes configured: run `rclone config` for each provider
 
 .PARAMETER UserConfig
   Per-user configuration hashtable from users.json. Must contain a cloudDrives
@@ -52,6 +51,16 @@ function Sync-CloudDrive {
 
     $mounts  = @($cloudDrivesConfig.mounts  | Where-Object { $_ })
     $replicas = @($cloudDrivesConfig.replicas | Where-Object { $_ })
+
+    # ------------------------------------------------------------------
+    # Legacy cleanup — remove old Servy-managed mount services
+    # ------------------------------------------------------------------
+    $oldMountServices = Get-Service -Name 'nucleus-cloud-mount-*' -ErrorAction SilentlyContinue
+    foreach ($oldSvc in $oldMountServices) {
+        Stop-Service -Name $oldSvc.Name -ErrorAction SilentlyContinue
+        sc.exe delete $oldSvc.Name
+        Write-Verbose "cloud-drives: cleaned up legacy Servy service '$($oldSvc.Name)'"
+    }
 
     # ------------------------------------------------------------------
     # Mounts
@@ -110,14 +119,11 @@ function Sync-CloudDrive {
             continue
         }
 
-        # Probe Servy CLI availability without failing the entire converge.
-        # WHY benign probe: if Servy is absent we skip mount automation and keep
-        # other cloud-drive entries converging.
-        $servyCliExe = (Get-Command servy-cli -ErrorAction SilentlyContinue)?.Source
-        if (-not $servyCliExe) {
-            Write-Warning "cloud-drives: servy-cli not found on PATH; install via 'winget install aelassas.Servy' for mount '$($mount.id)'."
-            continue
-        }
+        # Create working directory for mount wrapper scripts and logs.
+        $cloudDriveDir = Join-Path $env:LOCALAPPDATA 'nucleus\cloud-drive'
+        $null = New-Item -Path $cloudDriveDir -ItemType Directory -Force
+        $logDir = Join-Path $env:LOCALAPPDATA 'nucleus\logs'
+        $null = New-Item -Path $logDir -ItemType Directory -Force
 
         $serviceName = "nucleus-cloud-mount-$($mount.id)"
         $remoteSpec = "${remoteName}:${remotePath}"
@@ -146,17 +152,6 @@ function Sync-CloudDrive {
             $mountArgs += '--iclouddrive-service', $iCloudService
         }
 
-                # Pass the managed rclone config passphrase command when the secret file
-                # is present so Servy services can decrypt the config on every start.
-                # WHY --password-command not env var: Servy services run outside user
-                # shell sessions and cannot inherit $env:RCLONE_CONFIG_PASS from a
-                # profile.
-                $rclonePassFile = Join-Path $HomeDirectory '.config\nucleus\secrets\rclone-config-pass'
-                if (Test-Path -Path $rclonePassFile -PathType Leaf) {
-                    $escapedPassFile = $rclonePassFile.Replace('"', '""')
-                    $mountArgs += '--password-command', "cmd /c type `"$escapedPassFile`""
-                }
-
         if (-not $readWrite) {
             $mountArgs += '--read-only'
         }
@@ -165,51 +160,59 @@ function Sync-CloudDrive {
             $mountArgs += @($mount.extraArgs | Where-Object { $_ })
         }
 
-        # Quote all parameters so Servy preserves spaces/special characters in
-        # remotes, paths, and user-provided extra arguments.
-        $appParameters = ($mountArgs | ForEach-Object {
-            '"{0}"' -f ($_.ToString().Replace('"', '\"'))
+        # Write a PowerShell wrapper script that passes the rclone config
+        # password via env var (the file is user-accessible since the schtask
+        # runs as the logged-in user) and invokes rclone mount.
+        $taskName = "NucleusCloudMount-$($mount.id)"
+        $taskPath = '\NucleusCloudMount\'
+        $logFile = Join-Path $logDir "cloud-drive-mount-$($mount.id).log"
+        $wrapperPath = Join-Path $cloudDriveDir "mount-$($mount.id).ps1"
+        $rclonePassFile = Join-Path $HomeDirectory '.config\nucleus\secrets\rclone-config-pass'
+
+        $wrapperLines = [System.Collections.ArrayList]@()
+        $null = $wrapperLines.Add("# Generated by Sync-CloudDrive.ps1")
+        $null = $wrapperLines.Add("# Task: $taskName")
+        if (Test-Path -Path $rclonePassFile -PathType Leaf) {
+            $escapedPassFile = $rclonePassFile.Replace("'", "''")
+            $null = $wrapperLines.Add("`$env:RCLONE_CONFIG_PASS = (Get-Content '{0}' -Raw).Trim()" -f $escapedPassFile)
+        }
+        $escapedRclone = $rcloneExe.Replace("'", "''")
+        $escapedLogFile = $logFile.Replace("'", "''")
+        # Quote each arg for single-quoted PowerShell strings.
+        $quotedArgs = ($mountArgs | ForEach-Object {
+            $str = $_.ToString()
+            if ($str -match '[\s"''@()`$|;]') {
+                "'{0}'" -f $str.Replace("'", "''")
+            }
+            else {
+                $str
+            }
         }) -join ' '
+        $null = $wrapperLines.Add("& '{0}' {1} *>> '{2}'" -f $escapedRclone, $quotedArgs, $escapedLogFile)
+        Set-Content -Path $wrapperPath -Value ($wrapperLines -join "`r`n") -Force -Encoding UTF8
 
-        $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-        if ($existingService) {
-            if ($existingService.Status -eq 'Running') {
-                try {
-                    Stop-Service -Name $serviceName -ErrorAction Stop
-                }
-                catch {
-                    Write-Warning "cloud-drives: failed to stop existing service '$serviceName' before Servy reconfigure; skipping mount '$($mount.id)'."
-                    continue
-                }
-            }
-
-            & $servyCliExe uninstall "--name=$serviceName"
-            if ($LASTEXITCODE -ne 0) {
-                Write-Warning "cloud-drives: failed to uninstall existing Servy service '$serviceName'; skipping mount '$($mount.id)'."
-                continue
-            }
-        }
-
-        & $servyCliExe install "--name=$serviceName" "--displayName=$serviceName" "--description=Managed rclone mount for nucleus cloud drive '$($mount.id)'" "--path=$rcloneExe" "--startupDir=$(Split-Path -Parent $rcloneExe)" "--params=$appParameters" "--startupType=Automatic"
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "cloud-drives: failed to install Servy service '$serviceName' for mount '$($mount.id)'; skipping."
-            continue
-        }
-
-        $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-        if (-not $service) {
-            Write-Warning "cloud-drives: service '$serviceName' not found after Servy install; skipping start."
-            continue
-        }
-
-        if ($service.Status -eq 'Running') {
-            Restart-Service -Name $serviceName -ErrorAction Stop
-            Write-Verbose "cloud-drives: restarted mount service '$serviceName' for mount '$($mount.id)'."
+        # Register a logon scheduled task that runs the wrapper in a hidden
+        # window so no console appears at startup.
+        $userId = if ([string]::IsNullOrWhiteSpace($env:USERDOMAIN)) {
+            $env:USERNAME
         }
         else {
-            Start-Service -Name $serviceName -ErrorAction Stop
-            Write-Verbose "cloud-drives: started mount service '$serviceName' for mount '$($mount.id)'."
+            "$($env:USERDOMAIN)\$($env:USERNAME)"
         }
+
+        $action = New-ScheduledTaskAction -Execute 'pwsh.exe' -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$wrapperPath`""
+        $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
+        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+        $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
+
+        $existingTask = Get-ScheduledTask -TaskName $taskName -TaskPath $taskPath -ErrorAction SilentlyContinue
+        if ($existingTask) {
+            Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+            Write-Verbose "cloud-drives: unregistered previous scheduled task '$taskName'"
+        }
+
+        Register-ScheduledTask -TaskName $taskName -TaskPath $taskPath -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force
+        Write-Verbose "cloud-drives: registered scheduled task '$taskName' for mount '$($mount.id)'."
     }
 
     # ------------------------------------------------------------------

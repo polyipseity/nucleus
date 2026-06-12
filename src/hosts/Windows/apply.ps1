@@ -307,7 +307,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinAccount.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinLibrary.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinHttpsProxy.ps1")
-. (Join-Path -Path $systemModuleDir -ChildPath "Sync-LiteLLMScheduledTask.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-LiteLLMService.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-ReplicaSyncScheduledTask.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSSHServer.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-PowerPolicy.ps1")
@@ -509,6 +509,26 @@ else {
   Remove-ManagedSecret -Users $Users
 }
 
+# Materialise system-level secrets (AI API keys) from src/secrets/system.yml
+# into %ProgramData%\nucleus\secrets\ so the SYSTEM-native litellm SCM service
+# can read them at startup.
+$systemSecretsDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\secrets"
+$null = New-Item -Path $systemSecretsDir -ItemType Directory -Force
+$systemYmlPath = Join-Path -Path $secretsDir -ChildPath "system.yml"
+if (Test-Path -Path $systemYmlPath -PathType Leaf) {
+  $systemSecrets = Get-Secret -FilePath $systemYmlPath -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
+  foreach ($key in @('ai_openrouter_api_key', 'ai_opencode_api_key')) {
+    $value = $systemSecrets.$key
+    if (-not [string]::IsNullOrWhiteSpace($value)) {
+      $keyFile = Join-Path -Path $systemSecretsDir -ChildPath $key
+      $existing = if (Test-Path -Path $keyFile -PathType Leaf) { Get-Content -Path $keyFile -Raw -Encoding UTF8 }
+      if ($existing -ne $value) {
+        [System.IO.File]::WriteAllText($keyFile, $value, [System.Text.UTF8Encoding]::new($false))
+      }
+    }
+  }
+}
+
 # Materialize decrypted wallpapers ahead of DSC so user.dsc.yml can resolve an
 # explicit active wallpaper path deterministically.
 $wallpaperOutputDir = Join-Path -Path $HOME -ChildPath "Pictures\wallpapers"
@@ -635,12 +655,7 @@ $discordMusicRPCConfig = Join-Path -Path $discordMusicRPCConfigDir -ChildPath "c
 if (Test-Path -Path $discordMusicRPCConfig) { Remove-Item -Path $discordMusicRPCConfig -Force }
 New-Item -Path $discordMusicRPCConfig -ItemType SymbolicLink -Target (Join-Path -Path $repoRoot -ChildPath "src\modules\configs\discord-music-rpc\config.yaml") -Force | Out-Null
 Sync-DiscordMusicRPC -Enabled:$EnableDiscordMusicRPCParity
-# Symlink the config so edits take effect on service restart without re-running apply.
-$litellmConfigSymlink = Join-Path -Path $env:USERPROFILE -ChildPath ".config\nucleus\litellm-config.yml"
-$null = New-Item -Path (Split-Path -Path $litellmConfigSymlink -Parent) -ItemType Directory -Force
-if (Test-Path -Path $litellmConfigSymlink) { Remove-Item -Path $litellmConfigSymlink -Force }
-New-Item -Path $litellmConfigSymlink -ItemType SymbolicLink -Target (Join-Path -Path $repoRoot -ChildPath "src\modules\ai\litellm-config.yml") -Force | Out-Null
-Sync-LiteLLMScheduledTask -Enabled:`$true
+Sync-LiteLLMService -RepoRoot $repoRoot -Enabled:`$true
 Sync-ReplicaSyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
 Sync-OpenSSHServer -Enabled:$EnableRemoteAccessParity
 # Re-run host age key registration after Sync-OpenSSHServer has started
