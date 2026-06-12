@@ -263,6 +263,8 @@ $EnableQtPassParity = -not $noUserStateParity
 $EnableShellParity = -not $noUserStateParity
 $EnableDevDirectoryParity = -not $noUserStateParity
 $EnableDiscordMusicRPCParity = -not $noUserStateParity
+$EnableCamillaDSPServiceParity = -not $noUserStateParity
+$EnableCamillaGUIServiceParity = -not $noUserStateParity
 # EnableDevReposParity defaults to $null (deferred to devRepos registry).
 # When user-state is skipped, force $false instead.
 $EnableDevReposParity = if ($noUserStateParity) { $false } else { $null }
@@ -318,6 +320,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $setupModuleDir -ChildPath "Install-PrekHook.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-BunSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CamillaDSPSetup.ps1")
+. (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CamillaGUISetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CargoBinstallSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-RustupSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-ScoopSetup.ps1")
@@ -330,6 +333,8 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CustomProvisionSymlink.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DevRepo.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DiscordMusicRPC.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-CamillaDSPService.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-CamillaGUIService.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-GitAndSshConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ObsidianConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-PicardConfig.ps1")
@@ -584,6 +589,8 @@ Invoke-UvSetup
 # CamillaDSP prebuilt binary runs after PATH is fully configured (no WinGet
 # package available; downloads from GitHub releases).
 Invoke-CamillaDSPSetup
+# camillagui-backend prebuilt bundle (same rationale as CamillaDSP).
+Invoke-CamillaGUISetup
 
 # Ensure the live nucleus checkout installs its own Git hooks during the same
 # provision run that installs or updates prek itself.
@@ -660,6 +667,8 @@ $discordMusicRPCConfig = Join-Path -Path $discordMusicRPCConfigDir -ChildPath "c
 if (Test-Path -Path $discordMusicRPCConfig) { Remove-Item -Path $discordMusicRPCConfig -Force }
 New-Item -Path $discordMusicRPCConfig -ItemType SymbolicLink -Target (Join-Path -Path $repoRoot -ChildPath "src\modules\configs\discord-music-rpc\config.yaml") -Force | Out-Null
 Sync-DiscordMusicRPC -Enabled:$EnableDiscordMusicRPCParity
+Sync-CamillaDSPService -Enabled:$EnableCamillaDSPServiceParity
+Sync-CamillaGUIService -Enabled:$EnableCamillaGUIServiceParity
 Sync-LiteLLMService -RepoRoot $repoRoot -Enabled:`$true
 Sync-ReplicaSyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
 Sync-OpenSSHServer -Enabled:$EnableRemoteAccessParity
