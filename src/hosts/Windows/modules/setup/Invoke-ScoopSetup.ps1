@@ -58,7 +58,11 @@ function Invoke-ScoopSetup {
     'gopass',
     # QCOW2 tooling and guest VM runner for Invoke-VMSetup; absent from
     # WinGet; Scoop extras bucket.
-    'qemu'
+    'qemu',
+    # Temporary keyboard locker for cleaning; blocks all input while you
+    # wipe down the keyboard.  Press Ctrl+Break to unlock.
+    # Usage: run 'iwck' from any terminal.
+    'iwck'
   )
 
   # Prepend the Scoop shims directory so 'scoop' is resolvable in this session.

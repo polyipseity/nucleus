@@ -170,6 +170,14 @@
     openFirewall = true;
   };
 
+  # physlock: lock the keyboard at the driver layer for cleaning.
+  # The console switches to a blank text screen; type your password to unlock.
+  # Source: https://mynixos.com/nixpkgs/option/services.physlock.enable
+  services.physlock = {
+    enable = true;
+    allowAnyUser = true;
+  };
+
   # Steam game distribution platform.
   # hardware.graphics.enable32Bit provides the 32-bit Mesa/Vulkan drivers
   # required by Steam's 32-bit game runtime.  programs.steam.enable wires up

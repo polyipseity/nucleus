@@ -49,6 +49,7 @@ let
     "gimp" # Raster image editor; macOS-only cask (nixpkgs gimp is Linux-only)
     "google-chrome@canary" # Chrome dev channel for web testing
     "keka" # Graphical archiver with 7-Zip backend support
+    "keyboardcleantool" # Blocks all keyboard and TouchBar input for cleaning
     "linearmouse" # Per-device mouse/trackpad scrolling behavior and sensitivity
     "lulu" # Outbound network firewall
     "middleclick" # Three/four-finger middle-click gesture helper
