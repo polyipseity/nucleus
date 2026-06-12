@@ -1,93 +1,209 @@
 {
   "$schema": "./services.schema.json",
-  "ollama": {
-    "displayName": "Ollama",
-    "description": "LLM inference server",
+  "cloud-drive": {
+    "description": "rclone FUSE cloud drive mounts",
+    "displayName": "Cloud Drive Mounts",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "org.nixos.local.ollama", "domain": "system" },
-      "nixos": { "type": "systemctl", "service": "ollama.service", "scope": "system" },
-      "windows": { "type": "native", "service": "ollama" }
-    }
-  },
-  "litellm": {
-    "displayName": "LiteLLM",
-    "description": "AI API gateway for multi-provider routing",
-    "platforms": {
-      "macos": { "type": "launchctl", "service": "org.nixos.local.litellm", "domain": "system" },
-      "nixos": { "type": "systemctl", "service": "litellm.service", "scope": "system" },
-      "windows": { "type": "native", "service": "nucleus-litellm", "justification": "Native Windows SCM service runs as SYSTEM; SOPS-decrypted API keys stored in %ProgramData%\\nucleus\\secrets\\ for SYSTEM access." }
-    }
-  },
-  "jellyfin": {
-    "displayName": "Jellyfin",
-    "description": "Media server",
-    "platforms": {
-      "macos": { "type": "launchctl", "service": "org.nixos.jellyfin", "domain": "system" },
-      "nixos": { "type": "systemctl", "service": "jellyfin.service", "scope": "system" },
-      "windows": { "type": "native", "service": "JellyfinServer" }
-    }
-  },
-  "jellyfin-https": {
-    "displayName": "Jellyfin HTTPS Proxy",
-    "description": "Caddy reverse proxy for Jellyfin",
-    "platforms": {
-      "macos": { "type": "launchctl", "service": "org.nixos.jellyfinHttpsProxy", "domain": "system" },
-      "nixos": { "type": "omitted", "justification": "Integrated into services.caddy in src/hosts/NixOS/jellyfin.nix; not a separate managed service." },
-      "windows": { "type": "native", "service": "nucleus-jellyfin-https" }
+      "macos": {
+        "domain": "user",
+        "justification": "Per-user FUSE mount namespace bound to login session",
+        "prefixMatch": true,
+        "service": "local.cloud-mount.",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "justification": "Per-user FUSE mount namespace bound to login session",
+        "prefixMatch": true,
+        "scope": "user",
+        "service": "cloud-mount-",
+        "type": "systemctl"
+      },
+      "windows": {
+        "justification": "Per-user FUSE mount via scheduled task at logon; replaced Servy for user-context isolation.",
+        "prefixMatch": true,
+        "taskPath": "\\NucleusCloudMount",
+        "type": "schtask"
+      }
     }
   },
   "discord-music-rpc": {
-    "displayName": "Discord Music RPC",
     "description": "Discord Rich Presence for music players",
+    "displayName": "Discord Music RPC",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "local.discord-music-rpc", "domain": "user", "justification": "Requires GUI session (tray app with NSMenu)" },
-      "nixos": { "type": "systemctl", "service": "discord-music-rpc.service", "scope": "user", "justification": "Requires GUI session (tray app with NSMenu)" },
-      "windows": { "type": "schtask", "taskPath": "\\NucleusDiscordMusicRPC" }
+      "macos": {
+        "domain": "user",
+        "justification": "Requires GUI session (tray app with NSMenu)",
+        "service": "local.discord-music-rpc",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "justification": "Requires GUI session (tray app with NSMenu)",
+        "scope": "user",
+        "service": "discord-music-rpc.service",
+        "type": "systemctl"
+      },
+      "windows": {
+        "taskPath": "\\NucleusDiscordMusicRPC",
+        "type": "schtask"
+      }
     }
   },
-  "sshd": {
-    "displayName": "SSH Server",
-    "description": "Remote shell access via SSH",
+  "jellyfin": {
+    "description": "Media server",
+    "displayName": "Jellyfin",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "com.openssh.sshd", "domain": "system" },
-      "nixos": { "type": "systemctl", "service": "sshd.service", "scope": "system" },
-      "windows": { "type": "native", "service": "sshd" }
+      "macos": {
+        "domain": "system",
+        "service": "org.nixos.jellyfin",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "scope": "system",
+        "service": "jellyfin.service",
+        "type": "systemctl"
+      },
+      "windows": {
+        "service": "JellyfinServer",
+        "type": "native"
+      }
     }
   },
-  "ssh-agent": {
-    "displayName": "SSH Agent",
-    "description": "SSH key authentication agent",
+  "jellyfin-https": {
+    "description": "Caddy reverse proxy for Jellyfin",
+    "displayName": "Jellyfin HTTPS Proxy",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "com.openssh.ssh-agent", "domain": "user", "justification": "User key material in per-user ssh-agent process" },
-      "nixos": { "type": "omitted", "justification": "SSH agent provided by desktop environment keychain (GNOME Keyring / KDE Wallet); no standalone agent to manage." },
-      "windows": { "type": "native", "service": "ssh-agent", "justification": "Runs as SYSTEM SCM service; per-user isolation handled by OpenSSH's per-user ssh-agent.exe spawned on demand." }
-    }
-  },
-  "cloud-drive": {
-    "displayName": "Cloud Drive Mounts",
-    "description": "rclone FUSE cloud drive mounts",
-    "platforms": {
-      "macos": { "type": "launchctl", "service": "local.cloud-mount.", "domain": "user", "prefixMatch": true, "justification": "Per-user FUSE mount namespace bound to login session" },
-      "nixos": { "type": "systemctl", "service": "cloud-mount-", "scope": "user", "prefixMatch": true, "justification": "Per-user FUSE mount namespace bound to login session" },
-      "windows": { "type": "schtask", "taskPath": "\\NucleusCloudMount", "prefixMatch": true, "justification": "Per-user FUSE mount via scheduled task at logon; replaced Servy for user-context isolation." }
-    }
-  },
-  "rdp": {
-    "displayName": "Remote Desktop",
-    "description": "Remote Desktop Protocol server",
-    "platforms": {
-      "macos": { "type": "omitted", "justification": "macOS uses built-in Screen Sharing / VNC protocol instead of RDP." },
-      "nixos": { "type": "omitted", "justification": "Linux hosts typically use VNC or similar remote-access protocols; no RDP server configured." },
-      "windows": { "type": "native", "service": "TermService" }
+      "macos": {
+        "domain": "system",
+        "service": "org.nixos.jellyfinHttpsProxy",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "justification": "Integrated into services.caddy in src/hosts/NixOS/jellyfin.nix; not a separate managed service.",
+        "type": "omitted"
+      },
+      "windows": {
+        "service": "nucleus-jellyfin-https",
+        "type": "native"
+      }
     }
   },
   "linux-builder": {
-    "displayName": "Linux Builder VM",
     "description": "Nix Linux builder VM on macOS",
+    "displayName": "Linux Builder VM",
     "platforms": {
-      "macos": { "type": "launchctl", "service": "org.nixos.linux-builder", "domain": "system" },
-      "nixos": { "type": "omitted", "justification": "NixOS runs Linux natively; no builder VM required." },
-      "windows": { "type": "omitted", "justification": "Nix is not the primary build platform on Windows." }
+      "macos": {
+        "domain": "system",
+        "service": "org.nixos.linux-builder",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "justification": "NixOS runs Linux natively; no builder VM required.",
+        "type": "omitted"
+      },
+      "windows": {
+        "justification": "Nix is not the primary build platform on Windows.",
+        "type": "omitted"
+      }
+    }
+  },
+  "litellm": {
+    "description": "AI API gateway for multi-provider routing",
+    "displayName": "LiteLLM",
+    "platforms": {
+      "macos": {
+        "domain": "system",
+        "service": "org.nixos.local.litellm",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "scope": "system",
+        "service": "litellm.service",
+        "type": "systemctl"
+      },
+      "windows": {
+        "justification": "Native Windows SCM service runs as SYSTEM; SOPS-decrypted API keys stored in %ProgramData%\\nucleus\\secrets\\ for SYSTEM access.",
+        "service": "nucleus-litellm",
+        "type": "native"
+      }
+    }
+  },
+  "ollama": {
+    "description": "LLM inference server",
+    "displayName": "Ollama",
+    "platforms": {
+      "macos": {
+        "domain": "system",
+        "service": "org.nixos.local.ollama",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "scope": "system",
+        "service": "ollama.service",
+        "type": "systemctl"
+      },
+      "windows": {
+        "service": "ollama",
+        "type": "native"
+      }
+    }
+  },
+  "rdp": {
+    "description": "Remote Desktop Protocol server",
+    "displayName": "Remote Desktop",
+    "platforms": {
+      "macos": {
+        "justification": "macOS uses built-in Screen Sharing / VNC protocol instead of RDP.",
+        "type": "omitted"
+      },
+      "nixos": {
+        "justification": "Linux hosts typically use VNC or similar remote-access protocols; no RDP server configured.",
+        "type": "omitted"
+      },
+      "windows": {
+        "service": "TermService",
+        "type": "native"
+      }
+    }
+  },
+  "ssh-agent": {
+    "description": "SSH key authentication agent",
+    "displayName": "SSH Agent",
+    "platforms": {
+      "macos": {
+        "domain": "user",
+        "justification": "User key material in per-user ssh-agent process",
+        "service": "com.openssh.ssh-agent",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "justification": "SSH agent provided by desktop environment keychain (GNOME Keyring / KDE Wallet); no standalone agent to manage.",
+        "type": "omitted"
+      },
+      "windows": {
+        "justification": "Runs as SYSTEM SCM service; per-user isolation handled by OpenSSH's per-user ssh-agent.exe spawned on demand.",
+        "service": "ssh-agent",
+        "type": "native"
+      }
+    }
+  },
+  "sshd": {
+    "description": "Remote shell access via SSH",
+    "displayName": "SSH Server",
+    "platforms": {
+      "macos": {
+        "domain": "system",
+        "service": "com.openssh.sshd",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "scope": "system",
+        "service": "sshd.service",
+        "type": "systemctl"
+      },
+      "windows": {
+        "service": "sshd",
+        "type": "native"
+      }
     }
   }
 }

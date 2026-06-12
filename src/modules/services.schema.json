@@ -89,6 +89,22 @@
       ],
       "type": "object"
     },
+    "omittedEntry": {
+      "properties": {
+        "justification": {
+          "description": "Why this service is not managed on this platform.",
+          "type": "string"
+        },
+        "type": {
+          "const": "omitted"
+        }
+      },
+      "required": [
+        "type",
+        "justification"
+      ],
+      "type": "object"
+    },
     "platformEntry": {
       "description": "Platform-specific service configuration",
       "oneOf": [
@@ -130,22 +146,6 @@
       "required": [
         "type",
         "taskPath"
-      ],
-      "type": "object"
-    },
-    "omittedEntry": {
-      "properties": {
-        "justification": {
-          "description": "Why this service is not managed on this platform.",
-          "type": "string"
-        },
-        "type": {
-          "const": "omitted"
-        }
-      },
-      "required": [
-        "type",
-        "justification"
       ],
       "type": "object"
     },
