@@ -68,8 +68,9 @@ read_registry() {
   require_command jq
   jq -c --arg platform "$PLATFORM" '
     to_entries | map(
-      select(.value.platforms | has($platform))
-      | {key: .key, displayName: .value.displayName, description: .value.description, platform: .value.platforms[$platform]}
+      select(.value | type == "object")
+      | select(.value.platforms | has($platform))
+      | {key: .key, value: {displayName: .value.displayName, description: .value.description, platform: .value.platforms[$platform]}}
     ) | from_entries
   ' "$SERVICES_JSON"
 }
@@ -103,7 +104,7 @@ resolve_service_names() {
             local matches
             matches=$(launchctl list 2>/dev/null | awk -v p="$prefix" '$1 ~ p { print $1 }' || true)
             if [ -z "$matches" ]; then
-              printf '%s\n' "$name	$name	$(echo "$entry" | jq '.platform')"
+              printf '%s\n' "$name	$name	$(echo "$entry" | jq -c '.platform')"
             else
               while IFS= read -r m; do
                 printf '%s\n' "$name	$m	{\"type\":\"launchctl\",\"service\":\"$m\",\"domain\":\"$(echo "$entry" | jq -r '.platform.domain')\"}"
@@ -116,7 +117,7 @@ resolve_service_names() {
             local matches
             matches=$(systemctl $scope_flag list-units --all "$prefix*" --no-legend 2>/dev/null | awk '{ print $1 }' || true)
             if [ -z "$matches" ]; then
-              printf '%s\n' "$name	$name	$(echo "$entry" | jq '.platform')"
+              printf '%s\n' "$name	$name	$(echo "$entry" | jq -c '.platform')"
             else
               while IFS= read -r m; do
                 printf '%s\n' "$name	$m	{\"type\":\"systemctl\",\"service\":\"$m\",\"scope\":\"$(echo "$entry" | jq -r '.platform.scope')\"}"
@@ -125,7 +126,7 @@ resolve_service_names() {
             ;;
         esac
       else
-        printf '%s\n' "$name	$(echo "$entry" | jq -r '.displayName')	$(echo "$entry" | jq '.platform | tojson')"
+        printf '%s\n' "$name	$(echo "$entry" | jq -r '.displayName')	$(echo "$entry" | jq -c '.platform')"
       fi
     else
       printf '%s\n' "ERROR:unknown	$name	{\"error\":\"service not found in registry\"}"
@@ -149,15 +150,15 @@ svc_status() {
       domain=$(echo "$entry_json" | jq -r '.domain // "user"')
       [ "$domain" = "system" ] && domain_flag="sudo"
 
-      local list_out running=true enabled=true pid=""
-      list_out=$($domain_flag launchctl list "$svc_id" 2>/dev/null || true)
-      if [ -z "$list_out" ]; then
+      local list_line running=true enabled=true pid=""
+      list_line=$($domain_flag launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true)
+      if [ -z "$list_line" ]; then
         running=false; enabled=false
       else
-        pid=$(echo "$list_out" | awk '{ print $1 }')
+        pid=$(echo "$list_line" | awk '{ print $1 }')
         if [ "$pid" = "-" ] || [ -z "$pid" ]; then pid=""; fi
         local last_exit
-        last_exit=$(echo "$list_out" | awk '{ print $2 }')
+        last_exit=$(echo "$list_line" | awk '{ print $2 }')
         if [ -z "$pid" ] && [ "$last_exit" != "0" ]; then
           running=false
         fi
@@ -361,6 +362,17 @@ while [ "$#" -gt 0 ]; do
     *) printf '%s\n' "svc: unsupported argument '$1'" >&2; usage >&2; exit 1 ;;
   esac
 done
+
+# Filter --json from service_names (can appear before or after action)
+filtered_service_names=()
+for arg in "${service_names[@]}"; do
+  if [ "$arg" = "--json" ]; then
+    json_output=true
+  else
+    filtered_service_names+=("$arg")
+  fi
+done
+service_names=("${filtered_service_names[@]}")
 
 [ -z "$action" ] && { printf '%s\n' "svc: missing action (list, status, start, stop, restart, enable, disable)" >&2; usage >&2; exit 1; }
 

@@ -76,7 +76,7 @@ $RegistryRaw = Get-Content $ServicesJson -Raw | ConvertFrom-Json -AsHashtable
 $Registry = @{}
 foreach ($svc in $RegistryRaw.Keys) {
   $entry = $RegistryRaw[$svc]
-  if ($entry.platforms.ContainsKey($Platform)) {
+  if ($entry -is [hashtable] -and $entry.platforms.ContainsKey($Platform)) {
     $Registry[$svc] = @{
       displayName = $entry.displayName
       description = $entry.description
