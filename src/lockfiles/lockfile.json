@@ -5,6 +5,7 @@
     "clawhub": "0.20.0"
   },
   "camilladsp": "4.1.3",
+  "camillagui-backend": "4.1.0",
   "cargo-binstall": {
     "cargo-cache": "0.8.3",
     "nickel-lang-lsp": "1.16.0",
