@@ -16,6 +16,7 @@
 - `http://127.0.0.1:11434` — Ollama local API.
 - `tcp/1234` — CamillaDSP websocket API (loopback, for camillagui-backend).
 - `http://127.0.0.1:5005` — CamillaDSP web GUI.
+- `https://localhost:5006` — CamillaDSP web GUI (HTTPS).
 - `tcp/3389` — XRDP Remote Desktop.
 
 ## HTTPS certificate trust (one-time)
