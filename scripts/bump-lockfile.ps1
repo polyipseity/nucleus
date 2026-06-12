@@ -41,6 +41,9 @@ param(
   [Alias("h")]
   [switch]$Help
 )
+# Explicit reference to suppress false-positive PSAvoidUsingUnusedParameters
+# ($Sections is used via closure in Test-SectionEnabled).
+$null = $Sections
 
 $ErrorActionPreference = 'Stop'
 

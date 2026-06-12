@@ -39,8 +39,6 @@ function Sync-DiscordMusicRPC {
 
   $ErrorActionPreference = "Stop"
   $taskName = "NucleusDiscordMusicRPC"
-  $configDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "discord-music-rpc"
-  $configPath = Join-Path -Path $configDir -ChildPath "config.yaml"
   $logDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "nucleus\logs"
   $logFile = Join-Path -Path $logDir -ChildPath "discord-music-rpc.log"
 

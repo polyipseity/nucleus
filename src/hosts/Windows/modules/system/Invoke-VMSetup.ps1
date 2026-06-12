@@ -556,11 +556,11 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
         # Convert SI bytes to nearest binary MiB for QEMU -m flag (which
         # interprets bare integers as MiB).
         $ramMib      = [long](($vm.ramBytes + 524288) / 1048576)
-        $diskPath    = Join-Path $vmDir "$($vm.name).qcow2"
+        $diskPath    = Join-Path -Path $vmDir -ChildPath "$($vm.name).qcow2"
         $diskCredentialMarker = Get-VMGuestSecretMarkerPath -BasePath $diskPath
-        $startScriptPs1 = Join-Path $vmDir "scripts" "start-$($vm.name).ps1"
-        $startScriptSh = Join-Path $vmDir "scripts" "start-$($vm.name).sh"
-        $prebuilt    = Join-Path $imagesDir "$($vm.name).qcow2"
+        $startScriptPs1 = Join-Path -Path $vmDir -ChildPath "scripts" -AdditionalChildPath "start-$($vm.name).ps1"
+        $startScriptSh = Join-Path -Path $vmDir -ChildPath "scripts" -AdditionalChildPath "start-$($vm.name).sh"
+        $prebuilt    = Join-Path -Path $imagesDir -ChildPath "$($vm.name).qcow2"
 
         Write-Information "vm-setup: configuring VM '$($vm.display)'..."
 

@@ -94,6 +94,9 @@ function Sync-Wallpaper {
     [Parameter(Mandatory = $true)]
     [string]$SopsExe
   )
+  # Explicit reference to suppress false-positive PSAvoidUsingUnusedParameters
+  # ($Users is used via closure in Where-Object below).
+  $null = $Users
 
   if (-not (Test-Path -Path $AssetsDir)) {
     Write-Output "$($PSStyle.Foreground.Yellow)Wallpaper assets directory not found at $AssetsDir; skipping wallpaper sync.$($PSStyle.Reset)"

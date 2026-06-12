@@ -135,6 +135,9 @@ function Invoke-ReplicaSync {
 
   function Get-ReplicaGcConfig {
     param([Parameter(Mandatory)][string]$Provider)
+    # Explicit reference to suppress false-positive PSAvoidUsingUnusedParameters
+    # ($Provider is used via closure in Where-Object below).
+    $null = $Provider
 
     $providerProperty = $gcConfig.PSObject.Properties | Where-Object { $_.Name -eq $Provider } | Select-Object -First 1
     if ($null -eq $providerProperty) {
