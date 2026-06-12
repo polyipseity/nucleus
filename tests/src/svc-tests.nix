@@ -54,7 +54,6 @@ assert containsRegex "Invoke-ServiceAction" svcPs1Text;
 assert containsRegex "Format-StatusTable" svcPs1Text;
 assert containsRegex ''services\.json'' svcPs1Text;
 assert containsRegex "Get-Service" svcPs1Text;
-assert containsRegex "servy-cli" svcPs1Text;
 assert containsRegex "ScheduledTask" svcPs1Text;
 
 # --- svc.sh bug-fix assertions ---

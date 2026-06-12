@@ -1,12 +1,11 @@
 <#
 .SYNOPSIS
-  Unified service management for Windows (native, Servy, scheduled tasks).
+  Unified service management for Windows (native, scheduled tasks).
 
 .DESCRIPTION
   Provides a uniform CLI for listing, starting, stopping, restarting,
   enabling, and disabling services across Windows service types:
     - native:  standard Windows services (Get-Service, sc.exe)
-    - servy:   Servy-wrapped services (servy-cli)
     - schtask: Scheduled tasks (Get-ScheduledTask etc.)
 
   Services are defined in src/modules/services.json (the canonical registry).
@@ -130,37 +129,6 @@ function Resolve-ServiceName {
               }
             }
           }
-          'servy' {
-            $matched = servy-cli list 2>$null | Select-String -Pattern "$prefix" | ForEach-Object { $_.ToString().Trim() }
-            if ($matched.Count -gt 0) {
-              foreach ($m in $matched) {
-                $results["$name/$m"] = @{
-                  displayName = "$name ($m)"
-                  platform    = @{ type = 'servy'; service = $m }
-                }
-              }
-            } else {
-              $results["$name/*"] = @{
-                displayName = "$name (no matches)"
-                platform    = @{ type = 'servy'; service = $prefix }
-              }
-            }
-          }
-          'native' {
-            $matched = Get-Service "$prefix*" -ErrorAction SilentlyContinue
-            foreach ($s in $matched) {
-              $results["$name/$($s.Name)"] = @{
-                displayName = "$name ($($s.Name))"
-                platform    = @{ type = 'native'; service = $s.Name }
-              }
-            }
-            if ($matched.Count -eq 0) {
-              $results["$name/*"] = @{
-                displayName = "$name (no matches)"
-                platform    = @{ type = 'native'; service = $prefix }
-              }
-            }
-          }
         }
       } else {
         $results[$name] = $Registry[$name]
@@ -202,36 +170,8 @@ function Get-ServiceStatus {
         return @{ status = 'not-found'; running = $false; enabled = $false }
       }
     }
-    'servy' {
-      $svcName = $Platform.service
-      try {
-        $out = servy-cli status $svcName 2>&1
-        $running = $out -match 'is running'
-        return @{
-          status  = if ($running) { 'active' } else { 'inactive' }
-          running = $running
-          enabled = $true
-        }
-      } catch {
-        return @{ status = 'not-found'; running = $false; enabled = $false }
-      }
-    }
     'schtask' {
       $taskPath = $Platform.taskPath
-      try {
-        $task = Get-ScheduledTask -TaskPath (Split-Path $taskPath -Parent) -TaskName (Split-Path $taskPath -Leaf) -ErrorAction Stop
-        $enabled = $task.State -ne 'Disabled'
-        $running = $task.State -eq 'Running'
-        return @{
-          status  = if ($running) { 'active' } elseif ($enabled) { 'inactive' } else { 'disabled' }
-          running = $running
-          enabled = $enabled
-        }
-      } catch {
-        return @{ status = 'not-found'; running = $false; enabled = $false }
-      }
-    }
-    default {
       return @{ status = 'unknown'; running = $false; enabled = $false; error = "unsupported type: $type" }
     }
   }
@@ -257,31 +197,9 @@ function Invoke-ServiceAction {
         'disable' { Set-Service -Name $svcName -StartupType Disabled -ErrorAction Stop; return $true }
       }
     }
-    'servy' {
-      $svcName = $Platform.service
-      switch ($Action) {
-        'status'  { return Get-ServiceStatus -Platform $Platform }
-        'start'   { servy-cli start $svcName 2>&1 | Out-Null; return $LASTEXITCODE -eq 0 }
-        'stop'    { servy-cli stop $svcName 2>&1 | Out-Null; return $LASTEXITCODE -eq 0 }
-        'restart' { servy-cli restart $svcName 2>&1 | Out-Null; return $LASTEXITCODE -eq 0 }
-        'enable'  { servy-cli enable $svcName 2>&1 | Out-Null; return $LASTEXITCODE -eq 0 }
-        'disable' { servy-cli disable $svcName 2>&1 | Out-Null; return $LASTEXITCODE -eq 0 }
-      }
-    }
     'schtask' {
       $taskPath = $Platform.taskPath
       $taskName = Split-Path $taskPath -Leaf
-      $taskParent = Split-Path $taskPath -Parent
-      switch ($Action) {
-        'status'  { return Get-ServiceStatus -Platform $Platform }
-        'start'   { Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
-        'stop'    { Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
-        'restart' { Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop -ErrorAction SilentlyContinue; Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
-        'enable'  { Enable-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
-        'disable' { Disable-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
-      }
-    }
-    default {
       throw "svc: unsupported service type: $type"
     }
   }

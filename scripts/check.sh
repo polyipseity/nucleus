@@ -250,7 +250,7 @@ if ! $HAS_ARGS; then
     # Validate each platform entry has valid type and required fields
     while IFS=$'\t' read -r _name _platform _type _has_required; do
       case "$_type" in
-        launchctl|systemctl|native|servy|schtask) ;;
+        launchctl|systemctl|native|schtask) ;;
         *)
           echo "ERROR: services.json: '$_name' platform '$_platform' has invalid type '$_type'"
           _svc_errors=$((_svc_errors + 1))
@@ -272,7 +272,6 @@ if ! $HAS_ARGS; then
           if .value.type == "launchctl" then (.value.service | type == "string" and length > 0)
           elif .value.type == "systemctl" then (.value.service | type == "string" and length > 0)
           elif .value.type == "native" then (.value.service | type == "string" and length > 0)
-          elif .value.type == "servy" then (.value.service | type == "string" and length > 0)
           elif .value.type == "schtask" then (.value.taskPath | type == "string" and length > 0)
           else false
           end

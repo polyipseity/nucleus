@@ -98,7 +98,6 @@ Describe "Windows Package Installation" {
         $additionalPackages = @(
             @{ id = '9NBDXK71NK08'; displayName = 'WhatsApp Beta (msstore)' }
             @{ id = 'Adobe.SourceSerif4'; displayName = 'Source Serif 4' }
-            @{ id = 'aelassas.Servy'; displayName = 'Servy' }
             @{ id = 'ArtifexSoftware.GhostScript'; displayName = 'Ghostscript' }
             @{ id = 'CaddyServer.Caddy'; displayName = 'Caddy' }
             @{ id = 'Clement.bottom'; displayName = 'bottom' }

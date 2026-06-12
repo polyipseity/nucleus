@@ -209,7 +209,6 @@
   },
   "winget": {
     "7zip.7zip": "26.01",
-    "aelassas.Servy": "8.4",
     "ajeetdsouza.zoxide": "0.9.9",
     "astral-sh.ruff": "0.15.16",
     "astral-sh.ty": "0.0.44",

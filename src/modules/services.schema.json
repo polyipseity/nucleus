@@ -102,9 +102,6 @@
           "$ref": "#/definitions/nativeEntry"
         },
         {
-          "$ref": "#/definitions/servyEntry"
-        },
-        {
           "$ref": "#/definitions/schtaskEntry"
         },
         {
@@ -133,30 +130,6 @@
       "required": [
         "type",
         "taskPath"
-      ],
-      "type": "object"
-    },
-    "servyEntry": {
-      "properties": {
-        "justification": {
-          "description": "Explanation of platform-specific configuration choices.",
-          "type": "string"
-        },
-        "prefixMatch": {
-          "description": "Match all services with this prefix",
-          "type": "boolean"
-        },
-        "service": {
-          "description": "Servy service name",
-          "type": "string"
-        },
-        "type": {
-          "const": "servy"
-        }
-      },
-      "required": [
-        "type",
-        "service"
       ],
       "type": "object"
     },

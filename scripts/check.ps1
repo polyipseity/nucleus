@@ -104,7 +104,7 @@ if (-not $HAS_ARGS) {
         foreach ($_plat in $_entry.platforms.Keys) {
           $_pEntry = $_entry.platforms[$_plat]
           $_type = $_pEntry.type
-          if ($_type -notin @('launchctl', 'systemctl', 'native', 'servy', 'schtask')) {
+          if ($_type -notin @('launchctl', 'systemctl', 'native', 'schtask')) {
             Write-Output "ERROR: services.json: '$_svcName' platform '$_plat' has invalid type '$_type'"
             $_svcErrors++
           }
@@ -112,7 +112,6 @@ if (-not $HAS_ARGS) {
             'launchctl' { -not [string]::IsNullOrEmpty($_pEntry.service) }
             'systemctl' { -not [string]::IsNullOrEmpty($_pEntry.service) }
             'native'    { -not [string]::IsNullOrEmpty($_pEntry.service) }
-            'servy'     { -not [string]::IsNullOrEmpty($_pEntry.service) }
             'schtask'   { -not [string]::IsNullOrEmpty($_pEntry.taskPath) }
             default     { $false }
           }
