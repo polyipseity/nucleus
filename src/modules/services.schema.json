@@ -1,84 +1,176 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://nucleus.local/services.schema.json",
-  "title": "nucleus service registry",
-  "description": "Registry of manageable services for nucleus-svc across macOS, NixOS, and Windows",
-  "type": "object",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": {
-    "type": "object",
     "properties": {
-      "displayName": { "type": "string" },
-      "description": { "type": "string" },
+      "description": {
+        "type": "string"
+      },
+      "displayName": {
+        "type": "string"
+      },
       "platforms": {
-        "type": "object",
-        "properties": {
-          "macos": { "$ref": "#/definitions/platformEntry" },
-          "nixos": { "$ref": "#/definitions/platformEntry" },
-          "windows": { "$ref": "#/definitions/platformEntry" }
-        },
         "additionalProperties": false,
-        "minProperties": 1
+        "minProperties": 1,
+        "properties": {
+          "macos": {
+            "$ref": "#/definitions/platformEntry"
+          },
+          "nixos": {
+            "$ref": "#/definitions/platformEntry"
+          },
+          "windows": {
+            "$ref": "#/definitions/platformEntry"
+          }
+        },
+        "type": "object"
       }
     },
-    "required": ["displayName", "platforms"]
+    "required": [
+      "displayName",
+      "platforms"
+    ],
+    "type": "object"
   },
   "definitions": {
-    "platformEntry": {
-      "oneOf": [
-        { "$ref": "#/definitions/launchctlEntry" },
-        { "$ref": "#/definitions/systemctlEntry" },
-        { "$ref": "#/definitions/nativeEntry" },
-        { "$ref": "#/definitions/servyEntry" },
-        { "$ref": "#/definitions/schtaskEntry" }
-      ],
-      "description": "Platform-specific service configuration"
-    },
     "launchctlEntry": {
-      "type": "object",
       "properties": {
-        "type": { "const": "launchctl" },
-        "service": { "type": "string", "description": "launchd service label" },
-        "domain": { "type": "string", "enum": ["user", "system"], "description": "launchd domain (user agent or system daemon)" },
-        "prefixMatch": { "type": "boolean", "description": "Match all services with this prefix" }
+        "domain": {
+          "description": "launchd domain (user agent or system daemon)",
+          "enum": [
+            "user",
+            "system"
+          ],
+          "type": "string"
+        },
+        "prefixMatch": {
+          "description": "Match all services with this prefix",
+          "type": "boolean"
+        },
+        "service": {
+          "description": "launchd service label",
+          "type": "string"
+        },
+        "type": {
+          "const": "launchctl"
+        }
       },
-      "required": ["type", "service"]
-    },
-    "systemctlEntry": {
-      "type": "object",
-      "properties": {
-        "type": { "const": "systemctl" },
-        "service": { "type": "string", "description": "systemd unit name" },
-        "scope": { "type": "string", "enum": ["user", "system"], "description": "systemd scope" },
-        "prefixMatch": { "type": "boolean", "description": "Match all units with this prefix" }
-      },
-      "required": ["type", "service"]
+      "required": [
+        "type",
+        "service"
+      ],
+      "type": "object"
     },
     "nativeEntry": {
-      "type": "object",
       "properties": {
-        "type": { "const": "native" },
-        "service": { "type": "string", "description": "Windows service name" },
-        "prefixMatch": { "type": "boolean", "description": "Match all services with this prefix" }
+        "prefixMatch": {
+          "description": "Match all services with this prefix",
+          "type": "boolean"
+        },
+        "service": {
+          "description": "Windows service name",
+          "type": "string"
+        },
+        "type": {
+          "const": "native"
+        }
       },
-      "required": ["type", "service"]
+      "required": [
+        "type",
+        "service"
+      ],
+      "type": "object"
     },
-    "servyEntry": {
-      "type": "object",
-      "properties": {
-        "type": { "const": "servy" },
-        "service": { "type": "string", "description": "Servy service name" },
-        "prefixMatch": { "type": "boolean", "description": "Match all services with this prefix" }
-      },
-      "required": ["type", "service"]
+    "platformEntry": {
+      "description": "Platform-specific service configuration",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/launchctlEntry"
+        },
+        {
+          "$ref": "#/definitions/systemctlEntry"
+        },
+        {
+          "$ref": "#/definitions/nativeEntry"
+        },
+        {
+          "$ref": "#/definitions/servyEntry"
+        },
+        {
+          "$ref": "#/definitions/schtaskEntry"
+        }
+      ]
     },
     "schtaskEntry": {
-      "type": "object",
       "properties": {
-        "type": { "const": "schtask" },
-        "taskPath": { "type": "string", "description": "Scheduled task path (e.g. \\\\NucleusLiteLLM)" },
-        "prefixMatch": { "type": "boolean", "description": "Match all tasks with this prefix" }
+        "prefixMatch": {
+          "description": "Match all tasks with this prefix",
+          "type": "boolean"
+        },
+        "taskPath": {
+          "description": "Scheduled task path (e.g. \\\\NucleusLiteLLM)",
+          "type": "string"
+        },
+        "type": {
+          "const": "schtask"
+        }
       },
-      "required": ["type", "taskPath"]
+      "required": [
+        "type",
+        "taskPath"
+      ],
+      "type": "object"
+    },
+    "servyEntry": {
+      "properties": {
+        "prefixMatch": {
+          "description": "Match all services with this prefix",
+          "type": "boolean"
+        },
+        "service": {
+          "description": "Servy service name",
+          "type": "string"
+        },
+        "type": {
+          "const": "servy"
+        }
+      },
+      "required": [
+        "type",
+        "service"
+      ],
+      "type": "object"
+    },
+    "systemctlEntry": {
+      "properties": {
+        "prefixMatch": {
+          "description": "Match all units with this prefix",
+          "type": "boolean"
+        },
+        "scope": {
+          "description": "systemd scope",
+          "enum": [
+            "user",
+            "system"
+          ],
+          "type": "string"
+        },
+        "service": {
+          "description": "systemd unit name",
+          "type": "string"
+        },
+        "type": {
+          "const": "systemctl"
+        }
+      },
+      "required": [
+        "type",
+        "service"
+      ],
+      "type": "object"
     }
-  }
+  },
+  "description": "Registry of manageable services for nucleus-svc across macOS, NixOS, and Windows",
+  "title": "nucleus service registry",
+  "type": "object"
 }

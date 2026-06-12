@@ -5,7 +5,9 @@
       "diskBytes": 128000000000,
       "display": "MacBook",
       "enabled": false,
-      "hosts": ["MacBook"],
+      "hosts": [
+        "MacBook"
+      ],
       "macOSVersion": "tahoe",
       "name": "MacBook",
       "ramBytes": 8000000000,
