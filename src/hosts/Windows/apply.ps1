@@ -670,6 +670,7 @@ Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRe
   $discordMusicRPCConfigSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\discord-music-rpc\config.yaml"
   if (Test-Path -Path $discordMusicRPCConfig) { Remove-Item -Path $discordMusicRPCConfig -Force }
   New-Item -Path $discordMusicRPCConfig -ItemType SymbolicLink -Target $discordMusicRPCConfigSource -Force | Out-Null
+  Set-ManagedSymlinkDeleteProtection -Path $discordMusicRPCConfig
   # Make the source read-only so the app cannot overwrite config through the symlink.
   Set-ItemProperty -Path $discordMusicRPCConfigSource -Name IsReadOnly -Value $true
 Sync-DiscordMusicRPC -Enabled:$EnableDiscordMusicRPCParity
