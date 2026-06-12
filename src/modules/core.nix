@@ -25,6 +25,7 @@ let
     pkgs.bottom
     pkgs.bun
     pkgs.caddy
+    pkgs.camilladsp
     pkgs.cargo-binstall
     pkgs.cargo-cache
     pkgs.direnv
