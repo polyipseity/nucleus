@@ -83,8 +83,19 @@ resolve_service_names() {
   local names=("$@")
 
   if [ "${#names[@]}" -eq 0 ]; then
-    # Return all non-prefix services
-    echo "$registry" | jq -r 'to_entries[] | [.key, .value.displayName, (.value.platform | tojson)] | @tsv'
+    # Return all services, expanding prefix matches to concrete names
+    while IFS=$'\t' read -r key display plat_json; do
+      local prefix_match
+      prefix_match=$(echo "$plat_json" | jq -r '.prefixMatch // false')
+      if [ "$prefix_match" = "true" ]; then
+        local prefix entries
+        prefix=$(echo "$plat_json" | jq -r '.service')
+        entries=$(expand_prefix "$key" "$prefix" "$plat_json")
+        printf '%s\n' "$entries"
+      else
+        printf '%s\t%s\t%s\n' "$key" "$display" "$plat_json"
+      fi
+    done < <(echo "$registry" | jq -r 'to_entries[] | [.key, .value.displayName, (.value.platform | tojson)] | @tsv')
     return
   fi
 
@@ -95,36 +106,11 @@ resolve_service_names() {
       local prefix_match
       prefix_match=$(echo "$entry" | jq -r '.platform.prefixMatch // false')
       if [ "$prefix_match" = "true" ]; then
-        # Expand prefix to all matching known services on this platform
         local prefix
         prefix=$(echo "$entry" | jq -r '.platform.service')
-        # For launchctl and systemctl, list matching services
-        case "$PLATFORM" in
-          macos)
-            local matches
-            matches=$(launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)
-            if [ -z "$matches" ]; then
-              printf '%s\n' "$name	$name	$(echo "$entry" | jq -c '.platform')"
-            else
-              while IFS= read -r m; do
-                printf '%s\n' "$name	$m	{\"type\":\"launchctl\",\"service\":\"$m\",\"domain\":\"$(echo "$entry" | jq -r '.platform.domain')\"}"
-              done <<< "$matches"
-            fi
-            ;;
-          nixos)
-            local scope_flag=""
-            [ "$(echo "$entry" | jq -r '.platform.scope')" = "user" ] && scope_flag="--user"
-            local matches
-            matches=$(systemctl $scope_flag list-units --all "$prefix*" --no-legend 2>/dev/null | awk '{ print $1 }' || true)
-            if [ -z "$matches" ]; then
-              printf '%s\n' "$name	$name	$(echo "$entry" | jq -c '.platform')"
-            else
-              while IFS= read -r m; do
-                printf '%s\n' "$name	$m	{\"type\":\"systemctl\",\"service\":\"$m\",\"scope\":\"$(echo "$entry" | jq -r '.platform.scope')\"}"
-              done <<< "$matches"
-            fi
-            ;;
-        esac
+        local entries
+        entries=$(expand_prefix "$name" "$prefix" "$(echo "$entry" | jq -c '.platform')")
+        printf '%s\n' "$entries"
       else
         printf '%s\n' "$name	$(echo "$entry" | jq -r '.displayName')	$(echo "$entry" | jq -c '.platform')"
       fi
@@ -132,6 +118,38 @@ resolve_service_names() {
       printf '%s\n' "ERROR:unknown	$name	{\"error\":\"service not found in registry\"}"
     fi
   done
+}
+
+# expand_prefix — List concrete services matching a prefix on the current platform.
+# Outputs tab-separated lines: key\tserviceId\tplatformJson
+expand_prefix() {
+  local name="$1" prefix="$2" plat_json="$3"
+  case "$PLATFORM" in
+    macos)
+      local matches
+      matches=$(launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)
+      if [ -z "$matches" ]; then
+        printf '%s\t%s\t%s\n' "$name" "$prefix" "$plat_json"
+      else
+        while IFS= read -r m; do
+          printf '%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"launchctl\",\"service\":\"$m\",\"domain\":\"$(echo "$plat_json" | jq -r '.domain')\"}"
+        done <<< "$matches"
+      fi
+      ;;
+    nixos)
+      local scope_flag=""
+      [ "$(echo "$plat_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
+      local matches
+      matches=$(systemctl $scope_flag list-units --all "$prefix*" --no-legend 2>/dev/null | awk '{ print $1 }' || true)
+      if [ -z "$matches" ]; then
+        printf '%s\t%s\t%s\n' "$name" "$prefix" "$plat_json"
+      else
+        while IFS= read -r m; do
+          printf '%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"systemctl\",\"service\":\"$m\",\"scope\":\"$(echo "$plat_json" | jq -r '.scope')\"}"
+        done <<< "$matches"
+      fi
+      ;;
+  esac
 }
 
 # svc_status — Print JSON status for a single service entry.
