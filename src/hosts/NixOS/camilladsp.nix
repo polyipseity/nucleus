@@ -26,10 +26,13 @@ in
       "network-online.target"
       "sound.target"
     ];
+    preStart = ''
+      mkdir -p '%h/.local/state/nucleus/log/camilladsp'
+    '';
     serviceConfig = {
       Type = "simple";
       User = username;
-      ExecStart = "${pkgs.camilladsp}/bin/camilladsp -o %h/.config/camilladsp/config.yml -p ${wsPort} -w";
+      ExecStart = "${pkgs.camilladsp}/bin/camilladsp -p ${wsPort} -w -o %h/.local/state/nucleus/log/camilladsp/camilladsp.log %h/.config/camilladsp/config.yml";
       Restart = "on-failure";
     };
     wantedBy = [ "default.target" ];
