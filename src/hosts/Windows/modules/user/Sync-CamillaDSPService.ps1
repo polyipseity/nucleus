@@ -71,7 +71,6 @@ function Sync-CamillaDSPService {
     "$($env:USERDOMAIN)\$($env:USERNAME)"
   }
 
-  $configPath = Join-Path -Path $HOME -ChildPath ".config\camilladsp\configs\config.yml"
   $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command `"& '$camilladspBin' -o '$logFile' -p $wsPort -w --no_config`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
