@@ -448,16 +448,18 @@ in
       PY
     '';
 
-    # Protect the ~/iCloud symlink (mkOutOfStoreSymlink) against accidental
+    # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
     # deletion between rebuilds.
-    home.activation.unprotectICloudSymlink = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+    home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       ${builtins.readFile ../scripts/agent-helpers.sh}
       _nucleus_unprotect_symlink "home.nix" "$HOME/iCloud"
+      _nucleus_unprotect_symlink "home.nix" "$HOME/.config/camilladsp/config.yml"
     '';
 
-    home.activation.protectICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       ${builtins.readFile ../scripts/agent-helpers.sh}
       _nucleus_protect_symlink "home.nix" "$HOME/iCloud"
+      _nucleus_protect_symlink "home.nix" "$HOME/.config/camilladsp/config.yml"
     '';
 
     # Override the default logDir (which uses ~) with a proper absolute path.
@@ -484,12 +486,15 @@ in
         ".gitconfig".source = dotfilesRoot + "/.gitconfig";
       })
       {
-        ".config/camilladsp/config.yml".source = ./configs/camilladsp/config-${
-          if pkgs.stdenv.isDarwin then "macos" else "linux"
-        }.yml;
-        ".config/camilladsp/default_config.yml".source = ./configs/camilladsp/config-${
-          if pkgs.stdenv.isDarwin then "macos" else "linux"
-        }.yml;
+        ".config/camilladsp/config.yml".source =
+          let
+            repoRoot = builtins.getEnv "NUCLEUS_REPO";
+            configName = if pkgs.stdenv.isDarwin then "macos" else "linux";
+          in
+          if repoRoot != "" then
+            config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camilladsp/config-${configName}.yml"
+          else
+            ./configs/camilladsp/config-${configName}.yml;
         ".config/camillagui-backend/config.yml".source = ./configs/camillagui-backend/config-${
           if pkgs.stdenv.isDarwin then "macos" else "linux"
         }.yml;
