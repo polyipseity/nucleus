@@ -11,6 +11,3 @@ devices:
     channels: 2
     device: "Built-in Output"
     format: S32
-
-logging:
-  filename: "/Users/polyipseity/Library/Logs/nucleus/camilladsp/camilladsp.log"

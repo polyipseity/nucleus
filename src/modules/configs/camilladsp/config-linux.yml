@@ -11,6 +11,3 @@ devices:
     channels: 2
     device: "hw:CARD=DAC,DEV=0"
     format: S32
-
-logging:
-  filename: "/home/polyipseity/.local/state/nucleus/log/camilladsp/camilladsp.log"
