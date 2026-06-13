@@ -22,10 +22,14 @@
     ./activation.nix
     ./ai.nix
     ./base.nix
+    ./camilladsp.nix
     ../../modules/camilladsp.nix
+    ./camillagui-backend.nix
     ../../modules/camillagui-backend.nix
     ./defaults.nix
     ./homebrew.nix
+    ./https-proxy.nix
+    ../../modules/https-proxy.nix
     ./jellyfin.nix
     ./linux-builder.nix
     ./manual-installations.nix

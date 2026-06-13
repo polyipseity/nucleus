@@ -11,11 +11,10 @@
   config,
   lib,
   pkgs,
-  username ? null,
   ...
 }:
 let
-  inherit (lib) mkIf mkOption types;
+  inherit (lib) mkOption types;
   cfg = config.nucleus.httpsProxy;
 
   servicesJSON = builtins.fromJSON (builtins.readFile ./services.json);
@@ -103,21 +102,5 @@ in
     };
   };
 
-  config = mkIf pkgs.stdenv.isDarwin (
-    let
-      systemLogDir = config.nucleus.logging.systemLogDir;
-    in
-    {
-      launchd.daemons.httpsProxy = {
-        serviceConfig = {
-          ProgramArguments = [ "${proxyDaemon}" ];
-          KeepAlive = true;
-          RunAtLoad = true;
-          UserName = username;
-          StandardOutPath = "${systemLogDir}/https-proxy/stdout.log";
-          StandardErrorPath = "${systemLogDir}/https-proxy/stderr.log";
-        };
-      };
-    }
-  );
+  config = { };
 }
