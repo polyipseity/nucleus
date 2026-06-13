@@ -478,6 +478,14 @@ in
       (lib.optionalAttrs (builtins.pathExists (dotfilesRoot + "/.gitconfig")) {
         ".gitconfig".source = dotfilesRoot + "/.gitconfig";
       })
+      {
+        ".config/camilladsp/config.yml".source = ./configs/camilladsp/config-${
+          if pkgs.stdenv.isDarwin then "macos" else "linux"
+        }.yml;
+        ".config/camillagui-backend/config.yml".source = ./configs/camillagui-backend/config-${
+          if pkgs.stdenv.isDarwin then "macos" else "linux"
+        }.yml;
+      }
       (lib.optionalAttrs pkgs.stdenv.isDarwin {
         # Keep iCloud Drive reachable from a short, stable path for all managed
         # macOS users so scripts and shell workflows avoid long spaced paths.

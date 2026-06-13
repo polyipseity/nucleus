@@ -23,7 +23,6 @@
     ./ai.nix
     ./base.nix
     ./camilladsp.nix
-    ../../modules/camilladsp.nix
     ./camillagui-backend.nix
     ../../modules/camillagui-backend.nix
     ./defaults.nix

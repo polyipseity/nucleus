@@ -7,7 +7,7 @@
     1. Creates or removes a logon scheduled task that starts
        camillagui_backend.exe with the config file.
 
-  The config.yml is deployed to ProgramData by Invoke-CamillaGUISetup.
+  The config.yml is deployed to $HOME\.config\camillagui-backend\ by Invoke-CamillaGUISetup.
 
 .PARAMETER Enabled
   True applies the config and registers the startup task.  False removes the
@@ -49,7 +49,7 @@ function Sync-CamillaGUIService {
     return
   }
 
-  # Config is deployed to ProgramData by Invoke-CamillaGUISetup.  Ensure log directory exists.
+  # Config is deployed to $HOME\.config\camillagui-backend\ by Invoke-CamillaGUISetup.
   $null = New-Item -Path $logDir -ItemType Directory -Force
 
   # Find the camillagui_backend binary.
@@ -66,7 +66,7 @@ function Sync-CamillaGUIService {
     "$($env:USERDOMAIN)\$($env:USERNAME)"
   }
 
-  $configPath = Join-Path -Path $env:ProgramData -ChildPath "camillagui-backend\config.yml"
+  $configPath = Join-Path -Path $HOME -ChildPath ".config\camillagui-backend\config.yml"
   $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command `"& '$camillaguiBin' -c '$configPath' *>> '$logFile'`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)

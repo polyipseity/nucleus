@@ -6,11 +6,11 @@ port: 5005
 ssl_certificate: null
 ssl_private_key: null
 gui_config_file: null
-config_dir: "/var/lib/camilladsp/configs"
-coeff_dir: "/var/lib/camilladsp/coeffs"
-default_config: "/var/lib/camilladsp/default_config.yml"
-statefile_path: "/var/lib/camilladsp/statefile.yml"
-log_file: "/var/log/nucleus/camilladsp/camilladsp.log"
+config_dir: "~/.config/camilladsp/configs"
+coeff_dir: "~/.config/camilladsp/coeffs"
+default_config: "~/.config/camilladsp/default_config.yml"
+statefile_path: "~/.config/camilladsp/statefile.yml"
+log_file: "~/.local/state/nucleus/log/camilladsp/camilladsp.log"
 on_set_active_config: null
 on_get_active_config: null
 supported_capture_types: null

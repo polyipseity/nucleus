@@ -1,25 +1,33 @@
 # hosts/MacBook/camillagui-backend.nix — CamillaDSP GUI launchd service.
 #
-# Service-manager-specific fragment imported alongside the shared module.
-# The shared config definition is in src/modules/camillagui-backend.nix.
-{ config, lib, pkgs, ... }:
+# Runs as the primary user via UserName so the daemon can access user-level
+# config at $HOME/.config/camillagui-backend/. Config is deployed by Home
+# Manager in modules/home.nix.
+{
+  config,
+  lib,
+  pkgs,
+  username,
+  ...
+}:
 
 let
-  systemLogDir = config.nucleus.logging.systemLogDir;
+  userHome = config.users.users.${username}.home;
 in
 {
   launchd.daemons."camillagui-backend" = {
     serviceConfig = {
       Label = "local.camillagui-backend";
       ProgramArguments = [
-        "${pkgs.camillagui-backend}/bin/camillagui-backend"
+        "/bin/sh"
         "-c"
-        "/etc/camillagui-backend/config.yml"
+        "exec ${pkgs.camillagui-backend}/bin/camillagui-backend -c $HOME/.config/camillagui-backend/config.yml"
       ];
+      UserName = username;
       KeepAlive = true;
       RunAtLoad = true;
-      StandardOutPath = "${systemLogDir}/camillagui-backend/stdout.log";
-      StandardErrorPath = "${systemLogDir}/camillagui-backend/stderr.log";
+      StandardOutPath = "${userHome}/Library/Logs/nucleus/camillagui-backend/stdout.log";
+      StandardErrorPath = "${userHome}/Library/Logs/nucleus/camillagui-backend/stderr.log";
     };
   };
 }

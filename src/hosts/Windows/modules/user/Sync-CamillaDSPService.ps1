@@ -7,7 +7,7 @@
     1. Creates or removes a logon scheduled task that starts camilladsp.exe
        with the websocket API enabled.
 
-  The config.yml is deployed to ProgramData by Invoke-CamillaDSPSetup.
+  The config.yml is deployed to $HOME\.config\camilladsp\ by Invoke-CamillaDSPSetup.
 
 .PARAMETER Enabled
   True applies the config and registers the startup task.  False removes the
@@ -49,7 +49,7 @@ function Sync-CamillaDSPService {
     return
   }
 
-  # Config is deployed to ProgramData by Invoke-CamillaDSPSetup.  Ensure log directory exists.
+  # Config is deployed to $HOME\.config\camilladsp\ by Invoke-CamillaDSPSetup.
   $null = New-Item -Path $logDir -ItemType Directory -Force
 
   # Find the camilladsp binary.
@@ -60,14 +60,19 @@ function Sync-CamillaDSPService {
   }
   $camilladspBin = $camilladspCmd.Source
 
+  # Read port from services.json (single source of truth).
+  $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
+  $svc = Get-Content -Raw (Join-Path $repoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+  $wsPort = if ($svc.camilladsp.network.websocket.port) { $svc.camilladsp.network.websocket.port } else { 1234 }
+
   $userId = if ([string]::IsNullOrWhiteSpace($env:USERDOMAIN)) {
     $env:USERNAME
   } else {
     "$($env:USERDOMAIN)\$($env:USERNAME)"
   }
 
-  $configPath = Join-Path -Path $env:ProgramData -ChildPath "camilladsp\config.yml"
-  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command `"& '$camilladspBin' -o '$configPath' -p 1234 -w *>> '$logFile'`""
+  $configPath = Join-Path -Path $HOME -ChildPath ".config\camilladsp\config.yml"
+  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command `"& '$camilladspBin' -o '$configPath' -p $wsPort -w *>> '$logFile'`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited

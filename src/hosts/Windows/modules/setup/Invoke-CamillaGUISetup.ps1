@@ -118,9 +118,9 @@ function Invoke-CamillaGUISetup {
       $env:PATH = "$installDir;$env:PATH"
     }
 
-    # Deploy system-level config to ProgramData (cross-platform parity with
-    # POSIX /etc/camillagui-backend/config.yml).
-    $configDir = Join-Path -Path $env:ProgramData -ChildPath "camillagui-backend"
+    # Deploy user-level config to $HOME\.config (cross-platform parity with
+    # POSIX ~/.config/camillagui-backend/config.yml).
+    $configDir = Join-Path -Path $HOME -ChildPath ".config\camillagui-backend"
     $configPath = Join-Path -Path $configDir -ChildPath "config.yml"
     $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camillagui-backend\config-windows.yml"
     if (-not (Test-Path $configDir)) {
