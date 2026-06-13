@@ -9,5 +9,5 @@ devices:
   playback:
     type: CoreAudio
     channels: 2
-    device: "Built-in Output"
+    device: "外置耳筒"
     format: S32
