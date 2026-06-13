@@ -14,6 +14,30 @@
 let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   wsPort = toString servicesJSON.camilladsp.network.websocket.port;
+  userHome = config.users.users.${username}.home;
+  camilladspDaemon = pkgs.writeShellScript "camilladsp-daemon" ''
+    set -eu
+    camilladsp="${pkgs.camilladsp}/bin/camilladsp"
+    websocat="${pkgs.websocat}/bin/websocat"
+    jq="${pkgs.jq}/bin/jq"
+    ws_port="${wsPort}"
+    config_file="${userHome}/.config/camilladsp/configs/config.yml"
+    log_file="${userHome}/.local/state/nucleus/log/camilladsp/camilladsp.log"
+
+    "$camilladsp" -p "$ws_port" -w --no_config -o "$log_file" &
+    pid=$!
+
+    for i in $(seq 1 60); do
+      if [ -f "$config_file" ] && \
+         "$jq" -Rs '{SetConfig: .}' "$config_file" | \
+         "$websocat" -1 "ws://127.0.0.1:$ws_port" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 0.5
+    done
+
+    wait $pid
+  '';
 in
 {
   systemd.services.camilladsp = {
@@ -32,7 +56,7 @@ in
     serviceConfig = {
       Type = "simple";
       User = username;
-      ExecStart = "${pkgs.camilladsp}/bin/camilladsp -p ${wsPort} -w --no_config -o %h/.local/state/nucleus/log/camilladsp/camilladsp.log";
+      ExecStart = "${camilladspDaemon}";
       Restart = "on-failure";
       RestartSec = 30;
       WorkingDirectory = "%h";

@@ -71,7 +71,53 @@ function Sync-CamillaDSPService {
     "$($env:USERDOMAIN)\$($env:USERNAME)"
   }
 
-  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command `"& '$camilladspBin' -o '$logFile' -p $wsPort -w --no_config`""
+  # Compute config path for wrapper script.
+  $configPath = Join-Path -Path $HOME -ChildPath ".config\camilladsp\configs\config.yml"
+
+  # Write the wrapper script that auto-applies config via WS API.
+  $wrapperDir = Join-Path -Path $HOME -ChildPath ".config\camilladsp\bin"
+  $null = New-Item -Path $wrapperDir -ItemType Directory -Force
+  $wrapperScriptPath = Join-Path -Path $wrapperDir -ChildPath "autoconfig.ps1"
+  $wrapperContent = @'
+param(
+  [Parameter(Mandatory)] [string] $CamillaDSPBin,
+  [Parameter(Mandatory)] [int] $Port,
+  [Parameter(Mandatory)] [string] $ConfigFile,
+  [Parameter(Mandatory)] [string] $LogFile
+)
+
+$ErrorActionPreference = "Stop"
+
+# Start camilladsp with --no_config (WS server only, no device).
+$process = [System.Diagnostics.Process]::Start($CamillaDSPBin, "-p $Port -w --no_config -o `"$LogFile`"")
+if ($null -eq $process) { exit 1 }
+
+# Poll WS port and push config (up to ~15s).  Graceful if config file
+# doesn't exist yet (first boot before Home Manager deploy).
+for ($i = 0; $i -lt 30; $i++) {
+  Start-Sleep -Milliseconds 500
+  if (-not (Test-Path $ConfigFile)) { continue }
+  try {
+    $configYaml = Get-Content -Raw $ConfigFile
+    $configEscaped = $configYaml | ConvertTo-Json -Compress
+    $message = "{`"SetConfig`": $configEscaped}"
+    $ws = [System.Net.WebSockets.ClientWebSocket]::new()
+    $ct = [System.Threading.CancellationToken]::Empty
+    $ws.ConnectAsync([System.Uri]"ws://127.0.0.1:$Port", $ct).Wait()
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($message)
+    $ws.SendAsync([ArraySegment[byte]]::new($bytes), [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $ct).Wait()
+    $ws.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "done", $ct).Wait()
+    break
+  } catch {
+    # Port not ready or connection failed — retry.
+  }
+}
+
+$process.WaitForExit()
+'@
+  Set-Content -Path $wrapperScriptPath -Value $wrapperContent -NoNewline
+
+  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$wrapperScriptPath`" -CamillaDSPBin `"$camilladspBin`" -Port $wsPort -ConfigFile `"$configPath`" -LogFile `"$logFile`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
