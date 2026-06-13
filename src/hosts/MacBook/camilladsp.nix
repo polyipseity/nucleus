@@ -32,7 +32,7 @@ let
 
     for i in $(seq 1 60); do
       if [ -f "$config_file" ] && \
-         "$jq" -Rs '{SetConfig: .}' "$config_file" | \
+         "$jq" -cRs '{SetConfig: .}' "$config_file" | \
          "$websocat" -1 "ws://127.0.0.1:$ws_port" >/dev/null 2>&1; then
         break
       fi
