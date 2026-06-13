@@ -2,7 +2,13 @@
 #
 # Service-manager-specific fragment imported alongside the shared module.
 # The shared option definitions are in src/modules/https-proxy.nix.
-{ config, lib, pkgs, username, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  username,
+  ...
+}:
 
 let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
