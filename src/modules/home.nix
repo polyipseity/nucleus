@@ -454,12 +454,14 @@ in
       ${builtins.readFile ../scripts/agent-helpers.sh}
       _nucleus_unprotect_symlink "home.nix" "$HOME/iCloud"
       _nucleus_unprotect_symlink "home.nix" "$HOME/.config/camilladsp/config.yml"
+      _nucleus_unprotect_symlink "home.nix" "$HOME/.config/camillagui-backend/config.yml"
     '';
 
     home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       ${builtins.readFile ../scripts/agent-helpers.sh}
       _nucleus_protect_symlink "home.nix" "$HOME/iCloud"
       _nucleus_protect_symlink "home.nix" "$HOME/.config/camilladsp/config.yml"
+      _nucleus_protect_symlink "home.nix" "$HOME/.config/camillagui-backend/config.yml"
     '';
 
     # Override the default logDir (which uses ~) with a proper absolute path.
@@ -495,9 +497,15 @@ in
             config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camilladsp/config-${configName}.yml"
           else
             ./configs/camilladsp/config-${configName}.yml;
-        ".config/camillagui-backend/config.yml".source = ./configs/camillagui-backend/config-${
-          if pkgs.stdenv.isDarwin then "macos" else "linux"
-        }.yml;
+        ".config/camillagui-backend/config.yml".source =
+          let
+            repoRoot = builtins.getEnv "NUCLEUS_REPO";
+            configName = if pkgs.stdenv.isDarwin then "macos" else "linux";
+          in
+          if repoRoot != "" then
+            config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camillagui-backend/config-${configName}.yml"
+          else
+            ./configs/camillagui-backend/config-${configName}.yml;
       }
       (lib.optionalAttrs pkgs.stdenv.isDarwin {
         # Keep iCloud Drive reachable from a short, stable path for all managed
