@@ -81,6 +81,28 @@ following in both configuration and deconfiguration paths:
 - **Explicit toggle wiring**: expose enable/disable in
   `src/hosts/Windows/apply.ps1` and wire cleanup when disabled.
 
+## Service lifecycle cleanup
+
+When a service declaration is removed or disabled, each platform handles
+cleanup differently. Documented here so maintainers know what to expect.
+
+- **macOS (launchd) / NixOS (systemd)** — Mostly automatic.
+  Nix/darwin/home-manager removes the plist/unit file and unloads/stops the
+  service when you delete the declaration and re-apply (`darwin-rebuild switch` /
+  `home-manager switch` / `nixos-rebuild switch`). This works because Nix
+  manages the unit files declaratively.
+- **Windows native SCM services** (Caddy, LiteLLM) — Explicit.
+  Each `Sync-*Service.ps1` module implements its own cleanup when
+  `-Enabled:$false`: `Stop-Service` + `sc.exe delete`. The cleanup is manual
+  imperative code.
+- **Windows scheduled tasks** (cloud-drive, CamillaDSP, Discord Music RPC,
+  etc.) — Same explicit pattern. Each `Sync-*` module calls
+  `Unregister-ScheduledTask` when disabled.
+
+When adding a new Windows service module, always implement both the enable and
+disable paths. Verify disable removes the managed service/task state completely
+by testing with the toggle off.
+
 ## Package parity rules
 
 - When adding a cross-host CLI tool to `src/modules/core.nix`, check whether
