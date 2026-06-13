@@ -421,7 +421,7 @@ case "$(uname -s)" in
     run_nix run "$REPO_ROOT/src#health-check"
     # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
     # while running as root (which otherwise produces ownership warnings).
-    run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#macbook"
+    run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --impure --flake "$REPO_ROOT/src#macbook"
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust sudo
     NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/jellyfin-sync.sh"
