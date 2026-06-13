@@ -472,6 +472,7 @@ in
     # -------------------------------------------------------------------------
     vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
+      ${builtins.readFile ../scripts/agent-helpers.sh}
 
       # Locate the live repo checkout so the activation can resolve the
       # src/modules/configs/vscode/ path regardless of where the repo lives.
@@ -494,45 +495,6 @@ in
         exit 1
       fi
 
-      # Best-effort managed-symlink protection.  Absolute undeletability is not
-      # portable across all filesystems, so we use host-native immutable flags
-      # where available and gracefully continue when unsupported.
-      _nucleus_protect_symlink() {
-        _nps_path="$1"
-        case "$(uname -s)" in
-          Darwin)
-            if ! /usr/bin/chflags -h uchg "$_nps_path"; then
-              echo "VS Code: warning — could not protect symlink $_nps_path with uchg." >&2
-            fi
-            ;;
-          Linux)
-            if command -v chattr >/dev/null; then
-              if ! chattr -h +i "$_nps_path"; then
-                echo "VS Code: warning — could not protect symlink $_nps_path with chattr +i." >&2
-              fi
-            fi
-            ;;
-        esac
-      }
-
-      _nucleus_unprotect_symlink() {
-        _nus_path="$1"
-        case "$(uname -s)" in
-          Darwin)
-            if ! /usr/bin/chflags -h nouchg "$_nus_path"; then
-              echo "VS Code: warning — could not clear uchg from symlink $_nus_path before update." >&2
-            fi
-            ;;
-          Linux)
-            if command -v chattr >/dev/null; then
-              if ! chattr -h -i "$_nus_path"; then
-                echo "VS Code: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
-              fi
-            fi
-            ;;
-        esac
-      }
-
       # ensure_file_symlink TARGET LINK
       # Creates LINK as a symlink pointing to TARGET (a file).
       ensure_file_symlink() {
@@ -543,7 +505,7 @@ in
           # Already a symlink: skip when correct, remove when wrong (e.g. old
           # Nix-store path left over after removing home.file entry).
           [ "$(readlink "$_efs_link")" = "$_efs_target" ] && return 0
-          _nucleus_unprotect_symlink "$_efs_link"
+          _nucleus_unprotect_symlink "VS Code" "$_efs_link"
           rm "$_efs_link"
         elif [ -f "$_efs_link" ]; then
           # Real file: migrate content to repo target only when the repo does
@@ -557,7 +519,7 @@ in
 
         mkdir -p "$(dirname "$_efs_link")"
         ln -s "$_efs_target" "$_efs_link"
-        _nucleus_protect_symlink "$_efs_link"
+        _nucleus_protect_symlink "VS Code" "$_efs_link"
       }
 
       # ensure_dir_symlink TARGET LINK
@@ -568,7 +530,7 @@ in
 
         if [ -L "$_eds_link" ]; then
           [ "$(readlink "$_eds_link")" = "$_eds_target" ] && return 0
-          _nucleus_unprotect_symlink "$_eds_link"
+          _nucleus_unprotect_symlink "VS Code" "$_eds_link"
           rm "$_eds_link"
         elif [ -d "$_eds_link" ]; then
           # Real directory: copy each top-level file to the repo dir without
@@ -584,7 +546,7 @@ in
 
         mkdir -p "$(dirname "$_eds_link")"
         ln -s "$_eds_target" "$_eds_link"
-        _nucleus_protect_symlink "$_eds_link"
+        _nucleus_protect_symlink "VS Code" "$_eds_link"
       }
 
       for _vsym_base_dir in "${stableBaseDir}" "${insidersBaseDir}"; do
@@ -597,7 +559,7 @@ in
         _chat_lm_repo="$_vsym_config_dir/${vsCodeChatLanguageModelsFile}"
         _chat_lm_path="$_vsym_base_dir/chatLanguageModels.json"
         if [ -L "$_chat_lm_path" ]; then
-          _nucleus_unprotect_symlink "$_chat_lm_path"
+          _nucleus_unprotect_symlink "VS Code" "$_chat_lm_path"
           rm "$_chat_lm_path"
         fi
         if [ -s "$_chat_lm_path" ] 2>/dev/null; then
@@ -673,7 +635,7 @@ in
         # The previous approach linked the entire extensions/ dir to the Nix store,
         # which made VS Code's extensions.json writes fail with EACCES.
         if [ -L "$_sed_dir" ]; then
-          _nucleus_unprotect_symlink "$_sed_dir"
+          _nucleus_unprotect_symlink "VS Code" "$_sed_dir"
           rm "$_sed_dir"
         fi
         mkdir -p "$_sed_dir"
