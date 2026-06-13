@@ -187,6 +187,11 @@ in
       GOPASS_CONFIG_KEY_1 = "path";
       GOPASS_CONFIG_VALUE_1 = passwordStoreDir;
       PASSWORD_STORE_DIR = passwordStoreDir;
+    }
+    // lib.optionalAttrs pkgs.stdenv.isDarwin {
+      # Point out-of-store symlinks (e.g. CamillaDSP config) at the live repo
+      # tree so activation scripts can wire them up without dry-run uncertainty.
+      NUCLEUS_REPO = "/Users/polyipseity/Library/Mobile Documents/com~apple~CloudDocs/data/git/nucleus";
     };
 
     # QtPass keeps its own persisted settings store, which can override
