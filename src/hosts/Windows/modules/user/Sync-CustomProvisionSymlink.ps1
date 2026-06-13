@@ -45,37 +45,7 @@ function Sync-CustomProvisionSymlink {
     [object[]]$UserRecords
   )
 
-  function Set-ManagedSymlinkDeleteProtection {
-    [CmdletBinding(SupportsShouldProcess)]
-    param(
-      [Parameter(Mandatory = $true)]
-      [string]$Path
-    )
-
-    $principal = "$env:USERDOMAIN\$env:USERNAME"
-    if ($PSCmdlet.ShouldProcess($Path, "Apply symlink delete-protection ACL")) {
-      $grantResult = (& icacls $Path /L /deny "${principal}:(D)" 2>&1) | Out-String
-      if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Sync-CustomProvisionSymlink: could not apply delete-protection ACL to ${Path} : $grantResult"
-      }
-    }
-  }
-
-  function Remove-ManagedSymlinkDeleteProtection {
-    [CmdletBinding(SupportsShouldProcess)]
-    param(
-      [Parameter(Mandatory = $true)]
-      [string]$Path
-    )
-
-    $principal = "$env:USERDOMAIN\$env:USERNAME"
-    if ($PSCmdlet.ShouldProcess($Path, "Remove symlink delete-protection ACL")) {
-      $removeResult = (& icacls $Path /L /remove:d $principal 2>&1) | Out-String
-      if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Sync-CustomProvisionSymlink: could not clear delete-protection ACL from ${Path} before update : $removeResult"
-      }
-    }
-  }
+  . (Join-Path -Path $PSScriptRoot -ChildPath "..\..\Set-ManagedSymlinkDeleteProtection.ps1")
 
   function Resolve-ManagedUserPath {
     param(
@@ -149,7 +119,7 @@ function Sync-CustomProvisionSymlink {
 
     foreach ($previousPath in $previousManagedPaths) {
       if (Test-ManagedSymlink -Path $previousPath) {
-        Remove-ManagedSymlinkDeleteProtection -Path $previousPath
+        Remove-ManagedSymlinkDeleteProtection -Context "Sync-CustomProvisionSymlink" -Path $previousPath
       }
     }
 
@@ -219,7 +189,7 @@ function Sync-CustomProvisionSymlink {
         }
 
         if ($normalizedCurrentTarget -eq $entry.TargetPath) {
-          Set-ManagedSymlinkDeleteProtection -Path $entry.LinkPath
+          Set-ManagedSymlinkDeleteProtection -Context "Sync-CustomProvisionSymlink" -Path $entry.LinkPath
           continue
         }
 
@@ -228,7 +198,7 @@ function Sync-CustomProvisionSymlink {
 
       try {
         New-Item -ItemType SymbolicLink -Path $entry.LinkPath -Target $entry.TargetPath -Force -ErrorAction Stop | Out-Null
-        Set-ManagedSymlinkDeleteProtection -Path $entry.LinkPath
+        Set-ManagedSymlinkDeleteProtection -Context "Sync-CustomProvisionSymlink" -Path $entry.LinkPath
       }
       catch {
         Write-Warning "Sync-CustomProvisionSymlink: failed to create symlink $($entry.LinkPath) -> $($entry.TargetPath) for user '$username' : $_"
