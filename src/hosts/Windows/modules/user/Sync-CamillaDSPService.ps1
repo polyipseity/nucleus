@@ -88,8 +88,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$stateFile = Join-Path -Path $HOME -ChildPath ".local\state\camilladsp\statefile.yml"
+$null = New-Item -Path (Split-Path $stateFile -Parent) -ItemType Directory -Force
+
 # Start camilladsp with --no_config (WS server only, no device).
-$process = [System.Diagnostics.Process]::Start($CamillaDSPBin, "-p $Port -w --no_config -o `"$LogFile`"")
+$process = [System.Diagnostics.Process]::Start($CamillaDSPBin, "-p $Port --statefile `"$stateFile`" -w --no_config -o `"$LogFile`"")
 if ($null -eq $process) { exit 1 }
 
 # Poll WS port and push config (up to ~15s).  Graceful if config file

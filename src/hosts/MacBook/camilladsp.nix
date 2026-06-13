@@ -22,9 +22,12 @@ let
     jq="${pkgs.jq}/bin/jq"
     ws_port="${wsPort}"
     config_file="${userHome}/.config/camilladsp/configs/config.yml"
+    state_file="${userHome}/.local/state/camilladsp/statefile.yml"
     log_file="${userHome}/Library/Logs/nucleus/camilladsp/camilladsp.log"
 
-    "$camilladsp" -p "$ws_port" -w --no_config -o "$log_file" &
+    mkdir -p "$(dirname "$state_file")"
+
+    "$camilladsp" -p "$ws_port" --statefile "$state_file" -w --no_config -o "$log_file" &
     pid=$!
 
     for i in $(seq 1 60); do
