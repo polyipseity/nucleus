@@ -157,6 +157,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 REPO_ROOT="$(resolve_nucleus_root)"
+export NUCLEUS_REPO="$REPO_ROOT"
 
 # Augment PATH with the user Nix profile bin directory so Nix-managed binaries
 # (e.g. ssh-to-age, sops) are available when the script is invoked directly
@@ -199,8 +200,10 @@ run_nix() {
 run_nix_as_root() {
   # Execute nix as root while injecting the merged config explicitly so sudo's
   # default environment filtering cannot drop required flake settings.
+  # NUCLEUS_REPO is forwarded so builtins.getEnv in the Nix config can
+  # construct writable out-of-store symlinks during evaluation.
   NIX_CONFIG_VALUE="$(merge_nix_config)"
-  sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" nix --option warn-dirty false "$@"
+  sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" "NUCLEUS_REPO=${NUCLEUS_REPO:-}" nix --option warn-dirty false "$@"
 }
 
 start_sudo_keepalive() {
