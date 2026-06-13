@@ -200,41 +200,8 @@ in
             printf '%s\n' "$repoRoot"
           }
 
-          protect_managed_symlink() {
-            _pms_path="$1"
-            case "$(uname -s)" in
-              Darwin)
-                if ! /usr/bin/chflags -h uchg "$_pms_path"; then
-                  echo "devReposProvision: warning — could not protect symlink $_pms_path with uchg." >&2
-                fi
-                ;;
-              Linux)
-                if command -v chattr >/dev/null; then
-                  if ! chattr -h +i "$_pms_path"; then
-                    echo "devReposProvision: warning — could not protect symlink $_pms_path with chattr +i." >&2
-                  fi
-                fi
-                ;;
-            esac
-          }
-
-          unprotect_managed_symlink() {
-            _ums_path="$1"
-            case "$(uname -s)" in
-              Darwin)
-                if ! /usr/bin/chflags -h nouchg "$_ums_path"; then
-                  echo "devReposProvision: warning — could not clear uchg from symlink $_ums_path before update." >&2
-                fi
-                ;;
-              Linux)
-                if command -v chattr >/dev/null; then
-                  if ! chattr -h -i "$_ums_path"; then
-                    echo "devReposProvision: warning — could not clear chattr +i from symlink $_ums_path before update." >&2
-                  fi
-                fi
-                ;;
-            esac
-          }
+          # Source shared symlink protection helpers from agent-helpers.sh
+          ${builtins.readFile ../scripts/agent-helpers.sh}
 
           # Expand glob pattern and return matching paths. If no matches, return empty.
           expand_glob_paths() {
@@ -281,7 +248,7 @@ in
                 return 0
               fi
 
-              unprotect_managed_symlink "$symlinkPath"
+              _nucleus_unprotect_symlink "devReposProvision" "$symlinkPath"
               if ! rm "$symlinkPath"; then
                 report_error "failed to replace stale symlink for $repoName"
                 return 0
@@ -292,7 +259,7 @@ in
             fi
 
             if ln -s "$symlinkTarget" "$symlinkPath"; then
-              protect_managed_symlink "$symlinkPath"
+              _nucleus_protect_symlink "devReposProvision" "$symlinkPath"
               # Symlink created successfully (idempotent)
             else
               report_error "failed to create symlink for $repoName"

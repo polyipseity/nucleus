@@ -770,20 +770,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     configureRaycastApplicationAliases = lib.hm.dag.entryAfter [ "configureLaunchServices" ] ''
       _ray_alias_dir="$HOME/Applications/Nucleus App Aliases"
       mkdir -p "$_ray_alias_dir"
-
-      protect_alias_symlink() {
-        _ray_alias_path="$1"
-        if ! /usr/bin/chflags -h uchg "$_ray_alias_path"; then
-          echo "raycast: warning — could not protect alias symlink $_ray_alias_path with uchg." >&2
-        fi
-      }
-
-      unprotect_alias_symlink() {
-        _ray_alias_path="$1"
-        if ! /usr/bin/chflags -h nouchg "$_ray_alias_path"; then
-          echo "raycast: warning — could not clear uchg from alias symlink $_ray_alias_path before update." >&2
-        fi
-      }
+      ${builtins.readFile ../scripts/agent-helpers.sh}
 
       ensure_alias() {
         _alias_name="$1"
@@ -794,10 +781,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
         if [ -L "$_alias_path" ]; then
           if [ "$(readlink "$_alias_path")" = "$_target_app" ]; then
-            protect_alias_symlink "$_alias_path"
+            _nucleus_protect_symlink "raycast" "$_alias_path"
             return 0
           fi
-          unprotect_alias_symlink "$_alias_path"
+          _nucleus_unprotect_symlink "raycast" "$_alias_path"
           rm "$_alias_path"
         elif [ -e "$_alias_path" ]; then
           echo "raycast: keeping unmanaged app alias path $_alias_path (not a symlink)." >&2
@@ -805,7 +792,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         fi
 
         ln -s "$_target_app" "$_alias_path"
-        protect_alias_symlink "$_alias_path"
+        _nucleus_protect_symlink "raycast" "$_alias_path"
       }
 
       ensure_alias "Books (English).app" "/System/Applications/Books.app"

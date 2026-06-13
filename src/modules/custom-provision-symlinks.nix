@@ -68,44 +68,6 @@ let
   managedSymlinkManifestJson = builtins.toJSON (
     map (entry: entry.linkAbsolutePath) selectedSymlinksResolved
   );
-
-  managedSymlinkProtectionHelpers = ''
-    _nucleus_protect_symlink() {
-      _nps_path="$1"
-      case "$(uname -s)" in
-        Darwin)
-          if ! /usr/bin/chflags -h uchg "$_nps_path"; then
-            echo "customProvisionSymlinks: warning — could not protect symlink $_nps_path with uchg." >&2
-          fi
-          ;;
-        Linux)
-          if command -v chattr >/dev/null 2>&1; then
-            if ! chattr -h +i "$_nps_path"; then
-              echo "customProvisionSymlinks: warning — could not protect symlink $_nps_path with chattr +i." >&2
-            fi
-          fi
-          ;;
-      esac
-    }
-
-    _nucleus_unprotect_symlink() {
-      _nus_path="$1"
-      case "$(uname -s)" in
-        Darwin)
-          if ! /usr/bin/chflags -h nouchg "$_nus_path"; then
-            echo "customProvisionSymlinks: warning — could not clear uchg from symlink $_nus_path before update." >&2
-          fi
-          ;;
-        Linux)
-          if command -v chattr >/dev/null 2>&1; then
-            if ! chattr -h -i "$_nus_path"; then
-              echo "customProvisionSymlinks: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
-            fi
-          fi
-          ;;
-      esac
-    }
-  '';
 in
 {
   options.nucleus.customProvisionSymlinks = lib.mkOption {
@@ -179,13 +141,13 @@ in
       set -eu
 
       _nucleus_manifest_path=${lib.escapeShellArg managedSymlinkManifestPath}
-      ${managedSymlinkProtectionHelpers}
+      ${builtins.readFile ../scripts/agent-helpers.sh}
 
       if [ -f "$_nucleus_manifest_path" ]; then
         while IFS= read -r _nucleus_link_path; do
           [ -n "$_nucleus_link_path" ] || continue
           if [ -L "$_nucleus_link_path" ]; then
-            _nucleus_unprotect_symlink "$_nucleus_link_path"
+            _nucleus_unprotect_symlink "customProvisionSymlinks" "$_nucleus_link_path"
           fi
         done < <(${pkgs.jq}/bin/jq -r '.[]' "$_nucleus_manifest_path" 2>/dev/null || true)
       fi
@@ -196,11 +158,11 @@ in
 
       _nucleus_manifest_path=${lib.escapeShellArg managedSymlinkManifestPath}
       mkdir -p "$(dirname "$_nucleus_manifest_path")"
-      ${managedSymlinkProtectionHelpers}
+      ${builtins.readFile ../scripts/agent-helpers.sh}
 
       ${lib.concatMapStringsSep "\n" (entry: ''
         if [ -L ${lib.escapeShellArg entry.linkAbsolutePath} ]; then
-          _nucleus_protect_symlink ${lib.escapeShellArg entry.linkAbsolutePath}
+          _nucleus_protect_symlink "customProvisionSymlinks" ${lib.escapeShellArg entry.linkAbsolutePath}
         else
           echo "customProvisionSymlinks: warning — expected managed symlink at ${entry.linkAbsolutePath}." >&2
         fi

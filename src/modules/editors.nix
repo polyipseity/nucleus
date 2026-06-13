@@ -642,42 +642,7 @@ in
     # -----------------------------------------------------------------------
     vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
-
-      _nucleus_protect_symlink() {
-        _nps_path="$1"
-        case "$(uname -s)" in
-          Darwin)
-            if ! /usr/bin/chflags -h uchg "$_nps_path"; then
-              echo "VS Code: warning — could not protect symlink $_nps_path with uchg." >&2
-            fi
-            ;;
-          Linux)
-            if command -v chattr >/dev/null; then
-              if ! chattr -h +i "$_nps_path"; then
-                echo "VS Code: warning — could not protect symlink $_nps_path with chattr +i." >&2
-              fi
-            fi
-            ;;
-        esac
-      }
-
-      _nucleus_unprotect_symlink() {
-        _nus_path="$1"
-        case "$(uname -s)" in
-          Darwin)
-            if ! /usr/bin/chflags -h nouchg "$_nus_path"; then
-              echo "VS Code: warning — could not clear uchg from symlink $_nus_path before update." >&2
-            fi
-            ;;
-          Linux)
-            if command -v chattr >/dev/null; then
-              if ! chattr -h -i "$_nus_path"; then
-                echo "VS Code: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
-              fi
-            fi
-            ;;
-        esac
-      }
+      ${builtins.readFile ../scripts/agent-helpers.sh}
 
       source_extensions='${extensionStore}/share/vscode/extensions'
       stable_extensions="$HOME/.vscode/extensions"
@@ -725,7 +690,7 @@ in
           if [ -L "$_sed_link" ]; then
             # Correct symlink → no-op; wrong target (e.g. after store upgrade) → replace.
             [ "$(readlink "$_sed_link")" = "$_sed_src" ] && continue
-            _nucleus_unprotect_symlink "$_sed_link"
+            _nucleus_unprotect_symlink "VS Code" "$_sed_link"
             rm "$_sed_link"
           elif [ -e "$_sed_link" ]; then
             # Non-symlink entry (user-installed extension): leave untouched.
@@ -733,7 +698,7 @@ in
           fi
 
           ln -s "$_sed_src" "$_sed_link"
-          _nucleus_protect_symlink "$_sed_link"
+          _nucleus_protect_symlink "VS Code" "$_sed_link"
         done
 
         # Step 3: prune all entries not in the Nix-managed extension set.
@@ -745,7 +710,7 @@ in
           _sed_ext_name="''${_sed_existing##*/}"
           [ -e "$source_extensions/$_sed_ext_name" ] && continue
           if [ -L "$_sed_existing" ]; then
-            _nucleus_unprotect_symlink "$_sed_existing"
+            _nucleus_unprotect_symlink "VS Code" "$_sed_existing"
           fi
           rm -rf "$_sed_existing"
         done
