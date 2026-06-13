@@ -116,6 +116,17 @@ function Invoke-CamillaDSPSetup {
     if ($env:PATH -notlike "*$installDir*") {
       $env:PATH = "$installDir;$env:PATH"
     }
+
+    # Deploy system-level config to ProgramData (cross-platform parity with
+    # POSIX /etc/camilladsp/config.yml).
+    $configDir = Join-Path -Path $env:ProgramData -ChildPath "camilladsp"
+    $configPath = Join-Path -Path $configDir -ChildPath "config.yml"
+    $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camilladsp\config-windows.yml"
+    if (-not (Test-Path $configDir)) {
+      $null = New-Item -ItemType Directory -Path $configDir -Force
+    }
+    Copy-Item -Path $configSource -Destination $configPath -Force
+    Write-Output "camilladsp-setup: deployed config to $configPath"
   } finally {
     # Clean up temp directory.
     if (Test-Path $tempDir) {

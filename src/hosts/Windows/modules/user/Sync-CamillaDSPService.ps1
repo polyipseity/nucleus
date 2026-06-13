@@ -7,7 +7,7 @@
     1. Creates or removes a logon scheduled task that starts camilladsp.exe
        with the websocket API enabled.
 
-  The config.yml symlink is managed by apply.ps1.
+  The config.yml is deployed to ProgramData by Invoke-CamillaDSPSetup.
 
 .PARAMETER Enabled
   True applies the config and registers the startup task.  False removes the
@@ -49,7 +49,7 @@ function Sync-CamillaDSPService {
     return
   }
 
-  # Config symlink is managed by apply.ps1.  Ensure log directory exists.
+  # Config is deployed to ProgramData by Invoke-CamillaDSPSetup.  Ensure log directory exists.
   $null = New-Item -Path $logDir -ItemType Directory -Force
 
   # Find the camilladsp binary.
@@ -66,7 +66,8 @@ function Sync-CamillaDSPService {
     "$($env:USERDOMAIN)\$($env:USERNAME)"
   }
 
-  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command `"& '$camilladspBin' -o '$HOME\.config\camilladsp\config.yml' -p 1234 -w *>> '$logFile'`""
+  $configPath = Join-Path -Path $env:ProgramData -ChildPath "camilladsp\config.yml"
+  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command `"& '$camilladspBin' -o '$configPath' -p 1234 -w *>> '$logFile'`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
