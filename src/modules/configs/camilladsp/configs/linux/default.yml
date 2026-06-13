@@ -6,17 +6,17 @@ devices:
     device: BlackHole 2ch
     format: null
     labels: null
-    type: CoreAudio
+    type: Alsa
   capture_samplerate: null
   chunksize: 1024
   enable_rate_adjust: null
   multithreaded: null
   playback:
     channels: 2
-    device: "\u5916\u7F6E\u8033\u7B52"
+    device: hw:CARD=DAC,DEV=0
     exclusive: null
     format: null
-    type: CoreAudio
+    type: Alsa
   queuelimit: null
   rate_measure_interval: null
   samplerate: 96000
@@ -28,25 +28,7 @@ devices:
   volume_ramp_time: null
   worker_threads: null
 filters: {}
-mixers: {}
-pipeline:
-- bypassed: null
-  description: null
-  name: compressor
-  type: Processor
-processors:
-  compressor:
-    description: null
-    parameters:
-      attack: 0.025
-      channels: 2
-      clip_limit: 0
-      factor: 2.5
-      makeup_gain: 12
-      monitor_channels: null
-      process_channels: null
-      release: 0.25
-      soft_clip: true
-      threshold: -22
-    type: Compressor
+mixers: null
+pipeline: null
+processors: null
 title: null

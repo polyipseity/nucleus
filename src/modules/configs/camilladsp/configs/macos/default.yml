@@ -28,25 +28,7 @@ devices:
   volume_ramp_time: null
   worker_threads: null
 filters: {}
-mixers: {}
-pipeline:
-- bypassed: null
-  description: null
-  name: compressor
-  type: Processor
-processors:
-  compressor:
-    description: null
-    parameters:
-      attack: 0.025
-      channels: 2
-      clip_limit: 0
-      factor: 2.5
-      makeup_gain: 12
-      monitor_channels: null
-      process_channels: null
-      release: 0.25
-      soft_clip: true
-      threshold: -22
-    type: Compressor
+mixers: null
+pipeline: null
+processors: null
 title: null

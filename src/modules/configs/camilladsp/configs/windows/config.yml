@@ -1,14 +1,52 @@
+description: null
 devices:
-  samplerate: 48000
-  chunksize: 1024
+  adjust_period: null
   capture:
-    type: Wasapi
     channels: 2
-    device: "Speakers (Realtek Audio)"
-    loopback: true
-    format: F32
+    device: BlackHole 2ch
+    format: null
+    labels: null
+    type: Wasapi
+  capture_samplerate: null
+  chunksize: 1024
+  enable_rate_adjust: null
+  multithreaded: null
   playback:
-    type: Wasapi
     channels: 2
-    device: "Speakers (Realtek Audio)"
-    format: F32
+    device: Speakers (Realtek Audio)
+    exclusive: null
+    format: null
+    type: Wasapi
+  queuelimit: null
+  rate_measure_interval: null
+  samplerate: 96000
+  silence_threshold: null
+  silence_timeout: null
+  stop_on_rate_change: null
+  target_level: null
+  volume_limit: null
+  volume_ramp_time: null
+  worker_threads: null
+filters: {}
+mixers: {}
+pipeline:
+- bypassed: null
+  description: null
+  name: compressor
+  type: Processor
+processors:
+  compressor:
+    description: null
+    parameters:
+      attack: 0.025
+      channels: 2
+      clip_limit: 0
+      factor: 2.5
+      makeup_gain: 12
+      monitor_channels: null
+      process_channels: null
+      release: 0.25
+      soft_clip: true
+      threshold: -22
+    type: Compressor
+title: null
