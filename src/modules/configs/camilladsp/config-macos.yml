@@ -13,4 +13,4 @@ devices:
     format: S32
 
 logging:
-  filename: "~/Library/Logs/nucleus/camilladsp/camilladsp.log"
+  filename: "/Users/polyipseity/Library/Logs/nucleus/camilladsp/camilladsp.log"
