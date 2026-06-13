@@ -482,6 +482,9 @@ in
         ".config/camilladsp/config.yml".source = ./configs/camilladsp/config-${
           if pkgs.stdenv.isDarwin then "macos" else "linux"
         }.yml;
+        ".config/camilladsp/default_config.yml".source = ./configs/camilladsp/config-${
+          if pkgs.stdenv.isDarwin then "macos" else "linux"
+        }.yml;
         ".config/camillagui-backend/config.yml".source = ./configs/camillagui-backend/config-${
           if pkgs.stdenv.isDarwin then "macos" else "linux"
         }.yml;

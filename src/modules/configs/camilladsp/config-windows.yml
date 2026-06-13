@@ -12,3 +12,6 @@ devices:
     channels: 2
     device: "Speakers (Realtek Audio)"
     format: F32
+
+logging:
+  filename: "~/.local/state/nucleus/log/camilladsp/camilladsp.log"

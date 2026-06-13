@@ -11,3 +11,6 @@ devices:
     channels: 2
     device: "Built-in Output"
     format: S32
+
+logging:
+  filename: "~/Library/Logs/nucleus/camilladsp/camilladsp.log"
