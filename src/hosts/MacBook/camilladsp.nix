@@ -23,7 +23,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${pkgs.camilladsp}/bin/camilladsp -p ${wsPort} -w -o $HOME/Library/Logs/nucleus/camilladsp/camilladsp.log $HOME/.config/camilladsp/config.yml"
+        "exec ${pkgs.camilladsp}/bin/camilladsp -p ${wsPort} -w -o $HOME/Library/Logs/nucleus/camilladsp/camilladsp.log $HOME/.config/camilladsp/configs/config.yml"
       ];
       UserName = username;
       KeepAlive = true;

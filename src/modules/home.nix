@@ -460,14 +460,14 @@ in
     home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       ${builtins.readFile ../scripts/agent-helpers.sh}
       _nucleus_unprotect_symlink "home.nix" "$HOME/iCloud"
-      _nucleus_unprotect_symlink "home.nix" "$HOME/.config/camilladsp/config.yml"
+      _nucleus_unprotect_symlink "home.nix" "$HOME/.config/camilladsp/configs"
       _nucleus_unprotect_symlink "home.nix" "$HOME/.config/camillagui-backend/config.yml"
     '';
 
     home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       ${builtins.readFile ../scripts/agent-helpers.sh}
       _nucleus_protect_symlink "home.nix" "$HOME/iCloud"
-      _nucleus_protect_symlink "home.nix" "$HOME/.config/camilladsp/config.yml"
+      _nucleus_protect_symlink "home.nix" "$HOME/.config/camilladsp/configs"
       _nucleus_protect_symlink "home.nix" "$HOME/.config/camillagui-backend/config.yml"
     '';
 
@@ -494,26 +494,24 @@ in
       (lib.optionalAttrs (builtins.pathExists (dotfilesRoot + "/.gitconfig")) {
         ".gitconfig".source = dotfilesRoot + "/.gitconfig";
       })
-      {
-        ".config/camilladsp/config.yml".source =
-          let
-            repoRoot = builtins.getEnv "NUCLEUS_REPO";
-            configName = if pkgs.stdenv.isDarwin then "macos" else "linux";
-          in
-          if repoRoot != "" then
-            config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camilladsp/config-${configName}.yml"
-          else
-            ./configs/camilladsp/config-${configName}.yml;
-        ".config/camillagui-backend/config.yml".source =
-          let
-            repoRoot = builtins.getEnv "NUCLEUS_REPO";
-            configName = if pkgs.stdenv.isDarwin then "macos" else "linux";
-          in
-          if repoRoot != "" then
-            config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camillagui-backend/config-${configName}.yml"
-          else
-            ./configs/camillagui-backend/config-${configName}.yml;
-      }
+      (
+        let
+          repoRoot = builtins.getEnv "NUCLEUS_REPO";
+          configName = if pkgs.stdenv.isDarwin then "macos" else "linux";
+        in
+        {
+          ".config/camilladsp/configs".source =
+            if repoRoot != "" then
+              config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camilladsp/configs/${configName}"
+            else
+              ./configs/camilladsp/configs/${configName};
+          ".config/camillagui-backend/config.yml".source =
+            if repoRoot != "" then
+              config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camillagui-backend/config-${configName}.yml"
+            else
+              ./configs/camillagui-backend/config-${configName}.yml;
+        }
+      )
       (lib.optionalAttrs pkgs.stdenv.isDarwin {
         # Keep iCloud Drive reachable from a short, stable path for all managed
         # macOS users so scripts and shell workflows avoid long spaced paths.
