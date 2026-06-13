@@ -191,7 +191,9 @@ in
     // lib.optionalAttrs pkgs.stdenv.isDarwin {
       # Point out-of-store symlinks (e.g. CamillaDSP config) at the live repo
       # tree so activation scripts can wire them up without dry-run uncertainty.
-      NUCLEUS_REPO = "/Users/polyipseity/Library/Mobile Documents/com~apple~CloudDocs/data/git/nucleus";
+      # Resolved from the NUCLEUS_REPO env var that apply.sh exports before the
+      # rebuild — avoids hard-coding a machine-specific absolute path.
+      NUCLEUS_REPO = builtins.getEnv "NUCLEUS_REPO";
     };
 
     # QtPass keeps its own persisted settings store, which can override
