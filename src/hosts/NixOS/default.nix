@@ -7,7 +7,6 @@
 
   imports = [
     ../../modules/core.nix
-    ../../modules/custom-packages.nix
     ../../modules/gnupg.nix
     ../../modules/https-proxy.nix
     ../../modules/logging.nix
@@ -17,8 +16,8 @@
     ../../modules/posix-user-shell.nix
     ./ai.nix
     ./base.nix
-    ./camilladsp.nix
-    ./camillagui-backend.nix
+    ../../modules/camilladsp.nix
+    ../../modules/camillagui-backend.nix
     ./desktop.nix
     ./hardware/cpu.nix
     ./hardware/disks.nix

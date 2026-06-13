@@ -12,7 +12,6 @@
 
   imports = [
     ../../modules/core.nix
-    ../../modules/custom-packages.nix
     ../../modules/gnupg.nix
     ../../modules/https-proxy.nix
     ../../modules/logging.nix
@@ -23,8 +22,8 @@
     ./activation.nix
     ./ai.nix
     ./base.nix
-    ./camilladsp.nix
-    ./camillagui-backend.nix
+    ../../modules/camilladsp.nix
+    ../../modules/camillagui-backend.nix
     ./defaults.nix
     ./homebrew.nix
     ./jellyfin.nix

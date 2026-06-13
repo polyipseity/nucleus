@@ -26,6 +26,7 @@ let
     pkgs.bun
     pkgs.caddy
     pkgs.camilladsp
+    pkgs.camillagui-backend
     pkgs.cargo-binstall
     pkgs.cargo-cache
     pkgs.direnv
@@ -78,6 +79,7 @@ let
     pkgs.desktoppr
     pkgs.duti
     pkgs.pinentry_mac
+    pkgs.equaliser
   ];
 
   # macOS packages available in both nixpkgs and Homebrew.

@@ -239,6 +239,87 @@
                 '';
               });
             })
+            (_final: prev: {
+              equaliser = prev.stdenv.mkDerivation rec {
+                pname = "equaliser";
+                version = "1.3.3";
+
+                sourceRoot = ".";
+
+                nativeBuildInputs = [ prev.undmg ];
+
+                src = prev.fetchurl {
+                  url = "https://github.com/cvknage/equaliser/releases/download/v${version}/Equaliser-${version}.dmg";
+                  hash = "sha256-L/W2Vw2DPkTzeHG2wciN7ORQYRN35dM5sHmnBTkzlLI=";
+                };
+
+                installPhase = ''
+                  mkdir -p $out/Applications
+                  cp -r *.app $out/Applications/
+                '';
+
+                meta = {
+                  description = "System-wide parametric equaliser for Apple Silicon";
+                  homepage = "https://github.com/cvknage/equaliser";
+                  license = prev.lib.licenses.gpl3Only;
+                  platforms = [ "aarch64-darwin" ];
+                };
+              };
+            })
+            (_final: prev: {
+              # camillagui-backend is a PyInstaller one-file bundle: Python app
+              # data is appended after Mach-O section boundaries, so stripping
+              # removes the appended PKG archive.
+              camillagui-backend = prev.stdenv.mkDerivation rec {
+                pname = "camillagui-backend";
+                version = "4.1.0";
+
+                src =
+                  if prev.stdenv.isDarwin then
+                    if prev.stdenv.isAarch64 then
+                      prev.fetchurl {
+                        url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_macos_aarch64.tar.gz";
+                        hash = "sha256-CdoLZUrvqhyYPwIIUk2av3aOihOuRnDWm8ZcF/1LT2M=";
+                      }
+                    else
+                      prev.fetchurl {
+                        url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_macos_intel.tar.gz";
+                        hash = "sha256-RUDHi8Bbhpdydr6lGI+TCNTMqtlUyoJgtH0rG2x01kE=";
+                      }
+                  else if prev.stdenv.isAarch64 then
+                    prev.fetchurl {
+                      url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_linux_aarch64.tar.gz";
+                      hash = "sha256-mlQVtE3aWEePGN6f1XLt8JL2Wf1eRcvoCG/1ZI3Aidc=";
+                    }
+                  else
+                    prev.fetchurl {
+                      url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_linux_amd64.tar.gz";
+                      hash = "sha256-hv083ldQOPMS7ee60JENxeRrl0yvwEjCYRXsPLn1R5I=";
+                    };
+
+                sourceRoot = "camillagui_backend";
+                dontStrip = true;
+                dontPatchELF = true;
+
+                installPhase = ''
+                  mkdir -p $out/libexec/camillagui-backend $out/bin
+                  cp -r * $out/libexec/camillagui-backend/
+                  ln -s $out/libexec/camillagui-backend/camillagui_backend $out/bin/camillagui-backend
+                '';
+
+                meta = {
+                  description = "Web GUI for CamillaDSP";
+                  homepage = "https://github.com/HEnquist/camillagui-backend";
+                  license = prev.lib.licenses.mit;
+                  platforms = [
+                    "x86_64-linux"
+                    "aarch64-linux"
+                    "x86_64-darwin"
+                    "aarch64-darwin"
+                  ];
+                };
+              };
+            })
             (
               _final: prev:
               let

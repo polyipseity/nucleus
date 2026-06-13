@@ -65,14 +65,14 @@
     },
     "platforms": {
       "macos": {
-        "domain": "user",
-        "justification": "Per-user audio processing bound to login session",
+        "domain": "system",
+        "justification": "System-wide audio processor independent of login session",
         "service": "local.camilladsp",
         "type": "launchctl"
       },
       "nixos": {
-        "justification": "Per-user audio processing bound to login session",
-        "scope": "user",
+        "justification": "System-wide audio processor independent of login session",
+        "scope": "system",
         "service": "camilladsp.service",
         "type": "systemctl"
       },
@@ -94,14 +94,14 @@
     },
     "platforms": {
       "macos": {
-        "domain": "user",
-        "justification": "Per-user web GUI daemon bound to login session",
+        "domain": "system",
+        "justification": "System-wide web GUI daemon independent of login session",
         "service": "local.camillagui-backend",
         "type": "launchctl"
       },
       "nixos": {
-        "justification": "Per-user web GUI daemon bound to login session",
-        "scope": "user",
+        "justification": "System-wide web GUI daemon independent of login session",
+        "scope": "system",
         "service": "camillagui-backend.service",
         "type": "systemctl"
       },
