@@ -60,6 +60,13 @@
 # nix binary.
 set -euo pipefail
 
+# Refuse to run as root — privilege escalation (sudo) is managed internally
+# by the script when needed rather than relying on an already-elevated caller.
+if [ "$(id -u)" -eq 0 ]; then
+  printf '%s\n' "error: this script must not be run as root. Run as a regular user (sudo is used internally when needed)." >&2
+  exit 1
+fi
+
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 # shellcheck disable=SC1091

@@ -235,6 +235,15 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# Refuse to run as Administrator — privilege escalation is managed internally
+# when needed rather than relying on an already-elevated caller.
+$isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if ($isAdmin) {
+  Write-Error "This script must not be run as Administrator. Run as a regular user (elevation is managed internally when needed)."
+  exit 1
+}
+
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 
 # Compose internal Enable-* flags from high-level -No* switches for downstream guards.
