@@ -509,6 +509,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     "Downloads/iCloud".source = config.lib.file.mkOutOfStoreSymlink liveICloudDownloads;
   };
 
+  home.activation.unprotectDownloadsICloudSymlink = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+    ${builtins.readFile ../scripts/agent-helpers.sh}
+    _nucleus_unprotect_symlink "macos.nix" "$HOME/Downloads/iCloud"
+  '';
+
   home.activation.protectDownloadsICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     ${builtins.readFile ../scripts/agent-helpers.sh}
     _nucleus_protect_symlink "macos.nix" "$HOME/Downloads/iCloud"

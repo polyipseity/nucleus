@@ -450,6 +450,11 @@ in
 
     # Protect the ~/iCloud symlink (mkOutOfStoreSymlink) against accidental
     # deletion between rebuilds.
+    home.activation.unprotectICloudSymlink = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+      ${builtins.readFile ../scripts/agent-helpers.sh}
+      _nucleus_unprotect_symlink "home.nix" "$HOME/iCloud"
+    '';
+
     home.activation.protectICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       ${builtins.readFile ../scripts/agent-helpers.sh}
       _nucleus_protect_symlink "home.nix" "$HOME/iCloud"
