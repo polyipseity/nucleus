@@ -1,4 +1,6 @@
 devices:
+  samplerate: 48000
+  chunksize: 1024
   capture:
     type: Wasapi
     channels: 2
