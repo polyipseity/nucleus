@@ -21,13 +21,19 @@ in
     serviceConfig = {
       Label = "local.camilladsp";
       ProgramArguments = [
-        "/bin/sh"
-        "-c"
-        "exec ${pkgs.camilladsp}/bin/camilladsp -p ${wsPort} -w -o $HOME/Library/Logs/nucleus/camilladsp/camilladsp.log $HOME/.config/camilladsp/configs/config.yml"
+        "${pkgs.camilladsp}/bin/camilladsp"
+        "-p"
+        wsPort
+        "-w"
+        "--no_config"
+        "-o"
+        "${userHome}/Library/Logs/nucleus/camilladsp/camilladsp.log"
       ];
       UserName = username;
       KeepAlive = true;
       RunAtLoad = true;
+      ThrottleInterval = 30;
+      WorkingDirectory = userHome;
       StandardOutPath = "${userHome}/Library/Logs/nucleus/camilladsp/stdout.log";
       StandardErrorPath = "${userHome}/Library/Logs/nucleus/camilladsp/stderr.log";
     };

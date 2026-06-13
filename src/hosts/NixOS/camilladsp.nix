@@ -32,8 +32,10 @@ in
     serviceConfig = {
       Type = "simple";
       User = username;
-      ExecStart = "${pkgs.camilladsp}/bin/camilladsp -p ${wsPort} -w -o %h/.local/state/nucleus/log/camilladsp/camilladsp.log %h/.config/camilladsp/configs/config.yml";
+      ExecStart = "${pkgs.camilladsp}/bin/camilladsp -p ${wsPort} -w --no_config -o %h/.local/state/nucleus/log/camilladsp/camilladsp.log";
       Restart = "on-failure";
+      RestartSec = 30;
+      WorkingDirectory = "%h";
     };
     wantedBy = [ "default.target" ];
   };
