@@ -18,6 +18,29 @@ let
   shellNixText = builtins.readFile ../../src/modules/shell.nix;
   checkShText = builtins.readFile ../../scripts/check.sh;
   checkPs1Text = builtins.readFile ../../scripts/check.ps1;
+  windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
+
+  # Parsed services.json for structural assertions
+  parsedServices = builtins.fromJSON servicesJsonText;
+  serviceNames = builtins.filter (n: n != "\$schema") (builtins.attrNames parsedServices);
+
+  # Tail-recursive list helpers
+  all =
+    pred: list:
+    if list == [ ] then
+      true
+    else if pred (builtins.head list) then
+      all pred (builtins.tail list)
+    else
+      false;
+  any =
+    pred: list:
+    if list == [ ] then
+      false
+    else if pred (builtins.head list) then
+      true
+    else
+      any pred (builtins.tail list);
 in
 
 # --- services.json structural assertions ---
@@ -96,4 +119,89 @@ assert containsRegex "Service registry validation" checkPs1Text;
 assert containsRegex ''services\.json'' checkPs1Text;
 assert containsRegex "justification" checkPs1Text;
 assert containsRegex "users.json" checkPs1Text;
+
+# --- Windows profile wiring assertions ---
+assert containsRegex "nucleus-svc" windowsShellProfileText;
+assert containsRegex "scripts\\\\svc\\.ps1" windowsShellProfileText;
+
+# --- endpoint subcommand presence in both backends ---
+assert containsRegex "do_endpoint" svcShText;
+assert containsRegex "'endpoint'" svcPs1Text;
+assert containsRegex "endpoint_name" svcShText;
+
+# --- --json flag handling in both backends ---
+assert containsRegex "json_output" svcShText;
+assert containsRegex ''\$Json'' svcPs1Text;
+
+# --- Structural: each service has at least one non-omitted platform ---
+assert all (
+  name:
+  let
+    entry = parsedServices.${name};
+    platforms = builtins.attrNames entry.platforms;
+  in
+  any (p: entry.platforms.${p}.type != "omitted") platforms
+) serviceNames;
+
+# --- Structural: all host platform keys are valid (macos, nixos, windows) ---
+assert all (
+  name:
+  let
+    entry = parsedServices.${name};
+    knownPlatforms = [
+      "macos"
+      "nixos"
+      "windows"
+    ];
+  in
+  all (p: any (kp: kp == p) knownPlatforms) (builtins.attrNames entry.platforms)
+) serviceNames;
+
+# --- Schema reference integrity ---
+assert containsRegex ''services\.schema\.json'' servicesJsonText;
+
+# --- Phase C: Structural/parse assertions ---
+# read_registry jq filter syntax
+assert containsRegex "to_entries.*map" svcShText;
+assert containsRegex "select.*type == .object." svcShText;
+# --json handled before action (the filtered_service_names loop)
+assert containsRegex "filtered_service_names" svcShText;
+assert containsRegex "json_output=true" svcShText;
+# $Json switch parameter in svc.ps1 param block
+assert containsRegex "switch.*\\\$Json" svcPs1Text;
+# Error: service not found in both backends
+assert containsRegex "service not found" svcShText;
+assert containsRegex "service not found in registry" svcPs1Text;
+# Error: unsupported host in svc.sh
+assert containsRegex "unsupported host" svcShText;
+# Unknown action error in both backends
+assert containsRegex "unsupported argument" svcShText;
+assert containsRegex "missing action" svcShText;
+assert containsRegex "missing action" svcPs1Text;
+
+# --- Phase E: Cross-host parity assertions ---
+# All 8 subcommands handled in svc.sh case statement
+assert
+  containsRegex "list" svcShText
+  && containsRegex "status" svcShText
+  && containsRegex "start" svcShText
+  && containsRegex "stop" svcShText;
+assert
+  containsRegex "restart" svcShText
+  && containsRegex "enable" svcShText
+  && containsRegex "disable" svcShText
+  && containsRegex "endpoint" svcShText;
+# All 8 subcommands handled in svc.ps1 switch statement
+assert containsRegex "'list'" svcPs1Text && containsRegex "'status'" svcPs1Text;
+assert
+  containsRegex "'start'" svcPs1Text
+  && containsRegex "'stop'" svcPs1Text
+  && containsRegex "'restart'" svcPs1Text;
+assert
+  containsRegex "'enable'" svcPs1Text
+  && containsRegex "'disable'" svcPs1Text
+  && containsRegex "'endpoint'" svcPs1Text;
+# Both backends have consistent error message prefix
+assert containsRegex "svc:" svcShText;
+assert containsRegex "svc:" svcPs1Text;
 true
