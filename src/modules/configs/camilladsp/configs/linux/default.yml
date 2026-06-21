@@ -19,6 +19,7 @@ devices:
     type: Alsa
   queuelimit: null
   rate_measure_interval: null
+  resampler: null
   samplerate: 96000
   silence_threshold: null
   silence_timeout: null

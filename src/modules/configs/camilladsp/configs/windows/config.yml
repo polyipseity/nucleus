@@ -19,6 +19,7 @@ devices:
     type: Wasapi
   queuelimit: null
   rate_measure_interval: null
+  resampler: null
   samplerate: 96000
   silence_threshold: null
   silence_timeout: null
@@ -27,9 +28,23 @@ devices:
   volume_limit: null
   volume_ramp_time: null
   worker_threads: null
-filters: {}
+filters:
+  compressor pre-gain:
+    description: null
+    parameters:
+      gain: 20
+      inverted: false
+      mute: false
+      scale: dB
+    type: Gain
 mixers: {}
 pipeline:
+- bypassed: null
+  channels: null
+  description: null
+  names:
+  - compressor pre-gain
+  type: Filter
 - bypassed: null
   description: null
   name: compressor
@@ -41,12 +56,12 @@ processors:
       attack: 0.025
       channels: 2
       clip_limit: 0
-      factor: 2.5
-      makeup_gain: 12
+      factor: 3.5
+      makeup_gain: 0
       monitor_channels: null
       process_channels: null
       release: 0.25
       soft_clip: true
-      threshold: -22
+      threshold: -21
     type: Compressor
 title: null
