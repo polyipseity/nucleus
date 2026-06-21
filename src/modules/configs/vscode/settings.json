@@ -238,6 +238,7 @@
   },
   "terminal.integrated.enableMultiLinePasteWarning": "never",
   "terminal.integrated.fontSize": 14,
+  "terminal.integrated.initialHint": false,
   "terminal.integrated.initialHintCopilotCli": true,
   "ty.disableLanguageServices": false,
   "ty.importStrategy": "fromEnvironment",
