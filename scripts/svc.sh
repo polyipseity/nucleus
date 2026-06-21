@@ -96,7 +96,7 @@ resolve_service_names() {
         entries=$(expand_prefix "$key" "$prefix" "$plat_json")
         printf '%s\n' "$entries"
       else
-        printf '%s\t%s\t%s\n' "$key" "$display" "$plat_json"
+        printf '%s\t%s\t%s\t%s\n' "$key" "$display" "$plat_json" "$key"
       fi
     done < <(echo "$registry" | jq -r 'to_entries[] | [.key, .value.displayName, (.value.platform | tojson)] | @tsv')
     return
@@ -115,10 +115,10 @@ resolve_service_names() {
         entries=$(expand_prefix "$name" "$prefix" "$(echo "$entry" | jq -c '.platform')")
         printf '%s\n' "$entries"
       else
-        printf '%s\n' "$name	$(echo "$entry" | jq -r '.displayName')	$(echo "$entry" | jq -c '.platform')"
+        printf '%s\n' "$name	$(echo "$entry" | jq -r '.displayName')	$(echo "$entry" | jq -c '.platform')	$name"
       fi
     else
-      printf '%s\n' "ERROR:unknown	$name	{\"error\":\"service not found in registry\"}"
+      printf '%s\n' "ERROR:unknown	$name	{\"error\":\"service not found in registry\"}	ERROR:unknown"
     fi
   done
 }
@@ -136,10 +136,10 @@ expand_prefix() {
       local matches
       matches=$($sudo_prefix launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)
       if [ -z "$matches" ]; then
-        printf '%s\t%s\t%s\n' "$name" "$prefix" "$plat_json"
+        printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
       else
         while IFS= read -r m; do
-          printf '%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"launchctl\",\"service\":\"$m\",\"domain\":\"$(echo "$plat_json" | jq -r '.domain')\"}"
+          printf '%s\t%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"launchctl\",\"service\":\"$m\",\"domain\":\"$(echo "$plat_json" | jq -r '.domain')\"}" "$m"
         done <<< "$matches"
       fi
       ;;
@@ -149,10 +149,10 @@ expand_prefix() {
       local matches
       matches=$(systemctl $scope_flag list-units --all "$prefix*" --no-legend 2>/dev/null | awk '{ print $1 }' || true)
       if [ -z "$matches" ]; then
-        printf '%s\t%s\t%s\n' "$name" "$prefix" "$plat_json"
+        printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
       else
         while IFS= read -r m; do
-          printf '%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"systemctl\",\"service\":\"$m\",\"scope\":\"$(echo "$plat_json" | jq -r '.scope')\"}"
+          printf '%s\t%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"systemctl\",\"service\":\"$m\",\"scope\":\"$(echo "$plat_json" | jq -r '.scope')\"}" "$m"
         done <<< "$matches"
       fi
       ;;
@@ -218,6 +218,19 @@ svc_status() {
   esac
 }
 
+# launchctl_target — Build a macOS launchctl service target specifier.
+# macOS 25+ requires gui/<uid>/<service> for user domain and
+# system/<service> for system domain. Older macOS accepted bare service IDs.
+launchctl_target() {
+  local domain="$1"
+  local service="$2"
+  if [ "$domain" = "system" ]; then
+    printf 'system/%s' "$service"
+  else
+    printf 'gui/%s/%s' "$(id -u)" "$service"
+  fi
+}
+
 # svc_action — Perform an action on a single service.
 svc_action() {
   local action="$1"
@@ -234,14 +247,16 @@ svc_action() {
       domain=$(echo "$entry_json" | jq -r '.domain // "user"')
       local sudo_prefix=""
       [ "$domain" = "system" ] && sudo_prefix="sudo"
+      local target
+      target=$(launchctl_target "$domain" "$svc_id")
 
       case "$action" in
         status)  svc_status "$name" "$entry_json" ;;
-        start)   $sudo_prefix launchctl kickstart -p "$svc_id" >/dev/null 2>&1 || $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 ;;
-        stop)    $sudo_prefix launchctl kill SIGTERM "$svc_id" >/dev/null 2>&1 ;;
-        restart) $sudo_prefix launchctl kickstart -k -p "$svc_id" >/dev/null 2>&1 ;;
-        enable)  $sudo_prefix launchctl enable "$svc_id" >/dev/null 2>&1 ;;
-        disable) $sudo_prefix launchctl disable "$svc_id" >/dev/null 2>&1 ;;
+        start)   $sudo_prefix launchctl kickstart -p "$target" >/dev/null 2>&1 || $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 ;;
+        stop)    $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
+        restart) $sudo_prefix launchctl kickstart -k -p "$target" >/dev/null 2>&1 ;;
+        enable)  $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
+        disable) $sudo_prefix launchctl disable "$target" >/dev/null 2>&1 ;;
       esac
       ;;
     systemctl)
@@ -278,19 +293,19 @@ do_list() {
   if [ "$json_output" = true ]; then
     printf '{"svc_version":"1","services":{'
     local first=true
-    while IFS=$'\t' read -r key display svc_json; do
+    while IFS=$'\t' read -r key display svc_json json_key; do
       if echo "$key" | grep -q '^ERROR:'; then has_error=true; continue; fi
       local status_json
       status_json=$(svc_status "$key" "$svc_json")
       $first || printf ','
       first=false
-      printf '"%s":%s' "$key" "$status_json"
+      printf '"%s":%s' "$json_key" "$status_json"
     done <<< "$entries"
     printf '}}\n'
   else
     printf '%-24s %-10s %-8s %s\n' "Service" "Status" "Running" "PID"
     printf '%.0s-' {1..60}; printf '\n'
-    while IFS=$'\t' read -r key display svc_json; do
+    while IFS=$'\t' read -r key display svc_json json_key; do
       if echo "$key" | grep -q '^ERROR:'; then
         local err_name="${key#ERROR:}"
         printf '%-24s %-10s %-8s %s\n' "$err_name" "n/a" "-" "-"
@@ -303,7 +318,7 @@ do_list() {
       status=$(echo "$status_json" | jq -r '.status')
       running=$(echo "$status_json" | jq -r '.running')
       pid=$(echo "$status_json" | jq -r '.pid // "-"')
-      printf '%-24s %-10s %-8s %s\n' "$key" "$status" "$running" "$pid"
+      printf '%-24s %-10s %-8s %s\n' "$display" "$status" "$running" "$pid"
     done <<< "$entries"
   fi
   $has_error && return 1 || return 0
@@ -321,7 +336,7 @@ do_status() {
   fi
 
   local any_error=false
-  while IFS=$'\t' read -r key display svc_json; do
+  while IFS=$'\t' read -r key display svc_json json_key; do
     if echo "$key" | grep -q '^ERROR:'; then
       local err_name="${key#ERROR:}"
       printf 'svc: %s — %s\n' "$err_name" "$(echo "$svc_json" | jq -r '.error')" >&2
@@ -340,6 +355,10 @@ do_status() {
 }
 
 do_action() {
+  if [ "${#service_names[@]}" -eq 0 ]; then
+    printf 'svc: missing service name for %s\n' "$action" >&2
+    exit 1
+  fi
   local registry
   registry=$(read_registry)
 
@@ -413,7 +432,7 @@ do_endpoint() {
     if [ "$json_output" = true ]; then
       printf '%s\n' "$network"
     else
-      echo "$network" | jq -r 'to_entries[] | [.key, .protocol + "://" + .host + ":" + (.port|tostring)] | @tsv'
+      echo "$network" | jq -r 'to_entries[] | [.key, .value.protocol + "://" + .value.host + ":" + (.value.port|tostring)] | @tsv'
     fi
   fi
 }
