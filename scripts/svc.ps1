@@ -163,13 +163,19 @@ function Get-ServiceStatus {
         $svc = Get-Service -Name $svcName -ErrorAction Stop
         $running = $svc.Status -eq 'Running'
         $enabled = $svc.StartType -in @('Automatic', 'AutomaticDelayedStart')
+        $pid = $null
+        if ($running) {
+          $pid = (Get-CimInstance -ClassName Win32_Service -Filter "Name='$svcName'" -ErrorAction SilentlyContinue).ProcessId
+          if ($pid -eq 0) { $pid = $null }
+        }
         return @{
           status  = if ($running) { 'active' } else { 'inactive' }
           running = $running
           enabled = $enabled
+          pid     = $pid
         }
       } catch {
-        return @{ status = 'not-found'; running = $false; enabled = $false }
+        return @{ status = 'not-found'; running = $false; enabled = $false; pid = $null }
       }
     }
     'schtask' {
@@ -221,7 +227,7 @@ function Invoke-ServiceAction {
         'status'  { return Get-ServiceStatus -Platform $Platform }
         'start'   { Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
         'stop'    { Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
-        'restart' { Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop -ErrorAction SilentlyContinue; Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
+        'restart' { Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction SilentlyContinue; Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
         'enable'  { Enable-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
         'disable' { Disable-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
       }
@@ -260,7 +266,7 @@ function Format-StatusTable {
       $realKey = $key -replace '^ERROR:'
       $lines += "{0,-24} {1,-10} {2,-8} {3}" -f $realKey, 'n/a', '-', '-'
     } else {
-      $lines += "{0,-24} {1,-10} {2,-8} {3}" -f $key, $info.status, $info.running, ($info.Pid -as [int] -or '-')
+      $lines += "{0,-24} {1,-10} {2,-8} {3}" -f $key, $info.status, $info.running, ($info.pid -as [int] -or '-')
     }
   }
   return $lines -join "`n"
