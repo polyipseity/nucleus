@@ -268,13 +268,19 @@ function Format-StatusTable {
 
 switch ($Action) {
   'list' {
-    $resolved = Resolve-ServiceName -Names @()
+    $resolved = Resolve-ServiceName -Names $ServiceName
     $results = @{}
+    $hasError = $false
     foreach ($key in $resolved.Keys) {
+      if ($key -like 'ERROR:*') {
+        $hasError = $true
+        continue
+      }
       $status = Get-ServiceStatus -Platform $resolved[$key].platform
       $results[$key] = $status
     }
     Write-Output (Format-StatusTable -Results $results)
+    if ($hasError -and -not $Json) { exit 1 }
   }
 
   'status' {

@@ -274,11 +274,12 @@ do_list() {
   local entries
   entries=$(resolve_service_names "$registry" "${service_names[@]}")
 
+  local has_error=false
   if [ "$json_output" = true ]; then
     printf '{"svc_version":"1","services":{'
     local first=true
     while IFS=$'\t' read -r key display svc_json; do
-      if echo "$key" | grep -q '^ERROR:'; then continue; fi
+      if echo "$key" | grep -q '^ERROR:'; then has_error=true; continue; fi
       local status_json
       status_json=$(svc_status "$key" "$svc_json")
       $first || printf ','
@@ -293,6 +294,7 @@ do_list() {
       if echo "$key" | grep -q '^ERROR:'; then
         local err_name="${key#ERROR:}"
         printf '%-24s %-10s %-8s %s\n' "$err_name" "n/a" "-" "-"
+        has_error=true
         continue
       fi
       local status_json
@@ -304,6 +306,7 @@ do_list() {
       printf '%-24s %-10s %-8s %s\n' "$key" "$status" "$running" "$pid"
     done <<< "$entries"
   fi
+  $has_error && return 1 || return 0
 }
 
 do_status() {
