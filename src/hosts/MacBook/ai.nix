@@ -62,8 +62,8 @@ in
         OLLAMA_KV_CACHE_TYPE = "q4_0";
         OLLAMA_CONTEXT_LENGTH = "32768";
       };
-      StandardOutPath = "/dev/null";
-      StandardErrorPath = "/dev/null";
+      StandardOutPath = "${config.nucleus.logging.systemLogDir}/ollama/stdout.log";
+      StandardErrorPath = "${config.nucleus.logging.systemLogDir}/ollama/stderr.log";
     };
   };
 }

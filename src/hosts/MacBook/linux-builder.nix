@@ -106,6 +106,7 @@ in
           export TMPDIR=/run/org.nixos.linux-builder USE_TMPDIR=1
           rm -rf $TMPDIR
           mkdir -p $TMPDIR
+          mkdir -p "${workDir}"
           trap "rm -rf $TMPDIR" EXIT
           exec ${pkg}/bin/create-builder
         ''}"
@@ -113,6 +114,8 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       WorkingDirectory = workDir;
+      StandardOutPath = "${config.nucleus.logging.systemLogDir}/linux-builder/stdout.log";
+      StandardErrorPath = "${config.nucleus.logging.systemLogDir}/linux-builder/stderr.log";
       EnvironmentVariables = {
         NIX_SSL_CERT_FILE = config.environment.variables.NIX_SSL_CERT_FILE;
       };

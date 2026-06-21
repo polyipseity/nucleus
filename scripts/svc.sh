@@ -252,9 +252,9 @@ svc_action() {
 
       case "$action" in
         status)  svc_status "$name" "$entry_json" ;;
-        start)   $sudo_prefix launchctl kickstart -p "$target" >/dev/null 2>&1 || $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 ;;
+        start)   $sudo_prefix launchctl start "$target" >/dev/null 2>&1 || [ $? -eq 3 ] ;;
         stop)    $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
-        restart) $sudo_prefix launchctl kickstart -k -p "$target" >/dev/null 2>&1 ;;
+        restart) $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1; $sudo_prefix launchctl start "$target" >/dev/null 2>&1 || [ $? -eq 3 ] ;;
         enable)  $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
         disable) $sudo_prefix launchctl disable "$target" >/dev/null 2>&1 ;;
       esac
