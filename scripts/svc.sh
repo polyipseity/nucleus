@@ -129,8 +129,12 @@ expand_prefix() {
   local name="$1" prefix="$2" plat_json="$3"
   case "$PLATFORM" in
     macos)
+      local sudo_prefix=""
+      local domain
+      domain=$(echo "$plat_json" | jq -r '.domain // "user"')
+      [ "$domain" = "system" ] && sudo_prefix="sudo"
       local matches
-      matches=$(launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)
+      matches=$($sudo_prefix launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)
       if [ -z "$matches" ]; then
         printf '%s\t%s\t%s\n' "$name" "$prefix" "$plat_json"
       else
