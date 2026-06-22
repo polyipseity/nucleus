@@ -33,23 +33,14 @@ param(
 $ErrorActionPreference = 'Stop'
 
 function Resolve-NucleusRoot {
-  $configPath = Join-Path $HOME '.config\nucleus\repo-root'
-  if (Test-Path -Path $configPath -PathType Leaf) {
-    $configuredRoot = (Get-Content -Path $configPath -Raw).Trim()
-    if (-not [string]::IsNullOrWhiteSpace($configuredRoot) -and (Test-Path -Path $configuredRoot -PathType Container)) {
-      return $configuredRoot
-    }
+  $repoRoot = $env:NUCLEUS_REPO
+  if (-not $repoRoot) {
+    throw "NUCLEUS_REPO is not set. Run via apply.ps1"
   }
-
-  # git rev-parse stderr is suppressed because running outside a git checkout
-  # is expected and benign here; the result is validated before use.
-  # Use $PSScriptRoot so resolution works from any CWD.
-  $gitRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null | Out-String).Trim()
-  if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and (Test-Path -Path $gitRoot -PathType Container)) {
-    return $gitRoot
+  if (-not (Test-Path -Path $repoRoot -PathType Container)) {
+    throw "NUCLEUS_REPO path '$repoRoot' does not exist or is not a directory."
   }
-
-  return (Join-Path $HOME 'dev\nucleus')
+  return $repoRoot
 }
 
 function Get-RcloneMissingRemote {
