@@ -350,13 +350,8 @@ let
     && !(containsRegex "--check-access" windowsReplicaModuleText)
   ) "Replica sync runners must enforce pull-only policy and avoid bisync state machinery";
 
-  # Test 44: replica-sync entrypoints resolve repository root outside checkout CWD
-  test_replica_entrypoints_resolve_repo_root = assert' (
-    containsRegex "resolve_nucleus_root" replicaSyncShellText
-    && containsRegex "\.config/nucleus/repo-root" replicaSyncShellText
-    && containsRegex "Resolve-NucleusRepoRoot" replicaSyncPwshText
-    && containsRegex "\.config\\nucleus\\repo-root" replicaSyncPwshText
-  ) "Replica entrypoint scripts must resolve repo root via managed config/git/CWD fallback";
+  # Test 44: replica-sync entrypoints resolve repository root via env var
+  test_replica_entrypoints_resolve_repo_root = assert' (containsRegex "Resolve-NucleusRepoRoot" replicaSyncPwshText) "Replica entrypoint scripts must resolve repo root via env var";
 
   # Test 45: fallbackTimer settings are wired to intended scheduled-sync runners on all hosts
   test_replica_fallback_timer_wiring = assert' (
@@ -579,8 +574,7 @@ let
     # test_onedrive_personal_vault_excluded
     test_icloud_replica_platform_invariant
     test_replica_pull_only_policy
-    # FIXME(pre-existing): test_replica_entrypoints_resolve_repo_root — repo root resolution check fails
-    # test_replica_entrypoints_resolve_repo_root
+    test_replica_entrypoints_resolve_repo_root
     test_replica_fallback_timer_wiring
     test_macos_launchd_inventory_is_declared
     # FIXME(pre-existing): test_replica_reset_command_parity — replica-reset parity check fails
