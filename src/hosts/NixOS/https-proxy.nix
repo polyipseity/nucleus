@@ -3,12 +3,7 @@
 # Enables the NixOS Caddy module with the admin endpoint and per-virtual-host
 # TLS termination so all host-shared services declared via
 # nucleus.httpsProxy get Caddy HTTPS ingress.
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ config, lib, ... }:
 let
   inherit (lib) mkIf;
   cfg = config.nucleus.httpsProxy;

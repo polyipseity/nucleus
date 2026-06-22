@@ -5,7 +5,6 @@
 # Manager in modules/home.nix.
 {
   config,
-  lib,
   pkgs,
   username,
   ...

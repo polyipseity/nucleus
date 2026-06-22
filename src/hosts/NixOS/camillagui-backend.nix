@@ -3,13 +3,7 @@
 # Runs as the primary user so the daemon can access user-level config at
 # ~/.config/camillagui-backend/. Config is deployed by Home Manager in
 # modules/home.nix.
-{
-  config,
-  lib,
-  pkgs,
-  username,
-  ...
-}:
+{ pkgs, username, ... }:
 
 {
   systemd.services.camillagui-backend = {

@@ -2,11 +2,7 @@
 #
 # Provides the domain list and drift-reset script for purging stale user
 # preference state before declarative re-assertion.
-{
-  config,
-  lib,
-  pkgs,
-}:
+{ pkgs, ... }:
 let
   # Domains intentionally reset before each Home Manager write pass so stale
   # manual overrides do not survive forever in ~/Library/Preferences.

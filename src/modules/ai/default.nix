@@ -24,7 +24,6 @@
 #            qwen3:8b               — same as NixOS; tool-calling NOT yet
 #                                     curl-tested on Windows.
 {
-  config,
   lib,
   nixpkgs,
   pkgs,

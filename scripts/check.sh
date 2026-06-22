@@ -92,7 +92,7 @@ _step=0
 # ---------------------------------------------------------------------------
 printf '\n=== [%s] Dead Nix code ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
-  deadnix src/
+  deadnix --fail src/
   echo "No dead Nix code found."
 else
   echo "Skipping deadnix (path-scoped mode)."

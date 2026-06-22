@@ -5,12 +5,7 @@
 #
 # Import this module at both the system level (in host/default.nix) and the
 # user level (in home.nix) to make options available everywhere.
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ lib, pkgs, ... }:
 let
   inherit (lib) mkOption types;
 in

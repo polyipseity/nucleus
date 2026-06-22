@@ -2,11 +2,7 @@
 #
 # Provides Nix-level helpers for deterministic Finder sidebar state via
 # mysides.  Used by macos.nix activation hooks.
-{
-  config,
-  lib,
-  pkgs,
-}:
+{ config, lib, ... }:
 let
   # URI-encode a string for use in file:// URLs consumed by `mysides add`.
   # `mysides` expects properly encoded URIs; raw spaces cause silent failures.

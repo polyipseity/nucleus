@@ -164,7 +164,7 @@
               # because the latter doesn't propagate through the fixpoint to
               # python3Packages in an overlay context.
               python3Packages = prev.python3Packages.overrideScope (
-                pyfinal: pyprev: {
+                _pyfinal: pyprev: {
                   a2a-sdk = pyprev.a2a-sdk.overrideAttrs (_: {
                     dontUsePytestCheck = true;
                   });

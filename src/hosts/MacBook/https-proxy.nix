@@ -25,7 +25,7 @@ let
         }
       '';
 
-      virtualHostConfigs = lib.mapAttrsToList (name: vh: ''
+      virtualHostConfigs = lib.mapAttrsToList (_name: vh: ''
         https://${vh.hostname}:${toString vh.listenPort} {
           bind 127.0.0.1 ::1
           tls internal

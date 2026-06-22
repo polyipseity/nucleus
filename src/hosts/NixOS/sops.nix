@@ -3,13 +3,7 @@
 #
 # LiteLLM service runs as the dedicated `litellm` user (declared in
 # hosts/NixOS/ai.nix), so the AI API key secrets must be owned by it.
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
-{
+{ ... }: {
   # System-level SOPS secrets used by the LiteLLM systemd service
   # (hosts/NixOS/ai.nix).  sops-nix writes each secret as a plain file to
   # /run/secrets/<name> by default.

@@ -9,11 +9,11 @@
 #   - passwordStoreDir: resolved path to the password store root.
 #   - userAppSettings: (appName -> attrset) helper that reads per-user overrides.
 {
-  config,
   lib,
   pkgs,
   passwordStoreDir,
   userAppSettings,
+  ...
 }:
 let
   qtPassDefaultSettings = {
