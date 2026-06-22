@@ -9,7 +9,7 @@ gui_config_file: null
 config_dir: "~/.config/camilladsp/configs"
 coeff_dir: "~/.config/camilladsp/coeffs"
 default_config: "~/.config/camilladsp/configs/config.yml"
-statefile_path: "~/.config/camilladsp/configs/state.yml"
+statefile_path: "~/.local/state/camilladsp/statefile.yml"
 log_file: "~/.local/state/nucleus/log/camilladsp/camilladsp.log"
 on_set_active_config: null
 on_get_active_config: null

@@ -496,20 +496,13 @@ in
       })
       (
         let
-          repoRoot = builtins.getEnv "NUCLEUS_REPO";
           configName = if pkgs.stdenv.isDarwin then "macos" else "linux";
         in
         {
           ".config/camilladsp/configs".source =
-            if repoRoot != "" then
-              config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camilladsp/configs/${configName}"
-            else
-              ./configs/camilladsp/configs/${configName};
+            config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO"}/src/modules/configs/camilladsp/configs/${configName}";
           ".config/camillagui-backend/config.yml".source =
-            if repoRoot != "" then
-              config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camillagui-backend/config-${configName}.yml"
-            else
-              ./configs/camillagui-backend/config-${configName}.yml;
+            config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO"}/src/modules/configs/camillagui-backend/config-${configName}.yml";
         }
       )
       (lib.optionalAttrs pkgs.stdenv.isDarwin {
