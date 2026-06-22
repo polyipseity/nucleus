@@ -447,12 +447,9 @@
     # after homebrew bundle (so the cellar is populated) but before other
     # post-install scripts.  Never fails activation.
     #
-    # REPO_ROOT is inherited from the activation runner's environment (written by
-    # apply.sh at $HOME/.config/nucleus/repo-root).  If unset, skip gracefully.
+    # NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo.  If unset,
+    # skip gracefully.
     hb_repo_root="$NUCLEUS_REPO_ROOT"
-    if [ -z "$hb_repo_root" ] && [ -f "$HOME/.config/nucleus/repo-root" ]; then
-      read -r hb_repo_root < "$HOME/.config/nucleus/repo-root"
-    fi
     if [ -n "$hb_repo_root" ] && [ -f "$hb_repo_root/src/scripts/verify-homebrew-unpinnable.sh" ]; then
       NUCLEUS_REPO_ROOT="$hb_repo_root" sh "$hb_repo_root/src/scripts/verify-homebrew-unpinnable.sh" || true
     fi
@@ -467,12 +464,9 @@
     # it in src/scripts/jellyfin-sync.sh avoids duplicating 600+ lines of shell
     # across hosts and keeps the activation file scoped to macOS-specific hooks.
     #
-    # REPO_ROOT is inherited from the activation runner's environment (written by
-    # apply.sh at $HOME/.config/nucleus/repo-root).  If unset, skip gracefully.
+    # NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo.  If unset,
+    # skip gracefully.
     jellyfin_repo_root="$NUCLEUS_REPO_ROOT"
-    if [ -z "$jellyfin_repo_root" ] && [ -f "$HOME/.config/nucleus/repo-root" ]; then
-      read -r jellyfin_repo_root < "$HOME/.config/nucleus/repo-root"
-    fi
     if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh" ]; then
       NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh"
     fi

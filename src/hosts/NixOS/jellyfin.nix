@@ -32,9 +32,6 @@ in
   # convergence that Nix's build-time model cannot express.
   system.activationScripts.jellyfin-sync = lib.mkAfter ''
     jellyfin_repo_root="''${NUCLEUS_REPO_ROOT:-}"
-    if [ -z "$jellyfin_repo_root" ]; then
-      read -r jellyfin_repo_root < "$HOME/.config/nucleus/repo-root" 2>/dev/null || true
-    fi
     if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh" ]; then
       NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh"
     fi
