@@ -158,6 +158,7 @@ done
 
 REPO_ROOT="$(resolve_nucleus_root)"
 export NUCLEUS_REPO="$REPO_ROOT"
+export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 
 # Augment PATH with the user Nix profile bin directory so Nix-managed binaries
 # (e.g. ssh-to-age, sops) are available when the script is invoked directly
@@ -178,16 +179,10 @@ unset _nix_profile_bin
 # Resolve src/scripts/ for apply-internal script delegation.
 _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 
-# Write the repo root to a well-known path so Home Manager activation scripts
-# (particularly vscodeSymlinks in editors.nix) can locate live repo files such
-# as src/modules/configs/vscode/.  Environment variables are not reliably
-# propagated through the sudo sessions that darwin-rebuild and nixos-rebuild
-# invoke, so a stable file path is the safe transport mechanism.
-mkdir -p "$HOME/.config/nucleus"
-printf '%s\n' "$REPO_ROOT" > "$HOME/.config/nucleus/repo-root"
 # Symlink the LiteLLM config so edits take effect on service restart without
 # re-running apply.  All host services (macOS launchd, NixOS systemd, Windows
 # scheduled task) reference this well-known path.
+mkdir -p "$HOME/.config/nucleus"
 ln -sf "$REPO_ROOT/src/modules/ai/litellm-config.yml" "$HOME/.config/nucleus/litellm-config.yml"
 
 run_nix() {

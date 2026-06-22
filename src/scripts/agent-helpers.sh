@@ -7,7 +7,7 @@
 # Provided functions:
 #   _nucleus_protect_symlink       — set uchg / chattr +i on a symlink
 #   _nucleus_unprotect_symlink     — clear uchg / chattr -i from a symlink
-#   _nucleus_resolve_repo_root     — resolve NUCLEUS_REPO or fallback marker file
+#   _nucleus_resolve_repo_root     — resolve $NUCLEUS_REPO, fail if unset
 #   _nucleus_prepend_first_executable_dir — prepend dir containing executable to PATH
 
 # ---------------------------------------------------------------------------
@@ -57,15 +57,12 @@ _nucleus_unprotect_symlink() {
 # ---------------------------------------------------------------------------
 # Repo root resolver
 # ---------------------------------------------------------------------------
-# Resolve the active repo root from apply-time environment, falling back to
-# the persisted marker that survives sudo/rebuild boundaries.
+# Resolve the active repo root from $NUCLEUS_REPO (set by apply.sh).
+# Fails fast if unset — no fallback marker file.
 _nucleus_resolve_repo_root() {
   _nrr_context="$1"
-  _nrr_repo_root_file="$HOME/.config/nucleus/repo-root"
   if [ -n "${NUCLEUS_REPO:-}" ]; then
     printf '%s\n' "$NUCLEUS_REPO"
-  elif [ -f "$_nrr_repo_root_file" ]; then
-    cat "$_nrr_repo_root_file"
   else
     echo "$_nrr_context: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
     return 1

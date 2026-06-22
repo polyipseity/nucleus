@@ -17,7 +17,7 @@
 #   (none)        This is a library; source it, do not execute.
 #
 # Environment variables:
-#   NUCLEUS_REPO_ROOT  Override the detected repository root path (default: auto-detected via resolve_nucleus_root).
+#   NUCLEUS_REPO_ROOT  Repository root path. Must be set; resolve_nucleus_root fails if unset.
 #
 # Exit conditions:
 #   N/A           This is a library; exit codes apply to the sourcing script.
@@ -42,31 +42,15 @@ usage_std() {
 
 # resolve_nucleus_root — Print the absolute path of the nucleus repository root.
 #
-# Resolution order (Hybrid Precedence):
-#   1. $NUCLEUS_REPO_ROOT environment variable (if non-empty and directory exists)
-#   2. $HOME/.config/nucleus/repo-root file (first line, if directory exists)
-#   3. git rev-parse --show-toplevel (if inside a git working tree)
-#   4. $HOME/dev/nucleus (fallback)
+# Requires $NUCLEUS_REPO_ROOT to be set to a valid directory (e.g. by apply.sh).
+# Fails fast if unset or missing — no silent fallbacks.
 resolve_nucleus_root() {
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ]; then
     printf '%s\n' "$NUCLEUS_REPO_ROOT"
     return 0
   fi
-  _rnr_config_file="$HOME/.config/nucleus/repo-root"
-  if [ -f "$_rnr_config_file" ]; then
-    _rnr_root="$(cat "$_rnr_config_file")"
-    if [ -n "$_rnr_root" ] && [ -d "$_rnr_root" ]; then
-      printf '%s\n' "$_rnr_root"
-      return 0
-    fi
-  fi
-  if _rnr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
-    if [ -n "$_rnr_git_root" ] && [ -d "$_rnr_git_root" ]; then
-      printf '%s\n' "$_rnr_git_root"
-      return 0
-    fi
-  fi
-  printf '%s\n' "$HOME/dev/nucleus"
+  printf '%s\n' "resolve_nucleus_root: NUCLEUS_REPO_ROOT is not set or does not point to a directory" >&2
+  return 1
 }
 
 # resolve_nucleus_host — Print the canonical host name.
