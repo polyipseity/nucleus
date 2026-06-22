@@ -9,10 +9,8 @@
 # symlinks. This allows ClawHub to write fetched skill downloads into
 # ~/.agents/skills/ without those writes entering the tracked repo tree.
 #
-# Activation reads the repo root from:
-#   1. $NUCLEUS_REPO  (set by apply.sh before the rebuild call)
-#   2. ~/.config/nucleus/repo-root  (written by apply.sh, survives the sudo boundary)
-# Both paths mirror the pattern used by vsCodeSymlinks in editors.nix.
+# Activation reads the repo root from $NUCLEUS_REPO (set by apply.sh before the
+# rebuild call and forwarded through sudo).
 #
 # agentsSkills (below) manages ~/.agents/skills/ independently.
 {
@@ -22,9 +20,9 @@
   ...
 }:
 let
-  # Activation scripts resolve the repo root dynamically from the apply-time
-  # marker (~/.config/nucleus/repo-root), so out-of-store symlinks survive repo
-  # relocations and rebuilds without stale store paths.
+  # Activation scripts resolve the repo root dynamically from $NUCLEUS_REPO
+  # (set by apply.sh and forwarded through sudo), so out-of-store symlinks
+  # survive repo relocations and rebuilds without stale store paths.
 
   # Keep path fragments centralized so activation entries reference one source
   # of truth for the repo-hosted agents configuration tree.
@@ -72,8 +70,7 @@ in
 
       # Resolve the repo root so the activation can construct an absolute path
       # to src/modules/configs/agents/ regardless of where the repo is checked
-      # out.  $NUCLEUS_REPO is set by apply.sh; the file fallback survives the
-      # sudo boundary that darwin-rebuild / nixos-rebuild cross.
+      # out.  $NUCLEUS_REPO is set by apply.sh and forwarded through sudo.
       _as_repo_root="$(_nucleus_resolve_repo_root "agents-config")"
 
       _as_agents_source="$_as_repo_root/${agentsConfigRelativePath}"

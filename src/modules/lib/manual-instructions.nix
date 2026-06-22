@@ -3,17 +3,13 @@
 # same logic without duplication.
 { hostManualFile }: osLabel: ''
   _manual_path='${hostManualFile}'
-  _repo_root_file="$HOME/.config/nucleus/repo-root"
   _resolved_manual_path="$_manual_path"
 
   case "$_manual_path" in
     /*) ;;
     *)
-      if [ -n "''${NUCLEUS_REPO:-}" ]; then
-        _resolved_manual_path="$NUCLEUS_REPO/$_manual_path"
-      elif [ -f "$_repo_root_file" ]; then
-        _resolved_manual_path="$(cat "$_repo_root_file")/$_manual_path"
-      fi
+      _repo_root="''${NUCLEUS_REPO:?${osLabel}: NUCLEUS_REPO not set; run via apply.sh}"
+      _resolved_manual_path="$_repo_root/$_manual_path"
       ;;
   esac
 

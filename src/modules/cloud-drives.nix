@@ -260,25 +260,7 @@ let
     pkgs.writeShellScript "cloud-replica-scheduled-sync-${replica.id}" ''
       set -eu
 
-      resolve_nucleus_root() {
-        _rnr_config_file="$HOME/.config/nucleus/repo-root"
-        if [ -f "$_rnr_config_file" ]; then
-          _rnr_root="$(cat "$_rnr_config_file")"
-          if [ -n "$_rnr_root" ] && [ -d "$_rnr_root" ]; then
-            printf '%s\n' "$_rnr_root"
-            return 0
-          fi
-        fi
-        if _rnr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
-          if [ -n "$_rnr_git_root" ] && [ -d "$_rnr_git_root" ]; then
-            printf '%s\n' "$_rnr_git_root"
-            return 0
-          fi
-        fi
-        printf '%s\n' "$HOME/dev/nucleus"
-      }
-
-      _repo_root="$(resolve_nucleus_root)"
+      _repo_root="''${NUCLEUS_REPO_ROOT:?cloud-drives: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
       _nucleus_replica_cmd="${currentUserHome}/.nix-profile/bin/nucleus-replica-sync"
       if [ ! -x "$_nucleus_replica_cmd" ]; then
         echo "cloud-drives: nucleus replica command not found at $_nucleus_replica_cmd" >&2

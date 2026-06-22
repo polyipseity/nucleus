@@ -149,17 +149,14 @@ in
             echo "devReposProvision: $1" >&2
           }
 
-          # Resolve the live checkout root written by apply.sh before the rebuild.
-          # Repo-root symlinks must target the mutable working tree rather than the
-          # Nix store copy of flake inputs, or ~/dev/nucleus drifts away from the
-          # user's actual checkout after every rebuild.
-          repoRootFile="$HOME/.config/nucleus/repo-root"
+          # Resolve the live checkout root from $NUCLEUS_REPO (set by apply.sh
+          # before the rebuild and forwarded through sudo). Repo-root symlinks
+          # must target the mutable working tree rather than the Nix store copy
+          # of flake inputs, or ~/dev/nucleus drifts away from the user's actual
+          # checkout after every rebuild.
           repoRoot=""
-          gitBin="${pkgs.git}/bin/git"
           if [ -n "''${NUCLEUS_REPO:-}" ]; then
             repoRoot="$NUCLEUS_REPO"
-          elif [ -f "$repoRootFile" ]; then
-            repoRoot="$(cat "$repoRootFile")"
           fi
 
           devDir="$HOME/dev"

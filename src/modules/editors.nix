@@ -466,9 +466,8 @@ in
     #                           (no-clobber), then replace with symlink.
     #   - Absent              → create symlink (parent dirs created as needed).
     #
-    # Repo root is read from ~/.config/nucleus/repo-root (written by apply.sh
-    # before invoking darwin-rebuild / nixos-rebuild), with $NUCLEUS_REPO as
-    # an optional override for manual runs outside of apply.sh.
+    # Repo root is resolved from $NUCLEUS_REPO (set by apply.sh before invoking
+    # darwin-rebuild / nixos-rebuild and forwarded through sudo).
     # -------------------------------------------------------------------------
     vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
@@ -476,18 +475,12 @@ in
 
       # Locate the live repo checkout so the activation can resolve the
       # src/modules/configs/vscode/ path regardless of where the repo lives.
-      # apply.sh writes REPO_ROOT to this file before the rebuild because
-      # environment variables do not reliably survive the sudo boundary that
-      # darwin-rebuild and nixos-rebuild cross.
-      _vsym_repo_root_file="$HOME/.config/nucleus/repo-root"
-      if [ -n "''${NUCLEUS_REPO:-}" ]; then
-        _vsym_repo_root="$NUCLEUS_REPO"
-      elif [ -f "$_vsym_repo_root_file" ]; then
-        _vsym_repo_root="$(cat "$_vsym_repo_root_file")"
-      else
+      # $NUCLEUS_REPO is set by apply.sh and forwarded through sudo.
+      if [ -z "''${NUCLEUS_REPO:-}" ]; then
         echo "VS Code: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
         exit 1
       fi
+      _vsym_repo_root="$NUCLEUS_REPO"
 
       _vsym_config_dir="$_vsym_repo_root/src/modules/configs/vscode"
       if [ ! -d "$_vsym_config_dir" ]; then

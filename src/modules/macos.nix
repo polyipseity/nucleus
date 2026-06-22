@@ -36,8 +36,8 @@
   ...
 }:
 let
-  # Activation scripts resolve the repo root dynamically from the apply-time
-  # marker (~/.config/nucleus/repo-root), so out-of-store symlinks survive repo
+  # Activation scripts resolve the repo root from $NUCLEUS_REPO_ROOT (set by
+  # apply.sh and forwarded through sudo), so out-of-store symlinks survive repo
   # relocations and rebuilds without stale store paths.
   liveICloudDownloads = "${config.home.homeDirectory}/Library/Mobile Documents/com~apple~CloudDocs/Downloads";
 
@@ -422,17 +422,9 @@ let
   gcWeekly = pkgs.writeShellScript "gc-weekly" ''
     set -eu
 
-    # Locate the nucleus repository root. Launchd jobs run with a generic HOME,
-    # so we look for the canonical canonical repo path first, then fall back to
-    # git discovery.
-    REPO_ROOT=""
-    if [ -f "$HOME/.config/nucleus/repo-root" ]; then
-      REPO_ROOT="$(cat "$HOME/.config/nucleus/repo-root")"
-    elif REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; then
-      :
-    else
-      REPO_ROOT="$HOME/dev/nucleus"
-    fi
+    # Repo root must come from NUCLEUS_REPO_ROOT (set by apply.sh).
+    # Launchd jobs run with a generic HOME but inherit env via launchd plist.
+    REPO_ROOT="''${NUCLEUS_REPO_ROOT:?gc: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
 
     if [ ! -f "$REPO_ROOT/scripts/gc.sh" ]; then
       echo "gc: scripts/gc.sh not found at $REPO_ROOT; skipping weekly GC"
@@ -705,13 +697,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     configureLinearmouseConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
 
-      _ll_repo_root=""
-      if [ -f "$HOME/.config/nucleus/repo-root" ]; then
-        _ll_repo_root="$(cat "$HOME/.config/nucleus/repo-root")"
-      fi
-      if [ -z "$_ll_repo_root" ]; then
-        _ll_repo_root="$HOME/dev/nucleus"
-      fi
+      _ll_repo_root="''${NUCLEUS_REPO:?LinearMouse: NUCLEUS_REPO not set; run via apply.sh}"
       _ll_source="$_ll_repo_root/src/modules/configs/linearmouse/linearmouse.json"
 
       mkdir -p "$HOME/.config/linearmouse"

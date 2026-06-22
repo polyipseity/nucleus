@@ -113,17 +113,9 @@ let
         fi
       ''}
 
-      # Resolve the nucleus repository root from the apply-time marker
-      # (~/.config/nucleus/repo-root), falling back to the canonical checkout
-      # path. This prevents stale ~/dev/nucleus symlinks from breaking all
-      # nucleus-* commands after a repo relocation.
-      _nucleus_repo=""
-      if [ -f "$HOME/.config/nucleus/repo-root" ]; then
-        _nucleus_repo="$(cat "$HOME/.config/nucleus/repo-root")"
-      fi
-      if [ -z "$_nucleus_repo" ]; then
-        _nucleus_repo="$HOME/dev/nucleus"
-      fi
+      # Resolve the nucleus repository root from NUCLEUS_REPO (set by apply.sh
+      # and forwarded through sudo).
+      _nucleus_repo="''${NUCLEUS_REPO:?nucleus: NUCLEUS_REPO not set; run via apply.sh}"
       exec nix --option warn-dirty false run "$_nucleus_repo/src#${app}" -- "$@"
     '';
 
