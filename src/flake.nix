@@ -564,6 +564,7 @@
             pkgs.nixfmt
             pkgs.packer
             pkgs.powershell
+            pkgs.yq-go
           ];
         };
 
