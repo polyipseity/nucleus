@@ -322,6 +322,7 @@
       "macos": {
         "domain": "system",
         "service": "com.openssh.sshd",
+        "socketActivated": true,
         "type": "launchctl"
       },
       "nixos": {

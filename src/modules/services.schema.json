@@ -123,6 +123,10 @@
           "description": "launchd service label",
           "type": "string"
         },
+        "socketActivated": {
+          "description": "Service is socket-activated by launchd (e.g. sshd). Shows as \"listening\" in status instead of \"inactive\".",
+          "type": "boolean"
+        },
         "type": {
           "const": "launchctl"
         }

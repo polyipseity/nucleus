@@ -177,6 +177,8 @@ svc_status() {
 
       local list_line running=true enabled=true pid=""
       list_line=$($domain_flag launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true)
+      local socket_activated
+      socket_activated=$(echo "$entry_json" | jq -r '.socketActivated // false')
       if [ -z "$list_line" ]; then
         running=false; enabled=false
       else
@@ -188,8 +190,16 @@ svc_status() {
           running=false
         fi
       fi
+      local status_text
+      if [ "$running" = true ]; then
+        status_text="active"
+      elif [ "$socket_activated" = "true" ]; then
+        status_text="listening"
+      else
+        status_text="inactive"
+      fi
       printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s}' \
-        "$( [ "$running" = true ] && echo "active" || echo "inactive" )" \
+        "$status_text" \
         "$running" "$enabled" "${pid:-null}"
       ;;
     systemctl)
