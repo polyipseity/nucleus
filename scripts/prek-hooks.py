@@ -5,8 +5,8 @@
 # ///
 """Cross-platform Python wrapper for prek hooks.
 
-Detects the OS and dispatches to the appropriate check/format/test commands.
-On POSIX, uses nix run. On Windows, uses pwsh for PowerShell-based checks.
+On POSIX, runs ``scripts/check.sh`` directly. On Windows, uses pwsh for
+PowerShell-based checks.
 """
 
 import argparse
@@ -31,10 +31,11 @@ def get_repo_root() -> Path:
 def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -> int:
     """Run the check hook.
 
-    On POSIX, delegates entirely to ``nix run ./src#check`` with optional
-    file arguments.  On Windows, dispatches to ``check-pwsh.ps1`` and/or
-    ``check-packer.ps1`` depending on which file extensions are present, or
-    runs all available checks when no files are given.
+    On POSIX, delegates to ``scripts/check.sh`` directly (tools are available
+    via the user profile or direnv dev shell).  On Windows, dispatches to
+    ``check-pwsh.ps1`` and/or ``check-packer.ps1`` depending on which file
+    extensions are present, or runs all available checks when no files are
+    given.
 
     Args:
         files: List of file paths (relative or absolute) to check.  May be
@@ -49,17 +50,15 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -
         non-zero on failure.
     """
     if sys.platform != "win32":
-        # POSIX: delegate entirely to nix
-        env = os.environ.copy()
-        env["NIX_CONFIG"] = "experimental-features = nix-command flakes"
-        cmd = ["nix", "run", "./src#check"]
-        if format_enabled or files:
-            cmd.append("--")
-            if format_enabled:
-                cmd.append("--format")
-            if files:
-                cmd.extend(files)
-        result = subprocess.run(cmd, env=env, cwd=repo_root, shell=False)
+        # Nix run (slow, ~2s per invocation for flake evaluation).
+        # Direct call is safe because the required tools (nixfmt, pwsh, packer)
+        # are available via the user's profile or direnv dev shell.
+        cmd = [str(repo_root / "scripts" / "check.sh")]
+        if format_enabled:
+            cmd.append("--format")
+        if files:
+            cmd.extend(files)
+        result = subprocess.run(cmd, cwd=repo_root, shell=False)
         if result.returncode != 0:
             print(
                 f"scripts/prek-hooks.py: error: check failed (exit {result.returncode})",
