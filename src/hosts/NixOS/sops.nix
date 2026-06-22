@@ -15,7 +15,13 @@
     mode = "0400";
   };
 
-  sops.secrets."ai_opencode_api_key" = {
+  sops.secrets."ai_opencode_go_api_key" = {
+    sopsFile = ../../secrets/system.yml;
+    owner = "litellm";
+    mode = "0400";
+  };
+
+  sops.secrets."ai_opencode_zen_api_key" = {
     sopsFile = ../../secrets/system.yml;
     owner = "litellm";
     mode = "0400";

@@ -113,7 +113,8 @@ function Sync-LiteLLMService {
 
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
   $openrouterKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_openrouter_api_key"
-  $opencodeKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_api_key"
+  $opencodeGoKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_go_api_key"
+  $opencodeZenKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_zen_api_key"
 
   # Read the litellm endpoint from the canonical service registry.
   $litellmEndpoint = & {
@@ -128,7 +129,8 @@ function Sync-LiteLLMService {
   $wrapperContent = @"
 `$env:LITELLM_LOG = 'WARNING'
 `$env:OPENROUTER_API_KEY = if (Test-Path '$openrouterKeyFile') { Get-Content '$openrouterKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
-`$env:OPENCODE_GO_API_KEY = if (Test-Path '$opencodeKeyFile') { Get-Content '$opencodeKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
+`$env:OPENCODE_GO_API_KEY = if (Test-Path '$opencodeGoKeyFile') { Get-Content '$opencodeGoKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
+`$env:OPENCODE_ZEN_API_KEY = if (Test-Path '$opencodeZenKeyFile') { Get-Content '$opencodeZenKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
 & "$litellmBin" --config "$configLink" --port $($litellmEndpoint.port) --host $($litellmEndpoint.host) --drop_params *>> "$logFile"
 "@
   [System.IO.File]::WriteAllText($wrapperScript, $wrapperContent, [System.Text.UTF8Encoding]::new($false))

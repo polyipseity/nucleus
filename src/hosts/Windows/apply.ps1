@@ -527,7 +527,7 @@ $null = New-Item -Path $systemSecretsDir -ItemType Directory -Force
 $systemYmlPath = Join-Path -Path $secretsDir -ChildPath "system.yml"
 if (Test-Path -Path $systemYmlPath -PathType Leaf) {
   $systemSecrets = Get-Secret -FilePath $systemYmlPath -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
-  foreach ($key in @('ai_openrouter_api_key', 'ai_opencode_api_key')) {
+  foreach ($key in @('ai_openrouter_api_key', 'ai_opencode_go_api_key', 'ai_opencode_zen_api_key')) {
     $value = $systemSecrets.$key
     if (-not [string]::IsNullOrWhiteSpace($value)) {
       $keyFile = Join-Path -Path $systemSecretsDir -ChildPath $key

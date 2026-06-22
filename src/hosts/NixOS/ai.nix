@@ -29,9 +29,13 @@
         if [ -f "$_keyfile_oru" ]; then
           export OPENROUTER_API_KEY="$(cat "$_keyfile_oru")"
         fi
-        _keyfile_oc="${config.sops.secrets."ai_opencode_api_key".path}"
-        if [ -f "$_keyfile_oc" ]; then
-          export OPENCODE_GO_API_KEY="$(cat "$_keyfile_oc")"
+        _keyfile_oc_go="${config.sops.secrets."ai_opencode_go_api_key".path}"
+        if [ -f "$_keyfile_oc_go" ]; then
+          export OPENCODE_GO_API_KEY="$(cat "$_keyfile_oc_go")"
+        fi
+        _keyfile_oc_zen="${config.sops.secrets."ai_opencode_zen_api_key".path}"
+        if [ -f "$_keyfile_oc_zen" ]; then
+          export OPENCODE_ZEN_API_KEY="$(cat "$_keyfile_oc_zen")"
         fi
         exec ${pkgs.litellm}/bin/litellm \
           --config ${config.users.users.polyipseity.home}/.config/nucleus/litellm-config.yml \
