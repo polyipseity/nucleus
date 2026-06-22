@@ -8,6 +8,11 @@
 litellm_settings:
   # Drop unsupported client params (e.g. max_tokens) per-endpoint.
   drop_params: true
+  # Force IPv4 for all LLM API requests: local_addr=("0.0.0.0", 0) binds
+  # outgoing sockets to IPv4, avoiding IPv6 EHOSTUNREACH on networks with
+  # broken IPv6 routing.  This is a LiteLLM-level switch that affects the
+  # TCPConnector used by aiohttp for all outbound LLM model connections.
+  force_ipv4: true
 
 # WARNING suppresses per-request INFO chatter while still capturing
 # errors, warnings, and startup diagnostics.
