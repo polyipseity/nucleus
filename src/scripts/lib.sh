@@ -17,7 +17,7 @@
 #   (none)        This is a library; source it, do not execute.
 #
 # Environment variables:
-#   NUCLEUS_REPO_ROOT  Repository root path. Must be set; resolve_nucleus_root fails if unset.
+#   NUCLEUS_REPO_ROOT  Repository root path. Falls back to git detection if unset.
 #
 # Exit conditions:
 #   N/A           This is a library; exit codes apply to the sourcing script.
@@ -42,12 +42,20 @@ usage_std() {
 
 # resolve_nucleus_root — Print the absolute path of the nucleus repository root.
 #
-# Requires $NUCLEUS_REPO_ROOT to be set to a valid directory (e.g. by apply.sh).
-# Fails fast if unset or missing — no silent fallbacks.
+# Resolution order:
+#   1. $NUCLEUS_REPO_ROOT env var (if set to an existing directory)
+#   2. git rev-parse --show-toplevel (if inside a git repository)
 resolve_nucleus_root() {
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ]; then
     printf '%s\n' "$NUCLEUS_REPO_ROOT"
     return 0
+  fi
+  if command -v git >/dev/null 2>&1; then
+    _nrr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || true
+    if [ -n "${_nrr_git_root:-}" ] && [ -d "$_nrr_git_root" ]; then
+      printf '%s\n' "$_nrr_git_root"
+      return 0
+    fi
   fi
   printf '%s\n' "resolve_nucleus_root: NUCLEUS_REPO_ROOT is not set or does not point to a directory" >&2
   return 1

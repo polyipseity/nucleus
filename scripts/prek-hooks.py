@@ -28,7 +28,7 @@ def get_repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def run_check(files: list[str], repo_root: Path) -> int:
+def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -> int:
     """Run the check hook.
 
     On POSIX, delegates entirely to ``nix run ./src#check`` with optional
@@ -41,6 +41,8 @@ def run_check(files: list[str], repo_root: Path) -> int:
             empty, in which case all available checks are run.
         repo_root: Absolute path to the repository root, used to locate
             the check scripts.
+        format_enabled: If True, pass ``--format`` to format Nix files
+            in-place instead of just validating.
 
     Returns:
         Exit code from the underlying check process(es).  0 on success,
@@ -51,9 +53,12 @@ def run_check(files: list[str], repo_root: Path) -> int:
         env = os.environ.copy()
         env["NIX_CONFIG"] = "experimental-features = nix-command flakes"
         cmd = ["nix", "run", "./src#check"]
-        if files:
+        if format_enabled or files:
             cmd.append("--")
-            cmd.extend(files)
+            if format_enabled:
+                cmd.append("--format")
+            if files:
+                cmd.extend(files)
         result = subprocess.run(cmd, env=env, cwd=repo_root, shell=False)
         if result.returncode != 0:
             print(
@@ -132,38 +137,6 @@ def run_check(files: list[str], repo_root: Path) -> int:
     return 0
 
 
-def run_format_nix(files: list[str], repo_root: Path) -> int:
-    """Run the format-nix hook.
-
-    Runs ``nixfmt`` on the given Nix files using ``--sort`` and ``--verify``
-    flags.  Skipped on Windows (nixfmt is not available).
-
-    Args:
-        files: List of ``.nix`` file paths to format.
-        repo_root: Absolute path to the repository root, used as the working
-            directory for the nix command.
-
-    Returns:
-        Exit code from the nixfmt process.  0 on success, non-zero on failure.
-    """
-    if sys.platform == "win32":
-        print("scripts/prek-hooks.py: nixfmt skipped (not available on Windows)")
-        return 0
-
-    env = os.environ.copy()
-    env["NIX_CONFIG"] = "experimental-features = nix-command flakes"
-    cmd = ["nix", "run", "nixpkgs#nixfmt", "--", "-s", "--verify"]
-    cmd.extend(files)
-    result = subprocess.run(cmd, env=env, cwd=repo_root, shell=False)
-    if result.returncode != 0:
-        print(
-            f"scripts/prek-hooks.py: error: format-nix failed (exit {result.returncode})",
-            file=sys.stderr,
-        )
-        return result.returncode
-    return 0
-
-
 def run_test(files: list[str], repo_root: Path) -> int:
     """Run the test suite.
 
@@ -215,7 +188,7 @@ def main() -> int:
 
     Parses command-line arguments, resolves the repository root, and
     dispatches to the appropriate hook implementation (``check`` or
-    ``format-nix``).
+    ``test``).
 
     Returns:
         Exit code from the dispatched hook.  0 on success, non-zero on
@@ -225,8 +198,13 @@ def main() -> int:
         description="Cross-platform prek hook wrapper",
     )
     parser.add_argument(
+        "--format",
+        action="store_true",
+        help="Format Nix files in-place (instead of just validating)",
+    )
+    parser.add_argument(
         "hook",
-        choices=["check", "format-nix", "test"],
+        choices=["check", "test"],
         help="Hook to run",
     )
     parser.add_argument(
@@ -239,9 +217,7 @@ def main() -> int:
     repo_root = get_repo_root()
 
     if args.hook == "check":
-        return run_check(args.files, repo_root)
-    elif args.hook == "format-nix":
-        return run_format_nix(args.files, repo_root)
+        return run_check(args.files, repo_root, format_enabled=args.format)
     elif args.hook == "test":
         return run_test(args.files, repo_root)
     else:

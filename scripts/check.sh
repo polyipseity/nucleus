@@ -6,20 +6,23 @@
 #
 # Runs repository checks in sequence:
 #   1. Dead Nix code detection (deadnix)
-#   2. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
-#   3. Packer template validation
-#   4. Shell script validation tests
-#   5. Lockfile validation
-#   6. Service registry validation
-#   7. Locked DSC validation
-#   8. Package manager usage enforcement
+#   2. Nix formatting check (nixfmt --verify)
+#   3. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
+#   4. Packer template validation
+#   5. Shell script validation tests
+#   6. Lockfile validation
+#   7. Service registry validation
+#   8. Locked DSC validation
+#   9. Package manager usage enforcement
 #
 # With arguments, passes them through to individual checkers that support
-# path filtering (check-pwsh.ps1, check-packer.sh) and skips whole-repo
-# checks (deadnix, script validation, lockfile/locked DSC).
+# path filtering (check-pwsh.ps1, check-packer.sh, nixfmt) and skips
+# whole-repo checks (deadnix, script validation, lockfile/locked DSC).
 #
 # Arguments:
-#   (none)        No flags accepted; paths may be provided as positional arguments.
+#   --format      Format Nix files in-place (instead of just validating).
+#   (paths)       Files to check; passes paths through to sub-checkers and
+#                 skips whole-repo checks (deadnix, script validation).
 #
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Override the detected repository root path.
@@ -35,8 +38,10 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(resolve_nucleus_root)
 cd "$REPO_ROOT"
 
+FORMAT_NIX=false
+
 usage() {
-  usage_std "check.sh" "[path ...]" "Run all repository validation checks in sequence. With arguments, passes paths through to supporting checkers and skips whole-repo checks (deadnix, script validation)."
+  usage_std "check.sh" "[--format] [path ...]" "Run all repository validation checks in sequence. With arguments, passes paths through to supporting checkers and skips whole-repo checks (deadnix, script validation). Use --format to enable in-place Nix formatting (instead of just --verify)."
 }
 
 while [ "$#" -gt 0 ]; do
@@ -44,6 +49,10 @@ while [ "$#" -gt 0 ]; do
     -h|--help)
       usage
       exit 0
+      ;;
+    --format)
+      FORMAT_NIX=true
+      shift
       ;;
     -*)
       printf '%s\n' "error: unsupported argument '$1'" >&2
@@ -54,7 +63,6 @@ while [ "$#" -gt 0 ]; do
       break
       ;;
   esac
-  shift
 done
 
 HAS_ARGS=false
@@ -66,11 +74,13 @@ HAS_ARGS=false
 # files pattern matching multiple extensions.
 PS1_FILES=()
 PKR_FILES=()
+NIX_FILES=()
 if $HAS_ARGS; then
   for _f in "$@"; do
     case "$_f" in
       *.ps1)     PS1_FILES+=("$_f") ;;
       *.pkr.hcl) PKR_FILES+=("$_f") ;;
+      *.nix)     NIX_FILES+=("$_f") ;;
     esac
   done
 fi
@@ -78,7 +88,7 @@ fi
 _step=0
 
 # ---------------------------------------------------------------------------
-# 1. Dead Nix code detection
+# Dead Nix code detection
 # ---------------------------------------------------------------------------
 printf '\n=== [%s] Dead Nix code ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
@@ -89,7 +99,25 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 2. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
+# Nix formatting check
+# ---------------------------------------------------------------------------
+printf '\n=== [%s] Nix formatting (nixfmt) ===\n' "$((_step += 1))"
+if [ "${#NIX_FILES[@]}" -gt 0 ]; then
+  if $FORMAT_NIX; then
+    nixfmt -s "${NIX_FILES[@]}"
+    echo "Nix formatting applied."
+  else
+    nixfmt -s --verify "${NIX_FILES[@]}"
+    echo "Nix formatting OK."
+  fi
+elif ! $HAS_ARGS; then
+  echo "Skipping nixfmt (standalone mode — use \`nix run .#nixfmt\` to check all Nix files)."
+else
+  echo "Skipping nixfmt (no Nix files to check)."
+fi
+
+# ---------------------------------------------------------------------------
+# PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 # ---------------------------------------------------------------------------
 printf '\n=== [%s] PowerShell syntax validation ===\n' "$((_step += 1))"
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
@@ -101,7 +129,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Packer template validation
+# Packer template validation
 # ---------------------------------------------------------------------------
 printf '\n=== [%s] Packer template validation ===\n' "$((_step += 1))"
 if [ "${#PKR_FILES[@]}" -gt 0 ]; then
@@ -113,7 +141,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Shell script validation tests
+# Shell script validation tests
 # ---------------------------------------------------------------------------
 printf '\n=== [%s] Shell script validation tests ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
@@ -123,7 +151,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Lockfile validation
+# Lockfile validation
 # ---------------------------------------------------------------------------
 printf '\n=== [%s] Lockfile validation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
@@ -213,7 +241,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 6. Service registry validation
+# Service registry validation
 # ---------------------------------------------------------------------------
 printf '\n=== [%s] Service registry validation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
@@ -340,7 +368,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Locked DSC validation
+# Locked DSC validation
 # ---------------------------------------------------------------------------
 printf '\n=== [%s] Locked DSC validation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
@@ -390,7 +418,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 8. Package manager usage enforcement
+# Package manager usage enforcement
 # ---------------------------------------------------------------------------
 printf '\n=== [%s] Package manager usage enforcement ===\n' "$((_step += 1))"
 # Ban bare `pip install` and `npm install` — these bypass the lockfile and

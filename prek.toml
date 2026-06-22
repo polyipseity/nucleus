@@ -57,12 +57,14 @@ hooks = [{ id = "check-dependabot" }, { id = "check-github-workflows" }]
 [[repos]]
 repo = "local"
 hooks = [
-  # Consolidated repository check — runs shell, PowerShell, and Packer
-  # validation in sequence via check.sh. The files pattern catches all
-  # three types; check.sh routes each file to the right sub-checker.
-  { id = "repo-check", name = "repository checks", language = "python", files = "(\\.sh|\\.ps1|\\.pkr\\.hcl)$", entry = "python scripts/prek-hooks.py check" },
-  # Nix file formatting using nixfmt for consistent code style.
-  { id = "format-nix", name = "format Nix files", language = "python", files = "\\.nix$", entry = "python scripts/prek-hooks.py format-nix" },
+  # Consolidated repository check — runs shell, PowerShell, Packer, and Nix
+  # validation in sequence via check.sh. The files pattern catches all four
+  # types; check.sh routes each file to the right sub-checker.
+  # Nix formatting is opt-in: add `args = ["--format"]` to enable in-place
+  # formatting instead of just validation.
+  { id = "repo-check", name = "repository checks", language = "python", files = "(\\.hcl|\\.nix|\\.pkr|\\.ps1|\\.sh)$", entry = "python scripts/prek-hooks.py check", args = [
+    "--format",
+  ] },
   # Repository test suite — runs Nix test suite evaluation (tests/src/*.nix).
   # Always runs on pre-push regardless of changed files.
   { id = "repo-test", name = "repository tests", language = "python", always_run = true, stages = [

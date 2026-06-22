@@ -561,6 +561,7 @@
             pkgs.bash
             pkgs.deadnix
             pkgs.git
+            pkgs.nixfmt
             pkgs.packer
             pkgs.powershell
           ];
@@ -854,21 +855,27 @@
       # secret lifecycle tasks during bootstrap (gnupg, sops, ssh-to-age).
       # -----------------------------------------------------------------------
       packages = {
-        "${systems.mac}".bootstrap-deps = pkgsMac.symlinkJoin {
-          name = "bootstrap-deps";
-          paths = [
-            pkgsMac.gnupg
-            pkgsMac.sops
-            pkgsMac.ssh-to-age
-          ];
+        "${systems.mac}" = {
+          nixfmt = pkgsMac.nixfmt;
+          bootstrap-deps = pkgsMac.symlinkJoin {
+            name = "bootstrap-deps";
+            paths = [
+              pkgsMac.gnupg
+              pkgsMac.sops
+              pkgsMac.ssh-to-age
+            ];
+          };
         };
-        "${systems.linux}".bootstrap-deps = pkgsLinux.symlinkJoin {
-          name = "bootstrap-deps";
-          paths = [
-            pkgsLinux.gnupg
-            pkgsLinux.sops
-            pkgsLinux.ssh-to-age
-          ];
+        "${systems.linux}" = {
+          nixfmt = pkgsLinux.nixfmt;
+          bootstrap-deps = pkgsLinux.symlinkJoin {
+            name = "bootstrap-deps";
+            paths = [
+              pkgsLinux.gnupg
+              pkgsLinux.sops
+              pkgsLinux.ssh-to-age
+            ];
+          };
         };
       };
 
