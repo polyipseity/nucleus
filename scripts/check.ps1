@@ -376,6 +376,7 @@ if (-not $HAS_ARGS) {
   $_npmViolations = Select-String -Path @(
     Get-ChildItem -Recurse -Path "$RepoRoot\scripts","$RepoRoot\src","$RepoRoot\tests" `
       -Include *.sh,*.ps1,*.nix `
+      -Exclude check.sh,check.ps1 `
       | ForEach-Object { $_.FullName }
     ) -Pattern '(^|[^a-z])npm install([^-]|$)'
   if ($_npmViolations) {
