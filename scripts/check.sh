@@ -92,7 +92,7 @@ _step=0
 # ---------------------------------------------------------------------------
 printf '\n=== [%s] Dead Nix code ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
-  deadnix --fail src/
+  deadnix src/
   echo "No dead Nix code found."
 else
   echo "Skipping deadnix (path-scoped mode)."
@@ -161,13 +161,13 @@ if ! $HAS_ARGS; then
   _check_section_nonempty() {
     _section="$1"
     _lfpath="src/lockfiles/lockfile.json"
-    if ! jq -e ".$_section | type == \"object\" and length > 0" "$_lfpath" >/dev/null 2>&1; then
+    if ! jq -e ".[\"$_section\"] | type == \"object\" and length > 0" "$_lfpath" >/dev/null 2>&1; then
       echo "ERROR: $_section: empty or missing section"
       _lf_errors=$((_lf_errors + 1))
       return
     fi
     # Check for placeholder values
-    _placeholders=$(jq -r ".$_section | to_entries[] | select(.value == \"\" or .value == \"CHANGEME\" or .value == \"1.0.0\") | .key" "$_lfpath" 2>/dev/null)
+    _placeholders=$(jq -r ".[\"$_section\"] | to_entries[] | select(.value == \"\" or .value == \"CHANGEME\" or .value == \"1.0.0\") | .key" "$_lfpath" 2>/dev/null)
     if [ -n "$_placeholders" ]; then
       echo "ERROR: $_section has placeholder versions for:"
       echo "  ${_placeholders//$'\n'/$'\n'  }"

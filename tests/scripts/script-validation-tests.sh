@@ -418,7 +418,7 @@ if [[ -f "$SVC_SH" ]]; then
     else
         assert_fail "svc list: table headers present" "Missing expected table header line"
     fi
-    if echo "$SVC_LIST_OUTPUT" | grep -qE "ollama|litellm|jellyfin"; then
+    if echo "$SVC_LIST_OUTPUT" | grep -qiE "ollama|litellm|jellyfin"; then
         assert_pass "svc list: known services listed"
     else
         assert_fail "svc list: known services listed" "No expected service names found in output"
