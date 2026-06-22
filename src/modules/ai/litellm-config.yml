@@ -2,8 +2,9 @@
 #
 # AI gateway on 127.0.0.1:4000 routing to:
 #   - Local Ollama daemon (127.0.0.1:11434) for offline models
-#   - DeepSeek V4 via OpenCode Go (primary, order: 1) with
-#     OpenRouter fallback (order: 2).  API keys from SOPS secrets.
+#   - DeepSeek V4 Flash via OpenCode Zen (primary) → Go → OpenRouter
+#     fallback chain.  DeepSeek V4 Pro via Go (primary) → OpenRouter.
+#     API keys from SOPS secrets.
 
 litellm_settings:
   # Drop unsupported client params (e.g. max_tokens) per-endpoint.
@@ -56,7 +57,8 @@ model_list:
       api_base: http://127.0.0.1:11434
 
   # ---- DeepSeek V4 models with fallback chain ----
-  # Primary: OpenCode Go (order: 1), Fallback: OpenRouter (order: 2).
+  # Primary: OpenCode Zen (order: 1), Fallback: OpenCode Go (order: 2),
+  # Tertiary: OpenRouter (order: 3).
   # Both V4 Flash and V4 Pro support reasoning.effort = high | xhigh
   # (xhigh maps to max reasoning).  Each effort level gets a separate model
   # entry so clients can select the desired effort level by model name.
@@ -65,25 +67,43 @@ model_list:
   - model_name: deepseek/deepseek-v4-flash
     litellm_params:
       model: openai/deepseek-v4-flash
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OPENCODE_ZEN_API_KEY
+      order: 1
+      model_info:
+        max_input_tokens: 81920
+  - model_name: deepseek/deepseek-v4-flash
+    litellm_params:
+      model: openai/deepseek-v4-flash
       api_base: https://opencode.ai/zen/go/v1
       api_key: os.environ/OPENCODE_GO_API_KEY
-      order: 1
+      order: 2
       model_info:
         max_input_tokens: 81920
   - model_name: deepseek/deepseek-v4-flash
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-flash
       api_key: os.environ/OPENROUTER_API_KEY
-      order: 2
+      order: 3
       model_info:
         max_input_tokens: 81920
 
   - model_name: deepseek/deepseek-v4-flash/reasoning_high
     litellm_params:
       model: openai/deepseek-v4-flash
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OPENCODE_ZEN_API_KEY
+      order: 1
+      reasoning:
+        effort: high
+      model_info:
+        max_input_tokens: 81920
+  - model_name: deepseek/deepseek-v4-flash/reasoning_high
+    litellm_params:
+      model: openai/deepseek-v4-flash
       api_base: https://opencode.ai/zen/go/v1
       api_key: os.environ/OPENCODE_GO_API_KEY
-      order: 1
+      order: 2
       reasoning:
         effort: high
       model_info:
@@ -92,7 +112,7 @@ model_list:
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-flash
       api_key: os.environ/OPENROUTER_API_KEY
-      order: 2
+      order: 3
       reasoning:
         effort: high
       model_info:
@@ -101,9 +121,19 @@ model_list:
   - model_name: deepseek/deepseek-v4-flash/reasoning_xhigh
     litellm_params:
       model: openai/deepseek-v4-flash
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OPENCODE_ZEN_API_KEY
+      order: 1
+      reasoning:
+        effort: xhigh
+      model_info:
+        max_input_tokens: 81920
+  - model_name: deepseek/deepseek-v4-flash/reasoning_xhigh
+    litellm_params:
+      model: openai/deepseek-v4-flash
       api_base: https://opencode.ai/zen/go/v1
       api_key: os.environ/OPENCODE_GO_API_KEY
-      order: 1
+      order: 2
       reasoning:
         effort: xhigh
       model_info:
@@ -112,7 +142,7 @@ model_list:
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-flash
       api_key: os.environ/OPENROUTER_API_KEY
-      order: 2
+      order: 3
       reasoning:
         effort: xhigh
       model_info:
@@ -171,5 +201,64 @@ model_list:
       order: 2
       reasoning:
         effort: xhigh
+      model_info:
+        max_input_tokens: 81920
+
+  # ---- OpenCode Zen free models ----
+  # Free-tier models available through the OpenCode Zen endpoint.
+  - model_name: deepseek/deepseek-v4-flash-free
+    litellm_params:
+      model: openai/deepseek-v4-flash-free
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OPENCODE_ZEN_API_KEY
+      order: 1
+      model_info:
+        max_input_tokens: 81920
+  - model_name: stealth/big-pickle
+    litellm_params:
+      model: openai/big-pickle
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OPENCODE_ZEN_API_KEY
+      order: 1
+      model_info:
+        max_input_tokens: 81920
+  - model_name: xiaomi/mimo-v2.5-free
+    litellm_params:
+      model: openai/mimo-v2.5-free
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OPENCODE_ZEN_API_KEY
+      order: 1
+      model_info:
+        max_input_tokens: 81920
+  - model_name: alibaba/qwen3.6-plus-free
+    litellm_params:
+      model: openai/qwen3.6-plus-free
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OPENCODE_ZEN_API_KEY
+      order: 1
+      model_info:
+        max_input_tokens: 81920
+  - model_name: minimax/minimax-m3-free
+    litellm_params:
+      model: openai/minimax-m3-free
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OPENCODE_ZEN_API_KEY
+      order: 1
+      model_info:
+        max_input_tokens: 81920
+  - model_name: nvidia/nemotron-3-ultra-free
+    litellm_params:
+      model: openai/nemotron-3-ultra-free
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OPENCODE_ZEN_API_KEY
+      order: 1
+      model_info:
+        max_input_tokens: 81920
+  - model_name: stealth/north-mini-code-free
+    litellm_params:
+      model: openai/north-mini-code-free
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OPENCODE_ZEN_API_KEY
+      order: 1
       model_info:
         max_input_tokens: 81920
