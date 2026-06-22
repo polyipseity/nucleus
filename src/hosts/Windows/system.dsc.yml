@@ -3,18 +3,17 @@
         description: >-
           Schedule weekly garbage collection on Sunday at 12:00 local time to reclaim stale
           VM artifacts, build outputs, and tool caches (mirrors macOS launchd and NixOS
-          systemd timers for cross-host gc parity). The task discovers nucleus repo root
-          via %USERPROFILE%\.config\nucleus\repo-root fallback git discovery,
-          or canonical path %USERPROFILE%\dev\nucleus so gc is always rooted correctly.
+          systemd timers for cross-host gc parity). The task uses $env:NUCLEUS_REPO
+          (set by apply.ps1) to locate the gc script.
       settings:
         TaskPath: \nucleus\
         TaskName: gc-weekly
         TaskDescriptionLiteral: Scheduled weekly garbage collection cleanup
         Action: |
-          $RepoRoot = if (Test-Path "$env:USERPROFILE\.config\nucleus\repo-root") {
-            Get-Content "$env:USERPROFILE\.config\nucleus\repo-root" -Raw | ForEach-Object { $_.Trim() }
-          } else {
-            "$env:USERPROFILE\dev\nucleus"
+          $RepoRoot = $env:NUCLEUS_REPO
+          if (-not $RepoRoot) {
+            Write-Output "gc: NUCLEUS_REPO not set; run via apply.ps1"
+            exit 1
           }
           $GcScript = Join-Path $RepoRoot "scripts\gc.ps1"
           $ModuleDir = Join-Path $RepoRoot "src\hosts\Windows\modules"

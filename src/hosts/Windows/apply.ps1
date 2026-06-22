@@ -465,17 +465,11 @@ $picardDefaultsPath = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\
 $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 
 # Expose the repo root to any subprocesses (e.g. DSC script resources) that
-# may need to locate repo-relative files.  Also write it to a stable file path
-# so Home Manager activation scripts (e.g. vscodeSymlinks in editors.nix) can
-# read it after the sudo boundary that darwin-rebuild/nixos-rebuild crosses,
-# where environment variables are not reliably propagated.
+# may need to locate repo-relative files.  $env:NUCLEUS_REPO is forwarded
+# through to DSC and subsequent activation steps.
 $env:NUCLEUS_REPO = $repoRoot
 $env:NUCLEUS_HOST = "Windows"
 [Environment]::SetEnvironmentVariable("NUCLEUS_HOST", "Windows", "User")
-$configDir = Join-Path -Path $HOME -ChildPath ".config\nucleus"
-  if (-not (Test-Path -LiteralPath $configDir -PathType Container)) {
-    New-Item -ItemType Directory -Path $configDir -Force | Out-Null
-  }
 
 # Ensure the SSH host key exists before age key registration.  On a fresh
 # machine the key is absent until the OpenSSH Server service first starts;
