@@ -304,9 +304,9 @@ if (-not $HAS_ARGS) {
   # Generate locked DSC in-memory from system.dsc.yml + lockfile.
   $_lockfileData = Get-Content $_lockfilePath -Raw | ConvertFrom-Json -AsHashtable
   $_dscYaml = Get-Content $_dscSystem -Raw
-  # Convert YAML → nested hashtable. Always post-process through
-  # ConvertTo-HashtableDeep because powershell-yaml's -AsHashtable may be
-  # shallow-only on older versions, leaving nested PSCustomObject.
+  # Convert YAML → nested hashtable. Post-process through
+  # ConvertTo-HashtableDeep because powershell-yaml may return mixed
+  # hashtable/PSCustomObject trees depending on version.
   function ConvertTo-HashtableDeep ($_obj) {
     if ($_obj -is [PSCustomObject]) {
       $_ht = [ordered] @{}
@@ -314,6 +314,11 @@ if (-not $HAS_ARGS) {
       return $_ht
     }
     if ($_obj -is [array]) { return @($_obj | ForEach-Object { ConvertTo-HashtableDeep $_ }) }
+    if ($_obj -is [hashtable] -or $_obj -is [System.Collections.Specialized.OrderedDictionary]) {
+      $_ht = @{}
+      foreach ($_key in $_obj.Keys) { $_ht[$_key] = ConvertTo-HashtableDeep $_obj[$_key] }
+      return $_ht
+    }
     return $_obj
   }
   $_dsc = ConvertTo-HashtableDeep ($_dscYaml | ConvertFrom-Yaml)
