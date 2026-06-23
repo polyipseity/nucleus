@@ -32,7 +32,7 @@ OPTIONS:
 EOF
 }
 
-REPO_ROOT="$(resolve_nucleus_root)"
+REPO_ROOT="$(derive_repo_root)"
 SERVICES_JSON="$REPO_ROOT/src/modules/services.json"
 HOST="$(resolve_nucleus_host)"
 

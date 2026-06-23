@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-REPO_ROOT="$(resolve_nucleus_root)"
+REPO_ROOT="$(derive_repo_root)"
 
 if ! command -v curl >/dev/null 2>&1; then
   printf '%s\n' "jellyfin-sync: curl is not available; skipping sync"

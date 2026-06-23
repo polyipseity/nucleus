@@ -9,7 +9,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
-REPO_ROOT="$(resolve_nucleus_root)"
+REPO_ROOT="$(derive_repo_root)"
 MANIFEST="$REPO_ROOT/src/modules/ai/models.json"
 LOCKFILE="$REPO_ROOT/src/lockfiles/lockfile.json"
 

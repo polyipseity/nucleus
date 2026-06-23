@@ -1,13 +1,13 @@
 # shellcheck shell=sh
 # Source this at the top of nucleus POSIX shell scripts after setting SCRIPT_DIR.
-# Provides shared functions (usage_std, resolve_nucleus_root).
+# Provides shared functions (usage_std, derive_repo_root).
 #
 # Usage:
 #   SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 #   . "${SCRIPT_DIR}/../src/scripts/lib.sh"
 #
 # Environment variables:
-#   NUCLEUS_REPO_ROOT  Repository root path. Falls back to git detection if unset.
+#   NUCLEUS_REPO_ROOT  Repository root path. Falls back to auto-detection if unset.
 
 usage_std() {
   _us_name="$1"
@@ -20,20 +20,27 @@ usage_std() {
   fi
 }
 
-# Resolution order: NUCLEUS_REPO_ROOT env var, then git rev-parse.
-resolve_nucleus_root() {
+# Resolution order: NUCLEUS_REPO_ROOT env var, SCRIPT_DIR+offset auto-discovery, then git rev-parse.
+derive_repo_root() {
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ]; then
     printf '%s\n' "$NUCLEUS_REPO_ROOT"
     return 0
   fi
+  for _drr_offset in ".." "../.." "../../.."; do
+    _drr_candidate="$(CDPATH='' cd -- "${SCRIPT_DIR:?}/${_drr_offset}" && pwd -P 2>/dev/null)" || continue
+    if [ -f "$_drr_candidate/src/flake.nix" ]; then
+      printf '%s\n' "$_drr_candidate"
+      return 0
+    fi
+  done
   if command -v git >/dev/null 2>&1; then
-    _nrr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || true
-    if [ -n "${_nrr_git_root:-}" ] && [ -d "$_nrr_git_root" ]; then
-      printf '%s\n' "$_nrr_git_root"
+    _drr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || true
+    if [ -n "${_drr_git_root:-}" ] && [ -d "$_drr_git_root" ]; then
+      printf '%s\n' "$_drr_git_root"
       return 0
     fi
   fi
-  printf '%s\n' "resolve_nucleus_root: NUCLEUS_REPO_ROOT is not set or does not point to a directory" >&2
+  printf '%s\n' "derive_repo_root: cannot determine repository root" >&2
   return 1
 }
 

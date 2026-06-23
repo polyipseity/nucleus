@@ -17,7 +17,7 @@ usage() {
 EOF
 }
 
-REPO_ROOT="$(resolve_nucleus_root)"
+REPO_ROOT="$(derive_repo_root)"
 
 flake=true
 brew=true

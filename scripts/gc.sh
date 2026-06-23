@@ -25,7 +25,7 @@ usage() {
 EOF
 }
 
-REPO_ROOT="$(resolve_nucleus_root)"
+REPO_ROOT="$(derive_repo_root)"
 
 tool_cache_gc=true
 hm_gc=true

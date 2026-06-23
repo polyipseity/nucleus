@@ -13,7 +13,7 @@ usage() {
   usage_std "health-check.sh" "[options]" "Checks pre-flight readiness before bootstrap/apply/update operations."
 }
 
-REPO_ROOT="$(resolve_nucleus_root)"
+REPO_ROOT="$(derive_repo_root)"
 
 min_free_bytes=10000000000
 secret_health=true

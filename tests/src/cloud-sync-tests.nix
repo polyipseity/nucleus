@@ -389,7 +389,7 @@ let
     && containsRegex ''scripts\\replica-reset\.ps1'' windowsShellProfileText
     && containsRegex "Resolve-NucleusRepoRoot" replicaResetPwshText
     && containsRegex "Invoke-ReplicaReset" replicaResetPwshText
-    && containsRegex "resolve_nucleus_root" replicaResetShellText
+    && containsRegex "derive_repo_root" replicaResetShellText
     && containsRegex "legacy" replicaResetShellText
     && containsRegex "clearing local replica data" replicaResetShellText
     && containsRegex "expected iCloud drive symlink" replicaResetShellText

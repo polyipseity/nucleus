@@ -33,7 +33,7 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
-REPO_ROOT=$(resolve_nucleus_root)
+REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT"
 
 FORMAT_NIX=false
@@ -146,6 +146,14 @@ if ! $HAS_ARGS; then
   bash tests/scripts/script-validation-tests.sh
 else
   echo "Skipping validation tests (path-scoped mode)."
+fi
+
+# CWD-independence tests
+printf '\n=== [%s] CWD-independence tests ===\n' "$((_step += 1))"
+if ! $HAS_ARGS; then
+  bash tests/scripts/cwd-independence-tests.sh
+else
+  echo "Skipping cwd-independence tests (path-scoped mode)."
 fi
 
 # Lockfile validation

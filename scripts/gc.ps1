@@ -96,12 +96,17 @@ if ($Help) {
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   $env:NUCLEUS_REPO_ROOT
 } else {
-  $gitRoot = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Out-String
-  $gitRoot = $gitRoot.Trim()
-  if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and (Test-Path -Path $gitRoot -PathType Container)) {
-    $gitRoot
+  $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
+  if ($candidate -and (Test-Path "$candidate\src\flake.nix")) {
+    $candidate
   } else {
-    Join-Path $HOME 'dev\nucleus'
+    $gitRoot = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Out-String
+    $gitRoot = $gitRoot.Trim()
+    if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and (Test-Path -Path $gitRoot -PathType Container)) {
+      $gitRoot
+    } else {
+      Join-Path $HOME 'dev\nucleus'
+    }
   }
 }
 if ([string]::IsNullOrWhiteSpace($ModuleDir)) {

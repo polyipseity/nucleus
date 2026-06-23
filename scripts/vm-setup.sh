@@ -7,7 +7,7 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
-REPO_ROOT="$(resolve_nucleus_root)"
+REPO_ROOT="$(derive_repo_root)"
 MANIFEST="$REPO_ROOT/src/modules/VMs.json"
 VMS_DIR="$REPO_ROOT/src/vms"
 # shellcheck disable=SC2034 # consumed by vm-setup/lib.sh (shellcheck can't follow sourced file)

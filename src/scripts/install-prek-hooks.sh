@@ -25,7 +25,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ -z "$_ephi_repo_root" ]; then
-  _ephi_repo_root="$(resolve_nucleus_root)"
+  _ephi_repo_root="$(derive_repo_root)"
 fi
 _ephi_config_path="$_ephi_repo_root/prek.toml"
 

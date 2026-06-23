@@ -27,7 +27,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ -z "$_rak_repo_root" ]; then
-  _rak_repo_root="$(resolve_nucleus_root)"
+  _rak_repo_root="$(derive_repo_root)"
 fi
 
 # Why before darwin-rebuild / nixos-rebuild:

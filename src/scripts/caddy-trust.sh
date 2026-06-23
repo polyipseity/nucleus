@@ -36,7 +36,7 @@ if ! command -v caddy >/dev/null 2>&1; then
   exit 1
 fi
 
-REPO_ROOT="$(resolve_nucleus_root)"
+REPO_ROOT="$(derive_repo_root)"
 _ct_admin_addr="$(jq -r '.caddy.network.admin | "\(.host):\(.port)"' "$REPO_ROOT/src/modules/services.json" 2>/dev/null || echo '127.0.0.1:2019')"
 
 _ct_attempt=0

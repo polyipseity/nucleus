@@ -256,7 +256,7 @@ if ! command -v rclone >/dev/null 2>&1; then
   exit 1
 fi
 
-repo_root="$(resolve_nucleus_root)"
+repo_root="$(derive_repo_root)"
 USERS_JSON="$repo_root/src/modules/users.json"
 
 required_remotes="GoogleDrive iCloud OneDrive"

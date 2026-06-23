@@ -58,7 +58,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ -z "$repo_root" ]; then
-  REPO_ROOT="$(resolve_nucleus_root)"
+  REPO_ROOT="$(derive_repo_root)"
 else
   REPO_ROOT="$repo_root"
 fi
