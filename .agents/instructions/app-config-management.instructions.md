@@ -50,6 +50,7 @@ effective_settings = defaults // platform_overrides // user_overrides
 ### Step 1: Define Override Fields in User Registry
 
 **In `src/flake.nix` (Nix primary user)**:
+
 ```nix
 users = {
   polyipseity = {
@@ -70,6 +71,7 @@ users = {
 ```
 
 **In `src/hosts/Windows/users.json` (Windows users)**:
+
 ```json
 {
   "users": {
@@ -159,6 +161,7 @@ When adding app settings, audit all three hosts:
    registry, DSC YAML, or manifest files?
 
 For each platform where the app exists, ensure:
+
 - Default settings are centrally defined.
 - User override fields are present in the user registry (flake.nix or users.json).
 - Activation logic applies `defaults // platform_overrides // user_overrides` in the same order.
@@ -171,6 +174,7 @@ If an app exists on only one or two platforms, document why in a `# WHY` comment
 When adding a new app config or updating existing ones, group changes atomically:
 
 **For a new app config**:
+
 ```
 refactor: add <app> settings with per-user override support
 
@@ -182,6 +186,7 @@ refactor: add <app> settings with per-user override support
 ```
 
 **For moving an existing app from separate storage**:
+
 ```
 refactor: migrate <app> config from JSON to native format
 

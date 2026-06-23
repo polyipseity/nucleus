@@ -218,6 +218,7 @@ Describe "Windows Package Installation" {
 - Add ripgrep to system.dsc.yml for cross-host CLI parity
 - Add Pester test to validate installation
 - Ripgrep mirrors fd behavior on POSIX hosts"
+
 ```
 
 ---
@@ -311,3 +312,4 @@ Before committing changes, verify:
 - [nix-instantiate(1)](https://nix.dev/manual/nix/stable/command-ref/nix-instantiate.html) — Nix static evaluation tool
 - [Pester Documentation](https://pester.dev) — PowerShell testing framework
 - [WinGet DSC](https://learn.microsoft.com/en-us/windows/package-manager/configuration/) — Windows Desired State Configuration
+```

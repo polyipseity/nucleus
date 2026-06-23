@@ -71,19 +71,19 @@ brew list --cask --versions
 The lockfile follows `lockfile.schema.json` (JSON Schema Draft-07). Each
 top-level key corresponds to a package manager:
 
-| Key              | Format                         | Description                               |
-| ---------------- | ------------------------------ | ----------------------------------------- |
-| `$schema`        | string                         | Path to schema file                       |
-| `version`        | integer                        | Lockfile format version                   |
-| `updated`        | ISO 8601 timestamp             | Last update timestamp                     |
-| `scoop`          | string → string                | Scoop package name → version              |
-| `cargo-binstall` | string → string                | Cargo crate name → version                |
-| `bun`            | string → string                | Bun package name → version                |
-| `uv`             | string → string                | Uv package name → version                 |
-| `rustup`         | string → string                | Rust toolchain → date                     |
-| `winget`         | string → string                | WinGet package ID → version               |
-| `vscode`         | string → string                | VS Code extension ID → version            |
-| `homebrew`       | object with brews/casks/masApps | Homebrew formula/cask/MAS name → version  |
-| `ollama`         | string → string                | Ollama model name → digest hash           |
+| Key              | Format                          | Description                              |
+| ---------------- | ------------------------------- | ---------------------------------------- |
+| `$schema`        | string                          | Path to schema file                      |
+| `version`        | integer                         | Lockfile format version                  |
+| `updated`        | ISO 8601 timestamp              | Last update timestamp                    |
+| `scoop`          | string → string                 | Scoop package name → version             |
+| `cargo-binstall` | string → string                 | Cargo crate name → version               |
+| `bun`            | string → string                 | Bun package name → version               |
+| `uv`             | string → string                 | Uv package name → version                |
+| `rustup`         | string → string                 | Rust toolchain → date                    |
+| `winget`         | string → string                 | WinGet package ID → version              |
+| `vscode`         | string → string                 | VS Code extension ID → version           |
+| `homebrew`       | object with brews/casks/masApps | Homebrew formula/cask/MAS name → version |
+| `ollama`         | string → string                 | Ollama model name → digest hash          |
 
 All sections are required but may be empty (`{}`).
