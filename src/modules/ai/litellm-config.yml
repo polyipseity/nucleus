@@ -66,7 +66,7 @@ model_list:
   # Base variant (no reasoning param — lets the client decide).
   - model_name: deepseek/deepseek-v4-flash
     litellm_params:
-      model: openai/deepseek-v4-flash
+      model: openai/deepseek-v4-flash-free
       api_base: https://opencode.ai/zen/v1
       api_key: os.environ/OPENCODE_ZEN_API_KEY
       order: 1
@@ -90,7 +90,7 @@ model_list:
 
   - model_name: deepseek/deepseek-v4-flash/reasoning_high
     litellm_params:
-      model: openai/deepseek-v4-flash
+      model: openai/deepseek-v4-flash-free
       api_base: https://opencode.ai/zen/v1
       api_key: os.environ/OPENCODE_ZEN_API_KEY
       order: 1
@@ -120,7 +120,7 @@ model_list:
 
   - model_name: deepseek/deepseek-v4-flash/reasoning_xhigh
     litellm_params:
-      model: openai/deepseek-v4-flash
+      model: openai/deepseek-v4-flash-free
       api_base: https://opencode.ai/zen/v1
       api_key: os.environ/OPENCODE_ZEN_API_KEY
       order: 1
@@ -206,14 +206,6 @@ model_list:
 
   # ---- OpenCode Zen free models ----
   # Free-tier models available through the OpenCode Zen endpoint.
-  - model_name: deepseek/deepseek-v4-flash-free
-    litellm_params:
-      model: openai/deepseek-v4-flash-free
-      api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/OPENCODE_ZEN_API_KEY
-      order: 1
-      model_info:
-        max_input_tokens: 81920
   - model_name: stealth/big-pickle
     litellm_params:
       model: openai/big-pickle

@@ -84,15 +84,6 @@
 				"vision": false
 			},
 			{
-				"id": "deepseek/deepseek-v4-flash-free",
-				"maxInputTokens": 81920,
-				"maxOutputTokens": 8192,
-				"name": "DeepSeek V4 Flash Free",
-				"toolCalling": true,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
 				"id": "stealth/big-pickle",
 				"maxInputTokens": 81920,
 				"maxOutputTokens": 8192,
