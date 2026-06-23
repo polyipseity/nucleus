@@ -27,6 +27,7 @@
     ./networking.nix
     ./security.nix
     ./sops.nix
+    ./activation.nix
     ./users.nix
     ./vms.nix
   ];

@@ -17,6 +17,7 @@ let
   lockfileText = builtins.readFile ../../src/lockfiles/lockfile.json;
   settingsText = builtins.readFile ../../src/modules/configs/vscode/settings.json;
   macosDefaultsText = builtins.readFile ../../src/hosts/MacBook/defaults.nix;
+  macosActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
 
   test_extension_in_editors_nix = assert' (lib.hasInfix "asvetliakov.vscode-neovim" editorsText) "editors.nix must list asvetliakov.vscode-neovim in sharedExtensions";
 
@@ -36,9 +37,7 @@ let
     && lib.hasInfix "com.microsoft.VSCodeInsiders" macosDefaultsText
   ) "MacBook defaults.nix must disable ApplePressAndHold for both VS Code stable and Insiders";
 
-  test_neovim_launcher_symlink = assert' (
-    lib.hasInfix "home.file" editorsText && lib.hasInfix ".local/bin/nvim" editorsText
-  ) "editors.nix must have home.file launcher symlink for nvim at ~/.local/bin/nvim";
+  test_neovim_launcher_symlink = assert' (lib.hasInfix "nvimLauncher" macosActivationText) "MacBook activation.nix must have nvimLauncher section creating /etc/nucleus-bin/nvim";
 
   test_editor_line_numbers_in_settings = assert' (lib.hasInfix "\"editor.lineNumbers\": \"relative\"" settingsText) "settings.json must set editor.lineNumbers to relative";
 
@@ -54,13 +53,13 @@ let
       (
         lib.hasInfix "vscode-neovim.neovimExecutablePaths.darwin" settingsText
         && lib.hasInfix "vscode-neovim.neovimExecutablePaths.linux" settingsText
-        && lib.hasInfix "vscode-neovim.neovimExecutablePaths.win32" settingsText
-        && lib.hasInfix "~/.local/bin/nvim" settingsText
+        && lib.hasInfix "/etc/nucleus-bin/nvim" settingsText
+        && !lib.hasInfix "vscode-neovim.neovimExecutablePaths.win32" settingsText
       )
-      "settings.json must have vscode-neovim neovimExecutablePaths for all three platforms with ~/.local/bin/nvim path";
+      "settings.json must have vscode-neovim neovimExecutablePaths with /etc/nucleus-bin/nvim for darwin/linux and no win32 entry";
 in
 {
   success = true;
-  testCount = 10;
-  message = "All ${builtins.toString 10} vscode-neovim provisioning tests passed";
+  testCount = 11;
+  message = "All ${builtins.toString 11} vscode-neovim provisioning tests passed";
 }

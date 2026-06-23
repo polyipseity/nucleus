@@ -253,9 +253,8 @@
       "command": "vscode-neovim.escape"
     }
   },
-  "vscode-neovim.neovimExecutablePaths.darwin": "~/.local/bin/nvim",
-  "vscode-neovim.neovimExecutablePaths.linux": "~/.local/bin/nvim",
-  "vscode-neovim.neovimExecutablePaths.win32": "${userHome}\\AppData\\Local\\Programs\\Neovim\\bin\\nvim.exe",
+  "vscode-neovim.neovimExecutablePaths.darwin": "/etc/nucleus-bin/nvim",
+  "vscode-neovim.neovimExecutablePaths.linux": "/etc/nucleus-bin/nvim",
   "window.autoDetectColorScheme": true,
   "workbench.browser.agentHostChatToolsEnabled": true,
   "workbench.browser.enableChatTools": true,
