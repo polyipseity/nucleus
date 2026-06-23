@@ -561,6 +561,7 @@
             pkgs.bash
             pkgs.deadnix
             pkgs.git
+            pkgs.jq
             pkgs.nixfmt
             pkgs.packer
             pkgs.powershell

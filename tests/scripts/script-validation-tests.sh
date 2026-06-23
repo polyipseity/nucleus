@@ -421,6 +421,11 @@ if [[ -f "$SVC_SH" ]]; then
     if echo "$SVC_LIST_OUTPUT" | grep -qE "Ollama|LiteLLM|Jellyfin"; then
         assert_pass "svc list: known services listed"
     else
+        {
+          echo "DIAG: svc list output follows"
+          echo "$SVC_LIST_OUTPUT" | head -15
+          echo "DIAG: end svc list output"
+        } >&2
         assert_fail "svc list: known services listed" "No expected service names found in output"
     fi
     if ! echo "$SVC_LIST_OUTPUT" | grep -q "unknown"; then
@@ -434,6 +439,11 @@ if [[ -f "$SVC_SH" ]]; then
     if echo "$SVC_JSON_OUTPUT" | jq -e '.svc_version == "1"' >/dev/null 2>&1; then
         assert_pass "svc list --json: valid JSON with version"
     else
+        {
+          echo "DIAG: svc list --json output follows"
+          echo "$SVC_JSON_OUTPUT" | head -5
+          echo "DIAG: end svc list --json output"
+        } >&2
         assert_fail "svc list --json: valid JSON with version" "Output is not valid JSON or missing svc_version"
     fi
     if echo "$SVC_JSON_OUTPUT" | jq -e 'has("services")' >/dev/null 2>&1; then

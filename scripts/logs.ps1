@@ -253,8 +253,8 @@ function Show-EventLog {
 
   try {
     $events = Get-WinEvent -ProviderName $provider -MaxEvents $Lines -ErrorAction Stop | Sort-Object TimeCreated -Descending
-    foreach ($event in $events) {
-      $text = "[$($event.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss'))] [$($event.LevelDisplayName)] $($event.Message)"
+    foreach ($evt in $events) {
+      $text = "[$($evt.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss'))] [$($evt.LevelDisplayName)] $($evt.Message)"
       if (-not $Raw) {
         Write-Output (ConvertTo-SanitizedText $text)
       } else {
