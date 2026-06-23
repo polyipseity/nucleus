@@ -239,6 +239,8 @@ lib.mkIf pkgs.stdenv.isLinux {
         "installPackages"
         "linkGeneration"
         "onFilesChange"
+        "protectOpencodeSymlinks"
+        "protectOutOfStoreSymlinks"
         "sops-nix"
         "writeBoundary"
       ]
