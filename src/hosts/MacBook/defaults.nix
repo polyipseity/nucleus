@@ -634,6 +634,15 @@ in
       "com.if.Amphetamine" = {
         "Enable Power Protect Install" = true;
       };
+
+      # VS Code (stable and Insiders): disable ApplePressAndHold so held
+      # keys repeat. Required for vim motions (h/j/k/l) via vscode-neovim.
+      "com.microsoft.VSCode" = {
+        ApplePressAndHoldEnabled = false;
+      };
+      "com.microsoft.VSCodeInsiders" = {
+        ApplePressAndHoldEnabled = false;
+      };
     };
 
     # -------------------------------------------------------------------------

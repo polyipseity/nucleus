@@ -2,7 +2,7 @@
 #
 # This test verifies that the vscode-neovim VS Code extension is properly
 # wired across all provisioning layers (POSIX Nix, Windows PowerShell,
-# lockfile versions, VS Code settings, macOS activation, and Neovim init.lua).
+# lockfile versions, VS Code settings, macOS defaults, and Neovim init.lua).
 #
 # Run with: nix-instantiate --eval tests/src/vscode-neovim-tests.nix
 
@@ -16,7 +16,7 @@ let
   windowsExtensionsText = builtins.readFile ../../src/hosts/Windows/modules/editors/Sync-VSCodeExtension.ps1;
   lockfileText = builtins.readFile ../../src/lockfiles/lockfile.json;
   settingsText = builtins.readFile ../../src/modules/configs/vscode/settings.json;
-  macosActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
+  macosDefaultsText = builtins.readFile ../../src/hosts/MacBook/defaults.nix;
 
   test_extension_in_editors_nix = assert' (lib.hasInfix "asvetliakov.vscode-neovim" editorsText) "editors.nix must list asvetliakov.vscode-neovim in sharedExtensions";
 
@@ -30,11 +30,11 @@ let
 
   test_jk_mapping_in_init_lua = assert' (lib.hasInfix "\"jk\", \"<Esc>\"" editorsText) "editors.nix neovimInitLua must have jk -> <Esc> insert mode mapping";
 
-  test_keyrepeat_in_macos_activation = assert' (
-    lib.hasInfix "ApplePressAndHoldEnabled" macosActivationText
-    && lib.hasInfix "com.microsoft.VSCode" macosActivationText
-    && lib.hasInfix "com.microsoft.VSCodeInsiders" macosActivationText
-  ) "MacBook activation.nix must disable ApplePressAndHold for both VS Code stable and Insiders";
+  test_keyrepeat_in_macos_defaults = assert' (
+    lib.hasInfix "ApplePressAndHoldEnabled" macosDefaultsText
+    && lib.hasInfix "com.microsoft.VSCode" macosDefaultsText
+    && lib.hasInfix "com.microsoft.VSCodeInsiders" macosDefaultsText
+  ) "MacBook defaults.nix must disable ApplePressAndHold for both VS Code stable and Insiders";
 
   test_editor_line_numbers_in_settings = assert' (lib.hasInfix "\"editor.lineNumbers\": \"relative\"" settingsText) "settings.json must set editor.lineNumbers to relative";
 
