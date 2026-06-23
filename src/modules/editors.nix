@@ -2,6 +2,7 @@
 # Extension backend: nixpkgs on Linux vs Homebrew/nixpkgs on macOS;
 # extensions managed by vsCodeExtensionBridge on all backends.
 {
+  config,
   lib,
   managedUser ? null,
   managedUsername ? null,
@@ -428,6 +429,11 @@ in
   home.packages =
     lib.optionals (!isDarwin) [ pkgs.vscode ]
     ++ lib.optionals (!isDarwin && pkgs ? vscode-insiders) [ pkgs.vscode-insiders ];
+
+  # Stable user-level symlink so vscode-neovim can find nvim without a
+  # hardcoded username in the settings path (~/.nix-profile/bin/nvim does
+  # NOT exist when home-manager.useUserPackages = true).
+  home.file.".local/bin/nvim".source = "${config.home.profileDirectory}/bin/nvim";
 
   programs.vscode = {
     # Enable native Home Manager integration on non-Darwin hosts so the VS Code

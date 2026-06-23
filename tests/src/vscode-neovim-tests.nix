@@ -36,6 +36,10 @@ let
     && lib.hasInfix "com.microsoft.VSCodeInsiders" macosDefaultsText
   ) "MacBook defaults.nix must disable ApplePressAndHold for both VS Code stable and Insiders";
 
+  test_neovim_launcher_symlink = assert' (
+    lib.hasInfix "home.file" editorsText && lib.hasInfix ".local/bin/nvim" editorsText
+  ) "editors.nix must have home.file launcher symlink for nvim at ~/.local/bin/nvim";
+
   test_editor_line_numbers_in_settings = assert' (lib.hasInfix "\"editor.lineNumbers\": \"relative\"" settingsText) "settings.json must set editor.lineNumbers to relative";
 
   test_scroll_beyond_last_line_in_settings = assert' (lib.hasInfix "\"editor.scrollBeyondLastLine\": false" settingsText) "settings.json must set editor.scrollBeyondLastLine to false";
@@ -45,14 +49,18 @@ let
     && lib.hasInfix "vscode-neovim.escape" settingsText
   ) "settings.json must have vscode-neovim.compositeKeys with jk escape";
 
-  test_neovim_executable_paths_in_settings = assert' (
-    lib.hasInfix "vscode-neovim.neovimExecutablePaths.darwin" settingsText
-    && lib.hasInfix "vscode-neovim.neovimExecutablePaths.linux" settingsText
-    && lib.hasInfix "vscode-neovim.neovimExecutablePaths.win32" settingsText
-  ) "settings.json must have vscode-neovim neovimExecutablePaths for all three platforms";
+  test_neovim_executable_paths_in_settings =
+    assert'
+      (
+        lib.hasInfix "vscode-neovim.neovimExecutablePaths.darwin" settingsText
+        && lib.hasInfix "vscode-neovim.neovimExecutablePaths.linux" settingsText
+        && lib.hasInfix "vscode-neovim.neovimExecutablePaths.win32" settingsText
+        && lib.hasInfix "~/.local/bin/nvim" settingsText
+      )
+      "settings.json must have vscode-neovim neovimExecutablePaths for all three platforms with ~/.local/bin/nvim path";
 in
 {
   success = true;
-  testCount = 9;
-  message = "All ${builtins.toString 9} vscode-neovim provisioning tests passed";
+  testCount = 10;
+  message = "All ${builtins.toString 10} vscode-neovim provisioning tests passed";
 }
