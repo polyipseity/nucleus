@@ -90,6 +90,9 @@
   "extensions.allowOpenInModalEditor": true,
   "extensions.autoCheckUpdates": false,
   "extensions.autoUpdate": false,
+  "extensions.experimental.affinity": {
+    "asvetliakov.vscode-neovim": 1
+  },
   "extensions.experimental.deferredStartupFinishedActivation": true,
   "extensions.supportNodeGlobalNavigator": true,
   "files.associations": {
