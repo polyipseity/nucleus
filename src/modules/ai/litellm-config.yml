@@ -214,7 +214,7 @@ model_list:
       order: 1
       model_info:
         max_input_tokens: 81920
-  - model_name: xiaomi/mimo-v2.5-free
+  - model_name: xiaomi/mimo-v2.5
     litellm_params:
       model: openai/mimo-v2.5-free
       api_base: https://opencode.ai/zen/v1
@@ -222,7 +222,7 @@ model_list:
       order: 1
       model_info:
         max_input_tokens: 81920
-  - model_name: alibaba/qwen3.6-plus-free
+  - model_name: alibaba/qwen3.6-plus
     litellm_params:
       model: openai/qwen3.6-plus-free
       api_base: https://opencode.ai/zen/v1
@@ -230,7 +230,7 @@ model_list:
       order: 1
       model_info:
         max_input_tokens: 81920
-  - model_name: minimax/minimax-m3-free
+  - model_name: minimax/minimax-m3
     litellm_params:
       model: openai/minimax-m3-free
       api_base: https://opencode.ai/zen/v1
@@ -238,7 +238,7 @@ model_list:
       order: 1
       model_info:
         max_input_tokens: 81920
-  - model_name: nvidia/nemotron-3-ultra-free
+  - model_name: nvidia/nemotron-3-ultra
     litellm_params:
       model: openai/nemotron-3-ultra-free
       api_base: https://opencode.ai/zen/v1
@@ -246,7 +246,7 @@ model_list:
       order: 1
       model_info:
         max_input_tokens: 81920
-  - model_name: stealth/north-mini-code-free
+  - model_name: stealth/north-mini-code
     litellm_params:
       model: openai/north-mini-code-free
       api_base: https://opencode.ai/zen/v1
