@@ -316,7 +316,7 @@ if (-not $HAS_ARGS) {
     if ($_obj -is [array]) { return @($_obj | ForEach-Object { ConvertTo-HashtableDeep $_ }) }
     return $_obj
   }
-  $_dsc = $_dscYaml | ConvertFrom-Yaml | ConvertTo-HashtableDeep
+  $_dsc = ConvertTo-HashtableDeep ($_dscYaml | ConvertFrom-Yaml)
 
   foreach ($_resource in $_dsc.properties.resources) {
     if ($_resource.resource -eq 'Microsoft.WinGet.Client/Package' -and $_resource.settings.source -eq 'winget') {
