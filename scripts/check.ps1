@@ -306,20 +306,20 @@ if (-not $HAS_ARGS) {
   $_dscYaml = Get-Content $_dscSystem -Raw
   # Convert YAML → nested hashtable (powershell-yaml may lack -AsHashtable on
   # older versions in CI, requiring manual PSCustomObject → hashtable traversal).
-  function _ConvertTo-Hashtable ($_obj) {
+  function ConvertTo-HashtableDeep ($_obj) {
     if ($_obj -is [hashtable]) { return $_obj }
     if ($_obj -is [PSCustomObject]) {
       $_ht = [ordered] @{}
-      $_obj.PSObject.Properties | ForEach-Object { $_ht[$_.Name] = _ConvertTo-Hashtable $_.Value }
+      $_obj.PSObject.Properties | ForEach-Object { $_ht[$_.Name] = ConvertTo-HashtableDeep $_.Value }
       return $_ht
     }
-    if ($_obj -is [array]) { return @($_obj | ForEach-Object { _ConvertTo-Hashtable $_ }) }
+    if ($_obj -is [array]) { return @($_obj | ForEach-Object { ConvertTo-HashtableDeep $_ }) }
     return $_obj
   }
   $_dsc = if ((Get-Command ConvertFrom-Yaml).Parameters.Keys -contains 'AsHashtable') {
     $_dscYaml | ConvertFrom-Yaml -AsHashtable
   } else {
-    _ConvertTo-Hashtable ($_dscYaml | ConvertFrom-Yaml)
+    ConvertTo-HashtableDeep ($_dscYaml | ConvertFrom-Yaml)
   }
 
   foreach ($_resource in $_dsc.properties.resources) {
