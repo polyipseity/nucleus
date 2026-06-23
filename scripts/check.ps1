@@ -304,10 +304,10 @@ if (-not $HAS_ARGS) {
   # Generate locked DSC in-memory from system.dsc.yml + lockfile.
   $_lockfileData = Get-Content $_lockfilePath -Raw | ConvertFrom-Json -AsHashtable
   $_dscYaml = Get-Content $_dscSystem -Raw
-  # Convert YAML → nested hashtable (powershell-yaml may lack -AsHashtable on
-  # older versions in CI, requiring manual PSCustomObject → hashtable traversal).
+  # Convert YAML → nested hashtable. Always post-process through
+  # ConvertTo-HashtableDeep because powershell-yaml's -AsHashtable may be
+  # shallow-only on older versions, leaving nested PSCustomObject.
   function ConvertTo-HashtableDeep ($_obj) {
-    if ($_obj -is [hashtable]) { return $_obj }
     if ($_obj -is [PSCustomObject]) {
       $_ht = [ordered] @{}
       $_obj.PSObject.Properties | ForEach-Object { $_ht[$_.Name] = ConvertTo-HashtableDeep $_.Value }
@@ -316,11 +316,7 @@ if (-not $HAS_ARGS) {
     if ($_obj -is [array]) { return @($_obj | ForEach-Object { ConvertTo-HashtableDeep $_ }) }
     return $_obj
   }
-  $_dsc = if ((Get-Command ConvertFrom-Yaml).Parameters.Keys -contains 'AsHashtable') {
-    $_dscYaml | ConvertFrom-Yaml -AsHashtable
-  } else {
-    ConvertTo-HashtableDeep ($_dscYaml | ConvertFrom-Yaml)
-  }
+  $_dsc = $_dscYaml | ConvertFrom-Yaml | ConvertTo-HashtableDeep
 
   foreach ($_resource in $_dsc.properties.resources) {
     if ($_resource.resource -eq 'Microsoft.WinGet.Client/Package' -and $_resource.settings.source -eq 'winget') {
