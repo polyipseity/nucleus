@@ -1,10 +1,4 @@
-# modules/home.nix — Home Manager entrypoint shared by all three host types.
-#
-# Imported by flake.nix once per host inside a home-manager.users.* block or a
-# homeManagerConfiguration call.  Responsible for:
-#   • resolving the platform-appropriate home directory path
-#   • importing all shared feature modules
-#   • symlinking dotfiles from the repo's dotfiles/ tree into the home directory
+# Home Manager entrypoint shared by all three host types.
 {
   config,
   lib,

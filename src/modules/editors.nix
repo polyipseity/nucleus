@@ -1,21 +1,6 @@
-# modules/editors.nix — Cross-platform editor configuration and VS Code symmetry.
-#
-# Source of truth for VS Code extensions and config wiring lives here.
-# Installation backend intentionally pivots by platform:
-#   • Linux/NixOS: nixpkgs binaries; extensions managed by vsCodeExtensionBridge.
-#   • macOS: backend selected in modules/core.nix (Homebrew or nixpkgs);
-#     extensions managed by vsCodeExtensionBridge on all backends.
-#
-# The full 65-extension baseline is built entirely from Nix derivations:
-#   • 43 extensions packaged directly in nixpkgs (pkgs.vscode-extensions).
-#   • 22 extensions sourced from the VS Code Marketplace via the
-#     nix-vscode-extensions flake input (vsCodeMarketplace extraSpecialArg).
-#
-# VS Code config files (settings, per-host keybindings, MCP, tasks, snippets,
-# prompts, profiles, and Copilot Chat memory) are kept as live repo files under
-# src/modules/configs/vscode/ so that every VS Code write appears as an
-# unstaged git change.  The vsCodeSymlinks activation creates symlinks from
-# the per-channel User/ directories to those repo files at apply time.
+# Cross-platform editor configuration and VS Code extensions.
+# Extension backend: nixpkgs on Linux vs Homebrew/nixpkgs on macOS;
+# extensions managed by vsCodeExtensionBridge on all backends.
 {
   lib,
   managedUser ? null,

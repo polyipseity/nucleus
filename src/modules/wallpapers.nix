@@ -1,21 +1,7 @@
-# modules/wallpapers.nix — Home Manager activation hook that decrypts SOPS-
-# encrypted wallpaper blobs and configures a slideshow / gallery desktop.
-#
-# Asset layout: assets/wallpapers/<username>/*.sops — each subdirectory
-# represents a user, and all .sops files inside belong to that user.  Files
-# are encrypted with SOPS (age via machine SSH key or GPG fallback).  On
-# activation the blobs are decrypted into ~/Pictures/wallpapers/ and applied
-# as a rotating gallery (10-minute interval) on both macOS (desktoppr folder
-# mode) and GNOME (dynamically generated wallpaper-gallery.xml).
-#
-# Multi-user support: each subdirectory in assets/wallpapers/ is treated as a
-# separate user.  Home Manager activation for each user runs the provision
-# script to their own ~/Pictures/wallpapers/ directory.
-#
-# Stale gc: any file in ~/Pictures/wallpapers/ that no longer has a
-# matching *.sops source is removed so the gallery stays current.
-#
-# This activation runs after gpgImport so the keyring import has already
+# Decrypts SOPS-encrypted wallpaper blobs from assets/wallpapers/<user>/
+# into ~/Pictures/wallpapers/ with a 10-minute rotating slideshow
+# on macOS (desktoppr folder mode) and GNOME (wallpaper-gallery.xml).
+# Activation runs after gpgImport so the keyring import has already
 # happened before wallpaper decryption attempts.
 {
   config,

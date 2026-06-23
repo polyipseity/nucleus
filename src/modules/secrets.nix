@@ -1,14 +1,4 @@
-# modules/secrets.nix — Secret management for Home Manager.
-#
-# All decryption is delegated to sops-nix (sops.secrets). Imperative activation
-# hooks handle side-effects that have no declarative equivalent:
-#   - gpgImport:              imports the managed GPG key and enforces ownertrust
-#   - gitIdentityFromSops:    writes git name/email/signingkey from SOPS payload
-#   - sshKeyAdopt:            tracks the SSH key fingerprint; flushes agent on rotation
-#   - verifySecretDecryption: post-activation health check for each decryption backend
-#
-# SOPS file format and bootstrap: see scripts/bootstrap.sh and
-# .agents/instructions/primary-user-distinction.instructions.md.
+# Secret management via sops-nix.
 {
   config,
   lib,
@@ -53,22 +43,11 @@ let
 
 in
 lib.mkIf isPrimaryUser {
-  # Register the machine-identity decryption backend for the HM sops-nix module.
-  # /etc/sops/age/machine.txt is derived by the system activation script
-  # deriveHostAgeKey in posix-sops.nix from /etc/ssh/ssh_host_ed25519_key.
-  # Using keyFile instead of sshKeyPaths avoids the permission issue on macOS
-  # and NixOS where /etc/ssh/ssh_host_ed25519_key is 0600 root:wheel/root:root
-  # and the Home Manager sops-nix instance runs as the regular user.
-  # sops.gnupg.home is intentionally absent: sops-nix rejects keyFile and
-  # gnupgHome being set simultaneously (manifest validation error).  The machine
-  # age key registered in .sops.yaml age_devices is sufficient for all secret
-  # decryption at HM activation time; GPG is populated by gpgImport (below)
-  # from the decrypted SOPS payload and remains available for signing thereafter.
+  # Machine age key derived from /etc/ssh/ssh_host_ed25519_key by
+  # deriveHostAgeKey in posix-sops.nix. keyFile avoids the permission issue
+  # with sshKeyPaths (0600 root:wheel). gnupgHome is intentionally absent:
+  # sops-nix rejects setting both keyFile and gnupgHome simultaneously.
   sops.age.keyFile = "/etc/sops/age/machine.txt";
-
-  # --------------------------------------------------------------------------
-  # SSH private key — sops-nix owns decryption, file write, and chmod 600.
-  # --------------------------------------------------------------------------
 
   # Propagate rclone config passphrase availability to shell.nix and
   # cloud-drives.nix via nucleus.rclone options so those modules do not need
@@ -77,9 +56,7 @@ lib.mkIf isPrimaryUser {
   nucleus.rclone.configPassSecretPath = lib.mkIf hasUserSecretFile rcloneConfigPassPath;
 
   # --------------------------------------------------------------------------
-  # Per-user secret: rclone config passphrase.
-  # Encrypts the entire rclone.conf so stored cloud credentials are protected.
-  # WHY 0400: only the owner needs read access; rclone never modifies this file.
+  # rclone config passphrase (0400 — only owner needs read access)
   # --------------------------------------------------------------------------
   sops.secrets."${rcloneConfigPassSecretName}" = lib.mkIf hasUserSecretFile {
     sopsFile = userSecretFilePath;
@@ -94,8 +71,7 @@ lib.mkIf isPrimaryUser {
   };
 
   # --------------------------------------------------------------------------
-  # SSH public key — declaratively sourced from SOPS to avoid activation-time
-  # key derivation and passphrase handling edge cases.
+  # SSH public key
   # --------------------------------------------------------------------------
   sops.secrets."${sshPublicSecretName}" = {
     sopsFile = ../secrets/ssh-personal.yml;
@@ -104,9 +80,7 @@ lib.mkIf isPrimaryUser {
   };
 
   # --------------------------------------------------------------------------
-  # SSH RSA keypair (legacy fallback) — still materialized for compatibility
-  # with environments that have not migrated off RSA yet, but intentionally not
-  # referenced by the default SSH match blocks below.
+  # SSH RSA keypair (legacy fallback)
   # --------------------------------------------------------------------------
   sops.secrets."${sshRsaSecretName}" = {
     sopsFile = ../secrets/ssh-personal.yml;
@@ -121,8 +95,7 @@ lib.mkIf isPrimaryUser {
   };
 
   # --------------------------------------------------------------------------
-  # GPG key material — sops-nix decrypts to its managed path (tmpfs on Linux).
-  # The activation hook below imports it into the keyring.
+  # GPG key material
   # --------------------------------------------------------------------------
   sops.secrets."${gpgSecretName}" = {
     sopsFile = ../secrets/gpg-personal.yml;
@@ -131,20 +104,14 @@ lib.mkIf isPrimaryUser {
   };
 
   # --------------------------------------------------------------------------
-  # Git identity — SOPS-backed global name/email/signing key source-of-truth.
+  # Git identity
   # --------------------------------------------------------------------------
   sops.secrets."${gitIdentitySecretName}" = {
     sopsFile = ../secrets/git-identities.yml;
   };
 
   # --------------------------------------------------------------------------
-  # System-wide secrets — decrypted from the ``system`` SOPS file.
-  #   - ``ai_openrouter_api_key``: OpenRouter API key, exported as
-  #     OPENROUTER_API_KEY for the LiteLLM proxy.
-  #   - ``ai_opencode_go_api_key``: OpenCode Go API key, exported as
-  #     OPENCODE_GO_API_KEY for the LiteLLM proxy.
-  #   - ``ai_opencode_zen_api_key``: OpenCode Zen API key, exported as
-  #     OPENCODE_ZEN_API_KEY for the LiteLLM proxy.
+  # System-wide secrets (AI API keys for LiteLLM proxy)
   # --------------------------------------------------------------------------
   sops.secrets."ai_openrouter_api_key" = {
     sopsFile = ../secrets/system.yml;

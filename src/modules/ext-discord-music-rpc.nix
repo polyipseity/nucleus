@@ -1,15 +1,5 @@
-# modules/ext-discord-music-rpc.nix — Music presence for Discord.
-#
-# discord-music-rpc shows your currently playing music in Discord via Rich
-# Presence. Sources: Spotify, Last.fm, Plex, SoundCloud, YouTube.
-#
-# Package: built from the forked repo (forks/polyipseity branch) with pinned
-# pypresence dependency fetched from git instead of resolved by pip.
-# Config: Nix store path (read-only) — discord-music-rpc overwrites its config
-# on startup, so the symlink target must be immutable to prevent the app from
-# discarding managed settings.  The tracked source is at
-# src/modules/configs/discord-music-rpc/config.yaml in the repo.
-# Services: launchd on macOS, systemd user service on NixOS.
+# Discord Rich Presence for music (Spotify, Last.fm, Plex).
+# launchd on macOS, systemd user service on NixOS.
 args@{
   config,
   lib,

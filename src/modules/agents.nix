@@ -1,18 +1,6 @@
-# modules/agents.nix — Declarative ~/.agents directory layout for all POSIX hosts.
-#
-# Creates ~/.agents/ as a real directory, then creates a per-entry symlink inside
-# it for every top-level entry in src/modules/configs/agents/ except skills/.
-# skills/ is excluded here because it is managed by agentsSkills (below) and may
-# contain downloaded content that must not be committed (fetched / ClawHub).
-#
-# The per-subdir layout creates ~/.agents as a real directory with per-entry
-# symlinks. This allows ClawHub to write fetched skill downloads into
-# ~/.agents/skills/ without those writes entering the tracked repo tree.
-#
-# Activation reads the repo root from $NUCLEUS_REPO (set by apply.sh before the
-# rebuild call and forwarded through sudo).
-#
-# agentsSkills (below) manages ~/.agents/skills/ independently.
+# Declarative ~/.agents directory layout with per-entry symlinks into
+# src/modules/configs/agents/ (skills/ managed by agentsSkills).
+# Activation reads $NUCLEUS_REPO for out-of-store symlinks.
 {
   config,
   lib,

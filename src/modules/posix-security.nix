@@ -1,5 +1,4 @@
-# modules/posix-security.nix — Shared privilege-escalation hardening.
-# Imported by both nix-darwin and NixOS hosts.
+# Shared privilege-escalation hardening (sudo timeout).
 { ... }: {
   # Shorten sudo credential caching to reduce unattended escalation window.
   security.sudo.extraConfig = ''

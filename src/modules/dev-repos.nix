@@ -1,28 +1,4 @@
-# modules/dev-repos.nix — Home Manager activation hook that provisions
-# development repositories in ~/dev on POSIX hosts (macOS, NixOS).
-#
-# Configuration: Per-user dev repository settings are defined in the centralized
-# user registry (flake.nix users.<username>.devRepos). This module reads that
-# configuration and provisions repositories accordingly.
-#
-# Behavior:
-#   • Repository provisioning: symlinks are created if absent; repos are cloned only if uninitialized
-#   • Submodule provisioning: processes folder directories sequentially, allowing dependencies
-#   • soft-fail on errors (log warnings, do not exit)
-#   • remote URLs are verified and updated if needed
-#
-# Structure:
-#   Separate concerns between repo provisioning and submodule cloning:
-#   • repositories: list of repos to provision (clone/symlink)
-#   • submoduleDirectories: list of folder paths where submodules should be cloned (supports globs)
-#
-# Submodule directory entries:
-#   • path: directory path where submodules will be cloned (supports globbing: e.g. 'myrepo/subdir/*')
-#   • recursive: whether to recursively clone nested submodules (boolean; presence implies enabled)
-#
-# Dependency:
-#   • This hook runs after writeBoundary so basic file operations are available.
-#   • No secrets or decryption needed; cloning happens via Git SSH (configured separately).
+# Provisions dev repos in ~/dev from per-user config in users.json.
 args@{
   config,
   lib,

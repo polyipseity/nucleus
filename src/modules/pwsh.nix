@@ -1,16 +1,7 @@
-# modules/pwsh.nix — PowerShell profile management for POSIX hosts.
-#
-# Manages ~/.config/powershell/Microsoft.PowerShell_profile.ps1 so that
-# cross-host pwsh behavior mirrors the managed block written by
-# Sync-NucleusShellProfile on Windows (src/hosts/Windows/modules/sync-shellprofile.ps1).
-# Keeping both in sync makes PowerShell behavior consistent across all three
-# host types when pwsh is invoked on macOS or NixOS.
+# PowerShell profile for POSIX hosts.
 { lib, pkgs, ... }:
 let
-  # Keep the same fallback tool inventory as the POSIX zsh profile so managed
-  # pwsh sessions can work in repositories that do not provide direnv/Nix hooks.
-  # Rust toolchain management is via rustup on all platforms; cargo/rustc are
-  # not included so users go through rustup or a devShell.
+  # Fallback tool inventory matching shell.nix for repos without direnv/Nix hooks.
   defaultDevTools = pkgs.symlinkJoin {
     name = "default-dev-tools";
     paths = [
@@ -20,23 +11,13 @@ let
     ];
   };
 
-  # Single source of truth for AI agent session detection.  Shared with
-  # shell.nix and Sync-ShellProfile.ps1 (Windows).
   agentEnv = import ./agent-env-vars.nix;
 
-  # Lockfile-powered version pinning.  The consolidated lockfile is the single
-  # source of truth for pinned versions across all package managers.
   lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
   pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
 
-  # Shared shell environment variable values (CC, CXX, LD) defined in one place.
-  # Source of truth: ./shell/env.nix — update there, not here.
-  shellEnv = import ./shell/env.nix;
+  shellEnv = import ./shell/env.nix; # CC, CXX, LD from ./shell/env.nix
 
-  # Profile content mirroring the Windows managed block in shell.ps1.
-  # Using a Nix ''...'' string so the file is written verbatim; single
-  # dollar signs and PowerShell variables ($line, $cursor, etc.) do not
-  # need escaping because Nix only interpolates ${...} (braced) forms.
   profileContent = ''
         # This file is managed by nucleus (src/modules/pwsh.nix).
         # Manual edits will be overwritten on the next `nix run .#apply`.

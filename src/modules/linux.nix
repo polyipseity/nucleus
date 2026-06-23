@@ -1,10 +1,4 @@
-# modules/linux.nix — Linux-only Home Manager desktop/session parity settings.
-# Mirrors core UX/security intent from macOS defaults where GNOME equivalents
-# exist (clock, lock behavior, touchpad/keyboard ergonomics, privacy, and power).
-#
-# Systemd user units managed by this module:
-#   nix-index-update.service — rebuilds the nix-index file database on demand.
-#   nix-index-update.timer   — fires daily (12:00) with Persistent=true.
+# Linux-only desktop/session parity settings (GNOME) and systemd user units.
 {
   config,
   lib,

@@ -60,20 +60,9 @@ let
 in
 {
   # ---------------------------------------------------------------------------
-  # Activation script wiring — platform-conditional
-  #
-  # nix-darwin (macOS): activation-scripts.nix assembles only a hardcoded list
-  # of named scripts into the activate binary; any name outside that list is
-  # silently ignored.  The supported user extension points are:
-  #   extraActivation  — runs after createRun, before openssh
-  #   postActivation   — runs after homebrew (last hook before HM)
-  # deriveHostAgeKey reads /etc/ssh/ssh_host_ed25519_key which is written by
-  # the openssh step, so it must go in postActivation.  lib.mkBefore ensures
-  # this fragment is prepended before home-manager's HM activation call, which
-  # is also appended to postActivation.text at default priority.
-  #
-  # NixOS: system.activationScripts assembles ALL named scripts in topological
-  # order, so a custom name works correctly.
+  # nix-darwin only allows hardcoded named scripts; deriveHostAgeKey must run
+  # after openssh (which writes the host key), so use postActivation + mkBefore.
+  # NixOS accepts any script name.
   # ---------------------------------------------------------------------------
   system.activationScripts =
     if pkgs.stdenv.isDarwin then

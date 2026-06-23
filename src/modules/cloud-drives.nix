@@ -1,26 +1,6 @@
-# modules/cloud-drives.nix — Declarative cloud drive mounts and replicas.
-#
-# Manages two categories of cloud storage access per POSIX user:
-#
-#   Mounts — persistent rclone mount processes providing on-demand access via
-#             FUSE (requires FUSE-T on macOS, fuse3 on NixOS). Files are read
-#             from the remote on access; no full local copy is kept.
-#
-#   Replicas — full local copies of remote data, kept in sync by pull-only
-#              rclone sync (remote -> local).
-#
-# Configuration: per-user settings come from src/modules/users.json under the
-# "cloudDrives" key. Multiple mounts and replicas may be declared per user,
-# even for the same provider but with different accounts or paths (each entry
-# needs a unique "id" string).
-#
-# macOS prerequisites:
-#   - FUSE-T (Homebrew formula fuse-t) with FSKit support enabled.
-#   - rclone remote configured via `rclone config` before the LaunchAgent fires
-#
-# NixOS prerequisites:
-#   - programs.fuse.enable = true in the system-level NixOS configuration
-#   - rclone remote configured via `rclone config` before the service starts
+# Declarative rclone mounts and pull-only replicas per user.
+# Per-user config in users.json under "cloudDrives" key.
+# Requires FUSE (FUSE-T on macOS, fuse3 on NixOS) and rclone remote configured.
 args@{
   config,
   lib,

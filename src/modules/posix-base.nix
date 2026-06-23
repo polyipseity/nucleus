@@ -1,5 +1,4 @@
-# modules/posix-base.nix — Shared system-layer defaults for POSIX hosts.
-# Imported by both nix-darwin and NixOS host entrypoints.
+# Shared system-layer defaults for POSIX hosts.
 {
   config,
   lib,

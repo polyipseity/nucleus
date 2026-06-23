@@ -1,12 +1,4 @@
-# modules/https-proxy.nix — Local Caddy HTTPS proxy for loopback services.
-#
-# Defines nucleus.httpsProxy.virtualHosts and (on macOS) creates a single
-# launchd daemon that runs Caddy with an auto-generated Caddyfile.
-# On NixOS the option feeds into services.caddy via NixOS/https-proxy.nix.
-#
-# Sources:
-# - https://caddyserver.com/docs/caddyfile/directives/reverse_proxy
-# - https://caddyserver.com/docs/caddyfile/directives/tls
+# Local Caddy HTTPS proxy for loopback services.
 { lib, ... }:
 let
   inherit (lib) mkOption types;

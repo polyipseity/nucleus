@@ -1,5 +1,4 @@
-# NixOS/default.nix — NixOS entrypoint for the generic Linux host.
-# Aggregates all host-specific module fragments; no settings live here directly.
+# NixOS entrypoint for the generic Linux host.
 { ... }: {
   # Inject the host manual path into Home Manager at the user layer so the
   # system entrypoint never needs to define a Home Manager-only option.

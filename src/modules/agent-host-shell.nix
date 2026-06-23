@@ -1,15 +1,4 @@
-# modules/agent-host-shell.nix — VS Code agent-host wrapper script.
-#
-# VS Code's AgentHostTerminalManager spawns shell sessions via node-pty
-# directly, bypassing workbench terminal profiles and settings. This means
-# agent detection environment variables (NUCLEUS_AGENT_SESSION, VSCODE_AGENT)
-# are never set in agent-host terminals.
-#
-# This module creates a thin wrapper script at a stable path
-# (.local/bin/nucleus-agent-host-wrapper.sh) via home.file. The wrapper
-# exports those variables then execs the real shell. The
-# terminal.integrated.agentHostProfile.<os> VS Code setting references this
-# path via ${userHome} so that AgentHostTerminalManager uses it.
+# Wrapper for VS Code agent-host terminals (sets agent env vars).
 {
   config,
   lib,

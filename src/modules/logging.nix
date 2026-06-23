@@ -1,10 +1,4 @@
-# modules/logging.nix — Centralized logging configuration for nucleus services.
-#
-# Canonical source for log directory paths, rotation settings, and sanitization
-# policy consumed by all service modules.
-#
-# Import this module at both the system level (in host/default.nix) and the
-# user level (in home.nix) to make options available everywhere.
+# Logging paths, rotation, and sanitization shared across service modules.
 { lib, pkgs, ... }:
 let
   inherit (lib) mkOption types;

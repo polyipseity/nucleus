@@ -1,9 +1,4 @@
-# modules/custom-provision-symlinks.nix — Declarative per-user custom symlinks.
-#
-# Provisions a user-scoped set of extra symlinks whose targets can differ by
-# platform (macOS, Linux, Windows). On POSIX hosts Home Manager owns the link
-# lifecycle while activation hooks temporarily remove delete protection before
-# linkGeneration and restore it afterwards.
+# Per-user symlinks with platform-specific targets.
 args@{
   config,
   lib,

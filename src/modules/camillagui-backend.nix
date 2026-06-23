@@ -1,6 +1,4 @@
-# modules/camillagui-backend.nix — CamillaDSP web GUI config.
-#
-# Cross-platform shared module. Defines the HTTPS proxy virtual host here;
+# CamillaDSP web GUI config. Defines the HTTPS proxy virtual host here;
 # user-level config deployment happens via Home Manager in modules/home.nix.
 # Service-manager-specific definitions live in src/hosts/{MacBook,NixOS}/.
 {

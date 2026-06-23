@@ -1,33 +1,4 @@
-# modules/macos.nix — macOS-only Home Manager activation hooks and LaunchAgents.
-#
-# Guards the entire module with lib.mkIf pkgs.stdenv.isDarwin so it is a no-op
-# on Linux hosts even though home.nix imports it unconditionally.
-#
-# Activation order (Home Manager DAG):
-#   writeBoundary / linkGeneration
-#     → configureInputAndSiri, provisionDevDirectory,
-#       reloadDockPreferenceState
-#     → preflightPrivacyPermissions
-#       → configureSafariDefaults, configureUniversalAccessDefaults
-#       → reloadUserPreferenceState
-#     → configureLaunchServices, configureNightlight
-#       → ensureHeadlessDisplay
-#         → configureDisplayResolutions
-#           → displayHostManualInstructions
-#
-# LaunchAgents managed by this module:
-#   local.dev-ds-store-gc — removes Finder metadata files from ~/dev
-#     daily at 12:00 so apply runs do not block on large tree scans.
-#   local.dev-spotlight-exclusions — refreshes Spotlight exclusion markers
-#     under ~/dev daily at 12:00 so apply runs do not block on large tree scans.
-#   local.betterdisplay-heartbeat — polls HeadlessDisplay every 30 s and
-#     reconnects it if BetterDisplay drops the virtual screen connection.
-#   local.icloud-exclusions — marks large/transient directories with the
-#     com.apple.fileprovider.ignore#P xattr daily at 12:00 to prevent iCloud
-#     from syncing build/cache trees across devices.
-#   local.nix-index-update — rebuilds the nix-index file database daily
-#     (12:00) and on every agent load; a freshness check makes
-#     reloads a fast no-op when the DB was updated within the past 6 days.
+# macOS-only activation hooks and LaunchAgents.
 {
   config,
   lib,

@@ -1,5 +1,4 @@
-# MacBook/default.nix — nix-darwin entrypoint for the MacBook host.
-# Aggregates all host-specific module fragments; no settings live here directly.
+# nix-darwin entrypoint for the MacBook host.
 { ... }: {
   # Inject the host manual path into Home Manager at the user layer so the
   # system entrypoint never needs to define a Home Manager-only option.

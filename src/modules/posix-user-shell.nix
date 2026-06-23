@@ -1,4 +1,4 @@
-# modules/posix-user-shell.nix — Shared POSIX user account defaults.
+# Shared POSIX user account defaults.
 {
   lib,
   pkgs,

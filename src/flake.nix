@@ -1,85 +1,53 @@
 {
   description = "Nucleus - Unified Declarative System Configuration";
 
-  # ---------------------------------------------------------------------------
-  # Inputs — pinned external flakes.
-  # All sub-inputs are pointed at the single shared nixpkgs to avoid pulling in
-  # multiple versions of the same package set.
-  # ---------------------------------------------------------------------------
   inputs = {
-    # nix-darwin: NixOS-style declarative configuration for macOS.
     darwin = {
       url = "github:lnl7/nix-darwin";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # home-manager: user-environment management; used on all three host types.
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # nix-vscode-extensions: provides Nix derivations for VS Code Marketplace
-    # extensions not yet packaged in nixpkgs, enabling a fully declarative
-    # extension baseline without CLI-based activation fallbacks.
     nix-vscode-extensions = {
       url = "github:nix-community/nix-vscode-extensions";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # nixpkgs: the single shared package set; pinned to nixos-unstable for
-    # access to recent packages on both NixOS and Darwin.
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    # rust-overlay: provides rust-bin.fromRustupToolchainFile and friends for
-    # declarative Rust toolchain management in devShells.  Reads the project's
-    # rust-toolchain.toml to assemble a Nix-patched toolchain, providing
-    # reproducible per-project toolchains in devShells independent of the
-    # system rustup install (pkgs.rustup) that manages the interactive shell.
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # sops-nix: integrates SOPS secret decryption into NixOS / nix-darwin /
-    # Home Manager activation without ever writing secrets to the Nix store.
     sops-nix = {
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # nix-homebrew: pins Homebrew binary and provides declarative tap management
-    # that works alongside nix-darwin's homebrew module.
     nix-homebrew.url = "github:zhaofengli/nix-homebrew";
-    # homebrew-core: pinned homebrew formula definitions (all managed brews).
     homebrew-core = {
       url = "github:homebrew/homebrew-core";
       flake = false;
     };
-    # homebrew-cask: pinned cask definitions (all managed casks).
     homebrew-cask = {
       url = "github:homebrew/homebrew-cask";
       flake = false;
     };
-    # cirruslabs-cli: tap for tart (macOS VM hypervisor).
     cirruslabs-cli = {
       url = "github:cirruslabs/homebrew-cli";
       flake = false;
     };
-    # smudge-smudge: tap for nightlight (Night Shift control).
     smudge-smudge = {
       url = "github:smudge/homebrew-smudge";
       flake = false;
     };
-    # zackelia-formulae: tap for bclm (battery charge limit).
     zackelia-formulae = {
       url = "github:zackelia/homebrew-formulae";
       flake = false;
     };
-    # nixos-generators: builds VM disk images from NixOS configurations.
-    # Pinned via flake.lock so runtime `nix run` invocations in vm-setup
-    # resolve to a fixed revision instead of fetching latest main.
     nixos-generators = {
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # scripts: automation helpers (.sh entry points) that live outside the flake
-    # root (src/).  Included as a non-flake input so builtins.readFile works in
-    # pure evaluation mode (e.g. `nix flake check`).
     scripts = {
       url = "path:../scripts";
       flake = false;
@@ -105,18 +73,15 @@
       ...
     }:
     let
-      # User registry is loaded from src/modules/users.json so the data stays
-      # separate from flake wiring, mirroring the Windows users.json pattern.
+      # Loaded from src/modules/users.json, mirroring the Windows pattern.
       users = builtins.fromJSON (builtins.readFile ./modules/users.json);
 
-      # Derive the primary username from the registry.
-      # Filter users by isPrimary=true and extract the name (the attr key).
+      # Filter users by isPrimary=true and extract the attr name.
       username = builtins.head (
         builtins.filter (name: users.${name}.isPrimary) (builtins.attrNames users)
       );
 
-      # Generate home-manager.users attrset from the user registry.
-      # Each user gets the home.nix module and optionally sops-nix if isPrimary.
+      # home-manager.users attrset: each user gets home.nix; primary also gets sops-nix.
       mkHomeManagerUsers =
         userModulesPath:
         builtins.mapAttrs (name: user: {
@@ -135,34 +100,25 @@
           ]);
         }) users;
 
-      # Canonical system strings for the two supported architectures.
+      # Supported architectures.
       systems = {
         linux = "x86_64-linux";
         mac = "aarch64-darwin";
       };
 
-      # Build a nixpkgs package set for a given system with unfree packages
-      # permitted (required for VS Code, Discord, Spotify, etc.).
       mkPkgs =
         system:
         import nixpkgs {
           inherit system;
           config.allowUnfree = true;
-          # .NET 6 is intentionally pinned for EIDE/runtime compatibility across
-          # hosts. Upstream marks it insecure because it is EOL; keep this
-          # exception narrowly scoped to the exact runtime derivation.
+          # .NET 6 is EOL upstream; keep pinned for EIDE/runtime compatibility.
           config.permittedInsecurePackages = [ "dotnet-runtime-6.0.36" ];
 
           overlays = [
             (_final: prev: {
-              # a2a-sdk has flaky timing tests and FastAPI multiprocessing/pickle
-              # e2e errors in the Nix sandbox on aarch64-darwin. litellm builds
-              # fine with the installed a2a-sdk regardless.
-              # Note: tests run in pytestCheckPhase (preDistPhases), NOT in the
-              # regular checkPhase — controlled by dontUsePytestCheck, not doCheck.
-              # overrideScope is used instead of python3.override { packageOverrides }
-              # because the latter doesn't propagate through the fixpoint to
-              # python3Packages in an overlay context.
+              # a2a-sdk tests are flaky (timing/FastAPI e2e errors in Nix sandbox).
+              # overrideScope is used because python3.override doesn't propagate
+              # through the fixpoint in overlay context.
               python3Packages = prev.python3Packages.overrideScope (
                 _pyfinal: pyprev: {
                   a2a-sdk = pyprev.a2a-sdk.overrideAttrs (_: {
@@ -170,8 +126,8 @@
                   });
                 }
               );
-              # Disable tests for codec libs that are ffmpeg-full deps (tests OOM
-              # on aarch64-darwin Nix sandbox). ffmpeg-full's tests cover them.
+              # Codec libs that are ffmpeg-full deps: tests OOM on aarch64-darwin
+              # Nix sandbox; ffmpeg-full's tests cover them.
               chromaprint = prev.chromaprint.overrideAttrs (_: {
                 doCheck = false;
               });
@@ -357,12 +313,8 @@
       pkgsLinux = mkPkgs systems.linux;
       pkgsMac = mkPkgs systems.mac;
 
-      # mkDevPkgs — nixpkgs package set with rust-overlay applied.
-      # Used exclusively for devShells so the overlay does not affect the
-      # darwinConfigurations / nixosConfigurations / homeConfigurations
-      # evaluations.  Intentionally separate from mkPkgs (which carries
-      # system-specific overlays like the gnupg pin and codec doCheck=false
-      # patches).
+      # nixpkgs with rust-overlay, for devShells only (separate from mkPkgs
+      # to avoid affecting the system/hm evaluations).
       mkDevPkgs =
         system:
         import nixpkgs {
@@ -373,18 +325,13 @@
       pkgsDevLinux = mkDevPkgs systems.linux;
       pkgsDevMac = mkDevPkgs systems.mac;
 
-      # Per-system VS Code Marketplace derivation sets from nix-vscode-extensions.
-      # Used by editors.nix to build Nix derivations for the ~20 extensions that
-      # are not yet packaged in nixpkgs, replacing CLI-based activation with
-      # fully declarative Nix store derivations.
+      # VS Code Marketplace derivations from nix-vscode-extensions, for
+      # editors.nix (extensions not yet packaged in nixpkgs).
       vsCodeMarketplaceMac = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
       vsCodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
-      # writeShellApplicationWithLib — Like writeShellApplication but bundles
-      # lib.sh so scripts that source it work in both repo-direct and nix-store
-      # contexts.  Places lib.sh at both $out/bin/lib.sh (sibling pattern) and
-      # $out/src/scripts/lib.sh (parent-path pattern) so both convention sites
-      # resolve without runtime fallbacks.
+      # writeShellApplication plus lib.sh bundling, so scripts that source
+      # lib.sh work in both repo-direct and nix-store contexts.
       writeShellApplicationWithLib =
         pkgs: args:
         let
@@ -412,9 +359,8 @@
           ];
         };
 
-      # mkApp — Factored helper for defining `nix run .#<name>` apps.
-      # Wraps writeShellApplicationWithLib with uniform type/program boilerplate.
-      # Defaults to ../scripts/${name}.sh; pass explicit script for non-default paths.
+      # Helper for `nix run .#<name>` apps. Wraps writeShellApplicationWithLib.
+      # Defaults to ../scripts/${name}.sh.
       mkApp =
         pkgs:
         {
@@ -438,19 +384,9 @@
           }/bin/${appName}";
         };
 
-      # Build the `nix run .#apply` app for a given package set.
-      # Wraps src/scripts/apply.sh in a shell application that has git, jq,
-      # openssh, prek, sops, and ssh-to-age on PATH so the machine age key
-      # auto-registration step can derive the age public key and rewrap all
-      # SOPS-encrypted files, the post-apply AI sync can parse models.json,
-      # and the apply flow can install repository-local prek hooks on the
-      # first successful run.
-      # openssh provides ssh-keygen for the former generate_ssh_host_key_if_needed
-      # step (now generate-ssh-host-key.sh) that creates /etc/ssh/ssh_host_ed25519_key
-      # on first-provision machines.
-      # Sibling scripts (generate-ssh-host-key.sh, register-host-age-key.sh,
-      # install-prek-hooks.sh) are bundled into the same bin/ directory via
-      # symlinkJoin so apply.sh can find them through $_ash_script_dir resolution.
+      # `nix run .#apply` — wraps src/scripts/apply.sh with git/jq/openssh/prek/
+      # sops/ssh-to-age on PATH. Sibling scripts bundled via symlinkJoin so
+      # apply.sh resolves them through $_ash_script_dir.
 
       mkApplyApp =
         pkgs:
@@ -468,14 +404,10 @@
             ];
             text = builtins.readFile ./scripts/apply.sh;
           };
-          # Sibling scripts under src/scripts/ that apply.sh delegates to via
-          # $_ash_script_dir at runtime.  Bundled into the same bin/ directory so
-          # dirname-based resolution finds them.
-          # Explicit target names avoid hash-prefixed basenames from Nix single-
-          # file store paths (e.g. /nix/store/hash-generate-ssh-host-key.sh).
-          # ai-sync and vm-setup commands bundled as writeShellApplication so
-          # apply.sh can call `nucleus-ai-sync` / `nucleus-vm-setup` from PATH
-          # with their runtimeInputs (jq) resolved at build time.
+          # Sibling scripts (generate-ssh-host-key.sh etc) bundled into bin/
+          # so apply.sh resolves them through $_ash_script_dir. ai-sync and
+          # vm-setup are writeShellApplication derivations so apply.sh can run
+          # them from PATH with build-time runtimeInputs (jq).
           aiSyncDrv = writeShellApplicationWithLib pkgs {
             name = "nucleus-ai-sync";
             runtimeInputs = [ pkgs.jq ];
@@ -510,9 +442,7 @@
           program = "${applyDrv}/bin/nucleus-apply";
         };
 
-      # Build the PowerShell syntax validation app for a given package set.
-      # Runtime dependencies are bundled from this flake so CI and local runs do
-      # not depend on ad-hoc system package versions.
+      # PowerShell syntax validation (bundled deps so CI doesn't need system packages).
       mkCheckPwshApp = pkgs: {
         type = "app";
         program = "${
@@ -529,7 +459,7 @@
         }/bin/nucleus-check-pwsh";
       };
 
-      # Build the shell script lint app for a given package set.
+      # ShellCheck-based shell script linting.
       mkCheckShApp =
         pkgs:
         mkApp pkgs {
@@ -541,7 +471,7 @@
           ];
         };
 
-      # Build the Packer template validation app for a given package set.
+      # Packer template validation.
       mkCheckPackerApp =
         pkgs:
         mkApp pkgs {

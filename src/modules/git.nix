@@ -1,4 +1,4 @@
-# modules/git.nix — Shared Git behavior; identity is sourced from managed secrets.
+# Shared Git behavior; identity is sourced from managed secrets.
 { lib, pkgs, ... }:
 let
   gitIgnoreGlobalText = ''

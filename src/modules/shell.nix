@@ -1,7 +1,4 @@
-# modules/shell.nix — Interactive shell configuration shared across all managed hosts.
-#
-# Keeps shell aliases and environment variables in dedicated fragments to make
-# ordering checks and targeted reviews straightforward.
+# Interactive shell configuration shared across all managed hosts.
 {
   config,
   lib,

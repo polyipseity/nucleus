@@ -1,12 +1,4 @@
-# modules/core.nix — Cross-platform package set shared by every managed host.
-#
-# The same list of packages is injected whether the caller is nix-darwin
-# (system-level packages go into environment.systemPackages), NixOS (same
-# option), or a standalone Home Manager profile (home.packages).  A runtime
-# options-probe via lib.mkMerge + lib.mkIf lets this single module work in all
-# three contexts without the caller having to know which option is appropriate.
-#
-# System build tool policy: see AGENTS.md and .agents/instructions/package-installation-scope.instructions.md.
+# Cross-platform shared package set.
 {
   config,
   lib,
@@ -15,11 +7,6 @@
   ...
 }:
 let
-  # Packages installed on every host regardless of OS. Shared cross-platform
-  # tool set: CLI utilities, language runtimes, and developer tooling common
-  # to every managed host. See also darwinSharedPackages and
-  # overlappingPackages for platform-specific additions.
-  # pkgs.gemini-cli — DO NOT REMOVE THIS COMMENT: intentionally disabled for now per user request.
   baseSharedPackages = [
     pkgs.bat
     pkgs.bottom
@@ -35,7 +22,7 @@ let
     pkgs.ffmpeg-full
     pkgs.fzf
     pkgs.dotnetCorePackages.runtime_6_0
-    # pkgs.gemini-cli # DO NOT REMOVE THIS COMMENT: intentionally disabled for now per user request.
+    # pkgs.gemini-cli  # intentionally disabled per user request
     pkgs.gh
     pkgs.gitFull
     pkgs.gnupg
@@ -71,10 +58,6 @@ let
     pkgs.zoxide
   ];
 
-  # Darwin-only CLI extras that should always remain in nixpkgs.
-  #   desktoppr    — set desktop wallpaper from the command line
-  #   duti         — set default application for a UTI (used in macos.nix)
-  #   pinentry_mac — macOS-native GPG PIN entry dialog
   darwinSharedPackages = lib.optionals pkgs.stdenv.isDarwin [
     pkgs.desktoppr
     pkgs.duti
@@ -82,17 +65,9 @@ let
     pkgs.equaliser
   ];
 
-  # macOS packages available in both nixpkgs and Homebrew.
-  # Selection defaults follow AGENTS.md policy:
-  #   CLI → nixpkgs
-  #   GUI/hardware-integrated apps → Homebrew
-  # Entries here install via Homebrew on macOS (when backend resolves to
-  # homebrew).  NixOS installs for these GUI apps must be declared separately
-  # in host configs (e.g. src/hosts/NixOS/desktop.nix), as the overlap routing
-  # logic is macOS-only.
+  # Packages in both nixpkgs and Homebrew. CLI → nixpkgs, GUI → Homebrew. macOS-only.
   overlappingPackages = {
     blender = {
-      # Available on Linux via nixpkgs; macOS routes to Homebrew cask.
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -125,7 +100,6 @@ let
       nixpkgsAttr = "iterm2";
     };
     krita = {
-      # Available on Linux via nixpkgs; macOS routes to Homebrew cask.
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -134,7 +108,6 @@ let
       nixpkgsAttr = "krita";
     };
     libreoffice = {
-      # Available on Linux via nixpkgs; macOS routes to Homebrew cask.
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -151,7 +124,6 @@ let
       nixpkgsAttr = "obsidian";
     };
     "musicbrainz-picard" = {
-      # Available on Linux via nixpkgs; macOS routes to Homebrew cask.
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -160,8 +132,6 @@ let
       nixpkgsAttr = "picard";
     };
     qemu = {
-      # QEMU CLI tool for QCOW2 disk management (scripts/vm-setup.sh).
-      # POSIX: nixpkgs; Windows: Scoop (Invoke-ScoopSetup.ps1).
       category = "cli";
       homebrew = {
         kind = "formula";
@@ -218,8 +188,6 @@ let
       nixpkgsAttr = "vlc";
     };
     zoom = {
-      # nixpkgs attr is zoom-us (not zoom); Homebrew cask is zoom.
-      # Only macOS routes this to Homebrew; NixOS installs via nixpkgs in desktop.nix.
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -229,20 +197,13 @@ let
     };
   };
 
-  # Shorthand alias into the module option values set by the host config.
   packageSelection = config.nucleus.macos.packageSelection;
-  # Sorted list of all overlap package names; iterated in the selection pipeline below.
   overlapPackageNames = builtins.attrNames overlappingPackages;
 
-  # Policy function: maps a package category to its default backend.
-  # CLI tools default to nixpkgs; GUI/hardware-integrated apps default to
-  # Homebrew, following the AGENTS.md package selection policy.
+  # CLI → nixpkgs, GUI → homebrew.
   defaultBackendFor = category: if category == "cli" then "nixpkgs" else "homebrew";
 
-  # Per-package backend resolver — applies in priority order:
-  #   1. Explicit per-package override (packageSelection.overrides).
-  #   2. Policy function (defaultBackendFor) when overlapBackend == "policy".
-  #   3. Global backend setting ("homebrew" or "nixpkgs") otherwise.
+  # Priority: overrides > policy > global backend.
   resolveBackend =
     packageName:
     if builtins.hasAttr packageName packageSelection.overrides then
@@ -252,8 +213,6 @@ let
     else
       packageSelection.overlapBackend;
 
-  # Resolved backend attrset for every overlap package:
-  #   { "<package-name>" = "nixpkgs" | "homebrew"; }
   selectedOverlapBackends = builtins.listToAttrs (
     map (packageName: {
       name = packageName;
@@ -261,9 +220,7 @@ let
     }) overlapPackageNames
   );
 
-  # Validation list: overlap packages routed to nixpkgs but absent from the
-  # current pkgs attrset (e.g. a package unavailable on this platform).
-  # Non-empty causes an `assertions` failure at eval time via the config block.
+  # Overlap packages routed to nixpkgs but absent from pkgs (platform-specific).
   missingNixAttrs = lib.optionals pkgs.stdenv.isDarwin (
     builtins.filter (
       packageName:
@@ -272,8 +229,6 @@ let
     ) overlapPackageNames
   );
 
-  # Nix derivations for overlap packages resolved to the nixpkgs backend.
-  # Empty list on non-Darwin hosts because the overlap policy is macOS-only.
   overlapNixPackages = lib.optionals pkgs.stdenv.isDarwin (
     lib.concatMap (
       packageName:
@@ -287,9 +242,6 @@ let
     ) overlapPackageNames
   );
 
-  # Homebrew formula names (kind = "brew") for overlap packages on the homebrew
-  # backend.  Passed to homebrew.nix via the generated module option so the
-  # host does not need to list them manually.
   overlapHomebrewBrews = lib.optionals pkgs.stdenv.isDarwin (
     builtins.filter (name: name != null) (
       map (
@@ -305,9 +257,6 @@ let
     )
   );
 
-  # Homebrew cask names (kind = "cask") for overlap packages on the homebrew
-  # backend.  Passed to homebrew.nix via the generated module option so the
-  # host does not need to list them manually.
   overlapHomebrewCasks = lib.optionals pkgs.stdenv.isDarwin (
     builtins.filter (name: name != null) (
       map (
@@ -323,8 +272,6 @@ let
     )
   );
 
-  # Final merged package list installed on every host: shared base + Darwin
-  # extras + any overlap packages resolved to the nixpkgs backend on Darwin.
   sharedPackages = baseSharedPackages ++ darwinSharedPackages ++ overlapNixPackages;
 in
 {
@@ -377,12 +324,6 @@ in
     };
   };
 
-  # Probe the module option tree at evaluation time to decide which option to
-  # populate. optionalAttrs is used (instead of mkIf) for environment/home
-  # branches so unknown option paths are omitted entirely on module stacks
-  # where they do not exist (for example: home.* in pure system evaluations).
-  # Both branches may match simultaneously (e.g. nix-darwin with Home Manager),
-  # so mkMerge is used to merge both results safely.
   config = lib.mkMerge [
     (lib.optionalAttrs (options ? environment && options.environment ? systemPackages) {
       environment.systemPackages = sharedPackages;

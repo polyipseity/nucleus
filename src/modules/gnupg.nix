@@ -1,4 +1,4 @@
-# modules/gnupg.nix — Shared GnuPG runtime settings for non-Home-Manager hosts.
+# Shared GnuPG runtime settings for non-Home-Manager hosts.
 {
   lib,
   pkgs,
