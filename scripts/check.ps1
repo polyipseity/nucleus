@@ -334,9 +334,11 @@ if (-not $HAS_ARGS) {
 
   # Validate generated pins match lockfile entries.
   foreach ($_resource in $_dsc.properties.resources) {
+    # Use PSObject property check so this works on both PSCustomObject and hashtable.
+    $_hasVer = $_resource.settings.PSObject.Properties.Name -contains 'version'
     if ($_resource.resource -eq 'Microsoft.WinGet.Client/Package' `
         -and $_resource.settings.source -eq 'winget' `
-        -and $_resource.settings.version) {
+        -and $_hasVer) {
       $_id = $_resource.settings.id
       $_pinnedVer = $_resource.settings.version
       $_lfVer = if ($_lockfileData.winget.ContainsKey($_id)) { $_lockfileData.winget[$_id] } else { '' }
@@ -357,10 +359,11 @@ if (-not $HAS_ARGS) {
     $_lfVer = $_entry.Value
     $_foundPin = $false
     foreach ($_resource in $_dsc.properties.resources) {
+      $_hasVer = $_resource.settings.PSObject.Properties.Name -contains 'version'
       if ($_resource.resource -eq 'Microsoft.WinGet.Client/Package' `
           -and $_resource.settings.source -eq 'winget' `
           -and $_resource.settings.id -eq $_id `
-          -and $_resource.settings.version) {
+          -and $_hasVer) {
         $_foundPin = $true
         break
       }
