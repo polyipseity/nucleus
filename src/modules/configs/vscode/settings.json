@@ -72,7 +72,9 @@
   "editor.fontSize": 14,
   "editor.formatOnSave": true,
   "editor.guides.bracketPairs": true,
+  "editor.lineNumbers": "relative",
   "editor.minimap.sectionHeaderFontSize": 14,
+  "editor.scrollBeyondLastLine": false,
   "editor.tabCompletion": "on",
   "editor.tabSize": 2,
   "EIDE.Builder.EnvironmentVariables": [
@@ -243,6 +245,14 @@
   "ty.disableLanguageServices": false,
   "ty.importStrategy": "fromEnvironment",
   "update.mode": "none",
+  "vscode-neovim.compositeKeys": {
+    "jk": {
+      "command": "vscode-neovim.escape"
+    }
+  },
+  "vscode-neovim.neovimExecutablePaths.darwin": "~/.nix-profile/bin/nvim",
+  "vscode-neovim.neovimExecutablePaths.linux": "~/.nix-profile/bin/nvim",
+  "vscode-neovim.neovimExecutablePaths.win32": "${userHome}\\AppData\\Local\\Programs\\Neovim\\bin\\nvim.exe",
   "window.autoDetectColorScheme": true,
   "workbench.browser.agentHostChatToolsEnabled": true,
   "workbench.browser.enableChatTools": true,

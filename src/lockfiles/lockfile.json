@@ -146,6 +146,7 @@
     "windows": {}
   },
   "vscode": {
+    "asvetliakov.vscode-neovim": "1.19.0",
     "arrterian.nix-env-selector": "1.2.0",
     "astral-sh.ty": "2025.71.13500942",
     "charliermarsh.ruff": "2026.40.0",

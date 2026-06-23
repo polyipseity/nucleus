@@ -423,6 +423,21 @@
 
     echo "spotlight: done."
 
+    # ---- enableVSCodeKeyRepeat --------------------------------------------------
+    # Disable ApplePressAndHold for VS Code (stable and Insiders) so that held
+    # keys repeat. Required for vim motions (h/j/k/l) via vscode-neovim.
+    if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
+      console_uid="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
+      if [ -n "$console_uid" ]; then
+        for domain in com.microsoft.VSCode com.microsoft.VSCodeInsiders; do
+          if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" \
+            /usr/bin/defaults write "$domain" ApplePressAndHoldEnabled -bool false; then
+            echo "vscode-keyrepeat: failed to disable ApplePressAndHold for $domain." >&2
+          fi
+        done
+      fi
+    fi
+
     # ---- ensureSystemLogDirs ----------------------------------------------------
     # Create system log directories for all nucleus launchd daemons before they
     # start, so launchd can open StandardOutPath / StandardErrorPath files.

@@ -43,6 +43,8 @@ let
   # writable ~/.vscode/extensions and ~/.vscode-insiders/extensions directories
   # so both stable and insiders channels share an identical extension payload.
   sharedExtensions = builtins.concatLists [
+    # asvetliakov
+    (mkMktx "asvetliakov" "vscode-neovim")
     # arrterian
     (mkMktx "arrterian" "nix-env-selector")
     # astral-sh
@@ -391,6 +393,19 @@ let
             end
           end
         end
+
+        -- VS Code-specific settings (when running as embedded Neovim in VS Code).
+        -- <Leader>f calls VS Code's native formatSelection, which respects
+        -- project-specific formatters (Prettier, rustfmt, etc.) instead of
+        -- relying on Neovim's formatprg.
+        if vim.g.vscode then
+          vim.keymap.set({ "n", "v" }, "<Leader>f", function()
+            require("vscode").call("editor.action.formatSelection")
+          end)
+        end
+
+        -- jk -> <Esc> in insert mode for faster escape without leaving home row.
+        vim.keymap.set("i", "jk", "<Esc>", { noremap = true, silent = true })
   '';
 in
 {

@@ -61,6 +61,7 @@ function Sync-VSCodeExtension {
   $vscodeVersions = if ($lockfile -and $lockfile.vscode) { $lockfile.vscode } else { @{} }
 
   $managedExtensions = @(
+    'asvetliakov.vscode-neovim',
     'arrterian.nix-env-selector',
     'astral-sh.ty',
     'charliermarsh.ruff',
