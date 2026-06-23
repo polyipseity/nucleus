@@ -57,12 +57,23 @@ _nucleus_unprotect_symlink() {
 # ---------------------------------------------------------------------------
 # Repo root resolver
 # ---------------------------------------------------------------------------
-# Resolve the active repo root from $NUCLEUS_REPO (set by apply.sh).
-# Fails fast if unset — no fallback marker file.
+# Resolve the active repo root from $NUCLEUS_REPO (set by apply.sh) or an
+# optional fallback path baked in at eval time.  The fallback is a static
+# path captured during Nix evaluation (where NUCLEUS_REPO is available) and
+# embedded into the activation script so home-manager activation, which runs
+# as the user and does not inherit the sudo-level env var, can still find the
+# repo root.
+#
+# Arguments:
+#   $1  Context label for diagnostics.
+#   $2  Optional fallback path (baked in at eval time).
 _nucleus_resolve_repo_root() {
   _nrr_context="$1"
+  _nrr_fallback="${2:-}"
   if [ -n "${NUCLEUS_REPO:-}" ]; then
     printf '%s\n' "$NUCLEUS_REPO"
+  elif [ -n "$_nrr_fallback" ] && [ -d "$_nrr_fallback" ]; then
+    printf '%s\n' "$_nrr_fallback"
   else
     echo "$_nrr_context: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
     return 1

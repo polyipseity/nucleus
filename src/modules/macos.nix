@@ -36,9 +36,13 @@
   ...
 }:
 let
-  # Activation scripts resolve the repo root from $NUCLEUS_REPO_ROOT (set by
-  # apply.sh and forwarded through sudo), so out-of-store symlinks survive repo
-  # relocations and rebuilds without stale store paths.
+  # Activation scripts resolve the repo root from $NUCLEUS_REPO (set by apply.sh
+  # and forwarded through sudo), so out-of-store symlinks survive repo relocations
+  # and rebuilds without stale store paths.  As a fallback, capture NUCLEUS_REPO
+  # at eval time (where the env var IS available) so home-manager activation,
+  # which runs as the user and does not inherit the sudo-level env var, can still
+  # locate the repo root.
+  repoRoot = builtins.getEnv "NUCLEUS_REPO";
   liveICloudDownloads = "${config.home.homeDirectory}/Library/Mobile Documents/com~apple~CloudDocs/Downloads";
 
   # Sub-module imports extracted from this file for focused maintainability.
@@ -422,19 +426,21 @@ let
   gcWeekly = pkgs.writeShellScript "gc-weekly" ''
     set -eu
 
-    # Repo root must come from NUCLEUS_REPO_ROOT (set by apply.sh).
-    # Launchd jobs run with a generic HOME but inherit env via launchd plist.
-    REPO_ROOT="''${NUCLEUS_REPO_ROOT:?gc: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
+    # Eval-time fallback for launchd jobs that don't inherit apply.sh env.
+    _repo_root="${repoRoot}"
+    if [ -z "$_repo_root" ] || [ ! -d "$_repo_root" ]; then
+      _repo_root="''${NUCLEUS_REPO_ROOT:?gc: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
+    fi
 
-    if [ ! -f "$REPO_ROOT/scripts/gc.sh" ]; then
-      echo "gc: scripts/gc.sh not found at $REPO_ROOT; skipping weekly GC"
+    if [ ! -f "$_repo_root/scripts/gc.sh" ]; then
+      echo "gc: scripts/gc.sh not found at $_repo_root; skipping weekly GC"
       exit 1
     fi
 
     # Weekly GC is space-reclaim only; skip model pulls and skip any operations
     # that would block the background launchd job (like waiting for Ollama).
     # GC script handles tool availability checks internally.
-    exec "$REPO_ROOT/scripts/gc.sh"
+    exec "$_repo_root/scripts/gc.sh"
   '';
 
   # Keep displayHostManualInstructions as the final user-visible activation
@@ -472,9 +478,12 @@ let
     "verifyArchivingStack"
     "writeBoundary"
   ];
-  displayHostManualInstructionsBody = import ./lib/manual-instructions.nix {
-    inherit (config.nucleus) hostManualFile;
-  } "macos";
+  displayHostManualInstructionsBody =
+    import ./lib/manual-instructions.nix { inherit (config.nucleus) hostManualFile; }
+      {
+        osLabel = "macos";
+        inherit repoRoot;
+      };
 in
 lib.mkIf pkgs.stdenv.isDarwin {
   assertions = [
@@ -697,7 +706,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
     configureLinearmouseConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
 
-      _ll_repo_root="''${NUCLEUS_REPO:?LinearMouse: NUCLEUS_REPO not set; run via apply.sh}"
+      _ll_repo_root="${repoRoot}"
+      if [ -z "$_ll_repo_root" ] || [ ! -d "$_ll_repo_root" ]; then
+        _ll_repo_root="''${NUCLEUS_REPO:?LinearMouse: NUCLEUS_REPO not set; run via apply.sh}"
+      fi
       _ll_source="$_ll_repo_root/src/modules/configs/linearmouse/linearmouse.json"
 
       mkdir -p "$HOME/.config/linearmouse"

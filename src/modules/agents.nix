@@ -23,6 +23,10 @@ let
   # Activation scripts resolve the repo root dynamically from $NUCLEUS_REPO
   # (set by apply.sh and forwarded through sudo), so out-of-store symlinks
   # survive repo relocations and rebuilds without stale store paths.
+  # As a fallback, capture NUCLEUS_REPO at eval time (where the env var IS
+  # available) so home-manager activation, which runs as the user and does not
+  # inherit the sudo-level env var, can still locate the repo root.
+  repoRoot = builtins.getEnv "NUCLEUS_REPO";
 
   # Keep path fragments centralized so activation entries reference one source
   # of truth for the repo-hosted agents configuration tree.
@@ -71,7 +75,7 @@ in
       # Resolve the repo root so the activation can construct an absolute path
       # to src/modules/configs/agents/ regardless of where the repo is checked
       # out.  $NUCLEUS_REPO is set by apply.sh and forwarded through sudo.
-      _as_repo_root="$(_nucleus_resolve_repo_root "agents-config")"
+      _as_repo_root="$(_nucleus_resolve_repo_root "agents-config" "${repoRoot}")"
 
       _as_agents_source="$_as_repo_root/${agentsConfigRelativePath}"
       if [ ! -d "$_as_agents_source" ]; then
@@ -187,7 +191,7 @@ in
       ${agentHelpersSh}
 
       # Resolve the repo root (same mechanism as agentsSymlink above).
-      _ask_repo_root="$(_nucleus_resolve_repo_root "agents-skills")"
+      _ask_repo_root="$(_nucleus_resolve_repo_root "agents-skills" "${repoRoot}")"
 
       _ask_skills_source="$_ask_repo_root/${agentsSkillsRelativePath}"
       if [ ! -d "$_ask_skills_source" ]; then
@@ -691,7 +695,7 @@ in
       fi
 
       # Resolve the repo root (same mechanism as agentsSymlink and agentsSkills).
-      _scs_repo_root="$(_nucleus_resolve_repo_root "clawhub")"
+      _scs_repo_root="$(_nucleus_resolve_repo_root "clawhub" "${repoRoot}")"
 
       # Path to the declarative fetched skill manifest.  Slugs listed here are
       # downloaded by ClawHub; slugs absent from the manifest are cleaned up

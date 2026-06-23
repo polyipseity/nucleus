@@ -30,6 +30,7 @@ args@{
   ...
 }:
 let
+  repoRoot = builtins.getEnv "NUCLEUS_REPO";
   users = args.users or { };
   currentUserHome = config.home.homeDirectory;
   currentUsername = config.home.username;
@@ -150,13 +151,17 @@ in
           }
 
           # Resolve the live checkout root from $NUCLEUS_REPO (set by apply.sh
-          # before the rebuild and forwarded through sudo). Repo-root symlinks
-          # must target the mutable working tree rather than the Nix store copy
-          # of flake inputs, or ~/dev/nucleus drifts away from the user's actual
+          # before the rebuild and forwarded through sudo), with an eval-time
+          # fallback for home-manager activation (which runs as the user and
+          # does not inherit the sudo-level env var). Repo-root symlinks must
+          # target the mutable working tree rather than the Nix store copy of
+          # flake inputs, or ~/dev/nucleus drifts away from the user's actual
           # checkout after every rebuild.
-          repoRoot=""
-          if [ -n "''${NUCLEUS_REPO:-}" ]; then
-            repoRoot="$NUCLEUS_REPO"
+          repoRoot="${repoRoot}"
+          if [ -z "$repoRoot" ] || [ ! -d "$repoRoot" ]; then
+            if [ -n "''${NUCLEUS_REPO:-}" ]; then
+              repoRoot="$NUCLEUS_REPO"
+            fi
           fi
 
           devDir="$HOME/dev"
@@ -214,7 +219,7 @@ in
           list_direct_submodules() {
             repoTarget="$1"
 
-            if ! submoduleConfig=$(cd "$repoTarget" && "$gitBin" config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>&1); then
+            if ! submoduleConfig=$(cd "$repoTarget" && git config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>&1); then
               echo "devReposProvision: failed to read .gitmodules in $repoTarget ($submoduleConfig)" >&2
               return 1
             fi
@@ -283,13 +288,13 @@ in
             if [ -d "$repoTarget/.git" ]; then
               # Repo already initialized; verify/update remote.
               if [ -d "$repoTarget" ]; then
-                if ! currentRemote=$(cd "$repoTarget" && "$gitBin" config --get remote.origin.url 2>&1); then
+                if ! currentRemote=$(cd "$repoTarget" && git config --get remote.origin.url 2>&1); then
                   report_error "failed to read remote for $repoName ($currentRemote)"
                   currentRemote=""
                 fi
 
                 if [ "$currentRemote" != "$repoUrl" ]; then
-                  if remoteErr=$(cd "$repoTarget" && "$gitBin" remote set-url origin "$repoUrl" 2>&1); then
+                  if remoteErr=$(cd "$repoTarget" && git remote set-url origin "$repoUrl" 2>&1); then
                     # Remote updated successfully (idempotent)
                     :
                   else
@@ -312,7 +317,7 @@ in
               return 0
             fi
 
-            if cloneErr=$("$gitBin" clone "$repoUrl" "$repoTarget" 2>&1); then
+            if cloneErr=$(git clone "$repoUrl" "$repoTarget" 2>&1); then
               # Repository cloned successfully (idempotent)
               return 0
             else
@@ -333,7 +338,7 @@ in
 
             # Map submodule path -> submodule.<name>.path key in .gitmodules.
             submoduleConfigKey="$(
-              cd "$repoPath" && "$gitBin" config --file .gitmodules --get-regexp '^submodule\..*\.path$' | while IFS=' ' read -r _key _path; do
+              cd "$repoPath" && git config --file .gitmodules --get-regexp '^submodule\..*\.path$' | while IFS=' ' read -r _key _path; do
                 if [ "$_path" = "$submodulePath" ]; then
                   printf '%s\n' "$_key"
                   break
@@ -347,9 +352,9 @@ in
 
             # submodule.<name>.branch is optional in .gitmodules; absence means
             # "follow remote HEAD".
-            branchName="$(cd "$repoPath" && "$gitBin" config --file .gitmodules --get "submodule.$submoduleName.branch" || true)"
+            branchName="$(cd "$repoPath" && git config --file .gitmodules --get "submodule.$submoduleName.branch" || true)"
             if [ "$branchName" = "." ] || [ -z "$branchName" ]; then
-              originHeadRef="$(cd "$repoPath/$submodulePath" && "$gitBin" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+              originHeadRef="$(cd "$repoPath/$submodulePath" && git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || true)"
               branchName="''${originHeadRef#origin/}"
             fi
 
@@ -369,7 +374,7 @@ in
             submoduleTarget="$repoPath/$submodulePath"
             [ -e "$submoduleTarget/.git" ] || return 0
 
-            if currentBranch=$(cd "$submoduleTarget" && "$gitBin" symbolic-ref --quiet --short HEAD 2>&1); then
+            if currentBranch=$(cd "$submoduleTarget" && git symbolic-ref --quiet --short HEAD 2>&1); then
               echo "devReposProvision: submodule $submodulePath already on branch '$currentBranch' after initialization in $dirLabel"
               return 0
             fi
@@ -379,12 +384,12 @@ in
               return 0
             fi
 
-            if branchErr=$(cd "$submoduleTarget" && "$gitBin" checkout "$branchName" 2>&1); then
+            if branchErr=$(cd "$submoduleTarget" && git checkout "$branchName" 2>&1); then
               echo "devReposProvision: checked out freshly initialized submodule $submodulePath on branch '$branchName' in $dirLabel"
               return 0
             fi
 
-            if branchErr=$(cd "$submoduleTarget" && "$gitBin" checkout -b "$branchName" --track "origin/$branchName" 2>&1); then
+            if branchErr=$(cd "$submoduleTarget" && git checkout -b "$branchName" --track "origin/$branchName" 2>&1); then
               echo "devReposProvision: created+checked out branch '$branchName' for freshly initialized submodule $submodulePath in $dirLabel"
             else
               report_error "failed to switch freshly initialized submodule $submodulePath to branch '$branchName' in $dirLabel ($branchErr)"
@@ -421,14 +426,14 @@ in
               fi
 
               if [ "$recursive" = "1" ]; then
-                if submoduleErr=$(cd "$dirPath" && "$gitBin" submodule update --init --recursive "$submodulePath" 2>&1); then
+                if submoduleErr=$(cd "$dirPath" && git submodule update --init --recursive "$submodulePath" 2>&1); then
                   echo "devReposProvision: initialized submodule $submodulePath (recursive) in $dirLabel"
                   ensure_fresh_submodule_on_branch "$dirPath" "$submodulePath" "$dirLabel"
                 else
                   report_error "failed to initialize submodule $submodulePath (recursive) in $dirLabel ($submoduleErr)"
                 fi
               else
-                if submoduleErr=$(cd "$dirPath" && "$gitBin" submodule update --init "$submodulePath" 2>&1); then
+                if submoduleErr=$(cd "$dirPath" && git submodule update --init "$submodulePath" 2>&1); then
                   echo "devReposProvision: initialized submodule $submodulePath in $dirLabel"
                   ensure_fresh_submodule_on_branch "$dirPath" "$submodulePath" "$dirLabel"
                 else

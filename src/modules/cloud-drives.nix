@@ -28,6 +28,7 @@ args@{
   ...
 }:
 let
+  repoRoot = builtins.getEnv "NUCLEUS_REPO";
   users = args.users or { };
   currentUsername = config.home.username;
   currentUserHome = config.home.homeDirectory;
@@ -260,7 +261,11 @@ let
     pkgs.writeShellScript "cloud-replica-scheduled-sync-${replica.id}" ''
       set -eu
 
-      _repo_root="''${NUCLEUS_REPO_ROOT:?cloud-drives: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
+      # Eval-time fallback for launchd jobs that don't inherit apply.sh env.
+      _repo_root="${repoRoot}"
+      if [ -z "$_repo_root" ] || [ ! -d "$_repo_root" ]; then
+        _repo_root="''${NUCLEUS_REPO_ROOT:?cloud-drives: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
+      fi
       _nucleus_replica_cmd="${currentUserHome}/.nix-profile/bin/nucleus-replica-sync"
       if [ ! -x "$_nucleus_replica_cmd" ]; then
         echo "cloud-drives: nucleus replica command not found at $_nucleus_replica_cmd" >&2
