@@ -187,9 +187,6 @@ function Remove-VMGcItem {
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
 
 # ---- Step 1: stale wallpaper gc ----------------------------------------
-# Keeps the decrypted gallery in sync with declarative source blobs.  Without
-# this, removed or renamed wallpaper assets leave orphaned decrypted files on
-# disk that continue to appear in the rotation.
 if (-not $NoWallpaperGc) {
   $wallpaperAssetsDir = Join-Path -Path $resolvedRepoRoot -ChildPath "src\assets\wallpapers"
   $wallpaperOutputDir = Join-Path -Path $env:USERPROFILE   -ChildPath "Pictures\wallpapers"
@@ -197,12 +194,6 @@ if (-not $NoWallpaperGc) {
 }
 
 # ---- Step 2: tool cache gc -------------------------------------------------
-# bun/cargo/rustc/uv all accumulate user-scoped caches under the Windows user
-# profile, regardless of whether the binary came from the system install path
-# or a direnv-loaded shell. Clearing those shared cache locations reclaims
-# space for both system and devShell use without touching project-managed
-# dependencies. rustc has no standalone cache tree; its transient artifacts are
-# cleaned via cargo-cache and rustup's tmp directory.
 if (-not $NoToolCacheGc) {
   $bunCacheDir = Join-Path $HOME ".bun\install\cache"
   $cargoBinstallCacheDir = Join-Path $env:LOCALAPPDATA "cargo-binstall\cache"
@@ -221,8 +212,6 @@ if (-not $NoToolCacheGc) {
     & $cargoCacheCmd.Source -r all
   }
 
-  # uv does not need to be installed to clear its cache directory; remove the
-  # cached wheels and artifacts directly when the platform-default path exists.
   Clear-DirectoryContentsIfPresent -Path $uvCacheDir -Label "uv cache"
 
   if (Test-Path -LiteralPath $repoDirenvDir -PathType Container) {
@@ -236,10 +225,6 @@ if (-not $NoToolCacheGc) {
 }
 
 # ---- Step 3: Scoop cache and old-version cleanup ----------------------------
-# 'scoop cleanup *' removes all old app versions and installer caches that
-# Scoop retains by default, reclaiming disk space after updates.
-# Guarded by a shim presence check because Scoop may not be installed on
-# minimal setups or before the first apply.ps1 run.
 if (-not $NoScoopGc) {
   $scoopShims = Join-Path $env:USERPROFILE "scoop\shims"
   $scoopCmd   = Join-Path $scoopShims "scoop.cmd"
@@ -258,10 +243,6 @@ if (-not $NoScoopGc) {
 }
 
 # ---- Step 4: Ollama orphaned model gc --------------------------------------
-# Removes locally installed Ollama models that are absent from the declarative
-# manifest at src/modules/ai/models.json.  Uses -GcOnly so GC never
-# triggers multi-GB model pulls — only space reclamation.  Guarded by an
-# ollama presence check so this step is a no-op before Ollama is installed.
 if (-not $NoOllamaGc) {
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
@@ -271,11 +252,7 @@ if (-not $NoOllamaGc) {
   }
 }
 
-# ---- Step 5: stale VM artifact removal ------________________________________
-# Removes temporary Packer build directories and pre-built disk images for VMs
-# no longer declared in src/modules/VMs.json.
-# WHY: VM disk images are large (multi-gigabyte);
-# clearing stale files keeps disk usage bounded and VM provisioning fast.
+# ---- Step 5: stale VM artifact removal ------------------------------------
 if (-not $NoVMGc) {
   $vmDir = Join-Path $env:USERPROFILE "virtual machines"
   $imagesDir = Join-Path $vmDir "images"

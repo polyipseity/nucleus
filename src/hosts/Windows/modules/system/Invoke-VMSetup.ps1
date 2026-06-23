@@ -84,7 +84,6 @@ function Wait-GuestReady {
             if ($response -match '"return"\s*:\s*{}') { return $true }
         } catch {
             # Guest ping timeout is expected in retry loop.
-            $null = $_
         }
         Start-Sleep -Seconds 5
     }

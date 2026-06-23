@@ -115,19 +115,12 @@ function Invoke-SecretVerification {
   $sshKeyPath = Join-Path -Path $sshDir -ChildPath "ssh_personal_$PrimaryUsername"
   $sshPublicKeyPath = Join-Path -Path $sshDir -ChildPath "ssh_personal_$PrimaryUsername.pub"
 
-  # Enumerate all SOPS files to test: the three secret YAMLs plus every
-  # *.sops blob in the wallpapers directory.  This mirrors the dynamic
-  # builtins.readDir enumeration in the POSIX verifySecretDecryption.
   $sopsTestFiles = @(
     (Join-Path -Path $SecretsDir -ChildPath "git-identities.yml"),
     (Join-Path -Path $SecretsDir -ChildPath "gpg-personal.yml"),
     (Join-Path -Path $SecretsDir -ChildPath "ssh-personal.yml")
   )
   if (Test-Path -Path $WallpaperAssetsDir) {
-    # SilentlyContinue: WallpaperAssetsDir existence is confirmed by Test-Path
-    # above; suppression covers unlikely access-denied errors so that a
-    # permission issue on the assets folder causes an empty wallpaper list
-    # (graceful degradation) rather than aborting the verification run.
     $wallpaperSopsFiles = Get-ChildItem -Path $WallpaperAssetsDir -Filter "*.sops" -File -ErrorAction SilentlyContinue |
       Select-Object -ExpandProperty FullName
     if ($null -ne $wallpaperSopsFiles) {
@@ -155,10 +148,6 @@ function Invoke-SecretVerification {
   if ([string]::IsNullOrWhiteSpace($managedFpr)) {
     throw "verification: ERROR — managed-gpg-keys manifest is empty; gpgImport may have failed."
   }
-  # Dump all secret-key fingerprints once with --with-colons (machine-readable,
-  # non-interactive) and --no-autostart (prevents launching a new agent daemon,
-  # which can deadlock if the agent socket is not yet ready).  Cache the output
-  # for reuse in check 3 to avoid repeated invocations with per-file arguments.
   $allSecretKeysFpr = (& $GpgExe --with-colons --no-autostart --list-secret-keys 2>&1) -join "`n"
   if (-not ($allSecretKeysFpr -like "*$managedFpr*")) {
     throw "verification: ERROR — managed GPG key $managedFpr not in keyring after materialization."
@@ -211,13 +200,6 @@ function Invoke-SecretVerification {
   $sshAgePub = ConvertFrom-SshEd25519PublicKeyToAgePubKey -SshPublicKeyLine $sshPubKeyLine
   $sshFailures = @()
   foreach ($sopsFile in $sopsTestFiles) {
-    # Search for the bare age key value (not "recipient: KEY") so both YAML
-    # (unquoted field) and JSON (double-quoted key and value) SOPS formats
-    # are handled without needing two separate search patterns.
-    # SilentlyContinue: all $sopsTestFiles come from a validated list (Test-Path
-    # + Get-ChildItem enumeration) so "file not found" errors are not expected;
-    # suppression prevents Select-String from treating SOPS JSON encoding as a
-    # binary-file warning on some PowerShell versions.
     $hasSshRecipient = Select-String -Path $sopsFile -Pattern $sshAgePub -SimpleMatch -Quiet -ErrorAction SilentlyContinue
     if (-not $hasSshRecipient) {
       $sshFailures += [System.IO.Path]::GetFileName($sopsFile)
@@ -230,8 +212,6 @@ function Invoke-SecretVerification {
 
   # -------------------------------------------------------------------------
   # 5. Machine SSH host key existence check (advisory warning only).
-  # Warning-only: on first bootstrap the host key may not yet be registered
-  # in .sops.yaml.  See the bootstrap instructions in secrets.nix.
   # -------------------------------------------------------------------------
   Write-Output "$($PSStyle.Foreground.BrightBlack)verification: [5/5] checking machine SSH host key...$($PSStyle.Foreground.Default)"
   if (-not (Test-Path -Path $HostKeyPath)) {

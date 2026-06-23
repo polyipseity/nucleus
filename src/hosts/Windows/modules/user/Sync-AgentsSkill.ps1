@@ -3,51 +3,19 @@
   Sync committed (bundled) skill directories into ~/.agents/skills/ as symlinks.
 
 .DESCRIPTION
-  Creates %USERPROFILE%\.agents\skills\ as a real (writable) directory, then
-  creates a per-skill directory symbolic link inside it for every subdirectory
-  committed to   src\modules\configs\agents\skills\ (bundled / AGPL-compatible
-  skills).
+  Creates per-skill directory symlinks in ~/.agents/skills/ for each
+  subdirectory under src/modules/configs/agents/skills/. Bundled skills
+  (MIT-0/MIT/Apache) are committed to the repo; fetched skills are synced
+  separately by the post-apply step.
 
-  Bundled skills are committed to the repository because their license is
-  AGPL-compatible (MIT-0, MIT, Apache 2.0, etc.).  Fetched skills are managed
-  by the post-apply sync step in apply.ps1 (Sync-AgentsSkills is NOT called for
-  fetched); clawhub downloads them directly into %USERPROFILE%\.agents\skills\
-  at apply time without committing any files to the repo.
-
-  Non-directory entries in src\modules\configs\agents\skills\ (such as .gitkeep)
-  are skipped — only skill subdirectories receive symlinks.
-
-  Migration safety:
-    - Old whole-dir symlink to skills source -> removed; real directory created.
-    - Correct per-skill symlink  -> no-op.
-    - Wrong per-skill symlink    -> remove and recreate.
-    -     Real directory at skill path -> fail fast (could be fetched download or
-      user data; operator must resolve the conflict manually).
-    - Stale per-skill symlink (source removed) -> removed automatically.
-
-  Directory symbolic links require Developer Mode or an elevated session.
-  Developer Mode is enabled on this machine via system.dsc.yml
-  (Microsoft.Windows.Settings/DeveloperMode).
+  Directory symlinks require Developer Mode or an elevated session.
 
 .PARAMETER RepoRoot
-  Absolute path to the root of the nucleus repository checkout.  apply.ps1
-  resolves this from $PSScriptRoot and passes it explicitly.
+  Absolute path to the nucleus repository checkout root.
 
 .PARAMETER Enabled
-  Whether per-skill symlinks should be managed. Mandatory: caller must
-  explicitly choose true (ensure symlinks exist) or false (remove managed
-  symlinks). When $false, real directories from fetched clawhub downloads
-  are left untouched.
-
-.OUTPUTS
-  None.  Writes status messages to the host.
-
-.EXAMPLE
-  Sync-AgentsSkill -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$true
-
-.EXAMPLE
-  # Remove only managed per-skill symlinks (cleanup path); leave fetched dirs:
-  Sync-AgentsSkill -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
+  True ensures symlinks exist; false removes managed symlinks (leaves
+  fetched directories intact).
 
 .NOTES
   Environment variables: (none)

@@ -63,8 +63,6 @@ if (-not $Paths -or $Paths.Count -eq 0) {
 
 # ---------------------------------------------------------------------------
 # Phase 1: Syntax validation via the built-in parser.
-# Parser.ParseFile never executes the script; it only builds an AST and
-# collects parse errors, so this phase is safe to run in any environment.
 # ---------------------------------------------------------------------------
 $parseErrors = @()
 
@@ -94,10 +92,6 @@ Write-Output ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
 
 # ---------------------------------------------------------------------------
 # Phase 2: PSScriptAnalyzer lint (best-effort).
-# Skipped entirely when -SyntaxOnly is set (fast pre-commit path from check.sh).
-# PSScriptAnalyzer is not in nixpkgs; if it is absent the lint phase is
-# skipped so CI is not blocked on machines that lack the module.  Syntax
-# validation in Phase 1 always runs regardless of PSScriptAnalyzer availability.
 # ---------------------------------------------------------------------------
 if ($SyntaxOnly) {
   Write-Output 'PowerShell lint skipped (-SyntaxOnly).'
@@ -125,9 +119,6 @@ else {
   $lintResults = $jobs | Receive-Job
   $jobs | Remove-Job
 
-  # Filter results to only non-Info lints for failure determination.
-  # Wrap in @() so $nonInfoLints is always an array — with Set-StrictMode,
-  # accessing .Count on $null would throw.
   $nonInfoLints = @($lintResults | Where-Object { $_.Severity -ne 'Information' })
 
   if ($lintResults.Count -gt 0) {
