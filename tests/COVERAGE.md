@@ -15,10 +15,10 @@ scripts.
 
 Located in `tests/src/`, run via `nix-instantiate --eval` in CI.
 
-**Coverage**: 31 test files covering module options, import graphs, config
-composition, package parity, option conflict detection, activation dependency
-ordering, SOPS structure validation, and VS Code extension pruning. Run
-`ls tests/src/*.nix` for the current authoritative list.
+**Coverage**: Module options, import graphs, config composition, package parity,
+option conflict detection, activation dependency ordering, SOPS structure
+validation, and VS Code extension pruning. Run `ls tests/src/*.nix` for the
+current authoritative list.
 
 ---
 
@@ -126,63 +126,10 @@ All tests are automatically run on every commit:
 
 ---
 
-## Untested Areas (Known Gaps) → Gap Addressing Status
+## Untested Areas
 
-### ✅ HIGH PRIORITY (NOW ADDRESSED)
-
-1. **✅ Backend Package Selection Logic** (FIXED)
-   - `resolveBackend` decision tree (3 resolution layers)
-   - Package categorization by category
-   - Platform detection edge cases
-   - **Tests**: `core-tests.nix` (10 tests total, 6 new backend tests)
-   - **Coverage**: All branches of override→policy→global fallback
-
-2. **✅ Configuration Conflict Detection** (FIXED)
-   - Module option merge safety via mkIf/mkDefault
-   - Security policy enforcement
-   - Type consistency across modules
-   - **Tests**: `option-conflict-tests.nix` (11 new tests)
-   - **Coverage**: Bidirectional merge patterns, option precedence
-
-3. **✅ Cross-Module Dependency Verification** (FIXED)
-   - Activation hook ordering (Home Manager DAG)
-   - Dev repo provisioning sequence
-   - Secret materialization timing
-   - **Tests**: `activation-deps-tests.nix` (12 new tests)
-   - **Coverage**: 12 activation dependency invariants
-
-4. **✅ Secret Handling Configuration** (FIXED)
-   - SOPS key structure validation
-   - Age key format correctness
-   - Secret file mappings
-   - **Tests**: `sops-mock-tests.nix` (15 new tests, no encryption required)
-   - **Coverage**: Structure validation without live secrets
-
-### ⚠️ ARCHITECTURAL GAPS (Cannot test in CI without live systems)
-
-The following gaps are intentionally NOT unit-tested because they require
-live system state, actual deployments, or ephemeral VMs:
-
-1. **Live Activation Hook Execution**
-   - Home Manager activation on macOS/NixOS
-   - darwin-rebuild apply and nixos-rebuild switch
-   - Windows DSC apply
-   - **Why not tested**: Requires actual system changes, suitable for integration/e2e testing
-   - **Alternative**: Manual validation on ephemeral VMs
-
-2. **Real Secret Decryption**
-   - SOPS age key decryption with real encrypted files
-   - Git SSH key materialization
-   - GPG key import from encrypted backup
-   - **Why not tested**: Requires valid encrypted files + keys (security concern)
-   - **Alternative**: Mock tests (now in place via sops-mock-tests.nix)
-
-3. **Deployment Validation**
-   - Full configuration evaluation on target systems
-   - Package installation success verification
-   - Security policy enforcement on live systems
-   - **Why not tested**: Requires target machine state
-   - **Alternative**: Integration tests on ephemeral VMs
+Activation hooks, secret decryption, and deployment validation require live
+systems and are not unit-testable in CI. Mock tests cover secret structure.
 
 ---
 
@@ -226,26 +173,7 @@ act push --job test  # Requires 'act' (https://github.com/nektos/act)
 
 ---
 
-## Future Roadmap
-
-### Phase 2: Integration Testing
-- [ ] Add Nix evaluation tests that validate module outputs without system changes
-- [ ] Mock SOPS for secret decryption tests
-- [ ] Add Pester tests for PowerShell module functions
-
-### Phase 3: Coverage Metrics
-- [ ] Enable coverage reporting in CI
-- [ ] Set per-layer coverage targets (goal: 80%+)
-- [ ] Generate coverage badges for README
-
-### Phase 4: End-to-End Testing
-- [ ] Add ephemeral VM tests (macOS/NixOS/Windows) for activation validation
-- [ ] Validate security policy enforcement on live systems
-- [ ] Test upgrade/rollback scenarios
-
----
-
 **Last Updated**: Continuous (update this file whenever suite structure changes)
-**Nix Suite Status**: 16 `tests/src/*.nix` files tracked in-repo
+**Nix Suite Status**: See `ls tests/src/*.nix` for current list
 **Windows Suite Status**: hierarchical Pester suites under `tests/src/hosts/Windows/**`
 **Shell Suite Status**: script validation checks in `tests/scripts/`

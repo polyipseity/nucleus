@@ -1,15 +1,9 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  // Source: OpenCode config docs (`autoupdate`) and schema.
-  // https://opencode.ai/docs/zh-tw/config/#自動更新
-  // https://opencode.ai/config.json
+  // See opencode.ai/docs/zh-tw/ for config, rules, and skills docs.
   "autoupdate": false,
-  // Source: OpenCode instructions/rules loading.
-  // https://opencode.ai/docs/zh-tw/rules/
   "instructions": [".agents/instructions/**/*.md"],
   "skills": {
-    // Source: OpenCode skills discovery paths.
-    // https://opencode.ai/docs/zh-tw/skills/
     "paths": [".agents/skills"],
   },
 }
