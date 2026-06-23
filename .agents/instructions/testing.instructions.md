@@ -40,16 +40,6 @@ cd src && nix flake check
 Invoke-Pester -Path tests/src/hosts/Windows/ -Verbose
 ```
 
-**CI validation:**
-
-```bash
-# Runs automatically on push/PR; can be simulated locally
-nix run ./src#check-sh  # Shell syntax
-nix run ./src#check-pwsh  # PowerShell syntax
-cd src && nix flake check  # Nix evaluation
-nix-instantiate --eval tests/src/*.nix  # Nix unit tests
-```
-
 ---
 
 ## Nix Testing Strategy
@@ -202,52 +192,28 @@ winget configure --what-if .\src\hosts\Windows\user.dsc.yml
 - `tests/src/hosts/Windows/<area>/<feature>.Tests.ps1` — tests for a feature or DSC resource group
 - Example: `tests/src/hosts/Windows/system/system-policy.Tests.ps1` for machine-scoped DSC invariants
 
-### Example: Add a Test for a New Package
+### Example patterns
 
-**Scenario:** You're adding a new CLI tool `ripgrep` to the overlappingPackages table in core.nix.
-
-**Step 1: Add the Pester assertion** (on Windows)
+**Pester test for package installation:**
 
 ```powershell
-# tests/src/hosts/Windows/packages/package-installation.Tests.ps1 (excerpt)
 Describe "Windows Package Installation" {
-  It "Should have ripgrep installed" {
-    $pkg = winget list --exact -q "BurntSushi.ripgrep"
-        $pkg | Should -Not -BeNullOrEmpty
-    }
+  It "Should have <tool> installed" {
+    winget list --exact -q "<Publisher>.<Tool>" | Should -Not -BeNullOrEmpty
+  }
 }
 ```
 
-**Step 2: Run the test and watch it fail**
-
-```powershell
-Invoke-Pester tests/src/hosts/Windows/packages/package-installation.Tests.ps1
-# Test fails: ripgrep not found
-```
-
-**Step 3: Add ripgrep to src/hosts/Windows/system.dsc.yml**
+**DSC resource for package:**
 
 ```yaml
 - resource: Microsoft.WinGet.Client/Package
   directives:
-    description: Ensure ripgrep is installed for fast recursive text search
+    description: <why the tool is needed>
   settings:
-    id: BurntSushi.ripgrep.MSVC
+    id: <Publisher>.<Tool>
     source: winget
 ```
-
-**Step 4: Run the test again (should pass after `apply.ps1`)**
-
-```powershell
-Invoke-Pester tests/src/hosts/Windows/packages/package-installation.Tests.ps1
-# Test passes: ripgrep found
-```
-
-**Step 5: Commit atomically**
-
-```bash
-git add tests/src/hosts/Windows/packages/package-installation.Tests.ps1 src/hosts/Windows/system.dsc.yml
-git commit -S -m "feat(windows): add ripgrep for fast text search
 
 - Add ripgrep to system.dsc.yml for cross-host CLI parity
 - Add Pester test to validate installation

@@ -66,9 +66,6 @@ brew list --versions
 brew list --cask --versions
 ```
 
-If `brew bundle` re-introduces lockfile generation, we can migrate back to a
-native `Brewfile.lock.json`.
-
 ## Schema
 
 The lockfile follows `lockfile.schema.json` (JSON Schema Draft-07). Each

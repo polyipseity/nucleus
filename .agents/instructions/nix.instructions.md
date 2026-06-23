@@ -153,8 +153,7 @@ Background-process safety rule:
 ## macOS pmset power policy
 
 `src/hosts/MacBook/activation.nix` (in `postActivation`) is the single source
-of truth for managed `pmset` writes; keep this instruction file focused on
-invariants, not a duplicated full flag matrix.
+of truth for managed `pmset` writes.
 
 Invariants to preserve:
 

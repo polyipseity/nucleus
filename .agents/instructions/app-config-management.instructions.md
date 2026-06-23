@@ -6,9 +6,6 @@ applyTo: "src/modules/**/*.nix, src/modules/configs/**, src/hosts/Windows/module
 
 # App Configuration Management
 
-This instruction covers how to add, modify, and maintain application settings across **nucleus** while ensuring
-per-user overrides, cross-platform parity, and proper test coverage.
-
 ## Storage Location Rule (Critical)
 
 Choose app config storage **based on how the app reads it**, not on arbitrary preference:
