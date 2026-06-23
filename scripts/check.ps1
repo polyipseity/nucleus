@@ -93,6 +93,7 @@ if (-not $HAS_ARGS) {
 
     foreach ($_svcName in $_svc.Keys) {
       $_entry = $_svc[$_svcName]
+      if ($_entry -isnot [hashtable]) { continue }
       if (-not $_entry.ContainsKey('displayName') -or [string]::IsNullOrEmpty($_entry.displayName)) {
         Write-Output "ERROR: services.json: '$_svcName' missing displayName"
         $_svcErrors++
@@ -133,6 +134,7 @@ if (-not $HAS_ARGS) {
     # Validate user-scoped platform entries have justification.
     foreach ($_svcName in $_svc.Keys) {
       $_entry = $_svc[$_svcName]
+      if ($_entry -isnot [hashtable]) { continue }
       if ($_entry.ContainsKey('platforms')) {
         foreach ($_plat in $_entry.platforms.Keys) {
           $_pEntry = $_entry.platforms[$_plat]
