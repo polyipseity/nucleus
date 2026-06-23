@@ -35,7 +35,7 @@ assert containsRegex "127.0.0.1:11434" aiSyncText;
 assert containsRegex "OLLAMA_HOST.*litellmEndpoint" defaultAiText;
 assert containsRegex "local.litellm" macbookAiText;
 assert containsRegex "ai_openrouter_api_key" secretsText;
-assert containsRegex "OPENCODE_ZEN_API_KEY" secretsText;
+assert containsRegex "ai_opencode_zen_api_key" secretsText;
 assert containsRegex "opencode.ai/zen/v1" litellmConfigText;
 assert containsRegex "systemd.services.litellm" nixosAiText;
 true
