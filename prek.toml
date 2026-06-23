@@ -1,4 +1,9 @@
-# Prek native configuration for pre-commit-style hooks.
+# Prek native configuration: preferred as the canonical configuration for pre-commit-style hooks.
+# Pre-commit-style configuration for common checks and Python formatting.
+# Mirrors the project's conventions: enable the recommended hooks from pre-commit-hooks and use Ruff
+# for Python formatting and linting. Adjust or opt-out of any hooks as needed per team preference.
+# This file replaces `.pre-commit-config.yml`; that file has been removed to avoid duplication.
+# Note: `prek` can read `.pre-commit-config.yml` for compatibility, but `prek.toml` is preferred.
 
 default_install_hook_types = ["commit-msg", "pre-commit", "pre-push"]
 default_stages = ["pre-commit"]
@@ -6,7 +11,10 @@ default_stages = ["pre-commit"]
 [[repos]]
 repo = "https://github.com/pre-commit/pre-commit-hooks.git"
 rev = "3e8a8703264a2f4a69428a0aa4dcb512790b2c8c"
-# Remove undesired hooks and pin `rev` to explicit commit hashes.
+# Notes:
+# - These hooks are a recommended baseline. If a particular hook is undesired (for example, forbidding
+#   submodules in a repository that intentionally uses them), remove or configure that hook in `prek.toml`.
+# - Keep hook repositories pinned (set `rev`) to an explicit commit hash to ensure reproducible behaviour.
 hooks = [
   { id = "check-case-conflict" },
   { id = "check-executables-have-shebangs", exclude = "\\.(bat|cmd|ps1|psd1|psm1|vbs|wsf|wsh)$" },
@@ -27,7 +35,9 @@ hooks = [
   ] },
 ]
 
-# Commit message linting via commitlint-pre-commit-hook bridge.
+# Commit message linting using commitlint (Node.js). This uses
+# the commitlint-pre-commit-hook bridge so it runs as a commit-msg hook.
+# Note: Node.js must be available on developer machines to run this hook.
 [[repos]]
 repo = "https://github.com/alessandrojcm/commitlint-pre-commit-hook.git"
 rev = "1f6454da22d006d5bb0d2e65c96c43c23c8a534f"

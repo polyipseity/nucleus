@@ -1,4 +1,15 @@
 # CI: Build & Test
+#
+# Purpose:
+#   - Run repository checks: setup, install, test, and build.
+#   - Ensure a minimal, reproducible environment for quick CI feedback.
+#
+# Triggers:
+#   - push, pull_request, workflow_dispatch
+#
+# Security & reproducibility notes:
+#   - Use least-privilege permissions (contents: read) and pin action versions where appropriate.
+#   - Use local caches to speed builds and reduce external load.
 
 name: "CI: Build & Test"
 
@@ -11,7 +22,12 @@ on:
       - "**" # Ignore tag pushes
   workflow_dispatch:
 
-# Deduplicate runs: per-PR for pull requests, per-commit for pushes.
+# Use concurrency to deduplicate runs.
+# - For pull requests: group by `pr-<number>` so multiple commits to the same PR
+#   cancel previous runs and only the latest is kept.
+# - For direct pushes: fall back to deduplicating by commit SHA so identical
+#   commits don't trigger multiple concurrent workflows.
+# - Include the `github.workflow` name in the group to avoid cross-workflow collisions.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
   cancel-in-progress: true
@@ -32,7 +48,8 @@ jobs:
           - macos-latest
           - windows-latest
     env:
-      # Enable Nix flakes.
+      # Keep flake support centralized at the job level so individual commands
+      # stay readable while still working on fresh CI environments.
       NIX_CONFIG: experimental-features = nix-command flakes
     steps:
       - name: Checkout repository
