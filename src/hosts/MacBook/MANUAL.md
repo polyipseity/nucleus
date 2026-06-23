@@ -19,16 +19,7 @@
 - Open CamillaDSP once (CamillaDSP runs headlessly, so launch `camilladsp --version` in a terminal), then approve the **BlackHole** virtual audio driver system extension in `System Settings > Privacy & Security` (required after each macOS update that resets extension approval). Also grant Microphone permission to CamillaDSP in `System Settings > Privacy & Security > Microphone`.
 - Finder sidebar favorites set by `nucleus apply` are visible only after restarting macOS (log out and back in, or reboot).
 
-## accessible ports
 
-- `https://localhost:8920` — Jellyfin HTTPS endpoint (Caddy local reverse proxy).
-- `http://127.0.0.1:8096` — Jellyfin internal loopback HTTP API (automation upstream).
-- `http://127.0.0.1:11434` — Ollama local API.
-- `tcp/1234` — CamillaDSP websocket API (loopback, for camillagui-backend).
-- `http://127.0.0.1:5005` — CamillaDSP web GUI.
-- `https://localhost:5006` — CamillaDSP web GUI (HTTPS).
-- `tcp/5900` — macOS Screen Sharing / VNC (when enabled).
-- `tcp/31022` — Linux builder SSH endpoint.
 
 ## HTTPS certificate trust (one-time)
 

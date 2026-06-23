@@ -41,7 +41,7 @@ winget configure .\src\hosts\Windows\user.dsc.yml
 
 ## Notes
 
-- Shared logic belongs in `src/modules/`; host-specific details belong in `src/hosts/<Host>/`.
-- Manual one-time user steps are documented in host `MANUAL.md` files.
-- Bootstrap tool versions are pinned in `scripts/bootstrap-versions.env`.
-- Test suite coverage map: `tests/COVERAGE.md`.
+- Shared logic in `src/modules/`; host-specific in `src/hosts/<Host>/`.
+- Manual one-time steps: host `MANUAL.md` files.
+- Bootstrap tool versions: `scripts/bootstrap-versions.env`.
+- Test coverage: `tests/COVERAGE.md`.

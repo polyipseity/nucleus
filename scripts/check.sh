@@ -120,9 +120,7 @@ else
   echo "Skipping nixfmt (no Nix files to check)."
 fi
 
-# ---------------------------------------------------------------------------
 # PowerShell syntax validation (parser only, no PSScriptAnalyzer)
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] PowerShell syntax validation ===\n' "$((_step += 1))"
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly "${PS1_FILES[@]}"
@@ -132,9 +130,7 @@ else
   echo "Skipping (no PowerShell scripts to check)."
 fi
 
-# ---------------------------------------------------------------------------
 # Packer template validation
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] Packer template validation ===\n' "$((_step += 1))"
 if [ "${#PKR_FILES[@]}" -gt 0 ]; then
   bash scripts/check-packer.sh "${PKR_FILES[@]}"
@@ -144,9 +140,7 @@ else
   echo "Skipping (no Packer templates to check)."
 fi
 
-# ---------------------------------------------------------------------------
 # Shell script validation tests
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] Shell script validation tests ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   bash tests/scripts/script-validation-tests.sh
@@ -154,9 +148,7 @@ else
   echo "Skipping validation tests (path-scoped mode)."
 fi
 
-# ---------------------------------------------------------------------------
 # Lockfile validation
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] Lockfile validation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   _lf_errors=0
@@ -244,9 +236,7 @@ else
   echo "Skipping lockfile validation (path-scoped mode)."
 fi
 
-# ---------------------------------------------------------------------------
 # Service registry validation
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] Service registry validation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   _svc_json="src/modules/services.json"
@@ -371,9 +361,7 @@ else
   echo "Skipping service registry validation (path-scoped mode)."
 fi
 
-# ---------------------------------------------------------------------------
 # Locked DSC validation
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] Locked DSC validation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   _dsc_system="src/hosts/Windows/system.dsc.yml"
@@ -421,9 +409,7 @@ else
   echo "Skipping locked DSC validation (path-scoped mode)."
 fi
 
-# ---------------------------------------------------------------------------
 # Package manager usage enforcement
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] Package manager usage enforcement ===\n' "$((_step += 1))"
 # Ban bare `pip install` and `npm install` — these bypass the lockfile and
 # produce non-reproducible environments.  `uv pip install` is allowed (uv

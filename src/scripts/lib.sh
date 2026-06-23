@@ -9,7 +9,6 @@
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Repository root path. Falls back to git detection if unset.
 
-# usage_std — Emit standardized usage text and exit.
 usage_std() {
   _us_name="$1"
   _us_opts="${2:-}"
@@ -67,15 +66,7 @@ require_command() {
   fi
 }
 
-# sha256_of_file — Compute SHA-256 hex digest of a file.
-#
-# Usage: sha256_of_file file_path
-#
-# Tries sha256sum, then shasum -a 256, then openssl dgst -sha256.
-# Calls require_command if no tool is available.
-#
-# Arguments:
-#   file_path  Path to the file to hash.
+# Tries sha256sum, shasum -a 256, then openssl dgst -sha256.
 sha256_of_file() {
   _sof_file="$1"
 
@@ -93,10 +84,7 @@ sha256_of_file() {
   openssl dgst -sha256 "$_sof_file" | awk '{ print $2 }'
 }
 
-# nucleus_log_dir — Print the user-level log directory path.
-#
-# Platform-aware: returns the correct path for macOS vs Linux.
-# Environment override: NUCLEUS_LOG_DIR
+# Platform-aware user log directory.
 nucleus_log_dir() {
   if [ -n "${NUCLEUS_LOG_DIR:-}" ]; then
     printf '%s\n' "$NUCLEUS_LOG_DIR"
@@ -109,10 +97,7 @@ nucleus_log_dir() {
   esac
 }
 
-# nucleus_system_log_dir — Print the system-level log directory path.
-#
-# Platform-aware: returns the correct path for macOS vs Linux.
-# Environment override: NUCLEUS_SYSTEM_LOG_DIR
+# Platform-aware system log directory.
 nucleus_system_log_dir() {
   if [ -n "${NUCLEUS_SYSTEM_LOG_DIR:-}" ]; then
     printf '%s\n' "$NUCLEUS_SYSTEM_LOG_DIR"
@@ -125,12 +110,7 @@ nucleus_system_log_dir() {
   esac
 }
 
-# log_sanitize — Strip control characters from stdin to stdout.
-#
-# Removes ANSI escape sequences, carriage returns, and ASCII control
-# characters (except tab and newline).
-#
-# Usage: some_command | log_sanitize
+# Strip ANSI escapes, \r, and control chars (keep tab, newline).
 log_sanitize() {
   # Strip ANSI escape sequences and OSC sequences, remove \r, strip
   # control chars except tab (\x09) and newline (\x0A).

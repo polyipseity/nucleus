@@ -71,7 +71,7 @@ Located in `tests/scripts/script-validation-tests.sh`, run via bash in CI.
 
 **Shell Test Totals**: **8 validation categories** covering all deployment scripts
 
-#### ✅ **Consolidated check scripts** (NEW)
+#### ✅ **Consolidated check scripts**
 
 - `scripts/check.sh` (POSIX): Runs all 5 check categories (deadnix, shellcheck, PowerShell lint, Packer validation, script validation tests)
 - `scripts/check.ps1` (Windows): Runs Windows-compatible checks (PowerShell lint, Packer validation)

@@ -9,15 +9,7 @@
 - Open **EasyEffects** from the app grid. Navigate to `Effects > Output > Add Effect` and select Limiter or Compressor to cap volume. For one-click presets, clone <https://github.com/Digitalone1/EasyEffects-Presets> into `~/.local/share/easyeffects/output/`.
 - CamillaDSP uses `snd-aloop` for audio capture. Verify the loopback device exists: `arecord -l | grep Loopback`. If missing, reboot after `nucleus-apply` loads the kernel module.
 
-## accessible ports
 
-- `https://localhost:8920` — Jellyfin HTTPS endpoint (Caddy local reverse proxy).
-- `http://127.0.0.1:8096` — Jellyfin internal loopback HTTP API (automation upstream).
-- `http://127.0.0.1:11434` — Ollama local API.
-- `tcp/1234` — CamillaDSP websocket API (loopback, for camillagui-backend).
-- `http://127.0.0.1:5005` — CamillaDSP web GUI.
-- `https://localhost:5006` — CamillaDSP web GUI (HTTPS).
-- `tcp/3389` — XRDP Remote Desktop.
 
 ## HTTPS certificate trust (one-time)
 

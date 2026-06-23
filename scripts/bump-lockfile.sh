@@ -115,16 +115,12 @@ else
   log_skip "scoop" "scoop"
 fi
 
-# ---------------------------------------------------------------------------
 # cargo-binstall — keep current version (no reliable CLI query)
-# ---------------------------------------------------------------------------
 if section_enabled cargo-binstall; then
   log_skip_all "cargo-binstall (no reliable CLI query available)"
 fi
 
-# ---------------------------------------------------------------------------
 # bun — npm view <pkg> version, gated on bun availability
-# ---------------------------------------------------------------------------
 if section_enabled bun && command -v bun >/dev/null 2>&1; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
@@ -195,9 +191,7 @@ else
   log_skip "rustup" "rustup"
 fi
 
-# ---------------------------------------------------------------------------
 # pwsh — Find-Module via pwsh -NoProfile
-# ---------------------------------------------------------------------------
 if section_enabled pwsh && command -v pwsh >/dev/null 2>&1; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
@@ -213,9 +207,7 @@ else
   log_skip "pwsh" "pwsh"
 fi
 
-# ---------------------------------------------------------------------------
 # homebrew — brew list --versions, brew list --cask --versions
-# ---------------------------------------------------------------------------
 if section_enabled homebrew && command -v brew >/dev/null 2>&1; then
   # brews
   while IFS= read -r key; do
@@ -282,7 +274,6 @@ if section_enabled vscode; then
   fi
 fi
 
-# ollama — ollama show <name>:<tag> --format json
 : "${NUCLEUS_OLLAMA_HOST:=$(jq -r '.ollama.network.default | "\(.host):\(.port)"' "$REPO_ROOT/src/modules/services.json" 2>/dev/null || echo "127.0.0.1:11434")}"
 if section_enabled ollama && command -v ollama >/dev/null 2>&1; then
   # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
@@ -340,9 +331,7 @@ else
   log_skip "ollama" "ollama"
 fi
 
-# ---------------------------------------------------------------------------
 # nixos-iso — Query NixOS channel for latest ISO URL and its SHA-256
-# ---------------------------------------------------------------------------
 if section_enabled vm-setup || section_enabled nixos-iso; then
   while IFS= read -r arch; do
     [ -z "$arch" ] && continue
@@ -377,9 +366,7 @@ if section_enabled vm-setup || section_enabled nixos-iso; then
   done < <(printf '%s\n' "$data" | jq -r '(.vm-setup.nixos-iso // {}) | keys[]')
 fi
 
-# ---------------------------------------------------------------------------
 # tart-images — Query GHCR OCI registry for Cirrus CI macOS base image digests
-# ---------------------------------------------------------------------------
 if section_enabled vm-setup || section_enabled tart-images; then
   while IFS= read -r os_version; do
     [ -z "$os_version" ] && continue
@@ -425,9 +412,7 @@ if section_enabled vm-setup || section_enabled tart-images; then
   done < <(printf '%s\n' "$data" | jq -r '(.vm-setup.tart-images // {}) | keys[]')
 fi
 
-# ---------------------------------------------------------------------------
 # Atomic write
-# ---------------------------------------------------------------------------
 tmpfile=$(mktemp "$LOCKFILE_ABS.tmp.XXXXXX")
 # shellcheck disable=SC2064
 trap "rm -f '$tmpfile'" EXIT

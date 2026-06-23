@@ -120,9 +120,7 @@ should_include_host() {
   printf '%s' "$_sjh_json" | jq -e --arg host "$NUCLEUS_HOST" 'contains([$host])' >/dev/null 2>&1
 }
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 run_cmd() {
   if [ "$dry_run" = true ]; then
@@ -1660,9 +1658,7 @@ build_images() {
   for_each_vm build_one_image
 }
 
-# ---------------------------------------------------------------------------
 # macOS / Tart (macOS guests)
-# ---------------------------------------------------------------------------
 
 # setup_tart_vms — Phase 2 provisioning checks for macOS-type VM guests.
 #   The Packer Tart build already registered the VM in tart's store; this
@@ -1677,9 +1673,7 @@ setup_tart_vms() {
   for_each_vm setup_tart_vm
 }
 
-# ---------------------------------------------------------------------------
 # macOS / UTM (NixOS and Windows guests on macOS host)
-# ---------------------------------------------------------------------------
 
 setup_utm_vms() {
   if [ ! -d /Applications/UTM.app ]; then
@@ -1692,9 +1686,7 @@ setup_utm_vms() {
   printf 'vm-setup: macOS VM setup complete\n'
 }
 
-# ---------------------------------------------------------------------------
 # NixOS / libvirt
-# ---------------------------------------------------------------------------
 
 setup_libvirt_vms() {
   if ! command -v virsh >/dev/null 2>&1; then
@@ -1721,9 +1713,7 @@ setup_libvirt_vms() {
   printf 'vm-setup: NixOS VM setup complete; use the generated start-<name> helpers (or virt-manager) to start VMs\n'
 }
 
-# ---------------------------------------------------------------------------
 # Garbage collection for non-provisioned VM artifacts
-# ---------------------------------------------------------------------------
 
 # gc_vms — Top-level GC dispatcher.  Called from the vm-setup.sh main flow
 #   when --gc is passed.  Removes VM artifacts (Tart VMs, UTM bundles,

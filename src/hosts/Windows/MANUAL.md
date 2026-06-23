@@ -8,16 +8,7 @@
 - Launch **Peace Equalizer APO** (Peace GUI). Click the Effects button and use the visual Limiter sliders or pre-amplification dial to cap the system output threshold.
 - Run `camilladsp --list-devices` to list WASAPI device names. If the default device name in `src/modules/configs/camilladsp/configs/windows/config.yml` does not match your output device, update it.
 
-## accessible ports
 
-- `https://localhost:8920` — Jellyfin HTTPS endpoint (Caddy local reverse proxy).
-- `http://127.0.0.1:8096` — Jellyfin internal loopback HTTP API (automation upstream).
-- `http://127.0.0.1:11434` — Ollama local API.
-- `tcp/1234` — CamillaDSP websocket API (loopback, for camillagui-backend).
-- `http://127.0.0.1:5005` — CamillaDSP web GUI.
-- `https://localhost:5006` — CamillaDSP web GUI (HTTPS).
-- `tcp/5985` — WinRM HTTP listener.
-- `tcp/3389` — Windows Remote Desktop.
 
 ## HTTPS certificate trust (one-time)
 
