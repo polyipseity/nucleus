@@ -1,27 +1,3 @@
-<#
-.SYNOPSIS
-    Per-user SOPS secret materialization for user-scoped secret values.
-
-.DESCRIPTION
-    Reads src/secrets/users-<username>.yml (if present) and writes individual secret
-    values to the user-scoped secret directory
-    $HOME\.config\nucleus\secrets\.
-
-    Secrets materialized:
-      rclone_config_pass
-        Written to $HOME\.config\nucleus\secrets\rclone-config-pass.
-        The rclone config passphrase encrypts the entire rclone.conf so stored
-        cloud credentials are protected at rest.  shell profile and
-        Sync-CloudDrive both read this file automatically.
-
-    No-op when the per-user secrets file does not exist; machines that have not
-    yet created it continue to work without interruption.
-
-.NOTES
-    Environment variables: (none)
-    Exit codes: N/A — library script; functions use throw on failure.
-#>
-
 function Sync-UserSecret {
   <#
   .SYNOPSIS
@@ -29,32 +5,20 @@ function Sync-UserSecret {
 
   .DESCRIPTION
     Decrypts src/secrets/users-<username>.yml (when present) and writes individual
-    secret values to $HOME\.config\nucleus\secrets\.  Called by apply.ps1 after
-    Sync-Secret to handle user-scoped secrets that do not belong in the shared
-    secret files.
+    secret values to $HOME\.config\nucleus\secrets\.
 
   .PARAMETER RepoRoot
-    Absolute path to the repository root (for locating src\secrets\users-<user>.yml).
-
+    Absolute path to the repository root.
   .PARAMETER GpgExe
     Absolute path to the gpg executable.
-
   .PARAMETER HostKeyPath
-    Path to this machine's SSH host private key (used by Get-Secret for age
-    decryption via the machine identity).
-
+    Path to this machine's SSH host private key.
   .PARAMETER PrimarySshKeyPath
     Path to the primary user's managed SSH private key.
-
   .PARAMETER SopsExe
     Absolute path to the sops executable.
-
   .PARAMETER PrimaryUsername
     Username whose per-user secrets file to materialize.
-
-  .NOTES
-    Environment variables: (none)
-    Exit codes: N/A — library function; uses throw on failure.
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -78,8 +42,6 @@ function Sync-UserSecret {
 
   $userSecretFile = Join-Path $RepoRoot "src\secrets\users-$PrimaryUsername.yml"
   if (-not (Test-Path -Path $userSecretFile -PathType Leaf)) {
-    # WHY no warning: the file is optional and absent on first bootstrap; silence
-    # keeps apply output clean for machines where the user has not yet created it.
     return
   }
 
@@ -91,8 +53,6 @@ function Sync-UserSecret {
     New-Item -ItemType Directory -Path $secretDir -Force | Out-Null
   }
 
-  # Materialize rclone config passphrase.
-  # WHY key name is unscoped: src/secrets/users-<username>.yml is already per-user.
   $rclonePassKey = 'rclone_config_pass'
   $rclonePassValue = $secrets.$rclonePassKey
   if (-not [string]::IsNullOrWhiteSpace($rclonePassValue)) {
@@ -104,11 +64,8 @@ function Sync-UserSecret {
       $null
     }
     if ($existing -ne $rclonePassValue) {
-      # Write without BOM and without a trailing newline so cat-based reads on
-      # WSL/POSIX produce the exact passphrase string without trailing whitespace.
       [System.IO.File]::WriteAllText($rclonePassFile, $rclonePassValue, [System.Text.UTF8Encoding]::new($false))
-      # WHY restrict to owner-read-only: the passphrase decrypts all rclone
-      # credentials; broader permissions would expose them to other local users.
+      # Restrict to owner-read-only so the passphrase stays local.
       $acl = Get-Acl -Path $rclonePassFile
       $acl.SetAccessRuleProtection($true, $false)
       $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name

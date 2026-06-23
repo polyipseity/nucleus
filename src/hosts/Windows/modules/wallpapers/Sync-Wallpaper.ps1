@@ -1,16 +1,3 @@
-<#
-.SYNOPSIS
-  Decrypts all SOPS-encrypted wallpaper blobs for each managed user.
-
-.DESCRIPTION
-  Decrypts wallpaper blobs into the declarative output directory and returns the
-  first active file path for DSC token replacement.
-
-.NOTES
-  Environment variables: (none)
-  Exit codes: 0 on success; non-zero on failure
-#>
-
 function Sync-Wallpaper {
   <#
   .SYNOPSIS
@@ -38,8 +25,7 @@ function Sync-Wallpaper {
 
   .PARAMETER AssetsDir
     Absolute path to the directory containing user subdirectories with
-    SOPS-encrypted wallpaper blobs (*.sops files). Subdirectory names
-    must match usernames in the $Users list.
+    SOPS-encrypted wallpaper blobs.
 
   .PARAMETER GpgExe
     Absolute path to the gpg executable.
@@ -52,10 +38,8 @@ function Sync-Wallpaper {
     fallback age decryption identity.
 
   .PARAMETER Users
-    Mandatory: array of usernames for which wallpapers should be materialized.
-    Only user subdirectories matching names in this list are processed. Callers
-    must pass this explicitly so they are aware of which users' wallpapers will
-    be decrypted and written to their home directories.
+    Array of usernames for which wallpapers should be materialized.
+    Only user subdirectories matching names in this list are processed.
 
   .PARAMETER SopsExe
     Absolute path to the sops executable.
@@ -65,15 +49,13 @@ function Sync-Wallpaper {
               when no wallpapers were found.
 
   .EXAMPLE
-    $wallpaper = Sync-Wallpaper `
+    Sync-Wallpaper `
         -AssetsDir 'C:\Users\admin\nucleus\src\assets\wallpapers' `
         -GpgExe 'gpg.exe' `
         -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
         -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" `
-        -Users @('admin', 'guest') `
+        -Users 'admin', 'guest' `
         -SopsExe 'sops.exe'
-    # Wallpapers materialized to C:\Users\admin\Pictures\wallpapers\ and
-    # C:\Users\guest\Pictures\wallpapers\. $wallpaper is the first active path.
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -85,7 +67,7 @@ function Sync-Wallpaper {
     [Parameter(Mandatory = $true)]
     [string]$HostKeyPath,
 
-    [Parameter(Mandatory = $false)]
+    [Parameter()]
     [string]$PrimarySshKeyPath,
 
     [Parameter(Mandatory = $true)]
@@ -94,16 +76,11 @@ function Sync-Wallpaper {
     [Parameter(Mandatory = $true)]
     [string]$SopsExe
   )
-  # Explicit reference to suppress false-positive PSAvoidUsingUnusedParameters
-  # ($Users is used via closure in Where-Object below).
-  $null = $Users
-
   if (-not (Test-Path -Path $AssetsDir)) {
     Write-Output "$($PSStyle.Foreground.Yellow)Wallpaper assets directory not found at $AssetsDir; skipping wallpaper sync.$($PSStyle.Reset)"
     return $null
   }
 
-  # Only process user subdirectories explicitly listed in $Users.
   $userDirs = @(Get-ChildItem -Path $AssetsDir -Directory | Where-Object { $Users -contains $_.Name } | Sort-Object Name)
   if ($userDirs.Count -eq 0) {
     Write-Output "$($PSStyle.Foreground.Yellow)No user subdirectories matching specified users found in $AssetsDir; skipping wallpaper sync.$($PSStyle.Reset)"

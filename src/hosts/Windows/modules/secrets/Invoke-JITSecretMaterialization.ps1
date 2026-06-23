@@ -1,61 +1,27 @@
-<#
-.SYNOPSIS
-    Targeted JIT (just-in-time) secret materialization for specific modules.
-
-.DESCRIPTION
-    Allows modules to request only specific secret files instead of running the
-    full baseline sync.
-
-.NOTES
-    Environment variables: (none)
-    Exit codes: N/A — library script; functions use throw on failure.
-#>
-
 function Invoke-JITSecretMaterialization {
   <#
   .SYNOPSIS
-    Materializes a specific subset of named secret files on demand (JIT).
+    Materializes specific named secret files on demand (JIT).
 
   .DESCRIPTION
-    Designed for modules that need exactly one or two secrets rather than the
-    full batch sync.  For each name in $SecretNames, the function resolves the
-    corresponding .yml file under $SecretsDir (appending .yml if omitted) and
-    calls Sync-SecretFile.  Throws immediately if a requested secret
-    file does not exist.
+    For each name in $SecretNames, resolves the corresponding .yml file under
+    $SecretsDir (appending .yml if omitted) and calls Sync-SecretFile.
+    Throws if a requested file does not exist.
 
   .PARAMETER SecretsDir
-    Absolute path to the directory containing SOPS-encrypted YAML files.
-
+    Absolute path to SOPS-encrypted YAML files directory.
   .PARAMETER SecretNames
-    Names of the secret files to materialize.  The .yml extension is optional;
-    it is appended automatically if not present.
-
+    Names of the secret files to materialize (without .yml extension).
   .PARAMETER GpgExe
     Absolute path to the gpg executable.
-
   .PARAMETER HostKeyPath
-    Path to this machine's SSH host private key used as the age decryption key.
-
+    Path to this machine's SSH host private key.
   .PARAMETER PrimarySshKeyPath
-    Path to the primary user's managed SSH private key used as the final
-    fallback age decryption identity.
-
+    Path to the primary user's managed SSH private key.
   .PARAMETER SopsExe
     Absolute path to the sops executable.
-
   .PARAMETER PrimaryUsername
-    Canonical primary username allowed to materialize/import secrets.
-
-  .EXAMPLE
-    Invoke-JITSecretMaterialization -SecretsDir '.\secrets' `
-      -SecretNames @('gpg-personal', 'ssh-personal') `
-      -GpgExe 'gpg.exe' -HostKeyPath '...\ssh_host_ed25519_key' `
-      -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe' `
-      -PrimaryUsername 'admin'
-
-  .NOTES
-    Environment variables: (none)
-    Exit codes: N/A — library function; throws on failure.
+    Canonical primary username.
   #>
   param(
     [Parameter(Mandatory = $true)]

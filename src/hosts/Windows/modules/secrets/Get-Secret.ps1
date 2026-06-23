@@ -1,16 +1,3 @@
-<#
-.SYNOPSIS
-    Structured secret decryption helper for SOPS-encrypted YAML files.
-
-.DESCRIPTION
-    Decrypts SOPS YAML and returns JSON-decoded secret objects using the shared
-    machine-ssh -> gpg -> primary-ssh fallback chain.
-
-.NOTES
-    Environment variables: SOPS_AGE_SSH_PRIVATE_KEY_FILE — set temporarily during decryption, cleaned up in finally block.
-    Exit codes: N/A — library script; functions use throw on failure.
-#>
-
 function Get-Secret {
   <#
   .SYNOPSIS
@@ -33,13 +20,11 @@ function Get-Secret {
     Absolute path to the SOPS-encrypted YAML file to decrypt.
 
   .PARAMETER GpgExe
-    Absolute path to the gpg executable (used for both GPG-path decryption
-    and pre-flight key detection).
+    Absolute path to the gpg executable.
 
   .PARAMETER HostKeyPath
     Path to this machine's SSH host private key backing the age recipient.
-    When the file does not exist, machine-key decryption is skipped and GPG is
-    tried.
+    When the file does not exist, machine-key decryption is skipped.
 
   .PARAMETER PrimarySshKeyPath
     Path to the primary user's managed SSH private key used as the final
@@ -52,14 +37,9 @@ function Get-Secret {
     [PSCustomObject]  Decrypted secret data as a structured object.
 
   .EXAMPLE
-    $secrets = Get-NucleusSecrets -FilePath '.\secrets.yml' -GpgExe 'gpg.exe' `
-        -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-        -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe'
-    $secrets.ssh_keys
-
-  .NOTES
-    Environment variables: SOPS_AGE_SSH_PRIVATE_KEY_FILE — set temporarily during decryption, cleaned up in finally block.
-    Exit codes: N/A — library function; throws on failure.
+    $secrets = Get-Secret -FilePath '.\secrets.yml' -GpgExe 'gpg.exe' `
+      -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
+      -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe'
   #>
   param(
     [Parameter(Mandatory = $true)]

@@ -1,15 +1,3 @@
-<#
-.SYNOPSIS
-    Baseline managed secret sync entrypoint for Windows host orchestration.
-
-.DESCRIPTION
-    Materializes the fixed secret inventory expected by Windows host orchestration.
-
-.NOTES
-    Environment variables: (none)
-    Exit codes: N/A — library script; functions use throw on failure.
-#>
-
 function Sync-Secret {
   <#
   .SYNOPSIS
@@ -22,42 +10,20 @@ function Sync-Secret {
       - ssh-personal.yml
 
     For each file, decrypts it and checks which users in $Users have secrets
-    defined (keys matching `gpg_personal_<username>`, `git_identity_<username>`,
-    `ssh_personal_<username>`, `ssh_personal_<username>_pub`,
-    `ssh_personal_<username>_rsa`, or `ssh_personal_<username>_rsa_pub`).
-    Only those users are passed to Sync-SecretFile.  Users that have
-    no secrets in a given file are skipped gracefully.  Each user may have
-    a different set of secrets (or none); the function materializes only what
-    is actually defined for each user.
+    defined. Only those users are passed to Sync-SecretFile.
 
   .PARAMETER SecretsDir
     Absolute path to the directory containing SOPS-encrypted YAML files.
-
   .PARAMETER GpgExe
     Absolute path to the gpg executable.
-
   .PARAMETER HostKeyPath
-    Path to this machine's SSH host private key used as the age decryption key.
-
+    Path to this machine's SSH host private key.
   .PARAMETER PrimarySshKeyPath
-    Path to the primary user's managed SSH private key used as the final
-    fallback age decryption identity.
-
+    Path to the primary user's managed SSH private key.
   .PARAMETER SopsExe
     Absolute path to the sops executable.
-
   .PARAMETER Users
-    Array of usernames for which to materialize/import secrets.
-
-  .EXAMPLE
-    Sync-Secrets -SecretsDir '.\secrets' -GpgExe 'gpg.exe' `
-      -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-      -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe' `
-      -Users @('admin', 'guest')
-
-  .NOTES
-    Environment variables: (none)
-    Exit codes: N/A — library function; uses throw on failure.
+    Array of usernames for which to materialize secrets.
   #>
   param(
     [Parameter(Mandatory = $true)]

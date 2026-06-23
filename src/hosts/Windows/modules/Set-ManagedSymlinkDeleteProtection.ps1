@@ -1,20 +1,6 @@
-# Shared symlink delete-protection helpers for Windows managed symlinks.
 # Dot-source this file from any Sync-* function that creates protected symlinks.
-#
 # These functions add a Windows ACL that denies the current user the "delete"
-# (D) permission on the symlink itself (/L), so the link cannot be removed
-# accidentally.  Before modifying a managed symlink, first call
-# Remove-ManagedSymlinkDeleteProtection to clear the ACL, then recreate the
-# link, then re-apply protection with Set-ManagedSymlinkDeleteProtection.
-#
-# .PARAMETER Context
-#   Short caller identifier used in warning messages (e.g. "agents-config").
-#
-# .PARAMETER Path
-#   Absolute path to the managed symlink.
-#
-# .EXAMPLE
-#   Set-ManagedSymlinkDeleteProtection -Context "agents-config" -Path "C:\Users\me\.agents"
+# permission on the symlink itself (/L), so the link cannot be removed accidentally.
 
 function Set-ManagedSymlinkDeleteProtection {
   [CmdletBinding(SupportsShouldProcess)]

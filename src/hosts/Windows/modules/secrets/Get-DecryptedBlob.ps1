@@ -1,16 +1,3 @@
-<#
-.SYNOPSIS
-    Binary blob decryption helper for SOPS-encrypted assets.
-
-.DESCRIPTION
-    Decrypts SOPS binary payloads with the same key precedence chain used for
-    structured secrets and writes plaintext directly to disk.
-
-.NOTES
-    Environment variables: SOPS_AGE_SSH_PRIVATE_KEY_FILE — set temporarily during decryption, cleaned up in finally block.
-    Exit codes: N/A — library script; functions use throw on failure.
-#>
-
 function Get-DecryptedBlob {
   <#
   .SYNOPSIS
@@ -18,10 +5,9 @@ function Get-DecryptedBlob {
     $OutputPath.
 
   .DESCRIPTION
-    Similar key-priority logic to Get-Secrets (machine SSH key, then GPG,
-    then primary SSH key), but uses `sops --output` to write the raw decrypted
-    bytes directly to $OutputPath instead of capturing stdout.  Used for binary
-    assets such as wallpaper images that cannot be embedded in JSON.
+    Uses the same machine-ssh -> gpg -> primary-ssh fallback chain as
+    Get-Secret, but writes raw decrypted bytes to a file via `sops --output`.
+    Used for binary assets such as wallpaper images.
 
   .PARAMETER FilePath
     Absolute path to the SOPS-encrypted blob file (typically *.sops).
@@ -44,13 +30,9 @@ function Get-DecryptedBlob {
 
   .EXAMPLE
     Get-DecryptedBlob -FilePath '.\wallpaper.jpg.sops' -GpgExe 'gpg.exe' `
-    -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-    -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" `
-    -OutputPath 'C:\Users\admin\Pictures\wallpaper.jpg' -SopsExe 'sops.exe'
-
-  .NOTES
-    Environment variables: SOPS_AGE_SSH_PRIVATE_KEY_FILE — set temporarily during decryption, cleaned up in finally block.
-    Exit codes: N/A — library function; throws on failure.
+      -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
+      -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" `
+      -OutputPath 'C:\Users\admin\Pictures\wallpaper.jpg' -SopsExe 'sops.exe'
   #>
   param(
     [Parameter(Mandatory = $true)]

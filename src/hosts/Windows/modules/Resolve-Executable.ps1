@@ -1,37 +1,13 @@
-<#
-.SYNOPSIS
-  Returns the first candidate path that exists on disk.
-
-.DESCRIPTION
-  Ensures Windows apply scripts use deterministic executable resolution without
-  relying on PATH ordering drift.
-
-.NOTES
-  Environment variables: (none)
-  Exit codes: 0 on success; non-zero on failure (throws when no candidate found)
-#>
-
 function Resolve-Executable {
   <#
   .SYNOPSIS
     Returns the first candidate path that exists on disk.
-
-  .DESCRIPTION
-    Iterates $CandidatePaths in order and returns the first path that resolves
-    via Test-Path.  Used to locate managed executables (sops, age, gpg) that
-    may be installed in different locations depending on how WinGet, Scoop, or a
-    manual bootstrap placed them.
-
   .PARAMETER CandidatePaths
     Ordered list of absolute or relative paths to test.
-
   .PARAMETER Name
-    Display name of the executable, used in the error message when none of the
-    candidates are found.
-
+    Display name of the executable, used in the error message.
   .OUTPUTS
     [string]  Absolute path of the first candidate that exists.
-
   .EXAMPLE
     Resolve-Executable -Name 'sops' -CandidatePaths @(
       (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\sops\sops.exe'),
