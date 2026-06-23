@@ -304,7 +304,12 @@ if (-not $HAS_ARGS) {
   # Generate locked DSC in-memory from system.dsc.yml + lockfile.
   $_lockfileData = Get-Content $_lockfilePath -Raw | ConvertFrom-Json -AsHashtable
   $_dscYaml = Get-Content $_dscSystem -Raw
-  $_dsc = $_dscYaml | ConvertFrom-Yaml -AsHashtable
+  $_dsc = if ((Get-Command ConvertFrom-Yaml).Parameters.Keys -contains 'AsHashtable') {
+    $_dscYaml | ConvertFrom-Yaml -AsHashtable
+  } else {
+    # JSON roundtrip converts PSCustomObject → hashtable without -AsHashtable.
+    $_dscYaml | ConvertFrom-Yaml | ConvertTo-Json -Depth 20 | ConvertFrom-Json -AsHashtable
+  }
 
   foreach ($_resource in $_dsc.properties.resources) {
     if ($_resource.resource -eq 'Microsoft.WinGet.Client/Package' -and $_resource.settings.source -eq 'winget') {
