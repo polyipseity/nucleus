@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# bump-lockfile.sh — Bump version pins in the consolidated lockfile.
-#
 # Reads src/lockfiles/lockfile.json, queries each available tool for the
 # current installed/published version of each pinned item, and writes an
 # updated lockfile atomically.
@@ -18,17 +16,7 @@
 #   ollama        ollama show <name>:<tag> --format json
 #                 (skip if ollama unavailable)
 #   vm-setup      VM image artifact pins (nixos-iso, tart-images, windows). Use --sections nixos-iso etc. for sub-sections.
-#
-# Environment variables:
-#   NUCLEUS_REPO_ROOT      Override the detected repository root path.
-#   NUCLEUS_OLLAMA_HOST    Ollama daemon address (host:port) for admin CLI commands (default: read from services.json).
-#
-# Flags:
-#   --sections <list>  Comma-separated list of sections to update (default: all)
-#   --help             Show this help
-#
-# Exit conditions:
-#   0 on success; non-zero on failure (missing jq, lockfile not found).
+
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
@@ -39,9 +27,7 @@ REPO_ROOT="$(resolve_nucleus_root)"
 LOCKFILE_REL="src/lockfiles/lockfile.json"
 LOCKFILE_ABS="$REPO_ROOT/$LOCKFILE_REL"
 
-# ---------------------------------------------------------------------------
 # Pre-flight checks
-# ---------------------------------------------------------------------------
 require_command jq
 
 if [ ! -f "$LOCKFILE_ABS" ]; then
@@ -78,9 +64,7 @@ section_enabled() {
   esac
 }
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 log_update() {
   printf 'bump-lockfile: updating %s.%s from %s to %s\n' "$1" "$2" "$3" "$4"
 }
@@ -93,17 +77,13 @@ log_skip_all() {
   printf 'bump-lockfile: skipping %s section\n' "$1"
 }
 
-# ---------------------------------------------------------------------------
 # Read lockfile
-# ---------------------------------------------------------------------------
 data=$(cat "$LOCKFILE_ABS")
 
 # Update timestamp to current UTC ISO 8601
 data=$(printf '%s\n' "$data" | jq --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.updated = $d')
 
-# ---------------------------------------------------------------------------
 # winget — winget show --id <id>
-# ---------------------------------------------------------------------------
 if section_enabled winget && command -v winget >/dev/null 2>&1; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
@@ -119,9 +99,7 @@ else
   log_skip "winget" "winget"
 fi
 
-# ---------------------------------------------------------------------------
 # scoop — scoop info <pkg>
-# ---------------------------------------------------------------------------
 if section_enabled scoop && command -v scoop >/dev/null 2>&1; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
@@ -162,9 +140,7 @@ else
   log_skip "bun" "bun"
 fi
 
-# ---------------------------------------------------------------------------
 # uv — uv tool list
-# ---------------------------------------------------------------------------
 if section_enabled uv && command -v uv >/dev/null 2>&1; then
   # Build a map of package-name -> version from uv tool list.
   # Typical output: "pkgname@version" or "pkgname v1.0.0".
@@ -200,9 +176,7 @@ else
   log_skip "uv" "uv"
 fi
 
-# ---------------------------------------------------------------------------
-# rustup — rustc +<channel> --version
-# ---------------------------------------------------------------------------
+# rustup — rustc +<ch> --version
 if section_enabled rustup && command -v rustup >/dev/null 2>&1; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
@@ -270,9 +244,7 @@ else
   log_skip "brew" "homebrew"
 fi
 
-# ---------------------------------------------------------------------------
-# vscode — code / code-insiders --list-extensions --show-versions
-# ---------------------------------------------------------------------------
+# vscode — code/code-insiders --list-extensions --show-versions
 if section_enabled vscode; then
   vscode_output=""
   if command -v code >/dev/null 2>&1; then
@@ -310,9 +282,7 @@ if section_enabled vscode; then
   fi
 fi
 
-# ---------------------------------------------------------------------------
 # ollama — ollama show <name>:<tag> --format json
-# ---------------------------------------------------------------------------
 : "${NUCLEUS_OLLAMA_HOST:=$(jq -r '.ollama.network.default | "\(.host):\(.port)"' "$REPO_ROOT/src/modules/services.json" 2>/dev/null || echo "127.0.0.1:11434")}"
 if section_enabled ollama && command -v ollama >/dev/null 2>&1; then
   # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that

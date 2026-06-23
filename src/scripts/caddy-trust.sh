@@ -1,27 +1,8 @@
 #!/usr/bin/env bash
-# src/scripts/caddy-trust.sh — Trust Caddy's local CA for local TLS clients.
-#
 # Trusts Caddy's locally-managed CA root certificate so that `tls internal`
 # reverse proxy targets are recognized without client-side certificate
 # warnings. Applies generally to every local reverse proxy using the same
 # Caddy PKI authority.
-#
-# WHY a separate .sh file: needed by multiple call sites with different
-# privilege contexts (sudo on Darwin/NixOS, user on standalone Home Manager).
-# Extracting it avoids duplication and allows independent shellcheck
-# validation.
-#
-# Arguments:
-#   sudo          Run `caddy trust` with sudo.
-#   user          Run `caddy trust` as the current user.
-#
-# Environment variables:
-#   (none)        No environment variables used.
-#
-# Exit conditions:
-#   0 — CA trusted successfully.
-#   1 — caddy not found in PATH.
-#   2 — all 20 retry attempts exhausted.
 
 set -euo pipefail
 

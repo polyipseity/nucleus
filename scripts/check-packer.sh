@@ -1,17 +1,5 @@
 #!/usr/bin/env bash
-# check-packer.sh — Validate Packer template formatting and configuration.
-#
-# With no arguments, checks all .pkr.hcl files under src/vms/. With arguments,
-# checks only the provided paths.
-#
-# Arguments:
-#   (none)        No flags accepted; paths may be provided as positional arguments.
-#
-# Environment variables:
-#   NUCLEUS_REPO_ROOT  Override the detected repository root path.
-#
-# Exit conditions:
-#   0 on success; non-zero on any Packer format or validation failure.
+# Checks .pkr.hcl files under src/vms/. With arguments, checks only provided paths.
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)

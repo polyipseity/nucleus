@@ -1,41 +1,6 @@
 #!/usr/bin/env bash
-# vm-setup.sh — Build VM images (if needed) and provision VMs.
-#
-# Phase 1 builds pre-built QCOW2 OS images (if absent) using nixos-generators
-# (NixOS guest on macOS/NixOS) or Packer (Windows). Phase 2 provisions VM
-# bundles/domains from those images.
-#
-# Arguments:
-#   --dry-run                  Print planned actions without executing (default: off).
-#   --windows-iso PATH         Path to the Windows 11 ISO (required for Windows guest builds).
-#   --no-windows-iso           Skip using a Windows ISO (default: off).
-#   --windows-iso-source S     Source for Windows ISO auto-resolution: auto|url|fido (default: auto).
-#   --no-windows-iso-source    Skip Windows ISO auto-resolution (default: off).
-#   --windows-iso-retries N    Retry attempts for Windows ISO network downloads (default: 0).
-#   --headful|--no-headful     Run guest builds with visible GUI (--headful) or headless (default: --no-headful).
-#   --accelerator TYPE         QEMU accelerator for image builds (hvf/kvm/tcg) (default: auto-detected).
-#   --vm-dir-override PATH     Override the default ~/virtual machines path.
-#   --mido-script PATH         Override the Mido script path (default: vendored script).
-#   --mido-patch-file PATH     Override the runtime patch file path (default: src/vms/windows/patches/mido-iso-link.patch).
-#   --repo-root PATH           Override the repository root path.
-#
-# Environment variables:
-#   VM_DIR_OVERRIDE          Override the default ~/virtual machines path.
-#   NUCLEUS_MIDO_SCRIPT      Override the Mido script path (default: vendored script).
-#   NUCLEUS_MIDO_PATCH_FILE  Override the runtime patch file path (default: src/vms/windows/patches/mido-iso-link.patch).
-#   NUCLEUS_REPO_ROOT        Override the repository root path.
-#   NUCLEUS_HOST             Override the host name (auto-detected when unset).
-#   NUCLEUS_VM_SECRET_OWNER  Override the VM secret owner username.
-#
-# Prerequisites:
-#   NixOS guest   : nix (for nix run github:nix-community/nixos-generators).
-#   Windows guest : packer, QEMU, ISO auto-fetched via Fido.
-#   macOS guest   : tart (brew install cirruslabs/cli/tart), packer; macOS host only.
-#   macOS host    : UTM installed (/Applications/UTM.app); qemu-img in PATH.
-#   NixOS host    : libvirtd enabled (vms.nix); qemu-img and virsh in PATH.
-#
-# Exit conditions:
-#   0 (best-effort — a VM setup failure does not roll back a completed system apply).
+# Phase 1 builds pre-built QCOW2 OS images (if absent). Phase 2 provisions
+# VM bundles/domains from those images.
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)

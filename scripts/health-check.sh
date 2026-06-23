@@ -1,20 +1,8 @@
 #!/usr/bin/env bash
-# health-check.sh — Check pre-flight readiness before bootstrap/apply/update operations.
-#
 # Validates free disk space, outbound connectivity to key endpoints (GitHub,
 # cache.nixos.org), and SOPS secret decryptability for repository-managed
 # secret files.
-#
-# Arguments:
-#   --min-free-bytes <int>            Minimum free disk space in bytes (default: 10000000000).
-#   --secret-health|--no-secret-health  Enable or skip SOPS decryption identity verification (default: --secret-health).
-#   --log-health                       Enable log directory, size, and sanitize checks (default: disabled).
-#
-# Environment variables:
-#   (none)
-#
-# Exit conditions:
-#   0 on success; non-zero if any check fails.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"

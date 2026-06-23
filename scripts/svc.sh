@@ -1,29 +1,8 @@
 #!/usr/bin/env bash
-# svc.sh — Unified service management for POSIX hosts (macOS + NixOS).
-#
 # Provides a uniform CLI for listing, starting, stopping, restarting,
 # enabling, and disabling services across macOS (launchctl) and NixOS (systemctl).
 # Services are defined in src/modules/services.json (the canonical registry).
-#
-# Arguments:
-#   list                              List all known services with status.
-#   status [service...]               Show status of all (or specific) services.
-#   start <service>                   Start a service.
-#   stop <service>                    Stop a service.
-#   restart <service>                 Restart a service.
-#   enable <service>                  Enable auto-start.
-#   disable <service>                 Disable auto-start.
-#   endpoint <service> [<name>]       Show network endpoint(s) for a service.
-#
-# Options:
-#   --json        Machine-readable JSON output.
-#   -h|--help     Show usage.
-#
-# Environment variables:
-#   NUCLEUS_REPO_ROOT  Override the detected repository root path.
-#
-# Exit conditions:
-#   0 on success; non-zero on any failure.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
@@ -57,9 +36,7 @@ case "$HOST" in
   *)       printf '%s\n' "svc: unsupported host '$HOST'" >&2; exit 1 ;;
 esac
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 # read_registry — Parse services.json and return JSON filtered to current platform.
 read_registry() {
@@ -291,9 +268,7 @@ svc_action() {
   esac
 }
 
-# ---------------------------------------------------------------------------
 # Action implementations
-# ---------------------------------------------------------------------------
 
 do_list() {
   local registry
@@ -449,9 +424,7 @@ do_endpoint() {
   fi
 }
 
-# ---------------------------------------------------------------------------
 # Main
-# ---------------------------------------------------------------------------
 
 json_output=false
 action=""

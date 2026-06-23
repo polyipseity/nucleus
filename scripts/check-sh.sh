@@ -1,17 +1,5 @@
 #!/usr/bin/env bash
-# check-sh.sh — Validate shell script syntax and lint quality with ShellCheck.
-#
-# With no arguments, checks all tracked *.sh files from Git. With arguments,
-# checks only the provided paths.
-#
-# Arguments:
-#   (none)        No flags accepted; paths may be provided as positional arguments.
-#
-# Environment variables:
-#   (none)        Requires git and shellcheck in PATH.
-#
-# Exit conditions:
-#   0 on success; non-zero on any ShellCheck finding at error/warning level.
+# Checks all tracked *.sh files with ShellCheck. With arguments, only provided paths.
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)

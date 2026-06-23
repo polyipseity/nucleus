@@ -1,19 +1,8 @@
 #!/usr/bin/env bash
-# cloud-setup.sh — Guide one-time cloud remote setup and validate cloud mount automation.
-#
 # Verifies required rclone remotes exist (GoogleDrive, iCloud, OneDrive),
 # creates missing remotes with correct provider types, validates credentials,
 # and optionally runs nucleus apply to converge cloud mount services.
-#
-# Arguments:
-#   --apply|--no-apply  Run nucleus apply to converge cloud mount services (default: --no-apply).
-#
-# Environment variables:
-#   (none)
-#
-# Exit conditions:
-#   0 on success; non-zero when required remotes are still missing or credential
-#   validation fails after a recreation attempt.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
@@ -27,6 +16,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # use. The repository already declares per-user cloud-drive intent, so use that
 # as the source of truth and skip the extra prompt.
 resolve_icloud_service_for_remote() {
+  # Reads users.json to determine iCloud service type (drive/photos) for a
+  # remote, avoiding the interactive prompt from `rclone config create`.
   _ics_repo_root="$1"
   _ics_remote_name="$2"
   _ics_users_json="$_ics_repo_root/src/modules/users.json"

@@ -1,63 +1,6 @@
 #!/usr/bin/env bash
-# src/scripts/apply.sh — Dispatch the Nix apply command for the current host.
-#
-# Thin orchestrator: OS detection, lifecycle ordering (pre-apply checks →
-# rebuild → post-apply provisioning), and error-boundary handling. All heavy
-# logic lives in dedicated sibling scripts so each concern can be validated,
-# tested, and reused independently.
-#
-# Script location convention:
-#   scripts/        — Cross-platform scripts consumed as flake apps via
-#                     writeShellApplication or as repo script inputs.
-#   src/scripts/    — Apply-only internal scripts executed by this dispatcher
-#                     only. Resolved at runtime via $_ash_script_dir.
-#
-# Pre-apply lifecycle (order is significant):
-#   1. SSH host key generation             (generate-ssh-host-key.sh)
-#   2. SOPS machine key registration       (register-host-age-key.sh)
-#   3. Nix health check                    (nix run .#health-check)
-#   4. System rebuild                      (darwin-rebuild / nixos-rebuild / home-manager)
-#   5. Prek hooks installation             (install-prek-hooks.sh)
-#
-# Post-apply provisioning order:
-#   1. Local CA trust                      (caddy-trust.sh)
-#   2. Jellyfin sync                       (jellyfin-sync.sh)
-#   3. AI model sync                       (ai-sync.sh)
-#   4. Cloud replica sync                  (replica-sync.sh)
-#   5. VM setup                            (vm-setup.sh)
-#   6. Garbage collection                  (gc.sh)
-#
-# Detects the operating system and invokes the appropriate flake output:
-#   Darwin  → darwin-rebuild switch  (nix-darwin; manages system + home-manager)
-#   NixOS   → nixos-rebuild switch   (requires sudo; detected via /etc/NIXOS)
-#   Linux   → home-manager switch    (standalone HM for plain Linux / WSL)
-#
-# For Darwin and NixOS, the script prompts for the sudo password once upfront
-# via `sudo -v`, then maintains the sudo session with a background keepalive
-# loop for the duration of the rebuild. Standalone Linux runs home-manager
-# without sudo and skips the keepalive entirely.
-#
-# Arguments:
-#   --ai-sync|--no-ai-sync          Control post-apply Ollama model sync (default: --ai-sync).
-#   --replica-sync|--no-replica-sync  Control post-apply cloud replica sync (default: --replica-sync).
-#   --vm-setup|--no-vm-setup        Control post-apply VM setup (default: --vm-setup).
-#
-# Environment variables:
-#   (none)        Repository root discovered via resolve_nucleus_root().
-#
-# Exit conditions:
-#   0 on success; non-zero on failure.
-#   --target-user   select the Home Manager flake profile key on standalone
-#                   Linux hosts (ignored on Darwin and NixOS system rebuilds)
-#
-# Environment variables:
-#   NUCLEUS_USERNAME — override the Home Manager profile name used on standalone
-#                      Linux.  Defaults to `id -un` (the current user).  Set
-#                      this when the local username differs from the key used
-#                      in homeConfigurations in flake.nix.
-#
-# Prerequisites: Nix installed; caller's environment must allow reaching the
-# nix binary.
+# OS detection, lifecycle ordering (pre-apply checks → rebuild → post-apply
+# provisioning), and error-boundary handling. Heavy logic in sibling scripts.
 set -euo pipefail
 
 # Refuse to run as root — privilege escalation (sudo) is managed internally
@@ -72,18 +15,14 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/lib.sh"
 
-# ---------------------------------------------------------------------------
 # Usage
-# ---------------------------------------------------------------------------
 usage() {
   usage_std 'apply.sh' '[--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--target-user=<name>] [--username=<name>] [--vm-setup|--no-vm-setup]' \
     'Dispatch the Nix apply command for the current host.'
   exit 0
 }
 
-# ---------------------------------------------------------------------------
 # Flag parsing
-# ---------------------------------------------------------------------------
 ai_sync=true
 replica_sync=false
 vm_setup=false
@@ -91,38 +30,12 @@ target_user=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --ai-sync)
-      # Model pulls are 2–20 GB and may be undesirable in CI or on
-      # low-bandwidth connections; this flag opts in to the post-apply sync.
-      ai_sync=true
-      ;;
-    --no-ai-sync)
-      # Model pulls are 2–20 GB and may be undesirable in CI or on
-      # low-bandwidth connections; this flag opts out of the post-apply sync.
-      ai_sync=false
-      ;;
-    --replica-sync)
-      # Replica sync is slow for large trees and skipped by default after
-      # apply; this flag opts in to immediate post-apply convergence.
-      replica_sync=true
-      ;;
-    --no-replica-sync)
-      # Replica sync is slow for large trees and skipped by default after
-      # apply; this flag opts out of immediate post-apply convergence.
-      replica_sync=false
-      ;;
-    --vm-setup)
-      # VM setup provisions QEMU disk images and registers VMs (UTM on macOS,
-      # libvirt on NixOS).  Skipped by default after apply because disk
-      # pre-allocation and VM registration are large, slow, and idempotent.
-      vm_setup=true
-      ;;
-    --no-vm-setup)
-      # VM setup provisions QEMU disk images and registers VMs (UTM on macOS,
-      # libvirt on NixOS).  Skipped by default after apply because disk
-      # pre-allocation and VM registration are large, slow, and idempotent.
-      vm_setup=false
-      ;;
+    --ai-sync) ai_sync=true ;;
+    --no-ai-sync) ai_sync=false ;;
+    --replica-sync) replica_sync=true ;;
+    --no-replica-sync) replica_sync=false ;;
+    --vm-setup) vm_setup=true ;;
+    --no-vm-setup) vm_setup=false ;;
     --target-user)
       target_user="$2"; shift
       if [ -z "$target_user" ]; then
@@ -186,52 +99,24 @@ mkdir -p "$HOME/.config/nucleus"
 ln -sf "$REPO_ROOT/src/modules/ai/litellm-config.yml" "$HOME/.config/nucleus/litellm-config.yml"
 
 run_nix() {
-  # Execute nix with the merged config for non-root operations.
-  # Suppress repeated dirty-tree warnings so apply logs highlight actionable
-  # warnings/errors instead of repeating VCS status lines.
   NIX_CONFIG="$(merge_nix_config)" nix --option warn-dirty false "$@"
 }
 
 run_nix_as_root() {
-  # Execute nix as root while injecting the merged config explicitly so sudo's
-  # default environment filtering cannot drop required flake settings.
-  # NUCLEUS_REPO is forwarded so builtins.getEnv in the Nix config can
-  # construct writable out-of-store symlinks during evaluation.
+  # Forward NUCLEUS_REPO so builtins.getEnv in Nix config can construct
+  # writable out-of-store symlinks during evaluation.
   NIX_CONFIG_VALUE="$(merge_nix_config)"
   sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" "NUCLEUS_REPO=${NUCLEUS_REPO:-}" nix --option warn-dirty false "$@"
 }
 
 start_sudo_keepalive() {
   # Prompt for the sudo password once, before build output floods the terminal.
-  # sudo -v validates (and refreshes) credentials without running any
-  # privileged command yet.
   sudo -v
 
-  # Keep the sudo timestamp alive for the duration of the rebuild.
-  # darwin-rebuild and nixos-rebuild switch can run for many minutes;
-  # the timestamp_timeout=5 set in posix-security.nix would expire mid-build
-  # and block on a password prompt buried in build output.
-  #
-  # SCRIPT_PID is captured before the & fork because $$ is
-  # implementation-defined inside a background subshell in POSIX sh —
-  # capturing it here guarantees the parent's PID is used.
-  #
-  # Loop: sleep first (timestamp was just refreshed by sudo -v), then check
-  # the parent is still alive before touching sudo, then refresh.
-  # kill -0 sends no signal; it just tests whether the PID exists.
-  #
-  # The compound command is redirected to /dev/null so that the background
-  # subshell and its children (sleep, sudo) do not inherit this script's
-  # stdout/stderr file descriptors.  Without this redirect, when the script is
-  # run with stdout connected to a pipe (e.g. a CI step or a tool call), the
-  # pipe reader blocks until every process holding the write end closes it.
-  # In non-interactive mode a shell receiving SIGTERM exits immediately but
-  # does NOT kill its foreground child (the sleep); that orphaned sleep holds
-  # the write end open for up to 55 s after the main script has already exited,
-  # making the caller appear hung.  In a terminal stdout is a TTY — no pipe,
-  # no hang — so the problem is invisible outside automated contexts.
-  # sudo -n true failures are benign (session may expire mid-build; the loop
-  # simply retries on the next iteration); suppression here is intentional.
+  # Background loop refreshes the sudo timestamp every 55 s so a long rebuild
+  # does not prompt mid-build.  Dies when the parent exits.  I/O redirected to
+  # /dev/null so that the background children do not hold stdout/stderr open
+  # when the script is piped (which would cause the reader to hang).
   SCRIPT_PID=$$
   {
     while true; do
@@ -242,8 +127,6 @@ start_sudo_keepalive() {
   } </dev/null >/dev/null 2>&1 &
   SUDO_KEEPALIVE_PID=$!
 
-  # Kill the keepalive on any exit (success, error, INT, or TERM) so no
-  # background job is leaked to the calling shell.
   # shellcheck disable=SC2064  # intentional: expand PID now, not at trap time
   trap "kill $SUDO_KEEPALIVE_PID 2>/dev/null || true" EXIT INT TERM
 }
@@ -251,29 +134,6 @@ start_sudo_keepalive() {
 run_ai_sync() {
   # Call scripts/ai-sync.sh to converge locally installed Ollama models with
   # the declarative manifest after the system configuration has been applied.
-  #
-  # Why post-apply rather than pre-apply:
-  #   Model pulls are 2–20 GB; running them before activation could block the
-  #   critical configuration path.  Post-apply makes sync a best-effort step
-  #   that does not gate the system coming up.
-  #
-  # Why best-effort (no hard failure):
-  #   The system configuration applied successfully.  Model sync is additive —
-  #   a missing model does not break any declared system state.  Treating a
-  #   sync failure as fatal would roll back a successful system apply.
-  #
-  # Why detect ollama from $PATH rather than adding it to runtimeInputs:
-  #   ollama is a user-installed daemon managed declaratively by the AI
-  #   module (src/modules/ai/default.nix and hosts/NixOS/ai.nix).  Bundling
-  #   it in runtimeInputs would create a second, potentially different binary
-  #   that could mismatch the running server's version.  PATH detection keeps
-  #   the sync aligned with the actual runtime binary.
-  #
-  # Why lookup nucleus-ai-sync from $PATH rather than REPO_ROOT:
-  #   When running via `nix run .#apply`, the nucleus-ai-sync command is
-  #   bundled into the app closure via siblingScripts in mkApplyApp.  The
-  #   script's runtimeInputs (jq) are resolved at build time, so apply.sh
-  #   does not need to know the repository layout.
   if [ "$ai_sync" = false ]; then
     printf '%s\n' "ai-sync: --no-ai-sync set; skipping post-apply model sync"
     return
@@ -298,22 +158,6 @@ run_ai_sync() {
 run_vm_setup() {
   # Call scripts/vm-setup.sh to provision virtual machine disk images and
   # register VMs after the system configuration has been applied.
-  #
-  # Why opt-in (--vm-setup|--no-vm-setup):
-  #   Disk pre-allocation is slow (up to 128 GB) and only needed on the first
-  #   provision of a new machine.  Subsequent applies do not re-create existing
-  #   disks; the guard is in the script itself.  Still, running it on every
-  #   apply would waste time for users who never need it.
-  #
-  # Why best-effort:
-  #   A VM disk or registration error should not retroactively fail a completed
-  #   system apply.
-  #
-  # Why lookup nucleus-vm-setup from $PATH rather than REPO_ROOT:
-  #   When running via `nix run .#apply`, the nucleus-vm-setup command is
-  #   bundled into the app closure via siblingScripts in mkApplyApp.  The
-  #   script's runtimeInputs (jq) are resolved at build time, so apply.sh
-  #   does not need to know the repository layout.
   if [ "$vm_setup" = false ]; then
     printf '%s\n' "vm-setup: --vm-setup not set; skipping post-apply VM provisioning"
     return
@@ -333,15 +177,6 @@ run_vm_setup() {
 run_gc() {
   # Call scripts/gc.sh to perform bounded garbage collection after the system
   # configuration and model/VM setup have completed.
-  #
-  # Why post-apply:
-  #   Build outputs, caches, and stale artifacts accumulate during updates.
-  #   GC after all provisioning steps ensures the cleanup pass sees the most
-  #   recent set of intended resources.
-  #
-  # Why best-effort:
-  #   The system configuration and all provisioning steps have succeeded.
-  #   GC failures should not retroactively fail a completed apply.
   _rgc_script="$REPO_ROOT/scripts/gc.sh"
   if [ ! -f "$_rgc_script" ]; then
     printf '%s\n' "gc: scripts/gc.sh not found at $_rgc_script; skipping garbage collection"
@@ -357,11 +192,6 @@ run_gc() {
 run_caddy_local_ca_trust() {
   # Delegate to src/scripts/caddy-trust.sh for Caddy local CA trust
   # (retry loop with caddy --address 127.0.0.1:2019).
-  #
-  # Why a separate file:
-  #   The extracted script can be validated independently (shellcheck),
-  #   called from multiple privilege contexts (sudo/user), and reused
-  #   outside apply.sh if needed.
   _rclct_script="$REPO_ROOT/src/scripts/caddy-trust.sh"
   if [ ! -f "$_rclct_script" ]; then
     printf '%s\n' "caddy-trust: caddy-trust.sh not found at $_rclct_script; skipping local CA trust"
@@ -375,12 +205,7 @@ run_caddy_local_ca_trust() {
 
 run_replica_sync() {
   # Call scripts/replica-sync.sh so enabled replicas in users.json are
-  # synchronized after a successful apply. This keeps local replica trees
-  # (for example iCloudReplica) populated without requiring a separate manual run.
-  #
-  # Why best-effort: replica convergence is additive and may involve large
-  # transfers. A replica error should not retroactively fail a completed
-  # system apply.
+  # synchronized after a successful apply.
   if [ "$replica_sync" = false ]; then
     printf '%s\n' "replica-sync: skipping post-apply replica sync (default; pass --replica-sync to run now)"
     return

@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# check.sh — Consolidated repository validation script.
-#
 # Fast pre-commit checks only. Heavy lint (ShellCheck, PSScriptAnalyzer)
 # lives in test.sh.
 #
@@ -87,9 +85,7 @@ fi
 
 _step=0
 
-# ---------------------------------------------------------------------------
 # Dead Nix code detection
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] Dead Nix code ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   deadnix --fail src/
@@ -98,9 +94,7 @@ else
   echo "Skipping deadnix (path-scoped mode)."
 fi
 
-# ---------------------------------------------------------------------------
 # Nix flake evaluation
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] Nix flake evaluation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   sys=$(nix eval --impure --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
@@ -110,9 +104,7 @@ else
   echo "Skipping nix flake check (path-scoped mode)."
 fi
 
-# ---------------------------------------------------------------------------
 # Nix formatting check
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] Nix formatting (nixfmt) ===\n' "$((_step += 1))"
 if [ "${#NIX_FILES[@]}" -gt 0 ]; then
   if $FORMAT_NIX; then

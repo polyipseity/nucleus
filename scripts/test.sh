@@ -1,13 +1,5 @@
 #!/usr/bin/env bash
-# test.sh — Repository test suite runner.
-#
 # Runs Nix test suite, ShellCheck, and PSScriptAnalyzer.
-# Heavy lint moved here from check.sh so pre-commit stays fast.
-#
-# No file arguments accepted — always runs the full test suite.
-#
-# Exit conditions:
-#   0 on success; non-zero on any test failure.
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -43,9 +35,7 @@ fi
 
 _step=0
 
-# ---------------------------------------------------------------------------
 # 1. Nix test suite — auto-discover and run all *.nix test files
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] Nix test suite ===\n' "$((_step += 1))"
 tmp_failed=$(mktemp) || { echo "failed to create temp file" >&2; exit 1; }
 # shellcheck disable=SC2016
@@ -60,15 +50,11 @@ fi
 rm -f "$tmp_failed"
 echo "All Nix tests passed."
 
-# ---------------------------------------------------------------------------
 # 2. Shell script linting (ShellCheck)
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] Shell script linting ===\n' "$((_step += 1))"
 bash scripts/check-sh.sh
 
-# ---------------------------------------------------------------------------
 # 3. PowerShell lint (PSScriptAnalyzer)
-# ---------------------------------------------------------------------------
 printf '\n=== [%s] PowerShell lint ===\n' "$((_step += 1))"
 pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1
 

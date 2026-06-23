@@ -1,20 +1,6 @@
 #!/usr/bin/env bash
-# replica-reset.sh — Reset local cloud replica sync state for manual troubleshooting.
-#
 # Removes legacy per-replica state markers and local rclone cache directories
-# so the next replica-sync run starts from a clean local state. Local-only:
-# never modifies remote data.
-#
-# Arguments:
-#   --dry-run            Print planned actions without executing (default: off).
-#   --replica-id ID      Reset only the specified replica ID.
-#   --repo-root PATH     Override the repository root path.
-#
-# Environment variables:
-#   NUCLEUS_REPO_ROOT  Override the repository root path.
-#
-# Exit conditions:
-#   0 on success; non-zero on failure.
+# so the next replica-sync run starts from a clean local state.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"

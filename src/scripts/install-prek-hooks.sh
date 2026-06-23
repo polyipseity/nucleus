@@ -1,18 +1,8 @@
 #!/usr/bin/env bash
-# src/scripts/install-prek-hooks.sh — Install prek Git hooks for a repository.
-#
 # Installs repository-local Git hooks for repos that opt into prek via
 # prek.toml. mkApplyApp bundles pkgs.prek in runtimeInputs so first-run
 # `nix run .#apply` can install hooks without host-global PATH state.
-#
-# Arguments:
-#   --repo-root <path>  Override detected repository root (default: auto-detected via resolve_nucleus_root).
-#
-# Environment variables:
-#   NUCLEUS_REPO_ROOT  Override the detected repository root path (default: auto-detected).
-#
-# Exit conditions:
-#   0 on success (hooks installed or already present); 1 on error.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
@@ -20,11 +10,6 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/lib.sh"
 
-# Install repository-local Git hooks for repos that opt into prek.
-# mkApplyApp bundles pkgs.prek in runtimeInputs so first-run `nix run .#apply`
-# can install hooks without depending on host-global PATH state.
-# WHY git rev-parse: handles .git as file (submodules, worktrees) + directory
-# (normal repos). Avoids silent failure in workspace-variant scenarios.
 _ephi_repo_root=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -48,17 +33,12 @@ if [ ! -f "$_ephi_config_path" ]; then
   exit 0
 fi
 
-# Detect .git directory; works for normal repos, submodules, and worktrees.
 _ephi_git_dir=$(cd "$_ephi_repo_root" && git rev-parse --git-dir 2>/dev/null) || exit 0
 
-# Convert relative git-dir paths to absolute (git rev-parse --git-dir may
-# return relative paths like .git or ../../../.git in nested submodules).
 case "$_ephi_git_dir" in
   /*)
-    # Absolute path: use as-is
     ;;
   *)
-    # Relative path: join with repo root to make absolute
     _ephi_git_dir="$_ephi_repo_root/$_ephi_git_dir"
     ;;
 esac

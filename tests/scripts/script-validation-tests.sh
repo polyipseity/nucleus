@@ -1,20 +1,5 @@
 #!/usr/bin/env bash
-# script-validation-tests.sh — Smoke tests for shell scripts in the nucleus repository.
-#
-# Validates that critical shell scripts in scripts/ and src/scripts/ are
-# syntactically correct, follow best practices (shebang, executable bit, strict
-# mode, error handling, documentation), and have required dependencies available.
-# Runs a suite of test functions (test_bash_syntax, test_has_shebang, etc.)
-# against each discovered script and reports pass/fail counts.
-#
-# Arguments:
-#   (none)        No arguments accepted.
-#
-# Environment variables:
-#   (none)        No environment variables used.
-#
-# Exit conditions:
-#   0 on success (all tests pass); non-zero if any test fails.
+# Validates syntax, best practices, and dependencies for scripts/ and src/scripts/.
 
 set -euo pipefail
 
@@ -69,21 +54,7 @@ test_is_executable() {
     fi
 }
 
-# Test 4: Verify critical functions/variables are defined
-# Reserved for future test expansion; currently not invoked.
-# Uncomment when adding identifier checks to a specific test.
-# test_has_function_or_variable() {
-#     local script="$1"
-#     local identifier="$2"
-#     if grep -q "^\s*$identifier\s*=" "$script" || grep -q "^\s*function\s*$identifier" "$script" || grep -q "^\s*$identifier\s*()" "$script"; then
-#         assert_pass "Defines $identifier: $(basename "$script")"
-#     else
-#         # Non-fatal: some scripts may not need this
-#         echo -e "${YELLOW}⚠${NC}  Could not find $identifier in $(basename "$script")"
-#     fi
-# }
-
-# Test 5: Verify critical dependencies are available
+# Test 4: Verify critical dependencies are available
 test_dependencies_available() {
     local script="$1"
     shift
@@ -101,7 +72,7 @@ test_dependencies_available() {
     done
 }
 
-# Test 6: Verify error handling patterns (set -e or explicit checks)
+# Test 5: Verify error handling patterns (set -e or explicit checks)
 test_error_handling() {
     local script="$1"
     if grep -q "set -e" "$script" || grep -q "|| exit" "$script" || grep -q "|| return" "$script"; then
@@ -112,7 +83,7 @@ test_error_handling() {
     fi
 }
 
-# Test 7: Verify comments explain critical sections
+# Test 6: Verify comments explain critical sections
 test_has_documentation() {
     local script="$1"
     local comment_lines
@@ -128,7 +99,7 @@ test_has_documentation() {
     fi
 }
 
-# Test 8: Verify no dangerous patterns (unquoted variables, etc.)
+# Test 7: Verify no dangerous patterns (unquoted variables, etc.)
 test_no_dangerous_patterns() {
     local script="$1"
     local dangerous=0
@@ -151,7 +122,7 @@ test_no_dangerous_patterns() {
     fi
 }
 
-# Test 9: Verify bootstrap direnv auto-allow is strictly repo-scoped
+# Test 8: Verify bootstrap direnv auto-allow is strictly repo-scoped
 test_bootstrap_direnv_scope() {
     local script="$1"
 
@@ -170,7 +141,7 @@ test_bootstrap_direnv_scope() {
     assert_pass "Bootstrap direnv scope: $(basename "$script")"
 }
 
-# Test 10: Verify strict shell mode (set -euo pipefail)
+# Test 9: Verify strict shell mode (set -euo pipefail)
 # Ensures scripts fail fast on undefined variables and pipe errors.
 test_strict_shell_mode() {
     local script="$1"
@@ -181,7 +152,7 @@ test_strict_shell_mode() {
     fi
 }
 
-# Test 11: Verify usage_std function is defined (either local or via lib.sh)
+# Test 10: Verify usage_std function is defined (either local or via lib.sh)
 test_usage_std_present() {
     local script="$1"
     if grep -Eq '^\s*usage_std\(\)' "$script" || grep -Eq '^\s*\.\s+.*lib\.sh' "$script"; then
@@ -191,7 +162,7 @@ test_usage_std_present() {
     fi
 }
 
-# Test 12: Verify -h|--help handler is present
+# Test 11: Verify -h|--help handler is present
 test_help_handler() {
     local script="$1"
     if grep -Eq '\s+-h\||--help\)' "$script"; then
@@ -201,9 +172,7 @@ test_help_handler() {
     fi
 }
 
-# ============================================================================
 # Run Tests on All Scripts
-# ============================================================================
 
 echo "Testing shell scripts for correctness and best practices..."
 echo ""
@@ -222,8 +191,7 @@ if [[ -f "$VM_SETUP_SH" ]]; then
     test_usage_std_present "$VM_SETUP_SH"
     test_help_handler "$VM_SETUP_SH"
 
-    # Verify Apple Silicon arm64 tcg fallback: HVF on arm64 macOS only
-    # accelerates AArch64 guests; x86_64 Windows QEMU builds must use tcg.
+    # HVF on arm64 macOS only accelerates AArch64 guests; x86_64 Windows QEMU builds must use tcg.
     # Without this fix, qemu-system-x86_64 -accel hvf fails with
     # "invalid accelerator hvf" on Apple Silicon.
     if grep -q 'arm64' "$VM_SETUP_SH" && grep -q "accelerator='tcg'" "$VM_SETUP_SH"; then
@@ -411,7 +379,6 @@ if [[ -f "$SVC_SH" ]]; then
     test_usage_std_present "$SVC_SH"
     test_help_handler "$SVC_SH"
 
-    # Runtime sanity: svc list produces expected table headers
     SVC_LIST_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list 2>&1 || true)
     if echo "$SVC_LIST_OUTPUT" | grep -q "Service.*Status.*Running.*PID"; then
         assert_pass "svc list: table headers present"
@@ -434,7 +401,6 @@ if [[ -f "$SVC_SH" ]]; then
         assert_fail "svc list: no unknown services" "Output contains 'unknown' (likely jq parse failure)"
     fi
 
-    # Runtime sanity: svc list --json produces valid JSON
     SVC_JSON_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list --json 2>&1 || true)
     if echo "$SVC_JSON_OUTPUT" | jq -e '.svc_version == "1"' >/dev/null 2>&1; then
         assert_pass "svc list --json: valid JSON with version"
@@ -453,9 +419,7 @@ if [[ -f "$SVC_SH" ]]; then
     fi
 fi
 
-# ============================================================================
 # Summary
-# ============================================================================
 
 echo ""
 echo "============================================================"

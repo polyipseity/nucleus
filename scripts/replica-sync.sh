@@ -1,20 +1,8 @@
 #!/usr/bin/env bash
-# replica-sync.sh — Synchronize enabled cloud replicas declared in src/modules/users.json.
-#
 # Pull-only replica sync (remote -> local). Intended for post-apply best-effort
 # convergence from src/scripts/apply.sh and manual invocation via
 # nucleus-replica-sync.
-#
-# Arguments:
-#   --dry-run               Print planned actions without executing (default: off).
-#   --replica-id ID         Synchronize only the specified replica ID.
-#   --repo-root PATH        Override the repository root path.
-#
-# Environment variables:
-#   NUCLEUS_REPO_ROOT  Override the repository root path.
-#
-# Exit conditions:
-#   0 on success; non-zero on failure.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"

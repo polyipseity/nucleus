@@ -1,24 +1,8 @@
 #!/usr/bin/env bash
-# bootstrap.sh — Install Nix (if absent) and run the Nix-managed bootstrap/apply flow.
-#
 # Installs Nix if not already present, then optionally runs the apply flow to
 # converge the full system configuration. By default installs dependencies only.
 # Pass --apply to also run the apply flow.
-#
-# Arguments:
-#   --apply|--no-apply             Run the apply flow after installing dependencies (default: --no-apply).
-#   --ai-sync|--no-ai-sync         Control post-apply Ollama model sync (default: --ai-sync).
-#   --replica-sync|--no-replica-sync  Control immediate post-apply replica sync (default: --no-replica-sync).
-#   --target-user <name>           Select the Home Manager flake profile on standalone Linux hosts.
-#
-# Environment variables:
-#   NUCLEUS_APPLY        Override the --apply default (default: false).
-#   NUCLEUS_AI_SYNC      Override the --ai-sync default (default: true).
-#   NUCLEUS_REPLICA_SYNC Override the --replica-sync default (default: false).
-#   NUCLEUS_TARGET_USER  Override the --target-user default (default: unset).
-#
-# Exit conditions:
-#   0 on success; non-zero if any step fails.
+
 set -euo pipefail
 
 # Refuse to run as root — privilege escalation (sudo) is managed internally
@@ -35,9 +19,7 @@ REPO_ROOT="$(resolve_nucleus_root)"
 VERSIONS_FILE="$SCRIPT_DIR/bootstrap-versions.env"
 apply="${NUCLEUS_APPLY:-false}"
 
-# ---------------------------------------------------------------------------
 # Flag parsing
-# ---------------------------------------------------------------------------
 ai_sync="${NUCLEUS_AI_SYNC:-true}"
 replica_sync="${NUCLEUS_REPLICA_SYNC:-false}"
 target_user="${NUCLEUS_TARGET_USER:-}"

@@ -1,28 +1,11 @@
 #!/usr/bin/env bash
-# logs.sh — Unified log viewer for POSIX hosts (macOS + NixOS).
-#
 # Displays service logs from the nucleus logging system.
 # On macOS, reads from file-based logs under
 #   ~/Library/Logs/nucleus/{service}/{stdout,stderr}.log
 #   /Library/Logs/nucleus/{service}/{stdout,stderr}.log
 # On NixOS, queries journald for systemd services and reads files for
 # non-systemd services.
-#
-# Usage: nucleus logs [service...] [options]
-#
-# Arguments:
-#   service                      Names of services to show logs for.
-#
-# Options:
-#   --lines N, -n N              Last N lines per source (default: 10).
-#   --since DURATION             Since a duration (e.g. 1h, 30m, 2d).
-#                                  Only supported for journald-backed services.
-#   --paths                      Print log file paths instead of tailing.
-#   --raw                        Skip sanitization (show raw control chars).
-#   --stdout                     Show only stdout (separate-file services only).
-#   --stderr                     Show only stderr (separate-file services only).
-#   --json                       Machine-readable output (list mode).
-#   -h, --help                   Show usage.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
@@ -49,7 +32,6 @@ OPTIONS:
 EOF
 }
 
-# --- Resolve paths and platform ---
 REPO_ROOT="$(resolve_nucleus_root)"
 SERVICES_JSON="$REPO_ROOT/src/modules/services.json"
 HOST="$(resolve_nucleus_host)"
@@ -63,7 +45,6 @@ case "$HOST" in
     ;;
 esac
 
-# --- Defaults ---
 LINES=10
 SINCE=""
 JSON=false
@@ -74,7 +55,6 @@ STDERR=false
 HELP=false
 declare -a SERVICES=()
 
-# --- Argument parsing ---
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) HELP=true; shift ;;
@@ -104,7 +84,6 @@ esac
 
 require_command jq
 
-# --- Helpers ---
 
 # Get sorted list of services defined for this platform in services.json
 get_platform_services() {
@@ -206,7 +185,6 @@ file_modified_since() {
   [ -n "$(find "$file" -mmin "-$minutes" -type f 2>/dev/null)" ]
 }
 
-# --- Display implementations ---
 
 # Show file-based logs for a service
 show_file_logs() {
@@ -310,7 +288,6 @@ list_services() {
   fi
 }
 
-# --- Main ---
 
 if $PATHS; then
   show_paths

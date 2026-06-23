@@ -1,32 +1,7 @@
 #!/usr/bin/env bash
-# src/scripts/jellyfin-sync.sh — Converge Jellyfin accounts and libraries with a running server.
-#
 # Reads per-user jellyfin declarations from src/modules/users.json, resolves
 # credentials from SOPS secrets, and applies them to a running Jellyfin server
-# via its HTTP API. Invocable from apply.sh and Nix activation scripts (Darwin
-# postActivation, NixOS activationScripts) with no per-host duplication.
-#
-# WHY a separate file: imperative runtime convergence against a live REST API
-# (SOPS decryption, server readiness polling, token auth, diff-and-converge)
-# cannot be expressed declaratively in Nix.
-#
-# Dependencies: curl, jq, sops.
-#
-# Upstream Jellyfin API sources:
-#   https://raw.githubusercontent.com/jellyfin/jellyfin/.../Jellyfin.Api/Controllers/UserController.cs
-#   https://raw.githubusercontent.com/jellyfin/jellyfin/.../Jellyfin.Api/Controllers/StartupController.cs
-#
-# Arguments:
-#   --repo-root <path>             Override detected repository root (default: auto-detected via resolve_nucleus_root).
-#   --jellyfin-base-url <url>      Jellyfin server base URL (default: http://127.0.0.1:8096).
-#   -h, --help                     Show this help message and exit.
-#
-# Environment variables:
-#   NUCLEUS_REPO_ROOT  Override the detected repository root path (default: auto-detected).
-#   JELLYFIN_BASE_URL  Jellyfin server base URL (default: http://127.0.0.1:8096).
-#
-# Exit conditions:
-#   0 on success; non-zero on failure.
+# via its HTTP API.
 
 set -euo pipefail
 
@@ -44,7 +19,6 @@ usage() {
 EOF
 }
 
-# ---- CLI argument parsing -------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)
@@ -67,10 +41,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ---- Resolve repo root ----------------------------------------------------------
 REPO_ROOT="$(resolve_nucleus_root)"
 
-# ---- Prerequisite checks -------------------------------------------------------
 if ! command -v curl >/dev/null 2>&1; then
   printf '%s\n' "jellyfin-sync: curl is not available; skipping sync"
   exit 0
@@ -83,9 +55,6 @@ if ! command -v sops >/dev/null 2>&1; then
   printf '%s\n' "jellyfin-sync: sops is not available; skipping sync"
   exit 0
 fi
-
-# ---- Shared Jellyfin API helpers ------------------------------------------------
-# These are prefixed _jfs_ (jellyfin-sync) to avoid collisions when sourced.
 
 _jfs_base_url="${JELLYFIN_BASE_URL:-$(jq -r '.jellyfin.network.http | "http://\(.host):\(.port)"' "$REPO_ROOT/src/modules/services.json" 2>/dev/null || echo "http://127.0.0.1:8096")}"
 _jfs_auth_base='MediaBrowser Client="nucleus-apply", DeviceId="posix-apply", Device="POSIX", Version="1.0.0"'
@@ -122,7 +91,6 @@ _jfs_body_from_response() {
   printf '%s' "$1" | sed 's/HTTPSTATUS:[0-9][0-9][0-9]$//'
 }
 
-# ---- Account sync ---------------------------------------------------------------
 # Converge Jellyfin user accounts declared in src/modules/users.json.
 _jfs_sync_accounts() {
   _jfsa_users_json="$REPO_ROOT/src/modules/users.json"
@@ -365,7 +333,6 @@ _jfs_sync_accounts() {
   rm -f "$_jfsa_resolved_file"
 }
 
-# ---- Library sync ---------------------------------------------------------------
 # Converge Jellyfin library folders declared in src/modules/users.json.
 _jfs_sync_libraries() {
   _jfsl_users_json="$REPO_ROOT/src/modules/users.json"
@@ -671,6 +638,5 @@ _jfs_sync_libraries() {
   done
 }
 
-# ---- Main -----------------------------------------------------------------------
 _jfs_sync_accounts
 _jfs_sync_libraries

@@ -1,6 +1,4 @@
 # shellcheck shell=bash
-# scripts/vm-setup/lib.sh — VM setup library (function definitions).
-#
 # Source this file from the vm-setup dispatcher after setting shared variables
 # (REPO_ROOT, VM_DIR, IMAGES_DIR, TEMPLATES_DIR, dry_run, vm_guest_username,
 # vm_guest_password, vm_guest_credentials_fingerprint, etc.).
@@ -382,9 +380,7 @@ EOF
   printf 'vm-setup: wrote start helper scripts: %s, %s\n' "$_wss_path_sh" "$_wss_path_ps1"
 }
 
-# ---------------------------------------------------------------------------
 # VM iteration helper
-# ---------------------------------------------------------------------------
 
 # for_each_vm CALLBACK [ARGS...]
 #   Iterates VMs in MANIFEST, skipping disabled or host-mismatched entries.
@@ -441,9 +437,7 @@ get_expected_vm_names() {
   ' "$MANIFEST"
 }
 
-# ---------------------------------------------------------------------------
 # UTM re-registration helper
-# ---------------------------------------------------------------------------
 
 UTMCTL="/Applications/UTM.app/Contents/MacOS/utmctl"
 
@@ -491,9 +485,7 @@ re_register_utm_bundle() {
   return 0
 }
 
-# ---------------------------------------------------------------------------
 # Credential marker helper
-# ---------------------------------------------------------------------------
 
 # resize_and_mark_image IMAGE_PATH MARKER_PATH [DISK_GIB]
 #   Writes the current guest credential fingerprint to MARKER_PATH for drift
@@ -516,9 +508,7 @@ resize_and_mark_image() {
   printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_rmi_marker"
 }
 
-# ---------------------------------------------------------------------------
 # Image build callback for for_each_vm
-# ---------------------------------------------------------------------------
 
 build_one_image() {
   local _vm_name="$1" _vm_type="$2" _vm_hosts="$3" _vm_index="$4"
@@ -560,9 +550,7 @@ build_one_image() {
   esac
 }
 
-# ---------------------------------------------------------------------------
 # Tart VM setup callback for for_each_vm
-# ---------------------------------------------------------------------------
 
 setup_tart_vm() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
@@ -585,9 +573,7 @@ setup_tart_vm() {
   fi
 }
 
-# ---------------------------------------------------------------------------
 # UTM VM setup callback for for_each_vm
-# ---------------------------------------------------------------------------
 
 setup_utm_vm() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
@@ -763,9 +749,7 @@ setup_utm_vm() {
   fi
 }
 
-# ---------------------------------------------------------------------------
 # Libvirt VM setup callback for for_each_vm
-# ---------------------------------------------------------------------------
 
 setup_libvirt_vm() {
   # shellcheck disable=SC2034 # vm_hosts is part of the callback protocol
@@ -836,9 +820,7 @@ setup_libvirt_vm() {
   fi
 }
 
-# ---------------------------------------------------------------------------
 # Phase 1 — Build images (if absent)
-# ---------------------------------------------------------------------------
 
 # Detect host architecture for nixos-generators format selection.
 #   aarch64/arm64 → qcow-efi  (UTM on Apple Silicon uses UEFI/virt machine)

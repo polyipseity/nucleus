@@ -1,6 +1,4 @@
 # shellcheck shell=sh
-# src/scripts/agent-helpers.sh — Shared shell functions for agent activation entries.
-#
 # Source this file (conceptually; in Nix it is inlined via builtins.readFile) to
 # make the following functions available in home-manager activation scripts.
 #
@@ -10,9 +8,6 @@
 #   _nucleus_resolve_repo_root     — resolve $NUCLEUS_REPO, fail if unset
 #   _nucleus_prepend_first_executable_dir — prepend dir containing executable to PATH
 
-# ---------------------------------------------------------------------------
-# Symlink protection helpers (macOS / Linux)
-# ---------------------------------------------------------------------------
 # Set/clear immutable flags on symlinks so managed agent config symlinks are
 # not accidentally removed or replaced outside of an apply run.
 
@@ -54,19 +49,13 @@ _nucleus_unprotect_symlink() {
   esac
 }
 
-# ---------------------------------------------------------------------------
-# Repo root resolver
-# ---------------------------------------------------------------------------
-# Resolve the active repo root from $NUCLEUS_REPO (set by apply.sh) or an
-# optional fallback path baked in at eval time.  The fallback is a static
-# path captured during Nix evaluation (where NUCLEUS_REPO is available) and
-# embedded into the activation script so home-manager activation, which runs
-# as the user and does not inherit the sudo-level env var, can still find the
-# repo root.
+# Resolve $NUCLEUS_REPO or fallback path baked in at eval time.
+# home-manager activation runs as the user and does not inherit NUCLEUS_REPO,
+# so the fallback is embedded into the activation script during Nix eval.
 #
 # Arguments:
 #   $1  Context label for diagnostics.
-#   $2  Optional fallback path (baked in at eval time).
+#   $2  Optional fallback path (baked in at Nix eval time).
 _nucleus_resolve_repo_root() {
   _nrr_context="$1"
   _nrr_fallback="${2:-}"
@@ -80,10 +69,7 @@ _nucleus_resolve_repo_root() {
   fi
 }
 
-# ---------------------------------------------------------------------------
-# PATH-probing helper
-# ---------------------------------------------------------------------------
-# Prepend the first directory that contains a given executable to PATH.
+# Prepend the first directory containing $1 to PATH.
 _nucleus_prepend_first_executable_dir() {
   _nped_executable="$1"
   shift

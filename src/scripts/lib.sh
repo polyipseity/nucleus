@@ -1,34 +1,15 @@
 # shellcheck shell=sh
-# src/scripts/lib.sh — Shared library for nucleus POSIX shell scripts.
-#
-# Source this file at the top of any POSIX shell script under scripts/ or
-# src/scripts/ after setting SCRIPT_DIR so REPO_ROOT can be derived
-# automatically when needed.
-#
-# This file is a library meant to be sourced, not executed directly.
-# Provides shared functions (usage_std, resolve_nucleus_root) for other
-# scripts.
+# Source this at the top of nucleus POSIX shell scripts after setting SCRIPT_DIR.
+# Provides shared functions (usage_std, resolve_nucleus_root).
 #
 # Usage:
 #   SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 #   . "${SCRIPT_DIR}/../src/scripts/lib.sh"
 #
-# Arguments:
-#   (none)        This is a library; source it, do not execute.
-#
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Repository root path. Falls back to git detection if unset.
-#
-# Exit conditions:
-#   N/A           This is a library; exit codes apply to the sourcing script.
 
 # usage_std — Emit standardized usage text and exit.
-#
-# Usage: usage_std "script_name" "[options]" ["description"]
-#
-# Output format:
-#   usage: script_name [options]
-#   description (indented)
 usage_std() {
   _us_name="$1"
   _us_opts="${2:-}"
@@ -40,11 +21,7 @@ usage_std() {
   fi
 }
 
-# resolve_nucleus_root — Print the absolute path of the nucleus repository root.
-#
-# Resolution order:
-#   1. $NUCLEUS_REPO_ROOT env var (if set to an existing directory)
-#   2. git rev-parse --show-toplevel (if inside a git repository)
+# Resolution order: NUCLEUS_REPO_ROOT env var, then git rev-parse.
 resolve_nucleus_root() {
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ]; then
     printf '%s\n' "$NUCLEUS_REPO_ROOT"
@@ -61,11 +38,7 @@ resolve_nucleus_root() {
   return 1
 }
 
-# resolve_nucleus_host — Print the canonical host name.
-#
-# Resolution order (Hybrid Precedence):
-#   1. $NUCLEUS_HOST environment variable (if non-empty)
-#   2. Auto-detection from uname (Darwin → MacBook, Linux → NixOS)
+# Resolution order: NUCLEUS_HOST env var, then uname auto-detection.
 resolve_nucleus_host() {
   if [ -n "${NUCLEUS_HOST:-}" ]; then
     printf '%s\n' "$NUCLEUS_HOST"
@@ -78,15 +51,6 @@ resolve_nucleus_host() {
   esac
 }
 
-# merge_nix_config — Merge caller's NIX_CONFIG with required flake feature flags.
-#
-# Usage: merge_nix_config [features]
-#
-# Arguments:
-#   features  Nix features string (default: "experimental-features = nix-command flakes").
-#
-# Environment:
-#   NIX_CONFIG  Optional caller-provided nix configuration to merge.
 merge_nix_config() {
   _mnc_features="${1:-experimental-features = nix-command flakes}"
   if [ -n "${NIX_CONFIG:-}" ]; then
@@ -96,15 +60,6 @@ merge_nix_config() {
   fi
 }
 
-# require_command — Assert that a command exists in PATH.
-#
-# Usage: require_command command_name
-#
-# Arguments:
-#   command_name  Name of the command to check.
-#
-# Exit conditions:
-#   0 if found; prints error to stderr and exits 1 if missing.
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     printf '%s\n' "error: $1 is required but was not found in PATH" >&2

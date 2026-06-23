@@ -1,29 +1,8 @@
 #!/usr/bin/env bash
-# gc.sh — Perform bounded garbage collection on POSIX hosts.
-#
 # Expires old Home Manager generations, runs nix store GC, removes stale
 # decrypted wallpapers, gc's tool caches, and removes locally installed
 # Ollama models absent from the manifest.
-#
-# Arguments:
-#   --tool-cache-gc|--no-tool-cache-gc  Control bun/cargo/rustc/uv cache gc (default: --tool-cache-gc).
-#   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
-#   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
-#   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
-#   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
-#   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
-#   --expiry <duration>                       Master expiry override (e.g. "14d", "30d"). Per-tool flags win.
-#   --hm-expiry <duration>                    Home Manager generation expiry duration in nix format (e.g. "7d").
-#   --nix-expiry <duration>                   Nix store GC --delete-older-than duration (e.g. "7d", "30d").
-#   --dry-run|--no-dry-run                    Print actions without executing (default: --no-dry-run).
-#
-# Environment variables:
-#   NUCLEUS_GC_EXPIRY        Master expiry override (same as --expiry).
-#   NUCLEUS_GC_HM_EXPIRY     HM expiry override (same as --hm-expiry).
-#   NUCLEUS_GC_NIX_EXPIRY    Nix expiry override (same as --nix-expiry).
-#
-# Exit conditions:
-#   0 on success; non-zero on failure.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
