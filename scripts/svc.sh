@@ -207,8 +207,10 @@ svc_status() {
       [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
 
       local is_active is_enabled
-      is_active=$(systemctl $scope_flag is-active "$svc_id" 2>/dev/null || echo "inactive")
-      is_enabled=$(systemctl $scope_flag is-enabled "$svc_id" 2>/dev/null || echo "disabled")
+      is_active=$(systemctl $scope_flag is-active "$svc_id" 2>/dev/null || true)
+      is_active="${is_active:-inactive}"
+      is_enabled=$(systemctl $scope_flag is-enabled "$svc_id" 2>/dev/null || true)
+      is_enabled="${is_enabled:-disabled}"
 
       local running=true
       [ "$is_active" != "active" ] && running=false

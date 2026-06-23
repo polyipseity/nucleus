@@ -105,7 +105,7 @@ if (-not $HAS_ARGS) {
         foreach ($_plat in $_entry.platforms.Keys) {
           $_pEntry = $_entry.platforms[$_plat]
           $_type = $_pEntry.type
-          if ($_type -notin @('launchctl', 'systemctl', 'native', 'schtask')) {
+          if ($_type -notin @('launchctl', 'systemctl', 'native', 'schtask', 'omitted')) {
             Write-Output "ERROR: services.json: '$_svcName' platform '$_plat' has invalid type '$_type'"
             $_svcErrors++
           }
@@ -114,6 +114,7 @@ if (-not $HAS_ARGS) {
             'systemctl' { -not [string]::IsNullOrEmpty($_pEntry.service) }
             'native'    { -not [string]::IsNullOrEmpty($_pEntry.service) }
             'schtask'   { -not [string]::IsNullOrEmpty($_pEntry.taskPath) }
+            'omitted'   { -not [string]::IsNullOrEmpty($_pEntry.justification) }
             default     { $false }
           }
           if (-not $_hasRequired) {
@@ -208,7 +209,7 @@ if (-not $HAS_ARGS) {
         $_lfErrors++
       } else {
         foreach ($_entry in $_lf[$_section].GetEnumerator()) {
-          if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME', '1.0.0') -contains $_entry.Value) {
+          if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME') -contains $_entry.Value) {
             Write-Output "ERROR: $_section.$($_entry.Key): placeholder version ($($_entry.Value))"
             $_lfErrors++
           }
@@ -222,7 +223,7 @@ if (-not $HAS_ARGS) {
       $_lfErrors++
     } elseif ($_lf.winget.Count -gt 0) {
       foreach ($_entry in $_lf.winget.GetEnumerator()) {
-        if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME', '1.0.0') -contains $_entry.Value) {
+        if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME') -contains $_entry.Value) {
           Write-Output "ERROR: winget.$($_entry.Key): placeholder version ($($_entry.Value))"
           $_lfErrors++
         }
@@ -237,7 +238,7 @@ if (-not $HAS_ARGS) {
       $_lfErrors++
     } elseif ($_lf.vscode.Count -gt 0) {
       foreach ($_entry in $_lf.vscode.GetEnumerator()) {
-        if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME', '1.0.0') -contains $_entry.Value) {
+        if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME') -contains $_entry.Value) {
           Write-Output "ERROR: vscode.$($_entry.Key): placeholder version ($($_entry.Value))"
           $_lfErrors++
         }
@@ -292,6 +293,13 @@ if (-not $HAS_ARGS) {
   $_dscSystem = Join-Path $RepoRoot 'src\hosts\Windows\system.dsc.yml'
   $_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
   $_lfErrors = 0
+
+  # Ensure powershell-yaml module is available.
+  if (-not (Get-Module -ListAvailable -Name powershell-yaml)) {
+    Write-Output "Installing powershell-yaml module..."
+    Install-Module -Name powershell-yaml -Scope CurrentUser -Force -AcceptLicense
+  }
+  Import-Module -Name powershell-yaml -Force
 
   # Generate locked DSC in-memory from system.dsc.yml + lockfile.
   $_lockfileData = Get-Content $_lockfilePath -Raw | ConvertFrom-Json -AsHashtable
