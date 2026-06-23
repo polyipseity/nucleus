@@ -43,14 +43,14 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ "$#" -gt 0 ]; then
-  printf '%s\0' "$@" | xargs -0 shellcheck --source-path=SCRIPTDIR -x
+  printf '%s\0' "$@" | xargs -0 -P "$(nproc)" shellcheck --source-path=SCRIPTDIR -x
   count="$#"
 else
   if ! files="$(git ls-files '*.sh')" || [ -z "$files" ]; then
     printf '%s\n' 'No shell scripts to check.'
     exit 0
   fi
-  git ls-files -z '*.sh' | xargs -0 shellcheck --source-path=SCRIPTDIR -x
+  git ls-files -z '*.sh' | xargs -0 -P "$(nproc)" shellcheck --source-path=SCRIPTDIR -x
   count=$(printf '%s\n' "$files" | awk 'NF { c += 1 } END { print c + 0 }')
 fi
 

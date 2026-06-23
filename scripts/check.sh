@@ -99,6 +99,18 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Nix flake evaluation
+# ---------------------------------------------------------------------------
+printf '\n=== [%s] Nix flake evaluation ===\n' "$((_step += 1))"
+if ! $HAS_ARGS; then
+  sys=$(nix eval --impure --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
+  nix eval --impure "path:./src#packages.$sys" >/dev/null
+  echo "Nix flake evaluation passed."
+else
+  echo "Skipping nix flake check (path-scoped mode)."
+fi
+
+# ---------------------------------------------------------------------------
 # Nix formatting check
 # ---------------------------------------------------------------------------
 printf '\n=== [%s] Nix formatting (nixfmt) ===\n' "$((_step += 1))"

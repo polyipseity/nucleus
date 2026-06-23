@@ -47,16 +47,16 @@ _step=0
 # 1. Nix test suite — auto-discover and run all *.nix test files
 # ---------------------------------------------------------------------------
 printf '\n=== [%s] Nix test suite ===\n' "$((_step += 1))"
-echo "Running Nix unit tests..."
-FAILED=0
-while IFS= read -r test; do
-  echo "Running: $test"
-  nix-instantiate --eval "$test" || FAILED=1
-done < <(find tests/src -maxdepth 1 -name '*.nix' -type f | sort)
-if [ "$FAILED" -ne 0 ]; then
-  printf '\nNix test suite FAILED.\n' >&2
+tmp_failed=$(mktemp) || { echo "failed to create temp file" >&2; exit 1; }
+find tests/src -maxdepth 1 -name '*.nix' -type f | sort \
+  | xargs -P "$(nproc)" -I{} sh -c 'if ! nix-instantiate --eval "$1"; then echo "$1" >> "$2"; fi' _ {} "$tmp_failed"
+if [ -s "$tmp_failed" ]; then
+  echo "FAILED Nix tests:" >&2
+  cat "$tmp_failed" >&2
+  rm -f "$tmp_failed"
   exit 1
 fi
+rm -f "$tmp_failed"
 echo "All Nix tests passed."
 
 # ---------------------------------------------------------------------------

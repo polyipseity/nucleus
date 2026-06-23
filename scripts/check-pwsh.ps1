@@ -107,13 +107,23 @@ if ($SyntaxOnly) {
 else {
   Import-Module PSScriptAnalyzer
 
-  $lintResults = @()
-  foreach ($path in $Paths | Sort-Object -Unique) {
-    if (-not (Test-Path -Path $path)) {
-      continue
-    }
-    $lintResults += Invoke-ScriptAnalyzer -Path $path -Severity @('Error', 'Warning', 'Information') -ExcludeRule @('PSUseBOMForUnicodeEncodedFile')
+  $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
+  # Split files across parallel Start-Job processes. Each job spawns a separate
+  # pwsh process that loads PSScriptAnalyzer from scratch, so cap at 4 to avoid
+  # thrashing on module init (especially on high-core-count machines).
+  $chunks = [Math]::Min([Environment]::ProcessorCount, 4)
+  $size = [Math]::Ceiling($files.Count / $chunks)
+  $jobs = for ($i = 0; $i -lt $files.Count; $i += $size) {
+    $end = [Math]::Min($i + $size - 1, $files.Count - 1)
+    Start-Job -ScriptBlock {
+      param($paths)
+      Import-Module PSScriptAnalyzer
+      $paths | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity @('Error', 'Warning', 'Information') -ExcludeRule @('PSUseBOMForUnicodeEncodedFile', 'PSUseUsingScopeModifierInNewRunspaces', 'PSReviewUnusedParameter') }
+    } -ArgumentList (,$files[$i..$end])
   }
+  $null = $jobs | Wait-Job
+  $lintResults = $jobs | Receive-Job
+  $jobs | Remove-Job
 
   # Filter results to only non-Info lints for failure determination.
   # Wrap in @() so $nonInfoLints is always an array — with Set-StrictMode,

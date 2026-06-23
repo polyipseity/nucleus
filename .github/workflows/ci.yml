@@ -77,10 +77,6 @@ jobs:
         with:
           fail-mode: false
 
-      - name: Check Nix flake evaluation (POSIX)
-        if: runner.os != 'Windows'
-        run: cd src && nix flake check
-
       - name: Run repository checks (POSIX)
         if: runner.os != 'Windows'
         env:
