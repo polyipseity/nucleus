@@ -163,16 +163,16 @@ function Get-ServiceStatus {
         $svc = Get-Service -Name $svcName -ErrorAction Stop
         $running = $svc.Status -eq 'Running'
         $enabled = $svc.StartType -in @('Automatic', 'AutomaticDelayedStart')
-        $pid = $null
+        $processId = $null
         if ($running) {
-          $pid = (Get-CimInstance -ClassName Win32_Service -Filter "Name='$svcName'" -ErrorAction SilentlyContinue).ProcessId
-          if ($pid -eq 0) { $pid = $null }
+          $processId = (Get-CimInstance -ClassName Win32_Service -Filter "Name='$svcName'" -ErrorAction SilentlyContinue).ProcessId
+          if ($processId -eq 0) { $processId = $null }
         }
         return @{
           status  = if ($running) { 'active' } else { 'inactive' }
           running = $running
           enabled = $enabled
-          pid     = $pid
+          pid     = $processId
         }
       } catch {
         return @{ status = 'not-found'; running = $false; enabled = $false; pid = $null }
