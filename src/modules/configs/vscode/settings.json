@@ -65,6 +65,7 @@
   "debug.console.fontSize": 14,
   "debug.javascript.autoAttachFilter": "onlyWithFlag",
   "diffEditor.ignoreTrimWhitespace": false,
+  "discord.enabled": false,
   "docker.lsp.telemetry": "off",
   "editor.accessibilitySupport": "auto",
   "editor.aiStats.enabled": true,
