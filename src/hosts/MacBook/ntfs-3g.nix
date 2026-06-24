@@ -117,7 +117,7 @@ in
           make
           echo "ntfs-3g: installing..."
           # Patch src/Makefile to install to /usr/local/bin instead of /bin (SIP).
-          sed -i 's|^rootbindir = /bin$|rootbindir = /usr/local/bin|' src/Makefile
+          sed -i "" 's|^rootbindir = /bin$|rootbindir = /usr/local/bin|' src/Makefile
           make -k install || true
           rm -rf "$BUILD_DIR"
           echo "ntfs-3g: build complete."
