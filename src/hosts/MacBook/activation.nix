@@ -29,6 +29,17 @@
   # power.restartAfterPowerFailure = true;  # Keep the comment and keep it disabled.
 
   # ---------------------------------------------------------------------------
+  # extraActivation — runs before openssh / Homebrew bundle.
+  # ---------------------------------------------------------------------------
+  system.activationScripts.extraActivation.text = ''
+    # ---- ensureFuseTHeadersDir --------------------------------------------------
+    # fuse-t cask post-install symlinks headers into /usr/local/include.  If that
+    # directory doesn't exist, the cask install silently skips the link step,
+    # leaving ntfs-3g build with no fuse headers.  Create it pre-emptively.
+    /bin/mkdir -p /usr/local/include
+  '';
+
+  # ---------------------------------------------------------------------------
   # postActivation fragments (all macbook-specific activation scripts)
   #
   # lib.mkBefore (priority 500) positions these fragments before the

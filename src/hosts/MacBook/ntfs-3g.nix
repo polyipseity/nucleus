@@ -114,7 +114,7 @@ in
           # All actual files (binaries, dylib, headers) are installed before
           # that hook runs, so we ignore its failure.
           echo "ntfs-3g: building..."
-          make
+          make -j"$(sysctl -n hw.ncpu)"
           echo "ntfs-3g: installing..."
           # Patch src/Makefile to install to /usr/local/bin instead of /bin (SIP).
           sed -i "" 's|^rootbindir = /bin$|rootbindir = /usr/local/bin|' src/Makefile
