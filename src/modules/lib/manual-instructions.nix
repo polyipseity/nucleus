@@ -10,7 +10,7 @@
     *)
       _repo_root="${repoRoot}"
       if [ -z "$_repo_root" ] || [ ! -d "$_repo_root" ]; then
-        _repo_root="''${NUCLEUS_REPO:?${osLabel}: NUCLEUS_REPO not set; run via apply.sh}"
+        _repo_root="''${NUCLEUS_REPO_ROOT:?${osLabel}: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
       fi
       _resolved_manual_path="$_repo_root/$_manual_path"
       ;;

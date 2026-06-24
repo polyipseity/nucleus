@@ -7,13 +7,13 @@
   ...
 }:
 let
-  # Activation scripts resolve the repo root from $NUCLEUS_REPO (set by apply.sh
+  # Activation scripts resolve the repo root from $NUCLEUS_REPO_ROOT (set by apply.sh
   # and forwarded through sudo), so out-of-store symlinks survive repo relocations
-  # and rebuilds without stale store paths.  As a fallback, capture NUCLEUS_REPO
+  # and rebuilds without stale store paths.  As a fallback, capture NUCLEUS_REPO_ROOT
   # at eval time (where the env var IS available) so home-manager activation,
   # which runs as the user and does not inherit the sudo-level env var, can still
   # locate the repo root.
-  repoRoot = builtins.getEnv "NUCLEUS_REPO";
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
   liveICloudDownloads = "${config.home.homeDirectory}/Library/Mobile Documents/com~apple~CloudDocs/Downloads";
 
   # Sub-module imports extracted from this file for focused maintainability.
@@ -682,7 +682,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       _ll_repo_root="${repoRoot}"
       if [ -z "$_ll_repo_root" ] || [ ! -d "$_ll_repo_root" ]; then
-        _ll_repo_root="''${NUCLEUS_REPO:?LinearMouse: NUCLEUS_REPO not set; run via apply.sh}"
+        _ll_repo_root="''${NUCLEUS_REPO_ROOT:?LinearMouse: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
       fi
       _ll_source="$_ll_repo_root/src/modules/configs/linearmouse/linearmouse.json"
 

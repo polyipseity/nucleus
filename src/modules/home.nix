@@ -185,9 +185,9 @@ in
     // lib.optionalAttrs pkgs.stdenv.isDarwin {
       # Point out-of-store symlinks (e.g. CamillaDSP config) at the live repo
       # tree so activation scripts can wire them up without dry-run uncertainty.
-      # Resolved from the NUCLEUS_REPO env var that apply.sh exports before the
+      # Resolved from the NUCLEUS_REPO_ROOT env var that apply.sh exports before the
       # rebuild — avoids hard-coding a machine-specific absolute path.
-      NUCLEUS_REPO = builtins.getEnv "NUCLEUS_REPO";
+      NUCLEUS_REPO_ROOT = builtins.getEnv "NUCLEUS_REPO_ROOT";
     };
 
     # QtPass keeps its own persisted settings store, which can override
@@ -494,9 +494,9 @@ in
         in
         {
           ".config/camilladsp/configs".source =
-            config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO"}/src/modules/configs/camilladsp/configs/${configName}";
+            config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camilladsp/configs/${configName}";
           ".config/camillagui-backend/config.yml".source =
-            config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO"}/src/modules/configs/camillagui-backend/config-${configName}.yml";
+            config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camillagui-backend/config-${configName}.yml";
         }
       )
       (lib.optionalAttrs pkgs.stdenv.isDarwin {

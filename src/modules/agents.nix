@@ -1,6 +1,6 @@
 # Declarative ~/.agents directory layout with per-entry symlinks into
 # src/modules/configs/agents/ (skills/ managed by agentsSkills).
-# Activation reads $NUCLEUS_REPO for out-of-store symlinks.
+# Activation reads $NUCLEUS_REPO_ROOT for out-of-store symlinks.
 {
   config,
   lib,
@@ -8,13 +8,13 @@
   ...
 }:
 let
-  # Activation scripts resolve the repo root dynamically from $NUCLEUS_REPO
+  # Activation scripts resolve the repo root dynamically from $NUCLEUS_REPO_ROOT
   # (set by apply.sh and forwarded through sudo), so out-of-store symlinks
   # survive repo relocations and rebuilds without stale store paths.
-  # As a fallback, capture NUCLEUS_REPO at eval time (where the env var IS
+  # As a fallback, capture NUCLEUS_REPO_ROOT at eval time (where the env var IS
   # available) so home-manager activation, which runs as the user and does not
   # inherit the sudo-level env var, can still locate the repo root.
-  repoRoot = builtins.getEnv "NUCLEUS_REPO";
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   # Keep path fragments centralized so activation entries reference one source
   # of truth for the repo-hosted agents configuration tree.
@@ -62,7 +62,7 @@ in
 
       # Resolve the repo root so the activation can construct an absolute path
       # to src/modules/configs/agents/ regardless of where the repo is checked
-      # out.  $NUCLEUS_REPO is set by apply.sh and forwarded through sudo.
+      # out.  $NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo.
       _as_repo_root="$(_nucleus_resolve_repo_root "agents-config" "${repoRoot}")"
 
       _as_agents_source="$_as_repo_root/${agentsConfigRelativePath}"

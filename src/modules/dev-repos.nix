@@ -6,7 +6,7 @@ args@{
   ...
 }:
 let
-  repoRoot = builtins.getEnv "NUCLEUS_REPO";
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
   users = args.users or { };
   currentUserHome = config.home.homeDirectory;
   currentUsername = config.home.username;
@@ -126,7 +126,7 @@ in
             echo "devReposProvision: $1" >&2
           }
 
-          # Resolve the live checkout root from $NUCLEUS_REPO (set by apply.sh
+          # Resolve the live checkout root from $NUCLEUS_REPO_ROOT (set by apply.sh
           # before the rebuild and forwarded through sudo), with an eval-time
           # fallback for home-manager activation (which runs as the user and
           # does not inherit the sudo-level env var). Repo-root symlinks must
@@ -135,8 +135,8 @@ in
           # checkout after every rebuild.
           repoRoot="${repoRoot}"
           if [ -z "$repoRoot" ] || [ ! -d "$repoRoot" ]; then
-            if [ -n "''${NUCLEUS_REPO:-}" ]; then
-              repoRoot="$NUCLEUS_REPO"
+            if [ -n "''${NUCLEUS_REPO_ROOT:-}" ]; then
+              repoRoot="$NUCLEUS_REPO_ROOT"
             fi
           fi
 
@@ -171,7 +171,7 @@ in
           # to an empty string or a stale store path.
           resolve_repo_root_target() {
             if [ -z "$repoRoot" ]; then
-              report_error "repo root not set; run via apply.sh or export NUCLEUS_REPO."
+              report_error "repo root not set; run via apply.sh or export NUCLEUS_REPO_ROOT."
               return 1
             fi
 

@@ -12,9 +12,9 @@
   ...
 }:
 let
-  # Capture NUCLEUS_REPO at eval time as fallback for home-manager activation,
+  # Capture NUCLEUS_REPO_ROOT at eval time as fallback for home-manager activation,
   # which runs as the user and does not inherit the sudo-level env var.
-  repoRoot = builtins.getEnv "NUCLEUS_REPO";
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   # Platform switch used to keep one declarative config while selecting the
   # backend that integrates best on each OS.
@@ -470,7 +470,7 @@ in
     #                           (no-clobber), then replace with symlink.
     #   - Absent              → create symlink (parent dirs created as needed).
     #
-    # Repo root is resolved from $NUCLEUS_REPO (set by apply.sh before invoking
+    # Repo root is resolved from $NUCLEUS_REPO_ROOT (set by apply.sh before invoking
     # darwin-rebuild / nixos-rebuild and forwarded through sudo).
     # -------------------------------------------------------------------------
     vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
@@ -479,12 +479,12 @@ in
 
       # Locate the live repo checkout so the activation can resolve the
       # src/modules/configs/vscode/ path regardless of where the repo lives.
-      # $NUCLEUS_REPO is set by apply.sh and forwarded through sudo.  The
+      # $NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo.  The
       # eval-time fallback covers home-manager activation, which runs as the
       # user and does not inherit the sudo-level env var.
       _vsym_repo_root="${repoRoot}"
       if [ -z "$_vsym_repo_root" ] || [ ! -d "$_vsym_repo_root" ]; then
-        _vsym_repo_root="''${NUCLEUS_REPO:?VS Code: NUCLEUS_REPO not set; run via apply.sh}"
+        _vsym_repo_root="''${NUCLEUS_REPO_ROOT:?VS Code: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
       fi
 
       _vsym_config_dir="$_vsym_repo_root/src/modules/configs/vscode"

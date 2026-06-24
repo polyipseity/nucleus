@@ -6,10 +6,10 @@
   ...
 }:
 let
-  # Capture NUCLEUS_REPO at eval time as fallback for activation contexts
+  # Capture NUCLEUS_REPO_ROOT at eval time as fallback for activation contexts
   # where the env var may not be inherited (home-manager activation,
   # systemd services).
-  repoRoot = builtins.getEnv "NUCLEUS_REPO";
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   # Wrapper that resolves the nucleus repo root at runtime so the systemd unit
   # works regardless of the checkout location. Uses eval-time fallback for
