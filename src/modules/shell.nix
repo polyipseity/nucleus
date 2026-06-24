@@ -110,9 +110,10 @@ let
         fi
       ''}
 
-      # Resolve the nucleus repository root from NUCLEUS_REPO (set by apply.sh
+      # Resolve the nucleus repository root from NUCLEUS_REPO_ROOT (set by apply.sh
       # and forwarded through sudo).
-      _nucleus_repo="''${NUCLEUS_REPO:?nucleus: NUCLEUS_REPO not set; run via apply.sh}"
+      _nucleus_repo="''${NUCLEUS_REPO_ROOT:?nucleus: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
+      export NUCLEUS_REPO_ROOT="$_nucleus_repo"
       exec nix --option warn-dirty false run "$_nucleus_repo/src#${app}" -- "$@"
     '';
 
