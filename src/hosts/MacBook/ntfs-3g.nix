@@ -41,7 +41,6 @@ let
       gnumake
       libtool
       pkg-config
-      python3
     ]
   );
 
@@ -51,40 +50,13 @@ let
     "${pkgs.pkg-config}/share/aclocal"
   ];
 
+  cryptoPatchPath = ./patches/ntfs-3g-crypto.patch;
+  rootbindirPatchPath = ./patches/ntfs-3g-rootbindir.patch;
+
   # Build parameters (extracted for fingerprint-based rebuild detection).
   cppFlags = "-I/usr/local/include/fuse/fuse";
   ldFlags = "-L/usr/local/lib -lfuse-t -Wl,-rpath,/usr/local/lib";
   configureFlags = "--with-fuse=external --prefix=/usr/local --disable-crypto";
-  rootbindir = "/usr/local/bin";
-  patchCryptoAc = ''
-    python3 << 'PYEOF'
-    with open('configure.ac') as f:
-        lines = f.read().split('\n')
-
-    # Locate the crypto autodetect block.
-    auth_start = next(i for i, l in enumerate(lines) if 'Autodetect whether we can build crypto stuff or not.' in l)
-    if_start = next(i for i in range(auth_start, min(auth_start + 6, len(lines)))
-                    if lines[i].strip().startswith('if test "$enable_crypto"') and lines[i].strip().endswith('; then'))
-
-    # Find matching fi by tracking if/fi nesting.
-    depth = 0
-    fi_end = None
-    for i in range(if_start + 1, len(lines)):
-        s = lines[i].strip()
-        if s.startswith('if ') and s.endswith('; then'):
-            depth += 1
-        elif s == 'fi':
-            if depth == 0:
-                fi_end = i
-                break
-            depth -= 1
-
-    removed = lines[:if_start] + lines[fi_end + 1:]
-    with open('configure.ac', 'w') as f:
-        f.write('\n'.join(removed))
-    print(f"Removed {fi_end - if_start + 1} lines ({if_start + 1}-{fi_end + 1})")
-    PYEOF
-  '';
   buildFingerprint = builtins.hashString "sha256" (
     builtins.concatStringsSep "\n" [
       ntfs3gSrc.outPath
@@ -93,8 +65,8 @@ let
       cppFlags
       ldFlags
       configureFlags
-      rootbindir
-      patchCryptoAc
+      cryptoPatchPath
+      rootbindirPatchPath
     ]
   );
 in
@@ -117,14 +89,13 @@ in
       export CPPFLAGS="${cppFlags}"
       export LDFLAGS="${ldFlags}"
 
-      # Patch configure.ac to remove the crypto autodetect block
-      # (AM_PATH_LIBGCRYPT and PKG_CHECK_MODULES(GNUTLS) — these macros are
-      # undefined and cause shell syntax errors in the generated configure even
-      # when --disable-crypto is passed; see conversation-summary for details).
-      echo "ntfs-3g: patching out crypto check from configure.ac..."
-      ${patchCryptoAc}
+      # Patch configure.ac: remove crypto autodetect block (AM_PATH_LIBGCRYPT
+      # and PKG_CHECK_MODULES(GNUTLS macros undefined without library deps)
+      # and fix rootbindir default from /bin to /usr/local/bin (SIP).
+      echo "ntfs-3g: patching configure.ac..."
+      patch -p1 < ${cryptoPatchPath}
+      patch -p1 < ${rootbindirPatchPath}
 
-      # Regenerate build system files from patched configure.ac.
       echo "ntfs-3g: running autotools..."
       libtoolize --copy --force
       aclocal --force -I m4
@@ -142,8 +113,6 @@ in
       echo "ntfs-3g: building..."
       make -j"$(sysctl -n hw.ncpu)"
       echo "ntfs-3g: installing..."
-      # Patch src/Makefile to install to ${rootbindir} instead of /bin (SIP).
-      sed -i "" 's|^rootbindir = /bin$|rootbindir = ${rootbindir}|' src/Makefile
       make -k install || true
       rm -rf "$BUILD_DIR"
       echo "ntfs-3g: build complete."

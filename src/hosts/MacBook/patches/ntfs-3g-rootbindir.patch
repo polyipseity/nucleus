@@ -1,0 +1,11 @@
+--- configure.ac.orig	2026-06-24 11:27:44
++++ configure.ac	2026-06-24 11:27:44
+@@ -595,7 +595,7 @@
+ # and their dependencies are on an unmounted partition. Use --exec-prefix
+ # to override this.
+ if test "x${exec_prefix}" = "xNONE"; then
+-	rootbindir="/bin"
++	rootbindir="/usr/local/bin"
+ 	rootsbindir="/sbin"
+ 	rootlibdir="/lib${libdir##*/lib}"
+ else
