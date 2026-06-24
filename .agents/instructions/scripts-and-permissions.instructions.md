@@ -194,6 +194,22 @@ Without this, the health-check will fail on provisioned machines whenever the
 GPG private key is not in the running keyring (common in headless sessions or
 after a fresh login).
 
+## CWD independence — all `nucleus-*` commands must work from any working directory
+
+Repository root resolution goes through `derive_repo_root()` in
+`src/scripts/lib.sh` (priority order: `NUCLEUS_REPO_ROOT` environment variable →
+`SCRIPT_DIR` offset checks → `git rev-parse` fallback).
+
+The `mkNucleusCommand` wrapper in `src/modules/shell.nix` must export
+`NUCLEUS_REPO_ROOT` before invoking `nix run` so the environment variable is
+inherited by the derivation's script.
+
+Scripts must not assume the current working directory is inside the repository.
+Use `derive_repo_root()` or the `NUCLEUS_REPO_ROOT` environment variable for any
+path that resolves files relative to the repo root. Script-specific `--repo-root`
+flags (e.g. `replica-sync.sh`) are acceptable as additional manual overrides but
+must not be the sole mechanism for normal operation.
+
 ## PowerShell Linting
 
 Always suppress the `PSUseBOMForUnicodeEncodedFile` lint rule when:
