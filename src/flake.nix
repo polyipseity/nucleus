@@ -488,6 +488,9 @@
         };
 
       # Build the consolidated repository check app for a given package set.
+      # Does NOT inject nixpkgs `pkgs.nix` into PATH — scripts/check.sh uses
+      # nix eval which should use the host nix binary so host-specific nix.conf
+      # settings (eval-cores, lazy-trees) are interpreted without warnings.
       mkCheckApp =
         pkgs:
         mkApp pkgs {
@@ -504,6 +507,10 @@
           ];
         };
 
+      # Does NOT inject nixpkgs `pkgs.nix` into PATH — scripts/test.sh uses
+      # nix-instantiate --eval which should use the host nix binary so
+      # host-specific nix.conf settings (eval-cores, lazy-trees) are
+      # interpreted without warnings.
       mkTestApp =
         pkgs:
         mkApp pkgs {
@@ -558,6 +565,9 @@
         };
 
       # Build cloud setup helper app for POSIX hosts.
+      # Does NOT inject nixpkgs `pkgs.nix` into PATH — scripts/cloud-setup.sh
+      # uses nix --option which should use the host nix binary so host-specific
+      # nix.conf settings (eval-cores, lazy-trees) are interpreted without warnings.
       mkCloudSetupApp =
         pkgs:
         mkApp pkgs {
