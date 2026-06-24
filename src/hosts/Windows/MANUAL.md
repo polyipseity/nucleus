@@ -15,6 +15,10 @@
 - `nucleus-apply` now runs Caddy local-CA trust automatically for managed localhost HTTPS reverse proxies.
 - If trust is still missing after apply, run `caddy trust --address 127.0.0.1:2019` once in an elevated PowerShell session.
 
+## NTFS filesystem support
+
+- Native NTFS read/write is built into the Windows kernel. No drivers, services, or configuration needed — external NTFS drives work plug-and-play.
+
 ## command shortcuts
 
 - `-g` — run `git`.
