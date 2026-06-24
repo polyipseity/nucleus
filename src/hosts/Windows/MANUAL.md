@@ -6,11 +6,6 @@
 - Run Equalizer APO configurator to select your playback device, then reboot.
 - Launch Peace Equalizer APO, use Effects > Limiter sliders or pre-amplification to cap output.
 - Run `camilladsp --list-devices` and update `src/modules/configs/camilladsp/configs/windows/config.yml` if the default device name doesn't match.
-
-
-
-## HTTPS certificate trust (one-time)
-
 - Caddy local-CA trust runs automatically. If missing: run `caddy trust --address 127.0.0.1:2019` in an elevated PowerShell.
 
 ## command shortcuts

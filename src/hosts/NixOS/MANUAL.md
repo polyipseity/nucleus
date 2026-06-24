@@ -6,11 +6,6 @@
 - Open MusicBrainz Picard, sign in, and add AcoustID API key under Options.
 - Open EasyEffects, add Limiter or Compressor under Effects > Output to cap volume. For presets: clone <https://github.com/Digitalone1/EasyEffects-Presets> into `~/.local/share/easyeffects/output/`.
 - Verify CamillaDSP loopback: `arecord -l | grep Loopback`. If missing, reboot after `nucleus-apply`.
-
-
-
-## HTTPS certificate trust (one-time)
-
 - Caddy local-CA trust runs automatically. If missing: `sudo caddy trust --address 127.0.0.1:2019`.
 
 ## command shortcuts

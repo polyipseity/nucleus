@@ -1,7 +1,5 @@
 # macbook manual steps
 
-## One-Time Configuration
-
 - Configure Raycast database-only settings (see [raycast-manual-config.md](raycast-manual-config.md)): main hotkey (⌘Space), Clipboard History (⌥⌘C), search sensitivity, vim keybindings.
 - Hide MiddleClick from the menu bar: hold ⌘, drag icon away until ✖️ appears. Re-open to show the icon again.
 - Grant Accessibility to BetterDisplay, Chrome Remote Desktop Host, and MiddleClick.
@@ -17,11 +15,6 @@
 - Open Equaliser once, then approve its audio driver in System Settings > Privacy & Security > Extensions > Audio Extensions.
 - Run `camilladsp --version`, then approve BlackHole in System Settings > Privacy & Security and grant Microphone permission.
 - Restart macOS to see managed Finder sidebar favorites.
-
-
-
-## HTTPS certificate trust (one-time)
-
 - Caddy local-CA trust runs automatically. If missing: `sudo caddy trust --address 127.0.0.1:2019`.
 
 ## command shortcuts
