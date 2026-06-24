@@ -1,6 +1,6 @@
 # macbook manual steps
 
-- Configure Raycast database-only settings (see [raycast-manual-config.md](raycast-manual-config.md)): main hotkey (⌘Space), Clipboard History (⌥⌘C), search sensitivity, vim keybindings.
+- Configure Raycast database-only settings (see [raycast-manual-config.md](raycast-manual-config.md)): main hotkey (⌘Space), Clipboard History hotkey (⌥⌘C), search sensitivity, vim keybindings.
 - Hide MiddleClick from the menu bar: hold ⌘, drag icon away until ✖️ appears. Re-open to show the icon again.
 - Grant Accessibility to BetterDisplay, Chrome Remote Desktop Host, and MiddleClick.
 - Grant Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
