@@ -220,6 +220,30 @@ launchctl_target() {
   fi
 }
 
+# recover_launchctl_service — Recover a launchctl service stuck in spawn-scheduled/EX_CONFIG state.
+# Does bootout+bootstrap to fully reload. Returns 0 if recovery was done.
+recover_launchctl_service() {
+  local domain="$1" svc_id="$2" sudo_prefix="$3"
+  local target
+  target=$(launchctl_target "$domain" "$svc_id")
+  local print_out
+  print_out=$($sudo_prefix launchctl print "$target" 2>/dev/null || true)
+  case "$print_out" in
+    *"state = spawn scheduled"*)
+      local plist
+      if [ "$domain" = "system" ]; then
+        plist="/Library/LaunchDaemons/$svc_id.plist"
+      else
+        plist="$HOME/Library/LaunchAgents/$svc_id.plist"
+      fi
+      $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
+      $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null || true
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 # svc_action — Perform an action on a single service.
 svc_action() {
   local action="$1"
@@ -241,9 +265,17 @@ svc_action() {
 
       case "$action" in
         status)  svc_status "$name" "$entry_json" ;;
-        start)   $sudo_prefix launchctl start "$target" >/dev/null 2>&1 || [ $? -eq 3 ] ;;
+        start)
+          recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || \
+            $sudo_prefix launchctl start "$target" >/dev/null 2>&1 || [ $? -eq 3 ]
+          ;;
         stop)    $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
-        restart) $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1; $sudo_prefix launchctl start "$target" >/dev/null 2>&1 || [ $? -eq 3 ] ;;
+        restart)
+          recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
+            $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1
+            $sudo_prefix launchctl start "$target" >/dev/null 2>&1 || [ $? -eq 3 ]
+          }
+          ;;
         enable)  $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
         disable) $sudo_prefix launchctl disable "$target" >/dev/null 2>&1 ;;
       esac
