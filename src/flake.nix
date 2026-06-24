@@ -497,7 +497,6 @@
             pkgs.deadnix
             pkgs.git
             pkgs.jq
-            pkgs.nix
             pkgs.nixfmt
             pkgs.packer
             pkgs.powershell
@@ -513,7 +512,6 @@
             pkgs.bash
             pkgs.findutils
             pkgs.git
-            pkgs.nix
             pkgs.powershell
             pkgs.shellcheck
           ];
@@ -567,7 +565,6 @@
           runtimeInputs = [
             pkgs.git
             pkgs.jq
-            pkgs.nix
             pkgs.rclone
           ];
         };
