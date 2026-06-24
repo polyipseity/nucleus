@@ -175,7 +175,7 @@ function Test-LogHealth {
     $sanitize = if ($null -ne $svcConfig.sanitize) { [bool]$svcConfig.sanitize } else { $true }
 
     foreach ($dir in @($userDir, $systemDir)) {
-      $logGlob = Join-Path $dir $svc '*.log'
+      $logGlob = Join-Path -Path (Join-Path -Path $dir -ChildPath $svc) -ChildPath '*.log'
       foreach ($logFile in Get-ChildItem -Path $logGlob -ErrorAction SilentlyContinue) {
         # Check file size against rotation threshold
         $size = $logFile.Length

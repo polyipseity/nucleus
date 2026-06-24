@@ -83,7 +83,7 @@ function Wait-GuestReady {
             $response = $reader.ReadLine()
             if ($response -match '"return"\s*:\s*{}') { return $true }
         } catch {
-            # Guest ping timeout is expected in retry loop.
+            Write-Debug "Guest ping to $VmName timed out; retrying..."
         }
         Start-Sleep -Seconds 5
     }

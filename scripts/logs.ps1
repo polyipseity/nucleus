@@ -82,15 +82,15 @@ if ($Help) {
 }
 
 # --- Resolve repo root and services.json ---
-$repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { Join-Path $PSScriptRoot ".." }
-$servicesJson = Join-Path $repoRoot "src" "modules" "services.json"
+$repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { Join-Path -Path $PSScriptRoot -ChildPath ".." }
+$servicesJson = Join-Path -Path $repoRoot -ChildPath src | Join-Path -ChildPath modules | Join-Path -ChildPath services.json
 if (-not (Test-Path $servicesJson)) {
   Write-Error "logs: services.json not found at $servicesJson"
   exit 1
 }
 
 # --- Load log management helpers ---
-$logMgmtPath = Join-Path $repoRoot "src" "hosts" "Windows" "modules" "Invoke-LogManagement.ps1"
+$logMgmtPath = Join-Path -Path $repoRoot -ChildPath src | Join-Path -ChildPath hosts | Join-Path -ChildPath Windows | Join-Path -ChildPath modules | Join-Path -ChildPath 'Invoke-LogManagement.ps1'
 if (Test-Path $logMgmtPath) {
   . $logMgmtPath
 }
@@ -99,11 +99,11 @@ if (Test-Path $logMgmtPath) {
 if (-not (Get-Command "Get-NucleusLogDir" -ErrorAction SilentlyContinue)) {
   function Get-NucleusLogDir {
     if ($env:NUCLEUS_LOG_DIR) { return $env:NUCLEUS_LOG_DIR }
-    return Join-Path $env:LOCALAPPDATA "nucleus" "logs"
+    return Join-Path -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath nucleus) -ChildPath logs
   }
   function Get-NucleusSystemLogDir {
     if ($env:NUCLEUS_SYSTEM_LOG_DIR) { return $env:NUCLEUS_SYSTEM_LOG_DIR }
-    return Join-Path $env:ProgramData "nucleus" "logs"
+    return Join-Path -Path (Join-Path -Path $env:ProgramData -ChildPath nucleus) -ChildPath logs
   }
   function ConvertTo-SanitizedText {
     param([string]$Text)

@@ -116,7 +116,7 @@ else {
     } -ArgumentList (,$files[$i..$end])
   }
   $null = $jobs | Wait-Job
-  $lintResults = $jobs | Receive-Job
+  $lintResults = @($jobs | Receive-Job)
   $jobs | Remove-Job
 
   $nonInfoLints = @($lintResults | Where-Object { $_.Severity -ne 'Information' })
