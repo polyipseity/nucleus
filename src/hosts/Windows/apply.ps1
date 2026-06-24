@@ -201,7 +201,7 @@
 
 .NOTES
   Environment variables:
-    NUCLEUS_REPO   Path to the nucleus repository root (auto-detected from script path).
+    NUCLEUS_REPO_ROOT   Path to the nucleus repository root (auto-detected from script path).
     NUCLEUS_HOST   Must be set to "Windows" for apply behavior.
     USERNAME       Current Windows username.
     HOME           User home directory.
@@ -465,9 +465,9 @@ $picardDefaultsPath = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\
 $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 
 # Expose the repo root to any subprocesses (e.g. DSC script resources) that
-# may need to locate repo-relative files.  $env:NUCLEUS_REPO is forwarded
+# may need to locate repo-relative files.  $env:NUCLEUS_REPO_ROOT is forwarded
 # through to DSC and subsequent activation steps.
-$env:NUCLEUS_REPO = $repoRoot
+$env:NUCLEUS_REPO_ROOT = $repoRoot
 $env:NUCLEUS_HOST = "Windows"
 [Environment]::SetEnvironmentVariable("NUCLEUS_HOST", "Windows", "User")
 

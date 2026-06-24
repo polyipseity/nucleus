@@ -33,16 +33,16 @@ param(
 $ErrorActionPreference = 'Stop'
 
 function Resolve-NucleusRoot {
-  $repoRoot = $env:NUCLEUS_REPO
+  $repoRoot = $env:NUCLEUS_REPO_ROOT
   if (-not $repoRoot) {
     $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
     if ($candidate -and (Test-Path "$candidate\src\flake.nix")) {
       return $candidate
     }
-    throw "NUCLEUS_REPO is not set. Run via apply.ps1 or run from the repo checkout."
+    throw "NUCLEUS_REPO_ROOT is not set. Run via apply.ps1 or run from the repo checkout."
   }
   if (-not (Test-Path -Path $repoRoot -PathType Container)) {
-    throw "NUCLEUS_REPO path '$repoRoot' does not exist or is not a directory."
+    throw "NUCLEUS_REPO_ROOT path '$repoRoot' does not exist or is not a directory."
   }
   return $repoRoot
 }
