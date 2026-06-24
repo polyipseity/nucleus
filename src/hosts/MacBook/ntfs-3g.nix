@@ -62,7 +62,7 @@ in
           cp -r "${ntfs3gSrc}" "$BUILD_DIR/ntfs-3g"
           chmod -R u+w "$BUILD_DIR/ntfs-3g"
           cd "$BUILD_DIR/ntfs-3g"
-          export CPPFLAGS="-I/usr/local/include/fuse"
+          export CPPFLAGS="-I/usr/local/include/fuse/fuse"
           export LDFLAGS="-L/usr/local/lib -lfuse-t -Wl,-rpath,/usr/local/lib"
 
           # Patch configure.ac to remove the crypto autodetect block
@@ -109,11 +109,16 @@ in
           echo "ntfs-3g: configuring..."
           ./configure --with-fuse=external --prefix=/usr/local --disable-crypto
 
+          # Use -k to keep going if install-exec-hook fails (it tries to mv .so
+          # files to /lib, which doesn't exist on macOS — we use .dylib).
+          # All actual files (binaries, dylib, headers) are installed before
+          # that hook runs, so we ignore its failure.
           echo "ntfs-3g: building..."
           make
-
           echo "ntfs-3g: installing..."
-          make install
+          # Patch src/Makefile to install to /usr/local/bin instead of /bin (SIP).
+          sed -i 's|^rootbindir = /bin$|rootbindir = /usr/local/bin|' src/Makefile
+          make -k install || true
           rm -rf "$BUILD_DIR"
           echo "ntfs-3g: build complete."
         fi
