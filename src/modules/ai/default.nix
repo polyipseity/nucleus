@@ -1,10 +1,5 @@
 # Local AI inference baseline (Ollama, oterm, LiteLLM proxy).
-{
-  lib,
-  nixpkgs,
-  pkgs,
-  ...
-}:
+{ nixpkgs, pkgs, ... }:
 let
   servicesJSON = builtins.fromJSON (builtins.readFile ../services.json);
   litellmEndpoint = servicesJSON.litellm.network.default;
