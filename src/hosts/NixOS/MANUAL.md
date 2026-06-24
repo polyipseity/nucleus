@@ -15,15 +15,6 @@
 
 - `nucleus-apply` now runs Caddy local-CA trust automatically for managed localhost HTTPS reverse proxies.
 - If trust is still missing after apply, run `sudo caddy trust --address 127.0.0.1:2019` once.
-
-## NTFS filesystem support
-
-- NTFS read/write for removable drives is handled by GNOME's built-in udisks2 and GVFS, using the ntfs-3g (FUSE) userspace driver — pre-installed and active by default via `boot.supportedFilesystems = [ "ntfs" ]` from the NixOS base profile.
-- The in-kernel ntfs3 driver (built-in since Linux 5.15) is **not** used because:
-  - Partitions left "dirty" by Windows fast-startup refuse to mount without the `force` flag.
-  - Making udisks2 prefer ntfs3 requires a udev rule (`ENV{ID_FS_TYPE}="ntfs3"`), which [Arch Wiki explicitly recommends against](https://wiki.archlinux.org/title/NTFS#unknown_filesystem_type_'ntfs') as it "can confuse some 3rd party tools".
-  - ntfs-3g handles dirty volumes gracefully and has no known compatibility issues with desktop automounters.
-
 ## command shortcuts
 
 - `-g` — run `git`.

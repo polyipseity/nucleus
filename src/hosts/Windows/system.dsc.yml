@@ -1,5 +1,8 @@
 properties:
   configurationVersion: 0.2.0
+  # NTFS filesystem support — native read/write is built into the Windows
+  # kernel. No drivers, services, or configuration needed; external NTFS
+  # drives work plug-and-play.
   resources:
     - resource: Microsoft.Windows.Settings/TaskScheduler
       directives:
