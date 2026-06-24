@@ -5,7 +5,7 @@
 # Provided functions:
 #   _nucleus_protect_symlink       — set uchg / chattr +i on a symlink
 #   _nucleus_unprotect_symlink     — clear uchg / chattr -i from a symlink
-#   _nucleus_resolve_repo_root     — resolve $NUCLEUS_REPO, fail if unset
+#   _nucleus_resolve_repo_root     — resolve $NUCLEUS_REPO_ROOT, fail if unset
 #   _nucleus_prepend_first_executable_dir — prepend dir containing executable to PATH
 
 # Set/clear immutable flags on symlinks so managed agent config symlinks are
@@ -49,8 +49,8 @@ _nucleus_unprotect_symlink() {
   esac
 }
 
-# Resolve $NUCLEUS_REPO or fallback path baked in at eval time.
-# home-manager activation runs as the user and does not inherit NUCLEUS_REPO,
+# Resolve $NUCLEUS_REPO_ROOT or fallback path baked in at eval time.
+# home-manager activation runs as the user and does not inherit NUCLEUS_REPO_ROOT,
 # so the fallback is embedded into the activation script during Nix eval.
 #
 # Arguments:
@@ -59,12 +59,12 @@ _nucleus_unprotect_symlink() {
 _nucleus_resolve_repo_root() {
   _nrr_context="$1"
   _nrr_fallback="${2:-}"
-  if [ -n "${NUCLEUS_REPO:-}" ]; then
-    printf '%s\n' "$NUCLEUS_REPO"
+  if [ -n "${NUCLEUS_REPO_ROOT:-}" ]; then
+    printf '%s\n' "$NUCLEUS_REPO_ROOT"
   elif [ -n "$_nrr_fallback" ] && [ -d "$_nrr_fallback" ]; then
     printf '%s\n' "$_nrr_fallback"
   else
-    echo "$_nrr_context: repo root not set; run via apply.sh or export NUCLEUS_REPO." >&2
+    echo "$_nrr_context: repo root not set; run via apply.sh or export NUCLEUS_REPO_ROOT." >&2
     return 1
   fi
 }

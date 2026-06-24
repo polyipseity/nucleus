@@ -70,7 +70,6 @@ while [ "$#" -gt 0 ]; do
 done
 
 REPO_ROOT="$(derive_repo_root)"
-export NUCLEUS_REPO="$REPO_ROOT"
 export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 
 # Augment PATH with the user Nix profile bin directory so Nix-managed binaries
@@ -103,11 +102,11 @@ run_nix() {
 }
 
 run_nix_as_root() {
-  # Forward NUCLEUS_REPO so builtins.getEnv in Nix config can construct
+  # Forward NUCLEUS_REPO_ROOT so builtins.getEnv in Nix config can construct
+  # writable out-of-stor_ROOT so builtins.getEnv in Nix config can construct
   # writable out-of-store symlinks during evaluation.
   NIX_CONFIG_VALUE="$(merge_nix_config)"
-  sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" "NUCLEUS_REPO=${NUCLEUS_REPO:-}" nix --option warn-dirty false "$@"
-}
+  sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" "NUCLEUS_REPO_ROOT=${NUCLEUS_REPO_ROOT
 
 start_sudo_keepalive() {
   # Prompt for the sudo password once, before build output floods the terminal.
