@@ -11,6 +11,7 @@
   homebrew-core,
   homebrew-cask,
   cirruslabs-cli,
+  macos-fuse-t-cask,
   smudge-smudge,
   zackelia-formulae,
   ...
@@ -93,6 +94,7 @@ in
       "homebrew/homebrew-core" = homebrew-core;
       "homebrew/homebrew-cask" = homebrew-cask;
       "cirruslabs/homebrew-cli" = cirruslabs-cli;
+      "macos-fuse-t/homebrew-cask" = macos-fuse-t-cask;
       "smudge/homebrew-smudge" = smudge-smudge;
       "zackelia/homebrew-formulae" = zackelia-formulae;
     };

@@ -6,6 +6,7 @@
 - Grant Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
 - Grant Automation to the terminal running `nucleus-vm-setup` for UTM imports.
 - Open `fuse-t.app` once, then enable the extension in System Settings > General > Login Items & Extensions > Extensions.
+- NTFS read-write: plug in an NTFS drive, unmount it (Finder eject), then `sudo ntfs-3g /dev/diskXsY /path/to/mountpoint`. The ntfs-3g binary is built automatically during `nucleus-apply`.
 - Open `battery.app` once to install `/usr/local/bin/battery`.
 - Sign in to the App Store so `mas` can provision Xcode and Amphetamine.
 - Install Amphetamine Power Protect: copy script to `~/Library/Application Scripts/com.if.Amphetamine/` and sudoers to `/private/etc/sudoers.d/` (see upstream README). Re-run `nucleus-apply`.

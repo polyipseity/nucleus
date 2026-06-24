@@ -32,6 +32,7 @@
     ./linux-builder.nix
     ./manual-installations.nix
     ./networking.nix
+    ./ntfs-3g.nix
     ./security.nix
     ./sops.nix
   ];

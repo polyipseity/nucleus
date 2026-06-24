@@ -40,6 +40,10 @@
       url = "github:smudge/homebrew-smudge";
       flake = false;
     };
+    macos-fuse-t-cask = {
+      url = "github:macos-fuse-t/homebrew-cask";
+      flake = false;
+    };
     zackelia-formulae = {
       url = "github:zackelia/homebrew-formulae";
       flake = false;
@@ -69,6 +73,7 @@
       scripts,
       smudge-smudge,
       sops-nix,
+      macos-fuse-t-cask,
       zackelia-formulae,
       ...
     }:
@@ -724,6 +729,7 @@
             homebrew-core
             homebrew-cask
             cirruslabs-cli
+            macos-fuse-t-cask
             smudge-smudge
             zackelia-formulae
             ;
