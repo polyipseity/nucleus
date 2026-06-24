@@ -50,27 +50,14 @@ let
     "${pkgs.libtool}/share/aclocal"
     "${pkgs.pkg-config}/share/aclocal"
   ];
-in
-{
-  system.activationScripts.postActivation.text = lib.mkBefore ''
-        # ---- buildNtfs3g ----------------------------------------------------------
-        if ! [ -x /usr/local/bin/ntfs-3g ]; then
-          echo "ntfs-3g: building from source..."
-          export PATH="${buildToolsPath}:$PATH"
-          export ACLOCAL_PATH="${aclocalPath}"
-          BUILD_DIR="$(mktemp -d)"
-          cp -r "${ntfs3gSrc}" "$BUILD_DIR/ntfs-3g"
-          chmod -R u+w "$BUILD_DIR/ntfs-3g"
-          cd "$BUILD_DIR/ntfs-3g"
-          export CPPFLAGS="-I/usr/local/include/fuse/fuse"
-          export LDFLAGS="-L/usr/local/lib -lfuse-t -Wl,-rpath,/usr/local/lib"
 
-          # Patch configure.ac to remove the crypto autodetect block
-          # (AM_PATH_LIBGCRYPT and PKG_CHECK_MODULES(GNUTLS) — these macros are
-          # undefined and cause shell syntax errors in the generated configure even
-          # when --disable-crypto is passed; see conversation-summary for details).
-          echo "ntfs-3g: patching out crypto check from configure.ac..."
-          python3 << 'PYEOF'
+  # Build parameters (extracted for fingerprint-based rebuild detection).
+  cppFlags = "-I/usr/local/include/fuse/fuse";
+  ldFlags = "-L/usr/local/lib -lfuse-t -Wl,-rpath,/usr/local/lib";
+  configureFlags = "--with-fuse=external --prefix=/usr/local --disable-crypto";
+  rootbindir = "/usr/local/bin";
+  patchCryptoAc = ''
+    python3 << 'PYEOF'
     with open('configure.ac') as f:
         lines = f.read().split('\n')
 
@@ -97,30 +84,72 @@ in
         f.write('\n'.join(removed))
     print(f"Removed {fi_end - if_start + 1} lines ({if_start + 1}-{fi_end + 1})")
     PYEOF
+  '';
+  buildFingerprint = builtins.hashString "sha256" (
+    builtins.concatStringsSep "\n" [
+      ntfs3gSrc.outPath
+      buildToolsPath
+      aclocalPath
+      cppFlags
+      ldFlags
+      configureFlags
+      rootbindir
+      patchCryptoAc
+    ]
+  );
+in
+{
+  system.activationScripts.postActivation.text = lib.mkBefore ''
+    # ---- buildNtfs3g ----------------------------------------------------------
+    FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
+    CURRENT_FINGERPRINT="${buildFingerprint}"
 
-          # Regenerate build system files from patched configure.ac.
-          echo "ntfs-3g: running autotools..."
-          libtoolize --copy --force
-          aclocal --force -I m4
-          autoheader --force
-          automake --add-missing --copy --force-missing
-          autoconf --force
+    if ! [ -x /usr/local/bin/ntfs-3g ] \
+       || ! [ -f "$FINGERPRINT_FILE" ] \
+       || [ "$(cat "$FINGERPRINT_FILE")" != "$CURRENT_FINGERPRINT" ]; then
+      echo "ntfs-3g: building from source..."
+      export PATH="${buildToolsPath}:$PATH"
+      export ACLOCAL_PATH="${aclocalPath}"
+      BUILD_DIR="$(mktemp -d)"
+      cp -r "${ntfs3gSrc}" "$BUILD_DIR/ntfs-3g"
+      chmod -R u+w "$BUILD_DIR/ntfs-3g"
+      cd "$BUILD_DIR/ntfs-3g"
+      export CPPFLAGS="${cppFlags}"
+      export LDFLAGS="${ldFlags}"
 
-          echo "ntfs-3g: configuring..."
-          ./configure --with-fuse=external --prefix=/usr/local --disable-crypto
+      # Patch configure.ac to remove the crypto autodetect block
+      # (AM_PATH_LIBGCRYPT and PKG_CHECK_MODULES(GNUTLS) — these macros are
+      # undefined and cause shell syntax errors in the generated configure even
+      # when --disable-crypto is passed; see conversation-summary for details).
+      echo "ntfs-3g: patching out crypto check from configure.ac..."
+      ${patchCryptoAc}
 
-          # Use -k to keep going if install-exec-hook fails (it tries to mv .so
-          # files to /lib, which doesn't exist on macOS — we use .dylib).
-          # All actual files (binaries, dylib, headers) are installed before
-          # that hook runs, so we ignore its failure.
-          echo "ntfs-3g: building..."
-          make -j"$(sysctl -n hw.ncpu)"
-          echo "ntfs-3g: installing..."
-          # Patch src/Makefile to install to /usr/local/bin instead of /bin (SIP).
-          sed -i "" 's|^rootbindir = /bin$|rootbindir = /usr/local/bin|' src/Makefile
-          make -k install || true
-          rm -rf "$BUILD_DIR"
-          echo "ntfs-3g: build complete."
-        fi
+      # Regenerate build system files from patched configure.ac.
+      echo "ntfs-3g: running autotools..."
+      libtoolize --copy --force
+      aclocal --force -I m4
+      autoheader --force
+      automake --add-missing --copy --force-missing
+      autoconf --force
+
+      echo "ntfs-3g: configuring..."
+      ./configure ${configureFlags}
+
+      # Use -k to keep going if install-exec-hook fails (it tries to mv .so
+      # files to /lib, which doesn't exist on macOS — we use .dylib).
+      # All actual files (binaries, dylib, headers) are installed before
+      # that hook runs, so we ignore its failure.
+      echo "ntfs-3g: building..."
+      make -j"$(sysctl -n hw.ncpu)"
+      echo "ntfs-3g: installing..."
+      # Patch src/Makefile to install to ${rootbindir} instead of /bin (SIP).
+      sed -i "" 's|^rootbindir = /bin$|rootbindir = ${rootbindir}|' src/Makefile
+      make -k install || true
+      rm -rf "$BUILD_DIR"
+      echo "ntfs-3g: build complete."
+
+      /bin/mkdir -p "$(dirname "$FINGERPRINT_FILE")"
+      echo "$CURRENT_FINGERPRINT" > "$FINGERPRINT_FILE"
+    fi
   '';
 }
