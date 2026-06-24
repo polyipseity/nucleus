@@ -103,10 +103,10 @@ run_nix() {
 
 run_nix_as_root() {
   # Forward NUCLEUS_REPO_ROOT so builtins.getEnv in Nix config can construct
-  # writable out-of-stor_ROOT so builtins.getEnv in Nix config can construct
   # writable out-of-store symlinks during evaluation.
   NIX_CONFIG_VALUE="$(merge_nix_config)"
-  sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" "NUCLEUS_REPO_ROOT=${NUCLEUS_REPO_ROOT
+  sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" "NUCLEUS_REPO_ROOT=${NUCLEUS_REPO_ROOT}" nix --option warn-dirty false "$@"
+}
 
 start_sudo_keepalive() {
   # Prompt for the sudo password once, before build output floods the terminal.
