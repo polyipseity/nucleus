@@ -23,6 +23,7 @@ nucleus-config list                  # Print all config as flat key=value pairs.
 ```
 
 The `set` subcommand tries to parse the value as JSON (`true`, `false`, numbers) before falling back to string. So:
+
 - `nucleus-config set camilladsp.heartbeat false` → stores `false` as boolean
 - `nucleus-config set some.section "hello"` → stores `"hello"` as string
 
@@ -49,6 +50,7 @@ Only runtime toggles live here — things you want to change without a rebuild/r
 Services read `config.json` directly rather than shelling out to `nucleus-config`, so they work even when `nucleus-config` is unavailable (e.g. early boot before Nix finishes deploying).
 
 POSIX pattern (shell):
+
 ```sh
 config_json="${HOME}/.local/state/nucleus/config.json"
 enabled=true
@@ -62,6 +64,7 @@ fi
 ```
 
 Windows pattern (PowerShell):
+
 ```powershell
 $configFile = Join-Path $HOME ".local\state\nucleus\config.json"
 $enabled = $true
