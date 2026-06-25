@@ -35,12 +35,12 @@ derive_repo_root() {
   done
   if command -v git >/dev/null 2>&1; then
     _drr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || true
-    if [ -n "${_drr_git_root:-}" ] && [ -d "$_drr_git_root" ]; then
+    if [ -n "${_drr_git_root:-}" ] && [ -f "$_drr_git_root/src/flake.nix" ]; then
       printf '%s\n' "$_drr_git_root"
       return 0
     fi
   fi
-  printf '%s\n' "derive_repo_root: cannot determine repository root" >&2
+  printf '%s\n' "derive_repo_root: cannot determine nucleus repository root — set NUCLEUS_REPO_ROOT or run from within the nucleus repo" >&2
   return 1
 }
 
