@@ -257,16 +257,16 @@ function Format-StatusTable {
   }
 
   $lines = @()
-  $lines += "{0,-24} {1,-10} {2,-8} {3}" -f 'Service', 'Status', 'Running', 'PID'
-  $lines += '-' * 60
+  $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4}" -f 'ID', 'Name', 'Status', 'Running', 'PID'
+  $lines += '-' * 80
 
   foreach ($key in $Results.Keys) {
     $info = $Results[$key]
     if ($key -like 'ERROR:*') {
       $realKey = $key -replace '^ERROR:'
-      $lines += "{0,-24} {1,-10} {2,-8} {3}" -f $realKey, 'n/a', '-', '-'
+      $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4}" -f $realKey, '', 'n/a', '-', '-'
     } else {
-      $lines += "{0,-24} {1,-10} {2,-8} {3}" -f $key, $info.status, $info.running, ($info.pid -as [int] -or '-')
+      $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4}" -f $key, $info.displayName, $info.status, $info.running, ($info.pid -as [int] -or '-')
     }
   }
   return $lines -join "`n"
@@ -283,6 +283,7 @@ switch ($Action) {
         continue
       }
       $status = Get-ServiceStatus -Platform $resolved[$key].platform
+      $status.displayName = $resolved[$key].displayName
       $results[$key] = $status
     }
     Write-Output (Format-StatusTable -Results $results)
@@ -300,6 +301,7 @@ switch ($Action) {
         continue
       }
       $status = Get-ServiceStatus -Platform $resolved[$key].platform
+      $status.displayName = $resolved[$key].displayName
       $results[$key] = $status
     }
     Write-Output (Format-StatusTable -Results $results)
