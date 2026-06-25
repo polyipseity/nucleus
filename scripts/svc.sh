@@ -334,12 +334,12 @@ do_list() {
     done <<< "$entries"
     printf '}}\n'
   else
-    printf '%-24s %-10s %-8s %s\n' "Service" "Status" "Running" "PID"
-    printf '%.0s-' {1..60}; printf '\n'
+    printf '%-20s %-24s %-10s %-8s %s\n' "ID" "Name" "Status" "Running" "PID"
+    printf '%.0s-' {1..80}; printf '\n'
     while IFS=$'\t' read -r key display svc_json json_key; do
       if echo "$key" | grep -q '^ERROR:'; then
         local err_name="${key#ERROR:}"
-        printf '%-24s %-10s %-8s %s\n' "$err_name" "n/a" "-" "-"
+        printf '%-20s %-24s %-10s %-8s %s\n' "$err_name" "" "n/a" "-" "-"
         has_error=true
         continue
       fi
@@ -349,7 +349,7 @@ do_list() {
       status=$(echo "$status_json" | jq -r '.status')
       running=$(echo "$status_json" | jq -r '.running')
       pid=$(echo "$status_json" | jq -r '.pid // "-"')
-      printf '%-24s %-10s %-8s %s\n' "$display" "$status" "$running" "$pid"
+      printf '%-20s %-24s %-10s %-8s %s\n' "$json_key" "$display" "$status" "$running" "$pid"
     done <<< "$entries"
   fi
   $has_error && return 1 || return 0
@@ -380,7 +380,7 @@ do_status() {
     status=$(echo "$status_json" | jq -r '.status')
     running=$(echo "$status_json" | jq -r '.running')
     pid=$(echo "$status_json" | jq -r '.pid // "-"')
-    printf '%-24s %-10s %-8s %s\n' "$display" "$status" "$running" "$pid"
+    printf '%-20s %-24s %-10s %-8s %s\n' "$json_key" "$display" "$status" "$running" "$pid"
   done <<< "$entries"
   $any_error && return 1 || return 0
 }
