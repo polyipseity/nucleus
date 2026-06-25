@@ -277,7 +277,7 @@ function Format-StatusTable {
       $realKey = $key -replace '^ERROR:'
       $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4}" -f $realKey, '', 'n/a', '-', '-'
     } else {
-      $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4}" -f $key, $info.displayName, $info.status, $info.running, ($info.pid -as [int] -or '-')
+      $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4}" -f $key, $info.displayName, $info.status, $info.running, ($info.pid ?? '-')
     }
   }
   return $lines -join "`n"
