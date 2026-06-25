@@ -50,6 +50,40 @@ BeforeAll {
     }
   }
 
+  # Script-scoped mock RegistryRaw (raw JSON structure before main processing).
+  $Script:RegistryRaw = @{
+    'ollama' = @{
+      displayName = 'Ollama'
+      description = 'LLM inference server'
+      network     = @{ default = @{ host = '127.0.0.1'; port = 11434; protocol = 'http' } }
+      platforms   = @{ windows = @{ type = 'native'; service = 'ollama'; logging = @{ capture = 'all' } } }
+      logging     = @{ maxSize = 10485760 }
+    }
+    'sshd' = @{
+      displayName = 'SSH Server'
+      description = 'Remote shell access via SSH'
+      network     = @{ default = @{ host = '0.0.0.0'; port = 22; protocol = 'tcp' } }
+      platforms   = @{ windows = @{ type = 'native'; service = 'sshd' } }
+    }
+    'cloud-drive' = @{
+      displayName = 'Cloud Drive Mounts'
+      description = 'rclone FUSE cloud drive mounts'
+      platforms   = @{ windows = @{ type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'cloud-mount-'; logging = @{ capture = 'stderr' } } }
+    }
+    'camilladsp' = @{
+      displayName = 'CamillaDSP'
+      description = 'Audio processor'
+      network     = @{ websocket = @{ host = '127.0.0.1'; port = 1234; protocol = 'tcp' } }
+      platforms   = @{ windows = @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' } }
+    }
+  }
+
+  # Mock external dependencies for log functions.
+  Mock Get-NucleusLogDir { return 'TestDrive:\nucleus\logs' }
+  Mock Get-NucleusSystemLogDir { return 'TestDrive:\nucleus\system-logs' }
+  Mock Get-WinEvent { return @() }
+  Mock ConvertTo-SanitizedText { process { $_ } }
+
   # Dot-source the function definitions.
   . ([scriptblock]::Create($functionCode))
 }
@@ -375,5 +409,82 @@ Describe 'Invoke-ServiceAction' {
     It 'throws for unsupported type' {
       { Invoke-ServiceAction -Action 'start' -Platform @{ type = 'unknown' } } | Should -Throw
     }
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Log helper functions
+# ---------------------------------------------------------------------------
+
+Describe 'Get-PlatformService' {
+  It 'returns sorted service names' {
+    $result = Get-PlatformService
+    $result.Count | Should -Be 4
+    $result[0] | Should -Be 'camilladsp'
+    $result[-1] | Should -Be 'sshd'
+  }
+}
+
+Describe 'Get-CaptureMode' {
+  It 'returns platform-specific capture mode when set' {
+    $result = Get-CaptureMode -ServiceKey 'ollama'
+    $result | Should -Be 'all'
+  }
+
+  It 'falls back to platform-specific when top-level not set' {
+    $result = Get-CaptureMode -ServiceKey 'cloud-drive'
+    $result | Should -Be 'stderr'
+  }
+
+  It 'returns all for service with no logging config' {
+    $result = Get-CaptureMode -ServiceKey 'sshd'
+    $result | Should -Be 'all'
+  }
+}
+
+Describe 'Get-EventLogConfig' {
+  It 'returns null for services without eventLog config' {
+    $result = Get-EventLogConfig -ServiceKey 'ollama'
+    $result | Should -BeNullOrEmpty
+  }
+}
+
+Describe 'Test-ServiceHasLog' {
+  BeforeEach {
+    # Ensure Get-WinEvent returns nothing by default
+    Mock Get-WinEvent { return @() }
+  }
+
+  It 'returns false for service with capture none' {
+    Mock Get-CaptureMode { return 'none' } -ParameterFilter { $ServiceKey -eq 'sshd' }
+    $result = Test-ServiceHasLog -ServiceKey 'sshd'
+    $result | Should -Be $false
+  }
+
+  It 'returns false when no log files and no event log' {
+    $result = Test-ServiceHasLog -ServiceKey 'ollama'
+    $result | Should -Be $false
+  }
+}
+
+Describe 'Show-ServiceList' {
+  It 'outputs formatted lines without errors' {
+    $output = Show-ServiceList
+    $output | Should -Not -BeNullOrEmpty
+    $output.Count | Should -Be 4
+  }
+}
+
+Describe 'Show-LogConfig' {
+  It 'outputs human-readable config' {
+    $output = Show-LogConfig -ServiceKey 'ollama'
+    $output | Should -Not -BeNullOrEmpty
+    $output | Should -Match 'ollama'
+  }
+
+  It 'outputs JSON with -JsonOut' {
+    $output = Show-LogConfig -ServiceKey 'ollama' -JsonOut
+    $output | Should -Not -BeNullOrEmpty
+    $output | Should -Match '"ollama"'
   }
 }

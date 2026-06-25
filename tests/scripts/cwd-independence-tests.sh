@@ -109,7 +109,6 @@ test_derive_repo_root_fails_cleanly() {
 test_script_help_from_outside() {
     for script in \
         "$REPO_ROOT/scripts/gc.sh" \
-        "$REPO_ROOT/scripts/logs.sh" \
         "$REPO_ROOT/scripts/health-check.sh" \
         "$REPO_ROOT/scripts/test.sh" \
         "$REPO_ROOT/scripts/svc.sh" \
