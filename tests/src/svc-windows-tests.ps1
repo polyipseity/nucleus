@@ -78,11 +78,32 @@ BeforeAll {
     }
   }
 
+  # Stub external commands so Pester can mock them.
+  # These may not exist on macOS, so stubs are needed for Mock to work.
+  function Get-Service { }
+  function Get-ScheduledTask { }
+  function Get-NucleusLogDir { }
+  function Get-NucleusSystemLogDir { }
+  function Get-WinEvent { }
+  function ConvertTo-SanitizedText { }
+  function Start-Service { }
+  function Stop-Service { }
+  function Restart-Service { }
+  function Set-Service { [CmdletBinding()] param([string]$Name, [string]$StartupType) }
+  function Get-CimInstance { }
+  function Start-ScheduledTask { }
+  function Stop-ScheduledTask { }
+  function Enable-ScheduledTask { }
+  function Disable-ScheduledTask { }
+
   # Mock external dependencies for log functions.
   Mock Get-NucleusLogDir { return 'TestDrive:\nucleus\logs' }
   Mock Get-NucleusSystemLogDir { return 'TestDrive:\nucleus\system-logs' }
   Mock Get-WinEvent { return @() }
   Mock ConvertTo-SanitizedText { process { $_ } }
+
+  # Script-scoped platform (constant for Windows).
+  $Script:Platform = 'windows'
 
   # Dot-source the function definitions.
   . ([scriptblock]::Create($functionCode))
@@ -101,7 +122,7 @@ Describe 'Format-StatusTable' {
     }
     $output = Format-StatusTable -Results $results
     $output | Should -Not -BeNullOrEmpty
-    $output | Should -Match 'Service\s+Status\s+Running\s+PID'
+    $output | Should -Match 'ID\s+Name\s+Status\s+Running\s+PID'
     $output | Should -Match 'ollama'
     $output | Should -Match '12345'
     $output | Should -Match 'inactive'
@@ -304,7 +325,224 @@ Describe 'Get-ServiceStatus' {
     }
   }
 }
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
 
+Describe 'Dispatch' {
+  BeforeAll {
+    # Extract the switch ($Action) dispatch statement from the svc.ps1 AST.
+    $switchAsts = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.SwitchStatementAst] }, $true)
+    # Filter to the outermost switch ($Action) that contains 'list' (only the
+    # top-level dispatch switch has it; the inner one in Invoke-ServiceAction
+    # only has start/stop/restart/enable/disable/status).
+    $dispatchSwitchAst = $switchAsts | Where-Object { $_.Condition.Extent.Text -eq '$Action' -and $_.Extent.Text -match "'list'" } | Select-Object -First 1
+    $dispatchSwitchText = $dispatchSwitchAst.Extent.Text -replace '\bexit\b', 'throw'
+
+    # Test helper that wraps the switch dispatch for testing.
+    function Invoke-Dispatch {
+      param(
+        [string]$Action,
+        [string[]]$ServiceName
+      )
+      $Registry = $Script:Registry
+      $RegistryRaw = $Script:RegistryRaw
+      $Platform = $Script:Platform
+      $Json = $Script:Json
+      $RepoRoot = 'TestDrive:\'
+      . ([scriptblock]::Create($dispatchSwitchText))
+    }
+  }
+
+  BeforeEach {
+    $Script:Json = $false
+  }
+
+  Context 'action routing' {
+    It 'routes list to Resolve-ServiceName and Format-StatusTable' {
+      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Get-ServiceStatus { return @{ status = 'active'; running = $true; pid = 12345 } }
+      Mock Format-StatusTable { return 'formatted' }
+
+      Invoke-Dispatch -Action list
+
+      Should -Invoke Resolve-ServiceName -Exactly 1
+      Should -Invoke Format-StatusTable -Exactly 1
+    }
+
+    It 'routes status to Resolve-ServiceName and Format-StatusTable' {
+      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Get-ServiceStatus { return @{ status = 'active'; running = $true; pid = 12345 } }
+      Mock Format-StatusTable { return 'formatted' }
+
+      Invoke-Dispatch -Action status
+
+      Should -Invoke Resolve-ServiceName -Exactly 1
+      Should -Invoke Format-StatusTable -Exactly 1
+    }
+
+    It 'routes start to Invoke-ServiceAction' {
+      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Invoke-ServiceAction { return $true }
+
+      Invoke-Dispatch -Action start -ServiceName @('ollama')
+
+      Should -Invoke Invoke-ServiceAction -Exactly 1 -ParameterFilter { $Action -eq 'start' }
+    }
+
+    It 'routes stop to Invoke-ServiceAction' {
+      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Invoke-ServiceAction { return $true }
+
+      Invoke-Dispatch -Action stop -ServiceName @('ollama')
+
+      Should -Invoke Invoke-ServiceAction -Exactly 1 -ParameterFilter { $Action -eq 'stop' }
+    }
+
+    It 'routes restart to Invoke-ServiceAction' {
+      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Invoke-ServiceAction { return $true }
+
+      Invoke-Dispatch -Action restart -ServiceName @('ollama')
+
+      Should -Invoke Invoke-ServiceAction -Exactly 1 -ParameterFilter { $Action -eq 'restart' }
+    }
+
+    It 'routes enable to Invoke-ServiceAction' {
+      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Invoke-ServiceAction { return $true }
+
+      Invoke-Dispatch -Action enable -ServiceName @('ollama')
+
+      Should -Invoke Invoke-ServiceAction -Exactly 1 -ParameterFilter { $Action -eq 'enable' }
+    }
+
+    It 'routes disable to Invoke-ServiceAction' {
+      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Invoke-ServiceAction { return $true }
+
+      Invoke-Dispatch -Action disable -ServiceName @('ollama')
+
+      Should -Invoke Invoke-ServiceAction -Exactly 1 -ParameterFilter { $Action -eq 'disable' }
+    }
+
+    It 'routes endpoint and outputs endpoint URL' {
+      Mock Get-Content { return '{"ollama":{"network":{"default":{"host":"127.0.0.1","port":11434,"protocol":"http"}}}}' }
+      Mock ConvertFrom-Json {
+        return [PSCustomObject]@{
+          ollama = [PSCustomObject]@{
+            network = [PSCustomObject]@{
+              default = [PSCustomObject]@{ host = '127.0.0.1'; port = 11434; protocol = 'http' }
+            }
+          }
+        }
+      }
+
+      $output = Invoke-Dispatch -Action endpoint -ServiceName @('ollama', 'default')
+      $output | Should -Be 'http://127.0.0.1:11434'
+    }
+
+    It 'routes logs with service name to Show-ServiceLog' {
+      Mock Show-ServiceLog { }
+
+      Invoke-Dispatch -Action logs -ServiceName @('ollama')
+
+      Should -Invoke Show-ServiceLog -Exactly 1 -ParameterFilter { $ServiceKey -eq 'ollama' }
+    }
+
+    It 'routes logs without service name to Show-ServiceList' {
+      Mock Get-PlatformService { return @('ollama') }
+      Mock Get-CaptureMode { return 'all' }
+      Mock Test-ServiceHasLog { return $true }
+      Mock Show-ServiceList { }
+
+      Invoke-Dispatch -Action logs
+
+      Should -Invoke Show-ServiceList -Exactly 1
+    }
+
+    It 'routes log-paths to Get-ServiceLogFile' {
+      Mock Get-ServiceLogFile { return @() }
+
+      Invoke-Dispatch -Action log-paths -ServiceName @('ollama')
+
+      Should -Invoke Get-ServiceLogFile -Exactly 1 -ParameterFilter { $ServiceKey -eq 'ollama' }
+    }
+
+    It 'routes log-config to Show-LogConfig' {
+      Mock Show-LogConfig { }
+
+      Invoke-Dispatch -Action log-config -ServiceName @('ollama')
+
+      Should -Invoke Show-LogConfig -Exactly 1 -ParameterFilter { $ServiceKey -eq 'ollama' -and -not $JsonOut }
+    }
+  }
+
+  Context 'error handling' {
+    It 'endpoint with no ServiceName throws' {
+      { Invoke-Dispatch -Action endpoint } | Should -Throw 'svc: missing service name for endpoint'
+    }
+
+    It "start with no ServiceName throws" {
+      { Invoke-Dispatch -Action start } | Should -Throw "svc: missing service name for 'start'"
+    }
+
+    It "stop with no ServiceName throws" {
+      { Invoke-Dispatch -Action stop } | Should -Throw "svc: missing service name for 'stop'"
+    }
+
+    It "restart with no ServiceName throws" {
+      { Invoke-Dispatch -Action restart } | Should -Throw "svc: missing service name for 'restart'"
+    }
+
+    It "enable with no ServiceName throws" {
+      { Invoke-Dispatch -Action enable } | Should -Throw "svc: missing service name for 'enable'"
+    }
+
+    It "disable with no ServiceName throws" {
+      { Invoke-Dispatch -Action disable } | Should -Throw "svc: missing service name for 'disable'"
+    }
+
+    It 'logs with unknown service writes error' {
+      Mock Write-Error { throw "Write-Error: $Message" }
+
+      { Invoke-Dispatch -Action logs -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc logs: unknown service*'
+    }
+
+    It 'log-paths with unknown service writes error' {
+      Mock Write-Error { throw "Write-Error: $Message" }
+
+      { Invoke-Dispatch -Action log-paths -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc log-paths: unknown service*'
+    }
+
+    It 'log-config with unknown service writes error' {
+      Mock Write-Error { throw "Write-Error: $Message" }
+
+      { Invoke-Dispatch -Action log-config -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc log-config: unknown service*'
+    }
+  }
+
+  Context 'JSON routing' {
+    It 'list with Json outputs JSON through Format-StatusTable' {
+      $Script:Json = $true
+      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Get-ServiceStatus { return @{ status = 'active'; running = $true; pid = 12345; displayName = 'Ollama' } }
+
+      $output = Invoke-Dispatch -Action list
+
+      $output | Should -Match '"svc_version":"1"'
+    }
+
+    It 'log-config with Json passes -JsonOut to Show-LogConfig' {
+      $Script:Json = $true
+      Mock Show-LogConfig { }
+
+      Invoke-Dispatch -Action log-config -ServiceName @('ollama')
+
+      Should -Invoke Show-LogConfig -Exactly 1 -ParameterFilter { $ServiceKey -eq 'ollama' -and $JsonOut }
+    }
+  }
+}
 # ---------------------------------------------------------------------------
 # Invoke-ServiceAction
 # ---------------------------------------------------------------------------
@@ -312,7 +550,7 @@ Describe 'Get-ServiceStatus' {
 Describe 'Invoke-ServiceAction' {
   Context 'native type' {
     It 'starts a service and returns $true' {
-      Mock Start-Service { return $true }
+      Mock Start-Service { }
 
       $result = Invoke-ServiceAction -Action 'start' -Platform @{ type = 'native'; service = 'ollama' }
       $result | Should -Be $true
@@ -320,7 +558,7 @@ Describe 'Invoke-ServiceAction' {
     }
 
     It 'stops a service and returns $true' {
-      Mock Stop-Service { return $true }
+      Mock Stop-Service { }
 
       $result = Invoke-ServiceAction -Action 'stop' -Platform @{ type = 'native'; service = 'ollama' }
       $result | Should -Be $true
@@ -328,7 +566,7 @@ Describe 'Invoke-ServiceAction' {
     }
 
     It 'restarts a service and returns $true' {
-      Mock Restart-Service { return $true }
+      Mock Restart-Service { }
 
       $result = Invoke-ServiceAction -Action 'restart' -Platform @{ type = 'native'; service = 'ollama' }
       $result | Should -Be $true
@@ -336,7 +574,7 @@ Describe 'Invoke-ServiceAction' {
     }
 
     It 'enables a service and returns $true' {
-      Mock Set-Service { return $true }
+      Mock Set-Service { }
 
       $result = Invoke-ServiceAction -Action 'enable' -Platform @{ type = 'native'; service = 'ollama' }
       $result | Should -Be $true
@@ -344,7 +582,7 @@ Describe 'Invoke-ServiceAction' {
     }
 
     It 'disables a service and returns $true' {
-      Mock Set-Service { return $true }
+      Mock Set-Service { }
 
       $result = Invoke-ServiceAction -Action 'disable' -Platform @{ type = 'native'; service = 'ollama' }
       $result | Should -Be $true
@@ -363,7 +601,7 @@ Describe 'Invoke-ServiceAction' {
 
   Context 'schtask type' {
     It 'starts a scheduled task and returns $true' {
-      Mock Start-ScheduledTask { return $true }
+      Mock Start-ScheduledTask { }
 
       $result = Invoke-ServiceAction -Action 'start' -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
@@ -371,7 +609,7 @@ Describe 'Invoke-ServiceAction' {
     }
 
     It 'stops a scheduled task and returns $true' {
-      Mock Stop-ScheduledTask { return $true }
+      Mock Stop-ScheduledTask { }
 
       $result = Invoke-ServiceAction -Action 'stop' -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
@@ -379,8 +617,8 @@ Describe 'Invoke-ServiceAction' {
     }
 
     It 'restarts a scheduled task (stop then start) and returns $true' {
-      Mock Stop-ScheduledTask { return $true }
-      Mock Start-ScheduledTask { return $true }
+      Mock Stop-ScheduledTask { }
+      Mock Start-ScheduledTask { }
 
       $result = Invoke-ServiceAction -Action 'restart' -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
@@ -389,7 +627,7 @@ Describe 'Invoke-ServiceAction' {
     }
 
     It 'enables a scheduled task and returns $true' {
-      Mock Enable-ScheduledTask { return $true }
+      Mock Enable-ScheduledTask { }
 
       $result = Invoke-ServiceAction -Action 'enable' -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
@@ -397,7 +635,7 @@ Describe 'Invoke-ServiceAction' {
     }
 
     It 'disables a scheduled task and returns $true' {
-      Mock Disable-ScheduledTask { return $true }
+      Mock Disable-ScheduledTask { }
 
       $result = Invoke-ServiceAction -Action 'disable' -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
@@ -479,7 +717,7 @@ Describe 'Show-LogConfig' {
   It 'outputs human-readable config' {
     $output = Show-LogConfig -ServiceKey 'ollama'
     $output | Should -Not -BeNullOrEmpty
-    $output | Should -Match 'ollama'
+    ($output -join "`n") | Should -Match 'ollama'
   }
 
   It 'outputs JSON with -JsonOut' {
