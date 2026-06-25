@@ -60,9 +60,14 @@ _nucleus_resolve_repo_root() {
   _nrr_context="$1"
   _nrr_fallback="${2:-}"
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ]; then
+    # Resolve symlinks so downstream symlink creation (dev-repos.nix) does not
+    # self-loop when NUCLEUS_REPO_ROOT points at a symlink.
+    NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$NUCLEUS_REPO_ROOT" && pwd -P 2>/dev/null)" || true
     printf '%s\n' "$NUCLEUS_REPO_ROOT"
   elif [ -n "$_nrr_fallback" ] && [ -d "$_nrr_fallback" ]; then
-    printf '%s\n' "$_nrr_fallback"
+    # Also resolve fallback path for the same self-loop prevention.
+    _nrr_resolved="$(CDPATH='' cd -- "$_nrr_fallback" && pwd -P 2>/dev/null)" || true
+    printf '%s\n' "${_nrr_resolved:-$_nrr_fallback}"
   else
     echo "$_nrr_context: repo root not set; run via apply.sh or export NUCLEUS_REPO_ROOT." >&2
     return 1

@@ -105,7 +105,34 @@ test_derive_repo_root_fails_cleanly() {
     fi
 }
 
-# Test 5: Scripts with --help work from outside repo
+# Test 5: NUCLEUS_REPO_ROOT set to a symlink resolves to the real path
+test_env_var_symlink_resolution() {
+    local symlink_path
+    symlink_path="$(mktemp -d)/nucleus-symlink"
+    ln -s "$REPO_ROOT" "$symlink_path"
+    # Clean up on exit
+    trap 'rm -rf "$(dirname "$symlink_path")"' EXIT
+
+    local result
+    result=$(
+        cd /tmp
+        SCRIPT_DIR="$REPO_ROOT/src/scripts" \
+        NUCLEUS_REPO_ROOT="$symlink_path" \
+        bash -euo pipefail -c '
+            . "$SCRIPT_DIR/lib.sh"
+            derive_repo_root
+        '
+    ) || true
+    if [ "$result" = "$REPO_ROOT" ]; then
+        assert_pass "derive_repo_root resolves NUCLEUS_REPO_ROOT symlink to real path"
+    else
+        assert_fail "derive_repo_root resolves NUCLEUS_REPO_ROOT symlink to real path" "Expected '$REPO_ROOT', got '$result'"
+    fi
+    trap - EXIT
+    rm -rf "$(dirname "$symlink_path")"
+}
+
+# Test 6: Scripts with --help work from outside repo
 test_script_help_from_outside() {
     for script in \
         "$REPO_ROOT/scripts/gc.sh" \
@@ -137,6 +164,7 @@ test_derive_repo_root_from_outside_cwd
 test_derive_repo_root_from_src_scripts
 test_env_var_priority
 test_derive_repo_root_fails_cleanly
+test_env_var_symlink_resolution
 test_script_help_from_outside
 
 # Summary
