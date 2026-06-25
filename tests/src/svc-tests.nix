@@ -206,28 +206,45 @@ assert containsRegex "missing action" svcShText;
 assert containsRegex "missing action" svcPs1Text;
 
 # --- Phase E: Cross-host parity assertions ---
-# All 8 subcommands handled in svc.sh case statement
-assert
-  containsRegex "list" svcShText
-  && containsRegex "status" svcShText
-  && containsRegex "start" svcShText
-  && containsRegex "stop" svcShText;
-assert
-  containsRegex "restart" svcShText
-  && containsRegex "enable" svcShText
-  && containsRegex "disable" svcShText
-  && containsRegex "endpoint" svcShText;
-# All 8 subcommands handled in svc.ps1 switch statement
-assert containsRegex "'list'" svcPs1Text && containsRegex "'status'" svcPs1Text;
-assert
-  containsRegex "'start'" svcPs1Text
-  && containsRegex "'stop'" svcPs1Text
-  && containsRegex "'restart'" svcPs1Text;
-assert
-  containsRegex "'enable'" svcPs1Text
-  && containsRegex "'disable'" svcPs1Text
-  && containsRegex "'endpoint'" svcPs1Text;
+# All 11 subcommands present in both backends
+assert builtins.all (x: containsRegex x svcShText) [
+  "endpoint"
+  "logs"
+  "log-paths"
+  "log-config"
+  "list"
+  "status"
+  "start"
+  "stop"
+  "restart"
+  "enable"
+  "disable"
+];
+assert builtins.all (x: containsRegex ("'" + x + "'") svcPs1Text) [
+  "endpoint"
+  "logs"
+  "log-paths"
+  "log-config"
+  "list"
+  "status"
+  "start"
+  "stop"
+  "restart"
+  "enable"
+  "disable"
+];
 # Both backends have consistent error message prefix
 assert containsRegex "svc:" svcShText;
 assert containsRegex "svc:" svcPs1Text;
+
+# --- Dispatch wiring (explicit function mapping) ---
+# svc.sh action dispatch: special-case actions use explicit function names
+# (catches regression where "do_$action" produced invalid function names)
+assert containsRegex "log-paths) do_log_paths" svcShText;
+assert containsRegex "log-config) do_log_config" svcShText;
+assert containsRegex "endpoint) do_endpoint" svcShText;
+assert containsRegex "list[|]status[|]logs) \"do_\\$action\"" svcShText;
+assert containsRegex "start[|]stop[|]restart[|]enable[|]disable) do_action" svcShText;
+# do_log_config parses --json via global json_output (not a local variable)
+assert containsRegex "--json) json_output=true" svcShText;
 true
