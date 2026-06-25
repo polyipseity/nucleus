@@ -118,6 +118,16 @@ for ($i = 0; $i -lt 30; $i++) {
 
 # Heartbeat: re-push config every 5s so config re-applies when a
 # disconnected audio device reappears.
+# Check if heartbeat is enabled via nucleus-config.
+$nucleusCfgFile = Join-Path $HOME ".local\state\nucleus\config.json"
+$heartbeatEnabled = $true
+if (Test-Path $nucleusCfgFile) {
+  $nucleusCfg = Get-Content -Raw $nucleusCfgFile | ConvertFrom-Json
+  if ($null -ne $nucleusCfg.camilladsp.heartbeat -and -not $nucleusCfg.camilladsp.heartbeat) {
+    $heartbeatEnabled = $false
+  }
+}
+if ($heartbeatEnabled) {
 $heartbeatTimer = [System.Threading.Timer]::new({
   param($s)
   $cf, $p = $s
@@ -133,9 +143,10 @@ $heartbeatTimer = [System.Threading.Timer]::new({
     # Device may be gone — retry on next heartbeat.
   }
 }, ($ConfigFile, $Port), 5000, 5000)
+}
 
 $process.WaitForExit()
-$heartbeatTimer.Dispose()
+if ($heartbeatEnabled) { $heartbeatTimer.Dispose() }
 '@
   Set-Content -Path $wrapperScriptPath -Value $wrapperContent -NoNewline
 

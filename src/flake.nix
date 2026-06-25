@@ -646,6 +646,14 @@
           runtimeInputs = [ pkgs.jq ];
         };
 
+      # Manage runtime configuration for nucleus services.
+      mkNucleusConfigApp =
+        pkgs:
+        mkApp pkgs {
+          name = "nucleus-config";
+          runtimeInputs = [ pkgs.jq ];
+        };
+
     in
     {
       # -----------------------------------------------------------------------
@@ -675,6 +683,7 @@
           gc = mkGcApp pkgsMac;
           health-check = mkHealthCheckApp pkgsMac;
           nixos-generators = nixos-generators.apps.${systems.mac}.default;
+          nucleus-config = mkNucleusConfigApp pkgsMac;
           replica-reset = mkReplicaResetApp pkgsMac;
           replica-sync = mkReplicaSyncApp pkgsMac;
           update = mkUpdateApp pkgsMac;
@@ -703,6 +712,7 @@
             program = "${pkgsLinux.nixos-rebuild}/bin/nixos-rebuild";
           };
           nixos-generators = nixos-generators.apps.${systems.linux}.default;
+          nucleus-config = mkNucleusConfigApp pkgsLinux;
           replica-reset = mkReplicaResetApp pkgsLinux;
           replica-sync = mkReplicaSyncApp pkgsLinux;
           update = mkUpdateApp pkgsLinux;

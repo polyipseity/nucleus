@@ -40,11 +40,23 @@ let
 
     # Heartbeat: re-push config every 5s so config re-applies when a
     # disconnected audio device reappears.
-    while sleep 5; do
-      "$jq" -cRs '{SetConfig: .}' "$config_file" | \
-        "$websocat" -1 "ws://127.0.0.1:$ws_port" >/dev/null 2>&1 || true
-    done &
-    heartbeat_pid=$!
+    config_json="${userHome}/.local/state/nucleus/config.json"
+    heartbeat_enabled=true
+    if [ -f "$config_json" ]; then
+      val=$("$jq" -r '.camilladsp.heartbeat // true' "$config_json")
+      if [ "$val" = "false" ]; then
+        heartbeat_enabled=false
+      fi
+    fi
+    if [ "$heartbeat_enabled" = "true" ]; then
+      while sleep 5; do
+        "$jq" -cRs '{SetConfig: .}' "$config_file" | \
+          "$websocat" -1 "ws://127.0.0.1:$ws_port" >/dev/null 2>&1 || true
+      done &
+      heartbeat_pid=$!
+    else
+      heartbeat_pid=""
+    fi
 
     wait $pid
     kill "$heartbeat_pid" 2>/dev/null

@@ -126,6 +126,7 @@ in
     (mkNucleusCommand "nucleus-check-pwsh" "check-pwsh")
     (mkNucleusCommand "nucleus-check-sh" "check-sh")
     (mkNucleusCommand "nucleus-cloud-setup" "cloud-setup")
+    (mkNucleusCommand "nucleus-config" "nucleus-config")
     (mkNucleusCommand "nucleus-gc" "gc")
     (mkNucleusCommand "nucleus-health-check" "health-check")
     (mkNucleusCommand "nucleus-replica-reset" "replica-reset")
