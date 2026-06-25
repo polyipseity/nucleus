@@ -111,8 +111,16 @@ let
       ''}
 
       # Resolve the nucleus repository root from NUCLEUS_REPO_ROOT (set by apply.sh
-      # and forwarded through sudo).
-      _nucleus_repo="''${NUCLEUS_REPO_ROOT:?nucleus: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
+      # and forwarded through sudo), falling back to git-based auto-detection when
+      # the wrapper is invoked outside the apply.sh flow (e.g. during bootstrap).
+      _nucleus_repo="''${NUCLEUS_REPO_ROOT:-}"
+      if [ -z "$_nucleus_repo" ] || [ ! -d "$_nucleus_repo" ]; then
+        _nucleus_repo="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+        if [ -z "$_nucleus_repo" ] || [ ! -f "$_nucleus_repo/src/flake.nix" ]; then
+          printf '%s\n' "nucleus-${app}: cannot determine nucleus repository root — set NUCLEUS_REPO_ROOT or run from within the nucleus repo" >&2
+          exit 1
+        fi
+      fi
       export NUCLEUS_REPO_ROOT="$_nucleus_repo"
       exec nix --option warn-dirty false run "$_nucleus_repo/src#${app}" -- "$@"
     '';
