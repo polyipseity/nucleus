@@ -78,23 +78,7 @@ BeforeAll {
     }
   }
 
-  # Stub external commands so Pester can mock them.
-  # These may not exist on macOS, so stubs are needed for Mock to work.
-  function Get-Service { }
-  function Get-ScheduledTask { }
-  function Get-NucleusLogDir { }
-  function Get-NucleusSystemLogDir { }
-  function Get-WinEvent { }
-  function ConvertTo-SanitizedText { }
-  function Start-Service { }
-  function Stop-Service { }
-  function Restart-Service { }
-  function Set-Service { [CmdletBinding()] param([string]$Name, [string]$StartupType) }
-  function Get-CimInstance { }
-  function Start-ScheduledTask { }
-  function Stop-ScheduledTask { }
-  function Enable-ScheduledTask { }
-  function Disable-ScheduledTask { }
+  # Stubs are omitted — Pester Mock creates functions automatically when needed.
 
   # Mock external dependencies for log functions.
   Mock Get-NucleusLogDir { return 'TestDrive:\nucleus\logs' }
@@ -349,7 +333,6 @@ Describe 'Dispatch' {
       $RegistryRaw = $Script:RegistryRaw
       $Platform = $Script:Platform
       $Json = $Script:Json
-      $RepoRoot = 'TestDrive:\'
       . ([scriptblock]::Create($dispatchSwitchText))
     }
   }

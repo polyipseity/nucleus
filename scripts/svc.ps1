@@ -344,10 +344,8 @@ function Test-ServiceHasLog {
   }
   $eventLog = Get-EventLogConfig -ServiceKey $ServiceKey
   if ($eventLog -and $eventLog.ContainsKey('provider')) {
-    try {
-      $null = Get-WinEvent -ProviderName $eventLog.provider -MaxEvents 1 -ErrorAction SilentlyContinue
-      return $true
-    } catch { }
+    $evt = Get-WinEvent -ProviderName $eventLog.provider -MaxEvents 1 -ErrorAction SilentlyContinue
+    if ($evt) { return $true }
   }
   return $false
 }

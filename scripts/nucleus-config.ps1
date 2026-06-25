@@ -25,7 +25,7 @@ param(
   [string[]]$Arguments
 )
 
-$configFile = Join-Path $HOME ".local" "state" "nucleus" "config.json"
+$configFile = Join-Path -Path $HOME -ChildPath ".local/state/nucleus/config.json"
 
 # Default values for all known config keys.
 # Used as fallback when file/key is absent, so users can discover available options.
@@ -35,9 +35,11 @@ $script:Defaults = @{
   }
 }
 
-function Ensure-ConfigDir {
-  $dir = Split-Path $configFile -Parent
-  if (-not (Test-Path $dir)) {
+function New-ConfigDir {
+  [CmdletBinding(SupportsShouldProcess)]
+  param()
+  $dir = Split-Path -Path $configFile -Parent
+  if (-not (Test-Path $dir) -and $PSCmdlet.ShouldProcess($dir, 'Create config directory')) {
     New-Item -Path $dir -ItemType Directory -Force | Out-Null
   }
 }
@@ -80,11 +82,13 @@ function DeepMerge($a, $b) {
 }
 
 function Set-ConfigValue {
+  [CmdletBinding(SupportsShouldProcess)]
+  param()
   if ($Arguments.Count -lt 2) {
     Write-Error "Usage: nucleus-config set <section.key> <value>"
     exit 1
   }
-  Ensure-ConfigDir
+  New-ConfigDir
   $key = $Arguments[0]
   $rawValue = $Arguments[1]
 
@@ -113,7 +117,7 @@ function Set-ConfigValue {
   $cfg | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -NoNewline
 }
 
-function List-ConfigValues {
+function Out-ConfigValueList {
   $merged = Merge-Config
   function Flatten($obj, $prefix) {
     foreach ($prop in $obj.PSObject.Properties) {
@@ -132,7 +136,7 @@ function List-ConfigValues {
 switch ($Command) {
   'get' { Get-ConfigValue }
   'set' { Set-ConfigValue }
-  'list' { List-ConfigValues }
+  'list' { Out-ConfigValueList }
   default {
     Write-Error "Usage: nucleus-config get [<section.key>]|set <section.key> <value>|list"
     exit 1
