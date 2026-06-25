@@ -10,7 +10,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 usage() {
-  usage_std "$(basename "$0")" "list|status|start|stop|restart|enable|disable|endpoint [service...] [options]"
+  usage_std "$(basename "$0")" "list|status|start|stop|restart|enable|disable|endpoint|logs|log-paths|log-config [service...] [options]"
   cat <<'EOF'
   list                              List all known services with status.
   status [service...]               Show status of specified services (all if omitted).
@@ -20,6 +20,9 @@ usage() {
   enable <service>                  Enable auto-start.
   disable <service>                 Disable auto-start.
   endpoint <service> [<name>]       Show network endpoint(s) for a service.
+  logs [service...]                 Show service logs (list available if no service).
+  log-paths [service...]            Print log file path(s).
+  log-config [service...]           Show effective logging configuration.
   --json                            Machine-readable JSON output.
   -h|--help                         Show usage.
 EOF
@@ -468,6 +471,226 @@ do_endpoint() {
   fi
 }
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Log subcommand helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Get sorted list of services defined for the current platform.
+get_platform_services() {
+  jq -r --arg platform "$PLATFORM" '
+    to_entries[]
+    | select(.key | startswith("$") | not)
+    | select(.value.platforms[$platform] != null)
+    | .key
+  ' "$SERVICES_JSON" | sort
+}
+
+# Resolve capture mode for a service (platform-specific overrides top-level).
+get_capture() {
+  local svc="$1"
+  jq -r --arg svc "$svc" --arg platform "$PLATFORM" '
+    (.[$svc].platforms[$platform].logging.capture // .[$svc].logging.capture // "all")
+  ' "$SERVICES_JSON"
+}
+
+# Get the systemd unit name for a NixOS service.
+get_unit() {
+  local svc="$1"
+  jq -r --arg svc "$svc" '
+    (.[$svc].platforms.nixos.service // "")
+  ' "$SERVICES_JSON"
+}
+
+# Print all log file paths for a service (user + system dirs).
+service_log_files() {
+  local svc="$1"
+  local user_dir system_dir
+  user_dir="$(nucleus_log_dir)/$svc"
+  system_dir="$(nucleus_system_log_dir)/$svc"
+  for d in "$user_dir" "$system_dir"; do
+    [ -d "$d" ] && find "$d" -name '*.log' -type f 2>/dev/null || true
+  done
+}
+
+# Check if a service has any accessible log output.
+service_has_logs() {
+  local svc="$1"
+  local capture
+  capture="$(get_capture "$svc")"
+  if [ "$capture" != "none" ] && [ -n "$(service_log_files "$svc")" ]; then
+    return 0
+  fi
+  if [ "$PLATFORM" = "nixos" ]; then
+    local unit
+    unit="$(get_unit "$svc")"
+    if [ -n "$unit" ] && command -v journalctl >/dev/null 2>&1; then
+      journalctl -u "$unit" -n 1 --quiet --no-pager >/dev/null 2>&1 && return 0
+    fi
+  fi
+  return 1
+}
+
+# Show file-based logs for a service.
+show_file_logs() {
+  local svc="$1" lines="$2" raw="$3"
+  local files
+  files="$(service_log_files "$svc")"
+  [ -z "$files" ] && return 1
+  local sanitize_cmd="log_sanitize"
+  $raw && sanitize_cmd="cat"
+  # shellcheck disable=SC2086
+  tail -n "$lines" $files | "$sanitize_cmd"
+}
+
+# Show journald logs for a service (NixOS only).
+show_journald_logs() {
+  local svc="$1" lines="$2" raw="$3" since="$4"
+  local unit
+  unit="$(get_unit "$svc")"
+  [ -z "$unit" ] && return 1
+  local since_arg=()
+  [ -n "$since" ] && since_arg=(--since "$since")
+  local sanitize_cmd="log_sanitize"
+  $raw && sanitize_cmd="cat"
+  journalctl -u "$unit" -n "$lines" --no-pager -o cat "${since_arg[@]}" | "$sanitize_cmd"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Log action implementations
+# ──────────────────────────────────────────────────────────────────────────────
+
+do_logs() {
+  local lines=10 since="" raw=false
+  local parsed_args=()
+  while [ "${#service_names[@]}" -gt 0 ]; do
+    case "${service_names[0]}" in
+      -n|--lines) lines="${service_names[1]}"; service_names=("${service_names[@]:2}") ;;
+      --since) since="${service_names[1]}"; service_names=("${service_names[@]:2}") ;;
+      --raw) raw=true; service_names=("${service_names[@]:1}") ;;
+      --) service_names=("${service_names[@]:1}"); break ;;
+      -*) printf 'svc logs: unknown option %s\n' "${service_names[0]}" >&2; exit 1 ;;
+      *) parsed_args+=("${service_names[0]}"); service_names=("${service_names[@]:1}") ;;
+    esac
+  done
+  service_names=("${parsed_args[@]}")
+
+  # No service args: list available log sources.
+  if [ "${#service_names[@]}" -eq 0 ]; then
+    if $json_output; then
+      printf '['
+      local first=true
+      while IFS= read -r svc; do
+        $first || printf ',',
+        first=false
+        printf '  "%s"' "$svc"
+      done <<< "$(get_platform_services)"
+      printf '\n]\n'
+    else
+      printf 'Available services:\n\n'
+      while IFS= read -r svc; do
+        local capture
+        capture="$(get_capture "$svc")"
+        if service_has_logs "$svc"; then
+          printf '  %-25s capture=%-7s\n' "$svc" "$capture"
+        else
+          printf '  %-25s capture=%-7s (no logs yet)\n' "$svc" "$capture"
+        fi
+      done <<< "$(get_platform_services)"
+    fi
+    return
+  fi
+
+  for svc in "${service_names[@]}"; do
+    if ! get_platform_services | grep -qx "$svc"; then
+      printf 'svc logs: unknown service "%s"\n' "$svc" >&2
+      exit 1
+    fi
+    local capture
+    capture="$(get_capture "$svc")"
+
+    case "$PLATFORM" in
+      macos)
+        if [ "$capture" = "none" ]; then
+          printf 'svc logs: %s — capture disabled\n' "$svc" >&2
+          continue
+        fi
+        show_file_logs "$svc" "$lines" "$raw" || printf 'svc logs: %s — no log files found\n' "$svc" >&2
+        ;;
+      nixos)
+        local unit
+        unit="$(get_unit "$svc")"
+        if [ -n "$unit" ] && command -v journalctl >/dev/null 2>&1; then
+          show_journald_logs "$svc" "$lines" "$raw" "$since" || printf 'svc logs: %s — no journald logs\n' "$svc" >&2
+        elif [ "$capture" != "none" ]; then
+          show_file_logs "$svc" "$lines" "$raw" || printf 'svc logs: %s — no log files found\n' "$svc" >&2
+        else
+          printf 'svc logs: %s — capture disabled and no systemd unit\n' "$svc" >&2
+        fi
+        ;;
+    esac
+  done
+}
+
+do_log_paths() {
+  if [ "${#service_names[@]}" -gt 0 ]; then
+    for svc in "${service_names[@]}"; do
+      service_log_files "$svc"
+    done
+  else
+    while IFS= read -r svc; do
+      service_log_files "$svc"
+    done <<< "$(get_platform_services)"
+  fi
+}
+
+do_log_config() {
+  local want_json=false
+  local parsed_args=()
+  while [ "${#service_names[@]}" -gt 0 ]; do
+    case "${service_names[0]}" in
+      --json) want_json=true; service_names=("${service_names[@]:1}") ;;
+      --) service_names=("${service_names[@]:1}"); break ;;
+      -*) printf 'svc log-config: unknown option %s\n' "${service_names[0]}" >&2; exit 1 ;;
+      *) parsed_args+=("${service_names[0]}"); service_names=("${service_names[@]:1}") ;;
+    esac
+  done
+  service_names=("${parsed_args[@]}")
+
+  local targets=()
+  if [ "${#service_names[@]}" -gt 0 ]; then
+    targets=("${service_names[@]}")
+  else
+    while IFS= read -r svc; do targets+=("$svc"); done <<< "$(get_platform_services)"
+  fi
+
+  for svc in "${targets[@]}"; do
+    local entry
+    entry=$(jq -c --arg svc "$svc" --arg platform "$PLATFORM" '
+      def log: .logging // {};
+      def plat_log: .platforms[$platform].logging // {};
+      {
+        capture: (plat_log.capture // log.capture // "all"),
+        maxSize: (plat_log.maxSize // log.maxSize // 10485760),
+        maxFiles: (plat_log.maxFiles // log.maxFiles // 4),
+        compress: (plat_log.compress // log.compress // true),
+        sanitize: (plat_log.sanitize // log.sanitize // true),
+        level: (plat_log.level // log.level // null),
+        eventLog: (plat_log.eventLog // log.eventLog // null)
+      }
+    ' "$SERVICES_JSON")
+    if $want_json; then
+      printf '{"%s":%s}\n' "$svc" "$entry"
+    else
+      printf '%s:\n' "$svc"
+      echo "$entry" | jq -r '
+        to_entries[]
+        | select(.value != null)
+        | "  \(.key): \(.value)"
+      '
+    fi
+  done
+}
+
 # Main
 
 json_output=false
@@ -478,7 +701,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
     --json) json_output=true; shift ;;
-    endpoint)
+    endpoint|logs|log-paths|log-config)
       action="$1"; shift
       service_names=("$@")
       break
@@ -503,11 +726,10 @@ for arg in "${service_names[@]}"; do
 done
 service_names=("${filtered_service_names[@]}")
 
-[ -z "$action" ] && { printf '%s\n' "svc: missing action (list, status, start, stop, restart, enable, disable, endpoint)" >&2; usage >&2; exit 1; }
+[ -z "$action" ] && { printf '%s\n' "svc: missing action (list, status, start, stop, restart, enable, disable, endpoint, logs, log-paths, log-config)" >&2; usage >&2; exit 1; }
 
 case "$action" in
-  list)   do_list ;;
-  status) do_status ;;
+  list|status|logs|log-paths|log-config) "do_$action" ;;
   endpoint) do_endpoint ;;
   start|stop|restart|enable|disable) do_action ;;
 esac
