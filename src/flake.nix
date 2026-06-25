@@ -646,14 +646,6 @@
           runtimeInputs = [ pkgs.jq ];
         };
 
-      # Build the `nucleus logs` CLI viewer app for POSIX hosts.
-      mkLogsApp =
-        pkgs:
-        mkApp pkgs {
-          name = "logs";
-          runtimeInputs = [ pkgs.jq ];
-        };
-
     in
     {
       # -----------------------------------------------------------------------
@@ -682,7 +674,6 @@
           };
           gc = mkGcApp pkgsMac;
           health-check = mkHealthCheckApp pkgsMac;
-          logs = mkLogsApp pkgsMac;
           nixos-generators = nixos-generators.apps.${systems.mac}.default;
           replica-reset = mkReplicaResetApp pkgsMac;
           replica-sync = mkReplicaSyncApp pkgsMac;
@@ -703,7 +694,6 @@
           cloud-setup = mkCloudSetupApp pkgsLinux;
           gc = mkGcApp pkgsLinux;
           health-check = mkHealthCheckApp pkgsLinux;
-          logs = mkLogsApp pkgsLinux;
           home-manager = {
             type = "app";
             program = "${home-manager.packages.${systems.linux}.home-manager}/bin/home-manager";

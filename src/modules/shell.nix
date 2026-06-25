@@ -128,7 +128,6 @@ in
     (mkNucleusCommand "nucleus-cloud-setup" "cloud-setup")
     (mkNucleusCommand "nucleus-gc" "gc")
     (mkNucleusCommand "nucleus-health-check" "health-check")
-    (mkNucleusCommand "nucleus-logs" "logs")
     (mkNucleusCommand "nucleus-replica-reset" "replica-reset")
     (mkNucleusCommand "nucleus-replica-sync" "replica-sync")
     (mkNucleusCommand "nucleus-svc" "svc")
