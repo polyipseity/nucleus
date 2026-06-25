@@ -115,6 +115,7 @@ let
       # the wrapper is invoked outside the apply.sh flow (e.g. during bootstrap).
       _nucleus_repo="''${NUCLEUS_REPO_ROOT:-}"
       if [ -z "$_nucleus_repo" ] || [ ! -d "$_nucleus_repo" ]; then
+        # git resolves symlinks, matching derive_repo_root behavior in lib.sh.
         _nucleus_repo="$(git rev-parse --show-toplevel 2>/dev/null || true)"
         if [ -z "$_nucleus_repo" ] || [ ! -f "$_nucleus_repo/src/flake.nix" ]; then
           printf '%s\n' "nucleus-${app}: cannot determine nucleus repository root — set NUCLEUS_REPO_ROOT or run from within the nucleus repo" >&2
