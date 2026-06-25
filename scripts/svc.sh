@@ -263,17 +263,29 @@ svc_action() {
       local target
       target=$(launchctl_target "$domain" "$svc_id")
 
+      local plist=""
+      if [ "$domain" = "system" ]; then
+        plist="/Library/LaunchDaemons/$svc_id.plist"
+      else
+        plist="$HOME/Library/LaunchAgents/$svc_id.plist"
+      fi
+
       case "$action" in
         status)  svc_status "$name" "$entry_json" ;;
         start)
-          recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || \
-            $sudo_prefix launchctl start "$target" >/dev/null 2>&1 || [ $? -eq 3 ]
+          recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
+            $sudo_prefix launchctl enable "$target" >/dev/null 2>&1
+            $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 || \
+              $sudo_prefix launchctl bootstrap "$domain" "$plist" >/dev/null 2>&1
+          }
           ;;
         stop)    $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
         restart)
           recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
             $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1
-            $sudo_prefix launchctl start "$target" >/dev/null 2>&1 || [ $? -eq 3 ]
+            $sudo_prefix launchctl enable "$target" >/dev/null 2>&1
+            $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 || \
+              $sudo_prefix launchctl bootstrap "$domain" "$plist" >/dev/null 2>&1
           }
           ;;
         enable)  $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
