@@ -644,11 +644,10 @@ do_log_paths() {
 }
 
 do_log_config() {
-  local want_json=false
   local parsed_args=()
   while [ "${#service_names[@]}" -gt 0 ]; do
     case "${service_names[0]}" in
-      --json) want_json=true; service_names=("${service_names[@]:1}") ;;
+      --json) json_output=true; service_names=("${service_names[@]:1}") ;;
       --) service_names=("${service_names[@]:1}"); break ;;
       -*) printf 'svc log-config: unknown option %s\n' "${service_names[0]}" >&2; exit 1 ;;
       *) parsed_args+=("${service_names[0]}"); service_names=("${service_names[@]:1}") ;;
@@ -678,7 +677,7 @@ do_log_config() {
         eventLog: (plat_log.eventLog // log.eventLog // null)
       }
     ' "$SERVICES_JSON")
-    if $want_json; then
+    if $json_output; then
       printf '{"%s":%s}\n' "$svc" "$entry"
     else
       printf '%s:\n' "$svc"
@@ -729,7 +728,9 @@ service_names=("${filtered_service_names[@]}")
 [ -z "$action" ] && { printf '%s\n' "svc: missing action (list, status, start, stop, restart, enable, disable, endpoint, logs, log-paths, log-config)" >&2; usage >&2; exit 1; }
 
 case "$action" in
-  list|status|logs|log-paths|log-config) "do_$action" ;;
+  list|status|logs) "do_$action" ;;
+  log-paths) do_log_paths ;;
+  log-config) do_log_config ;;
   endpoint) do_endpoint ;;
   start|stop|restart|enable|disable) do_action ;;
 esac
