@@ -1,6 +1,6 @@
 --- configure.ac.orig	2026-06-24 11:27:34
 +++ configure.ac	2026-06-24 11:27:34
-@@ -322,36 +322,6 @@
+@@ -322,36 +322,7 @@
  	FUSE_LIB_PATH=`$PKG_CONFIG --libs-only-L fuse | sed -e 's,/[/]*,/,g' -e 's,[ ]*$,,'`
  fi
 
@@ -34,6 +34,7 @@
 -	fi
 -fi
 -AM_CONDITIONAL(ENABLE_CRYPTO, $compile_crypto)
++AM_CONDITIONAL([ENABLE_CRYPTO], [false])
 
  # add --with-extra-includes and --with-extra-libs switch to ./configure
  all_libraries="$all_libraries $USER_LDFLAGS"
