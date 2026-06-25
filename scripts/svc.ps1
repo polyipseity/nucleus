@@ -1,17 +1,19 @@
 <#
 .SYNOPSIS
-  Unified service management for Windows (native, scheduled tasks).
+  Unified service management and log inspection for Windows (native, scheduled tasks).
 
 .DESCRIPTION
   Provides a uniform CLI for listing, starting, stopping, restarting,
-  enabling, and disabling services across Windows service types:
+  enabling, disabling, and inspecting logs of services across Windows
+  service types:
     - native:  standard Windows services (Get-Service, sc.exe)
     - schtask: Scheduled tasks (Get-ScheduledTask etc.)
 
   Services are defined in src/modules/services.json (the canonical registry).
 
 .PARAMETER Action
-  The operation to perform: list, status, start, stop, restart, enable, disable, endpoint.
+  The operation to perform: list, status, start, stop, restart, enable, disable,
+  endpoint, logs, log-paths, log-config.
 
 .PARAMETER ServiceName
   One or more service names to target (required for start/stop/restart/enable/disable;
@@ -30,6 +32,12 @@
   .\svc.ps1 restart jellyfin
   .\svc.ps1 endpoint jellyfin http
   .\svc.ps1 list -Json
+  .\svc.ps1 logs
+  .\svc.ps1 logs ollama -n 50
+  .\svc.ps1 logs jellyfin --raw
+  .\svc.ps1 log-paths ollama
+  .\svc.ps1 log-config ollama,jellyfin
+  .\svc.ps1 log-config ollama -Json
 
 .NOTES
   Environment variables: NUCLEUS_REPO_ROOT.
@@ -38,7 +46,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'endpoint')]
+  [ValidateSet('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'endpoint', 'logs', 'log-paths', 'log-config')]
   [string]$Action,
 
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -53,7 +61,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 if ($Help -or -not $Action) {
-  if (-not $Action) { Write-Output "ERROR: missing action (list, status, start, stop, restart, enable, disable)" }
+  if (-not $Action) { Write-Output "ERROR: missing action (list, status, start, stop, restart, enable, disable, endpoint, logs, log-paths, log-config)" }
   Get-Help $PSCommandPath -Detailed
   exit 0
 }
@@ -85,6 +93,9 @@ foreach ($svc in $RegistryRaw.Keys) {
     }
   }
 }
+
+# Load log management helpers
+. (Join-Path -Path $RepoRoot -ChildPath "src\hosts\Windows\modules\Invoke-LogManagement.ps1")
 
 # ---------------------------------------------------------------------------
 # Resolve service names (expand prefix matches)
@@ -272,6 +283,157 @@ function Format-StatusTable {
   return $lines -join "`n"
 }
 
+# ---------------------------------------------------------------------------
+# Log helpers
+# ---------------------------------------------------------------------------
+
+function Get-PlatformService {
+  $Registry.Keys | Sort-Object
+}
+
+function Get-LogEntry {
+  param([string]$ServiceKey)
+  $entry = $RegistryRaw[$ServiceKey]
+  $platLog = if ($entry.platforms[$Platform].ContainsKey('logging')) { $entry.platforms[$Platform].logging } else { $null }
+  $topLog = if ($entry.ContainsKey('logging')) { $entry.logging } else { $null }
+  return @{ platform = $platLog; top = $topLog }
+}
+
+function Get-CaptureMode {
+  param([string]$ServiceKey)
+  $logEntry = Get-LogEntry -ServiceKey $ServiceKey
+  $platLog = $logEntry.platform
+  $topLog = $logEntry.top
+  if ($platLog -and $platLog.ContainsKey('capture')) { return $platLog.capture }
+  if ($topLog -and $topLog.ContainsKey('capture')) { return $topLog.capture }
+  return 'all'
+}
+
+function Get-EventLogConfig {
+  param([string]$ServiceKey)
+  $entry = $RegistryRaw[$ServiceKey]
+  $eventLog = $null
+  if ($entry.platforms[$Platform].ContainsKey('logging') -and $entry.platforms[$Platform].logging.ContainsKey('eventLog')) {
+    $eventLog = $entry.platforms[$Platform].logging.eventLog
+  } elseif ($entry.ContainsKey('logging') -and $entry.logging.ContainsKey('eventLog')) {
+    $eventLog = $entry.logging.eventLog
+  }
+  return $eventLog
+}
+
+function Get-ServiceLogFile {
+  param([string]$ServiceKey)
+  $files = @()
+  $userDir = Join-Path (Get-NucleusLogDir) $ServiceKey
+  $systemDir = Join-Path (Get-NucleusSystemLogDir) $ServiceKey
+  if (Test-Path -LiteralPath $userDir -PathType Container) {
+    $files += Get-ChildItem -LiteralPath $userDir -Filter '*.log' -File | Select-Object -ExpandProperty FullName
+  }
+  if (Test-Path -LiteralPath $systemDir -PathType Container) {
+    $files += Get-ChildItem -LiteralPath $systemDir -Filter '*.log' -File | Select-Object -ExpandProperty FullName
+  }
+  return $files | Sort-Object
+}
+
+function Test-ServiceHasLog {
+  param([string]$ServiceKey)
+  $capture = Get-CaptureMode -ServiceKey $ServiceKey
+  if ($capture -ne 'none') {
+    $files = Get-ServiceLogFile -ServiceKey $ServiceKey
+    if ($files.Count -gt 0) { return $true }
+  }
+  $eventLog = Get-EventLogConfig -ServiceKey $ServiceKey
+  if ($eventLog -and $eventLog.ContainsKey('provider')) {
+    try {
+      $null = Get-WinEvent -ProviderName $eventLog.provider -MaxEvents 1 -ErrorAction SilentlyContinue
+      return $true
+    } catch { }
+  }
+  return $false
+}
+
+function Show-FileLog {
+  param([string]$ServiceKey, [int]$Lines = 10, [switch]$Raw)
+  $files = Get-ServiceLogFile -ServiceKey $ServiceKey
+  if ($files.Count -eq 0) { return $false }
+  foreach ($file in $files) {
+    $content = Get-Content -LiteralPath $file -Tail $Lines
+    if (-not $Raw) { $content = $content | ConvertTo-SanitizedText }
+    Write-Output "# $file"
+    Write-Output $content
+  }
+  return $true
+}
+
+function Show-EventLog {
+  param([string]$ServiceKey, [int]$Lines = 10, [switch]$Raw)
+  $eventLog = Get-EventLogConfig -ServiceKey $ServiceKey
+  if (-not $eventLog) { return $false }
+  $provider = if ($eventLog.ContainsKey('provider')) { $eventLog.provider } else { $null }
+  $logName = if ($eventLog.ContainsKey('logName')) { $eventLog.logName } else { 'Application' }
+  if (-not $provider) { return $false }
+  try {
+    $events = Get-WinEvent -LogName $logName -ProviderName $provider -MaxEvents $Lines -ErrorAction Stop
+    foreach ($event in $events) {
+      $msg = $event.Message
+      if (-not $Raw) { $msg = $msg | ConvertTo-SanitizedText }
+      Write-Output "[$($event.TimeCreated)] $($event.LevelDisplayName): $msg"
+    }
+    return $true
+  } catch {
+    return $false
+  }
+}
+
+function Show-ServiceLog {
+  param([string]$ServiceKey, [int]$Lines = 10, [switch]$Raw)
+  if (Show-EventLog -ServiceKey $ServiceKey -Lines $Lines -Raw:$Raw) { return }
+  $capture = Get-CaptureMode -ServiceKey $ServiceKey
+  if ($capture -ne 'none') {
+    if (-not (Show-FileLog -ServiceKey $ServiceKey -Lines $Lines -Raw:$Raw)) {
+      Write-Warning "svc logs: $ServiceKey — no log files found"
+    }
+  } else {
+    Write-Warning "svc logs: $ServiceKey — capture disabled"
+  }
+}
+
+function Show-ServiceList {
+  foreach ($svc in (Get-PlatformService)) {
+    $capture = Get-CaptureMode -ServiceKey $svc
+    $hasLog = Test-ServiceHasLog -ServiceKey $svc
+    Write-Output ("  {0,-25} capture={1,-7}{2}" -f $svc, $capture, $(if (-not $hasLog) { ' (no logs yet)' } else { '' }))
+  }
+}
+
+function Show-LogConfig {
+  param([string]$ServiceKey, [switch]$JsonOut)
+  $lp = Get-LogEntry -ServiceKey $ServiceKey
+  $platLog = $lp.platform
+  $topLog = $lp.top
+  $config = @{
+    capture  = if ($platLog -and $platLog.ContainsKey('capture')) { $platLog.capture } elseif ($topLog -and $topLog.ContainsKey('capture')) { $topLog.capture } else { 'all' }
+    maxSize  = if ($platLog -and $platLog.ContainsKey('maxSize')) { $platLog.maxSize } elseif ($topLog -and $topLog.ContainsKey('maxSize')) { $topLog.maxSize } else { 10485760 }
+    maxFiles = if ($platLog -and $platLog.ContainsKey('maxFiles')) { $platLog.maxFiles } elseif ($topLog -and $topLog.ContainsKey('maxFiles')) { $topLog.maxFiles } else { 4 }
+    compress = if ($platLog -and $platLog.ContainsKey('compress')) { $platLog.compress } elseif ($topLog -and $topLog.ContainsKey('compress')) { $topLog.compress } else { $true }
+    sanitize = if ($platLog -and $platLog.ContainsKey('sanitize')) { $platLog.sanitize } elseif ($topLog -and $topLog.ContainsKey('sanitize')) { $topLog.sanitize } else { $true }
+    level    = if ($platLog -and $platLog.ContainsKey('level')) { $platLog.level } elseif ($topLog -and $topLog.ContainsKey('level')) { $topLog.level } else { $null }
+  }
+  $eventLogEntry = if ($platLog -and $platLog.ContainsKey('eventLog')) { $platLog.eventLog } elseif ($topLog -and $topLog.ContainsKey('eventLog')) { $topLog.eventLog } else { $null }
+  if ($eventLogEntry) { $config.eventLog = $eventLogEntry }
+  if ($JsonOut) {
+    $obj = @{}
+    $obj[$ServiceKey] = $config
+    Write-Output ($obj | ConvertTo-Json -Depth 3 -Compress)
+  } else {
+    Write-Output "${ServiceKey}:"
+    foreach ($key in ($config.Keys | Sort-Object)) {
+      $val = $config[$key]
+      if ($null -ne $val) { Write-Output "  $key`: $val" }
+    }
+  }
+}
+
 switch ($Action) {
   'list' {
     $resolved = Resolve-ServiceName -Names $ServiceName
@@ -386,5 +548,75 @@ switch ($Action) {
         }
       }
     }
+  }
+
+  'logs' {
+    $logLines = 10
+    $logRaw = $false
+    $parsedServices = @()
+    $i = 0
+    while ($i -lt $ServiceName.Count) {
+      switch ($ServiceName[$i]) {
+        '-n' { $i++; $logLines = [int]::Parse($ServiceName[$i]) }
+        '--lines' { $i++; $logLines = [int]::Parse($ServiceName[$i]) }
+        '--raw' { $logRaw = $true }
+        '--' { $i++; while ($i -lt $ServiceName.Count) { $parsedServices += $ServiceName[$i]; $i++ }; break }
+        default { $parsedServices += $ServiceName[$i] }
+      }
+      $i++
+    }
+    if ($parsedServices.Count -eq 0) {
+      if ($Json) {
+        $list = [ordered]@{}
+        foreach ($svc in (Get-PlatformService)) {
+          $list[$svc] = @{ capture = Get-CaptureMode -ServiceKey $svc; hasLogs = Test-ServiceHasLog -ServiceKey $svc }
+        }
+        Write-Output ($list | ConvertTo-Json -Compress)
+      } else {
+        Write-Output "Available services:"
+        Write-Output ""
+        Show-ServiceList
+      }
+      return
+    }
+    $hasError = $false
+    foreach ($svc in $parsedServices) {
+      if (-not $Registry.ContainsKey($svc)) {
+        Write-Error "svc logs: unknown service '$svc'"
+        $hasError = $true
+        continue
+      }
+      Show-ServiceLog -ServiceKey $svc -Lines $logLines -Raw:$logRaw
+    }
+    if ($hasError) { exit 1 }
+  }
+
+  'log-paths' {
+    $targets = if ($ServiceName.Count -gt 0) { $ServiceName } else { Get-PlatformService }
+    $hasError = $false
+    foreach ($svc in $targets) {
+      if (-not $Registry.ContainsKey($svc)) {
+        Write-Error "svc log-paths: unknown service '$svc'"
+        $hasError = $true
+        continue
+      }
+      $files = Get-ServiceLogFile -ServiceKey $svc
+      if ($files.Count -gt 0) { Write-Output ($files -join "`n") }
+    }
+    if ($hasError) { exit 1 }
+  }
+
+  'log-config' {
+    $targets = if ($ServiceName.Count -gt 0) { $ServiceName } else { Get-PlatformService }
+    $hasError = $false
+    foreach ($svc in $targets) {
+      if (-not $Registry.ContainsKey($svc)) {
+        Write-Error "svc log-config: unknown service '$svc'"
+        $hasError = $true
+        continue
+      }
+      Show-LogConfig -ServiceKey $svc -JsonOut:$Json
+    }
+    if ($hasError) { exit 1 }
   }
 }
