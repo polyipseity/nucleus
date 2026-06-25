@@ -85,8 +85,8 @@ assert containsRegex "%-24s" svcShText;
 
 # --- svc.ps1 column format assertions ---
 assert containsRegex "ID" svcPs1Text;
-assert containsRegex "{0,-20}" svcPs1Text;
-assert containsRegex "{1,-24}" svcPs1Text;
+assert containsRegex "[{]0,-20}" svcPs1Text;
+assert containsRegex "[{]1,-24}" svcPs1Text;
 
 # --- svc.sh bug-fix assertions ---
 assert containsRegex ''type == "object"'' svcShText;
