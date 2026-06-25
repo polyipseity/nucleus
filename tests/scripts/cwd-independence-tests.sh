@@ -98,7 +98,7 @@ test_derive_repo_root_fails_cleanly() {
             derive_repo_root
         ' 2>&1
     ) || true
-    if echo "$derr_output" | grep -q "cannot determine repository root"; then
+    if echo "$derr_output" | grep -q "cannot determine nucleus repository root"; then
         assert_pass "derive_repo_root fails with clear error when SCRIPT_DIR=/tmp"
     else
         assert_fail "derive_repo_root fails with clear error when SCRIPT_DIR=/tmp" "Output: '$derr_output'"

@@ -78,6 +78,16 @@ assert containsRegex ''services\.json'' svcPs1Text;
 assert containsRegex "Get-Service" svcPs1Text;
 assert containsRegex "ScheduledTask" svcPs1Text;
 
+# --- svc.sh column format assertions ---
+assert containsRegex "ID" svcShText;
+assert containsRegex "%-20s" svcShText;
+assert containsRegex "%-24s" svcShText;
+
+# --- svc.ps1 column format assertions ---
+assert containsRegex "ID" svcPs1Text;
+assert containsRegex "%-20s" svcPs1Text;
+assert containsRegex "%-24s" svcPs1Text;
+
 # --- svc.sh bug-fix assertions ---
 assert containsRegex ''type == "object"'' svcShText;
 assert containsRegex "value: .displayName" svcShText;

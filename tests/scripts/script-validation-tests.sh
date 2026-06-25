@@ -380,10 +380,15 @@ if [[ -f "$SVC_SH" ]]; then
     test_help_handler "$SVC_SH"
 
     SVC_LIST_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list 2>&1 || true)
-    if echo "$SVC_LIST_OUTPUT" | grep -q "Service.*Status.*Running.*PID"; then
+    if echo "$SVC_LIST_OUTPUT" | grep -q "ID.*Name.*Status.*Running.*PID"; then
         assert_pass "svc list: table headers present"
     else
         assert_fail "svc list: table headers present" "Missing expected table header line"
+    fi
+    if echo "$SVC_LIST_OUTPUT" | grep -qE "^ollama +Ollama"; then
+        assert_pass "svc list: ID and Name columns show service key and display name"
+    else
+        assert_fail "svc list: ID and Name columns show service key and display name" "Expected 'ollama  Ollama' pattern in output"
     fi
     if echo "$SVC_LIST_OUTPUT" | grep -qE "Ollama|LiteLLM|Jellyfin"; then
         assert_pass "svc list: known services listed"
