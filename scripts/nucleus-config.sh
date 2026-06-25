@@ -22,16 +22,39 @@ EOF
 
 require_command jq
 
+# Default values for all known config keys.
+# Used as fallback when file/key is absent, so users can discover available options.
+DEFAULTS='{
+  "camilladsp": {
+    "heartbeat": true
+  }
+}'
+
 ensure_config_dir() {
   mkdir -p "$(dirname "$CONFIG_FILE")"
 }
 
-cmd_get() {
-  if [ ! -f "$CONFIG_FILE" ]; then
-    return 0
+# Merge user config over defaults, output merged JSON.
+merge_config() {
+  if [ -f "$CONFIG_FILE" ]; then
+    jq -n --argjson defaults "$DEFAULTS" --argjson user "$(cat "$CONFIG_FILE")" '
+      def deepMerge(a; b):
+        if (a | type) == "object" and (b | type) == "object" then
+          (a | keys) + (b | keys) | unique |
+          reduce .[] as $k ({}; .[$k] = deepMerge(a[$k]; b[$k]))
+        elif b == null then a
+        else b
+        end;
+      deepMerge($defaults; $user)
+    '
+  else
+    echo "$DEFAULTS"
   fi
+}
+
+cmd_get() {
   if [ $# -eq 0 ]; then
-    jq . "$CONFIG_FILE"
+    merge_config
   else
     # Convert "section.key" to jq filter ".section.key // null"
     IFS='.' read -r -a parts <<< "$1"
@@ -40,7 +63,8 @@ cmd_get() {
       filter+=" | .\"$part\""
     done
     filter+=" // null"
-    val=$(jq -r "$filter" "$CONFIG_FILE" 2>/dev/null || echo "null")
+    merged=$(merge_config)
+    val=$(echo "$merged" | jq -r "$filter" 2>/dev/null || echo "null")
     if [ "$val" = "null" ]; then
       return 1
     fi
@@ -81,14 +105,11 @@ cmd_set() {
 }
 
 cmd_list() {
-  if [ ! -f "$CONFIG_FILE" ]; then
-    return 0
-  fi
-  jq -r '
+  merge_config | jq -r '
     paths(scalars) as $p
     | { key: ($p | join(".")), val: getpath($p) | tojson }
     | "\(.key)=\(.val)"
-  ' "$CONFIG_FILE"
+  '
 }
 
 case "${1:-}" in

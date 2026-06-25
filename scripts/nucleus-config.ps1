@@ -27,6 +27,14 @@ param(
 
 $configFile = Join-Path $HOME ".local" "state" "nucleus" "config.json"
 
+# Default values for all known config keys.
+# Used as fallback when file/key is absent, so users can discover available options.
+$script:Defaults = @{
+  camilladsp = @{
+    heartbeat = $true
+  }
+}
+
 function Ensure-ConfigDir {
   $dir = Split-Path $configFile -Parent
   if (-not (Test-Path $dir)) {
@@ -35,22 +43,40 @@ function Ensure-ConfigDir {
 }
 
 function Get-ConfigValue {
-  if (-not (Test-Path $configFile)) {
-    if ($Arguments.Count -eq 0) { return }
-    exit 1
-  }
-  $cfg = Get-Content -Raw $configFile | ConvertFrom-Json
+  $merged = Merge-Config
   if ($Arguments.Count -eq 0) {
-    $cfg | ConvertTo-Json
+    $merged | ConvertTo-Json
     return
   }
   $keys = $Arguments[0] -split '\.'
-  $val = $cfg
+  $val = $merged
   foreach ($k in $keys) {
     $val = $val.$k
     if ($null -eq $val) { exit 1 }
   }
   $val | ConvertTo-Json -Compress
+}
+
+function Merge-Config {
+  $merged = $script:Defaults | ConvertTo-Json -Depth 10 | ConvertFrom-Json
+  if (-not (Test-Path $configFile)) { return $merged }
+  $user = Get-Content -Raw $configFile | ConvertFrom-Json
+  return DeepMerge $merged $user
+}
+
+function DeepMerge($a, $b) {
+  if ($a -is [PSCustomObject] -and $b -is [PSCustomObject]) {
+    $result = $a.PSObject.Copy()
+    foreach ($prop in $b.PSObject.Properties) {
+      if ($null -ne $a.$($prop.Name)) {
+        $result.$($prop.Name) = DeepMerge $a.$($prop.Name) $prop.Value
+      } else {
+        $result | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
+      }
+    }
+    return $result
+  }
+  return $b
 }
 
 function Set-ConfigValue {
@@ -88,8 +114,7 @@ function Set-ConfigValue {
 }
 
 function List-ConfigValues {
-  if (-not (Test-Path $configFile)) { return }
-  $cfg = Get-Content -Raw $configFile | ConvertFrom-Json
+  $merged = Merge-Config
   function Flatten($obj, $prefix) {
     foreach ($prop in $obj.PSObject.Properties) {
       $key = if ($prefix) { "$prefix.$($prop.Name)" } else { $prop.Name }
@@ -101,7 +126,7 @@ function List-ConfigValues {
       }
     }
   }
-  Flatten $cfg ""
+  Flatten $merged ""
 }
 
 switch ($Command) {
