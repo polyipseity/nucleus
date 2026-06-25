@@ -118,19 +118,20 @@ for ($i = 0; $i -lt 30; $i++) {
 
 # Heartbeat: re-push config every 5s so config re-applies when a
 # disconnected audio device reappears.
-# Check if heartbeat is enabled via nucleus-config.
+# Checks config.json on each tick so dynamic changes apply instantly.
 $nucleusCfgFile = Join-Path $HOME ".local\state\nucleus\config.json"
-$heartbeatEnabled = $true
-if (Test-Path $nucleusCfgFile) {
-  $nucleusCfg = Get-Content -Raw $nucleusCfgFile | ConvertFrom-Json
-  if ($null -ne $nucleusCfg.camilladsp.heartbeat -and -not $nucleusCfg.camilladsp.heartbeat) {
-    $heartbeatEnabled = $false
-  }
-}
-if ($heartbeatEnabled) {
 $heartbeatTimer = [System.Threading.Timer]::new({
   param($s)
-  $cf, $p = $s
+  $cf, $p, $ncf = $s
+  # Check runtime toggle on every tick.
+  $enabled = $true
+  if (Test-Path $ncf) {
+    $nc = Get-Content -Raw $ncf -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+    if ($null -ne $nc.camilladsp.heartbeat -and -not $nc.camilladsp.heartbeat) {
+      $enabled = $false
+    }
+  }
+  if (-not $enabled) { return }
   try {
     $yaml = Get-Content -Raw $cf -ErrorAction Stop
     $msg = "{`"SetConfig`": $($yaml | ConvertTo-Json -Compress)}"
@@ -142,11 +143,10 @@ $heartbeatTimer = [System.Threading.Timer]::new({
   } catch {
     # Device may be gone — retry on next heartbeat.
   }
-}, ($ConfigFile, $Port), 5000, 5000)
-}
+}, ($ConfigFile, $Port, $nucleusCfgFile), 5000, 5000)
 
 $process.WaitForExit()
-if ($heartbeatEnabled) { $heartbeatTimer.Dispose() }
+$heartbeatTimer.Dispose()
 '@
   Set-Content -Path $wrapperScriptPath -Value $wrapperContent -NoNewline
 
