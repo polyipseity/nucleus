@@ -116,7 +116,26 @@ for ($i = 0; $i -lt 30; $i++) {
   }
 }
 
+# Heartbeat: re-push config every 5s so config re-applies when a
+# disconnected audio device reappears.
+$heartbeatTimer = [System.Threading.Timer]::new({
+  param($s)
+  $cf, $p = $s
+  try {
+    $yaml = Get-Content -Raw $cf -ErrorAction Stop
+    $msg = "{`"SetConfig`": $($yaml | ConvertTo-Json -Compress)}"
+    $ws = [System.Net.WebSockets.ClientWebSocket]::new()
+    $ct = [System.Threading.CancellationToken]::Empty
+    $ws.ConnectAsync([System.Uri]"ws://127.0.0.1:$p", $ct).Wait()
+    $ws.SendAsync([ArraySegment[byte]]::new([Text.Encoding]::UTF8.GetBytes($msg)), [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $ct).Wait()
+    $ws.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "done", $ct).Wait()
+  } catch {
+    # Device may be gone — retry on next heartbeat.
+  }
+}, ($ConfigFile, $Port), 5000, 5000)
+
 $process.WaitForExit()
+$heartbeatTimer.Dispose()
 '@
   Set-Content -Path $wrapperScriptPath -Value $wrapperContent -NoNewline
 

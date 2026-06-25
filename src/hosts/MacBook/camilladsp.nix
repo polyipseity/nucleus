@@ -38,7 +38,16 @@ let
       sleep 0.5
     done
 
+    # Heartbeat: re-push config every 5s so config re-applies when a
+    # disconnected audio device reappears.
+    while sleep 5; do
+      "$jq" -cRs '{SetConfig: .}' "$config_file" | \
+        "$websocat" -1 "ws://127.0.0.1:$ws_port" >/dev/null 2>&1 || true
+    done &
+    heartbeat_pid=$!
+
     wait $pid
+    kill "$heartbeat_pid" 2>/dev/null
   '';
 in
 {
