@@ -9,10 +9,8 @@
 #
 # Run with: nix-instantiate --eval tests/src/activation-deps-tests.nix
 
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   inherit (lib) topologicalSort unique;
 
   # Read live module files so ordering/name regressions are caught by tests

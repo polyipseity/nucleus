@@ -6,10 +6,8 @@
 #
 # Run with: nix-instantiate --eval tests/src/option-conflict-tests.nix
 
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   inherit (lib)
     mkOption
     mkIf

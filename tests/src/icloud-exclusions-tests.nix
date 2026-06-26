@@ -5,10 +5,8 @@
 #
 # Run with: nix-instantiate --eval tests/src/icloud-exclusions-tests.nix
 
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
   shellModuleText = builtins.readFile ../../src/modules/shell.nix;
   users = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);

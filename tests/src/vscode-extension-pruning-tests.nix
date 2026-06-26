@@ -6,10 +6,8 @@
 #
 # Run with: nix-instantiate --eval tests/src/vscode-extension-pruning-tests.nix
 
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   inherit (import ../lib.nix) assert';
 
   posixEditors = builtins.readFile ../../src/modules/editors.nix;

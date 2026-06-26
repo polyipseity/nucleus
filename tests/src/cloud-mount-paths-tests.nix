@@ -3,7 +3,6 @@
 # Ensures cloud-drives activation enforces real directory mount/replica paths
 # and replaces stale symlink targets from legacy /Volumes indirection flows.
 
-{ }:
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;

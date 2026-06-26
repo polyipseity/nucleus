@@ -3,10 +3,8 @@
 # Guards the cross-host shell contract so zsh, POSIX PowerShell, Windows
 # PowerShell, and host manuals stay aligned on the curated shortcut surface.
 
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   aliasesText = builtins.readFile ../../src/modules/shell/aliases.nix;
   shellText = builtins.readFile ../../src/modules/shell.nix;
   posixPwshText = builtins.readFile ../../src/modules/pwsh.nix;

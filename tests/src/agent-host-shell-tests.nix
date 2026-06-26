@@ -6,11 +6,9 @@
 #
 # Run with: nix-instantiate --eval tests/src/agent-host-shell-tests.nix
 
-{
-  lib ? import <nixpkgs/lib>,
-  pkgs ? import <nixpkgs> { },
-}:
 let
+  lib = import <nixpkgs/lib>;
+  pkgs = import <nixpkgs> { };
   inherit (lib) hasInfix hasSuffix;
 
   # Module imports cleanly (will throw if it doesn't).

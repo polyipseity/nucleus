@@ -6,10 +6,8 @@
 # - Windows power parity manages lid-close action explicitly
 # - CI executes this suite so regressions fail fast
 
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   ciWorkflowText = builtins.readFile ../../.github/workflows/ci.yml;
   macManualText = builtins.readFile ../../src/hosts/MacBook/MANUAL.md;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;

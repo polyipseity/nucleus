@@ -8,7 +8,6 @@
 #
 # Run with: nix-instantiate --eval tests/src/config-composition-tests.nix
 
-{ }:
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
