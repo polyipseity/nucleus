@@ -372,10 +372,10 @@ function Show-EventLog {
   if (-not $provider) { return $false }
   try {
     $events = Get-WinEvent -LogName $logName -ProviderName $provider -MaxEvents $Lines -ErrorAction Stop
-    foreach ($event in $events) {
-      $msg = $event.Message
+    foreach ($evt in $events) {
+      $msg = $evt.Message
       if (-not $Raw) { $msg = $msg | ConvertTo-SanitizedText }
-      Write-Output "[$($event.TimeCreated)] $($event.LevelDisplayName): $msg"
+      Write-Output "[$($evt.TimeCreated)] $($evt.LevelDisplayName): $msg"
     }
     return $true
   } catch {

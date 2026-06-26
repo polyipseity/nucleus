@@ -17,12 +17,7 @@
 #   requires a kernel extension.  fuse-t is a modern FSKit-based alternative
 #   that works without kext approval, so the macos-fuse-t fork is the preferred
 #   build on modern macOS.
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ lib, pkgs, ... }:
 let
   # Pinned source for the macos-fuse-t/ntfs-3g fork (edge branch).
   ntfs3gSrc = pkgs.fetchFromGitHub {
