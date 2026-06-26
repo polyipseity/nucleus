@@ -240,11 +240,11 @@ assert containsRegex "svc:" svcPs1Text;
 # --- Dispatch wiring (explicit function mapping) ---
 # svc.sh action dispatch: special-case actions use explicit function names
 # (catches regression where "do_$action" produced invalid function names)
-assert containsRegex "log-paths) do_log_paths" svcShText;
-assert containsRegex "log-config) do_log_config" svcShText;
-assert containsRegex "endpoint) do_endpoint" svcShText;
-assert containsRegex "list[|]status[|]logs) \"do_\\$action\"" svcShText;
-assert containsRegex "start[|]stop[|]restart[|]enable[|]disable) do_action" svcShText;
+assert containsRegex "log-paths[)] do_log_paths" svcShText;
+assert containsRegex "log-config[)] do_log_config" svcShText;
+assert containsRegex "endpoint[)] do_endpoint" svcShText;
+assert containsRegex "list[|]status[|]logs[)] \"do_\\$action\"" svcShText;
+assert containsRegex "start[|]stop[|]restart[|]enable[|]disable[)] do_action" svcShText;
 # do_log_config parses --json via global json_output (not a local variable)
-assert containsRegex "--json) json_output=true" svcShText;
+assert containsRegex "--json[)] json_output=true" svcShText;
 true
