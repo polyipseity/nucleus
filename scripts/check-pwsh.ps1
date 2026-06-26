@@ -8,9 +8,10 @@
   without executing scripts.
 
   Phase 2 — Lint: if PSScriptAnalyzer is available in the current session,
-  runs `Invoke-ScriptAnalyzer` at Error and Warning severity.  If the module
-  is absent, a warning is printed and the lint phase is skipped so CI can run
-  on machines that do not have PSScriptAnalyzer installed (syntax validation
+  runs `Invoke-ScriptAnalyzer` sequentially in-process at Error and Warning
+  severity with excluded rules that trigger false positives.  If the module is
+  absent, a warning is printed and the lint phase is skipped so CI can run on
+  machines that do not have PSScriptAnalyzer installed (syntax validation
   still passes).
 
   By default the script checks every tracked `*.ps1` file in the current Git
@@ -102,32 +103,17 @@ else {
   Import-Module PSScriptAnalyzer
 
   $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
-  # Split files across parallel Start-Job processes. Each job spawns a separate
-  # pwsh process that loads PSScriptAnalyzer from scratch, so cap at 4 to avoid
-  # thrashing on module init (especially on high-core-count machines).
-  $chunks = [Math]::Min([Environment]::ProcessorCount, 4)
-  $size = [Math]::Ceiling($files.Count / $chunks)
-  $jobs = for ($i = 0; $i -lt $files.Count; $i += $size) {
-    $end = [Math]::Min($i + $size - 1, $files.Count - 1)
-    Start-Job -ScriptBlock {
-      param($paths)
-      Import-Module PSScriptAnalyzer
-      $paths | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity @('Error', 'Warning', 'Information') -ExcludeRule @('PSUseBOMForUnicodeEncodedFile', 'PSUseUsingScopeModifierInNewRunspaces', 'PSReviewUnusedParameter') }
-    } -ArgumentList (,$files[$i..$end])
-  }
-  $null = $jobs | Wait-Job
-  $lintResults = @($jobs | Receive-Job)
-  $jobs | Remove-Job
+  $excludeRules = @('PSUseBOMForUnicodeEncodedFile', 'PSUseUsingScopeModifierInNewRunspaces', 'PSReviewUnusedParameter')
+  $settings = @{ Severity = @('Error', 'Warning') }
 
-  $nonInfoLints = @($lintResults | Where-Object { $_.Severity -ne 'Information' })
+  $lintResults = @($files | ForEach-Object {
+    Invoke-ScriptAnalyzer -Path $_ -Settings $settings -ExcludeRule $excludeRules
+  })
 
   if ($lintResults.Count -gt 0) {
     $lintResults | ForEach-Object {
       Write-Output ('{0}:{1}:{2}: [{3}] {4}' -f $_.ScriptPath, $_.Line, $_.Column, $_.Severity, $_.Message)
     }
-  }
-
-  if ($nonInfoLints.Count -gt 0) {
     throw 'PowerShell lint check failed.'
   }
 
