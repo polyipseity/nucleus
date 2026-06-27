@@ -8,9 +8,7 @@ applyTo: "src/modules/ai/**, src/modules/configs/vscode/chatLanguageModels.*.jso
 
 ## Profile key convention
 
-`src/modules/ai/models.json` groups model lists by **host name**, not by
-platform nickname. Use the exact OS hostname as keys (PascalCase, matching
-`networking.hostName` / `ComputerName` on each host):
+`src/modules/ai/models.json` groups model lists by **host name**, not by platform nickname. Use the exact OS hostname as keys (PascalCase, matching `networking.hostName` / `ComputerName` on each host):
 
 | Key       | Host          | Resolved by                            |
 | --------- | ------------- | -------------------------------------- |
@@ -18,16 +16,11 @@ platform nickname. Use the exact OS hostname as keys (PascalCase, matching
 | `NixOS`   | NixOS (Linux) | `ai-sync.sh` wildcard branch           |
 | `Windows` | Windows       | `Invoke-AISync.ps1` (always `Windows`) |
 
-Do **not** use lowercase names like `"macbook"`, `"nixos"`, or `"windows"` —
-the keys must match the exact OS hostname (see `AGENTS.md` **Host name equals
-display name** policy). Do **not** use generic names like `"mac"` or `"pc"`.
-When adding a new host, add a new key matching its exact OS hostname and update
-the profile detection logic in both `ai-sync.sh` and `Invoke-AISync.ps1`.
+Do **not** use lowercase names like `"macbook"`, `"nixos"`, or `"windows"` — the keys must match the exact OS hostname (see `AGENTS.md` **Host name equals display name** policy). Do **not** use generic names like `"mac"` or `"pc"`. When adding a new host, add a new key matching its exact OS hostname and update the profile detection logic in both `ai-sync.sh` and `Invoke-AISync.ps1`.
 
 ## Hardware constraints per host
 
-These are the authoritative assumptions for model size budgeting. Update
-this table whenever hardware changes.
+These are the authoritative assumptions for model size budgeting. Update this table whenever hardware changes.
 
 | Host      | Memory budget                                     | Notes                                                                                                                   |
 | --------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -37,8 +30,7 @@ this table whenever hardware changes.
 
 ## Required cross-file sync (do not forget)
 
-When changing model selections, update all of the following in the **same
-change** so editor/runtime behavior stays aligned:
+When changing model selections, update all of the following in the **same change** so editor/runtime behavior stays aligned:
 
 1. `src/modules/ai/models.json` host model lists.
 2. `src/modules/configs/vscode/chatLanguageModels.mac.json`
@@ -46,9 +38,7 @@ change** so editor/runtime behavior stays aligned:
 4. `src/modules/configs/vscode/chatLanguageModels.windows.json`
 5. Manifest comment block in `src/modules/ai/default.nix`.
 
-Rule: each host's `chatLanguageModels.<host>.json` IDs must be a subset of
-that host key in `models.json` (or exactly match). Never leave stale editor
-entries for models no longer present in the host manifest.
+Rule: each host's `chatLanguageModels.<host>.json` IDs must be a subset of that host key in `models.json` (or exactly match). Never leave stale editor entries for models no longer present in the host manifest.
 
 ## Quantization guidance
 
@@ -66,42 +56,25 @@ Ollama model tags follow `<base>-<quant>` naming. Key quantizations:
 
 ## Model selection preference
 
-When choosing between a larger model at a lower quantization vs a smaller
-model at a higher quantization, **prefer the larger parameter count** even at
-the cost of running the lower quantization. Examples:
+When choosing between a larger model at a lower quantization vs a smaller model at a higher quantization, **prefer the larger parameter count** even at the cost of running the lower quantization. Examples:
 
-- Prefer `qwen3.5:27b` (17 GB, 27B params, `q4_K_M`) over `qwen3:14b-q8_0`
-  (16 GB, 14B params, `q8_0`) for the macbook slot.
-- Prefer a 27B `q4_K_M` model over a 14B `q8_0` model even if their sizes
-  are similar, because more parameters usually outweigh the quantization
-  quality gap at the same budget.
-- Only choose a smaller model when the larger one genuinely cannot fit in the
-  budget (including the ~17–18 GB slight-excess window for macbook).
+- Prefer `qwen3.5:27b` (17 GB, 27B params, `q4_K_M`) over `qwen3:14b-q8_0` (16 GB, 14B params, `q8_0`) for the macbook slot.
+- Prefer a 27B `q4_K_M` model over a 14B `q8_0` model even if their sizes are similar, because more parameters usually outweigh the quantization quality gap at the same budget.
+- Only choose a smaller model when the larger one genuinely cannot fit in the budget (including the ~17–18 GB slight-excess window for macbook).
 
-This preference applies per-host and does **not** override the VRAM budget
-ceilings: macbook ≤ ~18 GB (slight excess OK); nixos/windows ≤ 6 GB
-(strict — the slight-excess allowance applies only to macbook).
+This preference applies per-host and does **not** override the VRAM budget ceilings: macbook ≤ ~18 GB (slight excess OK); nixos/windows ≤ 6 GB (strict — the slight-excess allowance applies only to macbook).
 
 ## Quantization rules
 
-Ollama's available quantizations for models in the relevant size range are
-limited to `q4_K_M` (or equivalent), `q8_0`, `fp16`/`bf16`, and selected
-hardware-specific formats (`nvfp4`, `mxfp8`, `mlx-bf16`). There are **no
-q3 or lower GGUF variants** available in Ollama for any model in this
-repository's selection; do not expect or look for them.
+Ollama's available quantizations for models in the relevant size range are limited to `q4_K_M` (or equivalent), `q8_0`, `fp16`/`bf16`, and selected hardware-specific formats (`nvfp4`, `mxfp8`, `mlx-bf16`). There are **no q3 or lower GGUF variants** available in Ollama for any model in this repository's selection; do not expect or look for them.
 
-- **macbook default**: `q4_K_M` (default tag); use `it-qat` when the model
-  family ships one (e.g. `gemma3:27b-it-qat`). Use `e4b-it-bf16` (16 GB)
-  for `gemma4:e4b` when maximum quality at a single small model is desired.
-- **nixos / windows default**: always `q4_K_M` (default tag) — VRAM is
-  tight; do not use q8_0 or fp16 variants.
-- Avoid lower-than-Q4 quantizations (Q3, Q2) — they do not exist on Ollama
-  for the models tracked here and offer significant quality degradation.
+- **macbook default**: `q4_K_M` (default tag); use `it-qat` when the model family ships one (e.g. `gemma3:27b-it-qat`). Use `e4b-it-bf16` (16 GB) for `gemma4:e4b` when maximum quality at a single small model is desired.
+- **nixos / windows default**: always `q4_K_M` (default tag) — VRAM is tight; do not use q8_0 or fp16 variants.
+- Avoid lower-than-Q4 quantizations (Q3, Q2) — they do not exist on Ollama for the models tracked here and offer significant quality degradation.
 
 ## Model size reference (verified from Ollama library)
 
-Sizes are download/VRAM footprint at default `q4_K_M` quantization unless noted.
-All tags below confirmed to exist on Ollama as of 2026-05.
+Sizes are download/VRAM footprint at default `q4_K_M` quantization unless noted. All tags below confirmed to exist on Ollama as of 2026-05.
 
 ### macbook candidates (≤ 16 GB target; ≤ ~18 GB acceptable — high-param preferred)
 
@@ -121,12 +94,7 @@ Ordered by preference under the high-param-count policy.
 
 ### nixos / windows candidates (≤ 6 GB VRAM — strict; high-param preferred)
 
-`qwen3:8b` (5.2 GB, `q4_K_M`) is the maximum-parameter model that fits within
-6 GB VRAM at any Ollama-available quantization. Ollama offers no sub-`q4_K_M`
-variants for models in this size range. The next size up (`qwen3.5:9b-q4_K_M`
-= 6.6 GB, `qwen3:14b-q4_K_M` = 9.3 GB) all exceed the strict 6 GB budget.
-The high-param preference does not change the selection here — `qwen3:8b` is
-already the optimum.
+`qwen3:8b` (5.2 GB, `q4_K_M`) is the maximum-parameter model that fits within 6 GB VRAM at any Ollama-available quantization. Ollama offers no sub-`q4_K_M` variants for models in this size range. The next size up (`qwen3.5:9b-q4_K_M` = 6.6 GB, `qwen3:14b-q4_K_M` = 9.3 GB) all exceed the strict 6 GB budget. The high-param preference does not change the selection here — `qwen3:8b` is already the optimum.
 
 | Model tag    | Size   | Fits 6 GB? | Capabilities          | Notes                                                                    |
 | ------------ | ------ | ---------- | --------------------- | ------------------------------------------------------------------------ |
@@ -138,12 +106,9 @@ already the optimum.
 Before committing a model change that relies on tool calling:
 
 1. Start the Ollama server with the new model.
-2. Run a basic function-call curl test (see `src/modules/ai/default.nix`
-   comment block for an example invocation).
-3. Record the result in the comment block in `default.nix`:
-   `— tool-calling curl-tested on <host>: PASS` or `FAIL`.
-4. Do not deploy a model as the primary agent model on a host until tool
-   calling is verified on that host.
+2. Run a basic function-call curl test (see `src/modules/ai/default.nix` comment block for an example invocation).
+3. Record the result in the comment block in `default.nix`: `— tool-calling curl-tested on <host>: PASS` or `FAIL`.
+4. Do not deploy a model as the primary agent model on a host until tool calling is verified on that host.
 
 ## Sorting
 

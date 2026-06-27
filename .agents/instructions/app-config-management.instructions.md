@@ -14,13 +14,11 @@ Choose app config storage **based on how the app reads it**, not on arbitrary pr
 
 Use a separate JSON file under `src/modules/configs/<appname>/` **only if** the app itself reads from that file:
 
-- **LinearMouse** (`src/modules/configs/linearmouse/linearmouse.json`): LinearMouse reads `.config/linearmouse/linearmouse.json` on
-  Linux/macOS and `%APPDATA%\linearmouse\linearmouse.json` on Windows.
+- **LinearMouse** (`src/modules/configs/linearmouse/linearmouse.json`): LinearMouse reads `.config/linearmouse/linearmouse.json` on Linux/macOS and `%APPDATA%\linearmouse\linearmouse.json` on Windows.
   - Store settings as JSON.
   - Symlink JSON file to both platform locations from activation (macOS: `src/modules/macos.nix`; Windows: DSC or modules).
 
-- **VS Code** (`src/modules/configs/vscode/`): VS Code reads `settings.json`, `keybindings.json`, `mcp.json`, etc. from
-  user config directories.
+- **VS Code** (`src/modules/configs/vscode/`): VS Code reads `settings.json`, `keybindings.json`, `mcp.json`, etc. from user config directories.
   - Maintain live repo files under `src/modules/configs/vscode/`.
   - Symlink to both `~/.config/Code/User/` (Linux) and `~/Library/Application Support/Code/User/` (macOS).
   - See `src/modules/editors.nix` for implementation details.
@@ -153,12 +151,9 @@ true
 
 When adding app settings, audit all three hosts:
 
-1. **macOS** (`src/hosts/MacBook/`, `src/modules/macos.nix`): Does the app exist? Are settings applied via
-   `defaults`, LaunchAgent, or symlinked config?
-2. **NixOS** (`src/hosts/NixOS/`, `src/modules/linux.nix`): Does the app exist? Are settings applied via INI files,
-   systemd, or other mechanisms?
-3. **Windows** (`src/hosts/Windows/`, `src/hosts/Windows/modules/*.ps1`): Does the app exist? Are settings applied via
-   registry, DSC YAML, or manifest files?
+1. **macOS** (`src/hosts/MacBook/`, `src/modules/macos.nix`): Does the app exist? Are settings applied via `defaults`, LaunchAgent, or symlinked config?
+2. **NixOS** (`src/hosts/NixOS/`, `src/modules/linux.nix`): Does the app exist? Are settings applied via INI files, systemd, or other mechanisms?
+3. **Windows** (`src/hosts/Windows/`, `src/hosts/Windows/modules/*.ps1`): Does the app exist? Are settings applied via registry, DSC YAML, or manifest files?
 
 For each platform where the app exists, ensure:
 
@@ -241,10 +236,8 @@ All app configs must have corresponding tests:
 
 **Never store config in a format the app doesn't read.**
 
-QtPass is the canonical example: it does not read `.json` files; it reads from `defaults` (macOS), `QSettings` (Linux), and
-registry (Windows). Storing config in a separate JSON file was wrong; storing it as a Nix attrset is correct.
+QtPass is the canonical example: it does not read `.json` files; it reads from `defaults` (macOS), `QSettings` (Linux), and registry (Windows). Storing config in a separate JSON file was wrong; storing it as a Nix attrset is correct.
 
 When reviewing or adding app configs, always verify: "Does this app actually read from this file or format?"
 
-If not, move the config to the native format the app reads from, keep JSON only for apps that use it directly, and ensure
-the pattern is documented in agent instructions.
+If not, move the config to the native format the app reads from, keep JSON only for apps that use it directly, and ensure the pattern is documented in agent instructions.

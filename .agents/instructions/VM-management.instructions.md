@@ -14,13 +14,11 @@ applyTo: "scripts/vm-setup.*, src/hosts/*/vms.nix, src/modules/VMs.json, src/mod
 | NixOS        | not supported | libvirt/KVM     | libvirt/KVM     |
 | Windows      | not supported | QEMU standalone | QEMU standalone |
 
-macOS guest uses Tart (Apple Virtualization.framework) exclusively; automated
-Tart→UTM runtime handoff is not supported (format mismatch, no tooling).
+macOS guest uses Tart (Apple Virtualization.framework) exclusively; automated Tart→UTM runtime handoff is not supported (format mismatch, no tooling).
 
 ## Hostname Convention
 
-VM guest OSes must use the same hostname and display name as the corresponding
-host OS. The canonical values are:
+VM guest OSes must use the same hostname and display name as the corresponding host OS. The canonical values are:
 
 | Guest OS | `networking.hostName` / `ComputerName` | `display` in VMs.json |
 | -------- | -------------------------------------- | --------------------- |
@@ -37,9 +35,7 @@ Apply this convention when adding or modifying:
 
 ## Guest Credential Convention
 
-VM guest credentials must come from per-user SOPS secrets, not from the host
-login name or any guessed/default password. This applies on every host OS
-(macOS, NixOS, Windows) and every guest OS path (NixOS, Windows, macOS).
+VM guest credentials must come from per-user SOPS secrets, not from the host login name or any guessed/default password. This applies on every host OS (macOS, NixOS, Windows) and every guest OS path (NixOS, Windows, macOS).
 
 - Store the actual values in `src/secrets/users-<username>.yml`.
 - Keep the keys flat and user-scoped by filename, for example:
@@ -54,33 +50,18 @@ login name or any guessed/default password. This applies on every host OS
 
 Required wiring and parity checks:
 
-- POSIX flow: `scripts/vm-setup.sh` must resolve the current secret owner,
-  read `src/modules/users.json`, decrypt `src/secrets/users-<username>.yml`,
-  and pass the resolved credentials into every guest builder/template.
-- Windows flow:
-  `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1` must resolve the same
-  `vmGuest` references from `src/hosts/Windows/users.json`, decrypt the same
-  per-user secret file, and pass the resolved credentials into every guest
-  builder/template.
-- NixOS guest paths: both `src/vms/nixos/guest.nix` and
-  `src/vms/nixos/packer.pkr.hcl` must consume the injected credentials.
-- Windows guest paths: `src/vms/windows/Autounattend.xml` placeholders and
-  `src/vms/windows/packer.pkr.hcl` variables must stay in sync with runtime
-  rendering.
-- macOS guest path: `src/vms/macos/packer.pkr.hcl` must provision/update the guest
-  account from the same resolved secret-backed values.
-- Credential drift must invalidate stale VM artifacts on every supported build
-  path so changing the secret-backed username or password actually rebuilds or
-  refreshes the guest image/runtime instead of silently reusing stale disks.
+- POSIX flow: `scripts/vm-setup.sh` must resolve the current secret owner, read `src/modules/users.json`, decrypt `src/secrets/users-<username>.yml`, and pass the resolved credentials into every guest builder/template.
+- Windows flow: `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1` must resolve the same `vmGuest` references from `src/hosts/Windows/users.json`, decrypt the same per-user secret file, and pass the resolved credentials into every guest builder/template.
+- NixOS guest paths: both `src/vms/nixos/guest.nix` and `src/vms/nixos/packer.pkr.hcl` must consume the injected credentials.
+- Windows guest paths: `src/vms/windows/Autounattend.xml` placeholders and `src/vms/windows/packer.pkr.hcl` variables must stay in sync with runtime rendering.
+- macOS guest path: `src/vms/macos/packer.pkr.hcl` must provision/update the guest account from the same resolved secret-backed values.
+- Credential drift must invalidate stale VM artifacts on every supported build path so changing the secret-backed username or password actually rebuilds or refreshes the guest image/runtime instead of silently reusing stale disks.
 
-When changing credential policy behavior, update
-`tests/src/vm-setup-tests.nix` in the same commit.
+When changing credential policy behavior, update `tests/src/vm-setup-tests.nix` in the same commit.
 
 ## VM Manifest
 
-All virtual machines are declared in `src/modules/VMs.json`.
-This is the single source of truth for VM names, resources, and options consumed by all three platform
-setup scripts.
+All virtual machines are declared in `src/modules/VMs.json`. This is the single source of truth for VM names, resources, and options consumed by all three platform setup scripts.
 
 Required fields for each VM entry:
 
@@ -104,27 +85,21 @@ Optional fields:
 
 ## Disk Format
 
-QCOW2 throughout all three platforms.
-Stored at:
+QCOW2 throughout all three platforms. Stored at:
 
 - macOS: `~/virtual machines/<name>.utm/Data/disk-main.qcow2`
 - NixOS: `~/virtual machines/<name>.qcow2`
 - Windows: `%USERPROFILE%\virtual machines\<name>.qcow2`
 
-Pre-built images land in `~/virtual machines/images/<name>.qcow2`
-(Windows: `%USERPROFILE%\virtual machines\images\<name>.qcow2`).
-`nucleus-vm-setup` builds these images in phase 1 (if absent) and copies them to the disk location in phase 2.
+Pre-built images land in `~/virtual machines/images/<name>.qcow2` (Windows: `%USERPROFILE%\virtual machines\images\<name>.qcow2`). `nucleus-vm-setup` builds these images in phase 1 (if absent) and copies them to the disk location in phase 2.
 
 QCOW2 enables copy-based migration between hosts without conversion.
 
 ## macOS — Tart (macOS guests)
 
 - VM backend: Tart CLI (Apple Virtualization.framework); macOS host only.
-- VM store: `~/virtual machines/.tart/vms/<name>/` — Tart's storage root
-  (`~/.tart`) is symlinked to `~/virtual machines/.tart` by `nucleus-vm-setup`
-  so Tart artifacts co-locate with UTM bundles for unified backup.
-- Build tool: Packer + `tart-cli` plugin pulling
-  `ghcr.io/cirruslabs/macos-<version>-base:latest` from GHCR.
+- VM store: `~/virtual machines/.tart/vms/<name>/` — Tart's storage root (`~/.tart`) is symlinked to `~/virtual machines/.tart` by `nucleus-vm-setup` so Tart artifacts co-locate with UTM bundles for unified backup.
+- Build tool: Packer + `tart-cli` plugin pulling `ghcr.io/cirruslabs/macos-<version>-base:latest` from GHCR.
 - Start command (after build): `tart run <name>`.
 - No UTM bundle is created for macOS guests; they remain Tart-managed.
 
@@ -132,9 +107,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 
 - VM backend: UTM 4.x QEMU backend.
 - Bundle location: `~/virtual machines/<name>.utm/`
-- Config template: `config.plist` pre-generated at
-  `~/.local/share/nucleus/vms/<name>-config.plist` by `src/hosts/MacBook/vms.nix`
-  at Home Manager activation time; `vm-setup.sh` copies it into the bundle.
+- Config template: `config.plist` pre-generated at `~/.local/share/nucleus/vms/<name>-config.plist` by `src/hosts/MacBook/vms.nix` at Home Manager activation time; `vm-setup.sh` copies it into the bundle.
 - Disk pre-created in `Images/disk-main.qcow2` by copying the pre-built image from the images directory.
 - After provisioning, UTM opens each bundle automatically.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in the Nix-generated config.plist.
@@ -147,8 +120,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - VM infrastructure declared in `src/hosts/NixOS/vms.nix` (system module).
 - Package: `qemu_kvm`, `virt-manager`, `virt-viewer`, `virtiofsd` in `environment.systemPackages`.
 - User groups: `kvm` and `libvirtd` added to the managed user via `lib.mkAfter` in `vms.nix`.
-- Domain XML pre-generated at `/etc/nucleus/vms/<name>-domain.xml` by `src/hosts/NixOS/vms.nix`
-  at NixOS activation time; `vm-setup.sh` calls `virsh define` on the pre-generated file (idempotent).
+- Domain XML pre-generated at `/etc/nucleus/vms/<name>-domain.xml` by `src/hosts/NixOS/vms.nix` at NixOS activation time; `vm-setup.sh` calls `virsh define` on the pre-generated file (idempotent).
 - VirtioFS shared directory: uses `virtiofsd` daemon; configured in the XML domain definition.
 - SPICE display + clipboard sharing enabled by default.
 - OVMF firmware (UEFI) and swtpm (TPM 2.0) enabled for Windows 11 compatibility.
@@ -161,8 +133,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
   - `qemu-system-x86_64.exe` / `qemu-system-aarch64.exe`: VM launch.
 - Disk images and generated start scripts placed in `%USERPROFILE%\virtual machines\`.
 - Start script: `start-<name>.ps1` — a self-contained PowerShell launch command.
-- VirtioFS on Windows requires `virtiofsd` running as a separate process before the VM starts.
-  See `~/virtual machines/README.md` for the exact command.
+- VirtioFS on Windows requires `virtiofsd` running as a separate process before the VM starts. See `~/virtual machines/README.md` for the exact command.
 
 ## Apply Hook
 
@@ -213,24 +184,16 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 **Windows 11 guest (all hosts)** (`nucleus-vm-setup --windows-iso /path/to/Win11.iso`):
 
 - Uses Packer with `src/vms/windows/packer.pkr.hcl` and QEMU builder.
-- Requires a Windows 11 ISO path via `--windows-iso` **or** a `windowsIsoUrl` field in the `VMs.json`
-  windows entry. When `windowsIsoUrl` is set, the ISO is downloaded automatically to
-  `~/virtual machines/images/<name>-installer.iso` on first run (subsequent runs reuse the cache).
-- On macOS/Linux hosts, when Mido fails, `vm-setup.sh` attempts a non-Windows
-  Fido URL resolver fallback via `pwsh` (`Fido.ps1 -GetUrl`) and then downloads
-  the resolved ISO URL with `curl`.
-- On Windows hosts, `Invoke-VMSetup` auto-detects WHPX (Windows Hypervisor Platform) when the
-  default `tcg` accelerator is in use. If WHPX is enabled, it upgrades automatically. If not,
-  it warns and prints the command to enable it. Pass `-Accelerator tcg` explicitly to suppress.
+- Requires a Windows 11 ISO path via `--windows-iso` **or** a `windowsIsoUrl` field in the `VMs.json` windows entry. When `windowsIsoUrl` is set, the ISO is downloaded automatically to `~/virtual machines/images/<name>-installer.iso` on first run (subsequent runs reuse the cache).
+- On macOS/Linux hosts, when Mido fails, `vm-setup.sh` attempts a non-Windows Fido URL resolver fallback via `pwsh` (`Fido.ps1 -GetUrl`) and then downloads the resolved ISO URL with `curl`.
+- On Windows hosts, `Invoke-VMSetup` auto-detects WHPX (Windows Hypervisor Platform) when the default `tcg` accelerator is in use. If WHPX is enabled, it upgrades automatically. If not, it warns and prints the command to enable it. Pass `-Accelerator tcg` explicitly to suppress.
 - SATA disk during build → VirtIO drivers installed post-install → final image is VirtIO-disk ready.
-- Autounattend.xml bypasses TPM/Secure Boot checks, enables WinRM for Packer,
-  and renders the managed guest account from the current host user identity.
+- Autounattend.xml bypasses TPM/Secure Boot checks, enables WinRM for Packer, and renders the managed guest account from the current host user identity.
 - Apply the nucleus Windows guest config after first boot.
 
 ### Guest configuration status
 
-Guest configuration is not automatic after first boot. `nucleus-vm-setup` builds
-images and provisions VM runtimes; apply commands must be run inside each guest.
+Guest configuration is not automatic after first boot. `nucleus-vm-setup` builds images and provisions VM runtimes; apply commands must be run inside each guest.
 
 ### Image location
 

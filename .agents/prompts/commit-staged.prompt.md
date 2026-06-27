@@ -6,8 +6,7 @@ argument-hint: Optional extras (e.g., ticket=ABC-123). To skip committing, pass 
 
 # Commit staged change
 
-Proceed automatically with best-effort defaults and available context. Do not ask
-for confirmation.
+Proceed automatically with best-effort defaults and available context. Do not ask for confirmation.
 
 ## Workflow
 
@@ -19,28 +18,21 @@ for confirmation.
      ```
 
    - Present the exact command before execution.
-   - If not executed, produce a best-effort commit message from available context
-     and stop.
+   - If not executed, produce a best-effort commit message from available context and stop.
 
 2. **Compose commit message**
-   - Inspect Command 1 output and repository conventions
-     (`CONTRIBUTING.md`, `.agents/`, `package.json`, `commitlint`, `prek.toml`,
-     `CHANGELOG.md`, etc.).
+   - Inspect Command 1 output and repository conventions (`CONTRIBUTING.md`, `.agents/`, `package.json`, `commitlint`, `prek.toml`, `CHANGELOG.md`, etc.).
    - Build a commit message with:
      - Short subject (~50 chars)
      - Optional body (each line wrapped to 72 chars or fewer; bullets allowed)
-     - Footer (`BREAKING CHANGE` / `Refs` / `Ticket`), including
-       `${input:extra}` when provided
+     - Footer (`BREAKING CHANGE` / `Refs` / `Ticket`), including `${input:extra}` when provided
    - Prefer tooling-enforced rules; default to Conventional Commits when unclear.
-   - If commitlint rejects line length or formatting, rewrap and retry until it
-     passes.
+   - If commitlint rejects line length or formatting, rewrap and retry until it passes.
    - Do not ask for confirmation before committing.
 
 3. **Create the commit**
-   - If `${input:commitNow}` is `no`, skip this step and only present the
-     message.
-   - Otherwise, present the exact command to commit from stdin and print the new
-     SHA. Run both parts in the same shell command block.
+   - If `${input:commitNow}` is `no`, skip this step and only present the message.
+   - Otherwise, present the exact command to commit from stdin and print the new SHA. Run both parts in the same shell command block.
    - Use shell-appropriate syntax:
      - **PowerShell (Windows):**
 
@@ -61,11 +53,9 @@ for confirmation.
        ) && git rev-parse HEAD
        ```
 
-       Use `<<'MSG'` to prevent shell expansion. If `MSG` appears in the message,
-       choose another delimiter.
+       Use `<<'MSG'` to prevent shell expansion. If `MSG` appears in the message, choose another delimiter.
 
-   - If Command 2 fails due to quoting/heredoc syntax, retry up to 3 corrected
-     forms. For other failures, report the error and do not modify the index.
+   - If Command 2 fails due to quoting/heredoc syntax, retry up to 3 corrected forms. For other failures, report the error and do not modify the index.
 
 4. **Output**
    - 1–2 line summary with staged files and detected convention
@@ -76,10 +66,8 @@ for confirmation.
 ## Rules
 
 - Never ask for confirmation or clarification.
-- Only run the two approved shell commands. Do not run `git add`, `git reset`,
-  or otherwise change the index.
-- If Command 1 is denied, still propose a best-effort commit message from
-  available context.
+- Only run the two approved shell commands. Do not run `git add`, `git reset`, or otherwise change the index.
+- If Command 1 is denied, still propose a best-effort commit message from available context.
 
 ## Inputs
 

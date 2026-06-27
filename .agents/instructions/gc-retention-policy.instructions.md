@@ -6,9 +6,7 @@ applyTo: "src/**/*.nix, scripts/gc.*, src/hosts/Windows/**/*.yml"
 
 # GC and Retention Policy
 
-Timing values are specified directly at their point of use — this file does
-not maintain a duplicate table. To find or change a retention interval, look
-in the relevant source file.
+Timing values are specified directly at their point of use — this file does not maintain a duplicate table. To find or change a retention interval, look in the relevant source file.
 
 ## Overriding expiry values at runtime
 
@@ -37,5 +35,4 @@ Source files:
 
 ## Authoring rule
 
-- When changing a timing value, update the actual configuration in the source
-  file listed above. No separate timing manifest needs updating.
+- When changing a timing value, update the actual configuration in the source file listed above. No separate timing manifest needs updating.

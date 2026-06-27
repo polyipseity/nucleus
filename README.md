@@ -9,8 +9,7 @@ It manages:
 - Windows native state (WinGet DSC)
 - user-level shell/editor preferences (Home Manager)
 
-Contributor policy and invariants live in `AGENTS.md` and
-`.agents/instructions/*.instructions.md`.
+Contributor policy and invariants live in `AGENTS.md` and `.agents/instructions/*.instructions.md`.
 
 ## Apply
 

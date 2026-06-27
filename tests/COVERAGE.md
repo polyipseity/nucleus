@@ -2,10 +2,7 @@
 
 ## Overview
 
-This document tracks test coverage across all **nucleus** platforms (macOS,
-NixOS, Windows) and layers (Nix, PowerShell, Shell). The suite validates
-configuration logic, module composition, package parity, and deployment
-scripts.
+This document tracks test coverage across all **nucleus** platforms (macOS, NixOS, Windows) and layers (Nix, PowerShell, Shell). The suite validates configuration logic, module composition, package parity, and deployment scripts.
 
 ---
 
@@ -15,40 +12,30 @@ scripts.
 
 Located in `tests/src/`, run via `nix-instantiate --eval` in CI.
 
-**Coverage**: Module options, import graphs, config composition, package parity,
-option conflict detection, activation dependency ordering, SOPS structure
-validation, and VS Code extension pruning. Run `ls tests/src/*.nix` for the
-current authoritative list.
+**Coverage**: Module options, import graphs, config composition, package parity, option conflict detection, activation dependency ordering, SOPS structure validation, and VS Code extension pruning. Run `ls tests/src/*.nix` for the current authoritative list.
 
 ---
 
 ### Windows Tests (PowerShell + DSC Layer)
 
-Located in `tests/src/hosts/Windows/`, organised by concern (`apps/`, `configuration/`,
-`packages/`, `smoke/`, `system/`) and run via Pester locally on Windows.
+Located in `tests/src/hosts/Windows/`, organised by concern (`apps/`, `configuration/`, `packages/`, `smoke/`, `system/`) and run via Pester locally on Windows.
 
 #### ✅ **Windows Pester suites**
 
 ##### Package Installation Tests
-- Cross-host CLI tooling: 7-Zip, zoxide, uv, Ruff, ty, ripgrep, direnv,
-  GitHub CLI, prek, jq, fzf, bat, fd, ShellCheck, Typst
-- Developer runtimes/editors: Git, PowerShell, VS Code stable + Insiders,
-  Windows Terminal Preview, Neovim, Ollama, Bun, rustup, SOPS
-- GUI applications: Blender, Discord Canary, Chrome Canary, QtPass,
-  Obsidian, Telegram Desktop Beta
+- Cross-host CLI tooling: 7-Zip, zoxide, uv, Ruff, ty, ripgrep, direnv, GitHub CLI, prek, jq, fzf, bat, fd, ShellCheck, Typst
+- Developer runtimes/editors: Git, PowerShell, VS Code stable + Insiders, Windows Terminal Preview, Neovim, Ollama, Bun, rustup, SOPS
+- GUI applications: Blender, Discord Canary, Chrome Canary, QtPass, Obsidian, Telegram Desktop Beta
 
 All tests validate cross-platform parity with nixpkgs/Homebrew equivalents.
 
 ##### Registry, Environment, and Policy Tests
-- User-scoped DSC state: screen saver posture, managed wallpaper path,
-  Explorer visibility/taskbar chrome settings, and managed environment vars
-- System-scoped invariants: long paths, RDP enablement + NLA, firewall,
-  TCP keepalive posture, lid-close power policy, and font substitutions
+- User-scoped DSC state: screen saver posture, managed wallpaper path, Explorer visibility/taskbar chrome settings, and managed environment vars
+- System-scoped invariants: long paths, RDP enablement + NLA, firewall, TCP keepalive posture, lid-close power policy, and font substitutions
 - App parity: QtPass registry values and Obsidian advanced-settings JSON
 - Smoke coverage: Windows platform + PowerShell runtime validation
 
-**Windows Test Totals**: multiple focused suites covering package parity,
-user configuration, system invariants, app-specific parity, and smoke checks
+**Windows Test Totals**: multiple focused suites covering package parity, user configuration, system invariants, app-specific parity, and smoke checks
 
 ---
 
@@ -128,8 +115,7 @@ All tests are automatically run on every commit:
 
 ## Untested Areas
 
-Activation hooks, secret decryption, and deployment validation require live
-systems and are not unit-testable in CI. Mock tests cover secret structure.
+Activation hooks, secret decryption, and deployment validation require live systems and are not unit-testable in CI. Mock tests cover secret structure.
 
 ---
 
@@ -173,7 +159,7 @@ act push --job test  # Requires 'act' (https://github.com/nektos/act)
 
 ---
 
-**Last Updated**: Continuous (update this file whenever suite structure changes)
-**Nix Suite Status**: See `ls tests/src/*.nix` for current list
-**Windows Suite Status**: hierarchical Pester suites under `tests/src/hosts/Windows/**`
-**Shell Suite Status**: script validation checks in `tests/scripts/`
+- **Last Updated**: Continuous (update this file whenever suite structure changes)
+- **Nix Suite Status**: See `ls tests/src/*.nix` for current list
+- **Windows Suite Status**: hierarchical Pester suites under `tests/src/hosts/Windows/**`
+- **Shell Suite Status**: script validation checks in `tests/scripts/`
