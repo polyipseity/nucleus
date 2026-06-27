@@ -1,5 +1,5 @@
 ---
-description: "Use when adding or editing any infrastructure code: Nix files, PowerShell modules, WinGet DSC YAML, or shell scripts. Mandates documentation standards for each file type and applies the WHY-not-WHAT commenting principle."
+description: "Use when adding or editing any infrastructure code: Nix files, PowerShell modules, WinGet DSC YAML, shell scripts, or MANUAL.md host docs. Mandates documentation standards for each file type, citation quality rules, and the WHY-not-WHAT commenting principle."
 name: "Documentation Standards"
 applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, src/hosts/**/MANUAL.md, scripts/**, src/scripts/**"
 ---

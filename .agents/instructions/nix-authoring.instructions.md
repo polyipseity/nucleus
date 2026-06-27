@@ -1,6 +1,6 @@
 ---
 description: "Use when authoring or editing Nix files in src/: flake.nix, host configs under src/hosts/, and shared modules under src/modules/. Covers flake structure, module conventions, Home Manager patterns, and authoring rules specific to this repository."
-name: "Nix Configuration Authoring"
+name: "Nix Authoring"
 applyTo: "src/**/*.nix"
 ---
 

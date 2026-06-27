@@ -1,6 +1,6 @@
 ---
 description: "Use when editing launchd plist configuration for system daemons on macOS. Documents SIP log-path restrictions and the approved /Users/Shared/logs directory."
-name: "macOS launchd log path restriction"
+name: "macOS launchd Log Paths"
 applyTo: "src/modules/logging.nix, src/hosts/MacBook/**"
 ---
 

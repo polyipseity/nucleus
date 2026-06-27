@@ -1,6 +1,6 @@
 ---
 description: "Use when adding or editing files under scripts/, src/scripts/, or src/hosts/Windows/modules/. Covers script placement, newline policy, cross-platform behavior, runtime detection, and permission expectations."
-name: "Scripts and Executable Permissions"
+name: "Scripts and Permissions"
 applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
 ---
 

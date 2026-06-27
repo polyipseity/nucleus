@@ -1,6 +1,6 @@
 ---
 description: "Use when editing markdown docs, AGENTS.md, prompt files, or agent customization markdown. Covers repo-specific markdownlint rules, linking strategy, mirrored prompts, and safe YAML frontmatter."
-name: "Markdown and Customization Authoring"
+name: "Markdown and Agent Customizations"
 applyTo: "AGENTS.md, .agents/**/*.md, .opencode/**/*.md, .github/**/*.md"
 ---
 

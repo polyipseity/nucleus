@@ -1,6 +1,6 @@
 ---
-description: "Use when creating or updating instructions for repository tooling, build commands, tests, CI, editor automation, or validation workflows. Also covers detecting the repository's programming languages, frameworks, runtimes, package managers, and setup from concrete files before writing detailed guidance."
-name: "Tooling and Validation Detection"
+description: "Use when creating or updating repository tooling, build commands, CI workflows, validation hooks, or authoring instructions about them. Also covers detecting the repository's languages, frameworks, runtimes, and package managers from concrete files."
+name: "Tooling and Validation"
 applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/settings.json, .github/workflows/**/*.yml, .github/dependabot.yml, .editorconfig, .gitattributes, prek.toml, scripts/check.sh, scripts/prek-hooks.py"
 ---
 
