@@ -87,6 +87,14 @@ in
       # NSGlobalDomain: global preferences that don't fit nix-darwin typed options.
       # Source: https://developer.apple.com/documentation/foundation/userdefaults
       "NSGlobalDomain" = {
+        # Disable "Close windows when quitting an application" so that
+        # macOS preserves and restores application windows across quit/launch
+        # cycles. This key is not exposed by nix-darwin's typed options.
+        # Sources:
+        # https://macos-defaults.com/misc/nsquitalwayskeepwindows.html
+        # https://apple.stackexchange.com/questions/411466
+        NSQuitAlwaysKeepsWindows = true;
+
         # Keep Finder context-menu Services at the default threshold so core
         # entries such as "New Terminal at Folder" remain discoverable from a
         # right-click without requiring keyboard-only fallbacks.
