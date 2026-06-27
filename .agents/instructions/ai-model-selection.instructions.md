@@ -70,7 +70,6 @@ Ollama's available quantizations for models in the relevant size range are limit
 
 - **macbook default**: `q4_K_M` (default tag); use `it-qat` when the model family ships one (e.g. `gemma3:27b-it-qat`). Use `e4b-it-bf16` (16 GB) for `gemma4:e4b` when maximum quality at a single small model is desired.
 - **nixos / windows default**: always `q4_K_M` (default tag) — VRAM is tight; do not use q8_0 or fp16 variants.
-- Avoid lower-than-Q4 quantizations (Q3, Q2) — they do not exist on Ollama for the models tracked here and offer significant quality degradation.
 
 ## Model size reference (verified from Ollama library)
 

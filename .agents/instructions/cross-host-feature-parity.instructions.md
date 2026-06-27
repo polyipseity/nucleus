@@ -59,7 +59,7 @@ If a parity feature requires imperative Windows code, enforce all of the followi
 
 When a service declaration is removed or disabled, each platform handles cleanup differently. Documented here so maintainers know what to expect.
 
-- **macOS (launchd) / NixOS (systemd)** — Mostly automatic. Nix/darwin/home-manager removes the plist/unit file and unloads/stops the service when you delete the declaration and re-apply (`darwin-rebuild switch` / `home-manager switch` / `nixos-rebuild switch`). This works because Nix manages the unit files declaratively.
+- **macOS (launchd) / NixOS (systemd)** — Automatic. Nix removes the unit file and stops the service on re-apply.
 - **Windows native SCM services** (Caddy, LiteLLM) — Explicit. Each `Sync-*Service.ps1` module implements its own cleanup when `-Enabled:$false`: `Stop-Service` + `sc.exe delete`. The cleanup is manual imperative code.
 - **Windows scheduled tasks** (cloud-drive, CamillaDSP, Discord Music RPC, etc.) — Same explicit pattern. Each `Sync-*` module calls `Unregister-ScheduledTask` when disabled.
 
@@ -84,8 +84,7 @@ When adding a new Windows service module, always implement both the enable and d
 ## Cloud-drive parity rules
 
 - Treat cloud-drive capabilities as parity-first across macOS, NixOS, and Windows for both mounts and replicas.
-- Directionality invariant: mounts are live/bidirectional access surfaces; replicas are pull-only read-only mirrors (remote -> local) for automation.
-- Do not add push/bisync execution paths for replicas in any host unless a new repository policy explicitly changes this invariant.
+- Directionality invariant: mounts are live/bidirectional access surfaces; replicas are pull-only read-only mirrors (remote -> local) for automation. Do not add push/bisync execution paths for replicas unless a new repository policy explicitly changes this invariant.
 - Preserve stable provider identity keys (`id`, `remoteName`) while allowing host-appropriate presentation labels.
 - Keep managed mount/replica local paths as real directories on every host unless a documented platform exception applies.
 - The current documented exception is macOS-only: `~/clouds/iCloudReplica` may be a symlink to `~/Library/Mobile Documents` to avoid duplicating native iCloud storage.

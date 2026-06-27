@@ -14,7 +14,7 @@ The guiding principle is **document the WHY, not the WHAT**: record the rational
 
 ## Provenance for non-validated external identifiers
 
-When a setting cannot be automatically validated by the repository's current tests or schema checks, include at least one inline source citation near the setting. Follow the citation quality standards in `.agents/instructions/citation-quality.instructions.md`.
+When a setting cannot be automatically validated by the repository's current tests or schema checks, include at least one inline source citation near the setting. See the Citation quality section below for standards.
 
 ## Nix files (`src/**/*.nix`)
 
@@ -26,7 +26,6 @@ There is no Nix-native documentation tool in use here; inline `#` comments are t
 - **Module options (`lib.mkOption`)**: the `description` field is the formal documentation mechanism for Nix module options and is mandatory on every `mkOption` call. The description must explain what the option controls and what effect different values have, not merely restate the type.
 - **Non-obvious inline code**: `builtins.*` calls, `lib.*` expressions, and config block patterns that are not immediately self-evident to a reader unfamiliar with Nix or this codebase must have a `#` comment explaining the purpose.
 - **Document the WHY**: prefer comments that explain the rationale, security implication, or design tradeoff behind a setting (e.g. why a PAM service name was chosen, why an option combination closes a specific attack surface) over comments that merely describe what the option does.
-- **Cite non-validated external keys**: for externally-defined keys/identifiers not covered by automated checks, add an inline `# Source:` comment with at least one verification URL adjacent to the setting.
 
 ## PowerShell files (`src/**/*.ps1`)
 
@@ -45,7 +44,6 @@ The `directives.description:` field on each resource entry is the formal documen
 - **Mandatory**: every resource entry must include a non-empty `directives.description:` value.
 - **WHY not WHAT**: the description must state the reason the resource exists and its practical effect, not merely restate the resource type or key names. For example, "Enable long path support so Nix store paths and deep Git trees do not hit the 260-character Windows limit" is better than "Enable long path support in the registry."
 - **Setting rationale**: when a resource sets a non-obvious registry value, environment variable, or system flag, the description must explain what enabling or disabling the setting changes in practice.
-- **Cite non-validated external keys**: when `settings.name`, registry paths, or resource identifiers depend on vendor-defined external contracts that are not test-validated here, include a source URL in `directives.description`.
 - **Dependency rationale**: if a resource uses `dependsOn:`, the description should note why the ordering constraint exists.
 
 ## CLI option and variable naming (positive options policy)
@@ -76,3 +74,131 @@ There is no formal documentation tool for POSIX sh or Bash; `#` comments are the
 - **Non-trivial inline logic**: `case` branches, conditional chains, and environment variable reads that are not self-explanatory must have an inline `#` comment explaining the branch condition and its effect.
 - **Document the WHY**: state why a particular tool or flag was chosen (e.g. "`set -a` exports all variables so child processes inherit version pins") and document any behaviour that a future reader might otherwise change incorrectly.
 - **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
+
+## Citation quality
+
+When citing external sources (APIs, documentation, vendor settings, support articles), maintain URL and content correctness to prevent drift and ensure maintainability.
+
+### Source preference (priority order)
+
+For claims about behavior, APIs, or configuration settings:
+
+1. **Developer/API documentation first**
+   - Apple: `developer.apple.com/documentation/*`
+   - Microsoft: `learn.microsoft.com/en-us/windows/*` or `learn.microsoft.com/en-us/dotnet/*`
+   - Official language/framework reference
+   - IETF RFCs for standards
+
+2. **User-oriented help only when developer docs don't exist**
+   - Apple: `support.apple.com/en-us/guide/*` (add explicit locale prefix)
+   - Microsoft: KB articles
+   - Vendor release notes or blogs
+   - If you must use a support page where a developer doc exists, add a `# WHY:` comment explaining why the support page is the only available source
+
+3. **Avoid**
+   - Mirrors, archived copies, or third-party rewrites (use canonical source)
+   - Forum posts, Reddit, Stack Overflow (document internal consensus via comments, not external link)
+   - Expired links or pages under redirect chains
+
+### URL standardization
+
+**Apple support URLs must include explicit US English locale:**
+
+- ✅ `https://support.apple.com/en-us/guide/mac-help/...`
+- ✅ `https://support.apple.com/en-us/HT123456`
+- ❌ `https://support.apple.com/guide/mac-help/...` (no locale prefix; redirects based on browser locale)
+- ❌ `https://support.apple.com/HT123456` (no locale prefix)
+
+**Preferred URL form:**
+
+- Use canonical, stable URLs without query parameters (e.g., `?search=...`)
+- Avoid short URLs or redirects if a canonical form exists
+- Include article/page ID (HT numbers, doc IDs) when possible for long-term stability
+
+### Topic and content verification
+
+Before committing, verify:
+
+1. **Article/page ID matches the claim**
+   - Example: If documenting `.DS_Store` behavior, the cited Apple article must be about `.DS_Store`, not "Activation Lock" (HT102541 ≠ .DS_Store)
+   - Browse the page or search the page text to confirm content matches your use case
+
+2. **Developer vs. user scope**
+   - Developer APIs should document behavior the way an SDK would
+   - End-user settings/UI should match Apple's own UI documentation or end-user release notes
+   - Mismatch? Add a comment explaining why the chosen source is most authoritative for your context
+
+### Deprecation hygiene
+
+When citing APIs or settings:
+
+1. **Do not cite deprecated APIs as current behavior**
+   - Carbon framework (macOS) → replace with modern equivalent (InputMethodKit, AppKit, SwiftUI)
+   - CoreGraphics (legacy) → consider modern Cocoa APIs
+   - When in doubt, check Apple's official deprecation notices
+
+2. **If a deprecated API must be documented** (for historical context):
+   - Mark it as deprecated in the comment
+   - Cite the deprecation notice
+   - Cite the modern replacement API in the same block
+   - Example:
+     ```nix
+     # Old approach (deprecated): use Carbon Text Services Manager
+     # Modern approach: use InputMethodKit
+     # Source: https://developer.apple.com/documentation/inputmethodkit
+     ```
+
+### Citation style in code/config
+
+Keep citations adjacent to the claim they support:
+
+```nix
+# Good: Source immediately follows the setting claim
+# Prevent .DS_Store files on network and removable volumes.
+# Source: https://support.apple.com/en-us/HT208209
+"com.apple.desktopservices" = {
+  DSDontWriteNetworkStores = true;
+};
+
+# Less good: Source buried far from the code
+"com.apple.desktopservices" = {
+  DSDontWriteNetworkStores = true; # See https://...
+};
+
+# Avoid: No source at all, or source in wrong place
+# Source: https://...
+# Many lines later...
+"com.apple.foo" = { ... };
+```
+
+For multi-line settings, put the source at the top of the comment block:
+
+```nix
+# Software Update: check, download, and install automatically.
+# Source: https://support.apple.com/en-us/guide/deployment/manage-software-updates-depafd2fad80/web
+"com.apple.SoftwareUpdate" = {
+  AutomaticCheckEnabled = true;
+  AutomaticDownload = true;
+  CriticalUpdateInstall = true;
+};
+```
+
+### Reviewer checklist for PR review
+
+When reviewing changes with external citations:
+
+- [ ] All non-trivial behavior claims have nearby citations
+- [ ] API/framework claims use `developer.<vendor>.com` when available
+- [ ] Any `support.apple.com/en-us/` links include `/en-us/` (no locale-less URLs)
+- [ ] Cited article/page actually covers the setting/claim being documented
+- [ ] No deprecated APIs cited as current behavior (or marked+explained if unavoidable)
+- [ ] If a user-help page is cited over developer docs, there's a WHY comment
+- [ ] All links are canonical (no query params, no obvious redirect stubs)
+- [ ] Citations stay adjacent to the claim they validate
+
+### When in doubt
+
+- Use `developer.<vendor>.com` over user-help pages
+- Add a comment explaining the choice if non-obvious
+- Verify the link actually covers your use case before commit
+- Include the article ID or page number for long-term reference

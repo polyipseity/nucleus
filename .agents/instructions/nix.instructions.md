@@ -41,11 +41,7 @@ See [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compa
 
 ## Cross-host parity expectations
 
-Follow `.agents/instructions/cross-host-feature-parity.instructions.md` for parity-first scope decisions. If a capability remains POSIX-only, add a short WHY comment near the decision point.
-
-## Minimal-chrome UI defaults
-
-See `.agents/instructions/cross-host-feature-parity.instructions.md` for the minimal-chrome UI defaults policy.
+If a capability remains POSIX-only, add a short WHY comment near the decision point.
 
 ## Open-source typography baseline
 

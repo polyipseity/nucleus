@@ -8,7 +8,6 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
 
 ## Discovery before prescription
 
-- Treat stack and tooling discovery as an evidence-based process.
 - Before you write language-specific, framework-specific, runtime-specific, or automation-specific instructions, determine what the repository actually uses.
 - Inspect the files that define the repository's actual setup: dependency manifests, lockfiles, build/test/linter/formatter configs, CI workflows, scripts, editor settings, automation configs, source directories, file extensions, and representative entrypoints.
 - If the repository is still a sparse template, describe the workflow as conditional or not yet initialized instead of pretending commands already exist.

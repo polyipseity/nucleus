@@ -54,13 +54,9 @@ ClawHub is installed and managed declaratively by the `installBunPackages` Home 
 5. Removes packages no longer desired (via `bun remove -g`).
 6. Persists the managed set to `~/.config/nucleus/bun-packages.json`.
 
-**Do not add a fallback `bun install -g clawhub` call inside** the `syncClawHubSkills` activation logic. If ClawHub is absent when sync runs, the `installBunPackages` activation failed; sync must warn and skip rather than attempt a second install.
-
 ### Windows
 
 ClawHub is managed by `Invoke-BunSetup` in `src/hosts/Windows/modules/Invoke-BunSetup.ps1`, which is called by `apply.ps1` before `Sync-AgentsClawHubSkills`. `Invoke-BunSetup` manages a `$desiredPackages` list (currently `@mariozechner/pi-coding-agent` and `clawhub`) and writes a manifest to `%USERPROFILE%\.config\nucleus\bun-packages.json`.
-
-**Do not add a fallback `bun install -g clawhub` call inside** `Sync-AgentsClawHubSkills`. If ClawHub is absent when the function runs, `Invoke-BunSetup` failed; the function must warn and skip.
 
 ## Activation DAG (POSIX)
 

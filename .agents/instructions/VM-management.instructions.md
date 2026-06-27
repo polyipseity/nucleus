@@ -195,15 +195,6 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 
 Guest configuration is not automatic after first boot. `nucleus-vm-setup` builds images and provisions VM runtimes; apply commands must be run inside each guest.
 
-### Image location
-
-Images land at:
-
-- macOS/NixOS: `~/virtual machines/images/<name>.qcow2`
-- Windows: `%USERPROFILE%\virtual machines\images\<name>.qcow2`
-
-Delete an image and re-run `nucleus-vm-setup` to rebuild from scratch.
-
 ### Packer requirements
 
 - Packer installed as `pkgs.packer` (POSIX) / `HashiCorp.Packer` WinGet (Windows).

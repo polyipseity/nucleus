@@ -74,31 +74,9 @@ These modules should:
 - Respect per-user configuration from the user registry (flake.nix users.<username>)
 - NOT hardcode usernames (except in comments explaining the constraint)
 
-## Verification Checklist
 
-Before committing changes that affect users:
-
-1. **Secrets/SOPS changes**: Confirm `isPrimaryUser` guard is in place in secrets.nix
-2. **Feature provisioning changes**: Confirm hardcoded `"polyipseity"` comparison or document why multi-user support is intentional
-3. **Dev-repos changes**: Confirm current username is used, but respects registry config
-4. **Global modules (home.nix, shell.nix)**: Confirm they use dynamic username, not hardcoded values
 
 ## Common Patterns
-
-### Pattern 1: Primary-User-Only Feature (Registry-Driven + Hardcoded Guard)
-
-```nix
-# In agents.nix:
-agentsConfig = users.${currentUsername}.agents or { enable = false; };
-
-lib.mkIf (config.home.username == "polyipseity" && agentsConfig.enable) {
-  # Read from registry, guard with hardcoded check
-  nucleus.agents.enable = true;
-  ...
-}
-```
-
-**Explanation**: Always read from the registry first. The hardcoded `"polyipseity"` check is a safety gate that prevents accidental feature activation for non-primary users.
 
 ### Pattern 2: Multi-User Feature (Registry-Driven)
 

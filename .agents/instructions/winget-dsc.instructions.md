@@ -66,8 +66,6 @@ Use `PSDscResources/Script` only for imperative steps that cannot be expressed b
 
 **cargo-cache is managed via cargo-binstall, not `system.dsc.yml`:** `cargo-cache` has no WinGet package ID and is not in Scoop. It is installed declaratively by `Invoke-CargoBinstallSetup` (in `src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1`) which runs after the DSC step in `apply.ps1`. `scripts/gc.ps1` probes for the binary gracefully and skips pruning when it is absent.
 
-**`winget cache purge` and `winget clean` do not exist** — WinGet has no cache management subcommands. Do not add either as a `SetScript` body.
-
 ## PSDscResources/Script resource
 
 ### Purpose and advantages
@@ -128,10 +126,6 @@ Do **not** use a Script block for:
 - **Service lifecycle management** (OpenSSH, RDP TermService): no reliable boolean `TestScript` without running `Get-Service` inline.
 - **`powercfg.exe`-based power policy**: no structured query API; output parsing fragile in YAML.
 - **Health checks / post-apply probes**: these are assertions, not convergence state.
-
-### Audit result for this repository
-
-A full audit of every `apply.ps1` operation against the four candidacy criteria found **zero candidates**: every operation fails at least one criterion (complex state, uncertain PATH, existing native resource, or service/crypto dependency). The existing architecture — DSC for packages/registry/environment/settings, `apply.ps1` for everything requiring crypto, service lifecycle, file-editing with managed blocks, or CLI tools with uncertain PATH — is correct.
 
 ## Package manager preference hierarchy
 

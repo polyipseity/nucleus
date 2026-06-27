@@ -6,18 +6,14 @@ applyTo: "src/modules/cloud-drives.nix, src/modules/macos.nix, src/hosts/Windows
 
 # Cloud Drives and Finder Favorites
 
-## Scope
-
-Use this guidance for cloud-drive convergence (mounts + replicas) and Finder favorites behavior on macOS.
-
-## Canonical terminology (required)
+## Canonical terminology
 
 - **Mounts**: live/on-demand access (`rclone mount`).
 - **Replicas**: materialized local copy (`rclone sync` pull-only, remote -> local).
 - Keep this vocabulary consistent across Nix options, Windows user registry, scripts, docs, and tests.
 - Replica automation must not write to remotes: no push paths and no bisync paths in scripts, wrappers, scheduled tasks, or tests.
 
-## Path ownership invariants (required)
+## Path ownership invariants
 
 - Keep mount/replica local paths under managed user home paths (for example `~/clouds/*` or `%USERPROFILE%\clouds\*`).
 - Managed mount/replica paths must be real directories by default on all hosts.
@@ -31,7 +27,7 @@ Use this guidance for cloud-drive convergence (mounts + replicas) and Finder fav
 - WHY: this avoids duplicating native iCloud Drive storage with a second managed tree on macOS.
 - Do not replicate this exception on NixOS or Windows.
 
-## Finder favorites policy on modern macOS (required)
+## Finder favorites policy on modern macOS
 
 - Do **not** manage Finder favorites by writing `FavoriteItems.sfl*` archives directly via NSKeyedArchiver/JXA.
 - Do **not** rely on `sfltool` for favorites management.
@@ -64,7 +60,7 @@ Use this guidance for cloud-drive convergence (mounts + replicas) and Finder fav
 - **Probe-time safeguards are acceptable**: bounded root-access probes (for example OneDrive inaccessible-root filtering) may use defensive listing flags and strict timeouts, but the real `rclone sync` path should use backend defaults.
 - **Replicas are pull-only and idempotent**: accept slow sync times as a trade-off for safe, one-way replication that never overwrites remote data. Scheduled replicas should account for multi-minute runtime and allow adequate inter-run spacing.
 
-## Tests and docs coupling (required)
+## Tests and docs coupling
 
 When changing cloud-drive/Finder behavior, update all of the following in the same change:
 

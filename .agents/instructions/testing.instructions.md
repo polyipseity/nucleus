@@ -174,11 +174,7 @@ winget configure --what-if .\src\hosts\Windows\user.dsc.yml
 
 ### Test-Driven Development (TDD) Workflow
 
-1. **Write the test first** — describe what correct behavior looks like
-2. **Watch it fail** — confirm the test catches the missing feature
-3. **Implement the feature** — make the test pass
-4. **Refactor if needed** — improve code while tests stay green
-5. **Commit atomically** — test + implementation in one commit
+Commit atomically: test + implementation in one commit.
 
 ### Naming Conventions
 
@@ -213,13 +209,7 @@ Describe "Windows Package Installation" {
   settings:
     id: <Publisher>.<Tool>
     source: winget
-```
 
-- Add ripgrep to system.dsc.yml for cross-host CLI parity
-- Add Pester test to validate installation
-- Ripgrep mirrors fd behavior on POSIX hosts"
-
-```
 
 ---
 
@@ -244,12 +234,7 @@ Tests run automatically on:
 
 **Windows-specific tests:** Not run in CI (uses Linux runners). Run locally before commit.
 
-### Viewing CI Results
 
-1. Go to the PR or commit in GitHub
-2. Click "Details" on the CI status check
-3. View the "Logs" tab to see test output
-4. Fix failures and push a new commit
 
 ---
 
