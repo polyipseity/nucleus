@@ -115,17 +115,7 @@ Your-Function
 
 ### When NOT to use PSDscResources/Script
 
-Do **not** use a Script block for:
-
-- **Secrets/SOPS/GPG operations**: PATH dependencies on GPG, complex state, explicitly excluded by policy.
-- **Wallpaper provisioning**: SOPS decryption, complex multi-file management, explicitly excluded by policy.
-- **SSH host key bootstrap or registration**: service lifecycle, network/git operations, timing-dependent state.
-- **VS Code extension management**: `code`/`code-insiders` CLI not guaranteed in PATH during DSC execution.
-- **Git/SSH config sync**: depends on SOPS-materialized files produced _outside_ DSC — `dependsOn` cannot model this ordering.
-- **Shell profile editing (managed-block pattern)**: complex file editing; inline YAML PowerShell would be fragile.
-- **Service lifecycle management** (OpenSSH, RDP TermService): no reliable boolean `TestScript` without running `Get-Service` inline.
-- **`powercfg.exe`-based power policy**: no structured query API; output parsing fragile in YAML.
-- **Health checks / post-apply probes**: these are assertions, not convergence state.
+Do **not** use a Script block for operations where PATH is unreliable, state is complex, or a declarative alternative exists: secrets lifecycle, wallpaper provisioning, SSH key bootstrap, VS Code extension install, Git/SSH config sync, shell profile editing, service lifecycle management, `powercfg.exe`-based power policy, or post-apply health checks.
 
 ## Package manager preference hierarchy
 
@@ -199,14 +189,9 @@ After Scoop installs cargo-binstall, `src/hosts/Windows/modules/Invoke-CargoBins
 
 ## Imperative fallback safety (Windows modules)
 
-When a capability cannot be represented in WinGet DSC and must be implemented in `src/hosts/Windows/modules/*.ps1` + `apply.ps1`, enforce all of the following:
+See [cross-host-feature-parity.instructions.md](cross-host-feature-parity.instructions.md) — the same `managed-scope only`, `fail-fast`, `idempotent convergence/cleanup`, and `explicit toggle` rules apply.
 
-- **Managed-scope only**: modify only declaratively managed files/blocks/keys. Do not overwrite or delete unrelated user content.
-- **Bounded edits**: use explicit markers (or equivalent precise selectors) for file edits so cleanup can remove only managed content.
-- **Fail-fast on unsafe state**: if a required precondition is ambiguous or a target looks externally managed, stop with an error instead of guessing.
-- **Idempotent configuration**: re-running apply must converge to the same state without duplicating blocks or repeatedly mutating equivalent values.
-- **Idempotent deconfiguration**: disabling a feature must safely remove only managed state and be no-op when already absent.
-- **Explicit toggle**: every imperative parity feature must expose an enable/ disable toggle in `src/hosts/Windows/apply.ps1` and wire cleanup when false.
+See [Imperative fallback safety (Windows)](cross-host-feature-parity.instructions.md#imperative-fallback-safety-windows) for the full policy.
 
 ## Validation
 

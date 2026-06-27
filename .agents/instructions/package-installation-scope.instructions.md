@@ -40,12 +40,6 @@ applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, sr
 | **Prebuilt binaries**       | N/A                                                   | N/A                                        | `cargo-binstall`, Scoop                  |
 | **Python tools**            | `uv tool install` (isolated venvs)                    | `uv tool install` (isolated venvs)         | `uv tool install` (isolated venvs)       |
 
-**Preference order** (apply in sequence; use first available):
-
-1. **Declarative (stateless)**: nix-darwin / NixOS / WinGet DSC — preferred for reproducibility
-2. **Managed global**: `bun install -g`, `uv tool install` — for CLI-only tools with isolated environments
-3. **Prebuilt**: `cargo-binstall`, Scoop — for binaries not in nixpkgs/WinGet
-4. **Isolated project**: devShell, `.venv`, `node_modules` — for development
 
 ---
 
@@ -74,12 +68,12 @@ Each blocked tool is overridden as a **shell function** that intercepts the comm
 
 Functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`, `pip3` are defined in `programs.zsh.initContent`. They:
 
-1. Check `$DIRENV_DIR` — set by direnv whenever an `.envrc` is active, including an **empty** `.envrc`. An empty `.envrc` (or any non-flake `.envrc`) with a `rust-toolchain.toml` present is an **intentional** design: it signals a managed project directory and allows cargo to route through the rustup shim which reads the toolchain file. The devShell (from a `use flake` `.envrc`) is the preferred path; empty `.envrc` is the lightweight alternative for projects that only need rustup-based toolchain selection without full Nix devShell overhead.
+1. Check `$DIRENV_DIR` — set by direnv whenever an `.envrc` is active. An empty `.envrc` (or any non-flake `.envrc`) with a `rust-toolchain.toml` is an **intentional** design: the lightweight alternative to a full devShell for projects that only need rustup-based toolchain selection.
 2. If set, invoke `command <tool>` to bypass the function and reach the devShell-scoped binary at the front of `PATH`.
 3. Otherwise, invoke the managed fallback toolchain published via `$NUCLEUS_DEFAULT_DEV_BIN`. On POSIX this path points at a dedicated Nix-built bundle containing the default development tools.
 4. If neither context is available, print a `shell: …` banner to stderr and return 1.
 
-**User-scope bin dir PATH wiring**: `~/.bun/bin`, `~/.cargo/bin`, and `~/.local/bin` are declared via `home.sessionPath`, **not** via `initContent` PATH guards. `home.sessionPath` writes to `~/.zshenv` (via the Home Manager session-vars mechanism) which is sourced before `~/.zshrc` (where the direnv hook lives). This ensures these directories are always part of the "original" PATH state that direnv captures and restores, even if the directories did not exist at the time the shell first started. Do **not** revert to `initContent` guarded `export PATH=...` lines — they are fragile under direnv because they only run at shell startup and are lost after a direnv deactivation if the directory was created later in the same session.
+**User-scope bin dir PATH wiring**: Declared via `home.sessionPath` (→ `~/.zshenv`, sourced before `~/.zshrc` with the direnv hook), not `initContent` PATH guards. This ensures directories stay in direnv's saved PATH state even if created after shell start. Do **not** revert to `initContent` `export PATH=...` — they are lost after direnv deactivation.
 
 ### POSIX (pwsh) — `src/modules/pwsh.nix`
 
@@ -89,7 +83,7 @@ Equivalent PowerShell functions in `profileContent`. Pass-through first uses `$e
 
 Same functions emitted into the managed block. Pass-through uses `$env:DIRENV_DIR` when present and otherwise the managed default shell environment flag (`$env:NUCLEUS_DEFAULT_DEV_ENV`). Windows currently reuses the managed user PATH entries instead of a second Nix-backed fallback root because the WinGet/PowerShell workflow has no nix-direnv-equivalent store path today.
 
-**User-scope bin dir PATH wiring**: `~\.bun\bin` and `~\.cargo\bin` are prepended **unconditionally** (no `Test-Path` guard) at the top of the managed block, before the direnv hook. This mirrors the POSIX `home.sessionPath` approach: the entries are always present in the environment direnv saves and restores, so they survive activation/deactivation cycles even when the directories were created after the current session started. Do **not** add `Test-Path` guards back — they break this contract.
+**User-scope bin dir PATH wiring**: Prepended **unconditionally** (no `Test-Path` guard) at the managed block top, before the direnv hook. Same rationale as POSIX: directories survive direnv cycles even if created mid-session. Do **not** add `Test-Path` guards back.
 
 ---
 
@@ -163,8 +157,6 @@ uv tool install black
 pip install --system black
 ```
 
-**Installation path**: `~/.local/share/uv/tools/` (added to `PATH` at user level) **No system-wide Python installation**: All Python via devShell or isolated `uv` environments
-
 ---
 
 ### Rust Tools (`cargo`, `cargo-binstall`)
@@ -177,8 +169,6 @@ pip install --system black
 cargo binstall ripgrep
 # Installs to ~/.cargo/bin
 ```
-
-**Installation paths**: `~/.cargo/bin`, `%USERPROFILE%\.cargo\bin` **System-wide rustc/cargo**: Blocked in interactive shells (see [Shell-Level Enforcement](#shell-level-enforcement))
 
 ---
 
@@ -198,8 +188,6 @@ npm install -g @tailwindlabs/tailwindcss
 
 - POSIX: `src/modules/agents.nix` — `installBunPackages` activation hook
 - Windows: `src/hosts/Windows/modules/setup/Invoke-BunSetup.ps1`
-
-**Installation path**: `~/.bun/bin`, `%USERPROFILE%\.bun\bin`
 
 ---
 
@@ -256,51 +244,4 @@ Only when declarative solutions don't exist:
 
 ---
 
-## Testing & Validation
-
-After adding or modifying packages:
-
-1. **Verify installation paths**:
-
-   ```bash
-   # POSIX
-   which <tool> && echo "Found at: $(which <tool>)"
-
-   # Windows PowerShell
-   (Get-Command <tool>).Source
-   ```
-
-2. **Confirm not in system directories**:
-
-   ```bash
-   # Should NOT match /usr/local, /usr/bin, C:\Windows\System32, Program Files
-   which <tool> | grep -E "/usr/(local/)?bin|Program Files"  # Should return nothing
-   ```
-
-3. **Run bootstrap apply** and verify tool remains accessible:
-   ```bash
-   ./scripts/bootstrap.sh apply
-   which <tool>  # Should still work
-   ```
-
 ---
-
-## Cross-Platform Examples
-
-### Adding a new Rust CLI tool (e.g., `sd`)
-
-```nix
-# POSIX: src/modules/core.nix via home.packages
-home.packages = with pkgs; [ sd ];
-```
-
-For Windows equivalents, see WinGet DSC patterns in [Declarative vs. Imperative](#declarative-vs-imperative) above or use `cargo-binstall` as documented in [Tool Installation Patterns](#tool-installation-patterns).
-
----
-
-## References
-
-- [winget-dsc.instructions.md](winget-dsc.instructions.md) — Windows package manager patterns (Scoop, cargo-binstall)
-- [AGENTS.md - Package Management Strategy](../../../AGENTS.md#package-management-strategy) — nixpkgs vs. Homebrew selection on macOS
-- [cross-host-feature-parity.instructions.md](cross-host-feature-parity.instructions.md) — Maintaining parity across hosts
-- [nix.instructions.md](nix.instructions.md) — Shell module authoring rules (alias-vs-function precedence for blocked tools)

@@ -167,10 +167,8 @@ winget configure --what-if .\src\hosts\Windows\user.dsc.yml
 
 ### When to Write Tests
 
-- **New Nix module:** Add unit tests to `tests/src/` for any logic beyond simple declarations
-- **New DSC resource:** Add Pester test to `tests/src/hosts/Windows/` to verify state after apply
-- **Module changes:** Update existing tests if logic changes
-- **Bug fix:** Add a test case that reproduces the bug, then verify the fix passes
+- New feature or breaking change: tests required (logic tests for Nix, Pester for DSC).
+- Bug fix: add a case that reproduces the bug, then verify the fix passes.
 
 ### Test-Driven Development (TDD) Workflow
 
@@ -200,17 +198,6 @@ Describe "Windows Package Installation" {
 }
 ```
 
-**DSC resource for package:**
-
-```yaml
-- resource: Microsoft.WinGet.Client/Package
-  directives:
-    description: <why the tool is needed>
-  settings:
-    id: <Publisher>.<Tool>
-    source: winget
-
-
 ---
 
 ## CI Integration
@@ -230,7 +217,3 @@ Before committing changes, verify:
 - [ ] Shell syntax passes: `nix run ./src#check-sh`
 - [ ] PowerShell syntax passes: `nix run ./src#check-pwsh`
 - [ ] (Windows only) Pester tests pass: `Invoke-Pester tests/src/hosts/Windows/`
-- [ ] Commit message follows conventional commits
-- [ ] Commit is atomic
-- [ ] Pre-commit hooks pass
-```

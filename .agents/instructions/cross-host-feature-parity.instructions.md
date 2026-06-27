@@ -100,30 +100,14 @@ If an exception hides information or controls (for example auto-hide, taskbar/me
 
 ## Pre-merge parity checklist
 
-- [ ] Feature scope evaluated for macOS, NixOS, and Windows.
-- [ ] Existing feature inventory reviewed one-by-one with explicit decisions.
-- [ ] Multi-host implementation completed where practical.
+- [ ] Feature scope evaluated for all three hosts (macOS, NixOS, Windows).
+- [ ] Multi-host implementation done where practical; exceptions have WHY comments.
 - [ ] Shared logic extracted into shared modules where possible.
-- [ ] Platform-specific exceptions documented with WHY comments.
 - [ ] Related instructions/AGENTS guidance updated when invariants changed.
 
 ## GC and Retention Policy
 
-Timing values are specified directly at their point of use — this file does not maintain a duplicate table. To find or change a retention interval, look in the relevant source file.
-
-### Overriding expiry values at runtime
-
-| Mechanism | Scope | Example |
-|---|---|---|
-| `--expiry` / `NUCLEUS_GC_EXPIRY` | Master override for both HM and Nix GC durations (gc.sh) | `--expiry 14d` |
-| `--hm-expiry` / `NUCLEUS_GC_HM_EXPIRY` | Home Manager generation expiry (gc.sh) | `--hm-expiry 30d` |
-| `--nix-expiry` / `NUCLEUS_GC_NIX_EXPIRY` | Nix store `--delete-older-than` (gc.sh) | `--nix-expiry 30d` |
-| `modules.gc.expiry` | Master Nix option (posix-base.nix) | `modules.gc.expiry = "14d"` |
-| `modules.gc.nixStoreExpiry` | Per-tool Nix option (posix-base.nix) | `modules.gc.nixStoreExpiry = "30d"` |
-
-Precedence: CLI flag > per-tool env var > master flag/env > Nix config default > `7d`.
-
-Source files:
+Timing values are specified directly at their point of use. Find or change a retention interval in the relevant source file:
 
 | Category | Source files |
 |---|---|
@@ -135,6 +119,8 @@ Source files:
 | AI/LLM timeouts | `scripts/ai-sync.sh`, `scripts/gc.sh` |
 | Declarative-diff GC items | `scripts/gc.sh`, `scripts/gc.ps1` |
 | App-level timeouts | `src/modules/editors.nix`, `src/modules/configs/picard/Picard.ini` |
+
+Runtime overrides via `--expiry`/`NUCLEUS_GC_EXPIRY` etc. have precedence: CLI flag > per-tool env var > master flag/env > Nix config default > `7d`. See each source file for available flags.
 
 ### Authoring rule
 

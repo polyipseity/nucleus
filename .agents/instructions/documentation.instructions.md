@@ -122,19 +122,6 @@ For claims about behavior, APIs, or configuration settings:
 - Avoid short URLs or redirects if a canonical form exists
 - Include article/page ID (HT numbers, doc IDs) when possible for long-term stability
 
-### Topic and content verification
-
-Before committing, verify:
-
-1. **Article/page ID matches the claim**
-   - Example: If documenting `.DS_Store` behavior, the cited Apple article must be about `.DS_Store`, not "Activation Lock" (HT102541 ≠ .DS_Store)
-   - Browse the page or search the page text to confirm content matches your use case
-
-2. **Developer vs. user scope**
-   - Developer APIs should document behavior the way an SDK would
-   - End-user settings/UI should match Apple's own UI documentation or end-user release notes
-   - Mismatch? Add a comment explaining why the chosen source is most authoritative for your context
-
 ### Deprecation hygiene
 
 When citing APIs or settings:
@@ -189,23 +176,3 @@ For multi-line settings, put the source at the top of the comment block:
   CriticalUpdateInstall = true;
 };
 ```
-
-### Reviewer checklist for PR review
-
-When reviewing changes with external citations:
-
-- [ ] All non-trivial behavior claims have nearby citations
-- [ ] API/framework claims use `developer.<vendor>.com` when available
-- [ ] Any `support.apple.com/en-us/` links include `/en-us/` (no locale-less URLs)
-- [ ] Cited article/page actually covers the setting/claim being documented
-- [ ] No deprecated APIs cited as current behavior (or marked+explained if unavoidable)
-- [ ] If a user-help page is cited over developer docs, there's a WHY comment
-- [ ] All links are canonical (no query params, no obvious redirect stubs)
-- [ ] Citations stay adjacent to the claim they validate
-
-### When in doubt
-
-- Use `developer.<vendor>.com` over user-help pages
-- Add a comment explaining the choice if non-obvious
-- Verify the link actually covers your use case before commit
-- Include the article ID or page number for long-term reference

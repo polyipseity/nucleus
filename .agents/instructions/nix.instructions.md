@@ -134,25 +134,23 @@ Rules:
 
 ## Machine age key auto-registration
 
-The `apply.sh` dispatcher (wrapped as `nix run .#apply`) calls `generate_ssh_host_key_if_needed` then `register_host_age_key_if_needed` before handing off to `darwin-rebuild` / `nixos-rebuild`.
+The `apply.sh` dispatcher calls `generate_ssh_host_key_if_needed` then `register_host_age_key_if_needed` before `darwin-rebuild`/`nixos-rebuild`.
 
 `generate_ssh_host_key_if_needed`:
 
-- Checks for `/etc/ssh/ssh_host_ed25519_key`; returns immediately if present (idempotent on every subsequent apply).
-- If absent, runs `sudo env "PATH=$PATH" ssh-keygen -A` to generate all standard host key types. `PATH` is passed explicitly so sudo finds the Nix-wrapped openssh binary from `mkApplyApp` `runtimeInputs`.
-- Fails fast with a clear error if key generation fails or if the expected file is still absent after the call.
-- Only called from the Darwin and NixOS branches (not standalone Home Manager), since those are the only branches with an active sudo session and a managed `/etc/ssh/` directory.
+- Checks for `/etc/ssh/ssh_host_ed25519_key`; returns immediately if present (idempotent).
+- If absent, runs `sudo env "PATH=$PATH" ssh-keygen -A` (explicit PATH finds Nix-wrapped openssh from `mkApplyApp` `runtimeInputs`). Fails fast on error.
+- Only called from Darwin and NixOS branches (have sudo + `/etc/ssh/`).
 
 `register_host_age_key_if_needed`:
 
-- Derives the machine age public key from `/etc/ssh/ssh_host_ed25519_key.pub` using `ssh-to-age -i` (no private key or passphrase required). `-i` without `-private-key` reads an SSH public key and outputs the age **public** key suitable for `.sops.yaml` recipients.
-- Checks whether that age key is already present in `.sops.yaml`; if so, it is a no-op (safe to re-run on every apply).
-- If the key is new, inserts it immediately before the marker comment `# -- machine keys end; personal SSH backup key below --` in `.sops.yaml` using `awk`, then rewraps every SOPS-encrypted file with `sops updatekeys --yes` so the machine can decrypt them.
-- Prints `git add` + `git commit` commands but does **not** commit automatically; the operator must commit and push the updated `.sops.yaml` and rewrapped secrets.
-- Requires the primary GPG key in the keyring (imported via `gpg --import` before first apply) so `sops updatekeys` can re-encrypt data keys for all recipients; fails with a clear error and a `gpg --import` hint if GPG is not available.
-- `ssh-to-age`, `sops`, `openssh`, and `git` are provided by `mkApplyApp` `runtimeInputs` in `flake.nix`; no separate installation is needed when using `nix run .#apply`.
+- Derives machine age public key via `ssh-to-age -i` from `/etc/ssh/ssh_host_ed25519_key.pub`. If already in `.sops.yaml`, no-op.
+- If new: inserts before `# -- machine keys end; personal SSH backup key below --` marker via `awk`, then rewraps all SOPS files with `sops updatekeys --yes`.
+- Prints `git add`/`git commit` commands but does not commit automatically; operator must commit updated `.sops.yaml` and rewrapped secrets.
+- Requires primary GPG key in keyring (`gpg --import` before first apply); fails with clear error and hint if GPG unavailable.
+- `ssh-to-age`, `sops`, `openssh`, `git` provided by `mkApplyApp` `runtimeInputs` in `flake.nix`; no separate install needed.
 
-The equivalent Windows function is `Register-HostAgeKey` in `src/hosts/Windows/modules/secrets/Register-HostAgeKey.ps1`, called from `apply.ps1` when `$EnableHostAgeKeyRegistration` is `$true` (the default).
+Windows equivalent: `Register-HostAgeKey` in `src/hosts/Windows/modules/secrets/Register-HostAgeKey.ps1`, called when `$EnableHostAgeKeyRegistration` is `$true`.
 
 ## Pre-provision key adoption semantics
 

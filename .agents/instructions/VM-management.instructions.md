@@ -35,29 +35,14 @@ Apply this convention when adding or modifying:
 
 ## Guest Credential Convention
 
-VM guest credentials must come from per-user SOPS secrets, not from the host login name or any guessed/default password. This applies on every host OS (macOS, NixOS, Windows) and every guest OS path (NixOS, Windows, macOS).
+VM guest credentials must come from per-user SOPS secrets (`src/secrets/users-<username>.yml`), not from host login or defaults.
 
-- Store the actual values in `src/secrets/users-<username>.yml`.
-- Keep the keys flat and user-scoped by filename, for example:
-  - `vm_guest_username`
-  - `vm_guest_password`
-- Reference those keys from:
-  - `src/modules/users.json` on POSIX hosts
-  - `src/hosts/Windows/users.json` on Windows hosts
-- Use a `vmGuest` object with:
-  - `usernameSecretKey`
-  - `passwordSecretKey`
+- Keys: `vm_guest_username`, `vm_guest_password` — referenced via `vmGuest` object (`usernameSecretKey`, `passwordSecretKey`) in `src/modules/users.json` (POSIX) or `src/hosts/Windows/users.json` (Windows).
+- Each setup script (`vm-setup.sh` / `Invoke-VMSetup.ps1`) resolves the current user, reads the `vmGuest` reference, decrypts the secret, and passes credentials into guest builders/templates.
+- All guest paths (NixOS: `guest.nix` + `packer.pkr.hcl`; Windows: `Autounattend.xml` + `packer.pkr.hcl`; macOS: `packer.pkr.hcl`) must consume injected credentials.
+- Credential drift must invalidate stale VM artifacts so changing secret-backed values rebuilds rather than reusing stale disks.
 
-Required wiring and parity checks:
-
-- POSIX flow: `scripts/vm-setup.sh` must resolve the current secret owner, read `src/modules/users.json`, decrypt `src/secrets/users-<username>.yml`, and pass the resolved credentials into every guest builder/template.
-- Windows flow: `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1` must resolve the same `vmGuest` references from `src/hosts/Windows/users.json`, decrypt the same per-user secret file, and pass the resolved credentials into every guest builder/template.
-- NixOS guest paths: both `src/vms/nixos/guest.nix` and `src/vms/nixos/packer.pkr.hcl` must consume the injected credentials.
-- Windows guest paths: `src/vms/windows/Autounattend.xml` placeholders and `src/vms/windows/packer.pkr.hcl` variables must stay in sync with runtime rendering.
-- macOS guest path: `src/vms/macos/packer.pkr.hcl` must provision/update the guest account from the same resolved secret-backed values.
-- Credential drift must invalidate stale VM artifacts on every supported build path so changing the secret-backed username or password actually rebuilds or refreshes the guest image/runtime instead of silently reusing stale disks.
-
-When changing credential policy behavior, update `tests/src/vm-setup-tests.nix` in the same commit.
+When changing credential policy, update `tests/src/vm-setup-tests.nix` in the same commit.
 
 ## VM Manifest
 
@@ -185,8 +170,8 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 
 - Uses Packer with `src/vms/windows/packer.pkr.hcl` and QEMU builder.
 - Requires a Windows 11 ISO path via `--windows-iso` **or** a `windowsIsoUrl` field in the `VMs.json` windows entry. When `windowsIsoUrl` is set, the ISO is downloaded automatically to `~/virtual machines/images/<name>-installer.iso` on first run (subsequent runs reuse the cache).
-- On macOS/Linux hosts, when Mido fails, `vm-setup.sh` attempts a non-Windows Fido URL resolver fallback via `pwsh` (`Fido.ps1 -GetUrl`) and then downloads the resolved ISO URL with `curl`.
-- On Windows hosts, `Invoke-VMSetup` auto-detects WHPX (Windows Hypervisor Platform) when the default `tcg` accelerator is in use. If WHPX is enabled, it upgrades automatically. If not, it warns and prints the command to enable it. Pass `-Accelerator tcg` explicitly to suppress.
+- On macOS/Linux, falls back from Mido to Fido URL resolver via `pwsh` (`Fido.ps1 -GetUrl`) + `curl`.
+- On Windows, auto-detects WHPX accelerator when `tcg` is default; upgrades automatically. Pass `-Accelerator tcg` to suppress.
 - SATA disk during build → VirtIO drivers installed post-install → final image is VirtIO-disk ready.
 - Autounattend.xml bypasses TPM/Secure Boot checks, enables WinRM for Packer, and renders the managed guest account from the current host user identity.
 - Apply the nucleus Windows guest config after first boot.
