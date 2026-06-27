@@ -1,20 +1,18 @@
 ---
 description: "Use when adding or editing any infrastructure code: Nix files, PowerShell modules, WinGet DSC YAML, or shell scripts. Mandates documentation standards for each file type and applies the WHY-not-WHAT commenting principle."
 name: "Documentation Standards"
-applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, src/scripts/**"
+applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, src/hosts/**/MANUAL.md, scripts/**, src/scripts/**"
 ---
 
 # Documentation Standards
 
-Every piece of infrastructure code must be documented using the formal mechanism available for its file type. When no formal mechanism exists, inline `#` comments are required instead.
-
-The guiding principle is **document the WHY, not the WHAT**: record the rationale, security implication, or design tradeoff behind a decision — not a restatement of what the code already says. Avoid obvious comments.
+Document the **WHY, not the WHAT**: rationale, security implications, and design tradeoffs — not restatements of existing code. Use the formal documentation mechanism for each file type; fall back to `#` comments when none exists.
 
 - **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
 
 ## Provenance for non-validated external identifiers
 
-When a setting cannot be automatically validated by the repository's current tests or schema checks, include at least one inline source citation near the setting. See the Citation quality section below for standards.
+When a setting cannot be auto-validated by tests or schemas, include an inline source citation (see Citation quality below).
 
 ## Nix files (`src/**/*.nix`)
 
@@ -36,7 +34,6 @@ Comment-based help (`<# … #>`) is the formal documentation mechanism for Power
 - **Inline logic comments**: non-trivial logic blocks, exit-code checks, and PowerShell idioms that are not immediately obvious must have an inline `#` comment explaining what the block does and, where relevant, why this approach was chosen over alternatives.
 - **Document the WHY**: record the rationale behind security-sensitive patterns (e.g. "env var cleared in `finally` so it is never left in the environment on failure") and any non-obvious fallback behaviour or error handling choices.
 
-
 ## WinGet DSC YAML (`src/hosts/Windows/**/*.yml`)
 
 The `directives.description:` field on each resource entry is the formal documentation mechanism for WinGet DSC configurations.
@@ -50,13 +47,13 @@ The `directives.description:` field on each resource entry is the formal documen
 
 Use `--XXX`/`--no-XXX` flag pairs for CLI options and positive variable names for scripts and config knobs. Every feature must support both `--XXX` and `--no-XXX` regardless of its default state.
 
-| Aspect              | Convention                                          |
-| ------------------- | --------------------------------------------------- |
-| Shell variable      | `ai_sync=true` (positive, no prefix)                |
-| Conditional check   | `if [ "$ai_sync" = false ]` or `if [ "$ai_sync" = true ]` |
-| POSIX CLI flag      | `--ai-sync` (enables) / `--no-ai-sync` (disables)   |
-| PowerShell param    | `[switch]$AISync` + `[switch]$NoAISync`             |
-| PowerShell call     | `-AISync` (enables) / `-NoAISync` (disables)        |
+| Aspect            | Convention                                                |
+| ----------------- | --------------------------------------------------------- |
+| Shell variable    | `ai_sync=true` (positive, no prefix)                      |
+| Conditional check | `if [ "$ai_sync" = false ]` or `if [ "$ai_sync" = true ]` |
+| POSIX CLI flag    | `--ai-sync` (enables) / `--no-ai-sync` (disables)         |
+| PowerShell param  | `[switch]$AISync` + `[switch]$NoAISync`                   |
+| PowerShell call   | `-AISync` (enables) / `-NoAISync` (disables)              |
 
 Rules:
 
@@ -74,6 +71,16 @@ There is no formal documentation tool for POSIX sh or Bash; `#` comments are the
 - **Non-trivial inline logic**: `case` branches, conditional chains, and environment variable reads that are not self-explanatory must have an inline `#` comment explaining the branch condition and its effect.
 - **Document the WHY**: state why a particular tool or flag was chosen (e.g. "`set -a` exports all variables so child processes inherit version pins") and document any behaviour that a future reader might otherwise change incorrectly.
 - **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
+
+## Host MANUAL.md (`src/hosts/**/MANUAL.md`)
+
+MANUAL.md files are concise post-apply checklists. They must contain only steps that cannot be safely automated.
+
+- Keep formatting minimal: title plus short bullet lists. Prefer direct actions with concrete names in backticks.
+- Include a `command shortcuts` section (complete set, names starting with `-` like `-g`, `-ga`) and a separate `nucleus commands` section.
+- Group permission-grant steps by category (e.g. Accessibility, Screen Recording); each permission appears once with all apps that need it.
+- Do not duplicate behavior that `apply` already guarantees. Remove steps when they become automatable.
+- Point to setup commands (e.g. `nucleus-cloud-setup`) instead of expanding internal details.
 
 ## Citation quality
 

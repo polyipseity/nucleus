@@ -1,7 +1,7 @@
 ---
-description: "Use when adding or changing capabilities that may apply to multiple hosts (macOS, NixOS, Windows). Enforces cross-host parity-first design and explicit rationale for platform-specific exceptions."
+description: "Use when adding or changing capabilities across hosts (macOS, NixOS, Windows), managing GC/retention timings, or creating provisioned symlinks. Enforces cross-host parity-first design, explicit rationale for platform-specific exceptions, and consistent infrastructure conventions."
 name: "Cross-Host Feature Parity"
-applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml"
+applyTo: "src/**/*.nix, src/**/*.ps1, scripts/gc.*, src/hosts/Windows/**/*.yml"
 ---
 
 # Cross-Host Feature Parity
@@ -106,3 +106,65 @@ If an exception hides information or controls (for example auto-hide, taskbar/me
 - [ ] Shared logic extracted into shared modules where possible.
 - [ ] Platform-specific exceptions documented with WHY comments.
 - [ ] Related instructions/AGENTS guidance updated when invariants changed.
+
+## GC and Retention Policy
+
+Timing values are specified directly at their point of use — this file does not maintain a duplicate table. To find or change a retention interval, look in the relevant source file.
+
+### Overriding expiry values at runtime
+
+| Mechanism | Scope | Example |
+|---|---|---|
+| `--expiry` / `NUCLEUS_GC_EXPIRY` | Master override for both HM and Nix GC durations (gc.sh) | `--expiry 14d` |
+| `--hm-expiry` / `NUCLEUS_GC_HM_EXPIRY` | Home Manager generation expiry (gc.sh) | `--hm-expiry 30d` |
+| `--nix-expiry` / `NUCLEUS_GC_NIX_EXPIRY` | Nix store `--delete-older-than` (gc.sh) | `--nix-expiry 30d` |
+| `modules.gc.expiry` | Master Nix option (posix-base.nix) | `modules.gc.expiry = "14d"` |
+| `modules.gc.nixStoreExpiry` | Per-tool Nix option (posix-base.nix) | `modules.gc.nixStoreExpiry = "30d"` |
+
+Precedence: CLI flag > per-tool env var > master flag/env > Nix config default > `7d`.
+
+Source files:
+
+| Category | Source files |
+|---|---|
+| Nix store GC, HM expiry | `src/modules/posix-base.nix`, `scripts/gc.sh` |
+| macOS timers & defaults | `src/modules/macos.nix`, `src/hosts/MacBook/defaults.nix` |
+| Linux timers & timeouts | `src/modules/linux.nix`, `src/modules/posix-security.nix` |
+| Windows schedules & timeouts | `src/hosts/Windows/system.dsc.yml`, `src/hosts/Windows/user.dsc.yml`, `src/hosts/Windows/modules/system/*.ps1` |
+| Cloud drive caches | `src/modules/cloud-drives.nix` |
+| AI/LLM timeouts | `scripts/ai-sync.sh`, `scripts/gc.sh` |
+| Declarative-diff GC items | `scripts/gc.sh`, `scripts/gc.ps1` |
+| App-level timeouts | `src/modules/editors.nix`, `src/modules/configs/picard/Picard.ini` |
+
+### Authoring rule
+
+- When changing a timing value, update the actual configuration in the source file listed above. No separate timing manifest needs updating.
+
+## Provisioned Symlink Policy
+
+### Default Rule
+
+Every provisioned symlink must be **writable** AND **delete-protected**.
+
+- **Delete-protection mechanism**: `chflags uchg` (macOS), `chattr +i` (Linux), `icacls /deny` (Windows). Best-effort with warning on failure.
+
+### Read-Only Exception
+
+A symlink MUST be read-only when its target is in the Nix store (or on Windows, when the corresponding POSIX symlink uses a Nix store target). The Nix store target is immutable, making the content effectively read-only.
+
+### Deviation Rule
+
+Any deviation from the default or read-only exception must be documented with:
+
+1. A `# WHY` comment at the creation site.
+2. An entry in the exceptions list below with full rationale.
+
+### Cross-Platform Parity
+
+When a symlink exists on both POSIX and Windows, writability semantics MUST match. A read-only symlink on POSIX (Nix store target) must be made read-only on Windows (read-only attribute or restrictive ACL).
+
+### Known Exceptions
+
+| Symlink | Reason | Platform |
+|---|---|---|
+| `~/.config/discord-music-rpc/config.yaml` | discord-music-rpc overwrites config on startup; read-only target prevents app from discarding managed settings | POSIX + Windows |

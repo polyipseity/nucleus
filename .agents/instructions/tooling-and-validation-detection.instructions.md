@@ -1,7 +1,7 @@
 ---
 description: "Use when creating or updating instructions for repository tooling, build commands, tests, CI, editor automation, or validation workflows. Also covers detecting the repository's programming languages, frameworks, runtimes, package managers, and setup from concrete files before writing detailed guidance."
 name: "Tooling and Validation Detection"
-applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/settings.json, .github/workflows/**/*.yml, .github/dependabot.yml, .editorconfig, .gitattributes"
+applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/settings.json, .github/workflows/**/*.yml, .github/dependabot.yml, .editorconfig, .gitattributes, prek.toml, scripts/check.sh, scripts/prek-hooks.py"
 ---
 
 # Tooling and Validation Detection
@@ -12,32 +12,11 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
 - Inspect the files that define the repository's actual setup: dependency manifests, lockfiles, build/test/linter/formatter configs, CI workflows, scripts, editor settings, automation configs, source directories, file extensions, and representative entrypoints.
 - If the repository is still a sparse template, describe the workflow as conditional or not yet initialized instead of pretending commands already exist.
 
-## Detection order
+## Detection targets
 
-- Start with the highest-signal files and directories:
-  - workspace-wide guidance such as `AGENTS.md`
-  - dependency manifests and lockfiles
-  - build, test, formatter, linter, and compiler configs
-  - CI workflows and repo scripts
-  - source directories, file extensions, and representative entrypoints
-  - editor settings and automation configs
-- Prefer multiple signals over a single clue when deciding that a stack is truly in use.
-- If evidence conflicts, document the ambiguity and avoid inventing hard rules until the repository structure clarifies the intended setup.
-
-## What to detect
-
-- Programming languages in active use, not merely hinted at by empty folders.
-- Frameworks, build systems, package managers, test runners, linters, formatters, type checkers, documentation generators, and release tooling.
-- Directory boundaries that deserve their own instructions because they follow different conventions.
-- Canonical commands, if any, and where they are defined.
-- Platform-specific constraints such as line endings, executable bits, or shell assumptions.
-
-## Evidence standards
-
-- A single empty directory is weak evidence.
-- A real config file, lockfile, script, workflow step, or representative source file is strong evidence.
-- Comments in docs are weaker than executable config unless the docs are clearly the source of truth.
-- Prefer on-disk facts over habits carried from similar repositories.
+- Detect languages, frameworks, build systems, package managers, test runners, linters, formatters, and release tooling from real config files, lockfiles, scripts, CI steps, and source files — not empty directories or assumptions from similar repos.
+- Check in order: workspace guidance → dependency manifests → build/test/lint configs → CI workflows → source layouts → editor/automation configs.
+- Record directory boundaries that follow different conventions for their own instruction files.
 
 ## Command discovery
 
@@ -54,30 +33,20 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
 
 ## Config coordination
 
-- When you change an instruction about tooling, check the neighboring configs in the same pass:
-  - CI workflows
-  - editor automation
-  - dependency update automation
-  - formatting and line-ending config
-  - prompt files that tell agents how to run checks
-- Keep those files consistent so the repo does not describe one workflow while automating another.
-- When documenting test coverage or test inventory, derive counts and file lists from the current `tests/` tree and CI workflow globs, not from stale prose copied from older docs.
-- Do not leave placeholder statements that claim tests are absent when test files or validation workflows already exist.
-- In instruction examples, prefer real in-repo file names over hypothetical names unless the example is explicitly labeled as illustrative.
+- When changing tooling instructions, update neighboring configs (CI workflows, editor/automation configs, formatting/line-ending files, prompt files) in the same pass.
+- Derive test coverage counts and file lists from the current `tests/` tree and CI globs — no stale prose or placeholder absence claims.
+- In instruction examples, prefer real in-repo file names unless labeled as illustrative.
 
 ## How to write follow-up instructions
 
-- When a stack is detected or a repository gains a clearly defined language or framework setup, create or refine a focused instruction file whose `name`, `description`, and `applyTo` clearly target that stack.
-- Keep repo-wide discovery rules in `AGENTS.md` and stack details in dedicated files; do not overload the root guidance.
-- Make the instruction thorough and evidence-backed: code structure, tests, commands, key config files, source locations, testing expectations, common failure modes, and validation workflow for that stack.
-- Keep `applyTo` globs narrow so the detailed instruction only loads for the files it truly governs.
-- Link to canonical config files instead of copying long option lists unless a short inline summary is critical to agent behavior.
+- When a stack gains a clear setup, create or refine a focused instruction file. Keep `applyTo` narrow, link to canonical configs instead of copying option lists, and keep repo-wide discovery in `AGENTS.md`.
+- Make it evidence-backed: code structure, tests, commands, config files, source locations, common failure modes.
 
 ## Validation guidance
 
-- For every detected stack, document how agents should validate changes:
-  - what to run
-  - where the commands are defined
+- For every detected stack, document what to run and where commands are defined.
+- **Nix check-and-format (pre-commit hook)**: `check.sh` accepts `--format` to auto-fix Nix files (nixfmt). The flag is passed by `prek-hooks.py` when `args = ["--format"]` in `prek.toml`. `nixfmt` is bundled in `mkCheckApp` runtimeInputs in `src/flake.nix` to avoid expensive nixpkgs eval. No separate `format-nix` hook exists.
+- **CI policy**: Do not add new checks or tests to `ci.yml`. Route new validation into repo checks (`scripts/check.sh` / `scripts/check.ps1`) or repo tests (`tests/`). Decouples checks from CI runners so they work locally too.
   - what files act as the source of truth
   - what should be avoided when the stack is only partially initialized
 - When specific identifiers/settings are not covered by executable validation (for example app IDs, bundle IDs, launch labels, registry keys, env-var names, or preference domains), require inline source citations adjacent to those settings so reviewers can verify each one independently.

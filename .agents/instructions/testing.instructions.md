@@ -215,64 +215,9 @@ Describe "Windows Package Installation" {
 
 ## CI Integration
 
-### GitHub Actions Workflow
-
-Tests run automatically on:
-
-- Every push to any branch
-- Every pull request
-- Manual workflow dispatch
-
-**Current CI steps:**
-
-1. **Checkout repository** — get latest code
-2. **Install Nix** — bootstrap nixpkgs environment
-3. **Nix flake check** — ensure all configs parse
-4. **Nix unit tests** — run logic tests with `nix-instantiate --eval`
-5. **PowerShell syntax check** — validate all `.ps1` files
-6. **Shell script check** — validate all `.sh` files
-
-**Windows-specific tests:** Not run in CI (uses Linux runners). Run locally before commit.
+Tests run automatically on push, pull request, and manual dispatch. CI runs `nix flake check`, Nix unit tests, PowerShell syntax check, and shell script check. Windows-specific tests not run in CI (uses Linux runners); run locally before commit.
 
 
-
----
-
-## Troubleshooting
-
-### Test Failure: "Undefined option namespace"
-
-**Cause:** A Nix module imports a feature module that's not properly scoped.
-
-**Fix:** Ensure all module options are declared with `lib.mkOption` and are at the correct hierarchy level.
-
-### Test Failure: Pester "Package not found"
-
-**Cause:** Test ran before `apply.ps1` finished, or package wasn't installed correctly.
-
-**Fix:**
-
-1. Verify DSC syntax: `winget configure --what-if .\src\hosts\Windows\*.dsc.yml`
-2. Run apply manually: `.\src\scripts\bootstrap.ps1`
-3. Wait for package manager to finish installing
-4. Re-run Pester: `Invoke-Pester tests/src/hosts/Windows/`
-
-### Test Failure: "Permission denied" (Pester)
-
-**Cause:** Pester tests require admin privileges to read registry and check installations.
-
-**Fix:** Run PowerShell as Administrator before calling `Invoke-Pester`.
-
-### Flake Check Hangs or Times Out
-
-**Cause:** A module evaluation is infinite-looping or fetching large derivations.
-
-**Fix:**
-
-1. Interrupt the check: `Ctrl+C`
-2. Check recent `.nix` changes for recursive imports or infinite loops
-3. Use `nix-instantiate --parse` to do a syntax-only check (no evaluation)
-4. Revert the last change and debug incrementally
 
 ---
 
@@ -285,16 +230,7 @@ Before committing changes, verify:
 - [ ] Shell syntax passes: `nix run ./src#check-sh`
 - [ ] PowerShell syntax passes: `nix run ./src#check-pwsh`
 - [ ] (Windows only) Pester tests pass: `Invoke-Pester tests/src/hosts/Windows/`
-- [ ] Commit message follows conventional commits (e.g., `test(nix): ...`, `feat(windows): ...`)
-- [ ] Commit is atomic (one logical change, not a mix of unrelated changes)
-- [ ] No `--no-verify` bypasses; pre-commit hooks must pass
-
----
-
-## References
-
-- [AGENTS.md](../AGENTS.md) — Repository-wide testing strategy overview
-- [nix-instantiate(1)](https://nix.dev/manual/nix/stable/command-ref/nix-instantiate.html) — Nix static evaluation tool
-- [Pester Documentation](https://pester.dev) — PowerShell testing framework
-- [WinGet DSC](https://learn.microsoft.com/en-us/windows/package-manager/configuration/) — Windows Desired State Configuration
+- [ ] Commit message follows conventional commits
+- [ ] Commit is atomic
+- [ ] Pre-commit hooks pass
 ```

@@ -6,22 +6,11 @@ applyTo: "src/hosts/MacBook/activation.nix, src/hosts/MacBook/MANUAL.md, tests/s
 
 # Spotlight Disable Strategy for macOS
 
-## Status: WORKING ✓
-
-**Verification**: User confirmed `cmd+space` no longer triggers Spotlight (FIX VERIFIED). The strategy documented here is **proven and production-ready**. Do not second-guess it or attempt "simplifications."
-
 ---
 
 ## Problem Statement
 
 On macOS, Spotlight (the cmd+space launcher/search tool) cannot be fully disabled by setting a single keyboard shortcut. Attempts to disable only hotkey ID 61 leave Spotlight active because macOS stores the Cmd+Space binding across multiple symbolic-hotkey slots (61, 64, 65) depending on OS version, migration history, and hardware platform.
-
-Previous failed approaches:
-
-- ❌ Disabled only hotkey 61 → left 64 and 65 active → cmd+space still worked
-- ❌ Ran disable at user level (home.activation) → insufficient privilege for mdutil/launchctl operations
-- ❌ Ran mdutil without sudo → failed silently due to permission constraints
-- ❌ Did not call `activateSettings -u` → changes applied only after logout/login, not immediately visible
 
 ---
 
@@ -173,62 +162,6 @@ The entire Spotlight disable strategy must run in `src/hosts/MacBook/activation.
 
 ---
 
-## What NOT to Do (Previous Failed Approaches)
-
-### ❌ WRONG: Disable only hotkey 61
-
-```bash
-# THIS WILL NOT WORK — left 64 and 65 active
-defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 61 "..."
-```
-
-**Why it fails**: macOS stores Cmd+Space across multiple ID slots; you must disable all three.
-
-### ❌ WRONG: Run disable in home.activation (user level)
-
-```nix
-# THIS WILL NOT WORK — insufficient privilege
-home.activation.disableSpotlight = ''
-  defaults write com.apple.symbolichotkeys ...
-  mdutil -i off /  # Fails silently — no root privilege
-  launchctl bootout ...  # Fails silently — no root privilege
-'';
-```
-
-**Why it fails**: User context cannot execute root-required operations; they fail silently.
-
-### ❌ WRONG: Skip activateSettings -u
-
-```bash
-# Changes are written but not applied to running session
-defaults write com.apple.symbolichotkeys ...
-# Missing: activateSettings -u
-```
-
-**Why it fails**: User must log out/in for changes to take effect; looks broken during current session.
-
-### ❌ WRONG: Disable launchctl service but not stop it
-
-```bash
-# Service is marked as disabled but still running
-launchctl disable gui/.../com.apple.Spotlight
-# Missing: launchctl bootout to stop running instance
-```
-
-**Why it fails**: Service continues indexing until reboot; Spotlight may still respond during current session.
-
-### ❌ WRONG: Turn off indexing but leave service running
-
-```bash
-# Indexing is off but service is still active
-mdutil -i off /
-# Missing: launchctl bootout and disable
-```
-
-**Why it fails**: Service can re-enable indexing on demand or after update; users can manually re-enable it via System Settings.
-
----
-
 ## Testing & Verification
 
 After applying the Spotlight disable strategy, verify:
@@ -273,59 +206,6 @@ After applying the Spotlight disable strategy, verify:
 
 ## Troubleshooting
 
-### Symptom: "Cmd+Space still opens Spotlight after activation"
-
-**Diagnosis**:
-
-1. Check if activateSettings -u ran and succeeded (review activation log).
-2. Verify hotkeys 61, 64, 65 are all marked `enabled=false` in com.apple.symbolichotkeys.
-3. Did the activation run at all? (Check if `darwin-rebuild switch` completed successfully.)
-
-**Solution**:
-
-- If hotkeys are **not** marked disabled → check that defaults write completed without error.
-- If hotkeys **are** disabled but Spotlight still responds → log out/in once; `activateSettings -u` only affects the current session.
-- If problem persists after logout/login → verify that Spotlight is truly off at the launchctl level (see Testing section above).
-
-### Symptom: "Activation failed with mdutil error"
-
-**Diagnosis**: Most likely running in user context (home.activation) instead of system context.
-
-**Solution**: Ensure the disable code is in `src/hosts/MacBook/activation.nix` under `system.activationScripts.postActivation`, not in `src/modules/macos.nix`.
-
-### Symptom: "activateSettings -u failed or returned non-zero"
-
-**Diagnosis**:
-
-- The private framework path may have changed in a newer macOS release.
-- The console user context may not be correctly resolved.
-
-**Solution**:
-
-1. Verify `/System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings` exists on the current macOS version.
-2. Verify `$console_user` and `$console_uid` are correctly resolved (check activation log).
-3. If the path has changed, update it in activation.nix.
-
----
-
-## Related Files
-
-- **Implementation**: [src/hosts/MacBook/activation.nix](src/hosts/MacBook/activation.nix#L363) — the `disableSpotlight` section
-- **Testing**: `tests/src/*spotlight*.nix` — test cases validating the disable
-- **Manual Steps**: [src/hosts/MacBook/MANUAL.md](src/hosts/MacBook/MANUAL.md) — note if any manual steps are required post-activation
-- **Defaults Configuration**: [src/hosts/MacBook/defaults.nix](src/hosts/MacBook/defaults.nix) — ensure no conflicting `com.apple.spotlight` plist settings re-enable it
-
----
-
-## Key Takeaway
-
-**Do NOT simplify or reduce this 6-stage strategy.** Each stage addresses a distinct layer of macOS Spotlight control:
-
-1. Hotkey disable (user preference layer)
-2. Immediate activation (session layer)
-3. Service disable (boot-time layer)
-4. Service stop (runtime layer)
-5. Indexing disable (kernel/storage layer)
-6. Cache cleanup (filesystem layer)
-
-**Removing any stage will cause partial failure or regression.** If you encounter an issue, add a stage (e.g., additional hardening) rather than removing one. The strategy is battle-tested and verified as working.
+- **Cmd+Space still opens Spotlight**: verify hotkeys 61/64/65 are all `enabled=false` and `activateSettings -u` ran. Log out/in if still unresponsive.
+- **mdutil error**: likely running in user context (home.activation) instead of system context. Move to `system.activationScripts.postActivation` in `src/hosts/MacBook/activation.nix`.
+- **activateSettings -u failed**: verify the private framework path exists and `$console_user`/`$console_uid` resolve correctly.

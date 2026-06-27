@@ -74,25 +74,18 @@ These modules should:
 - Respect per-user configuration from the user registry (flake.nix users.<username>)
 - NOT hardcode usernames (except in comments explaining the constraint)
 
-
-
 ## Common Patterns
 
-### Pattern 2: Multi-User Feature (Registry-Driven)
-
+**Multi-User Feature (Registry-Driven)** (e.g., `dev-repos.nix`):
 ```nix
-# In dev-repos.nix:
 userConfig = users.${currentUsername}.devRepos or {
   enable = false;
   ...
 };
-# Each user's devRepos is read from the registry; activation auto-routes to the correct user
 ```
 
-### Pattern 3: Secrets (Primary User Only, SOPS-Aware)
-
+**Secrets (Primary User Only, SOPS-Aware)** (e.g., `secrets.nix`):
 ```nix
-# In secrets.nix:
 isPrimaryUser = config.home.username == primaryUsername;
 lib.mkIf isPrimaryUser {
   # Only the primary user receives decrypted secrets

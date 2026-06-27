@@ -47,34 +47,25 @@ Only runtime toggles live here — things you want to change without a rebuild/r
 
 ## How services consume the config
 
-Services read `config.json` directly rather than shelling out to `nucleus-config`, so they work even when `nucleus-config` is unavailable (e.g. early boot before Nix finishes deploying).
+Services read `config.json` directly (not via `nucleus-config`) so they work during early boot. Both POSIX and Windows follow the same pattern: read file, default `section.key` to `true`.
 
-POSIX pattern (shell):
-
+**POSIX** (shell — uses `jq`):
 ```sh
 config_json="${HOME}/.local/state/nucleus/config.json"
 enabled=true
-if [ -f "$config_json" ]; then
-  val=$(jq -r '.section.key // true' "$config_json")
-  if [ "$val" = "false" ]; then enabled=false; fi
-fi
+[ -f "$config_json" ] && enabled=$(jq -r '.section.key // true' "$config_json")
 if [ "$enabled" = "true" ]; then
-  # heartbeat loop or feature
+  # run feature
 fi
 ```
 
-Windows pattern (PowerShell):
-
+**Windows** (PowerShell — uses `ConvertFrom-Json`):
 ```powershell
 $configFile = Join-Path $HOME ".local\state\nucleus\config.json"
 $enabled = $true
 if (Test-Path $configFile) {
   $cfg = Get-Content -Raw $configFile | ConvertFrom-Json
-  if ($null -ne $cfg.section.key -and -not $cfg.section.key) {
-    $enabled = $false
-  }
+  $enabled = if ($null -eq $cfg.section.key) { $true } else { $cfg.section.key }
 }
-if ($enabled) {
-  # heartbeat loop or feature
-}
+if ($enabled) { /* run feature */ }
 ```

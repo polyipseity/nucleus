@@ -197,13 +197,6 @@ After Scoop installs cargo-binstall, `src/hosts/Windows/modules/Invoke-CargoBins
 
 **PATH note**: DSC runs in a fresh session where `~\.cargo\bin` is not on PATH. The setup module prepends `~\.cargo\bin` internally before any `cargo uninstall` call. When invoking cargo-binstall from `apply.ps1` (after the DSC run), Scoop shims at `~\scoop\shims` are already resolvable.
 
-## Cross-host equivalence checks
-
-- Before adding a Windows package, check whether the capability should be mirrored in `src/modules/core.nix` for macOS/NixOS parity.
-- Before adding a new cross-host CLI tool in `core.nix`, check whether Windows should receive the same capability through `system.dsc.yml`.
-- Prefer implementing parity in the same change when practical; if not, document the platform-specific rationale.
-- Follow `.agents/instructions/cross-host-feature-parity.instructions.md` for parity-first scope decisions.
-
 ## Imperative fallback safety (Windows modules)
 
 When a capability cannot be represented in WinGet DSC and must be implemented in `src/hosts/Windows/modules/*.ps1` + `apply.ps1`, enforce all of the following:

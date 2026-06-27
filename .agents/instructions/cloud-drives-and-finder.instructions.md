@@ -53,12 +53,10 @@ applyTo: "src/modules/cloud-drives.nix, src/modules/macos.nix, src/hosts/Windows
 
 ## Replica sync performance constraints
 
-**rclone is slow in general** due to expensive remote listing and comparison phases. Even incremental syncs incur multi-minute overhead because rclone must re-validate entire directory trees against remote backends (for example OneDrive, iCloud Drive, Google Drive).
+rclone's remote listing/comparison phase is inherently slow — expect multi-minute runtimes even for incremental syncs (5–15 min for full-root). Accept this as the trade-off for safe pull-only idempotent replication.
 
-- **Full-root replicas are slowest**: syncing `/` from a cloud backend requires traversing and validating the entire remote tree structure. Expect 5–15 minute runtime even when zero local changes are needed.
-- **Do not force conservative throttle flags in runtime sync paths**: avoid hard-coding per-provider throttles in replica `rclone sync` invocations (for example `--checkers 1`, `--transfers 1`, custom chunk-size caps) unless a specific incident requires a temporary exception.
-- **Probe-time safeguards are acceptable**: bounded root-access probes (for example OneDrive inaccessible-root filtering) may use defensive listing flags and strict timeouts, but the real `rclone sync` path should use backend defaults.
-- **Replicas are pull-only and idempotent**: accept slow sync times as a trade-off for safe, one-way replication that never overwrites remote data. Scheduled replicas should account for multi-minute runtime and allow adequate inter-run spacing.
+- **Do not force throttle flags** (`--checkers 1`, `--transfers 1`, etc.) in runtime sync paths unless a temporary exception is required. Bounded root-access probes (e.g., OneDrive inaccessible-root filtering) may use defensive flags; the real sync path must use backend defaults.
+- **Schedule adequately**: inter-run spacing must accommodate multi-minute runtime.
 
 ## Tests and docs coupling
 

@@ -35,10 +35,6 @@ When a Nix activation script must perform runtime imperative operations (SOPS de
 
 See `src/scripts/jellyfin-sync.sh` for an example of this pattern.
 
-## No Backwards Compatibility
-
-See [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility) for the canonical policy.
-
 ## Cross-host parity expectations
 
 If a capability remains POSIX-only, add a short WHY comment near the decision point.
@@ -176,9 +172,7 @@ Do not add a `[ -n "$old_fingerprint" ]` guard (POSIX) or an `$oldSshFingerprint
 - `nix.settings.experimental-features` lists must be sorted alphabetically.
 - Do not sort items whose order is semantically significant: `boot.initrd.availableKernelModules`, ordered `imports` lists where one module precedes another by design.
 
-## Shell module authoring rules
-
-See `.agents/instructions/package-installation-scope.instructions.md` for the full system-install-only policy for `bun`, `cargo`, `rustc`, `uv`, `python`, and related tools, and for guidance on adding new blocked tools to the shell profile.
+## Shell module conventions
 
 **zsh alias-vs-function precedence**
 

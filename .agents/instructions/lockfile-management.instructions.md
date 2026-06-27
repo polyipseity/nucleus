@@ -12,11 +12,9 @@ The repository uses a consolidated lockfile at `src/lockfiles/lockfile.json` to 
 
 Some package managers don't generate a lockfile natively. In that case, pin versions directly in `lockfile.json` under the appropriate key.
 
-### Homebrew: no native Brewfile.lock.json
+### Homebrew: no native lockfile
 
-Homebrew's `brew bundle` command has no native lockfile (confirmed: no `--lockfile` flag, dead `no_lock` parameter, zero search results).
-
-Homebrew formula, cask, and Mac App Store version pins live under the `homebrew` key in `lockfile.json`:
+Homebrew's `brew bundle` has no native lockfile. Formula, cask, and MAS version pins live under the `homebrew` key in `lockfile.json`:
 
 ```json
 {

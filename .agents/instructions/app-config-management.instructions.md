@@ -86,52 +86,16 @@ users = {
 
 ### Step 2: Implement Merge Logic
 
-**For Nix-based configurations (macOS/Linux, home.nix)**:
+Merge order `defaults // platform_overrides // user_overrides` in target-platform syntax:
 
+**Nix** (home.nix):
 ```nix
-# Define defaults
-appDefaultSettings = {
-  key1 = "default_value";
-  key2 = true;
-};
-
-# Platform-specific overrides (optional)
-appPlatformSettings = lib.optionalAttrs pkgs.stdenv.isDarwin {
-  key3 = false;  # Override only on macOS
-};
-
-# Read user overrides from effectiveUser (injected by flake.nix)
-appUserSettings =
-  if effectiveUser ? app && effectiveUser.app ? settings then
-    effectiveUser.app.settings
-  else
-    { };
-
-# Merge in order
 appManagedSettings = appDefaultSettings // appPlatformSettings // appUserSettings;
 ```
 
-**For Windows configurations (Sync-AppConfig.ps1)**:
-
+**PowerShell** (Sync-AppConfig.ps1):
 ```powershell
-function Sync-AppConfig {
-  param(
-    [Parameter(Mandatory = $true)]
-    [object[]]$Users  # Loaded from Load-UserRegistry.ps1
-  )
-
-  foreach ($user in $Users) {
-    # Defaults
-    $effectiveSettings = $defaults
-
-    # Merge user overrides if present
-    if ($user.PSObject.Properties['app'] -and $user.app.settings) {
-      $effectiveSettings = Merge-Settings $effectiveSettings $user.app.settings
-    }
-
-    # Apply to registry, DSC, or config file
-  }
-}
+$effectiveSettings = Merge-Settings (Merge-Settings $defaults $platformOverrides) $user.app.settings
 ```
 
 ### Step 3: Update Tests
@@ -163,52 +127,6 @@ For each platform where the app exists, ensure:
 - Tests assert on all three locations.
 
 If an app exists on only one or two platforms, document why in a `# WHY` comment in code.
-
-## Atomic Commits
-
-When adding a new app config or updating existing ones, group changes atomically:
-
-**For a new app config**:
-
-```
-refactor: add <app> settings with per-user override support
-
-- Define <app> defaults in src/modules/home.nix (or config/<app>/ if JSON)
-- Add user override fields to flake.nix and users.json
-- Implement merge logic in macos.nix / linux.nix / Windows modules
-- Add tests to verify override structure and defaults
-- Document WHY comment if platform-specific
-```
-
-**For moving an existing app from separate storage**:
-
-```
-refactor: migrate <app> config from JSON to native format
-
-BREAKING CHANGE: <app> settings now stored in [native format] instead of JSON.
-
-- Move settings from src/modules/configs/<app>/ to Nix/defaults/registry
-- Update activation logic to apply merged settings
-- Update tests to assert on new storage location
-- Rationale: <app> reads from [native format], not JSON
-```
-
-## Testing Requirements
-
-All app configs must have corresponding tests:
-
-1. **Nix tests** (`tests/src/<app>-config-tests.nix`):
-   - Assert default values are present and correct.
-   - Assert user override fields exist in flake.nix and users.json.
-   - Assert platform overrides are correctly wired.
-
-2. **Windows tests** (`tests/src/hosts/Windows/**/*.Tests.ps1` or a dedicated module):
-   - Assert registry values are correctly written post-sync.
-   - Assert user-specific overrides take precedence over defaults.
-
-3. **CI integration**:
-   - Ensure test file is auto-discovered by CI glob pattern or explicitly listed.
-   - Run during every PR and push.
 
 ## Checklist for Adding a New App Config
 
