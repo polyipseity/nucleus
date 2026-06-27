@@ -89,11 +89,13 @@ users = {
 Merge order `defaults // platform_overrides // user_overrides` in target-platform syntax:
 
 **Nix** (home.nix):
+
 ```nix
 appManagedSettings = appDefaultSettings // appPlatformSettings // appUserSettings;
 ```
 
 **PowerShell** (Sync-AppConfig.ps1):
+
 ```powershell
 $effectiveSettings = Merge-Settings (Merge-Settings $defaults $platformOverrides) $user.app.settings
 ```

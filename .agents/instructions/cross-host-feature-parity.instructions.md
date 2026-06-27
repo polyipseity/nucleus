@@ -109,16 +109,16 @@ If an exception hides information or controls (for example auto-hide, taskbar/me
 
 Timing values are specified directly at their point of use. Find or change a retention interval in the relevant source file:
 
-| Category | Source files |
-|---|---|
-| Nix store GC, HM expiry | `src/modules/posix-base.nix`, `scripts/gc.sh` |
-| macOS timers & defaults | `src/modules/macos.nix`, `src/hosts/MacBook/defaults.nix` |
-| Linux timers & timeouts | `src/modules/linux.nix`, `src/modules/posix-security.nix` |
+| Category                     | Source files                                                                                                   |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Nix store GC, HM expiry      | `src/modules/posix-base.nix`, `scripts/gc.sh`                                                                  |
+| macOS timers & defaults      | `src/modules/macos.nix`, `src/hosts/MacBook/defaults.nix`                                                      |
+| Linux timers & timeouts      | `src/modules/linux.nix`, `src/modules/posix-security.nix`                                                      |
 | Windows schedules & timeouts | `src/hosts/Windows/system.dsc.yml`, `src/hosts/Windows/user.dsc.yml`, `src/hosts/Windows/modules/system/*.ps1` |
-| Cloud drive caches | `src/modules/cloud-drives.nix` |
-| AI/LLM timeouts | `scripts/ai-sync.sh`, `scripts/gc.sh` |
-| Declarative-diff GC items | `scripts/gc.sh`, `scripts/gc.ps1` |
-| App-level timeouts | `src/modules/editors.nix`, `src/modules/configs/picard/Picard.ini` |
+| Cloud drive caches           | `src/modules/cloud-drives.nix`                                                                                 |
+| AI/LLM timeouts              | `scripts/ai-sync.sh`, `scripts/gc.sh`                                                                          |
+| Declarative-diff GC items    | `scripts/gc.sh`, `scripts/gc.ps1`                                                                              |
+| App-level timeouts           | `src/modules/editors.nix`, `src/modules/configs/picard/Picard.ini`                                             |
 
 Runtime overrides via `--expiry`/`NUCLEUS_GC_EXPIRY` etc. have precedence: CLI flag > per-tool env var > master flag/env > Nix config default > `7d`. See each source file for available flags.
 
@@ -151,6 +151,6 @@ When a symlink exists on both POSIX and Windows, writability semantics MUST matc
 
 ### Known Exceptions
 
-| Symlink | Reason | Platform |
-|---|---|---|
+| Symlink                                   | Reason                                                                                                         | Platform        |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------- |
 | `~/.config/discord-music-rpc/config.yaml` | discord-music-rpc overwrites config on startup; read-only target prevents app from discarding managed settings | POSIX + Windows |

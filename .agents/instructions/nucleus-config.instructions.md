@@ -50,6 +50,7 @@ Only runtime toggles live here — things you want to change without a rebuild/r
 Services read `config.json` directly (not via `nucleus-config`) so they work during early boot. Both POSIX and Windows follow the same pattern: read file, default `section.key` to `true`.
 
 **POSIX** (shell — uses `jq`):
+
 ```sh
 config_json="${HOME}/.local/state/nucleus/config.json"
 enabled=true
@@ -60,6 +61,7 @@ fi
 ```
 
 **Windows** (PowerShell — uses `ConvertFrom-Json`):
+
 ```powershell
 $configFile = Join-Path $HOME ".local\state\nucleus\config.json"
 $enabled = $true

@@ -204,8 +204,6 @@ Describe "Windows Package Installation" {
 
 Tests run automatically on push, pull request, and manual dispatch. CI runs `nix flake check`, Nix unit tests, PowerShell syntax check, and shell script check. Windows-specific tests not run in CI (uses Linux runners); run locally before commit.
 
-
-
 ---
 
 ## Validation Checklist

@@ -77,6 +77,7 @@ These modules should:
 ## Common Patterns
 
 **Multi-User Feature (Registry-Driven)** (e.g., `dev-repos.nix`):
+
 ```nix
 userConfig = users.${currentUsername}.devRepos or {
   enable = false;
@@ -85,6 +86,7 @@ userConfig = users.${currentUsername}.devRepos or {
 ```
 
 **Secrets (Primary User Only, SOPS-Aware)** (e.g., `secrets.nix`):
+
 ```nix
 isPrimaryUser = config.home.username == primaryUsername;
 lib.mkIf isPrimaryUser {
