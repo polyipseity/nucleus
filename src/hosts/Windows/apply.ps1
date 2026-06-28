@@ -116,6 +116,11 @@
 .PARAMETER EnableRemoteAccessParity
   Enable managed OpenSSH remote-access convergence and cleanup fallback.
 
+.PARAMETER EnableWiFiParity
+  Enable managed Wi-Fi MAC address randomization parity convergence and cleanup
+  fallback.  Mirrors the NixOS networking.networkmanager.wifi.macAddress and
+  macOS Private Wi-Fi Address features.
+
 .PARAMETER EnableShellParity
   Enable managed PowerShell profile parity block and cleanup fallback.
 
@@ -258,6 +263,7 @@ $EnableHostAgeKeyRegistration = -not $noSystemParity
 $EnableRemoteAccessParity = -not $noSystemParity
 $EnableRdpParity = -not $noSystemParity
 $EnablePowerParity = -not $noSystemParity
+$EnableWiFiParity = -not $noSystemParity
 
 $EnableAgentsConfigParity = -not $noUserStateParity
 $EnableAgentsSkillsParity = -not $noUserStateParity
@@ -323,6 +329,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-ReplicaSyncScheduledTask.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSSHServer.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-PowerPolicy.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-WifiMacRandomization.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-WindowsRDP.ps1")
 # setup/: one-time or infrequent toolchain provisioning (Scoop, Bun, Cargo, prek).
 . (Join-Path -Path $setupModuleDir -ChildPath "Initialize-DevDirectory.ps1")
@@ -696,6 +703,7 @@ if ($EnableHostAgeKeyRegistration) {
 }
 Sync-WindowsRDP -Enabled:$EnableRdpParity
 Sync-PowerPolicy -Enabled:$EnablePowerParity
+Sync-WifiMacRandomization -Enabled:$EnableWiFiParity
 Invoke-AgentHostShellSetup
 
 # Health check: verify archiving ecosystem (7-Zip CLI + app) is functional post-apply.
