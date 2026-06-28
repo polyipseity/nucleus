@@ -24,6 +24,14 @@
   # Source: NixOS NetworkManager option.
   # https://mynixos.com/nixpkgs/option/networking.networkmanager.enable
   networking.networkmanager.enable = true;
+  # Randomize MAC address on each Wi-Fi connect (random).
+  # Source: NixOS NetworkManager Wi-Fi option.
+  # https://mynixos.com/nixpkgs/option/networking.networkmanager.wifi.macAddress
+  networking.networkmanager.wifi.macAddress = "random";
+  # Randomize MAC address during Wi-Fi scanning (default true; set explicitly).
+  # Source: NixOS NetworkManager Wi-Fi option.
+  # https://mynixos.com/nixpkgs/option/networking.networkmanager.wifi.scanRandMacAddress
+  networking.networkmanager.wifi.scanRandMacAddress = true;
 
   # Wake-on-LAN parity with macOS (pmset womp=1) and Windows (WakeOnMagicPacket).
   # The NixOS declarative option is interface-name-specific:
