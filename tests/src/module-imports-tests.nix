@@ -23,6 +23,7 @@ let
     "git"
     "gnupg"
     "home"
+    "iterm2"
     "linux"
     "macos"
     "posix-base"
@@ -53,6 +54,7 @@ let
         "git" = true;
         "gnupg" = true;
         "home" = true;
+        "iterm2" = true;
         "linux" = true;
         "macos" = true;
         "posix-base" = true;

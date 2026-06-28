@@ -383,17 +383,6 @@ let
     fi
   '';
 
-  # Pinned iTerm2 zsh shell integration script placed at
-  # ~/.iterm2_shell_integration.zsh via home.file.  The script enables command
-  # marks, command history, directory reporting, and in-terminal image display
-  # in iTerm2 sessions; it is sourced at zsh startup via programs.zsh.initContent.
-  # Update sha256 when iTerm2 publishes a new integration revision:
-  #   nix-prefetch-url https://iterm2.com/shell_integration/zsh
-  iterm2ZshIntegration = pkgs.fetchurl {
-    url = "https://iterm2.com/shell_integration/zsh";
-    sha256 = "0yhfnaigim95sk1idrc3hpwii8hfhjl5m3lyc0ip3vi1a9npq0li";
-  };
-
   gcWeekly = pkgs.writeShellScript "gc-weekly" ''
     set -eu
 
@@ -473,12 +462,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   ];
 
   home.file = {
-    # Place the pinned iTerm2 zsh shell integration script at the well-known
-    # path that the sourcing guard in programs.zsh.initContent expects.
-    # home.file replaces the symlink atomically on each home-manager switch so
-    # the script version tracks the pinned hash in iterm2ZshIntegration above.
-    ".iterm2_shell_integration.zsh".source = iterm2ZshIntegration;
-
     # Keep iCloud Downloads reachable from a short stable path without
     # replacing ~/Downloads itself.
     "Downloads/iCloud".source = config.lib.file.mkOutOfStoreSymlink liveICloudDownloads;
@@ -492,14 +475,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   home.activation.protectDownloadsICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     ${builtins.readFile ../scripts/agent-helpers.sh}
     _nucleus_protect_symlink "macos.nix" "$HOME/Downloads/iCloud"
-  '';
-
-  # Source iTerm2 shell integration when the script is present.  The test-e
-  # guard makes this a no-op in non-iTerm2 terminals (VS Code terminal, SSH,
-  # Ghostty, etc.) where the iTerm2 escape sequences produce no useful output
-  # and may be visible as raw control codes.
-  programs.zsh.initContent = ''
-    test -e "$HOME/.iterm2_shell_integration.zsh" && source "$HOME/.iterm2_shell_integration.zsh"
   '';
 
   home.activation = {
@@ -663,12 +638,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
             echo "macos: activateSettings -u failed; some preference updates may require relogin." >&2
           fi
         '';
-
-    # -------------------------------------------------------------------------
-    # configureITerm2Settings was removed: `BootstrapDaemon = true` is now
-    # handled declaratively in defaults.nix via
-    # system.defaults.CustomUserPreferences."com.googlecode.iterm2".
-    # -------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------
     # configureLinearmouseConfig

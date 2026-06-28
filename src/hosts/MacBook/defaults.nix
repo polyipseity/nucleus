@@ -605,31 +605,7 @@ in
         SUAutomaticallyUpdate = false;
       };
 
-      # iTerm2: allow clipboard access from terminal applications, enable the
-      # bootstrap daemon (supports shell integration without requiring a full
-      # app launch), disable in-app update checks because updates are managed
-      # declaratively, enable the tip-of-the-day feature while suppressing its
-      # first-launch permission prompt so tips appear on a fresh provision
-      # without a dialog interruption, suppress the
-      # secure-keyboard-entry/open-command warning, keep Secure Keyboard Entry
-      # enabled, and enable the Finder service so "Open in iTerm" appears in
-      # Finder right-click context menu.
-      # Source: https://iterm2.com/documentation.html
-      "com.googlecode.iterm2" = {
-        "AllowClipboardAccess" = true;
-        "BootstrapDaemon" = true;
-        "EnableFindersService" = true; # enable "Open in iTerm" in Finder
-        # Pre-answer the first-launch "may we show you tips?" permission prompt
-        # so iTerm2 skips that dialog on a fresh provision and goes straight to
-        # showing tips.  Simulates the state where the user already answered yes
-        # to the prompt.
-        "NoSyncPermissionToShowTip" = true;
-        "NoSyncTipOfTheDay" = true;
-        "Secure Input" = true; # blocks other processes from reading keystrokes
-        "SUCheckAtStartup" = false;
-        "SUEnableAutomaticChecks" = false;
-        "WarnAboutSecureKeyboardInputWithOpenCommand" = false;
-      };
+      # iTerm2 configuration lives in src/modules/iterm2.nix.
 
       # Amphetamine: declaratively enable the Power Protect install toggle.
       # WHY partial declarative only: upstream requires users to place the

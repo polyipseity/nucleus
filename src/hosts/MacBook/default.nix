@@ -13,6 +13,7 @@
     ../../modules/core.nix
     ../../modules/gnupg.nix
     ../../modules/https-proxy.nix
+    ../../modules/iterm2.nix
     ../../modules/logging.nix
     ../../modules/posix-base.nix
     ../../modules/posix-security.nix
