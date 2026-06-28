@@ -49,6 +49,24 @@
     if ! /bin/launchctl list com.apple.screensharing > /dev/null 2>&1; then
           echo "RDP: Screen Sharing daemon not listed after load; remote desktop may not be active." >&2
     fi
+
+    # ---- wifiPrivateAddress ----------------------------------------------------
+    # macOS does not expose a CLI to configure per-network Private Wi-Fi Address
+    # (Fixed/Rotating/Off). The SystemConfiguration plist is SIP-protected and
+    # the airport binary was removed in Sequoia. Private Wi-Fi Address is
+    # enabled by default (Fixed per SSID) — each SSID gets a unique private MAC
+    # that stays stable across reconnects. To switch a network to Rotating mode
+    # (changes ~24h), use:
+    #   System Settings > Wi-Fi > [Network] > Private Wi-Fi Address > Rotating
+    _WIFI_IFACE=$(/usr/sbin/networksetup -listallhardwareports 2>/dev/null | \
+      /usr/bin/awk '/Wi-Fi|AirPort/{getline; gsub(/^Device: /,""); print; exit}')
+    if [ -n "$_WIFI_IFACE" ]; then
+      _WIFI_MAC=$(/usr/sbin/networksetup -getmacaddress "$_WIFI_IFACE" 2>/dev/null | \
+        /usr/bin/awk '{print $3}')
+      echo "Wi-Fi ($_WIFI_IFACE): permanent HW MAC $_WIFI_MAC — Private Address active (Fixed per SSID by default)"
+      echo "  Per-network Rotating mode: System Settings > Wi-Fi > [SSID] > Private Wi-Fi Address > Rotating"
+    fi
+    unset _WIFI_IFACE _WIFI_MAC
   '';
 
   # Hostname values are intentionally titlecase to match the machine identity
