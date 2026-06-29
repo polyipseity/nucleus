@@ -60,6 +60,7 @@
 
   outputs =
     {
+      self,
       cirruslabs-cli,
       darwin,
       home-manager,
@@ -364,9 +365,9 @@
           ];
         };
 
-      # Helper for `nix run .#<name>` apps. Wraps writeShellApplicationWithLib.
-      # Defaults to ../scripts/${name}.sh.
-      mkApp =
+      # Like mkApp but returns the derivation directly (no { type, program } wrapper).
+      # Use for home.packages installation without nix run overhead.
+      mkNucleusPackage =
         pkgs:
         {
           name,
@@ -374,26 +375,30 @@
           extraBin ? { },
           script ? scripts + "/${name}.sh",
         }:
+        writeShellApplicationWithLib pkgs {
+          name = "nucleus-${name}";
+          runtimeInputs = runtimeInputs;
+          text = builtins.readFile script;
+          inherit extraBin;
+        };
+
+      # Helper for `nix run .#<name>` apps. Delegates to mkNucleusPackage.
+      # Defaults to ../scripts/${name}.sh.
+      mkApp =
+        pkgs: args:
         let
-          appName = "nucleus-${name}";
+          pkg = mkNucleusPackage pkgs args;
         in
         {
           type = "app";
-          program = "${
-            writeShellApplicationWithLib pkgs {
-              name = appName;
-              runtimeInputs = runtimeInputs;
-              text = builtins.readFile script;
-              inherit extraBin;
-            }
-          }/bin/${appName}";
+          program = "${pkg}/bin/nucleus-${args.name}";
         };
 
-      # `nix run .#apply` — wraps src/scripts/apply.sh with git/jq/openssh/prek/
-      # sops/ssh-to-age on PATH. Sibling scripts bundled via symlinkJoin so
-      # apply.sh resolves them through $_ash_script_dir.
-
-      mkApplyApp =
+      # Derivation for nucleus-apply. Sibling scripts bundled via symlinkJoin so
+      # apply.sh resolves them through $_ash_script_dir. ai-sync and vm-setup
+      # are not bundled here — they are installed on PATH via home.packages
+      # (see mkNucleusApps) and thus available in post-apply after rebuild.
+      mkApplyPackage =
         pkgs:
         let
           baseApply = writeShellApplicationWithLib pkgs {
@@ -409,59 +414,44 @@
             ];
             text = builtins.readFile ./scripts/apply.sh;
           };
-          # Sibling scripts (generate-ssh-host-key.sh etc) bundled into bin/
-          # so apply.sh resolves them through $_ash_script_dir. ai-sync and
-          # vm-setup are writeShellApplication derivations so apply.sh can run
-          # them from PATH with build-time runtimeInputs (jq).
-          aiSyncDrv = writeShellApplicationWithLib pkgs {
-            name = "nucleus-ai-sync";
-            runtimeInputs = [ pkgs.jq ];
-            text = builtins.readFile (scripts + "/ai-sync.sh");
-          };
-          vmSetupDrv = writeShellApplicationWithLib pkgs {
-            name = "nucleus-vm-setup";
-            runtimeInputs = [ pkgs.jq ];
-            text = builtins.readFile (scripts + "/vm-setup.sh");
-            extraBin = {
-              "vm-setup/lib.sh" = scripts + "/vm-setup/lib.sh";
-            };
-          };
           siblingScripts = pkgs.runCommand "apply-siblings" { } ''
             mkdir -p "$out/bin"
             install -m755 "${./scripts/generate-ssh-host-key.sh}" "$out/bin/generate-ssh-host-key.sh"
             install -m755 "${./scripts/register-host-age-key.sh}" "$out/bin/register-host-age-key.sh"
             install -m755 "${./scripts/install-prek-hooks.sh}" "$out/bin/install-prek-hooks.sh"
-            install -m755 "${aiSyncDrv}/bin/nucleus-ai-sync" "$out/bin/nucleus-ai-sync"
-            install -m755 "${vmSetupDrv}/bin/nucleus-vm-setup" "$out/bin/nucleus-vm-setup"
           '';
-          applyDrv = pkgs.symlinkJoin {
-            name = "nucleus-apply";
-            paths = [
-              baseApply
-              siblingScripts
-            ];
-          };
         in
-        {
-          type = "app";
-          program = "${applyDrv}/bin/nucleus-apply";
+        pkgs.symlinkJoin {
+          name = "nucleus-apply";
+          paths = [
+            baseApply
+            siblingScripts
+          ];
         };
 
+      # App wrapper for `nix run .#apply`.
+      mkApplyApp = pkgs: {
+        type = "app";
+        program = "${mkApplyPackage pkgs}/bin/nucleus-apply";
+      };
+
       # PowerShell syntax validation (bundled deps so CI doesn't need system packages).
+      mkCheckPwshPackage =
+        pkgs:
+        pkgs.writeShellApplication {
+          name = "nucleus-check-pwsh";
+          runtimeInputs = [
+            pkgs.git
+            pkgs.powershell
+          ];
+          text = ''
+            exec pwsh -NoLogo -NoProfile -NonInteractive -File "${scripts + "/check-pwsh.ps1"}" "$@"
+          '';
+        };
+
       mkCheckPwshApp = pkgs: {
         type = "app";
-        program = "${
-          pkgs.writeShellApplication {
-            name = "nucleus-check-pwsh";
-            runtimeInputs = [
-              pkgs.git
-              pkgs.powershell
-            ];
-            text = ''
-              exec pwsh -NoLogo -NoProfile -NonInteractive -File "${scripts + "/check-pwsh.ps1"}" "$@"
-            '';
-          }
-        }/bin/nucleus-check-pwsh";
+        program = "${mkCheckPwshPackage pkgs}/bin/nucleus-check-pwsh";
       };
 
       # ShellCheck-based shell script linting.
@@ -650,9 +640,132 @@
       mkNucleusConfigApp =
         pkgs:
         mkApp pkgs {
-          name = "nucleus-config";
+          name = "config";
+          runtimeInputs = [ pkgs.jq ];
+          script = scripts + "/nucleus-config.sh";
+        };
+
+      # Build the full set of nucleus app packages for a given package set.
+      # Used by home-manager (home.packages) and flake packages output.
+      mkNucleusApps = pkgs: {
+        nucleus-apply = mkApplyPackage pkgs;
+        nucleus-ai-sync = mkNucleusPackage pkgs {
+          name = "ai-sync";
           runtimeInputs = [ pkgs.jq ];
         };
+        nucleus-bootstrap = mkNucleusPackage pkgs {
+          name = "bootstrap";
+          runtimeInputs = [ ];
+          extraBin = {
+            "bootstrap-versions.env" = scripts + "/bootstrap-versions.env";
+          };
+        };
+        nucleus-check = mkNucleusPackage pkgs {
+          name = "check";
+          runtimeInputs = [
+            pkgs.bash
+            pkgs.deadnix
+            pkgs.git
+            pkgs.jq
+            pkgs.nixfmt
+            pkgs.packer
+            pkgs.powershell
+            pkgs.yq-go
+          ];
+        };
+        nucleus-check-packer = mkNucleusPackage pkgs {
+          name = "check-packer";
+          runtimeInputs = [
+            pkgs.bash
+            pkgs.packer
+          ];
+        };
+        nucleus-check-pwsh = mkCheckPwshPackage pkgs;
+        nucleus-check-sh = mkNucleusPackage pkgs {
+          name = "check-sh";
+          runtimeInputs = [
+            pkgs.bash
+            pkgs.git
+            pkgs.shellcheck
+          ];
+        };
+        nucleus-cloud-setup = mkNucleusPackage pkgs {
+          name = "cloud-setup";
+          runtimeInputs = [
+            pkgs.git
+            pkgs.jq
+            pkgs.rclone
+          ];
+        };
+        nucleus-config = mkNucleusPackage pkgs {
+          name = "config";
+          runtimeInputs = [ pkgs.jq ];
+          script = scripts + "/nucleus-config.sh";
+        };
+        nucleus-gc = mkNucleusPackage pkgs {
+          name = "gc";
+          runtimeInputs = [
+            pkgs.jq
+            pkgs.gnugrep
+            pkgs.home-manager
+          ];
+        };
+        nucleus-health-check = mkNucleusPackage pkgs {
+          name = "health-check";
+          runtimeInputs = [
+            pkgs.curl
+            pkgs.git
+            pkgs.gnupg
+            pkgs.sops
+          ];
+        };
+        nucleus-replica-reset = mkNucleusPackage pkgs {
+          name = "replica-reset";
+          runtimeInputs = [
+            pkgs.git
+            pkgs.jq
+          ];
+        };
+        nucleus-replica-sync = mkNucleusPackage pkgs {
+          name = "replica-sync";
+          runtimeInputs = [
+            pkgs.git
+            pkgs.jq
+            pkgs.rclone
+          ];
+        };
+        nucleus-svc = mkNucleusPackage pkgs {
+          name = "svc";
+          runtimeInputs = [ pkgs.jq ];
+        };
+        nucleus-test = mkNucleusPackage pkgs {
+          name = "test";
+          runtimeInputs = [
+            pkgs.bash
+            pkgs.findutils
+            pkgs.git
+            pkgs.powershell
+            pkgs.shellcheck
+          ];
+        };
+        nucleus-update = mkNucleusPackage pkgs {
+          name = "update";
+          runtimeInputs = [
+            pkgs.gnupg
+            pkgs.sops
+          ];
+        };
+        nucleus-vm-setup = mkNucleusPackage pkgs {
+          name = "vm-setup";
+          runtimeInputs = [ pkgs.jq ];
+          extraBin = {
+            "vm-setup/lib.sh" = scripts + "/vm-setup/lib.sh";
+          };
+        };
+      };
+
+      nucleusAppsMac = mkNucleusApps pkgsMac;
+      nucleusAppsLinux = mkNucleusApps pkgsLinux;
 
     in
     {
@@ -683,7 +796,7 @@
           gc = mkGcApp pkgsMac;
           health-check = mkHealthCheckApp pkgsMac;
           nixos-generators = nixos-generators.apps.${systems.mac}.default;
-          nucleus-config = mkNucleusConfigApp pkgsMac;
+          config = mkNucleusConfigApp pkgsMac;
           replica-reset = mkReplicaResetApp pkgsMac;
           replica-sync = mkReplicaSyncApp pkgsMac;
           update = mkUpdateApp pkgsMac;
@@ -712,7 +825,7 @@
             program = "${pkgsLinux.nixos-rebuild}/bin/nixos-rebuild";
           };
           nixos-generators = nixos-generators.apps.${systems.linux}.default;
-          nucleus-config = mkNucleusConfigApp pkgsLinux;
+          config = mkNucleusConfigApp pkgsLinux;
           replica-reset = mkReplicaResetApp pkgsLinux;
           replica-sync = mkReplicaSyncApp pkgsLinux;
           update = mkUpdateApp pkgsLinux;
@@ -758,6 +871,7 @@
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
               inherit nixpkgs username users;
+              nucleusApps = nucleusAppsMac;
               vsCodeMarketplace = vsCodeMarketplaceMac;
             };
             home-manager.users = mkHomeManagerUsers ./modules/home.nix;
@@ -788,6 +902,7 @@
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
               inherit nixpkgs username users;
+              nucleusApps = nucleusAppsLinux;
               vsCodeMarketplace = vsCodeMarketplaceLinux;
             };
             home-manager.users = mkHomeManagerUsers ./modules/home.nix;
@@ -811,7 +926,8 @@
               pkgsMac.ssh-to-age
             ];
           };
-        };
+        }
+        // nucleusAppsMac;
         "${systems.linux}" = {
           nixfmt = pkgsLinux.nixfmt;
           bootstrap-deps = pkgsLinux.symlinkJoin {
@@ -822,7 +938,8 @@
               pkgsLinux.ssh-to-age
             ];
           };
-        };
+        }
+        // nucleusAppsLinux;
       };
 
       # -----------------------------------------------------------------------
