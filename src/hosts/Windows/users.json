@@ -110,7 +110,6 @@
           }
         ]
       },
-      # Entries resolve relative to the user/ directory; apply.ps1 prepends "user/" automatically.
       "dscConfigFiles": ["context.dsc.yml", "env.dsc.yml", "dsc.yml"],
       "homeDirectory": "C:\\Users\\polyipseity",
       "isPrimary": true,
