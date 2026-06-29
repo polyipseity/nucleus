@@ -3,6 +3,7 @@
   config,
   lib,
   pkgs,
+  nucleusApps,
   users ? null,
   ...
 }:
@@ -90,61 +91,9 @@ let
   iCloudExcludedDirNames = _iCloudCfg.excludedDirNames;
   iCloudManagedRoots = _iCloudCfg.managedRoots;
 
-  # Build wrapper commands that always target the canonical nucleus flake path,
-  # making nucleus-* commands runnable from any working directory and any shell
-  # (without relying on shell alias expansion state).
-  mkNucleusCommand =
-    name: app:
-    pkgs.writeShellScriptBin name ''
-      set -eu
-
-      # Export rclone config passphrase from SOPS-managed secret so rclone
-      # transparently uses config file encryption in all interactive and
-      # scripted invocations.
-      # WHY conditional: sops-nix materializes the file asynchronously (macOS
-      # LaunchAgent) or inline (NixOS); skip silently if the secret file is
-      # absent during early bootstrap before decryption completes.
-      ${lib.optionalString config.nucleus.rclone.configPassEnabled ''
-        if [ -s "${config.nucleus.rclone.configPassSecretPath}" ]; then
-          export RCLONE_CONFIG_PASS="$(cat "${config.nucleus.rclone.configPassSecretPath}")"
-        fi
-      ''}
-
-      # Resolve the nucleus repository root from NUCLEUS_REPO_ROOT (set by apply.sh
-      # and forwarded through sudo), falling back to git-based auto-detection when
-      # the wrapper is invoked outside the apply.sh flow (e.g. during bootstrap).
-      _nucleus_repo="''${NUCLEUS_REPO_ROOT:-}"
-      if [ -z "$_nucleus_repo" ] || [ ! -d "$_nucleus_repo" ]; then
-        # git resolves symlinks, matching derive_repo_root behavior in lib.sh.
-        _nucleus_repo="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-        if [ -z "$_nucleus_repo" ] || [ ! -f "$_nucleus_repo/src/flake.nix" ]; then
-          printf '%s\n' "nucleus-${app}: cannot determine nucleus repository root — set NUCLEUS_REPO_ROOT or run from within the nucleus repo" >&2
-          exit 1
-        fi
-      fi
-      export NUCLEUS_REPO_ROOT="$_nucleus_repo"
-      exec nix --option warn-dirty false run "$_nucleus_repo/src#${app}" -- "$@"
-    '';
-
 in
 {
-  home.packages = [
-    (mkNucleusCommand "nucleus-ai-sync" "ai-sync")
-    (mkNucleusCommand "nucleus-apply" "apply")
-    (mkNucleusCommand "nucleus-check-packer" "check-packer")
-    (mkNucleusCommand "nucleus-check-pwsh" "check-pwsh")
-    (mkNucleusCommand "nucleus-check-sh" "check-sh")
-    (mkNucleusCommand "nucleus-cloud-setup" "cloud-setup")
-    (mkNucleusCommand "nucleus-config" "nucleus-config")
-    (mkNucleusCommand "nucleus-gc" "gc")
-    (mkNucleusCommand "nucleus-health-check" "health-check")
-    (mkNucleusCommand "nucleus-replica-reset" "replica-reset")
-    (mkNucleusCommand "nucleus-replica-sync" "replica-sync")
-    (mkNucleusCommand "nucleus-svc" "svc")
-    (mkNucleusCommand "nucleus-update" "update")
-    (mkNucleusCommand "nucleus-vm-setup" "vm-setup")
-    (mkNucleusCommand "nucleus-bootstrap" "bootstrap")
-  ];
+  home.packages = builtins.attrValues nucleusApps;
 
   # direnv: automatically loads/unloads per-directory environments.
   # nix-direnv: caches nix-shell/flake devShells so re-entering a directory
