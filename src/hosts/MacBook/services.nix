@@ -41,7 +41,14 @@ let
           end run
         APPLESCRIPT
 
-        /usr/bin/osacompile -l AppleScript -o "$out/NucleusManual.app" "$as_src"
+        # osacompile uses CoreServices APIs that fail when writing directly
+        # to the Nix store output path (coreFoundationUnknownErr -4960).
+        # Compile to a temp dir and copy the result to $out.
+        build_dir="$(mktemp -d)"
+        /usr/bin/osacompile -l AppleScript -o "$build_dir/NucleusManual.app" "$as_src"
+        mkdir -p "$out"
+        cp -R "$build_dir/NucleusManual.app" "$out/"
+        rm -rf "$build_dir"
 
         plist="$out/NucleusManual.app/Contents/Info.plist"
         /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.nucleus.OpenNucleusManual" "$plist"
