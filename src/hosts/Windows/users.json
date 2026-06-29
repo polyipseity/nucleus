@@ -110,7 +110,11 @@
           }
         ]
       },
-      "dscConfigFiles": ["context.dsc.yml", "env.dsc.yml", "dsc.yml"],
+      "dscConfigFiles": [
+        "context.dsc.yml",
+        "env.dsc.yml",
+        "dsc.yml"
+      ],
       "homeDirectory": "C:\\Users\\polyipseity",
       "isPrimary": true,
       "jellyfin": {
