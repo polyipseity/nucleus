@@ -1,0 +1,540 @@
+# WinGet DSC v3 - system-level package baseline for Windows host
+# Package ID policy: prefer human-readable named IDs (for example
+# `Microsoft.PowerToys`) over opaque Microsoft Store-generated IDs. Use
+# generated IDs only when the Store package has no stable named identifier.
+# Source for package ID validity: WinGet package index and manifests.
+# https://learn.microsoft.com/windows/package-manager/winget/
+# https://github.com/microsoft/winget-pkgs
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure 7-Zip is installed with CLI PATH integration and shell extensions for cross-host archive handling parity with macOS (Keka) and NixOS (File Roller + Ark)
+      settings:
+        id: 7zip.7zip
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure WhatsApp Beta is installed to mirror the macOS beta-channel application baseline; Microsoft Store currently exposes only generated ID `9NBDXK71NK08` (no stable named alias)
+      settings:
+        id: 9NBDXK71NK08
+        source: msstore
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Source Serif 4 is installed as the open-source serif baseline (SIL OFL) for Windows font parity with POSIX hosts using pkgs.source-serif
+      settings:
+        id: Adobe.SourceSerif4
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure zoxide is installed for cross-host shell navigation parity with macOS and NixOS
+      settings:
+        id: ajeetdsouza.zoxide
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Ghostscript is installed to provide the `gs` PostScript/PDF CLI for cross-host parity with macOS and NixOS
+      settings:
+        id: ArtifexSoftware.GhostScript
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Ensure HashiCorp Packer is installed for automated VM image building
+          (scripts\VM-build.ps1; cross-host parity with pkgs.packer on macOS/NixOS).
+      settings:
+        id: HashiCorp.Packer
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure uv is installed for cross-host Python workflow parity with macOS and NixOS
+      settings:
+        id: astral-sh.uv
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Ruff is installed for cross-host Python lint/format CLI parity with macOS and NixOS
+      settings:
+        id: astral-sh.ruff
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure ty is installed for cross-host Python type-check/LSP CLI parity with macOS and NixOS
+      settings:
+        id: astral-sh.ty
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Blender — 3D creation suite for modelling, animation, rendering, and video
+          editing. Cross-platform parity with macOS (Homebrew cask) and NixOS (nixpkgs).
+      settings:
+        id: BlenderFoundation.Blender
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure ripgrep is installed for cross-host search tooling parity with macOS and NixOS
+      settings:
+        id: BurntSushi.ripgrep
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Caddy is installed as the host-local HTTPS reverse proxy used for Jellyfin and other managed service TLS ingress
+      settings:
+        id: CaddyServer.Caddy
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure bottom is installed for cross-host terminal monitoring parity with macOS and NixOS
+      settings:
+        id: Clement.bottom
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure JetBrains Mono Nerd Font is installed as the open-source terminal monospace + icon baseline for Windows font parity with POSIX hosts
+      settings:
+        id: DEVCOM.JetBrainsMonoNerdFont
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure direnv is installed for cross-host per-directory environment parity with macOS and NixOS
+      settings:
+        id: direnv.direnv
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Discord Canary is installed to match the macOS canary-channel declaration
+      settings:
+        id: Discord.Discord.Canary
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Equalizer APO — system-wide parametric equalizer for Windows.
+          Provides the driver-level audio processing backend; paired with the
+          Peace GUI for visual slider-based control.
+          Cross-platform parity: EasyEffects (NixOS), Equaliser (macOS).
+      settings:
+        id: EqualizerAPO.EqualizerAPO
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure eza is installed for cross-host shell listing parity with macOS and NixOS
+      settings:
+        id: eza-community.eza
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          GIMP — raster image editor. Cross-platform parity with macOS (Homebrew cask)
+          and NixOS (nixpkgs).
+      settings:
+        id: GIMP.GIMP
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      id: GitInstall
+      directives:
+        description: Ensure Git is installed (includes gitk for cross-host Git history browser parity with macOS and NixOS)
+      settings:
+        id: Git.Git
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      id: GithubCliInstall
+      directives:
+        description: Ensure GitHub CLI is installed for cross-host Git repository management parity with macOS and NixOS
+      settings:
+        id: GitHub.cli
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Gpg4win is installed
+      settings:
+        id: GnuPG.Gpg4win
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Chrome is installed
+      settings:
+        id: Google.Chrome
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Chrome Canary is installed to mirror the macOS canary-channel browser declaration
+      settings:
+        id: Google.Chrome.Canary
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Chrome Remote Desktop Host is installed to mirror the macOS remote-access host declaration
+      settings:
+        id: Google.ChromeRemoteDesktopHost
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Noto Sans CJK SC is installed for Simplified Chinese sans-serif coverage on Windows, matching pkgs.noto-fonts-cjk-sans on POSIX hosts
+      settings:
+        id: Google.NotoSans.CJK.SC
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Noto Sans CJK TC is installed for Traditional Chinese sans-serif coverage on Windows, completing the Simplified+Traditional parity required by repository policy
+      settings:
+        id: Google.NotoSans.CJK.TC
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Noto Serif CJK SC is installed for Simplified Chinese serif coverage on Windows, matching pkgs.noto-fonts-cjk-serif on POSIX hosts
+      settings:
+        id: Google.NotoSerif.CJK.SC
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Noto Serif CJK TC is installed for Traditional Chinese serif coverage on Windows, completing the Simplified+Traditional parity required by repository policy
+      settings:
+        id: Google.NotoSerif.CJK.TC
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure FFmpeg is installed for cross-host multimedia processing and transcoding parity with macOS and NixOS; GPL build from gyan.dev includes comprehensive open-source codec support (x264, x265, AAC, Opus, and others)
+      settings:
+        id: Gyan.FFmpeg
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          QtPass — Qt GUI frontend for gopass/pass. Parity with NixOS (nixpkgs qtpass);
+          macOS excluded because the Homebrew cask fails Gatekeeper checks.
+      settings:
+        id: IJHack.QtPass
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure ImageMagick is installed for cross-host image conversion and processing parity with macOS and NixOS (`convert`, `magick`)
+      settings:
+        id: ImageMagick.ImageMagick
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Inter is installed as the open-source sans-serif UI baseline (SIL OFL) for Windows font parity with POSIX hosts using pkgs.inter
+      settings:
+        id: Inter.Inter
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure prek is installed for cross-host pre-commit hook manager parity with macOS and NixOS
+      settings:
+        id: j178.Prek
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure jq is installed for cross-host JSON tooling parity with macOS and NixOS
+      settings:
+        id: jqlang.jq
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Ensure Jellyfin Server is installed for cross-host media-server parity
+          with the macOS launchd agent and Linux systemd user service. WinGet
+          package ID verified from microsoft/winget-pkgs manifests:
+          https://github.com/microsoft/winget-pkgs/tree/master/manifests/j/Jellyfin/Server
+      settings:
+        id: Jellyfin.Server
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure fzf is installed for cross-host fuzzy finder parity with macOS and NixOS
+      settings:
+        id: junegunn.fzf
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Krita — digital painting and illustration editor. Cross-platform parity with
+          macOS (Homebrew cask) and NixOS (nixpkgs).
+      settings:
+        id: KDE.Krita
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure LLVM/Clang is installed so clang and lld are available for cross-host native build parity with macOS and NixOS
+      settings:
+        id: LLVM.LLVM
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure .NET 6 runtime is installed for EIDE/runtime parity with macOS and NixOS
+      settings:
+        id: Microsoft.DotNet.Runtime.6
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure PowerShell (`pwsh`) is installed for cross-host shell and script parity with macOS and NixOS
+      settings:
+        id: Microsoft.PowerShell
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Microsoft PowerToys is installed for Windows productivity tooling; Raycast (`9PFXXSHC64H3`) is intentionally not used on Windows and Rectangle is macOS-specific
+      settings:
+        id: Microsoft.PowerToys
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Visual Studio Code is installed
+      settings:
+        id: Microsoft.VisualStudioCode
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Visual Studio Code Insiders is installed to match the dual-channel editor baseline declared for macOS and NixOS
+      settings:
+        id: Microsoft.VisualStudioCode.Insiders
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Windows Terminal Preview — preferred over stable per repository policy
+          (preview/beta channels are favoured when available).  Provides "Open in
+          Windows Terminal" context menu option in Explorer for cross-platform parity
+          with macOS (Terminal/iTerm) and NixOS (GNOME Terminal/Konsole).
+      settings:
+        id: Microsoft.WindowsTerminal.Preview
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Neovim is installed to mirror the default-editor baseline declared on macOS and NixOS
+      settings:
+        id: Neovim.Neovim
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Ensure MusicBrainz Picard is installed for cross-host tagging workflow
+          parity with macOS (Homebrew cask musicbrainz-picard) and NixOS
+          (nixpkgs picard). WinGet does not expose a preview/beta channel for
+          Picard, so stable is used by policy exception.
+      settings:
+        id: MusicBrainz.Picard
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Obsidian is installed to mirror the macOS GUI package declaration
+      settings:
+        id: Obsidian.Obsidian
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Ensure Ollama is installed as the local LLM inference backend for
+          cross-host AI parity with macOS (launchd user agent) and NixOS
+          (system services.ollama unit).  The WinGet installer registers Ollama
+          as a background service that starts at user login and binds to
+          127.0.0.1:11434 by default.
+      settings:
+        id: Ollama.Ollama
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      id: BunInstall
+      directives:
+        description: >-
+          Ensure Bun is installed as the global JS runtime and package manager; provides
+          `bun` CLI for running JS ecosystem tools and `bun install -g` for global package
+          installs (for example pi-coding-agent).  Bun fills the last tier of the install
+          hierarchy (winget > scoop > cargo binstall > bun > uv) for JS-only tools absent from
+          all higher tiers.
+      settings:
+        id: Oven-sh.Bun
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Parsec is installed to mirror the macOS low-latency remote-desktop package declaration
+      settings:
+        id: Parsec.Parsec
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Peace Equalizer APO — graphical user interface for Equalizer APO.
+          Provides point-and-click sliders, effect toggles, and preset management
+          so volume limits can be configured without editing config files.
+          Cross-platform parity: EasyEffects (NixOS), Equaliser (macOS).
+      settings:
+        id: PeterVerbeek.PeaceEqualizerAPO
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure rclone is installed as the cross-platform cloud storage sync and mount tool for cloud drive parity with macOS and NixOS
+      settings:
+        id: Rclone.Rclone
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure rustup is installed for cross-host Rust toolchain parity with macOS and NixOS
+      settings:
+        id: Rustlang.Rustup
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      id: ScoopInstall
+      directives:
+        description: >-
+          Scoop user-space package manager for portable CLI utilities not
+          available in WinGet (e.g. cargo-binstall).  Git is required by Scoop
+          for bucket management and updates; declared via dependsOn to ensure
+          Git is present before Scoop initialises.
+      settings:
+        id: Scoop.Scoop
+        source: winget
+      dependsOn:
+        - GitInstall
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure SOPS is installed
+      settings:
+        id: SecretsOPerationS.SOPS
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure bat is installed for cross-host shell utility parity with macOS and NixOS
+      settings:
+        id: sharkdp.bat
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure fd is installed for cross-host file search parity with macOS and NixOS
+      settings:
+        id: sharkdp.fd
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure ShellCheck is installed for cross-host shell script linting parity with macOS and NixOS
+      settings:
+        id: ShellCheck.ShellCheck
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure opencode is installed for cross-host agent tooling parity with macOS and NixOS
+      settings:
+        id: SST.opencode
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Steam — game distribution and launcher platform. Cross-platform parity with
+          macOS (Homebrew steam cask) and NixOS (programs.steam.enable). No Steam
+          beta/preview channel is available via WinGet; stable release only per
+          repository channel policy exception.
+      settings:
+        id: Valve.Steam
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Telegram Desktop Beta is installed to mirror the macOS beta-channel messaging baseline
+      settings:
+        id: Telegram.TelegramDesktop.Beta
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          LibreOffice — open-source office suite. Cross-platform parity with macOS
+          (Homebrew cask) and NixOS (nixpkgs).
+      settings:
+        id: TheDocumentFoundation.LibreOffice
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Ensure Typst is installed as the command-line document-composition
+          compiler for cross-host parity with macOS and NixOS (pkgs.typst);
+          pairs with the Tinymist language server managed by VS Code extension
+          sync on all platforms.
+      settings:
+        id: Typst.Typst
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure VLC media player is installed to mirror the macOS GUI package declaration
+      settings:
+        id: VideoLAN.VLC
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure WinFsp (FUSE for Windows) is installed as a prerequisite for rclone mount on Windows; required for any cloud drive mount operation
+      settings:
+        id: WinFsp.WinFsp
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Zoom — video conferencing client. Cross-platform parity with macOS (Homebrew
+          cask) and NixOS (nixpkgs zoom-us).
+      settings:
+        id: Zoom.Zoom
+        source: winget

@@ -373,11 +373,14 @@ fi
 printf '\n=== [%s] Locked DSC validation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   _dsc_system="src/hosts/Windows/system.dsc.yml"
+  _dsc_system_packages="src/hosts/Windows/system-packages.dsc.yml"
   _lockfile="src/lockfiles/lockfile.json"
   _lf_errors=0
 
-  # Generate locked DSC in-memory from system.dsc.yml + lockfile.
-  _locked_json=$(jq --argjson locked "$(jq -c '.winget // {}' "$_lockfile")" '
+  # Generate locked DSC in-memory from both system DSC files + lockfile.
+  # Merge resources from system-packages.dsc.yml into a single tree, then lock.
+  _locked_json=$(jq -s --argjson locked "$(jq -c '.winget // {}' "$_lockfile")" '
+    { properties: { resources: (.[0].properties.resources + .[1].properties.resources) } } |
     .properties.resources |= [
       .[] | if .resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and ($locked[.settings.id] | length > 0) then
         .settings.version = $locked[.settings.id]
@@ -385,16 +388,16 @@ if ! $HAS_ARGS; then
         .
       end
     ]
-  ' <(yq eval -o=j '.' "$_dsc_system"))
+  ' <(yq eval -o=j '.' "$_dsc_system") <(yq eval -o=j '.' "$_dsc_system_packages"))
 
   # For each pinned resource, verify version matches lockfile.
   while IFS=$'\t' read -r _id _pinned_ver; do
     _lf_ver=$(jq -r --arg id "$_id" '.winget[$id] // ""' "$_lockfile")
     if [ -z "$_lf_ver" ]; then
-      echo "ERROR: $_dsc_system: $_id has version $_pinned_ver but no lockfile entry"
+      echo "ERROR: system DSC files: $_id has version $_pinned_ver but no lockfile entry"
       _lf_errors=$((_lf_errors + 1))
     elif [ "$_pinned_ver" != "$_lf_ver" ]; then
-      echo "ERROR: $_dsc_system: $_id pinned $_pinned_ver but lockfile has $_lf_ver"
+      echo "ERROR: system DSC files: $_id pinned $_pinned_ver but lockfile has $_lf_ver"
       _lf_errors=$((_lf_errors + 1))
     fi
   done < <(echo "$_locked_json" | jq -r '.properties.resources[] | select(.resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and .settings.version != null) | [.settings.id, .settings.version] | @tsv')

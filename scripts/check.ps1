@@ -291,6 +291,7 @@ if (-not $HAS_ARGS) {
 Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
 if (-not $HAS_ARGS) {
   $_dscSystem = Join-Path $RepoRoot 'src\hosts\Windows\system.dsc.yml'
+  $_dscSystemPackages = Join-Path $RepoRoot 'src\hosts\Windows\system-packages.dsc.yml'
   $_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
   $_lfErrors = 0
 
@@ -301,12 +302,7 @@ if (-not $HAS_ARGS) {
   }
   Import-Module -Name powershell-yaml -Force
 
-  # Generate locked DSC in-memory from system.dsc.yml + lockfile.
-  $_lockfileData = Get-Content $_lockfilePath -Raw | ConvertFrom-Json -AsHashtable
-  $_dscYaml = Get-Content $_dscSystem -Raw
-  # Convert YAML → nested hashtable. Post-process through
-  # ConvertTo-HashtableDeep because powershell-yaml may return mixed
-  # hashtable/PSCustomObject trees depending on version.
+  # Helper: convert mixed PSCustomObject/hashtable trees to pure hashtable.
   function ConvertTo-HashtableDeep ($_obj) {
     if ($_obj -is [PSCustomObject]) {
       $_ht = [ordered] @{}
@@ -321,7 +317,15 @@ if (-not $HAS_ARGS) {
     }
     return $_obj
   }
+
+  # Generate locked DSC in-memory from both system DSC files + lockfile.
+  $_lockfileData = Get-Content $_lockfilePath -Raw | ConvertFrom-Json -AsHashtable
+  $_dscYaml = Get-Content $_dscSystem -Raw
+  $_dscPkgYaml = Get-Content $_dscSystemPackages -Raw
   $_dsc = ConvertTo-HashtableDeep ($_dscYaml | ConvertFrom-Yaml)
+  $_dscPkg = ConvertTo-HashtableDeep ($_dscPkgYaml | ConvertFrom-Yaml)
+  # Merge package resources from system-packages.dsc.yml into the main DSC tree.
+  $_dsc.properties.resources += $_dscPkg.properties.resources
 
   foreach ($_resource in $_dsc.properties.resources) {
     if ($_resource.resource -eq 'Microsoft.WinGet.Client/Package' -and $_resource.settings.source -eq 'winget') {
@@ -345,10 +349,10 @@ if (-not $HAS_ARGS) {
       $_lfVer = if ($_lockfileData.winget.ContainsKey($_id)) { $_lockfileData.winget[$_id] } else { '' }
 
       if ([string]::IsNullOrEmpty($_lfVer)) {
-        Write-Output "ERROR: ${_dscSystem}: $_id has version $_pinnedVer but no lockfile entry"
+        Write-Output "ERROR: system DSC files: $_id has version $_pinnedVer but no lockfile entry"
         $_lfErrors++
       } elseif ($_pinnedVer -ne $_lfVer) {
-        Write-Output "ERROR: ${_dscSystem}: $_id pinned $_pinnedVer but lockfile has $_lfVer"
+        Write-Output "ERROR: system DSC files: $_id pinned $_pinnedVer but lockfile has $_lfVer"
         $_lfErrors++
       }
     }

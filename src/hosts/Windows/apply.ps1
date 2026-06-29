@@ -221,7 +221,7 @@
 [CmdletBinding()]
 param(
   [string]$ConfigDir = $PSScriptRoot,
-  [string[]]$ConfigFiles = @("system.dsc.yml", "user.dsc.yml"),
+  [string[]]$ConfigFiles = @("system.dsc.yml", "system-packages.dsc.yml", "user.dsc.yml", "user-env.dsc.yml", "user-context.dsc.yml"),
   [Alias("h")]
   [switch]$Help,
   [Parameter(Mandatory)]
@@ -566,10 +566,13 @@ Remove-StaleWallpaper -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutput
 # Generate locked DSC from lockfile before applying.
 $lockfilePath = Join-Path -Path $PSScriptRoot -ChildPath "..\..\lockfiles\lockfile.json"
 ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system-locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system-packages.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system-packages-locked.dsc.yml")
 
-# Replace system.dsc.yml with the locked variant in effective config list.
+# Replace system DSC files with locked variants in effective config list.
 $effectiveConfigFiles = @($effectiveConfigFiles | ForEach-Object {
-  if ($_ -eq "system.dsc.yml") { "system-locked.dsc.yml" } else { $_ }
+  if ($_ -eq "system.dsc.yml") { "system-locked.dsc.yml" }
+  elseif ($_ -eq "system-packages.dsc.yml") { "system-packages-locked.dsc.yml" }
+  else { $_ }
 })
 
 foreach ($configFile in $effectiveConfigFiles) {

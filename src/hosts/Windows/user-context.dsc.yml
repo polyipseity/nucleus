@@ -1,0 +1,45 @@
+# WinGet DSC v3 - user-level context menu entries for Windows host
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    # Right-click "open nucleus manual" for all files
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: servicesFileVerb
+      directives:
+        description: Add "open nucleus manual" to the right-click context menu for all files
+      settings:
+        keyPath: HKCU\Software\Classes\*\shell\open nucleus manual
+        valueData: "open nucleus manual"
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: servicesFileCmd
+      directives:
+        description: Command for the file context menu verb
+      settings:
+        keyPath: HKCU\Software\Classes\*\shell\open nucleus manual\command
+        valueData: >-
+          powershell.exe -NoProfile -WindowStyle Hidden -Command
+          "Start-Process (Join-Path $HOME 'dev\nucleus\src\hosts\Windows\MANUAL.md')"
+        valueType: String
+
+    # Right-click "open nucleus manual" for folders
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: servicesDirVerb
+      directives:
+        description: Add "open nucleus manual" to the right-click context menu for folders
+      settings:
+        keyPath: HKCU\Software\Classes\Directory\shell\open nucleus manual
+        valueData: "open nucleus manual"
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: servicesDirCmd
+      directives:
+        description: Command for the folder context menu verb
+      settings:
+        keyPath: HKCU\Software\Classes\Directory\shell\open nucleus manual\command
+        valueData: >-
+          powershell.exe -NoProfile -WindowStyle Hidden -Command
+          "Start-Process (Join-Path $HOME 'dev\nucleus\src\hosts\Windows\MANUAL.md')"
+        valueType: String
