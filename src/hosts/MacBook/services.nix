@@ -22,12 +22,7 @@
 #   macOS-version-specific .scpt bytecode, but only once per `nucleus-apply`
 #   run instead of at every activation. This keeps the same safety property
 #   while making the activation script simpler and faster.
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ lib, pkgs, ... }:
 let
   nucleusManualApp =
     pkgs.runCommand "nucleus-manual-app"
