@@ -28,7 +28,6 @@ let
   windowsReplicaScheduleModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-ReplicaSyncScheduledTask.ps1;
   replicaGcConfigText = builtins.readFile ../../src/modules/configs/cloud/replica-gc.json;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
-  shellNixText = builtins.readFile ../../src/modules/shell.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   finderSidebarText = builtins.readFile ../../src/modules/macos/finder-sidebar.nix;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
@@ -145,12 +144,8 @@ let
       (containsRegex "password-command" moduleText && containsRegex "configPassEnabled" moduleText)
       "cloud-drives.nix must add --password-command to mount args when nucleus.rclone.configPassEnabled is true";
 
-  # Test 22: shell.nix exports RCLONE_CONFIG_PASS guarded by configPassEnabled
-  test_shell_exports_rclone_pass = assert' (
-    containsRegex "RCLONE_CONFIG_PASS" shellNixText && containsRegex "configPassEnabled" shellNixText
-  ) "shell.nix must export RCLONE_CONFIG_PASS conditional on nucleus.rclone.configPassEnabled";
-
-  # Test 23: Both cloud-setup scripts export RCLONE_CONFIG_PASS before remote creation
+  # Test 22: Both cloud-setup scripts export RCLONE_CONFIG_PASS before remote creation
+  # (shell.nix previously handled this; now each script manages it independently.)
   test_cloud_setup_exports_rclone_pass =
     assert'
       (
@@ -235,11 +230,10 @@ let
     && containsRegex ''"enable": true'' posixUsersText
   ) "iCloud replica entry must remain enabled for local replica convergence";
 
-  # Test 33: shell exports nucleus-replica-sync command wrapper
-  test_shell_has_replica_command = assert' (
-    containsRegex ''"nucleus-replica-sync"'' shellNixText
-    && containsRegex ''"replica-sync"'' shellNixText
-  ) "shell module must expose nucleus-replica-sync command";
+  # Test 33: flake exports nucleus-replica-sync command
+  test_flake_has_replica_command = assert' (
+    containsRegex "nucleus-replica-sync" flakeText && containsRegex ''name = "replica-sync"'' flakeText
+  ) "flake.nix must expose nucleus-replica-sync in nucleusApps";
 
   # Test 34: flake exposes replica-sync app wired to scripts/replica-sync.sh
   test_flake_has_replica_app = assert' (
@@ -382,8 +376,8 @@ let
   test_replica_reset_command_parity = assert' (
     containsRegex "mkReplicaResetApp" flakeText
     && containsRegex "scripts/replica-reset\.sh" flakeText
-    && containsRegex ''"nucleus-replica-reset"'' shellNixText
-    && containsRegex ''"replica-reset"'' shellNixText
+    && containsRegex "nucleus-replica-reset" flakeText
+    && containsRegex ''name = "replica-reset"'' flakeText
     && containsRegex "function nucleus-replica-reset" windowsShellProfileText
     && containsRegex ''scripts\\replica-reset\.ps1'' windowsShellProfileText
     && containsRegex "Resolve-NucleusRepoRoot" replicaResetPwshText
@@ -546,7 +540,6 @@ let
     # test_cloud_setup_passes_icloud_service
     test_rclone_options_in_home_nix
     test_cloud_drives_password_command
-    test_shell_exports_rclone_pass
     test_cloud_setup_exports_rclone_pass
     test_cloud_setup_uses_root_only_listing
     test_finder_sidebar_automatic_strategy
@@ -558,7 +551,7 @@ let
     test_macos_uses_fuse_t
     test_google_drive_display_name
     test_icloud_replica_enabled
-    test_shell_has_replica_command
+    test_flake_has_replica_command
     # FIXME(pre-existing): test_flake_has_replica_app — flake doesn't seem to expose replica-sync app
     # test_flake_has_replica_app
     test_apply_runs_replica_sync

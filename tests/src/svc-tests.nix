@@ -15,7 +15,6 @@ let
   svcShText = builtins.readFile ../../scripts/svc.sh;
   svcPs1Text = builtins.readFile ../../scripts/svc.ps1;
   flakeText = builtins.readFile ../../src/flake.nix;
-  shellNixText = builtins.readFile ../../src/modules/shell.nix;
   checkShText = builtins.readFile ../../scripts/check.sh;
   checkPs1Text = builtins.readFile ../../scripts/check.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
@@ -120,9 +119,9 @@ assert containsRegex "svc = mkSvcApp pkgsMac" flakeText;
 assert containsRegex "svc = mkSvcApp pkgsLinux" flakeText;
 assert containsRegex "runtimeInputs.*jq" flakeText;
 
-# --- shell.nix wiring assertions ---
-assert containsRegex "nucleus-svc" shellNixText;
-assert containsRegex ''mkNucleusCommand "nucleus-svc" "svc"'' shellNixText;
+# --- flake.nix nucleusApps wiring assertions ---
+assert containsRegex "nucleus-svc" flakeText;
+assert containsRegex ''name = "svc"'' flakeText;
 
 # --- services.json scope assertions ---
 # ollama and litellm are system-wide on macOS.
