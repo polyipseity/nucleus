@@ -21,10 +21,10 @@
   Path to write the locked DSC.
 
 .EXAMPLE
-  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system-locked.dsc.yml
+  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system.locked.dsc.yml
 
 .EXAMPLE
-  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system-packages.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system-packages-locked.dsc.yml
+  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system-packages.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system-packages.locked.dsc.yml
 
 .NOTES
   Environment variables:
