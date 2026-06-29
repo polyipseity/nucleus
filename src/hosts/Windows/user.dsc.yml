@@ -311,3 +311,45 @@ properties:
           OPENCODE_CLIENT if not defined NUCLEUS_AGENT_SESSION if not defined VSCODE_AGENT if not exist
           "C:\opt\.devin" (@echo off & prompt $g)
         valueType: String
+
+    # Right-click "Open Nucleus Manual" for all files
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: servicesFileVerb
+      directives:
+        description: Add "Open Nucleus Manual" to the right-click context menu for all files
+      settings:
+        keyPath: HKCU\Software\Classes\*\shell\Open Nucleus Manual
+        valueData: "Open Nucleus Manual"
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: servicesFileCmd
+      directives:
+        description: Command for the file context menu verb
+      settings:
+        keyPath: HKCU\Software\Classes\*\shell\Open Nucleus Manual\command
+        valueData: >-
+          powershell.exe -NoProfile -WindowStyle Hidden -Command
+          "Start-Process (Join-Path $HOME 'dev\nucleus\src\hosts\Windows\MANUAL.md')"
+        valueType: String
+
+    # Right-click "Open Nucleus Manual" for folders
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: servicesDirVerb
+      directives:
+        description: Add "Open Nucleus Manual" to the right-click context menu for folders
+      settings:
+        keyPath: HKCU\Software\Classes\Directory\shell\Open Nucleus Manual
+        valueData: "Open Nucleus Manual"
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: servicesDirCmd
+      directives:
+        description: Command for the folder context menu verb
+      settings:
+        keyPath: HKCU\Software\Classes\Directory\shell\Open Nucleus Manual\command
+        valueData: >-
+          powershell.exe -NoProfile -WindowStyle Hidden -Command
+          "Start-Process (Join-Path $HOME 'dev\nucleus\src\hosts\Windows\MANUAL.md')"
+        valueType: String
