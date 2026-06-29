@@ -75,6 +75,9 @@ in
     store_path="${nucleusManualApp}/NucleusManual.app"
 
     mkdir -p "$app_dir"
+    # Nix store outputs are read-only; strip that before deletion to avoid
+    # Permission denied on the next generation switch.
+    chmod -R +w "$app_path" 2>/dev/null || true
     rm -rf "$app_path"
     cp -R "$store_path" "$app_dir/"
 
