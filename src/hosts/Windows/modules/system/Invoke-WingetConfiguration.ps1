@@ -42,7 +42,7 @@ function Invoke-WingetConfiguration {
     wallpaper or a fallback path is used instead.
 
   .EXAMPLE
-    Invoke-WingetConfiguration -ConfigPath '.\user.dsc.yml' -WallpaperPath 'C:\Users\primary\Pictures\bg.png'
+    Invoke-WingetConfiguration -ConfigPath '.\user\dsc.yml' -WallpaperPath 'C:\Users\primary\Pictures\bg.png'
 
   .NOTES
     Environment variables:

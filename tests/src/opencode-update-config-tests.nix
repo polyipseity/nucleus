@@ -5,7 +5,7 @@ let
 
   shellEnvText = builtins.readFile ../../src/modules/shell/env.nix;
   nixosBaseText = builtins.readFile ../../src/hosts/NixOS/base.nix;
-  windowsUserDscText = builtins.readFile ../../src/hosts/Windows/user.dsc.yml;
+  windowsUserDscText = builtins.readFile ../../src/hosts/Windows/user/dsc.yml;
   rootOpenCodeConfigText = builtins.readFile ../../opencode.jsonc;
   userOpenCodeConfigText = builtins.readFile ../../src/modules/configs/agents/opencode.user.jsonc;
 in

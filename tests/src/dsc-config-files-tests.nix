@@ -1,8 +1,11 @@
 # tests/src/dsc-config-files-tests.nix — Per-user DSC config declaration tests.
 #
-# Validates that user-level DSC configs (user.dsc.yml, user-env.dsc.yml,
-# user-context.dsc.yml) are declared per-user via users.json dscConfigFiles,
+# Validates that user-level DSC configs (dsc.yml, env.dsc.yml, context.dsc.yml
+# in the user/ folder) are declared per-user via users.json dscConfigFiles,
 # not as universal defaults in apply.ps1.
+#
+# Also validates that apply.ps1 prepends "user/" to each dscConfigFiles entry
+# and prevents path-traversal escape.
 #
 # Run with: nix-instantiate --eval tests/src/dsc-config-files-tests.nix
 
@@ -15,11 +18,11 @@ let
 
   inherit (import ../lib.nix) assert';
 
-  # Expected user-level DSC files.
+  # Expected user-level DSC files (bare filenames; apply.ps1 prepends "user/").
   expectedUserDscFiles = [
-    "user.dsc.yml"
-    "user-env.dsc.yml"
-    "user-context.dsc.yml"
+    "context.dsc.yml"
+    "dsc.yml"
+    "env.dsc.yml"
   ];
 
   # The primary user from the registry.
@@ -29,16 +32,14 @@ let
   # apply.ps1 default ConfigFiles assertions
   # ---------------------------------------------------------------------------
 
-  # Test 1: Default ConfigFiles must include both system-level DSC files.
-  test_default_includes_system_files = assert' (containsRegex ''"system\.dsc\.yml", "system-packages\.dsc\.yml"'' windowsApplyText) "Default ConfigFiles must contain system.dsc.yml and system-packages.dsc.yml";
+  # Test 1: Default ConfigFiles must include both system-level DSC files (subfolder paths).
+  test_default_includes_system_files = assert' (containsRegex ''"system/dsc\.yml", "system/packages\.dsc\.yml"'' windowsApplyText) "Default ConfigFiles must contain system/dsc.yml and system/packages.dsc.yml";
 
   # Test 2: Default ConfigFiles must NOT include any user-level DSC file.
   test_default_excludes_user_files = assert' (
-    # The ConfigFiles = @(...) default value must not contain user file names.
-    # We check that the unique default array doesn't contain user-level files.
-    (!containsRegex ''ConfigFiles = [^)]*user\.dsc\.yml[^)]*\)'' windowsApplyText)
-    && (!containsRegex ''ConfigFiles = [^)]*user-env\.dsc\.yml[^)]*\)'' windowsApplyText)
-    && (!containsRegex ''ConfigFiles = [^)]*user-context\.dsc\.yml[^)]*\)'' windowsApplyText)
+    (!containsRegex ''ConfigFiles = [^)]*user/dsc\.yml[^)]*\)'' windowsApplyText)
+    && (!containsRegex ''ConfigFiles = [^)]*user/env\.dsc\.yml[^)]*\)'' windowsApplyText)
+    && (!containsRegex ''ConfigFiles = [^)]*user/context\.dsc\.yml[^)]*\)'' windowsApplyText)
   ) "Default ConfigFiles must NOT contain any user-level DSC file";
 
   # Test 3: ConfigFiles param doc must describe per-user extension mechanism.
@@ -49,7 +50,7 @@ let
 
   # Test 4: Deduplication mechanism must exist in apply.ps1.
   test_deduplication_mechanism = assert' (
-    containsRegex "userConfigFile -notin" windowsApplyText
+    containsRegex "resolvedConfigFile -notin" windowsApplyText
     && containsRegex "effectiveConfigFiles" windowsApplyText
   ) "apply.ps1 must deduplicate per-user dscConfigFiles against effectiveConfigFiles";
 
@@ -70,25 +71,22 @@ let
     builtins.hasAttr "dscConfigFiles" user && user.dscConfigFiles or [ ] != [ ]
   ) "Primary user must have a non-empty dscConfigFiles array";
 
-  # Test 7: Primary user must have all 3 user-level DSC files.
-  test_primary_user_files_complete =
-    assert'
-      (
-        let
-          user = builtins.head primaryUsers;
-        in
-        builtins.all (f: builtins.elem f (user.dscConfigFiles or [ ])) expectedUserDscFiles
-      )
-      "Primary user's dscConfigFiles must include user.dsc.yml, user-env.dsc.yml, and user-context.dsc.yml";
+  # Test 7: Primary user must have all 3 user-level DSC files (bare filenames).
+  test_primary_user_files_complete = assert' (
+    let
+      user = builtins.head primaryUsers;
+    in
+    builtins.all (f: builtins.elem f (user.dscConfigFiles or [ ])) expectedUserDscFiles
+  ) "Primary user's dscConfigFiles must include context.dsc.yml, dsc.yml, and env.dsc.yml";
 
   # Test 8: Primary user must not have system-level files in dscConfigFiles.
   test_primary_user_no_system_files = assert' (
     let
       user = builtins.head primaryUsers;
     in
-    !builtins.elem "system.dsc.yml" (user.dscConfigFiles or [ ])
-    && !builtins.elem "system-packages.dsc.yml" (user.dscConfigFiles or [ ])
-  ) "Primary user's dscConfigFiles must not contain system.dsc.yml or system-packages.dsc.yml";
+    !builtins.elem "system/dsc.yml" (user.dscConfigFiles or [ ])
+    && !builtins.elem "system/packages.dsc.yml" (user.dscConfigFiles or [ ])
+  ) "Primary user's dscConfigFiles must not contain system/dsc.yml or system/packages.dsc.yml";
 
   # Test 9: Primary user files must be in alphabetical order.
   test_primary_user_files_alphabetical = assert' (
@@ -97,13 +95,29 @@ let
     in
     user.dscConfigFiles == builtins.sort builtins.lessThan user.dscConfigFiles
   ) "Primary user's dscConfigFiles must be sorted alphabetically";
+
+  # ---------------------------------------------------------------------------
+  # apply.ps1 per-user prefix and escape-prevention assertions
+  # ---------------------------------------------------------------------------
+
+  # Test 10: Per-user loop must prepend "user/" to dscConfigFiles entries.
+  test_per_user_prepends_user_prefix = assert' (
+    containsRegex ''resolvedConfigFile = "user/"'' windowsApplyText
+    || containsRegex "resolvedConfigFile = .user/" windowsApplyText
+    || containsRegex ''"user/\$userConfigFile"'' windowsApplyText
+  ) "apply.ps1 per-user loop must prepend 'user/' to dscConfigFiles entries";
+
+  # Test 11: Per-user loop must prevent path traversal (.. or / or \ in entries).
+  test_per_user_escape_prevention = assert' (
+    containsRegex ''match.*[\\/]'' windowsApplyText && containsRegex "path separators" windowsApplyText
+  ) "apply.ps1 per-user loop must reject dscConfigFiles entries with path separators or '..'";
 in
 {
   success = true;
-  testCount = 9;
-  message = "All 9 DSC config file declaration tests passed";
+  testCount = 11;
+  message = "All 11 DSC config file declaration tests passed";
   testNames = [
-    "1:  Default ConfigFiles includes system.dsc.yml and system-packages.dsc.yml"
+    "1:  Default ConfigFiles includes system/dsc.yml and system/packages.dsc.yml"
     "2:  Default ConfigFiles excludes user-level DSC files"
     "3:  ConfigFiles param doc describes per-user extension via users.json"
     "4:  Deduplication mechanism exists in apply.ps1"
@@ -112,5 +126,7 @@ in
     "7:  Primary user dscConfigFiles includes all 3 user-level files"
     "8:  Primary user dscConfigFiles excludes system-level files"
     "9:  Primary user dscConfigFiles is sorted alphabetically"
+    "10: Per-user loop prepends user/ prefix to dscConfigFiles entries"
+    "11: Per-user loop prevents path traversal escape"
   ];
 }

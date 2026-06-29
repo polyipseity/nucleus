@@ -29,7 +29,7 @@ function Sync-WindowsRDP {
       - Firewall rule: RemoteDesktop-UserMode-In-UDP enabled
 
     The registry key fDenyTSConnections is managed declaratively via
-    system.dsc.yml rather than here, so this function only controls service
+    system/dsc.yml rather than here, so this function only controls service
     lifecycle and firewall state.
 
     When disabled, the function reverses managed state:

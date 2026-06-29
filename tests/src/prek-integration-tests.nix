@@ -20,15 +20,15 @@ let
   agentEnvVarNames = (import ../../src/modules/agent-env-vars.nix).agentEnvVarNames;
   windowsInstallModuleText = builtins.readFile ../../src/hosts/Windows/modules/setup/Install-PrekHook.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
-  windowsSystemDscText = builtins.readFile ../../src/hosts/Windows/system.dsc.yml;
-  windowsSystemPackagesDscText = builtins.readFile ../../src/hosts/Windows/system-packages.dsc.yml;
-  windowsUserDscText = builtins.readFile ../../src/hosts/Windows/user.dsc.yml;
+  windowsSystemDscText = builtins.readFile ../../src/hosts/Windows/system/dsc.yml;
+  windowsSystemPackagesDscText = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
+  windowsUserDscText = builtins.readFile ../../src/hosts/Windows/user/dsc.yml;
 
   inherit (import ../lib.nix) assert';
 
   test_posix_binary_baseline = assert' (lib.hasInfix "pkgs.prek" coreModuleText) "POSIX shared package baseline must include pkgs.prek";
 
-  test_windows_binary_baseline = assert' (lib.hasInfix "id: j178.Prek" windowsSystemPackagesDscText) "Windows system-packages.dsc.yml must include the j178.Prek package";
+  test_windows_binary_baseline = assert' (lib.hasInfix "id: j178.Prek" windowsSystemPackagesDscText) "Windows system/packages.dsc.yml must include the j178.Prek package";
 
   test_apply_runtime_bundles_prek = assert' (
     (lib.hasInfix "runtimeInputs = [" flakeText) && (lib.hasInfix "pkgs.prek" flakeText)
@@ -112,7 +112,7 @@ let
     (lib.hasInfix "cmdAutoRun" windowsUserDscText)
     && (lib.hasInfix "AutoRun" windowsUserDscText)
     && lib.all (var: lib.hasInfix "if not defined ${var}" windowsUserDscText) agentEnvVarNames
-  ) "Windows user.dsc.yml must define cmdAutoRun RegistryValue that checks all agent env vars";
+  ) "Windows user/dsc.yml must define cmdAutoRun RegistryValue that checks all agent env vars";
 
   test_zsh_agent_env_vars_complete = assert' (lib.all (
     var: lib.hasInfix "[[ -n \"\${${var}:-}\" ]] && return 0" posixShellText

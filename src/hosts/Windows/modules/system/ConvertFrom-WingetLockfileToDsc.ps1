@@ -12,7 +12,7 @@
   copied verbatim (graceful degradation).
 
 .PARAMETER ConfigPath
-  Path to the base WinGet DSC YAML (e.g. system.dsc.yml or system-packages.dsc.yml).
+  Path to the base WinGet DSC YAML (e.g. dsc.yml or packages.dsc.yml in the system/ directory).
 
 .PARAMETER LockfilePath
   Path to lockfile.json.
@@ -21,10 +21,10 @@
   Path to write the locked DSC.
 
 .EXAMPLE
-  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system.locked.dsc.yml
+  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system\dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system\dsc.locked.dsc.yml
 
 .EXAMPLE
-  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system-packages.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system-packages.locked.dsc.yml
+  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system\packages.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system\packages.locked.dsc.yml
 
 .NOTES
   Environment variables:

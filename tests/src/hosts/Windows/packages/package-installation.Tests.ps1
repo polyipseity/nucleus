@@ -4,7 +4,7 @@
 .DESCRIPTION
     Validates that all cross-host CLI tools, developer runtimes and editors,
     GUI applications, and additional WinGet packages declared in
-    system-packages.dsc.yml are installed via WinGet.
+    system/packages.dsc.yml are installed via WinGet.
 .NOTES
     Environment variables: (none)
     Exit codes: 0 on success; 1 on failure
@@ -91,9 +91,9 @@ Describe "Windows Package Installation" {
         }
     }
 
-    Context "Additional WinGet IDs declared in system-packages.dsc.yml" {
+    Context "Additional WinGet IDs declared in system/packages.dsc.yml" {
         # Keep this list synchronized with package IDs declared in
-        # src/hosts/Windows/system-packages.dsc.yml so identifier drift is caught by
+        # src/hosts/Windows/system/packages.dsc.yml so identifier drift is caught by
         # executable tests instead of silently no-oping at apply time.
         $additionalPackages = @(
             @{ id = '9NBDXK71NK08'; displayName = 'WhatsApp Beta (msstore)' }

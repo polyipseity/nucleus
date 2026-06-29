@@ -372,13 +372,13 @@ fi
 # Locked DSC validation
 printf '\n=== [%s] Locked DSC validation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
-  _dsc_system="src/hosts/Windows/system.dsc.yml"
-  _dsc_system_packages="src/hosts/Windows/system-packages.dsc.yml"
+  _dsc_system="src/hosts/Windows/system/dsc.yml"
+  _dsc_system_packages="src/hosts/Windows/system/packages.dsc.yml"
   _lockfile="src/lockfiles/lockfile.json"
   _lf_errors=0
 
   # Generate locked DSC in-memory from both system DSC files + lockfile.
-  # Merge resources from system-packages.dsc.yml into a single tree, then lock.
+  # Merge resources from system/packages.dsc.yml into a single tree, then lock.
   _locked_json=$(jq -s --argjson locked "$(jq -c '.winget // {}' "$_lockfile")" '
     { properties: { resources: (.[0].properties.resources + .[1].properties.resources) } } |
     .properties.resources |= [

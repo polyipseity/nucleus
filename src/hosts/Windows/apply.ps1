@@ -23,7 +23,7 @@
 
 .PARAMETER ConfigFiles
   Ordered list of DSC YAML filenames to apply.  Defaults to
-  @('system.dsc.yml', 'system-packages.dsc.yml').  Filenames are resolved relative to
+  @('system/dsc.yml', 'system/packages.dsc.yml').  Filenames are resolved relative to
   $ConfigDir.
 
   Per-user DSC files can be declared in users.json under each
@@ -178,7 +178,7 @@
 
 .EXAMPLE
   # Apply only the user-level DSC file:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -ConfigFiles @('user.dsc.yml')
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -ConfigFiles @('user/dsc.yml')
 
 .EXAMPLE
   # Apply while explicitly scoping secret materialization to one user:
@@ -221,7 +221,7 @@
 [CmdletBinding()]
 param(
   [string]$ConfigDir = $PSScriptRoot,
-  [string[]]$ConfigFiles = @("system.dsc.yml", "system-packages.dsc.yml"),
+  [string[]]$ConfigFiles = @("system/dsc.yml", "system/packages.dsc.yml"),
   [Alias("h")]
   [switch]$Help,
   [Parameter(Mandatory)]
@@ -400,8 +400,13 @@ foreach ($configuredUser in $userRegistry.users) {
     if ([string]::IsNullOrWhiteSpace($userConfigFile)) {
       continue
     }
-    if ($userConfigFile -notin $effectiveConfigFiles) {
-      $effectiveConfigFiles += $userConfigFile
+    # Prevent path traversal: entries must be plain filenames relative to user/.
+    if ($userConfigFile -match '[\\/]|\.\.') {
+      throw "User '$($configuredUser.name)' dscConfigFiles entry '$userConfigFile' contains path separators or '..'; entries must be plain filenames relative to the user/ directory"
+    }
+    $resolvedConfigFile = "user/$userConfigFile"
+    if ($resolvedConfigFile -notin $effectiveConfigFiles) {
+      $effectiveConfigFiles += $resolvedConfigFile
     }
   }
 }
@@ -546,7 +551,7 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
   }
 }
 
-# Materialize decrypted wallpapers ahead of DSC so user.dsc.yml can resolve an
+# Materialize decrypted wallpapers ahead of DSC so user/dsc.yml can resolve an
 # explicit active wallpaper path deterministically.
 $wallpaperOutputDir = Join-Path -Path $HOME -ChildPath "Pictures\wallpapers"
 
@@ -565,13 +570,13 @@ Remove-StaleWallpaper -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutput
 
 # Generate locked DSC from lockfile before applying.
 $lockfilePath = Join-Path -Path $PSScriptRoot -ChildPath "..\..\lockfiles\lockfile.json"
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system.locked.dsc.yml")
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system-packages.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system-packages.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/dsc.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/packages.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/packages.locked.dsc.yml")
 
 # Replace system DSC files with locked variants in effective config list.
 $effectiveConfigFiles = @($effectiveConfigFiles | ForEach-Object {
-  if ($_ -eq "system.dsc.yml") { "system.locked.dsc.yml" }
-  elseif ($_ -eq "system-packages.dsc.yml") { "system-packages.locked.dsc.yml" }
+  if ($_ -eq "system/dsc.yml") { "system/dsc.locked.dsc.yml" }
+  elseif ($_ -eq "system/packages.dsc.yml") { "system/packages.locked.dsc.yml" }
   else { $_ }
 })
 

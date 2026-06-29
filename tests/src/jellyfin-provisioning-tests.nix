@@ -33,7 +33,7 @@ let
   windowsJellyfinLibraryText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinLibrary.ps1;
   windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
   windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
-  windowsSystemPackagesText = builtins.readFile ../../src/hosts/Windows/system-packages.dsc.yml;
+  windowsSystemPackagesText = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
   jellyfinSyncScript = builtins.readFile ../../src/scripts/jellyfin-sync.sh;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
 

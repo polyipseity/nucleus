@@ -290,8 +290,8 @@ if (-not $HAS_ARGS) {
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
 if (-not $HAS_ARGS) {
-  $_dscSystem = Join-Path $RepoRoot 'src\hosts\Windows\system.dsc.yml'
-  $_dscSystemPackages = Join-Path $RepoRoot 'src\hosts\Windows\system-packages.dsc.yml'
+  $_dscSystem = Join-Path $RepoRoot 'src\hosts\Windows\system\dsc.yml'
+  $_dscSystemPackages = Join-Path $RepoRoot 'src\hosts\Windows\system\packages.dsc.yml'
   $_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
   $_lfErrors = 0
 
@@ -324,7 +324,7 @@ if (-not $HAS_ARGS) {
   $_dscPkgYaml = Get-Content $_dscSystemPackages -Raw
   $_dsc = ConvertTo-HashtableDeep ($_dscYaml | ConvertFrom-Yaml)
   $_dscPkg = ConvertTo-HashtableDeep ($_dscPkgYaml | ConvertFrom-Yaml)
-  # Merge package resources from system-packages.dsc.yml into the main DSC tree.
+  # Merge package resources from system/packages.dsc.yml into the main DSC tree.
   $_dsc.properties.resources += $_dscPkg.properties.resources
 
   foreach ($_resource in $_dsc.properties.resources) {
