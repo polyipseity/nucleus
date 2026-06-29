@@ -46,11 +46,10 @@ let
         # Compile to a temp dir and copy the result to $out.
         build_dir="$(mktemp -d)"
         /usr/bin/osacompile -l AppleScript -o "$build_dir/NucleusManual.app" "$as_src"
-        mkdir -p "$out"
-        cp -R "$build_dir/NucleusManual.app" "$out/"
-        rm -rf "$build_dir"
 
-        plist="$out/NucleusManual.app/Contents/Info.plist"
+        # Modify Info.plist, then re-sign (osacompile signs the bundle, but
+        # PlistBuddy invalidates the signature).
+        plist="$build_dir/NucleusManual.app/Contents/Info.plist"
         /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.nucleus.OpenNucleusManual" "$plist"
         /usr/libexec/PlistBuddy -c "Set :CFBundleName Nucleus Manual" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices array" "$plist"
@@ -60,6 +59,15 @@ let
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMessage string open" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes array" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes:0 string NSFilenamesPboardType" "$plist"
+        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes array" "$plist"
+        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes:0 string public.folder" "$plist"
+        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes:1 string public.data" "$plist"
+
+        /usr/bin/codesign --force -s - "$build_dir/NucleusManual.app"
+
+        mkdir -p "$out"
+        cp -R "$build_dir/NucleusManual.app" "$out/"
+        rm -rf "$build_dir"
       '';
 in
 {
@@ -82,6 +90,6 @@ in
     cp -R "$store_path" "$app_dir/"
 
     LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
-    "$LSREGISTER" -R -f "$app_path" 2>/dev/null || true
+    "$LSREGISTER" -R -f "$app_path" || true
   '';
 }
