@@ -24,7 +24,7 @@
 - Validate changed files before finishing work:
   - Nix syntax/eval: `nix-instantiate --parse <file.nix>` or `nix flake check` from `src/`
   - PowerShell parse checks: `nix shell nixpkgs#powershell -c pwsh ...`
-  - WinGet DSC what-if: `winget configure --what-if .\src\hosts\Windows\system.dsc.yml` and `winget configure --what-if .\src\hosts\Windows\user.dsc.yml`
+  - WinGet DSC what-if: `winget configure --what-if .\src\hosts\Windows\system.dsc.yml`, `.\src\hosts\Windows\system-packages.dsc.yml`, `.\src\hosts\Windows\user.dsc.yml`, `.\src\hosts\Windows\user-env.dsc.yml`, `.\src\hosts\Windows\user-context.dsc.yml`
 - All `nucleus-*` commands are expected to run from any directory: `nucleus-ai-sync`, `nucleus-apply`, `nucleus-bootstrap`, `nucleus-bump-lockfile`, `nucleus-check-pwsh`, `nucleus-check-sh`, `nucleus-cloud-setup`, `nucleus-gc`, `nucleus-health-check`, `nucleus-replica-reset`, `nucleus-replica-sync`, `nucleus-update`, `nucleus-vm-setup`.
 - Known upstream caveat: `builtins.derivation`/`options.json` contextless-source warning is upstream, not a local regression unless concrete local breakage is shown.
 

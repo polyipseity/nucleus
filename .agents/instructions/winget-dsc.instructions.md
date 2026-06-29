@@ -8,8 +8,11 @@ applyTo: "src/hosts/Windows/**/*.yml"
 
 ## File location and purpose
 
-- `src/hosts/Windows/system.dsc.yml` contains pre-provision system baseline resources (packages, machine settings, machine registry).
-- `src/hosts/Windows/user.dsc.yml` contains post-provision user baseline resources (folder layout, user registry, user environment variables).
+- `src/hosts/Windows/system.dsc.yml` contains pre-provision system baseline resources (machine settings, system registry, scheduled tasks, firewall rules).
+- `src/hosts/Windows/system-packages.dsc.yml` contains all WinGet-managed system-level package installations.
+- `src/hosts/Windows/user.dsc.yml` contains post-provision user baseline resources (wallpaper, Explorer appearance, lock settings, shell autorun).
+- `src/hosts/Windows/user-env.dsc.yml` contains user environment variable declarations.
+- `src/hosts/Windows/user-context.dsc.yml` contains right-click context menu registry entries.
 - They are applied in-order by `src/hosts/Windows/apply.ps1`.
 - Reusable Windows helper logic is loaded from `src/hosts/Windows/modules/*.ps1`; DSC files should remain state declarations rather than script logic.
 
@@ -64,7 +67,7 @@ Use `PSDscResources/Script` only for imperative steps that cannot be expressed b
 
 **When PATH is not guaranteed during DSC execution:** DSC resources run in a fresh PowerShell session where `$env:PATH` may not include user-level tool directories (for example `~\.cargo\bin` from a prior `rustup init` call). Any `PSDscResources/Script` block that invokes a user-installed binary must prepend the relevant path explicitly in `SetScript` and `TestScript`. If that cannot be done reliably, do not add the resource — document the gap and rely on a graceful probe in `apply.ps1` or a `scripts/gc.ps1`-style script instead.
 
-**cargo-cache is managed via cargo-binstall, not `system.dsc.yml`:** `cargo-cache` has no WinGet package ID and is not in Scoop. It is installed declaratively by `Invoke-CargoBinstallSetup` (in `src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1`) which runs after the DSC step in `apply.ps1`. `scripts/gc.ps1` probes for the binary gracefully and skips pruning when it is absent.
+**cargo-cache is managed via cargo-binstall, not `system-packages.dsc.yml`:** `cargo-cache` has no WinGet package ID and is not in Scoop. It is installed declaratively by `Invoke-CargoBinstallSetup` (in `src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1`) which runs after the DSC step in `apply.ps1`. `scripts/gc.ps1` probes for the binary gracefully and skips pruning when it is absent.
 
 ## PSDscResources/Script resource
 
@@ -121,10 +124,10 @@ Do **not** use a Script block for operations where PATH is unreliable, state is 
 
 When adding a new tool or capability, choose the package manager in this order:
 
-1. **WinGet (`system.dsc.yml`)** — preferred for any package with a WinGet ID. Declarative, `--what-if`-capable, and centrally tracked.
+1. **WinGet (`system-packages.dsc.yml`)** — preferred for any package with a WinGet ID. Declarative, `--what-if`-capable, and centrally tracked.
 2. **Scoop (`src/hosts/Windows/modules/Invoke-ScoopSetup.ps1`)** — for portable CLI utilities that have no WinGet ID but exist in a Scoop bucket. Scoop is the user-space fallback: it requires no admin rights and installs to `%USERPROFILE%\scoop\`.
 3. **cargo binstall (`src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1`)** — for Rust CLI tools not available in WinGet or Scoop. cargo-binstall downloads prebuilt binaries without requiring a local Rust toolchain.
-4. **bun (`src/hosts/Windows/modules/Invoke-BunSetup.ps1`)** — last resort for JS/npm-only tools absent from WinGet, Scoop, and cargo-binstall. `bun install -g` places binaries in `%USERPROFILE%\.bun\bin`. Bun itself is installed via WinGet (`Oven-sh.Bun` in `system.dsc.yml`).
+4. **bun (`src/hosts/Windows/modules/Invoke-BunSetup.ps1`)** — last resort for JS/npm-only tools absent from WinGet, Scoop, and cargo-binstall. `bun install -g` places binaries in `%USERPROFILE%\.bun\bin`. Bun itself is installed via WinGet (`Oven-sh.Bun` in `system-packages.dsc.yml`).
 
 The equivalent hierarchy on POSIX hosts is: `nixpkgs > cargo binstall > bun`.
 
@@ -136,7 +139,7 @@ Document any departure from this order with a short WHY comment explaining why a
 
 Scoop is the user-space package manager for portable CLI utilities that have no WinGet package ID. It installs to `%USERPROFILE%\scoop\` without requiring admin rights. Use Scoop when a tool is absent from WinGet but available in a Scoop bucket (e.g. `cargo-binstall` from the `main` bucket).
 
-### Declaring Scoop in system.dsc.yml
+### Declaring Scoop in system-packages.dsc.yml
 
 Install Scoop itself via WinGet (package ID `Scoop.Scoop`). Scoop requires `Git.Git` for bucket management; ensure it appears in the packages list. Use `dependsOn` to enforce ordering:
 
@@ -198,14 +201,17 @@ See [Imperative fallback safety (Windows)](cross-host-feature-parity.instruction
 - Test the manifest dry-run on the target machine with:
   ```powershell
   winget configure --what-if .\src\hosts\windows\system.dsc.yml
+  winget configure --what-if .\src\hosts\windows\system-packages.dsc.yml
   winget configure --what-if .\src\hosts\windows\user.dsc.yml
+  winget configure --what-if .\src\hosts\windows\user-env.dsc.yml
+  winget configure --what-if .\src\hosts\windows\user-context.dsc.yml
   ```
 - Full application requires an elevated PowerShell session and `--accept-configuration-agreements`.
 - The `scripts/bootstrap.ps1` wrapper passes both flags automatically.
 
 ## What to avoid
 
-- Do not add duplicate entries for tools already managed by another Windows declarative layer. In this repository, `system.dsc.yml` is the canonical Windows package baseline and should be kept intentionally in parity with shared host policy.
+- Do not add duplicate entries for tools already managed by another Windows declarative layer. In this repository, `system-packages.dsc.yml` is the canonical WinGet package baseline, complemented by `system.dsc.yml` for machine settings. Keep both files intentionally in parity with shared host policy.
 - Do not hard-code version strings in `settings.id` unless pinning to a specific release is intentional; WinGet resolves the latest by default.
 - Do not leave commented-out resources in the file; remove them or track intent in a separate note.
 

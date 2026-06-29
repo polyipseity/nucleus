@@ -155,11 +155,14 @@ Invoke-Pester -Path tests/src/hosts/Windows/packages/package-installation.Tests.
 Before applying DSC changes, preview them without modifying system state:
 
 ```powershell
-# Preview system-level changes
+# Preview system-level changes (baseline + packages)
 winget configure --what-if .\src\hosts\Windows\system.dsc.yml
+winget configure --what-if .\src\hosts\Windows\system-packages.dsc.yml
 
-# Preview user-level changes
+# Preview user-level changes (settings, env vars, context menu)
 winget configure --what-if .\src\hosts\Windows\user.dsc.yml
+winget configure --what-if .\src\hosts\Windows\user-env.dsc.yml
+winget configure --what-if .\src\hosts\Windows\user-context.dsc.yml
 ```
 
 ---

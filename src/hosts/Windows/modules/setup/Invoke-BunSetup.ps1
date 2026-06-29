@@ -27,7 +27,7 @@ function Invoke-BunSetup {
                                          from WinGet, Scoop, and cargo-binstall;
                                          bun is the only viable install tier
 
-    Requires bun to be on PATH (installed from WinGet by system.dsc.yml).
+    Requires bun to be on PATH (installed from WinGet by system-packages.dsc.yml).
     Prepends %USERPROFILE%\.bun\bin to PATH internally so bun-installed
     binaries are accessible in subsequent steps of the same apply session.
 

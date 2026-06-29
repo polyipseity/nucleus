@@ -33,7 +33,7 @@ let
   windowsJellyfinLibraryText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinLibrary.ps1;
   windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
   windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
-  windowsSystemText = builtins.readFile ../../src/hosts/Windows/system.dsc.yml;
+  windowsSystemPackagesText = builtins.readFile ../../src/hosts/Windows/system-packages.dsc.yml;
   jellyfinSyncScript = builtins.readFile ../../src/scripts/jellyfin-sync.sh;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
 
@@ -76,9 +76,9 @@ let
     !containsRegex "jellyfin-media-server" linuxText && !containsRegex "jellyfin-media-server" macosText
   ) "Per-user Jellyfin units must not exist in shared linux.nix or macos.nix modules";
 
-  test_windows_installs_jellyfin_server = assert' (containsRegex ''id: Jellyfin\.Server'' windowsSystemText) "Windows DSC must install Jellyfin.Server via WinGet";
+  test_windows_installs_jellyfin_server = assert' (containsRegex ''id: Jellyfin\.Server'' windowsSystemPackagesText) "Windows DSC must install Jellyfin.Server via WinGet";
 
-  test_windows_installs_caddy_for_https_proxy = assert' (containsRegex ''id: CaddyServer\.Caddy'' windowsSystemText) "Windows DSC must install Caddy for Jellyfin HTTPS proxy";
+  test_windows_installs_caddy_for_https_proxy = assert' (containsRegex ''id: CaddyServer\.Caddy'' windowsSystemPackagesText) "Windows DSC must install Caddy for Jellyfin HTTPS proxy";
 
   test_windows_wires_https_proxy_module = assert' (
     containsRegex "Sync-CaddyService" windowsApplyText

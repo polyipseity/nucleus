@@ -79,7 +79,7 @@ When a new `home.activation` entry is added to `agents.nix`, update the deps lis
 ## Windows apply order
 
 ```
-WinGet DSC (system.dsc.yml)
+WinGet DSC (all .dsc.yml files)
   → Invoke-BunSetup        (bun global packages incl. clawhub)
   → Sync-AgentsSkills      (bundled skill symlinks)
   → Sync-AgentsClawHubSkills  (fetched skill downloads)

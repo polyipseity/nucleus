@@ -11,7 +11,7 @@ function Invoke-UvSetup {
 
     Mirrors the installUvTools POSIX activation in agents.nix.
 
-    Requires uv to be on PATH (installed from WinGet by system.dsc.yml).
+    Requires uv to be on PATH (installed from WinGet by system-packages.dsc.yml).
     Prepends %USERPROFILE%\.local\bin to PATH internally so uv-installed
     binaries are accessible in subsequent steps of the same apply session.
 

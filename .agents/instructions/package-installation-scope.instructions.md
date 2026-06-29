@@ -31,14 +31,14 @@ applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, sr
 
 ## Cross-Host Package Manager Hierarchy
 
-| Scope                       | macOS (nix-darwin)                                    | NixOS                                      | Windows                                  |
-| --------------------------- | ----------------------------------------------------- | ------------------------------------------ | ---------------------------------------- |
-| **System packages**         | `nixpkgs` via nix-darwin `environment.systemPackages` | `nixpkgs` via NixOS system config          | WinGet DSC (`system.dsc.yml`)            |
-| **User-level CLI tools**    | `nixpkgs` via Home Manager `home.packages`            | `nixpkgs` via Home Manager `home.packages` | WinGet DSC (`user.dsc.yml`) + Scoop      |
-| **Development tools**       | devShell (Nix flake)                                  | devShell (Nix flake)                       | devShell (Nix flake) OR managed fallback |
-| **Managed global packages** | `bun install -g` (JS tools only)                      | `bun install -g` (JS tools only)           | `bun install -g` (JS tools only)         |
-| **Prebuilt binaries**       | N/A                                                   | N/A                                        | `cargo-binstall`, Scoop                  |
-| **Python tools**            | `uv tool install` (isolated venvs)                    | `uv tool install` (isolated venvs)         | `uv tool install` (isolated venvs)       |
+| Scope                       | macOS (nix-darwin)                                    | NixOS                                      | Windows                                                 |
+| --------------------------- | ----------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------- |
+| **System packages**         | `nixpkgs` via nix-darwin `environment.systemPackages` | `nixpkgs` via NixOS system config          | WinGet DSC (`system-packages.dsc.yml`)                  |
+| **User-level CLI tools**    | `nixpkgs` via Home Manager `home.packages`            | `nixpkgs` via Home Manager `home.packages` | WinGet DSC (`user.dsc.yml`, `user-env.dsc.yml`) + Scoop |
+| **Development tools**       | devShell (Nix flake)                                  | devShell (Nix flake)                       | devShell (Nix flake) OR managed fallback                |
+| **Managed global packages** | `bun install -g` (JS tools only)                      | `bun install -g` (JS tools only)           | `bun install -g` (JS tools only)                        |
+| **Prebuilt binaries**       | N/A                                                   | N/A                                        | `cargo-binstall`, Scoop                                 |
+| **Python tools**            | `uv tool install` (isolated venvs)                    | `uv tool install` (isolated venvs)         | `uv tool install` (isolated venvs)                      |
 
 ---
 
@@ -207,7 +207,7 @@ home.packages = with pkgs; [
 **WinGet DSC** (Windows):
 
 ```yaml
-# src/hosts/Windows/system.dsc.yml or user.dsc.yml
+# src/hosts/Windows/system-packages.dsc.yml or user.dsc.yml
 - name: Install ripgrep via WinGet
   resource: Microsoft.WinGet.DSC/WinGetPackage
   properties:

@@ -23,13 +23,13 @@
 
 .PARAMETER ConfigFiles
   Ordered list of DSC YAML filenames to apply.  Defaults to
-  @('system.dsc.yml', 'user.dsc.yml').  Filenames are resolved relative to
+  @('system.dsc.yml', 'system-packages.dsc.yml').  Filenames are resolved relative to
   $ConfigDir.
 
-  Additional per-user DSC files can be declared in users.json under each
+  Per-user DSC files can be declared in users.json under each
   user's dscConfigFiles array.  apply.ps1 appends those files for every user
   listed in -Users (de-duplicated, preserving order) so each managed user can
-  extend the declarative DSC set without editing script code.
+  declare their own user-level DSC configs without editing script code.
 
 .PARAMETER ModuleDir
   Path to the directory containing one-function Windows helper modules.
@@ -221,7 +221,7 @@
 [CmdletBinding()]
 param(
   [string]$ConfigDir = $PSScriptRoot,
-  [string[]]$ConfigFiles = @("system.dsc.yml", "system-packages.dsc.yml", "user.dsc.yml", "user-env.dsc.yml", "user-context.dsc.yml"),
+  [string[]]$ConfigFiles = @("system.dsc.yml", "system-packages.dsc.yml"),
   [Alias("h")]
   [switch]$Help,
   [Parameter(Mandatory)]

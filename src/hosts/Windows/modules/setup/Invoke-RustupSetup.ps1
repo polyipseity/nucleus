@@ -14,7 +14,7 @@ function Invoke-RustupSetup {
     component before the first dash, so "stable-x86_64-pc-windows-msvc"
     has channel "stable".
 
-    Requires rustup to be on PATH (installed from WinGet by system.dsc.yml).
+    Requires rustup to be on PATH (installed from WinGet by system-packages.dsc.yml).
 
   .EXAMPLE
     Invoke-RustupSetup

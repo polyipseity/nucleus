@@ -33,9 +33,9 @@ sudo nixos-rebuild switch --flake ./src#NixOS
 
 ```powershell
 .\src\hosts\Windows\apply.ps1
-# or directly
-winget configure .\src\hosts\Windows\system.dsc.yml
-winget configure .\src\hosts\Windows\user.dsc.yml
+# or directly with individual config files
+winget configure .\src\hosts\Windows\system.dsc.yml .\src\hosts\Windows\system-packages.dsc.yml
+winget configure .\src\hosts\Windows\user.dsc.yml .\src\hosts\Windows\user-env.dsc.yml .\src\hosts\Windows\user-context.dsc.yml
 ```
 
 ## Notes

@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-  Generate system-locked.dsc.yml by merging version pins from lockfile.json into system.dsc.yml.
+  Generate a locked DSC YAML by merging version pins from lockfile.json into a WinGet DSC file.
 
 .DESCRIPTION
-  Reads the lockfile.json winget section and the source system.dsc.yml,
+  Reads the lockfile.json winget section and the source WinGet DSC YAML,
   injects `version` fields into each Microsoft.WinGet.Client/Package resource
   whose settings.id and source: winget match a lockfile entry.
   Packages not in the lockfile are left unmodified.
@@ -12,7 +12,7 @@
   copied verbatim (graceful degradation).
 
 .PARAMETER ConfigPath
-  Path to the base WinGet DSC YAML (system.dsc.yml).
+  Path to the base WinGet DSC YAML (e.g. system.dsc.yml or system-packages.dsc.yml).
 
 .PARAMETER LockfilePath
   Path to lockfile.json.
@@ -22,6 +22,9 @@
 
 .EXAMPLE
   ConvertFrom-WingetLockfileToDsc -ConfigPath .\system.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system-locked.dsc.yml
+
+.EXAMPLE
+  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system-packages.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system-packages-locked.dsc.yml
 
 .NOTES
   Environment variables:

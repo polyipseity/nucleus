@@ -4,7 +4,7 @@ let
 
   coreText = builtins.readFile ../../src/modules/core.nix;
   nixosDesktopText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
-  windowsSystemText = builtins.readFile ../../src/hosts/Windows/system.dsc.yml;
+  windowsSystemPackagesText = builtins.readFile ../../src/hosts/Windows/system-packages.dsc.yml;
 
   inherit (import ../lib.nix) assert';
 
@@ -16,7 +16,7 @@ let
 
   test_nixos_installs_picard = assert' (containsRegex ''\bpicard\b'' nixosDesktopText) "NixOS desktop package list must include picard";
 
-  test_windows_installs_picard = assert' (containsRegex ''id: MusicBrainz\.Picard'' windowsSystemText) "Windows system.dsc.yml must install MusicBrainz.Picard";
+  test_windows_installs_picard = assert' (containsRegex ''id: MusicBrainz\.Picard'' windowsSystemPackagesText) "Windows system-packages.dsc.yml must install MusicBrainz.Picard";
 
   allTests = [
     test_macos_routes_picard_to_homebrew

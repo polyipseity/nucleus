@@ -50,7 +50,7 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
   - what files act as the source of truth
   - what should be avoided when the stack is only partially initialized
 - When specific identifiers/settings are not covered by executable validation (for example app IDs, bundle IDs, launch labels, registry keys, env-var names, or preference domains), require inline source citations adjacent to those settings so reviewers can verify each one independently.
-- Treat syntax validation as mandatory: always run at least one syntax/parse check for each changed file type before concluding. Prefer repository-defined commands (for example `nix-instantiate --parse <file.nix>`, `nix flake check` from `src/`, `nix shell nixpkgs#powershell -c pwsh ...`, and `winget configure --what-if .\src\hosts\windows\system.dsc.yml` with `winget configure --what-if .\src\hosts\windows\user.dsc.yml`).
+- Treat syntax validation as mandatory: always run at least one syntax/parse check for each changed file type before concluding. Prefer repository-defined commands (for example `nix-instantiate --parse <file.nix>`, `nix flake check` from `src/`, `nix shell nixpkgs#powershell -c pwsh ...`, and `winget configure --what-if .\src\hosts\windows\system.dsc.yml` / `winget configure --what-if .\src\hosts\windows\system-packages.dsc.yml` / `winget configure --what-if .\src\hosts\windows\user.dsc.yml` / `winget configure --what-if .\src\hosts\windows\user-env.dsc.yml` / `winget configure --what-if .\src\hosts\windows\user-context.dsc.yml`).
 - When no runnable validation exists yet, say that explicitly and point to the files that would need to be added before validation can be automated.
 
 ## What to avoid

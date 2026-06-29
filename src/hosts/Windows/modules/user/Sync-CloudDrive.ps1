@@ -18,8 +18,8 @@
   $env:RCLONE_CONFIG_PASS from the secrets file and invokes rclone mount.
 
   Prerequisites (one-time manual steps):
-    1. WinFsp installed (WinFsp.WinFsp via WinGet — declared in system.dsc.yml)
-    2. rclone installed (Rclone.Rclone via WinGet — declared in system.dsc.yml)
+    1. WinFsp installed (WinFsp.WinFsp via WinGet — declared in system-packages.dsc.yml)
+    2. rclone installed (Rclone.Rclone via WinGet — declared in system-packages.dsc.yml)
     3. rclone remotes configured: run `rclone config` for each provider
 
 .PARAMETER UserConfig

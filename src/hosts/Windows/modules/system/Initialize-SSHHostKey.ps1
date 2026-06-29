@@ -76,14 +76,16 @@ function Initialize-SSHHostKey {
 
   $sshdService = Get-Service -Name 'sshd' -ErrorAction SilentlyContinue
   if ($null -eq $sshdService) {
-    # sshd not yet installed: advisory warning only.  WinGet DSC
-    # (system.dsc.yml) installs OpenSSH Server later in this apply run.
-    # Sync-OpenSSHServer then starts the service and host keys are
-    # generated; the trailing Register-NucleusHostAgeKey call completes
-    # registration in the same run.
+    # sshd not yet installed: advisory warning only.  Initialize-SSHHostKey
+    # runs before DSC and Sync-OpenSSHServer on each apply.  If sshd is absent
+    # (fresh machine without the OpenSSH Server optional feature), the host key
+    # cannot be generated yet.  Sync-OpenSSHServer (called later in this run)
+    # will skip gracefully when the service is missing, and the trailing
+    # Register-HostAgeKey call completes registration on a future apply once
+    # sshd is available.
     Write-Warning ("SSH: sshd service not installed; SSH host key cannot be " +
-                   "generated yet.  Keys will be generated when Sync-OpenSSHServer " +
-                   "starts sshd after DSC installs OpenSSH.")
+                   "generated yet.  Keys will be generated when sshd is available " +
+                   "(enable the OpenSSH Server Windows optional feature).")
     return
   }
 

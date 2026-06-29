@@ -41,7 +41,7 @@ Typography is also a parity category: prefer a shared open-source font baseline 
 ## Where to implement
 
 - **POSIX shared behavior** (applies to both macOS and NixOS): centralize in `src/modules/*.nix`.
-- **Windows declarative state**: prefer `src/hosts/Windows/system.dsc.yml` or `src/hosts/Windows/user.dsc.yml` when a WinGet DSC resource can represent it.
+- **Windows declarative state**: prefer `src/hosts/Windows/system.dsc.yml`, `src/hosts/Windows/system-packages.dsc.yml`, `src/hosts/Windows/user.dsc.yml`, `src/hosts/Windows/user-env.dsc.yml`, or `src/hosts/Windows/user-context.dsc.yml` when a WinGet DSC resource can represent it.
 - **Windows reusable imperative logic**: keep in `src/hosts/Windows/modules/*.ps1`; keep `src/hosts/Windows/apply.ps1` orchestration-only.
 - If a Windows parity feature cannot be represented declaratively, implement it in a reusable module with an explicit **cleanup/deconfiguration path** so the feature can be safely disabled later.
 
@@ -67,8 +67,8 @@ When adding a new Windows service module, always implement both the enable and d
 
 ## Package parity rules
 
-- When adding a cross-host CLI tool to `src/modules/core.nix`, check whether a Windows equivalent should be added to `src/hosts/Windows/system.dsc.yml`.
-- When adding a Windows CLI package to `system.dsc.yml`, check whether POSIX hosts should also receive it through `core.nix`.
+- When adding a cross-host CLI tool to `src/modules/core.nix`, check whether a Windows equivalent should be added to `src/hosts/Windows/system-packages.dsc.yml`.
+- When adding a Windows CLI package to `system-packages.dsc.yml`, check whether POSIX hosts should also receive it through `core.nix`.
 - If parity is intentionally not applied, document why in code comments and in the change summary.
 
 ## Secrets and wallpaper parity rules
@@ -109,16 +109,16 @@ If an exception hides information or controls (for example auto-hide, taskbar/me
 
 Timing values are specified directly at their point of use. Find or change a retention interval in the relevant source file:
 
-| Category                     | Source files                                                                                                   |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Nix store GC, HM expiry      | `src/modules/posix-base.nix`, `scripts/gc.sh`                                                                  |
-| macOS timers & defaults      | `src/modules/macos.nix`, `src/hosts/MacBook/defaults.nix`                                                      |
-| Linux timers & timeouts      | `src/modules/linux.nix`, `src/modules/posix-security.nix`                                                      |
-| Windows schedules & timeouts | `src/hosts/Windows/system.dsc.yml`, `src/hosts/Windows/user.dsc.yml`, `src/hosts/Windows/modules/system/*.ps1` |
-| Cloud drive caches           | `src/modules/cloud-drives.nix`                                                                                 |
-| AI/LLM timeouts              | `scripts/ai-sync.sh`, `scripts/gc.sh`                                                                          |
-| Declarative-diff GC items    | `scripts/gc.sh`, `scripts/gc.ps1`                                                                              |
-| App-level timeouts           | `src/modules/editors.nix`, `src/modules/configs/picard/Picard.ini`                                             |
+| Category                     | Source files                                                                                                                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nix store GC, HM expiry      | `src/modules/posix-base.nix`, `scripts/gc.sh`                                                                                                                                                                                               |
+| macOS timers & defaults      | `src/modules/macos.nix`, `src/hosts/MacBook/defaults.nix`                                                                                                                                                                                   |
+| Linux timers & timeouts      | `src/modules/linux.nix`, `src/modules/posix-security.nix`                                                                                                                                                                                   |
+| Windows schedules & timeouts | `src/hosts/Windows/system.dsc.yml`, `src/hosts/Windows/system-packages.dsc.yml`, `src/hosts/Windows/user.dsc.yml`, `src/hosts/Windows/user-env.dsc.yml`, `src/hosts/Windows/user-context.dsc.yml`, `src/hosts/Windows/modules/system/*.ps1` |
+| Cloud drive caches           | `src/modules/cloud-drives.nix`                                                                                                                                                                                                              |
+| AI/LLM timeouts              | `scripts/ai-sync.sh`, `scripts/gc.sh`                                                                                                                                                                                                       |
+| Declarative-diff GC items    | `scripts/gc.sh`, `scripts/gc.ps1`                                                                                                                                                                                                           |
+| App-level timeouts           | `src/modules/editors.nix`, `src/modules/configs/picard/Picard.ini`                                                                                                                                                                          |
 
 Runtime overrides via `--expiry`/`NUCLEUS_GC_EXPIRY` etc. have precedence: CLI flag > per-tool env var > master flag/env > Nix config default > `7d`. See each source file for available flags.
 
