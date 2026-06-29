@@ -91,5 +91,13 @@ in
 
     LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
     "$LSREGISTER" -R -f "$app_path" || true
+
+    # Enable the service in NSServicesStatus so it appears in the Services
+    # menu without manual toggling in System Settings > Extensions > Services.
+    # Service key format: "<NSBundleIdentifier> - <NSMenuItem.default> - <NSMessage>"
+    enablement_key="com.nucleus.OpenNucleusManual - open nucleus manual - open"
+    defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
+      '<dict><key>enabled_context_menu</key><true/><key>enabled_services_menu</key><true/></dict>'
+    defaults read pbs > /dev/null || true
   '';
 }
