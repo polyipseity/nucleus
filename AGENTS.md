@@ -39,6 +39,7 @@
 - Keep POSIX shared behavior in shared modules, not duplicated per-host.
 - Design for cross-host parity first; see `.agents/instructions/cross-host-feature-parity.instructions.md` for the full policy.
 - Sort unordered lists/blocks alphabetically; preserve semantic/load order where required.
+- Use sentence case for all user-facing UI labels (right-click menus, dock/folder/script labels, visible text); see `.agents/instructions/ui-label-naming.instructions.md`.
 - Use `.yml` for YAML files (except required `.sops.yaml`).
 - Do not hide meaningful errors (`2>/dev/null`, unconditional `|| true`, `-ErrorAction SilentlyContinue`) unless failure is expected, explicitly justified, and still checked.
 - Keep canonical hostnames and display names aligned: `MacBook`, `NixOS`, `Windows`.
