@@ -6,6 +6,7 @@
   home-manager.sharedModules = [
     ./cloud-drives.nix
     { nucleus.hostManualFile = "src/hosts/MacBook/MANUAL.md"; }
+    ./services.nix
     ./vms.nix
   ];
 
