@@ -605,7 +605,35 @@ in
         SUAutomaticallyUpdate = false;
       };
 
-      # iTerm2 configuration lives in src/modules/iterm2.nix.
+      # iTerm2 terminal emulator app-level preferences (not per-profile settings).
+      #
+      # Source: https://iterm2.com/documentation.html
+      "com.googlecode.iterm2" = {
+        # Allow clipboard access from terminal applications.
+        "AllowClipboardAccess" = true;
+        # Bootstrap daemon: supports shell integration without requiring a full
+        # app launch.
+        "BootstrapDaemon" = true;
+        # Enable "Open in iTerm" Finder right-click context menu.
+        "EnableFindersService" = true;
+        # Pre-answer the first-launch "may we show you tips?" permission prompt
+        # so iTerm2 skips that dialog on a fresh provision and goes straight to
+        # showing tips.  Simulates the state where the user already answered yes.
+        "NoSyncPermissionToShowTip" = true;
+        "NoSyncTipOfTheDay" = true;
+        # Blocks other processes from reading keystrokes.
+        "Secure Input" = true;
+        # Disable in-app update checks; updates are managed declaratively.
+        "SUCheckAtStartup" = false;
+        "SUEnableAutomaticChecks" = false;
+        # Suppress the "Warn about short-lived sessions" dialog for each profile.
+        # The NeverWarnAboutShortLivedSessions_<GUID> key silences the iTermWarning
+        # that fires when a session ends within shortLivedSessionDuration (default 3s).
+        # Source: PTYSession.m _maybeWarnAboutShortLivedSessions
+        "NeverWarnAboutShortLivedSessions_743F1344-118A-4E38-8CB0-D7319D34EF8C" = true;
+        # Suppress the secure-keyboard-entry warning when opening a command.
+        "WarnAboutSecureKeyboardInputWithOpenCommand" = false;
+      };
 
       # Amphetamine: declaratively enable the Power Protect install toggle.
       # WHY partial declarative only: upstream requires users to place the

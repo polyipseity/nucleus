@@ -1,8 +1,8 @@
 # iTerm2 terminal emulator configuration.
 #
-# Houses all iTerm2-specific settings: NSUserDefaults keys (written via
-# nix-darwin's system.defaults.CustomUserPreferences), shell integration
-# script, and zsh initContent sourcing guard.
+# Houses iTerm2 shell integration script and zsh initContent sourcing guard.
+# NSUserDefaults keys are in src/hosts/MacBook/defaults.nix (darwin context,
+# where system.defaults.CustomUserPreferences is available).
 #
 # Source: https://iterm2.com/documentation.html
 { lib, pkgs, ... }:
@@ -19,37 +19,6 @@ let
   };
 in
 lib.mkIf pkgs.stdenv.isDarwin {
-  # ---------------------------------------------------------------------------
-  # NSUserDefaults keys written to the com.googlecode.iterm2 domain.
-  # These control app-level preferences (not per-profile settings).
-  # ---------------------------------------------------------------------------
-  system.defaults.CustomUserPreferences."com.googlecode.iterm2" = {
-    # Allow clipboard access from terminal applications.
-    "AllowClipboardAccess" = true;
-    # Bootstrap daemon: supports shell integration without requiring a full
-    # app launch.
-    "BootstrapDaemon" = true;
-    # Enable "Open in iTerm" Finder right-click context menu.
-    "EnableFindersService" = true;
-    # Pre-answer the first-launch "may we show you tips?" permission prompt
-    # so iTerm2 skips that dialog on a fresh provision and goes straight to
-    # showing tips.  Simulates the state where the user already answered yes.
-    "NoSyncPermissionToShowTip" = true;
-    "NoSyncTipOfTheDay" = true;
-    # Blocks other processes from reading keystrokes.
-    "Secure Input" = true;
-    # Disable in-app update checks; updates are managed declaratively.
-    "SUCheckAtStartup" = false;
-    "SUEnableAutomaticChecks" = false;
-    # Suppress the "Warn about short-lived sessions" dialog for each profile.
-    # The NeverWarnAboutShortLivedSessions_<GUID> key silences the iTermWarning
-    # that fires when a session ends within shortLivedSessionDuration (default 3s).
-    # Source: PTYSession.m _maybeWarnAboutShortLivedSessions
-    "NeverWarnAboutShortLivedSessions_743F1344-118A-4E38-8CB0-D7319D34EF8C" = true;
-    # Suppress the secure-keyboard-entry warning when opening a command.
-    "WarnAboutSecureKeyboardInputWithOpenCommand" = false;
-  };
-
   home.file = {
     # Place the pinned iTerm2 zsh shell integration script at the well-known
     # path that the sourcing guard in programs.zsh.initContent expects.
