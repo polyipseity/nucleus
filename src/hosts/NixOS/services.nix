@@ -1,6 +1,6 @@
 # NixOS/services.nix — Right-click context menu entries for Linux file managers.
 #
-# Adds "Open Nucleus Manual" to Nautilus (GNOME) and Dolphin (KDE) context
+# Adds "open nucleus manual" to Nautilus (GNOME) and Dolphin (KDE) context
 # menus. Both delegate to a shared script that resolves the host manual path
 # via NUCLEUS_REPO_ROOT at runtime and opens it with xdg-open.
 {
@@ -31,13 +31,13 @@ lib.mkIf pkgs.stdenv.isLinux {
       executable = true;
     };
 
-    # Nautilus: right-click → Scripts → Open Nucleus Manual
-    ".local/share/nautilus/scripts/Open Nucleus Manual" = {
+    # Nautilus: right-click → Scripts → open nucleus manual
+    ".local/share/nautilus/scripts/open nucleus manual" = {
       source = openManualScript;
       executable = true;
     };
 
-    # Dolphin: right-click → Open Nucleus Manual
+    # Dolphin: right-click → open nucleus manual
     ".local/share/kio/servicemenus/nucleus-manual.desktop" = {
       text = ''
         [Desktop Entry]
@@ -47,7 +47,7 @@ lib.mkIf pkgs.stdenv.isLinux {
         Actions=openNucleusManual
 
         [Desktop Action openNucleusManual]
-        Name=Open Nucleus Manual
+        Name=open nucleus manual
         Exec=${openManualScript}
         Icon=help-contents
       '';

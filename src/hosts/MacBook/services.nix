@@ -54,7 +54,7 @@ let
         /usr/libexec/PlistBuddy -c "Add :NSServices array" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0 dict" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem dict" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem:default string Open Nucleus Manual" "$plist"
+        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem:default string open nucleus manual" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMessage string open" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes array" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes:0 string public.folder" "$plist"
