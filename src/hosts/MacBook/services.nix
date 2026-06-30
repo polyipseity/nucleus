@@ -96,8 +96,8 @@ in
     # menu without manual toggling in System Settings > Extensions > Services.
     # Service key format: "<NSBundleIdentifier> - <NSMenuItem.default> - <NSMessage>"
     enablement_key="com.nucleus.OpenNucleusManual - open nucleus manual - open"
-    defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
+    /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
       '<dict><key>enabled_context_menu</key><true/><key>enabled_services_menu</key><true/></dict>'
-    defaults read pbs > /dev/null || true
+    /usr/bin/defaults read pbs > /dev/null || true
   '';
 }
