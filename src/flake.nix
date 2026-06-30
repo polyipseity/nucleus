@@ -337,33 +337,29 @@
       vsCodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
       # writeShellApplication plus lib.sh bundling, so scripts that source
-      # lib.sh work in both repo-direct and nix-store contexts.
+      # lib.sh work in both repo-direct and nix-store contexts regardless of
+      # how $0 resolves through symlinks.
       writeShellApplicationWithLib =
         pkgs: args:
         let
           name = args.name;
           baseDrv = pkgs.writeShellApplication (builtins.removeAttrs args [ "extraBin" ]);
           extraBin = args.extraBin or { };
-          libShDrv = pkgs.runCommand "${name}-lib-sh" { } ''
-            mkdir -p "$out/bin" "$out/src/scripts"
-            cp "${./scripts/lib.sh}" "$out/src/scripts/lib.sh"
-            chmod +x "$out/src/scripts/lib.sh"
-            ln -s ../src/scripts/lib.sh "$out/bin/lib.sh"
-            ${pkgs.lib.concatStringsSep "\n" (
-              pkgs.lib.mapAttrsToList (target: src: ''
-                mkdir -p "$(dirname "$out/bin/${target}")"
-                cp "${src}" "$out/bin/${target}"
-              '') extraBin
-            )}
-          '';
         in
-        pkgs.symlinkJoin {
-          name = "${name}-with-lib";
-          paths = [
-            baseDrv
-            libShDrv
-          ];
-        };
+        pkgs.runCommand "${name}-with-lib" { } ''
+          mkdir -p "$out/bin" "$out/src/scripts"
+          cp -r "${baseDrv}/bin/." "$out/bin/"
+          chmod +w "$out/bin/${name}"
+          cp "${./scripts/lib.sh}" "$out/src/scripts/lib.sh"
+          chmod +x "$out/src/scripts/lib.sh"
+          ln -s ../src/scripts/lib.sh "$out/bin/lib.sh"
+          ${pkgs.lib.concatStringsSep "\n" (
+            pkgs.lib.mapAttrsToList (target: src: ''
+              mkdir -p "$(dirname "$out/bin/${target}")"
+              cp "${src}" "$out/bin/${target}"
+            '') extraBin
+          )}
+        '';
 
       # Like mkApp but returns the derivation directly (no { type, program } wrapper).
       # Use for home.packages installation without nix run overhead.

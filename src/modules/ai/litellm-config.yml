@@ -40,21 +40,33 @@ model_list:
     litellm_params:
       model: ollama_chat/devstral-small-2:24b
       api_base: http://127.0.0.1:11434
+      model_info:
+        max_input_tokens: 32768
+        max_output_tokens: 8192
 
   - model_name: ollama_chat/magistral:24b
     litellm_params:
       model: ollama_chat/magistral:24b
       api_base: http://127.0.0.1:11434
+      model_info:
+        max_input_tokens: 32768
+        max_output_tokens: 8192
 
   - model_name: ollama_chat/qwen2.5:1.5b
     litellm_params:
       model: ollama_chat/qwen2.5:1.5b
       api_base: http://127.0.0.1:11434
+      model_info:
+        max_input_tokens: 32768
+        max_output_tokens: 8192
 
   - model_name: ollama_chat/qwen3:8b
     litellm_params:
       model: ollama_chat/qwen3:8b
       api_base: http://127.0.0.1:11434
+      model_info:
+        max_input_tokens: 32768
+        max_output_tokens: 8192
 
   # ---- DeepSeek V4 models with fallback chain ----
   # Primary: OpenCode Zen (order: 1), Fallback: OpenCode Go (order: 2),
@@ -71,7 +83,8 @@ model_list:
       api_key: os.environ/OPENCODE_ZEN_API_KEY
       order: 1
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: deepseek/deepseek-v4-flash
     litellm_params:
       model: openai/deepseek-v4-flash
@@ -79,14 +92,16 @@ model_list:
       api_key: os.environ/OPENCODE_GO_API_KEY
       order: 2
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: deepseek/deepseek-v4-flash
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-flash
       api_key: os.environ/OPENROUTER_API_KEY
       order: 3
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
 
   - model_name: deepseek/deepseek-v4-flash/reasoning_high
     litellm_params:
@@ -97,7 +112,8 @@ model_list:
       reasoning:
         effort: high
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: deepseek/deepseek-v4-flash/reasoning_high
     litellm_params:
       model: openai/deepseek-v4-flash
@@ -107,7 +123,8 @@ model_list:
       reasoning:
         effort: high
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: deepseek/deepseek-v4-flash/reasoning_high
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-flash
@@ -116,7 +133,8 @@ model_list:
       reasoning:
         effort: high
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
 
   - model_name: deepseek/deepseek-v4-flash/reasoning_xhigh
     litellm_params:
@@ -127,7 +145,8 @@ model_list:
       reasoning:
         effort: xhigh
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: deepseek/deepseek-v4-flash/reasoning_xhigh
     litellm_params:
       model: openai/deepseek-v4-flash
@@ -137,7 +156,8 @@ model_list:
       reasoning:
         effort: xhigh
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: deepseek/deepseek-v4-flash/reasoning_xhigh
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-flash
@@ -146,7 +166,8 @@ model_list:
       reasoning:
         effort: xhigh
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
 
   - model_name: deepseek/deepseek-v4-pro
     litellm_params:
@@ -155,14 +176,16 @@ model_list:
       api_key: os.environ/OPENCODE_GO_API_KEY
       order: 1
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: deepseek/deepseek-v4-pro
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-pro
       api_key: os.environ/OPENROUTER_API_KEY
       order: 2
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
 
   - model_name: deepseek/deepseek-v4-pro/reasoning_high
     litellm_params:
@@ -173,7 +196,8 @@ model_list:
       reasoning:
         effort: high
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: deepseek/deepseek-v4-pro/reasoning_high
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-pro
@@ -182,7 +206,8 @@ model_list:
       reasoning:
         effort: high
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
 
   - model_name: deepseek/deepseek-v4-pro/reasoning_xhigh
     litellm_params:
@@ -193,7 +218,8 @@ model_list:
       reasoning:
         effort: xhigh
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: deepseek/deepseek-v4-pro/reasoning_xhigh
     litellm_params:
       model: openrouter/deepseek/deepseek-v4-pro
@@ -202,7 +228,8 @@ model_list:
       reasoning:
         effort: xhigh
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
 
   # ---- OpenCode Zen free models ----
   # Free-tier models available through the OpenCode Zen endpoint.
@@ -213,7 +240,8 @@ model_list:
       api_key: os.environ/OPENCODE_ZEN_API_KEY
       order: 1
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: xiaomi/mimo-v2.5
     litellm_params:
       model: openai/mimo-v2.5-free
@@ -221,7 +249,8 @@ model_list:
       api_key: os.environ/OPENCODE_ZEN_API_KEY
       order: 1
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: alibaba/qwen3.6-plus
     litellm_params:
       model: openai/qwen3.6-plus-free
@@ -229,7 +258,8 @@ model_list:
       api_key: os.environ/OPENCODE_ZEN_API_KEY
       order: 1
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: minimax/minimax-m3
     litellm_params:
       model: openai/minimax-m3-free
@@ -237,7 +267,8 @@ model_list:
       api_key: os.environ/OPENCODE_ZEN_API_KEY
       order: 1
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: nvidia/nemotron-3-ultra
     litellm_params:
       model: openai/nemotron-3-ultra-free
@@ -245,7 +276,8 @@ model_list:
       api_key: os.environ/OPENCODE_ZEN_API_KEY
       order: 1
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192
   - model_name: stealth/north-mini-code
     litellm_params:
       model: openai/north-mini-code-free
@@ -253,4 +285,5 @@ model_list:
       api_key: os.environ/OPENCODE_ZEN_API_KEY
       order: 1
       model_info:
-        max_input_tokens: 81920
+        max_input_tokens: 128000
+        max_output_tokens: 8192

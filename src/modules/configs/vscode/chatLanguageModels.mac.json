@@ -31,7 +31,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-flash",
-				"maxInputTokens": 81920,
+			"maxInputTokens": 128000,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Flash",
 				"toolCalling": true,
@@ -40,7 +40,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-flash/reasoning_high",
-				"maxInputTokens": 81920,
+			"maxInputTokens": 128000,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Flash (High)",
 				"toolCalling": true,
@@ -49,7 +49,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-flash/reasoning_xhigh",
-				"maxInputTokens": 81920,
+			"maxInputTokens": 128000,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Flash (X-High)",
 				"toolCalling": true,
@@ -58,7 +58,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-pro",
-				"maxInputTokens": 81920,
+			"maxInputTokens": 128000,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Pro",
 				"toolCalling": true,
@@ -67,7 +67,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-pro/reasoning_high",
-				"maxInputTokens": 81920,
+			"maxInputTokens": 128000,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Pro (High)",
 				"toolCalling": true,
@@ -76,7 +76,7 @@
 			},
 			{
 				"id": "deepseek/deepseek-v4-pro/reasoning_xhigh",
-				"maxInputTokens": 81920,
+			"maxInputTokens": 128000,
 				"maxOutputTokens": 8192,
 				"name": "DeepSeek V4 Pro (X-High)",
 				"toolCalling": true,
@@ -85,7 +85,7 @@
 			},
 			{
 				"id": "stealth/big-pickle",
-				"maxInputTokens": 81920,
+			"maxInputTokens": 128000,
 				"maxOutputTokens": 8192,
 				"name": "Big Pickle",
 				"toolCalling": false,
@@ -94,7 +94,7 @@
 			},
 			{
 				"id": "xiaomi/mimo-v2.5",
-				"maxInputTokens": 81920,
+			"maxInputTokens": 128000,
 				"maxOutputTokens": 8192,
 				"name": "MiMo V2.5",
 				"toolCalling": true,
@@ -103,7 +103,7 @@
 			},
 			{
 				"id": "alibaba/qwen3.6-plus",
-				"maxInputTokens": 81920,
+			"maxInputTokens": 128000,
 				"maxOutputTokens": 8192,
 				"name": "Qwen3.6 Plus",
 				"toolCalling": true,
@@ -112,7 +112,7 @@
 			},
 			{
 				"id": "minimax/minimax-m3",
-				"maxInputTokens": 81920,
+			"maxInputTokens": 128000,
 				"maxOutputTokens": 8192,
 				"name": "MiniMax M3",
 				"toolCalling": true,
@@ -121,7 +121,7 @@
 			},
 			{
 				"id": "nvidia/nemotron-3-ultra",
-				"maxInputTokens": 81920,
+			"maxInputTokens": 128000,
 				"maxOutputTokens": 8192,
 				"name": "Nemotron 3 Ultra",
 				"toolCalling": true,
@@ -130,7 +130,7 @@
 			},
 			{
 				"id": "stealth/north-mini-code",
-				"maxInputTokens": 81920,
+			"maxInputTokens": 128000,
 				"maxOutputTokens": 8192,
 				"name": "North Mini Code",
 				"toolCalling": false,
