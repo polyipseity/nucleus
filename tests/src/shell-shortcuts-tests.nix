@@ -53,6 +53,7 @@ let
     && lib.hasInfix ''"nucleus-check-sh"'' shellText
     && lib.hasInfix ''"nucleus-cloud-setup"'' shellText
     && lib.hasInfix ''"nucleus-gc"'' shellText
+    && lib.hasInfix ''"nucleus-gs-pdf-opt"'' shellText
     && lib.hasInfix ''"nucleus-health-check"'' shellText
     && lib.hasInfix ''"nucleus-replica-reset"'' shellText
     && lib.hasInfix ''"nucleus-replica-sync"'' shellText
@@ -68,6 +69,7 @@ let
     && lib.hasInfix "function nucleus-check-sh" windowsShellProfileText
     && lib.hasInfix "function nucleus-cloud-setup" windowsShellProfileText
     && lib.hasInfix "function nucleus-gc" windowsShellProfileText
+    && lib.hasInfix "function nucleus-gs-pdf-opt" windowsShellProfileText
     && lib.hasInfix "function nucleus-health-check" windowsShellProfileText
     && lib.hasInfix "function nucleus-replica-reset" windowsShellProfileText
     && lib.hasInfix "function nucleus-replica-sync" windowsShellProfileText
@@ -93,6 +95,7 @@ let
       && lib.hasInfix "`nucleus-check-sh` — run POSIX shell syntax checks." text
       && lib.hasInfix "`nucleus-cloud-setup` — configure required cloud remotes and re-run apply." text
       && lib.hasInfix "`nucleus-gc` — run the managed Nix garbage-collection flow." text
+      && lib.hasInfix "`nucleus-gs-pdf-opt` — run the gs-pdf-opt script (optimize PDFs with Ghostscript)." text
       && lib.hasInfix "`nucleus-health-check` — run the managed repository health checks." text
       && lib.hasInfix "`nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas." text
       && lib.hasInfix "`nucleus-replica-reset` — clear local replica state without touching remote data." text
