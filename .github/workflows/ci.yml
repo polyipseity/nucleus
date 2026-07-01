@@ -53,7 +53,7 @@ jobs:
       NIX_CONFIG: experimental-features = nix-command flakes
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: Install Nix (POSIX)
         if: runner.os != 'Windows'
@@ -67,13 +67,13 @@ jobs:
 
       - name: Setup Packer CLI (Windows)
         if: runner.os == 'Windows'
-        uses: hashicorp/setup-packer@3286471d6cc6756d056a0b199fea5e0becdbc189
+        uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789
         with:
           version: "latest"
 
       - name: Check Nix flake inputs freshness (POSIX)
         if: runner.os != 'Windows'
-        uses: DeterminateSystems/flake-checker-action@89c01715e5d0dfdc0a1bfe9d59891ee4945c1483
+        uses: DeterminateSystems/flake-checker-action@a0f068d37b542f3150564fbf1164fec2d958ee11
         with:
           fail-mode: false
 
