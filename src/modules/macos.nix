@@ -432,7 +432,6 @@ let
     "protectDownloadsICloudSymlink"
     "protectOpencodeSymlinks"
     "protectOutOfStoreSymlinks"
-    "refreshFinderServices"
     "relaunchDesktopServices"
     "reloadDockPreferenceState"
     "reloadUserPreferenceState"
@@ -1009,38 +1008,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # refreshFinderServices
-    # Register Services with LaunchServices so they appear in context menus.
-    # lsregister -r is sufficient; no Finder restart is needed for Services.
-    # Source: https://developer.apple.com/documentation/coreservices/launch_services
-    # -------------------------------------------------------------------------
-    refreshFinderServices =
-      lib.hm.dag.entryAfter [ "configureFinderSidebar" "installPackages" "configureLaunchServices" ]
-        ''
-          # Refresh finder-related daemons (sharedfilelistd, cfprefsd).
-          ${finderSidebar.finderRefreshDaemonsShell}
-
-          # Enable Services to appear in Finder context menu for both files and
-          # empty space. Set NSServicesMinimumItemCountForContextSubmenu to 0 to show
-          # all services regardless of count (already set in defaults, but ensure
-          # it takes effect during this activation).
-          /usr/bin/defaults write NSGlobalDomain NSServicesMinimumItemCountForContextSubmenu -int 0
-
-          # Explicitly register the Automator Quick Action workflows (Services) so
-          # they are discoverable by LaunchServices and appear in Finder context menus.
-          SERVICES_DIR="$HOME/Library/Services"
-          if [ -d "$SERVICES_DIR" ]; then
-            # Use the correct lsregister path for registering services
-            LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
-            if [ -x "$LSREGISTER" ]; then
-              if ! $LSREGISTER -r -domain local -domain system -domain user; then
-                echo "macos: lsregister failed; Finder Services may not appear in context menus until the next login." >&2
-              fi
-            fi
-          fi
-        '';
-
-    # -------------------------------------------------------------------------
     # relaunchDesktopServices
     # Single dedicated restart for desktop-related system processes (Finder,
     # SystemUIServer, WindowManager) after all configuration changes complete.
@@ -1049,54 +1016,50 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Re-applies sidebar favorites after restart since Finder may restore
     # default ordering.
     # -------------------------------------------------------------------------
-    relaunchDesktopServices =
-      lib.hm.dag.entryAfter [ "configureFinderSidebar" "refreshFinderServices" ]
-        ''
-          ${finderSidebar.finderRefreshDaemonsShell}
+    relaunchDesktopServices = lib.hm.dag.entryAfter [ "configureFinderSidebar" ] ''
+      ${finderSidebar.finderRefreshDaemonsShell}
 
-          # Restart Finder via launchd (preserves window state, cleanest method).
-          if ! /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
-            echo "macos: relaunchDesktopServices — launchctl Finder restart failed; restart Finder manually." >&2
-          fi
+      # Restart Finder via launchd (preserves window state, cleanest method).
+      if ! /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
+        echo "macos: relaunchDesktopServices — launchctl Finder restart failed; restart Finder manually." >&2
+      fi
 
-          # Restart SystemUIServer (menu bar icons) and WindowManager (Spaces).
-          for proc in SystemUIServer WindowManager; do
-            if ! /usr/bin/killall "$proc"; then
-              echo "macos: $proc was not running (or could not be restarted)." >&2
-            fi
-          done
+      # Restart SystemUIServer (menu bar icons) and WindowManager (Spaces).
+      for proc in SystemUIServer WindowManager; do
+        if ! /usr/bin/killall "$proc"; then
+          echo "macos: $proc was not running (or could not be restarted)." >&2
+        fi
+      done
 
-          # Finder restarts can reintroduce default favorites ordering.
-          # Re-apply managed favorites to keep deterministic output.
-          MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
-          if [ -x "$MYSIDES_BIN" ]; then
-            ${finderSidebar.finderSidebarRebuildBestEffortShell}
-          fi
-        '';
+      # Finder restarts can reintroduce default favorites ordering.
+      # Re-apply managed favorites to keep deterministic output.
+      MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
+      if [ -x "$MYSIDES_BIN" ]; then
+        ${finderSidebar.finderSidebarRebuildBestEffortShell}
+      fi
+    '';
 
     # -------------------------------------------------------------------------
     # verifyArchivingStack
     # Health check for archiving tools: verifies 7z CLI, Keka app registration,
     # and archive handler associations are functional after activation.
     # -------------------------------------------------------------------------
-    verifyArchivingStack =
-      lib.hm.dag.entryAfter [ "configureLaunchServices" "installPackages" "refreshFinderServices" ]
-        ''
-          # Verify 7z CLI is available and functional using direct Nix store path.
-          # Do not rely on PATH lookup since Home Manager activation runs in a minimal
-          # shell that may not have nix-darwin system package paths available yet.
-          seven_z_exe="${pkgs.p7zip}/bin/7z"
-          if [ ! -x "$seven_z_exe" ]; then
-            echo "macos: warning — 7z binary not found at $seven_z_exe; archive extraction may fail." >&2
-          elif ! "$seven_z_exe" --help >/dev/null 2>&1; then
-            echo "macos: warning — 7z exists but --help failed; archive handling may be broken." >&2
-          fi
+    verifyArchivingStack = lib.hm.dag.entryAfter [ "configureLaunchServices" "installPackages" ] ''
+      # Verify 7z CLI is available and functional using direct Nix store path.
+      # Do not rely on PATH lookup since Home Manager activation runs in a minimal
+      # shell that may not have nix-darwin system package paths available yet.
+      seven_z_exe="${pkgs.p7zip}/bin/7z"
+      if [ ! -x "$seven_z_exe" ]; then
+        echo "macos: warning — 7z binary not found at $seven_z_exe; archive extraction may fail." >&2
+      elif ! "$seven_z_exe" --help >/dev/null 2>&1; then
+        echo "macos: warning — 7z exists but --help failed; archive handling may be broken." >&2
+      fi
 
-          # Verify Keka application is installed and registered.
-          if [ ! -d "/Applications/Keka.app" ]; then
-            echo "macos: warning — Keka.app not found in /Applications; GUI archiving unavailable." >&2
-          fi
-        '';
+      # Verify Keka application is installed and registered.
+      if [ ! -d "/Applications/Keka.app" ]; then
+        echo "macos: warning — Keka.app not found in /Applications; GUI archiving unavailable." >&2
+      fi
+    '';
 
     # -------------------------------------------------------------------------
     # hideMenuBarIcons

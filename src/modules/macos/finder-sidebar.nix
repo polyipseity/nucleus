@@ -138,7 +138,7 @@ rec {
     ) finderSidebarManagedFavorites
   );
 
-  # Best-effort add mode for refreshFinderServices: preserve soft-fail behavior.
+  # Best-effort add mode for relaunchDesktopServices: preserve soft-fail behavior.
   finderSidebarAddManagedBestEffortShell = builtins.concatStringsSep "\n" (
     map (
       favorite:
