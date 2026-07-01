@@ -1,0 +1,26 @@
+# WinGet DSC v3 - user-level "gs optimize pdf" context menu entry for Windows
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    # Adds "gs optimize pdf" to the right-click context menu for .pdf files only.
+    # Uses SystemFileAssociations\.pdf so the verb only appears on PDF files,
+    # not all files (*).
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: gsPdfOptVerb
+      directives:
+        description: Add "gs optimize pdf" to the right-click context menu for PDF files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\gs optimize pdf
+        valueData: "gs optimize pdf"
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: gsPdfOptCmd
+      directives:
+        description: Command for the gs optimize pdf context menu entry
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\gs optimize pdf\command
+        valueData: >-
+          powershell.exe -NoProfile -WindowStyle Hidden -Command
+          "nucleus-gs-pdf-opt --preset default '%1'"
+        valueType: String

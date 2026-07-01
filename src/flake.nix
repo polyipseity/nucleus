@@ -698,6 +698,10 @@
           runtimeInputs = [ pkgs.jq ];
           script = scripts + "/nucleus-config.sh";
         };
+        nucleus-gs-pdf-opt = mkNucleusPackage pkgs {
+          name = "gs-pdf-opt";
+          runtimeInputs = [ pkgs.ghostscript ];
+        };
         nucleus-gc = mkNucleusPackage pkgs {
           name = "gc";
           runtimeInputs = [

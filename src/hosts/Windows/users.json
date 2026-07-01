@@ -113,7 +113,8 @@
       "dscConfigFiles": [
         "context.dsc.yml",
         "env.dsc.yml",
-        "dsc.yml"
+        "dsc.yml",
+        "gs-pdf-opt.dsc.yml"
       ],
       "homeDirectory": "C:\\Users\\polyipseity",
       "isPrimary": true,
