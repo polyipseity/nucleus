@@ -448,6 +448,10 @@ in
             #      pass under iCloud-managed roots.
             #   2) mkdir wrapper: newly created matching directories are marked
             #      immediately.
+            #   3) precmd hook: after each command, checks immediate children of
+            #      $PWD (depth 1) for newly created excluded dirs.  This catches
+            #      tools like npm install, git clone, pip install that create
+            #      directories via syscalls without using mkdir.
             #
             # Existing directories are also covered by the activation-time recursive
             # pass in modules/macos.nix.
@@ -547,6 +551,20 @@ in
             autoload -Uz add-zsh-hook
             add-zsh-hook chpwd __nucleus_check_icloud_exclusions_on_pwd_change
             __nucleus_check_icloud_exclusions_on_pwd_change
+
+            # Lightweight precmd check: scans only immediate children of $PWD (-maxdepth 1)
+            # so tools that create excluded directories without mkdir (npm install,
+            # git clone, pip install, etc.) get marked promptly.  Unlike the chpwd
+            # hook, this must be fast — it runs after every command.
+            __nucleus_check_icloud_exclusions_immediate() {
+              [[ "''${#__nucleus_icloud_excluded_names[@]}" -gt 0 ]] || return 0
+              local __candidate
+              while IFS= read -r __candidate; do
+                __nucleus_check_icloud_exclusion "$__candidate"
+              done < <(/usr/bin/find "$PWD" -maxdepth 1 -type d 2>/dev/null)
+            }
+
+            add-zsh-hook precmd __nucleus_check_icloud_exclusions_immediate
 
             # Override mkdir to check for excluded directories after creation.
             mkdir() {

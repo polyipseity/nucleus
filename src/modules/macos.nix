@@ -1399,11 +1399,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
   # --------------------------------------------------------------------------
   # iCloud exclusion LaunchAgent
-  # Runs the iCloud directory exclusion logic daily (12:00) so that newly
-  # created build/cache directories inside iCloud-managed trees are marked
-  # with com.apple.fileprovider.ignore#P without waiting for the next
-  # home-manager switch.  configureICloudExclusions handles the immediate
-  # first-run case; this agent provides drift correction between activations.
+  # Runs the iCloud directory exclusion logic hourly so that newly created
+  # build/cache directories inside iCloud-managed trees are marked with
+  # com.apple.fileprovider.ignore#P without waiting for the next home-manager
+  # switch.  configureICloudExclusions handles the immediate first-run case;
+  # this agent provides drift correction between activations.
   # RunAtLoad = false because the activation hook already runs on every apply.
   # --------------------------------------------------------------------------
   launchd.agents."icloud-exclusions" = {
@@ -1413,15 +1413,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
       ProgramArguments = [ "${icloudExclusionsScript}" ];
       # Do not run on every agent reload during apply/bootstrap apply; the
       # activation hook (configureICloudExclusions) runs synchronously during
-      # apply and covers the immediate case.  The daily timer handles drift
+      # apply and covers the immediate case.  The hourly timer handles drift
       # correction for directories created between activations.
       RunAtLoad = false;
-      StartCalendarInterval = [
-        {
-          Hour = 12;
-          Minute = 0;
-        }
-      ];
+      StartInterval = 3600;
     };
   };
 }

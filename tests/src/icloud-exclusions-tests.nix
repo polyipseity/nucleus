@@ -82,6 +82,18 @@ let
     && (lib.hasInfix "lib.hasPrefix \"Library/Mobile Documents/\"" shellModuleText)
   ) "shell.nix must sanitize managed roots to Library/Mobile Documents subpaths only";
 
+  test_shell_adds_precmd_hook = assert' (lib.hasInfix "add-zsh-hook precmd __nucleus_check_icloud_exclusions_immediate" shellModuleText) "shell.nix must register a precmd hook for iCloud exclusions";
+
+  test_shell_uses_depth1_scan_in_precmd = assert' (lib.hasInfix "maxdepth 1" shellModuleText) "shell.nix precmd hook must use -maxdepth 1 to avoid recursion on every prompt";
+
+  test_shell_does_not_recurse_in_precmd = assert' (
+    !lib.hasInfix "__nucleus_mark_icloud_exclusions_under" (
+      builtins.head (builtins.split "__nucleus_check_icloud_exclusions_immediate" shellModuleText).rest
+    )
+  ) "shell.nix precmd hook must not call the recursive __nucleus_mark_icloud_exclusions_under";
+
+  test_launchagent_hourly_interval = assert' (lib.hasInfix "StartInterval = 3600" macosModuleText) "macos.nix must use StartInterval 3600 (hourly) for the iCloud exclusion LaunchAgent";
+
   allTests = [
     test_exclusion_list_exists
     test_managed_roots_centralized
@@ -94,6 +106,10 @@ let
     test_shell_keeps_mkdir_hook
     test_macos_activation_recursive_pass
     test_shell_restricts_roots_to_mobile_documents
+    test_shell_adds_precmd_hook
+    test_shell_uses_depth1_scan_in_precmd
+    test_shell_does_not_recurse_in_precmd
+    test_launchagent_hourly_interval
   ];
 in
 {
