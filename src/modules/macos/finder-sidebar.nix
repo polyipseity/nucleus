@@ -85,7 +85,7 @@ rec {
     map (
       favorite:
       let
-        safeName = lib.escapeShellArg favorite.name;
+        safeName = favorite.name;
       in
       if builtins.elem favorite.name finderSidebarAlwaysExist then
         "# ${favorite.name}: system-owned, always exists\nmkdir -p \"$HOME/${safeName}\""
