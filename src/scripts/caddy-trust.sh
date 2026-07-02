@@ -57,5 +57,21 @@ while [ "$_ct_attempt" -lt 20 ]; do
   sleep 1
 done
 
+# If we're in sudo mode and Caddy was unreachable, the launchd service may be
+# stuck in penalty box (EX_CONFIG). Attempt a fresh bootstrap to recover.
+if [ "$_ct_mode" = "sudo" ]; then
+  printf '%s\n' "caddy-trust: attempting launchd service recovery via bootout/bootstrap..." >&2
+  sudo launchctl bootout system/org.nixos.httpsProxy 2>/dev/null || true
+  sleep 1
+  if sudo launchctl bootstrap system /Library/LaunchDaemons/org.nixos.httpsProxy.plist 2>/dev/null; then
+    printf '%s\n' 'caddy-trust: launchd service re-bootstrapped; retrying trust...' >&2
+    sleep 2
+    if sudo env "PATH=$PATH" caddy trust --address "$_ct_admin_addr"; then
+      printf '%s\n' 'caddy-trust: local CA trusted successfully (after service recovery)'
+      exit 0
+    fi
+  fi
+fi
+
 printf '%s\n' "caddy-trust: failed to trust local CA from admin endpoint $_ct_admin_addr; continuing without failing apply" >&2
 exit 2

@@ -12,7 +12,16 @@ if [ "$(id -u)" -eq 0 ]; then
   exit 1
 fi
 
-SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+# Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
+_self="$0"
+if [ -h "$_self" ]; then
+  _target="$(readlink "$_self")"
+  case "$_target" in
+    /*) _self="$_target" ;;
+    *) _self="$(dirname "$_self")/$_target" ;;
+  esac
+fi
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 REPO_ROOT="$(derive_repo_root)"

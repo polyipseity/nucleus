@@ -2,7 +2,16 @@
 # Checks .pkr.hcl files under src/vms/. With arguments, checks only provided paths.
 set -euo pipefail
 
-SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+# Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
+_self="$0"
+if [ -h "$_self" ]; then
+  _target="$(readlink "$_self")"
+  case "$_target" in
+    /*) _self="$_target" ;;
+    *) _self="$(dirname "$_self")/$_target" ;;
+  esac
+fi
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
