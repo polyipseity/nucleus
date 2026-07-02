@@ -66,10 +66,15 @@ if [ "$_ct_mode" = "sudo" ]; then
   if sudo launchctl bootstrap system /Library/LaunchDaemons/org.nixos.httpsProxy.plist 2>/dev/null; then
     printf '%s\n' 'caddy-trust: launchd service re-bootstrapped; retrying trust...' >&2
     sleep 2
-    if sudo env "PATH=$PATH" caddy trust --address "$_ct_admin_addr"; then
-      printf '%s\n' 'caddy-trust: local CA trusted successfully (after service recovery)'
-      exit 0
-    fi
+    _ct_attempt=0
+    while [ "$_ct_attempt" -lt 20 ]; do
+      if sudo env "PATH=$PATH" caddy trust --address "$_ct_admin_addr"; then
+        printf '%s\n' 'caddy-trust: local CA trusted successfully (after service recovery)'
+        exit 0
+      fi
+      _ct_attempt=$((_ct_attempt + 1))
+      sleep 1
+    done
   fi
 fi
 
