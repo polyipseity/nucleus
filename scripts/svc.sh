@@ -249,7 +249,7 @@ recover_launchctl_service() {
   local print_out
   print_out=$($sudo_prefix launchctl print "$target" 2>/dev/null || true)
   case "$print_out" in
-    *"state = spawn scheduled"*|*"state = waiting"*|*"last exit code"*"= 78"*)
+    *"state = spawn scheduled"*|*"state = waiting"*|*"last exit code = 78"*)
       local plist
       if [ "$domain" = "system" ]; then
         plist="/Library/LaunchDaemons/$svc_id.plist"
@@ -301,12 +301,28 @@ svc_action() {
           ;;
         stop)    $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
         restart)
-          # bootout+bootstrap is the only reliable restart for launchctl
-          # services: it clears terminal exit codes (EX_CONFIG etc.) and
-          # re-registers the service from scratch.  A simple SIGTERM often
-          # fails when the service has exited with a non-retryable status.
-          $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
-          $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null || true
+          # Three-stage restart strategy for launchctl services:
+          #   1. recover_launchctl_service — handles stuck states (EX_CONFIG,
+          #      "waiting", "spawn scheduled") via bootout+bootstrap.
+          #   2. SIGTERM — graceful shutdown for running services.
+          #   3. bootout+bootstrap — safety net that clears remaining exit
+          #      codes and re-registers the service.
+          #
+          # Stage 3 sends SIGKILL if the process is still alive after the
+          # 5s grace window.  This trade-off (forceful clear) is necessary
+          # because launchd will not retry services that exited with
+          # non-retryable codes.  The grace window gives well-behaved
+          # processes time to shut down cleanly before the hard kill.
+          recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
+            $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || true
+            for _i in 1 2 3 4 5; do
+              $sudo_prefix launchctl print "$target" 2>/dev/null \
+                | grep -q "state = running" || break
+              sleep 1
+            done
+            $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
+            $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null || true
+          }
           ;;
         enable)  $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
         disable) $sudo_prefix launchctl disable "$target" >/dev/null 2>&1 ;;
