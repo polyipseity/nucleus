@@ -284,6 +284,7 @@ $EnableDevDirectoryParity = -not $noUserStateParity
 $EnableDiscordMusicRPCParity = -not $noUserStateParity
 $EnableCamillaDSPServiceParity = -not $noUserStateParity
 $EnableCamillaGUIServiceParity = -not $noUserStateParity
+$EnableSteamAutoStartupParity = -not $noUserStateParity
 # EnableDevReposParity defaults to $null (deferred to devRepos registry).
 # When user-state is skipped, force $false instead.
 $EnableDevReposParity = if ($noUserStateParity) { $false } else { $null }
@@ -355,6 +356,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DiscordMusicRPC.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CamillaDSPService.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CamillaGUIService.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Disable-SteamAutoStartup.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-GitAndSshConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ObsidianConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-PicardConfig.ps1")
@@ -714,6 +716,7 @@ Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRe
 Sync-DiscordMusicRPC -Enabled:$EnableDiscordMusicRPCParity
 Sync-CamillaDSPService -Enabled:$EnableCamillaDSPServiceParity
 Sync-CamillaGUIService -Enabled:$EnableCamillaGUIServiceParity
+Disable-SteamAutoStartup -Enabled:$EnableSteamAutoStartupParity
 Sync-LiteLLMService -RepoRoot $repoRoot -Enabled:`$true
 Sync-ReplicaSyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
 Sync-OpenSSHServer -Enabled:$EnableRemoteAccessParity

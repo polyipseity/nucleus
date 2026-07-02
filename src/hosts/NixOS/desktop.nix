@@ -204,6 +204,18 @@
   hardware.graphics.enable32Bit = true;
   programs.steam.enable = true;
 
+  # Suppress Steam autostart: Steam creates ~/.config/autostart/steam.desktop
+  # when the user toggles "Start Steam on login" inside the application.
+  # This activation script removes the file on every rebuild so the declarative
+  # config overrides that runtime preference.
+  # Cross-platform parity:
+  #   macOS   — login item removal in MacBook/activation.nix (osascript)
+  #   NixOS   — this activation script
+  #   Windows — Disable-SteamAutoStartup module + apply.ps1
+  system.activationScripts.disableSteamAutostart = lib.mkAfter ''
+    find /home -maxdepth 3 -path '*/autostart/steam.desktop' -delete 2>/dev/null || true
+  '';
+
   # EasyEffects: graphical PipeWire audio processing GUI with plugin-based
   # limiter, compressor, equalizer, and other DSP effects.
   # Usage: open the EasyEffects GUI, navigate to Effects > Output > Add Effect,
