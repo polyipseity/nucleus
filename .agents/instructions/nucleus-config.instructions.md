@@ -1,7 +1,7 @@
 ---
 description: "Use when adding, modifying, or reviewing runtime configuration for nucleus services. Covers the nucleus-config CLI usage, config.json schema, and how services consume runtime toggles."
 name: "nucleus-config Runtime Configuration"
-applyTo: "scripts/nucleus-config.*, src/**/*camilladsp*"
+applyTo: "scripts/config.*, src/**/*camilladsp*"
 ---
 
 # nucleus-config Runtime Configuration

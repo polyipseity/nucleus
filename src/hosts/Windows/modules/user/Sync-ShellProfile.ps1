@@ -361,7 +361,7 @@ function Sync-ShellProfile {
     '  Invoke-NucleusRepoScript ''scripts\cloud-setup.ps1'' @Args'
     '}'
     'function nucleus-config {'
-    '  Invoke-NucleusRepoScript ''scripts\nucleus-config.ps1'' @Args'
+    '  Invoke-NucleusRepoScript ''scripts\config.ps1'' @Args'
     '}'
     'function nucleus-gc {'
     '  Invoke-NucleusRepoScript ''scripts\gc.ps1'' @Args'

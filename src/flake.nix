@@ -371,6 +371,11 @@
           extraBin ? { },
           script ? scripts + "/${name}.sh",
         }:
+        assert pkgs.lib.assertMsg (builtins.baseNameOf script != "nucleus-${name}.sh") ''
+          script filename '${builtins.baseNameOf script}' for package '${name}' must not start with 'nucleus-'.
+          The nucleus- prefix is added automatically by the package derivation.
+          Name the script file '${name}.sh' instead.
+        '';
         writeShellApplicationWithLib pkgs {
           name = "nucleus-${name}";
           runtimeInputs = runtimeInputs;
@@ -638,7 +643,6 @@
         mkApp pkgs {
           name = "config";
           runtimeInputs = [ pkgs.jq ];
-          script = scripts + "/nucleus-config.sh";
         };
 
       # Build the full set of nucleus app packages for a given package set.
@@ -696,7 +700,6 @@
         nucleus-config = mkNucleusPackage pkgs {
           name = "config";
           runtimeInputs = [ pkgs.jq ];
-          script = scripts + "/nucleus-config.sh";
         };
         nucleus-gs-pdf-opt = mkNucleusPackage pkgs {
           name = "gs-pdf-opt";
