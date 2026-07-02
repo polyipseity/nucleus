@@ -1,4 +1,4 @@
-# WinGet DSC v3 - user-level baseline for Windows host
+# WinGet DSC v3 - user-level HKCU registry values for Windows host
 properties:
   configurationVersion: 0.2.0
   resources:
