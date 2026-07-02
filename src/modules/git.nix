@@ -75,6 +75,10 @@ in
       # hook at ~/.config/git/identity.  Using an include file lets the hook write
       # to a path it owns without touching the HM-managed (read-only) config symlink.
       include.path = "~/.config/git/identity";
+      # `push.autoSetupRemote` makes `git push` on a branch without an upstream
+      # automatically configure the upstream to the same-named remote branch,
+      # avoiding the need for `--set-upstream`/`-u`.
+      push.autoSetupRemote = true;
       # `push.followTags` is Git's built-in "push the tags that belong with the
       # commits I just pushed" toggle; it avoids a custom alias while keeping
       # release/signing tags in sync with ordinary branch pushes.

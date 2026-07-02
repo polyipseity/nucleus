@@ -200,6 +200,7 @@ function Sync-GitAndSshConfig {
         'fetch.pruneTags' = 'true'
         'gpg.format' = 'openpgp'
         'init.defaultBranch' = 'main'
+        'push.autoSetupRemote' = 'true'
         'push.followTags' = 'true'
         'tag.gpgsign' = 'true'
         'url.git@github.com:.insteadOf' = 'https://github.com/'
@@ -235,6 +236,7 @@ function Sync-GitAndSshConfig {
           'fetch.pruneTags' = 'true'
           'gpg.format' = 'openpgp'
           'init.defaultBranch' = 'main'
+          'push.autoSetupRemote' = $null
           'push.followTags' = 'true'
           'tag.gpgsign' = 'true'
           'url.git@github.com:.insteadOf' = 'https://github.com/'

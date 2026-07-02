@@ -22,6 +22,10 @@ Describe "Windows Git Configuration Parity" {
             git config --file $script:gitConfigPath --get fetch.pruneTags | Should -Be 'true'
         }
 
+        It "Should auto-setup remote on push" {
+            git config --file $script:gitConfigPath --get push.autoSetupRemote | Should -Be 'true'
+        }
+
         It "Should push related tags with branch pushes" {
             git config --file $script:gitConfigPath --get push.followTags | Should -Be 'true'
         }
