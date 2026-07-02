@@ -47,7 +47,7 @@ Located in `tests/scripts/nucleus-apps-smoke-tests.sh`, run via `nix run ./src#t
 
 1. **Tier 1 — --help invocation**: All 18 nucleus-* commands are built via nix and invoked with `--help` to verify they compile and produce output. Covers all `mkNucleusApps` entries + `bump-lockfile` app.
 2. **Tier 2 — --dry-run**: Commands with dry-run support (ai-sync, gc, replica-sync, replica-reset, vm-setup) are run in dry mode to exercise control flow without side effects.
-3. **Tier 3 — Safe no-op commands**: `config list` validates read-only execution against local files. `svc list --json` is excluded because it triggers `sudo` for system-domain services which breaks in non-interactive CI contexts.
+3. **Tier 3 — Safe no-op commands**: `config list` validates read-only execution against local files. `svc list --json` is a known skip (triggers `sudo` for system-domain services, hangs in non-interactive CI).
 
 **Coverage**: All 19 nucleus commands (18 apps + 1 package-only: check-pwsh, gs-pdf-opt)
 **Status**: ✅ Full

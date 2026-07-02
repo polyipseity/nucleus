@@ -167,6 +167,9 @@ test_app_noop() {
 # config list: reads ~/.local/state/nucleus/config.json (or defaults).
 test_app_noop config list
 
+# svc list --json: triggers sudo for system-domain services, hangs in CI.
+assert_skip "svc list --json" "triggers sudo for system-domain services (non-interactive CI)"
+
 # --- Summary ---------------------------------------------------------------
 echo ""
 if [ "$TESTS_FAILED" -eq 0 ]; then
