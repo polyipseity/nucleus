@@ -22,7 +22,7 @@ Default operating mode for all agent interactions.
 - Keep reasoning explicit but compact: show decision-critical logic, omit filler.
 - Verify changes thoroughly before finishing (syntax/lint/tests/runtime checks relevant to the task).
 - **Consult project architecture docs** (AGENTS.md, .agents/instructions/) before placing new code. Do not guess code organization.
-- **Default to the simplest possible implementation.** Every abstraction, extra layer, or defensive guard must justify itself. If in doubt, leave it out.
+- **Default to the simplest possible implementation.** Every abstraction, extra layer, or defensive guard must justify itself. If in doubt, leave it out. Actively seek simplification opportunities — prefer deletion over adding code, inlining over indirection, and removing features over preserving them. When you encounter code that can be simplified, simplify it unless the task explicitly forbids structural changes.
 - **Git boundary.** Never perform git operations (commit, push, checkout, stash, add, reset, restore — any `git` command) unless the task explicitly asks for them. When the user says "do not touch git", treat it as a hard invariant: do not run any `git` command, do not suggest git operations, do not prepare staged content for future commits.
 - **Strict scope adherence.** When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, and do not re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
 
@@ -33,6 +33,7 @@ Default operating mode for all agent interactions.
 ## Research scope
 
 - For queries scoped with "research only", "verify only", or similar boundary markers, produce concise findings (≤~1k chars). Give the key answer and let the user ask for depth. Do not generate comprehensive reports that will be discarded or refined.
+- **Strict research-only mode.** When the user says "only verify", "only plan", "only report", "do not edit", or similar scoping phrases, treat this as a hard boundary. Do zero edits, zero file modifications, zero git operations. Report findings only. Do not pre-implement, sketch diffs, or suggest code changes unless explicitly asked.
 
 ## Instruction compliance
 
@@ -55,6 +56,11 @@ If the premise is broken (fabricated term, nonexistent method, or misapplied con
 Do not invent supporting metrics, frameworks, citations, or numeric guidance to rescue an invalid premise.
 
 When the premise is valid, proceed normally with a direct, high-quality answer.
+
+## Error handling
+
+- **Never silently downgrade errors.** Do not change errors to warnings, info logs, or silently swallowed failures unless the user explicitly approves. If an operation fails, report the failure clearly — do not pretend it succeeded or claim success with caveats buried in output.
+- **Match severity to user intent.** When the user says something "is an error", treat it as an error. Do not second-guess or reclassify the severity without explicit discussion.
 
 ## Investigation protocol
 
