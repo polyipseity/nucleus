@@ -232,8 +232,16 @@ launchctl_target() {
   fi
 }
 
-# recover_launchctl_service — Recover a launchctl service stuck in spawn-scheduled/EX_CONFIG state.
+# recover_launchctl_service — Recover a launchctl service stuck in
+# spawn-scheduled / waiting / EX_CONFIG state.
 # Does bootout+bootstrap to fully reload. Returns 0 if recovery was done.
+#
+# Handles three cases that `launchctl start` alone cannot fix:
+#   • state = spawn scheduled   — server shutdown left service in limbo
+#   • state = waiting           — service exited with a terminal code
+#   • last exit code = 78       — EX_CONFIG: launchd won't retry
+# In all cases a full bootout+bootstrap cycle is required to clear the exit
+# memory and let launchd try again.
 recover_launchctl_service() {
   local domain="$1" svc_id="$2" sudo_prefix="$3"
   local target
@@ -241,7 +249,7 @@ recover_launchctl_service() {
   local print_out
   print_out=$($sudo_prefix launchctl print "$target" 2>/dev/null || true)
   case "$print_out" in
-    *"state = spawn scheduled"*)
+    *"state = spawn scheduled"*|*"state = waiting"*|*"last exit code"*"= 78"*)
       local plist
       if [ "$domain" = "system" ]; then
         plist="/Library/LaunchDaemons/$svc_id.plist"
@@ -293,12 +301,12 @@ svc_action() {
           ;;
         stop)    $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
         restart)
-          recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
-            $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1
-            $sudo_prefix launchctl enable "$target" >/dev/null 2>&1
-            $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 || \
-              $sudo_prefix launchctl bootstrap "$domain" "$plist" >/dev/null 2>&1
-          }
+          # bootout+bootstrap is the only reliable restart for launchctl
+          # services: it clears terminal exit codes (EX_CONFIG etc.) and
+          # re-registers the service from scratch.  A simple SIGTERM often
+          # fails when the service has exited with a non-retryable status.
+          $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
+          $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null || true
           ;;
         enable)  $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
         disable) $sudo_prefix launchctl disable "$target" >/dev/null 2>&1 ;;
