@@ -113,6 +113,7 @@ cmd_list() {
 }
 
 case "${1:-}" in
+  -h|--help) usage; exit 0 ;;
   get) shift; cmd_get "$@" ;;
   set) shift; cmd_set "$@" ;;
   list) cmd_list ;;
