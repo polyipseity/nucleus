@@ -555,7 +555,7 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
   }
 }
 
-# Materialize decrypted wallpapers ahead of DSC so user/registry.dsc.yml can resolve an
+# Materialize decrypted wallpapers ahead of DSC so user/wallpaper.dsc.yml can resolve an
 # explicit active wallpaper path deterministically.
 $wallpaperOutputDir = Join-Path -Path $HOME -ChildPath "Pictures\wallpapers"
 
