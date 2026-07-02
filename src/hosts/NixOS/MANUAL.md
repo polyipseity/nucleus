@@ -29,8 +29,6 @@
 - `nucleus-cloud-setup` — configure cloud remotes and re-apply
 - `nucleus-gc` — run Nix garbage collection
 - `nucleus-gs-pdf-opt` — optimize PDF files with Ghostscript (creates .bak backup)
-
-Also available as a right-click context menu entry: in Nautilus (Scripts → gs optimize pdf) and Dolphin (right-click PDF → gs optimize pdf).
 - `nucleus-health-check` — run health checks
 - `nucleus-replica-sync` — pull cloud replicas
 - `nucleus-replica-reset` — reset local replica state
