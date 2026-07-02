@@ -45,6 +45,10 @@
 - Keep canonical hostnames and display names aligned: `MacBook`, `NixOS`, `Windows`.
 - Prefer preview/beta/canary channels when viable; if stable is required, add a short `# WHY`.
 
+## Interaction Boundaries
+
+- When the user says "only plan", "only research", "do not start implement", or "do not edit files", the agent MUST NOT create or edit any files, run any implementation- related commands, or invoke `/implement-plan`. Only read/search operations and text output are permitted. This is a hard rule, not a suggestion.
+
 ## No Backwards Compatibility
 
 - This codebase has zero tolerance for backwards-compatibility shims, deprecation layers, or migration glue. When renaming, restructuring, or removing something, do it in one commit — no aliases, no fallbacks, no compat wrappers.
@@ -67,3 +71,4 @@ See `.agents/instructions/package-installation-scope.instructions.md` for packag
 - Pre-flight: verify target paths and explicitly list files to be changed.
 - When adding new fragments (`.json`, `.md`, `.nix`, `.ps1`), verify wiring (`imports`, `readFile`, dot-sourcing).
 - Keep reusable Windows PowerShell logic in `src/hosts/Windows/modules/`; keep `src/hosts/Windows/apply.ps1` orchestration-focused.
+- Before modifying any file that has cross-references (imports, callers, grep patterns), first run an exhaustive search of all references and report them. Do not start edits until the full reference map is known.
