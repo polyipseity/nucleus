@@ -8,6 +8,10 @@ argument-hint: "backwardsCompat=no atomicCommits=yes maxConcurrency=1"
 
 Proceed automatically with best-effort defaults. Do not ask for confirmation.
 
+## Guard clause
+
+If the user's message that triggered this prompt contains "only plan", "only research", "do not start implement", "do not edit files", or any equivalent boundary marker, this prompt MUST NOT auto-execute. Instead, output a brief confirmation of the boundary and stop. Do not create plan files, run commands, or edit anything.
+
 ## Workflow
 
 1. **Create the plan file**
