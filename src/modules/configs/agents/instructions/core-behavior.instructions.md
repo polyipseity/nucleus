@@ -23,6 +23,8 @@ Default operating mode for all agent interactions.
 - Verify changes thoroughly before finishing (syntax/lint/tests/runtime checks relevant to the task).
 - **Consult project architecture docs** (AGENTS.md, .agents/instructions/) before placing new code. Do not guess code organization.
 - **Default to the simplest possible implementation.** Every abstraction, extra layer, or defensive guard must justify itself. If in doubt, leave it out.
+- **Git boundary.** Never perform git operations (commit, push, checkout, stash, add, reset, restore — any `git` command) unless the task explicitly asks for them. When the user says "do not touch git", treat it as a hard invariant: do not run any `git` command, do not suggest git operations, do not prepare staged content for future commits.
+- **Strict scope adherence.** When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, and do not re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
 
 ## Terminal hygiene
 
@@ -31,6 +33,14 @@ Default operating mode for all agent interactions.
 ## Research scope
 
 - For queries scoped with "research only", "verify only", or similar boundary markers, produce concise findings (≤~1k chars). Give the key answer and let the user ask for depth. Do not generate comprehensive reports that will be discarded or refined.
+
+## Instruction compliance
+
+- **Re-read instructions when context changes.** When a task transitions into a new domain (e.g., switches from editing notes to running Python, or from writing content to debugging a tool), re-read any instruction files that apply to the new context. Do not rely on memory of rules from earlier in the conversation — instruction files are the ground truth.
+- **Critical gotchas (violations cause data loss or task failure):**
+  - NEVER `cd` into `.agents/skills/` or any skill subfolder. Always run commands from the repo root. Running inside a skill folder creates `.venv/`/`uv.lock` trash there and fails.
+  - NEVER suggest or run `uv run -m init generate` — content generation is automatic. This instruction applies to ALL content in this repo.
+  - NEVER suggest or run `uv run -m init generate -C`.
 
 ## Premise integrity
 
