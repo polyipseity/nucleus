@@ -957,7 +957,9 @@
       #               package manager), Rust toolchain via rust-overlay (reads
       #               rust-toolchain.toml when present in the project root;
       #               falls back to the latest stable default otherwise), prek
-      #               (Git hook manager for repos that opt in via prek.toml).
+      #               (Git hook manager for repos that opt in via prek.toml),
+      #               nixfmt (Nix formatter), powershell (pwsh) for pre-commit
+      #               validation, and packer for VM template builds.
       #               Auto-loaded by nix-direnv from the repo root .envrc.
       #   bootstrap — bootstrap tool set (gnupg, sops, ssh-to-age) for manual
       #               secret lifecycle tasks during initial provisioning.
@@ -980,6 +982,9 @@
             pkgsDevMac.mkShell {
               packages = [
                 pkgsDevMac.bun
+                pkgsDevMac.nixfmt
+                pkgsDevMac.packer
+                pkgsDevMac.powershell
                 pkgsDevMac.prek
                 rustToolchain
                 pkgsDevMac.uv
@@ -1018,6 +1023,9 @@
             pkgsDevLinux.mkShell {
               packages = [
                 pkgsDevLinux.bun
+                pkgsDevLinux.nixfmt
+                pkgsDevLinux.packer
+                pkgsDevLinux.powershell
                 pkgsDevLinux.prek
                 rustToolchain
                 pkgsDevLinux.uv
