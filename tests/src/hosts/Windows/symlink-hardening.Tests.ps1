@@ -171,7 +171,7 @@ Describe "Symlink Hardening - Windows" {
 Describe "Obsidian Configuration - Windows DSC" {
   Context "WinGet DSC Obsidian Settings" {
     It "should have DisableAutoUpdate configuration" {
-      $dscPath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/user/dsc.yml"
+      $dscPath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/user/registry.dsc.yml"
       $content = Get-Content -Path $dscPath -Raw
       # Check if Obsidian is configured (DSC format check)
       $content | Should -Match "Obsidian|obsidian" -Because "Obsidian should be configured in Windows DSC"

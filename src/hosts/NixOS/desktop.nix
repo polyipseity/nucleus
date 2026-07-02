@@ -197,7 +197,7 @@
   # Channel note: no Steam beta/preview channel is exposed as a NixOS module
   # option; programs.steam always tracks the latest stable release.
   # Cross-platform parity: macOS uses the Homebrew steam cask; Windows uses
-  # Valve.Steam in system-packages.dsc.yml.
+  # Valve.Steam in system/packages.dsc.yml.
   # Sources:
   # https://nixos.wiki/wiki/Steam
   # https://mynixos.com/nixpkgs/option/programs.steam.enable

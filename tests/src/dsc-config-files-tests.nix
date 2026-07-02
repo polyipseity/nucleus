@@ -21,8 +21,8 @@ let
   # Expected user-level DSC files (bare filenames; apply.ps1 prepends "user/").
   expectedUserDscFiles = [
     "context.dsc.yml"
-    "dsc.yml"
     "env.dsc.yml"
+    "registry.dsc.yml"
   ];
 
   # The primary user from the registry.
@@ -32,12 +32,12 @@ let
   # apply.ps1 default ConfigFiles assertions
   # ---------------------------------------------------------------------------
 
-  # Test 1: Default ConfigFiles must include both system-level DSC files (subfolder paths).
-  test_default_includes_system_files = assert' (containsRegex ''"system/dsc\.yml", "system/packages\.dsc\.yml"'' windowsApplyText) "Default ConfigFiles must contain system/dsc.yml and system/packages.dsc.yml";
+  # Test 1: Default ConfigFiles must include all system-level DSC files (subfolder paths).
+  test_default_includes_system_files = assert' (containsRegex ''"system/settings\.dsc\.yml", "system/registry\.dsc\.yml", "system/packages\.dsc\.yml"'' windowsApplyText) "Default ConfigFiles must contain system/settings.dsc.yml, system/registry.dsc.yml, and system/packages.dsc.yml";
 
   # Test 2: Default ConfigFiles must NOT include any user-level DSC file.
   test_default_excludes_user_files = assert' (
-    (!containsRegex ''ConfigFiles = [^)]*user/dsc\.yml[^)]*\)'' windowsApplyText)
+    (!containsRegex ''ConfigFiles = [^)]*user/registry\.dsc\.yml[^)]*\)'' windowsApplyText)
     && (!containsRegex ''ConfigFiles = [^)]*user/env\.dsc\.yml[^)]*\)'' windowsApplyText)
     && (!containsRegex ''ConfigFiles = [^)]*user/context\.dsc\.yml[^)]*\)'' windowsApplyText)
   ) "Default ConfigFiles must NOT contain any user-level DSC file";
@@ -77,16 +77,17 @@ let
       user = builtins.head primaryUsers;
     in
     builtins.all (f: builtins.elem f (user.dscConfigFiles or [ ])) expectedUserDscFiles
-  ) "Primary user's dscConfigFiles must include context.dsc.yml, dsc.yml, and env.dsc.yml";
+  ) "Primary user's dscConfigFiles must include context.dsc.yml, env.dsc.yml, and registry.dsc.yml";
 
   # Test 8: Primary user must not have system-level files in dscConfigFiles.
   test_primary_user_no_system_files = assert' (
     let
       user = builtins.head primaryUsers;
     in
-    !builtins.elem "system/dsc.yml" (user.dscConfigFiles or [ ])
+    !builtins.elem "system/settings.dsc.yml" (user.dscConfigFiles or [ ])
+    && !builtins.elem "system/registry.dsc.yml" (user.dscConfigFiles or [ ])
     && !builtins.elem "system/packages.dsc.yml" (user.dscConfigFiles or [ ])
-  ) "Primary user's dscConfigFiles must not contain system/dsc.yml or system/packages.dsc.yml";
+  ) "Primary user's dscConfigFiles must not contain system-level DSC files";
 
   # Test 9: Primary user files must be in alphabetical order.
   test_primary_user_files_alphabetical = assert' (
@@ -117,7 +118,7 @@ in
   testCount = 11;
   message = "All 11 DSC config file declaration tests passed";
   testNames = [
-    "1:  Default ConfigFiles includes system/dsc.yml and system/packages.dsc.yml"
+    "1:  Default ConfigFiles includes system/settings.dsc.yml, system/registry.dsc.yml, and system/packages.dsc.yml"
     "2:  Default ConfigFiles excludes user-level DSC files"
     "3:  ConfigFiles param doc describes per-user extension via users.json"
     "4:  Deduplication mechanism exists in apply.ps1"

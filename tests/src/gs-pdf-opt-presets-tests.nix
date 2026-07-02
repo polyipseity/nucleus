@@ -7,7 +7,7 @@ let
   lib = import <nixpkgs/lib>;
   macServicesText = builtins.readFile ../../src/hosts/MacBook/services.nix;
   nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
-  windowsDscText = builtins.readFile ../../src/hosts/Windows/user/gs-pdf-opt.dsc.yml;
+  windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context.dsc.yml;
 
   inherit (import ../lib.nix) assert';
 
