@@ -380,18 +380,6 @@ if [[ -f "$GS_PDF_OPT_SH" ]]; then
     test_help_handler "$GS_PDF_OPT_SH"
 fi
 
-# Test src/scripts/gs-pdf-opt.sh (shared library)
-GS_PDF_OPT_LIB_SH="src/scripts/gs-pdf-opt.sh"
-if [[ -f "$GS_PDF_OPT_LIB_SH" ]]; then
-    test_bash_syntax "$GS_PDF_OPT_LIB_SH"
-    test_has_shebang "$GS_PDF_OPT_LIB_SH"
-    test_is_executable "$GS_PDF_OPT_LIB_SH"
-    test_dependencies_available "$GS_PDF_OPT_LIB_SH" gs
-    test_error_handling "$GS_PDF_OPT_LIB_SH"
-    test_has_documentation "$GS_PDF_OPT_LIB_SH"
-    test_no_dangerous_patterns "$GS_PDF_OPT_LIB_SH"
-fi
-
 # Test scripts/svc.sh (macOS-only: launchctl-based service management)
 SVC_SH="scripts/svc.sh"
 if [[ -f "$SVC_SH" ]]; then

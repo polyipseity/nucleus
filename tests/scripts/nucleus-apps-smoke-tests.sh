@@ -109,10 +109,7 @@ test_package_build_and_run() {
 	fi
 }
 test_package_build_and_run nucleus-check-pwsh false
-# gs-pdf-opt: known pre-existing shellcheck SC1091 warning in derivation
-# (source path unresolvable at analysis time). Skip build test until the
-# derivation is fixed.
-assert_skip nucleus-gs-pdf-opt build "pre-existing shellcheck SC1091 in derivation"
+test_package_build_and_run nucleus-gs-pdf-opt true
 
 # --- Tier 2: dry-run tests -------------------------------------------------
 # Commands that support --dry-run: run in dry mode to verify the control flow
