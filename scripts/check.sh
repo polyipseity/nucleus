@@ -381,15 +381,13 @@ fi
 # Locked DSC validation
 printf '\n=== [%s] Locked DSC validation ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
-  _dsc_system="src/hosts/Windows/system/dsc.yml"
   _dsc_system_packages="src/hosts/Windows/system/packages.dsc.yml"
   _lockfile="src/lockfiles/lockfile.json"
   _lf_errors=0
 
-  # Generate locked DSC in-memory from both system DSC files + lockfile.
-  # Merge resources from system/packages.dsc.yml into a single tree, then lock.
+  # Generate locked DSC in-memory from system packages DSC + lockfile.
   _locked_json=$(jq -s --argjson locked "$(jq -c '.winget // {}' "$_lockfile")" '
-    { properties: { resources: (.[0].properties.resources + .[1].properties.resources) } } |
+    { properties: { resources: .[0].properties.resources } } |
     .properties.resources |= [
       .[] | if .resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and ($locked[.settings.id] | length > 0) then
         .settings.version = $locked[.settings.id]
@@ -397,7 +395,7 @@ if ! $HAS_ARGS; then
         .
       end
     ]
-  ' <(yq eval -o=j '.' "$_dsc_system") <(yq eval -o=j '.' "$_dsc_system_packages"))
+  ' <(yq eval -o=j '.' "$_dsc_system_packages"))
 
   # For each pinned resource, verify version matches lockfile.
   while IFS=$'\t' read -r _id _pinned_ver; do
