@@ -58,4 +58,8 @@ bash scripts/check-sh.sh
 printf '\n=== [%s] PowerShell lint ===\n' "$((_step += 1))"
 pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1
 
+# 4. Nucleus apps smoke tests (build + --help / dry-run)
+printf '\n=== [%s] Nucleus apps smoke tests ===\n' "$((_step += 1))"
+bash tests/scripts/nucleus-apps-smoke-tests.sh
+
 printf '\nAll tests passed.\n'
