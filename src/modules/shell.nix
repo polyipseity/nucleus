@@ -676,15 +676,19 @@ in
         "$_zsh_comp_dir/_bun" \
         "'${pkgs.bun}/bin/bun' completions"
 
-      _generate_if_stale \
-        "${pkgs.cargo-binstall}/bin/cargo-binstall" \
-        "$_zsh_comp_dir/_cargo-binstall" \
-        "'${pkgs.cargo-binstall}/bin/cargo-binstall' --completion zsh"
+      # cargo-binstall skipped: --completion flag not supported in current
+      # version (confirmed 2026-07-01). No replacement available.
+      #_generate_if_stale \
+      #  "${pkgs.cargo-binstall}/bin/cargo-binstall" \
+      #  "$_zsh_comp_dir/_cargo-binstall" \
+      #  "'${pkgs.cargo-binstall}/bin/cargo-binstall' --completion zsh"
 
-      _generate_if_stale \
-        "${pkgs.eza}/bin/eza" \
-        "$_zsh_comp_dir/_eza" \
-        "'${pkgs.eza}/bin/eza' --generate-completion zsh"
+      # eza skipped: --generate-completion / --completion flags not supported
+      # in current version (confirmed 2026-07-01). No replacement available.
+      #_generate_if_stale \
+      #  "${pkgs.eza}/bin/eza" \
+      #  "$_zsh_comp_dir/_eza" \
+      #  "'${pkgs.eza}/bin/eza' --generate-completion zsh"
 
       _generate_if_stale \
         "${pkgs.fd}/bin/fd" \
@@ -701,10 +705,13 @@ in
         "$_zsh_comp_dir/_opencode" \
         "'${pkgs.opencode}/bin/opencode' completion zsh"
 
-      _generate_if_stale \
-        "${pkgs.prek}/bin/prek" \
-        "$_zsh_comp_dir/_prek" \
-        "'${pkgs.prek}/bin/prek' completion zsh"
+      # prek skipped: no completion subcommand exists in current version
+      # (confirmed 2026-07-01). "prek completion zsh" is interpreted as hook
+      # selectors, not a completion command.
+      #_generate_if_stale \
+      #  "${pkgs.prek}/bin/prek" \
+      #  "$_zsh_comp_dir/_prek" \
+      #  "'${pkgs.prek}/bin/prek' completion zsh"
 
       _generate_if_stale \
         "${pkgs.ruff}/bin/ruff" \
@@ -719,7 +726,7 @@ in
       _generate_if_stale \
         "${pkgs.typst}/bin/typst" \
         "$_zsh_comp_dir/_typst" \
-        "'${pkgs.typst}/bin/typst' completion zsh"
+        "'${pkgs.typst}/bin/typst' completions zsh"
 
       _generate_if_stale \
         "${pkgs.uv}/bin/uv" \
