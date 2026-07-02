@@ -8,6 +8,8 @@ applyTo: "src/hosts/Windows/**/*.yml"
 
 ## File location and purpose
 
+Each DSC file covers exactly one Windows subsystem or functional concern. Do not mix resources from different subsystems in the same file. If a new setting belongs to an existing subsystem, add it to that subsystem's file; if it introduces a new concern, create a new file.
+
 - `src/hosts/Windows/system/scheduler.dsc.yml` — scheduled task (weekly gc).
 - `src/hosts/Windows/system/developer-mode.dsc.yml` — Developer Mode toggle.
 - `src/hosts/Windows/system/firewall.dsc.yml` — firewall enable/disable.
@@ -23,7 +25,7 @@ applyTo: "src/hosts/Windows/**/*.yml"
 - `src/hosts/Windows/user/explorer.dsc.yml` — user-level Explorer appearance and behavior registry values.
 - `src/hosts/Windows/user/shell.dsc.yml` — user-level shell autorun (cmd AutoRun).
 - `src/hosts/Windows/user/env.dsc.yml` — user environment variable declarations.
-- `src/hosts/Windows/user/context-manual.dsc.yml`— right-click "open nucleus manual" entries.
+- `src/hosts/Windows/user/context-manual.dsc.yml` — right-click "open nucleus manual" entries.
 - `src/hosts/Windows/user/context-pdf-opt.dsc.yml` — right-click "optimize pdf" presets.
 - They are applied in-order by `src/hosts/Windows/apply.ps1`.
 - Reusable Windows helper logic is loaded from `src/hosts/Windows/modules/*.ps1`; DSC files should remain state declarations rather than script logic.
