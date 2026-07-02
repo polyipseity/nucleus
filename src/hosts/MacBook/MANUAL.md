@@ -40,7 +40,7 @@
 - `nucleus-gc` — run Nix garbage collection
 - `nucleus-gs-pdf-opt` — optimize PDF files with Ghostscript (creates .bak backup)
 
-Also available as a right-click Finder Service: select one or more PDFs, right-click → Services → gs optimize pdf.
+Also available as right-click Finder Services: right-click one or more PDFs → Services → optimize pdf (default), optimize pdf (ebook), optimize pdf (prepress), optimize pdf (printer), optimize pdf (screen).
 - `nucleus-health-check` — run health checks
 - `nucleus-replica-sync` — pull cloud replicas
 - `nucleus-replica-reset` — reset local replica state

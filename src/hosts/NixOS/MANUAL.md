@@ -30,7 +30,7 @@
 - `nucleus-gc` — run Nix garbage collection
 - `nucleus-gs-pdf-opt` — optimize PDF files with Ghostscript (creates .bak backup)
 
-Also available as a right-click context menu entry: in Nautilus (Scripts → gs optimize pdf) and Dolphin (right-click PDF → gs optimize pdf).
+Also available as right-click context menu entries: in Nautilus (Scripts → optimize pdf (default/ebook/prepress/printer/screen)) and Dolphin (right-click PDF → optimize pdf (default/ebook/prepress/printer/screen)).
 - `nucleus-health-check` — run health checks
 - `nucleus-replica-sync` — pull cloud replicas
 - `nucleus-replica-reset` — reset local replica state
