@@ -70,18 +70,29 @@ let
         rm -rf "$build_dir"
       '';
 
-  nucleusGSPDFOptApp =
-    pkgs.runCommand "nucleus-gs-pdf-opt-app"
+  # Generate a per-preset .app bundle for Ghostscript PDF optimization.
+  # Each preset gets its own .app so it can have a distinct menu label.
+  gsPdfOptPresets = [
+    "default"
+    "ebook"
+    "prepress"
+    "printer"
+    "screen"
+  ];
+
+  mkGSPDFOptApp =
+    preset:
+    pkgs.runCommand "nucleus-gs-pdf-opt-${preset}-app"
       {
         preferLocalBuild = true;
         allowSubstitutes = false;
       }
       ''
         as_src="$TMPDIR/NucleusGSPDFOpt.applescript"
-        cat > "$as_src" << 'APPLESCRIPT'
+        cat > "$as_src" << APPLESCRIPT
           on open theFiles
             repeat with theFile in theFiles
-              do shell script "export PATH=\"$HOME/.nix-profile/bin:/usr/local/bin:/usr/bin:/bin\" && nucleus-gs-pdf-opt --preset default " & quoted form of POSIX path of theFile
+              do shell script "export PATH=\"\$HOME/.nix-profile/bin:/usr/local/bin:/usr/bin:/bin\" && nucleus-gs-pdf-opt --preset ${preset} " & quoted form of POSIX path of theFile
             end repeat
           end open
           on run
@@ -90,27 +101,34 @@ let
         APPLESCRIPT
 
         build_dir="$(mktemp -d)"
-        /usr/bin/osacompile -l AppleScript -o "$build_dir/NucleusGSPDFOpt.app" "$as_src"
+        /usr/bin/osacompile -l AppleScript -o "$build_dir/NucleusGSPDFOpt-${preset}.app" "$as_src"
 
-        plist="$build_dir/NucleusGSPDFOpt.app/Contents/Info.plist"
-        /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.nucleus.GSPDFOpt" "$plist"
-        /usr/libexec/PlistBuddy -c "Set :CFBundleName GS PDF Opt" "$plist"
+        plist="$build_dir/NucleusGSPDFOpt-${preset}.app/Contents/Info.plist"
+        /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.nucleus.GSPDFOpt-${preset}" "$plist"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleName Optimize PDF (${preset})" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices array" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0 dict" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem dict" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem:default string gs optimize pdf" "$plist"
+        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem:default string optimize pdf (${preset})" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMessage string open" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes array" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes:0 string NSFilenamesPboardType" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes array" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes:0 string com.adobe.pdf" "$plist"
 
-        /usr/bin/codesign --force -s - "$build_dir/NucleusGSPDFOpt.app"
+        /usr/bin/codesign --force -s - "$build_dir/NucleusGSPDFOpt-${preset}.app"
 
         mkdir -p "$out"
-        cp -R "$build_dir/NucleusGSPDFOpt.app" "$out/"
+        cp -R "$build_dir/NucleusGSPDFOpt-${preset}.app" "$out/"
         rm -rf "$build_dir"
       '';
+
+  nucleusGSPDFOptApps = builtins.listToAttrs (
+    map (p: {
+      name = p;
+      value = mkGSPDFOptApp p;
+    }) gsPdfOptPresets
+  );
 in
 {
   # Symlink the manual to a fixed home path so the .app can find it without
@@ -143,22 +161,31 @@ in
     /usr/bin/defaults read pbs > /dev/null || true
   '';
 
-  home.activation.deployGSPDFOptService = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    app_dir="$HOME/Applications"
-    app_path="$app_dir/NucleusGSPDFOpt.app"
-    store_path="${nucleusGSPDFOptApp}/NucleusGSPDFOpt.app"
+  home.activation.deployGSPDFOptServices = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+    let
+      LSREGISTER = "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister";
+      deployOne = preset: app: ''
+        app_dir="$HOME/Applications"
+        app_path="$app_dir/NucleusGSPDFOpt-${preset}.app"
+        store_path="${app}/NucleusGSPDFOpt-${preset}.app"
 
-    mkdir -p "$app_dir"
-    chmod -R +w "$app_path" 2>/dev/null || true
-    rm -rf "$app_path"
-    cp -R "$store_path" "$app_dir/"
+        mkdir -p "$app_dir"
+        chmod -R +w "$app_path" 2>/dev/null || true
+        rm -rf "$app_path"
+        cp -R "$store_path" "$app_dir/"
 
-    LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
-    "$LSREGISTER" -R -f "$app_path" || true
+        "$LSREGISTER" -R -f "$app_path" || true
 
-    enablement_key="com.nucleus.GSPDFOpt - gs optimize pdf - open"
-    /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
-      '<dict><key>enabled_context_menu</key><true/><key>enabled_services_menu</key><true/></dict>'
-    /usr/bin/defaults read pbs > /dev/null || true
-  '';
+        enablement_key="com.nucleus.GSPDFOpt-${preset} - optimize pdf (${preset}) - open"
+        /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
+          '<dict><key>enabled_context_menu</key><true/><key>enabled_services_menu</key><true/></dict>'
+      '';
+    in
+    builtins.concatStringsSep "\n" (
+      map (preset: deployOne preset nucleusGSPDFOptApps.${preset}) gsPdfOptPresets
+    )
+    + ''
+      /usr/bin/defaults read pbs > /dev/null || true
+    ''
+  );
 }
