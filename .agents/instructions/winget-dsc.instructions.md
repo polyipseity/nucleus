@@ -8,11 +8,12 @@ applyTo: "src/hosts/Windows/**/*.yml"
 
 ## File location and purpose
 
-- `src/hosts/Windows/system.dsc.yml` contains pre-provision system baseline resources (machine settings, system registry, scheduled tasks, firewall rules).
-- `src/hosts/Windows/system-packages.dsc.yml` contains all WinGet-managed system-level package installations.
-- `src/hosts/Windows/user.dsc.yml` contains post-provision user baseline resources (wallpaper, Explorer appearance, lock settings, shell autorun).
-- `src/hosts/Windows/user-env.dsc.yml` contains user environment variable declarations.
-- `src/hosts/Windows/user-context.dsc.yml` contains right-click context menu registry entries.
+- `src/hosts/Windows/system/settings.dsc.yml` contains machine-level settings resources (scheduled tasks, developer mode, taskbar, firewall).
+- `src/hosts/Windows/system/registry.dsc.yml` contains system-wide HKLM registry values (computer name, long paths, RDP, font substitution, storage sense).
+- `src/hosts/Windows/system/packages.dsc.yml` contains all WinGet-managed system-level package installations.
+- `src/hosts/Windows/user/registry.dsc.yml` contains user-level HKCU registry values (wallpaper, Explorer appearance, lock settings, shell autorun).
+- `src/hosts/Windows/user/env.dsc.yml` contains user environment variable declarations.
+- `src/hosts/Windows/user/context.dsc.yml` contains right-click context menu registry entries.
 - They are applied in-order by `src/hosts/Windows/apply.ps1`.
 - Reusable Windows helper logic is loaded from `src/hosts/Windows/modules/*.ps1`; DSC files should remain state declarations rather than script logic.
 
@@ -67,7 +68,7 @@ Use `PSDscResources/Script` only for imperative steps that cannot be expressed b
 
 **When PATH is not guaranteed during DSC execution:** DSC resources run in a fresh PowerShell session where `$env:PATH` may not include user-level tool directories (for example `~\.cargo\bin` from a prior `rustup init` call). Any `PSDscResources/Script` block that invokes a user-installed binary must prepend the relevant path explicitly in `SetScript` and `TestScript`. If that cannot be done reliably, do not add the resource — document the gap and rely on a graceful probe in `apply.ps1` or a `scripts/gc.ps1`-style script instead.
 
-**cargo-cache is managed via cargo-binstall, not `system-packages.dsc.yml`:** `cargo-cache` has no WinGet package ID and is not in Scoop. It is installed declaratively by `Invoke-CargoBinstallSetup` (in `src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1`) which runs after the DSC step in `apply.ps1`. `scripts/gc.ps1` probes for the binary gracefully and skips pruning when it is absent.
+**cargo-cache is managed via cargo-binstall, not `system/packages.dsc.yml`:** `cargo-cache` has no WinGet package ID and is not in Scoop. It is installed declaratively by `Invoke-CargoBinstallSetup` (in `src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1`) which runs after the DSC step in `apply.ps1`. `scripts/gc.ps1` probes for the binary gracefully and skips pruning when it is absent.
 
 ## PSDscResources/Script resource
 
@@ -124,10 +125,10 @@ Do **not** use a Script block for operations where PATH is unreliable, state is 
 
 When adding a new tool or capability, choose the package manager in this order:
 
-1. **WinGet (`system-packages.dsc.yml`)** — preferred for any package with a WinGet ID. Declarative, `--what-if`-capable, and centrally tracked.
+1. **WinGet (`system/packages.dsc.yml`)** — preferred for any package with a WinGet ID. Declarative, `--what-if`-capable, and centrally tracked.
 2. **Scoop (`src/hosts/Windows/modules/Invoke-ScoopSetup.ps1`)** — for portable CLI utilities that have no WinGet ID but exist in a Scoop bucket. Scoop is the user-space fallback: it requires no admin rights and installs to `%USERPROFILE%\scoop\`.
 3. **cargo binstall (`src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1`)** — for Rust CLI tools not available in WinGet or Scoop. cargo-binstall downloads prebuilt binaries without requiring a local Rust toolchain.
-4. **bun (`src/hosts/Windows/modules/Invoke-BunSetup.ps1`)** — last resort for JS/npm-only tools absent from WinGet, Scoop, and cargo-binstall. `bun install -g` places binaries in `%USERPROFILE%\.bun\bin`. Bun itself is installed via WinGet (`Oven-sh.Bun` in `system-packages.dsc.yml`).
+4. **bun (`src/hosts/Windows/modules/Invoke-BunSetup.ps1`)** — last resort for JS/npm-only tools absent from WinGet, Scoop, and cargo-binstall. `bun install -g` places binaries in `%USERPROFILE%\.bun\bin`. Bun itself is installed via WinGet (`Oven-sh.Bun` in `system/packages.dsc.yml`).
 
 The equivalent hierarchy on POSIX hosts is: `nixpkgs > cargo binstall > bun`.
 
@@ -139,7 +140,7 @@ Document any departure from this order with a short WHY comment explaining why a
 
 Scoop is the user-space package manager for portable CLI utilities that have no WinGet package ID. It installs to `%USERPROFILE%\scoop\` without requiring admin rights. Use Scoop when a tool is absent from WinGet but available in a Scoop bucket (e.g. `cargo-binstall` from the `main` bucket).
 
-### Declaring Scoop in system-packages.dsc.yml
+### Declaring Scoop in system/packages.dsc.yml
 
 Install Scoop itself via WinGet (package ID `Scoop.Scoop`). Scoop requires `Git.Git` for bucket management; ensure it appears in the packages list. Use `dependsOn` to enforce ordering:
 
