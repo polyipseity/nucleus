@@ -20,6 +20,7 @@ Execution checklist:
 3. Apply the smallest coherent simplification that materially improves clarity.
 4. Validate behavior still matches intent.
 5. Commit in atomic slices with precise messages.
+6. **Verify actual behavior** — run the changed code path and check the output. Compilation is not sufficient; ensure the change produces the intended user-visible effect.
 
 Broad cleanup rule:
 
@@ -39,6 +40,16 @@ Safety rules:
 - NEVER use `git reset` (especially `--hard` or `--keep`) under any circumstance. It destroys uncommitted work and can wipe days of progress. Use `git revert` or `git restore` instead.
 - Never revert or cherry-pick earlier than the captured baseline hash.
 - Do not mix unrelated concerns in the same commit.
+
+## Investigation protocol
+
+When investigating a bug or unexpected behavior:
+
+1. Trace the full call chain from entry point to leaf operations.
+2. Enumerate all plausible root causes before diving into any single one.
+3. For each cause, produce concrete evidence (log lines, error output, observed values) — do not reason from assumptions.
+4. Report findings with evidence before proposing fixes.
+5. Propose the simplest fix that addresses the confirmed root cause.
 
 ## Atomic commit workflow (unstaged changes → multiple commits)
 

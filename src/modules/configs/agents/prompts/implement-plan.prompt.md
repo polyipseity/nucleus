@@ -21,15 +21,21 @@ Proceed automatically with best-effort defaults. Do not ask for confirmation.
    - Backwards compatibility: if `${input:backwardsCompat}` is `yes`, preserve backwards compatibility; otherwise (default), do not add compat shims.
    - Think and work step by step, explain your reasoning. No filler.
    - If `${input:atomicCommits}` is `no`, skip all git operations. Otherwise (default `yes`), commit each atomic change with a precise message after each meaningful sub-step.
+   - Re-read the original plan file regularly — especially after interruptions or context switches — to ensure no phase is skipped or misinterpreted.
 
 3. **Use subagents for parallelism**
    - Spawn subagents to manage context and work in parallel on independent lanes.
    - Limit concurrent subagents to `${input:maxConcurrency}` (default 1).
    - Subagents must also follow the step-by-step reasoning and no-filler style.
 
-4. **Finalize**
-   - After the plan is fully executed, verify everything was done.
-   - Output a concise summary of what was implemented.
+4. **Verify completeness before finalizing**
+   - Re-read the original plan file. Verify every phase is fully implemented.
+   - If any phase was ambiguous, re-read the source context that generated the plan.
+   - Do not declare completion for phases that were skipped or only partially done.
+
+5. **Finalize**
+   - After the plan is fully verified and executed, output a concise summary.
+   - Include what was implemented, what files changed, and any deferred items.
 
 ## Inputs
 
