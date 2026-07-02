@@ -59,7 +59,7 @@ function Write-RestartLog {
 }
 
 # ── Check native services ──────────────────────────────────────────────────
-function Check-NativeService {
+function Test-NativeService {
   param([string]$Key, [string]$DisplayName, [string]$ServiceName)
 
   try {
@@ -75,7 +75,7 @@ function Check-NativeService {
 }
 
 # ── Check scheduled tasks ──────────────────────────────────────────────────
-function Check-ScheduledTask {
+function Test-ScheduledTask {
   param([string]$Key, [string]$DisplayName, [string]$TaskPath)
 
   try {
@@ -98,10 +98,10 @@ function Check-ScheduledTask {
 foreach ($svc in $Services) {
   switch ($svc.type) {
     "native" {
-      Check-NativeService -Key $svc.key -DisplayName $svc.displayName -ServiceName $svc.service
+      Test-NativeService -Key $svc.key -DisplayName $svc.displayName -ServiceName $svc.service
     }
     "schtask" {
-      Check-ScheduledTask -Key $svc.key -DisplayName $svc.displayName -TaskPath $svc.taskPath
+      Test-ScheduledTask -Key $svc.key -DisplayName $svc.displayName -TaskPath $svc.taskPath
     }
     default {
       Write-Output "watchdog: unsupported type $($svc.type) for $($svc.key)"
