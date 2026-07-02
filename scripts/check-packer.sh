@@ -40,6 +40,8 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+require_command packer
+
 # Check formatting
 if [ "$#" -gt 0 ]; then
   packer fmt -check "$@"

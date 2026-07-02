@@ -50,9 +50,8 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -
         non-zero on failure.
     """
     if sys.platform != "win32":
-        # Nix run (slow, ~2s per invocation for flake evaluation).
         # Direct call is safe because the required tools (nixfmt, pwsh, packer)
-        # are available via the user's profile or direnv dev shell.
+        # are available in the default devShell (loaded by .envrc use flake).
         cmd = [str(repo_root / "scripts" / "check.sh")]
         if format_enabled:
             cmd.append("--format")

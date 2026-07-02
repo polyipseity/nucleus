@@ -115,6 +115,7 @@ fi
 
 # Nix formatting check
 printf '\n=== [%s] Nix formatting (nixfmt) ===\n' "$((_step += 1))"
+require_command nixfmt
 if [ "${#NIX_FILES[@]}" -gt 0 ]; then
   if $FORMAT_NIX; then
     nixfmt -s "${NIX_FILES[@]}"
@@ -131,6 +132,7 @@ fi
 
 # PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 printf '\n=== [%s] PowerShell syntax validation ===\n' "$((_step += 1))"
+require_command pwsh
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly "${PS1_FILES[@]}"
 elif ! $HAS_ARGS; then
