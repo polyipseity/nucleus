@@ -8,12 +8,23 @@ applyTo: "src/hosts/Windows/**/*.yml"
 
 ## File location and purpose
 
-- `src/hosts/Windows/system/settings.dsc.yml` contains machine-level settings resources (scheduled tasks, developer mode, taskbar, firewall).
-- `src/hosts/Windows/system/registry.dsc.yml` contains system-wide HKLM registry values (computer name, long paths, RDP, font substitution, storage sense).
-- `src/hosts/Windows/system/packages.dsc.yml` contains all WinGet-managed system-level package installations.
-- `src/hosts/Windows/user/registry.dsc.yml` contains user-level HKCU registry values (wallpaper, Explorer appearance, lock settings, shell autorun).
-- `src/hosts/Windows/user/env.dsc.yml` contains user environment variable declarations.
-- `src/hosts/Windows/user/context.dsc.yml` contains right-click context menu registry entries.
+- `src/hosts/Windows/system/scheduler.dsc.yml` — scheduled task (weekly gc).
+- `src/hosts/Windows/system/developer-mode.dsc.yml` — Developer Mode toggle.
+- `src/hosts/Windows/system/firewall.dsc.yml` — firewall enable/disable.
+- `src/hosts/Windows/system/taskbar.dsc.yml` — taskbar alignment and size.
+- `src/hosts/Windows/system/computer-name.dsc.yml` — HKLM computer name.
+- `src/hosts/Windows/system/long-paths.dsc.yml` — HKLM long path support.
+- `src/hosts/Windows/system/storage-sense.dsc.yml` — HKLM Storage Sense policy values.
+- `src/hosts/Windows/system/font-substitutes.dsc.yml` — HKLM font substitution entries.
+- `src/hosts/Windows/system/remote-desktop.dsc.yml` — HKLM RDP policy values.
+- `src/hosts/Windows/system/packages.dsc.yml` — all WinGet-managed system-level package installations.
+- `src/hosts/Windows/user/wallpaper.dsc.yml` — user-level wallpaper folder, path, and refresh script.
+- `src/hosts/Windows/user/screen-saver.dsc.yml` — user-level screen-saver activation, security, timeout.
+- `src/hosts/Windows/user/explorer.dsc.yml` — user-level Explorer appearance and behavior registry values.
+- `src/hosts/Windows/user/shell.dsc.yml` — user-level shell autorun (cmd AutoRun).
+- `src/hosts/Windows/user/env.dsc.yml` — user environment variable declarations.
+- `src/hosts/Windows/user/context-manual.dsc.yml`— right-click "open nucleus manual" entries.
+- `src/hosts/Windows/user/context-pdf-opt.dsc.yml` — right-click "optimize pdf" presets.
 - They are applied in-order by `src/hosts/Windows/apply.ps1`.
 - Reusable Windows helper logic is loaded from `src/hosts/Windows/modules/*.ps1`; DSC files should remain state declarations rather than script logic.
 

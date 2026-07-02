@@ -1,0 +1,23 @@
+# WinGet DSC v3 - user-level shell autorun (cmd AutoRun)
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: cmdAutoRun
+      directives:
+        description: >-
+          Suppress cmd.exe echo and simplify prompt in AI agent sessions.
+          Agent env var names sourced from src/modules/agent-env-vars.nix.
+          Uses chained batch if-not-defined conditionals — when any agent
+          indicator is present, the command block is skipped (no echo off,
+          no prompt change), preserving default cmd.exe behavior.
+      settings:
+        keyPath: HKCU\Software\Microsoft\Command Processor
+        valueName: AutoRun
+        valueData: >-
+          @if not defined AGENT if not defined AI_AGENT if not defined
+          AUGMENT_AGENT if not defined CLAUDECODE if not defined CLAUDE_CODE
+          if not defined CURSOR_AGENT if not defined GOOSE_TERMINAL if not
+          defined CLINE_ACTIVE if not defined GEMINI_CLI if not defined
+          CODEX_SANDBOX if not defined TRAE_AI_SHELL_ID if not defined
+          OPENCODE_CLIENT if not defined NUCLEUS_AGENT_SESSION if not defined VSCODE_AGENT if not exist

@@ -111,9 +111,13 @@
         ]
       },
       "dscConfigFiles": [
-        "context.dsc.yml",
+        "context-manual.dsc.yml",
+        "context-pdf-opt.dsc.yml",
         "env.dsc.yml",
-        "registry.dsc.yml"
+        "wallpaper.dsc.yml",
+        "screen-saver.dsc.yml",
+        "explorer.dsc.yml",
+        "shell.dsc.yml"
       ],
       "homeDirectory": "C:\\Users\\polyipseity",
       "isPrimary": true,

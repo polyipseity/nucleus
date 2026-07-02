@@ -23,7 +23,11 @@
 
 .PARAMETER ConfigFiles
   Ordered list of DSC YAML filenames to apply.  Defaults to
-  @('system/settings.dsc.yml', 'system/registry.dsc.yml', 'system/packages.dsc.yml').
+  @('system/scheduler.dsc.yml', 'system/developer-mode.dsc.yml',
+  'system/firewall.dsc.yml', 'system/taskbar.dsc.yml',
+  'system/computer-name.dsc.yml', 'system/long-paths.dsc.yml',
+  'system/storage-sense.dsc.yml', 'system/font-substitutes.dsc.yml',
+  'system/remote-desktop.dsc.yml', 'system/packages.dsc.yml').
   Filenames are resolved relative to $ConfigDir.
 
   Per-user DSC files can be declared in users.json under each
@@ -178,7 +182,7 @@
 
 .EXAMPLE
   # Apply only the user-level DSC file:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -ConfigFiles @('user/registry.dsc.yml')
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -ConfigFiles @('user/wallpaper.dsc.yml')
 
 .EXAMPLE
   # Apply while explicitly scoping secret materialization to one user:
@@ -221,7 +225,7 @@
 [CmdletBinding()]
 param(
   [string]$ConfigDir = $PSScriptRoot,
-  [string[]]$ConfigFiles = @("system/settings.dsc.yml", "system/registry.dsc.yml", "system/packages.dsc.yml"),
+  [string[]]$ConfigFiles = @("system/scheduler.dsc.yml", "system/developer-mode.dsc.yml", "system/firewall.dsc.yml", "system/taskbar.dsc.yml", "system/computer-name.dsc.yml", "system/long-paths.dsc.yml", "system/storage-sense.dsc.yml", "system/font-substitutes.dsc.yml", "system/remote-desktop.dsc.yml", "system/packages.dsc.yml"),
   [Alias("h")]
   [switch]$Help,
   [Parameter(Mandatory)]
@@ -570,14 +574,28 @@ Remove-StaleWallpaper -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutput
 
 # Generate locked DSC from lockfile before applying.
 $lockfilePath = Join-Path -Path $PSScriptRoot -ChildPath "..\..\lockfiles\lockfile.json"
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/settings.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/settings.locked.dsc.yml")
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/registry.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/registry.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/scheduler.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/scheduler.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/developer-mode.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/developer-mode.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/firewall.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/firewall.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/taskbar.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/taskbar.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/computer-name.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/computer-name.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/long-paths.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/long-paths.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/storage-sense.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/storage-sense.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/font-substitutes.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/font-substitutes.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/remote-desktop.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/remote-desktop.locked.dsc.yml")
 ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/packages.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/packages.locked.dsc.yml")
 
 # Replace system DSC files with locked variants in effective config list.
 $effectiveConfigFiles = @($effectiveConfigFiles | ForEach-Object {
-  if ($_ -eq "system/settings.dsc.yml") { "system/settings.locked.dsc.yml" }
-  elseif ($_ -eq "system/registry.dsc.yml") { "system/registry.locked.dsc.yml" }
+  if ($_ -eq "system/scheduler.dsc.yml") { "system/scheduler.locked.dsc.yml" }
+  elseif ($_ -eq "system/developer-mode.dsc.yml") { "system/developer-mode.locked.dsc.yml" }
+  elseif ($_ -eq "system/firewall.dsc.yml") { "system/firewall.locked.dsc.yml" }
+  elseif ($_ -eq "system/taskbar.dsc.yml") { "system/taskbar.locked.dsc.yml" }
+  elseif ($_ -eq "system/computer-name.dsc.yml") { "system/computer-name.locked.dsc.yml" }
+  elseif ($_ -eq "system/long-paths.dsc.yml") { "system/long-paths.locked.dsc.yml" }
+  elseif ($_ -eq "system/storage-sense.dsc.yml") { "system/storage-sense.locked.dsc.yml" }
+  elseif ($_ -eq "system/font-substitutes.dsc.yml") { "system/font-substitutes.locked.dsc.yml" }
+  elseif ($_ -eq "system/remote-desktop.dsc.yml") { "system/remote-desktop.locked.dsc.yml" }
   elseif ($_ -eq "system/packages.dsc.yml") { "system/packages.locked.dsc.yml" }
   else { $_ }
 })

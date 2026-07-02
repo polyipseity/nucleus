@@ -1,0 +1,42 @@
+# WinGet DSC v3 - HKLM font substitution entries
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Substitute Courier New with JetBrains Mono so applications that
+          request the traditional monospace generic fall back to the open-source
+          coding baseline; mirrors the fontconfig defaultFonts.monospace
+          declaration on POSIX hosts
+      settings:
+        keyPath: HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontSubstitutes
+        valueName: Courier New
+        valueData: JetBrains Mono
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Substitute Helvetica with Inter so applications that request the
+          traditional Latin sans-serif generic fall back to the open-source UI
+          baseline; Helvetica is not present on Windows so this substitution
+          is safe and non-disruptive
+      settings:
+        keyPath: HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontSubstitutes
+        valueName: Helvetica
+        valueData: Inter
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Substitute Times New Roman with Source Serif 4 so applications that
+          request the traditional serif generic fall back to the open-source
+          document baseline; mirrors the fontconfig defaultFonts.serif
+          declaration on POSIX hosts
+      settings:
+        keyPath: HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontSubstitutes
+        valueName: Times New Roman
+        valueData: Source Serif 4
+        valueType: String

@@ -1,0 +1,9 @@
+# WinGet DSC v3 - developer mode toggle
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.Windows.Settings/DeveloperMode
+      directives:
+        description: Enable Developer Mode (source https://learn.microsoft.com/windows/apps/get-started/enable-your-device-for-development)
+      settings:
+        Enabled: true

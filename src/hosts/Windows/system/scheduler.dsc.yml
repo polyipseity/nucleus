@@ -1,4 +1,4 @@
-# WinGet DSC v3 - system-level settings for Windows host
+# WinGet DSC v3 - scheduled task for weekly garbage collection
 properties:
   configurationVersion: 0.2.0
   resources:
@@ -33,22 +33,3 @@ properties:
         RunWithHighestPrivileges: false
         RunOnlyWhenNetworkAvailable: false
         RunOnlyIfLoggedOn: true
-
-    - resource: Microsoft.Windows.Settings/DeveloperMode
-      directives:
-        description: Enable Developer Mode (source https://learn.microsoft.com/windows/apps/get-started/enable-your-device-for-development)
-      settings:
-        Enabled: true
-
-    - resource: Microsoft.Windows.Settings/Firewall
-      directives:
-        description: Enable firewall parity with macOS and NixOS host hardening so baseline inbound filtering remains active
-      settings:
-        IsEnabled: true
-
-    - resource: Microsoft.Windows.Settings/Taskbar
-      directives:
-        description: Keep a centered large taskbar for improved visibility (source https://support.microsoft.com/windows/customize-the-windows-11-taskbar)
-      settings:
-        Alignment: Center
-        Size: Large

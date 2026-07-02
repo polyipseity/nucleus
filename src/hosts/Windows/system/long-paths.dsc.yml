@@ -1,0 +1,12 @@
+# WinGet DSC v3 - HKLM long path support
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: Enable long path support so Nix store paths and deep Git worktrees do not hit the default 260-character Windows path limit
+      settings:
+        keyPath: HKLM\System\CurrentControlSet\Control\FileSystem
+        valueName: LongPathsEnabled
+        valueData: 1
+        valueType: DWord

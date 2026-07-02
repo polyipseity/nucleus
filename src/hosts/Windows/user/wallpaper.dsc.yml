@@ -1,0 +1,38 @@
+# WinGet DSC v3 - user-level wallpaper (folder, path, refresh)
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    # Source: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-systemparametersinfoa
+    - resource: Microsoft.Windows.Storage/Folder
+      id: wallpaperFolder
+      directives:
+        description: Ensure wallpaper output directory exists
+      settings:
+        Path: "%USERPROFILE%\\Pictures\\wallpapers"
+        Ensure: Present
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: wallpaperPath
+      dependsOn:
+        - wallpaperFolder
+      directives:
+        description: Ensure desktop wallpaper points at declaratively materialized asset
+      settings:
+        keyPath: HKCU\Control Panel\Desktop
+        valueName: Wallpaper
+        valueData: "__NUCLEUS_ACTIVE_WALLPAPER__"
+        valueType: String
+
+    - resource: PSDscResources/Script
+      id: wallpaperRefresh
+      dependsOn:
+        - wallpaperPath
+      directives:
+        description: Refresh desktop parameters after wallpaper state updates (source https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-systemparametersinfoa)
+      settings:
+        GetScript: |
+          return @{ Result = "WallpaperRefresh" }
+        TestScript: |
+          return $false
+        SetScript: |
+          & "$env:SystemRoot\System32\rundll32.exe" "user32.dll,UpdatePerUserSystemParameters"

@@ -20,9 +20,9 @@ let
   agentEnvVarNames = (import ../../src/modules/agent-env-vars.nix).agentEnvVarNames;
   windowsInstallModuleText = builtins.readFile ../../src/hosts/Windows/modules/setup/Install-PrekHook.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
-  windowsSystemDscText = builtins.readFile ../../src/hosts/Windows/system/registry.dsc.yml;
+  windowsSystemDscText = builtins.readFile ../../src/hosts/Windows/system/computer-name.dsc.yml;
   windowsSystemPackagesDscText = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
-  windowsUserDscText = builtins.readFile ../../src/hosts/Windows/user/registry.dsc.yml;
+  windowsUserDscText = builtins.readFile ../../src/hosts/Windows/user/shell.dsc.yml;
 
   inherit (import ../lib.nix) assert';
 
@@ -108,14 +108,11 @@ let
     && (lib.hasInfix "function prompt { \"PS> \" }" windowsShellProfileText)
   ) "Windows pwsh profile must suppress PSReadLine and flatten prompt in AI agent sessions";
 
-  test_windows_cmd_autorun_agent_detection =
-    assert'
-      (
-        (lib.hasInfix "cmdAutoRun" windowsUserDscText)
-        && (lib.hasInfix "AutoRun" windowsUserDscText)
-        && lib.all (var: lib.hasInfix "if not defined ${var}" windowsUserDscText) agentEnvVarNames
-      )
-      "Windows user/registry.dsc.yml must define cmdAutoRun RegistryValue that checks all agent env vars";
+  test_windows_cmd_autorun_agent_detection = assert' (
+    (lib.hasInfix "cmdAutoRun" windowsUserDscText)
+    && (lib.hasInfix "AutoRun" windowsUserDscText)
+    && lib.all (var: lib.hasInfix "if not defined ${var}" windowsUserDscText) agentEnvVarNames
+  ) "Windows user/shell.dsc.yml must define cmdAutoRun RegistryValue that checks all agent env vars";
 
   test_zsh_agent_env_vars_complete = assert' (lib.all (
     var: lib.hasInfix "[[ -n \"\${${var}:-}\" ]] && return 0" posixShellText

@@ -1,0 +1,9 @@
+# WinGet DSC v3 - firewall enable/disable
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.Windows.Settings/Firewall
+      directives:
+        description: Enable firewall parity with macOS and NixOS host hardening so baseline inbound filtering remains active
+      settings:
+        IsEnabled: true

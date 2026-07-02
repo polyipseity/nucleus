@@ -1,0 +1,15 @@
+# WinGet DSC v3 - HKLM computer name
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Set the Windows computer name to "Windows" so the hostname matches the
+          host-name convention used across all nucleus hosts (MacBook/NixOS/Windows).
+          Takes effect after the next reboot.
+      settings:
+        keyPath: HKLM\System\CurrentControlSet\Control\ComputerName\ComputerName
+        valueName: ComputerName
+        valueData: Windows
+        valueType: String

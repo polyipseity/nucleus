@@ -1,0 +1,34 @@
+# WinGet DSC v3 - user-level screen-saver settings
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    # Source: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-systemparametersinfoa
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: screenSaveActive
+      directives:
+        description: Enable screen saver so Windows enforces an automatic lock path similar to macOS and GNOME session-idle behavior
+      settings:
+        keyPath: HKCU\Control Panel\Desktop
+        valueName: ScreenSaveActive
+        valueData: "1"
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: screenSaverSecure
+      directives:
+        description: Require password on screen saver resume so unattended sessions are protected with the same intent as immediate-lock policies on macOS and NixOS
+      settings:
+        keyPath: HKCU\Control Panel\Desktop
+        valueName: ScreenSaverIsSecure
+        valueData: "1"
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: screenSaveTimeout
+      directives:
+        description: Set a 60-second idle timeout before launching the screen saver to keep lock enforcement aggressive and parity-aligned with strict POSIX lock posture
+      settings:
+        keyPath: HKCU\Control Panel\Desktop
+        valueName: ScreenSaveTimeOut
+        valueData: "60"
+        valueType: String
