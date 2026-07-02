@@ -40,8 +40,8 @@ if ($validPresets -notcontains $Preset) {
 }
 
 if ($File.Count -eq 0) {
-  Write-Host "Usage: $(Split-Path -Leaf $PSCommandPath) [[-Preset] <name>] [-File] <path>..." -ForegroundColor Yellow
-  Write-Host "Presets: $($validPresets -join ', ') (default: default)" -ForegroundColor Yellow
+  Write-Output "Usage: $(Split-Path -Leaf $PSCommandPath) [[-Preset] <name>] [-File] <path>..."
+  Write-Output "Presets: $($validPresets -join ', ') (default: default)"
   exit 1
 }
 
