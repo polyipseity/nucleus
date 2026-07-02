@@ -41,16 +41,6 @@ Safety rules:
 - Never revert or cherry-pick earlier than the captured baseline hash.
 - Do not mix unrelated concerns in the same commit.
 
-## Investigation protocol
-
-When investigating a bug or unexpected behavior:
-
-1. Trace the full call chain from entry point to leaf operations.
-2. Enumerate all plausible root causes before diving into any single one.
-3. For each cause, produce concrete evidence (log lines, error output, observed values) — do not reason from assumptions.
-4. Report findings with evidence before proposing fixes.
-5. Propose the simplest fix that addresses the confirmed root cause.
-
 ## Atomic commit workflow (unstaged changes → multiple commits)
 
 When you have a set of unstaged changes and need to split them into multiple atomic commits, use this primary workflow:
