@@ -33,3 +33,40 @@ properties:
         RunWithHighestPrivileges: false
         RunOnlyWhenNetworkAvailable: false
         RunOnlyIfLoggedOn: true
+
+    - resource: Microsoft.Windows.Settings/TaskScheduler
+      directives:
+        description: >-
+          Periodic service watchdog — detects and restarts nucleus-managed
+          services stuck in non-running states.  Invokes scripts/service-watchdog.ps1
+          which checks native SCM services and scheduled tasks.  Every 5 minutes
+          (repeated indefinitely).  Mirrors macOS launchd agent
+          (local.service-watchdog, StartInterval=300) and NixOS systemd timer
+          (nucleus-service-watchdog, OnUnitActiveSec=5min).
+      settings:
+        TaskPath: \nucleus\
+        TaskName: service-watchdog
+        TaskDescriptionLiteral: >-
+          Service watchdog — restart stuck nucleus services.
+        Action: |
+          $RepoRoot = $env:NUCLEUS_REPO_ROOT
+          if (-not $RepoRoot) {
+            Write-Output "watchdog: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
+            exit 1
+          }
+          $WatchdogScript = Join-Path $RepoRoot "scripts\service-watchdog.ps1"
+          if (-not (Test-Path $WatchdogScript)) {
+            Write-Output "watchdog: scripts/service-watchdog.ps1 not found"
+            exit 1
+          }
+          & $WatchdogScript
+        Trigger: Once
+        AtTime: "1970-01-01T00:00:00"
+        Enabled: true
+        RunWithHighestPrivileges: false
+        RunOnlyWhenNetworkAvailable: false
+        RunOnlyIfLoggedOn: true
+        Repetition:
+          Interval: PT5M
+          Duration: P1D
+          StopAtDurationEnd: false

@@ -1,0 +1,110 @@
+<#
+.SYNOPSIS
+  Periodic service watchdog for Windows.
+
+.DESCRIPTION
+  Detects and restarts nucleus-managed services stuck in a non-running state.
+  Reads src/modules/services.json, filters to Windows services, and restarts
+  any native SCM service or scheduled task that is not running.  Mirrors
+  scripts/service-watchdog.sh (POSIX counterpart).
+
+  Intended to run every 5 minutes from a scheduled task (scheduler.dsc.yml).
+#>
+
+$ErrorActionPreference = "Stop"
+
+# ── Resolve repo root ──────────────────────────────────────────────────────
+$RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
+  $env:NUCLEUS_REPO_ROOT
+} else {
+  Split-Path -Parent (Get-Item $PSScriptRoot).Parent.FullName
+}
+
+$ServicesJson = Join-Path $RepoRoot "src\modules\services.json"
+if (-not (Test-Path $ServicesJson)) {
+  Write-Output "watchdog: services registry not found at $ServicesJson"
+  exit 1
+}
+
+$RegistryRaw = Get-Content $ServicesJson -Raw | ConvertFrom-Json -AsHashtable
+$Platform = "windows"
+
+# ── Filter to watchdog-managed services ────────────────────────────────────
+# Exclude: omitted, socket-activated, prefix-match (handled by svc.ps1).
+$Services = @()
+foreach ($key in $RegistryRaw.Keys) {
+  $entry = $RegistryRaw[$key]
+  if ($entry -isnot [hashtable]) { continue }
+  if (-not $entry.platforms.ContainsKey($Platform)) { continue }
+
+  $plat = $entry.platforms[$Platform]
+  if ($plat.type -eq "omitted") { continue }
+  if ($plat.socketActivated) { continue }
+  if ($plat.prefixMatch) { continue }
+
+  $Services += @{
+    key         = $key
+    displayName = $entry.displayName
+    type        = $plat.type
+    service     = $plat.service
+    taskPath    = $plat.taskPath
+  }
+}
+
+# ── Helper: log restart ────────────────────────────────────────────────────
+function Write-RestartLog {
+  param([string]$Name, [string]$Reason)
+  $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+  Write-Output "[$timestamp] watchdog: restarted $Name ($Reason)"
+}
+
+# ── Check native services ──────────────────────────────────────────────────
+function Check-NativeService {
+  param([string]$Key, [string]$DisplayName, [string]$ServiceName)
+
+  try {
+    $svc = Get-Service -Name $ServiceName -ErrorAction Stop
+    if ($svc.Status -eq "Running") { return }
+
+    $status = $svc.Status.ToString().ToLower()
+    Restart-Service -Name $ServiceName -Force -ErrorAction Stop
+    Write-RestartLog -Name $DisplayName -Reason $status
+  } catch {
+    Write-Output "watchdog: error checking $Key ($ServiceName): $_"
+  }
+}
+
+# ── Check scheduled tasks ──────────────────────────────────────────────────
+function Check-ScheduledTask {
+  param([string]$Key, [string]$DisplayName, [string]$TaskPath)
+
+  try {
+    $taskName = Split-Path $TaskPath -Leaf
+    $taskParent = Split-Path $TaskPath -Parent
+    $task = Get-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop
+
+    if ($task.State -eq "Running") { return }
+
+    $status = $task.State.ToString().ToLower()
+    Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction SilentlyContinue
+    Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop
+    Write-RestartLog -Name $DisplayName -Reason $status
+  } catch {
+    Write-Output "watchdog: error checking $Key ($TaskPath): $_"
+  }
+}
+
+# ── Main ───────────────────────────────────────────────────────────────────
+foreach ($svc in $Services) {
+  switch ($svc.type) {
+    "native" {
+      Check-NativeService -Key $svc.key -DisplayName $svc.displayName -ServiceName $svc.service
+    }
+    "schtask" {
+      Check-ScheduledTask -Key $svc.key -DisplayName $svc.displayName -TaskPath $svc.taskPath
+    }
+    default {
+      Write-Output "watchdog: unsupported type $($svc.type) for $($svc.key)"
+    }
+  }
+}
