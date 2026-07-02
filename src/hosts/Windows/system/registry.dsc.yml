@@ -1,0 +1,131 @@
+# WinGet DSC v3 - system-level HKLM registry values for Windows host
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    # Resources are sorted alphabetically by valueName.
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Enable Storage Sense for automatic disk cleanup (Microsoft Policy CSP
+          Storage/AllowStorageSenseGlobal). Storage Sense natively handles
+          Recycle Bin, temporary files, and Downloads cleanup at the configured
+          cadence, replacing the previous COM-based Recycle Bin scheduled task
+          with a first-party Windows mechanism.
+      settings:
+        keyPath: HKLM\Software\Policies\Microsoft\Windows\StorageSense
+        valueName: AllowStorageSenseGlobal
+        valueData: 1
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Set the Windows computer name to "Windows" so the hostname matches the
+          host-name convention used across all nucleus hosts (MacBook/NixOS/Windows).
+          Takes effect after the next reboot.
+      settings:
+        keyPath: HKLM\System\CurrentControlSet\Control\ComputerName\ComputerName
+        valueName: ComputerName
+        valueData: Windows
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Run Storage Sense daily at 12:00 local time (Microsoft Policy CSP
+          Storage/ConfigStorageSenseGlobalCadence). Daily execution provides
+          prompt cleanup while avoiding the overhead of continuous monitoring.
+      settings:
+        keyPath: HKLM\Software\Policies\Microsoft\Windows\StorageSense
+        valueName: ConfigStorageSenseGlobalCadence
+        valueData: 1
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Set Recycle Bin cleanup threshold to 30 days (Microsoft Policy CSP
+          Storage/ConfigStorageSenseRecycleBinCleanupThreshold). Cross-host
+          parity with the macOS Finder 30-day Trash auto-prune
+          (FXRemoveOldTrashItems).
+      settings:
+        keyPath: HKLM\Software\Policies\Microsoft\Windows\StorageSense
+        valueName: ConfigStorageSenseRecycleBinCleanupThreshold
+        valueData: 30
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Substitute Courier New with JetBrains Mono so applications that
+          request the traditional monospace generic fall back to the open-source
+          coding baseline; mirrors the fontconfig defaultFonts.monospace
+          declaration on POSIX hosts
+      settings:
+        keyPath: HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontSubstitutes
+        valueName: Courier New
+        valueData: JetBrains Mono
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Allow inbound Remote Desktop connections by clearing the deny flag on
+          the TermService registry key.  Setting fDenyTSConnections to 0 is
+          required for the Windows built-in RDP server to accept connections;
+          the default value of 1 blocks all inbound RDP sessions regardless of
+          firewall state.
+      settings:
+        keyPath: HKLM\System\CurrentControlSet\Control\Terminal Server
+        valueName: fDenyTSConnections
+        valueData: 0
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Substitute Helvetica with Inter so applications that request the
+          traditional Latin sans-serif generic fall back to the open-source UI
+          baseline; Helvetica is not present on Windows so this substitution
+          is safe and non-disruptive
+      settings:
+        keyPath: HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontSubstitutes
+        valueName: Helvetica
+        valueData: Inter
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: Enable long path support so Nix store paths and deep Git worktrees do not hit the default 260-character Windows path limit
+      settings:
+        keyPath: HKLM\System\CurrentControlSet\Control\FileSystem
+        valueName: LongPathsEnabled
+        valueData: 1
+        valueType: DWord
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Substitute Times New Roman with Source Serif 4 so applications that
+          request the traditional serif generic fall back to the open-source
+          document baseline; mirrors the fontconfig defaultFonts.serif
+          declaration on POSIX hosts
+      settings:
+        keyPath: HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontSubstitutes
+        valueName: Times New Roman
+        valueData: Source Serif 4
+        valueType: String
+
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Require Network Level Authentication (NLA) for Remote Desktop
+          connections.  NLA forces clients to authenticate before a full desktop
+          session is established, which reduces the attack surface compared to
+          the legacy mode that authenticates only after presenting the login
+          screen.
+      settings:
+        keyPath: HKLM\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp
+        valueName: UserAuthentication
+        valueData: 1
+        valueType: DWord

@@ -1,0 +1,54 @@
+# WinGet DSC v3 - system-level settings for Windows host
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.Windows.Settings/TaskScheduler
+      directives:
+        description: >-
+          Schedule weekly garbage collection on Sunday at 12:00 local time to reclaim stale
+          VM artifacts, build outputs, and tool caches (mirrors macOS launchd and NixOS
+          systemd timers for cross-host gc parity). The task uses $env:NUCLEUS_REPO_ROOT
+          (set by apply.ps1) to locate the gc script.
+      settings:
+        TaskPath: \nucleus\
+        TaskName: gc-weekly
+        TaskDescriptionLiteral: Scheduled weekly garbage collection cleanup
+        Action: |
+          $RepoRoot = $env:NUCLEUS_REPO_ROOT
+          if (-not $RepoRoot) {
+            Write-Output "gc: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
+            exit 1
+          }
+          $GcScript = Join-Path $RepoRoot "scripts\gc.ps1"
+          $ModuleDir = Join-Path $RepoRoot "src\hosts\Windows\modules"
+          if (-not (Test-Path $GcScript)) {
+            Write-Output "gc: scripts/gc.ps1 not found; skipping weekly GC"
+            exit 1
+          }
+          & $GcScript -ModuleDir $ModuleDir -RepoRoot $RepoRoot
+        Trigger: Weekly
+        DaysOfWeek: Sunday
+        AtTime: 12:00
+        Enabled: true
+        RunWithHighestPrivileges: false
+        RunOnlyWhenNetworkAvailable: false
+        RunOnlyIfLoggedOn: true
+
+    - resource: Microsoft.Windows.Settings/DeveloperMode
+      directives:
+        description: Enable Developer Mode (source https://learn.microsoft.com/windows/apps/get-started/enable-your-device-for-development)
+      settings:
+        Enabled: true
+
+    - resource: Microsoft.Windows.Settings/Firewall
+      directives:
+        description: Enable firewall parity with macOS and NixOS host hardening so baseline inbound filtering remains active
+      settings:
+        IsEnabled: true
+
+    - resource: Microsoft.Windows.Settings/Taskbar
+      directives:
+        description: Keep a centered large taskbar for improved visibility (source https://support.microsoft.com/windows/customize-the-windows-11-taskbar)
+      settings:
+        Alignment: Center
+        Size: Large
