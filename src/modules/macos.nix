@@ -235,6 +235,15 @@ let
     '';
   };
 
+  # Wrapper that invokes the packaged nucleus-service-watchdog command.
+  # Using an intermediate script guarantees launchd resolves the binary
+  # regardless of its inherited PATH at load time.  The command itself is
+  # installed by the nucleus flake (src/flake.nix → mkNucleusApps).
+  serviceWatchdogScript = pkgs.writeShellScript "service-watchdog" ''
+    set -eu
+    exec nucleus-service-watchdog
+  '';
+
   betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" ''
     set +e  # heartbeat is fully soft-fail; never abort on individual check failure
 
@@ -1380,6 +1389,39 @@ lib.mkIf pkgs.stdenv.isDarwin {
       # correction for directories created between activations.
       RunAtLoad = false;
       StartInterval = 3600;
+    };
+  };
+
+  # --------------------------------------------------------------------------
+  # Service watchdog LaunchAgent
+  # Checks nucleus-managed services every 5 minutes and recovers any that are
+  # stuck in a non-running state (EX_CONFIG, waiting, spawn-scheduled, etc.).
+  # The watchdog script uses launchctl bootout+bootstrap for full recovery.
+  #
+  # Why a separate agent rather than relying on KeepAlive=true alone:
+  #   KeepAlive only handles simple crashes.  Services that exit with EX_CONFIG
+  #   (exit code 78) or that end up in "waiting" state after repeated failures
+  #   are NOT retried by launchd.  The watchdog catches these edge cases and
+  #   performs a full bootout+bootstrap cycle to clear launchd's exit memory.
+  #
+  # Cross-host parity:
+  #   macOS   — this launchd agent (StartInterval=300)
+  #   NixOS   — systemd timer (planned, via activation.nix)
+  #   Windows — scheduled task (planned, via scheduler.dsc.yml)
+  # --------------------------------------------------------------------------
+  launchd.agents."service-watchdog" = {
+    enable = true;
+    config = {
+      Label = "local.service-watchdog";
+      ProgramArguments = [ "${serviceWatchdogScript}" ];
+      # Check every 5 minutes; frequent enough to catch stuck services quickly
+      # without adding meaningful CPU or IPC overhead.
+      StartInterval = 300;
+      # Run immediately on load so any stuck state from before the timer
+      # activates is caught without waiting for the first interval.
+      RunAtLoad = true;
+      StandardOutPath = "/Users/Shared/nucleus/logs/service-watchdog/stdout.log";
+      StandardErrorPath = "/Users/Shared/nucleus/logs/service-watchdog/stderr.log";
     };
   };
 }

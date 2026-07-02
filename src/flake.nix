@@ -738,6 +738,10 @@
           name = "svc";
           runtimeInputs = [ pkgs.jq ];
         };
+        nucleus-service-watchdog = mkNucleusPackage pkgs {
+          name = "service-watchdog";
+          runtimeInputs = [ pkgs.jq ];
+        };
         nucleus-test = mkNucleusPackage pkgs {
           name = "test";
           runtimeInputs = [
