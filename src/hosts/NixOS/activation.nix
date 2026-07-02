@@ -1,7 +1,13 @@
 # NixOS/activation.nix — NixOS system activation hooks for the generic Linux host.
 #
 # All scripts run during nixos-rebuild switch as root.
-{ config, lib, pkgs, ... }: {
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+{
   # ---------------------------------------------------------------------------
   # nvimLauncher
   # Creates a deterministic symlink at /etc/nucleus-bin/nvim that

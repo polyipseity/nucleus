@@ -27,6 +27,26 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 REPO_ROOT="$(derive_repo_root)"
+
+# Handle help request before any further processing.
+for _arg in "$@"; do
+  case "$_arg" in
+    -h|--help)
+      usage_std "$(basename "$0")" "[options]"
+      cat <<'EOF'
+  Periodic service watchdog — detects and restarts nucleus-managed
+  services stuck in non-running states (EX_CONFIG, waiting,
+  spawn-scheduled, inactive, failed, or not loaded at all).
+  Intended to run from a periodic timer (launchd/systemd/schtask).
+
+  Options:
+  -h|--help  Show usage.
+EOF
+      exit 0
+      ;;
+  esac
+done
+
 SERVICES_JSON="$REPO_ROOT/src/modules/services.json"
 HOST="$(resolve_nucleus_host)"
 
@@ -105,7 +125,7 @@ check_service_macos() {
       recover_launchctl "$svc" "$domain" "$svc_id"
       log_restart "$svc_id" "waiting"
       ;;
-    *"last exit code"*"= 78"*)
+    *"last exit code = 78"*)
       recover_launchctl "$svc" "$domain" "$svc_id"
       log_restart "$svc_id" "EX_CONFIG"
       ;;

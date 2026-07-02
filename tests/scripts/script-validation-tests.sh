@@ -439,6 +439,33 @@ if [[ -f "$SVC_SH" ]]; then
     fi
 fi
 
+# Test scripts/service-watchdog.sh (macOS/NixOS: launchctl/systemctl watchdog)
+WATCHDOG_SH="scripts/service-watchdog.sh"
+if [[ -f "$WATCHDOG_SH" ]]; then
+    test_bash_syntax "$WATCHDOG_SH"
+    test_has_shebang "$WATCHDOG_SH"
+    test_is_executable "$WATCHDOG_SH"
+    test_dependencies_available "$WATCHDOG_SH" jq
+    test_error_handling "$WATCHDOG_SH"
+    test_has_documentation "$WATCHDOG_SH"
+    test_no_dangerous_patterns "$WATCHDOG_SH"
+    test_strict_shell_mode "$WATCHDOG_SH"
+    test_usage_std_present "$WATCHDOG_SH"
+    test_help_handler "$WATCHDOG_SH"
+fi
+
+# Test scripts/service-watchdog.ps1 (Windows: scheduled task watchdog)
+WATCHDOG_PS1="scripts/service-watchdog.ps1"
+if [[ -f "$WATCHDOG_PS1" ]] && command -v pwsh &>/dev/null; then
+    if pwsh -NoProfile -Command "& { if (!(Test-Path '$WATCHDOG_PS1')) { exit 1 }; \$null = Get-Command '$WATCHDOG_PS1' -Syntax; exit 0 }" 2>/dev/null; then
+        assert_pass "PowerShell syntax: service-watchdog.ps1"
+    else
+        assert_fail "PowerShell syntax: service-watchdog.ps1" "Parse error detected by pwsh"
+    fi
+elif [[ -f "$WATCHDOG_PS1" ]]; then
+    echo -e "${YELLOW}⚠${NC}  pwsh not available: skipping service-watchdog.ps1 syntax check"
+fi
+
 # Summary
 
 echo ""
