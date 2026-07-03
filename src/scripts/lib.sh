@@ -114,7 +114,7 @@ nucleus_system_log_dir() {
     return 0
   fi
   case "$(uname -s)" in
-    Darwin)  printf '%s\n' "/Library/Logs/nucleus" ;;
+    Darwin)  printf '%s\n' "/Users/Shared/nucleus/logs" ;;
     Linux)   printf '%s\n' "/var/log/nucleus" ;;
     *)       printf '%s\n' "/var/log/nucleus" ;;
   esac
