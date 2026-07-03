@@ -172,8 +172,10 @@ rec {
   '';
 
   # Shared refresh for Finder sidebar/cache daemons.
+  # Delegates to daemon-refresh.nix for centralized daemon management.
+  daemonRefresh = import ./daemon-refresh.nix;
   finderRefreshDaemonsShell = ''
-    /usr/bin/killall sharedfilelistd 2>/dev/null || true
-    /usr/bin/killall cfprefsd 2>/dev/null || true
+    ${daemonRefresh.refreshSharedFilelistd}
+    ${daemonRefresh.refreshCfprefsd}
   '';
 }
