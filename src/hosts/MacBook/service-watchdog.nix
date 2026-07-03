@@ -18,6 +18,7 @@ in
 {
   launchd.daemons."service-watchdog" = {
     serviceConfig = {
+      Label = "local.service-watchdog";
       ProgramArguments = [
         "${pkgs.writeShellScript "svc-watchdog-daemon" ''
           exec ${nucleusSvcWatchdog}
