@@ -179,6 +179,20 @@ svc_status() {
           running=false
         fi
       fi
+      # Fallback: if the basic check says inactive but launchctl print says
+      # the service is actually running (transient state in launchctl list),
+      # trust the authoritative print output.
+      if [ "$running" != "true" ]; then
+        local print_out
+        print_out=$($domain_flag launchctl print "$(launchctl_target "$domain" "$svc_id")" 2>/dev/null || true)
+        case "$print_out" in
+          *"state = running"*)
+            running=true; enabled=true
+            pid=$(echo "$print_out" | sed -n 's/.*pid = \([0-9]*\).*/\1/p')
+            [ -z "$pid" ] && pid=""
+            ;;
+        esac
+      fi
       local status_text
       if [ "$running" = true ]; then
         status_text="active"
