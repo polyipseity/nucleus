@@ -139,6 +139,21 @@ let
 
   test_windows_scoped_to_pdf = assert' (lib.hasInfix "SystemFileAssociations\\\\.pdf" windowsDscText) "Windows DSC must scope to PDF files via SystemFileAssociations\\.pdf";
 
+  # Phase 1: Self-pruning framework known lists.
+
+  test_macos_has_removed_app_dirs = assert' (
+    lib.hasInfix "removedNucleusAppDirs" macServicesText
+    && lib.hasInfix "NucleusGSPDFOpt.app" macServicesText
+    &&
+      builtins.stringLength (builtins.head (builtins.split "NucleusGSPDFOpt.app" macServicesText))
+      > builtins.stringLength (builtins.head (builtins.split "removedNucleusAppDirs" macServicesText))
+  ) "macOS services.nix must define removedNucleusAppDirs containing the old single-preset app dir";
+
+  test_macos_has_current_app_dirs = assert' (
+    lib.hasInfix "currentNucleusAppDirs" macServicesText
+    && lib.hasInfix "NucleusManual.app" macServicesText
+  ) "macOS services.nix must define currentNucleusAppDirs containing current service app dirs";
+
   allTests = [
     test_all_5_presets_in_macos
     test_no_old_gs_labels_in_macos
@@ -151,6 +166,8 @@ let
     test_no_old_gs_labels_in_windows
     test_windows_presets_sorted
     test_windows_scoped_to_pdf
+    test_macos_has_removed_app_dirs
+    test_macos_has_current_app_dirs
   ];
 in
 {
