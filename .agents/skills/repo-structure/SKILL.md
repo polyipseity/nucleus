@@ -46,7 +46,7 @@ description: Cached knowledge of the nucleus repository architecture, key files,
 
 - `default.nix` — nix-darwin entry. Imports modules, defines services, system defaults.
 - `defaults.nix` — macOS `defaults write` settings (NSGlobalDomain, dock, Finder, etc.).
-- `services.nix` — launchd services activation scripts.
+- `services.nix` — macOS Services (.app bundles for right-click menus). Uses a self-pruning home.activation block: removes apps listed in `removedNucleusAppDirs`, deploys from `currentNucleusAppDirs`. To remove a service: delete deploy logic + move app dir between these two lists.
 - `activation.nix` — nix-darwin activation script hooks (Spotlight disable, login items, shell profile).
 
 ### NixOS (`src/hosts/NixOS/`)

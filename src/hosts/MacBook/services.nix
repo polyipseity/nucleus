@@ -129,27 +129,68 @@ let
       value = mkGSPDFOptApp p;
     }) gsPdfOptPresets
   );
+
+  # Known list of current Nucleus service .app directory names.
+  # Used for deterministic deployment.
+  currentNucleusAppDirs = [
+    "NucleusManual.app"
+  ]
+  ++ map (preset: "NucleusGSPDFOpt-${preset}.app") gsPdfOptPresets;
+
+  # Known list of historically-removed Nucleus service .app directory names.
+  # When a service is removed, move its app dir from currentNucleusAppDirs
+  # to here. The activation script prunes any that still exist on disk and
+  # removes their NSServicesStatus keys. Entries can be removed after all
+  # machines have applied once after the removal commit.
+  removedNucleusAppDirs = [ "NucleusGSPDFOpt.app" ];
 in
 {
   # Symlink the manual to a fixed home path so the .app can find it without
   # needing NUCLEUS_REPO_ROOT at runtime.
   home.file.".local/share/nucleus/manual.md".source = ./MANUAL.md;
 
-  # Deploy the .app bundle and register with LaunchServices.
+  # Deploy all Nucleus .app bundles and register with LaunchServices.
   # home.file can't be used because LaunchServices doesn't traverse symlinks.
-  home.activation.deployNucleusManualService = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    app_dir="$HOME/Applications"
-    app_path="$app_dir/NucleusManual.app"
+  #
+  # Self-pruning: before deploying, deletes any app bundle listed in
+  # removedNucleusAppDirs that still exists on disk, plus its corresponding
+  # NSServicesStatus enablement key. To remove a service: delete its deploy
+  # logic and move its app dir name from currentNucleusAppDirs to
+  # removedNucleusAppDirs. The cleanup happens automatically on next apply.
+  home.activation.deployNucleusServices = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
+    APP_DIR="$HOME/Applications"
+
+    # ── Phase 1: Prune historically-removed services ────────────────────
+    echo "${builtins.concatStringsSep "\n" removedNucleusAppDirs}" | while IFS= read -r app_dirname; do
+      [ -z "$app_dirname" ] && continue
+      app_path="$APP_DIR/$app_dirname"
+      [ -d "$app_path" ] || continue
+
+      bundle_id=$(plutil -extract CFBundleIdentifier raw "$app_path/Contents/Info.plist" 2>/dev/null || true)
+      menu_item=$(plutil -extract NSServices.0.NSMenuItem.default raw "$app_path/Contents/Info.plist" 2>/dev/null || true)
+      message_val=$(plutil -extract NSServices.0.NSMessage raw "$app_path/Contents/Info.plist" 2>/dev/null || true)
+
+      chmod -R +w "$app_path" 2>/dev/null || true
+      rm -rf "$app_path"
+
+      if [ -n "$bundle_id" ] && [ -n "$menu_item" ] && [ -n "$message_val" ]; then
+        /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"$bundle_id - $menu_item - $message_val\"" \
+          ~/Library/Preferences/pbs.plist 2>/dev/null || true
+      fi
+    done
+
+    # ── Phase 2: Deploy NucleusManual ──────────────────────────────────
+    app_path="$APP_DIR/NucleusManual.app"
     store_path="${nucleusManualApp}/NucleusManual.app"
 
-    mkdir -p "$app_dir"
+    mkdir -p "$APP_DIR"
     # Nix store outputs are read-only; strip that before deletion to avoid
     # Permission denied on the next generation switch.
     chmod -R +w "$app_path" 2>/dev/null || true
     rm -rf "$app_path"
-    cp -R "$store_path" "$app_dir/"
+    cp -R "$store_path" "$APP_DIR/"
 
-    LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
     "$LSREGISTER" -R -f "$app_path" || true
 
     # Enable the service in NSServicesStatus so it appears in the Services
@@ -158,34 +199,26 @@ in
     enablement_key="com.nucleus.OpenNucleusManual - open nucleus manual - open"
     /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
       '<dict><key>enabled_context_menu</key><true/><key>enabled_services_menu</key><true/></dict>'
-    /usr/bin/defaults read pbs > /dev/null || true
-  '';
 
-  home.activation.deployGSPDFOptServices = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-    let
-      LSREGISTER = "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister";
-      deployOne = preset: app: ''
-        app_dir="$HOME/Applications"
-        app_path="$app_dir/NucleusGSPDFOpt-${preset}.app"
-        store_path="${app}/NucleusGSPDFOpt-${preset}.app"
+    # ── Phase 3: Deploy GSPDFOpt per-preset apps ───────────────────────
+    ${builtins.concatStringsSep "\n" (
+      map (preset: ''
+        app_path="$APP_DIR/NucleusGSPDFOpt-${preset}.app"
+        store_path="${nucleusGSPDFOptApps.${preset}}/NucleusGSPDFOpt-${preset}.app"
 
-        mkdir -p "$app_dir"
+        mkdir -p "$APP_DIR"
         chmod -R +w "$app_path" 2>/dev/null || true
         rm -rf "$app_path"
-        cp -R "$store_path" "$app_dir/"
+        cp -R "$store_path" "$APP_DIR/"
 
-        "${LSREGISTER}" -R -f "$app_path" || true
+        "$LSREGISTER" -R -f "$app_path" || true
 
         enablement_key="com.nucleus.GSPDFOpt-${preset} - optimize pdf - ${preset} - open"
         /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
           '<dict><key>enabled_context_menu</key><true/><key>enabled_services_menu</key><true/></dict>'
-      '';
-    in
-    builtins.concatStringsSep "\n" (
-      map (preset: deployOne preset nucleusGSPDFOptApps.${preset}) gsPdfOptPresets
-    )
-    + ''
-      /usr/bin/defaults read pbs > /dev/null || true
-    ''
-  );
+      '') gsPdfOptPresets
+    )}
+
+    /usr/bin/defaults read pbs > /dev/null || true
+  '';
 }
