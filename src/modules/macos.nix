@@ -17,6 +17,7 @@ let
   liveICloudDownloads = "${config.home.homeDirectory}/Library/Mobile Documents/com~apple~CloudDocs/Downloads";
 
   # Sub-module imports extracted from this file for focused maintainability.
+  daemonRefresh = import ./macos/daemon-refresh.nix;
   finderSidebar = import ./macos/finder-sidebar.nix { inherit config lib pkgs; };
   preferenceGc = import ./macos/preference-gc.nix { inherit config lib pkgs; };
 
@@ -627,9 +628,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         echo "macos: activateSettings -u failed; input settings may apply on next login." >&2
       fi
 
-      # TISwitcher may not exist in every session state; treat absence as a
-      # benign no-op and suppress killall noise.
-      /usr/bin/killall -HUP TISwitcher 2>/dev/null || true
+      ${daemonRefresh.refreshTISwitcher}
     '';
 
     # -------------------------------------------------------------------------
@@ -955,9 +954,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # maintenance. Keeping it independent avoids fake coupling with ~/dev work.
     # -------------------------------------------------------------------------
     reloadDockPreferenceState = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      if ! /usr/bin/killall Dock; then
-        echo "macos: Dock was not running (or could not be restarted)." >&2
-      fi
+      ${daemonRefresh.refreshDock}
     '';
 
     # -------------------------------------------------------------------------
@@ -1026,19 +1023,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # default ordering.
     # -------------------------------------------------------------------------
     relaunchDesktopServices = lib.hm.dag.entryAfter [ "configureFinderSidebar" ] ''
-      ${finderSidebar.finderRefreshDaemonsShell}
-
-      # Restart Finder via launchd (preserves window state, cleanest method).
-      if ! /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder"; then
-        echo "macos: relaunchDesktopServices — launchctl Finder restart failed; restart Finder manually." >&2
-      fi
-
-      # Restart SystemUIServer (menu bar icons) and WindowManager (Spaces).
-      for proc in SystemUIServer WindowManager; do
-        if ! /usr/bin/killall "$proc"; then
-          echo "macos: $proc was not running (or could not be restarted)." >&2
-        fi
-      done
+      ${daemonRefresh.refreshDesktopServices}
 
       # Finder restarts can reintroduce default favorites ordering.
       # Re-apply managed favorites to keep deterministic output.
