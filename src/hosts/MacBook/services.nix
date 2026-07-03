@@ -132,6 +132,9 @@ let
     }) gsPdfOptPresets
   );
 
+  # Import centralized daemon refresh helpers for Phase 4.
+  daemonRefresh = import ../../modules/macos/daemon-refresh.nix;
+
   # Known list of current Nucleus service .app directory names.
   # Used for deterministic deployment.
   currentNucleusAppDirs = [
@@ -186,6 +189,8 @@ in
     )}
 
     # Force full LaunchServices re-scan to flush stale cache entries.
+    # Phase 4's -kill -domain user is stronger and runs after all deploys,
+    # so this call is redundant but kept as a gentle early flush.
     "$LSREGISTER" -R 2>/dev/null || true
 
     # ── Phase 2: Deploy NucleusManual ──────────────────────────────────
@@ -232,10 +237,6 @@ in
     # cached state in process memory, requiring a full reboot to pick up
     # new service registrations and NSServicesStatus changes.
     # All daemons are managed by launchd and restart automatically.
-    killall -KILL cfprefsd 2>/dev/null || true
-    "$LSREGISTER" -kill -domain user 2>/dev/null || true
-    killall -KILL pbs 2>/dev/null || true
-    sleep 1
-    killall Finder 2>/dev/null || true
+    ${daemonRefresh.refreshServicesMenu}
   '';
 }
