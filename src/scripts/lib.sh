@@ -143,3 +143,73 @@ launchctl_target() {
     printf 'gui/%s/%s' "$(id -u)" "$service"
   fi
 }
+
+# refresh_cfprefsd — Kill cfprefsd (CFPreferences daemon) on macOS.
+# Caches all defaults read/write in process memory; kill forces re-read from
+# plist on next access.  No-op on non-macOS.
+refresh_cfprefsd() {
+  case "$(uname -s)" in
+    Darwin)
+      /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
+      ;;
+  esac
+}
+
+# refresh_pbs — Kill pbs (Pasteboard Server + Services manager) on macOS.
+# Caches NSServicesStatus at startup; kill forces re-read of pbs.plist so
+# new/changed services appear in menus.  No-op on non-macOS.
+refresh_pbs() {
+  case "$(uname -s)" in
+    Darwin)
+      /usr/bin/killall -KILL pbs 2>/dev/null || true
+      ;;
+  esac
+}
+
+# refresh_lsd — Rebuild the Launch Services database on macOS.
+# Kills lsd (Launch Services Daemon); on restart it rebuilds from scratch,
+# picking up newly registered .app bundles.  No-op on non-macOS.
+refresh_lsd() {
+  case "$(uname -s)" in
+    Darwin)
+      /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -domain user 2>/dev/null || true
+      ;;
+  esac
+}
+
+# refresh_finder — Restart Finder on macOS via killall.
+# No-op on non-macOS.
+refresh_finder() {
+  case "$(uname -s)" in
+    Darwin)
+      /usr/bin/killall Finder 2>/dev/null || true
+      ;;
+  esac
+}
+
+# refresh_dock — Restart Dock on macOS via killall.
+# No-op on non-macOS.
+refresh_dock() {
+  case "$(uname -s)" in
+    Darwin)
+      /usr/bin/killall Dock 2>/dev/null || true
+      ;;
+  esac
+}
+
+# refresh_services_menu — Full flush of the Services menu pipeline on macOS.
+# Kills cfprefsd, lsd, pbs, waits 1 s, then restarts Finder.
+# Call this after deploying or removing .app bundles so the Services menu
+# reflects the new state without a logout/reboot.
+# No-op on non-macOS.
+refresh_services_menu() {
+  case "$(uname -s)" in
+    Darwin)
+      /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
+      /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -domain user 2>/dev/null || true
+      /usr/bin/killall -KILL pbs 2>/dev/null || true
+      /bin/sleep 1
+      /usr/bin/killall Finder 2>/dev/null || true
+      ;;
+  esac
+}
