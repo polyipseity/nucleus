@@ -227,6 +227,15 @@ in
       '') gsPdfOptPresets
     )}
 
-    /usr/bin/defaults read pbs > /dev/null || true
+    # ── Phase 4: Flush daemon caches so changes take effect immediately ─
+    # Without these restarts, cfprefsd, lsd, pbs, and Finder all hold stale
+    # cached state in process memory, requiring a full reboot to pick up
+    # new service registrations and NSServicesStatus changes.
+    # All daemons are managed by launchd and restart automatically.
+    killall -KILL cfprefsd 2>/dev/null || true
+    "$LSREGISTER" -kill -domain user 2>/dev/null || true
+    killall -KILL pbs 2>/dev/null || true
+    sleep 1
+    killall Finder 2>/dev/null || true
   '';
 }
