@@ -174,7 +174,7 @@ in
         rm -rf "$app_path"
         cp -R "$store_path" "$app_dir/"
 
-        "$LSREGISTER" -R -f "$app_path" || true
+        "${LSREGISTER}" -R -f "$app_path" || true
 
         enablement_key="com.nucleus.GSPDFOpt-${preset} - optimize pdf (${preset}) - open"
         /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
