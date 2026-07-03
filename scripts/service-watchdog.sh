@@ -103,7 +103,7 @@ recover_launchctl() {
   if [ "$domain" = "system" ]; then
     plist="/Library/LaunchDaemons/$svc_id.plist"
   else
-    plist="$HOME/Library/LaunchAgents/$svc_id.plist"
+    plist="${HOME:-}/Library/LaunchAgents/$svc_id.plist"
   fi
   $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
   $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null || true
@@ -148,7 +148,7 @@ check_service_macos() {
       if [ "$domain" = "system" ]; then
         plist="/Library/LaunchDaemons/$svc_id.plist"
       else
-        plist="$HOME/Library/LaunchAgents/$svc_id.plist"
+        plist="${HOME:-}/Library/LaunchAgents/$svc_id.plist"
       fi
       if [ -f "$plist" ]; then
         $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null || true
