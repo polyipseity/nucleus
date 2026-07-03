@@ -141,13 +141,14 @@ let
 
   # Phase 1: Self-pruning framework known lists.
 
-  test_macos_has_removed_app_dirs = assert' (
-    lib.hasInfix "removedNucleusAppDirs" macServicesText
-    && lib.hasInfix "NucleusGSPDFOpt.app" macServicesText
-    &&
-      builtins.stringLength (builtins.head (builtins.split "NucleusGSPDFOpt.app" macServicesText))
-      > builtins.stringLength (builtins.head (builtins.split "removedNucleusAppDirs" macServicesText))
-  ) "macOS services.nix must define removedNucleusAppDirs containing the old single-preset app dir";
+  test_macos_has_removed_services =
+    assert'
+      (
+        lib.hasInfix "removedNucleusServices" macServicesText
+        && lib.hasInfix "NucleusGSPDFOpt.app" macServicesText
+        && lib.hasInfix "com.nucleus.GSPDFOpt" macServicesText
+      )
+      "macOS services.nix must define removedNucleusServices containing the old single-preset service metadata";
 
   test_macos_has_current_app_dirs = assert' (
     lib.hasInfix "currentNucleusAppDirs" macServicesText
@@ -166,7 +167,7 @@ let
     test_no_old_gs_labels_in_windows
     test_windows_presets_sorted
     test_windows_scoped_to_pdf
-    test_macos_has_removed_app_dirs
+    test_macos_has_removed_services
     test_macos_has_current_app_dirs
   ];
 in

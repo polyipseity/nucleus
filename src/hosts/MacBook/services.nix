@@ -137,12 +137,19 @@ let
   ]
   ++ map (preset: "NucleusGSPDFOpt-${preset}.app") gsPdfOptPresets;
 
-  # Known list of historically-removed Nucleus service .app directory names.
-  # When a service is removed, move its app dir from currentNucleusAppDirs
-  # to here. The activation script prunes any that still exist on disk and
-  # removes their NSServicesStatus keys. Entries can be removed after all
-  # machines have applied once after the removal commit.
-  removedNucleusAppDirs = [ "NucleusGSPDFOpt.app" ];
+  # Known list of historically-removed Nucleus services.
+  # When a service is removed, add its metadata here and remove its app dir
+  # from currentNucleusAppDirs. The activation script unconditionally removes
+  # its NSServicesStatus key and prunes its app directory from disk. Entries
+  # can be removed after all machines have applied once after the removal commit.
+  removedNucleusServices = [
+    {
+      appDir = "NucleusGSPDFOpt.app";
+      bundleId = "com.nucleus.GSPDFOpt";
+      menuItem = "gs optimize pdf";
+      message = "open";
+    }
+  ];
 in
 {
   # Symlink the manual to a fixed home path so the .app can find it without
@@ -152,33 +159,32 @@ in
   # Deploy all Nucleus .app bundles and register with LaunchServices.
   # home.file can't be used because LaunchServices doesn't traverse symlinks.
   #
-  # Self-pruning: before deploying, deletes any app bundle listed in
-  # removedNucleusAppDirs that still exists on disk, plus its corresponding
-  # NSServicesStatus enablement key. To remove a service: delete its deploy
-  # logic and move its app dir name from currentNucleusAppDirs to
-  # removedNucleusAppDirs. The cleanup happens automatically on next apply.
+  # Self-pruning: before deploying, unconditionally removes NSServicesStatus
+  # keys and app directories listed in removedNucleusServices. To remove a
+  # service: delete its deploy logic and add its metadata to
+  # removedNucleusServices. The cleanup happens automatically on next apply.
   home.activation.deployNucleusServices = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
     APP_DIR="$HOME/Applications"
 
     # ── Phase 1: Prune historically-removed services ────────────────────
-    echo "${builtins.concatStringsSep "\n" removedNucleusAppDirs}" | while IFS= read -r app_dirname; do
-      [ -z "$app_dirname" ] && continue
-      app_path="$APP_DIR/$app_dirname"
-      [ -d "$app_path" ] || continue
-
-      bundle_id=$(plutil -extract CFBundleIdentifier raw "$app_path/Contents/Info.plist" 2>/dev/null || true)
-      menu_item=$(plutil -extract NSServices.0.NSMenuItem.default raw "$app_path/Contents/Info.plist" 2>/dev/null || true)
-      message_val=$(plutil -extract NSServices.0.NSMessage raw "$app_path/Contents/Info.plist" 2>/dev/null || true)
-
-      chmod -R +w "$app_path" 2>/dev/null || true
-      rm -rf "$app_path"
-
-      if [ -n "$bundle_id" ] && [ -n "$menu_item" ] && [ -n "$message_val" ]; then
-        /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"$bundle_id - $menu_item - $message_val\"" \
+    ${builtins.concatStringsSep "\n" (
+      map (svc: ''
+        # Delete NSServicesStatus key for ${svc.appDir} unconditionally.
+        /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"${svc.bundleId} - ${svc.menuItem} - ${svc.message}\"" \
           ~/Library/Preferences/pbs.plist 2>/dev/null || true
-      fi
-    done
+
+        app_path="$APP_DIR/${svc.appDir}"
+        if [ -d "$app_path" ]; then
+          "$LSREGISTER" -u "$app_path" 2>/dev/null || true
+          chmod -R +w "$app_path" 2>/dev/null || true
+          rm -rf "$app_path"
+        fi
+      '') removedNucleusServices
+    )}
+
+    # Force full LaunchServices re-scan to flush stale cache entries.
+    "$LSREGISTER" -R 2>/dev/null || true
 
     # ── Phase 2: Deploy NucleusManual ──────────────────────────────────
     app_path="$APP_DIR/NucleusManual.app"
