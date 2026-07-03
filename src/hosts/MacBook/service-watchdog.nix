@@ -9,7 +9,6 @@
   pkgs,
   lib,
   nucleusApps,
-  username,
   ...
 }:
 let
@@ -27,7 +26,6 @@ in
       ];
       StartInterval = 300;
       RunAtLoad = true;
-      UserName = username;
       KeepAlive = false;
       EnvironmentVariables = {
         NUCLEUS_REPO_ROOT = repoRoot;

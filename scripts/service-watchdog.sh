@@ -14,6 +14,15 @@
 
 set -euo pipefail
 
+# Log unexpected exit codes to stderr for diagnostics.
+_trap_exit() {
+  local _exit_code=$?
+  if [ "$_exit_code" -ne 0 ]; then
+    printf '[%s] watchdog: unexpected exit code %d\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$_exit_code" >&2
+  fi
+}
+trap _trap_exit EXIT
+
 _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
@@ -85,7 +94,9 @@ log_restart() {
 recover_launchctl() {
   local svc="$1" domain="$2" svc_id="$3"
   local sudo_prefix=""
-  [ "$domain" = "system" ] && sudo_prefix="sudo"
+  if [ "$domain" = "system" ] && [ "$(id -u)" -ne 0 ]; then
+    sudo_prefix="sudo"
+  fi
   local target
   target=$(launchctl_target "$domain" "$svc_id")
   local plist=""
@@ -106,7 +117,9 @@ check_service_macos() {
   [ -z "$svc_id" ] && return 0
 
   local sudo_prefix=""
-  [ "$domain" = "system" ] && sudo_prefix="sudo"
+  if [ "$domain" = "system" ] && [ "$(id -u)" -ne 0 ]; then
+    sudo_prefix="sudo"
+  fi
   local target
   target=$(launchctl_target "$domain" "$svc_id")
   local print_out
