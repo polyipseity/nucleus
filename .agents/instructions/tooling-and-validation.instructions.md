@@ -37,6 +37,15 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
 - Derive test coverage counts and file lists from the current `tests/` tree and CI globs — no stale prose or placeholder absence claims.
 - In instruction examples, prefer real in-repo file names unless labeled as illustrative.
 
+## Skill vs instruction vs AGENTS.md boundary
+
+When adding new guidance content to this repo, choose the right vehicle:
+- **AGENTS.md**: durable project-wide conventions and invariants that every agent needs. Keep short (~30 lines max per section). Per-file-type rules belong in instruction files.
+- **`.agents/instructions/*.instructions.md`**: file-type-scoped authoring rules with a narrow `applyTo` glob. Loaded automatically when editing matching files. Not for general reference material — instructions fire on every edit within their scope, so they must be lean and targeted.
+- **`.agents/skills/<skill>/SKILL.md`**: reference orientation material loaded on demand via the `skill` tool. Use for content valuable enough to cache but too broad or reference-oriented for an instruction file. Avoid duplicating AGENTS.md.
+
+When editing a skill, check AGENTS.md and the relevant instruction files first for overlapping content.
+
 ## How to write follow-up instructions
 
 - When a stack gains a clear setup, create or refine a focused instruction file. Keep `applyTo` narrow, link to canonical configs instead of copying option lists, and keep repo-wide discovery in `AGENTS.md`.
