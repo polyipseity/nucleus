@@ -23,9 +23,7 @@ usage_std() {
 # Resolution order: NUCLEUS_REPO_ROOT env var, SCRIPT_DIR+offset auto-discovery, then git rev-parse.
 derive_repo_root() {
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ]; then
-    # Resolve symlinks (e.g. ~/dev/nucleus → real path) to prevent self-loop
-    # when dev-repos.nix creates a symlink targeting $NUCLEUS_REPO_ROOT.
-    NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$NUCLEUS_REPO_ROOT" && pwd -P)"
+    NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$NUCLEUS_REPO_ROOT" && pwd)"
     printf '%s\n' "$NUCLEUS_REPO_ROOT"
     return 0
   fi
