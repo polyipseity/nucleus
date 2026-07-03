@@ -130,3 +130,16 @@ log_sanitize() {
       -e 's/\r//g' \
       -e "s/[\x00-\x08\x0B\x0C\x0E-\x1F]//g"
 }
+
+# launchctl_target — Build a macOS launchctl service target specifier.
+# macOS 25+ requires gui/<uid>/<service> for user domain and
+# system/<service> for system domain. Older macOS accepted bare service IDs.
+launchctl_target() {
+  local domain="$1"
+  local service="$2"
+  if [ "$domain" = "system" ]; then
+    printf 'system/%s' "$service"
+  else
+    printf 'gui/%s/%s' "$(id -u)" "$service"
+  fi
+}

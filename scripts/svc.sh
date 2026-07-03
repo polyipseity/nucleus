@@ -219,19 +219,6 @@ svc_status() {
   esac
 }
 
-# launchctl_target — Build a macOS launchctl service target specifier.
-# macOS 25+ requires gui/<uid>/<service> for user domain and
-# system/<service> for system domain. Older macOS accepted bare service IDs.
-launchctl_target() {
-  local domain="$1"
-  local service="$2"
-  if [ "$domain" = "system" ]; then
-    printf 'system/%s' "$service"
-  else
-    printf 'gui/%s/%s' "$(id -u)" "$service"
-  fi
-}
-
 # recover_launchctl_service — Recover a launchctl service stuck in
 # spawn-scheduled / waiting / EX_CONFIG state.
 # Does bootout+bootstrap to fully reload. Returns 0 if recovery was done.
