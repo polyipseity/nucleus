@@ -895,7 +895,10 @@
         # Keep NixOS evaluation aligned with the same pinned package set and
         # unfree policy used by the rest of the flake outputs.
         pkgs = pkgsLinux;
-        specialArgs = { inherit username users; };
+        specialArgs = {
+          inherit username users;
+          nucleusApps = nucleusAppsLinux;
+        };
         system = systems.linux;
         modules = [
           ./hosts/NixOS/default.nix

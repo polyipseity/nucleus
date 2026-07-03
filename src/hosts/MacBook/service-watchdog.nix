@@ -14,6 +14,7 @@
 }:
 let
   nucleusSvcWatchdog = "${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog";
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 in
 {
   launchd.daemons."service-watchdog" = {
@@ -28,6 +29,9 @@ in
       RunAtLoad = true;
       UserName = username;
       KeepAlive = false;
+      EnvironmentVariables = {
+        NUCLEUS_REPO_ROOT = repoRoot;
+      };
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/service-watchdog/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/service-watchdog/stderr.log";
     };
