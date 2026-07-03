@@ -13,9 +13,15 @@
 }:
 let
   nucleusSvcWatchdog = "${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog";
-  # Use the dev symlink path, not the iCloud real path: launchd-rooted
-  # processes cannot read iCloud documents (sandboxed), but the symlink
-  # at ~/dev/nucleus is outside the iCloud container and works.
+  # Bundle services.json into the nix store so launchd-rooted daemons
+  # can read it — they cannot access iCloud Drive paths even through
+  # the ~/dev/nucleus symlink (macOS sandbox restriction).
+  servicesJson = builtins.path {
+    path = ../../modules/services.json;
+    name = "nucleus-services-json";
+  };
+  # Keep repoRoot for any other flake.nix-relative lookups the script
+  # might need (derive_repo_root fallback, host detection, etc.).
   repoRoot = "/Users/polyipseity/dev/nucleus";
 in
 {
@@ -31,6 +37,7 @@ in
       RunAtLoad = true;
       KeepAlive = false;
       EnvironmentVariables = {
+        NUCLEUS_SERVICES_JSON = servicesJson;
         NUCLEUS_REPO_ROOT = repoRoot;
       };
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/service-watchdog/stdout.log";

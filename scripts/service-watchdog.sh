@@ -56,7 +56,7 @@ EOF
   esac
 done
 
-SERVICES_JSON="$REPO_ROOT/src/modules/services.json"
+SERVICES_JSON="${NUCLEUS_SERVICES_JSON:-$REPO_ROOT/src/modules/services.json}"
 HOST="$(resolve_nucleus_host)"
 
 case "$HOST" in
