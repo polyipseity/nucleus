@@ -28,12 +28,12 @@ let
 
   test_all_5_presets_in_macos = assert' (
     allPresetsPresent macServicesText
-    && lib.hasInfix "optimize pdf (default)" macServicesText
-    && lib.hasInfix "optimize pdf (ebook)" macServicesText
-    && lib.hasInfix "optimize pdf (prepress)" macServicesText
-    && lib.hasInfix "optimize pdf (printer)" macServicesText
-    && lib.hasInfix "optimize pdf (screen)" macServicesText
-  ) "macOS services.nix must define all 5 presets with 'optimize pdf (X)' labels";
+    && lib.hasInfix "optimize pdf - default" macServicesText
+    && lib.hasInfix "optimize pdf - ebook" macServicesText
+    && lib.hasInfix "optimize pdf - prepress" macServicesText
+    && lib.hasInfix "optimize pdf - printer" macServicesText
+    && lib.hasInfix "optimize pdf - screen" macServicesText
+  ) "macOS services.nix must define all 5 presets with 'optimize pdf - X' labels";
 
   test_no_old_gs_labels_in_macos = assert' (noOldLabel macServicesText) "macOS services.nix must not contain the old 'gs optimize pdf' label";
 
@@ -64,31 +64,31 @@ let
 
   test_all_5_presets_in_nixos = assert' (
     allPresetsPresent nixosServicesText
-    && lib.hasInfix "optimize pdf (default)" nixosServicesText
-    && lib.hasInfix "optimize pdf (ebook)" nixosServicesText
-    && lib.hasInfix "optimize pdf (prepress)" nixosServicesText
-    && lib.hasInfix "optimize pdf (printer)" nixosServicesText
-    && lib.hasInfix "optimize pdf (screen)" nixosServicesText
-  ) "NixOS services.nix must define all 5 presets with 'optimize pdf (X)' labels";
+    && lib.hasInfix "optimize pdf - default" nixosServicesText
+    && lib.hasInfix "optimize pdf - ebook" nixosServicesText
+    && lib.hasInfix "optimize pdf - prepress" nixosServicesText
+    && lib.hasInfix "optimize pdf - printer" nixosServicesText
+    && lib.hasInfix "optimize pdf - screen" nixosServicesText
+  ) "NixOS services.nix must define all 5 presets with 'optimize pdf - X' labels";
 
   test_no_old_gs_labels_in_nixos = assert' (noOldLabel nixosServicesText) "NixOS services.nix must not contain the old 'gs optimize pdf' label";
 
   test_nixos_presets_sorted = assert' (
     let
       posDefault = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(default\\)" nixosServicesText)
+        builtins.head (builtins.split "optimize pdf - default" nixosServicesText)
       );
       posEbook = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(ebook\\)" nixosServicesText)
+        builtins.head (builtins.split "optimize pdf - ebook" nixosServicesText)
       );
       posPrepress = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(prepress\\)" nixosServicesText)
+        builtins.head (builtins.split "optimize pdf - prepress" nixosServicesText)
       );
       posPrinter = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(printer\\)" nixosServicesText)
+        builtins.head (builtins.split "optimize pdf - printer" nixosServicesText)
       );
       posScreen = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(screen\\)" nixosServicesText)
+        builtins.head (builtins.split "optimize pdf - screen" nixosServicesText)
       );
     in
     posDefault < posEbook

@@ -68,25 +68,25 @@ lib.mkIf pkgs.stdenv.isLinux {
       executable = true;
     };
 
-    # Nautilus: right-click → Scripts → optimize pdf (<preset>) (5 presets)
+    # Nautilus: right-click → Scripts → optimize pdf - <preset> (5 presets)
     # Nautilus scripts have no MIME filtering; each script guards with file --mime-type.
-    ".local/share/nautilus/scripts/optimize pdf (default)" = {
+    ".local/share/nautilus/scripts/optimize pdf - default" = {
       source = gsPdfOptNautilusScripts.default;
       executable = true;
     };
-    ".local/share/nautilus/scripts/optimize pdf (ebook)" = {
+    ".local/share/nautilus/scripts/optimize pdf - ebook" = {
       source = gsPdfOptNautilusScripts.ebook;
       executable = true;
     };
-    ".local/share/nautilus/scripts/optimize pdf (prepress)" = {
+    ".local/share/nautilus/scripts/optimize pdf - prepress" = {
       source = gsPdfOptNautilusScripts.prepress;
       executable = true;
     };
-    ".local/share/nautilus/scripts/optimize pdf (printer)" = {
+    ".local/share/nautilus/scripts/optimize pdf - printer" = {
       source = gsPdfOptNautilusScripts.printer;
       executable = true;
     };
-    ".local/share/nautilus/scripts/optimize pdf (screen)" = {
+    ".local/share/nautilus/scripts/optimize pdf - screen" = {
       source = gsPdfOptNautilusScripts.screen;
       executable = true;
     };
@@ -117,27 +117,27 @@ lib.mkIf pkgs.stdenv.isLinux {
         Actions=optimizePdfDefault;optimizePdfEbook;optimizePdfPrepress;optimizePdfPrinter;optimizePdfScreen
 
         [Desktop Action optimizePdfDefault]
-        Name=optimize pdf (default)
+        Name=optimize pdf - default
         Exec=nucleus-gs-pdf-opt --preset default %f
         Icon=application-pdf
 
         [Desktop Action optimizePdfEbook]
-        Name=optimize pdf (ebook)
+        Name=optimize pdf - ebook
         Exec=nucleus-gs-pdf-opt --preset ebook %f
         Icon=application-pdf
 
         [Desktop Action optimizePdfPrepress]
-        Name=optimize pdf (prepress)
+        Name=optimize pdf - prepress
         Exec=nucleus-gs-pdf-opt --preset prepress %f
         Icon=application-pdf
 
         [Desktop Action optimizePdfPrinter]
-        Name=optimize pdf (printer)
+        Name=optimize pdf - printer
         Exec=nucleus-gs-pdf-opt --preset printer %f
         Icon=application-pdf
 
         [Desktop Action optimizePdfScreen]
-        Name=optimize pdf (screen)
+        Name=optimize pdf - screen
         Exec=nucleus-gs-pdf-opt --preset screen %f
         Icon=application-pdf
       '';

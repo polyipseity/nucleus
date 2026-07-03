@@ -105,11 +105,11 @@ let
 
         plist="$build_dir/NucleusGSPDFOpt-${preset}.app/Contents/Info.plist"
         /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.nucleus.GSPDFOpt-${preset}" "$plist"
-        /usr/libexec/PlistBuddy -c "Set :CFBundleName Optimize PDF (${preset})" "$plist"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleName Optimize PDF - ${preset}" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices array" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0 dict" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem dict" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem:default string optimize pdf (${preset})" "$plist"
+        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem:default string optimize pdf - ${preset}" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMessage string open" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes array" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes:0 string NSFilenamesPboardType" "$plist"
@@ -176,7 +176,7 @@ in
 
         "${LSREGISTER}" -R -f "$app_path" || true
 
-        enablement_key="com.nucleus.GSPDFOpt-${preset} - optimize pdf (${preset}) - open"
+        enablement_key="com.nucleus.GSPDFOpt-${preset} - optimize pdf - ${preset} - open"
         /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
           '<dict><key>enabled_context_menu</key><true/><key>enabled_services_menu</key><true/></dict>'
       '';
