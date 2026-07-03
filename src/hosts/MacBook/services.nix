@@ -92,9 +92,12 @@ let
         as_src="$TMPDIR/NucleusGSPDFOpt.applescript"
         cat > "$as_src" << APPLESCRIPT
           on open theFiles
+            set fileCount to 0
             repeat with theFile in theFiles
               do shell script "export PATH=\"\$HOME/.nix-profile/bin:/etc/profiles/per-user/\$USER/bin:/usr/local/bin:/usr/bin:/bin\" && nucleus-gs-pdf-opt --preset ${preset} " & quoted form of POSIX path of theFile
+              set fileCount to fileCount + 1
             end repeat
+            display notification "Optimized " & fileCount & " PDF file(s) with preset " & "${preset}" subtitle "nucleus-gs-pdf-opt"
           end open
           on run
             -- No default action without files
@@ -112,9 +115,6 @@ let
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem dict" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem:default string optimize pdf - ${preset}" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMessage string open" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes array" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes:0 string public.file-url" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes:1 string NSFilenamesPboardType" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes array" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes:0 string com.adobe.pdf" "$plist"
 
