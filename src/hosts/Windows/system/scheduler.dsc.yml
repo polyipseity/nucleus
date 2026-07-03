@@ -63,9 +63,9 @@ properties:
         Trigger: Once
         AtTime: "1970-01-01T00:00:00"
         Enabled: true
-        RunWithHighestPrivileges: false
+        RunWithHighestPrivileges: true
         RunOnlyWhenNetworkAvailable: false
-        RunOnlyIfLoggedOn: true
+        RunOnlyIfLoggedOn: false
         Repetition:
           Interval: PT5M
           Duration: P1D
