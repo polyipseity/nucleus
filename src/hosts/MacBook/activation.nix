@@ -49,10 +49,24 @@
         echo "logging: failed to create $system_log_dir/$subdir." >&2
       fi
     done
-    # Create user-level log dir for camilladsp so launchd can open stdout/stderr.
-    _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
-    if [ -n "$_camilladsp_user" ] && [ "$_camilladsp_user" != "/Users/root" ]; then
-      /bin/mkdir -p "$_camilladsp_user/Library/Logs/nucleus/camilladsp"
+    # Create user-level log dir for camilladsp/camillagui-backend so launchd can
+    # open stdout/stderr, then chown to the console user so the daemon process
+    # (which runs as that user via UserName) can write to the log files.
+    _console_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+    if [ -n "$_console_user" ] && [ "$_console_user" != "/Users/root" ]; then
+      _username="''${_console_user#/Users/}"
+      for _sub in camilladsp camillagui-backend; do
+        /bin/mkdir -p "$_console_user/Library/Logs/nucleus/$_sub"
+      done
+      /usr/sbin/chown -R "$_username:staff" "$_console_user/Library/Logs/nucleus"
+
+      # Chown system log subdirs used by UserName=polyipseity services so launchd
+      # can create StandardOutPath/StandardErrorPath files as that user.
+      # Services running as root (https-proxy, linux-builder, litellm,
+      # service-watchdog) can write to any dir, so chowning these is safe.
+      for _sub in camilladsp jellyfin ollama; do
+        /usr/sbin/chown "$_username:staff" "$system_log_dir/$_sub" 2>/dev/null || true
+      done
     fi
   '';
 
