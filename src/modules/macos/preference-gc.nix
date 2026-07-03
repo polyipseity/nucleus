@@ -57,6 +57,8 @@ let
     "com.googlecode.iterm2"
     "com.raycast.macos"
   ];
+
+  daemonRefresh = import ./daemon-refresh.nix;
 in
 {
   inherit resetUserPreferenceDomains;
@@ -105,8 +107,8 @@ in
       purge_domain_variants "$domain"
     done
 
-    /usr/bin/killall cfprefsd >/dev/null 2>&1 || true
-    /bin/sleep 2
+    ${daemonRefresh.refreshCfprefsd}
+    ${daemonRefresh.waitForDaemons}
 
     echo "Managed preference domains purged. Run your apply flow to re-assert declarative defaults."
   '';
