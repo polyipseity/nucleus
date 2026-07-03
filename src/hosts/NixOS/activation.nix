@@ -25,7 +25,6 @@
   '';
 
   # ---------------------------------------------------------------------------
-  # ---------------------------------------------------------------------------
   # Service watchdog — periodic check for stuck nucleus services.
   # Every 5 minutes, systemd runs the watchdog script which detects services
   # stuck in non-running states and recovers them via reset-failed+restart.
