@@ -54,6 +54,8 @@ function Sync-LiteLLMService {
     throw "RepoRoot does not exist: $RepoRoot"
   }
 
+  . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-NucleusService.ps1")
+
   $ErrorActionPreference = "Stop"
   $serviceName = 'nucleus-litellm'
   $oldTaskName = 'NucleusLiteLLM'
@@ -69,10 +71,7 @@ function Sync-LiteLLMService {
   if (-not $Enabled) {
     $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     if ($null -ne $existingService) {
-      if ($existingService.Status -ne 'Stopped') {
-        Stop-Service -Name $serviceName -Force
-      }
-      & sc.exe delete $serviceName | Out-Null
+      Remove-NucleusService -Name $serviceName
       Write-Output "litellm: removed SCM service '$serviceName' (disabled)"
     }
     return
@@ -137,18 +136,13 @@ function Sync-LiteLLMService {
 
   $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
   if ($null -eq $existingService) {
-    & sc.exe create $serviceName binPath= "pwsh.exe -NoLogo -ExecutionPolicy Bypass -File `"$wrapperScript`"" start= auto DisplayName= "nucleus LiteLLM AI gateway proxy" | Out-Null
-    & sc.exe description $serviceName "Managed LiteLLM proxy for unified AI model access (http://$($litellmEndpoint.host):$($litellmEndpoint.port))" | Out-Null
+    Set-NucleusService -Name $serviceName -BinaryPath "pwsh.exe -NoLogo -ExecutionPolicy Bypass -File `"$wrapperScript`"" -DisplayName "nucleus LiteLLM AI gateway proxy" -Description "Managed LiteLLM proxy for unified AI model access (http://$($litellmEndpoint.host):$($litellmEndpoint.port))"
     Write-Output "litellm: created SCM service '$serviceName'"
   }
   else {
-    if ($existingService.Status -ne 'Stopped') {
-      Stop-Service -Name $serviceName -Force
-    }
-    & sc.exe config $serviceName binPath= "pwsh.exe -NoLogo -ExecutionPolicy Bypass -File `"$wrapperScript`"" start= auto | Out-Null
+    Set-NucleusService -Name $serviceName -BinaryPath "pwsh.exe -NoLogo -ExecutionPolicy Bypass -File `"$wrapperScript`"" -DisplayName "nucleus LiteLLM AI gateway proxy" -Description "Managed LiteLLM proxy for unified AI model access (http://$($litellmEndpoint.host):$($litellmEndpoint.port))"
     Write-Output "litellm: updated SCM service '$serviceName'"
   }
 
-  Start-Service -Name $serviceName
   Write-Output "litellm: ensured SCM service on http://127.0.0.1:4000"
 }

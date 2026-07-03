@@ -66,6 +66,8 @@ function Sync-CaddyService {
     [bool]$Enabled
   )
 
+  . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-NucleusService.ps1")
+
   if (-not (Test-Path -LiteralPath $RepoRoot -PathType Container)) {
     throw "RepoRoot does not exist: $RepoRoot"
   }
@@ -157,33 +159,12 @@ $($virtualHostBlocks -join "`n")
 "@
     [System.IO.File]::WriteAllText($caddyfilePath, $caddyfile, [System.Text.UTF8Encoding]::new($false))
 
-    $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     $serviceCommand = "`"$($caddyCommand.Source)`" run --config `"$caddyfilePath`" --adapter caddyfile"
 
-    if ($null -eq $existingService) {
-      & sc.exe create $serviceName binPath= $serviceCommand start= auto DisplayName= "nucleus Caddy HTTPS proxy" | Out-Null
-      & sc.exe description $serviceName "Managed local Caddy TLS ingress for all configured service HTTPS endpoints" | Out-Null
-    }
-    else {
-      if ($existingService.Status -ne 'Stopped') {
-        Stop-Service -Name $serviceName -Force
-      }
-      & sc.exe config $serviceName binPath= $serviceCommand start= auto | Out-Null
-    }
-
-    Start-Service -Name $serviceName
+    Set-NucleusService -Name $serviceName -BinaryPath $serviceCommand -DisplayName "nucleus Caddy HTTPS proxy" -Description "Managed local Caddy TLS ingress for all configured service HTTPS endpoints"
     Write-Output "caddy-service: ensured HTTPS proxy service ($serviceName)."
     return
   }
 
-  $serviceToRemove = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-  if ($null -eq $serviceToRemove) {
-    return
-  }
-
-  if ($serviceToRemove.Status -ne 'Stopped') {
-    Stop-Service -Name $serviceName -Force
-  }
-
-  & sc.exe delete $serviceName | Out-Null
+  Remove-NucleusService -Name $serviceName
 }
