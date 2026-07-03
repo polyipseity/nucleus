@@ -7,7 +7,11 @@
       "capture": "all"
     },
     "network": {
-      "admin": { "host": "127.0.0.1", "port": 2019, "protocol": "tcp" }
+      "admin": {
+        "host": "127.0.0.1",
+        "port": 2019,
+        "protocol": "tcp"
+      }
     },
     "platforms": {
       "macos": {
@@ -22,6 +26,75 @@
       "windows": {
         "service": "nucleus-caddy",
         "type": "native"
+      }
+    }
+  },
+  "camilladsp": {
+    "description": "Audio processor with websocket API for camillagui-backend",
+    "displayName": "CamillaDSP",
+    "logging": {
+      "capture": "all"
+    },
+    "network": {
+      "websocket": {
+        "host": "127.0.0.1",
+        "port": 1234,
+        "protocol": "tcp"
+      }
+    },
+    "platforms": {
+      "macos": {
+        "domain": "system",
+        "justification": "System-wide audio processor independent of login session",
+        "service": "local.camilladsp",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "justification": "System-wide audio processor independent of login session",
+        "scope": "system",
+        "service": "camilladsp.service",
+        "type": "systemctl"
+      },
+      "windows": {
+        "taskPath": "\\NucleusCamillaDSP",
+        "type": "schtask"
+      }
+    }
+  },
+  "camillagui-backend": {
+    "description": "Web configuration interface for CamillaDSP",
+    "displayName": "CamillaDSP GUI",
+    "logging": {
+      "capture": "all"
+    },
+    "network": {
+      "default": {
+        "host": "127.0.0.1",
+        "port": 5005,
+        "protocol": "http"
+      },
+      "https": {
+        "host": "localhost",
+        "port": 5006,
+        "protocol": "https"
+      }
+    },
+    "platforms": {
+      "macos": {
+        "domain": "system",
+        "justification": "System-wide web GUI daemon independent of login session",
+        "service": "local.camillagui-backend",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "justification": "System-wide web GUI daemon independent of login session",
+        "scope": "system",
+        "service": "camillagui-backend.service",
+        "type": "systemctl"
+      },
+      "windows": {
+        "taskPath": "\\NucleusCamillaGUI",
+        "type": "schtask"
       }
     }
   },
@@ -54,63 +127,6 @@
       }
     }
   },
-  "camilladsp": {
-    "description": "Audio processor with websocket API for camillagui-backend",
-    "displayName": "CamillaDSP",
-    "logging": {
-      "capture": "all"
-    },
-    "network": {
-      "websocket": { "host": "127.0.0.1", "port": 1234, "protocol": "tcp" }
-    },
-    "platforms": {
-      "macos": {
-        "domain": "system",
-        "justification": "System-wide audio processor independent of login session",
-        "service": "local.camilladsp",
-        "type": "launchctl"
-      },
-      "nixos": {
-        "justification": "System-wide audio processor independent of login session",
-        "scope": "system",
-        "service": "camilladsp.service",
-        "type": "systemctl"
-      },
-      "windows": {
-        "taskPath": "\\NucleusCamillaDSP",
-        "type": "schtask"
-      }
-    }
-  },
-  "camillagui-backend": {
-    "description": "Web configuration interface for CamillaDSP",
-    "displayName": "CamillaDSP GUI",
-    "logging": {
-      "capture": "all"
-    },
-    "network": {
-      "default": { "host": "127.0.0.1", "port": 5005, "protocol": "http" },
-      "https": { "host": "localhost", "port": 5006, "protocol": "https" }
-    },
-    "platforms": {
-      "macos": {
-        "domain": "system",
-        "justification": "System-wide web GUI daemon independent of login session",
-        "service": "local.camillagui-backend",
-        "type": "launchctl"
-      },
-      "nixos": {
-        "justification": "System-wide web GUI daemon independent of login session",
-        "scope": "system",
-        "service": "camillagui-backend.service",
-        "type": "systemctl"
-      },
-      "windows": {
-        "taskPath": "\\NucleusCamillaGUI",
-        "type": "schtask"
-      }
-    }
-  },
   "discord-music-rpc": {
     "description": "Discord Rich Presence for music players",
     "displayName": "Discord Music RPC",
@@ -118,7 +134,11 @@
       "capture": "all"
     },
     "network": {
-      "oauth": { "host": "localhost", "port": 8888, "protocol": "http" }
+      "oauth": {
+        "host": "localhost",
+        "port": 8888,
+        "protocol": "http"
+      }
     },
     "platforms": {
       "macos": {
@@ -149,8 +169,16 @@
       }
     },
     "network": {
-      "http": { "host": "127.0.0.1", "port": 8096, "protocol": "http" },
-      "https": { "host": "localhost", "port": 8920, "protocol": "https" }
+      "http": {
+        "host": "127.0.0.1",
+        "port": 8096,
+        "protocol": "http"
+      },
+      "https": {
+        "host": "localhost",
+        "port": 8920,
+        "protocol": "https"
+      }
     },
     "platforms": {
       "macos": {
@@ -169,30 +197,6 @@
       }
     }
   },
-  "service-watchdog": {
-    "description": "Periodic service watchdog that detects and restarts stuck nucleus services",
-    "displayName": "Service Watchdog",
-    "logging": {
-      "capture": "all"
-    },
-    "platforms": {
-      "macos": {
-        "domain": "system",
-        "service": "local.service-watchdog",
-        "type": "launchctl"
-      },
-      "nixos": {
-        "scope": "system",
-        "service": "nucleus-service-watchdog.service",
-        "type": "systemctl"
-      },
-      "windows": {
-        "taskPath": "\\nucleus\\service-watchdog",
-        "type": "schtask"
-      }
-    }
-  },
-
   "linux-builder": {
     "description": "Nix Linux builder VM on macOS",
     "displayName": "Linux Builder VM",
@@ -200,7 +204,11 @@
       "capture": "none"
     },
     "network": {
-      "ssh": { "host": "127.0.0.1", "port": 31022, "protocol": "tcp" }
+      "ssh": {
+        "host": "127.0.0.1",
+        "port": 31022,
+        "protocol": "tcp"
+      }
     },
     "platforms": {
       "macos": {
@@ -226,7 +234,11 @@
       "level": "WARNING"
     },
     "network": {
-      "default": { "host": "127.0.0.1", "port": 4000, "protocol": "http" }
+      "default": {
+        "host": "127.0.0.1",
+        "port": 4000,
+        "protocol": "http"
+      }
     },
     "platforms": {
       "macos": {
@@ -256,7 +268,11 @@
       }
     },
     "network": {
-      "default": { "host": "127.0.0.1", "port": 11434, "protocol": "http" }
+      "default": {
+        "host": "127.0.0.1",
+        "port": 11434,
+        "protocol": "http"
+      }
     },
     "platforms": {
       "macos": {
@@ -285,7 +301,11 @@
       }
     },
     "network": {
-      "default": { "host": "0.0.0.0", "port": 3389, "protocol": "tcp" }
+      "default": {
+        "host": "0.0.0.0",
+        "port": 3389,
+        "protocol": "tcp"
+      }
     },
     "platforms": {
       "macos": {
@@ -299,6 +319,29 @@
       "windows": {
         "service": "TermService",
         "type": "native"
+      }
+    }
+  },
+  "service-watchdog": {
+    "description": "Periodic service watchdog that detects and restarts stuck nucleus services",
+    "displayName": "Service Watchdog",
+    "logging": {
+      "capture": "all"
+    },
+    "platforms": {
+      "macos": {
+        "domain": "system",
+        "service": "local.service-watchdog",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "scope": "system",
+        "service": "nucleus-service-watchdog.service",
+        "type": "systemctl"
+      },
+      "windows": {
+        "taskPath": "\\nucleus\\service-watchdog",
+        "type": "schtask"
       }
     }
   },
@@ -339,7 +382,11 @@
       }
     },
     "network": {
-      "default": { "host": "0.0.0.0", "port": 22, "protocol": "tcp" }
+      "default": {
+        "host": "0.0.0.0",
+        "port": 22,
+        "protocol": "tcp"
+      }
     },
     "platforms": {
       "macos": {
