@@ -3,6 +3,12 @@ name: repo-structure
 description: Cached knowledge of the nucleus repository architecture, key files, module purposes, and DSC file semantics. Use when working in the nucleus repo to avoid re-discovering foundational structure every session.
 ---
 
+<!-- Maintainer note: this skill is reference orientation material, not authoring
+     rules. The module table, host structure, and DSC sections are the core value.
+     The "Agent customization" and "Scripts" sections were intentionally removed
+     because they duplicate AGENTS.md. When editing, check AGENTS.md for
+     overlapping content first. -->
+
 # Nucleus Repository Structure
 
 ## Top-level layout
@@ -77,15 +83,3 @@ description: Cached knowledge of the nucleus repository architecture, key files,
 Current user files: `wallpaper`, `screen-saver`, `explorer`, `shell`, `env`, `context-manual`, `context-pdf-opt`.
 
 Current system files: `scheduler`, `developer-mode`, `firewall`, `taskbar`, `computer-name`, `long-paths`, `storage-sense`, `font-substitutes`, `remote-desktop`, `packages`.
-
-## Scripts
-
-- All `nucleus-*` commands are apps defined in `src/flake.nix` and callable from any directory.
-- Paired `.sh`/`.ps1` entry points under `scripts/` with identical names: `apply`, `ai-sync`, `bootstrap`, `bump-lockfile`, `check`, `cloud-setup`, `gc`, `health-check`, `replica-reset`, `replica-sync`, `update`, `vm-setup`, `svc`, `test`.
-
-## Agent customization
-
-- `.agents/instructions/*.instructions.md` — file-type-scoped rules loaded automatically.
-- `.agents/prompts/*.prompt.md` — reusable workflow prompts (`implement-plan`, `commit-staged`).
-- `.agents/skills/<skill>/` — skill bundles for repeatable operations.
-- `AGENTS.md` — canonical workspace-wide source of truth (keep short).
