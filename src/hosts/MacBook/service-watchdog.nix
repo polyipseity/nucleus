@@ -13,7 +13,10 @@
 }:
 let
   nucleusSvcWatchdog = "${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog";
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+  # Use the dev symlink path, not the iCloud real path: launchd-rooted
+  # processes cannot read iCloud documents (sandboxed), but the symlink
+  # at ~/dev/nucleus is outside the iCloud container and works.
+  repoRoot = "/Users/polyipseity/dev/nucleus";
 in
 {
   launchd.daemons."service-watchdog" = {
