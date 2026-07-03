@@ -22,6 +22,12 @@ let
   servicesJsonText = builtins.readFile ../../src/modules/services.json;
 in
 
+# --- services.json structural assertions ---
+assert containsRegex ''"service-watchdog"'' servicesJsonText;
+assert containsRegex ''"local.service-watchdog"'' servicesJsonText;
+assert containsRegex ''"nucleus-service-watchdog.service"'' servicesJsonText;
+assert containsRegex ''"\\\\nucleus\\\\service-watchdog"'' servicesJsonText;
+
 # --- service-watchdog.sh structural assertions ---
 assert containsRegex "#!/usr/bin/env bash" watchdogShText;
 assert containsRegex "set -euo pipefail" watchdogShText;
@@ -79,8 +85,9 @@ assert containsRegex "OnUnitActiveSec" nixosActivationText;
 assert containsRegex "5min" nixosActivationText;
 assert containsRegex "timers.target" nixosActivationText;
 assert containsRegex "oneshot" nixosActivationText;
-assert containsRegex "service-watchdog.sh" nixosActivationText;
+assert containsRegex "nucleus-service-watchdog" nixosActivationText;
 assert containsRegex "pkgs.jq" nixosActivationText;
+assert containsRegex "NUCLEUS_REPO_ROOT" nixosActivationText;
 
 # --- Windows DSC task config ---
 assert containsRegex "TaskName: service-watchdog" windowsSchedulerDscText;
@@ -88,10 +95,12 @@ assert containsRegex "TaskPath: \\\\nucleus\\\\" windowsSchedulerDscText;
 assert containsRegex "PT5M" windowsSchedulerDscText;
 assert containsRegex "service-watchdog.ps1" windowsSchedulerDscText;
 assert containsRegex "NUCLEUS_REPO_ROOT" windowsSchedulerDscText;
+assert containsRegex "RunWithHighestPrivileges: true" windowsSchedulerDscText;
 
 # --- Flake wiring ---
 assert containsRegex "nucleus-service-watchdog" flakeText;
 assert containsRegex ''name = "service-watchdog"'' flakeText;
+assert containsRegex "nucleusApps = nucleusAppsLinux" flakeText;
 assert containsRegex "pkgs.jq" flakeText;
 
 # --- Services.json integration ---

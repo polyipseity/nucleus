@@ -53,6 +53,7 @@ assert containsRegex ''"ssh-agent"'' servicesJsonText;
 assert containsRegex ''"cloud-drive"'' servicesJsonText;
 assert containsRegex ''"rdp"'' servicesJsonText;
 assert containsRegex ''"linux-builder"'' servicesJsonText;
+assert containsRegex ''"service-watchdog"'' servicesJsonText;
 assert containsRegex ''"displayName"'' servicesJsonText;
 assert containsRegex "prefixMatch" servicesJsonText;
 
