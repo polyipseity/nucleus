@@ -1,4 +1,14 @@
 # Interactive shell configuration shared across all managed hosts.
+#
+# History exclusion features enabled here:
+#   - HIST_IGNORE_SPACE: exclude commands starting with a space
+#   - HIST_IGNORE_DUPS:  exclude consecutive duplicate commands
+#
+# When adding a new shell (bash, fish, nushell, etc.), enable the equivalent:
+#   - bash:   HISTCONTROL=ignorespace:ignoredups
+#   - fish:   fish_history ignore-space (or custom function)
+#   - nu:     $env.config.shell_integration.history.exclude_patterns or similar
+#   - cmd.exe: no equivalent — cannot be implemented
 {
   config,
   lib,
@@ -130,6 +140,12 @@ in
     # so they can emit multi-line guidance via heredoc and pass through when in a
     # devShell (DIRENV_DIR set) or via the managed default toolchain.
     initContent = ''
+            # ---------------------------------------------------------------
+            # History: exclude commands starting with a space and duplicates
+            # ---------------------------------------------------------------
+            setopt HIST_IGNORE_SPACE
+            setopt HIST_IGNORE_DUPS
+
             # ---------------------------------------------------------------
             # Writable user-local completion directory
             # ---------------------------------------------------------------
