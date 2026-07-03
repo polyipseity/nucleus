@@ -233,10 +233,10 @@ in
     )}
 
     # ── Phase 4: Flush daemon caches so changes take effect immediately ─
-    # Without these restarts, cfprefsd, lsd, pbs, and Finder all hold stale
-    # cached state in process memory, requiring a full reboot to pick up
-    # new service registrations and NSServicesStatus changes.
-    # All daemons are managed by launchd and restart automatically.
+    # Without these restarts, cfprefsd, lsd, and pbs all hold stale cached
+    # state in process memory. Finder is intentionally excluded here —
+    # relaunchDesktopServices (DAG-ordered after writeBoundary) restarts it
+    # via launchctl kickstart to preserve window state.
     ${daemonRefresh.refreshServicesMenu}
   '';
 }

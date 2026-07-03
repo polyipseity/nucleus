@@ -4,10 +4,11 @@
 # process memory. All targeted daemons are managed by launchd and restart
 # automatically after SIGKILL.
 #
-# Use composite helpers (refreshServicesMenu, refreshDesktopServices) once at
-# the end of a deploy sequence rather than killing individual daemons after
-# each sub-operation. Avoid redundant restarts by consolidating all daemon
-# refreshes into a single call.
+# All daemon restarts for a given OS are centralized here for macOS, in
+# Set-NucleusService.ps1 for Windows SCM operations, and in lib.sh shell
+# functions for cross-platform scripts. Every daemon/service must be
+# restarted at most once per activation run — no redundant kills.
+# See: AGENTS.md > Core Conventions for the cross-OS principle.
 rec {
   # Kill cfprefsd (CFPreferences daemon).
   # Caches all defaults read/write in process memory. Kill forces re-read from
@@ -76,22 +77,22 @@ rec {
     /bin/sleep 1
   '';
 
-  # Composite: flush the full services menu pipeline.
-  # Call once after deploying or removing .app bundles so the Services menu
-  # reflects the new state without a logout/reboot.
+  # Composite: flush the services menu daemon pipeline.
+  # Does not restart Finder — the dedicated relaunchDesktopServices phase
+  # (in macos.nix) handles that later via launchctl kickstart with window
+  # state preservation.
   refreshServicesMenu = ''
     ${refreshCfprefsd}
     ${refreshLsd}
     ${refreshPbs}
     ${waitForDaemons}
-    ${refreshFinderKillall}
   '';
 
-  # Composite: restart all desktop UI daemons after configuration changes.
+  # Composite: restart UI daemons for desktop configuration changes.
+  # Does not restart cfprefsd or sharedfilelistd — those are killed by
+  # configureFinderSidebar (DAG-ordered immediately before this in macos.nix).
   # Preserves Finder window state via launchctl kickstart.
   refreshDesktopServices = ''
-    ${refreshSharedFilelistd}
-    ${refreshCfprefsd}
     ${refreshFinderLaunchd}
     ${refreshSystemUI}
   '';
