@@ -46,7 +46,7 @@ description: Cached knowledge of the nucleus repository architecture, key files,
 
 - `default.nix` — nix-darwin entry. Imports modules, defines services, system defaults.
 - `defaults.nix` — macOS `defaults write` settings (NSGlobalDomain, dock, Finder, etc.).
-- `services.nix` — macOS Services (.app bundles for right-click menus). Uses a self-pruning home.activation block: removes apps listed in `removedNucleusAppDirs`, deploys from `currentNucleusAppDirs`. To remove a service: delete deploy logic + move app dir between these two lists.
+- `services.nix` — macOS Services (.app bundles for right-click menus). Uses a self-pruning home.activation block: removes apps listed in `removedNucleusServices`, deploys from `currentNucleusAppDirs`. Relies on `macos/daemon-refresh.nix` for cache flushes.
 - `activation.nix` — nix-darwin activation script hooks (Spotlight disable, login items, shell profile).
 
 ### NixOS (`src/hosts/NixOS/`)
@@ -67,6 +67,12 @@ description: Cached knowledge of the nucleus repository architecture, key files,
 |----------|-------|-------|
 | System | `system/*.dsc.yml` | Always applied to all users |
 | User | `user/*.dsc.yml` | Per-user via `dscConfigFiles` in `users.json` |
+
+## Windows modules (`src/hosts/Windows/modules/`)
+
+| File | Purpose |
+|------|---------|
+| `Set-NucleusService.ps1` | Centralized SCM service lifecycle helpers (`Set-NucleusService`, `Remove-NucleusService`). |
 
 Current user files: `wallpaper`, `screen-saver`, `explorer`, `shell`, `env`, `context-manual`, `context-pdf-opt`.
 
