@@ -64,7 +64,7 @@
       # can create StandardOutPath/StandardErrorPath files as that user.
       # Services running as root (https-proxy, linux-builder, litellm,
       # service-watchdog) can write to any dir, so chowning these is safe.
-      for _sub in camilladsp jellyfin ollama; do
+      for _sub in camilladsp https-proxy jellyfin litellm ollama; do
         /usr/sbin/chown "$_username:staff" "$system_log_dir/$_sub" 2>/dev/null || true
       done
     fi
