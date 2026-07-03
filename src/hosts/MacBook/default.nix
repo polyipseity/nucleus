@@ -37,5 +37,6 @@
     ./ntfs-3g.nix
     ./security.nix
     ./sops.nix
+    ./service-watchdog.nix
   ];
 }

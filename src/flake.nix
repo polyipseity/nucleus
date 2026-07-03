@@ -860,6 +860,7 @@
             smudge-smudge
             zackelia-formulae
             ;
+          nucleusApps = nucleusAppsMac;
         };
         system = systems.mac;
         modules = [
