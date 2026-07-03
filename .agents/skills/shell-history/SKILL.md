@@ -1,3 +1,9 @@
+---
+name: shell-history
+description: Reference for shell history exclusion features across all managed shells (zsh, PowerShell, cmd.exe). Use when editing shell configs to avoid re-discovering cross-shell parity details.
+applyTo: "src/modules/shell.nix, src/modules/pwsh.nix, src/hosts/Windows/modules/user/Sync-ShellProfile.ps1, src/hosts/Windows/user/shell.dsc.yml"
+---
+
 # Shell History Exclusion Features
 
 ## Enabled features
