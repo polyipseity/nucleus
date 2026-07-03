@@ -37,6 +37,23 @@
     # directory doesn't exist, the cask install silently skips the link step,
     # leaving ntfs-3g build with no fuse headers.  Create it pre-emptively.
     /bin/mkdir -p /usr/local/include
+
+    # ---- ensureSystemLogDirs ----------------------------------------------------
+    # Create system log directories for all nucleus launchd daemons before they
+    # start, so launchd can open StandardOutPath / StandardErrorPath files.
+    # Runs in extraActivation (before nix-darwin's launchd step) so the dirs
+    # exist before launchd tries to start daemons.
+    system_log_dir="${config.nucleus.logging.systemLogDir}"
+    for subdir in camilladsp jellyfin https-proxy linux-builder litellm ollama service-watchdog; do
+      if ! /bin/mkdir -p "$system_log_dir/$subdir"; then
+        echo "logging: failed to create $system_log_dir/$subdir." >&2
+      fi
+    done
+    # Create user-level log dir for camilladsp so launchd can open stdout/stderr.
+    _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+    if [ -n "$_camilladsp_user" ] && [ "$_camilladsp_user" != "/Users/root" ]; then
+      /bin/mkdir -p "$_camilladsp_user/Library/Logs/nucleus/camilladsp"
+    fi
   '';
 
   # ---------------------------------------------------------------------------
@@ -467,17 +484,20 @@
       fi
     fi
 
-    # ---- ensureSystemLogDirs ----------------------------------------------------
-    # Create system log directories for all nucleus launchd daemons before they
-    # start, so launchd can open StandardOutPath / StandardErrorPath files.
+    # ---- ensureSystemLogDirs (duplicated from extraActivation) -----------------
+    # Also ensure directories exist during postActivation in case the log dir
+    # config changed (systemLogDir is evaluated at activation time).
     system_log_dir="${config.nucleus.logging.systemLogDir}"
-    for subdir in jellyfin https-proxy linux-builder litellm ollama; do
+    for subdir in camilladsp jellyfin https-proxy linux-builder litellm ollama service-watchdog; do
       if ! /bin/mkdir -p "$system_log_dir/$subdir"; then
         echo "logging: failed to create $system_log_dir/$subdir." >&2
       fi
     done
+    _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+    if [ -n "$_camilladsp_user" ] && [ "$_camilladsp_user" != "/Users/root" ]; then
+      /bin/mkdir -p "$_camilladsp_user/Library/Logs/nucleus/camilladsp"
+    fi
 
-    # ---- NUCLEUS_HOST ------------------------------------------------------------
     # Export the canonical host name for downstream VM host-scoping and Host
     # module consumers (e.g. src/modules/VMs.json hosts field filtering).
     console_user="''${console_user:-$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)}"
