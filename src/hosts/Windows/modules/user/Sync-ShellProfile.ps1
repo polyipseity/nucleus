@@ -95,6 +95,11 @@ function Sync-ShellProfile {
     '  Set-PSReadLineOption -PredictionSource History'
     '  Set-PSReadLineOption -PredictionViewStyle ListView'
     '  Set-PSReadLineKeyHandler -Key Tab -Function MenuComplete'
+    '  Set-PSReadLineOption -HistoryNoDuplicates'
+    '  Set-PSReadLineOption -AddToHistoryHandler {'
+    '    param($line)'
+    '    $line -notmatch ''^\s'''
+    '  }'
     '}'
     # zoxide: smart directory navigation learned from visit history.
     'if (Get-Command zoxide -ErrorAction SilentlyContinue) {'
