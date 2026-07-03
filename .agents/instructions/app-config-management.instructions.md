@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or modifying application settings and configurations. Covers storage location selection, per-user override patterns, cross-platform parity, and testing requirements."
 name: "App Configuration Management"
-applyTo: "src/modules/**/*.nix, src/modules/configs/**, src/hosts/Windows/modules/**/*.ps1, src/flake.nix, src/hosts/Windows/users.json, tests/src/*-tests.nix"
+applyTo: "src/modules/**/*.nix, src/modules/configs/**, src/hosts/Windows/modules/**/*.ps1, src/flake.nix, src/hosts/Windows/users.json, tests/modules/*-tests.nix, tests/integration/*-tests.nix, tests/hosts/**/*-tests.nix"
 ---
 
 # App Configuration Management
@@ -105,7 +105,7 @@ $effectiveSettings = Merge-Settings (Merge-Settings $defaults $platformOverrides
 Add assertions to ensure override fields exist and are wired correctly:
 
 ```nix
-# tests/src/app-config-tests.nix
+# tests/modules/app-config-tests.nix
 assert builtins.hasAttr "app" windowsUsers.users.polyipseity;
 assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.app;
 assert containsRegex "app =" flakeText;  # Verify flake.nix defines overrides

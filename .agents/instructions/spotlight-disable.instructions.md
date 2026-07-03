@@ -1,7 +1,7 @@
 ---
 description: "Use when modifying, debugging, or troubleshooting the Spotlight (cmd+space) disable mechanism on macOS. Covers the proven 6-stage strategy, why single-hotkey approaches fail, and the critical role of each disable stage."
 name: "Spotlight Disable Strategy (macOS)"
-applyTo: "src/hosts/MacBook/activation.nix, src/hosts/MacBook/MANUAL.md, tests/src/activation-deps-tests.nix, src/hosts/MacBook/defaults.nix"
+applyTo: "src/hosts/MacBook/activation.nix, src/hosts/MacBook/MANUAL.md, tests/integration/activation-deps-tests.nix, src/hosts/MacBook/defaults.nix"
 ---
 
 # Spotlight Disable Strategy for macOS

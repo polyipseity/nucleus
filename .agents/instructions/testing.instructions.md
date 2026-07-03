@@ -25,10 +25,10 @@ Tests must accompany every feature or breaking change. Ensure tests pass locally
 
 ```bash
 # Evaluate core module logic tests
-nix-instantiate --eval tests/src/core-tests.nix
+nix-instantiate --eval tests/modules/core-tests.nix
 
 # Evaluate module import tests
-nix-instantiate --eval tests/src/module-imports-tests.nix
+nix-instantiate --eval tests/modules/module-imports-tests.nix
 
 # Full flake check (all configs parse)
 cd src && nix flake check
@@ -38,7 +38,7 @@ cd src && nix flake check
 
 ```powershell
 # Run Pester tests for DSC validation
-Invoke-Pester -Path tests/src/hosts/Windows/ -Verbose
+Invoke-Pester -Path tests/hosts/Windows/ -Verbose
 ```
 
 ---
@@ -59,7 +59,7 @@ Invoke-Pester -Path tests/src/hosts/Windows/ -Verbose
 
 ### Layer 2: Pure Logic Tests
 
-**File location:** `tests/src/*.nix`
+**File locations:** `tests/modules/*.nix`, `tests/integration/*.nix`, `tests/hosts/*/*.nix`
 
 **What to test:**
 
@@ -74,7 +74,7 @@ Invoke-Pester -Path tests/src/hosts/Windows/ -Verbose
 **Example:**
 
 ```nix
-# tests/src/package-parity-tests.nix (excerpt)
+# tests/modules/package-parity-tests.nix (excerpt)
 {
   lib ? import <nixpkgs/lib>,
 }:
@@ -92,11 +92,11 @@ in
 }
 ```
 
-**Run:** `nix-instantiate --eval tests/src/package-parity-tests.nix`
+**Run:** `nix-instantiate --eval tests/modules/package-parity-tests.nix`
 
 ### Layer 3: Module Import Validation
 
-**File location:** `tests/src/module-imports-tests.nix`
+**File location:** `tests/modules/module-imports-tests.nix`
 
 **What to test:**
 
@@ -112,7 +112,7 @@ in
 
 ### Pester Test Structure
 
-**File location:** `tests/src/hosts/Windows/**/*.Tests.ps1`
+**File location:** `tests/hosts/Windows/**/*.Tests.ps1`
 
 **Test categories:**
 
@@ -144,10 +144,10 @@ Describe "Security Settings" {
 
 ```powershell
 # Run all Windows tests (requires admin)
-Invoke-Pester -Path tests/src/hosts/Windows/ -Verbose
+Invoke-Pester -Path tests/hosts/Windows/ -Verbose
 
 # Run a single test file
-Invoke-Pester -Path tests/src/hosts/Windows/packages/package-installation.Tests.ps1
+Invoke-Pester -Path tests/hosts/Windows/packages/package-installation.Tests.ps1
 ```
 
 ### DSC Dry-Run Validation
@@ -182,13 +182,13 @@ Commit atomically: test + implementation in one commit.
 
 **Nix tests:**
 
-- `tests/src/<module>-tests.nix` — logic tests for a specific module
-- Example: `tests/src/core-tests.nix` for core.nix logic
+- `tests/<area>/<topic>-tests.nix` — logic tests organized by scope
+- Examples: `tests/modules/core-tests.nix`, `tests/integration/cloud-sync-tests.nix`, `tests/hosts/MacBook/alttab-settings-tests.nix`
 
 **Pester tests:**
 
-- `tests/src/hosts/Windows/<area>/<feature>.Tests.ps1` — tests for a feature or DSC resource group
-- Example: `tests/src/hosts/Windows/system/system-policy.Tests.ps1` for machine-scoped DSC invariants
+- `tests/hosts/Windows/<area>/<feature>.Tests.ps1` — tests for a feature or DSC resource group
+- Example: `tests/hosts/Windows/system/system-policy.Tests.ps1` for machine-scoped DSC invariants
 
 ### Example patterns
 
@@ -214,8 +214,8 @@ Tests run automatically on push, pull request, and manual dispatch. CI runs `nix
 
 Before committing changes, verify:
 
-- [ ] All Nix tests pass: `nix-instantiate --eval tests/src/*.nix`
+- [ ] All Nix tests pass: `find tests/modules tests/integration tests/hosts -name '*.nix' -exec nix-instantiate --eval {} +`
 - [ ] Flake checks pass: `cd src && nix flake check`
 - [ ] Shell syntax passes: `nix run ./src#check-sh`
 - [ ] PowerShell syntax passes: `nix run ./src#check-pwsh`
-- [ ] (Windows only) Pester tests pass: `Invoke-Pester tests/src/hosts/Windows/`
+- [ ] (Windows only) Pester tests pass: `Invoke-Pester tests/hosts/Windows/`

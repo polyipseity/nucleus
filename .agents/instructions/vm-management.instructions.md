@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing virtual machine provisioning across hosts, VM manifests, or VM test files."
 name: "VM Management"
-applyTo: "scripts/vm-setup.*, src/hosts/*/vms.nix, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, tests/src/vm-setup-tests.nix, src/vms/**"
+applyTo: "scripts/vm-setup.*, src/hosts/*/vms.nix, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, tests/modules/vm-setup-tests.nix, src/vms/**"
 ---
 
 # VM Management
@@ -42,7 +42,7 @@ VM guest credentials must come from per-user SOPS secrets (`src/secrets/users-<u
 - All guest paths (NixOS: `guest.nix` + `packer.pkr.hcl`; Windows: `Autounattend.xml` + `packer.pkr.hcl`; macOS: `packer.pkr.hcl`) must consume injected credentials.
 - Credential drift must invalidate stale VM artifacts so changing secret-backed values rebuilds rather than reusing stale disks.
 
-When changing credential policy, update `tests/src/vm-setup-tests.nix` in the same commit.
+When changing credential policy, update `tests/modules/vm-setup-tests.nix` in the same commit.
 
 ## VM Manifest
 
@@ -133,7 +133,7 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 
 1. Add an entry to `src/modules/VMs.json` with all required fields.
 2. Run `nucleus-vm-setup` on all three host platforms.
-3. Add a test in `tests/src/vm-setup-tests.nix` if the new VM has platform-specific constraints.
+3. Add a test in `tests/modules/vm-setup-tests.nix` if the new VM has platform-specific constraints.
 4. Update `src/hosts/<platform>/MANUAL.md` if the VM requires manual steps.
 
 ## VM Image Building
