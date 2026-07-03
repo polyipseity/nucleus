@@ -169,6 +169,29 @@
       }
     }
   },
+  "service-watchdog": {
+    "description": "Periodic service watchdog that detects and restarts stuck nucleus services",
+    "displayName": "Service Watchdog",
+    "logging": {
+      "capture": "all"
+    },
+    "platforms": {
+      "macos": {
+        "domain": "system",
+        "service": "local.service-watchdog",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "scope": "system",
+        "service": "nucleus-service-watchdog.service",
+        "type": "systemctl"
+      },
+      "windows": {
+        "taskPath": "\\nucleus\\service-watchdog",
+        "type": "schtask"
+      }
+    }
+  },
 
   "linux-builder": {
     "description": "Nix Linux builder VM on macOS",
