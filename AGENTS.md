@@ -6,7 +6,7 @@
 - `src/` contains the Nix-based declarative configuration: `flake.nix`, `hosts/` (per-machine configs), and `modules/` (shared logic).
 - Prefer single-file modules in `src/modules/*.nix` unless a module truly needs nested sub-components. Exceptions: `src/modules/macos/` (daemon-refresh.nix, finder-sidebar.nix, preference-gc.nix).
 - `scripts/` contains automation helpers with paired `.sh`/`.ps1` entry points: bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and others.
-- `tests/` contains automated tests: `tests/src/` for Nix logic tests, `tests/src/hosts/Windows/` for Pester DSC validation. All changes require corresponding tests; see `.agents/instructions/testing.instructions.md`.
+- `tests/` contains automated tests: `tests/modules/`, `tests/integration/`, and `tests/hosts/<host>/` for Nix logic tests, `tests/hosts/Windows/` for Pester DSC validation. All changes require corresponding tests; see `.agents/instructions/testing.instructions.md`.
 - Keep this file short and durable. Put file-type and workflow-specific rules in `.agents/instructions/*.instructions.md`, reusable workflows in `.agents/prompts/*.prompt.md`, and skill assets in `.agents/skills/<skill>/`.
 - Inspect the on-disk tree before assuming source files, tests, or runnable commands exist in a given location.
 

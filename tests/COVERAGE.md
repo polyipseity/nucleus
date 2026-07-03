@@ -10,15 +10,15 @@ This document tracks test coverage across all **nucleus** platforms (macOS, NixO
 
 ### Nix Tests (Pure Evaluation Layer)
 
-Located in `tests/src/`, run via `nix-instantiate --eval` in CI.
+Located in `tests/modules/`, `tests/integration/`, and `tests/hosts/<host>/`, run via `nix-instantiate --eval` in CI.
 
-**Coverage**: Module options, import graphs, config composition, package parity, option conflict detection, activation dependency ordering, SOPS structure validation, and VS Code extension pruning. Run `ls tests/src/*.nix` for the current authoritative list.
+**Coverage**: Module options, import graphs, config composition, package parity, option conflict detection, activation dependency ordering, SOPS structure validation, and VS Code extension pruning. Run `find tests/modules tests/integration tests/hosts -name '*.nix'` for the current authoritative list.
 
 ---
 
 ### Windows Tests (PowerShell + DSC Layer)
 
-Located in `tests/src/hosts/Windows/`, organised by concern (`apps/`, `configuration/`, `packages/`, `smoke/`, `system/`) and run via Pester locally on Windows.
+Located in `tests/hosts/Windows/`, organised by concern (`apps/`, `configuration/`, `packages/`, `smoke/`, `system/`) and run via Pester locally on Windows.
 
 #### ✅ **Windows Pester suites**
 
@@ -89,7 +89,7 @@ All tests are automatically run on every commit:
 
 1. **Nix Parse** (`nix flake check`): Verify all `.nix` files parse
 2. **Consolidated POSIX Checks** (`nix run ./src#check`): Runs deadnix, shellcheck, PowerShell lint, Packer validation, and script validation tests in one step (macOS/Linux)
-3. **Repository test suite (POSIX)** (`nix run ./src#test`): Evaluates all `tests/src/*.nix` test files (macOS/Linux)
+3. **Repository test suite (POSIX)** (`nix run ./src#test`): Evaluates all Nix test files (macOS/Linux)
 4. **Consolidated Windows Checks** (`pwsh -File scripts/check.ps1`): Runs PowerShell lint and Packer validation (Windows)
 5. **Repository test suite (Windows)** (`pwsh -File scripts/test.ps1`): Placeholder for future Windows test support
 
@@ -139,12 +139,12 @@ Activation hooks, secret decryption, and deployment validation require live syst
 **Run all Nix tests:**
 ```bash
 nix flake check src/
-nix-instantiate --eval tests/src/*.nix
+find tests/modules tests/integration tests/hosts -name '*.nix' -exec nix-instantiate --eval {} +
 ```
 
 **Run Windows Pester tests:**
 ```powershell
-pwsh -Command "Invoke-Pester tests/src/hosts/Windows/"
+pwsh -Command "Invoke-Pester tests/hosts/Windows/"
 ```
 
 **Run shell script validation:**
@@ -165,7 +165,7 @@ act push --job test  # Requires 'act' (https://github.com/nektos/act)
 
 ## Test Maintenance Guidelines
 
-1. **Add tests for new modules**: Every `.nix` file in `src/modules/` should have corresponding tests in `tests/src/module-imports-tests.nix`
+1. **Add tests for new modules**: Every `.nix` file in `src/modules/` should have corresponding tests in `tests/modules/module-imports-tests.nix`
 2. **Update parity tests**: When adding a new package, add it to `package-parity-tests.nix` across all platforms
 3. **Validate security policies**: All invariants in `AGENTS.md` must have corresponding tests
 4. **Document untested areas**: Update this file when adding test coverage
@@ -173,6 +173,6 @@ act push --job test  # Requires 'act' (https://github.com/nektos/act)
 ---
 
 - **Last Updated**: Continuous (update this file whenever suite structure changes)
-- **Nix Suite Status**: See `ls tests/src/*.nix` for current list
-- **Windows Suite Status**: hierarchical Pester suites under `tests/src/hosts/Windows/**`
+- **Nix Suite Status**: See `find tests/modules tests/integration tests/hosts -name '*.nix'` for current list
+- **Windows Suite Status**: hierarchical Pester suites under `tests/hosts/Windows/**`
 - **Shell Suite Status**: script validation checks in `tests/scripts/`
