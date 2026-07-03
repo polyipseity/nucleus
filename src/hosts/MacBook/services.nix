@@ -92,7 +92,7 @@ let
         cat > "$as_src" << APPLESCRIPT
           on open theFiles
             repeat with theFile in theFiles
-              do shell script "export PATH=\"\$HOME/.nix-profile/bin:/usr/local/bin:/usr/bin:/bin\" && nucleus-gs-pdf-opt --preset ${preset} " & quoted form of POSIX path of theFile
+              do shell script "export PATH=\"\$HOME/.nix-profile/bin:/etc/profiles/per-user/\$USER/bin:/usr/local/bin:/usr/bin:/bin\" && nucleus-gs-pdf-opt --preset ${preset} " & quoted form of POSIX path of theFile
             end repeat
           end open
           on run
