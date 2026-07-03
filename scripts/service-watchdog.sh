@@ -79,6 +79,7 @@ read_watchdog_services() {
     | select(.value.platforms[$platform].type != "omitted")
     | select(.value.platforms[$platform].socketActivated // false | not)
     | select(.value.platforms[$platform].prefixMatch // false | not)
+    | select(.key != "service-watchdog")
     | {key: .key, displayName: .value.displayName, platform: .value.platforms[$platform]}
   ' "$SERVICES_JSON"
 }
