@@ -61,7 +61,7 @@ hooks = [
   { id = "repo-check", name = "repository checks", language = "python", files = "(\\.hcl|\\.nix|\\.pkr|\\.ps1|\\.sh)$", entry = "python scripts/prek-hooks.py check", args = [
     "--format",
   ] },
-  # Repository test suite — runs Nix test suite evaluation (tests/src/*.nix).
+  # Repository test suite — runs Nix test suite evaluation under tests/.
   # Always runs on pre-push regardless of changed files.
   { id = "repo-test", name = "repository tests", language = "python", always_run = true, stages = [
     "pre-push",
