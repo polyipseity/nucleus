@@ -20,7 +20,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${pkgs.camillagui-backend}/bin/camillagui-backend -c $HOME/.config/camillagui-backend/config.yml"
+        "exec ${pkgs.camillagui-backend}/bin/camillagui-backend -c ${userHome}/.config/camillagui-backend/config.yml"
       ];
       UserName = username;
       KeepAlive = true;
