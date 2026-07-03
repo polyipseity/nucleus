@@ -8,7 +8,7 @@
 # the end of a deploy sequence rather than killing individual daemons after
 # each sub-operation. Avoid redundant restarts by consolidating all daemon
 # refreshes into a single call.
-{
+rec {
   # Kill cfprefsd (CFPreferences daemon).
   # Caches all defaults read/write in process memory. Kill forces re-read from
   # ~/Library/Preferences/*.plist on next access.
