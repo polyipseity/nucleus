@@ -37,6 +37,7 @@
 
 - Prefer declarative state (`src/modules/*.nix`, WinGet DSC YAML) over imperative scripts.
 - Keep POSIX shared behavior in shared modules, not duplicated per-host.
+- Centralize all daemon and service restarts per OS and restart each daemon at most once per activation run. macOS daemon refreshes go in `src/modules/macos/daemon-refresh.nix`; Windows SCM operations go in `src/hosts/Windows/modules/Set-NucleusService.ps1`; cross-platform shell helpers go in `src/scripts/lib.sh`.
 - Design for cross-host parity first; see `.agents/instructions/cross-host-feature-parity.instructions.md` for the full policy.
 - Sort unordered lists/blocks alphabetically; preserve semantic/load order where required.
 - Use sentence case for all user-facing UI labels (right-click menus, dock/folder/script labels, visible text); see `.agents/instructions/ui-label-naming.instructions.md`.
