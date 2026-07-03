@@ -1,4 +1,4 @@
-# tests/src/nix-conf-warnings-tests.nix — Regression guard for nix.conf warnings.
+# tests/modules/nix-conf-warnings-tests.nix — Regression guard for nix.conf warnings.
 #
 # Validates that mkCheckApp, mkTestApp, and mkCloudSetupApp intentionally omit
 # pkgs.nix from runtimeInputs, so scripts use the host Nix (Determinate Nix on
@@ -11,7 +11,7 @@
 # Any new app that also omits pkgs.nix should be added here with a matching
 # comment in flake.nix.
 #
-# Run with: nix-instantiate --eval tests/src/nix-conf-warnings-tests.nix
+# Run with: nix-instantiate --eval tests/modules/nix-conf-warnings-tests.nix
 
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;

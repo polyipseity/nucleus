@@ -1,4 +1,4 @@
-# tests/src/service-watchdog-tests.nix — Schema and invariant tests for service
+# tests/integration/service-watchdog-tests.nix — Schema and invariant tests for service
 # watchdog.
 #
 # Validates that the watchdog scripts (service-watchdog.sh,
@@ -6,7 +6,7 @@
 # NixOS systemd timer, Windows DSC task), and flake wiring contain the
 # required structural elements.
 #
-# Run with: nix-instantiate --eval tests/src/service-watchdog-tests.nix
+# Run with: nix-instantiate --eval tests/integration/service-watchdog-tests.nix
 
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;

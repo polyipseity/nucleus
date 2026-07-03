@@ -1,4 +1,4 @@
-# tests/src/dsc-config-files-tests.nix — Per-user DSC config declaration tests.
+# tests/integration/dsc-config-files-tests.nix — Per-user DSC config declaration tests.
 #
 # Validates that user-level DSC configs (context-manual.dsc.yml,
 # context-pdf-opt.dsc.yml, env.dsc.yml, explorer.dsc.yml, screen-saver.dsc.yml,
@@ -8,7 +8,7 @@
 # Also validates that apply.ps1 prepends "user/" to each dscConfigFiles entry
 # and prevents path-traversal escape.
 #
-# Run with: nix-instantiate --eval tests/src/dsc-config-files-tests.nix
+# Run with: nix-instantiate --eval tests/integration/dsc-config-files-tests.nix
 
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;

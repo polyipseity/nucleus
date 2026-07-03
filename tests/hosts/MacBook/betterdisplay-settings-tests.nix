@@ -1,4 +1,4 @@
-# tests/src/betterdisplay-settings-tests.nix — Verify BetterDisplay settings wiring on macOS.
+# tests/hosts/MacBook/betterdisplay-settings-tests.nix — Verify BetterDisplay settings wiring on macOS.
 #
 # This suite guards declarative BetterDisplay defaults and activation hooks so
 # menu icon visibility stays converged after app updates and rebuilds.

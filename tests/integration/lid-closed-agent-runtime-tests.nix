@@ -1,4 +1,4 @@
-# tests/src/lid-closed-agent-runtime-tests.nix — Verify lid-closed agent runtime posture.
+# tests/integration/lid-closed-agent-runtime-tests.nix — Verify lid-closed agent runtime posture.
 #
 # Guards the cross-host contract for unattended work with the lid shut:
 # - macOS keeps its no-idle-sleep posture and documents the clamshell limit
@@ -55,7 +55,7 @@ let
     && (lib.hasInfix "Sync-PowerPolicy -Enabled:$EnablePowerParity" windowsApplyText)
   ) "Windows apply.ps1 must load and execute Sync-PowerPolicy for lid-close parity";
 
-  test_ci_runs_this_suite = assert' (lib.hasInfix "tests/src/lid-closed-agent-runtime-tests.nix" ciWorkflowText) "CI must execute the lid-closed agent runtime tests";
+  test_ci_runs_this_suite = assert' (lib.hasInfix "tests/integration/lid-closed-agent-runtime-tests.nix" ciWorkflowText) "CI must execute the lid-closed agent runtime tests";
 
   allTests = [
     test_macos_keeps_remote_session_pmset_posture

@@ -1,9 +1,9 @@
-# tests/src/module-options-tests.nix — Comprehensive Nix module option validation.
+# tests/modules/module-options-tests.nix — Comprehensive Nix module option validation.
 #
 # Tests verify that all module options have correct types, defaults, and descriptions.
 # This catches option definition errors before configurations are applied.
 #
-# Run with: nix-instantiate --eval tests/src/module-options-tests.nix
+# Run with: nix-instantiate --eval tests/modules/module-options-tests.nix
 
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;

@@ -1,11 +1,11 @@
-# tests/src/package-parity-tests.nix — Verify cross-platform package presence.
+# tests/modules/package-parity-tests.nix — Verify cross-platform package presence.
 #
 # Tests validate that:
 #   - All critical packages exist in both nixpkgs and homebrew/winget
 #   - Package naming is consistent across platforms
 #   - No platform is missing essential packages
 #
-# Run with: nix-instantiate --eval tests/src/package-parity-tests.nix
+# Run with: nix-instantiate --eval tests/modules/package-parity-tests.nix
 
 {
   lib ? import <nixpkgs/lib>,

@@ -1,4 +1,4 @@
-# tests/src/alttab-settings-tests.nix — Verify explicit AltTab settings wiring on macOS.
+# tests/hosts/MacBook/alttab-settings-tests.nix — Verify explicit AltTab settings wiring on macOS.
 #
 # This suite ensures all requested AltTab preferences remain declared in
 # defaults.nix so host rebuilds converge the same behavior every run.

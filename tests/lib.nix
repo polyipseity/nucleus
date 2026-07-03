@@ -1,4 +1,4 @@
-# tests/lib.nix — Shared test helpers for tests/src/*.nix.
+# tests/lib.nix — Shared test helpers for Nix tests.
 
 {
   # Simple assertion helper with descriptive errors.

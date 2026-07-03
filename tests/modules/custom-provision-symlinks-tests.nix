@@ -1,9 +1,9 @@
-# tests/src/custom-provision-symlinks-tests.nix — Validate custom provision symlink wiring.
+# tests/modules/custom-provision-symlinks-tests.nix — Validate custom provision symlink wiring.
 #
 # Ensures the shared per-user custom symlink mechanism is imported, platform-aware,
 # and configured to expose ~/data using iCloud on macOS and Google Drive elsewhere.
 #
-# Run with: nix-instantiate --eval tests/src/custom-provision-symlinks-tests.nix
+# Run with: nix-instantiate --eval tests/modules/custom-provision-symlinks-tests.nix
 
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;

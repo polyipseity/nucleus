@@ -1,9 +1,9 @@
-# tests/src/icloud-exclusions-tests.nix — Validate macOS iCloud exclusion hook wiring.
+# tests/modules/icloud-exclusions-tests.nix — Validate macOS iCloud exclusion hook wiring.
 #
 # Verifies that iCloud exclusion names are declared in users.json and that
 # shell/macos modules wire both directory-entry and mkdir triggers.
 #
-# Run with: nix-instantiate --eval tests/src/icloud-exclusions-tests.nix
+# Run with: nix-instantiate --eval tests/modules/icloud-exclusions-tests.nix
 
 let
   lib = import <nixpkgs/lib>;

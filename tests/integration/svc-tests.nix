@@ -1,10 +1,10 @@
-# tests/src/svc-tests.nix — Schema and invariant tests for service management.
+# tests/integration/svc-tests.nix — Schema and invariant tests for service management.
 #
 # Validates that the service registry (services.json), backends (svc.sh,
 # svc.ps1), and wiring (flake.nix, shell.nix, check scripts) contain the
 # required structural elements.
 #
-# Run with: nix-instantiate --eval tests/src/svc-tests.nix
+# Run with: nix-instantiate --eval tests/integration/svc-tests.nix
 
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;

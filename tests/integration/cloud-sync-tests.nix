@@ -1,9 +1,9 @@
-# tests/src/cloud-sync-tests.nix — Schema and invariant tests for cloud-drives.nix.
+# tests/integration/cloud-sync-tests.nix — Schema and invariant tests for cloud-drives.nix.
 #
 # Validates that the cloud-drives module text contains the required option
 # definitions, type declarations, and structural invariants.
 #
-# Run with: nix-instantiate --eval tests/src/cloud-sync-tests.nix
+# Run with: nix-instantiate --eval tests/integration/cloud-sync-tests.nix
 
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;

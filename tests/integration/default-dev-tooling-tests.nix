@@ -1,4 +1,4 @@
-# tests/src/default-dev-tooling-tests.nix — Verify managed fallback tooling policy wiring.
+# tests/integration/default-dev-tooling-tests.nix — Verify managed fallback tooling policy wiring.
 #
 # Guards the cross-host contract for repositories that do not ship direnv/Nix
 # metadata: POSIX shells must expose the dedicated fallback tool bundle and
@@ -11,7 +11,7 @@
 #   - Windows: user-scope bin dirs prepended unconditionally (no Test-Path
 #     guard) at the top of the managed block, before the direnv hook.
 #
-# Run with: nix-instantiate --eval tests/src/default-dev-tooling-tests.nix
+# Run with: nix-instantiate --eval tests/integration/default-dev-tooling-tests.nix
 
 {
   lib ? import <nixpkgs/lib>,
@@ -61,7 +61,7 @@ let
     && (lib.hasInfix "NUCLEUS_DEFAULT_DEV_ENV" buildToolsPolicyText)
   ) "Build tools policy instructions must document the managed fallback environment";
 
-  test_ci_runs_this_suite = assert' (lib.hasInfix "tests/src/default-dev-tooling-tests.nix" ciWorkflowText) "CI must execute the managed fallback tooling tests";
+  test_ci_runs_this_suite = assert' (lib.hasInfix "tests/integration/default-dev-tooling-tests.nix" ciWorkflowText) "CI must execute the managed fallback tooling tests";
 
   # Verify that user-scope bin dirs are declared via home.sessionPath (POSIX)
   # and not via initContent PATH guards.  home.sessionPath writes to ~/.zshenv

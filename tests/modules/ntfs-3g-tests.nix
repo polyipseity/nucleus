@@ -1,10 +1,10 @@
-# tests/src/ntfs-3g-tests.nix — Validate ntfs-3g patch files and Nix module.
+# tests/modules/ntfs-3g-tests.nix — Validate ntfs-3g patch files and Nix module.
 #
 # Verifies that the checked-in patch files are valid unified diffs, that they
 # produce the correct transformations, and that the Nix module no longer uses
 # inline Python or sed for patching.
 #
-# Run with: nix-instantiate --eval tests/src/ntfs-3g-tests.nix
+# Run with: nix-instantiate --eval tests/modules/ntfs-3g-tests.nix
 
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;

@@ -1,10 +1,10 @@
-# tests/src/vscode-neovim-tests.nix — Verify vscode-neovim extension provisioning.
+# tests/integration/vscode-neovim-tests.nix — Verify vscode-neovim extension provisioning.
 #
 # This test verifies that the vscode-neovim VS Code extension is properly
 # wired across all provisioning layers (POSIX Nix, Windows PowerShell,
 # lockfile versions, VS Code settings, macOS defaults, and Neovim init.lua).
 #
-# Run with: nix-instantiate --eval tests/src/vscode-neovim-tests.nix
+# Run with: nix-instantiate --eval tests/integration/vscode-neovim-tests.nix
 
 let
   lib = import <nixpkgs/lib>;

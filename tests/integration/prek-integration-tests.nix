@@ -1,9 +1,9 @@
-# tests/src/prek-integration-tests.nix — Verify prek lifecycle integration.
+# tests/integration/prek-integration-tests.nix — Verify prek lifecycle integration.
 #
 # Guards the cross-host prek contract: binary parity, apply-time installation,
 # and shell-driven hook installation across POSIX and Windows.
 #
-# Run with: nix-instantiate --eval tests/src/prek-integration-tests.nix
+# Run with: nix-instantiate --eval tests/integration/prek-integration-tests.nix
 
 {
   lib ? import <nixpkgs/lib>,

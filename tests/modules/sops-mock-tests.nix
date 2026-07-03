@@ -1,4 +1,4 @@
-# tests/src/sops-mock-tests.nix — Mock SOPS secret handling validation.
+# tests/modules/sops-mock-tests.nix — Mock SOPS secret handling validation.
 #
 # Tests verify that SOPS configuration structure is correct without requiring
 # actual encrypted files or age keys. These are mock tests that validate:
@@ -7,7 +7,7 @@
 # - Recipient lists
 # - Age key presence requirements
 #
-# Run with: nix-instantiate --eval tests/src/sops-mock-tests.nix
+# Run with: nix-instantiate --eval tests/modules/sops-mock-tests.nix
 
 {
   lib ? import <nixpkgs/lib>,

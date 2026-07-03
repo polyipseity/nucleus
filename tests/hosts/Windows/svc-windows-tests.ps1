@@ -7,13 +7,13 @@
   and Invoke-ServiceAction functions by sourcing the function definitions
   from svc.ps1 with a mock $Registry.
 
-  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/src/svc-windows-tests.ps1 -Passthru"
+  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/svc-windows-tests.ps1 -Passthru"
 #>
 
 BeforeAll {
   # Read svc.ps1 and extract function definitions using the PowerShell AST parser.
   # This handles nested braces correctly, unlike simple regex approaches.
-  $svcPs1Path = Join-Path $PSScriptRoot '../../scripts/svc.ps1'
+  $svcPs1Path = Join-Path $PSScriptRoot '../../../scripts/svc.ps1'
   $svcPs1Content = Get-Content -Path $svcPs1Path -Raw
   $tokens = $null
   $errors = $null

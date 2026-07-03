@@ -1,7 +1,7 @@
-# tests/src/core-tests.nix — Tests for backend selection, package resolution,
+# tests/modules/core-tests.nix — Tests for backend selection, package resolution,
 # and nix-index schedule invariants.
 #
-# Run via: nix-instantiate --eval tests/src/core-tests.nix
+# Run via: nix-instantiate --eval tests/modules/core-tests.nix
 
 {
   lib ? import <nixpkgs/lib>,

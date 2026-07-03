@@ -1,4 +1,4 @@
-# tests/src/config-composition-tests.nix — Verify host configurations compose correctly.
+# tests/integration/config-composition-tests.nix — Verify host configurations compose correctly.
 #
 # Tests validate that:
 #   - macOS, NixOS, and standalone HM configs don't have conflicting options
@@ -6,7 +6,7 @@
 #   - Cross-module dependencies are satisfied
 #   - Parity settings exist on supported hosts
 #
-# Run with: nix-instantiate --eval tests/src/config-composition-tests.nix
+# Run with: nix-instantiate --eval tests/integration/config-composition-tests.nix
 
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;

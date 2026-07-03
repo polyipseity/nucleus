@@ -1,10 +1,10 @@
-# tests/src/agent-host-shell-tests.nix — Validate agent-host-shell module.
+# tests/modules/agent-host-shell-tests.nix — Validate agent-host-shell module.
 #
 # Verifies:
 #   • Module can be imported and defines expected options
 #   • Wrapper content exports expected environment variables
 #
-# Run with: nix-instantiate --eval tests/src/agent-host-shell-tests.nix
+# Run with: nix-instantiate --eval tests/modules/agent-host-shell-tests.nix
 
 let
   lib = import <nixpkgs/lib>;

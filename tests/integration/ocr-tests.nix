@@ -1,6 +1,6 @@
-# tests/src/ocr-tests.nix — Verify PaddleOCR provisioning across all hosts.
+# tests/integration/ocr-tests.nix — Verify PaddleOCR provisioning across all hosts.
 #
-# Run with: nix-instantiate --eval tests/src/ocr-tests.nix
+# Run with: nix-instantiate --eval tests/integration/ocr-tests.nix
 
 let
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;

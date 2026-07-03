@@ -1,4 +1,4 @@
-# tests/src/cloud-mount-paths-tests.nix — Validate cloud mount path invariants.
+# tests/modules/cloud-mount-paths-tests.nix — Validate cloud mount path invariants.
 #
 # Ensures cloud-drives activation enforces real directory mount/replica paths
 # and replaces stale symlink targets from legacy /Volumes indirection flows.
