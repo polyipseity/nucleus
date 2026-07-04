@@ -14,8 +14,8 @@ package versions.
 
 | Package manager | Mechanism | Setting | File(s) |
 |---|---|---|---|
-| **bun** | `~/.bunfig.toml` | `[install] minimumReleaseAge = "5 days"` | `src/modules/shell.nix` |
-| **uv** | `UV_EXCLUDE_NEWER` env var | `"5 days ago"` | `src/modules/shell/env.nix`, `src/hosts/Windows/user/env.dsc.yml`, `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` |
+| **bun** | `~/.bunfig.toml` | `[install] minimumReleaseAge = 432000` (5 days in seconds) | `src/modules/shell.nix` |
+| **uv** | `UV_EXCLUDE_NEWER` env var | `"P5D"` (ISO 8601 duration) | `src/modules/shell/env.nix`, `src/hosts/Windows/user/env.dsc.yml`, `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` |
 
 ## Package managers without delay features
 

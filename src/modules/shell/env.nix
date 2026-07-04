@@ -26,5 +26,5 @@
   # supply-chain delay pattern adopted by npm, bun, pnpm, and Yarn.
   # Source: uv CLI env var table (`UV_EXCLUDE_NEWER`)
   # https://docs.astral.sh/uv/reference/settings/#exclude-newer
-  UV_EXCLUDE_NEWER = "5 days ago";
+  UV_EXCLUDE_NEWER = "P5D";
 }

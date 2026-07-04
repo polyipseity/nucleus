@@ -83,7 +83,7 @@ function Sync-ShellProfile {
     # Impose 5-day minimum release age for uv package installations. Mirrors
     # UV_EXCLUDE_NEWER set in shell/env.nix and env.dsc.yml.
     # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
-    '$env:UV_EXCLUDE_NEWER = "5 days ago"'
+    '$env:UV_EXCLUDE_NEWER = "P5D"'
     # Load rclone config passphrase from materialized secret for automatic config
     # file encryption in interactive and scripted rclone invocations.
     # WHY conditional: secret file may be absent before apply has materialized it.

@@ -635,7 +635,7 @@ in
   home.file.".bunfig.toml" = {
     text = ''
       [install]
-      minimumReleaseAge = "5 days"
+      minimumReleaseAge = 432000
     '';
   };
 
