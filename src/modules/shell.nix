@@ -632,10 +632,25 @@ in
   # installs (bun install -g, bun add, etc.). Bun reads bunfig.toml from $HOME
   # by default.
   # Source: https://bun.sh/docs/runtime/bunfig#install
+  # Global bun configuration: set a 5-day minimum release age for all package
+  # installs (bun install -g, bun add, etc.) and enable exact version pinning
+  # in package.json (no caret ranges). Bun reads bunfig.toml from $HOME by default.
+  # Source: https://bun.sh/docs/runtime/bunfig#install
   home.file.".bunfig.toml" = {
     text = ''
       [install]
+      exact = true
       minimumReleaseAge = 432000
+    '';
+  };
+
+  # Global uv configuration: set add-bounds = "exact" so all dependency additions
+  # use exact version pins (==) instead of compatible-release specifiers (>=).
+  # uv reads uv.toml from $XDG_CONFIG_HOME/uv/uv.toml (~/.config/uv/uv.toml).
+  # Source: https://docs.astral.sh/uv/reference/settings/#add-bounds
+  home.file."${config.xdg.configHome}/uv/uv.toml" = {
+    text = ''
+      add-bounds = "exact"
     '';
   };
 

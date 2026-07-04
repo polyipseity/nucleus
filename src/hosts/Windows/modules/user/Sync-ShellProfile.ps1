@@ -84,6 +84,15 @@ function Sync-ShellProfile {
     # UV_EXCLUDE_NEWER set in shell/env.nix and env.dsc.yml.
     # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
     '$env:UV_EXCLUDE_NEWER = "P5D"'
+    # Configure uv add-bounds = exact (config-file only setting, no env var).
+    # Mirrors the uv.toml created by shell.nix on POSIX hosts.
+    # Source: https://docs.astral.sh/uv/reference/settings/#add-bounds
+    '$uvConfigDir = Join-Path $env:APPDATA "uv"'
+    '$uvConfigFile = Join-Path $uvConfigDir "uv.toml"'
+    'if (-not (Test-Path -Path $uvConfigFile -PathType Leaf)) {'
+    '  New-Item -Path $uvConfigDir -ItemType Directory -Force | Out-Null'
+    '  Set-Content -Path $uvConfigFile -Value "add-bounds = \"exact\"" -Encoding UTF8'
+    '}'
     # Load rclone config passphrase from materialized secret for automatic config
     # file encryption in interactive and scripted rclone invocations.
     # WHY conditional: secret file may be absent before apply has materialized it.
