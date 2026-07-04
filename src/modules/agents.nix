@@ -365,7 +365,7 @@ in
       while IFS= read -r _ibp_pkg; do
         [ -z "$_ibp_pkg" ] && continue
         echo "bun: installing $_ibp_pkg"
-        if ! bun install -g "$_ibp_pkg"; then
+        if ! bun install -g --ignore-scripts "$_ibp_pkg"; then
           echo "bun: 'bun install -g $_ibp_pkg' failed" >&2
           rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
           exit 1
@@ -481,10 +481,10 @@ in
         _iut_python=$(_iut_python_for_tool "$_iut_tool")
         if [ -n "$_iut_python" ]; then
           echo "uv: installing tool '$_iut_tool' with Python $_iut_python"
-          "$_iut_uv_bin" tool install --python "$_iut_python" "$_iut_tool"
+          "$_iut_uv_bin" tool install --no-build --python "$_iut_python" "$_iut_tool"
         else
           echo "uv: installing tool '$_iut_tool'"
-          "$_iut_uv_bin" tool install "$_iut_tool"
+          "$_iut_uv_bin" tool install --no-build "$_iut_tool"
         fi
       done < "$_iut_to_install"
 
