@@ -19,4 +19,12 @@
   # Source: OpenCode CLI env var table (`OPENCODE_DISABLE_AUTOUPDATE`)
   # https://opencode.ai/docs/zh-tw/cli/#環境變數
   OPENCODE_DISABLE_AUTOUPDATE = "true";
+
+  # Impose a 5-day minimum release age for uv package installations so newly
+  # published (potentially compromised) packages must survive 5 days of public
+  # scrutiny before they can be installed. This mirrors the industry-wide
+  # supply-chain delay pattern adopted by npm, bun, pnpm, and Yarn.
+  # Source: uv CLI env var table (`UV_EXCLUDE_NEWER`)
+  # https://docs.astral.sh/uv/reference/settings/#exclude-newer
+  UV_EXCLUDE_NEWER = "5 days ago";
 }

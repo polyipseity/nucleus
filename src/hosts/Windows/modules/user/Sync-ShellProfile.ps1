@@ -80,6 +80,10 @@ function Sync-ShellProfile {
     '# path here, so the fallback reuses the managed user PATH entries applied by'
     '# WinGet/bootstrap while still gating invocation through this profile layer.'
     '$env:NUCLEUS_DEFAULT_DEV_ENV = "1"'
+    # Impose 5-day minimum release age for uv package installations. Mirrors
+    # UV_EXCLUDE_NEWER set in shell/env.nix and env.dsc.yml.
+    # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
+    '$env:UV_EXCLUDE_NEWER = "5 days ago"'
     # Load rclone config passphrase from materialized secret for automatic config
     # file encryption in interactive and scripted rclone invocations.
     # WHY conditional: secret file may be absent before apply has materialized it.
