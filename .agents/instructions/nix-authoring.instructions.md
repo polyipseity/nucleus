@@ -182,6 +182,34 @@ Consequence: never add a `shellAliases` / `programs.zsh.shellAliases` entry whos
 
 - Avoid repository-brand prefixes (for example `nucleus*`) in new Nix identifiers unless the prefix is required for cross-module disambiguation or external integration points.
 
+## Lockfile management
+
+The repository uses a consolidated lockfile at `src/lockfiles/lockfile.json` to pin tool and package versions across all package managers.
+
+### Schema
+
+| Key              | Format                          | Description                              |
+| ---------------- | ------------------------------- | ---------------------------------------- |
+| `scoop`          | `string → string`               | Scoop package name → version             |
+| `cargo-binstall` | `string → string`               | Cargo crate name → version               |
+| `bun`            | `string → string`               | Bun package name → version               |
+| `uv`             | `string → string`               | Uv package name → version                |
+| `rustup`         | `string → string`               | Rust toolchain → date                    |
+| `winget`         | `string → string`               | WinGet package ID → version              |
+| `vscode`         | `string → string`               | VS Code extension ID → version           |
+| `homebrew`       | `object with brews/casks/masApps`| Homebrew formula/cask/MAS name → version |
+| `ollama`         | `string → string`               | Ollama model name → digest hash          |
+
+All sections are required but may be empty (`{}`).
+
+### Homebrew (no native lockfile)
+
+Homebrew's `brew bundle` has no native lockfile. Formula, cask, and MAS version pins live under the `homebrew` key. Activation runs `brew bundle --force` from nix-darwin's generated Brewfile; the lockfile provides the audit trail.
+
+### Updating
+
+Use `scripts/bump-lockfile.sh` / `scripts/bump-lockfile.ps1` to update the lockfile. For Nix-managed packages, regenerate `src/flake.lock` with `nix flake lock` from `src/`.
+
 ## Validation
 
 - Nix files can be syntax-checked locally with `nix-instantiate --parse <file>` or `nix flake check` (requires Nix to be installed).

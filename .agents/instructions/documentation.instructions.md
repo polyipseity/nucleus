@@ -82,6 +82,14 @@ MANUAL.md files are concise post-apply checklists. They must contain only steps 
 - Do not duplicate behavior that `apply` already guarantees. Remove steps when they become automatable.
 - Point to setup commands (e.g. `nucleus-cloud-setup`) instead of expanding internal details.
 
+## UI Label Naming Convention
+
+All user-facing UI labels — right-click context menu entries, dock/folder/script labels, button text, and any other visible text — must use sentence case (capitalize only the first word and proper nouns).
+
+This applies across all hosts: macOS `.app` bundles (`NSMenuItem`), NixOS file manager entries (Nautilus scripts, Dolphin `Name=`), and Windows Registry context menu entries (`valueData`).
+
+Exception: system-internal identifiers like `CFBundleIdentifier`, filenames on disk that differ from display names, and AppleScript source code may use whatever case the platform requires.
+
 ## Citation quality
 
 When citing external sources (APIs, documentation, vendor settings, support articles), maintain URL and content correctness to prevent drift and ensure maintainability.

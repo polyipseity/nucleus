@@ -123,3 +123,16 @@ Always suppress the `PSUseBOMForUnicodeEncodedFile` lint rule when:
 - Configuring suppressions in `scripts/check-pwsh.ps1`
 
 This rule should be consistently suppressed across the repository's PowerShell scripts since UTF-8 without BOM is the standard encoding for the codebase and enforced by `.editorconfig` and other repository policies.
+
+## Runtime configuration (`nucleus-config`)
+
+The `nucleus-config` CLI manages runtime toggles at `~/.local/state/nucleus/config.json` (outside `~/.config/` so changes survive rebuilds).
+
+- `nucleus-config get [<section.key>]` — print config value(s)
+- `nucleus-config set <section.key> <val>` — set a config key (value is JSON-typed)
+- `nucleus-config list` — print all config as flat key=value pairs
+- Default (file absent or key missing) = enabled for all toggles
+
+Services read the config file directly (not via `nucleus-config`) so they work during early boot. Both POSIX and Windows follow the same pattern: read file, default `section.key` to `true`. See `scripts/config.sh` / `scripts/config.ps1` for the implementation.
+
+Adding a new toggle: document the key path, update consuming code to read the config with a `true` default, and the CLI handles the file transparently.
