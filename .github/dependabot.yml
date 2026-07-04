@@ -6,7 +6,8 @@ version: 2
 updates:
   # GitHub Actions (workflow dependencies)
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "**/*"
     schedule:
       interval: "monthly"
     commit-message:
@@ -26,7 +27,8 @@ updates:
 
   # Git submodules (gitmodules)
   - package-ecosystem: "gitsubmodule"
-    directory: "/"
+    directories:
+      - "**/*"
     schedule:
       interval: "monthly"
     commit-message:
@@ -46,7 +48,8 @@ updates:
 
   # Nix (flake.nix)
   - package-ecosystem: "nix"
-    directory: "/"
+    directories:
+      - "**/*"
     schedule:
       interval: "monthly"
     commit-message:
