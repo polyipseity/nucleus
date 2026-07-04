@@ -39,12 +39,10 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
 
 ## Skill vs instruction vs AGENTS.md boundary
 
-When adding new guidance content to this repo, choose the right vehicle:
-- **AGENTS.md**: durable project-wide conventions and invariants that every agent needs. Keep short (~30 lines max per section). Per-file-type rules belong in instruction files.
-- **`.agents/instructions/*.instructions.md`**: file-type-scoped authoring rules with a narrow `applyTo` glob. Loaded automatically when editing matching files. Not for general reference material — instructions fire on every edit within their scope, so they must be lean and targeted.
-- **`.agents/skills/<skill>/SKILL.md`**: reference orientation material loaded on demand via the `skill` tool. Use for content valuable enough to cache but too broad or reference-oriented for an instruction file. Avoid duplicating AGENTS.md.
-
-When editing a skill, check AGENTS.md and the relevant instruction files first for overlapping content.
+Choose the right vehicle:
+- **AGENTS.md**: durable project-wide conventions. Keep short (~30 lines max per section).
+- **`.agents/instructions/*.instructions.md`**: file-type-scoped authoring rules with a narrow `applyTo` glob. Loaded automatically when editing matching files. Must be lean and targeted.
+- **`.agents/skills/<skill>/SKILL.md`**: on-demand reference. Use for content too broad for an instruction file. Avoid duplicating AGENTS.md.
 
 ## How to write follow-up instructions
 

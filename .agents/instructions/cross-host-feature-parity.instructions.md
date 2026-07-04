@@ -36,7 +36,6 @@ Do not skip categories. At minimum review: packages/tools, shell/dev workflow, s
 
 When reviewing desktop/UI behavior, apply a minimal-chrome parity lens: prefer reducing persistent chrome (menu extras, taskbar buttons, recents, always-visible docks/panels) when equivalent keyboard/command workflows remain available. At the same time, preserve high-signal visibility defaults (for example hidden files, file extensions, status/path bars, and explicit metadata) unless there is a concrete host constraint.
 
-Typography is also a parity category: prefer a shared open-source font baseline (Latin sans/serif/monospace + Nerd Font + CJK) across macOS, NixOS, and Windows when practical.
 
 ## Where to implement
 

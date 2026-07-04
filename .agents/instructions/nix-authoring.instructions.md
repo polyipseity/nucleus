@@ -31,18 +31,13 @@ applyTo: "src/**/*.nix"
 
 ## Runtime imperative scripts vs. inline activation shell
 
-When a Nix activation script must perform runtime imperative operations (SOPS decryption, REST API calls, service readiness polling, token-based auth handshakes, diff-and-converge against live services), extract the logic into a separate invocable script rather than inlining it in a Nix indented string (`''...''`). This keeps activation files readable, allows independent testing, avoids duplication across hosts, and makes the script callable from non-Nix paths (apply.sh, Windows PowerShell modules).
+Extract runtime imperative logic (SOPS decryption, API calls, service polling) into separate invocable scripts instead of inlining in Nix indented strings. Keeps activation files readable, allows independent testing, and avoids duplication across hosts.
 
-See `src/scripts/jellyfin-sync.sh` for an example of this pattern.
-
-## Cross-host parity expectations
-
-If a capability remains POSIX-only, add a short WHY comment near the decision point.
+See `src/scripts/jellyfin-sync.sh` for an example.
 
 ## Open-source typography baseline
 
-- Keep typography declarative and open-source only across Nix modules.
-- Prefer one shared inventory that covers Latin sans/serif/monospace, Nerd Font terminal iconography, and CJK (Simplified + Traditional) coverage.
+Prefer open-source fonts: one shared inventory covering Latin sans/serif/monospace, Nerd Font terminal iconography, and CJK (Simplified + Traditional).
 
 ## Module conventions
 

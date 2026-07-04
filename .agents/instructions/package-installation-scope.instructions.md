@@ -65,24 +65,22 @@ Each blocked tool is overridden as a **shell function** that intercepts the comm
 
 ### POSIX (zsh) — `src/modules/shell.nix`
 
-Functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`, `pip3` are defined in `programs.zsh.initContent`. They:
+Functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`, `pip3` in `programs.zsh.initContent` follow a 4-step flow:
 
-1. Check `$DIRENV_DIR` — set by direnv whenever an `.envrc` is active. An empty `.envrc` (or any non-flake `.envrc`) with a `rust-toolchain.toml` is an **intentional** design: the lightweight alternative to a full devShell for projects that only need rustup-based toolchain selection.
-2. If set, invoke `command <tool>` to bypass the function and reach the devShell-scoped binary at the front of `PATH`.
-3. Otherwise, invoke the managed fallback toolchain published via `$NUCLEUS_DEFAULT_DEV_BIN`. On POSIX this path points at a dedicated Nix-built bundle containing the default development tools.
-4. If neither context is available, print a `shell: …` banner to stderr and return 1.
+1. Check `$DIRENV_DIR` (set by direnv when `.envrc` is active).
+2. If set, invoke `command <tool>` to reach the devShell-scoped binary.
+3. Otherwise, invoke the managed fallback via `$NUCLEUS_DEFAULT_DEV_BIN`.
+4. If neither context is available, print error and return 1.
 
-**User-scope bin dir PATH wiring**: Declared via `home.sessionPath` (→ `~/.zshenv`, sourced before `~/.zshrc` with the direnv hook), not `initContent` PATH guards. This ensures directories stay in direnv's saved PATH state even if created after shell start. Do **not** revert to `initContent` `export PATH=...` — they are lost after direnv deactivation.
+**User-scope bin dir PATH wiring**: Declared via `home.sessionPath` (→ `~/.zshenv`), not `initContent` PATH guards. This ensures directories survive direnv deactivation. Do not revert to `initContent` `export PATH=...`.
 
 ### POSIX (pwsh) — `src/modules/pwsh.nix`
 
-Equivalent PowerShell functions in `profileContent`. Pass-through first uses `$env:DIRENV_DIR`, then the managed fallback toolchain published via `$env:NUCLEUS_DEFAULT_DEV_BIN`.
+Equivalent PowerShell functions in `profileContent`, same 4-step flow via `$env:DIRENV_DIR` then `$env:NUCLEUS_DEFAULT_DEV_BIN`.
 
 ### Windows (PowerShell) — `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1`
 
-Same functions emitted into the managed block. Pass-through uses `$env:DIRENV_DIR` when present and otherwise the managed default shell environment flag (`$env:NUCLEUS_DEFAULT_DEV_ENV`). Windows currently reuses the managed user PATH entries instead of a second Nix-backed fallback root because the WinGet/PowerShell workflow has no nix-direnv-equivalent store path today.
-
-**User-scope bin dir PATH wiring**: Prepended **unconditionally** (no `Test-Path` guard) at the managed block top, before the direnv hook. Same rationale as POSIX: directories survive direnv cycles even if created mid-session. Do **not** add `Test-Path` guards back.
+Same functions in the managed block. Pass-through uses `$env:DIRENV_DIR` when present, otherwise `$env:NUCLEUS_DEFAULT_DEV_ENV`. Bin dir PATH is prepended unconditionally (no `Test-Path` guard) before the direnv hook — same rationale as POSIX.
 
 ---
 
@@ -234,12 +232,12 @@ Only when declarative solutions don't exist:
 
 | Pattern                                    | Issue                              | Fix                                         |
 | ------------------------------------------ | ---------------------------------- | ------------------------------------------- |
-| `sudo bun install -g …`                    | Admin escalation for user tool     | Remove `sudo`; use plain `bun install -g`   |
-| `pip install --system …`                   | System-wide Python lib             | Use `uv tool install` or devShell           |
+| `sudo bun install -g …`                    | Admin escalation                   | Remove `sudo`; use plain `bun install -g`   |
+| `pip install --system …`                   | System-wide Python                 | Use `uv tool install` or devShell           |
 | `npm install -g …` (unmanaged)             | Untracked global package           | Use `bun install -g` with manifest tracking |
-| Installing to `/usr/local/bin`             | System-level binary pollution      | Use user-level tool directories             |
-| `cargo install` in `setup.sh`              | Imperative build-time tool install | Add to devShell or use `cargo-binstall`     |
-| PowerShell `Install-Module -Scope Machine` | System-wide module installation    | Use `-Scope CurrentUser`                    |
+| Installing to `/usr/local/bin`             | Binary pollution                   | Use user-level tool directories             |
+| `cargo install` in `setup.sh`              | Imperative build-time install      | Add to devShell or use `cargo-binstall`     |
+| `Install-Module -Scope Machine`            | System-wide module                 | Use `-Scope CurrentUser`                    |
 
 ---
 
