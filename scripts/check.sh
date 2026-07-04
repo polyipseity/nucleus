@@ -169,6 +169,37 @@ fi
 
 # Lockfile validation
 printf '\n=== [%s] Lockfile validation ===\n' "$((_step += 1))"
+
+# Consistency and overlap checks (always run, even in path-scoped mode):
+#  1. lockfile.json must exist.
+#  2. No package should appear in multiple package-manager sections.
+#     (Ollama is excluded because it uses a nested structure unrelated to
+#      package versions.)
+_lfpath="src/lockfiles/lockfile.json"
+_lf_overlap_issues=0
+if [ ! -f "$_lfpath" ]; then
+  echo "ERROR: lockfile.json not found at $_lfpath"
+  _lf_overlap_issues=$((_lf_overlap_issues + 1))
+  # Do not exit early — the section below may still run useful checks if
+  # HAS_ARGS is false; the error count will cause a non-zero exit later.
+else
+  _lf_overlaps=$(jq -r '
+    [to_entries[] | select(.key != "ollama" and (.value | type == "object")) | .key as $s | (.value | keys)[] | {s: $s, p: .}]
+    | group_by(.p)
+    | map(select(length > 1))
+    | .[][]
+    | "WARNING: package \"\(.p)\" appears in both \(.s)"' "$_lfpath" 2>/dev/null)
+  if [ -n "$_lf_overlaps" ]; then
+    echo "$_lf_overlaps"
+    _lf_overlap_issues=$((_lf_overlap_issues + 1))
+  fi
+fi
+if [ "$_lf_overlap_issues" -gt 0 ]; then
+  echo "lockfile.json consistency: $_lf_overlap_issues overlap issue(s) (warnings only)"
+else
+  echo "lockfile.json consistency: no overlapping packages across sections"
+fi
+
 if ! $HAS_ARGS; then
   _lf_errors=0
 

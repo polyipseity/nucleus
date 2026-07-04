@@ -193,14 +193,53 @@ if (-not $HAS_ARGS) {
 # 4. Lockfile validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Lockfile validation ===" -f (++$_step))
+
+# Consistency and overlap checks (always run, even in path-scoped mode):
+#  1. lockfile.json must exist.
+#  2. No package should appear in multiple package-manager sections.
+#     (Ollama is excluded because it uses a nested structure unrelated to
+#      package versions.)
+$_lfPath = Join-Path $RepoRoot "src\lockfiles\lockfile.json"
+$_lf = $null
+$_lfOverlapErrors = 0
+if (-not (Test-Path $_lfPath)) {
+  Write-Output "ERROR: lockfile.json not found at $_lfPath"
+  $exitCode = 1
+  $_lfOverlapErrors++
+} else {
+  $_lf = Get-Content $_lfPath -Raw | ConvertFrom-Json -AsHashtable
+  $_pkgToSections = @{}
+  foreach ($_section in $_lf.Keys) {
+    if ($_section -eq 'ollama') { continue }
+    if ($_lf[$_section] -is [hashtable]) {
+      foreach ($_pkg in $_lf[$_section].Keys) {
+        if ($_pkgToSections.ContainsKey($_pkg)) {
+          $_pkgToSections[$_pkg] += ,$_section
+        } else {
+          $_pkgToSections[$_pkg] = @($_section)
+        }
+      }
+    }
+  }
+  foreach ($_entry in $_pkgToSections.GetEnumerator()) {
+    if ($_entry.Value.Count -gt 1) {
+      Write-Output ("WARNING: package '{0}' appears in both {1}" -f $_entry.Key, ($_entry.Value -join ', '))
+      $_lfOverlapErrors++
+    }
+  }
+}
+if ($_lfOverlapErrors -gt 0) {
+  Write-Output ("lockfile.json consistency: {0} overlap issue(s) (warnings only)" -f $_lfOverlapErrors)
+} else {
+  Write-Output "lockfile.json consistency: no overlapping packages across sections"
+}
+
 if (-not $HAS_ARGS) {
-  $_lfErrors = 0
-  $_lfPath = Join-Path $RepoRoot "src\lockfiles\lockfile.json"
-  if (-not (Test-Path $_lfPath)) {
-    Write-Output "ERROR: lockfile.json not found at $_lfPath"
+  if ($null -eq $_lf) {
+    Write-Output "ERROR: lockfile.json could not be loaded — skipping section validation"
     $exitCode = 1
   } else {
-    $_lf = Get-Content $_lfPath -Raw | ConvertFrom-Json -AsHashtable
+    $_lfErrors = 0
 
     # Check sections that must be non-empty
     foreach ($_section in @('scoop', 'cargo-binstall', 'bun', 'uv', 'rustup', 'pwsh')) {
