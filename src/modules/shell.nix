@@ -628,6 +628,17 @@ in
 
   home.sessionVariables = mergedSessionVariables;
 
+  # Global bun configuration: set a 5-day minimum release age for all package
+  # installs (bun install -g, bun add, etc.). Bun reads bunfig.toml from $HOME
+  # by default.
+  # Source: https://bun.sh/docs/runtime/bunfig#install
+  home.file.".bunfig.toml" = {
+    text = ''
+      [install]
+      minimumReleaseAge = "5 days"
+    '';
+  };
+
   # ---------------------------------------------------------------------------
   # installZshCompletions
   # Idempotently generates zsh completion files for CLI tools whose Nix packages
