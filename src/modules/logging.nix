@@ -12,6 +12,10 @@ in
       description = "User-level log directory for nucleus services.";
     };
 
+    # macOS SIP log path restriction: on macOS 26+, SIP blocks non-root
+    # launchd daemons from writing to /Library/Logs/ (EX_CONFIG 78).
+    # /Users/Shared/nucleus/logs is the approved alternative.
+    # /tmp/ works for testing; /Library/Logs/ is blocked.
     systemLogDir = mkOption {
       type = types.str;
       default = if pkgs.stdenv.isDarwin then "/Users/Shared/nucleus/logs" else "/var/log/nucleus";

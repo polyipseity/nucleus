@@ -1,4 +1,6 @@
 # Local AI inference baseline (Ollama, oterm, LiteLLM proxy).
+# Primary-user-only: unconditionally installs AI tooling; gated at the
+# host level by which user's Home Manager config imports this module.
 { nixpkgs, pkgs, ... }:
 let
   servicesJSON = builtins.fromJSON (builtins.readFile ../services.json);

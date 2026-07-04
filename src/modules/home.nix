@@ -1,4 +1,7 @@
 # Home Manager entrypoint shared by all three host types.
+# Multi-user aware: uses effectiveUsername / managedUsername dynamically
+# rather than hardcoding a username. Respects per-user config from the
+# user registry.
 {
   config,
   lib,

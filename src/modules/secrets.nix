@@ -1,4 +1,7 @@
 # Secret management via sops-nix.
+# Primary-user pattern: uses SOPS-aware isPrimaryUser check
+# (config.home.username == primaryUsername) so non-primary users never
+# trigger secret decryption. Other modules hardcode "polyipseity".
 {
   config,
   lib,
