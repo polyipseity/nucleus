@@ -155,14 +155,6 @@ expire_hm_generations_if_available() {
 }
 
 run_nix_gc_if_available() {
-  # Store gc is best-effort because this helper also runs on hosts where
-  # Nix may not be installed (for example minimal CI images).
-  if ! command -v nix-collect-garbage >/dev/null 2>&1; then
-    # Existence probe — tool absent is expected and benign on some hosts.
-    printf '%s\n' "gc: nix-collect-garbage unavailable; skipping Nix GC"
-    return 0
-  fi
-
   # Expiry controlled by --nix-expiry / $nix_expiry.
   nix-collect-garbage --delete-older-than "$nix_expiry"
 }

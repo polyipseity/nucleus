@@ -78,25 +78,10 @@ function Write-Update {
   Write-Output "bump-lockfile: updating ${Section}.${Key} from ${OldValue} to ${NewValue}"
 }
 
-function Write-Skip {
-  param([string]$Tool, [string]$Section)
-  Write-Output "bump-lockfile: ${Tool} not available, skipping ${Section} section"
-}
-
-function Write-SkipAll {
-  param([string]$Section)
-  Write-Output "bump-lockfile: skipping ${Section} section"
-}
-
 function Test-SectionEnabled {
   param([string]$Name)
   if ([string]::IsNullOrEmpty($Sections)) { return $true }
   return $Sections.Split(',') -contains $Name
-}
-
-function Test-CommandAvailable {
-  param([string]$Command)
-  return [bool](Get-Command -Name $Command -ErrorAction SilentlyContinue)
 }
 
 function Set-LockfileValue {
@@ -164,7 +149,7 @@ $ht['updated'] = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC)
 # ---------------------------------------------------------------------------
 # winget — winget show --id <id>
 # ---------------------------------------------------------------------------
-if ((Test-SectionEnabled 'winget') -and (Test-CommandAvailable 'winget')) {
+if (Test-SectionEnabled 'winget') {
   if ($ht.ContainsKey('winget') -and $ht['winget'] -is [hashtable]) {
     foreach ($key in $ht['winget'].Keys) {
       $old = $ht['winget'][$key]
@@ -178,14 +163,12 @@ if ((Test-SectionEnabled 'winget') -and (Test-CommandAvailable 'winget')) {
       }
     }
   }
-} else {
-  Write-Skip -Tool 'winget' -Section 'winget'
 }
 
 # ---------------------------------------------------------------------------
 # scoop — scoop info <pkg>
 # ---------------------------------------------------------------------------
-if ((Test-SectionEnabled 'scoop') -and (Test-CommandAvailable 'scoop')) {
+if (Test-SectionEnabled 'scoop') {
   if ($ht.ContainsKey('scoop') -and $ht['scoop'] -is [hashtable]) {
     foreach ($key in $ht['scoop'].Keys) {
       $old = $ht['scoop'][$key]
@@ -199,21 +182,17 @@ if ((Test-SectionEnabled 'scoop') -and (Test-CommandAvailable 'scoop')) {
       }
     }
   }
-} else {
-  Write-Skip -Tool 'scoop' -Section 'scoop'
 }
 
 # ---------------------------------------------------------------------------
-# cargo-binstall — keep current version
+# cargo-binstall — keep current version (no reliable CLI query)
 # ---------------------------------------------------------------------------
-if (Test-SectionEnabled 'cargo-binstall') {
-  Write-SkipAll -Section 'cargo-binstall (no reliable CLI query available)'
-}
+# Pinned versions are kept as-is; no CLI query available.
 
 # ---------------------------------------------------------------------------
-# bun — npm view <pkg> version, gated on bun availability
+# bun — npm view <pkg> version
 # ---------------------------------------------------------------------------
-if ((Test-SectionEnabled 'bun') -and (Test-CommandAvailable 'bun')) {
+if (Test-SectionEnabled 'bun') {
   if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
     foreach ($key in $ht['bun'].Keys) {
       $old = $ht['bun'][$key]
@@ -227,14 +206,12 @@ if ((Test-SectionEnabled 'bun') -and (Test-CommandAvailable 'bun')) {
       }
     }
   }
-} else {
-  Write-Skip -Tool 'bun' -Section 'bun'
 }
 
 # ---------------------------------------------------------------------------
 # uv — uv tool list
 # ---------------------------------------------------------------------------
-if ((Test-SectionEnabled 'uv') -and (Test-CommandAvailable 'uv')) {
+if (Test-SectionEnabled 'uv') {
   $uvOutput = & uv tool list 2>$null
   if ($uvOutput) {
     # Build hashtable from uv tool list output.
@@ -274,14 +251,12 @@ if ((Test-SectionEnabled 'uv') -and (Test-CommandAvailable 'uv')) {
       }
     }
   }
-} else {
-  Write-Skip -Tool 'uv' -Section 'uv'
 }
 
 # ---------------------------------------------------------------------------
 # rustup — rustc +<channel> --version
 # ---------------------------------------------------------------------------
-if ((Test-SectionEnabled 'rustup') -and (Test-CommandAvailable 'rustup')) {
+if (Test-SectionEnabled 'rustup') {
   # Get installed toolchains
   $toolchains = & rustup toolchain list 2>$null
   $toolchainSet = @{}
@@ -314,14 +289,12 @@ if ((Test-SectionEnabled 'rustup') -and (Test-CommandAvailable 'rustup')) {
       }
     }
   }
-} else {
-  Write-Skip -Tool 'rustup' -Section 'rustup'
 }
 
 # ---------------------------------------------------------------------------
 # pwsh — Find-Module via pwsh -NoProfile
 # ---------------------------------------------------------------------------
-if ((Test-SectionEnabled 'pwsh') -and (Test-CommandAvailable 'pwsh')) {
+if (Test-SectionEnabled 'pwsh') {
   if ($ht.ContainsKey('pwsh') -and $ht['pwsh'] -is [hashtable]) {
     foreach ($key in $ht['pwsh'].Keys) {
       $old = $ht['pwsh'][$key]
@@ -335,8 +308,6 @@ if ((Test-SectionEnabled 'pwsh') -and (Test-CommandAvailable 'pwsh')) {
       }
     }
   }
-} else {
-  Write-Skip -Tool 'pwsh' -Section 'pwsh'
 }
 
 # ---------------------------------------------------------------------------
@@ -344,49 +315,47 @@ if ((Test-SectionEnabled 'pwsh') -and (Test-CommandAvailable 'pwsh')) {
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'vscode') {
   $vscodeOutput = $null
-if (Test-CommandAvailable 'code') {
-  $vscodeOutput = & code --list-extensions --show-versions 2>$null
-} elseif (Test-CommandAvailable 'code-insiders') {
-  $vscodeOutput = & code-insiders --list-extensions --show-versions 2>$null
-}
-
-if ($vscodeOutput) {
-  # Build extension map from output lines "publisher.extension@version"
-  $vscodeExts = @{}
-  foreach ($line in $vscodeOutput) {
-    $line = $line.Trim()
-    if ([string]::IsNullOrEmpty($line)) { continue }
-    $atIdx = $line.LastIndexOf('@')
-    if ($atIdx -ge 0) {
-      $pkg = $line.Substring(0, $atIdx)
-      $ver = $line.Substring($atIdx + 1)
-      if (-not [string]::IsNullOrEmpty($pkg) -and -not [string]::IsNullOrEmpty($ver)) {
-        $vscodeExts[$pkg] = $ver
-      }
-    }
+  if (Get-Command -Name 'code' -ErrorAction SilentlyContinue) {
+    $vscodeOutput = & code --list-extensions --show-versions 2>$null
+  } elseif (Get-Command -Name 'code-insiders' -ErrorAction SilentlyContinue) {
+    $vscodeOutput = & code-insiders --list-extensions --show-versions 2>$null
   }
 
-  if ($ht.ContainsKey('vscode') -and $ht['vscode'] -is [hashtable]) {
-    foreach ($key in $ht['vscode'].Keys) {
-      $old = $ht['vscode'][$key]
-      if ($vscodeExts.ContainsKey($key)) {
-        $new = $vscodeExts[$key]
-        if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
-          Write-Update -Section 'vscode' -Key $key -OldValue $old -NewValue $new
-          $ht['vscode'][$key] = $new
+  if ($vscodeOutput) {
+    # Build extension map from output lines "publisher.extension@version"
+    $vscodeExts = @{}
+    foreach ($line in $vscodeOutput) {
+      $line = $line.Trim()
+      if ([string]::IsNullOrEmpty($line)) { continue }
+      $atIdx = $line.LastIndexOf('@')
+      if ($atIdx -ge 0) {
+        $pkg = $line.Substring(0, $atIdx)
+        $ver = $line.Substring($atIdx + 1)
+        if (-not [string]::IsNullOrEmpty($pkg) -and -not [string]::IsNullOrEmpty($ver)) {
+          $vscodeExts[$pkg] = $ver
         }
       }
     }
-  }
-} else {
-    Write-Skip -Tool 'vscode' -Section 'vscode'
+
+    if ($ht.ContainsKey('vscode') -and $ht['vscode'] -is [hashtable]) {
+      foreach ($key in $ht['vscode'].Keys) {
+        $old = $ht['vscode'][$key]
+        if ($vscodeExts.ContainsKey($key)) {
+          $new = $vscodeExts[$key]
+          if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
+            Write-Update -Section 'vscode' -Key $key -OldValue $old -NewValue $new
+            $ht['vscode'][$key] = $new
+          }
+        }
+      }
+    }
   }
 }
 
 # ---------------------------------------------------------------------------
 # ollama — ollama show <name>:<tag> --format json
 # ---------------------------------------------------------------------------
-if ((Test-SectionEnabled 'ollama') -and (Test-CommandAvailable 'ollama')) {  # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
+if (Test-SectionEnabled 'ollama') {  # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
   # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
   if ($ht.ContainsKey('ollama') -and $ht['ollama'] -is [hashtable]) {
     foreach ($hostName in $ht['ollama'].Keys) {
@@ -422,8 +391,6 @@ if ((Test-SectionEnabled 'ollama') -and (Test-CommandAvailable 'ollama')) {  # P
       }
     }
   }
-} else {
-  Write-Skip -Tool 'ollama' -Section 'ollama'
 }
 
 # ---------------------------------------------------------------------------

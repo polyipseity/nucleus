@@ -456,14 +456,12 @@ fi
 
 # Test scripts/service-watchdog.ps1 (Windows: scheduled task watchdog)
 WATCHDOG_PS1="scripts/service-watchdog.ps1"
-if [[ -f "$WATCHDOG_PS1" ]] && command -v pwsh &>/dev/null; then
+if [[ -f "$WATCHDOG_PS1" ]]; then
     if pwsh -NoProfile -Command "& { if (!(Test-Path '$WATCHDOG_PS1')) { exit 1 }; \$null = Get-Command '$WATCHDOG_PS1' -Syntax; exit 0 }" 2>/dev/null; then
         assert_pass "PowerShell syntax: service-watchdog.ps1"
     else
         assert_fail "PowerShell syntax: service-watchdog.ps1" "Parse error detected by pwsh"
     fi
-elif [[ -f "$WATCHDOG_PS1" ]]; then
-    echo -e "${YELLOW}⚠${NC}  pwsh not available: skipping service-watchdog.ps1 syntax check"
 fi
 
 # Summary

@@ -82,11 +82,11 @@ update_flake_inputs() {
 
   printf '%s\n' "$flake_output" >&2
 
-  # Transient network / GitHub API-rate-limit failures should not abort the
-  # whole update workflow: continue with host package updates and SOPS rewrap.
+  # Transient network / GitHub API-rate-limit failures should propagate as
+  # errors so callers can handle the failure upstream.
   if printf '%s' "$flake_output" | grep -Eq 'API rate limit exceeded|unable to download|HTTP error 403'; then
-    printf '%s\n' "update: warning: flake update skipped due to transient fetch/rate-limit error" >&2
-    return 0
+    printf '%s\n' "update: error: flake update failed due to transient fetch/rate-limit error" >&2
+    return 1
   fi
 
   printf '%s\n' "update: error: flake update failed" >&2
@@ -94,12 +94,6 @@ update_flake_inputs() {
 }
 
 update_homebrew_if_available() {
-  # Homebrew upgrades are executed only when brew is present, allowing this
-  # script to stay portable across non-macOS hosts.
-  if ! command -v brew >/dev/null 2>&1; then
-    printf '%s\n' "update: brew unavailable on this host, skipping Homebrew upgrade step"
-    return 0
-  fi
 
   # Refresh formula/cask metadata first to avoid stale-upgrade decisions.
   brew update

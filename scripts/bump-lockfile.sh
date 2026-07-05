@@ -4,12 +4,12 @@
 # updated lockfile atomically.
 #
 # Sections (pass comma-separated via --sections to update selectively):
-#   winget        winget show --id <id>     (skip if winget unavailable)
-#   scoop         scoop info <pkg>          (skip if scoop unavailable)
+#   winget        winget show --id <id>
+#   scoop         scoop info <pkg>
 #   cargo-binstall Keep current version     (no reliable CLI query)
-#   bun           npm view <pkg> version    (skip if bun unavailable)
-#   uv            uv tool list              (skip if uv unavailable)
-#   rustup        rustc +<ch> --version     (skip if rustup unavailable)
+#   bun           npm view <pkg> version
+#   uv            uv tool list
+#   rustup        rustc +<ch> --version
 #   pwsh          Find-Module via pwsh      (skip if pwsh unavailable)
 #   vscode        code/code-insiders --list-extensions --show-versions
 #                 (skip if neither available)
@@ -74,14 +74,6 @@ log_update() {
   printf 'bump-lockfile: updating %s.%s from %s to %s\n' "$1" "$2" "$3" "$4"
 }
 
-log_skip() {
-  printf 'bump-lockfile: %s not available, skipping %s section\n' "$1" "$2"
-}
-
-log_skip_all() {
-  printf 'bump-lockfile: skipping %s section\n' "$1"
-}
-
 # Read lockfile
 data=$(cat "$LOCKFILE_ABS")
 
@@ -89,7 +81,7 @@ data=$(cat "$LOCKFILE_ABS")
 data=$(printf '%s\n' "$data" | jq --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.updated = $d')
 
 # winget — winget show --id <id>
-if section_enabled winget && command -v winget >/dev/null 2>&1; then
+if section_enabled winget; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
     old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.winget // {})[$k] // empty')
@@ -100,12 +92,10 @@ if section_enabled winget && command -v winget >/dev/null 2>&1; then
       data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.winget[$k] = $v')
     fi
   done < <(printf '%s\n' "$data" | jq -r '(.winget // {}) | keys[]')
-else
-  log_skip "winget" "winget"
 fi
 
 # scoop — scoop info <pkg>
-if section_enabled scoop && command -v scoop >/dev/null 2>&1; then
+if section_enabled scoop; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
     old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.scoop // {})[$k] // empty')
@@ -116,17 +106,13 @@ if section_enabled scoop && command -v scoop >/dev/null 2>&1; then
       data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.scoop[$k] = $v')
     fi
   done < <(printf '%s\n' "$data" | jq -r '(.scoop // {}) | keys[]')
-else
-  log_skip "scoop" "scoop"
 fi
 
 # cargo-binstall — keep current version (no reliable CLI query)
-if section_enabled cargo-binstall; then
-  log_skip_all "cargo-binstall (no reliable CLI query available)"
-fi
+#   No CLI query available; pinned versions are kept as-is.
 
-# bun — npm view <pkg> version, gated on bun availability
-if section_enabled bun && command -v bun >/dev/null 2>&1; then
+# bun — npm view <pkg> version
+if section_enabled bun; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
     old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.bun // {})[$k] // empty')
@@ -137,12 +123,10 @@ if section_enabled bun && command -v bun >/dev/null 2>&1; then
       data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.bun[$k] = $v')
     fi
   done < <(printf '%s\n' "$data" | jq -r '(.bun // {}) | keys[]')
-else
-  log_skip "bun" "bun"
 fi
 
 # uv — uv tool list
-if section_enabled uv && command -v uv >/dev/null 2>&1; then
+if section_enabled uv; then
   # Build a map of package-name -> version from uv tool list.
   # Typical output: "pkgname@version" or "pkgname v1.0.0".
   declare -A uv_installed=()
@@ -173,12 +157,10 @@ if section_enabled uv && command -v uv >/dev/null 2>&1; then
       data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.uv[$k] = $v')
     fi
   done < <(printf '%s\n' "$data" | jq -r '(.uv // {}) | keys[]')
-else
-  log_skip "uv" "uv"
 fi
 
 # rustup — rustc +<ch> --version
-if section_enabled rustup && command -v rustup >/dev/null 2>&1; then
+if section_enabled rustup; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
     old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.rustup // {})[$k] // empty')
@@ -192,12 +174,10 @@ if section_enabled rustup && command -v rustup >/dev/null 2>&1; then
       fi
     fi
   done < <(printf '%s\n' "$data" | jq -r '(.rustup // {}) | keys[]')
-else
-  log_skip "rustup" "rustup"
 fi
 
 # pwsh — Find-Module via pwsh -NoProfile
-if section_enabled pwsh && command -v pwsh >/dev/null 2>&1; then
+if section_enabled pwsh; then
   while IFS= read -r key; do
     [ -z "$key" ] && continue
     old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.pwsh // {})[$k] // empty')
@@ -208,12 +188,10 @@ if section_enabled pwsh && command -v pwsh >/dev/null 2>&1; then
       data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.pwsh[$k] = $v')
     fi
   done < <(printf '%s\n' "$data" | jq -r '(.pwsh // {}) | keys[]')
-else
-  log_skip "pwsh" "pwsh"
 fi
 
 # homebrew — brew list --versions, brew list --cask --versions
-if section_enabled homebrew && command -v brew >/dev/null 2>&1; then
+if section_enabled homebrew; then
   # brews
   while IFS= read -r key; do
     [ -z "$key" ] && continue
@@ -237,8 +215,6 @@ if section_enabled homebrew && command -v brew >/dev/null 2>&1; then
       data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.homebrew.casks[$k] = $v')
     fi
   done < <(printf '%s\n' "$data" | jq -r '(.homebrew.casks // {}) | keys[]')
-else
-  log_skip "brew" "homebrew"
 fi
 
 # vscode — code/code-insiders --list-extensions --show-versions
@@ -274,13 +250,11 @@ if section_enabled vscode; then
         data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.vscode[$k] = $v')
       fi
     done < <(printf '%s\n' "$data" | jq -r '(.vscode // {}) | keys[]')
-  else
-    log_skip "vscode" "vscode"
   fi
 fi
 
 : "${NUCLEUS_OLLAMA_HOST:=$(jq -r '.ollama.network.default | "\(.host):\(.port)"' "$REPO_ROOT/src/modules/services.json" 2>/dev/null || echo "127.0.0.1:11434")}"
-if section_enabled ollama && command -v ollama >/dev/null 2>&1; then
+if section_enabled ollama; then
   # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
   # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
   while IFS= read -r host; do
@@ -332,8 +306,6 @@ if section_enabled ollama && command -v ollama >/dev/null 2>&1; then
       fi
     done
   done < <(printf '%s\n' "$data" | jq -r '(.ollama // {}) | keys[]')
-else
-  log_skip "ollama" "ollama"
 fi
 
 # nixos-iso — Query NixOS channel for latest ISO URL and its SHA-256

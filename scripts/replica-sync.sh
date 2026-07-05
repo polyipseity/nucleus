@@ -91,11 +91,6 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v rclone >/dev/null 2>&1; then
-  printf '%s\n' "replica-sync: rclone not found; skipping replica sync"
-  exit 0
-fi
-
 rclone_pass_path="$HOME/.config/nucleus/secrets/rclone-config-pass"
 if [ -s "$rclone_pass_path" ]; then
   rclone_config_pass_value="$(cat "$rclone_pass_path")"
