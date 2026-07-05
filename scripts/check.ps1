@@ -387,20 +387,52 @@ if (-not $HAS_ARGS) {
   }
   Import-Module -Name powershell-yaml -Force
 
-  # Helper: convert mixed PSCustomObject/hashtable trees to pure hashtable.
+  # Helper: convert mixed PSCustomObject/hashtable/list trees to pure hashtable/array.
   function ConvertTo-HashtableDeep ($_obj) {
     if ($_obj -is [PSCustomObject]) {
       $_ht = [ordered] @{}
       $_obj.PSObject.Properties | ForEach-Object { $_ht[$_.Name] = ConvertTo-HashtableDeep $_.Value }
       return $_ht
     }
-    if ($_obj -is [array]) { return @($_obj | ForEach-Object { ConvertTo-HashtableDeep $_ }) }
+    if ($_obj -is [array] -or $_obj -is [System.Collections.IList]) { $_result = @(); foreach ($_item in $_obj) { $_result += ConvertTo-HashtableDeep $_item }; return ,$_result }
     if ($_obj -is [hashtable] -or $_obj -is [System.Collections.Specialized.OrderedDictionary]) {
       $_ht = @{}
       foreach ($_key in $_obj.Keys) { $_ht[$_key] = ConvertTo-HashtableDeep $_obj[$_key] }
       return $_ht
     }
     return $_obj
+  }
+
+  # Helper: normalize resources (which may arrive in columnar OrderedDictionary/hashtable
+  # format from powershell-yaml on Windows CI) to a flat array of resource items.
+  function ConvertTo-ResourceArray ($_resources) {
+    if ($null -eq $_resources) { return ,@() }
+    if ($_resources -is [array] -or $_resources -is [System.Collections.IList]) { return ,@($_resources) }
+    if ($_resources -is [System.Collections.IDictionary]) {
+      $_keys = @($_resources.Keys)
+      if ($_keys.Count -gt 0) {
+        $_firstVal = $_resources[$_keys[0]]
+        if ($null -ne $_firstVal -and ($_firstVal -is [array] -or $_firstVal -is [System.Collections.IList])) {
+          # Columnar format — unpivot into individual items.
+          $_count = $_firstVal.Count
+          $_result = @()
+          for ($_i = 0; $_i -lt $_count; $_i++) {
+            $_item = @{}
+            foreach ($_key in $_keys) {
+              $_val = $_resources[$_key]
+              if ($null -ne $_val -and ($_val -is [array] -or $_val -is [System.Collections.IList]) -and $_i -lt $_val.Count) {
+                $_item[$_key] = $_val[$_i]
+              }
+            }
+            $_result += $_item
+          }
+          return ,$_result
+        }
+      }
+      # Single resource item (not columnar).
+      return ,@($_resources)
+    }
+    return ,@($_resources)
   }
 
   # Generate locked DSC in-memory from all system DSC files + lockfile.
@@ -410,15 +442,18 @@ if (-not $HAS_ARGS) {
   # Initialize DSC from the first file's structure.
   $_dscYaml = Get-Content $_dscSystemFiles[0].FullName -Raw
   $_dsc = ConvertTo-HashtableDeep ($_dscYaml | ConvertFrom-Yaml)
+  $_dsc.properties.resources = ConvertTo-ResourceArray $_dsc.properties.resources
   # Merge resources from remaining system DSC files.
   foreach ($_file in $_dscSystemFiles[1..($_dscSystemFiles.Count - 1)]) {
     $_fileYaml = Get-Content $_file.FullName -Raw
     $_fileDsc = ConvertTo-HashtableDeep ($_fileYaml | ConvertFrom-Yaml)
+    $_fileDsc.properties.resources = ConvertTo-ResourceArray $_fileDsc.properties.resources
     $_dsc.properties.resources += $_fileDsc.properties.resources
   }
   # Merge package resources from system/packages.dsc.yml into the main DSC tree.
   $_dscPkgYaml = Get-Content $_dscSystemPackages -Raw
   $_dscPkg = ConvertTo-HashtableDeep ($_dscPkgYaml | ConvertFrom-Yaml)
+  $_dscPkg.properties.resources = ConvertTo-ResourceArray $_dscPkg.properties.resources
   $_dsc.properties.resources += $_dscPkg.properties.resources
 
   foreach ($_resource in $_dsc.properties.resources) {
