@@ -60,7 +60,6 @@
 
   outputs =
     {
-      self,
       cirruslabs-cli,
       darwin,
       home-manager,

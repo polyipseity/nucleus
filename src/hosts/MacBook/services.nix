@@ -135,18 +135,11 @@ let
   # Import centralized daemon refresh helpers for Phase 4.
   daemonRefresh = import ../../modules/macos/daemon-refresh.nix;
 
-  # Known list of current Nucleus service .app directory names.
-  # Used for deterministic deployment.
-  currentNucleusAppDirs = [
-    "NucleusManual.app"
-  ]
-  ++ map (preset: "NucleusGSPDFOpt-${preset}.app") gsPdfOptPresets;
-
   # Known list of historically-removed Nucleus services.
-  # When a service is removed, add its metadata here and remove its app dir
-  # from currentNucleusAppDirs. The activation script unconditionally removes
-  # its NSServicesStatus key and prunes its app directory from disk. Entries
-  # can be removed after all machines have applied once after the removal commit.
+  # When a service is removed, add its metadata here and remove its app dir.
+  # The activation script unconditionally removes its NSServicesStatus key
+  # and prunes its app directory from disk. Entries can be removed after all
+  # machines have applied once after the removal commit.
   removedNucleusServices = [
     {
       appDir = "NucleusGSPDFOpt.app";

@@ -7,7 +7,6 @@
 {
   config,
   pkgs,
-  lib,
   nucleusApps,
   ...
 }:
