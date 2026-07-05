@@ -21,10 +21,6 @@ properties:
           }
           $GcScript = Join-Path $RepoRoot "scripts\gc.ps1"
           $ModuleDir = Join-Path $RepoRoot "src\hosts\Windows\modules"
-          if (-not (Test-Path $GcScript)) {
-            Write-Output "gc: scripts/gc.ps1 not found; skipping weekly GC"
-            exit 1
-          }
           & $GcScript -ModuleDir $ModuleDir -RepoRoot $RepoRoot
         Trigger: Weekly
         DaysOfWeek: Sunday
