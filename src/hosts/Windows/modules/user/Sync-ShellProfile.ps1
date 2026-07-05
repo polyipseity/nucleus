@@ -80,18 +80,22 @@ function Sync-ShellProfile {
     '# path here, so the fallback reuses the managed user PATH entries applied by'
     '# WinGet/bootstrap while still gating invocation through this profile layer.'
     '$env:NUCLEUS_DEFAULT_DEV_ENV = "1"'
-    # Impose 5-day minimum release age for uv package installations. Mirrors
-    # UV_EXCLUDE_NEWER set in shell/env.nix and env.dsc.yml.
-    # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
-    '$env:UV_EXCLUDE_NEWER = "P5D"'
-    # Configure uv add-bounds = exact (config-file only setting, no env var).
+    # Configure uv supply-chain defaults via uv.toml.
     # Mirrors the uv.toml created by shell.nix on POSIX hosts.
     # Source: https://docs.astral.sh/uv/reference/settings/#add-bounds
+    # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
     '$uvConfigDir = Join-Path $env:APPDATA "uv"'
     '$uvConfigFile = Join-Path $uvConfigDir "uv.toml"'
     'if (-not (Test-Path -Path $uvConfigFile -PathType Leaf)) {'
     '  New-Item -Path $uvConfigDir -ItemType Directory -Force | Out-Null'
-    '  Set-Content -Path $uvConfigFile -Value "add-bounds = \"exact\"" -Encoding UTF8'
+    '  Set-Content -Path $uvConfigFile -Value "add-bounds = \"exact\"`nexclude-newer = \"P5D\"" -Encoding UTF8'
+    '}'
+    # Configure bun supply-chain defaults via .bunfig.toml.
+    # Mirrors the .bunfig.toml created by shell.nix on POSIX hosts.
+    # Source: https://bun.sh/docs/runtime/bunfig#install
+    '$bunConfigFile = Join-Path $env:USERPROFILE ".bunfig.toml"'
+    'if (-not (Test-Path -Path $bunConfigFile -PathType Leaf)) {'
+    '  Set-Content -Path $bunConfigFile -Value "[install]`nexact = true`nminimumReleaseAge = 432000" -Encoding UTF8'
     '}'
     # Load rclone config passphrase from materialized secret for automatic config
     # file encryption in interactive and scripted rclone invocations.
