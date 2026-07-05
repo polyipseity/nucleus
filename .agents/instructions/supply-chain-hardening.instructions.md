@@ -14,8 +14,8 @@ package versions.
 
 | Package manager | Mechanism | Setting | File(s) |
 |---|---|---|---|
-| **bun** | `~/.bunfig.toml` | `[install] minimumReleaseAge = 432000` (5 days in seconds), `saveExact = true` | `src/modules/shell.nix` |
-| **uv** | `UV_EXCLUDE_NEWER` env var + `uv.toml` | `"P5D"` (ISO 8601 duration) + `add-bounds = "exact"` | `src/modules/shell/env.nix`, `src/modules/shell.nix`, `src/hosts/Windows/user/env.dsc.yml`, `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` |
+| **bun** | `~/.bunfig.toml` | `[install] minimumReleaseAge = 432000` (5 days in seconds), `exact = true` | `src/modules/shell.nix`, `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` |
+| **uv** | `uv.toml` | `exclude-newer = "P5D"` (ISO 8601 duration) + `add-bounds = "exact"` | `src/modules/shell.nix`, `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` |
 
 ## Package managers without delay features
 
@@ -82,9 +82,8 @@ When adding a NEW package manager to this repository, you MUST:
 1. Check whether it supports a minimum-release-age / exclude-newer / install-delay
    configuration option or environment variable.
 2. If yes: configure it with `"5 days"` (or equivalent) in every shell layer:
-   - POSIX: `src/modules/shell/env.nix` (env var) or `src/modules/shell.nix` (config file)
-   - Windows: `src/hosts/Windows/user/env.dsc.yml` (DSC env var) +
-     `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` (PowerShell profile)
+   - POSIX: `src/modules/shell.nix`
+   - Windows: `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1`
 3. If no: add a note to this table explaining why, and rely on lockfile pinning.
 4. If an existing package manager gains a delay feature in an upstream update,
    add it and remove the "no delay feature" note.
