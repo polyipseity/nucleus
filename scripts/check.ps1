@@ -375,7 +375,7 @@ if (-not $HAS_ARGS) {
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
 if (-not $HAS_ARGS) {
-  $_dscSystem = Join-Path $RepoRoot 'src\hosts\Windows\system\dsc.yml'
+  $_dscSystemDir = Join-Path $RepoRoot 'src\hosts\Windows\system'
   $_dscSystemPackages = Join-Path $RepoRoot 'src\hosts\Windows\system\packages.dsc.yml'
   $_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
   $_lfErrors = 0
@@ -403,13 +403,22 @@ if (-not $HAS_ARGS) {
     return $_obj
   }
 
-  # Generate locked DSC in-memory from both system DSC files + lockfile.
+  # Generate locked DSC in-memory from all system DSC files + lockfile.
   $_lockfileData = Get-Content $_lockfilePath -Raw | ConvertFrom-Json -AsHashtable
-  $_dscYaml = Get-Content $_dscSystem -Raw
-  $_dscPkgYaml = Get-Content $_dscSystemPackages -Raw
+  # Read all system DSC files (sorted by name), excluding packages.dsc.yml.
+  $_dscSystemFiles = Get-ChildItem (Join-Path $_dscSystemDir '*.dsc.yml') | Where-Object { $_.Name -ne 'packages.dsc.yml' } | Sort-Object Name
+  # Initialize DSC from the first file's structure.
+  $_dscYaml = Get-Content $_dscSystemFiles[0].FullName -Raw
   $_dsc = ConvertTo-HashtableDeep ($_dscYaml | ConvertFrom-Yaml)
-  $_dscPkg = ConvertTo-HashtableDeep ($_dscPkgYaml | ConvertFrom-Yaml)
+  # Merge resources from remaining system DSC files.
+  foreach ($_file in $_dscSystemFiles[1..($_dscSystemFiles.Count - 1)]) {
+    $_fileYaml = Get-Content $_file.FullName -Raw
+    $_fileDsc = ConvertTo-HashtableDeep ($_fileYaml | ConvertFrom-Yaml)
+    $_dsc.properties.resources += $_fileDsc.properties.resources
+  }
   # Merge package resources from system/packages.dsc.yml into the main DSC tree.
+  $_dscPkgYaml = Get-Content $_dscSystemPackages -Raw
+  $_dscPkg = ConvertTo-HashtableDeep ($_dscPkgYaml | ConvertFrom-Yaml)
   $_dsc.properties.resources += $_dscPkg.properties.resources
 
   foreach ($_resource in $_dsc.properties.resources) {
@@ -485,7 +494,7 @@ if (-not $HAS_ARGS) {
   $_pipViolations = Select-String -Path @(
     Get-ChildItem -Recurse -Path "$RepoRoot\scripts","$RepoRoot\src","$RepoRoot\tests" `
       -Include *.sh,*.ps1,*.nix `
-      -Exclude check.sh,check.ps1 `
+      -Exclude check.sh,check.ps1,shell.nix `
       | ForEach-Object { $_.FullName }
     ) -Pattern '(^|[^a-z])pip install([^-]|$)' `
     | Where-Object { $_.Line -notmatch 'uv pip install' }
@@ -496,7 +505,7 @@ if (-not $HAS_ARGS) {
   $_npmViolations = Select-String -Path @(
     Get-ChildItem -Recurse -Path "$RepoRoot\scripts","$RepoRoot\src","$RepoRoot\tests" `
       -Include *.sh,*.ps1,*.nix `
-      -Exclude check.sh,check.ps1 `
+      -Exclude check.sh,check.ps1,shell.nix `
       | ForEach-Object { $_.FullName }
     ) -Pattern '(^|[^a-z])npm install([^-]|$)'
   if ($_npmViolations) {

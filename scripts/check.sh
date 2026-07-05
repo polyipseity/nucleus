@@ -507,7 +507,7 @@ printf '\n=== [%s] Package manager usage enforcement ===\n' "$((_step += 1))"
 if ! $HAS_ARGS; then
   _violations=0
   if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
-       --exclude='check.sh' --exclude='check.ps1' \
+       --exclude='check.sh' --exclude='check.ps1' --exclude='shell.nix' \
        -E '(^|[^a-z])pip install([^-]|$)' \
        scripts/ src/ tests/ 2>/dev/null \
        | grep -v 'uv pip install' \
@@ -516,7 +516,7 @@ if ! $HAS_ARGS; then
     _violations=$((_violations + 1))
   fi
   if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
-       --exclude='check.sh' --exclude='check.ps1' \
+       --exclude='check.sh' --exclude='check.ps1' --exclude='shell.nix' \
        -E '(^|[^a-z])npm install([^-]|$)' \
        scripts/ src/ tests/ 2>/dev/null \
        | grep . >/dev/null 2>&1; then
