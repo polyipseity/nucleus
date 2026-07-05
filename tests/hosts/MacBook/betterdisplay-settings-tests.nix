@@ -6,8 +6,8 @@
 
 let
   lib = import <nixpkgs/lib>;
-  defaultsText = builtins.readFile ../../src/hosts/MacBook/defaults.nix;
-  macosModuleText = builtins.readFile ../../src/modules/macos.nix;
+  defaultsText = builtins.readFile ../../../src/hosts/MacBook/defaults.nix;
+  macosModuleText = builtins.readFile ../../../src/modules/macos.nix;
 in
 assert lib.hasInfix ''"pro.betterdisplay.BetterDisplay"'' defaultsText;
 assert lib.hasInfix "hideMenuIcon = true;" defaultsText;
