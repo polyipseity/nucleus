@@ -15,13 +15,15 @@ in
 rec {
   # =========================================================================
   # Assertion 1: VS Code symlink protection in editors.nix
+  #               (shell helpers that implement chflags/chattr live in
+  #                agent-helpers.sh — verified below via agentsHelpersText)
   # =========================================================================
   vsCodeProtection =
     assert containsRegex "_nucleus_protect_symlink" editorsText;
     assert containsRegex "_nucleus_unprotect_symlink" editorsText;
-    assert containsRegex "chflags -h uchg" editorsText;
-    assert containsRegex "chattr -h \\+i" editorsText;
-    assert containsRegex "chflags -h nouchg" editorsText;
+    assert containsRegex "chflags -h uchg" agentsHelpersText;
+    assert containsRegex "chattr -h \\+i" agentsHelpersText;
+    assert containsRegex "chflags -h nouchg" agentsHelpersText;
     true;
 
   # =========================================================================
@@ -48,10 +50,10 @@ rec {
   # Assertion 4: Dev repos symlink protection in dev-repos.nix
   # =========================================================================
   devReposProtection =
-    assert containsRegex "protect_managed_symlink" devReposText;
-    assert containsRegex "unprotect_managed_symlink" devReposText;
+    assert containsRegex "_nucleus_protect_symlink" devReposText;
+    assert containsRegex "_nucleus_unprotect_symlink" devReposText;
     assert containsRegex "devReposProvision" devReposText;
-    assert containsRegex "chflags -h" devReposText;
+    assert containsRegex "chflags -h" agentsHelpersText;
     true;
 
   # =========================================================================
@@ -61,16 +63,16 @@ rec {
     assert containsRegex "_nucleus_protect_symlink" customProvisionSymlinksText;
     assert containsRegex "_nucleus_unprotect_symlink" customProvisionSymlinksText;
     assert containsRegex "custom-provision-symlinks\.json" customProvisionSymlinksText;
-    assert containsRegex "chflags -h uchg" customProvisionSymlinksText;
-    assert containsRegex "chattr -h \\+i" customProvisionSymlinksText;
+    assert containsRegex "chflags -h uchg" agentsHelpersText;
+    assert containsRegex "chattr -h \\+i" agentsHelpersText;
     true;
 
   # =========================================================================
   # Assertion 5: Raycast alias symlink protection in macos.nix
   # =========================================================================
   raycastAliasProtection =
-    assert containsRegex "protect_alias_symlink" macosText;
-    assert containsRegex "unprotect_alias_symlink" macosText;
+    assert containsRegex "_nucleus_protect_symlink" macosText;
+    assert containsRegex "_nucleus_unprotect_symlink" macosText;
     assert containsRegex "raycast" macosText;
     true;
 
