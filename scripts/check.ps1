@@ -234,6 +234,43 @@ if ($_lfOverlapErrors -gt 0) {
   Write-Output "lockfile.json consistency: no overlapping packages across sections"
 }
 
+# Lifecycle script allowlist validation (always run):
+#  - lifecycle-allowlist.json must exist and be a valid JSON object.
+#  - Each entry must have a non-empty justification string.
+$_lfAlPath = Join-Path $RepoRoot "src\lockfiles\lifecycle-allowlist.json"
+$_lfAlErrors = 0
+if (-not (Test-Path $_lfAlPath)) {
+  Write-Output "ERROR: lifecycle-allowlist.json not found at $_lfAlPath"
+  $_lfAlErrors++
+} else {
+  $_lfAlRaw = Get-Content $_lfAlPath -Raw -ErrorAction Stop
+  $_lfAl = $null
+  try {
+    $_lfAl = ConvertFrom-Json $_lfAlRaw -AsHashtable
+  } catch {
+    Write-Output "ERROR: lifecycle-allowlist.json is not valid JSON: $_($_.Exception.Message)"
+    $_lfAlErrors++
+  }
+  if ($null -ne $_lfAl -and $_lfAl -isnot [hashtable]) {
+    Write-Output "ERROR: lifecycle-allowlist.json must be a JSON object"
+    $_lfAlErrors++
+  } elseif ($null -ne $_lfAl) {
+    foreach ($_entry in $_lfAl.GetEnumerator()) {
+      if ($_entry.Value -isnot [string] -or [string]::IsNullOrEmpty($_entry.Value)) {
+        Write-Output "WARNING: lifecycle-allowlist.json: '$($_entry.Key)' has empty or non-string justification"
+        $_lfAlErrors++
+      }
+    }
+  }
+}
+if ($_lfAlErrors -gt 0) {
+  Write-Output "ERROR: lifecycle-allowlist.json validation failed with $_lfAlErrors error(s)"
+  $exitCode = 1
+} else {
+  $_lfAlCount = if ($null -ne $_lfAl -and $_lfAl -is [hashtable]) { $_lfAl.Count } else { 0 }
+  Write-Output ("lifecycle-allowlist.json: valid (entry count: {0})" -f $_lfAlCount)
+}
+
 if (-not $HAS_ARGS) {
   if ($null -eq $_lf) {
     Write-Output "ERROR: lockfile.json could not be loaded — skipping section validation"

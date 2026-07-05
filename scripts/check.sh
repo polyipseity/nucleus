@@ -200,6 +200,38 @@ else
   echo "lockfile.json consistency: no overlapping packages across sections"
 fi
 
+# Lifecycle script allowlist validation (always run):
+#  - lifecycle-allowlist.json must exist and be a valid JSON object.
+#  - Each entry must have a non-empty justification string.
+#  - The allowlist starts empty — this provides the mechanism for future
+#    per-package lifecycle script approval.
+_lf_al_path="src/lockfiles/lifecycle-allowlist.json"
+_lf_al_errors=0
+if [ ! -f "$_lf_al_path" ]; then
+  echo "ERROR: lifecycle-allowlist.json not found at $_lf_al_path"
+  _lf_al_errors=$((_lf_al_errors + 1))
+else
+  _al_is_obj=$(jq -e 'type == "object"' "$_lf_al_path" >/dev/null 2>&1 && echo true || echo false)
+  if [ "$_al_is_obj" != "true" ]; then
+    echo "ERROR: lifecycle-allowlist.json must be a JSON object"
+    _lf_al_errors=$((_lf_al_errors + 1))
+  else
+    # Validate each entry has a non-empty justification string.
+    _al_invalid=$(jq -r '
+      to_entries[] | select(.value | type != "string" or .value == "") |
+      "WARNING: lifecycle-allowlist.json: \"\(.key)\" has empty or non-string justification"' "$_lf_al_path")
+    if [ -n "$_al_invalid" ]; then
+      echo "$_al_invalid"
+      _lf_al_errors=$((_lf_al_errors + 1))
+    fi
+  fi
+fi
+if [ "$_lf_al_errors" -gt 0 ]; then
+  echo "ERROR: lifecycle-allowlist.json validation failed with $_lf_al_errors error(s)"
+  exit 1
+fi
+echo "lifecycle-allowlist.json: valid (entry count: $(jq 'length' "$_lf_al_path" 2>/dev/null || echo 0))"
+
 if ! $HAS_ARGS; then
   _lf_errors=0
 
