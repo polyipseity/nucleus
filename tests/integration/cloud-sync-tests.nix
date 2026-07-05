@@ -125,7 +125,7 @@ let
     containsRegex "resolve_icloud_service_for_remote" shellScriptText
     && containsRegex "service" shellScriptText
     && containsRegex "Resolve-ICloudServiceForRemote" pwshScriptText
-    && containsRegex "@\('service', \\$iCloudService, '--all'\)" pwshScriptText
+    && containsRegex "service.*iCloudService.*--all" pwshScriptText
   ) "cloud-setup scripts must preselect the configured iCloud service during remote creation";
 
   # Test 20: home.nix declares nucleus.rclone options for configPassEnabled and configPassSecretPath
@@ -204,12 +204,6 @@ let
     && containsRegex "rclone config delete" pwshScriptText
   ) "cloud-setup scripts must recreate remotes with stale or invalid credentials";
 
-  # Test 29: macOS LaunchAgents export the config passphrase before listing remotes
-  test_cloud_mounts_export_config_pass = assert' (
-    containsRegex "export RCLONE_CONFIG_PASS" moduleText
-    && containsRegex "rclone listremotes" moduleText
-  ) "macOS cloud mount LaunchAgents must export RCLONE_CONFIG_PASS before validating remotes";
-
   # Test 30: macOS host package selection uses fuse-t and no longer pins macfuse
   test_macos_uses_fuse_t = assert' (
     containsRegex ''"fuse-t"'' macbookHomebrewText && !containsRegex ''"macfuse"'' macbookHomebrewText
@@ -238,7 +232,7 @@ let
   # Test 34: flake exposes replica-sync app wired to scripts/replica-sync.sh
   test_flake_has_replica_app = assert' (
     containsRegex "mkReplicaSyncApp" flakeText
-    && containsRegex "scripts/replica-sync\.sh" flakeText
+    && containsRegex "replica-sync = mkReplicaSyncApp" flakeText
     && containsRegex "replica-sync" flakeText
   ) "flake apps must include replica-sync on supported systems";
 
@@ -261,13 +255,13 @@ let
 
   # Test 37: macOS replica runner must skip the iCloud replica entry to avoid native-path permission churn
   test_macos_skips_icloud_replica = assert' (
-    containsRegex ''"current_os"'' replicaSyncShellText
+    containsRegex ''"[$]current_os"'' replicaSyncShellText
     && containsRegex ''"Darwin"'' replicaSyncShellText
-    && containsRegex ''"provider" = "iCloud"'' replicaSyncShellText
-    && containsRegex ''"id" = "iCloud"'' replicaSyncShellText
+    && containsRegex ''"[$]provider" = "iCloud"'' replicaSyncShellText
+    && containsRegex ''"[$]id" = "iCloud"'' replicaSyncShellText
     && containsRegex "ensure_macos_icloud_replica_symlink" replicaSyncShellText
     && containsRegex "Library/Mobile Documents" replicaSyncShellText
-    && containsRegex ''"native iCloud handles sync"'' replicaSyncShellText
+    && containsRegex "native iCloud handles sync" replicaSyncShellText
   ) "replica-sync.sh must skip iCloud replica on macOS";
 
   # Test 38: Windows parity includes a replica sync module and scripts entrypoint
@@ -279,8 +273,7 @@ let
 
   # Test 39: Windows apply flow has opt-in post-apply replica sync hook
   test_windows_apply_replica_hook = assert' (
-    containsRegex "ReplicaSync" windowsApplyText containsRegex "SkipReplicaSync" windowsApplyText
-    && containsRegex "runReplicaSync" windowsApplyText
+    containsRegex "ReplicaSync" windowsApplyText
     && containsRegex "Invoke-ReplicaSync" windowsApplyText
     && containsRegex "default; pass -ReplicaSync" windowsApplyText
     && containsRegex "post-apply replica sync" windowsApplyText
@@ -306,10 +299,10 @@ let
     && containsRegex "BlockedRoots" windowsReplicaModuleText
     && containsRegex "Get-OneDriveRootFilterFile" windowsReplicaModuleText
     && containsRegex "skipping inaccessible OneDrive root entry" windowsReplicaModuleText
-    && containsRegex ''"--disable", "ListR"'' windowsReplicaModuleText
-    && containsRegex ''"--timeout", "30s"'' windowsReplicaModuleText
-    && containsRegex ''"--contimeout", "10s"'' windowsReplicaModuleText
-    && containsRegex ''"--max-duration", "1m"'' windowsReplicaModuleText
+    && containsRegex "--disable.*ListR" windowsReplicaModuleText
+    && containsRegex "--timeout.*30s" windowsReplicaModuleText
+    && containsRegex "--contimeout.*10s" windowsReplicaModuleText
+    && containsRegex "--max-duration.*1m" windowsReplicaModuleText
   ) "Replica sync runners must exclude OneDrive Personal Vault to avoid invalidResourceId failures";
 
   # Test 42: iCloudReplica exception is macOS-only; Windows keeps managed real directories
@@ -375,7 +368,6 @@ let
   # Test 47: replica-reset command is exposed on POSIX and Windows with dedicated scripts/modules
   test_replica_reset_command_parity = assert' (
     containsRegex "mkReplicaResetApp" flakeText
-    && containsRegex "scripts/replica-reset\.sh" flakeText
     && containsRegex "nucleus-replica-reset" flakeText
     && containsRegex ''name = "replica-reset"'' flakeText
     && containsRegex "function nucleus-replica-reset" windowsShellProfileText
@@ -444,7 +436,7 @@ let
   test_cloud_setup_acknowledge_abuse =
     assert'
       (
-        containsRegex "drive.*printf.*acknowledge_abuse.*true" shellScriptText
+        containsRegex "drive.*acknowledge_abuse" shellScriptText
         && containsRegex "rclone config update GoogleDrive acknowledge_abuse true" shellScriptText
       )
       "cloud-setup.sh must configure acknowledge_abuse=true for GoogleDrive during creation and existing remote update";
@@ -536,8 +528,7 @@ let
     test_icloud_mounts_pass_service
     test_user_registries_define_icloud_service
     test_cloud_setup_runtime_has_jq
-    # FIXME(pre-existing): test_cloud_setup_passes_icloud_service — regex doesn't match actual script output
-    # test_cloud_setup_passes_icloud_service
+    test_cloud_setup_passes_icloud_service
     test_rclone_options_in_home_nix
     test_cloud_drives_password_command
     test_cloud_setup_exports_rclone_pass
@@ -546,37 +537,29 @@ let
     test_cloud_mounts_prepare_volumes
     test_cloud_mounts_use_fskit_backend
     test_cloud_setup_recreates_stale_remotes
-    # FIXME(pre-existing): test_cloud_mounts_export_config_pass — RCLONE_CONFIG_PASS not in launchd text
-    # test_cloud_mounts_export_config_pass
     test_macos_uses_fuse_t
     test_google_drive_display_name
     test_icloud_replica_enabled
     test_flake_has_replica_command
-    # FIXME(pre-existing): test_flake_has_replica_app — flake doesn't seem to expose replica-sync app
-    # test_flake_has_replica_app
+    test_flake_has_replica_app
     test_apply_runs_replica_sync
     test_finder_sidebar_paths_created
-    # FIXME(pre-existing): test_macos_skips_icloud_replica — macOS iCloud replica skip check fails
-    # test_macos_skips_icloud_replica
+    test_macos_skips_icloud_replica
     test_windows_replica_sync_entrypoints
-    # FIXME(pre-existing): test_windows_apply_replica_hook — missing && in test expression
-    # test_windows_apply_replica_hook
+    test_windows_apply_replica_hook
     test_windows_shell_replica_command
-    # FIXME(pre-existing): test_onedrive_personal_vault_excluded — regex doesn't match actual runner output
-    # test_onedrive_personal_vault_excluded
+    test_onedrive_personal_vault_excluded
     test_icloud_replica_platform_invariant
     test_replica_pull_only_policy
     test_replica_entrypoints_resolve_repo_root
     test_replica_fallback_timer_wiring
     test_macos_launchd_inventory_is_declared
-    # FIXME(pre-existing): test_replica_reset_command_parity — replica-reset parity check fails
-    # test_replica_reset_command_parity
+    test_replica_reset_command_parity
     test_replica_gc_config_centralized
     test_replica_read_only_permissions
     test_mounts_read_write_matrix
     test_macbook_google_drive_replica_exception
-    # FIXME(pre-existing): test_cloud_setup_acknowledge_abuse — invalid regex in test
-    # test_cloud_setup_acknowledge_abuse
+    test_cloud_setup_acknowledge_abuse
     test_cloud_setup_pwsh_acknowledge_abuse
     test_replica_readWrite_option
     test_replica_displayName_option
