@@ -644,13 +644,14 @@ in
     '';
   };
 
-  # Global uv configuration: set add-bounds = "exact" so all dependency additions
-  # use exact version pins (==) instead of compatible-release specifiers (>=).
+  # Global uv configuration: exact pinning and supply-chain hardening.
   # uv reads uv.toml from $XDG_CONFIG_HOME/uv/uv.toml (~/.config/uv/uv.toml).
   # Source: https://docs.astral.sh/uv/reference/settings/#add-bounds
+  # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
   home.file."${config.xdg.configHome}/uv/uv.toml" = {
     text = ''
       add-bounds = "exact"
+      exclude-newer = "P5D"
     '';
   };
 
