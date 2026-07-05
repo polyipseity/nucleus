@@ -75,16 +75,6 @@ With the `--verify` flag (requires network), additional checks run:
 all registry queries without writing to disk, then diffs against the current
 lockfile.
 
-## CI drift detection
-
-`.github/workflows/drift-detect.yml` runs weekly (Sunday 06:00 UTC) on
-ubuntu-latest and macos-latest:
-- `bump-lockfile --verify` — checks if any pinned version is stale.
-- `check --verify` — runs all online determinism checks.
-
-This workflow is separate from `ci.yml` because `--verify` requires network
-access and non-deterministic registry calls.
-
 ## Hardening requirement for new additions
 
 When adding a NEW package manager to this repository, you MUST:
