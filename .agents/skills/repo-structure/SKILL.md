@@ -83,3 +83,16 @@ description: Cached knowledge of the nucleus repository architecture, key files,
 Current user files: `wallpaper`, `screen-saver`, `explorer`, `shell`, `env`, `context-manual`, `context-pdf-opt`.
 
 Current system files: `scheduler`, `developer-mode`, `firewall`, `taskbar`, `computer-name`, `long-paths`, `storage-sense`, `font-substitutes`, `remote-desktop`, `packages`.
+
+## PowerShell type stability notes
+
+When debugging `scripts/check.ps1` locked DSC validation, these gotchas matter:
+
+- **`ConvertFrom-Yaml` (powershell-yaml module)** returns:
+  - `PSCustomObject` for YAML mappings
+  - `List<object>` (not `Object[]`) for YAML sequences
+  - Columnar `OrderedDictionary` on Windows CI: each key maps to an array of values instead of an array of objects
+- **`[System.Collections.IList]`** matches `List<object>`, but `[array]` does NOT — always check both.
+- **`ForEach-Object` pipeline coercions**: Using `ForEach-Object { ConvertTo-HashtableDeep $_ }` converts `Hashtable` return values to `OrderedDictionary` when the function is recursive. Use a `foreach` loop instead.
+- **Single-element array unrolling**: `return @(singleItem)` unrolls to the scalar. Use unary comma: `return ,$arr` or `return ,@(expr)`.
+- **Empty array returns**: `return @()` produces no output (assignment becomes `$null`). Use `return ,@()` for an empty array.
