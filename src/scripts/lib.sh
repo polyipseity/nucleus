@@ -133,12 +133,10 @@ log_sanitize() {
 # macOS 25+ requires gui/<uid>/<service> for user domain and
 # system/<service> for system domain. Older macOS accepted bare service IDs.
 launchctl_target() {
-  local domain="$1"
-  local service="$2"
-  if [ "$domain" = "system" ]; then
-    printf 'system/%s' "$service"
+  if [ "$1" = "system" ]; then
+    printf 'system/%s' "$2"
   else
-    printf 'gui/%s/%s' "$(id -u)" "$service"
+    printf 'gui/%s/%s' "$(id -u)" "$2"
   fi
 }
 
