@@ -47,8 +47,11 @@ cd "$REPO_ROOT"
 
 FORMAT_NIX=false
 
+FORMAT_NIX=false
+VERIFY=false
+
 usage() {
-  usage_std "check.sh" "[--format] [path ...]" "Run all repository validation checks in sequence. With arguments, passes paths through to supporting checkers and skips whole-repo checks (deadnix, script validation). Use --format to enable in-place Nix formatting (instead of just --verify)."
+  usage_std "check.sh" "[--format] [--verify] [path ...]" "Run all repository validation checks in sequence. With arguments, passes paths through to supporting checkers and skips whole-repo checks (deadnix, script validation). Use --format to enable in-place Nix formatting (instead of just --verify). Use --verify to additionally run online determinism checks (requires network)."
 }
 
 while [ "$#" -gt 0 ]; do
@@ -59,6 +62,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --format)
       FORMAT_NIX=true
+      shift
+      ;;
+    --verify)
+      VERIFY=true
       shift
       ;;
     -*)
@@ -522,6 +529,15 @@ if ! $HAS_ARGS; then
   echo "No package manager violations found."
 else
   echo "Skipping (path-scoped mode)."
+fi
+
+# Online determinism checks (--verify mode only)
+printf '\n=== [%s] Online determinism checks (--verify) ===\n' "$((_step += 1))"
+if $VERIFY; then
+  bash "$SCRIPT_DIR/bump-lockfile.sh" --verify
+  echo "Online determinism checks passed."
+else
+  echo "Skipping (use --verify to run online determinism checks)."
 fi
 
 printf '\nAll checks passed.\n'

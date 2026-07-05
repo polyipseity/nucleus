@@ -28,22 +28,31 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { Split-Path -Parent $PSScriptRoot }
 $exitCode = 0
+$VERIFY = $false
+$positionalArgs = @()
 
-# Process -h|--help
-if ($args.Count -gt 0 -and ($args[0] -eq '-h' -or $args[0] -eq '--help')) {
-  Write-Output "Usage: check.ps1 [path ...]"
-  Write-Output "  Run all Windows-compatible repository validation checks in sequence."
-  Write-Output "  With arguments, passes paths through to supporting checkers."
-  exit 0
+# Process -h|--help and --verify
+foreach ($_arg in $args) {
+  if ($_arg -eq '-h' -or $_arg -eq '--help') {
+    Write-Output "Usage: check.ps1 [--verify] [path ...]"
+    Write-Output "  Run all Windows-compatible repository validation checks in sequence."
+    Write-Output "  With arguments, passes paths through to supporting checkers."
+    Write-Output "  --verify    Additionally run online determinism checks (requires network)."
+    exit 0
+  } elseif ($_arg -eq '--verify') {
+    $VERIFY = $true
+  } else {
+    $positionalArgs += $_arg
+  }
 }
 
-$HAS_ARGS = $args.Count -gt 0
+$HAS_ARGS = $positionalArgs.Count -gt 0
 
 # Group paths by extension — each sub-checker receives only files it understands.
 $PS1_FILES = @()
 $PKR_FILES = @()
 if ($HAS_ARGS) {
-  foreach ($_f in $args) {
+  foreach ($_f in $positionalArgs) {
     if ($_f -like '*.ps1')     { $PS1_FILES += $_f }
     if ($_f -like '*.pkr.hcl') { $PKR_FILES += $_f }
   }
@@ -501,6 +510,18 @@ if (-not $HAS_ARGS) {
   }
 } else {
   Write-Output "Skipping (path-scoped mode)."
+}
+
+# ---------------------------------------------------------------------------
+# 7. Online determinism checks (--verify mode only)
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Online determinism checks (--verify) ===" -f (++$_step))
+if ($VERIFY) {
+  & "$PSScriptRoot\bump-lockfile.ps1" -Verify
+  if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
+  Write-Output "Online determinism checks passed."
+} else {
+  Write-Output "Skipping (use --verify to run online determinism checks)."
 }
 
 if ($exitCode -ne 0) {
