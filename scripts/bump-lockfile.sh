@@ -37,11 +37,16 @@ fi
 
 # Parse --sections flag (comma-separated, defaults to all)
 SECTIONS=""
+VERIFY=false
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --sections)
       shift
       SECTIONS="$1"
+      ;;
+    --verify)
+      VERIFY=true
       ;;
     --help)
       grep '^#' "$0" | sed 's/^# \?//' | sed 's/^#//'
@@ -410,6 +415,18 @@ if section_enabled vm-setup || section_enabled tart-images; then
       ')
     fi
   done < <(printf '%s\n' "$data" | jq -r '(.vm-setup.tart-images // {}) | keys[]')
+fi
+
+# Compute the diff for --verify mode
+if $VERIFY; then
+  _diff=$(diff <(printf '%s\n' "$data") "$LOCKFILE_ABS" 2>/dev/null || true)
+  if [ -n "$_diff" ]; then
+    printf 'bump-lockfile --verify: lockfile out of date — changes would be made:\n'
+    printf '%s\n' "$_diff"
+    exit 1
+  fi
+  printf 'bump-lockfile --verify: lockfile is up to date.\n'
+  exit 0
 fi
 
 # Atomic write

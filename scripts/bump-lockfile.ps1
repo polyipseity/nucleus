@@ -39,7 +39,9 @@ param(
   [Alias("s")]
   [string]$Sections,
   [Alias("h")]
-  [switch]$Help
+  [switch]$Help,
+  [Alias("v")]
+  [switch]$Verify
 )
 # Explicit reference to suppress false-positive PSAvoidUsingUnusedParameters
 # ($Sections is used via closure in Test-SectionEnabled).
@@ -517,6 +519,22 @@ if ((Test-SectionEnabled 'vm-setup') -or (Test-SectionEnabled 'tart-images')) {
       }
     }
   }
+}
+
+# ---------------------------------------------------------------------------
+# Verify mode — diff against current lockfile without writing
+# ---------------------------------------------------------------------------
+if ($Verify) {
+  $outputJson = $ht | ConvertTo-Json -Depth 10
+  $currentJson = Get-Content $lockfileAbs -Raw
+  if ($outputJson -ne $currentJson) {
+    Write-Output "bump-lockfile --verify: lockfile out of date — changes would be made:"
+    $diffLines = Compare-Object ([string[]]($currentJson -split "`n")) ([string[]]($outputJson -split "`n"))
+    $diffLines | ForEach-Object { Write-Output $_.ToString() }
+    exit 1
+  }
+  Write-Output "bump-lockfile --verify: lockfile is up to date."
+  return
 }
 
 # ---------------------------------------------------------------------------
