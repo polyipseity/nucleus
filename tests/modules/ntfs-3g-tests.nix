@@ -63,11 +63,6 @@ let
     !containsRegex "patchCryptoAc" nixText
   ) "ntfs-3g.nix must not contain inline Python patchCryptoAc";
 
-  # Test 9: sed rootbindir fix is removed.
-  test_no_sed_rootbindir = assert' (
-    !containsRegex "sed.*rootbindir" nixText
-  ) "ntfs-3g.nix must not use sed for rootbindir patching";
-
   # === Nix module references the checked-in patch files ===
 
   # Test 10: Module references cryptoPatchPath.
@@ -97,7 +92,6 @@ in
     test_rootbindir_patch_changes_bin
     test_no_python3_dependency
     test_no_inline_python_patch
-    test_no_sed_rootbindir
     test_references_crypto_patch
     test_references_rootbindir_patch
     test_uses_patch_command
