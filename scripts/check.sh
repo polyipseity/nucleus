@@ -190,19 +190,27 @@ if [ ! -f "$_lfpath" ]; then
   # Do not exit early — the section below may still run useful checks if
   # HAS_ARGS is false; the error count will cause a non-zero exit later.
 else
-  _lf_overlaps=$(jq -r '
+  # Known cross-section overlaps that are legitimate (same publisher.package ID
+  # used for different products across package-manager sections).
+  # Add new entries here with a brief justification comment.
+  _lf_overlap_exceptions='[
+    "astral-sh.ty"  # VS Code extension (vscode) vs CLI tool (winget) — different products
+  ]'
+  _lf_overlaps=$(jq -r --argjson exceptions "$_lf_overlap_exceptions" '
     [to_entries[] | select(.key != "ollama" and (.value | type == "object")) | .key as $s | (.value | keys)[] | {s: $s, p: .}]
     | group_by(.p)
     | map(select(length > 1))
     | .[][]
-    | "WARNING: package \"\(.p)\" appears in both \(.s)"' "$_lfpath" 2>/dev/null)
+    | select(.p as $p | ($exceptions | index($p)) | not)
+    | "ERROR: package \"\(.p)\" appears in both \(.s)"' "$_lfpath" 2>/dev/null)
   if [ -n "$_lf_overlaps" ]; then
     echo "$_lf_overlaps"
     _lf_overlap_issues=$((_lf_overlap_issues + 1))
   fi
 fi
 if [ "$_lf_overlap_issues" -gt 0 ]; then
-  echo "lockfile.json consistency: $_lf_overlap_issues overlap issue(s) (warnings only)"
+  echo "ERROR: lockfile.json has $_lf_overlap_issues overlapping package(s) across sections"
+  exit 1
 else
   echo "lockfile.json consistency: no overlapping packages across sections"
 fi
