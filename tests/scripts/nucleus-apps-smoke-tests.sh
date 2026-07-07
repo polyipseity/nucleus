@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Smoke tests: builds every nucleus-* command and invokes it with --help (or
-# dry-run / safe no-op) to verify it compiles and executes.
+# Smoke tests: builds every nucleus-* command via a single batch build, then
+# invokes each binary directly from its store path for --help (or dry-run /
+# safe no-op) verification.
 #
 # Tier 1 — --help for every command (build + run verification).
 # Tier 2 — --dry-run for commands that support it.
 # Tier 3 — safe no-op execution (config list, svc list --json).
 #
-# Dependencies: nix (with flakes enabled).
+# Dependencies: nix (with flakes enabled), jq.
 
 set -euo pipefail
 
@@ -44,21 +45,80 @@ assert_skip() {
 	((++TESTS_SKIPPED))
 }
 
-# Run a flake app with arguments.
-run_app() {
-	local app="$1"
+# --- Phase 1: Batch build all nucleus packages -------------------------------
+# Build every package in a single Nix evaluation. Outputs store paths in the
+# same order as the package list.
+
+# All nucleus-* packages that we test. Ordered to match the smoke test tiers
+# below: app packages first (for --help), then package-only commands.
+declare -a BATCH_PACKAGES=(
+	nucleus-apply nucleus-ai-sync nucleus-bootstrap nucleus-bump-lockfile
+	nucleus-check nucleus-test nucleus-check-packer nucleus-check-pwsh
+	nucleus-check-sh nucleus-cloud-setup nucleus-config nucleus-gc
+	nucleus-gs-pdf-opt nucleus-health-check nucleus-replica-reset
+	nucleus-replica-sync nucleus-svc nucleus-update nucleus-vm-setup
+)
+
+echo "Building ${#BATCH_PACKAGES[@]} nucleus packages..."
+
+BUILD_JSON=$(nix build --no-link --json \
+	"${BATCH_PACKAGES[@]/#/./src#}")
+echo "Build complete."
+
+# Build a map from package index → store path, preserving build order.
+declare -a PKG_PATHS
+while IFS=$'\t' read -r _idx _path; do
+		PKG_PATHS[_idx]="$_path"
+done < <(echo "$BUILD_JSON" | jq -r 'to_entries | .[] | [.key, .value.outputs.out] | @tsv')
+
+# Run a nucleus-* binary from its store path.
+run_binary() {
+	local pkg="$1"
 	shift
-	NUCLEUS_REPO_ROOT="$REPO_ROOT" nix run "./src#$app" -- "$@" 2>&1
+	local idx=-1
+	for i in "${!BATCH_PACKAGES[@]}"; do
+		if [ "${BATCH_PACKAGES[$i]}" = "$pkg" ]; then
+			idx=$i
+			break
+		fi
+	done
+	if [ "$idx" -lt 0 ]; then
+		echo "error: unknown package $pkg" >&2
+		return 1
+	fi
+	NUCLEUS_REPO_ROOT="$REPO_ROOT" "${PKG_PATHS[idx]}/bin/$pkg" "$@" 2>&1
 }
 
 # --- Tier 1: --help tests --------------------------------------------------
 # Verifies every nucleus-* command builds and responds to --help with output.
 
+# Map app names (nix run names) to their corresponding package names.
+declare -A APP_TO_PKG=(
+	[apply]=nucleus-apply
+	[ai-sync]=nucleus-ai-sync
+	[bootstrap]=nucleus-bootstrap
+	[bump-lockfile]=nucleus-bump-lockfile
+	[check]=nucleus-check
+	[test]=nucleus-test
+	[check-packer]=nucleus-check-packer
+	[check-sh]=nucleus-check-sh
+	[cloud-setup]=nucleus-cloud-setup
+	[config]=nucleus-config
+	[gc]=nucleus-gc
+	[health-check]=nucleus-health-check
+	[replica-reset]=nucleus-replica-reset
+	[replica-sync]=nucleus-replica-sync
+	[svc]=nucleus-svc
+	[update]=nucleus-update
+	[vm-setup]=nucleus-vm-setup
+)
+
 test_app_help() {
 	local app_name="$1"
+	local pkg="${APP_TO_PKG[$app_name]}"
 	local exit_code=0
 	local output
-	output=$(run_app "$app_name" --help) || exit_code=$?
+	output=$(run_binary "$pkg" --help) || exit_code=$?
 	if [ "$exit_code" -eq 0 ] && [ -n "$output" ]; then
 		assert_pass "$app_name --help"
 	elif [ -n "$output" ]; then
@@ -70,7 +130,7 @@ test_app_help() {
 	fi
 }
 
-# App commands (available via `nix run ./src#<name>`)
+# App commands (names match `nix run ./src#<name>`)
 APP_COMMANDS=(
 	apply ai-sync bootstrap bump-lockfile check test
 	check-packer check-sh cloud-setup config
@@ -84,32 +144,21 @@ for cmd in "${APP_COMMANDS[@]}"; do
 done
 
 # check-pwsh: wrapper script does `exec pwsh -File ...` which does not handle
-# --help.  Verify it builds successfully instead.
+# --help.  Verify it builds (already done in batch) and just note the pass
+# for the package-only build assertion.
 echo ""
 echo "--- Package-only commands ---"
-test_package_build_and_run() {
-	local pkg="$1"
-	local run_help="${2:-false}"
-	local exit_code=0
-	local output
-	output=$(nix build "./src#$pkg" 2>&1) || exit_code=$?
-	if [ "$exit_code" -ne 0 ]; then
-		assert_fail "$pkg build" "exit=$exit_code: $(echo "$output" | head -c 200)"
-		return
-	fi
-	assert_pass "$pkg build"
-	if [ "$run_help" = "true" ]; then
-		exit_code=0
-		output=$(NUCLEUS_REPO_ROOT="$REPO_ROOT" ./result/bin/"$pkg" --help 2>/dev/null) || exit_code=$?
-		if [ "$exit_code" -eq 0 ] && [ -n "$output" ]; then
-			assert_pass "$pkg --help"
-		else
-			assert_fail "$pkg --help" "exit=$exit_code"
-		fi
-	fi
-}
-test_package_build_and_run nucleus-check-pwsh false
-test_package_build_and_run nucleus-gs-pdf-opt true
+assert_pass "nucleus-check-pwsh build"
+assert_pass "nucleus-gs-pdf-opt build"
+
+# gs-pdf-opt does support --help; run it from the store path.
+gs_pdf_opt_exit=0
+gs_pdf_opt_output=$(run_binary nucleus-gs-pdf-opt --help 2>/dev/null) || gs_pdf_opt_exit=$?
+if [ "$gs_pdf_opt_exit" -eq 0 ] && [ -n "$gs_pdf_opt_output" ]; then
+	assert_pass "nucleus-gs-pdf-opt --help"
+else
+	assert_fail "nucleus-gs-pdf-opt --help" "exit=$gs_pdf_opt_exit"
+fi
 
 # --- Tier 2: dry-run tests -------------------------------------------------
 # Commands that support --dry-run: run in dry mode to verify the control flow
@@ -118,12 +167,20 @@ test_package_build_and_run nucleus-gs-pdf-opt true
 echo ""
 echo "=== Tier 2: dry-run tests ==="
 
+declare -A DRY_RUN_APPS=(
+	[ai-sync]=nucleus-ai-sync
+	[gc]=nucleus-gc
+	[replica-sync]=nucleus-replica-sync
+	[replica-reset]=nucleus-replica-reset
+	[vm-setup]=nucleus-vm-setup
+)
+
 test_app_dry_run() {
 	local app_name="$1"
-	shift
+	local pkg="${DRY_RUN_APPS[$app_name]}"
 	local exit_code=0
 	local output
-	output=$(run_app "$app_name" --dry-run 2>&1) || exit_code=$?
+	output=$(run_binary "$pkg" --dry-run 2>&1) || exit_code=$?
 	if [ "$exit_code" -eq 0 ]; then
 		assert_pass "$app_name --dry-run"
 	else
@@ -151,9 +208,10 @@ test_app_noop() {
 	local app_name="$1"
 	shift
 	local args=("$@")
+	local pkg="${APP_TO_PKG[$app_name]}"
 	local exit_code=0
 	local output
-	output=$(run_app "$app_name" "${args[@]}") || exit_code=$?
+	output=$(run_binary "$pkg" "${args[@]}") || exit_code=$?
 	if [ "$exit_code" -eq 0 ]; then
 		assert_pass "$app_name ${args[*]}"
 	else
