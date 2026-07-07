@@ -193,9 +193,8 @@ else
   # Known cross-section overlaps that are legitimate (same publisher.package ID
   # used for different products across package-manager sections).
   # Add new entries here with a brief justification comment.
-  _lf_overlap_exceptions='[
-    "astral-sh.ty"  # VS Code extension (vscode) vs CLI tool (winget) — different products
-  ]'
+  # astral-sh.ty: VS Code extension (vscode) vs CLI tool (winget) — different products
+  _lf_overlap_exceptions='["astral-sh.ty"]'
   _lf_overlaps=$(jq -r --argjson exceptions "$_lf_overlap_exceptions" '
     [to_entries[] | select(.key != "ollama" and (.value | type == "object")) | .key as $s | (.value | keys)[] | {s: $s, p: .}]
     | group_by(.p)

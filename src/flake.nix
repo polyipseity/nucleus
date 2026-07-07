@@ -659,6 +659,10 @@
             "bootstrap-versions.env" = scripts + "/bootstrap-versions.env";
           };
         };
+        nucleus-bump-lockfile = mkNucleusPackage pkgs {
+          name = "bump-lockfile";
+          runtimeInputs = [ pkgs.jq ];
+        };
         nucleus-check = mkNucleusPackage pkgs {
           name = "check";
           runtimeInputs = [
