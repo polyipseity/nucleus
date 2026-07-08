@@ -21,8 +21,10 @@
 # Auto-derive the short command name from the script path.
 # e.g., "scripts/gc.ps1" → "gc", "nucleus-gc" → "gc"
 function Get-NucleusCommandName {
-    $scriptPath = $PSCommandPath
-    $name = [System.IO.Path]::GetFileNameWithoutExtension($scriptPath)
+    param(
+        [string]$Path = $PSCommandPath
+    )
+    $name = [System.IO.Path]::GetFileNameWithoutExtension($Path)
     if ($name -like 'nucleus-*') {
         $name = $name.Substring(8) # strip 'nucleus-'
     }
@@ -86,4 +88,4 @@ function Write-NucleusDone {
     Write-Output "$cmd`: done"
 }
 
-Export-ModuleMember -Function Write-NucleusInfo, Write-NucleusError, Write-NucleusWarning, Write-NucleusDryRun, Write-NucleusDone
+Export-ModuleMember -Function Get-NucleusCommandName, Write-NucleusInfo, Write-NucleusError, Write-NucleusWarning, Write-NucleusDryRun, Write-NucleusDone
