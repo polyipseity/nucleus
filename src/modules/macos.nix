@@ -439,6 +439,7 @@ let
     "linkGeneration"
     "onFilesChange"
     "preflightPrivacyPermissions"
+    "protectDiscordMusicRPCConfig"
     "protectDownloadsICloudSymlink"
     "protectOpencodeSymlinks"
     "protectOutOfStoreSymlinks"

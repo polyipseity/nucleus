@@ -23,6 +23,8 @@ let
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   windowsGitSshModuleText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1;
   sharedGitModuleText = builtins.readFile ../../src/modules/git.nix;
+  discordMusicRpcModuleText = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
+  homeModuleText = builtins.readFile ../../src/modules/home.nix;
 
   inherit (import ../lib.nix) assert';
 
@@ -101,6 +103,7 @@ let
         else
           "";
       protectEntries = [
+        "protectDiscordMusicRPCConfig"
         "protectDownloadsICloudSymlink"
         "protectOpencodeSymlinks"
         "protectOutOfStoreSymlinks"
@@ -353,6 +356,17 @@ let
     && !(lib.hasInfix "configureDevSpotlightExclusions = lib.hm.dag.entryAfter" macosModuleText)
   ) "macOS dev-tree maintenance must run from launchd agents instead of Home Manager activation";
 
+  # === TEST: discord-music-rpc out-of-store symlink properly wired ===
+  # Verify that protectDiscordMusicRPCConfig activation exists and that the
+  # config.yaml path appears in the protect/unprotect hooks in home.nix.
+  test_discord_music_rpc_out_of_store_symlink =
+    assert'
+      (
+        (lib.hasInfix "protectDiscordMusicRPCConfig" discordMusicRpcModuleText)
+        && (lib.hasInfix "discord-music-rpc/config.yaml" homeModuleText)
+      )
+      "discord-music-rpc config.yaml must have protectDiscordMusicRPCConfig activation and be listed in home.nix protect/unprotect hooks";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -377,6 +391,7 @@ let
     test_spotlight_disables_all_hotkey_slots
     test_install_cargo_binstall_dependency_name_alignment
     test_macos_dev_maintenance_is_scheduled
+    test_discord_music_rpc_out_of_store_symlink
   ];
 in
 {
@@ -405,5 +420,6 @@ in
     "19: Spotlight disables all known launcher hotkey slots"
     "20: installCargoBinstallPackages activation name alignment"
     "21: macOS dev-tree maintenance runs from launchd instead of activation"
+    "22: discord-music-rpc out-of-store symlink properly wired"
   ];
 }

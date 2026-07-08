@@ -11,6 +11,8 @@ let
   macosText = builtins.readFile ../../src/modules/macos.nix;
   finderSidebarText = builtins.readFile ../../src/modules/macos/finder-sidebar.nix;
   agentsHelpersText = builtins.readFile ../../src/scripts/agent-helpers.sh;
+  discordMusicRpcText = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
+  homeNixText = builtins.readFile ../../src/modules/home.nix;
 in
 rec {
   # =========================================================================
@@ -119,6 +121,16 @@ rec {
     true;
 
   # =========================================================================
+  # Assertion 9: Discord Music RPC config symlink protection
+  # =========================================================================
+  discordMusicRpcConfigProtection =
+    assert containsRegex "protectDiscordMusicRPCConfig" discordMusicRpcText;
+    assert containsRegex "chflags uchg" discordMusicRpcText;
+    assert containsRegex "_nucleus_unprotect_symlink .* discord-music-rpc" homeNixText;
+    assert containsRegex "_nucleus_protect_symlink .* discord-music-rpc" homeNixText;
+    true;
+
+  # =========================================================================
   # Validation: force all assertions — if any fails, evaluation aborts.
   # =========================================================================
   _validation =
@@ -133,6 +145,7 @@ rec {
         finderSidebarRewrite
         shouldProcessCompliance
         devReposLoggingPolicy
+        discordMusicRpcConfigProtection
       ];
     in
     builtins.all (x: x == true) allResults;
@@ -142,7 +155,7 @@ rec {
   # =========================================================================
   summary = {
     testSuiteName = "Symlink Hardening Regression Tests";
-    totalAssertions = 9;
+    totalAssertions = 10;
     coverage = [
       "VS Code"
       "Agents Config"
@@ -153,6 +166,7 @@ rec {
       "Raycast Aliases"
       "Finder Sidebar"
       "Windows ShouldProcess"
+      "Discord Music RPC"
     ];
   };
 }

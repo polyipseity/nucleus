@@ -19,6 +19,7 @@ let
     "core"
     "dev-repos"
     "editors"
+    "ext-discord-music-rpc"
     "fonts"
     "git"
     "gnupg"
@@ -50,6 +51,7 @@ let
         "core" = true;
         "dev-repos" = true;
         "editors" = true;
+        "ext-discord-music-rpc" = true;
         "fonts" = true;
         "git" = true;
         "gnupg" = true;
