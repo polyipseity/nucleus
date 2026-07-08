@@ -1,0 +1,23 @@
+#compdef nucleus-config
+
+local -a subcmds
+
+subcmds=(
+  'get:Print config value(s)'
+  'set:Set a config key'
+  'list:Print all config as flat key=value pairs'
+)
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '1: :->subcmd' \
+  '*: :->args'
+
+case $state in
+  subcmd)
+    _describe -t subcommands 'subcommand' subcmds
+    ;;
+  args)
+    _describe -t subcommands 'subcommand' subcmds
+    ;;
+esac

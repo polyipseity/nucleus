@@ -1,0 +1,7 @@
+#compdef nucleus-replica-reset
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--dry-run[Print what would be done without doing it]' \
+  '--replica-id:Replica identifier' \
+  '--repo-root:Repository root path:_files -/'

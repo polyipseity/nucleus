@@ -1,0 +1,6 @@
+#compdef nucleus-bump-lockfile
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--sections:Comma-separated section names to update' \
+  '--verify[Verify lockfile integrity without modifying]'

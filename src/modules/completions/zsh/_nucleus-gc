@@ -1,0 +1,26 @@
+#compdef nucleus-gc
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--dry-run[Print what would be done without doing it]' \
+  '--no-dry-run[Perform garbage collection (default)]' \
+  '--tool-cache-gc[GC tool caches (bun, uv, cargo)]' \
+  '--no-tool-cache-gc[Skip tool cache GC]' \
+  '--hm-gc[GC Home Manager generations]' \
+  '--no-hm-gc[Skip Home Manager GC]' \
+  '--nix-gc[Run nix store GC]' \
+  '--no-nix-gc[Skip nix store GC]' \
+  '--ollama-gc[Remove Ollama models absent from manifest]' \
+  '--no-ollama-gc[Skip Ollama model GC]' \
+  '--wallpaper-gc[Remove stale decrypted wallpapers]' \
+  '--no-wallpaper-gc[Skip wallpaper GC]' \
+  '--vm-gc[GC VM state]' \
+  '--no-vm-gc[Skip VM GC]' \
+  '--log-gc[GC log files]' \
+  '--no-log-gc[Skip log GC]' \
+  '--log-max-size:Maximum log file size in bytes' \
+  '--log-max-files:Maximum number of log files to keep' \
+  '--log-compress:Whether to compress log files (true|false)' \
+  '--expiry:GC expiry duration (e.g. 30d)' \
+  '--hm-expiry:Home Manager GC expiry duration' \
+  '--nix-expiry:Nix store GC expiry duration'

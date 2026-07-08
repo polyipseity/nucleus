@@ -1,0 +1,12 @@
+#compdef nucleus-bootstrap
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--apply[Run apply after bootstrap]' \
+  '--no-apply[Skip apply after bootstrap]' \
+  '--ai-sync[Run ai-sync after bootstrap]' \
+  '--no-ai-sync[Skip ai-sync after bootstrap]' \
+  '--replica-sync[Run replica-sync after bootstrap]' \
+  '--no-replica-sync[Skip replica-sync after bootstrap]' \
+  '--target-user:Target username' \
+  '--:Separator for apply arguments'

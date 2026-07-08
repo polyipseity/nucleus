@@ -1,0 +1,7 @@
+#compdef nucleus-check
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--format[Format files in-place]' \
+  '--verify[Verify formatting without modifying]' \
+  '*:path:_files'

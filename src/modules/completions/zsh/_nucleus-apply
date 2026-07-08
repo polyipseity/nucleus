@@ -1,0 +1,12 @@
+#compdef nucleus-apply
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--ai-sync[Run ai-sync after apply]' \
+  '--no-ai-sync[Skip ai-sync after apply]' \
+  '--replica-sync[Run replica-sync after apply]' \
+  '--no-replica-sync[Skip replica-sync after apply]' \
+  '--vm-setup[Run vm-setup after apply]' \
+  '--no-vm-setup[Skip vm-setup after apply]' \
+  '--target-user:Target username' \
+  '--username:Username for apply'

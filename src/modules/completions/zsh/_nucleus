@@ -1,0 +1,7 @@
+#compdef nucleus-
+
+# Fallback completer for all nucleus-* commands that lack a dedicated completion file.
+# Provides --help as the only completion option.
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]'

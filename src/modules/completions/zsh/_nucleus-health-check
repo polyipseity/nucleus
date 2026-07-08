@@ -1,0 +1,8 @@
+#compdef nucleus-health-check
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--min-free-bytes:Minimum free disk space in bytes' \
+  '--secret-health[Check SOPS secret decryptability]' \
+  '--no-secret-health[Skip secret health check]' \
+  '--log-health[Check log health]'

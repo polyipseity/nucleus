@@ -1,0 +1,10 @@
+#compdef nucleus-update
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--flake[Run nix flake update]' \
+  '--no-flake[Skip nix flake update]' \
+  '--brew[Run Homebrew update/upgrade (macOS only)]' \
+  '--no-brew[Skip Homebrew update]' \
+  '--sops[Run sops updatekeys]' \
+  '--no-sops[Skip sops updatekeys]'

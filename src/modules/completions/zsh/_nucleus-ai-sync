@@ -1,0 +1,8 @@
+#compdef nucleus-ai-sync
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--dry-run[Print what would be done without doing it]' \
+  '--ollama-profile:Ollama model profile name' \
+  '--gc-only[Only run GC, skip model sync]' \
+  '--no-gc-only[Run full sync including GC]'

@@ -1,0 +1,62 @@
+#compdef nucleus-svc
+
+local state line
+local -a subcmds flags
+
+subcmds=(
+  'list:List all known services with status'
+  'status:Show status of specified services'
+  'start:Start a service'
+  'stop:Stop a service'
+  'restart:Restart a service'
+  'enable:Enable auto-start'
+  'disable:Disable auto-start'
+  'endpoint:Show network endpoint for a service'
+  'logs:Show service logs'
+  'log-paths:Print log file paths'
+  'log-config:Show effective logging configuration'
+)
+
+flags=(
+  '--json:Machine-readable JSON output'
+  '--help:Show usage'
+)
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--json[Machine-readable JSON output]' \
+  '1: :->subcmd_or_svc' \
+  '*: :->rest'
+
+case $state in
+  subcmd_or_svc)
+    _describe -t subcommands 'subcommand' subcmds || _message 'service name'
+    ;;
+  rest)
+    case $words[1] in
+      start|stop|restart|enable|disable|endpoint|logs|log-paths|log-config|status)
+        _nucleus_svc_services
+        ;;
+      *)
+        _describe -t subcommands 'subcommand' subcmds
+        _nucleus_svc_services
+        ;;
+    esac
+    ;;
+esac
+
+_nucleus_svc_services() {
+  local services_json
+  if [[ -n "$NUCLEUS_REPO_ROOT" ]]; then
+    services_json="$NUCLEUS_REPO_ROOT/src/modules/services.json"
+  else
+    local repo_root
+    repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+    services_json="$repo_root/src/modules/services.json"
+  fi
+  if [[ -f "$services_json" ]] && command -v jq >/dev/null 2>&1; then
+    local -a svc_names
+    svc_names=("${(@f)$(jq -r 'to_entries | .[] | select(.value | type == "object") | .key' "$services_json" 2>/dev/null)}")
+    _describe -t services 'service' svc_names
+  fi
+}

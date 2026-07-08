@@ -776,6 +776,17 @@ in
         "$_zsh_comp_dir/_uv" \
         "'${pkgs.uv}/bin/uv' generate-shell-completion zsh"
 
+      # -----------------------------------------------------------------------
+      # Nucleus-command completions: static zsh completion files shipped with
+      # the repository. Copied directly (no generation needed).
+      # -----------------------------------------------------------------------
+      _zsh_nucleus_comp_src="${./completions/zsh}"
+      for _zsh_nuc_f in "$_zsh_nucleus_comp_src"/_nucleus-* "$_zsh_nucleus_comp_src"/_nucleus; do
+        [ -f "$_zsh_nuc_f" ] || continue
+        cp -f "$_zsh_nuc_f" "$_zsh_comp_dir/"
+      done
+      unset _zsh_nucleus_comp_src _zsh_nuc_f
+
       echo "zsh-completions: done"
     '';
   };

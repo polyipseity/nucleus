@@ -451,6 +451,165 @@ let
           Write-Host "         - Or use the user-scoped default toolchain installed by nucleus apply" -ForegroundColor Yellow
           return 1
         }
+
+        # --- nucleus-* argument completers ---
+        # Register argument completers for all nucleus commands to provide
+        # tab-completion for subcommands, flags, and dynamic values.
+
+        # Helper: resolve the nucleus repo root for dynamic completions.
+        function Resolve-NucleusRepoRoot {
+          if ($env:NUCLEUS_REPO_ROOT) {
+            return $env:NUCLEUS_REPO_ROOT
+          }
+          $gitRoot = git rev-parse --show-toplevel 2>$null
+          if ($gitRoot -and (Test-Path (Join-Path $gitRoot "src/flake.nix"))) {
+            return $gitRoot
+          }
+          return $null
+        }
+
+        $nucleusSvcCommands = @('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'endpoint', 'logs', 'log-paths', 'log-config')
+        $nucleusConfigCommands = @('get', 'set', 'list')
+
+        Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          $nucleusSvcCommands | Where-Object { $_ -like "$wordToComplete*" }
+          if ($commandAst.CommandElements.Count -ge 2) {
+            $prev = $commandAst.CommandElements[1].Value
+            if ($nucleusSvcCommands -contains $prev) {
+              # Complete service names by reading services.json
+              $repoRoot = Resolve-NucleusRepoRoot
+              if ($repoRoot) {
+                $svcJson = Join-Path $repoRoot "src/modules/services.json"
+                if (Test-Path $svcJson) {
+                  Get-Content $svcJson | ConvertFrom-Json | Get-Member -MemberType NoteProperty |
+                    Select-Object -ExpandProperty Name | Where-Object { $_ -like "$wordToComplete*" }
+                }
+              }
+            }
+          }
+          @('--help', '--json') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-config -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          $nucleusConfigCommands | Where-Object { $_ -like "$wordToComplete*" }
+          @('--help') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-gc -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @(
+            '--help', '--dry-run', '--no-dry-run',
+            '--tool-cache-gc', '--no-tool-cache-gc',
+            '--hm-gc', '--no-hm-gc',
+            '--nix-gc', '--no-nix-gc',
+            '--ollama-gc', '--no-ollama-gc',
+            '--wallpaper-gc', '--no-wallpaper-gc',
+            '--vm-gc', '--no-vm-gc',
+            '--log-gc', '--no-log-gc',
+            '--log-max-size', '--log-max-files', '--log-compress',
+            '--expiry', '--hm-expiry', '--nix-expiry'
+          ) | Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-health-check -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help', '--min-free-bytes', '--secret-health', '--no-secret-health', '--log-health') |
+            Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-update -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help', '--flake', '--no-flake', '--brew', '--no-brew', '--sops', '--no-sops') |
+            Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-check -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help', '--format', '--verify') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-ai-sync -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help', '--dry-run', '--ollama-profile', '--gc-only', '--no-gc-only') |
+            Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-replica-sync -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help', '--dry-run', '--replica-id', '--repo-root') |
+            Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-replica-reset -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help', '--dry-run', '--replica-id', '--repo-root') |
+            Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-bootstrap -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help', '--apply', '--no-apply', '--ai-sync', '--no-ai-sync',
+            '--replica-sync', '--no-replica-sync', '--target-user') |
+            Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-cloud-setup -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help', '--apply', '--no-apply') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-vm-setup -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help', '--dry-run', '--gc', '--no-gc',
+            '--mido-patch-file', '--mido-script',
+            '--windows-iso', '--no-windows-iso',
+            '--windows-iso-source', '--no-windows-iso-source',
+            '--windows-iso-retries',
+            '--headful', '--no-headful',
+            '--vm-dir-override', '--repo-root',
+            '--accelerator') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-apply -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help', '--ai-sync', '--no-ai-sync',
+            '--replica-sync', '--no-replica-sync',
+            '--vm-setup', '--no-vm-setup',
+            '--target-user', '--username') |
+            Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-bump-lockfile -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help', '--sections', '--verify') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-check-pwsh -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-check-sh -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-service-watchdog -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-gs-pdf-opt -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+
+        Register-ArgumentCompleter -CommandName nucleus-test -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help') | Where-Object { $_ -like "$wordToComplete*" }
+        }
   '';
 in
 {

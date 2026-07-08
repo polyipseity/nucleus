@@ -225,6 +225,93 @@ test_app_noop config list
 # svc list --json: triggers sudo for system-domain services, hangs in CI.
 assert_skip "svc list --json" "triggers sudo for system-domain services (non-interactive CI)"
 
+# --- Tier 4: completion syntax validation -----------------------------------
+
+echo ""
+echo "=== Tier 4: completion file syntax validation ==="
+
+# Zsh completion files: check syntax with zsh -n.
+_zsh_comp_dir="$REPO_ROOT/src/modules/completions/zsh"
+if command -v zsh >/dev/null 2>&1; then
+  for _zsh_comp_f in "$_zsh_comp_dir"/_nucleus-* "$_zsh_comp_dir"/_nucleus; do
+    [ -f "$_zsh_comp_f" ] || continue
+    _zsh_comp_name="$(basename "$_zsh_comp_f")"
+    if zsh -n "$_zsh_comp_f" 2>/dev/null; then
+      assert_pass "zsh completion syntax: $_zsh_comp_name"
+    else
+      assert_fail "zsh completion syntax: $_zsh_comp_name" "syntax error"
+    fi
+  done
+else
+  assert_skip "zsh completion syntax check" "zsh not available"
+fi
+unset _zsh_comp_dir _zsh_comp_f _zsh_comp_name
+
+# PowerShell completion ScriptBlocks: extract from pwsh.nix and parse-check.
+if command -v pwsh >/dev/null 2>&1; then
+  # Extract Register-ArgumentCompleter blocks from pwsh.nix into a temp script
+  # and parse them.  The ScriptBlocks contain valid PowerShell that can be
+  # verified with [ScriptBlock]::Create().
+  _pwsh_nix_file="$REPO_ROOT/src/modules/pwsh.nix"
+  if [ -f "$_pwsh_nix_file" ]; then
+    # Extract lines inside profileContent that start with 'Register-ArgumentCompleter'
+    # and run them through pwsh -NoProfile syntax check.
+    # We just verify that the ScriptBlock literals parse correctly.
+    _temp_pwsh_check="$(mktemp)"
+    # Use sed to extract the Register-ArgumentCompleter section from pwsh.nix.
+    # The content is inside a '' string, so we need to normalize it.
+    awk '
+      /Register-ArgumentCompleter/ { printing=1 }
+      printing { print }
+      printing && /^  '\'\'';?$|^        '\'\'';?$/ { printing=0 }
+    ' "$_pwsh_nix_file" > "$_temp_pwsh_check" 2>/dev/null || true
+    if [ -s "$_temp_pwsh_check" ]; then
+      if pwsh -NoProfile -NonInteractive -Command "
+        \$errors = @()
+        Get-Content '$_temp_pwsh_check' -Raw | Select-String -Pattern 'Register-ArgumentCompleter' -AllMatches | ForEach-Object {
+          try { [ScriptBlock]::Create(\$_.Line) > \$null } catch { \$errors += \$_ }
+        }
+        if (\$errors.Count -gt 0) { throw \"\$(\$errors.Count) parse error(s): \$(\$errors -join ''; '')\" }
+        Write-Host \"pwsh completions: \$(\$errors.Count) errors\"
+      " 2>/dev/null; then
+        assert_pass "pwsh completion ScriptBlocks parse (pwsh.nix)"
+      else
+        assert_fail "pwsh completion ScriptBlocks parse (pwsh.nix)" "syntax error in extracted completions"
+      fi
+    else
+      assert_skip "pwsh completion ScriptBlocks parse (pwsh.nix)" "could not extract completions from pwsh.nix"
+    fi
+    rm -f "$_temp_pwsh_check"
+  fi
+
+  # Windows: extract from Sync-ShellProfile.ps1 managed block.
+  _win_profile_file="$REPO_ROOT/src/hosts/Windows/modules/user/Sync-ShellProfile.ps1"
+  if [ -f "$_win_profile_file" ]; then
+    _temp_win_check="$(mktemp)"
+    awk '/Register-ArgumentCompleter/ { printing=1 } printing { print } printing && /^\t\t'\''\}$|^\t\t\t'\''\}$/ { printing=0 }' "$_win_profile_file" > "$_temp_win_check" 2>/dev/null || true
+    if [ -s "$_temp_win_check" ]; then
+      if pwsh -NoProfile -NonInteractive -Command "
+        \$errors = @()
+        Get-Content '$_temp_win_check' -Raw | Select-String -Pattern 'Register-ArgumentCompleter' -AllMatches | ForEach-Object {
+          try { [ScriptBlock]::Create(\$_.Line) > \$null } catch { \$errors += \$_ }
+        }
+        if (\$errors.Count -gt 0) { throw \"\$(\$errors.Count) parse error(s): \$(\$errors -join ''; '')\" }
+        Write-Host \"pwsh completions: \$(\$errors.Count) errors\"
+      " 2>/dev/null; then
+        assert_pass "pwsh completion ScriptBlocks parse (Sync-ShellProfile.ps1)"
+      else
+        assert_fail "pwsh completion ScriptBlocks parse (Sync-ShellProfile.ps1)" "syntax error in extracted completions"
+      fi
+    else
+      assert_skip "pwsh completion ScriptBlocks parse (Sync-ShellProfile.ps1)" "could not extract completions"
+    fi
+    rm -f "$_temp_win_check"
+  fi
+else
+  assert_skip "pwsh completion ScriptBlocks parse" "pwsh not available"
+fi
+unset _pwsh_nix_file _win_profile_file
+
 # --- Summary ---------------------------------------------------------------
 echo ""
 if [ "$TESTS_FAILED" -eq 0 ]; then

@@ -1,0 +1,6 @@
+#compdef nucleus-cloud-setup
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--apply[Run apply after cloud setup]' \
+  '--no-apply[Skip apply after cloud setup]'
