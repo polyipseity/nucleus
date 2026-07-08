@@ -5,7 +5,7 @@ discord:
   show_urls: true
   show_ad: true
 spotify:
-  enabled: true
+  enabled: false
   client_id: null
   client_secret: null
   redirect_uri: http://localhost:8888/callback
