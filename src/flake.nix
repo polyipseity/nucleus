@@ -123,37 +123,37 @@
             (_final: prev: {
               # Nix sandbox; ffmpeg-full's tests cover them.
               davs2 = prev.davs2.overrideAttrs (_: {
-                doCheck = false;
+                doCheck = !prev.stdenv.isDarwin;
               });
               kvazaar = prev.kvazaar.overrideAttrs (_: {
-                doCheck = false;
+                doCheck = !prev.stdenv.isDarwin;
               });
               lcevcdec = prev.lcevcdec.overrideAttrs (_: {
-                doCheck = false;
+                doCheck = !prev.stdenv.isDarwin;
               });
               openapv = prev.openapv.overrideAttrs (_: {
-                doCheck = false;
+                doCheck = !prev.stdenv.isDarwin;
               });
               openh264 = prev.openh264.overrideAttrs (_: {
-                doCheck = false;
+                doCheck = !prev.stdenv.isDarwin;
               });
               svt-av1 = prev.svt-av1.overrideAttrs (_: {
-                doCheck = false;
+                doCheck = !prev.stdenv.isDarwin;
               });
               uavs3d = prev.uavs3d.overrideAttrs (_: {
-                doCheck = false;
+                doCheck = !prev.stdenv.isDarwin;
               });
               vvenc = prev.vvenc.overrideAttrs (_: {
-                doCheck = false;
+                doCheck = !prev.stdenv.isDarwin;
               });
               xavs2 = prev.xavs2.overrideAttrs (_: {
-                doCheck = false;
+                doCheck = !prev.stdenv.isDarwin;
               });
               xeve = prev.xeve.overrideAttrs (_: {
-                doCheck = false;
+                doCheck = !prev.stdenv.isDarwin;
               });
               xevd = prev.xevd.overrideAttrs (_: {
-                doCheck = false;
+                doCheck = !prev.stdenv.isDarwin;
               });
             })
             (_final: prev: {
