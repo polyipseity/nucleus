@@ -57,7 +57,7 @@ while [ "$#" -gt 0 ]; do
       gc_only=false
       ;;
     *)
-      printf '%s\n' "ai-sync: unsupported argument '$1'" >&2
+      error "unsupported argument '$1'"
       usage >&2
       exit 1
       ;;
@@ -86,7 +86,7 @@ wait_for_ollama_server() {
     return 1
   fi
 
-  printf '%s\n' "ai-sync: waiting up to ${ready_timeout_seconds}s for ollama server readiness..."
+  say "waiting up to ${ready_timeout_seconds}s for ollama server readiness..."
   _waited=0
   while [ "$_waited" -lt "$ready_timeout_seconds" ]; do
     sleep "$ready_poll_seconds"
@@ -102,16 +102,15 @@ wait_for_ollama_server() {
 # Fail fast if jq is unavailable: the manifest is JSON and the rest of the
 # script depends on jq for reliable parsing.
 if ! command -v jq >/dev/null 2>&1; then
-  printf '%s\n' "ai-sync: jq not found; cannot parse manifest" >&2
-  exit 1
+  error "jq not found; cannot parse manifest"
 fi
 
 if ! command -v ollama >/dev/null 2>&1; then
-  printf '%s\n' "ai-sync: ollama not found; skipping sync"
+  say "ollama not found; skipping sync"
   exit 0
 fi
 if ! wait_for_ollama_server; then
-  printf '%s\n' "ai-sync: ollama server unavailable after waiting ${ready_timeout_seconds}s; skipping sync"
+  say "ollama server unavailable after waiting ${ready_timeout_seconds}s; skipping sync"
   exit 0
 fi
 
@@ -132,13 +131,12 @@ if [ "$gc_only" = false ]; then
       continue
     fi
     if [ "$dry_run" = true ]; then
-      printf '%s\n' "ai-sync: would pull $model"
+      dry_run "would pull $model"
     else
-      printf '%s\n' "ai-sync: pulling $model"
+      say "pulling $model"
       OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama pull "$model"
       if ! printf '%s\n' "$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama list | awk 'NR>1 && \$1!="" {print \$1}')" | grep -Fxq "$model"; then
-        printf '%s\n' "ai-sync: ERROR: $model was pulled but is not in 'ollama list'" >&2
-        exit 1
+        error "$model was pulled but is not in 'ollama list'"
       fi
       if [ -f "$LOCKFILE" ]; then
         _model_name="${model%%:*}"
@@ -149,9 +147,9 @@ if [ "$gc_only" = false ]; then
         if [ -n "$_expected_digest" ]; then
           _actual_digest=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama show --format json "$model" 2>/dev/null | jq -r '.digest // empty' 2>/dev/null || true)
           if [ -n "$_actual_digest" ] && [ "$_actual_digest" != "$_expected_digest" ]; then
-            printf '%s\n' "ai-sync: WARNING: digest mismatch for $model (expected $_expected_digest, got $_actual_digest)" >&2
+            warn "digest mismatch for $model (expected $_expected_digest, got $_actual_digest)"
           elif [ -n "$_actual_digest" ]; then
-            printf '%s\n' "ai-sync: digest verified for $model"
+            say "digest verified for $model"
           fi
         fi
       fi
@@ -170,9 +168,9 @@ printf '%s\n' "$installed_models" | while IFS= read -r model; do
     continue
   fi
   if [ "$dry_run" = true ]; then
-    printf '%s\n' "ai-sync: would remove $model"
+    dry_run "would remove $model"
   else
-    printf '%s\n' "ai-sync: removing $model"
+    say "removing $model"
     OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama rm "$model"
   fi
 done
@@ -185,4 +183,4 @@ if [ "$gc_only" = true ]; then
     _summary_flags="${_summary_flags}, gc-only mode (no pulls)"
 fi
 
-printf '%s\n' "ai-sync: sync completed (profile=$profile${_summary_flags})"
+say "sync completed (profile=$profile${_summary_flags})"

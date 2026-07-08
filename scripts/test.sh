@@ -30,12 +30,12 @@ if [ "$#" -gt 0 ]; then
       exit 0
       ;;
     -*)
-      printf '%s\n' "error: unsupported argument '$1'" >&2
+      error "unsupported argument '$1'"
       usage >&2
       exit 1
       ;;
     *)
-      printf '%s\n' "error: unexpected argument '$1'" >&2
+      error "unexpected argument '$1'"
       usage >&2
       exit 1
       ;;
@@ -45,30 +45,30 @@ fi
 _step=0
 
 # 1. Nix test suite — auto-discover and run all *.nix test files
-printf '\n=== [%s] Nix test suite ===\n' "$((_step += 1))"
-tmp_failed=$(mktemp) || { echo "failed to create temp file" >&2; exit 1; }
+section "$((_step += 1))" "Nix test suite"
+tmp_failed=$(mktemp) || { error "failed to create temp file"; }
 # shellcheck disable=SC2016
 find tests/modules tests/integration tests/hosts -name '*.nix' -type f | sort \
   | xargs -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" -I{} sh -c 'f="$1"; echo "Testing: $f" >&2; if ! nix-instantiate --eval "$f"; then echo "FAIL: $f" >&2; echo "$f" >> "$2"; else echo "PASS: $f" >&2; fi' _ {} "$tmp_failed"
 if [ -s "$tmp_failed" ]; then
-  echo "FAILED Nix tests:" >&2
+  error "FAILED Nix tests:"
   cat "$tmp_failed" >&2
   rm -f "$tmp_failed"
   exit 1
 fi
 rm -f "$tmp_failed"
-echo "All Nix tests passed."
+say "all Nix tests passed."
 
 # 2. Shell script linting (ShellCheck)
-printf '\n=== [%s] Shell script linting ===\n' "$((_step += 1))"
+section "$((_step += 1))" "Shell script linting"
 bash scripts/check-sh.sh
 
 # 3. PowerShell lint (PSScriptAnalyzer)
-printf '\n=== [%s] PowerShell lint ===\n' "$((_step += 1))"
+section "$((_step += 1))" "PowerShell lint"
 pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1
 
 # 4. Nucleus apps smoke tests (build + --help / dry-run)
-printf '\n=== [%s] Nucleus apps smoke tests ===\n' "$((_step += 1))"
+section "$((_step += 1))" "Nucleus apps smoke tests"
 bash tests/scripts/nucleus-apps-smoke-tests.sh
 
-printf '\nAll tests passed.\n'
+nuc_done

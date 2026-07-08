@@ -33,7 +33,7 @@ while [ "$#" -gt 0 ]; do
     --replica-id)
       shift
       if [ "$#" -eq 0 ] || [ -z "$1" ]; then
-        printf '%s\n' "replica-reset: --replica-id requires a value" >&2
+        error "--replica-id requires a value"
         exit 1
       fi
       replica_id_filter="$1"
@@ -41,7 +41,7 @@ while [ "$#" -gt 0 ]; do
     --repo-root)
       shift
       if [ "$#" -eq 0 ] || [ -z "$1" ]; then
-        printf '%s\n' "replica-reset: --repo-root requires a value" >&2
+        error "--repo-root requires a value"
         exit 1
       fi
       repo_root="$1"
@@ -49,7 +49,7 @@ while [ "$#" -gt 0 ]; do
     --repo-root=*)
       repo_root="${1#--repo-root=}"
       if [ -z "$repo_root" ]; then
-        printf '%s\n' "replica-reset: --repo-root requires a non-empty value" >&2
+        error "--repo-root requires a non-empty value"
         exit 1
       fi
       ;;
@@ -58,7 +58,7 @@ while [ "$#" -gt 0 ]; do
       exit 0
       ;;
     *)
-      printf '%s\n' "replica-reset: unsupported argument '$1'" >&2
+      error "unsupported argument '$1'"
       usage >&2
       exit 1
       ;;
@@ -74,13 +74,11 @@ fi
 USERS_JSON="$REPO_ROOT/src/modules/users.json"
 
 if [ ! -f "$USERS_JSON" ]; then
-  printf '%s\n' "replica-reset: users registry not found at $USERS_JSON" >&2
-  exit 1
+  error "users registry not found at $USERS_JSON"
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-  printf '%s\n' "replica-reset: jq not found; cannot parse users.json" >&2
-  exit 1
+  error "jq not found; cannot parse users.json"
 fi
 
 username="$(id -un)"
@@ -101,15 +99,13 @@ replica_lines="$({
 } || true)"
 
 if [ -z "$replica_lines" ]; then
-  printf '%s\n' "replica-reset: no enabled replicas for user '$username'"
+  say "no enabled replicas for user '$username'"
   exit 0
 fi
 
 run_local_cmd() {
   if [ "$dry_run" = true ]; then
-    printf 'replica-reset: [dry-run] '
-    printf '%s ' "$@"
-    printf '\n'
+    dry_run "would run: $*"
     return 0
   fi
   "$@"
@@ -150,7 +146,7 @@ while IFS="$(printf '\t')" read id local_path provider icloud_service; do
         local_failures=$((local_failures + 1))
       fi
     elif [ -e "$local_root" ]; then
-      printf '%s\n' "replica-reset: [$id] warning: expected iCloud drive symlink at '$local_root'; leaving non-symlink path untouched" >&2
+      warn "[$id] expected iCloud drive symlink at '$local_root'; leaving non-symlink path untouched"
     fi
     continue
   fi
@@ -192,8 +188,7 @@ for cache_dir in \
 done
 
 if [ "$local_failures" -gt 0 ]; then
-  printf '%s\n' "replica-reset: completed with $local_failures failure(s)" >&2
-  exit 1
+  error "completed with $local_failures failure(s)"
 fi
 
-printf '%s\n' "replica-reset: completed successfully"
+say "completed successfully"

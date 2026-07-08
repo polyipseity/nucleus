@@ -83,6 +83,7 @@ cmd_get() {
 
 cmd_set() {
   if [ $# -lt 2 ]; then
+    error "set requires a key and a value"
     usage >&2
     return 1
   fi
@@ -126,5 +127,7 @@ case "${1:-}" in
   get) shift; cmd_get "$@" ;;
   set) shift; cmd_set "$@" ;;
   list) cmd_list ;;
-  *) usage >&2; exit 1 ;;
+  *) error "unknown command '${1:-}'"
+     usage >&2
+     exit 1 ;;
 esac

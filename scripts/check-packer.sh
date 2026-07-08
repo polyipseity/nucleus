@@ -29,7 +29,7 @@ while [ "$#" -gt 0 ]; do
       exit 0
       ;;
     -*)
-      printf '%s\n' "error: unsupported argument '$1'" >&2
+      error "unsupported argument '$1'"
       usage >&2
       exit 1
       ;;
@@ -54,7 +54,7 @@ fi
 # Each template may require different -var flags for required variables.
 validate_dir() {
   local dir="$1"
-  printf 'Validating %s...\n' "$dir"
+  say "validating $dir..."
   local vars=()
   case "$dir" in
     *nixos)
@@ -77,5 +77,5 @@ validate_dir src/vms/windows
 if [ "$(uname)" = "Darwin" ]; then
   validate_dir src/vms/macos
 else
-  printf 'Skipping macOS Packer template validation (requires Tart plugin on macOS)\n'
+  say "skipping macOS Packer template validation (requires Tart plugin on macOS)"
 fi

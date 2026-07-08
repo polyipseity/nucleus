@@ -8,8 +8,7 @@ set -euo pipefail
 # Refuse to run as root — privilege escalation (sudo) is managed internally
 # by the script when needed rather than relying on an already-elevated caller.
 if [ "$(id -u)" -eq 0 ]; then
-  printf '%s\n' "error: this script must not be run as root. Run as a regular user (sudo is used internally when needed)." >&2
-  exit 1
+  error "this script must not be run as root. Run as a regular user (sudo is used internally when needed)."
 fi
 
 # Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
@@ -64,7 +63,7 @@ while [ "$#" -gt 0 ]; do
       ;;
     --target-user)
       if [ "$#" -lt 2 ] || [ -z "$2" ]; then
-        printf '%s\n' "error: --target-user requires a non-empty value" >&2
+        error "--target-user requires a non-empty value"
         exit 1
       fi
       target_user="$2"
@@ -73,7 +72,7 @@ while [ "$#" -gt 0 ]; do
     --target-user=*)
       target_user="${1#--target-user=}"
       if [ -z "$target_user" ]; then
-        printf '%s\n' "error: --target-user requires a non-empty value" >&2
+        error "--target-user requires a non-empty value"
         exit 1
       fi
       ;;
@@ -83,7 +82,7 @@ while [ "$#" -gt 0 ]; do
       break
       ;;
     *)
-      printf '%s\n' "error: unsupported argument '$1'" >&2
+      error "unsupported argument '$1'"
       usage >&2
       exit 1
       ;;
@@ -111,8 +110,7 @@ load_bootstrap_versions() {
   #   NIX_INSTALLER_SHA256  — expected SHA-256 hex digest of the installer
   #   NIX_INSTALLER_URL     — download URL for the Nix installer script
   if [ ! -f "$VERSIONS_FILE" ]; then
-    printf '%s\n' "error: expected bootstrap versions file at $VERSIONS_FILE" >&2
-    exit 1
+    error "expected bootstrap versions file at $VERSIONS_FILE"
   fi
 
   set -a
@@ -122,13 +120,11 @@ load_bootstrap_versions() {
   set +a
 
   if [ -z "${NUCLEUS_NIX_INSTALLER_SHA256:-}" ]; then
-    printf '%s\n' "error: NUCLEUS_NIX_INSTALLER_SHA256 missing in $VERSIONS_FILE" >&2
-    exit 1
+    error "NUCLEUS_NIX_INSTALLER_SHA256 missing in $VERSIONS_FILE"
   fi
 
   if [ -z "${NUCLEUS_NIX_INSTALLER_URL:-}" ]; then
-    printf '%s\n' "error: NUCLEUS_NIX_INSTALLER_URL missing in $VERSIONS_FILE" >&2
-    exit 1
+    error "NUCLEUS_NIX_INSTALLER_URL missing in $VERSIONS_FILE"
   fi
 
   NIX_INSTALLER_SHA256="$NUCLEUS_NIX_INSTALLER_SHA256"
@@ -160,14 +156,11 @@ bootstrap_nix_if_missing() {
   curl -fsSL "$NIX_INSTALLER_URL" -o "$installer_path"
 
   if [ "$NIX_INSTALLER_SHA256" = "REPLACE_WITH_NIX_INSTALLER_SHA256" ]; then
-    printf '%s\n' "warning: NUCLEUS_NIX_INSTALLER_SHA256 is not set; skipping installer checksum verification."
+    warn "NUCLEUS_NIX_INSTALLER_SHA256 is not set; skipping installer checksum verification."
   else
     actual_sha256="$(sha256_of_file "$installer_path")"
     if [ "$actual_sha256" != "$NIX_INSTALLER_SHA256" ]; then
-      printf '%s\n' "error: Nix installer checksum mismatch." >&2
-      printf '%s\n' "expected: $NIX_INSTALLER_SHA256" >&2
-      printf '%s\n' "actual:   $actual_sha256" >&2
-      exit 1
+      error "Nix installer checksum mismatch (expected: $NIX_INSTALLER_SHA256, actual: $actual_sha256)"
     fi
   fi
 
@@ -210,7 +203,7 @@ allow_repo_direnv_if_available() {
   fi
 
   if ! direnv allow "$REPO_ROOT"; then
-    printf '%s\n' "warning: failed to run 'direnv allow' for $REPO_ROOT" >&2
+    warn "failed to run 'direnv allow' for $REPO_ROOT"
   fi
 }
 
@@ -237,20 +230,18 @@ ensure_macos_nix_mount() {
     return
   fi
 
-  printf '%s\n' "macOS requires /nix before Nix installation can proceed."
+  say "macOS requires /nix before Nix installation can proceed."
 
   if [ ! -f /etc/synthetic.conf ] || ! grep -Eq '^nix$' /etc/synthetic.conf; then
     if command -v sudo >/dev/null 2>&1; then
-      printf '%s\n' "Adding 'nix' to /etc/synthetic.conf (sudo may prompt)."
+      say "Adding 'nix' to /etc/synthetic.conf (sudo may prompt)."
       printf 'nix\n' | sudo tee -a /etc/synthetic.conf >/dev/null
     else
-      printf '%s\n' "error: sudo is required to write /etc/synthetic.conf on macOS" >&2
-      exit 1
+      error "sudo is required to write /etc/synthetic.conf on macOS"
     fi
   fi
 
-  printf '%s\n' "Reboot once to materialize /nix, then re-run bootstrap.sh."
-  exit 1
+  error "Reboot once to materialize /nix, then re-run bootstrap.sh."
 }
 
 load_bootstrap_versions
@@ -258,16 +249,16 @@ ensure_macos_nix_mount
 bootstrap_nix_if_missing
 
 if ! run_nix profile list 2>/dev/null | grep -q "bootstrap-deps"; then
-  printf '%s\n' "Installing bootstrap-managed dependencies..."
+  say "Installing bootstrap-managed dependencies..."
   run_nix profile add "$REPO_ROOT/src#bootstrap-deps"
 else
-  printf '%s\n' "Bootstrap dependencies already present, skipping installation."
+  say "Bootstrap dependencies already present, skipping installation."
 fi
 
 allow_repo_direnv_if_available
 
 if [ "$apply" = true ]; then
-  printf '%s\n' "Running apply flow via src#apply..."
+  say "Running apply flow via src#apply..."
   # Health-check is already invoked by apply.sh for each OS branch; calling it
   # here too would print "health checks passed" twice and slow bootstrap down.
   set --
@@ -289,4 +280,4 @@ if [ "$apply" = true ]; then
   exit 0
 fi
 
-printf '%s\n' "Bootstrap complete. Run 'nix run ./src#apply' to configure this host."
+say "Bootstrap complete. Run 'nix run ./src#apply' to configure this host."

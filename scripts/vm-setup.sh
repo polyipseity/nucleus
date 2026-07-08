@@ -72,7 +72,7 @@ while [ "$#" -gt 0 ]; do
     --gc)           gc=true ;;
     --no-gc)        gc=false ;;
     *)
-      printf '%s\n' "vm-setup: unsupported argument '$1'" >&2
+      error "unsupported argument '$1'"
       usage >&2
       exit 1
       ;;
@@ -83,17 +83,13 @@ done
 case "$windows_iso_source" in
   auto|url|fido|'') ;;
   *)
-    printf 'vm-setup: invalid --windows-iso-source value: %s\n' "$windows_iso_source" >&2
-    printf 'vm-setup: expected one of: auto, url, fido\n' >&2
-    exit 1
+    error "invalid --windows-iso-source value: $windows_iso_source; expected one of: auto, url, fido"
     ;;
 esac
 
 case "$windows_iso_retries" in
   ''|*[!0-9]*)
-    printf 'vm-setup: invalid --windows-iso-retries value: %s\n' "$windows_iso_retries" >&2
-    printf 'vm-setup: expected a non-negative integer\n' >&2
-    exit 1
+    error "invalid --windows-iso-retries value: $windows_iso_retries; expected a non-negative integer"
     ;;
 esac
 
@@ -121,12 +117,12 @@ NUCLEUS_HOST="$(resolve_nucleus_host)"
 export NUCLEUS_HOST
 
 if [ ! -f "$MANIFEST" ]; then
-  printf 'vm-setup: manifest not found at %s; skipping\n' "$MANIFEST" >&2
+  say "manifest not found at $MANIFEST; skipping"
   exit 0
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-  printf 'vm-setup: jq not found in PATH; cannot parse manifest\n' >&2
+  error "jq not found in PATH; cannot parse manifest"
   exit 0
 fi
 
@@ -164,36 +160,30 @@ resolve_vm_guest_credentials() {
   fi
 
   if [ -z "$_rvgc_owner" ]; then
-    printf 'vm-setup: could not determine the per-user VM secret owner (set NUCLEUS_VM_SECRET_OWNER to override)\n' >&2
-    return 1
+    error "could not determine the per-user VM secret owner (set NUCLEUS_VM_SECRET_OWNER to override)"
   fi
 
   if ! command -v sops >/dev/null 2>&1; then
-    printf 'vm-setup: sops not found in PATH; cannot resolve VM guest credentials from SOPS\n' >&2
-    return 1
+    error "sops not found in PATH; cannot resolve VM guest credentials from SOPS"
   fi
 
   if [ ! -f "$_rvgc_users_json" ]; then
-    printf 'vm-setup: users registry not found: %s\n' "$_rvgc_users_json" >&2
-    return 1
+    error "users registry not found: $_rvgc_users_json"
   fi
 
   _rvgc_secret_file="$REPO_ROOT/src/secrets/users-${_rvgc_owner}.yml"
   if [ ! -f "$_rvgc_secret_file" ]; then
-    printf 'vm-setup: per-user VM secret file not found: %s\n' "$_rvgc_secret_file" >&2
-    return 1
+    error "per-user VM secret file not found: $_rvgc_secret_file"
   fi
 
   _rvgc_username_key="$(jq -r --arg owner "$_rvgc_owner" '.[ $owner ].vmGuest.usernameSecretKey // empty' "$_rvgc_users_json")"
   _rvgc_password_key="$(jq -r --arg owner "$_rvgc_owner" '.[ $owner ].vmGuest.passwordSecretKey // empty' "$_rvgc_users_json")"
   if [ -z "$_rvgc_username_key" ] || [ -z "$_rvgc_password_key" ]; then
-    printf 'vm-setup: vmGuest secret-key references are missing for user %s in %s\n' "$_rvgc_owner" "$_rvgc_users_json" >&2
-    return 1
+    error "vmGuest secret-key references are missing for user $_rvgc_owner in $_rvgc_users_json"
   fi
 
   if ! _rvgc_secret_json="$(sops --decrypt --output-type json "$_rvgc_secret_file")"; then
-    printf 'vm-setup: failed to decrypt per-user VM secret file: %s\n' "$_rvgc_secret_file" >&2
-    return 1
+    error "failed to decrypt per-user VM secret file: $_rvgc_secret_file"
   fi
 
   vm_secret_owner="$_rvgc_owner"
@@ -201,7 +191,7 @@ resolve_vm_guest_credentials() {
   vm_guest_password="$(printf '%s' "$_rvgc_secret_json" | jq -r --arg key "$_rvgc_password_key" '.[ $key ] // empty')"
 
   if [ -z "$vm_guest_username" ] || [ -z "$vm_guest_password" ]; then
-    printf 'vm-setup: vmGuest secret values are missing in %s for user %s\n' "$_rvgc_secret_file" "$_rvgc_owner" >&2
+    error "vmGuest secret values are missing in $_rvgc_secret_file for user $_rvgc_owner"
     return 1
   fi
 
@@ -224,7 +214,7 @@ vm_guest_credentials_hash() {
     return 0
   fi
 
-  printf 'vm-setup: no SHA-256 tool is available; cannot track VM guest credential drift\n' >&2
+  error "no SHA-256 tool is available; cannot track VM guest credential drift"
   return 1
 }
 
@@ -251,10 +241,10 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # Main
 # ---------------------------------------------------------------------------
 
-printf 'vm-setup: reading manifest from %s\n' "$MANIFEST"
-printf 'vm-setup: guest credential policy active (owner=%s, username=%s, source=SOPS)\n' "$vm_secret_owner" "$vm_guest_username"
+say "reading manifest from $MANIFEST"
+say "guest credential policy active (owner=$vm_secret_owner, username=$vm_guest_username, source=SOPS)"
 if [ "$dry_run" = true ]; then
-  printf 'vm-setup: dry-run mode — no changes will be made\n'
+  say "dry-run mode — no changes will be made"
 fi
 
 if [ "$dry_run" = false ]; then
@@ -269,14 +259,14 @@ if [ "$dry_run" = false ]; then
   fi
 fi
 
-printf 'vm-setup: phase 1 \u2014 building images...\n'
+say "phase 1 — building images..."
 build_images
 
-printf 'vm-setup: phase 2 \u2014 provisioning VMs...\n'
+say "phase 2 — provisioning VMs..."
 if [ -d "$VM_DIR/scripts" ]; then
   for _prune_f in "$VM_DIR/scripts"/*.sh "$VM_DIR/scripts"/*.ps1; do
     [ -f "$_prune_f" ] || continue
-    printf 'vm-setup: removed stale script: %s\n' "$_prune_f"
+    say "removed stale script: $_prune_f"
     rm -f "$_prune_f"
   done
 fi
@@ -290,11 +280,11 @@ case "$_os" in
     if [ -f /etc/NIXOS ]; then
       setup_libvirt_vms
     else
-      printf 'vm-setup: unsupported Linux host outside NixOS; no provisioning actions executed\n'
+      say "unsupported Linux host outside NixOS; no provisioning actions executed"
     fi
     ;;
   *)
-    printf 'vm-setup: unsupported OS "%s"; nothing to do\n' "$_os"
+    say "unsupported OS '$_os'; nothing to do"
     ;;
 esac
 
@@ -302,4 +292,4 @@ if [ "$gc" = true ]; then
   gc_vms
 fi
 
-printf 'vm-setup: done\n'
+nuc_done

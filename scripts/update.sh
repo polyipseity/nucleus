@@ -59,7 +59,7 @@ while [ "$#" -gt 0 ]; do
       ;;
 
     *)
-      printf '%s\n' "update: unsupported argument '$1'" >&2
+      error "unsupported argument '$1'"
       usage >&2
       exit 1
       ;;
@@ -85,12 +85,10 @@ update_flake_inputs() {
   # Transient network / GitHub API-rate-limit failures should propagate as
   # errors so callers can handle the failure upstream.
   if printf '%s' "$flake_output" | grep -Eq 'API rate limit exceeded|unable to download|HTTP error 403'; then
-    printf '%s\n' "update: error: flake update failed due to transient fetch/rate-limit error" >&2
-    return 1
+    error "flake update failed due to transient fetch/rate-limit error"
   fi
 
-  printf '%s\n' "update: error: flake update failed" >&2
-  return 1
+  error "flake update failed"
 }
 
 update_homebrew_if_available() {
@@ -142,4 +140,4 @@ if [ "$sops" = true ]; then
   rewrap_sops_files
 fi
 
-printf '%s\n' "update: update workflow completed"
+nuc_done

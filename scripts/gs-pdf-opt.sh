@@ -2,6 +2,27 @@
 # nucleus-gs-pdf-opt: Optimize PDF files with Ghostscript (backup/restore).
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/../src/scripts/lib.sh"
+
+usage() {
+  usage_std "$(basename "$0")" "[--preset <name>] <file>..." \
+    "Optimize PDF files using Ghostscript. Creates .bak backup before processing."
+  cat <<'EOF'
+
+Presets (default: default):
+  default   - high quality
+  ebook     - medium quality (good for e-readers)
+  prepress  - high quality (preserves color, suitable for printing)
+  printer   - medium quality for printing
+  screen    - low quality (smallest file)
+
+If a .bak file already exists for any input, the command refuses and exits.
+On failure, the original file is restored from backup.
+EOF
+}
+
 gs_pdf_opt() {
   local preset="default"
   local files=()
@@ -9,19 +30,7 @@ gs_pdf_opt() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -h|--help)
-        echo "Usage: $(basename "$0") [--preset <name>] <file>..."
-        echo ""
-        echo "Optimize PDF files using Ghostscript. Creates .bak backup before processing."
-        echo ""
-        echo "Presets (default: default):"
-        echo "  default   - high quality"
-        echo "  ebook     - medium quality (good for e-readers)"
-        echo "  prepress  - high quality (preserves color, suitable for printing)"
-        echo "  printer   - medium quality for printing"
-        echo "  screen    - low quality (smallest file)"
-        echo ""
-        echo "If a .bak file already exists for any input, the command refuses and exits."
-        echo "On failure, the original file is restored from backup."
+        usage
         return 0
         ;;
       --preset)
@@ -33,7 +42,7 @@ gs_pdf_opt() {
         shift
         ;;
       -*)
-        echo "Unknown option: $1" >&2
+        warn "unknown option: $1"
         return 1
         ;;
       *)
@@ -44,34 +53,34 @@ gs_pdf_opt() {
   done
 
   if [[ ${#files[@]} -eq 0 ]]; then
-    echo "Usage: gs_pdf_opt [--preset <name>] <file>..." >&2
+    usage >&2
     return 1
   fi
 
   case "$preset" in
     default|ebook|prepress|printer|screen) ;;
     *)
-      echo "Unknown preset: $preset (valid: default, ebook, prepress, printer, screen)" >&2
+      warn "unknown preset: $preset (valid: default, ebook, prepress, printer, screen)"
       return 1
       ;;
   esac
 
   local gs_cmd
   gs_cmd="$(command -v gs)" || {
-    echo "Error: gs not found in PATH" >&2
+    error "gs not found in PATH"
     return 1
   }
 
   local f bak
   for f in "${files[@]}"; do
     if [[ ! -f "$f" ]]; then
-      echo "Skipping non-file: $f" >&2
+      warn "skipping non-file: $f"
       continue
     fi
 
     bak="${f}.bak"
     if [[ -e "$bak" ]]; then
-      echo "Error: backup already exists, refusing to overwrite: $bak" >&2
+      error "backup already exists, refusing to overwrite: $bak"
       return 1
     fi
 
@@ -80,10 +89,10 @@ gs_pdf_opt() {
       "-dPDFSETTINGS=/$preset" -dNOPAUSE -dQUIET -dBATCH \
       -sOutputFile="$f" "$bak"; then
       rm -f "$bak"
-      echo "Optimized: $f (preset: $preset)"
+      say "optimized: $f (preset: $preset)"
     else
       mv "$bak" "$f"
-      echo "Error: optimization failed, restored original: $f" >&2
+      error "optimization failed, restored original: $f"
       return 1
     fi
   done
@@ -91,19 +100,7 @@ gs_pdf_opt() {
 
 main() {
   if [[ $# -eq 0 ]]; then
-    echo "Usage: $(basename "$0") [--preset <name>] <file>..."
-    echo ""
-    echo "Optimize PDF files using Ghostscript. Creates .bak backup before processing."
-    echo ""
-    echo "Presets (default: default):"
-    echo "  default   - high quality"
-    echo "  ebook     - medium quality (good for e-readers)"
-    echo "  prepress  - high quality (preserves color, suitable for printing)"
-    echo "  printer   - medium quality for printing"
-    echo "  screen    - low quality (smallest file)"
-    echo ""
-    echo "If a .bak file already exists for any input, the command refuses and exits."
-    echo "On failure, the original file is restored from backup."
+    usage
     exit 0
   fi
 

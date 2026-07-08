@@ -69,7 +69,7 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     -*)
-      printf '%s\n' "error: unsupported argument '$1'" >&2
+      error "unsupported argument '$1'"
       usage >&2
       exit 1
       ;;
@@ -102,80 +102,80 @@ fi
 _step=0
 
 # Dead Nix code detection
-printf '\n=== [%s] Dead Nix code ===\n' "$((_step += 1))"
+section "$((_step += 1))" "Dead Nix code"
 if ! $HAS_ARGS; then
   deadnix --fail src/
-  echo "No dead Nix code found."
+  say "no dead Nix code found."
 else
-  echo "Skipping deadnix (path-scoped mode)."
+  say "skipping deadnix (path-scoped mode)."
 fi
 
 # Nix flake evaluation
-printf '\n=== [%s] Nix flake evaluation ===\n' "$((_step += 1))"
+section "$((_step += 1))" "Nix flake evaluation"
 if ! $HAS_ARGS; then
   sys=$(nix eval --impure --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
   nix eval --impure "path:./src#packages.$sys" >/dev/null
-  echo "Nix flake evaluation passed."
+  say "nix flake evaluation passed."
 else
-  echo "Skipping nix flake check (path-scoped mode)."
+  say "skipping nix flake check (path-scoped mode)."
 fi
 
 # Nix formatting check
-printf '\n=== [%s] Nix formatting (nixfmt) ===\n' "$((_step += 1))"
+section "$((_step += 1))" "Nix formatting (nixfmt)"
 require_command nixfmt
 if [ "${#NIX_FILES[@]}" -gt 0 ]; then
   if $FORMAT_NIX; then
     nixfmt -s "${NIX_FILES[@]}"
-    echo "Nix formatting applied."
+    say "nix formatting applied."
   else
     nixfmt -s --verify "${NIX_FILES[@]}"
-    echo "Nix formatting OK."
+    say "nix formatting OK."
   fi
 elif ! $HAS_ARGS; then
-  echo "Skipping nixfmt (standalone mode — use \`nix run .#nixfmt\` to check all Nix files)."
+  say "skipping nixfmt (standalone mode — use \`nix run .#nixfmt\` to check all Nix files)."
 else
-  echo "Skipping nixfmt (no Nix files to check)."
+  say "skipping nixfmt (no Nix files to check)."
 fi
 
 # PowerShell syntax validation (parser only, no PSScriptAnalyzer)
-printf '\n=== [%s] PowerShell syntax validation ===\n' "$((_step += 1))"
+section "$((_step += 1))" "PowerShell syntax validation"
 require_command pwsh
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly "${PS1_FILES[@]}"
 elif ! $HAS_ARGS; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly
 else
-  echo "Skipping (no PowerShell scripts to check)."
+  say "skipping (no PowerShell scripts to check)."
 fi
 
 # Packer template validation
-printf '\n=== [%s] Packer template validation ===\n' "$((_step += 1))"
+section "$((_step += 1))" "Packer template validation"
 if [ "${#PKR_FILES[@]}" -gt 0 ]; then
   bash scripts/check-packer.sh "${PKR_FILES[@]}"
 elif ! $HAS_ARGS; then
   bash scripts/check-packer.sh
 else
-  echo "Skipping (no Packer templates to check)."
+  say "skipping (no Packer templates to check)."
 fi
 
 # Shell script validation tests
-printf '\n=== [%s] Shell script validation tests ===\n' "$((_step += 1))"
+section "$((_step += 1))" "Shell script validation tests"
 if ! $HAS_ARGS; then
   bash tests/scripts/script-validation-tests.sh
 else
-  echo "Skipping validation tests (path-scoped mode)."
+  say "skipping validation tests (path-scoped mode)."
 fi
 
 # CWD-independence tests
-printf '\n=== [%s] CWD-independence tests ===\n' "$((_step += 1))"
+section "$((_step += 1))" "CWD-independence tests"
 if ! $HAS_ARGS; then
   bash tests/scripts/cwd-independence-tests.sh
 else
-  echo "Skipping cwd-independence tests (path-scoped mode)."
+  say "skipping cwd-independence tests (path-scoped mode)."
 fi
 
 # Lockfile validation
-printf '\n=== [%s] Lockfile validation ===\n' "$((_step += 1))"
+section "$((_step += 1))" "Lockfile validation"
 
 # Consistency and overlap checks (always run, even in path-scoped mode):
 #  1. lockfile.json must exist.
@@ -185,7 +185,7 @@ printf '\n=== [%s] Lockfile validation ===\n' "$((_step += 1))"
 _lfpath="src/lockfiles/lockfile.json"
 _lf_overlap_issues=0
 if [ ! -f "$_lfpath" ]; then
-  echo "ERROR: lockfile.json not found at $_lfpath"
+    warn "lockfile.json not found at $_lfpath"
   _lf_overlap_issues=$((_lf_overlap_issues + 1))
   # Do not exit early — the section below may still run useful checks if
   # HAS_ARGS is false; the error count will cause a non-zero exit later.
@@ -203,15 +203,15 @@ else
     | select(.p as $p | ($exceptions | index($p)) | not)
     | "ERROR: package \"\(.p)\" appears in both \(.s)"' "$_lfpath" 2>/dev/null)
   if [ -n "$_lf_overlaps" ]; then
-    echo "$_lf_overlaps"
+    warn "$_lf_overlaps"
     _lf_overlap_issues=$((_lf_overlap_issues + 1))
   fi
 fi
 if [ "$_lf_overlap_issues" -gt 0 ]; then
-  echo "ERROR: lockfile.json has $_lf_overlap_issues overlapping package(s) across sections"
+  warn "lockfile.json has $_lf_overlap_issues overlapping package(s) across sections"
   exit 1
 else
-  echo "lockfile.json consistency: no overlapping packages across sections"
+  say "lockfile.json consistency: no overlapping packages across sections"
 fi
 
 # Lifecycle script allowlist validation (always run):
@@ -222,12 +222,12 @@ fi
 _lf_al_path="src/lockfiles/lifecycle-allowlist.json"
 _lf_al_errors=0
 if [ ! -f "$_lf_al_path" ]; then
-  echo "ERROR: lifecycle-allowlist.json not found at $_lf_al_path"
+  warn "lifecycle-allowlist.json not found at $_lf_al_path"
   _lf_al_errors=$((_lf_al_errors + 1))
 else
   _al_is_obj=$(jq -e 'type == "object"' "$_lf_al_path" >/dev/null 2>&1 && echo true || echo false)
   if [ "$_al_is_obj" != "true" ]; then
-    echo "ERROR: lifecycle-allowlist.json must be a JSON object"
+    warn "lifecycle-allowlist.json must be a JSON object"
     _lf_al_errors=$((_lf_al_errors + 1))
   else
     # Validate each entry has a non-empty justification string.
@@ -235,16 +235,16 @@ else
       to_entries[] | select(.value | type != "string" or .value == "") |
       "WARNING: lifecycle-allowlist.json: \"\(.key)\" has empty or non-string justification"' "$_lf_al_path")
     if [ -n "$_al_invalid" ]; then
-      echo "$_al_invalid"
+      warn "$_al_invalid"
       _lf_al_errors=$((_lf_al_errors + 1))
     fi
   fi
 fi
 if [ "$_lf_al_errors" -gt 0 ]; then
-  echo "ERROR: lifecycle-allowlist.json validation failed with $_lf_al_errors error(s)"
+  warn "lifecycle-allowlist.json validation failed with $_lf_al_errors error(s)"
   exit 1
 fi
-echo "lifecycle-allowlist.json: valid (entry count: $(jq 'length' "$_lf_al_path" 2>/dev/null || echo 0))"
+say "lifecycle-allowlist.json: valid (entry count: $(jq 'length' "$_lf_al_path" 2>/dev/null || echo 0))"
 
 if ! $HAS_ARGS; then
   _lf_errors=0
@@ -254,15 +254,15 @@ if ! $HAS_ARGS; then
     _section="$1"
     _lfpath="src/lockfiles/lockfile.json"
     if ! jq -e ".[\"$_section\"] | type == \"object\" and length > 0" "$_lfpath" >/dev/null 2>&1; then
-      echo "ERROR: $_section: empty or missing section"
+      warn "$_section: empty or missing section"
       _lf_errors=$((_lf_errors + 1))
       return
     fi
     # Check for placeholder values
     _placeholders=$(jq -r ".[\"$_section\"] | to_entries[] | select(.value == \"\" or .value == \"CHANGEME\" or .value == \"1.0.0\") | .key" "$_lfpath" 2>/dev/null)
     if [ -n "$_placeholders" ]; then
-      echo "ERROR: $_section has placeholder versions for:"
-      echo "  ${_placeholders//$'\n'/$'\n'  }"
+      warn "$_section has placeholder versions for:"
+      warn "  ${_placeholders//$'\n'/$'\n'  }"
       _lf_errors=$((_lf_errors + 1))
     fi
   }
@@ -274,46 +274,46 @@ if ! $HAS_ARGS; then
 
   # winget: must be non-null; warn if empty, validate non-placeholder if non-empty
   if ! jq -e '.winget | type == "object"' src/lockfiles/lockfile.json >/dev/null 2>&1; then
-    echo "ERROR: winget: missing or invalid section"
+    warn "winget: missing or invalid section"
     _lf_errors=$((_lf_errors + 1))
   elif jq '.winget | length == 0' src/lockfiles/lockfile.json >/dev/null 2>&1; then
-    echo "WARNING: winget: empty section (not yet populated)"
+    say "winget: empty section (not yet populated)"
   else
     _placeholders=$(jq -r '.winget | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' src/lockfiles/lockfile.json 2>/dev/null)
     if [ -n "$_placeholders" ]; then
-      echo "ERROR: winget has placeholder versions for:"
-      echo "  ${_placeholders//$'\n'/$'\n'  }"
+      warn "winget has placeholder versions for:"
+      warn "  ${_placeholders//$'\n'/$'\n'  }"
       _lf_errors=$((_lf_errors + 1))
     fi
   fi
   # homebrew: must be non-empty
   if ! jq -e '.homebrew | type == "object" and length > 0' src/lockfiles/lockfile.json >/dev/null 2>&1; then
-    echo "ERROR: homebrew: empty or missing section"
+    warn "homebrew: empty or missing section"
     _lf_errors=$((_lf_errors + 1))
   fi
   # vscode: must be non-null; warn if empty, validate non-placeholder if non-empty
   if ! jq -e '.vscode | type == "object"' src/lockfiles/lockfile.json >/dev/null 2>&1; then
-    echo "ERROR: vscode: missing or invalid section"
+    warn "vscode: missing or invalid section"
     _lf_errors=$((_lf_errors + 1))
   elif jq '.vscode | length == 0' src/lockfiles/lockfile.json >/dev/null 2>&1; then
-    echo "WARNING: vscode: empty section (not yet populated)"
+    say "vscode: empty section (not yet populated)"
   else
     _placeholders=$(jq -r '.vscode | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' src/lockfiles/lockfile.json 2>/dev/null)
     if [ -n "$_placeholders" ]; then
-      echo "ERROR: vscode has placeholder versions for:"
-      echo "  ${_placeholders//$'\n'/$'\n'  }"
+      warn "vscode has placeholder versions for:"
+      warn "  ${_placeholders//$'\n'/$'\n'  }"
       _lf_errors=$((_lf_errors + 1))
     fi
   fi
 
   # ollama: must have at least one profile with models
   if ! jq -e '.ollama | type == "object" and length > 0' src/lockfiles/lockfile.json >/dev/null 2>&1; then
-    echo "ERROR: ollama: empty or missing section"
+    warn "ollama: empty or missing section"
     _lf_errors=$((_lf_errors + 1))
   else
     while IFS=$'\t' read -r _profile _idx _name _tag; do
       if [ -z "$_name" ] || [ -z "$_tag" ]; then
-        echo "ERROR: ollama.${_profile}[${_idx}]: missing name or tag"
+        warn "ollama.${_profile}[${_idx}]: missing name or tag"
         _lf_errors=$((_lf_errors + 1))
       fi
     done < <(jq -r '
@@ -324,36 +324,36 @@ if ! $HAS_ARGS; then
   fi
 
   if [ "$_lf_errors" -gt 0 ]; then
-    echo "ERROR: lockfile.json validation failed with $_lf_errors error(s)"
+    warn "lockfile.json validation failed with $_lf_errors error(s)"
     exit 1
   fi
-  echo "lockfile.json validation passed"
+  say "lockfile.json validation passed"
 else
-  echo "Skipping lockfile validation (path-scoped mode)."
+  say "skipping lockfile validation (path-scoped mode)."
 fi
 
 # Service registry validation
-printf '\n=== [%s] Service registry validation ===\n' "$((_step += 1))"
+section "$((_step += 1))" "Service registry validation"
 if ! $HAS_ARGS; then
   _svc_json="src/modules/services.json"
   _svc_errors=0
 
   if [ ! -f "$_svc_json" ]; then
-    echo "ERROR: services.json not found at $_svc_json"
+    warn "services.json not found at $_svc_json"
     _svc_errors=$((_svc_errors + 1))
   else
     # Check each entry has displayName and platforms
     while IFS=$'\t' read -r _name _has_display _has_platforms _platform_count; do
       if [ "$_has_display" != "true" ]; then
-        echo "ERROR: services.json: '$_name' missing displayName"
+        warn "services.json: '$_name' missing displayName"
         _svc_errors=$((_svc_errors + 1))
       fi
       if [ "$_has_platforms" != "true" ]; then
-        echo "ERROR: services.json: '$_name' missing platforms"
+        warn "services.json: '$_name' missing platforms"
         _svc_errors=$((_svc_errors + 1))
       fi
       if [ "$_platform_count" -lt 1 ]; then
-        echo "ERROR: services.json: '$_name' has no platform entries"
+        warn "services.json: '$_name' has no platform entries"
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
@@ -370,12 +370,12 @@ if ! $HAS_ARGS; then
       case "$_type" in
         launchctl|systemctl|native|schtask) ;;
         *)
-          echo "ERROR: services.json: '$_name' platform '$_platform' has invalid type '$_type'"
+          warn "services.json: '$_name' platform '$_platform' has invalid type '$_type'"
           _svc_errors=$((_svc_errors + 1))
           ;;
       esac
       if [ "$_has_required" != "true" ]; then
-        echo "ERROR: services.json: '$_name' platform '$_platform' missing required fields for type '$_type'"
+        warn "services.json: '$_name' platform '$_platform' missing required fields for type '$_type'"
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
@@ -398,16 +398,16 @@ if ! $HAS_ARGS; then
   fi
 
   if [ "$_svc_errors" -gt 0 ]; then
-    echo "ERROR: services.json validation failed with $_svc_errors error(s)"
+    warn "services.json validation failed with $_svc_errors error(s)"
     exit 1
   fi
-  echo "services.json validation passed"
+  say "services.json validation passed"
 
   # Validate user-scoped platform entries have justification.
   # User-scoped means domain=user (macOS launchctl) or scope=user (Linux systemctl).
   while IFS=$'\t' read -r _name _platform _domain_scope _value; do
     if [ "$_domain_scope" = "user" ] && { [ "$_value" = "null" ] || [ -z "$_value" ]; }; then
-      echo "ERROR: services.json: '$_name' platform '$_platform' is user-scoped but missing justification"
+      warn "services.json: '$_name' platform '$_platform' is user-scoped but missing justification"
       _svc_errors=$((_svc_errors + 1))
     fi
   done < <(jq -r '
@@ -427,7 +427,7 @@ if ! $HAS_ARGS; then
     _svc_names=$(jq -r 'to_entries[].key' "$_svc_json")
     while IFS=$'\t' read -r _username _svc_name _has_enable; do
       if ! echo "$_svc_names" | grep -qxF "$_svc_name"; then
-        echo "ERROR: $_users_json: user '$_username' references unknown service '$_svc_name'"
+        warn "$_users_json: user '$_username' references unknown service '$_svc_name'"
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
@@ -443,7 +443,7 @@ if ! $HAS_ARGS; then
   if [ -f "$_win_users_json" ]; then
     while IFS=$'\t' read -r _username _svc_name _has_enable; do
       if ! echo "$_svc_names" | grep -qxF "$_svc_name"; then
-        echo "ERROR: $_win_users_json: user '$_username' references unknown service '$_svc_name'"
+        warn "$_win_users_json: user '$_username' references unknown service '$_svc_name'"
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
@@ -454,11 +454,11 @@ if ! $HAS_ARGS; then
       [$user, .key, "true"] | @tsv' "$_win_users_json")
   fi
 else
-  echo "Skipping service registry validation (path-scoped mode)."
+  say "skipping service registry validation (path-scoped mode)."
 fi
 
 # Locked DSC validation
-printf '\n=== [%s] Locked DSC validation ===\n' "$((_step += 1))"
+section "$((_step += 1))" "Locked DSC validation"
 if ! $HAS_ARGS; then
   _dsc_system_packages="src/hosts/Windows/system/packages.dsc.yml"
   _lockfile="src/lockfiles/lockfile.json"
@@ -480,10 +480,10 @@ if ! $HAS_ARGS; then
   while IFS=$'\t' read -r _id _pinned_ver; do
     _lf_ver=$(jq -r --arg id "$_id" '.winget[$id] // ""' "$_lockfile")
     if [ -z "$_lf_ver" ]; then
-      echo "ERROR: system DSC files: $_id has version $_pinned_ver but no lockfile entry"
+      warn "system DSC files: $_id has version $_pinned_ver but no lockfile entry"
       _lf_errors=$((_lf_errors + 1))
     elif [ "$_pinned_ver" != "$_lf_ver" ]; then
-      echo "ERROR: system DSC files: $_id pinned $_pinned_ver but lockfile has $_lf_ver"
+      warn "system DSC files: $_id pinned $_pinned_ver but lockfile has $_lf_ver"
       _lf_errors=$((_lf_errors + 1))
     fi
   done < <(echo "$_locked_json" | jq -r '.properties.resources[] | select(.resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and .settings.version != null) | [.settings.id, .settings.version] | @tsv')
@@ -492,22 +492,22 @@ if ! $HAS_ARGS; then
   while IFS=$'\t' read -r _id _lf_ver; do
     _pinned=$(echo "$_locked_json" | jq -r --arg id "$_id" '.properties.resources[] | select(.resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and .settings.id == $id) | .settings.version // ""')
     if [ -z "$_pinned" ]; then
-      echo "ERROR: $_id ($_lf_ver) is in lockfile but missing version pin after generation"
+      warn "$_id ($_lf_ver) is in lockfile but missing version pin after generation"
       _lf_errors=$((_lf_errors + 1))
     fi
   done < <(jq -r '.winget // {} | to_entries[] | [.key, .value] | @tsv' "$_lockfile")
 
   if [ "$_lf_errors" -gt 0 ]; then
-    echo "ERROR: locked DSC validation failed with $_lf_errors error(s)"
+    warn "locked DSC validation failed with $_lf_errors error(s)"
     exit 1
   fi
-  echo "Locked DSC validation passed"
+  say "locked DSC validation passed"
 else
-  echo "Skipping locked DSC validation (path-scoped mode)."
+  say "skipping locked DSC validation (path-scoped mode)."
 fi
 
 # Package manager usage enforcement
-printf '\n=== [%s] Package manager usage enforcement ===\n' "$((_step += 1))"
+section "$((_step += 1))" "Package manager usage enforcement"
 # Ban bare `pip install` and `npm install` — these bypass the lockfile and
 # produce non-reproducible environments.  `uv pip install` is allowed (uv
 # respects the lockfile).  Exclude self-references and help-text mentions.
@@ -519,7 +519,7 @@ if ! $HAS_ARGS; then
        scripts/ src/ tests/ 2>/dev/null \
        | grep -v 'uv pip install' \
        | grep . >/dev/null 2>&1; then
-    echo "ERROR: bare pip install detected (use uv pip install instead)"
+    warn "bare pip install detected (use uv pip install instead)"
     _violations=$((_violations + 1))
   fi
   if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
@@ -527,24 +527,24 @@ if ! $HAS_ARGS; then
        -E '(^|[^a-z])npm install([^-]|$)' \
        scripts/ src/ tests/ 2>/dev/null \
        | grep . >/dev/null 2>&1; then
-    echo "ERROR: bare npm install detected (use bun or nix instead)"
+    warn "bare npm install detected (use bun or nix instead)"
     _violations=$((_violations + 1))
   fi
   if [ "$_violations" -gt 0 ]; then
     exit 1
   fi
-  echo "No package manager violations found."
+  say "no package manager violations found."
 else
-  echo "Skipping (path-scoped mode)."
+  say "skipping (path-scoped mode)."
 fi
 
 # Online determinism checks (--verify mode only)
-printf '\n=== [%s] Online determinism checks (--verify) ===\n' "$((_step += 1))"
+section "$((_step += 1))" "Online determinism checks (--verify)"
 if $VERIFY; then
   bash "$SCRIPT_DIR/bump-lockfile.sh" --verify
-  echo "Online determinism checks passed."
+  say "online determinism checks passed."
 else
-  echo "Skipping (use --verify to run online determinism checks)."
+  say "skipping (use --verify to run online determinism checks)."
 fi
 
-printf '\nAll checks passed.\n'
+nuc_done

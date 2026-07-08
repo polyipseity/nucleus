@@ -59,7 +59,7 @@ resolve_icloud_service_for_remote() {
       printf '%s\n' "$_ics_services" | /usr/bin/awk 'NF { print; exit }'
       ;;
     [2-9]*|[1-9][0-9]*)
-      printf '%s\n' "cloud-setup: multiple iCloud services are configured for remote '$_ics_remote_name'; defaulting remote setup to 'drive' and letting mount commands override per entry." >&2
+      warn "multiple iCloud services are configured for remote '$_ics_remote_name'; defaulting remote setup to 'drive' and letting mount commands override per entry."
       printf '%s\n' 'drive'
       ;;
     *)
@@ -127,7 +127,7 @@ restart_cloud_mount_services() {
   case "$(uname)" in
     Darwin)
       _rcms_uid="$(id -u)"
-      printf '%s\n' "cloud-setup: restarting managed macOS cloud mount services..."
+      say "restarting managed macOS cloud mount services..."
 
       # shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
       while IFS="$(printf '\t')" read mount_id remote_name; do
@@ -139,7 +139,7 @@ restart_cloud_mount_services() {
         # auth/session state reconciles. Skip it here so cloud-setup remains
         # responsive; users can still restart iCloud mounts via nucleus apply.
         if [ "$remote_name" = "iCloud" ]; then
-          printf '%s\n' "cloud-setup: skipping launchctl restart for iCloud mount (${mount_id}); restart via nucleus apply if needed."
+          say "skipping launchctl restart for iCloud mount (${mount_id}); restart via nucleus apply if needed."
           continue
         fi
 
@@ -150,12 +150,12 @@ restart_cloud_mount_services() {
         # if the service is absent we emit a targeted hint and continue.
         if launchctl print "$_rcms_target" >/dev/null 2>&1; then
           if launchctl kickstart -k "$_rcms_target"; then
-            printf '%s\n' "cloud-setup: restarted $_rcms_label (${remote_name})"
+            say "restarted $_rcms_label (${remote_name})"
           else
-            printf '%s\n' "cloud-setup: warning: failed to restart $_rcms_label (${remote_name}); run nucleus apply if mount content remains stale." >&2
+            warn "failed to restart $_rcms_label (${remote_name}); run nucleus apply if mount content remains stale."
           fi
         else
-          printf '%s\n' "cloud-setup: mount service $_rcms_label (${remote_name}) is not loaded; run nucleus apply to create/load it." >&2
+          warn "mount service $_rcms_label (${remote_name}) is not loaded; run nucleus apply to create/load it."
         fi
       done <<EOF
 $_rcms_mount_rows
@@ -163,11 +163,11 @@ EOF
       ;;
     Linux)
       if ! command -v systemctl >/dev/null 2>&1; then
-        printf '%s\n' "cloud-setup: warning: systemctl not found; cannot restart user cloud mount services on Linux." >&2
+        warn "systemctl not found; cannot restart user cloud mount services on Linux."
         return 0
       fi
 
-      printf '%s\n' "cloud-setup: restarting managed Linux cloud mount services..."
+      say "restarting managed Linux cloud mount services..."
 
       # shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
       while IFS="$(printf '\t')" read mount_id remote_name; do
@@ -178,12 +178,12 @@ EOF
         _rcms_service="cloud-mount-${mount_id}.service"
         if systemctl --user is-active --quiet "$_rcms_service" || systemctl --user is-enabled --quiet "$_rcms_service"; then
           if systemctl --user restart "$_rcms_service"; then
-            printf '%s\n' "cloud-setup: restarted $_rcms_service (${remote_name})"
+            say "restarted $_rcms_service (${remote_name})"
           else
-            printf '%s\n' "cloud-setup: warning: failed to restart $_rcms_service (${remote_name}); run nucleus apply if mount content remains stale." >&2
+            warn "failed to restart $_rcms_service (${remote_name}); run nucleus apply if mount content remains stale."
           fi
         else
-          printf '%s\n' "cloud-setup: mount service $_rcms_service (${remote_name}) is not installed/enabled; run nucleus apply to create/load it." >&2
+          warn "mount service $_rcms_service (${remote_name}) is not installed/enabled; run nucleus apply to create/load it."
         fi
       done <<EOF
 $_rcms_mount_rows
@@ -217,7 +217,7 @@ while [ "$#" -gt 0 ]; do
       ;;
 
     *)
-      printf '%s\n' "cloud-setup: unsupported argument '$1'" >&2
+      error "unsupported argument '$1'"
       usage >&2
       exit 1
       ;;
@@ -261,8 +261,7 @@ remote_provider_create_args() {
 }
 
 if ! command -v rclone >/dev/null 2>&1; then
-  printf '%s\n' "cloud-setup: rclone not found on PATH. Run apply/bootstrap first, then retry." >&2
-  exit 1
+  error "rclone not found on PATH. Run apply/bootstrap first, then retry."
 fi
 
 repo_root="$(derive_repo_root)"
@@ -270,8 +269,7 @@ USERS_JSON="$repo_root/src/modules/users.json"
 
 required_remotes="GoogleDrive iCloud OneDrive"
 missing_remotes="$(collect_missing_remotes "$required_remotes")" || {
-  printf '%s\n' "cloud-setup: failed to read rclone remotes. Run 'rclone config' manually and retry." >&2
-  exit 1
+  error "failed to read rclone remotes. Run 'rclone config' manually and retry."
 }
 
 if [ -n "$missing_remotes" ]; then
@@ -285,16 +283,16 @@ if [ -n "$missing_remotes" ]; then
     RCLONE_CONFIG_PASS="$(cat "$_rclone_pass_file")"
     export RCLONE_CONFIG_PASS
   fi
-  printf '%s\n' "cloud-setup: missing rclone remotes: $missing_remotes"
-  printf '%s\n' "cloud-setup: creating and authenticating each missing remote..."
+  say "missing rclone remotes: $missing_remotes"
+  say "creating and authenticating each missing remote..."
   for _remote in $missing_remotes; do
     _type="$(remote_provider_type "$_remote")"
     if [ -z "$_type" ]; then
-      printf '%s\n' "cloud-setup: unknown remote '$_remote'; add it manually with 'rclone config'." >&2
+      warn "unknown remote '$_remote'; add it manually with 'rclone config'."
       continue
     fi
     _create_args="$(remote_provider_create_args "$_type" "$_remote" "$repo_root")"
-    printf '%s\n' "cloud-setup: setting up remote '$_remote' (provider: $_type)..."
+    say "setting up remote '$_remote' (provider: $_type)..."
     if [ -n "$_create_args" ]; then
       # Word splitting is intentional here: helper output is a whitespace-
       # separated flag list for rclone, not arbitrary user input.
@@ -306,31 +304,29 @@ if [ -n "$missing_remotes" ]; then
   done
 
   missing_remotes="$(collect_missing_remotes "$required_remotes")" || {
-    printf '%s\n' "cloud-setup: failed to re-read rclone remotes after setup." >&2
-    exit 1
+    error "failed to re-read rclone remotes after setup."
   }
 fi
 
 if [ -n "$missing_remotes" ]; then
-  printf '%s\n' "cloud-setup: required remotes are still missing: $missing_remotes" >&2
-  printf '%s\n' "cloud-setup: rerun this command after completing those remotes in rclone config." >&2
-  exit 1
+  error "required remotes are still missing: $missing_remotes"
+  error "rerun this command after completing those remotes in rclone config."
 fi
 
-printf '%s\n' "cloud-setup: required remotes are configured."
+say "required remotes are configured."
 
 # Validate each remote's credentials; recreate any remote that fails so stale
 # auth tokens can be refreshed without manually deleting and rebuilding the
 # config. WHY: cloud providers rotate tokens; the user should not need to
 # manually delete remotes to recover from expired credentials.
-printf '%s\n' "cloud-setup: validating remote credentials with root-only listings..."
+say "validating remote credentials with root-only listings..."
 _stale_remotes=""
 for _remote in $required_remotes; do
   # Suppressed: expected failure when credentials are stale; exit code drives branching.
   if rclone lsd "$_remote:" >/dev/null 2>&1; then
-    printf '%s\n' "cloud-setup: ✓ $_remote credentials valid"
+    say "✓ $_remote credentials valid"
   else
-    printf '%s\n' "cloud-setup: ✗ $_remote credentials stale or unreachable; will recreate..." >&2
+    warn "✗ $_remote credentials stale or unreachable; will recreate..."
     _stale_remotes="${_stale_remotes:+$_stale_remotes }$_remote"
   fi
 done
@@ -342,9 +338,9 @@ if [ -n "$_stale_remotes" ]; then
     export RCLONE_CONFIG_PASS
   fi
   for _remote in $_stale_remotes; do
-    printf '%s\n' "cloud-setup: deleting and recreating remote '$_remote'..."
+    say "deleting and recreating remote '$_remote'..."
     if ! rclone config delete "$_remote"; then
-      printf '%s\n' "cloud-setup: warning: could not delete '$_remote' config entry; continuing." >&2
+      warn "could not delete '$_remote' config entry; continuing."
     fi
     _type="$(remote_provider_type "$_remote")"
     _create_args="$(remote_provider_create_args "$_type" "$_remote" "$repo_root")"
@@ -358,25 +354,24 @@ if [ -n "$_stale_remotes" ]; then
     fi
   done
 
-  printf '%s\n' "cloud-setup: re-validating credentials after recreation..."
+  say "re-validating credentials after recreation..."
   _validation_failed=false
   for _remote in $_stale_remotes; do
     # Suppressed: expected failure when recreation did not resolve credentials; exit code drives branching.
     if rclone lsd "$_remote:" >/dev/null 2>&1; then
-      printf '%s\n' "cloud-setup: ✓ $_remote credentials valid"
+      say "✓ $_remote credentials valid"
     else
-      printf '%s\n' "cloud-setup: ✗ $_remote credentials still invalid after recreation" >&2
+      warn "✗ $_remote credentials still invalid after recreation"
       _validation_failed=true
     fi
   done
 
   if [ "$_validation_failed" = true ]; then
-    printf '%s\n' "cloud-setup: credential validation failed after recreation; recheck in 'rclone config'." >&2
-    exit 1
+    error "credential validation failed after recreation; recheck in 'rclone config'."
   fi
 fi
 
-printf '%s\n' "cloud-setup: all credentials valid."
+say "all credentials valid."
 
 # Acknowledge Google Drive abuse flag so rclone can download flagged files.
 # WHY: Google Drive flags some files (e.g., zips, executables) as
@@ -388,9 +383,9 @@ if rclone listremotes | grep -Fxq 'GoogleDrive:'; then
   } 2>/dev/null || true)"
   if [ "$_current_abuse" != "true" ]; then
     if rclone config update GoogleDrive acknowledge_abuse true; then
-      printf '%s\n' "cloud-setup: enabled acknowledge_abuse on GoogleDrive"
+      say "enabled acknowledge_abuse on GoogleDrive"
     else
-      printf '%s\n' "cloud-setup: warning: failed to enable acknowledge_abuse on GoogleDrive" >&2
+      warn "failed to enable acknowledge_abuse on GoogleDrive"
     fi
   fi
 fi
@@ -400,7 +395,7 @@ fi
 # When users.json declares a displayName, propagate it to rclone config so
 # the mount shows correct labels in Finder and on desktop.
 if [ -f "$USERS_JSON" ] && command -v jq >/dev/null 2>&1; then
-  printf '%s\n' "cloud-setup: syncing display names from users.json to rclone config..."
+  say "syncing display names from users.json to rclone config..."
   _username="$(id -un)"
   _display_names="$({
     jq -r \
@@ -444,9 +439,9 @@ if [ -f "$USERS_JSON" ] && command -v jq >/dev/null 2>&1; then
       # WHY: rclone config update is idempotent and non-destructive; only
       # updates the single 'description' field, leaving all other config intact.
       if rclone config update "$remote_name" description "$display_name"; then
-        printf '%s\n' "cloud-setup: updated $remote_name description to '$display_name'"
+        say "updated $remote_name description to '$display_name'"
       else
-        printf '%s\n' "cloud-setup: warning: failed to update $remote_name description; continuing with mount restart." >&2
+        warn "failed to update $remote_name description; continuing with mount restart."
       fi
     done <<EOF
 $_display_names
@@ -459,8 +454,8 @@ if [ -f "$USERS_JSON" ]; then
 fi
 
 if [ "$apply" = true ]; then
-  printf '%s\n' "cloud-setup: running nucleus apply to converge cloud mount services..."
+  say "running nucleus apply to converge cloud mount services..."
   nix --option warn-dirty false run "$repo_root/src#apply"
 fi
 
-printf '%s\n' "cloud-setup: setup complete"
+say "setup complete"

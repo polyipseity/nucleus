@@ -23,6 +23,27 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
+usage() {
+  usage_std "$(basename "$0")" "[--sections <comma-separated>] [--verify]" \
+    "Query each available tool for the current version of each pinned item and write an updated lockfile atomically."
+  cat <<'EOF'
+
+Sections (pass comma-separated via --sections to update selectively):
+  winget        winget show --id <id>
+  scoop         scoop info <pkg>
+  cargo-binstall Keep current version     (no reliable CLI query)
+  bun           npm view <pkg> version
+  uv            uv tool list
+  rustup        rustc +<ch> --version
+  pwsh          Find-Module via pwsh      (skip if pwsh unavailable)
+  vscode        code/code-insiders --list-extensions --show-versions
+                (skip if neither available)
+  ollama        ollama show <name>:<tag> --format json
+                (skip if ollama unavailable)
+  vm-setup      VM image artifact pins (nixos-iso, tart-images, windows). Use --sections nixos-iso etc. for sub-sections.
+EOF
+}
+
 REPO_ROOT="$(derive_repo_root)"
 LOCKFILE_REL="src/lockfiles/lockfile.json"
 LOCKFILE_ABS="$REPO_ROOT/$LOCKFILE_REL"
@@ -31,7 +52,7 @@ LOCKFILE_ABS="$REPO_ROOT/$LOCKFILE_REL"
 require_command jq
 
 if [ ! -f "$LOCKFILE_ABS" ]; then
-  printf '%s\n' "bump-lockfile: error: lockfile not found at $LOCKFILE_ABS" >&2
+  error "lockfile not found at $LOCKFILE_ABS"
   exit 1
 fi
 
@@ -49,11 +70,11 @@ while [ $# -gt 0 ]; do
       VERIFY=true
       ;;
     --help)
-      grep '^#' "$0" | sed 's/^# \?//' | sed 's/^#//'
+      usage
       exit 0
       ;;
     *)
-      printf 'bump-lockfile: unknown flag: %s\n' "$1" >&2
+      error "unknown flag: $1"
       exit 1
       ;;
   esac
@@ -71,7 +92,7 @@ section_enabled() {
 
 # Helpers
 log_update() {
-  printf 'bump-lockfile: updating %s.%s from %s to %s\n' "$1" "$2" "$3" "$4"
+  say "updating $1.$2 from $3 to $4"
 }
 
 # Read lockfile
@@ -320,7 +341,7 @@ if section_enabled vm-setup || section_enabled nixos-iso; then
     latest_url="https://channels.nixos.org/nixos-unstable/latest-nixos-minimal-${arch}.iso"
     resolved_url=$(curl -sIL "$latest_url" 2>/dev/null | grep -i "^location:" | tail -1 | tr -d '[:space:]' | sed 's/^location://I')
     if [ -z "$resolved_url" ]; then
-      printf 'bump-lockfile: warning: could not resolve %s for %s\n' "$latest_url" "$arch" >&2
+      warn "could not resolve $latest_url for $arch"
       continue
     fi
 
@@ -329,7 +350,7 @@ if section_enabled vm-setup || section_enabled nixos-iso; then
     sha256_content=$(curl -sL "$sha256_url" 2>/dev/null || true)
     new_sha256=$(printf '%s\n' "$sha256_content" | grep -oE '^[0-9a-f]{64}' | head -1)
     if [ -z "$new_sha256" ]; then
-      printf 'bump-lockfile: warning: could not fetch checksum for %s (%s)\n' "$arch" "$sha256_url" >&2
+      warn "could not fetch checksum for $arch ($sha256_url)"
       continue
     fi
     new_digest="sha256:$new_sha256"
@@ -357,14 +378,14 @@ if section_enabled vm-setup || section_enabled tart-images; then
     # Pull the OCI image name from the lockfile entry; extract the short repo name from the full image path
     image_repo="${old_image#ghcr.io/}"
     if [ -z "$image_repo" ]; then
-      printf 'bump-lockfile: warning: no image repo found for %s, skipping\n' "$os_version" >&2
+      warn "no image repo found for $os_version, skipping"
       continue
     fi
 
     # Get an anonymous GHCR token and query the manifest
     ghcr_token=$(curl -s "https://ghcr.io/token?service=ghcr.io\&scope=repository:${image_repo}:pull" 2>/dev/null | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || true)
     if [ -z "$ghcr_token" ]; then
-      printf 'bump-lockfile: warning: could not get GHCR token for %s, skipping\n' "$old_image" >&2
+      warn "could not get GHCR token for $old_image, skipping"
       continue
     fi
 
@@ -376,7 +397,7 @@ if section_enabled vm-setup || section_enabled tart-images; then
       "https://ghcr.io/v2/${image_repo}/manifests/latest" 2>/dev/null | grep -i "^docker-content-digest:" | grep -oE 'sha256:[a-f0-9]{64}' || true)
 
     if [ -z "$new_digest" ]; then
-      printf 'bump-lockfile: warning: could not fetch digest for %s, skipping\n' "$old_image" >&2
+      warn "could not fetch digest for $old_image, skipping"
       continue
     fi
 
@@ -393,11 +414,11 @@ fi
 if $VERIFY; then
   _diff=$(diff <(printf '%s\n' "$data") "$LOCKFILE_ABS" 2>/dev/null || true)
   if [ -n "$_diff" ]; then
-    printf 'bump-lockfile --verify: lockfile out of date — changes would be made:\n'
+    say "lockfile out of date — changes would be made:"
     printf '%s\n' "$_diff"
     exit 1
   fi
-  printf 'bump-lockfile --verify: lockfile is up to date.\n'
+  say "lockfile is up to date."
   exit 0
 fi
 
@@ -409,4 +430,4 @@ trap "rm -f '$tmpfile'" EXIT
 printf '%s\n' "$data" > "$tmpfile"
 mv -- "$tmpfile" "$LOCKFILE_ABS"
 
-printf 'bump-lockfile: wrote %s\n' "$LOCKFILE_REL"
+say "wrote $LOCKFILE_REL"

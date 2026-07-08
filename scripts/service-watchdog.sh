@@ -37,12 +37,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 
 REPO_ROOT="$(derive_repo_root)"
 
-# Handle help request before any further processing.
-for _arg in "$@"; do
-  case "$_arg" in
-    -h|--help)
-      usage_std "$(basename "$0")" "[options]"
-      cat <<'EOF'
+usage() {
+  usage_std "$(basename "$0")" "[options]"
+  cat <<'EOF'
   Periodic service watchdog — detects and restarts nucleus-managed
   services stuck in non-running states (EX_CONFIG, waiting,
   spawn-scheduled, inactive, failed, or not loaded at all).
@@ -51,6 +48,13 @@ for _arg in "$@"; do
   Options:
   -h|--help  Show usage.
 EOF
+}
+
+# Handle help request before any further processing.
+for _arg in "$@"; do
+  case "$_arg" in
+    -h|--help)
+      usage
       exit 0
       ;;
   esac

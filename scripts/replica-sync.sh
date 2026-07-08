@@ -35,7 +35,7 @@ while [ "$#" -gt 0 ]; do
     --replica-id)
       shift
       if [ "$#" -eq 0 ] || [ -z "$1" ]; then
-        printf '%s\n' "replica-sync: --replica-id requires a value" >&2
+        error "--replica-id requires a value"
         exit 1
       fi
       replica_id_filter="$1"
@@ -43,7 +43,7 @@ while [ "$#" -gt 0 ]; do
     --repo-root)
       shift
       if [ "$#" -eq 0 ] || [ -z "$1" ]; then
-        printf '%s\n' "replica-sync: --repo-root requires a value" >&2
+        error "--repo-root requires a value"
         exit 1
       fi
       repo_root="$1"
@@ -51,7 +51,7 @@ while [ "$#" -gt 0 ]; do
     --repo-root=*)
       repo_root="${1#--repo-root=}"
       if [ -z "$repo_root" ]; then
-        printf '%s\n' "replica-sync: --repo-root requires a non-empty value" >&2
+        error "--repo-root requires a non-empty value"
         exit 1
       fi
       ;;
@@ -60,7 +60,7 @@ while [ "$#" -gt 0 ]; do
       exit 0
       ;;
     *)
-      printf '%s\n' "replica-sync: unsupported argument '$1'" >&2
+      error "unsupported argument '$1'"
       usage >&2
       exit 1
       ;;
@@ -77,18 +77,15 @@ USERS_JSON="$REPO_ROOT/src/modules/users.json"
 REPLICA_GC_CONFIG_JSON="$REPO_ROOT/src/modules/configs/cloud/replica-gc.json"
 
 if [ ! -f "$USERS_JSON" ]; then
-  printf '%s\n' "replica-sync: users registry not found at $USERS_JSON" >&2
-  exit 1
+  error "users registry not found at $USERS_JSON"
 fi
 
 if [ ! -f "$REPLICA_GC_CONFIG_JSON" ]; then
-  printf '%s\n' "replica-sync: gc config not found at $REPLICA_GC_CONFIG_JSON" >&2
-  exit 1
+  error "gc config not found at $REPLICA_GC_CONFIG_JSON"
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-  printf '%s\n' "replica-sync: jq not found; cannot parse users.json" >&2
-  exit 1
+  error "jq not found; cannot parse users.json"
 fi
 
 rclone_pass_path="$HOME/.config/nucleus/secrets/rclone-config-pass"
@@ -128,15 +125,13 @@ replica_lines="$({
 } || true)"
 
 if [ -z "$replica_lines" ]; then
-  printf '%s\n' "replica-sync: no enabled replicas for user '$username'"
+  say "no enabled replicas for user '$username'"
   exit 0
 fi
 
 run_cmd() {
   if [ "$dry_run" = true ]; then
-    printf 'replica-sync: [dry-run] '
-    printf '%s ' "$@"
-    printf '\n'
+    dry_run "would run: $*"
     return 0
   fi
   "$@"
@@ -211,14 +206,14 @@ build_onedrive_root_filter_file() {
       fi
 
       if should_skip_onedrive_root_entry "$_remote_dir" "$_blocked_root_entries"; then
-        printf '%s\n' "replica-sync: [$_id] skipping inaccessible OneDrive root entry '$_remote_dir'" >&2
+        warn "[$_id] skipping inaccessible OneDrive root entry '$_remote_dir'"
         continue
       fi
 
       if remote_top_level_path_accessible "$_remote_ref" "$_remote_dir"; then
         record_unique_name "$_dir_entries_file" "$_remote_dir"
       else
-        printf '%s\n' "replica-sync: [$_id] skipping inaccessible OneDrive root entry '$_remote_dir'" >&2
+        warn "[$_id] skipping inaccessible OneDrive root entry '$_remote_dir'"
       fi
     done
   fi
@@ -234,7 +229,7 @@ build_onedrive_root_filter_file() {
   if [ -n "$_remote_files" ]; then
     printf '%s\n' "$_remote_files" | while IFS= read -r _remote_file; do
       if should_skip_onedrive_root_entry "$_remote_file" "$_blocked_root_entries"; then
-        printf '%s\n' "replica-sync: [$_id] skipping inaccessible OneDrive root entry '$_remote_file'" >&2
+        warn "[$_id] skipping inaccessible OneDrive root entry '$_remote_file'"
         continue
       fi
       record_unique_name "$_file_entries_file" "$_remote_file"
@@ -248,7 +243,7 @@ build_onedrive_root_filter_file() {
 
     _local_name="$(basename "$_local_entry")"
     if should_skip_onedrive_root_entry "$_local_name" "$_blocked_root_entries"; then
-      printf '%s\n' "replica-sync: [$_id] skipping inaccessible OneDrive root entry '$_local_name'" >&2
+      warn "[$_id] skipping inaccessible OneDrive root entry '$_local_name'"
       continue
     fi
     if [ -d "$_local_entry" ]; then
@@ -293,7 +288,7 @@ gc_local_macos_artifacts() {
   fi
 
   if [ "$dry_run" = true ]; then
-    printf '%s\n' "replica-sync: [dry-run] local metadata gc in $_target_dir"
+    dry_run "local metadata gc in $_target_dir"
     return 0
   fi
 
@@ -312,7 +307,7 @@ ensure_macos_icloud_replica_symlink() {
   _replica_path="$HOME/$_relative_path"
 
   if [ ! -d "$_native_target" ]; then
-    printf '%s\n' "replica-sync: [iCloud] native target missing at $_native_target; cannot protect iCloudReplica symlink" >&2
+    error "[iCloud] native target missing at $_native_target; cannot protect iCloudReplica symlink"
     return 1
   fi
 
@@ -322,34 +317,34 @@ ensure_macos_icloud_replica_symlink() {
       return 0
     fi
     if [ "$dry_run" = true ]; then
-      printf '%s\n' "replica-sync: [dry-run] would update iCloudReplica symlink $_replica_path -> $_native_target (was $_current_target)"
+      dry_run "would update iCloudReplica symlink $_replica_path -> $_native_target (was $_current_target)"
       return 0
     fi
     rm "$_replica_path"
     ln -s "$_native_target" "$_replica_path"
-    printf '%s\n' "replica-sync: [iCloud] updated iCloudReplica symlink $_replica_path -> $_native_target (was $_current_target)"
+    say "[iCloud] updated iCloudReplica symlink $_replica_path -> $_native_target (was $_current_target)"
     return 0
   fi
 
   if [ -e "$_replica_path" ]; then
     _backup_path="$_replica_path.pre-native-icloud.$(date +%Y%m%d%H%M%S)"
     if [ "$dry_run" = true ]; then
-      printf '%s\n' "replica-sync: [dry-run] would move $_replica_path to $_backup_path and create symlink -> $_native_target"
+      dry_run "would move $_replica_path to $_backup_path and create symlink -> $_native_target"
       return 0
     fi
     mv "$_replica_path" "$_backup_path"
     ln -s "$_native_target" "$_replica_path"
-    printf '%s\n' "replica-sync: [iCloud] migrated $_replica_path to native iCloud symlink target $_native_target (backup: $_backup_path)"
+    say "[iCloud] migrated $_replica_path to native iCloud symlink target $_native_target (backup: $_backup_path)"
     return 0
   fi
 
   if [ "$dry_run" = true ]; then
-    printf '%s\n' "replica-sync: [dry-run] would create iCloudReplica symlink $_replica_path -> $_native_target"
+    dry_run "would create iCloudReplica symlink $_replica_path -> $_native_target"
     return 0
   fi
 
   ln -s "$_native_target" "$_replica_path"
-  printf '%s\n' "replica-sync: [iCloud] linked $_replica_path -> $_native_target"
+  say "[iCloud] linked $_replica_path -> $_native_target"
 }
 
 resolve_filter_path() {
@@ -381,7 +376,7 @@ set_replica_tree_writable() {
   fi
 
   if [ "$dry_run" = true ]; then
-    printf '%s\n' "replica-sync: [dry-run] unlock replica tree $_target_dir (owner write for sync run)"
+    dry_run "unlock replica tree $_target_dir (owner write for sync run)"
     return 0
   fi
 
@@ -398,7 +393,7 @@ set_replica_tree_read_only() {
   fi
 
   if [ "$dry_run" = true ]; then
-    printf '%s\n' "replica-sync: [dry-run] lock replica tree $_target_dir (remove write perms)"
+    dry_run "lock replica tree $_target_dir (remove write perms)"
     return 0
   fi
 
@@ -420,7 +415,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_path provider icl
     if ! ensure_macos_icloud_replica_symlink "$local_path"; then
       failures=$((failures + 1))
     fi
-    printf '%s\n' "replica-sync: [$display_name] skipping on macOS (native iCloud handles sync)"
+    say "[$display_name] skipping on macOS (native iCloud handles sync)"
     continue
   fi
 
@@ -430,7 +425,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_path provider icl
   provider_blocked_roots="$(load_provider_gc_entries "$provider" "blockedRoots")"
 
   if [ "$direction" != "pull" ]; then
-    printf '%s\n' "replica-sync: [$display_name] unsupported direction '$direction'; replicas are pull-only by policy" >&2
+    warn "[$display_name] unsupported direction '$direction'; replicas are pull-only by policy"
     failures=$((failures + 1))
     continue
   fi
@@ -443,16 +438,16 @@ while IFS="$(printf '\t')" read id direction local_path remote_path provider icl
   mkdir -p "$local_dir"
 
   if ! set_replica_tree_writable "$local_dir"; then
-    printf '%s\n' "replica-sync: [$display_name] failed to unlock replica tree '$local_dir'" >&2
+    warn "[$display_name] failed to unlock replica tree '$local_dir'"
     failures=$((failures + 1))
     continue
   fi
 
   if [ -n "$resolved_filters" ] && [ ! -f "$resolved_filters" ]; then
-    printf '%s\n' "replica-sync: filters file '$resolved_filters' not found for replica '$display_name'" >&2
+    warn "filters file '$resolved_filters' not found for replica '$display_name'"
     if [ "$read_write" != "true" ]; then
       if ! set_replica_tree_read_only "$local_dir"; then
-        printf '%s\n' "replica-sync: [$display_name] failed to re-lock replica tree '$local_dir' after filter validation failure" >&2
+        warn "[$display_name] failed to re-lock replica tree '$local_dir' after filter validation failure"
         failures=$((failures + 1))
       fi
     fi
@@ -489,7 +484,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_path provider icl
     fi
   fi
 
-  printf '%s\n' "replica-sync: [$display_name] pull $remote_ref -> $local_dir"
+  say "[$display_name] pull $remote_ref -> $local_dir"
   if ! run_cmd rclone sync "$remote_ref" "$local_dir" "$@"; then
     failures=$((failures + 1))
   fi
@@ -500,7 +495,7 @@ while IFS="$(printf '\t')" read id direction local_path remote_path provider icl
 
   if [ "$read_write" != "true" ]; then
     if ! set_replica_tree_read_only "$local_dir"; then
-      printf '%s\n' "replica-sync: [$display_name] failed to lock replica tree '$local_dir'" >&2
+      warn "[$display_name] failed to lock replica tree '$local_dir'"
       failures=$((failures + 1))
     fi
   fi
@@ -509,8 +504,8 @@ done < "$replica_lines_file"
 rm -f "$replica_lines_file"
 
 if [ "$failures" -gt 0 ]; then
-  printf '%s\n' "replica-sync: completed with $failures failure(s)" >&2
+  error "completed with $failures failure(s)"
   exit 1
 fi
 
-printf '%s\n' "replica-sync: completed successfully"
+say "completed successfully"

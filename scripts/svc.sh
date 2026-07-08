@@ -45,7 +45,7 @@ HOST="$(resolve_nucleus_host)"
 case "$HOST" in
   MacBook) PLATFORM="macos" ;;
   NixOS)   PLATFORM="nixos" ;;
-  *)       printf '%s\n' "svc: unsupported host '$HOST'" >&2; exit 1 ;;
+  *)       error "unsupported host '$HOST'" ;;
 esac
 
 # Helpers
@@ -53,8 +53,7 @@ esac
 # read_registry — Parse services.json and return JSON filtered to current platform.
 read_registry() {
   if [ ! -f "$SERVICES_JSON" ]; then
-    printf '%s\n' "svc: services registry not found at $SERVICES_JSON" >&2
-    exit 1
+    error "services registry not found at $SERVICES_JSON"
   fi
   require_command jq
   jq -c --arg platform "$PLATFORM" '
@@ -407,7 +406,7 @@ do_status() {
   while IFS=$'\t' read -r key display svc_json json_key; do
     if echo "$key" | grep -q '^ERROR:'; then
       local err_name="${key#ERROR:}"
-      printf 'svc: %s — %s\n' "$err_name" "$(echo "$svc_json" | jq -r '.error')" >&2
+      warn "$err_name — $(echo "$svc_json" | jq -r '.error')"
       any_error=true
       continue
     fi
@@ -424,8 +423,7 @@ do_status() {
 
 do_action() {
   if [ "${#service_names[@]}" -eq 0 ]; then
-    printf 'svc: missing service name for %s\n' "$action" >&2
-    exit 1
+    error "missing service name for $action"
   fi
   local registry
   registry=$(read_registry)
@@ -435,7 +433,7 @@ do_action() {
     local entry
     entry=$(echo "$registry" | jq -c --arg name "$svc_name" '.[$name] // empty')
     if [ -z "$entry" ]; then
-      printf 'svc: %s — service not found in registry\n' "$svc_name" >&2
+      warn "$svc_name — service not found in registry"
       overall_exit=1
       continue
     fi
@@ -444,13 +442,13 @@ do_action() {
     prefix_match=$(echo "$entry" | jq -r '.platform.prefixMatch // false')
     if [ "$prefix_match" = "true" ]; then
       # For actions on prefix-match services, user must specify exact service name
-      printf 'svc: %s — prefix-match services (like %s*) require exact name; use list or status to discover\n' "$svc_name" "$(echo "$entry" | jq -r '.platform.service')" >&2
+      warn "$svc_name — prefix-match services (like $(echo "$entry" | jq -r '.platform.service')*) require exact name; use list or status to discover"
       overall_exit=1
       continue
     fi
 
     if ! svc_action "$action" "$svc_name" "$(echo "$entry" | jq '.platform')"; then
-      printf 'svc: %s — action %s failed\n' "$svc_name" "$action" >&2
+      warn "$svc_name — action $action failed"
       overall_exit=1
     fi
   done
@@ -465,31 +463,27 @@ do_endpoint() {
   local endpoint_name="${service_names[1]:-}"
 
   if [ -z "$svc_name" ]; then
-    printf '%s\n' "svc: missing service name for endpoint" >&2
-    exit 1
+    error "missing service name for endpoint"
   fi
   require_command jq
 
   local entry
   entry=$(jq -c --arg name "$svc_name" '.[$name] // empty' "$SERVICES_JSON")
   if [ -z "$entry" ]; then
-    printf 'svc: %s — service not found in registry\n' "$svc_name" >&2
-    exit 1
+    error "$svc_name — service not found in registry"
   fi
 
   local network
   network=$(echo "$entry" | jq -c '.network // empty')
   if [ -z "$network" ]; then
-    printf 'svc: %s — no network endpoints defined\n' "$svc_name" >&2
-    exit 1
+    error "$svc_name — no network endpoints defined"
   fi
 
   if [ -n "$endpoint_name" ]; then
     local ep
     ep=$(echo "$network" | jq -c --arg ep "$endpoint_name" '.[$ep] // empty')
     if [ -z "$ep" ]; then
-      printf 'svc: %s — endpoint "%s" not found\n' "$svc_name" "$endpoint_name" >&2
-      exit 1
+      error "$svc_name — endpoint \"$endpoint_name\" not found"
     fi
     if [ "$json_output" = true ]; then
       printf '%s\n' "$ep"
@@ -602,7 +596,7 @@ do_logs() {
       --since) since="${service_names[1]}"; service_names=("${service_names[@]:2}") ;;
       --raw) raw=true; service_names=("${service_names[@]:1}") ;;
       --) service_names=("${service_names[@]:1}"); break ;;
-      -*) printf 'svc logs: unknown option %s\n' "${service_names[0]}" >&2; exit 1 ;;
+      -*) error "logs: unknown option '${service_names[0]}'" ; exit 1 ;;
       *) parsed_args+=("${service_names[0]}"); service_names=("${service_names[@]:1}") ;;
     esac
   done
@@ -636,7 +630,7 @@ do_logs() {
 
   for svc in "${service_names[@]}"; do
     if ! get_platform_services | grep -qx "$svc"; then
-      printf 'svc logs: unknown service "%s"\n' "$svc" >&2
+      error "logs: unknown service '$svc'"
       exit 1
     fi
     local capture
@@ -645,20 +639,20 @@ do_logs() {
     case "$PLATFORM" in
       macos)
         if [ "$capture" = "none" ]; then
-          printf 'svc logs: %s — capture disabled\n' "$svc" >&2
+          warn "$svc — capture disabled"
           continue
         fi
-        show_file_logs "$svc" "$lines" "$raw" || printf 'svc logs: %s — no log files found\n' "$svc" >&2
+        show_file_logs "$svc" "$lines" "$raw" || warn "$svc — no log files found"
         ;;
       nixos)
         local unit
         unit="$(get_unit "$svc")"
         if [ -n "$unit" ] && command -v journalctl >/dev/null 2>&1; then
-          show_journald_logs "$svc" "$lines" "$raw" "$since" || printf 'svc logs: %s — no journald logs\n' "$svc" >&2
+          show_journald_logs "$svc" "$lines" "$raw" "$since" || warn "$svc — no journald logs"
         elif [ "$capture" != "none" ]; then
-          show_file_logs "$svc" "$lines" "$raw" || printf 'svc logs: %s — no log files found\n' "$svc" >&2
+          show_file_logs "$svc" "$lines" "$raw" || warn "$svc — no log files found"
         else
-          printf 'svc logs: %s — capture disabled and no systemd unit\n' "$svc" >&2
+          warn "$svc — capture disabled and no systemd unit"
         fi
         ;;
     esac
@@ -683,7 +677,7 @@ do_log_config() {
     case "${service_names[0]}" in
       --json) json_output=true; service_names=("${service_names[@]:1}") ;;
       --) service_names=("${service_names[@]:1}"); break ;;
-      -*) printf 'svc log-config: unknown option %s\n' "${service_names[0]}" >&2; exit 1 ;;
+      -*) error "log-config: unknown option '${service_names[0]}'" ; exit 1 ;;
       *) parsed_args+=("${service_names[0]}"); service_names=("${service_names[@]:1}") ;;
     esac
   done
@@ -744,7 +738,7 @@ while [ "$#" -gt 0 ]; do
       service_names=("$@")
       break
       ;;
-    *) printf '%s\n' "svc: unsupported argument '$1'" >&2; usage >&2; exit 1 ;;
+    *) error "unsupported argument '$1'" ; usage >&2 ; exit 1 ;;
   esac
 done
 
@@ -759,7 +753,7 @@ for arg in "${service_names[@]}"; do
 done
 service_names=("${filtered_service_names[@]}")
 
-[ -z "$action" ] && { printf '%s\n' "svc: missing action (list, status, start, stop, restart, enable, disable, endpoint, logs, log-paths, log-config)" >&2; usage >&2; exit 1; }
+[ -z "$action" ] && { error "missing action (list, status, start, stop, restart, enable, disable, endpoint, logs, log-paths, log-config)" ; usage >&2 ; exit 1; }
 
 case "$action" in
   list|status|logs) "do_$action" ;;

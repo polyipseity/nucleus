@@ -18,7 +18,7 @@
 write_vm_directory_readme() {
   _wvdr_readme="$VM_DIR/README.md"
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] write VM directory guide: %s\n' "$_wvdr_readme"
+    dry_run "write VM directory guide: $_wvdr_readme"
     return 0
   fi
 
@@ -28,10 +28,9 @@ write_vm_directory_readme() {
     sed -e "s|{{VM_DIR_DISPLAY}}|$_wvdr_vm_dir_short|g" \
         -e "s|{{IMAGES_DIR_DISPLAY}}|$_wvdr_images_dir_short|g" \
         "$TEMPLATES_DIR/README.md" >"$_wvdr_readme"
-    printf 'vm-setup: wrote VM directory guide: %s (template)\n' "$_wvdr_readme"
+    say "wrote VM directory guide: $_wvdr_readme (template)"
   else
-    printf 'vm-setup: WARNING — README template not found at %s; writing minimal guide\n' \
-      "$TEMPLATES_DIR/README.md" >&2
+    warn "README template not found at $TEMPLATES_DIR/README.md; writing minimal guide"
     {
       printf '# virtual machines\n\n'
       # shellcheck disable=SC2016 # single quotes intentional — backticks must not expand
@@ -49,10 +48,9 @@ ensure_utm_default_vm_location() {
   if [ -L "$_eudvl_utm_docs" ]; then
     _eudvl_target="$(readlink "$_eudvl_utm_docs" 2>/dev/null || true)"
     if [ "$_eudvl_target" = "$VM_DIR" ]; then
-      printf 'vm-setup: UTM default VM location already points to %s\n' "$VM_DIR"
+      say "UTM default VM location already points to $VM_DIR"
     else
-      printf 'vm-setup: WARNING — %s is a symlink to %s; expected %s\n' \
-        "$_eudvl_utm_docs" "$_eudvl_target" "$VM_DIR" >&2
+      warn "$_eudvl_utm_docs is a symlink to $_eudvl_target; expected $VM_DIR"
     fi
     return 0
   fi
@@ -61,15 +59,14 @@ ensure_utm_default_vm_location() {
     # WHY: preserve existing user-managed UTM document stores; only replace an
     # empty directory to avoid destructive moves.
     if [ -n "$(find "$_eudvl_utm_docs" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
-      printf 'vm-setup: WARNING — %s is non-empty; cannot auto-link to %s\n' \
-        "$_eudvl_utm_docs" "$VM_DIR" >&2
+      warn "$_eudvl_utm_docs is non-empty; cannot auto-link to $VM_DIR"
       return 0
     fi
     rmdir "$_eudvl_utm_docs"
   fi
 
   ln -s "$VM_DIR" "$_eudvl_utm_docs"
-  printf 'vm-setup: linked UTM default VM location: %s -> %s\n' "$_eudvl_utm_docs" "$VM_DIR"
+  say "linked UTM default VM location: $_eudvl_utm_docs -> $VM_DIR"
 }
 
 # ensure_tart_vm_dir
@@ -86,10 +83,9 @@ ensure_tart_vm_dir() {
   if [ -L "$_etd_default" ]; then
     _etd_current="$(readlink "$_etd_default" 2>/dev/null || true)"
     if [ "$_etd_current" = "$_etd_target" ]; then
-      printf 'vm-setup: tart storage already linked: %s -> %s\n' "$_etd_default" "$_etd_target"
+      say "tart storage already linked: $_etd_default -> $_etd_target"
     else
-      printf 'vm-setup: WARNING — %s is a symlink to %s (expected %s); not relinking\n' \
-        "$_etd_default" "$_etd_current" "$_etd_target" >&2
+      warn "$_etd_default is a symlink to $_etd_current (expected $_etd_target); not relinking"
     fi
     return 0
   fi
@@ -99,13 +95,13 @@ ensure_tart_vm_dir() {
     # not lost when this policy was introduced.
     # Use rsync --no-specials to skip Unix socket files (e.g. control.sock)
     # which cp -a cannot copy and which are not persistent data.
-    printf 'vm-setup: migrating ~/.tart to %s...\n' "$_etd_target"
+    say "migrating ~/.tart to $_etd_target..."
     rsync -a --no-specials --no-devices "$_etd_default/" "$_etd_target/"
     rm -rf "$_etd_default"
   fi
 
   ln -s "$_etd_target" "$_etd_default"
-  printf 'vm-setup: linked tart storage: %s -> %s\n' "$_etd_default" "$_etd_target"
+  say "linked tart storage: $_etd_default -> $_etd_target"
 }
 
 # should_include_host HOSTS_JSON — returns 0 if the VM should run on the
@@ -124,7 +120,7 @@ should_include_host() {
 
 run_cmd() {
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] %s\n' "$*"
+    dry_run "$*"
   else
     "$@"
   fi
@@ -138,34 +134,32 @@ validate_qcow2_image() {
   _vqi_label="$2"
 
   if [ ! -f "$_vqi_path" ]; then
-    printf 'vm-setup: %s not found: %s\n' "$_vqi_label" "$_vqi_path" >&2
+    error "$_vqi_label not found: $_vqi_path"
     return 1
   fi
 
   _vqi_size_bytes="$(wc -c < "$_vqi_path" | tr -d '[:space:]')"
   if [ -z "$_vqi_size_bytes" ] || [ "$_vqi_size_bytes" -le 0 ]; then
-    printf 'vm-setup: %s is empty or unreadable: %s\n' "$_vqi_label" "$_vqi_path" >&2
+    error "$_vqi_label is empty or unreadable: $_vqi_path"
     return 1
   fi
 
   if command -v qemu-img >/dev/null 2>&1; then
     _vqi_info="$(qemu-img info --output=json "$_vqi_path" 2>/dev/null || true)"
     if [ -z "$_vqi_info" ]; then
-      printf 'vm-setup: qemu-img could not read %s: %s\n' "$_vqi_label" "$_vqi_path" >&2
+      error "qemu-img could not read $_vqi_label: $_vqi_path"
       return 1
     fi
 
     _vqi_format="$(printf '%s' "$_vqi_info" | jq -r '.format // empty')"
     if [ "$_vqi_format" != 'qcow2' ]; then
-      printf 'vm-setup: %s has unexpected format "%s" (expected qcow2): %s\n' \
-        "$_vqi_label" "$_vqi_format" "$_vqi_path" >&2
+      error "$_vqi_label has unexpected format '$_vqi_format' (expected qcow2): $_vqi_path"
       return 1
     fi
 
     _vqi_virtual_size="$(printf '%s' "$_vqi_info" | jq -r '."virtual-size" // 0')"
     if [ -z "$_vqi_virtual_size" ] || [ "$_vqi_virtual_size" -lt 10737418240 ]; then
-      printf 'vm-setup: %s virtual size is too small (%s bytes): %s\n' \
-        "$_vqi_label" "$_vqi_virtual_size" "$_vqi_path" >&2
+      error "$_vqi_label virtual size is too small ($_vqi_virtual_size bytes): $_vqi_path"
       return 1
     fi
   fi
@@ -248,8 +242,7 @@ run_with_backoff() {
       _rwb_sleep=30
     fi
 
-    printf 'vm-setup: %s failed (attempt %s/%s); retrying in %ss\n' \
-      "$_rwb_label" "$_rwb_attempt" "$_rwb_max" "$_rwb_sleep" >&2
+    warn "$_rwb_label failed (attempt $_rwb_attempt/$_rwb_max); retrying in ${_rwb_sleep}s"
     sleep "$_rwb_sleep"
     _rwb_attempt=$((_rwb_attempt + 1))
   done
@@ -312,7 +305,7 @@ write_start_script() {
   _wss_path_ps1="$VM_DIR/scripts/start-${_wss_name}.ps1"
 
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] write start helper scripts: %s, %s\n' "$_wss_path_sh" "$_wss_path_ps1"
+    dry_run "write start helper scripts: $_wss_path_sh, $_wss_path_ps1"
     return 0
   fi
 
@@ -325,8 +318,7 @@ write_start_script() {
         -e "s|{{VM_DIR}}|$VM_DIR|g" \
         "$TEMPLATES_DIR/start-posix.sh" >"$_wss_path_sh"
   else
-    printf 'vm-setup: WARNING — start-posix.sh template not found at %s\n' \
-      "$TEMPLATES_DIR/start-posix.sh" >&2
+    warn "start-posix.sh template not found at $TEMPLATES_DIR/start-posix.sh"
     printf '#!/usr/bin/env sh\nset -eu\necho "VM start script for %s"\n' "$_wss_name" >"$_wss_path_sh"
   fi
   chmod 755 "$_wss_path_sh"
@@ -369,13 +361,13 @@ if (Get-Command virt-viewer -ErrorAction SilentlyContinue) {
 EOF
       ;;
     *)
-      printf 'vm-setup: unknown start-script host kind: %s\n' "$_wss_host_kind" >&2
+      error "unknown start-script host kind: $_wss_host_kind"
       return 1
       ;;
   esac
   chmod 755 "$_wss_path_ps1"
 
-  printf 'vm-setup: wrote start helper scripts: %s, %s\n' "$_wss_path_sh" "$_wss_path_ps1"
+  say "wrote start helper scripts: $_wss_path_sh, $_wss_path_ps1"
 }
 
 # VM iteration helper
@@ -398,21 +390,21 @@ for_each_vm() {
     case "$_vm_enabled" in
       true|false) ;;
       *)
-        printf 'vm-setup: WARNING — VM "%s" has invalid enabled value "%s"; expected boolean true/false in manifest\n' "$_vm_name" "$_vm_enabled" >&2
+        warn "VM '$_vm_name' has invalid enabled value '$_vm_enabled'; expected boolean true/false in manifest"
         _i=$((_i + 1))
         continue
         ;;
     esac
 
     if [ "$_vm_enabled" != "true" ]; then
-      printf 'vm-setup: VM "%s" is disabled in manifest; skipping\n' "$_vm_name"
+      say "VM '$_vm_name' is disabled in manifest; skipping"
       _i=$((_i + 1))
       continue
     fi
 
     _vm_hosts="$(jq -c ".VMs[$_i].hosts" "$MANIFEST")"
     if ! should_include_host "$_vm_hosts"; then
-      printf 'vm-setup: VM "%s" is not available on host "%s" (hosts: %s); skipping\n' "$_vm_name" "$NUCLEUS_HOST" "$_vm_hosts"
+      say "VM '$_vm_name' is not available on host '$NUCLEUS_HOST' (hosts: $_vm_hosts); skipping"
       _i=$((_i + 1))
       continue
     fi
@@ -450,12 +442,12 @@ re_register_utm_bundle() {
 
   rm -rf "$_rr_backup"
   if ! cp -R "$_rr_bundle" "$_rr_backup"; then
-    printf 'vm-setup: WARNING — failed to stage re-registration backup for %s; keeping current registration\n' "$_rr_name" >&2
+    warn "failed to stage re-registration backup for $_rr_name; keeping current registration"
     return 1
   fi
 
   if ! "$UTMCTL" delete "$_rr_name"; then
-    printf 'vm-setup: WARNING — failed to delete stale UTM registration for %s; keeping current registration\n' "$_rr_name" >&2
+    warn "failed to delete stale UTM registration for $_rr_name; keeping current registration"
     rm -rf "$_rr_backup"
     return 1
   fi
@@ -465,18 +457,18 @@ re_register_utm_bundle() {
   fi
 
   if ! mv "$_rr_backup" "$_rr_bundle"; then
-    printf 'vm-setup: WARNING — failed to restore bundle after re-registration delete for %s\n' "$_rr_name" >&2
+    warn "failed to restore bundle after re-registration delete for $_rr_name"
     return 1
   fi
 
-  printf 'vm-setup: re-opening UTM bundle to refresh registration: %s\n' "$_rr_bundle"
+  say "re-opening UTM bundle to refresh registration: $_rr_bundle"
   if ! open "$_rr_bundle"; then
-    printf 'vm-setup: WARNING — opening %s failed after re-registration; open it manually in UTM\n' "$_rr_bundle" >&2
+    warn "opening $_rr_bundle failed after re-registration; open it manually in UTM"
     return 1
   fi
 
   if ! wait_for_utm_registration "$_rr_name"; then
-    printf 'vm-setup: WARNING — UTM did not re-register VM "%s" within timeout after stale-config repair\n' "$_rr_name" >&2
+    warn "UTM did not re-register VM '$_rr_name' within timeout after stale-config repair"
     return 1
   fi
 
@@ -495,11 +487,11 @@ resize_and_mark_image() {
   if [ -n "$_rmi_disk_gib" ]; then
     if command -v qemu-img >/dev/null 2>&1; then
       if ! qemu-img resize "$_rmi_file" "${_rmi_disk_gib}G" >/dev/null; then
-        printf 'vm-setup: failed to resize %s to %s GiB\n' "$_rmi_file" "$_rmi_disk_gib" >&2
+        error "failed to resize $_rmi_file to $_rmi_disk_gib GiB"
         return 1
       fi
     else
-      printf 'vm-setup: qemu-img not found; cannot resize %s to %s GiB\n' "$_rmi_file" "$_rmi_disk_gib" >&2
+      error "qemu-img not found; cannot resize $_rmi_file to $_rmi_disk_gib GiB"
       return 1
     fi
   fi
@@ -522,13 +514,13 @@ build_one_image() {
       # VM type must not abort builds for the remaining VMs; the build
       # function prints a specific error before returning non-zero.
       build_nixos_image "$_vm_name" "$_vm_disk_gib" \
-        || printf 'vm-setup: NixOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
+        || say "NixOS image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     Windows)
       _vm_edition="$(jq -r ".VMs[$_vm_index].windowsEdition // \"Pro\"" "$MANIFEST")"
       # WHY: best-effort — see NixOS branch above.
       build_windows_image "$_vm_name" "$_vm_disk_gib" "$_vm_edition" \
-        || printf 'vm-setup: Windows image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
+        || say "Windows image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     macOS)
       _vm_macos_ver="$(jq -r ".VMs[$_vm_index].macOSVersion // \"tahoe\"" "$MANIFEST")"
@@ -539,11 +531,10 @@ build_one_image() {
       _vm_cpus="$(jq -r ".VMs[$_vm_index].cpus" "$MANIFEST")"
       # WHY: best-effort — see NixOS branch above.
       build_macos_image "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver" \
-        || printf 'vm-setup: macOS image build skipped for "%s" (prerequisite missing or build failed; see above)\n' "$_vm_name" >&2
+        || say "macOS image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     *)
-      printf 'vm-setup: skipping build for "%s" (unsupported type: %s)\n' \
-        "$_vm_name" "$_vm_type"
+      say "skipping build for '$_vm_name' (unsupported type: $_vm_type)"
       ;;
   esac
 }
@@ -559,15 +550,15 @@ setup_tart_vm() {
 
   # Verify the tart VM was created in phase 1.
   if ! tart list 2>/dev/null | awk 'NR > 1 { print $2 }' | grep -qxF "$vm_name"; then
-    printf 'vm-setup: WARNING — tart VM "%s" not found; Packer build may have failed or was skipped\n' "$vm_name" >&2
+    warn "tart VM '$vm_name' not found; Packer build may have failed or was skipped"
     return
   fi
 
   if [ "$dry_run" = false ]; then
-    printf 'vm-setup: tart VM ready: %s (start with: tart run %s)\n' "$vm_name" "$vm_name"
+    say "tart VM ready: $vm_name (start with: tart run $vm_name)"
     write_start_script "$vm_name" "$vm_name" "$vm_type" 'darwin-tart'
   else
-    printf 'vm-setup: [dry-run] verify tart VM registration: %s\n' "$vm_name"
+    dry_run "verify tart VM registration: $vm_name"
   fi
 }
 
@@ -583,7 +574,7 @@ setup_utm_vm() {
 
   # macOS guests are provisioned via tart (setup_tart_vms), not UTM.
   if [ "$vm_type" = "macOS" ]; then
-    printf 'vm-setup: macOS guest "%s" stays on Tart runtime; skipping UTM bundle provisioning for this VM\n' "$vm_name"
+    say "macOS guest '$vm_name' stays on Tart runtime; skipping UTM bundle provisioning for this VM"
     return
   fi
 
@@ -596,14 +587,14 @@ setup_utm_vm() {
   legacy_display_config=false
   template_drift_config=false
 
-  printf 'vm-setup: configuring UTM VM "%s"...\n' "$vm_display"
+  say "configuring UTM VM '$vm_display'..."
 
   if [ -d "$bundle" ]; then
     bundle_exists=true
-    printf 'vm-setup: UTM bundle already exists: %s; refreshing config.plist\n' "$bundle"
+    say "UTM bundle already exists: $bundle; refreshing config.plist"
     if [ -f "$config_plist" ] && grep -qE '<string>(vga|std|virtio-ramfb|virtio-ramfb-gl)</string>' "$config_plist"; then
       legacy_display_config=true
-      printf 'vm-setup: detected legacy display config in existing bundle; VM will be re-registered to refresh runtime state: %s\n' "$vm_name"
+      say "detected legacy display config in existing bundle; VM will be re-registered to refresh runtime state: $vm_name"
     fi
   fi
 
@@ -611,13 +602,13 @@ setup_utm_vm() {
   # at Home Manager activation time (run nucleus-apply first).
   _plist_template="${HOME}/.local/share/nucleus/vms/${vm_name}-config.plist"
   if [ ! -f "$_plist_template" ]; then
-    printf 'vm-setup: WARNING \u2014 UTM config template not found at %s; apply the macOS config first\n' "$_plist_template" >&2
+    warn "UTM config template not found at $_plist_template; apply the macOS config first"
     return
   fi
   # Detect stale templates from older schema/value generations and fail fast
   # with a concrete action instead of copying a known-invalid plist.
   if grep -qE 'virtio-ramfb-gl|<key>DirectorySharing</key>|<key>ReadOnlySharing</key>|<key>SharedDirectories</key>' "$_plist_template"; then
-    printf 'vm-setup: WARNING — stale UTM template detected at %s; run home-manager switch (or nucleus apply) before vm-setup\n' "$_plist_template" >&2
+    warn "stale UTM template detected at $_plist_template; run home-manager switch (or nucleus apply) before vm-setup"
     return
   fi
   _required_utm_keys='
@@ -652,8 +643,7 @@ setup_utm_vm() {
     fi
   done
   if [ -n "$_missing_utm_keys" ]; then
-    printf 'vm-setup: WARNING — stale or incomplete UTM template detected at %s (missing key(s):%s); run home-manager switch (or nucleus apply) before vm-setup\n' \
-      "$_plist_template" "$_missing_utm_keys" >&2
+    warn "stale or incomplete UTM template detected at $_plist_template (missing key(s):$_missing_utm_keys); run home-manager switch (or nucleus apply) before vm-setup"
     return
   fi
   # Detect config drift in already-registered bundles. UTM can keep runtime
@@ -661,7 +651,7 @@ setup_utm_vm() {
   # bundle config no longer matches the managed template.
   if [ "$bundle_exists" = true ] && [ -f "$config_plist" ] && ! cmp -s "$_plist_template" "$config_plist"; then
     template_drift_config=true
-    printf 'vm-setup: detected config drift in existing bundle; VM will be re-registered to refresh runtime state: %s\n' "$vm_name"
+    say "detected config drift in existing bundle; VM will be re-registered to refresh runtime state: $vm_name"
   fi
   # Require a pre-built image only when the bundle does not already have a
   # disk. Existing bundles can refresh config.plist in-place.
@@ -670,9 +660,9 @@ setup_utm_vm() {
   if [ ! -f "$disk_file" ] && [ ! -f "$_prebuilt" ]; then
     _build_tmp="$IMAGES_DIR/${vm_name}-build"
     if [ -d "$_build_tmp" ]; then
-      printf 'vm-setup: WARNING — image not ready for %s; build appears in progress at %s\n' "$vm_name" "$_build_tmp" >&2
+      warn "image not ready for '$vm_name'; build appears in progress at $_build_tmp"
     else
-      printf 'vm-setup: WARNING — image not found: %s; build failed or type not supported\n' "$_prebuilt" >&2
+      warn "image not found: $_prebuilt; build failed or type not supported"
     fi
     return
   fi
@@ -681,7 +671,7 @@ setup_utm_vm() {
     if validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
       _prebuilt_valid=true
     else
-      printf 'vm-setup: WARNING — pre-built image is invalid for %s: %s\n' "$vm_name" "$_prebuilt" >&2
+      warn "pre-built image is invalid for '$vm_name': $_prebuilt"
       return
     fi
   fi
@@ -692,58 +682,58 @@ setup_utm_vm() {
     mkdir -p "$data_dir"
     _replace_runtime=false
     if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}"; then
-      printf 'vm-setup: existing runtime disk is invalid for %s; replacing from pre-built image\n' "$vm_name" >&2
+      warn "existing runtime disk is invalid for '$vm_name'; replacing from pre-built image"
       rm -f "$disk_file"
       _replace_runtime=true
     fi
     if [ -f "$disk_file" ] && ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
-      printf 'vm-setup: %s runtime disk guest credential drift detected; replacing runtime disk from pre-built image\n' "$vm_name" >&2
+      warn "$vm_name runtime disk guest credential drift detected; replacing runtime disk from pre-built image"
       rm -f "$disk_file"
       _replace_runtime=true
     fi
     if [ ! -f "$disk_file" ]; then
       if [ "$_prebuilt_valid" != true ]; then
-        printf 'vm-setup: WARNING — cannot replace the %s runtime disk because no valid pre-built image is available: %s\n' "$vm_name" "$_prebuilt" >&2
+        warn "cannot replace the $vm_name runtime disk because no valid pre-built image is available: $_prebuilt"
         return
       fi
       cp "$_prebuilt" "$disk_file"
-      printf 'vm-setup: copied pre-built disk image: %s\n' "$disk_file"
+      say "copied pre-built disk image: $disk_file"
       resize_and_mark_image '' "$disk_credential_marker"
     elif [ "$_replace_runtime" = true ]; then
-      printf 'vm-setup: WARNING — replacement was requested for %s but the runtime disk still exists; leaving it untouched\n' "$vm_name" >&2
+      warn "replacement was requested for '$vm_name' but the runtime disk still exists; leaving it untouched"
     else
-      printf 'vm-setup: preserving existing disk image: %s\n' "$disk_file"
+      say "preserving existing disk image: $disk_file"
     fi
     cp "$_plist_template" "$config_plist"
     # Nix store files are read-only (mode 0444).  Make the bundle-local copy
     # writable so UTM can update the plist after import if needed.
     chmod +w "$config_plist"
     if [ "$bundle_exists" = true ]; then
-      printf 'vm-setup: refreshed UTM bundle config: %s\n' "$bundle"
+      say "refreshed UTM bundle config: $bundle"
     else
-      printf 'vm-setup: UTM bundle created: %s\n' "$bundle"
+      say "UTM bundle created: $bundle"
     fi
     if ! "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$vm_name"; then
-      printf 'vm-setup: opening UTM bundle in place: %s\n' "$bundle"
+      say "opening UTM bundle in place: $bundle"
       if open "$bundle"; then
         if wait_for_utm_registration "$vm_name"; then
-          printf 'vm-setup: UTM VM opened and registered: %s\n' "$vm_name"
+          say "UTM VM opened and registered: $vm_name"
         else
-          printf 'vm-setup: WARNING — UTM did not register VM "%s" within timeout; open UTM and retry vm-setup\n' "$vm_name" >&2
+          warn "UTM did not register VM '$vm_name' within timeout; open UTM and retry vm-setup"
         fi
       else
-        printf 'vm-setup: WARNING — opening %s failed; ensure UTM can access the managed VM directory and retry\n' "$bundle" >&2
+        warn "opening $bundle failed; ensure UTM can access the managed VM directory and retry"
       fi
     elif [ "$legacy_display_config" = true ] || [ "$template_drift_config" = true ]; then
-      printf 'vm-setup: repairing stale UTM runtime registration for %s\n' "$vm_name"
+      say "repairing stale UTM runtime registration for $vm_name"
       if re_register_utm_bundle "$vm_name" "$bundle"; then
-        printf 'vm-setup: stale UTM registration repaired: %s\n' "$vm_name"
+        say "stale UTM registration repaired: $vm_name"
       fi
     else
-      printf 'vm-setup: UTM VM already registered: %s\n' "$vm_name"
+      say "UTM VM already registered: $vm_name"
     fi
   else
-    printf 'vm-setup: [dry-run] create UTM bundle %s from %s\n' "$bundle" "$_plist_template"
+    dry_run "create UTM bundle $bundle from $_plist_template"
   fi
 }
 
@@ -759,16 +749,16 @@ setup_libvirt_vm() {
   disk_path="$VM_DIR/${vm_name}.qcow2"
   disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_path")"
 
-  printf 'vm-setup: configuring libvirt VM "%s"...\n' "$vm_display"
+  say "configuring libvirt VM '$vm_display'..."
 
   # Require a pre-built image (built in phase 1).
   _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
   if [ ! -f "$_prebuilt" ]; then
-    printf 'vm-setup: WARNING \u2014 image not found: %s; skipping "%s"\n' "$_prebuilt" "$vm_name" >&2
+    warn "image not found: $_prebuilt; skipping '$vm_name'"
     return
   fi
   if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
-    printf 'vm-setup: WARNING — pre-built image is invalid for %s: %s\n' "$vm_name" "$_prebuilt" >&2
+    warn "pre-built image is invalid for '$vm_name': $_prebuilt"
     return
   fi
 
@@ -778,43 +768,43 @@ setup_libvirt_vm() {
     if [ ! -f "$disk_path" ]; then
       _replace_runtime=true
     elif ! validate_qcow2_image "$disk_path" "existing libvirt runtime disk for ${vm_name}"; then
-      printf 'vm-setup: existing libvirt runtime disk is invalid for %s; replacing from pre-built image\n' "$vm_name" >&2
+      warn "existing libvirt runtime disk is invalid for '$vm_name'; replacing from pre-built image"
       rm -f "$disk_path"
       _replace_runtime=true
     elif ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
-      printf 'vm-setup: %s runtime disk guest credential drift detected; replacing runtime disk from pre-built image\n' "$vm_name" >&2
+      warn "$vm_name runtime disk guest credential drift detected; replacing runtime disk from pre-built image"
       rm -f "$disk_path"
       _replace_runtime=true
     fi
 
     if [ "$_replace_runtime" = true ]; then
       cp "$_prebuilt" "$disk_path"
-      printf 'vm-setup: disk image placed: %s\n' "$disk_path"
+      say "disk image placed: $disk_path"
       resize_and_mark_image '' "$disk_credential_marker"
     else
-      printf 'vm-setup: disk already exists: %s\n' "$disk_path"
+      say "disk already exists: $disk_path"
     fi
   else
-    printf 'vm-setup: [dry-run] copy %s to %s\n' "$_prebuilt" "$disk_path"
+    dry_run "copy $_prebuilt to $disk_path"
   fi
 
   # Define/update the libvirt domain from the Nix-generated XML (idempotent).
   # The file is installed at apply time by environment.etc in vms.nix.
   _xml_file="/etc/nucleus/vms/${vm_name}-domain.xml"
   if [ ! -f "$_xml_file" ]; then
-    printf 'vm-setup: WARNING — domain XML not found at %s; apply the NixOS config first\n' "$_xml_file" >&2
+    warn "domain XML not found at $_xml_file; apply the NixOS config first"
     return
   fi
 
   if [ "$dry_run" = false ]; then
     if virsh define "$_xml_file"; then
-      printf 'vm-setup: VM "%s" defined/updated in libvirt\n' "$vm_name"
+      say "VM '$vm_name' defined/updated in libvirt"
       write_start_script "$vm_name" "$vm_display" "$vm_type" 'nixos-libvirt'
     else
-      printf 'vm-setup: WARNING — virsh define failed for "%s"; check libvirtd status\n' "$vm_name" >&2
+      warn "virsh define failed for '$vm_name'; check libvirtd status"
     fi
   else
-    printf 'vm-setup: [dry-run] virsh define %s\n' "$_xml_file"
+    dry_run "virsh define $_xml_file"
   fi
 }
 
@@ -851,33 +841,31 @@ build_nixos_image() {
   if [ -f "$_out" ]; then
     if validate_qcow2_image "$_out" "existing NixOS image"; then
       if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
-        printf 'vm-setup: NixOS image already built for the current guest credentials (owner=%s, username=%s): %s\n' "$vm_secret_owner" "$vm_guest_username" "$_out"
+        say "NixOS image already built for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username): $_out"
         return 0
       fi
-      printf 'vm-setup: NixOS image guest credential drift detected; rebuilding image: %s\n' "$_out"
+      say "NixOS image guest credential drift detected; rebuilding image: $_out"
     else
-      printf 'vm-setup: existing NixOS image is invalid; rebuilding from scratch: %s\n' "$_out" >&2
+      warn "existing NixOS image is invalid; rebuilding from scratch: $_out"
     fi
     if [ "$dry_run" = false ]; then
       rm -f "$_out" "$_marker"
     else
-      printf 'vm-setup: [dry-run] rm -f %s %s\n' "$_out" "$_marker"
+      dry_run "rm -f $_out $_marker"
       return 0
     fi
   fi
 
   _guest_nix="$VMS_DIR/nixos/guest.nix"
   if [ ! -f "$_guest_nix" ]; then
-    printf 'vm-setup: nixos guest config not found: %s\n' "$_guest_nix" >&2
+    error "nixos guest config not found: $_guest_nix"
     return 1
   fi
 
-  printf 'vm-setup: building NixOS image (system=%s, format=%s)...\n' \
-    "$_nixos_system" "$_nixos_format"
+  say "building NixOS image (system=$_nixos_system, format=$_nixos_format)..."
 
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] nix run "%s/src#nixos-generators" -- --format %s --system %s --configuration %s -o <tmpdir>\n' \
-      "$REPO_ROOT" "$_nixos_format" "$_nixos_system" "$_guest_nix"
+    dry_run "nix run $REPO_ROOT/src#nixos-generators -- --format $_nixos_format --system $_nixos_system --configuration $_guest_nix -o <tmpdir>"
     return 0
   fi
 
@@ -898,7 +886,7 @@ build_nixos_image() {
     _img="$(find -L "$_out_link" -maxdepth 2 -name '*.qcow2' -print -quit 2>/dev/null)"
   fi
   if [ -z "$_img" ] || [ ! -e "$_img" ]; then
-    printf 'vm-setup: nixos-generators produced no .qcow2 via %s\n' "$_out_link" >&2
+    error "nixos-generators produced no .qcow2 via $_out_link"
     rm -rf "$_tmpdir"
     return 1
   fi
@@ -916,7 +904,7 @@ build_nixos_image() {
   fi
 
   rm -rf "$_tmpdir"
-  printf 'vm-setup: NixOS image ready: %s\n' "$_out"
+  say "NixOS image ready: $_out"
 }
 
 # download_windows_iso_mido CACHED_ISO EDITION
@@ -933,12 +921,12 @@ download_windows_iso_mido() {
   _mido_vendor_script="$REPO_ROOT/vendor/qvm-create-windows-qube/windows/isos/mido.sh"
   _mido_script="${NUCLEUS_MIDO_SCRIPT:-$_mido_vendor_script}"
   if [ ! -f "$_mido_script" ]; then
-    printf 'vm-setup: mido.sh not found; run: git submodule update --init vendor/qvm-create-windows-qube\n' >&2
+    error "mido.sh not found; run: git submodule update --init vendor/qvm-create-windows-qube"
     return 1
   fi
 
   if ! command -v curl >/dev/null 2>&1; then
-    printf 'vm-setup: curl not found; required for Mido ISO download\n' >&2
+    error "curl not found; required for Mido ISO download"
     return 1
   fi
 
@@ -951,7 +939,7 @@ download_windows_iso_mido() {
     *) _mido_media='win11x64' ;;
   esac
 
-  printf 'vm-setup: downloading Windows 11 ISO via Mido (media=%s)...\n' "$_mido_media"
+  say "downloading Windows 11 ISO via Mido (media=$_mido_media)..."
 
   # Keep vendor submodules immutable by patching a temporary copy only.
   # This preserves a clean submodule tree while allowing fast compatibility
@@ -966,21 +954,21 @@ download_windows_iso_mido() {
       cp "$_mido_script" "$_mido_exec_script"
       chmod 755 "$_mido_exec_script"
       if patch -s "$_mido_exec_script" "$_mido_patch_file" >/dev/null 2>&1; then
-        printf 'vm-setup: applied runtime Mido patch: %s\n' "$_mido_patch_file"
+        say "applied runtime Mido patch: $_mido_patch_file"
       elif patch -s -R --dry-run "$_mido_exec_script" "$_mido_patch_file" >/dev/null 2>&1; then
-        printf 'vm-setup: runtime Mido patch already present in source script; continuing\n'
+        say "runtime Mido patch already present in source script; continuing"
       else
-        printf 'vm-setup: runtime Mido patch failed to apply; update %s for current vendor mido.sh before retrying\n' "$_mido_patch_file" >&2
+        error "runtime Mido patch failed to apply; update $_mido_patch_file for current vendor mido.sh before retrying"
         rm -rf "$_mido_script_tmp"
         _mido_script_tmp=''
         return 1
       fi
     else
-      printf 'vm-setup: patch command is required for Mido runtime patching; install patch and retry\n' >&2
+      error "patch command is required for Mido runtime patching; install patch and retry"
       return 1
     fi
   else
-    printf 'vm-setup: warning: runtime Mido patch file not found (%s); continuing with vendor script\n' "$_mido_patch_file" >&2
+    warn "runtime Mido patch file not found ($_mido_patch_file); continuing with vendor script"
   fi
 
   _mido_tmp="$(mktemp -d)"
@@ -1011,7 +999,7 @@ EOF
   # Accept the file and proceed; the caller can verify manually if desired.
   # Source: Mido exit codes in the ending_summary function of mido.sh
   if [ "$_mido_status" -ne 0 ] && [ "$_mido_status" -ne 4 ]; then
-    printf 'vm-setup: Mido exited with code %s\n' "$_mido_status" >&2
+    error "Mido exited with code $_mido_status"
     rm -rf "$_mido_tmp"
     rm -rf "$_mido_script_tmp"
     return 1
@@ -1019,7 +1007,7 @@ EOF
 
   _mido_iso="$(find "$_mido_tmp" -maxdepth 1 \( -name '*.iso' -o -name '*.iso.UNVERIFIED' \) -print -quit 2>/dev/null)"
   if [ -z "$_mido_iso" ]; then
-    printf 'vm-setup: Mido: no ISO found in temp dir after download\n' >&2
+    error "Mido: no ISO found in temp dir after download"
     rm -rf "$_mido_tmp"
     rm -rf "$_mido_script_tmp"
     return 1
@@ -1028,7 +1016,7 @@ EOF
   mv "$_mido_iso" "$_mido_cached"
   rm -rf "$_mido_tmp"
   rm -rf "$_mido_script_tmp"
-  printf 'vm-setup: Windows ISO downloaded: %s\n' "$_mido_cached"
+  say "Windows ISO downloaded: $_mido_cached"
   return 0
 }
 
@@ -1044,16 +1032,16 @@ download_windows_iso_fido() {
 
   _fido_script="$REPO_ROOT/vendor/Fido/Fido.ps1"
   if [ ! -f "$_fido_script" ]; then
-    printf 'vm-setup: Fido.ps1 not found; run: git submodule update --init vendor/Fido\n' >&2
+    error "Fido.ps1 not found; run: git submodule update --init vendor/Fido"
     return 1
   fi
 
   if ! command -v pwsh >/dev/null 2>&1; then
-    printf 'vm-setup: pwsh not found; cannot use Fido for ISO auto-download\n'
+    say "pwsh not found; cannot use Fido for ISO auto-download"
     return 1
   fi
 
-  printf 'vm-setup: downloading Windows 11 ISO via Fido (edition=%s)...\n' "$_fido_edition"
+  say "downloading Windows 11 ISO via Fido (edition=$_fido_edition)..."
   # Run Fido in a temp dir so it downloads the ISO to a known location.
   # Fido.ps1 downloads to the working directory and returns the filename.
   # Source: https://github.com/pbatard/Fido#usage
@@ -1068,7 +1056,7 @@ download_windows_iso_fido() {
   ) || _fido_status=$?
 
   if [ "$_fido_status" -ne 0 ]; then
-    printf 'vm-setup: Fido exited with code %s\n' "$_fido_status" >&2
+    error "Fido exited with code $_fido_status"
     rm -rf "$_fido_tmp"
     return 1
   fi
@@ -1077,14 +1065,14 @@ download_windows_iso_fido() {
   # ISO so sort-by-time is unnecessary.
   _fido_iso="$(find "$_fido_tmp" -maxdepth 1 -name '*.iso' | head -1)"
   if [ -z "$_fido_iso" ]; then
-    printf 'vm-setup: Fido: no ISO found in temp dir after download\n' >&2
+    error "Fido: no ISO found in temp dir after download"
     rm -rf "$_fido_tmp"
     return 1
   fi
 
   mv "$_fido_iso" "$_fido_cached"
   rm -rf "$_fido_tmp"
-  printf 'vm-setup: Windows ISO downloaded: %s\n' "$_fido_cached"
+  say "Windows ISO downloaded: $_fido_cached"
   return 0
 }
 
@@ -1100,22 +1088,22 @@ download_windows_iso_fido_url_nonwindows() {
 
   _fido_script="$REPO_ROOT/vendor/Fido/Fido.ps1"
   if [ ! -f "$_fido_script" ]; then
-    printf 'vm-setup: Fido.ps1 not found; run: git submodule update --init vendor/Fido\n' >&2
+    error "Fido.ps1 not found; run: git submodule update --init vendor/Fido"
     return 1
   fi
 
   if ! command -v pwsh >/dev/null 2>&1; then
-    printf 'vm-setup: pwsh not found; cannot use Fido URL fallback\n' >&2
+    error "pwsh not found; cannot use Fido URL fallback"
     return 1
   fi
 
   if ! command -v perl >/dev/null 2>&1; then
-    printf 'vm-setup: perl not found; cannot patch temporary Fido script for non-Windows URL fallback\n' >&2
+    error "perl not found; cannot patch temporary Fido script for non-Windows URL fallback"
     return 1
   fi
 
   if ! command -v curl >/dev/null 2>&1; then
-    printf 'vm-setup: curl not found; required for Fido URL fallback download\n' >&2
+    error "curl not found; required for Fido URL fallback download"
     return 1
   fi
 
@@ -1124,7 +1112,7 @@ download_windows_iso_fido_url_nonwindows() {
     *) _fido_ed_query='Home/Pro/Edu' ;;
   esac
 
-  printf 'vm-setup: resolving Windows 11 ISO URL via Fido fallback (edition=%s)...\n' "$_fido_ed_query"
+  say "resolving Windows 11 ISO URL via Fido fallback (edition=$_fido_ed_query)..."
 
   _fido_tmp="$(mktemp -d)"
   _fido_exec="$_fido_tmp/Fido.ps1"
@@ -1136,7 +1124,7 @@ download_windows_iso_fido_url_nonwindows() {
   _fido_patch_status=0
   perl -0pi -e 's/if \(\$winver -le 6\.1\) \{/if (\$false) {/g' "$_fido_exec" || _fido_patch_status=$?
   if [ "$_fido_patch_status" -ne 0 ]; then
-    printf 'vm-setup: failed to patch temporary Fido script for non-Windows fallback (exit %s)\n' "$_fido_patch_status" >&2
+    error "failed to patch temporary Fido script for non-Windows fallback (exit $_fido_patch_status)"
     rm -rf "$_fido_tmp"
     return 1
   fi
@@ -1150,9 +1138,9 @@ download_windows_iso_fido_url_nonwindows() {
 
   if [ "$_fido_status" -ne 0 ]; then
     if grep -q '715-123130' "$_fido_output_file"; then
-      printf 'vm-setup: Microsoft blocked automated ISO URL resolution (code 715-123130); retry later or use --windows-iso PATH\n' >&2
+      error "Microsoft blocked automated ISO URL resolution (code 715-123130); retry later or use --windows-iso PATH"
     fi
-    printf 'vm-setup: Fido URL resolver exited with code %s\n' "$_fido_status" >&2
+    error "Fido URL resolver exited with code $_fido_status"
     rm -rf "$_fido_tmp"
     return 1
   fi
@@ -1160,25 +1148,25 @@ download_windows_iso_fido_url_nonwindows() {
   _fido_url="$(grep -Eo 'https://[^[:space:]]+\.iso[^[:space:]]*' "$_fido_output_file" | tail -1)"
   if [ -z "$_fido_url" ]; then
     if grep -q '715-123130' "$_fido_output_file"; then
-      printf 'vm-setup: Microsoft blocked automated ISO URL resolution (code 715-123130); retry later or use --windows-iso PATH\n' >&2
+      error "Microsoft blocked automated ISO URL resolution (code 715-123130); retry later or use --windows-iso PATH"
     fi
-    printf 'vm-setup: Fido URL resolver returned no ISO URL\n' >&2
+    error "Fido URL resolver returned no ISO URL"
     rm -rf "$_fido_tmp"
     return 1
   fi
 
-  printf 'vm-setup: downloading Windows ISO from resolved URL...\n'
+  say "downloading Windows ISO from resolved URL..."
   _fido_dl_status=0
   curl -fL -o "$_fido_cached" "$_fido_url" || _fido_dl_status=$?
   if [ "$_fido_dl_status" -ne 0 ]; then
-    printf 'vm-setup: Fido URL fallback download failed (exit %s); removing partial file\n' "$_fido_dl_status" >&2
+    error "Fido URL fallback download failed (exit $_fido_dl_status); removing partial file"
     rm -f "$_fido_cached"
     rm -rf "$_fido_tmp"
     return 1
   fi
 
   rm -rf "$_fido_tmp"
-  printf 'vm-setup: Windows ISO downloaded via Fido URL fallback: %s\n' "$_fido_cached"
+  say "Windows ISO downloaded via Fido URL fallback: $_fido_cached"
   return 0
 }
 
@@ -1195,12 +1183,12 @@ build_windows_image() {
   if [ -f "$_out" ]; then
     if validate_qcow2_image "$_out" "existing Windows image"; then
       if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
-        printf 'vm-setup: Windows image already built for the current guest credentials (owner=%s, username=%s): %s\n' "$vm_secret_owner" "$vm_guest_username" "$_out"
+        say "Windows image already built for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username): $_out"
         return 0
       fi
-      printf 'vm-setup: Windows image guest credential drift detected; rebuilding image: %s\n' "$_out"
+      say "Windows image guest credential drift detected; rebuilding image: $_out"
     fi
-    printf 'vm-setup: existing Windows image is invalid; rebuilding from scratch: %s\n' "$_out" >&2
+    warn "existing Windows image is invalid; rebuilding from scratch: $_out"
     rm -f "$_out" "$_marker"
   fi
 
@@ -1208,14 +1196,14 @@ build_windows_image() {
   # windowsIsoUrl field from VMs.json as a download source.
   _iso="$windows_iso"
   if [ -z "$_iso" ]; then
-    printf 'vm-setup: Windows ISO fallback order: cached installer -> windowsIsoUrl -> downloader (%s mode)\n' "$windows_iso_source"
+    say "Windows ISO fallback order: cached installer -> windowsIsoUrl -> downloader ($windows_iso_source mode)"
   fi
 
   # Resolve from cache first when --windows-iso is omitted.
   if [ -z "$_iso" ]; then
     _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
     if [ -f "$_cached_iso" ]; then
-      printf 'vm-setup: using cached Windows installer: %s\n' "$_cached_iso"
+      say "using cached Windows installer: $_cached_iso"
       _iso="$_cached_iso"
     fi
   fi
@@ -1225,18 +1213,18 @@ build_windows_image() {
     _iso_url="$(jq -r ".VMs[] | select(.name == \"$_name\") | .windowsIsoUrl // empty" "$MANIFEST")"
     if [ -n "$_iso_url" ]; then
       _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
-      printf 'vm-setup: downloading Windows installer from windowsIsoUrl...\n'
+      say "downloading Windows installer from windowsIsoUrl..."
       if [ "$dry_run" = false ]; then
         if run_with_backoff 'windowsIsoUrl download' curl -fL -o "$_cached_iso" "$_iso_url"; then
           _iso="$_cached_iso"
-          printf 'vm-setup: Windows installer downloaded: %s\n' "$_cached_iso"
+          say "Windows installer downloaded: $_cached_iso"
         else
-          printf 'vm-setup: windowsIsoUrl download failed; remove %s and retry\n' "$_cached_iso" >&2
+          error "windowsIsoUrl download failed; remove $_cached_iso and retry"
           rm -f "$_cached_iso"
           return 1
         fi
       else
-        printf 'vm-setup: [dry-run] curl -fL -o %s %s\n' "$_cached_iso" "$_iso_url"
+        dry_run "curl -fL -o $_cached_iso $_iso_url"
       fi
     fi
   fi
@@ -1251,7 +1239,7 @@ build_windows_image() {
     if [ "$dry_run" = false ]; then
       case "$windows_iso_source" in
         url)
-          printf 'vm-setup: windows-iso-source=url selected and no cached/windowsIsoUrl installer was resolved\n' >&2
+          error "windows-iso-source=url selected and no cached/windowsIsoUrl installer was resolved"
           ;;
         mido)
           if run_with_backoff 'Mido Windows ISO download' download_windows_iso_mido "$_cached_iso" "$_edition"; then
@@ -1272,7 +1260,7 @@ build_windows_image() {
               if run_with_backoff 'Fido URL resolver/download' download_windows_iso_fido_url_nonwindows "$_cached_iso" "$_edition"; then
                 _iso="$_cached_iso"
               else
-                printf 'vm-setup: Fido URL fallback failed on %s; trying Mido as secondary fallback\n' "$_host_uname" >&2
+                warn "Fido URL fallback failed on $_host_uname; trying Mido as secondary fallback"
                 if run_with_backoff 'Mido Windows ISO download' download_windows_iso_mido "$_cached_iso" "$_edition"; then
                   _iso="$_cached_iso"
                 fi
@@ -1284,32 +1272,32 @@ build_windows_image() {
     else
       case "$windows_iso_source" in
         url)
-          printf 'vm-setup: [dry-run] windows-iso-source=url selected; no downloader fallback will run\n'
+          dry_run "windows-iso-source=url selected; no downloader fallback will run"
           ;;
         mido)
-          printf 'vm-setup: [dry-run] would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (with runtime patch copy)\n'
+          dry_run "would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (with runtime patch copy)"
           ;;
         auto)
-          printf 'vm-setup: [dry-run] non-Windows hosts: Fido URL resolver then Mido; Windows hosts: Mido then Fido\n'
+          dry_run "non-Windows hosts: Fido URL resolver then Mido; Windows hosts: Mido then Fido"
           ;;
       esac
     fi
   fi
 
   if [ -z "$_iso" ]; then
-    printf 'vm-setup: --windows-iso PATH is required for Windows 11 builds\n' >&2
-    printf 'vm-setup: alternatively add "windowsIsoUrl": "<url>" to the VMs.json windows entry\n' >&2
-    printf 'vm-setup: download from: https://www.microsoft.com/software-download/windows11\n' >&2
+    error "--windows-iso PATH is required for Windows 11 builds"
+    error "alternatively add 'windowsIsoUrl': '<url>' to the VMs.json windows entry"
+    error "download from: https://www.microsoft.com/software-download/windows11"
     return 1
   fi
 
   if [ ! -f "$_iso" ]; then
-    printf 'vm-setup: Windows ISO not found: %s\n' "$_iso" >&2
+    error "Windows ISO not found: $_iso"
     return 1
   fi
 
   if ! command -v packer >/dev/null 2>&1; then
-    printf 'vm-setup: packer not found; install via nixpkgs (pkgs.packer is in baseSharedPackages)\n' >&2
+    error "packer not found; install via nixpkgs (pkgs.packer is in baseSharedPackages)"
     return 1
   fi
 
@@ -1326,8 +1314,7 @@ build_windows_image() {
     _ssh_timeout='72h'
   fi
 
-  printf 'vm-setup: building Windows 11 image (disk=%s GiB, accelerator=%s)...\n' \
-    "$_disk_gib" "$accelerator"
+  say "building Windows 11 image (disk=$_disk_gib GiB, accelerator=$accelerator)..."
   _display_backend=''
   if [ "$windows_headless" = 'false' ]; then
     _display_help="$(qemu-system-x86_64 -display help || true)"
@@ -1338,11 +1325,11 @@ build_windows_image() {
       fi
     done
     if [ -z "$_display_backend" ]; then
-      printf 'vm-setup: no supported QEMU display backend found for headful debugging; available backends:\n%s\n' "$_display_help" >&2
+      error "no supported QEMU display backend found for headful debugging; available backends:\n$_display_help"
       return 1
     fi
-    printf 'vm-setup: debug mode enabled; running Windows Packer build headful (headless=false)\n'
-    printf 'vm-setup: using QEMU display backend for debug run: %s\n' "$_display_backend"
+    say "debug mode enabled; running Windows Packer build headful (headless=false)"
+    say "using QEMU display backend for debug run: $_display_backend"
   fi
 
   # WHY: This repository currently standardizes Windows guest runtime on BIOS
@@ -1399,13 +1386,13 @@ bios legacy 3h'
   fi
 
   if [ -n "$_efi_code" ] && [ -n "$_efi_vars" ]; then
-    printf 'vm-setup: EFI firmware detected (%s, %s) but BIOS-only build policy is active\n' "$_efi_code" "$_efi_vars"
+    say "EFI firmware detected ($_efi_code, $_efi_vars) but BIOS-only build policy is active"
   else
-    printf 'vm-setup: EFI firmware not detected; using BIOS-only build attempts\n'
+    say "EFI firmware not detected; using BIOS-only build attempts"
   fi
 
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] remove stale temporary output directory (if present): %s\n' "$_tmp_out"
+    dry_run "remove stale temporary output directory (if present): $_tmp_out"
     while IFS=' ' read -r _firmware_mode _boot_strategy _attempt_timeout; do
       [ -n "$_firmware_mode" ] || continue
       _pv="-var windows_iso=$_iso -var guest_username=$vm_guest_username -var guest_password=<redacted>"
@@ -1420,7 +1407,7 @@ bios legacy 3h'
         _pv="$_pv -var efi_firmware_code=$_efi_code -var efi_firmware_vars=$_efi_vars"
       fi
       _pv="$_pv -var disk_size=${_disk_gib}G -var output_directory=$_tmp_out"
-      printf 'vm-setup: [dry-run] cd %s && packer build %s .\n' "$_packer_dir" "$_pv"
+      dry_run "cd $_packer_dir && packer build $_pv ."
     done <<EOF
 $_build_attempts
 EOF
@@ -1428,7 +1415,7 @@ EOF
   fi
 
   if ! command -v perl >/dev/null 2>&1; then
-    printf 'vm-setup: perl not found; required to render Windows Autounattend.xml guest credentials\n' >&2
+    error "perl not found; required to render Windows Autounattend.xml guest credentials"
     return 1
   fi
 
@@ -1438,7 +1425,7 @@ EOF
     packer init .
   ) || _packer_init_status=$?
   if [ "$_packer_init_status" -ne 0 ]; then
-    printf 'vm-setup: Packer init for Windows VM "%s" failed (exit %s)\n' "$_name" "$_packer_init_status" >&2
+    error "Packer init for Windows VM '$_name' failed (exit $_packer_init_status)"
     return "$_packer_init_status"
   fi
 
@@ -1447,8 +1434,7 @@ EOF
   while IFS=' ' read -r _firmware_mode _boot_strategy _attempt_timeout; do
     [ -n "$_firmware_mode" ] || continue
 
-    printf 'vm-setup: Windows Packer attempt using firmware_mode=%s boot_strategy=%s (ssh_timeout=%s)...\n' \
-      "$_firmware_mode" "$_boot_strategy" "$_attempt_timeout"
+    say "Windows Packer attempt using firmware_mode=$_firmware_mode boot_strategy=$_boot_strategy (ssh_timeout=$_attempt_timeout)..."
 
     # WHY: Packer qemu builder requires a non-existent output_directory.
     # Use a fresh temp tree per attempt so a failed try cannot poison the next
@@ -1459,7 +1445,7 @@ EOF
     _autounattend_rendered="$_attempt_tmpdir/Autounattend.xml"
     perl -pe "s/__NUCLEUS_GUEST_USERNAME__/${vm_guest_username}/g; s/__NUCLEUS_GUEST_PASSWORD__/${vm_guest_password}/g" \
       "$VMS_DIR/windows/Autounattend.xml" >"$_autounattend_rendered"
-    printf 'vm-setup: writing Packer debug log for this attempt: %s\n' "$_packer_log"
+    say "writing Packer debug log for this attempt: $_packer_log"
 
     _attempt_status=0
     if [ "$_firmware_mode" = 'efi' ]; then
@@ -1509,16 +1495,15 @@ EOF
     fi
 
     if [ "$_attempt_status" -eq 130 ] || [ "$_attempt_status" -eq 143 ]; then
-      printf 'vm-setup: Windows Packer attempt cancelled (exit %s); aborting retry matrix\n' "$_attempt_status" >&2
+      warn "Windows Packer attempt cancelled (exit $_attempt_status); aborting retry matrix"
       _packer_status="$_attempt_status"
       rm -rf "$_attempt_tmpdir"
       break
     fi
 
-    printf 'vm-setup: Windows Packer attempt failed for firmware_mode=%s boot_strategy=%s (exit %s); trying next strategy\n' \
-      "$_firmware_mode" "$_boot_strategy" "$_attempt_status" >&2
+    warn "Windows Packer attempt failed for firmware_mode=$_firmware_mode boot_strategy=$_boot_strategy (exit $_attempt_status); trying next strategy"
     if [ -f "$_packer_log" ]; then
-      printf 'vm-setup: last 60 lines from failed Packer log (%s):\n' "$_packer_log" >&2
+      warn "last 60 lines from failed Packer log ($_packer_log):"
       tail -n 60 "$_packer_log" >&2
     fi
     _packer_status="$_attempt_status"
@@ -1528,12 +1513,12 @@ $_build_attempts
 EOF
 
   if [ "$_packer_status" -ne 0 ]; then
-    printf 'vm-setup: Packer build for Windows VM "%s" failed (exit %s)\n' "$_name" "$_packer_status" >&2
+    error "Packer build for Windows VM '$_name' failed (exit $_packer_status)"
     return "$_packer_status"
   fi
   _built="$_built_tmpdir/output/windows.qcow2"
   if [ ! -f "$_built" ]; then
-    printf 'vm-setup: Packer did not produce %s\n' "$_built" >&2
+    error "Packer did not produce $_built"
     rm -rf "$_built_tmpdir"
     return 1
   fi
@@ -1542,13 +1527,13 @@ EOF
   rm -rf "$_built_tmpdir"
 
   if ! validate_qcow2_image "$_out" 'newly built Windows image'; then
-    printf 'vm-setup: Windows image validation failed after build; removing %s\n' "$_out" >&2
+    error "Windows image validation failed after build; removing $_out"
     rm -f "$_out"
     return 1
   fi
 
   resize_and_mark_image '' "$_marker"
-  printf 'vm-setup: Windows 11 image ready: %s\n' "$_out"
+  say "Windows 11 image ready: $_out"
 }
 
 # build_macos_image NAME DISK_GIB RAM_MIB CPUS MACOS_VERSION
@@ -1568,30 +1553,30 @@ build_macos_image() {
 
   # Tart requires Apple Virtualization.framework — macOS host only.
   if [ "$(uname -s)" != "Darwin" ]; then
-    printf 'vm-setup: macOS guest build requires a macOS host (Tart uses Virtualization.framework); skipping\n'
+    say "macOS guest build requires a macOS host (Tart uses Virtualization.framework); skipping"
     return 0
   fi
 
   if ! command -v tart >/dev/null 2>&1; then
-    printf 'vm-setup: tart not found; install with: brew install cirruslabs/cli/tart\n' >&2
+    error "tart not found; install with: brew install cirruslabs/cli/tart"
     return 1
   fi
 
   if ! command -v packer >/dev/null 2>&1; then
-    printf 'vm-setup: packer not found; install via nixpkgs (pkgs.packer)\n' >&2
+    error "packer not found; install via nixpkgs (pkgs.packer)"
     return 1
   fi
 
   # Check if tart VM already exists.
   if tart list 2>/dev/null | awk 'NR > 1 { print $2 }' | grep -qxF "$_name"; then
     if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
-      printf 'vm-setup: tart VM "%s" already exists for the current guest credentials (owner=%s, username=%s)\n' "$_name" "$vm_secret_owner" "$vm_guest_username"
+      say "tart VM '$_name' already exists for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username)"
       return 0
     fi
 
-    printf 'vm-setup: macOS guest credential drift detected; rebuilding tart VM "%s"\n' "$_name"
+    say "macOS guest credential drift detected; rebuilding tart VM '$_name'"
     if ! tart delete "$_name"; then
-      printf 'vm-setup: failed to delete stale tart VM "%s" before rebuild\n' "$_name" >&2
+      error "failed to delete stale tart VM '$_name' before rebuild"
       return 1
     fi
     rm -f "$_marker"
@@ -1602,12 +1587,10 @@ build_macos_image() {
   # Uses (n + 512) / 1024 for round-half-up in integer arithmetic.
   _mem_gib="$(( (_ram_mib + 512) / 1024 ))"
 
-  printf 'vm-setup: building macOS %s VM via Packer Tart (disk=%s GiB, mem=%s GiB, cpus=%s)...\n' \
-    "$_macos_version" "$_disk_gib" "$_mem_gib" "$_cpus"
+  say "building macOS $_macos_version VM via Packer Tart (disk=$_disk_gib GiB, mem=$_mem_gib GiB, cpus=$_cpus)..."
 
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] cd %s && packer build -var vm_name=%s -var macos_version=%s -var guest_username=%s -var guest_password=<redacted> -var disk_size_gib=%s -var memory_gib=%s -var cpus=%s .\n' \
-      "$_packer_dir" "$_name" "$_macos_version" "$vm_guest_username" "$_disk_gib" "$_mem_gib" "$_cpus"
+    dry_run "cd $_packer_dir && packer build -var vm_name=$_name -var macos_version=$_macos_version -var guest_username=$vm_guest_username -var guest_password=<redacted> -var disk_size_gib=$_disk_gib -var memory_gib=$_mem_gib -var cpus=$_cpus ."
     return 0
   fi
 
@@ -1627,11 +1610,11 @@ build_macos_image() {
   ) || _packer_status=$?
 
   if [ "$_packer_status" -ne 0 ]; then
-    printf 'vm-setup: Packer build for macOS VM "%s" failed (exit %s)\n' "$_name" "$_packer_status" >&2
+    error "Packer build for macOS VM '$_name' failed (exit $_packer_status)"
     return "$_packer_status"
   fi
   resize_and_mark_image '' "$_marker"
-  printf 'vm-setup: macOS VM "%s" built and registered in tart\n' "$_name"
+  say "macOS VM '$_name' built and registered in tart"
 }
 
 # prune_stale_build_dirs
@@ -1647,7 +1630,7 @@ prune_stale_build_dirs() {
       continue
     fi
     if [ -d "$_dir" ]; then
-      printf 'vm-setup: removing stale temporary build directory: %s\n' "$_dir"
+      say "removing stale temporary build directory: $_dir"
       rm -rf "$_dir"
     fi
   done
@@ -1666,7 +1649,7 @@ build_images() {
 #   Source: https://github.com/cirruslabs/tart
 setup_tart_vms() {
   if ! command -v tart >/dev/null 2>&1; then
-    printf 'vm-setup: tart not found; skipping macOS VM start-script generation\n'
+    say "tart not found; skipping macOS VM start-script generation"
     return
   fi
 
@@ -1677,40 +1660,40 @@ setup_tart_vms() {
 
 setup_utm_vms() {
   if [ ! -d /Applications/UTM.app ]; then
-    printf 'vm-setup: UTM not found at /Applications/UTM.app; skipping macOS VM provisioning\n'
+    say "UTM not found at /Applications/UTM.app; skipping macOS VM provisioning"
     return
   fi
 
   for_each_vm setup_utm_vm
 
-  printf 'vm-setup: macOS VM setup complete\n'
+  say "macOS VM setup complete"
 }
 
 # NixOS / libvirt
 
 setup_libvirt_vms() {
   if ! command -v virsh >/dev/null 2>&1; then
-    printf 'vm-setup: virsh not found in PATH; libvirtd may not be enabled yet\n'
-    printf 'vm-setup: apply the NixOS configuration first so vms.nix activates libvirtd\n'
+    say "virsh not found in PATH; libvirtd may not be enabled yet"
+    say "apply the NixOS configuration first so vms.nix activates libvirtd"
     return
   fi
 
   # Ensure the libvirt default network is started so VMs can reach the host.
   if virsh net-list --all 2>/dev/null | grep -q "default"; then
     if ! virsh net-list 2>/dev/null | grep -q "default.*active"; then
-      printf 'vm-setup: starting libvirt default network...\n'
+      say "starting libvirt default network..."
       if ! run_cmd virsh net-start default; then
-        printf 'vm-setup: WARNING — failed to start libvirt default network; guest networking may be unavailable until it is started manually\n' >&2
+        warn "failed to start libvirt default network; guest networking may be unavailable until it is started manually"
       fi
       if ! run_cmd virsh net-autostart default; then
-        printf 'vm-setup: WARNING — failed to mark libvirt default network for autostart; future boots may require manual recovery\n' >&2
+        warn "failed to mark libvirt default network for autostart; future boots may require manual recovery"
       fi
     fi
   fi
 
   for_each_vm setup_libvirt_vm
 
-  printf 'vm-setup: NixOS VM setup complete; use the generated start-<name> helpers (or virt-manager) to start VMs\n'
+  say "NixOS VM setup complete; use the generated start-<name> helpers (or virt-manager) to start VMs"
 }
 
 # Garbage collection for non-provisioned VM artifacts
@@ -1722,9 +1705,9 @@ setup_libvirt_vms() {
 gc_vms() {
   _gcv_expected="$(get_expected_vm_names)" || return
 
-  printf 'vm-setup: GC — scanning for non-provisioned VM artifacts...\n'
+  say "GC — scanning for non-provisioned VM artifacts..."
   if [ "$dry_run" = true ]; then
-    printf 'vm-setup: [dry-run] GC mode enabled — inspecting artifacts...\n'
+    dry_run "GC mode enabled — inspecting artifacts..."
   fi
 
   case "$(uname -s)" in
@@ -1742,7 +1725,7 @@ gc_vms() {
   gc_orphan_disks "$_gcv_expected"
   gc_orphan_markers "$_gcv_expected"
 
-  printf 'vm-setup: GC — done\n'
+  say "GC — done"
 }
 
 # gc_tart_vms EXPECTED_NAMES — Remove Tart VMs not in the expected set.
@@ -1753,7 +1736,7 @@ gc_tart_vms() {
   tart list 2>/dev/null | awk 'NR>1{print $2}' | while IFS= read -r _gct_name; do
     [ -z "$_gct_name" ] && continue
     if ! printf '%s\n' "$_gct_expected" | grep -qxF "$_gct_name"; then
-      printf 'vm-setup: GC — removing non-provisioned Tart VM: %s\n' "$_gct_name"
+      say "GC — removing non-provisioned Tart VM: $_gct_name"
       if [ "$dry_run" = false ]; then
         tart delete "$_gct_name"
       fi
@@ -1770,7 +1753,7 @@ gc_utm_bundles() {
     [ -d "$_gcu_bundle" ] || continue
     _gcu_name="$(basename "$_gcu_bundle" .utm)"
     if ! printf '%s\n' "$_gcu_expected" | grep -qxF "$_gcu_name"; then
-      printf 'vm-setup: GC — removing non-provisioned UTM bundle: %s\n' "$_gcu_bundle"
+      say "GC — removing non-provisioned UTM bundle: $_gcu_bundle"
       if [ "$dry_run" = false ]; then
         rm -rf "$_gcu_bundle"
       fi
@@ -1786,7 +1769,7 @@ gc_libvirt_vms() {
   virsh list --all --name 2>/dev/null | while IFS= read -r _gcl_name; do
     [ -z "$_gcl_name" ] && continue
     if ! printf '%s\n' "$_gcl_expected" | grep -qxF "$_gcl_name"; then
-      printf 'vm-setup: GC — removing non-provisioned libvirt domain: %s\n' "$_gcl_name"
+      say "GC — removing non-provisioned libvirt domain: $_gcl_name"
       if [ "$dry_run" = false ]; then
         virsh undefine "$_gcl_name" 2>/dev/null || true
       fi
@@ -1804,7 +1787,7 @@ gc_orphan_disks() {
       [ -f "$_gcod_path" ] || continue
       _gcod_name="$(basename "$_gcod_path" .qcow2)"
       if ! printf '%s\n' "$_gcod_expected" | grep -qxF "$_gcod_name"; then
-        printf 'vm-setup: GC — removing non-provisioned disk image: %s\n' "$_gcod_path"
+        say "GC — removing non-provisioned disk image: $_gcod_path"
         if [ "$dry_run" = false ]; then
           rm -f "$_gcod_path"
         fi
@@ -1824,7 +1807,7 @@ gc_orphan_markers() {
       [ -f "$_gcom_marker" ] || continue
       _gcom_base="${_gcom_marker%.vm-guest-credentials-sha256}"
       if [ ! -f "$_gcom_base" ]; then
-        printf 'vm-setup: GC — removing orphaned credential marker: %s\n' "$_gcom_marker"
+        say "GC — removing orphaned credential marker: $_gcom_marker"
         if [ "$dry_run" = false ]; then
           rm -f "$_gcom_marker"
         fi
