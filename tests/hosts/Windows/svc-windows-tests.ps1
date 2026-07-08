@@ -57,7 +57,7 @@ BeforeAll {
       description = 'LLM inference server'
       network     = @{ default = @{ host = '127.0.0.1'; port = 11434; protocol = 'http' } }
       platforms   = @{ windows = @{ type = 'native'; service = 'ollama'; logging = @{ capture = 'all' } } }
-      logging     = @{ maxSize = 10485760 }
+      logging     = @{ maxSize = 10000000 }
     }
     'sshd' = @{
       displayName = 'SSH Server'

@@ -49,7 +49,7 @@ assert containsRegex "NUCLEUS_GC_NO_LOG_GC" gcPs1Text;
 
 # --- src/modules/services.json: $defaults.logging block ---
 assert containsRegex "[$]defaults" servicesJsonText;
-assert containsRegex ''"maxSize": 10485760'' servicesJsonText;
+assert containsRegex ''"maxSize": 10000000'' servicesJsonText;
 assert containsRegex ''"maxFiles": 4'' servicesJsonText;
 assert containsRegex ''"compress": true'' servicesJsonText;
 

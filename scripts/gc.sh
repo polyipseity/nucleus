@@ -28,7 +28,7 @@ usage() {
   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
   --log-gc|--no-log-gc                Control log rotation (default: --log-gc).
-  --log-max-size <bytes>              Log rotation max file size before rotation (default: 10485760).
+  --log-max-size <bytes>              Log rotation max file size before rotation (default: 10000000).
   --log-max-files <count>             Number of rotated archives to keep (default: 4).
   --log-compress <true|false>         Compress rotated logs (default: true).
   --expiry <duration>                       Master expiry override (e.g. "14d"). Per-tool flags win (default: "7d").
@@ -478,7 +478,7 @@ gc_logs() {
     return 0
   fi
 
-  _gl_maxsize="${log_max_size:-$(jq -r '.["$defaults"].logging.maxSize // 10485760' "$services_json")}"
+  _gl_maxsize="${log_max_size:-$(jq -r '.["$defaults"].logging.maxSize // 10000000' "$services_json")}" # bytes
   _gl_maxfiles="${log_max_files:-$(jq -r '.["$defaults"].logging.maxFiles // 4' "$services_json")}"
   _gl_compress="${log_compress:-$(jq -r '.["$defaults"].logging.compress // "true"' "$services_json")}"
 

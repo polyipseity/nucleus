@@ -41,7 +41,7 @@ test_below_maxsize_noop() {
     echo "small log content" > "$logfile"
     local before_size
     before_size=$(wc -c < "$logfile")
-    rotate_log_file "$logfile" 10485760 4 false
+    rotate_log_file "$logfile" 10000000 4 false
     local after_size
     after_size=$(wc -c < "$logfile")
     if [ "$before_size" -eq "$after_size" ] && [ -f "$logfile" ]; then

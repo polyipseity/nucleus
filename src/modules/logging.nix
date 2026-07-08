@@ -30,7 +30,7 @@ in
     rotation = {
       maxSize = mkOption {
         type = types.int;
-        default = 10485760;
+        default = 10000000; # bytes
         description = "Maximum log file size in bytes before rotation (runtime source: services.json).";
       };
 

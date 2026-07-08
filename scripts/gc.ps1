@@ -356,11 +356,11 @@ if (-not $NoLogGc) {
     }
 
     if ($defaultLogging) {
-      $logMaxSize = if ($LogMaxSize) { [int]$LogMaxSize } elseif ($defaultLogging.maxSize) { [int]$defaultLogging.maxSize } else { 10485760 }
+      $logMaxSize = if ($LogMaxSize) { [int]$LogMaxSize } elseif ($defaultLogging.maxSize) { [int]$defaultLogging.maxSize } else { 10000000 } # bytes
       $logMaxFiles = if ($LogMaxFiles) { [int]$LogMaxFiles } elseif ($defaultLogging.maxFiles) { [int]$defaultLogging.maxFiles } else { 4 }
       $logCompress = if ($LogCompress) { [bool]::Parse($LogCompress) } elseif ($null -ne $defaultLogging.compress) { [bool]$defaultLogging.compress } else { $true }
     } else {
-      $logMaxSize = 10485760
+      $logMaxSize = 10000000 # bytes
       $logMaxFiles = 4
       $logCompress = $true
     }

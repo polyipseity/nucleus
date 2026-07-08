@@ -216,7 +216,7 @@ refresh_services_menu() {
 # When compress is "true", the .1 archive is gzip-compressed to .1.gz.
 rotate_log_file() {
   _rlf_logfile="$1"
-  _rlf_maxsize="${2:-10485760}"
+  _rlf_maxsize="${2:-10000000}" # bytes
   _rlf_maxfiles="${3:-4}"
   _rlf_compress="${4:-true}"
 
@@ -255,7 +255,7 @@ rotate_log_file() {
 # each one via rotate_log_file.  Uses POSIX find for portability.
 rotate_logs_in_directory() {
   _rld_dir="$1"
-  _rld_maxsize="${2:-10485760}"
+  _rld_maxsize="${2:-10000000}" # bytes
   _rld_maxfiles="${3:-4}"
   _rld_compress="${4:-true}"
 

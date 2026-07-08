@@ -117,7 +117,7 @@ function Invoke-LogRotation {
   param(
     [Parameter(Mandatory)]
     [string]$Path,
-    [int]$MaxSize = 10485760,
+    [int]$MaxSize = 10000000, # bytes
     [int]$MaxFiles = 4,
     [bool]$Compress = $true
   )

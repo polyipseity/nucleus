@@ -411,7 +411,7 @@ function Show-LogConfig {
   $topLog = $lp.top
   $config = @{
     capture  = if ($platLog -and $platLog.ContainsKey('capture')) { $platLog.capture } elseif ($topLog -and $topLog.ContainsKey('capture')) { $topLog.capture } else { 'all' }
-    maxSize  = if ($platLog -and $platLog.ContainsKey('maxSize')) { $platLog.maxSize } elseif ($topLog -and $topLog.ContainsKey('maxSize')) { $topLog.maxSize } else { 10485760 }
+    maxSize  = if ($platLog -and $platLog.ContainsKey('maxSize')) { $platLog.maxSize } elseif ($topLog -and $topLog.ContainsKey('maxSize')) { $topLog.maxSize } else { 10000000 } # bytes
     maxFiles = if ($platLog -and $platLog.ContainsKey('maxFiles')) { $platLog.maxFiles } elseif ($topLog -and $topLog.ContainsKey('maxFiles')) { $topLog.maxFiles } else { 4 }
     compress = if ($platLog -and $platLog.ContainsKey('compress')) { $platLog.compress } elseif ($topLog -and $topLog.ContainsKey('compress')) { $topLog.compress } else { $true }
     sanitize = if ($platLog -and $platLog.ContainsKey('sanitize')) { $platLog.sanitize } elseif ($topLog -and $topLog.ContainsKey('sanitize')) { $topLog.sanitize } else { $true }

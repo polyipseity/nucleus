@@ -703,7 +703,7 @@ do_log_config() {
       def plat_log: .platforms[$platform].logging // {};
       {
         capture: (plat_log.capture // log.capture // "all"),
-        maxSize: (plat_log.maxSize // log.maxSize // 10485760),
+        maxSize: (plat_log.maxSize // log.maxSize // 10000000), # bytes
         maxFiles: (plat_log.maxFiles // log.maxFiles // 4),
         compress: (plat_log.compress // log.compress // true),
         sanitize: (plat_log.sanitize // log.sanitize // true),
