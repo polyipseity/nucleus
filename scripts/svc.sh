@@ -358,7 +358,7 @@ do_list() {
 
   local has_error=false
   if [ "$json_output" = true ]; then
-    printf '{"svc_version":"1","services":{'
+    printf '{"version":1,"services":{'
     local first=true
     while IFS=$'\t' read -r key display svc_json json_key; do
       if echo "$key" | grep -q '^ERROR:'; then has_error=true; continue; fi
