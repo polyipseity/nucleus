@@ -135,6 +135,16 @@ let
   test_no_make_k_or_true = assert' (
     !containsRegex "make -k install" nixText && !containsRegex "\\|\\| true" nixText
   ) "ntfs-3g.nix must not use make -k install or || true to mask failures";
+
+  # Test 21: Build-finished echo is not inside the exit-code-tracked brace group.
+  # Regression check: previously `echo "=== finished ==="` was the last command in
+  # the brace group, always returning 0 and masking build failures.
+  test_finished_echo_not_masking_error =
+    assert' (!containsRegex "make install[^}]*echo === ntfs-3g build finished[^}]*\\} >>" nixText)
+      "ntfs-3g.nix must not have the build-finished echo inside the brace group whose exit code is tracked";
+
+  # Test 22: Install-hook patch glob matches both .so and .dylib on macOS.
+  test_install_hook_patch_glob_matches_any_ext = assert' (containsRegex "libntfs-3g\\.\\*" installHookPatchText) "ntfs-3g-install-hook.patch must use a glob that matches both .so and .dylib (not just .so)";
 in
 {
   inherit
@@ -162,5 +172,7 @@ in
     test_log_path_on_success
     test_log_path_on_failure
     test_no_make_k_or_true
+    test_finished_echo_not_masking_error
+    test_install_hook_patch_glob_matches_any_ext
     ;
 }
