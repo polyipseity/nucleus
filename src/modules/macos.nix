@@ -432,7 +432,6 @@ let
     "configureSafariDefaults"
     "configureUniversalAccessDefaults"
     "ensureHeadlessDisplay"
-    "hideMenuBarIcons"
     "initRustup"
     "installCargoBinstallPackages"
     "installPackages"
