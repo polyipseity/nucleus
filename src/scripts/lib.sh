@@ -20,6 +20,34 @@ usage_std() {
   fi
 }
 
+# Auto-derived command prefix for output helpers.
+# Strips "nucleus-" prefix if present; falls back to basename.
+_nuc_prefix="$(basename "$0")"
+case "$_nuc_prefix" in
+  nucleus-*) _nuc_prefix="${_nuc_prefix#nucleus-}" ;;
+esac
+
+# Output helpers — use these instead of raw printf/echo.
+# All derive the <cmd>: prefix automatically from the script name.
+
+# say — Print an info message to stdout.
+say() { printf '%s\n' "$_nuc_prefix: $*"; }
+
+# error — Print an error message to stderr and return 1.
+error() { printf '%s\n' "$_nuc_prefix: error: $*" >&2; return 1; }
+
+# warn — Print a warning message to stderr.
+warn() { printf '%s\n' "$_nuc_prefix: warning: $*" >&2; }
+
+# dry_run — Print a dry-run message to stdout.
+dry_run() { printf '%s\n' "$_nuc_prefix: [dry-run] $*"; }
+
+# section — Print a section header to stdout.
+section() { printf '\n=== [%s] %s ===\n' "$1" "$2"; }
+
+# nuc_done — Print a completion message to stdout.
+nuc_done() { printf '%s\n' "$_nuc_prefix: done"; }
+
 # Resolution order: NUCLEUS_REPO_ROOT env var, SCRIPT_DIR+offset auto-discovery, then git rev-parse.
 derive_repo_root() {
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ]; then
