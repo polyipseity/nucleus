@@ -76,12 +76,21 @@ in
     {
       home.packages = [ discord-music-rpc ];
 
-      # Nix store path for the config file — the app overwrites its config on
-      # startup, so the target must be immutable to preserve managed settings.
-      # Source the file relative to this module at build time.  # WHY: read-only
-      # deviation — see symlink-policy.instructions.md.
-      home.file.".config/discord-music-rpc/config.yaml".source = ./configs/discord-music-rpc/config.yaml;
+      # Out-of-store symlink so edits take effect without rebuild, matching the
+      # Windows approach.  The source is marked immutable (macOS uchg) because
+      # the app overwrites its config on startup and the writable symlink would
+      # let writes reach the tracked file.
+      home.file.".config/discord-music-rpc/config.yaml".source =
+        config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/discord-music-rpc/config.yaml";
     }
+
+    # macOS: mark the source file immutable so the app cannot discard managed
+    # settings through the writable out-of-store symlink.
+    (lib.mkIf (pkgs.stdenv.isDarwin && userEnable) {
+      home.activation.protectDiscordMusicRPCConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+        /usr/bin/chflags uchg "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/discord-music-rpc/config.yaml" 2>/dev/null || true
+      '';
+    })
 
     # macOS: launchd agent keeps the tray app running persistently after login.
     (lib.mkIf (pkgs.stdenv.isDarwin && userEnable) {

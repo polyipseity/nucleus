@@ -701,9 +701,8 @@ Sync-JellyfinAccount -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgE
 Sync-JellyfinLibrary -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRecords $selectedUserRecords
 # Symlink the config so edits take effect on service restart without re-running apply.
-  # The source file is marked read-only (# WHY: see symlink-policy.instructions.md —
-  # discord-music-rpc overwrites config on startup; read-only target prevents the
-  # app from discarding managed settings).
+  # The source file is marked read-only because discord-music-rpc overwrites config
+  # on startup; read-only target prevents the app from discarding managed settings.
   $discordMusicRPCConfigDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "discord-music-rpc"
   $null = New-Item -Path $discordMusicRPCConfigDir -ItemType Directory -Force
   $discordMusicRPCConfig = Join-Path -Path $discordMusicRPCConfigDir -ChildPath "config.yaml"
