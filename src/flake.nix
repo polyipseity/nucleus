@@ -168,25 +168,6 @@
               });
             })
             (_final: prev: {
-              # ollama's cmake/local.cmake calls ollama_check_metal_toolchain()
-              # unconditionally on Apple Silicon when OLLAMA_MLX_BACKENDS is not
-              # pre-defined. That check runs `xcrun -sdk macosx metal`, which
-              # fails during nix builds because DEVELOPER_DIR points at the Nix
-              # apple SDK instead of real Xcode. Pre-empt the check by defining
-              # OLLAMA_MLX_BACKENDS early so cmake skips the Metal probe.
-              # Upstream fix from
-              # https://github.com/NixOS/nixpkgs/pull/529076.
-              # (PR closed, not merged — still required at this pin)
-              ollama = prev.ollama.overrideAttrs (old: {
-                postPatch = (old.postPatch or "") + ''
-                  substituteInPlace cmake/local.cmake \
-                    --replace-fail \
-                      "ollama_default_mlx_backends(_ollama_default_mlx_backends)" \
-                      "set(_ollama_default_mlx_backends \"\")"
-                '';
-              });
-            })
-            (_final: prev: {
               equaliser = prev.stdenv.mkDerivation rec {
                 pname = "equaliser";
                 version = "1.3.3";
