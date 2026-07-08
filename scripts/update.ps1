@@ -43,6 +43,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
 if ($Help) {
   Get-Help $PSCommandPath -Detailed
   return
@@ -58,7 +61,7 @@ if (-not $NoFlake -and (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinu
   if ($LASTEXITCODE -ne 0) {
     $joined = ($flakeOutput | Out-String)
     if ($joined -match 'API rate limit exceeded|unable to download|HTTP error 403') {
-      Write-Warning 'nucleus: flake update skipped due to transient fetch/rate-limit error.'
+      Write-NucleusWarning 'flake update skipped due to transient fetch/rate-limit error.'
     }
     else {
       throw 'nucleus: nix flake update failed.'
@@ -99,4 +102,4 @@ foreach ($secretFile in $secretFiles) {
   # Close if (-not $WithoutSops).
 }
 
-Write-Output "$($PSStyle.Foreground.Green)nucleus: update workflow completed$($PSStyle.Reset)"
+Write-NucleusInfo "$($PSStyle.Foreground.Green)update workflow completed$($PSStyle.Reset)"

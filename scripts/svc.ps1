@@ -60,8 +60,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
 if ($Help -or -not $Action) {
-  if (-not $Action) { Write-Output "ERROR: missing action (list, status, start, stop, restart, enable, disable, endpoint, logs, log-paths, log-config)" }
+  if (-not $Action) { Write-NucleusError "missing action (list, status, start, stop, restart, enable, disable, endpoint, logs, log-paths, log-config)" }
   Get-Help $PSCommandPath -Detailed
   exit 0
 }
@@ -389,10 +392,10 @@ function Show-ServiceLog {
   $capture = Get-CaptureMode -ServiceKey $ServiceKey
   if ($capture -ne 'none') {
     if (-not (Show-FileLog -ServiceKey $ServiceKey -Lines $Lines -Raw:$Raw)) {
-      Write-Warning "svc logs: $ServiceKey — no log files found"
+      Write-NucleusWarning "$ServiceKey — no log files found"
     }
   } else {
-    Write-Warning "svc logs: $ServiceKey — capture disabled"
+    Write-NucleusWarning "$ServiceKey — capture disabled"
   }
 }
 
@@ -456,7 +459,7 @@ switch ($Action) {
     $hasError = $false
     foreach ($key in $resolved.Keys) {
       if ($key -like 'ERROR:*') {
-        Write-Warning "svc: $($resolved[$key].displayName) — $($resolved[$key].platform.error)"
+        Write-NucleusWarning "$($resolved[$key].displayName) — $($resolved[$key].platform.error)"
         $hasError = $true
         continue
       }
@@ -470,21 +473,21 @@ switch ($Action) {
 
   { @('start', 'stop', 'restart', 'enable', 'disable') -contains $_ } {
     if ($ServiceName.Count -eq 0) {
-      throw "svc: missing service name for '$Action'"
+      throw "missing service name for '$Action'"
     }
     $resolved = Resolve-ServiceName -Names $ServiceName
     $overallExit = 0
 
     foreach ($key in $resolved.Keys) {
       if ($key -like 'ERROR:*') {
-        Write-Error "svc: $($resolved[$key].displayName) — service not found in registry"
+        Write-NucleusError "$($resolved[$key].displayName) — service not found in registry"
         $overallExit = 1
         continue
       }
 
       $plat = $resolved[$key].platform
       if ($plat.prefixMatch) {
-        Write-Error "svc: $key — prefix-match services require exact name; use list/status first"
+        Write-NucleusError "$key — prefix-match services require exact name; use list/status first"
         $overallExit = 1
         continue
       }
@@ -492,13 +495,13 @@ switch ($Action) {
       try {
         $result = Invoke-ServiceAction -Action $Action -Platform $plat
         if ($result -ne $true) {
-          Write-Error "svc: $key — action '$Action' failed"
+          Write-NucleusError "$key — action '$Action' failed"
           $overallExit = 1
         } elseif ($Json) {
           Write-Output "{`"$key`":{`"success`":true}}"
         }
       } catch {
-        Write-Error "svc: $key — $($_.Exception.Message)"
+        Write-NucleusError "$key — $($_.Exception.Message)"
         $overallExit = 1
       }
     }
@@ -507,7 +510,7 @@ switch ($Action) {
 
   'endpoint' {
     if ($ServiceName.Count -eq 0) {
-      throw "svc: missing service name for endpoint"
+      throw "missing service name for endpoint"
     }
     $svcName = $ServiceName[0]
     $epName  = if ($ServiceName.Count -ge 2) { $ServiceName[1] } else { $null }
@@ -515,19 +518,19 @@ switch ($Action) {
     $Registry = [ordered]@{}
     $raw = Get-Content -Raw "$RepoRoot/src/modules/services.json" | ConvertFrom-Json
     if (-not $raw.PSObject.Properties.Name -contains $svcName) {
-      Write-Error "svc: $svcName — service not found in registry"
+      Write-NucleusError "$svcName — service not found in registry"
       exit 1
     }
     $entry = $raw.$svcName
     if (-not $entry.PSObject.Properties.Name -contains 'network') {
-      Write-Error "svc: $svcName — no network endpoints defined"
+      Write-NucleusError "$svcName — no network endpoints defined"
       exit 1
     }
     $network = $entry.network
 
     if ($epName) {
       if (-not $network.PSObject.Properties.Name -contains $epName) {
-        Write-Error "svc: $svcName — endpoint '$epName' not found"
+        Write-NucleusError "$svcName — endpoint '$epName' not found"
         exit 1
       }
       $ep = $network.$epName
@@ -580,7 +583,7 @@ switch ($Action) {
     $hasError = $false
     foreach ($svc in $parsedServices) {
       if (-not $Registry.ContainsKey($svc)) {
-        Write-Error "svc logs: unknown service '$svc'"
+        Write-NucleusError "unknown service '$svc'"
         $hasError = $true
         continue
       }
@@ -594,7 +597,7 @@ switch ($Action) {
     $hasError = $false
     foreach ($svc in $targets) {
       if (-not $Registry.ContainsKey($svc)) {
-        Write-Error "svc log-paths: unknown service '$svc'"
+        Write-NucleusError "unknown service '$svc'"
         $hasError = $true
         continue
       }
@@ -609,7 +612,7 @@ switch ($Action) {
     $hasError = $false
     foreach ($svc in $targets) {
       if (-not $Registry.ContainsKey($svc)) {
-        Write-Error "svc log-config: unknown service '$svc'"
+        Write-NucleusError "unknown service '$svc'"
         $hasError = $true
         continue
       }

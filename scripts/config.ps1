@@ -25,6 +25,9 @@ param(
   [string[]]$Arguments
 )
 
+$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
 $configFile = Join-Path -Path $HOME -ChildPath ".local/state/nucleus/config.json"
 
 # Default values for all known config keys.
@@ -85,7 +88,7 @@ function Set-ConfigValue {
   [CmdletBinding(SupportsShouldProcess)]
   param()
   if ($Arguments.Count -lt 2) {
-    Write-Error "Usage: nucleus-config set <section.key> <value>"
+    Write-NucleusError "Usage: nucleus-config set <section.key> <value>"
     exit 1
   }
   New-ConfigDir
@@ -138,7 +141,7 @@ switch ($Command) {
   'set' { Set-ConfigValue }
   'list' { Out-ConfigValueList }
   default {
-    Write-Error "Usage: nucleus-config get [<section.key>]|set <section.key> <value>|list"
+    Write-NucleusError "Usage: nucleus-config get [<section.key>]|set <section.key> <value>|list"
     exit 1
   }
 }

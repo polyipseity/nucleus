@@ -76,11 +76,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
 # Refuse to run as Administrator — privilege escalation is managed internally
 # when needed rather than relying on an already-elevated caller.
 $isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if ($isAdmin) {
-  Write-Error "This script must not be run as Administrator. Run as a regular user (elevation is managed internally when needed)."
+  Write-NucleusError "this script must not be run as Administrator. Run as a regular user (elevation is managed internally when needed)."
   exit 1
 }
 
@@ -237,11 +240,11 @@ function Invoke-WingetPackageInstall {
     }
 
     if ($LASTEXITCODE -eq $NoApplicableUpgradeExitCode) {
-      Write-Output "$($PSStyle.Foreground.Green)Package '$Id' is already installed at the requested version (or newer available version is not applicable).$($PSStyle.Reset)"
+      Write-NucleusInfo "$($PSStyle.Foreground.Green)Package '$Id' is already installed at the requested version (or newer available version is not applicable).$($PSStyle.Reset)"
       return
     }
 
-    Write-Output "$($PSStyle.Foreground.Yellow)Requested version '$Version' for '$Id' not available. Falling back to latest.$($PSStyle.Reset)"
+    Write-NucleusInfo "$($PSStyle.Foreground.Yellow)Requested version '$Version' for '$Id' not available. Falling back to latest.$($PSStyle.Reset)"
   }
 
   & winget @installArgs
@@ -251,7 +254,7 @@ function Invoke-WingetPackageInstall {
   }
 
   if ($LASTEXITCODE -eq $NoApplicableUpgradeExitCode) {
-    Write-Output "$($PSStyle.Foreground.Green)Package '$Id' is already installed and up to date.$($PSStyle.Reset)"
+    Write-NucleusInfo "$($PSStyle.Foreground.Green)Package '$Id' is already installed and up to date.$($PSStyle.Reset)"
     return
   }
 
@@ -290,7 +293,7 @@ function Invoke-RepositoryDirenvAllowIfAvailable {
 
   & direnv allow $repoRoot
   if ($LASTEXITCODE -ne 0) {
-    Write-Warning "failed to run 'direnv allow' for $repoRoot"
+    Write-NucleusWarning "failed to run 'direnv allow' for $repoRoot"
   }
 }
 
@@ -344,7 +347,7 @@ if ($Apply) {
     }
   }
 
-  Write-Output "$($PSStyle.Foreground.Cyan)Running apply flow via $applyScriptPath$($PSStyle.Reset)"
+  Write-NucleusInfo "$($PSStyle.Foreground.Cyan)Running apply flow via $applyScriptPath$($PSStyle.Reset)"
   & $applyScriptPath @effectiveApplyArgs
 
   if ($LASTEXITCODE -ne 0) {
@@ -354,4 +357,4 @@ if ($Apply) {
   return
 }
 
-Write-Output "$($PSStyle.Foreground.Green)Bootstrap complete. Run '.\src\hosts\Windows\apply.ps1' to configure this host, or use -Apply.$($PSStyle.Reset)"
+Write-NucleusInfo "$($PSStyle.Foreground.Green)Bootstrap complete. Run '.\src\hosts\Windows\apply.ps1' to configure this host, or use -Apply.$($PSStyle.Reset)"

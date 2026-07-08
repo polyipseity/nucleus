@@ -38,6 +38,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$fmtModulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $fmtModulePath -Force -DisableNameChecking
+
 $repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path }
 $modulePath = Join-Path -Path $repoRoot -ChildPath 'src\hosts\Windows\modules\Invoke-AISync.ps1'
 

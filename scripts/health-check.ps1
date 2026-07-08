@@ -52,6 +52,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
 if ($Help) {
   Get-Help $PSCommandPath -Detailed
   return
@@ -154,7 +157,7 @@ function Test-LogHealth {
 
   foreach ($dir in @($userDir, $systemDir)) {
     if (-not (Test-Path -Path $dir -PathType Container)) {
-      Write-Warning "nucleus: log dir '$dir' does not exist"
+      Write-NucleusWarning "log dir '$dir' does not exist"
       $failures++
     }
   }
@@ -181,14 +184,14 @@ function Test-LogHealth {
         $size = $logFile.Length
         $threshold = $maxSize * 80 / 100
         if ($size -gt $threshold) {
-          Write-Warning "nucleus: '$($logFile.FullName)' ($size bytes) exceeds 80% of rotation max ($maxSize bytes)"
+          Write-NucleusWarning "'$($logFile.FullName)' ($size bytes) exceeds 80% of rotation max ($maxSize bytes)"
         }
 
         # Spot-check for control characters when sanitize is enabled
         if ($sanitize) {
           $sample = Get-Content -Path $logFile.FullName -TotalCount 5 -Raw
           if ($sample -match '[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]') {
-            Write-Warning "nucleus: '$($logFile.FullName)' contains control characters despite sanitize=true"
+            Write-NucleusWarning "'$($logFile.FullName)' contains control characters despite sanitize=true"
             $failures++
           }
         }

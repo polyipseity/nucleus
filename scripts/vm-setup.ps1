@@ -84,6 +84,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
 if ($Help) {
   Get-Help $PSCommandPath -Detailed
   return
@@ -94,7 +97,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..') |
 
 $module = Join-Path $repoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
 if (-not (Test-Path $module)) {
-    Write-Warning "vm-setup: module not found at $module"
+    Write-NucleusWarning "module not found at $module"
     exit 1
 }
 

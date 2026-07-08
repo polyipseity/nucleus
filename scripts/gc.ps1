@@ -107,6 +107,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
 if ($Help) {
   Get-Help $PSCommandPath -Detailed
   return
@@ -135,22 +138,22 @@ if ([string]::IsNullOrWhiteSpace($ModuleDir)) {
 # -NoNixGc and -NoHmGc are accepted but ignored on Windows (POSIX-only
 # options from gc.sh). Accepted for cross-platform CLI parity.
 if ($NoNixGc) {
-  Write-Warning "gc: -NoNixGc accepted but ignored on Windows (POSIX-only)"
+  Write-NucleusWarning "-NoNixGc accepted but ignored on Windows (POSIX-only)"
 }
 if ($NoHmGc) {
-  Write-Warning "gc: -NoHmGc accepted but ignored on Windows (POSIX-only)"
+  Write-NucleusWarning "-NoHmGc accepted but ignored on Windows (POSIX-only)"
 }
 
 # -Expiry, -HmExpiry, -NixExpiry are accepted but ignored on Windows
 # (POSIX-only options from gc.sh). Accepted for cross-platform CLI parity.
 if ($Expiry) {
-  Write-Warning "gc: -Expiry accepted but ignored on Windows (POSIX-only)"
+  Write-NucleusWarning "-Expiry accepted but ignored on Windows (POSIX-only)"
 }
 if ($HmExpiry) {
-  Write-Warning "gc: -HmExpiry accepted but ignored on Windows (POSIX-only)"
+  Write-NucleusWarning "-HmExpiry accepted but ignored on Windows (POSIX-only)"
 }
 if ($NixExpiry) {
-  Write-Warning "gc: -NixExpiry accepted but ignored on Windows (POSIX-only)"
+  Write-NucleusWarning "-NixExpiry accepted but ignored on Windows (POSIX-only)"
 }
 
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
@@ -173,7 +176,7 @@ function Clear-DirectoryContentsIfPresent {
     Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop | Remove-Item -Recurse -Force -ErrorAction Stop
   }
   catch {
-    Write-Warning "gc: failed to gc $Label at '$Path' — $($_.Exception.Message)"
+    Write-NucleusWarning "failed to gc $Label at '$Path' — $($_.Exception.Message)"
   }
 }
 
@@ -199,10 +202,10 @@ function Remove-VMGcItem {
     } else {
       Remove-Item -LiteralPath $Item.FullName -Force -ErrorAction Stop
     }
-    Write-Output "gc: removed $Label '$($Item.Name)'"
+    Write-NucleusInfo "removed $Label '$($Item.Name)'"
   }
   catch {
-    Write-Warning "gc: failed to remove $Label '$($Item.FullName)' — $($_.Exception.Message)"
+    Write-NucleusWarning "failed to remove $Label '$($Item.FullName)' — $($_.Exception.Message)"
   }
 }
 
@@ -232,7 +235,7 @@ if (-not $NoToolCacheGc) {
 
   $cargoCacheCmd = Get-Command -Name "cargo-cache" -ErrorAction SilentlyContinue
   if ($null -eq $cargoCacheCmd) {
-    Write-Output "nucleus: cargo-cache unavailable; skipping cargo cache gc"
+    Write-NucleusInfo "cargo-cache unavailable; skipping cargo cache gc"
   } else {
     & $cargoCacheCmd.Source -r all
   }
@@ -244,7 +247,7 @@ if (-not $NoToolCacheGc) {
       Remove-Item -LiteralPath $repoDirenvDir -Recurse -Force -ErrorAction Stop
     }
     catch {
-      Write-Warning "gc: failed to remove repo-local direnv cache '$repoDirenvDir' — $($_.Exception.Message)"
+      Write-NucleusWarning "failed to remove repo-local direnv cache '$repoDirenvDir' — $($_.Exception.Message)"
     }
   }
 }
@@ -254,15 +257,15 @@ if (-not $NoScoopGc) {
   $scoopShims = Join-Path $env:USERPROFILE "scoop\shims"
   $scoopCmd   = Join-Path $scoopShims "scoop.cmd"
   if (-not (Test-Path $scoopCmd)) {
-    Write-Output "gc: scoop not installed; skipping scoop gc"
+    Write-NucleusInfo "scoop not installed; skipping scoop gc"
   } else {
     if ($env:PATH -notlike "*$scoopShims*") {
       $env:PATH = "$scoopShims;$env:PATH"
     }
-    Write-Output "gc: running scoop cleanup..."
+    Write-NucleusInfo "running scoop cleanup..."
     scoop cleanup *
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning "gc: scoop cleanup exited with code $LASTEXITCODE"
+      Write-NucleusWarning "scoop cleanup exited with code $LASTEXITCODE"
     }
   }
 }
@@ -271,7 +274,7 @@ if (-not $NoScoopGc) {
 if (-not $NoOllamaGc) {
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
-    Write-Output "gc: ollama not installed; skipping ollama model gc"
+    Write-NucleusInfo "ollama not installed; skipping ollama model gc"
   } else {
     Invoke-AISync -GcOnly -RepoRoot $resolvedRepoRoot -ServerReadyTimeoutSeconds 0
   }
@@ -285,9 +288,9 @@ if (-not $NoVMGc) {
 
   # If VM directories do not exist, there is nothing to clean.
   if (-not (Test-Path -LiteralPath $vmDir -PathType Container)) {
-    Write-Output "gc: VM directory not found; skipping VM artifact gc"
+    Write-NucleusInfo "VM directory not found; skipping VM artifact gc"
   } elseif (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
-    Write-Warning "gc: manifest '$manifest' not found; skipping VM artifact gc"
+    Write-NucleusWarning "manifest '$manifest' not found; skipping VM artifact gc"
   } else {
     # Load the manifest and build a list of enabled VM names.
     try {
@@ -295,7 +298,7 @@ if (-not $NoVMGc) {
       $declaredVMNames = @($manifestContent.VMs | Where-Object { $_.enabled -eq $true } | ForEach-Object { $_.name })
     }
     catch {
-      Write-Warning "gc: failed to parse manifest '$manifest' — $($_.Exception.Message); skipping VM artifact gc"
+      Write-NucleusWarning "failed to parse manifest '$manifest' — $($_.Exception.Message); skipping VM artifact gc"
       $declaredVMNames = @()
     }
 
@@ -345,13 +348,13 @@ if (-not $NoVMGc) {
 if (-not $NoLogGc) {
   $servicesJson = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\services.json"
   if (-not (Test-Path -LiteralPath $servicesJson -PathType Leaf)) {
-    Write-Warning "gc: services.json not found; skipping log rotation"
+    Write-NucleusWarning "services.json not found; skipping log rotation"
   } else {
     try {
       $servicesContent = Get-Content -LiteralPath $servicesJson -Raw | ConvertFrom-Json
       $defaultLogging = $servicesContent.'$defaults'.logging
     } catch {
-      Write-Warning "gc: failed to parse services.json; skipping log rotation — $($_.Exception.Message)"
+      Write-NucleusWarning "failed to parse services.json; skipping log rotation — $($_.Exception.Message)"
       $defaultLogging = $null
     }
 
@@ -376,4 +379,4 @@ if (-not $NoLogGc) {
   }
 }
 
-Write-Output "nucleus: gc workflow completed"
+Write-NucleusDone

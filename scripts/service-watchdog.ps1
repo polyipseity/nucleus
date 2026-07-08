@@ -13,6 +13,9 @@
 
 $ErrorActionPreference = "Stop"
 
+$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
 # ── Resolve repo root ──────────────────────────────────────────────────────
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   $env:NUCLEUS_REPO_ROOT
@@ -22,7 +25,7 @@ $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
 
 $ServicesJson = Join-Path $RepoRoot "src\modules\services.json"
 if (-not (Test-Path $ServicesJson)) {
-  Write-Output "watchdog: services registry not found at $ServicesJson"
+  Write-NucleusInfo "services registry not found at $ServicesJson"
   exit 1
 }
 
@@ -55,7 +58,8 @@ foreach ($key in $RegistryRaw.Keys) {
 function Write-RestartLog {
   param([string]$Name, [string]$Reason)
   $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-  Write-Output "[$timestamp] watchdog: restarted $Name ($Reason)"
+  $cmd = Get-NucleusCommandName
+  Write-Output "[$timestamp] ${cmd}: restarted $Name ($Reason)"
 }
 
 # ── Check native services ──────────────────────────────────────────────────
@@ -70,7 +74,7 @@ function Test-NativeService {
     Restart-Service -Name $ServiceName -Force -ErrorAction Stop
     Write-RestartLog -Name $DisplayName -Reason $status
   } catch {
-    Write-Output "watchdog: error checking $Key ($ServiceName): $_"
+    Write-NucleusInfo "error checking $Key ($ServiceName): $_"
   }
 }
 
@@ -90,7 +94,7 @@ function Test-ScheduledTask {
     Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop
     Write-RestartLog -Name $DisplayName -Reason $status
   } catch {
-    Write-Output "watchdog: error checking $Key ($TaskPath): $_"
+    Write-NucleusInfo "error checking $Key ($TaskPath): $_"
   }
 }
 
@@ -104,7 +108,7 @@ foreach ($svc in $Services) {
       Test-ScheduledTask -Key $svc.key -DisplayName $svc.displayName -TaskPath $svc.taskPath
     }
     default {
-      Write-Output "watchdog: unsupported type $($svc.type) for $($svc.key)"
+      Write-NucleusInfo "unsupported type $($svc.type) for $($svc.key)"
     }
   }
 }

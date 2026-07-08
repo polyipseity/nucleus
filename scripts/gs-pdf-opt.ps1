@@ -22,6 +22,9 @@ param(
   [string[]]$File
 )
 
+$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
 # Import ghostscript invocation helper.
 # Sync-ShellProfile defines Invoke-NucleusGhostscript; define inline as fallback.
 if (-not (Get-Command Invoke-NucleusGhostscript -ErrorAction SilentlyContinue)) {
@@ -35,25 +38,25 @@ if (-not (Get-Command Invoke-NucleusGhostscript -ErrorAction SilentlyContinue)) 
 
 $validPresets = @("default", "ebook", "prepress", "printer", "screen")
 if ($validPresets -notcontains $Preset) {
-  Write-Error "Unknown preset '$Preset'. Valid: $($validPresets -join ', ')"
+  Write-NucleusError "unknown preset '$Preset'. Valid: $($validPresets -join ', ')"
   exit 1
 }
 
 if ($File.Count -eq 0) {
-  Write-Output "Usage: $(Split-Path -Leaf $PSCommandPath) [[-Preset] <name>] [-File] <path>..."
-  Write-Output "Presets: $($validPresets -join ', ') (default: default)"
+  Write-NucleusInfo "usage: $(Split-Path -Leaf $PSCommandPath) [[-Preset] <name>] [-File] <path>..."
+  Write-NucleusInfo "presets: $($validPresets -join ', ') (default: default)"
   exit 1
 }
 
 foreach ($f in $File) {
   if (-not (Test-Path -LiteralPath $f -PathType Leaf)) {
-    Write-Warning "Skipping non-file: $f"
+    Write-NucleusWarning "skipping non-file: $f"
     continue
   }
 
   $bak = "$f.bak"
   if (Test-Path -LiteralPath $bak) {
-    Write-Error "Backup already exists, refusing to overwrite: $bak"
+    Write-NucleusError "backup already exists, refusing to overwrite: $bak"
     exit 1
   }
 
@@ -68,10 +71,10 @@ foreach ($f in $File) {
       "$bak"
     )
     Remove-Item -LiteralPath $bak -Force
-    Write-Output "Optimized: $f (preset: $Preset)"
+    Write-NucleusInfo "optimized: $f (preset: $Preset)"
   } catch {
     Move-Item -LiteralPath $bak -Destination $f -Force
-    Write-Error "Optimization failed, restored: $f"
+    Write-NucleusError "optimization failed, restored: $f"
     exit 1
   }
 }

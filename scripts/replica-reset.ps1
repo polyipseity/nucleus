@@ -30,6 +30,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$fmtModulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $fmtModulePath -Force -DisableNameChecking
+
 function Resolve-NucleusRepoRoot {
   $repoRoot = $env:NUCLEUS_REPO_ROOT
   if (-not $repoRoot) {

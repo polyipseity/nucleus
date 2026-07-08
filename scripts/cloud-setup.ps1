@@ -32,6 +32,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
 function Resolve-NucleusRoot {
   $repoRoot = $env:NUCLEUS_REPO_ROOT
   if (-not $repoRoot) {
@@ -150,7 +153,7 @@ function Resolve-ICloudServiceForRemote {
   }
 
   if ($matchingServices.Count -gt 1) {
-    Write-Warning "cloud-setup: multiple iCloud services are configured for remote '$RemoteName'; defaulting remote setup to 'drive' and letting mount commands override per entry."
+    Write-NucleusWarning "multiple iCloud services are configured for remote '$RemoteName'; defaulting remote setup to 'drive' and letting mount commands override per entry."
   }
 
   return 'drive'
@@ -222,19 +225,19 @@ if ($missingRemotes.Count -gt 0) {
   if (Test-Path -Path $rclonePassFile -PathType Leaf) {
     $Env:RCLONE_CONFIG_PASS = (Get-Content -Path $rclonePassFile -Raw).Trim()
   }
-  Write-Output "cloud-setup: missing rclone remotes: $($missingRemotes -join ', ')"
-  Write-Output 'cloud-setup: creating and authenticating each missing remote...'
+  Write-NucleusInfo "missing rclone remotes: $($missingRemotes -join ', ')"
+  Write-NucleusInfo 'creating and authenticating each missing remote...'
   foreach ($remote in $missingRemotes) {
     $providerType = Get-ProviderType -RemoteName $remote
     if ($null -eq $providerType) {
-      Write-Error "cloud-setup: unknown remote '$remote'; add it manually with 'rclone config'."
+      Write-NucleusError "unknown remote '$remote'; add it manually with 'rclone config'."
       continue
     }
     $providerCreateArguments = Get-ProviderCreateArgument -ProviderType $providerType -RemoteName $remote -RepoRoot $repoRoot
-    Write-Output "cloud-setup: setting up remote '$remote' (provider: $providerType)..."
+    Write-NucleusInfo "setting up remote '$remote' (provider: $providerType)..."
     & rclone config create $remote $providerType @providerCreateArguments
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning "cloud-setup: remote '$remote' setup exited with code $LASTEXITCODE."
+      Write-NucleusWarning "remote '$remote' setup exited with code $LASTEXITCODE."
     }
   }
 
@@ -248,21 +251,21 @@ if ($missingRemotes.Count -gt 0) {
   throw "cloud-setup: required remotes are still missing: $($missingRemotes -join ', '). Rerun after completing those remotes in rclone config."
 }
 
-Write-Output 'cloud-setup: required remotes are configured.'
+Write-NucleusInfo 'required remotes are configured.'
 
 # Validate credentials; recreate remotes with stale auth so the user can refresh
 # tokens without manually deleting and rebuilding the config.
 # WHY: cloud providers rotate tokens; the user should not need to manually
 # delete remotes to recover from expired credentials.
-Write-Output 'cloud-setup: validating remote credentials with root-only listings...'
+Write-NucleusInfo 'validating remote credentials with root-only listings...'
 $staleRemotes = [System.Collections.Generic.List[string]]::new()
 foreach ($remote in $requiredRemotes) {
   # Suppressed: expected failure when credentials are stale; LASTEXITCODE drives branching.
   & rclone lsd "$remote`:">$null 2>&1
   if ($LASTEXITCODE -eq 0) {
-    Write-Output "cloud-setup: ✓ $remote credentials valid"
+    Write-NucleusInfo "✓ $remote credentials valid"
   } else {
-    Write-Warning "cloud-setup: ✗ $remote credentials stale or unreachable; will recreate..."
+    Write-NucleusWarning "✗ $remote credentials stale or unreachable; will recreate..."
     $staleRemotes.Add($remote)
   }
 }
@@ -273,25 +276,25 @@ if ($staleRemotes.Count -gt 0) {
     $Env:RCLONE_CONFIG_PASS = (Get-Content -Path $rclonePassFile -Raw).Trim()
   }
   foreach ($remote in $staleRemotes) {
-    Write-Output "cloud-setup: deleting and recreating remote '$remote'..."
+    Write-NucleusInfo "deleting and recreating remote '$remote'..."
     & rclone config delete $remote
     $providerType = Get-ProviderType -RemoteName $remote
     $providerCreateArguments = Get-ProviderCreateArgument -ProviderType $providerType -RemoteName $remote -RepoRoot $repoRoot
     & rclone config create $remote $providerType @providerCreateArguments
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning "cloud-setup: remote '$remote' recreation exited with code $LASTEXITCODE."
+      Write-NucleusWarning "remote '$remote' recreation exited with code $LASTEXITCODE."
     }
   }
 
-  Write-Output 'cloud-setup: re-validating credentials after recreation...'
+  Write-NucleusInfo 're-validating credentials after recreation...'
   $validationFailed = $false
   foreach ($remote in $staleRemotes) {
     # Suppressed: expected failure when recreation did not resolve credentials; LASTEXITCODE drives branching.
     & rclone lsd "$remote`:">$null 2>&1
     if ($LASTEXITCODE -eq 0) {
-      Write-Output "cloud-setup: ✓ $remote credentials valid"
+      Write-NucleusInfo "✓ $remote credentials valid"
     } else {
-      Write-Warning "cloud-setup: ✗ $remote credentials still invalid after recreation"
+      Write-NucleusWarning "✗ $remote credentials still invalid after recreation"
       $validationFailed = $true
     }
   }
@@ -301,7 +304,7 @@ if ($staleRemotes.Count -gt 0) {
   }
 }
 
-Write-Output 'cloud-setup: all credentials valid.'
+Write-NucleusInfo 'all credentials valid.'
 
 # Ensure acknowledge_abuse is set on GoogleDrive to prevent 403 errors on
 # publicly-shared files. This is required for rclone to download files shared
@@ -323,23 +326,23 @@ if ($LASTEXITCODE -eq 0 -and ($gdListed -contains 'GoogleDrive:')) {
   if (-not $gdAckAlreadySet) {
     & rclone config update GoogleDrive acknowledge_abuse true
     if ($LASTEXITCODE -eq 0) {
-      Write-Output 'cloud-setup: acknowledge_abuse set for GoogleDrive'
+      Write-NucleusInfo 'acknowledge_abuse set for GoogleDrive'
     } else {
-      Write-Warning "cloud-setup: failed to set acknowledge_abuse for GoogleDrive (exit code $LASTEXITCODE)"
+      Write-NucleusWarning "failed to set acknowledge_abuse for GoogleDrive (exit code $LASTEXITCODE)"
     }
   } else {
-    Write-Output 'cloud-setup: acknowledge_abuse already set for GoogleDrive, skipping'
+    Write-NucleusInfo 'acknowledge_abuse already set for GoogleDrive, skipping'
   }
 } else {
-  Write-Warning 'cloud-setup: GoogleDrive remote not found, skipping acknowledge_abuse configuration'
+  Write-NucleusWarning 'GoogleDrive remote not found, skipping acknowledge_abuse configuration'
 }
 
 if ($Apply) {
-  Write-Output 'cloud-setup: running nucleus apply to converge cloud mount services...'
+  Write-NucleusInfo 'running nucleus apply to converge cloud mount services...'
   & nix --option warn-dirty false run "$repoRoot/src#apply"
   if ($LASTEXITCODE -ne 0) {
     throw "cloud-setup: apply failed with exit code $LASTEXITCODE"
   }
 }
 
-Write-Output "$($PSStyle.Foreground.Green)cloud-setup: setup complete$($PSStyle.Reset)"
+Write-NucleusInfo "$($PSStyle.Foreground.Green)setup complete$($PSStyle.Reset)"

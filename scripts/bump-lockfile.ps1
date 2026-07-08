@@ -62,11 +62,15 @@ $repoRoot = if ($env:NUCLEUS_REPO_ROOT) {
 } else {
   (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
 }
+
+$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
 $lockfileRel = 'src/lockfiles/lockfile.json'
 $lockfileAbs = Join-Path -Path $repoRoot -ChildPath $lockfileRel
 
 if (-not (Test-Path -Path $lockfileAbs)) {
-  Write-Error "bump-lockfile: lockfile not found at $lockfileAbs"
+  Write-NucleusError "lockfile not found at $lockfileAbs"
   exit 1
 }
 
@@ -75,7 +79,7 @@ if (-not (Test-Path -Path $lockfileAbs)) {
 # ---------------------------------------------------------------------------
 function Write-Update {
   param([string]$Section, [string]$Key, [string]$OldValue, [string]$NewValue)
-  Write-Output "bump-lockfile: updating ${Section}.${Key} from ${OldValue} to ${NewValue}"
+  Write-NucleusInfo "updating ${Section}.${Key} from ${OldValue} to ${NewValue}"
 }
 
 function Test-SectionEnabled {
@@ -386,7 +390,7 @@ if (Test-SectionEnabled 'ollama') {  # Point at the Ollama daemon directly, bypa
             }
           }
         } catch {
-          Write-Warning "bump-lockfile: ollama show failed for ${name}:${tag}; keeping existing digest"
+          Write-NucleusWarning "ollama show failed for ${name}:${tag}; keeping existing digest"
         }
       }
     }
@@ -412,7 +416,7 @@ if ((Test-SectionEnabled 'vm-setup') -or (Test-SectionEnabled 'nixos-iso')) {
         $resolvedUrl = $response.ResponseUri.AbsoluteUri
         $response.Close()
       } catch {
-        Write-Warning "bump-lockfile: could not resolve ${latestUrl} for ${arch}: $($_.Exception.Message)"
+        Write-NucleusWarning "could not resolve ${latestUrl} for ${arch}: $($_.Exception.Message)"
         continue
       }
 
@@ -422,11 +426,11 @@ if ((Test-SectionEnabled 'vm-setup') -or (Test-SectionEnabled 'nixos-iso')) {
         if ($sha256Content -match '^([0-9a-f]{64})') {
           $newSha256 = $Matches[1]
         } else {
-          Write-Warning "bump-lockfile: could not parse checksum from ${sha256Url}"
+          Write-NucleusWarning "could not parse checksum from ${sha256Url}"
           continue
         }
       } catch {
-        Write-Warning "bump-lockfile: could not fetch checksum for ${arch}: $($_.Exception.Message)"
+        Write-NucleusWarning "could not fetch checksum for ${arch}: $($_.Exception.Message)"
         continue
       }
       $newDigest = "sha256:${newSha256}"
@@ -453,7 +457,7 @@ if ((Test-SectionEnabled 'vm-setup') -or (Test-SectionEnabled 'tart-images')) {
       # Extract OCI repo name from image URI
       $imageRepo = $oldImage -replace '^ghcr\.io/', ''
       if ([string]::IsNullOrEmpty($imageRepo)) {
-        Write-Warning "bump-lockfile: no image repo found for ${osVersion}, skipping"
+        Write-NucleusWarning "no image repo found for ${osVersion}, skipping"
         continue
       }
 
@@ -473,7 +477,7 @@ if ((Test-SectionEnabled 'vm-setup') -or (Test-SectionEnabled 'tart-images')) {
         } else { $null }
 
         if ([string]::IsNullOrEmpty($newDigest)) {
-          Write-Warning "bump-lockfile: could not fetch digest for ${oldImage}, skipping"
+          Write-NucleusWarning "could not fetch digest for ${oldImage}, skipping"
           continue
         }
 
@@ -482,7 +486,7 @@ if ((Test-SectionEnabled 'vm-setup') -or (Test-SectionEnabled 'tart-images')) {
           $entry['digest'] = $newDigest
         }
       } catch {
-        Write-Warning "bump-lockfile: error fetching digest for ${oldImage}: $($_.Exception.Message)"
+        Write-NucleusWarning "error fetching digest for ${oldImage}: $($_.Exception.Message)"
       }
     }
   }
@@ -495,12 +499,12 @@ if ($Verify) {
   $outputJson = $ht | ConvertTo-Json -Depth 10
   $currentJson = Get-Content $lockfileAbs -Raw
   if ($outputJson -ne $currentJson) {
-    Write-Output "bump-lockfile --verify: lockfile out of date — changes would be made:"
+    Write-NucleusInfo "--verify: lockfile out of date — changes would be made:"
     $diffLines = Compare-Object ([string[]]($currentJson -split "`n")) ([string[]]($outputJson -split "`n"))
     $diffLines | ForEach-Object { Write-Output $_.ToString() }
     exit 1
   }
-  Write-Output "bump-lockfile --verify: lockfile is up to date."
+  Write-NucleusInfo "--verify: lockfile is up to date."
   return
 }
 
@@ -515,7 +519,7 @@ try {
   # Use UTF8 without BOM
   [System.IO.File]::WriteAllText($tmpFile, $outputJson, [System.Text.UTF8Encoding]::$false)
   Move-Item -Path $tmpFile -Destination $lockfileAbs -Force
-  Write-Output "bump-lockfile: wrote ${lockfileRel}"
+  Write-NucleusInfo "wrote ${lockfileRel}"
 } catch {
   if (Test-Path -Path $tmpFile) {
     Remove-Item -Path $tmpFile -Force
