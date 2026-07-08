@@ -121,17 +121,6 @@
 
           overlays = [
             (_final: prev: {
-              # a2a-sdk tests are flaky (timing/FastAPI e2e errors in Nix sandbox).
-              # overrideScope is used because python3.override doesn't propagate
-              # through the fixpoint in overlay context.
-              python3Packages = prev.python3Packages.overrideScope (
-                _pyfinal: pyprev: {
-                  a2a-sdk = pyprev.a2a-sdk.overrideAttrs (_: {
-                    dontUsePytestCheck = true;
-                  });
-                }
-              );
-              # Codec libs that are ffmpeg-full deps: tests OOM on aarch64-darwin
               # Nix sandbox; ffmpeg-full's tests cover them.
               davs2 = prev.davs2.overrideAttrs (_: {
                 doCheck = false;
