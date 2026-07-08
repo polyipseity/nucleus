@@ -95,7 +95,7 @@ in
         # Patch configure.ac: remove crypto autodetect block (AM_PATH_LIBGCRYPT
         # and PKG_CHECK_MODULES(GNUTLS macros undefined without library deps),
         # fix rootbindir default from /bin to /usr/local/bin (SIP), and fix
-        # install-exec-hook to handle missing .so files on Darwin.
+        # install-exec-hook to handle missing .so/.dylib files on Darwin.
         echo "ntfs-3g: patching..."
         patch -p1 < ${cryptoPatchPath}
         patch -p1 < ${rootbindirPatchPath}
@@ -115,13 +115,14 @@ in
         make -j"$(sysctl -n hw.ncpu)"
         echo "ntfs-3g: installing..."
         make install
-        echo "=== ntfs-3g build finished at $(date) ==="
-      } >> "$LOG_FILE" 2>&1 || {
-        # shellcheck disable=SC2320 # $? is first command after || — false positive
-        exit_code=$?
-        echo "ntfs-3g: BUILD FAILED (exit $exit_code) — see $(/bin/realpath "$LOG_FILE")" >&2
-        exit $exit_code
-      }
+      } >> "$LOG_FILE" 2>&1 || exit_code=$?
+
+      if [ "''${exit_code:-0}" -ne 0 ]; then
+        echo "ntfs-3g: BUILD FAILED (exit ''${exit_code}) — see $(/bin/realpath "$LOG_FILE")" >&2
+        exit "$exit_code"
+      fi
+
+      echo "=== ntfs-3g build finished at $(date) ===" >> "$LOG_FILE" 2>&1
 
       echo "ntfs-3g: build complete — log at $(/bin/realpath "$LOG_FILE")"
 
