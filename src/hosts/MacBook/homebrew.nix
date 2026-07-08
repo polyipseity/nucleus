@@ -99,6 +99,15 @@ in
       "smudge/homebrew-smudge" = smudge-smudge;
       "zackelia/homebrew-formulae" = zackelia-formulae;
     };
+    trust = {
+      # Trust cirruslabs/cli as a whole tap because softnet is a transitive
+      # dependency of tart that cannot be enumerated statically.
+      taps = [ "cirruslabs/cli" ];
+      formulae = [
+        "smudge/smudge/nightlight"
+        "zackelia/formulae/bclm"
+      ];
+    };
   };
 
   homebrew = {
