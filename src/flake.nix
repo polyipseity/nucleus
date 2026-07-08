@@ -166,17 +166,6 @@
               xevd = prev.xevd.overrideAttrs (_: {
                 doCheck = false;
               });
-              # On macOS, koffi/build/koffi is a native binary, not a
-              # directory, so the unguarded
-              # `find "$nm/koffi/build/koffi" ...` in upstream postInstall
-              # fails with "No such file or directory".
-              pi-coding-agent = prev.pi-coding-agent.overrideAttrs (old: {
-                postInstall =
-                  builtins.replaceStrings
-                    [ "find \"$nm/koffi/build/koffi\"" ]
-                    [ "[ -d \"$nm/koffi/build/koffi\" ] && find \"$nm/koffi/build/koffi\"" ]
-                    old.postInstall;
-              });
             })
             (_final: prev: {
               # ollama's cmake/local.cmake calls ollama_check_metal_toolchain()
