@@ -21,7 +21,10 @@
        presence check so the step is a no-op when Ollama is not installed.
     5. Remove stale VM build artifacts (Packer directories, pre-built disk
        images) for VMs no longer declared in src/modules/VMs.json.
-       Guarded by the SkipVMGc switch.
+       Guarded by the NoVMGc switch.
+    6. Rotate managed log files via copy-truncate using rotation parameters
+       from src/modules/services.json.
+       Guarded by the NoLogGc switch.
 
   All file operations are scoped to the primary user profile.  The script is
   idempotent and safe to re-run.
@@ -48,6 +51,18 @@
 
 .PARAMETER NoWallpaperGc
   Skip stale wallpaper file gc (default: $false).
+
+.PARAMETER NoLogGc
+  Skip log rotation (default: $false).
+
+.PARAMETER LogMaxSize
+  Log rotation max file size in bytes before rotation (default: from services.json $defaults.logging.maxSize).
+
+.PARAMETER LogMaxFiles
+  Number of rotated archives to keep (default: from services.json $defaults.logging.maxFiles).
+
+.PARAMETER LogCompress
+  Whether to compress rotated logs (default: from services.json $defaults.logging.compress).
 
 .PARAMETER NoVMGc
   Skip stale VM artifact removal (default: $false).
@@ -79,6 +94,10 @@ param(
   [switch]$NoScoopGc = { $env:NUCLEUS_GC_NO_SCOOP_GC -eq 'true' }.Invoke(),
   [switch]$NoWallpaperGc = { $env:NUCLEUS_GC_NO_WALLPAPER_GC -eq 'true' }.Invoke(),
   [switch]$NoVMGc = { $env:NUCLEUS_GC_NO_VM_GC -eq 'true' }.Invoke(),
+  [switch]$NoLogGc = { $env:NUCLEUS_GC_NO_LOG_GC -eq 'true' }.Invoke(),
+  [string]$LogMaxSize = $(if ($env:NUCLEUS_GC_LOG_MAX_SIZE) { $env:NUCLEUS_GC_LOG_MAX_SIZE } else { '' }),
+  [string]$LogMaxFiles = $(if ($env:NUCLEUS_GC_LOG_MAX_FILES) { $env:NUCLEUS_GC_LOG_MAX_FILES } else { '' }),
+  [string]$LogCompress = $(if ($env:NUCLEUS_GC_LOG_COMPRESS) { $env:NUCLEUS_GC_LOG_COMPRESS } else { '' }),
   [string]$Expiry = $(if ($env:NUCLEUS_GC_EXPIRY) { $env:NUCLEUS_GC_EXPIRY } else { '' }),
   [string]$HmExpiry = $(if ($env:NUCLEUS_GC_HM_EXPIRY) { $env:NUCLEUS_GC_HM_EXPIRY } else { '' }),
   [string]$NixExpiry = $(if ($env:NUCLEUS_GC_NIX_EXPIRY) { $env:NUCLEUS_GC_NIX_EXPIRY } else { '' }),
@@ -190,6 +209,7 @@ function Remove-VMGcItem {
 # Load only the modules required by this script.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
 
 # ---- Step 1: stale wallpaper gc ----------------------------------------
 if (-not $NoWallpaperGc) {
@@ -317,6 +337,41 @@ if (-not $NoVMGc) {
           }
         }
       }
+    }
+  }
+}
+
+# ---- Step 6: log rotation -------------------------------------------------
+if (-not $NoLogGc) {
+  $servicesJson = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\services.json"
+  if (-not (Test-Path -LiteralPath $servicesJson -PathType Leaf)) {
+    Write-Warning "gc: services.json not found; skipping log rotation"
+  } else {
+    try {
+      $servicesContent = Get-Content -LiteralPath $servicesJson -Raw | ConvertFrom-Json
+      $defaultLogging = $servicesContent.'$defaults'.logging
+    } catch {
+      Write-Warning "gc: failed to parse services.json; skipping log rotation — $($_.Exception.Message)"
+      $defaultLogging = $null
+    }
+
+    if ($defaultLogging) {
+      $logMaxSize = if ($LogMaxSize) { [int]$LogMaxSize } elseif ($defaultLogging.maxSize) { [int]$defaultLogging.maxSize } else { 10485760 }
+      $logMaxFiles = if ($LogMaxFiles) { [int]$LogMaxFiles } elseif ($defaultLogging.maxFiles) { [int]$defaultLogging.maxFiles } else { 4 }
+      $logCompress = if ($LogCompress) { [bool]::Parse($LogCompress) } elseif ($null -ne $defaultLogging.compress) { [bool]$defaultLogging.compress } else { $true }
+    } else {
+      $logMaxSize = 10485760
+      $logMaxFiles = 4
+      $logCompress = $true
+    }
+
+    $logDir = Get-NucleusLogDir
+    $systemLogDir = Get-NucleusSystemLogDir
+
+    Invoke-LogRotation -Path $logDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
+
+    if ($systemLogDir -and ($systemLogDir -ne $logDir)) {
+      Invoke-LogRotation -Path $systemLogDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
     }
   }
 }
