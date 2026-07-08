@@ -23,23 +23,27 @@ in
       description = "System-level log directory for nucleus services.";
     };
 
+    # Rotation parameters are now defined in services.json $defaults.logging
+    # and consumed at runtime by scripts/gc.sh and scripts/gc.ps1.
+    # The Nix build-time options are retired in favor of the JSON source of
+    # truth, which is readable by both POSIX and Windows tooling.
     rotation = {
       maxSize = mkOption {
         type = types.int;
-        default = 10485760; # 10 MB
-        description = "Maximum log file size in bytes before rotation.";
+        default = 10485760;
+        description = "Maximum log file size in bytes before rotation (runtime source: services.json).";
       };
 
       maxFiles = mkOption {
         type = types.int;
         default = 4;
-        description = "Number of rotated archives to keep.";
+        description = "Number of rotated archives to keep (runtime source: services.json).";
       };
 
       compress = mkOption {
         type = types.bool;
         default = true;
-        description = "Whether to compress rotated archives with gzip.";
+        description = "Whether to compress rotated archives with gzip (runtime source: services.json).";
       };
     };
 

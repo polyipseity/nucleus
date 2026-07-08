@@ -153,7 +153,7 @@ check_log_health() {
 
   while IFS= read -r svc; do
     capture=$(jq -r --arg svc "$svc" '.[$svc].logging.capture // "all"' "$services_json")
-    max_size=$(jq -r --arg svc "$svc" '.[$svc].logging.maxSize // 10485760' "$services_json")
+    max_size=$(jq -r --arg svc "$svc" '(.[$svc].logging.maxSize // .["$defaults"].logging.maxSize // 10485760)' "$services_json")
     sanitize=$(jq -r --arg svc "$svc" '.[$svc].logging.sanitize // true' "$services_json")
 
     if [ "$capture" = "none" ]; then
