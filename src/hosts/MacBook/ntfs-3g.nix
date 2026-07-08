@@ -47,6 +47,7 @@ let
 
   cryptoPatchPath = ./patches/ntfs-3g-crypto.patch;
   rootbindirPatchPath = ./patches/ntfs-3g-rootbindir.patch;
+  installHookPatchPath = ./patches/ntfs-3g-install-hook.patch;
 
   # Build parameters (extracted for fingerprint-based rebuild detection).
   cppFlags = "-I/usr/local/include/fuse/fuse";
@@ -62,6 +63,7 @@ let
       configureFlags
       cryptoPatchPath
       rootbindirPatchPath
+      installHookPatchPath
     ]
   );
 in
@@ -70,47 +72,57 @@ in
     # ---- buildNtfs3g ----------------------------------------------------------
     FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
     CURRENT_FINGERPRINT="${buildFingerprint}"
+    LOG_FILE="/Users/Shared/nucleus/logs/ntfs-3g-build.log"
 
     if ! [ -x /usr/local/bin/ntfs-3g ] \
        || ! [ -f "$FINGERPRINT_FILE" ] \
        || [ "$(cat "$FINGERPRINT_FILE")" != "$CURRENT_FINGERPRINT" ]; then
-      echo "ntfs-3g: building from source..."
+      echo "ntfs-3g: building from source... (log: $LOG_FILE)"
       export PATH="${buildToolsPath}:$PATH"
       export ACLOCAL_PATH="${aclocalPath}"
       BUILD_DIR="$(mktemp -d)"
+      trap 'rm -rf "$BUILD_DIR"' EXIT
       cp -r "${ntfs3gSrc}" "$BUILD_DIR/ntfs-3g"
       chmod -R u+w "$BUILD_DIR/ntfs-3g"
       cd "$BUILD_DIR/ntfs-3g"
       export CPPFLAGS="${cppFlags}"
       export LDFLAGS="${ldFlags}"
 
-      # Patch configure.ac: remove crypto autodetect block (AM_PATH_LIBGCRYPT
-      # and PKG_CHECK_MODULES(GNUTLS macros undefined without library deps)
-      # and fix rootbindir default from /bin to /usr/local/bin (SIP).
-      echo "ntfs-3g: patching configure.ac..."
-      patch -p1 < ${cryptoPatchPath}
-      patch -p1 < ${rootbindirPatchPath}
+      /bin/mkdir -p "$(dirname "$LOG_FILE")"
+      {
+        echo "=== ntfs-3g build started at $(date) ==="
 
-      echo "ntfs-3g: running autotools..."
-      libtoolize --copy --force
-      aclocal --force -I m4
-      autoheader --force
-      automake --add-missing --copy --force-missing
-      autoconf --force
+        # Patch configure.ac: remove crypto autodetect block (AM_PATH_LIBGCRYPT
+        # and PKG_CHECK_MODULES(GNUTLS macros undefined without library deps),
+        # fix rootbindir default from /bin to /usr/local/bin (SIP), and fix
+        # install-exec-hook to handle missing .so files on Darwin.
+        echo "ntfs-3g: patching..."
+        patch -p1 < ${cryptoPatchPath}
+        patch -p1 < ${rootbindirPatchPath}
+        patch -p1 < ${installHookPatchPath}
 
-      echo "ntfs-3g: configuring..."
-      ./configure ${configureFlags}
+        echo "ntfs-3g: running autotools..."
+        libtoolize --copy --force
+        aclocal --force -I m4
+        autoheader --force
+        automake --add-missing --copy --force-missing
+        autoconf --force
 
-      # Use -k to keep going if install-exec-hook fails (it tries to mv .so
-      # files to /lib, which doesn't exist on macOS — we use .dylib).
-      # All actual files (binaries, dylib, headers) are installed before
-      # that hook runs, so we ignore its failure.
-      echo "ntfs-3g: building..."
-      make -j"$(sysctl -n hw.ncpu)"
-      echo "ntfs-3g: installing..."
-      make -k install || true
-      rm -rf "$BUILD_DIR"
-      echo "ntfs-3g: build complete."
+        echo "ntfs-3g: configuring..."
+        ./configure ${configureFlags}
+
+        echo "ntfs-3g: building..."
+        make -j"$(sysctl -n hw.ncpu)"
+        echo "ntfs-3g: installing..."
+        make install
+        echo "=== ntfs-3g build finished at $(date) ==="
+      } >> "$LOG_FILE" 2>&1 || {
+        exit_code=$?
+        echo "ntfs-3g: BUILD FAILED (exit $exit_code) — see $(/bin/realpath "$LOG_FILE")" >&2
+        exit $exit_code
+      }
+
+      echo "ntfs-3g: build complete — log at $(/bin/realpath "$LOG_FILE")"
 
       /bin/mkdir -p "$(dirname "$FINGERPRINT_FILE")"
       echo "$CURRENT_FINGERPRINT" > "$FINGERPRINT_FILE"
