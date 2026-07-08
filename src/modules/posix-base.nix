@@ -34,6 +34,12 @@ in
           "flakes"
           "nix-command"
         ];
+        # nix-community cachix broadens binary cache coverage, especially for
+        # aarch64-darwin where cache.nixos.org often lags.
+        extra-substituters = [ "https://nix-community.cachix.org" ];
+        extra-trusted-public-keys = [
+          "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+        ];
         # Preserve derivation/output metadata for active shells and rollback
         # workflows so GC does not prune still-useful build context.
         keep-derivations = true;
