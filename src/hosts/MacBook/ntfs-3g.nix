@@ -117,6 +117,7 @@ in
         make install
         echo "=== ntfs-3g build finished at $(date) ==="
       } >> "$LOG_FILE" 2>&1 || {
+        # shellcheck disable=SC2320 # $? is first command after || — false positive
         exit_code=$?
         echo "ntfs-3g: BUILD FAILED (exit $exit_code) — see $(/bin/realpath "$LOG_FILE")" >&2
         exit $exit_code
