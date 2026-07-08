@@ -27,6 +27,10 @@ usage() {
   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
+  --log-gc|--no-log-gc                Control log rotation (default: --log-gc).
+  --log-max-size <bytes>              Log rotation max file size before rotation (default: 10485760).
+  --log-max-files <count>             Number of rotated archives to keep (default: 4).
+  --log-compress <true|false>         Compress rotated logs (default: true).
   --expiry <duration>                       Master expiry override (e.g. "14d"). Per-tool flags win (default: "7d").
   --hm-expiry <duration>                    Home Manager generation expiry duration in nix format (e.g. "7d").
   --nix-expiry <duration>                   Nix store GC --delete-older-than duration (e.g. "7d", "30d").
@@ -88,6 +92,24 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-vm-gc)
       vm_gc=false
+      ;;
+    --log-gc)
+      log_gc=true
+      ;;
+    --no-log-gc)
+      log_gc=false
+      ;;
+    --log-max-size)
+      log_max_size="$2"
+      shift
+      ;;
+    --log-max-files)
+      log_max_files="$2"
+      shift
+      ;;
+    --log-compress)
+      log_compress="$2"
+      shift
       ;;
     --expiry)
       expiry_arg="$2"
@@ -449,7 +471,37 @@ if [ "$vm_gc" = true ]; then
   fi
 fi
 
-# Step 7: Scoop cache gc (accepted but ignored on POSIX; Windows-only).
+gc_logs() {
+  services_json="$REPO_ROOT/src/modules/services.json"
+  if [ ! -f "$services_json" ]; then
+    printf '%s\n' "gc: services.json not found; skipping log rotation" >&2
+    return 0
+  fi
+
+  _gl_maxsize="${log_max_size:-$(jq -r '.["$defaults"].logging.maxSize // 10485760' "$services_json")}"
+  _gl_maxfiles="${log_max_files:-$(jq -r '.["$defaults"].logging.maxFiles // 4' "$services_json")}"
+  _gl_compress="${log_compress:-$(jq -r '.["$defaults"].logging.compress // "true"' "$services_json")}"
+
+  _gl_log_dir="$(nucleus_log_dir)"
+  _gl_system_log_dir="$(nucleus_system_log_dir)"
+
+  rotate_logs_in_directory "$_gl_log_dir" "$_gl_maxsize" "$_gl_maxfiles" "$_gl_compress"
+
+  if [ -n "$_gl_system_log_dir" ] && [ "$_gl_system_log_dir" != "$_gl_log_dir" ]; then
+    rotate_logs_in_directory "$_gl_system_log_dir" "$_gl_maxsize" "$_gl_maxfiles" "$_gl_compress"
+  fi
+}
+
+# Step 7: rotate managed log files via copy-truncate (preserves inodes).
+if [ "$log_gc" = true ]; then
+  if [ "$dry_run" = true ]; then
+    printf '%s\n' "gc: --dry-run: would rotate managed logs"
+  else
+    gc_logs
+  fi
+fi
+
+# Step 8: Scoop cache gc (accepted but ignored on POSIX; Windows-only).
 # This flag exists for cross-platform CLI parity with the Windows gc.ps1 script.
 
 printf '%s\n' "gc: gc workflow completed"
