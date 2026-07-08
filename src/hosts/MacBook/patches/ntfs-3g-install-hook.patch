@@ -1,0 +1,16 @@
+--- a/libntfs-3g/Makefile.am
++++ b/libntfs-3g/Makefile.am
+@@ -59,9 +59,11 @@
+ install-exec-hook: install-rootlibLTLIBRARIES
+ if INSTALL_LIBRARY
+ 	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
+-		$(MV) -f "$(DESTDIR)/$(libdir)"/libntfs-3g.so* "$(DESTDIR)/$(rootlibdir)";  \
+-	fi
++		for f in "$(DESTDIR)/$(libdir)"/libntfs-3g.so*; do \
++			[ -e "$$f" ] || [ -L "$$f" ] || continue; \
++			$(MV) -f "$$f" "$(DESTDIR)/$(rootlibdir)"; \
++		done \
++	fi
+ if GENERATE_LDSCRIPT
+ 	if [ ! "$(rootlibdir)" -ef "$(libdir)" ]; then \
+ 		$(install_sh_PROGRAM) "libntfs-3g.script.so" "$(DESTDIR)/$(libdir)/libntfs-3g.so"; \
