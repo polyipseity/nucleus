@@ -209,3 +209,59 @@ refresh_services_menu() {
       ;;
   esac
 }
+
+# rotate_log_file — Copy-truncate a single log file if it exceeds MAXSIZE.
+# Preserves the inode so open file descriptors (launchd/systemd) stay valid.
+# Archives are shifted: .1 (newest) through .$maxfiles (oldest).
+# When compress is "true", the .1 archive is gzip-compressed to .1.gz.
+rotate_log_file() {
+  _rlf_logfile="$1"
+  _rlf_maxsize="${2:-10485760}"
+  _rlf_maxfiles="${3:-4}"
+  _rlf_compress="${4:-true}"
+
+  [ -f "$_rlf_logfile" ] || return 0
+
+  _rlf_size=$(wc -c < "$_rlf_logfile")
+  [ "$_rlf_size" -le "$_rlf_maxsize" ] && return 0
+
+  if [ "$_rlf_maxfiles" -gt 0 ]; then
+    # Remove oldest archive
+    rm -f "$_rlf_logfile.$_rlf_maxfiles" "$_rlf_logfile.$_rlf_maxfiles.gz"
+
+    # Shift existing archives
+    _rlf_i=$((_rlf_maxfiles - 1))
+    while [ "$_rlf_i" -ge 1 ]; do
+      [ -f "$_rlf_logfile.$_rlf_i" ] && mv "$_rlf_logfile.$_rlf_i" "$_rlf_logfile.$((_rlf_i + 1))"
+      [ -f "$_rlf_logfile.$_rlf_i.gz" ] && mv "$_rlf_logfile.$_rlf_i.gz" "$_rlf_logfile.$((_rlf_i + 1)).gz"
+      _rlf_i=$((_rlf_i - 1))
+    done
+
+    # Copy-truncate: copy to archive, then truncate in-place
+    cp "$_rlf_logfile" "$_rlf_logfile.1"
+    : > "$_rlf_logfile"
+
+    # Compress the newest archive if requested
+    if [ "$_rlf_compress" = "true" ]; then
+      gzip -f "$_rlf_logfile.1" 2>/dev/null || true
+    fi
+  else
+    # maxfiles=0: just truncate, keep no archives
+    : > "$_rlf_logfile"
+  fi
+}
+
+# rotate_logs_in_directory — Iterate over all *.log files under DIR and rotate
+# each one via rotate_log_file.  Uses POSIX find for portability.
+rotate_logs_in_directory() {
+  _rld_dir="$1"
+  _rld_maxsize="${2:-10485760}"
+  _rld_maxfiles="${3:-4}"
+  _rld_compress="${4:-true}"
+
+  [ -d "$_rld_dir" ] || return 0
+
+  find "$_rld_dir" -name '*.log' -type f | while IFS= read -r _rld_logfile; do
+    rotate_log_file "$_rld_logfile" "$_rld_maxsize" "$_rld_maxfiles" "$_rld_compress"
+  done
+}
