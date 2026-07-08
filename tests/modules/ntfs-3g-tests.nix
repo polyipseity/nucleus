@@ -46,11 +46,15 @@ let
     && containsRegex "PKG_CHECK_MODULES" cryptoPatchText
   ) "ntfs-3g-crypto.patch must remove the crypto autodetection block from configure.ac";
 
-  # Test 6: Rootbindir patch changes /bin to /usr/local/bin.
-  test_rootbindir_patch_changes_bin = assert' (
-    containsRegex ''rootbindir="/bin"'' rootbindirPatchText
-    && containsRegex ''rootbindir="/usr/local/bin"'' rootbindirPatchText
-  ) "ntfs-3g-rootbindir.patch must change rootbindir from /bin to /usr/local/bin";
+  # Test 6: Rootbindir patch changes /bin to /usr/local/bin and /lib to /usr/local/lib.
+  test_rootbindir_patch_changes_bin =
+    assert'
+      (
+        containsRegex ''rootbindir="/bin"'' rootbindirPatchText
+        && containsRegex ''rootbindir="/usr/local/bin"'' rootbindirPatchText
+        && containsRegex ''rootlibdir="/usr/local/lib"'' rootbindirPatchText
+      )
+      "ntfs-3g-rootbindir.patch must change rootbindir from /bin to /usr/local/bin and rootlibdir from /lib to /usr/local/lib";
 
   # === New patch: install-exec-hook ===
 

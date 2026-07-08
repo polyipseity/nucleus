@@ -7,5 +7,6 @@
 -	rootbindir="/bin"
 +	rootbindir="/usr/local/bin"
  	rootsbindir="/sbin"
- 	rootlibdir="/lib${libdir##*/lib}"
+-	rootlibdir="/lib${libdir##*/lib}"
++	rootlibdir="/usr/local/lib"
  else

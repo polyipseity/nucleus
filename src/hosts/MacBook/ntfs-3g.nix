@@ -94,8 +94,9 @@ in
 
         # Patch configure.ac: remove crypto autodetect block (AM_PATH_LIBGCRYPT
         # and PKG_CHECK_MODULES(GNUTLS macros undefined without library deps),
-        # fix rootbindir default from /bin to /usr/local/bin (SIP), and fix
-        # install-exec-hook to handle missing .so/.dylib files on Darwin.
+        # fix rootbindir/rootlibdir defaults from /bin:/lib to /usr/local/*
+        # (SIP), and fix install-exec-hook to handle missing .so/.dylib files
+        # on Darwin.
         echo "ntfs-3g: patching..."
         patch -p1 < ${cryptoPatchPath}
         patch -p1 < ${rootbindirPatchPath}
