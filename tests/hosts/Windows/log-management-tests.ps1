@@ -1,0 +1,150 @@
+<#
+.SYNOPSIS
+  Pester tests for Invoke-LogManagement.ps1 functions.
+
+.DESCRIPTION
+  Tests Invoke-LogRotation, Get-NucleusLogDir, Get-NucleusSystemLogDir,
+  and ConvertTo-SanitizedText from the Invoke-LogManagement module.
+
+  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/log-management-tests.ps1 -Passthru"
+#>
+
+BeforeAll {
+  # Source the module directly.
+  $modulePath = Join-Path $PSScriptRoot '../../../src/hosts/Windows/modules/Invoke-LogManagement.ps1'
+  . $modulePath
+
+  # Capture functions into test scope.
+  $Script:TestDir = "$(Join-Path $env:TEMP 'nucleus-log-tests')"
+}
+
+AfterAll {
+  if (Test-Path -LiteralPath $Script:TestDir -PathType Container) {
+    Remove-Item -LiteralPath $Script:TestDir -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
+Describe 'Get-NucleusLogDir' {
+  It 'returns a non-empty string' {
+    $result = Get-NucleusLogDir
+    $result | Should -Not -BeNullOrEmpty
+  }
+
+  It 'returns path ending with nucleus\logs' {
+    $result = Get-NucleusLogDir
+    $result | Should -Match 'nucleus[\\/]logs$'
+  }
+}
+
+Describe 'Get-NucleusSystemLogDir' {
+  It 'returns a non-empty string' {
+    $result = Get-NucleusSystemLogDir
+    $result | Should -Not -BeNullOrEmpty
+  }
+
+  It 'returns path ending with nucleus\logs' {
+    $result = Get-NucleusSystemLogDir
+    $result | Should -Match 'nucleus[\\/]logs$'
+  }
+}
+
+Describe 'ConvertTo-SanitizedText' {
+  It 'strips ANSI escape sequences' {
+    $input = "`e[31mred`e[0m normal"
+    $result = $input | ConvertTo-SanitizedText
+    $result | Should -Be "red normal"
+  }
+
+  It 'strips carriage returns' {
+    $input = "line1`r`nline2"
+    $result = $input | ConvertTo-SanitizedText
+    $result | Should -Be "line1`nline2"
+  }
+}
+
+Describe 'Invoke-LogRotation' {
+  BeforeEach {
+    # Create a fresh test directory per test.
+    $dir = Join-Path $Script:TestDir ([System.IO.Path]::GetRandomFileName())
+    New-Item -Path $dir -ItemType Directory -Force | Out-Null
+    $Script:LogDir = $dir
+  }
+
+  AfterEach {
+    if (Test-Path -LiteralPath $Script:LogDir -PathType Container) {
+      Remove-Item -LiteralPath $Script:LogDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  It 'is a no-op on missing directory' {
+    # Should not throw.
+    { Invoke-LogRotation -Path "$Script:TestDir\nonexistent" } | Should -Not -Throw
+  }
+
+  It 'is a no-op on files below MaxSize' {
+    $logFile = Join-Path $Script:LogDir 'test.log'
+    Set-Content -Path $logFile -Value 'small content'
+
+    Invoke-LogRotation -Path $Script:LogDir -MaxSize 1MB
+
+    (Test-Path -LiteralPath $logFile -PathType Leaf) | Should -Be $true
+    (Get-Item -LiteralPath $logFile).Length | Should -BeGreaterThan 0
+  }
+
+  It 'rotates a file exceeding MaxSize' {
+    $logFile = Join-Path $Script:LogDir 'test.log'
+    # Create a file larger than 10 bytes.
+    $content = 'a' * 100
+    Set-Content -Path $logFile -Value $content
+
+    Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 2 -Compress:$false
+
+    # Original should be renamed to .1.log
+    $archive = Join-Path $Script:LogDir 'test.1.log'
+    (Test-Path -LiteralPath $archive -PathType Leaf) | Should -Be $true
+  }
+
+  It 'shifts existing archives' {
+    $logFile = Join-Path $Script:LogDir 'test.log'
+    $content = 'a' * 100
+
+    # Populate current log, .1, .2
+    Set-Content -Path $logFile -Value $content
+    Set-Content -Path "$Script:LogDir\test.1.log" -Value 'old1'
+    Set-Content -Path "$Script:LogDir\test.2.log" -Value 'old2'
+
+    Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 3 -Compress:$false
+
+    # .1, .2, .3 should all exist after rotation
+    (Test-Path -LiteralPath "$Script:LogDir\test.1.log" -PathType Leaf) | Should -Be $true
+    (Test-Path -LiteralPath "$Script:LogDir\test.2.log" -PathType Leaf) | Should -Be $true
+    (Test-Path -LiteralPath "$Script:LogDir\test.3.log" -PathType Leaf) | Should -Be $true
+  }
+
+  It 'removes oldest archive when at MaxFiles' {
+    $logFile = Join-Path $Script:LogDir 'test.log'
+    $content = 'a' * 100
+
+    # Fill all slots: current, .1, .2, .3
+    Set-Content -Path $logFile -Value $content
+    Set-Content -Path "$Script:LogDir\test.1.log" -Value 'old1'
+    Set-Content -Path "$Script:LogDir\test.2.log" -Value 'old2'
+    Set-Content -Path "$Script:LogDir\test.3.log" -Value 'old3'
+
+    Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 3 -Compress:$false
+
+    # .4 must not exist
+    (Test-Path -LiteralPath "$Script:LogDir\test.4.log" -PathType Leaf) | Should -Be $false
+  }
+
+  It 'does not rotate files without .log extension' {
+    $nonLog = Join-Path $Script:LogDir 'data.txt'
+    Set-Content -Path $nonLog -Value ('a' * 100)
+
+    Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 2 -Compress:$false
+
+    # txt file should be untouched
+    (Test-Path -LiteralPath $nonLog -PathType Leaf) | Should -Be $true
+    (Test-Path -LiteralPath "$Script:LogDir\data.1.txt" -PathType Leaf) | Should -Be $false
+  }
+}

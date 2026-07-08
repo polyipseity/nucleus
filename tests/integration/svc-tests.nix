@@ -21,7 +21,9 @@ let
 
   # Parsed services.json for structural assertions
   parsedServices = builtins.fromJSON servicesJsonText;
-  serviceNames = builtins.filter (n: n != "\$schema") (builtins.attrNames parsedServices);
+  serviceNames = builtins.filter (n: n != "\$schema" && n != "\$defaults") (
+    builtins.attrNames parsedServices
+  );
 
   # Tail-recursive list helpers
   all =
