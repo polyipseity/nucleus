@@ -133,9 +133,6 @@
               );
               # Codec libs that are ffmpeg-full deps: tests OOM on aarch64-darwin
               # Nix sandbox; ffmpeg-full's tests cover them.
-              chromaprint = prev.chromaprint.overrideAttrs (_: {
-                doCheck = false;
-              });
               davs2 = prev.davs2.overrideAttrs (_: {
                 doCheck = false;
               });
