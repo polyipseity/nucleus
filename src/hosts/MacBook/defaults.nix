@@ -591,12 +591,21 @@ in
       # org.linearmouse.LinearMouse and com.lujjjh.LinearMouse because both
       # domains can appear on migrated installs.
       # Screenshot configurations:
-      #   - showInMenuBar: false (menu bar icon hidden via hideMenuBarIcons)
+      #   - showInMenuBar: false (menu bar icon hidden declaratively via
+      #     CustomUserPreferences)
       #   - showBattery: "always" (always display battery in menu bar when visible)
       #   - showInDock: true (app icon visible in Dock)
       #   - launchAtLogin: true (app auto-starts at login)
       #   - Also: disable automatic update checks (Sparkle preferences)
       "com.lujjjh.LinearMouse" = {
+        showInMenuBar = false;
+        showBattery = "always";
+        showInDock = true;
+        launchAtLogin = true;
+        SUEnableAutomaticChecks = false;
+        SUAutomaticallyUpdate = false;
+      };
+      "org.linearmouse.LinearMouse" = {
         showInMenuBar = false;
         showBattery = "always";
         showInDock = true;
