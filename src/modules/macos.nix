@@ -1057,59 +1057,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # hideMenuBarIcons
-    # Hides menu bar icons for AltTab, BetterDisplay, and LinearMouse to reduce
-    # persistent UI chrome. MiddleClick does not have a documented menu bar
-    # hiding option (see src/hosts/MacBook/MANUAL.md for limitations).
-    #
-    # Declarative approach: use defaults write to configure per-app settings.
-    # Each app requires restart to apply changes.
-    # -------------------------------------------------------------------------
-    hideMenuBarIcons = lib.hm.dag.entryAfter [ "reloadUserPreferenceState" ] ''
-      # Source: AltTab preference domain/key naming used by the app.
-      # https://alt-tab-macos.netlify.app/
-      # AltTab: hide menu bar icon (in-app toggle available in Preferences → General)
-      if /usr/bin/defaults write com.lwouis.alt-tab-macos menubarIconShown -bool false; then
-        echo "macos: AltTab menu bar icon hidden (restart app to apply)." >&2
-      else
-        echo "macos: warning — AltTab menu bar hide failed (app may not be installed)." >&2
-      fi
-
-      # BetterDisplay: hide app icon and deprecated menu-bar key.
-      # Source: BetterDisplay preference domain and menu-bar options.
-      # https://github.com/waydabber/BetterDisplay/wiki
-      if /usr/bin/defaults write pro.betterdisplay.BetterDisplay hideMenuIcon -bool true; then
-        if /usr/bin/defaults write pro.betterdisplay.BetterDisplay showInMenuBar -bool false; then
-          echo "macos: BetterDisplay menu icon hidden (restart app to apply)." >&2
-        else
-          echo "macos: warning — BetterDisplay legacy menu bar key write failed (app may not be installed)." >&2
-        fi
-      else
-        echo "macos: warning — BetterDisplay menu bar hide failed (app may not be installed)." >&2
-      fi
-
-      # LinearMouse: hide menu bar icon (showInMenuBar defaults key).
-      # Source: community-documented preference domain/key and local defaults
-      # domain enumeration (both org.linearmouse.LinearMouse and
-      # com.lujjjh.LinearMouse can exist depending on app build/migration).
-      # https://github.com/linearmouse/linearmouse/wiki
-      linearmouse_hide_ok=0
-      if /usr/bin/defaults write org.linearmouse.LinearMouse showInMenuBar -bool false; then
-        linearmouse_hide_ok=1
-      fi
-      if /usr/bin/defaults write com.lujjjh.LinearMouse showInMenuBar -bool false; then
-        linearmouse_hide_ok=1
-      fi
-      if [ "$linearmouse_hide_ok" -eq 1 ]; then
-        echo "macos: LinearMouse menu bar icon hidden (restart app to apply)." >&2
-      else
-        echo "macos: warning — LinearMouse menu bar hide failed (app may not be installed)." >&2
-      fi
-
-      echo "macos: menu bar icon hiding configured. Restart AltTab, BetterDisplay, and LinearMouse to apply." >&2
-    '';
-
-    # -------------------------------------------------------------------------
     # displayHostManualInstructions
     # Prints host-scoped one-time manual setup instructions from the dedicated
     # host manual document instead of embedding long reminder strings here.
