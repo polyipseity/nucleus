@@ -157,6 +157,7 @@ in
     ./macos.nix
     ./pwsh.nix
     ./secrets.nix
+    ./starship.nix
     ./shell.nix
     ./wallpapers.nix
   ];

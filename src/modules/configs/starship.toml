@@ -1,0 +1,38 @@
+# Starship configuration — managed by nucleus (src/modules/configs/starship.toml)
+# See https://starship.rs/config/ for all options.
+
+# Minimal informative prompt: directory, git, nix shell, slow cmd duration, exit code.
+format = """
+$directory\
+$git_branch\
+$git_status\
+$nix_shell\
+$fill\
+$cmd_duration\
+$status\
+"""
+
+[directory]
+truncation_length = 3
+
+[git_branch]
+format = "[$symbol$branch]($style)"
+style = "bold purple"
+
+[git_status]
+style = "bold purple"
+
+[nix_shell]
+format = "via [❄️ $state( \($name\))]($style)"
+impure_msg = "impure"
+pure_msg = "pure"
+style = "bold yellow"
+
+[cmd_duration]
+min_time = 2000
+format = "⏱️ [$duration]($style)"
+
+[status]
+disabled = false
+format = "[✖ $status]($style)"
+style = "bold red"
