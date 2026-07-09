@@ -122,6 +122,10 @@ function Sync-ShellProfile {
     'if (Get-Command zoxide -ErrorAction SilentlyContinue) {'
     '  Invoke-Expression (& zoxide init powershell | Out-String)'
     '}'
+    # Starship prompt: cross-shell prompt with git/nix/status info.
+    'if (Get-Command starship -ErrorAction SilentlyContinue) {'
+    '  Invoke-Expression (& starship init powershell | Out-String)'
+    '}'
     # fzf: fuzzy history search on Ctrl+R via a PSReadLine key handler.
     # Reads the PSReadLine history file directly so all sessions are searchable.
     'if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvailable -Name PSReadLine)) {'

@@ -74,6 +74,11 @@ let
           Invoke-Expression (& zoxide init powershell | Out-String)
         }
 
+        # Starship prompt: cross-shell prompt with git/nix/status info.
+        if (Get-Command starship -ErrorAction SilentlyContinue) {
+          Invoke-Expression (& starship init powershell | Out-String)
+        }
+
         # LLVM/Clang toolchain defaults for cross-host compiler parity.
         # Values sourced from src/modules/shell/env.nix.
         $env:CC = "${shellEnv.CC}"

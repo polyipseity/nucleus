@@ -201,6 +201,13 @@ in
               eval "$(pay-respects zsh --alias)"
             fi
 
+            # ---------------------------------------------------------------
+            # Starship prompt
+            # ---------------------------------------------------------------
+            if command -v starship >/dev/null 2>&1; then
+              eval "$(starship init zsh)"
+            fi
+
             # home.sessionVariables does not reliably populate plain interactive
             # `zsh -i` sessions in every launch path, so export the fallback tool
             # coordinates here as well.  This keeps repositories without .envrc
