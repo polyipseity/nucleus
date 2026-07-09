@@ -94,7 +94,9 @@ run_nix() {
   # Execute nix with the merged config for this script invocation.
   # Suppress the repeated dirty-tree warning so bootstrap/apply logs surface
   # actionable failures instead of identical VCS status noise.
-  NIX_CONFIG="$(merge_nix_config)" nix --option warn-dirty false "$@"
+  # NIX_PATH is set explicitly because darwin-rebuild's export NIX_PATH=${NIX_PATH:-}
+  # would otherwise clear it, overriding the nix-path config option.
+  NIX_CONFIG="$(merge_nix_config)" NIX_PATH="nixpkgs=flake:nixpkgs" nix --option warn-dirty false "$@"
 }
 
 load_bootstrap_versions() {

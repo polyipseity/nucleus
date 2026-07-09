@@ -68,7 +68,9 @@ while [ "$#" -gt 0 ]; do
 done
 
 run_nix() {
-  NIX_CONFIG="$(merge_nix_config)" nix --option warn-dirty false "$@"
+  # NIX_PATH is set explicitly because darwin-rebuild's export NIX_PATH=${NIX_PATH:-}
+  # would otherwise clear it, overriding the nix-path config option.
+  NIX_CONFIG="$(merge_nix_config)" NIX_PATH="nixpkgs=flake:nixpkgs" nix --option warn-dirty false "$@"
 }
 
 update_flake_inputs() {
