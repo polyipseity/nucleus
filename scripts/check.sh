@@ -174,6 +174,14 @@ else
   say "skipping cwd-independence tests (path-scoped mode)."
 fi
 
+# Nix search path regression tests
+section "$((_step += 1))" "Nix search path tests"
+if ! $HAS_ARGS; then
+  bash tests/scripts/nix-search-path-tests.sh
+else
+  say "skipping nix-search-path tests (path-scoped mode)."
+fi
+
 # Lockfile validation
 section "$((_step += 1))" "Lockfile validation"
 
