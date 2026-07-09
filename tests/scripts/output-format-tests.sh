@@ -61,6 +61,7 @@ MOCKSCRIPT
 # ---------------------------------------------------------------------------
 test_prefix_derivation() {
     local result
+    # shellcheck disable=SC2016 # $_nuc_prefix is expanded inside mock_nucleus_script, not here
     result=$(mock_nucleus_script 'printf "%s" "$_nuc_prefix"' 2>/dev/null) || true
     if [ "$result" = "foo" ]; then
         assert_pass "_nuc_prefix derives 'foo' from 'nucleus-foo'"

@@ -494,6 +494,7 @@ fi
 rm -rf "${SUDO_WRAPPER_DIR:-}" 2>/dev/null || true
 
 # jq unit test: do_log_config filter resolves fields correctly (Fix 1 regression)
+# shellcheck disable=SC2016 # $svc/$platform are jq variables, not shell variables
 JQ_FILTER='{
   capture: (.[$svc].platforms[$platform].logging.capture // .[$svc].logging.capture // "all"),
   maxSize: (.[$svc].platforms[$platform].logging.maxSize // .[$svc].logging.maxSize // 10000000),

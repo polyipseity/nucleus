@@ -149,8 +149,6 @@ test_rotate_directory() {
     # Create a small log file (should NOT be rotated) and a large one (should)
     echo "small" > "$dir/small.log"
     for _ in 1 2 3 4 5 6 7 8 9 10; do printf 'abcdefghij'; done > "$dir/large.log"
-    local large_size
-    large_size=$(wc -c < "$dir/large.log")
     rotate_logs_in_directory "$dir" 50 2 false
     if [ -f "$dir/small.log" ] && [ -f "$dir/large.log.1" ] && [ "$(wc -c < "$dir/large.log")" -eq 0 ]; then
         assert_pass "rotate_logs_in_directory: finds and rotates *.log files"
