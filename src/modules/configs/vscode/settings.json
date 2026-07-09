@@ -116,6 +116,7 @@
     "cursor-workspace": true,
     "windsurf": true
   },
+  "chat.permissions.default": "autopilot",
   "chat.planAgent.defaultModel": "DeepSeek V4 Flash (High) (customendpoint)",
   "chat.promptFilesLocations": {
     ".agents/prompts": true,
