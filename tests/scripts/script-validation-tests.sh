@@ -394,6 +394,16 @@ if [[ -f "$SVC_SH" ]]; then
     test_usage_std_present "$SVC_SH"
     test_help_handler "$SVC_SH"
 
+    # Override sudo with a wrapper using -n (non-interactive) so that
+    # svc_status does not hang on stdin for system-domain launchd services.
+    SUDO_WRAPPER_DIR=$(mktemp -d)
+    cat > "$SUDO_WRAPPER_DIR/sudo" << 'SUDO_WRAPPER'
+#!/usr/bin/env bash
+exec /usr/bin/sudo -n "$@"
+SUDO_WRAPPER
+    chmod +x "$SUDO_WRAPPER_DIR/sudo"
+    PATH="$SUDO_WRAPPER_DIR:$PATH"
+
     SVC_LIST_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list 2>&1 || true)
     if echo "$SVC_LIST_OUTPUT" | grep -q "ID.*Name.*Status.*Running.*PID"; then
         assert_pass "svc list: table headers present"
@@ -441,8 +451,8 @@ if [[ -f "$SVC_SH" ]]; then
     # Regression: log-config shows correct capture values for all services (Fix 1 + Fix 3)
     SVC_LOG_CONFIG_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config 2>&1 || true)
     if echo "$SVC_LOG_CONFIG_OUTPUT" | grep -q "capture: all"; then
-        capture_all_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: all")
-        capture_none_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: none")
+        capture_all_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: all" || true)
+        capture_none_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: none" || true)
         if [ "$capture_all_lines" -gt 0 ] && [ "$capture_none_lines" -eq 0 ]; then
             assert_pass "svc log-config: all services have capture=all"
         else
@@ -479,6 +489,8 @@ if [[ -f "$SVC_SH" ]]; then
         fi
     done
 fi
+# Clean up sudo wrapper used by svc tests above.
+rm -rf "${SUDO_WRAPPER_DIR:-}" 2>/dev/null || true
 
 # jq unit test: do_log_config filter resolves fields correctly (Fix 1 regression)
 JQ_FILTER='{
