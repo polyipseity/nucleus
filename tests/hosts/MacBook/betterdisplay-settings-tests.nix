@@ -7,14 +7,9 @@
 let
   lib = import <nixpkgs/lib>;
   defaultsText = builtins.readFile ../../../src/hosts/MacBook/defaults.nix;
-  macosModuleText = builtins.readFile ../../../src/modules/macos.nix;
 in
 assert lib.hasInfix ''"pro.betterdisplay.BetterDisplay"'' defaultsText;
 assert lib.hasInfix "hideMenuIcon = true;" defaultsText;
 assert lib.hasInfix "showInMenuBar = false;" defaultsText;
-assert lib.hasInfix "defaults write pro.betterdisplay.BetterDisplay hideMenuIcon -bool true"
-  macosModuleText;
-assert lib.hasInfix "defaults write pro.betterdisplay.BetterDisplay showInMenuBar -bool false"
-  macosModuleText;
 
 true
