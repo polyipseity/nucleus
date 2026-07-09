@@ -228,7 +228,7 @@ gc_dir_contents_if_present() {
     return 0
   fi
 
-  if ! find "$cache_dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} +; then
+  if ! find "$cache_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +; then
     warn "failed to gc $cache_label at '$cache_dir'"
   fi
 }
@@ -276,7 +276,7 @@ gc_tool_caches_if_available() {
   # Clearing only the nucleus checkout keeps scope bounded to managed content;
   # unrelated repositories are left untouched.
   if [ -d "$repo_direnv_dir" ]; then
-    if ! rm -rf "$repo_direnv_dir"; then
+    if ! rm -rf -- "$repo_direnv_dir"; then
       warn "failed to remove repo-local direnv cache '$repo_direnv_dir'"
     fi
   fi
@@ -357,7 +357,7 @@ gc_vm_artifacts_if_present() {
   # Remove temporary Packer build directories.
   for build_dir in "$images_dir"/*-build; do
     if [ -d "$build_dir" ]; then
-      if rm -rf "$build_dir" 2>/dev/null; then
+      if rm -rf -- "$build_dir" 2>/dev/null; then
         say "removed temporary VM build directory '$(basename "$build_dir")'"
       else
         warn "failed to remove temporary VM build directory '$build_dir'"
@@ -370,7 +370,7 @@ gc_vm_artifacts_if_present() {
     for _gc_packer_tmp in "$images_dir"/.??*; do
       [ -d "$_gc_packer_tmp" ] || continue
       warn "removing stale Packer temporary build directory: ${_gc_packer_tmp##*/}"
-      rm -rf "$_gc_packer_tmp"
+      rm -rf -- "$_gc_packer_tmp"
     done
     unset _gc_packer_tmp
   fi

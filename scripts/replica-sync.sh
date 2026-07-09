@@ -297,7 +297,7 @@ gc_local_macos_artifacts() {
   done
 
   for _dir_name in $_dir_names; do
-    find "$_target_dir" -type d -name "$_dir_name" -prune -exec rm -rf {} +
+    find "$_target_dir" -type d -name "$_dir_name" -prune -exec rm -rf -- {} +
   done
 }
 

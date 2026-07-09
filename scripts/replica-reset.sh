@@ -157,7 +157,7 @@ while IFS="$(printf '\t')" read id local_path provider icloud_service; do
     if ! run_local_cmd chmod -R u+w "$local_root" 2>/dev/null; then
       : # Ignore chmod errors (may be symlink or already writable)
     fi
-    if ! run_local_cmd rm -rf "$local_root"; then
+    if ! run_local_cmd rm -rf -- "$local_root"; then
       local_failures=$((local_failures + 1))
       continue
     fi
@@ -181,7 +181,7 @@ for cache_dir in \
   "$HOME/Library/Caches/rclone/sync" \
   "$HOME/Library/Caches/rclone/sync-lock"; do
   if [ -d "$cache_dir" ]; then
-    if ! run_local_cmd rm -rf "$cache_dir"; then
+    if ! run_local_cmd rm -rf -- "$cache_dir"; then
       local_failures=$((local_failures + 1))
     fi
   fi
