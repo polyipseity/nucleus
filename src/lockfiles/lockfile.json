@@ -105,7 +105,8 @@
     ]
   },
   "pwsh": {
-    "PSScriptAnalyzer": "1.20.0"
+    "PSScriptAnalyzer": "1.20.0",
+    "powershell-yaml": "0.4.12"
   },
   "rustup": {
     "stable": "2024-12-01"
