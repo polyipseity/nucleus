@@ -437,6 +437,47 @@ if [[ -f "$SVC_SH" ]]; then
     else
         assert_fail "svc list --json: services key present" "Missing services key in JSON output"
     fi
+
+    # Regression: log-config shows correct capture values for all services (Fix 1 + Fix 3)
+    SVC_LOG_CONFIG_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config 2>&1 || true)
+    if echo "$SVC_LOG_CONFIG_OUTPUT" | grep -q "capture: all"; then
+        capture_all_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: all")
+        capture_none_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: none")
+        if [ "$capture_all_lines" -gt 0 ] && [ "$capture_none_lines" -eq 0 ]; then
+            assert_pass "svc log-config: all services have capture=all"
+        else
+            assert_fail "svc log-config: all services have capture=all" "capture=all: $capture_all_lines, capture=none: $capture_none_lines"
+        fi
+    else
+        assert_fail "svc log-config: all services have capture=all" "No capture=all found in output"
+    fi
+
+    SVC_LOG_CONFIG_JSON=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config --json 2>&1 || true)
+    if echo "$SVC_LOG_CONFIG_JSON" | jq -e --slurp 'all(.[]; .[].capture == "all")' >/dev/null 2>&1; then
+        assert_pass "svc log-config --json: all capture=all via jq"
+    else
+        {
+          echo "DIAG: svc log-config --json output follows"
+          echo "$SVC_LOG_CONFIG_JSON" | head -5
+          echo "DIAG: end svc log-config --json output"
+        } >&2
+        assert_fail "svc log-config --json: all capture=all via jq" "jq filter 'all(.[]; .[].capture == \"all\")' failed"
+    fi
+
+    # Regression: logs listing shows all services with capture=all (Fix 2 + Fix 4)
+    SVC_LOGS_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" logs 2>&1 || true)
+    if echo "$SVC_LOGS_OUTPUT" | grep -q "capture=all"; then
+        assert_pass "svc logs: listing shows capture=all"
+    else
+        assert_fail "svc logs: listing shows capture=all" "No capture=all found in logs listing"
+    fi
+    for expected_svc in caddy jellyfin litellm ollama sshd; do
+        if echo "$SVC_LOGS_OUTPUT" | grep -qE "^\s+$expected_svc\s"; then
+            assert_pass "svc logs: service $expected_svc listed"
+        else
+            assert_fail "svc logs: service $expected_svc listed" "Missing from listing"
+        fi
+    done
 fi
 
 # Test scripts/service-watchdog.sh (macOS/NixOS: launchctl/systemctl watchdog)
