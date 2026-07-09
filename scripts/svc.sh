@@ -682,16 +682,14 @@ do_log_config() {
   for svc in "${targets[@]}"; do
     local entry
     entry=$(jq -c --arg svc "$svc" --arg platform "$PLATFORM" '
-      def log: .[$svc].logging // {};
-      def plat_log: .[$svc].platforms[$platform].logging // {};
       {
-        capture: (plat_log.capture // log.capture // "all"),
-        maxSize: (plat_log.maxSize // log.maxSize // 10000000), # bytes
-        maxFiles: (plat_log.maxFiles // log.maxFiles // 4),
-        compress: (plat_log.compress // log.compress // true),
-        sanitize: (plat_log.sanitize // log.sanitize // true),
-        level: (plat_log.level // log.level // null),
-        eventLog: (plat_log.eventLog // log.eventLog // null)
+        capture: (.[$svc].platforms[$platform].logging.capture // .[$svc].logging.capture // "all"),
+        maxSize: (.[$svc].platforms[$platform].logging.maxSize // .[$svc].logging.maxSize // 10000000), # bytes
+        maxFiles: (.[$svc].platforms[$platform].logging.maxFiles // .[$svc].logging.maxFiles // 4),
+        compress: (.[$svc].platforms[$platform].logging.compress // .[$svc].logging.compress // true),
+        sanitize: (.[$svc].platforms[$platform].logging.sanitize // .[$svc].logging.sanitize // true),
+        level: (.[$svc].platforms[$platform].logging.level // .[$svc].logging.level // null),
+        eventLog: (.[$svc].platforms[$platform].logging.eventLog // .[$svc].logging.eventLog // null)
       }
     ' "$SERVICES_JSON")
     if $json_output; then
