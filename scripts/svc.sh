@@ -693,8 +693,8 @@ do_log_config() {
   for svc in "${targets[@]}"; do
     local entry
     entry=$(jq -c --arg svc "$svc" --arg platform "$PLATFORM" '
-      def log: .logging // {};
-      def plat_log: .platforms[$platform].logging // {};
+      def log: .[$svc].logging // {};
+      def plat_log: .[$svc].platforms[$platform].logging // {};
       {
         capture: (plat_log.capture // log.capture // "all"),
         maxSize: (plat_log.maxSize // log.maxSize // 10000000), # bytes
