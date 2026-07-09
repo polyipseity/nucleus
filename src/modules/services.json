@@ -170,7 +170,7 @@
     "description": "Media server",
     "displayName": "Jellyfin",
     "logging": {
-      "capture": "none",
+      "capture": "all",
       "eventLog": {
         "provider": "Jellyfin"
       }
@@ -208,7 +208,7 @@
     "description": "Nix Linux builder VM on macOS",
     "displayName": "Linux Builder VM",
     "logging": {
-      "capture": "none"
+      "capture": "all"
     },
     "network": {
       "ssh": {
@@ -237,7 +237,7 @@
     "description": "AI API gateway for multi-provider routing",
     "displayName": "LiteLLM",
     "logging": {
-      "capture": "stderr",
+      "capture": "all",
       "level": "WARNING"
     },
     "network": {
@@ -269,7 +269,7 @@
     "description": "LLM inference server",
     "displayName": "Ollama",
     "logging": {
-      "capture": "none",
+      "capture": "all",
       "eventLog": {
         "provider": "Ollama"
       }
@@ -302,7 +302,7 @@
     "description": "Remote Desktop Protocol server",
     "displayName": "Remote Desktop",
     "logging": {
-      "capture": "none",
+      "capture": "all",
       "eventLog": {
         "provider": "Microsoft-Windows-TerminalServices-RemoteConnectionManager"
       }
@@ -356,7 +356,7 @@
     "description": "SSH key authentication agent",
     "displayName": "SSH Agent",
     "logging": {
-      "capture": "none",
+      "capture": "all",
       "eventLog": {
         "provider": "OpenSSH"
       }
@@ -383,7 +383,7 @@
     "description": "Remote shell access via SSH",
     "displayName": "SSH Server",
     "logging": {
-      "capture": "none",
+      "capture": "all",
       "eventLog": {
         "provider": "OpenSSH"
       }
