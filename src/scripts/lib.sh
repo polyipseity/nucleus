@@ -87,11 +87,15 @@ resolve_nucleus_host() {
 }
 
 merge_nix_config() {
-  _mnc_features="${1:-experimental-features = nix-command flakes}"
+  _mnc_base="${1:-}"
+  if [ -z "$_mnc_base" ]; then
+    _mnc_base="experimental-features = nix-command flakes
+nix-path = nixpkgs=flake:nixpkgs"
+  fi
   if [ -n "${NIX_CONFIG:-}" ]; then
-    printf '%s\n%s' "$NIX_CONFIG" "$_mnc_features"
+    printf '%s\n%s' "$NIX_CONFIG" "$_mnc_base"
   else
-    printf '%s' "$_mnc_features"
+    printf '%s' "$_mnc_base"
   fi
 }
 
