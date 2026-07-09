@@ -17,6 +17,7 @@
     builders = @/etc/nix/machines
     builders-use-substitutes = true
     extra-platforms = x86_64-darwin aarch64-darwin
+    nix-path = nixpkgs=flake:nixpkgs
     trusted-users = root ${username}
   '';
 
