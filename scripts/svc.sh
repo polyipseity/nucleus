@@ -543,9 +543,7 @@ service_log_files() {
 # Check if a service has any accessible log output.
 service_has_logs() {
   local svc="$1"
-  local capture
-  capture="$(get_capture "$svc")"
-  if [ "$capture" != "none" ] && [ -n "$(service_log_files "$svc")" ]; then
+  if [ -n "$(service_log_files "$svc")" ]; then
     return 0
   fi
   if [ "$PLATFORM" = "nixos" ]; then
@@ -633,15 +631,8 @@ do_logs() {
       error "logs: unknown service '$svc'"
       exit 1
     fi
-    local capture
-    capture="$(get_capture "$svc")"
-
     case "$PLATFORM" in
       macos)
-        if [ "$capture" = "none" ]; then
-          warn "$svc — capture disabled"
-          continue
-        fi
         show_file_logs "$svc" "$lines" "$raw" || warn "$svc — no log files found"
         ;;
       nixos)
@@ -649,10 +640,8 @@ do_logs() {
         unit="$(get_unit "$svc")"
         if [ -n "$unit" ] && command -v journalctl >/dev/null 2>&1; then
           show_journald_logs "$svc" "$lines" "$raw" "$since" || warn "$svc — no journald logs"
-        elif [ "$capture" != "none" ]; then
-          show_file_logs "$svc" "$lines" "$raw" || warn "$svc — no log files found"
         else
-          warn "$svc — capture disabled and no systemd unit"
+          show_file_logs "$svc" "$lines" "$raw" || warn "$svc — no log files found"
         fi
         ;;
     esac
