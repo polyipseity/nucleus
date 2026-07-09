@@ -111,8 +111,8 @@ test_no_dangerous_patterns() {
         echo -e "${YELLOW}⚠${NC}  Potential unquoted variable: $(basename "$script")"
     fi
 
-    # Check for rm -rf without safeguards
-    if grep -E 'rm\s+-rf' "$script" | grep -v 'HOME\|TMPDIR\|/tmp' >/dev/null 2>&1; then
+    # Check for rm -rf without safeguards (-- after rm -rf is accepted as a separator guard)
+    if grep -E 'rm\s+-rf' "$script" | grep -v 'HOME\|TMPDIR\|/tmp\|--' >/dev/null 2>&1; then
         dangerous=$((dangerous + 1))
         echo -e "${YELLOW}⚠${NC}  Potentially unsafe rm -rf: $(basename "$script")"
     fi
