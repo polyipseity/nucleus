@@ -432,7 +432,7 @@ SUDO_WRAPPER
     fi
 
     SVC_JSON_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list --json 2>&1 || true)
-    if echo "$SVC_JSON_OUTPUT" | jq -e '.svc_version == "1"' >/dev/null 2>&1; then
+    if echo "$SVC_JSON_OUTPUT" | jq -e '.version == "1"' >/dev/null 2>&1; then
         assert_pass "svc list --json: valid JSON with version"
     else
         {
@@ -440,7 +440,8 @@ SUDO_WRAPPER
           echo "$SVC_JSON_OUTPUT" | head -5
           echo "DIAG: end svc list --json output"
         } >&2
-        assert_fail "svc list --json: valid JSON with version" "Output is not valid JSON or missing svc_version"
+        assert_fail "svc list --json: valid JSON with version" "Output is not valid JSON or missing version"
+
     fi
     if echo "$SVC_JSON_OUTPUT" | jq -e 'has("services")' >/dev/null 2>&1; then
         assert_pass "svc list --json: services key present"

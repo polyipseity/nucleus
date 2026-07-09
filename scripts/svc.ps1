@@ -262,7 +262,7 @@ function Format-StatusTable {
   )
 
   if ($Json) {
-    $jsonObj = @{ svc_version = '1'; services = @{} }
+    $jsonObj = @{ version = '1'; services = @{} }
     foreach ($key in $Results.Keys) {
       if ($key -like 'ERROR:*') { continue }
       $jsonObj.services[$key] = $Results[$key]
