@@ -1,7 +1,7 @@
-# MacBook/ntfs-3g.nix — build macos-fuse-t/ntfs-3g from source.
+# MacBook/ntfs-3g.nix — build polyipseity/ext.ntfs-3g from source.
 #
 # WHY build from source, not nixpkgs:
-#   The macos-fuse-t fork of ntfs-3g (commit f0e5cb0) links against fuse-t, a
+#   The polyipseity fork of ntfs-3g (commit f0e5cb0) links against fuse-t, a
 #   FSKit-based FUSE implementation distributed as a Homebrew cask at
 #   /usr/local/lib/libfuse-t.dylib.  Nix sandbox builds cannot resolve this
 #   impure dependency, so we build imperatively during activation.
@@ -15,14 +15,14 @@
 # WHY not ntfs-3g from nixpkgs:
 #   nixpkgs ntfs-3g uses the native macOS FUSE kext (osxfuse / macFUSE), which
 #   requires a kernel extension.  fuse-t is a modern FSKit-based alternative
-#   that works without kext approval, so the macos-fuse-t fork is the preferred
+#   that works without kext approval, so the polyipseity fork is the preferred
 #   build on modern macOS.
 { lib, pkgs, ... }:
 let
-  # Pinned source for the macos-fuse-t/ntfs-3g fork (edge branch).
+  # Pinned source for the polyipseity/ext.ntfs-3g fork (edge branch).
   ntfs3gSrc = pkgs.fetchFromGitHub {
-    owner = "macos-fuse-t";
-    repo = "ntfs-3g";
+    owner = "polyipseity";
+    repo = "ext.ntfs-3g";
     rev = "f0e5cb0274e30334dd03aefb4fd5a14c239e6756";
     hash = "sha256-35c5H2q1/YsKiyFXC/nd5Ax3fngpcGL0J1TkX2Vk+5M=";
   };

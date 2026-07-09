@@ -13,13 +13,13 @@ let
 
   pypresence = pkgs.python3Packages.buildPythonPackage rec {
     pname = "pypresence";
-    version = "66f43b72";
+    version = "e941a582";
 
     src = pkgs.fetchFromGitHub {
-      owner = "f0e";
-      repo = "pypresence";
-      rev = "66f43b724c8b9df9a34c96c90cee113b23d5a301";
-      hash = "sha256-SbX+mNsiXlEiefLgBwaW9sIvFLfPJw7fZdwIpW6CD1Y=";
+      owner = "polyipseity";
+      repo = "ext.pypresence";
+      rev = "e941a582d0aa920d5e51301fbc9744d6ab4a9603";
+      hash = "sha256-fHTAJWW2k9Tmtc5u8zWKf5ydaAPzAQYDCvi6X6UGcIQ=";
     };
 
     format = "pyproject";
@@ -64,7 +64,7 @@ let
     # propagatedBuildInputs above.
     postPatch = ''
       substituteInPlace pyproject.toml \
-        --replace 'pypresence @ git+https://github.com/f0e/pypresence.git@66f43b724c8b9df9a34c96c90cee113b23d5a301' \
+        --replace 'pypresence @ git+https://github.com/polyipseity/ext.pypresence.git@e941a582d0aa920d5e51301fbc9744d6ab4a9603' \
                   'pypresence'
     '';
 
