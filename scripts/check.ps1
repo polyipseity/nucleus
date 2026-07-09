@@ -12,6 +12,10 @@
 # deadnix, shellcheck, and script validation tests are skipped
 # on Windows (Nix/ShellCheck not available on Windows runners).
 #
+# Prerequisites:
+#   - powershell-yaml module (Install-Module powershell-yaml -Scope CurrentUser)
+#     is required for locked DSC validation. It is NOT auto-installed.
+#
 # Arguments:
 #   (none)        Paths may be provided as positional arguments; passed
 #                 through to individual checkers that support path filtering.
@@ -398,12 +402,8 @@ if (-not $HAS_ARGS) {
   $_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
   $_lfErrors = 0
 
-  # Ensure powershell-yaml module is available.
-  if (-not (Get-Module -ListAvailable -Name powershell-yaml)) {
-    Write-Output "Installing powershell-yaml module..."
-    Install-Module -Name powershell-yaml -Scope CurrentUser -Force -AcceptLicense
-  }
-  Import-Module -Name powershell-yaml -Force
+  # powershell-yaml is a prerequisite — must be pre-installed.
+  Import-Module -Name powershell-yaml -ErrorAction Stop
 
   # Helper: convert mixed PSCustomObject/hashtable/list trees to pure hashtable/array.
   function ConvertTo-HashtableDeep ($_obj) {
