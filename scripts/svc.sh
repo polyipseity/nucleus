@@ -318,6 +318,10 @@ svc_action() {
           # because launchd will not retry services that exited with
           # non-retryable codes.  The grace window gives well-behaved
           # processes time to shut down cleanly before the hard kill.
+          #
+          # After bootstrap, the service is verified running.  If launchd
+          # fails to auto-start (transient bootstrap race), a start
+          # fallback is attempted as a safety net.
           recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
             $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || true
             for _i in 1 2 3 4 5; do
@@ -326,7 +330,26 @@ svc_action() {
               sleep 1
             done
             $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
+            # Small delay between bootout and bootstrap to give launchd
+            # time to finish cleanup and avoid a bootstrap race.
+            sleep 0.5
             $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null || true
+            # Verify the service started after bootstrap.  Poll briefly
+            # and fall through to enable + start as a safety net.
+            for _j in 1 2 3 4; do
+              $sudo_prefix launchctl print "$target" 2>/dev/null \
+                | grep -q "state = running" && break
+              sleep 0.5
+            done
+            if ! $sudo_prefix launchctl print "$target" 2>/dev/null \
+                | grep -q "state = running"; then
+              # launchd may need an explicit enable+start if bootstrap
+              # loaded the plist but a transient condition blocked
+              # KeepAlive from auto-starting the service.
+              $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 || true
+              $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 || \
+                warn "$name — restart: failed to start service after reload"
+            fi
           }
           ;;
         enable)  $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
