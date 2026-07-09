@@ -34,6 +34,7 @@ let
     "pwsh"
     "secrets"
     "shell"
+    "starship"
     "wallpapers"
     "agents"
   ];
@@ -66,6 +67,7 @@ let
         "pwsh" = true;
         "secrets" = true;
         "shell" = true;
+        "starship" = true;
         "wallpapers" = true;
         "agents" = true;
       };
