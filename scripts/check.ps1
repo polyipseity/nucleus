@@ -21,6 +21,8 @@
 #
 # Exit conditions:
 #   0 on success; non-zero on any check failure.
+# By default, all checks run and failures accumulate (report-at-end).
+# Use --fail-fast to exit immediately on the first failure.
 
 #Requires -Version 7.4
 Set-StrictMode -Version Latest
@@ -28,17 +30,21 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { Split-Path -Parent $PSScriptRoot }
 $exitCode = 0
+$FAIL_FAST = $false
 $VERIFY = $false
 $positionalArgs = @()
 
 # Process -h|--help and --verify
 foreach ($_arg in $args) {
   if ($_arg -eq '-h' -or $_arg -eq '--help') {
-    Write-Output "Usage: check.ps1 [--verify] [path ...]"
+    Write-Output "Usage: check.ps1 [--fail-fast] [--verify] [path ...]"
     Write-Output "  Run all Windows-compatible repository validation checks in sequence."
     Write-Output "  With arguments, passes paths through to supporting checkers."
-    Write-Output "  --verify    Additionally run online determinism checks (requires network)."
+    Write-Output "  --fail-fast  Exit immediately on first failure (default: accumulate all)."
+    Write-Output "  --verify     Additionally run online determinism checks (requires network)."
     exit 0
+  } elseif ($_arg -eq '--fail-fast') {
+    $FAIL_FAST = $true
   } elseif ($_arg -eq '--verify') {
     $VERIFY = $true
   } else {
@@ -72,6 +78,7 @@ if ($PS1_FILES.Count -gt 0) {
   Write-Output "Skipping (no PowerShell scripts to check)."
 }
 if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
+if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
 # 2. Packer template validation
@@ -85,6 +92,7 @@ if ($PKR_FILES.Count -gt 0) {
   Write-Output "Skipping (no Packer templates to check)."
 }
 if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
+if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
 # 3. Service registry validation
@@ -138,6 +146,7 @@ if (-not $HAS_ARGS) {
   if ($_svcErrors -gt 0) {
     Write-Output "ERROR: services.json validation failed with $_svcErrors error(s)"
     $exitCode = 1
+    if ($FAIL_FAST) { exit $exitCode }
   } else {
     Write-Output "services.json validation passed"
 
@@ -214,6 +223,7 @@ $_lfOverlapErrors = 0
 if (-not (Test-Path $_lfPath)) {
   Write-Output "ERROR: lockfile.json not found at $_lfPath"
   $exitCode = 1
+  if ($FAIL_FAST) { exit $exitCode }
   $_lfOverlapErrors++
 } else {
   $_lf = Get-Content $_lfPath -Raw | ConvertFrom-Json -AsHashtable
@@ -280,6 +290,7 @@ if (-not (Test-Path $_lfAlPath)) {
 if ($_lfAlErrors -gt 0) {
   Write-Output "ERROR: lifecycle-allowlist.json validation failed with $_lfAlErrors error(s)"
   $exitCode = 1
+  if ($FAIL_FAST) { exit $exitCode }
 } else {
   $_lfAlCount = if ($null -ne $_lfAl -and $_lfAl -is [hashtable]) { $_lfAl.Count } else { 0 }
   Write-Output ("lifecycle-allowlist.json: valid (entry count: {0})" -f $_lfAlCount)
@@ -289,6 +300,7 @@ if (-not $HAS_ARGS) {
   if ($null -eq $_lf) {
     Write-Output "ERROR: lockfile.json could not be loaded — skipping section validation"
     $exitCode = 1
+    if ($FAIL_FAST) { exit $exitCode }
   } else {
     $_lfErrors = 0
 
@@ -299,7 +311,7 @@ if (-not $HAS_ARGS) {
         $_lfErrors++
       } else {
         foreach ($_entry in $_lf[$_section].GetEnumerator()) {
-          if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME') -contains $_entry.Value) {
+          if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME', '1.0.0') -contains $_entry.Value) {
             Write-Output "ERROR: $_section.$($_entry.Key): placeholder version ($($_entry.Value))"
             $_lfErrors++
           }
@@ -313,7 +325,7 @@ if (-not $HAS_ARGS) {
       $_lfErrors++
     } elseif ($_lf.winget.Count -gt 0) {
       foreach ($_entry in $_lf.winget.GetEnumerator()) {
-        if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME') -contains $_entry.Value) {
+        if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME', '1.0.0') -contains $_entry.Value) {
           Write-Output "ERROR: winget.$($_entry.Key): placeholder version ($($_entry.Value))"
           $_lfErrors++
         }
@@ -328,7 +340,7 @@ if (-not $HAS_ARGS) {
       $_lfErrors++
     } elseif ($_lf.vscode.Count -gt 0) {
       foreach ($_entry in $_lf.vscode.GetEnumerator()) {
-        if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME') -contains $_entry.Value) {
+        if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME', '1.0.0') -contains $_entry.Value) {
           Write-Output "ERROR: vscode.$($_entry.Key): placeholder version ($($_entry.Value))"
           $_lfErrors++
         }
@@ -367,6 +379,7 @@ if (-not $HAS_ARGS) {
     if ($_lfErrors -gt 0) {
       Write-Output "ERROR: lockfile.json validation failed with $_lfErrors error(s)"
       $exitCode = 1
+      if ($FAIL_FAST) { exit $exitCode }
     } else {
       Write-Output "lockfile.json validation passed"
     }
@@ -516,6 +529,7 @@ if (-not $HAS_ARGS) {
   if ($_lfErrors -gt 0) {
     Write-Output "ERROR: locked DSC validation failed with $_lfErrors error(s)"
     $exitCode = 1
+    if ($FAIL_FAST) { exit $exitCode }
   } else {
     Write-Output 'Locked DSC validation passed'
   }
@@ -554,6 +568,7 @@ if (-not $HAS_ARGS) {
   }
   if ($_violations -gt 0) {
     $exitCode = $_violations
+    if ($FAIL_FAST) { exit $exitCode }
   } else {
     Write-Output "No package manager violations found."
   }
@@ -568,6 +583,7 @@ Write-Output ("`n=== [{0}] Online determinism checks (--verify) ===" -f (++$_ste
 if ($VERIFY) {
   & "$PSScriptRoot\bump-lockfile.ps1" -Verify
   if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
+  if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
   Write-Output "Online determinism checks passed."
 } else {
   Write-Output "Skipping (use --verify to run online determinism checks)."

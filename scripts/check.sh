@@ -27,7 +27,12 @@
 #
 # Exit conditions:
 #   0 on success; non-zero on any check failure.
-set -euo pipefail
+# By default, all checks run and failures accumulate (report-at-end).
+# Use --fail-fast to exit immediately on the first failure.
+set -uo pipefail
+
+exit_code=0
+FAIL_FAST=false
 
 # Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
 _self="$0"
@@ -51,7 +56,7 @@ FORMAT_NIX=false
 VERIFY=false
 
 usage() {
-  usage_std "check.sh" "[--format] [--verify] [path ...]" "Run all repository validation checks in sequence. With arguments, passes paths through to supporting checkers and skips whole-repo checks (deadnix, script validation). Use --format to enable in-place Nix formatting (instead of just --verify). Use --verify to additionally run online determinism checks (requires network)."
+  usage_std "check.sh" "[--format] [--fail-fast] [--verify] [path ...]" "Run all repository validation checks in sequence. With arguments, passes paths through to supporting checkers and skips whole-repo checks (deadnix, script validation). Use --format to enable in-place Nix formatting (instead of just --verify). Use --fail-fast to exit immediately on first failure (default: accumulate all failures). Use --verify to additionally run online determinism checks (requires network)."
 }
 
 while [ "$#" -gt 0 ]; do
@@ -62,6 +67,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --format)
       FORMAT_NIX=true
+      shift
+      ;;
+    --fail-fast)
+      FAIL_FAST=true
       shift
       ;;
     --verify)
@@ -104,8 +113,12 @@ _step=0
 # Dead Nix code detection
 section "$((_step += 1))" "Dead Nix code"
 if ! $HAS_ARGS; then
-  deadnix --fail src/
-  say "no dead Nix code found."
+  if ! deadnix --fail src/; then
+    exit_code=$?
+  else
+    say "no dead Nix code found."
+  fi
+  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 else
   say "skipping deadnix (path-scoped mode)."
 fi
@@ -114,8 +127,12 @@ fi
 section "$((_step += 1))" "Nix flake evaluation"
 if ! $HAS_ARGS; then
   sys=$(nix eval --impure --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
-  nix eval --impure "path:./src#packages.$sys" >/dev/null
-  say "nix flake evaluation passed."
+  if ! nix eval --impure "path:./src#packages.$sys" >/dev/null; then
+    exit_code=$?
+  else
+    say "nix flake evaluation passed."
+  fi
+  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 else
   say "skipping nix flake check (path-scoped mode)."
 fi
@@ -125,12 +142,19 @@ section "$((_step += 1))" "Nix formatting (nixfmt)"
 require_command nixfmt
 if [ "${#NIX_FILES[@]}" -gt 0 ]; then
   if $FORMAT_NIX; then
-    nixfmt -s "${NIX_FILES[@]}"
-    say "nix formatting applied."
+    if nixfmt -s "${NIX_FILES[@]}"; then
+      say "nix formatting applied."
+    else
+      exit_code=$?
+    fi
   else
-    nixfmt -s --verify "${NIX_FILES[@]}"
-    say "nix formatting OK."
+    if nixfmt -s --verify "${NIX_FILES[@]}"; then
+      say "nix formatting OK."
+    else
+      exit_code=$?
+    fi
   fi
+  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 elif ! $HAS_ARGS; then
   say "skipping nixfmt (standalone mode — use \`nix run .#nixfmt\` to check all Nix files)."
 else
@@ -140,28 +164,31 @@ fi
 # PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 section "$((_step += 1))" "PowerShell syntax validation"
 require_command pwsh
+_ps_exit=0
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly "${PS1_FILES[@]}"
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly "${PS1_FILES[@]}" || _ps_exit=$?
 elif ! $HAS_ARGS; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly
-else
-  say "skipping (no PowerShell scripts to check)."
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly || _ps_exit=$?
 fi
+if [ $_ps_exit -ne 0 ]; then exit_code=$_ps_exit; fi
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Packer template validation
 section "$((_step += 1))" "Packer template validation"
 if [ "${#PKR_FILES[@]}" -gt 0 ]; then
-  bash scripts/check-packer.sh "${PKR_FILES[@]}"
+  bash scripts/check-packer.sh "${PKR_FILES[@]}" || exit_code=$?
 elif ! $HAS_ARGS; then
-  bash scripts/check-packer.sh
+  bash scripts/check-packer.sh || exit_code=$?
 else
   say "skipping (no Packer templates to check)."
 fi
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Shell script validation tests
 section "$((_step += 1))" "Shell script validation tests"
 if ! $HAS_ARGS; then
-  bash tests/scripts/script-validation-tests.sh
+  bash tests/scripts/script-validation-tests.sh || exit_code=$?
+  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 else
   say "skipping validation tests (path-scoped mode)."
 fi
@@ -169,7 +196,8 @@ fi
 # CWD-independence tests
 section "$((_step += 1))" "CWD-independence tests"
 if ! $HAS_ARGS; then
-  bash tests/scripts/cwd-independence-tests.sh
+  bash tests/scripts/cwd-independence-tests.sh || exit_code=$?
+  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 else
   say "skipping cwd-independence tests (path-scoped mode)."
 fi
@@ -177,7 +205,8 @@ fi
 # Nix search path regression tests
 section "$((_step += 1))" "Nix search path tests"
 if ! $HAS_ARGS; then
-  bash tests/scripts/nix-search-path-tests.sh
+  bash tests/scripts/nix-search-path-tests.sh || exit_code=$?
+  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 else
   say "skipping nix-search-path tests (path-scoped mode)."
 fi
@@ -217,7 +246,8 @@ else
 fi
 if [ "$_lf_overlap_issues" -gt 0 ]; then
   warn "lockfile.json has $_lf_overlap_issues overlapping package(s) across sections"
-  exit 1
+  exit_code=1
+  $FAIL_FAST && exit $exit_code
 else
   say "lockfile.json consistency: no overlapping packages across sections"
 fi
@@ -250,7 +280,8 @@ else
 fi
 if [ "$_lf_al_errors" -gt 0 ]; then
   warn "lifecycle-allowlist.json validation failed with $_lf_al_errors error(s)"
-  exit 1
+  exit_code=1
+  $FAIL_FAST && exit $exit_code
 fi
 say "lifecycle-allowlist.json: valid (entry count: $(jq 'length' "$_lf_al_path" 2>/dev/null || echo 0))"
 
@@ -333,7 +364,8 @@ if ! $HAS_ARGS; then
 
   if [ "$_lf_errors" -gt 0 ]; then
     warn "lockfile.json validation failed with $_lf_errors error(s)"
-    exit 1
+    exit_code=1
+    $FAIL_FAST && exit $exit_code
   fi
   say "lockfile.json validation passed"
 else
@@ -407,7 +439,8 @@ if ! $HAS_ARGS; then
 
   if [ "$_svc_errors" -gt 0 ]; then
     warn "services.json validation failed with $_svc_errors error(s)"
-    exit 1
+    exit_code=1
+    $FAIL_FAST && exit $exit_code
   fi
   say "services.json validation passed"
 
@@ -507,7 +540,8 @@ if ! $HAS_ARGS; then
 
   if [ "$_lf_errors" -gt 0 ]; then
     warn "locked DSC validation failed with $_lf_errors error(s)"
-    exit 1
+    exit_code=1
+    $FAIL_FAST && exit $exit_code
   fi
   say "locked DSC validation passed"
 else
@@ -539,7 +573,8 @@ if ! $HAS_ARGS; then
     _violations=$((_violations + 1))
   fi
   if [ "$_violations" -gt 0 ]; then
-    exit 1
+    exit_code=1
+    $FAIL_FAST && exit $exit_code
   fi
   say "no package manager violations found."
 else
@@ -549,10 +584,17 @@ fi
 # Online determinism checks (--verify mode only)
 section "$((_step += 1))" "Online determinism checks (--verify)"
 if $VERIFY; then
-  bash "$SCRIPT_DIR/bump-lockfile.sh" --verify
-  say "online determinism checks passed."
+  bash "$SCRIPT_DIR/bump-lockfile.sh" --verify || exit_code=$?
+  if [ $exit_code -eq 0 ]; then
+    say "online determinism checks passed."
+  fi
+  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 else
   say "skipping (use --verify to run online determinism checks)."
 fi
 
+if [ $exit_code -ne 0 ]; then
+  warn "some checks failed with exit code $exit_code"
+  exit $exit_code
+fi
 nuc_done
