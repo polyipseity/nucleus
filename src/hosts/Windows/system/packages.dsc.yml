@@ -119,6 +119,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Starship is installed for cross-shell prompt parity with macOS and NixOS
+      settings:
+        id: Starship.Starship
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Discord Canary is installed to match the macOS canary-channel declaration
       settings:
         id: Discord.Discord.Canary

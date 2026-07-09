@@ -363,6 +363,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-PicardConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-QtPassConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ShellProfile.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
 # editors/: VS Code configuration and workspace management.
 . (Join-Path -Path $editorsModuleDir -ChildPath "Set-VSCodeWorkspaceTrust.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeExtension.ps1")
@@ -693,6 +694,7 @@ if ($null -eq $EnableDevReposParity) {
 # secret/key ordering across macOS, NixOS, and Windows.
 Sync-DevRepo -Enabled:$EnableDevReposParity -Repositories $devRepositories
 Sync-ShellProfile -Enabled:$EnableShellParity
+Sync-StarshipConfig -Enabled:$EnableShellParity
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
     Sync-CloudDrive -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
