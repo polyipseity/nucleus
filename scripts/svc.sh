@@ -257,8 +257,13 @@ recover_launchctl_service() {
         plist="$HOME/Library/LaunchAgents/$svc_id.plist"
       fi
       $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
-      $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null || true
-      return 0
+      # If bootstrap fails (e.g. launchd still cleaning up from bootout),
+      # return 1 so the caller's || block retries with the full
+      # graceful-shutdown path (SIGTERM + wait + bootout + bootstrap).
+      if $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null; then
+        return 0
+      fi
+      return 1
       ;;
   esac
   return 1
