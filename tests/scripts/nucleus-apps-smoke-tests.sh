@@ -288,12 +288,12 @@ if command -v pwsh >/dev/null 2>&1; then
   _win_profile_file="$REPO_ROOT/src/hosts/Windows/modules/user/Sync-ShellProfile.ps1"
   if [ -f "$_win_profile_file" ]; then
     _temp_win_check="$(mktemp)"
-    awk '/Register-ArgumentCompleter/ { printing=1 } printing { print } printing && /^\t\t'\''\}$|^\t\t\t'\''\}$/ { printing=0 }' "$_win_profile_file" > "$_temp_win_check" 2>/dev/null || true
+    grep "^[[:space:]]*'Register-ArgumentCompleter" "$_win_profile_file" > "$_temp_win_check" 2>/dev/null || true
     if [ -s "$_temp_win_check" ]; then
       if pwsh -NoProfile -NonInteractive -Command "
         \$errors = @()
-        Get-Content '$_temp_win_check' -Raw | Select-String -Pattern 'Register-ArgumentCompleter' -AllMatches | ForEach-Object {
-          try { [ScriptBlock]::Create(\$_.Line) > \$null } catch { \$errors += \$_ }
+        Get-Content '$_temp_win_check' | ForEach-Object {
+          try { [ScriptBlock]::Create(\$_) > \$null } catch { \$errors += \$_ }
         }
         if (\$errors.Count -gt 0) { throw \"\$(\$errors.Count) parse error(s): \$(\$errors -join ''; '')\" }
         Write-Host \"pwsh completions: \$(\$errors.Count) errors\"
