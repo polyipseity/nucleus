@@ -408,7 +408,7 @@ if ! $HAS_ARGS; then
     # Validate each platform entry has valid type and required fields
     while IFS=$'\t' read -r _name _platform _type _has_required; do
       case "$_type" in
-        launchctl|systemctl|native|schtask) ;;
+        launchctl|systemctl|native|schtask|omitted) ;;
         *)
           warn "services.json: '$_name' platform '$_platform' has invalid type '$_type'"
           _svc_errors=$((_svc_errors + 1))
@@ -431,6 +431,7 @@ if ! $HAS_ARGS; then
           elif .value.type == "systemctl" then (.value.service | type == "string" and length > 0)
           elif .value.type == "native" then (.value.service | type == "string" and length > 0)
           elif .value.type == "schtask" then (.value.taskPath | type == "string" and length > 0)
+          elif .value.type == "omitted" then (.value.justification | type == "string" and length > 0)
           else false
           end
         ) | tostring
@@ -501,13 +502,15 @@ fi
 # Locked DSC validation
 section "$((_step += 1))" "Locked DSC validation"
 if ! $HAS_ARGS; then
-  _dsc_system_packages="src/hosts/Windows/system/packages.dsc.yml"
+  _dsc_system_dir="src/hosts/Windows/system"
   _lockfile="src/lockfiles/lockfile.json"
   _lf_errors=0
 
-  # Generate locked DSC in-memory from system packages DSC + lockfile.
-  _locked_json=$(jq -s --argjson locked "$(jq -c '.winget // {}' "$_lockfile")" '
-    { properties: { resources: .[0].properties.resources } } |
+  # Generate locked DSC in-memory from ALL system DSC files + lockfile.
+  # This mirrors check.ps1's behavior — validates version pins across the
+  # full system configuration, not just packages.dsc.yml.
+  _locked_json=$(yq eval -o=j '.' "$_dsc_system_dir"/*.dsc.yml 2>/dev/null | jq -s --argjson locked "$(jq -c '.winget // {}' "$_lockfile")" '
+    { properties: { resources: (map(.properties.resources // []) | add) } } |
     .properties.resources |= [
       .[] | if .resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and ($locked[.settings.id] | length > 0) then
         .settings.version = $locked[.settings.id]
@@ -515,7 +518,7 @@ if ! $HAS_ARGS; then
         .
       end
     ]
-  ' <(yq eval -o=j '.' "$_dsc_system_packages"))
+  ')
 
   # For each pinned resource, verify version matches lockfile.
   while IFS=$'\t' read -r _id _pinned_ver; do
