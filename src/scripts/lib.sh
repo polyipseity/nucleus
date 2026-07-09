@@ -23,6 +23,8 @@ usage_std() {
 # Auto-derived command prefix for output helpers.
 # Strips "nucleus-" prefix if present; falls back to basename.
 _nuc_prefix="$(basename "$0")"
+# Strip .sh extension for cleaner prefix (e.g., "svc:" instead of "svc.sh:")
+_nuc_prefix="${_nuc_prefix%.sh}"
 case "$_nuc_prefix" in
   nucleus-*) _nuc_prefix="${_nuc_prefix#nucleus-}" ;;
 esac
