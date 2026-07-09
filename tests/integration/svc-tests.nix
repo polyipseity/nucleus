@@ -236,7 +236,8 @@ assert builtins.all (x: containsRegex ("'" + x + "'") svcPs1Text) [
   "disable"
 ];
 # Both backends have consistent error message prefix
-assert containsRegex "svc:" svcShText;
+# svc.sh: prefix auto-derived via shared error/warn helpers from lib.sh
+assert containsRegex "error \"" svcShText;
 assert containsRegex "svc:" svcPs1Text;
 
 # --- Dispatch wiring (explicit function mapping) ---
