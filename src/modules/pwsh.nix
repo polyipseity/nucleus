@@ -15,6 +15,7 @@ let
 
   lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
   pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
+  pwshYamlVersion = lockfile.pwsh."powershell-yaml" or null;
 
   shellEnv = import ./shell/env.nix; # CC, CXX, LD from ./shell/env.nix
 
@@ -633,6 +634,26 @@ in
           }
           Write-Host 'installPwshScriptAnalyzer: installing PSScriptAnalyzer version \$requiredVersion...' -ForegroundColor Cyan
           Install-Module -Name PSScriptAnalyzer -RequiredVersion \$requiredVersion -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
+        }
+      "
+    fi
+  '';
+
+  # Install powershell-yaml for locked DSC validation if pwsh is available.
+  # This enables the locked DSC validation phase in scripts/check.ps1.
+  home.activation.installPwshYaml = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    _pwsh="${pkgs.powershell}/bin/pwsh"
+    if [ -x "$_pwsh" ] && [ -n "${pwshYamlVersion}" ]; then
+      "$_pwsh" -NoProfile -Command "
+        \$requiredVersion = '${pwshYamlVersion}'
+        \$installed = Get-Module -ListAvailable -Name powershell-yaml | Select-Object -First 1
+        if (-not \$installed -or \$installed.Version -ne [Version]\$requiredVersion) {
+          if (\$installed) {
+            Write-Host 'installPwshYaml: removing powershell-yaml version '\$(\$installed.Version)'...' -ForegroundColor Yellow
+            Uninstall-Module -Name powershell-yaml -AllVersions -Force
+          }
+          Write-Host 'installPwshYaml: installing powershell-yaml version \$requiredVersion...' -ForegroundColor Cyan
+          Install-Module -Name powershell-yaml -RequiredVersion \$requiredVersion -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
         }
       "
     fi
