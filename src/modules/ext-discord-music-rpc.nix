@@ -37,8 +37,8 @@ let
     src = pkgs.fetchFromGitHub {
       owner = "polyipseity";
       repo = "ext.discord-music-rpc";
-      rev = "ffe210a8b4e21735a9966174f50dfde145ab5f53";
-      hash = "sha256-ahk3SWQkGybsfpzAUru4IUzdBI6Oy88eF7YOuixW9Xc=";
+      rev = "9a44dcd0e912e42fe029eb319153a89029f8ab18";
+      hash = "sha256-iLtXeDny+sbKY4PCO7zCp2LNu5ka936D5BnxYdc9J1w=";
     };
 
     format = "pyproject";
