@@ -98,14 +98,14 @@ mkdir -p "$HOME/.config/nucleus"
 ln -sf "$REPO_ROOT/src/modules/ai/litellm-config.yml" "$HOME/.config/nucleus/litellm-config.yml"
 
 run_nix() {
-  NIX_CONFIG="$(merge_nix_config)" nix --option warn-dirty false "$@"
+  NIX_CONFIG="$(merge_nix_config)" NIX_PATH="nixpkgs=flake:nixpkgs" nix --option warn-dirty false "$@"
 }
 
 run_nix_as_root() {
   # Forward NUCLEUS_REPO_ROOT so builtins.getEnv in Nix config can construct
   # writable out-of-store symlinks during evaluation.
   NIX_CONFIG_VALUE="$(merge_nix_config)"
-  sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" "NUCLEUS_REPO_ROOT=${NUCLEUS_REPO_ROOT}" nix --option warn-dirty false "$@"
+  sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" "NIX_PATH=nixpkgs=flake:nixpkgs" "NUCLEUS_REPO_ROOT=${NUCLEUS_REPO_ROOT}" nix --option warn-dirty false "$@"
 }
 
 start_sudo_keepalive() {
