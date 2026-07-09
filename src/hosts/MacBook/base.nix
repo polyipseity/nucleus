@@ -17,6 +17,10 @@
     builders = @/etc/nix/machines
     builders-use-substitutes = true
     extra-platforms = x86_64-darwin aarch64-darwin
+    # Fallback for standalone nix commands (e.g. manual nix build/eval).
+    # The apply fix uses apply.sh's explicit NIX_PATH env var prepended
+    # to each nix invocation because darwin-rebuild overrides file-based
+    # config by clearing NIX_PATH to its default empty value.
     nix-path = nixpkgs=flake:nixpkgs
     trusted-users = root ${username}
   '';
