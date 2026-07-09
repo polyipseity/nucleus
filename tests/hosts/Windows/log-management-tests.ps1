@@ -50,14 +50,14 @@ Describe 'Get-NucleusSystemLogDir' {
 
 Describe 'ConvertTo-SanitizedText' {
   It 'strips ANSI escape sequences' {
-    $input = "`e[31mred`e[0m normal"
-    $result = $input | ConvertTo-SanitizedText
+    $inputText = "`e[31mred`e[0m normal"
+    $result = $inputText | ConvertTo-SanitizedText
     $result | Should -Be "red normal"
   }
 
   It 'strips carriage returns' {
-    $input = "line1`r`nline2"
-    $result = $input | ConvertTo-SanitizedText
+    $inputText = "line1`r`nline2"
+    $result = $inputText | ConvertTo-SanitizedText
     $result | Should -Be "line1`nline2"
   }
 }
