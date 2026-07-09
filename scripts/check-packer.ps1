@@ -77,7 +77,7 @@ function Test-PackerDir {
     $varArgs = switch -Wildcard ($Dir) {
       '*nixos'   { @('guest_username=dummy', 'guest_password=dummy', 'nixos_iso_url=https://dummy.iso', 'nixos_iso_checksum=none') }
       '*windows' { @('windows_iso=dummy.iso') }
-      '*macos'   { @('macos_version=14.0', 'vm_name=dummy', 'cpus=2', 'memory_gib=4', 'disk_size_gib=40', 'guest_username=dummy', 'guest_password=dummy', 'ssh_username=dummy', 'ssh_password=dummy') }
+      '*macos'   { @('macos_version=14.0', 'vm_name=dummy', 'cpus=2', 'memory_gib=4', 'disk_size_gib=40', 'guest_username=dummy', 'guest_password=dummy', 'ssh_username=dummy', 'ssh_password=dummy', 'tart_image_ref=dummy') }
       default    { @() }
     }
     $validateArgs = @('validate') + ($varArgs | ForEach-Object { @('-var', $_) }) + @('.')
