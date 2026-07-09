@@ -217,6 +217,11 @@ if (-not (Test-Path $_lfPath)) {
   $_lfOverlapErrors++
 } else {
   $_lf = Get-Content $_lfPath -Raw | ConvertFrom-Json -AsHashtable
+  # Known cross-section overlaps that are legitimate (same publisher.package ID
+  # used for different products across package-manager sections).
+  # Add new entries here with a brief justification comment.
+  # astral-sh.ty: VS Code extension (vscode) vs CLI tool (winget) — different products
+  $_lfOverlapExceptions = @('astral-sh.ty')
   $_pkgToSections = @{}
   foreach ($_section in $_lf.Keys) {
     if ($_section -eq 'ollama') { continue }
@@ -231,7 +236,7 @@ if (-not (Test-Path $_lfPath)) {
     }
   }
   foreach ($_entry in $_pkgToSections.GetEnumerator()) {
-    if ($_entry.Value.Count -gt 1) {
+    if ($_entry.Value.Count -gt 1 -and $_entry.Key -notin $_lfOverlapExceptions) {
       Write-Output ("WARNING: package '{0}' appears in both {1}" -f $_entry.Key, ($_entry.Value -join ', '))
       $_lfOverlapErrors++
     }
