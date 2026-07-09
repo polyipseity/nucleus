@@ -7,6 +7,7 @@
 - Launch Peace Equalizer APO, use Effects > Limiter sliders or pre-amplification to cap output.
 - Run `camilladsp --list-devices` and update `src/modules/configs/camilladsp/configs/windows/config.yml` if the default device name doesn't match.
 - Caddy local-CA trust runs automatically. If missing: run `caddy trust --address 127.0.0.1:2019` in an elevated PowerShell.
+- Starship prompt is active in all shells. Requires a Nerd Font (configured automatically via `CaskaydiaCove Nerd Font`).
 
 ## command shortcuts
 
