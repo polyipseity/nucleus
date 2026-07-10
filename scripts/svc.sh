@@ -194,17 +194,22 @@ svc_status() {
             ;;
         esac
       fi
-      local status_text
+      local status_text state_text exit_code=""
       if [ "$running" = true ]; then
         status_text="active"
       elif [ "$socket_activated" = "true" ]; then
         status_text="listening"
       else
         status_text="inactive"
+        # Capture state and exit code from print output for diagnostics.
+        state_text=$(echo "$print_out" | sed -n 's/.*state = //p' | head -1)
+        exit_code=$(echo "$print_out" | sed -n 's/.*last exit code = //p' | head -1 | sed 's/:.*//')
       fi
-      printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s}' \
+      printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
         "$status_text" \
-        "$running" "$enabled" "${pid:-null}"
+        "$running" "$enabled" "${pid:-null}" \
+        "$(printf '%s' "${state_text:-null}" | jq -R . 2>/dev/null || echo null)" \
+        "${exit_code:-null}"
       ;;
     systemctl)
       local scope_flag=""
@@ -221,12 +226,18 @@ svc_status() {
       local enabled_bool=true
       [ "$is_enabled" != "enabled" ] && enabled_bool=false
 
-      local pid=""
+      local pid="" exit_code=""
       if [ "$running" = true ]; then
         pid=$(systemctl $scope_flag show -p MainPID "$svc_id" 2>/dev/null | sed 's/MainPID=//' || true)
         [ -z "$pid" ] || [ "$pid" = "0" ] && pid=""
+      else
+        exit_code=$(systemctl $scope_flag show -p ExecMainStatus "$svc_id" 2>/dev/null | sed 's/ExecMainStatus=//' || true)
+        [ -z "$exit_code" ] && exit_code=""
       fi
-      printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s}' "$is_active" "$running" "$enabled_bool" "${pid:-null}"
+      printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
+        "$is_active" "$running" "$enabled_bool" "${pid:-null}" \
+        "$(printf '%s' "$is_active" | jq -R . 2>/dev/null || echo null)" \
+        "${exit_code:-null}"
       ;;
     *)
       printf '{"status":"unknown","running":false,"enabled":false,"pid":null}'
@@ -484,10 +495,15 @@ do_list() {
       fi
       local status_json
       status_json=$(svc_status "$key" "$svc_json")
-      local status running pid
+      local status running pid exit_code state_str
       status=$(echo "$status_json" | jq -r '.status')
       running=$(echo "$status_json" | jq -r '.running')
       pid=$(echo "$status_json" | jq -r '.pid // "-"')
+      exit_code=$(echo "$status_json" | jq -r '.exitCode // ""')
+      if [ -n "$exit_code" ] && [ "$exit_code" != "null" ]; then
+        local exit_display="exit $exit_code"
+        pid="$exit_display"
+      fi
       printf '%-20s %-24s %-10s %-8s %s\n' "$json_key" "$display" "$status" "$running" "$pid"
     done <<< "$entries"
   fi
@@ -515,10 +531,15 @@ do_status() {
     fi
     local status_json
     status_json=$(svc_status "$key" "$svc_json")
-    local status running pid
+    local status running pid exit_code
     status=$(echo "$status_json" | jq -r '.status')
     running=$(echo "$status_json" | jq -r '.running')
     pid=$(echo "$status_json" | jq -r '.pid // "-"')
+    exit_code=$(echo "$status_json" | jq -r '.exitCode // ""')
+    if [ -n "$exit_code" ] && [ "$exit_code" != "null" ]; then
+      local exit_display="exit $exit_code"
+      pid="$exit_display"
+    fi
     printf '%-20s %-24s %-10s %-8s %s\n' "$json_key" "$display" "$status" "$running" "$pid"
   done <<< "$entries"
   $any_error && return 1 || return 0
