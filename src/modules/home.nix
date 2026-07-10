@@ -203,6 +203,11 @@ in
     # Keep both aligned with the per-user passwordStoreDir and the shared
     # screenshot-backed Settings + Template tab baseline, while still allowing
     # centralized per-user overrides from flake.nix.
+    # Method 3 (merge) — cannot use Method 1 (symlink) because QtPass manages
+    # its own UI preferences via QSettings (macOS: defaults, Linux: INI,
+    # Windows: registry). A symlink does not apply to these platform-native
+    # stores. Merge writes the managed defaults into each store while
+    # preserving any user-configured settings outside managed keys.
     home.activation.configureQtPassSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
             _escape_qsettings_ini_string() {
               printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e ':join' -e 'N' -e '$!b join' -e 's/\n/\\n/g'
@@ -290,6 +295,11 @@ in
     # on macOS and Linux. Merge-overwrite defaults from the canonical
     # Picard.ini baseline file, then layer per-user [setting] overrides.
     # Always preserve unmanaged keys and sections.
+    # Method 3 (merge) — cannot use Method 1 (symlink) because Picard manages
+    # its INI through UI preferences (window state, plugin tokens, user
+    # settings that should persist across applies). A symlink would let app
+    # writes reach the repo file. Merge applies managed defaults while
+    # preserving all app-owned keys and sections.
     home.activation.configurePicardSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
             _upsert_ini_key() {
               _conf="$1"
@@ -414,6 +424,12 @@ in
     # vault metadata.  Merge only the managed advanced-setting keys into that
     # file so the declarative defaults converge without clobbering vault lists
     # or other app-owned state.
+    #
+    # Method 3 (merge) — cannot use Method 1 (symlink) because Obsidian owns
+    # obsidian.json and writes vault metadata (vault paths, window state) into
+    # it. A symlink would let those app-owned writes reach the repo file,
+    # mixing managed settings with runtime state that does not belong in the
+    # repo. Merge preserves both managed and app-owned keys.
     home.activation.configureObsidianSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
             set -eu
 

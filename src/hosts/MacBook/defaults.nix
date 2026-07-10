@@ -35,9 +35,12 @@ let
   # Loaded from src/modules/configs/wordlist.txt: one word per line, sorted
   # alphabetically. Identity substitutions (word → word) prevent macOS from
   # autocorrecting technical terms and product names.
-  # This file is intentionally shared and platform-neutral; the actual
-  # NSUserDictionaryReplacementItems key is macOS-only (no NixOS / Windows
-  # equivalent for per-word suppression at the OS level).
+  # Method 3 (merge / defaults-based) — not Method 1 (symlink) because macOS
+  # NSUserDictionaryReplacementItems is managed via the `defaults` system
+  # preference store, not a file path. There is no file to symlink. The value
+  # is read from wordlist.txt at Nix eval time and written into the defaults
+  # domain during darwin-rebuild.
+  # This is macOS-only (no NixOS/Windows equivalent).
   # ---------------------------------------------------------------------------
   autocorrectWords = builtins.filter (w: w != "") (
     builtins.filter builtins.isString (
