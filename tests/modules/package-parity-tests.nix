@@ -157,84 +157,122 @@ let
   # have valid nixpkgs attribute names.
   coreModuleText = builtins.readFile ../../src/modules/core.nix;
 
-  test_overlapping_packages_have_nixpkgs =
-    let
-      # Extract key overlappingPackages from core.nix to validate attrs exist in nixpkgs.
-      # These are cross-platform packages that should exist on both darwin and linux.
-      crossPlatformOverlapAttrs = [
-        {
-          name = "blender";
-          nixpkgsAttr = "blender";
-        }
-        {
-          name = "czkawka";
-          nixpkgsAttr = "czkawka";
-        }
-        {
-          name = "google-chrome";
-          nixpkgsAttr = "google-chrome";
-        }
-        {
-          name = "krita";
-          nixpkgsAttr = "krita";
-        }
-        {
-          name = "libreoffice";
-          nixpkgsAttr = "libreoffice";
-        }
-        {
-          name = "obsidian";
-          nixpkgsAttr = "obsidian";
-        }
-        {
-          name = "musicbrainz-picard";
-          nixpkgsAttr = "picard";
-        }
-        {
-          name = "qemu";
-          nixpkgsAttr = "qemu";
-        }
-        {
-          name = "discord@canary";
-          nixpkgsAttr = "discord-canary";
-        }
-        {
-          name = "visual-studio-code";
-          nixpkgsAttr = "vscode";
-        }
-        {
-          name = "visual-studio-code@insiders";
-          nixpkgsAttr = "vscode-insiders";
-        }
-        {
-          name = "vlc";
-          nixpkgsAttr = "vlc";
-        }
-        {
-          name = "zoom";
-          nixpkgsAttr = "zoom-us";
-        }
-      ];
-    in
-    assert' (builtins.all (p: builtins.match ".*" + p.nixpkgsAttr + ".*" coreModuleText != null)
-      crossPlatformOverlapAttrs
-    ) "All cross-platform overlappingPackages entries should be defined in core.nix";
+  # Cross-platform overlappingPackages entries (available on both darwin and linux).
+  crossPlatformOverlapAttrs = [
+    {
+      name = "blender";
+      nixpkgsAttr = "blender";
+    }
+    {
+      name = "czkawka";
+      nixpkgsAttr = "czkawka";
+    }
+    {
+      name = "google-chrome";
+      nixpkgsAttr = "google-chrome";
+    }
+    {
+      name = "krita";
+      nixpkgsAttr = "krita";
+    }
+    {
+      name = "libreoffice";
+      nixpkgsAttr = "libreoffice";
+    }
+    {
+      name = "obsidian";
+      nixpkgsAttr = "obsidian";
+    }
+    {
+      name = "musicbrainz-picard";
+      nixpkgsAttr = "picard";
+    }
+    {
+      name = "qemu";
+      nixpkgsAttr = "qemu";
+    }
+    {
+      name = "discord@canary";
+      nixpkgsAttr = "discord-canary";
+    }
+    {
+      name = "visual-studio-code";
+      nixpkgsAttr = "vscode";
+    }
+    {
+      name = "vlc";
+      nixpkgsAttr = "vlc";
+    }
+    {
+      name = "zoom";
+      nixpkgsAttr = "zoom-us";
+    }
+  ];
+
+  # Darwin-only overlappingPackages entries (not available on Linux nixpkgs).
+  darwinOnlyPackages = [
+    {
+      name = "iterm2";
+      nixpkgsAttr = "iterm2";
+    }
+    {
+      name = "rectangle";
+      nixpkgsAttr = "rectangle";
+    }
+    {
+      name = "stats";
+      nixpkgsAttr = "stats";
+    }
+    {
+      name = "utm";
+      nixpkgsAttr = "utm";
+    }
+    {
+      name = "visual-studio-code@insiders";
+      nixpkgsAttr = "vscode-insiders";
+    }
+  ];
+
+  test_overlapping_packages_have_nixpkgs = assert' (builtins.all
+    (p: builtins.match ".*" + p.nixpkgsAttr + ".*" coreModuleText != null)
+    crossPlatformOverlapAttrs
+  ) "All cross-platform overlappingPackages entries should be defined in core.nix";
 
   test_darwin_only_packages_platform_marked =
     let
-      darwinOnlyPackages = [
-        "iterm2"
-        "rectangle"
-        "stats"
-        "utm"
-        "visual-studio-code@insiders"
-      ];
+      darwinOnlyPkgNames = map (p: p.name) darwinOnlyPackages;
       # Match a core.nix package entry with platforms = ["darwin"].
       hasDarwinPlatform =
         name:
-        builtins.match (".*" + name + " = \\{\n.*platforms = \\[ \"darwin\" \\];.*") coreModuleText != null;
+        builtins.match (".*" + name + " = \\{\n.*platforms = \\[ \"darwin\" \];.*") coreModuleText != null;
     in
-    assert' (builtins.all hasDarwinPlatform darwinOnlyPackages) "Darwin-only packages should have platforms field set in core.nix";
+    assert' (builtins.all hasDarwinPlatform darwinOnlyPkgNames) "Darwin-only packages should have platforms field set in core.nix";
+
+  test_darwin_only_absent_on_linux =
+    let
+      linuxPkgs = import <nixpkgs> { system = "x86_64-linux"; };
+      notExistsOnLinux = p: !builtins.hasAttr p.nixpkgsAttr linuxPkgs;
+    in
+    assert' (builtins.all notExistsOnLinux darwinOnlyPackages) "Darwin-only packages should not exist in nixpkgs on Linux";
+
+  # Guard: every overlappingPackages entry in core.nix must be covered by either
+  # crossPlatformOverlapAttrs (cross-platform) or darwinOnlyPackages (darwin-only).
+  test_all_overlapping_packages_covered =
+    let
+      # Extract all entry names from core.nix overlappingPackages block.
+      # Entries have the form: `    name = {` or `    "quoted name" = {`
+      parts = builtins.split "\n    \"?([a-zA-Z0-9@._-]+)\"? = \\{" coreModuleText;
+      isListElement = x: builtins.isList x;
+      listElements = builtins.filter isListElement parts;
+      extractedNames = map builtins.head listElements;
+      crossPlatformNames = map (p: p.name) crossPlatformOverlapAttrs;
+      darwinOnlyNames = map (p: p.name) darwinOnlyPackages;
+      knownNames = crossPlatformNames ++ darwinOnlyNames;
+      uncovered = builtins.filter (n: !(builtins.elem n knownNames)) extractedNames;
+    in
+    assert' (
+      uncovered == [ ]
+    ) "All overlappingPackages entries must be covered by tests: ${builtins.toString uncovered}";
 
   allTests = [
     test_nixpkgs_coverage
@@ -246,6 +284,8 @@ let
     test_gui_tools_declared
     test_overlapping_packages_have_nixpkgs
     test_darwin_only_packages_platform_marked
+    test_darwin_only_absent_on_linux
+    test_all_overlapping_packages_covered
   ];
 in
 {
