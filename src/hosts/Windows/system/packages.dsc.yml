@@ -406,6 +406,26 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          Czkawka CLI — duplicate file finder CLI. Cross-platform parity with
+          nixpkgs pkgs.czkawka (provides czkawka_cli, czkawka_gui, krokiet)
+          on POSIX hosts. Paired with qarmin.krokiet for GUI parity.
+      settings:
+        id: qarmin.czkawka.cli
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Krokiet — Slint GUI frontend of Czkawka. Provides duplicate file
+          finding with a modern Rust UI. Cross-platform parity with the
+          krokiet binary bundled inside nixpkgs pkgs.czkawka on POSIX hosts.
+      settings:
+        id: qarmin.krokiet
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Parsec is installed to mirror the macOS low-latency remote-desktop package declaration
       settings:
         id: Parsec.Parsec
