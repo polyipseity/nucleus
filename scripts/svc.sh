@@ -495,7 +495,7 @@ do_list() {
       fi
       local status_json
       status_json=$(svc_status "$key" "$svc_json")
-      local status running pid exit_code state_str
+      local status running pid exit_code
       status=$(echo "$status_json" | jq -r '.status')
       running=$(echo "$status_json" | jq -r '.running')
       pid=$(echo "$status_json" | jq -r '.pid // "-"')
