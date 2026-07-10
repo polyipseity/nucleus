@@ -346,6 +346,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-PowerShellModuleSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-RustupSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-ScoopSetup.ps1")
+. (Join-Path -Path $setupModuleDir -ChildPath "Invoke-SourceBuild.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-UvSetup.ps1")
 # user/: per-user home convergence (git/SSH, shell, agents, dev repos, apps).
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CloudDrive.ps1")
@@ -643,6 +644,10 @@ Invoke-PowerShellModuleSetup
 Invoke-CamillaDSPSetup
 # camillagui-backend prebuilt bundle (same rationale as CamillaDSP).
 Invoke-CamillaGUISetup
+# Source-built packages: git clone + build system at pinned revisions.
+# Requires zig from Scoop (installed by Invoke-ScoopSetup above) and
+# git from WinGet (system/packages.dsc.yml).
+Invoke-SourceBuild
 
 # Ensure the live nucleus checkout installs its own Git hooks during the same
 # provision run that installs or updates prek itself.
