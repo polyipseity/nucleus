@@ -44,7 +44,7 @@
     # Runs in extraActivation (before nix-darwin's launchd step) so the dirs
     # exist before launchd tries to start daemons.
     system_log_dir="${config.nucleus.logging.systemLogDir}"
-    for subdir in camilladsp jellyfin https-proxy linux-builder litellm ollama service-watchdog; do
+    for subdir in camilladsp jellyfin jellyfin-app https-proxy linux-builder litellm ollama service-watchdog; do
       if ! /bin/mkdir -p "$system_log_dir/$subdir"; then
         echo "logging: failed to create $system_log_dir/$subdir." >&2
       fi
@@ -64,7 +64,7 @@
       # can create StandardOutPath/StandardErrorPath files as that user.
       # Services running as root (https-proxy, linux-builder, litellm,
       # service-watchdog) can write to any dir, so chowning these is safe.
-      for _sub in camilladsp https-proxy jellyfin litellm ollama; do
+      for _sub in camilladsp https-proxy jellyfin jellyfin-app litellm ollama; do
         /usr/sbin/chown "$_username:staff" "$system_log_dir/$_sub" 2>/dev/null || true
       done
     fi
@@ -502,7 +502,7 @@
     # Also ensure directories exist during postActivation in case the log dir
     # config changed (systemLogDir is evaluated at activation time).
     system_log_dir="${config.nucleus.logging.systemLogDir}"
-    for subdir in camilladsp jellyfin https-proxy linux-builder litellm ollama service-watchdog; do
+    for subdir in camilladsp jellyfin jellyfin-app https-proxy linux-builder litellm ollama service-watchdog; do
       if ! /bin/mkdir -p "$system_log_dir/$subdir"; then
         echo "logging: failed to create $system_log_dir/$subdir." >&2
       fi
