@@ -39,5 +39,8 @@
   "-ni" = "bun install";
   "-nr" = "bun run";
   "-nx" = "bun x";
+  # Terminal clearing — `cls` alias for cross-platform parity (Windows/PowerShell
+  # and cmd.exe both use cls; this makes zsh accept it too).
+  "cls" = "clear";
   "-v" = "nvim";
 }
