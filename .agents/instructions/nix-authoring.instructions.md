@@ -83,6 +83,31 @@ Background-process safety rule:
 
 - Any activation command that can fork a persistent daemon must fully detach its stdio (`</dev/null >/dev/null 2>&1` or equivalent fd-closing), or apply can hang waiting on inherited activation pipe file descriptors.
 
+## macOS launchd service management
+
+### nix-darwin launchd API (rev a1fa429+)
+
+nix-darwin refactored the launchd module. The old flat `config` attrset and `enable` flag are gone:
+
+- Replace `launchd.agents.<name>.enable` with `launchd.agents.<name>.serviceConfig` submodule.
+- Replace `launchd.agents.<name>.config` with `launchd.agents.<name>.serviceConfig`.
+- The `serviceConfig` submodule accepts: `command`, `script`, `path`, `environment`, and a nested `serviceConfig` attrset for raw plist keys.
+- `types.path` rejects tilde paths — use absolute paths: `"/Users/${username}/Library/Logs/..."` for user agents, `/Users/Shared/...` for system daemons.
+- `StandardOutPath`/`StandardErrorPath` are `null or path` — tilde paths fail type checking.
+- Home Manager's launchd module is unchanged (still `enable` + `config`).
+
+### launchd EX_CONFIG (exit 78)
+
+launchd permanently blacklists services that exit with code 78. `bootout`/`bootstrap` alone does not clear it — run `disable` + `enable` or kill the process. Never silence launchd stderr with `2>/dev/null || true`; always log failures to enable debugging.
+
+### Root processes and iCloud Drive
+
+Root processes launched via launchd (system domain) cannot read files inside iCloud Drive, even through symlinks. `pwd -P` resolves symlinks — avoid it for paths that may point into iCloud. Fix: bundle files into the nix store at build time with `builtins.path` instead of reading from the filesystem at runtime.
+
+### HOME in root launchd processes
+
+When running as root via launchd without `UserName`, `HOME` is unset. Scripts with `set -u` crash on `$HOME` — use `${HOME:-}` for optional HOME access.
+
 ## macOS pmset power policy
 
 `src/hosts/MacBook/activation.nix` (in `postActivation`) is the single source of truth for managed `pmset` writes.
