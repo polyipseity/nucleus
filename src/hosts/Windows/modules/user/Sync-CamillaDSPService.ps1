@@ -37,7 +37,6 @@ function Sync-CamillaDSPService {
   $taskName = "NucleusCamillaDSP"
   $logDir = Get-NucleusLogDir
   $serviceLogDir = Join-Path -Path $logDir -ChildPath "camilladsp"
-  $null = New-Item -Path $serviceLogDir -ItemType Directory -Force
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   if (-not $Enabled) {
@@ -48,9 +47,6 @@ function Sync-CamillaDSPService {
     }
     return
   }
-
-  # Config is deployed to $HOME\.config\camilladsp\ by Invoke-CamillaDSPSetup.
-  $null = New-Item -Path $logDir -ItemType Directory -Force
 
   # Find the camilladsp binary.
   $camilladspCmd = Get-Command -Name "camilladsp.exe" -ErrorAction SilentlyContinue

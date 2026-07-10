@@ -94,7 +94,6 @@ function Sync-LiteLLMService {
   $logDir = Get-NucleusSystemLogDir
   $serviceLogDir = Join-Path -Path $logDir -ChildPath "litellm"
   $secretsDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\secrets"
-  $null = New-Item -Path $serviceLogDir -ItemType Directory -Force
   $null = New-Item -Path $secretsDir -ItemType Directory -Force
 
   . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-ManagedSymlinkDeleteProtection.ps1")

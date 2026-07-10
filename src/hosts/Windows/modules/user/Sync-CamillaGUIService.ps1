@@ -37,7 +37,6 @@ function Sync-CamillaGUIService {
   $taskName = "NucleusCamillaGUI"
   $logDir = Get-NucleusLogDir
   $serviceLogDir = Join-Path -Path $logDir -ChildPath "camillagui-backend"
-  $null = New-Item -Path $serviceLogDir -ItemType Directory -Force
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   if (-not $Enabled) {
@@ -48,9 +47,6 @@ function Sync-CamillaGUIService {
     }
     return
   }
-
-  # Config is deployed to $HOME\.config\camillagui-backend\ by Invoke-CamillaGUISetup.
-  $null = New-Item -Path $logDir -ItemType Directory -Force
 
   # Find the camillagui_backend binary.
   $camillaguiCmd = Get-Command -Name "camillagui_backend.exe" -ErrorAction SilentlyContinue

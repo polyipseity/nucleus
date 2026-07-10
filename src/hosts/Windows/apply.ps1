@@ -324,6 +324,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-ReplicaSync.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-VMSetup.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AgentHostShellSetup.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Invoke-EnsureLogDirs.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "ConvertFrom-WingetLockfileToDsc.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-CaddyLocalCA.ps1")
@@ -713,6 +714,8 @@ if ($EnableCloudDrivesParity) {
     Sync-CloudDrive -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
   }
 }
+# Ensure all nucleus log subdirectories exist before starting services.
+Invoke-EnsureLogDirs -ServicesJson (Join-Path -Path $repoRoot -ChildPath "src\modules\services.json")
 Sync-CaddyService -RepoRoot $repoRoot -Enabled:`$true
 Sync-CaddyLocalCA -RepoRoot $repoRoot -Enabled:$true
 Sync-JellyfinAccount -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
