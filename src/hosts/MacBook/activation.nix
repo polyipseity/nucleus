@@ -12,7 +12,32 @@
 #   and postActivation (after homebrew, last before the gc-root symlink).
 #   lib.mkBefore ensures these fragments are prepended before home-manager's
 #   HM activation call, which is also appended to postActivation.text.
-{ config, lib, ... }: {
+{ config, lib, ... }:
+let
+  servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
+
+  macosServices = lib.filterAttrs (
+    name: svc:
+    svc ? platforms.macos && svc.platforms.macos ? type && svc.platforms.macos.type != "omitted"
+  ) servicesJSON;
+
+  systemLogDirs = lib.unique (
+    lib.flatten (lib.mapAttrsToList (name: svc: svc.logging.dirs.system or [ ]) macosServices)
+  );
+
+  userLogDirs = lib.unique (
+    lib.flatten (lib.mapAttrsToList (name: svc: svc.logging.dirs.user or [ ]) macosServices)
+  );
+
+  chownLogDirs = lib.unique (
+    lib.flatten (
+      lib.mapAttrsToList (
+        name: svc: if svc.platforms.macos.runAsUser or false then svc.logging.dirs.system or [ ] else [ ]
+      ) macosServices
+    )
+  );
+in
+{
   # ---------------------------------------------------------------------------
   # Declarative power-management settings handled by nix-darwin's power module.
   # These translate to systemsetup / pmset calls at activation time.
@@ -44,7 +69,7 @@
     # Runs in extraActivation (before nix-darwin's launchd step) so the dirs
     # exist before launchd tries to start daemons.
     system_log_dir="${config.nucleus.logging.systemLogDir}"
-    for subdir in camilladsp camillagui-backend jellyfin jellyfin-app https-proxy linux-builder litellm ollama service-watchdog; do
+    for subdir in ${builtins.toString systemLogDirs}; do
       if ! /bin/mkdir -p "$system_log_dir/$subdir"; then
         echo "logging: failed to create $system_log_dir/$subdir." >&2
       fi
@@ -55,7 +80,7 @@
     _console_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     if [ -n "$_console_user" ] && [ "$_console_user" != "/Users/root" ]; then
       _username="''${_console_user#/Users/}"
-      for _sub in camilladsp camillagui-backend discord-music-rpc; do
+      for _sub in ${builtins.toString userLogDirs}; do
         /bin/mkdir -p "$_console_user/Library/Logs/nucleus/$_sub"
       done
       /usr/sbin/chown -R "$_username:staff" "$_console_user/Library/Logs/nucleus"
@@ -64,7 +89,7 @@
       # can create StandardOutPath/StandardErrorPath files as that user.
       # Services running as root (https-proxy, linux-builder, litellm,
       # service-watchdog) can write to any dir, so chowning these is safe.
-      for _sub in camilladsp camillagui-backend https-proxy jellyfin jellyfin-app litellm ollama; do
+      for _sub in ${builtins.toString chownLogDirs}; do
         /usr/sbin/chown "$_username:staff" "$system_log_dir/$_sub" 2>/dev/null || true
       done
     fi
@@ -502,7 +527,7 @@
     # Also ensure directories exist during postActivation in case the log dir
     # config changed (systemLogDir is evaluated at activation time).
     system_log_dir="${config.nucleus.logging.systemLogDir}"
-    for subdir in camilladsp camillagui-backend jellyfin jellyfin-app https-proxy linux-builder litellm ollama service-watchdog; do
+    for subdir in ${builtins.toString systemLogDirs}; do
       if ! /bin/mkdir -p "$system_log_dir/$subdir"; then
         echo "logging: failed to create $system_log_dir/$subdir." >&2
       fi
