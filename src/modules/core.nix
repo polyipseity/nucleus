@@ -66,7 +66,9 @@ let
     pkgs.equaliser
   ];
 
-  # Packages in both nixpkgs and Homebrew. CLI → nixpkgs, GUI → Homebrew. macOS-only.
+  # Packages in both nixpkgs and Homebrew. macOS-only.
+  # Category rules: cli → nixpkgs; gui → Homebrew (cask preferred).
+  # If a package ships any GUI component (binary, UI, daemon), classify as "gui".
   overlappingPackages = {
     blender = {
       category = "gui";
@@ -209,7 +211,7 @@ let
   packageSelection = config.nucleus.macos.packageSelection;
   overlapPackageNames = builtins.attrNames overlappingPackages;
 
-  # CLI → nixpkgs, GUI → homebrew.
+  # CLI → nixpkgs, GUI → homebrew. If a package ships any GUI component, classify as "gui".
   defaultBackendFor = category: if category == "cli" then "nixpkgs" else "homebrew";
 
   # Priority: overrides > policy > global backend.
@@ -294,8 +296,9 @@ in
       default = "policy";
       description = ''
         Backend used for macOS packages that exist in both nixpkgs and
-        Homebrew. "policy" follows AGENTS.md defaults (CLI → nixpkgs,
-        GUI/hardware-integrated apps → Homebrew).
+        Homebrew. "policy" follows default routing (CLI → nixpkgs,
+        GUI → Homebrew/cask). Packages with any GUI component
+        are classified as "gui".
       '';
     };
 
