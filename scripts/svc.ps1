@@ -46,7 +46,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'endpoint', 'logs', 'log-paths', 'log-config')]
+  [ValidateSet('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'verify', 'endpoint', 'logs', 'log-paths', 'log-config')]
   [string]$Action,
 
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -64,7 +64,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-Nucle
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (list, status, start, stop, restart, enable, disable, endpoint, logs, log-paths, log-config)" }
+  if (-not $Action) { Write-NucleusError "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)" }
   Get-Help $PSCommandPath -Detailed
   exit 0
 }
@@ -506,6 +506,31 @@ switch ($Action) {
       }
     }
     if ($overallExit -ne 0) { exit $overallExit }
+  }
+
+  'verify' {
+    $resolved = Resolve-ServiceName -Names $ServiceName
+    $hasInactive = $false
+    foreach ($key in $resolved.Keys) {
+      if ($key -like 'ERROR:*') {
+        Write-NucleusWarning "$($resolved[$key].displayName) — $($resolved[$key].platform.error)"
+        $hasInactive = $true
+        continue
+      }
+      $status = Get-ServiceStatus -Platform $resolved[$key].platform
+      if ($status.running) {
+        $pidStr = if ($status.pid) { " (pid $($status.pid))" } else { '' }
+        Write-Output "svc: verify $key — active$pidStr"
+      } else {
+        $diag = if ($status.status) { " ($($status.status))" } else { '' }
+        Write-NucleusWarning "$key — inactive$diag"
+        $hasInactive = $true
+      }
+    }
+    if (-not $hasInactive) {
+      Write-Output "svc: all services active"
+    }
+    if ($hasInactive) { exit 1 }
   }
 
   'endpoint' {

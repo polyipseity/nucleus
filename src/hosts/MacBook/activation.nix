@@ -574,5 +574,16 @@
     if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh" ]; then
       NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh"
     fi
+
+    # ---- verifyNucleusServices ---------------------------------------------------
+    # Warn-only verification that all managed services are running.
+    # Failing to start a service should not block activation, but the warning
+    # surfaces issues that operators can investigate post-apply.
+    # nucleus-svc is expected to be in PATH after bootstrap.
+    if command -v nucleus-svc >/dev/null 2>&1; then
+      if ! nucleus-svc verify; then
+        echo "svc: some services are inactive (non-fatal; check /var/log/nucleus/ for details)" >&2
+      fi
+    fi
   '';
 }

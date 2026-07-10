@@ -749,6 +749,18 @@ Sync-PowerPolicy -Enabled:$EnablePowerParity
 Sync-WifiMacRandomization -Enabled:$EnableWiFiParity
 Invoke-AgentHostShellSetup
 
+# Warn-only service verification: check all managed services are running.
+# Failing to start a service should not block activation, but the warning
+# surfaces issues for post-apply investigation.
+$svcScript = Join-Path -Path $repoRoot -ChildPath "scripts\svc.ps1"
+if (Test-Path -LiteralPath $svcScript) {
+  try {
+    & $svcScript verify
+  } catch {
+    Write-NucleusWarning "svc: some services are inactive (non-fatal; check Event Viewer for details)"
+  }
+}
+
 # Health check: verify archiving ecosystem (7-Zip CLI + app) is functional post-apply.
 Test-ArchivingStack | Out-Null
 
