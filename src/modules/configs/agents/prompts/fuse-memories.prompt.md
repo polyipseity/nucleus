@@ -143,7 +143,9 @@ Poor: Memory says "macOS watchdog daemon: use launchctl to reload". Appended ver
 
 ## Delete
 
-Remove each absorbed memory file. Use the resolved URI from Step 2 (preferred). Fallback:
+Only delete a memory file if **all** its facts received verdict **current**, **update**, or **discard**. If any fact was **ignore** or **uncertain**, preserve the file — those facts remain for future reference.
+
+Use the resolved URI from Step 2 (preferred). Fallback:
 
 - POSIX: `rm "<resolved-path>"`
 - Windows: `Remove-Item -Path "<resolved-path>"`
