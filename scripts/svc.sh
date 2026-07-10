@@ -19,7 +19,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 usage() {
-  usage_std "$(basename "$0")" "list|status|start|stop|restart|enable|disable|endpoint|logs|log-paths|log-config [service...] [options]"
+  usage_std "$(basename "$0")" "list|status|start|stop|restart|enable|disable|verify|endpoint|logs|log-paths|log-config [service...] [options]"
   cat <<'EOF'
   list                              List all known services with status.
   status [service...]               Show status of specified services (all if omitted).
@@ -28,11 +28,13 @@ usage() {
   restart <service>                 Restart a service.
   enable <service>                  Enable auto-start.
   disable <service>                 Disable auto-start.
+  verify [service...]               Check all (or specified) services, warn if inactive.
   endpoint <service> [<name>]       Show network endpoint(s) for a service.
   logs [service...]                 Show service logs (list available if no service).
   log-paths [service...]            Print log file path(s).
   log-config [service...]           Show effective logging configuration.
   --json                            Machine-readable JSON output.
+  --verbose                         Show action result summaries (start/restart).
   -h|--help                         Show usage.
 EOF
 }
@@ -552,8 +554,46 @@ do_action() {
       warn "$svc_name — action $action failed"
       overall_exit=1
     fi
+    if $verbose_mode && [ "$action" = "start" ] || [ "$action" = "restart" ]; then
+      local _v_status
+      _v_status=$(svc_status "$svc_name" "$(echo "$entry" | jq '.platform')")
+      local _v_running _v_pid
+      _v_running=$(echo "$_v_status" | jq -r '.running')
+      _v_pid=$(echo "$_v_status" | jq -r '.pid // "-"')
+      if [ "$_v_running" = "true" ]; then
+        say "$action $svc_name → active (pid $_v_pid)"
+      fi
+    fi
   done
   return "$overall_exit"
+}
+
+# do_verify — Check all services and warn about inactive ones.
+do_verify() {
+  local registry
+  registry=$(read_registry)
+  local entries
+  entries=$(resolve_service_names "$registry" "${service_names[@]}")
+  local any_inactive=false
+
+  while IFS=$'\t' read -r key display svc_json json_key; do
+    if echo "$key" | grep -q '^ERROR:'; then continue; fi
+    local status_json
+    status_json=$(svc_status "$key" "$svc_json")
+    local running
+    running=$(echo "$status_json" | jq -r '.running')
+    if [ "$running" != "true" ]; then
+      any_inactive=true
+      local diag
+      diag=$(service_diagnostic "$svc_json")
+      warn "$json_key — inactive ($diag); check 'nucleus-svc logs $json_key'"
+    fi
+  done <<< "$entries"
+
+  if $any_inactive; then
+    return 1
+  fi
+  say "all services active"
 }
 
 # do_endpoint — Show network endpoint(s) for a service.
@@ -809,6 +849,7 @@ do_log_config() {
 # Main
 
 json_output=false
+verbose_mode=false
 action=""
 service_names=()
 
@@ -816,7 +857,8 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
     --json) json_output=true; shift ;;
-    endpoint|logs|log-paths|log-config)
+    --verbose) verbose_mode=true; shift ;;
+    endpoint|logs|log-paths|log-config|verify)
       action="$1"; shift
       service_names=("$@")
       break
@@ -830,23 +872,25 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-# Filter --json from service_names (can appear before or after action)
+# Filter --json and --verbose from service_names (can appear before or after action)
 filtered_service_names=()
 for arg in "${service_names[@]}"; do
   if [ "$arg" = "--json" ]; then
     json_output=true
+  elif [ "$arg" = "--verbose" ]; then
+    verbose_mode=true
   else
     filtered_service_names+=("$arg")
   fi
 done
 service_names=("${filtered_service_names[@]}")
 
-[ -z "$action" ] && { error "missing action (list, status, start, stop, restart, enable, disable, endpoint, logs, log-paths, log-config)" ; usage >&2 ; exit 1; }
+[ -z "$action" ] && { error "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)" ; usage >&2 ; exit 1; }
 
 case "$action" in
   list|status|logs) "do_$action" ;;
   log-paths) do_log_paths ;;
   log-config) do_log_config ;;
-  endpoint) do_endpoint ;;
+  verify|endpoint) "do_$action" ;;
   start|stop|restart|enable|disable) do_action ;;
 esac
