@@ -81,15 +81,13 @@
       # Zoom: video conferencing.
       # pass: Unix password manager (compatible with gopass on Windows).
       # qtpass: Qt GUI frontend for pass/gopass.
-      blender
+      # Blender, Krita, LibreOffice, Picard, and Zoom are provided via
+      # sharedPackages from modules/core.nix (overlappingPackages) — listed
+      # here for context only; they come from core.nix environment.systemPackages.
       easyeffects # graphical PipeWire audio processing GUI
       gimp
-      krita
-      libreoffice
       pass
-      picard
       qtpass
-      zoom-us
     ])
     ++ lib.optionals (pkgs.gnome ? nautilus-open-terminal) [
       pkgs.gnome.nautilus-open-terminal # adds "Open in Terminal" to Files context menu when available
