@@ -18,5 +18,13 @@ lib.mkIf
     programs.gnupg.agent = {
       enable = true;
       enableSSHSupport = true;
+      # Manage gpg-agent.conf declaratively so pinentry config and flags survive
+      # redeployments; without this, losing the file silently breaks signing.
+      settings = {
+        pinentry-program = "${pkgs.pinentry_mac}/bin/pinentry-mac";
+        # Allow programs to supply passphrases via --passphrase/--status-fd for
+        # non-interactive signing contexts (scripts, CI).
+        allow-loopback-pinentry = true;
+      };
     };
   }
