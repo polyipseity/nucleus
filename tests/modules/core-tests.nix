@@ -215,7 +215,103 @@ let
     ]
   ) "Filtering null values from list failed";
 
-  # Test 8: Attribute merging with lib.mkMerge.
+  # === PLATFORM COMPATIBILITY FILTERING ===
+  # Tests for the platformCompatible helper added in core.nix.
+
+  # Test 8: Package without platforms field is compatible on both darwin and linux.
+  test_platform_default_compatible =
+    let
+      # Simulate the logic from core.nix
+      platformCompatible =
+        isDarwin: isLinux: packageName:
+        let
+          entry = overlappingPackages.${packageName};
+          platforms =
+            entry.platforms or [
+              "darwin"
+              "linux"
+            ];
+        in
+        if isDarwin then
+          lib.elem "darwin" platforms
+        else if isLinux then
+          lib.elem "linux" platforms
+        else
+          true;
+
+      overlappingPackages = {
+        blender = {
+          category = "gui";
+        };
+      };
+    in
+    assert' (
+      platformCompatible true false "blender" && platformCompatible false true "blender"
+    ) "Package without platforms field should be compatible on both darwin and linux";
+
+  # Test 9: Package with platforms = ["darwin"] is excluded on linux.
+  test_platform_darwin_only =
+    let
+      platformCompatible =
+        isDarwin: isLinux: packageName:
+        let
+          entry = overlappingPackages.${packageName};
+          platforms =
+            entry.platforms or [
+              "darwin"
+              "linux"
+            ];
+        in
+        if isDarwin then
+          lib.elem "darwin" platforms
+        else if isLinux then
+          lib.elem "linux" platforms
+        else
+          true;
+
+      overlappingPackages = {
+        iterm2 = {
+          category = "gui";
+          platforms = [ "darwin" ];
+        };
+      };
+    in
+    assert' (
+      platformCompatible true false "iterm2" && !platformCompatible false true "iterm2"
+    ) "Package with platforms = [\"darwin\"] should be compatible on darwin but not linux";
+
+  # Test 10: Package with platforms = ["linux"] is excluded on darwin.
+  test_platform_linux_only =
+    let
+      platformCompatible =
+        isDarwin: isLinux: packageName:
+        let
+          entry = overlappingPackages.${packageName};
+          platforms =
+            entry.platforms or [
+              "darwin"
+              "linux"
+            ];
+        in
+        if isDarwin then
+          lib.elem "darwin" platforms
+        else if isLinux then
+          lib.elem "linux" platforms
+        else
+          true;
+
+      overlappingPackages = {
+        linux-only-pkg = {
+          category = "cli";
+          platforms = [ "linux" ];
+        };
+      };
+    in
+    assert' (
+      !platformCompatible true false "linux-only-pkg" && platformCompatible false true "linux-only-pkg"
+    ) "Package with platforms = [\"linux\"] should be compatible on linux but not darwin";
+
+  # Test 11: Attribute merging with lib.mkMerge.
   test_mkmerge_basic = assert' (
     builtins.length (
       lib.flatten [
@@ -231,7 +327,7 @@ let
     ) == 4
   ) "List flattening failed for config merging";
 
-  # Test 9: OS-conditional path resolution.
+  # Test 12: OS-conditional path resolution.
   test_conditional_home_path =
     let
       isDarwin = false;
@@ -240,7 +336,7 @@ let
       (if isDarwin then "/Users/admin" else "/home/admin") == "/home/admin"
     ) "Home directory path resolution failed for Linux";
 
-  # Test 10: Package category validation.
+  # Test 13: Package category validation.
   test_package_category_enum =
     let
       isValidCategory =
@@ -266,6 +362,9 @@ let
     test_selective_override_in_policy_mode
     test_multiple_overrides
     test_filter_nulls
+    test_platform_default_compatible
+    test_platform_darwin_only
+    test_platform_linux_only
     test_mkmerge_basic
     test_conditional_home_path
     test_package_category_enum

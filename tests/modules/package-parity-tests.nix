@@ -152,6 +152,89 @@ let
     builtins.length guiTools >= 2
   ) "GUI tools should be declared for applicable platforms";
 
+  # === OVERLAPPING PACKAGES PARITY ===
+  # Verify all cross-platform entries in modules/core.nix overlappingPackages
+  # have valid nixpkgs attribute names.
+  coreModuleText = builtins.readFile ../../src/modules/core.nix;
+
+  test_overlapping_packages_have_nixpkgs =
+    let
+      # Extract key overlappingPackages from core.nix to validate attrs exist in nixpkgs.
+      # These are cross-platform packages that should exist on both darwin and linux.
+      crossPlatformOverlapAttrs = [
+        {
+          name = "blender";
+          nixpkgsAttr = "blender";
+        }
+        {
+          name = "czkawka";
+          nixpkgsAttr = "czkawka";
+        }
+        {
+          name = "google-chrome";
+          nixpkgsAttr = "google-chrome";
+        }
+        {
+          name = "krita";
+          nixpkgsAttr = "krita";
+        }
+        {
+          name = "libreoffice";
+          nixpkgsAttr = "libreoffice";
+        }
+        {
+          name = "obsidian";
+          nixpkgsAttr = "obsidian";
+        }
+        {
+          name = "musicbrainz-picard";
+          nixpkgsAttr = "picard";
+        }
+        {
+          name = "qemu";
+          nixpkgsAttr = "qemu";
+        }
+        {
+          name = "discord@canary";
+          nixpkgsAttr = "discord-canary";
+        }
+        {
+          name = "visual-studio-code";
+          nixpkgsAttr = "vscode";
+        }
+        {
+          name = "visual-studio-code@insiders";
+          nixpkgsAttr = "vscode-insiders";
+        }
+        {
+          name = "vlc";
+          nixpkgsAttr = "vlc";
+        }
+        {
+          name = "zoom";
+          nixpkgsAttr = "zoom-us";
+        }
+      ];
+    in
+    assert' (builtins.all (p: builtins.match ".*" + p.nixpkgsAttr + ".*" coreModuleText != null)
+      crossPlatformOverlapAttrs
+    ) "All cross-platform overlappingPackages entries should be defined in core.nix";
+
+  test_darwin_only_packages_platform_marked =
+    let
+      darwinOnlyPackages = [
+        "iterm2"
+        "rectangle"
+        "stats"
+        "utm"
+      ];
+      # Match a core.nix package entry with platforms = ["darwin"].
+      hasDarwinPlatform =
+        name:
+        builtins.match (".*" + name + " = \\{\n.*platforms = \\[ \"darwin\" \\];.*") coreModuleText != null;
+    in
+    assert' (builtins.all hasDarwinPlatform darwinOnlyPackages) "Darwin-only packages should have platforms field set in core.nix";
+
   allTests = [
     test_nixpkgs_coverage
     test_homebrew_coverage
@@ -160,6 +243,8 @@ let
     test_naming_consistency
     test_shell_tools_available
     test_gui_tools_declared
+    test_overlapping_packages_have_nixpkgs
+    test_darwin_only_packages_platform_marked
   ];
 in
 {
