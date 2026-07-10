@@ -58,7 +58,7 @@
           "default": true
         },
         "dirs": {
-          "description": "Log subdirectories this service needs under each log root. Values are subdirectory names (may differ from the service key, e.g. 'https-proxy' for service 'caddy').",
+          "description": "Log subdirectories this service needs under each log root. Values are subdirectory names (may differ from the service key, e.g. 'caddy' uses 'https-proxy'). Multiple dirs are declared when a service has both launchd-captured stdout/stderr and application-level logs on separate paths (e.g. jellyfin uses 'jellyfin' for launchd capture and 'jellyfin-app' for its internal --logdir).",
           "properties": {
             "system": {
               "description": "Subdirs needed under the system-wide log root.",
