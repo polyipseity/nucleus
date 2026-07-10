@@ -53,6 +53,10 @@ assert containsRegex ''"maxSize": 10000000'' servicesJsonText;
 assert containsRegex ''"maxFiles": 4'' servicesJsonText;
 assert containsRegex ''"compress": true'' servicesJsonText;
 
+# --- src/modules/services.json: dirs and runAsUser fields ---
+assert containsRegex ''"dirs"'' servicesJsonText;
+assert containsRegex ''"runAsUser": true'' servicesJsonText;
+
 # --- src/modules/logging.nix: option docs point to services.json ---
 assert containsRegex "services\\.json" loggingNixText;
 assert containsRegex "runtime source: services\\.json" loggingNixText;

@@ -148,3 +148,92 @@ Describe 'Invoke-LogRotation' {
     (Test-Path -LiteralPath "$Script:LogDir\data.1.txt" -PathType Leaf) | Should -Be $false
   }
 }
+
+Describe 'Invoke-EnsureLogDirs' {
+  BeforeAll {
+    # Source the function.
+    $ensureLogDirsPath = Join-Path $PSScriptRoot '../../../src/hosts/Windows/modules/system/Invoke-EnsureLogDirs.ps1'
+    . $ensureLogDirsPath
+
+    $Script:TestServicesJson = Join-Path $env:TEMP 'nucleus-test-services.json'
+    $Script:TestSystemLogDir = Join-Path $env:TEMP 'nucleus-test-system-log'
+    $Script:TestUserLogDir = Join-Path $env:TEMP 'nucleus-test-user-log'
+  }
+
+  AfterAll {
+    foreach ($p in @($Script:TestServicesJson, $Script:TestSystemLogDir, $Script:TestUserLogDir)) {
+      if (Test-Path -LiteralPath $p) {
+        Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue
+      }
+    }
+  }
+
+  It 'creates system subdirectories from services.json' {
+    # Stub services.json with one system dir entry.
+    $stub = @'
+{
+  "test-svc": {
+    "platforms": {
+      "windows": { "type": "service" }
+    },
+    "logging": {
+      "dirs": { "system": ["test-svc"], "user": [] }
+    }
+  }
+}
+'@
+    Set-Content -Path $Script:TestServicesJson -Value $stub -Encoding utf8
+
+    # Mock log dir functions by overriding with test vars.
+    Mock Get-NucleusSystemLogDir { return $Script:TestSystemLogDir }
+    Mock Get-NucleusLogDir { return $Script:TestUserLogDir }
+
+    Invoke-EnsureLogDirs -ServicesJson $Script:TestServicesJson
+
+    $expectedDir = Join-Path $Script:TestSystemLogDir 'test-svc'
+    (Test-Path -LiteralPath $expectedDir -PathType Container) | Should -Be $true
+  }
+
+  It 'creates user subdirectories from services.json' {
+    $stub = @'
+{
+  "test-user-svc": {
+    "platforms": {
+      "windows": { "type": "service" }
+    },
+    "logging": {
+      "dirs": { "system": [], "user": ["test-user-svc"] }
+    }
+  }
+}
+'@
+    Set-Content -Path $Script:TestServicesJson -Value $stub -Encoding utf8
+
+    Mock Get-NucleusSystemLogDir { return $Script:TestSystemLogDir }
+    Mock Get-NucleusLogDir { return $Script:TestUserLogDir }
+
+    Invoke-EnsureLogDirs -ServicesJson $Script:TestServicesJson
+
+    $expectedDir = Join-Path $Script:TestUserLogDir 'test-user-svc'
+    (Test-Path -LiteralPath $expectedDir -PathType Container) | Should -Be $true
+  }
+
+  It 'handles services with no logging.dirs' {
+    $stub = @'
+{
+  "no-log-svc": {
+    "platforms": {
+      "windows": { "type": "service" }
+    }
+  }
+}
+'@
+    Set-Content -Path $Script:TestServicesJson -Value $stub -Encoding utf8
+
+    Mock Get-NucleusSystemLogDir { return $Script:TestSystemLogDir }
+    Mock Get-NucleusLogDir { return $Script:TestUserLogDir }
+
+    # Should not throw.
+    { Invoke-EnsureLogDirs -ServicesJson $Script:TestServicesJson } | Should -Not -Throw
+  }
+}
