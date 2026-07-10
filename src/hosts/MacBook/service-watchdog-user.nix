@@ -6,10 +6,12 @@
 {
   config,
   pkgs,
+  username,
   nucleusApps,
   ...
 }:
 let
+  userLogDir = "/Users/${username}/Library/Logs/nucleus";
   nucleusSvcWatchdog = "${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog";
   servicesJson = builtins.path {
     path = ../../modules/services.json;
@@ -19,8 +21,7 @@ let
 in
 {
   launchd.agents."service-watchdog-user" = {
-    enable = true;
-    config = {
+    serviceConfig = {
       Label = "local.service-watchdog-user";
       ProgramArguments = [
         "${pkgs.writeShellScript "svc-watchdog-agent" ''
@@ -29,8 +30,8 @@ in
       ];
       StartInterval = 300;
       RunAtLoad = true;
-      StandardOutPath = "${config.nucleus.logging.logDir}/service-watchdog/stdout.log";
-      StandardErrorPath = "${config.nucleus.logging.logDir}/service-watchdog/stderr.log";
+      StandardOutPath = "${userLogDir}/service-watchdog/stdout.log";
+      StandardErrorPath = "${userLogDir}/service-watchdog/stderr.log";
       EnvironmentVariables = {
         NUCLEUS_SERVICES_JSON = servicesJson;
         NUCLEUS_REPO_ROOT = repoRoot;

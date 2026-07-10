@@ -72,8 +72,8 @@ in
       RunAtLoad = true;
       ThrottleInterval = 30;
       WorkingDirectory = userHome;
-      StandardOutPath = "${config.nucleus.logging.logDir}/camilladsp/stdout.log";
-      StandardErrorPath = "${config.nucleus.logging.logDir}/camilladsp/stderr.log";
+      StandardOutPath = "${config.nucleus.logging.systemLogDir}/camilladsp/stdout.log";
+      StandardErrorPath = "${config.nucleus.logging.systemLogDir}/camilladsp/stderr.log";
     };
   };
 }
