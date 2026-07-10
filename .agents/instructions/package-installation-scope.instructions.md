@@ -228,6 +228,19 @@ Only when declarative solutions don't exist:
 
 ---
 
+## Overlapping package classification (macOS)
+
+Packages available in both nixpkgs and Homebrew use a `category` field in
+`src/modules/core.nix`'s `overlappingPackages` to decide the install backend.
+
+Category rules:
+- `cli` → nixpkgs
+- `gui` → Homebrew (cask preferred, formula fallback)
+
+**If a package ships any GUI component** (a graphical binary, a UI frontend,
+a background daemon with a UI), classify it as `"gui"` even if it also
+provides CLI-only tools.
+
 ## What Violates This Policy
 
 | Pattern                                    | Issue                              | Fix                                         |
