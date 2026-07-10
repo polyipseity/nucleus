@@ -60,11 +60,53 @@ Read all confirmed memory files and all `.instructions.md` files at the target l
 2. Read all `.instructions.md` files at target: `read_file` each one in full.
 3. **Segment each instruction file by section headings** (top-level `##` blocks). Record the heading name and line range for each section.
 
+## Evaluate — assess memory staleness
+
+Before absorbing, evaluate each atomic fact for staleness. Break each memory file into atomic facts (paragraph-level or bullet-level claims). For each fact, apply these checks from cheapest to most expensive:
+
+### Staleness indicators
+
+| Signal | Method | Example |
+|--------|--------|--------|
+| **Codebase contradiction** | Search the codebase (`grep_search`, `file_search`) for the key claim. If current code contradicts it → **outdated**. | Memory says "activation runs via `apply.sh`" but the file was renamed. |
+| **Reference death** | Check that files, functions, commands, or config keys referenced in the fact still exist. If any are missing → **outdated**. | Memory says "see `src/modules/foo.nix`" but that file was deleted. |
+| **Instruction supersession** | Cross-reference against current `.instructions.md` files. If an instruction already covers the topic differently and is authoritative → **outdated**. | Memory says "use `nix build`" but `core-behavior.instructions.md` says "use `nix build .#target`". |
+| **Git timestamps** (optional, high cost) | Get the memory file timestamp via `git log -1 --format=%ct <memory_path>`. If the memory predates significant changes to referenced code, likely **outdated**. Corroborate with other signals. | Memory is 6 months old; referenced code was refactored 3 months ago. |
+| **Ambiguous / unverifiable** | Fact cannot be verified or falsified against current workspace. Mark as **uncertain**. | Memory says "prefer TCP over UDP" with no supporting code to check. |
+
+### Verdicts
+
+| Verdict | Meaning | Action |
+|---------|---------|--------|
+| **current** | Fact matches current codebase state and isn't superseded. | Proceed to **Absorb** normally. |
+| **discard** | Fact is provably wrong or references removed features. | Remove from memory file; do **not** absorb. |
+| **update** | Useful core but expressed inaccurately for current state. | Correct the fact inline in memory, then proceed to **Absorb** with corrected version. |
+| **ignore** | Outdated but harmless, and you cannot confidently update it. | Leave in memory file; do **not** absorb. |
+| **uncertain** | Cannot determine staleness with available evidence. | Absorb with `# TODO: verify staleness` annotation. |
+
+### Report before acting
+
+Print an evaluation summary after processing all facts:
+
+```
+Evaluation summary:
+  memory-foo.md:
+    ✅ "run prek for formatting" — current
+    ❌ "use build.sh" — discard (file removed)
+    🔄 "deploy via rsync" — update (now uses nucleus-apply)
+    ⚠️ "use port 8080" — ignore (harmless, can't verify)
+    ❓ "prefer UDP" — uncertain, absorbing with TODO
+  memory-bar.md:
+    ... etc
+```
+
 ## Absorb — cohesive multi-location edits
 
 ### Analyze and match
 
-For each memory file, extract its key facts/paragraphs. For each fact, find the best target:
+Only facts with verdict **current** or **update** proceed to matching. Facts with verdict **discard** or **ignore** are excluded from absorption. Facts with verdict **uncertain** proceed with a `# TODO: verify staleness` annotation in the instruction file.
+
+For each qualifying fact, find the best target:
 
 1. **Match by topic keywords** — intersect memory keywords with instruction file names, section headings, and content.
 2. **If a fact matches a specific section** → integrate it into that section, within the relevant paragraph or bullet list.
