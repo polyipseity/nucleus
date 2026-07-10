@@ -158,8 +158,9 @@ If any edit in the previous step failed, keep the file and report the failure.
 
 1. Re-read each modified `.instructions.md` file.
 2. Confirm all facts from the original memory are present and accurately expressed.
-3. Prune redundancy: if the same fact appears twice in the same file, keep only the better-placed instance.
-4. Check voice: the result should read as if the knowledge was always there — no awkward transitions, no verbatim memory dumps.
+3. For **uncertain** facts absorbed with `# TODO: verify staleness`: verify the fact at least references existing files, commands, or config keys — no dead references.
+4. Prune redundancy: if the same fact appears twice in the same file, keep only the better-placed instance.
+5. Check voice: the result should read as if the knowledge was always there — no awkward transitions, no verbatim memory dumps.
 
 ## Rules
 
