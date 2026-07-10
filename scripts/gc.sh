@@ -28,6 +28,7 @@ usage() {
   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
   --log-gc|--no-log-gc                Control log rotation (default: --log-gc).
+  --journald-gc|--no-journald-gc        Control journald log vacuum (default: --journald-gc).
   --log-max-size <bytes>              Log rotation max file size before rotation (default: 10000000).
   --log-max-files <count>             Number of rotated archives to keep (default: 4).
   --log-compress <true|false>         Compress rotated logs (default: true).
@@ -46,6 +47,8 @@ nix_gc=true
 ollama_gc=true
 wallpaper_gc=true
 vm_gc=true
+log_gc=true
+journald_gc=true
 dry_run=false
 hm_expiry_arg=""
 nix_expiry_arg=""
@@ -98,6 +101,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-log-gc)
       log_gc=false
+      ;;
+    --journald-gc)
+      journald_gc=true
+      ;;
+    --no-journald-gc)
+      journald_gc=false
       ;;
     --log-max-size)
       log_max_size="$2"
@@ -499,7 +508,33 @@ if [ "$log_gc" = true ]; then
   fi
 fi
 
-# Step 8: Scoop cache gc (accepted but ignored on POSIX; Windows-only).
+gc_journald_if_available() {
+  # Vacuum journald logs older than the configured expiry.
+  # Uses the master expiry ($expiry_arg -> 7d default) so journald GC is
+  # aligned with other retention windows in this script.
+  #
+  # journald vacuum preserves at minimum the specified time, so on NixOS
+  # where all service logs go through journald, this ensures old logs are
+  # reclaimed on the same schedule as file-based logs.
+  if ! command -v journalctl >/dev/null 2>&1; then
+    say "journalctl unavailable; skipping journald vacuum"
+    return 0
+  fi
+
+  _jv_expiry="${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}"
+  journalctl --vacuum-time="$_jv_expiry" 2>/dev/null || true
+}
+
+# Step 8: vacuum journald logs (NixOS only; no-op on macOS/Windows).
+if [ "$journald_gc" = true ]; then
+  if [ "$dry_run" = true ]; then
+    dry_run "would vacuum journald logs older than ${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}"
+  else
+    gc_journald_if_available
+  fi
+fi
+
+# Step 9: Scoop cache gc (accepted but ignored on POSIX; Windows-only).
 # This flag exists for cross-platform CLI parity with the Windows gc.ps1 script.
 
 nuc_done

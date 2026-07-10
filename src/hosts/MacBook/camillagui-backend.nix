@@ -25,8 +25,8 @@ in
       UserName = username;
       KeepAlive = true;
       RunAtLoad = true;
-      StandardOutPath = "${userHome}/Library/Logs/nucleus/camillagui-backend/stdout.log";
-      StandardErrorPath = "${userHome}/Library/Logs/nucleus/camillagui-backend/stderr.log";
+      StandardOutPath = "${config.nucleus.logging.logDir}/camillagui-backend/stdout.log";
+      StandardErrorPath = "${config.nucleus.logging.logDir}/camillagui-backend/stderr.log";
     };
   };
 }

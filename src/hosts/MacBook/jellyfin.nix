@@ -25,7 +25,7 @@ let
     config_dir="$state_root/config"
     data_dir="$state_root/data"
     cache_dir="$state_root/cache"
-    log_dir="$state_root/log"
+    log_dir="${config.nucleus.logging.systemLogDir}/jellyfin-app"
 
     mkdir -p "$config_dir" "$data_dir" "$cache_dir" "$log_dir"
 

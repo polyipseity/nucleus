@@ -55,6 +55,9 @@
 .PARAMETER NoLogGc
   Skip log rotation (default: $false).
 
+.PARAMETER NoJournaldGc
+  Accepted but ignored on Windows (POSIX-only) (default: $false).
+
 .PARAMETER LogMaxSize
   Log rotation max file size in bytes before rotation (default: from services.json $defaults.logging.maxSize).
 
@@ -95,6 +98,7 @@ param(
   [switch]$NoWallpaperGc = { $env:NUCLEUS_GC_NO_WALLPAPER_GC -eq 'true' }.Invoke(),
   [switch]$NoVMGc = { $env:NUCLEUS_GC_NO_VM_GC -eq 'true' }.Invoke(),
   [switch]$NoLogGc = { $env:NUCLEUS_GC_NO_LOG_GC -eq 'true' }.Invoke(),
+  [switch]$NoJournaldGc = { $env:NUCLEUS_GC_NO_JOURNALD_GC -eq 'true' }.Invoke(),
   [string]$LogMaxSize = $(if ($env:NUCLEUS_GC_LOG_MAX_SIZE) { $env:NUCLEUS_GC_LOG_MAX_SIZE } else { '' }),
   [string]$LogMaxFiles = $(if ($env:NUCLEUS_GC_LOG_MAX_FILES) { $env:NUCLEUS_GC_LOG_MAX_FILES } else { '' }),
   [string]$LogCompress = $(if ($env:NUCLEUS_GC_LOG_COMPRESS) { $env:NUCLEUS_GC_LOG_COMPRESS } else { '' }),
@@ -135,13 +139,16 @@ if ([string]::IsNullOrWhiteSpace($ModuleDir)) {
   $ModuleDir = Join-Path $RepoRoot 'src\hosts\Windows\modules'
 }
 
-# -NoNixGc and -NoHmGc are accepted but ignored on Windows (POSIX-only
-# options from gc.sh). Accepted for cross-platform CLI parity.
+# -NoNixGc, -NoHmGc, and -NoJournaldGc are accepted but ignored on Windows
+# (POSIX-only options from gc.sh). Accepted for cross-platform CLI parity.
 if ($NoNixGc) {
   Write-NucleusWarning "-NoNixGc accepted but ignored on Windows (POSIX-only)"
 }
 if ($NoHmGc) {
   Write-NucleusWarning "-NoHmGc accepted but ignored on Windows (POSIX-only)"
+}
+if ($NoJournaldGc) {
+  Write-NucleusWarning "-NoJournaldGc accepted but ignored on Windows (POSIX-only)"
 }
 
 # -Expiry, -HmExpiry, -NixExpiry are accepted but ignored on Windows

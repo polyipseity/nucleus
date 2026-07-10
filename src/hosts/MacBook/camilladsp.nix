@@ -22,7 +22,8 @@ let
     ws_port="${wsPort}"
     config_file="${userHome}/.config/camilladsp/configs/config.yml"
     state_file="${userHome}/.local/state/camilladsp/statefile.yml"
-    log_file="${userHome}/Library/Logs/nucleus/camilladsp/camilladsp.log"
+    log_dir="${config.nucleus.logging.logDir}/camilladsp"
+    log_file="$log_dir/camilladsp.log"
 
     mkdir -p "$(dirname "$state_file")"
 
@@ -71,8 +72,8 @@ in
       RunAtLoad = true;
       ThrottleInterval = 30;
       WorkingDirectory = userHome;
-      StandardOutPath = "${userHome}/Library/Logs/nucleus/camilladsp/stdout.log";
-      StandardErrorPath = "${userHome}/Library/Logs/nucleus/camilladsp/stderr.log";
+      StandardOutPath = "${config.nucleus.logging.logDir}/camilladsp/stdout.log";
+      StandardErrorPath = "${config.nucleus.logging.logDir}/camilladsp/stderr.log";
     };
   };
 }
