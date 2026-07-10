@@ -46,18 +46,34 @@ usage() {
   Intended to run from a periodic timer (launchd/systemd/schtask).
 
   Options:
-  -h|--help  Show usage.
+  -h|--help     Show usage.
+  --domain <d>  Filter to only check services in this domain (user/system).
+                When omitted, checks all services for the current platform.
 EOF
 }
 
 # Handle help request before any further processing.
-for _arg in "$@"; do
-  case "$_arg" in
+watchdog_domain=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
     -h|--help)
       usage
       exit 0
       ;;
+    --domain)
+      if [ -z "${2:-}" ]; then
+        printf 'error: --domain requires an argument\n' >&2
+        exit 1
+      fi
+      watchdog_domain="$2"
+      shift
+      ;;
+    *)
+      printf 'error: unknown option: %s\n' "$1" >&2
+      exit 1
+      ;;
   esac
+  shift
 done
 
 SERVICES_JSON="${NUCLEUS_SERVICES_JSON:-$REPO_ROOT/src/modules/services.json}"
@@ -197,6 +213,14 @@ check_service_nixos() {
 while IFS= read -r entry; do
   [ -z "$entry" ] && continue
   key=$(echo "$entry" | jq -r '.key')
+
+  # If --domain was specified, skip services that don't match.
+  if [ -n "$watchdog_domain" ]; then
+    svc_domain=$(echo "$entry" | jq -r '.platform.domain // "user"')
+    if [ "$svc_domain" != "$watchdog_domain" ]; then
+      continue
+    fi
+  fi
 
   case "$PLATFORM" in
     macos) check_service_macos "$key" "$(echo "$entry" | jq -c '.platform')" ;;

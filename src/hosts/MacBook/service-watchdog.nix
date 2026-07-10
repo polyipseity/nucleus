@@ -29,7 +29,7 @@ in
       Label = "local.service-watchdog";
       ProgramArguments = [
         "${pkgs.writeShellScript "svc-watchdog-daemon" ''
-          exec ${nucleusSvcWatchdog}
+          exec ${nucleusSvcWatchdog} --domain system
         ''}"
       ];
       StartInterval = 300;
