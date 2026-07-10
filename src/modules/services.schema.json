@@ -57,6 +57,22 @@
           "type": "boolean",
           "default": true
         },
+        "dirs": {
+          "description": "Log subdirectories this service needs under each log root. Values are subdirectory names (may differ from the service key, e.g. 'https-proxy' for service 'caddy').",
+          "properties": {
+            "system": {
+              "description": "Subdirs needed under the system-wide log root.",
+              "items": { "type": "string" },
+              "type": "array"
+            },
+            "user": {
+              "description": "Subdirs needed under the per-user log root.",
+              "items": { "type": "string" },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
         "eventLog": {
           "description": "Windows Event Log query config for native services (ignored on other platforms).",
           "properties": {
@@ -118,6 +134,11 @@
         "prefixMatch": {
           "description": "Match all services with this prefix",
           "type": "boolean"
+        },
+        "runAsUser": {
+          "description": "Service runs as the console user via UserName (not root). Needed for chown logic on macOS.",
+          "type": "boolean",
+          "default": false
         },
         "service": {
           "description": "launchd service label",

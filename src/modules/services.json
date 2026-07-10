@@ -11,7 +11,11 @@
     "description": "Local TLS reverse proxy engine",
     "displayName": "Caddy",
     "logging": {
-      "capture": "all"
+      "capture": "all",
+      "dirs": {
+        "system": ["https-proxy"],
+        "user": []
+      }
     },
     "network": {
       "admin": {
@@ -23,6 +27,7 @@
     "platforms": {
       "macos": {
         "domain": "system",
+        "runAsUser": true,
         "service": "org.nixos.httpsProxy",
         "type": "launchctl"
       },
@@ -40,7 +45,11 @@
     "description": "Audio processor with websocket API for camillagui-backend",
     "displayName": "CamillaDSP",
     "logging": {
-      "capture": "all"
+      "capture": "all",
+      "dirs": {
+        "system": ["camilladsp"],
+        "user": ["camilladsp"]
+      }
     },
     "network": {
       "websocket": {
@@ -53,6 +62,7 @@
       "macos": {
         "domain": "system",
         "justification": "System-wide audio processor independent of login session",
+        "runAsUser": true,
         "service": "local.camilladsp",
         "type": "launchctl"
       },
@@ -72,7 +82,11 @@
     "description": "Web configuration interface for CamillaDSP",
     "displayName": "CamillaDSP GUI",
     "logging": {
-      "capture": "all"
+      "capture": "all",
+      "dirs": {
+        "system": ["camillagui-backend"],
+        "user": ["camillagui-backend"]
+      }
     },
     "network": {
       "default": {
@@ -90,6 +104,7 @@
       "macos": {
         "domain": "system",
         "justification": "System-wide web GUI daemon independent of login session",
+        "runAsUser": true,
         "service": "local.camillagui-backend",
         "type": "launchctl"
       },
@@ -171,6 +186,10 @@
     "displayName": "Jellyfin",
     "logging": {
       "capture": "all",
+      "dirs": {
+        "system": ["jellyfin", "jellyfin-app"],
+        "user": []
+      },
       "eventLog": {
         "provider": "Jellyfin"
       }
@@ -190,6 +209,7 @@
     "platforms": {
       "macos": {
         "domain": "system",
+        "runAsUser": true,
         "service": "org.nixos.jellyfin",
         "type": "launchctl"
       },
@@ -208,7 +228,11 @@
     "description": "Nix Linux builder VM on macOS",
     "displayName": "Linux Builder VM",
     "logging": {
-      "capture": "all"
+      "capture": "all",
+      "dirs": {
+        "system": ["linux-builder"],
+        "user": []
+      }
     },
     "network": {
       "ssh": {
@@ -238,6 +262,10 @@
     "displayName": "LiteLLM",
     "logging": {
       "capture": "all",
+      "dirs": {
+        "system": ["litellm"],
+        "user": []
+      },
       "level": "WARNING"
     },
     "network": {
@@ -250,6 +278,7 @@
     "platforms": {
       "macos": {
         "domain": "system",
+        "runAsUser": true,
         "service": "org.nixos.local.litellm",
         "type": "launchctl"
       },
@@ -270,6 +299,10 @@
     "displayName": "Ollama",
     "logging": {
       "capture": "all",
+      "dirs": {
+        "system": ["ollama"],
+        "user": []
+      },
       "eventLog": {
         "provider": "Ollama"
       }
@@ -284,6 +317,7 @@
     "platforms": {
       "macos": {
         "domain": "system",
+        "runAsUser": true,
         "service": "org.nixos.local.ollama",
         "type": "launchctl"
       },
@@ -333,7 +367,11 @@
     "description": "Periodic service watchdog that detects and restarts stuck nucleus services",
     "displayName": "Service Watchdog",
     "logging": {
-      "capture": "all"
+      "capture": "all",
+      "dirs": {
+        "system": ["service-watchdog"],
+        "user": []
+      }
     },
     "platforms": {
       "macos": {
