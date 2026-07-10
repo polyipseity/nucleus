@@ -13,7 +13,7 @@
     "logging": {
       "capture": "all",
       "dirs": {
-        "system": ["https-proxy"],
+        "system": ["caddy"],
         "user": []
       }
     },

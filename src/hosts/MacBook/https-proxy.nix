@@ -65,8 +65,8 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
-      StandardOutPath = "${systemLogDir}/https-proxy/stdout.log";
-      StandardErrorPath = "${systemLogDir}/https-proxy/stderr.log";
+      StandardOutPath = "${systemLogDir}/caddy/stdout.log";
+      StandardErrorPath = "${systemLogDir}/caddy/stderr.log";
     };
   };
 }

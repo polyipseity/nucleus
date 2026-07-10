@@ -38,8 +38,8 @@ let
   ) "camillagui-backend: dirs.system=[camillagui-backend] dirs.user=[camillagui-backend]";
 
   test_caddy_dirs = assert' (
-    caddyDirs.system == [ "https-proxy" ] && caddyDirs.user == [ ]
-  ) "caddy: dirs.system=[https-proxy] dirs.user=[]";
+    caddyDirs.system == [ "caddy" ] && caddyDirs.user == [ ]
+  ) "caddy: dirs.system=[caddy] dirs.user=[]";
 
   test_jellyfin_dirs = assert' (
     jellyfinDirs.system == [
