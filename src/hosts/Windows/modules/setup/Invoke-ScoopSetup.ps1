@@ -24,6 +24,8 @@ function Invoke-ScoopSetup {
                          for pkgs.pass on POSIX hosts.
       - qemu           — QCOW2 tooling and guest VM runner for Invoke-VMSetup;
                          absent from WinGet; Scoop extras bucket.
+      - zig            — Zig compiler toolchain; build-time dependency for
+                         source-built packages (Invoke-SourceBuild).
 
   .EXAMPLE
     Invoke-ScoopSetup
@@ -62,7 +64,10 @@ function Invoke-ScoopSetup {
     # Temporary keyboard locker for cleaning; blocks all input while you
     # wipe down the keyboard.  Press Ctrl+Break to unlock.
     # Usage: run 'iwck' from any terminal.
-    'iwck'
+    'iwck',
+    # Zig compiler toolchain — build-time dependency for source-built
+    # packages (Invoke-SourceBuild).  Requires Scoop main bucket.
+    'zig'
   )
 
   # Prepend the Scoop shims directory so 'scoop' is resolvable in this session.
