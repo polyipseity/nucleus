@@ -228,18 +228,56 @@ Only when declarative solutions don't exist:
 
 ---
 
-## Overlapping package classification (macOS)
+## Overlapping package classification
 
 Packages available in both nixpkgs and Homebrew use a `category` field in
 `src/modules/core.nix`'s `overlappingPackages` to decide the install backend.
+This mechanism is the single source of truth for all packages that exist in
+both package managers. It works cross-platform:
+
+- **macOS**: routes to either nixpkgs or Homebrew based on `category` and backend policy.
+- **NixOS**: all platform-compatible packages go through nixpkgs unconditionally
+  (no Homebrew on NixOS).
 
 Category rules:
-- `cli` → nixpkgs
-- `gui` → Homebrew (cask preferred, formula fallback)
+- `"cli"` → nixpkgs
+- `"gui"` → Homebrew (cask preferred, formula fallback) on macOS; nixpkgs on NixOS
 
 **If a package ships any GUI component** (a graphical binary, a UI frontend,
 a background daemon with a UI), classify it as `"gui"` even if it also
 provides CLI-only tools.
+
+### Platform restrictions
+
+Packages that only exist on a specific platform must declare a `platforms`
+field in their `overlappingPackages` entry:
+
+```nix
+iterm2 = {
+  category = "gui";
+  platforms = ["darwin"];  # only available on macOS
+  homebrew = { kind = "cask"; name = "iterm2"; };
+  nixpkgsAttr = "iterm2";
+};
+```
+
+Known darwin-only packages: `iterm2`, `rectangle`, `stats`, `utm`.
+
+### Packages not in nixpkgs
+
+For packages that exist in Homebrew but not in nixpkgs, use `missingNixAttrs`
+in `core.nix` to keep them declared in the same central location. These are
+macOS-only and do not apply to NixOS / Windows.
+
+### Adding a new overlapping package
+
+1. Add an entry to the `overlappingPackages` attribute set in `src/modules/core.nix`.
+2. Use alphabetical ordering within the set.
+3. If the package only exists on macOS (not in nixpkgs on Linux), add `platforms = ["darwin"]`.
+4. Choose the appropriate `category` (see rules above).
+5. On macOS, the package flows to Homebrew or nixpkgs based on `category` / policy.
+6. On NixOS, it automatically flows through `sharedPackages` to `environment.systemPackages`.
+7. If needed, remove any duplicate declaration from `src/hosts/NixOS/desktop.nix`.
 
 ## What Violates This Policy
 

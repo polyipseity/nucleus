@@ -68,7 +68,8 @@ When adding a new Windows service module, always implement both the enable and d
 
 - When adding a cross-host CLI tool to `src/modules/core.nix`, check whether a Windows equivalent should be added to `src/hosts/Windows/system-packages.dsc.yml`.
 - When adding a Windows CLI package to `system-packages.dsc.yml`, check whether POSIX hosts should also receive it through `core.nix`.
-- If parity is intentionally not applied, document why in code comments and in the change summary.
+- **When adding a package that exists in both nixpkgs and Homebrew**, add it to `overlappingPackages` in `src/modules/core.nix` (not spread across host files). Use `platforms` to restrict darwin-only packages and `category` to set the install backend policy.
+- Remove duplicate declarations from `src/hosts/NixOS/desktop.nix` when a package is already delivered via `core.nix`'s `sharedPackages`.
 
 ## Secrets and wallpaper parity rules
 
