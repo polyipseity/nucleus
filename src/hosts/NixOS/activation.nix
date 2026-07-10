@@ -8,6 +8,16 @@
   nucleusApps,
   ...
 }:
+let
+  servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
+  linuxServices = lib.filterAttrs (
+    name: svc:
+    svc ? platforms.nixos && svc.platforms.nixos ? type && svc.platforms.nixos.type != "omitted"
+  ) servicesJSON;
+  linuxSystemLogDirs = lib.unique (
+    lib.flatten (lib.mapAttrsToList (name: svc: svc.logging.dirs.system or [ ]) linuxServices)
+  );
+in
 {
   # ---------------------------------------------------------------------------
   # nvimLauncher
@@ -22,6 +32,18 @@
       mkdir -p /etc/nucleus-bin
       ln -sfn "$_nvim_real" /etc/nucleus-bin/nvim
     fi
+  '';
+
+  # ---------------------------------------------------------------------------
+  # ensureLogDirs
+  # Create system log directories for all nucleus systemd services before they
+  # start, so journald/stderr redirect targets exist on disk.
+  # ---------------------------------------------------------------------------
+  system.activationScripts.ensureLogDirs = lib.mkAfter ''
+    system_log_dir="${config.nucleus.logging.systemLogDir}"
+    for subdir in ${builtins.toString linuxSystemLogDirs}; do
+      mkdir -p "$system_log_dir/$subdir"
+    done
   '';
 
   # ---------------------------------------------------------------------------
