@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "sourceBuildPackage": {
+      "additionalProperties": false,
+      "description": "A package built from source (git clone + build system invocation).",
+      "properties": {
+        "binaryName": {
+          "description": "Filename of the built binary (e.g. ncdu.exe).",
+          "type": "string"
+        },
+        "binarySubDir": {
+          "description": "Subdirectory within the build output where the binary resides (e.g. zig-out/bin).",
+          "type": "string"
+        },
+        "buildSystem": {
+          "description": "Build system / toolchain used to compile the package.",
+          "enum": ["zig"],
+          "type": "string"
+        },
+        "checkVersionArgs": {
+          "description": "CLI arguments passed to the binary to print its version string.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "checkVersionPattern": {
+          "description": "Regex pattern to extract the version from the binary's --version output.",
+          "type": "string"
+        },
+        "dependencies": {
+          "description": "Build-time dependencies (Scoop package names or system tools).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "description": {
+          "description": "Human-readable description of the package.",
+          "type": "string"
+        },
+        "displayName": {
+          "description": "Human-readable display name (e.g. NCDU).",
+          "type": "string"
+        },
+        "id": {
+          "description": "Unique package identifier (e.g. ncdu).",
+          "type": "string"
+        },
+        "installDir": {
+          "description": "Subdirectory name under the source-builds root for this package's binary (e.g. ncdu).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "binaryName",
+        "binarySubDir",
+        "buildSystem",
+        "checkVersionArgs",
+        "checkVersionPattern",
+        "dependencies",
+        "description",
+        "displayName",
+        "id",
+        "installDir"
+      ],
+      "type": "object"
+    }
+  },
+  "description": "Registry of Windows packages built from source (git clone + build system). Mirrors the declarative approach of nixpkgs mkDerivation for the Windows host.",
+  "properties": {
+    "packages": {
+      "items": {
+        "$ref": "#/definitions/sourceBuildPackage"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "packages"
+  ],
+  "title": "nucleus Windows source-builds registry",
+  "type": "object"
+}

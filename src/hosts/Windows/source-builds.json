@@ -1,0 +1,16 @@
+{
+  "packages": [
+    {
+      "binaryName": "ncdu.exe",
+      "binarySubDir": "zig-out/bin",
+      "buildSystem": "zig",
+      "checkVersionArgs": ["--version"],
+      "checkVersionPattern": "^ncdu (?<version>\\d+\\.\\d+(\\.\\d+)?)",
+      "dependencies": ["zig"],
+      "description": "Ncdu — NCurses Disk Usage analyzer. Cross-platform parity with nixpkgs pkgs.ncdu on POSIX hosts. Built from Zig source at pinned git revision.",
+      "displayName": "NCDU",
+      "id": "ncdu",
+      "installDir": "ncdu"
+    }
+  ]
+}
