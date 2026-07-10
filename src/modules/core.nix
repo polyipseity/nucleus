@@ -16,7 +16,6 @@ let
     pkgs.camillagui-backend
     pkgs.cargo-binstall
     pkgs.cargo-cache
-    pkgs.czkawka
     pkgs.direnv
     pkgs.eza
     pkgs.fd
@@ -76,6 +75,14 @@ let
         name = "blender";
       };
       nixpkgsAttr = "blender";
+    };
+    czkawka = {
+      category = "gui";
+      homebrew = {
+        kind = "brew";
+        name = "czkawka";
+      };
+      nixpkgsAttr = "czkawka";
     };
     "discord@canary" = {
       category = "gui";
