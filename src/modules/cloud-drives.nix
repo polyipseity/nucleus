@@ -445,9 +445,9 @@ in
                 # remote is being set up.
                 ThrottleInterval = 30;
                 # Log errors to ~/Library/Logs for easier debugging.
-                # WHY not /dev/null: mount failures are actionable (e.g. remote
-                # not configured, network unavailable) and should be inspectable.
-                StandardOutPath = "/dev/null";
+                # Capture both stdout and stderr so mount activity is fully
+                # inspectable (remote not configured, network unavailable, etc.).
+                StandardOutPath = "${config.nucleus.logging.logDir}/cloud-mount-${mount.id}/stdout.log";
                 StandardErrorPath = "${config.nucleus.logging.logDir}/cloud-mount-${mount.id}/stderr.log";
               };
             };
@@ -536,7 +536,9 @@ in
                 StartCalendarInterval = mkScheduledSyncLaunchdCalendar replica.fallbackTimer.interval;
                 # Keep scheduled sync runs on schedule boundaries only.
                 RunAtLoad = false;
-                StandardOutPath = "/dev/null";
+                # Capture both stdout and stderr so sync activity is fully
+                # inspectable alongside the per-replica sync log.
+                StandardOutPath = "${config.nucleus.logging.logDir}/replica-sync-${replica.id}/stdout.log";
                 StandardErrorPath = "${config.nucleus.logging.logDir}/replica-sync-${replica.id}/stderr.log";
               };
             };

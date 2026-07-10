@@ -55,7 +55,7 @@
     _console_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     if [ -n "$_console_user" ] && [ "$_console_user" != "/Users/root" ]; then
       _username="''${_console_user#/Users/}"
-      for _sub in camilladsp camillagui-backend; do
+      for _sub in camilladsp camillagui-backend discord-music-rpc; do
         /bin/mkdir -p "$_console_user/Library/Logs/nucleus/$_sub"
       done
       /usr/sbin/chown -R "$_username:staff" "$_console_user/Library/Logs/nucleus"

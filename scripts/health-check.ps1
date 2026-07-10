@@ -174,7 +174,7 @@ function Test-LogHealth {
     $capture = if ($svcConfig.capture) { $svcConfig.capture } else { 'all' }
     if ($capture -eq 'none') { continue }
 
-    $maxSize = if ($svcConfig.maxSize) { [int64]$svcConfig.maxSize } else { 10000000 } # bytes
+    $maxSize = if ($svcConfig.maxSize) { [int64]$svcConfig.maxSize } elseif ($services.'$defaults'.logging.maxSize) { [int64]$services.'$defaults'.logging.maxSize } else { 10000000 } # bytes
     $sanitize = if ($null -ne $svcConfig.sanitize) { [bool]$svcConfig.sanitize } else { $true }
 
     foreach ($dir in @($userDir, $systemDir)) {

@@ -608,6 +608,14 @@ foreach ($configFile in $effectiveConfigFiles) {
   Invoke-WingetConfiguration -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath $configFile) -WallpaperPath $activeWallpaperPath
 }
 
+# Set Windows Application Event Log max size to 200 MB.
+# No declarative DSC resource exists for this; wevtutil is the canonical tool.
+try {
+  wevtutil sl Application /ms:209715200 2>$null
+} catch {
+  Write-NucleusWarning "Failed to set Application Event Log max size: $($_.Exception.Message)"
+}
+
 # Scoop bucket and app provisioning must run after DSC installs Scoop.Scoop.
 # scoop shims are written to a user-local directory that is not on PATH in
 # the current session until explicitly prepended; Invoke-ScoopSetup handles
