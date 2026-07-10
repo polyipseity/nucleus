@@ -1,18 +1,15 @@
 function Sync-StarshipConfig {
   <#
   .SYNOPSIS
-    Deploys the repository-managed starship.toml config to the correct path.
+    Deploys a repository-managed starship.toml writable symlink.
 
   .DESCRIPTION
-    Reads src/modules/configs/starship.toml from the repository (resolved via
-    NUCLEUS_REPO_ROOT) and writes it to the path expected by STARSHIP_CONFIG
-    (set in user/env.dsc.yml: %USERPROFILE%\.config\starship.toml).
-
-    Only overwrites if the destination differs from the source, to avoid
-    unnecessary file I/O on every apply.
+    Creates a symbolic link from %USERPROFILE%\.config\starship.toml to
+    src\modules\configs\starship.toml in the repository (Method 1).
+    Edits in the repo take effect immediately without re-running apply.
 
   .PARAMETER Enabled
-    True applies the managed config. False removes the managed config file.
+    True applies the managed config. False removes the managed symlink.
 
   .EXAMPLE
     Sync-StarshipConfig -Enabled:$true
@@ -56,17 +53,10 @@ function Sync-StarshipConfig {
     New-Item -Path $destDir -ItemType Directory -Force | Out-Null
   }
 
-  $sourceContent = Get-Content -Path $sourcePath -Raw -Encoding UTF8
-  $destExists = Test-Path -Path $destPath -PathType Leaf
-  $needsUpdate = $true
-
-  if ($destExists) {
-    $destContent = Get-Content -Path $destPath -Raw -Encoding UTF8
-    $needsUpdate = ($sourceContent -ne $destContent)
+  # Method 1 (writable symlink): remove existing file/symlink and replace with symlink.
+  if (Test-Path -Path $destPath) {
+    Remove-Item -Path $destPath -Force
   }
-
-  if ($needsUpdate) {
-    Set-Content -Path $destPath -Value $sourceContent -Encoding UTF8 -NoNewline
-    Write-Host "Sync-StarshipConfig: deployed $destPath" -ForegroundColor DarkCyan
-  }
+  New-Item -Path $destPath -ItemType SymbolicLink -Target $sourcePath -Force | Out-Null
+  Write-Host "Sync-StarshipConfig: symlinked $destPath" -ForegroundColor DarkCyan
 }

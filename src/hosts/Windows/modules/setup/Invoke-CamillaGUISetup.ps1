@@ -118,16 +118,17 @@ function Invoke-CamillaGUISetup {
       $env:PATH = "$installDir;$env:PATH"
     }
 
-    # Deploy user-level config to $HOME\.config (cross-platform parity with
-    # POSIX ~/.config/camillagui-backend/config.yml).
+    # Method 1 (writable symlink): deploy user-level config to $HOME\.config
+    # (cross-platform parity with POSIX ~/.config/camillagui-backend/config.yml).
     $configDir = Join-Path -Path $HOME -ChildPath ".config\camillagui-backend"
     $configPath = Join-Path -Path $configDir -ChildPath "config.yml"
     $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camillagui-backend\config-windows.yml"
     if (-not (Test-Path $configDir)) {
       $null = New-Item -ItemType Directory -Path $configDir -Force
     }
-    Copy-Item -Path $configSource -Destination $configPath -Force
-    Write-Output "camillagui-backend-setup: deployed config to $configPath"
+    if (Test-Path $configPath) { Remove-Item -Path $configPath -Force }
+    New-Item -Path $configPath -ItemType SymbolicLink -Target $configSource -Force | Out-Null
+    Write-Output "camillagui-backend-setup: symlinked config to $configPath"
   } finally {
     # Clean up temp directory.
     if (Test-Path $tempDir) {

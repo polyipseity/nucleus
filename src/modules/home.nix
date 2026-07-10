@@ -461,6 +461,7 @@ in
       _nucleus_unprotect_symlink "home.nix" "$HOME/.config/camilladsp/configs"
       _nucleus_unprotect_symlink "home.nix" "$HOME/.config/camillagui-backend/config.yml"
       _nucleus_unprotect_symlink "home.nix" "$HOME/.config/discord-music-rpc/config.yaml"
+      _nucleus_unprotect_symlink "home.nix" "$HOME/.config/starship.toml"
     '';
 
     home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
@@ -469,6 +470,7 @@ in
       _nucleus_protect_symlink "home.nix" "$HOME/.config/camilladsp/configs"
       _nucleus_protect_symlink "home.nix" "$HOME/.config/camillagui-backend/config.yml"
       _nucleus_protect_symlink "home.nix" "$HOME/.config/discord-music-rpc/config.yaml"
+      _nucleus_protect_symlink "home.nix" "$HOME/.config/starship.toml"
     '';
 
     # Override the default logDir (which uses ~) with a proper absolute path.

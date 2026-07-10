@@ -718,18 +718,13 @@ Sync-CaddyLocalCA -RepoRoot $repoRoot -Enabled:$true
 Sync-JellyfinAccount -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-JellyfinLibrary -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRecords $selectedUserRecords
-# Symlink the config so edits take effect on service restart without re-running apply.
-  # The source file is marked read-only because discord-music-rpc overwrites config
-  # on startup; read-only target prevents the app from discarding managed settings.
+# Method 1 (writable symlink): symlink config so edits take effect immediately.
   $discordMusicRPCConfigDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "discord-music-rpc"
   $null = New-Item -Path $discordMusicRPCConfigDir -ItemType Directory -Force
   $discordMusicRPCConfig = Join-Path -Path $discordMusicRPCConfigDir -ChildPath "config.yaml"
   $discordMusicRPCConfigSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\discord-music-rpc\config.yaml"
   if (Test-Path -Path $discordMusicRPCConfig) { Remove-Item -Path $discordMusicRPCConfig -Force }
   New-Item -Path $discordMusicRPCConfig -ItemType SymbolicLink -Target $discordMusicRPCConfigSource -Force | Out-Null
-  Set-ManagedSymlinkDeleteProtection -Path $discordMusicRPCConfig
-  # Make the source read-only so the app cannot overwrite config through the symlink.
-  Set-ItemProperty -Path $discordMusicRPCConfigSource -Name IsReadOnly -Value $true
 Sync-DiscordMusicRPC -Enabled:$EnableDiscordMusicRPCParity
 Sync-CamillaDSPService -Enabled:$EnableCamillaDSPServiceParity
 Sync-CamillaGUIService -Enabled:$EnableCamillaGUIServiceParity
