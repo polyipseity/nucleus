@@ -16,6 +16,7 @@ let
     pkgs.camillagui-backend
     pkgs.cargo-binstall
     pkgs.cargo-cache
+    pkgs.czkawka
     pkgs.direnv
     pkgs.eza
     pkgs.fd
@@ -34,6 +35,7 @@ let
     pkgs.llvmPackages.clang
     pkgs.llvmPackages.lldb
     pkgs.llvmPackages.lld
+    pkgs.ncdu
     pkgs.nickel
     pkgs.nixd
     pkgs.nixfmt
