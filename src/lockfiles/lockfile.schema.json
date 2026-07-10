@@ -128,6 +128,13 @@
       "description": "Scoop package versions. Package name → version string.",
       "type": "object"
     },
+    "source-builds": {
+      "additionalProperties": {
+        "$ref": "#/definitions/versionOrHash"
+      },
+      "description": "Windows source-built package VCS pins. Package name → VCS hash pin with source URL and version.",
+      "type": "object"
+    },
     "starship": {
       "description": "Starship cross-shell prompt version.",
       "type": "string"
@@ -257,6 +264,8 @@
     "pwsh",
     "rustup",
     "scoop",
+    "source-builds",
+    "starship",
     "updated",
     "uv",
     "version",

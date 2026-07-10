@@ -115,7 +115,15 @@
     "cargo-binstall": "1.10.0",
     "gopass": "1.15.0",
     "iwck": "3.10",
-    "qemu": "9.0.0"
+    "qemu": "9.0.0",
+    "zig": "0.16.0"
+  },
+  "source-builds": {
+    "ncdu": {
+      "rev": "1b3d0a670e730b338de6b716e2a60cf86351e44b",
+      "source": "https://code.blicky.net/yorhel/ncdu.git",
+      "version": "2.9.2"
+    }
   },
   "starship": "1.22.1",
   "updated": "2026-06-28T05:41:36Z",
