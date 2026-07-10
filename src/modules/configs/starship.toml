@@ -23,7 +23,7 @@ style = "bold purple"
 style = "bold purple"
 
 [nix_shell]
-format = "via [❄️ $state( \($name\))]($style)"
+format = 'via [❄️ $state( \($name\))]($style)'
 impure_msg = "impure"
 pure_msg = "pure"
 style = "bold yellow"
