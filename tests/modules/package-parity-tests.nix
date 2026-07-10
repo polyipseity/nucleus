@@ -227,6 +227,7 @@ let
         "rectangle"
         "stats"
         "utm"
+        "visual-studio-code@insiders"
       ];
       # Match a core.nix package entry with platforms = ["darwin"].
       hasDarwinPlatform =

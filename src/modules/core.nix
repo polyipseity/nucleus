@@ -191,6 +191,7 @@ let
     };
     "visual-studio-code@insiders" = {
       category = "gui";
+      platforms = [ "darwin" ];
       homebrew = {
         kind = "cask";
         name = "visual-studio-code@insiders";
