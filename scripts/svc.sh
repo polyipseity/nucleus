@@ -269,6 +269,50 @@ recover_launchctl_service() {
   return 1
 }
 
+# poll_service_status — Poll svc_status until running or timeout (~4s).
+# Returns the final status JSON on stdout. Exit 0 if running, 1 if still inactive.
+poll_service_status() {
+  local name="$1" entry_json="$2"
+  for _i in 1 2 3 4 5 6 7 8; do
+    local status_json
+    status_json=$(svc_status "$name" "$entry_json")
+    local running
+    running=$(echo "$status_json" | jq -r '.running')
+    if [ "$running" = "true" ]; then
+      printf '%s\n' "$status_json"
+      return 0
+    fi
+    sleep 0.5
+  done
+  printf '%s\n' "$status_json"
+  return 1
+}
+
+# service_diagnostic — Print one-line diagnostic for a failing service.
+# Reads launchctl print / systemctl status and extracts state + exit code.
+service_diagnostic() {
+  local entry_json="$1"
+  local svc_type svc_id
+  svc_type=$(echo "$entry_json" | jq -r '.type')
+  svc_id=$(echo "$entry_json" | jq -r '.service // ""')
+  case "$svc_type" in
+    launchctl)
+      local domain sudo_prefix target
+      domain=$(echo "$entry_json" | jq -r '.domain // "user"')
+      [ "$domain" = "system" ] && sudo_prefix="sudo"
+      target=$(launchctl_target "$domain" "$svc_id")
+      $sudo_prefix launchctl print "$target" 2>/dev/null \
+        | awk -F'= ' '/state =/{s=$2} /last exit code/{e=$NF} END{printf "state=%s", s; if(e) printf ", exit=%s", e; printf "\n"}'
+      ;;
+    systemctl)
+      local scope_flag=""
+      [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
+      systemctl $scope_flag --no-pager -l status "$svc_id" 2>&1 \
+        | sed -n 's/.*Active: //p' | head -1
+      ;;
+  esac
+}
+
 # svc_action — Perform an action on a single service.
 svc_action() {
   local action="$1"
@@ -302,6 +346,12 @@ svc_action() {
             $sudo_prefix launchctl enable "$target" >/dev/null 2>&1
             $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 || \
               $sudo_prefix launchctl bootstrap "$domain" "$plist" >/dev/null 2>&1
+          }
+          poll_service_status "$name" "$entry_json" >/dev/null || {
+            local _diag
+            _diag=$(service_diagnostic "$entry_json")
+            warn "$name — started but not running ($_diag); check 'nucleus-svc logs $name'"
+            return 1
           }
           ;;
         stop)    $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
@@ -351,6 +401,13 @@ svc_action() {
                 warn "$name — restart: failed to start service after reload"
             fi
           }
+          # Verify the service started after all recovery stages.
+          poll_service_status "$name" "$entry_json" >/dev/null || {
+            local _diag
+            _diag=$(service_diagnostic "$entry_json")
+            warn "$name — restarted but not running ($_diag); check 'nucleus-svc logs $name'"
+            return 1
+          }
           ;;
         enable)  $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
         disable) $sudo_prefix launchctl disable "$target" >/dev/null 2>&1 ;;
@@ -362,9 +419,25 @@ svc_action() {
 
       case "$action" in
         status)  svc_status "$name" "$entry_json" ;;
-        start)   systemctl $scope_flag start "$svc_id" >/dev/null 2>&1 ;;
+        start)
+          systemctl $scope_flag start "$svc_id" >/dev/null 2>&1
+          poll_service_status "$name" "$entry_json" >/dev/null || {
+            local _diag
+            _diag=$(service_diagnostic "$entry_json")
+            warn "$name — started but not running ($_diag); check 'nucleus-svc logs $name'"
+            return 1
+          }
+          ;;
         stop)    systemctl $scope_flag stop "$svc_id" >/dev/null 2>&1 ;;
-        restart) systemctl $scope_flag restart "$svc_id" >/dev/null 2>&1 ;;
+        restart)
+          systemctl $scope_flag restart "$svc_id" >/dev/null 2>&1
+          poll_service_status "$name" "$entry_json" >/dev/null || {
+            local _diag
+            _diag=$(service_diagnostic "$entry_json")
+            warn "$name — restarted but not running ($_diag); check 'nucleus-svc logs $name'"
+            return 1
+          }
+          ;;
         enable)  systemctl $scope_flag enable "$svc_id" >/dev/null 2>&1 ;;
         disable) systemctl $scope_flag disable "$svc_id" >/dev/null 2>&1 ;;
       esac
