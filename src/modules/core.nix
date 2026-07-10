@@ -66,8 +66,11 @@ let
     pkgs.equaliser
   ];
 
-  # Packages in both nixpkgs and Homebrew. macOS-only.
-  # Category rules: cli → nixpkgs; gui → Homebrew (cask preferred).
+  # Packages available in both nixpkgs and Homebrew. Cross-platform by default.
+  # field: platforms — restrict to specific platforms (["darwin"] or ["linux"]).
+  #   Default (absent): both darwin and linux.
+  # Category rules: cli → nixpkgs; gui → Homebrew (cask preferred) on macOS.
+  #   On NixOS: all packages go to nixpkgs unconditionally.
   # If a package ships any GUI component (binary, UI, daemon), classify as "gui".
   overlappingPackages = {
     blender = {
@@ -104,6 +107,7 @@ let
     };
     iterm2 = {
       category = "gui";
+      platforms = [ "darwin" ];
       homebrew = {
         kind = "cask";
         name = "iterm2";
@@ -152,6 +156,7 @@ let
     };
     rectangle = {
       category = "gui";
+      platforms = [ "darwin" ];
       homebrew = {
         kind = "cask";
         name = "rectangle";
@@ -160,6 +165,7 @@ let
     };
     stats = {
       category = "gui";
+      platforms = [ "darwin" ];
       homebrew = {
         kind = "cask";
         name = "stats";
@@ -168,6 +174,7 @@ let
     };
     utm = {
       category = "gui";
+      platforms = [ "darwin" ];
       homebrew = {
         kind = "cask";
         name = "utm";
@@ -231,27 +238,46 @@ let
     }) overlapPackageNames
   );
 
-  # Overlap packages routed to nixpkgs but absent from pkgs (platform-specific).
-  missingNixAttrs = lib.optionals pkgs.stdenv.isDarwin (
-    builtins.filter (
-      packageName:
-      selectedOverlapBackends.${packageName} == "nixpkgs"
-      && !(builtins.hasAttr overlappingPackages.${packageName}.nixpkgsAttr pkgs)
-    ) overlapPackageNames
-  );
+  # Platform compatibility check: a package's `platforms` field restricts which
+  # platforms receive it. Default (absent) = both darwin and linux.
+  platformCompatible =
+    packageName:
+    let
+      entry = overlappingPackages.${packageName};
+      platforms =
+        entry.platforms or [
+          "darwin"
+          "linux"
+        ];
+    in
+    if pkgs.stdenv.isDarwin then
+      lib.elem "darwin" platforms
+    else if pkgs.stdenv.isLinux then
+      lib.elem "linux" platforms
+    else
+      true;
 
-  overlapNixPackages = lib.optionals pkgs.stdenv.isDarwin (
-    lib.concatMap (
-      packageName:
-      let
-        meta = overlappingPackages.${packageName};
-      in
-      if selectedOverlapBackends.${packageName} == "nixpkgs" then
-        [ (builtins.getAttr meta.nixpkgsAttr pkgs) ]
-      else
-        [ ]
-    ) overlapPackageNames
-  );
+  # Overlap packages routed to nixpkgs but absent from pkgs (platform-specific).
+  missingNixAttrs = builtins.filter (
+    packageName:
+    platformCompatible packageName
+    && (if pkgs.stdenv.isDarwin then selectedOverlapBackends.${packageName} == "nixpkgs" else true)
+    && !(builtins.hasAttr overlappingPackages.${packageName}.nixpkgsAttr pkgs)
+  ) overlapPackageNames;
+
+  # Cross-platform nixpkgs packages from the overlap set.
+  # On macOS: respects backend selection (only if routed to nixpkgs).
+  # On NixOS: all platform-compatible packages go to nixpkgs unconditionally.
+  overlapNixPackages =
+    map (packageName: builtins.getAttr overlappingPackages.${packageName}.nixpkgsAttr pkgs)
+      (
+        if pkgs.stdenv.isDarwin then
+          builtins.filter (
+            name: selectedOverlapBackends.${name} == "nixpkgs" && platformCompatible name
+          ) overlapPackageNames
+        else
+          builtins.filter platformCompatible overlapPackageNames
+      );
 
   overlapHomebrewBrews = lib.optionals pkgs.stdenv.isDarwin (
     builtins.filter (name: name != null) (
@@ -343,14 +369,16 @@ in
 
     (lib.optionalAttrs (options ? home && options.home ? packages) { home.packages = sharedPackages; })
 
-    (lib.mkIf pkgs.stdenv.isDarwin {
+    {
       assertions = map (packageName: {
         assertion = false;
-        message = "core.nix: packageSelection requests nixpkgs for `${packageName}`, but pkgs.${
+        message = "core.nix: package '${packageName}' routes to nixpkgs but pkgs.${
           overlappingPackages.${packageName}.nixpkgsAttr
         } is unavailable on this platform.";
       }) missingNixAttrs;
+    }
 
+    (lib.mkIf pkgs.stdenv.isDarwin {
       nucleus.macos.generatedHomebrew.brews = overlapHomebrewBrews;
       nucleus.macos.generatedHomebrew.casks = overlapHomebrewCasks;
     })
