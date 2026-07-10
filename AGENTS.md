@@ -37,6 +37,7 @@
 ## Core Conventions
 
 - Prefer declarative state (`src/modules/*.nix`, WinGet DSC YAML) over imperative scripts.
+- Config deployment follows priority-ordered methods defined in `.agents/instructions/app-config-policy.instructions.md`: writable symlink (default) > read-only > merge > runtime direct read. Any deviation from the default must have a code comment explaining why.
 - Keep POSIX shared behavior in shared modules, not duplicated per-host.
 - Centralize all daemon and service restarts per OS and restart each daemon at most once per activation run. macOS daemon refreshes go in `src/modules/macos/daemon-refresh.nix`; Windows SCM operations go in `src/hosts/Windows/modules/Set-NucleusService.ps1`; cross-platform shell helpers go in `src/scripts/lib.sh`.
 - Design for cross-host parity first; see `.agents/instructions/cross-host-feature-parity.instructions.md` for the full policy.
