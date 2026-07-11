@@ -42,17 +42,32 @@ let
     # disconnected audio device reappears.
     # Checks config.json on each iteration so dynamic changes apply instantly.
     config_json="${userHome}/.local/state/nucleus/config.json"
-    while sleep 5; do
+    backoff=5
+    while true; do
+      sleep "$backoff"
       _hb_enabled=true
       if [ -f "$config_json" ]; then
         _val=$("$jq" -r '.camilladsp.heartbeat // true' "$config_json")
-        if [ "$_val" = "false" ]; then
-          _hb_enabled=false
-        fi
+        [ "$_val" = "false" ] && _hb_enabled=false
       fi
-      if [ "$_hb_enabled" = "true" ]; then
-        "$jq" -cRs '{SetConfig: .}' "$config_file" | \
-          "$websocat" -1 "ws://127.0.0.1:$ws_port" >/dev/null 2>&1 || true
+      [ "$_hb_enabled" = "false" ] && continue
+
+      # Only push config when not already running, to avoid filling
+      # CamillaDSP's bounded command channel (capacity 10).
+      _state_resp=$(echo '{"GetState":null}' | "$websocat" -1 "ws://127.0.0.1:$ws_port" 2>/dev/null)
+      _state=$(echo "$_state_resp" | "$jq" -r '.GetState.value // empty')
+      if [ "$_state" = "Running" ]; then
+        backoff=5
+        continue
+      fi
+
+      # Push config; on failure (device timeout, rate limit), back off.
+      _push_resp=$(echo '{"SetConfig":'"$("$jq" -cRs '.' "$config_file")"'}' | "$websocat" -1 "ws://127.0.0.1:$ws_port" 2>/dev/null)
+      if echo "$_push_resp" | "$jq" -e '.SetConfig.result == "Ok"' >/dev/null 2>&1; then
+        backoff=5
+      else
+        backoff=$((backoff * 2))
+        [ "$backoff" -gt 60 ] && backoff=60
       fi
     done &
     heartbeat_pid=$!
