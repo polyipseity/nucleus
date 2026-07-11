@@ -9,7 +9,10 @@
 - Open `fuse-t.app` once, then enable the extension in System Settings > General > Login Items & Extensions > Extensions.
 - NTFS read-write: launch Mounty, agree to the dialog, plug in an NTFS drive, then re-mount it via the Mounty menu-bar icon. If the drive mounts read-only (e.g. after Windows Fast Startup): unmount the drive, run `sudo ntfsfix /dev/diskXsY`, then reconnect the drive. Fallback: unmount and `sudo ntfs-3g /dev/diskXsY /path/to/mountpoint`. The ntfs-3g binary is built automatically during `nucleus-apply`. If the build fails, see `/Users/Shared/nucleus/logs/ntfs-3g-build.log` for the full output.
 - Open `battery.app` once to install `/usr/local/bin/battery`.
-- Sign in to the App Store so `mas` can provision Xcode and Amphetamine.
+- Sign in to the App Store so `mas` can provision Amphetamine.
+- Apple Command Line Tools (CLT) are not required. nixpkgs provides the
+  compiler (`llvmPackages.clang`), SDK (`apple-sdk` via `DEVELOPER_DIR`), and
+  linker tools (`darwin.cctools`) declaratively.
 - Install Amphetamine Power Protect: copy script to `~/Library/Application Scripts/com.if.Amphetamine/` and sudoers to `/private/etc/sudoers.d/` (see upstream README). Re-run `nucleus-apply`.
 - Generate `rclone_config_pass` in `src/secrets/users-<username>.yml` via `openssl rand -hex 64`, commit, re-run `nucleus-apply`. If remotes exist without encryption, delete `~/.config/rclone/rclone.conf` first.
 - Run `nucleus-cloud-setup` and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
