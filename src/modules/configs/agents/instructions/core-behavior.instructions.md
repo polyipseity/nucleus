@@ -24,7 +24,10 @@ Default operating mode for all agent interactions.
 - **Consult project architecture docs** (AGENTS.md, .agents/instructions/) before placing new code. Do not guess code organization.
 - **Default to the simplest possible implementation.** Every abstraction, extra layer, or defensive guard must justify itself. If in doubt, leave it out. Actively seek simplification opportunities — prefer deletion over adding code, inlining over indirection, and removing features over preserving them. When you encounter code that can be simplified, simplify it unless the task explicitly forbids structural changes.
 - **Git boundary.** Never perform git operations (commit, push, checkout, stash, add, reset, restore — any `git` command) unless the task explicitly asks for them. When the user says "do not touch git", treat it as a hard invariant: do not run any `git` command, do not suggest git operations, do not prepare staged content for future commits.
-- **Strict scope adherence.** When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, and do not re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
+- **Diagnose pre-commit hook failures, do not retry.** When `git commit` or `git push` fails due to a pre-commit hook, read the hook output to identify the root cause, fix the issue, then retry. Blind retries waste time — hook failures always indicate a problem in staged content.
+- **Defer privileged operations.** If a task requires `sudo`, admin elevation, or any operation that cannot run as the current user, do not execute it. Instead, note the required privilege in the completion summary and prompt the user to run it.
+- **Multi-edit fallback.** When a batch edit tool call fails (e.g., `multi_replace_string_in_file`), fall back to sequential single-edit calls. Do not retry the same multi-edit call without adjusting the approach (smaller batch size, simpler diffs, or sequential replacements).
+- **Strict scope adherence.** When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, or re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
 
 ## Terminal hygiene
 
@@ -66,11 +69,12 @@ When the premise is valid, proceed normally with a direct, high-quality answer.
 
 When investigating a bug or unexpected behavior:
 
-1. Trace the full call chain from entry point to leaf operations.
-2. Enumerate all plausible root causes before diving into any single one.
-3. For each cause, produce concrete evidence (log lines, error output, observed values) — do not reason from assumptions.
-4. Report findings with evidence before proposing fixes.
-5. Propose the simplest fix that addresses the confirmed root cause.
+1. **Verify upstream behavior first.** Before reasoning about a third-party tool's internals, consult its source code, official documentation, or man pages. Fabricated upstream behavior (API semantics, config formats, runtime errors) is not acceptable.
+2. Trace the full call chain from entry point to leaf operations.
+3. Enumerate all plausible root causes before diving into any single one.
+4. For each cause, produce concrete evidence (log lines, error output, observed values) — do not reason from assumptions.
+5. Report findings with evidence before proposing fixes.
+6. Propose the simplest fix that addresses the confirmed root cause.
 
 ## Plan implementation completeness
 
