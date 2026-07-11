@@ -1,8 +1,11 @@
 # iTerm2 terminal emulator configuration.
 #
-# Houses iTerm2 shell integration script and zsh initContent sourcing guard.
-# NSUserDefaults keys are in src/hosts/MacBook/defaults.nix (darwin context,
-# where system.defaults.CustomUserPreferences is available).
+# Houses iTerm2 shell integration script, Dynamic Profiles directory symlink,
+# and zsh initContent sourcing guard.  NSUserDefaults keys are in
+# src/hosts/MacBook/defaults.nix (darwin context, where
+# system.defaults.CustomUserPreferences is available).
+#
+# Parity note: iTerm2 is macOS-only.  No equivalent exists on NixOS/Windows.
 #
 # Source: https://iterm2.com/documentation.html
 { lib, pkgs, ... }:
@@ -17,6 +20,8 @@ let
     url = "https://iterm2.com/shell_integration/zsh";
     sha256 = "0yhfnaigim95sk1idrc3hpwii8hfhjl5m3lyc0ip3vi1a9npq0li";
   };
+  # Root of the nucleus repository, set by apply.sh at activation time.
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 in
 lib.mkIf pkgs.stdenv.isDarwin {
   home.file = {
@@ -25,6 +30,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # home.file replaces the symlink atomically on each home-manager switch so
     # the script version tracks the pinned hash in iterm2ZshIntegration above.
     ".iterm2_shell_integration.zsh".source = iterm2ZshIntegration;
+
+    # Symlink the Dynamic Profiles directory so iTerm2 picks up profile
+    # definitions at runtime.  iTerm2 monitors this directory for changes.
+    # Method 1 (writable symlink) via config.lib.file.mkOutOfStoreSymlink.
+    # See .agents/instructions/app-config-policy.instructions.md
+    "Library/Application Support/iTerm2/DynamicProfiles".source =
+      config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/iterm2/DynamicProfiles";
   };
 
   # Source iTerm2 shell integration when the script is present.  The test-e
