@@ -91,6 +91,40 @@ $null = New-Item -Path (Split-Path $stateFile -Parent) -ItemType Directory -Forc
 $process = [System.Diagnostics.Process]::Start($CamillaDSPBin, "-p $Port --statefile `"$stateFile`" -w --no_config -o `"$LogFile`"")
 if ($null -eq $process) { exit 1 }
 
+# Assign camilladsp to a Windows Job Object with KILL_ON_JOB_CLOSE.
+# When this wrapper exits (for any reason), the kernel automatically
+# kills camilladsp too — no orphan processes on Windows.
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class JobObject {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern IntPtr CreateJobObject(IntPtr a, string b);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool SetInformationJobObject(IntPtr h, int c, IntPtr i, int s);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool AssignProcessToJobObject(IntPtr h, IntPtr p);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool CloseHandle(IntPtr h);
+    public static IntPtr NewKillOnClose() {
+        IntPtr job = CreateJobObject(IntPtr.Zero, null);
+        if (job == IntPtr.Zero) return IntPtr.Zero;
+        var ext = new byte[144];
+        BitConverter.GetBytes((uint)0x2000).CopyTo(ext, 16);
+        IntPtr ptr = Marshal.AllocHGlobal(ext.Length);
+        Marshal.Copy(ext, 0, ptr, ext.Length);
+        bool ok = SetInformationJobObject(job, 9, ptr, ext.Length);
+        Marshal.FreeHGlobal(ptr);
+        if (!ok) { CloseHandle(job); return IntPtr.Zero; }
+        return job;
+    }
+}
+"@
+$job = [JobObject]::NewKillOnClose()
+if ($job -ne [IntPtr]::Zero) {
+  [void][JobObject]::AssignProcessToJobObject($job, $process.SafeHandle.DangerousGetHandle())
+}
+
 # Poll WS port and push config (up to ~15s).  Graceful if config file
 # doesn't exist yet (first boot before Home Manager deploy).
 for ($i = 0; $i -lt 30; $i++) {
@@ -120,22 +154,37 @@ $heartbeatTimer = [System.Threading.Timer]::new({
   param($s)
   $cf, $p, $ncf = $s
   # Check runtime toggle on every tick.
-  $enabled = $true
   if (Test-Path $ncf) {
     $nc = Get-Content -Raw $ncf -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
-    if ($null -ne $nc.camilladsp.heartbeat -and -not $nc.camilladsp.heartbeat) {
-      $enabled = $false
-    }
+    if ($null -ne $nc.camilladsp.heartbeat -and -not $nc.camilladsp.heartbeat) { return }
   }
-  if (-not $enabled) { return }
+  try {
+    # Check current state — skip if already Running to avoid filling
+    # CamillaDSP's bounded command channel (capacity 10).
+    $stateWs = [System.Net.WebSockets.ClientWebSocket]::new()
+    $ct = [System.Threading.CancellationToken]::Empty
+    $stateWs.ConnectAsync([System.Uri]"ws://127.0.0.1:$p", $ct).Wait()
+    $getState = '{ "GetState": null }'
+    $stateBytes = [Text.Encoding]::UTF8.GetBytes($getState)
+    $stateWs.SendAsync([ArraySegment[byte]]::new($stateBytes), [WebSocketMessageType]::Text, $true, $ct).Wait()
+    $recvBuf = New-Object byte[] 1024
+    $result = $stateWs.ReceiveAsync([ArraySegment[byte]]::new($recvBuf), $ct).Result
+    $stateResp = [Text.Encoding]::UTF8.GetString($recvBuf, 0, $result.Count)
+    $stateWs.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
+    $state = ($stateResp | ConvertFrom-Json).GetState.value
+    if ($state -eq "Running") { return }
+  } catch {
+    # Can't connect — will retry on next heartbeat.
+    return
+  }
+  # Push config.
   try {
     $yaml = Get-Content -Raw $cf -ErrorAction Stop
     $msg = "{`"SetConfig`": $($yaml | ConvertTo-Json -Compress)}"
     $ws = [System.Net.WebSockets.ClientWebSocket]::new()
-    $ct = [System.Threading.CancellationToken]::Empty
     $ws.ConnectAsync([System.Uri]"ws://127.0.0.1:$p", $ct).Wait()
-    $ws.SendAsync([ArraySegment[byte]]::new([Text.Encoding]::UTF8.GetBytes($msg)), [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $ct).Wait()
-    $ws.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "done", $ct).Wait()
+    $ws.SendAsync([ArraySegment[byte]]::new([Text.Encoding]::UTF8.GetBytes($msg)), [WebSocketMessageType]::Text, $true, $ct).Wait()
+    $ws.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
   } catch {
     # Device may be gone — retry on next heartbeat.
   }
