@@ -48,9 +48,7 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 REPO_ROOT=$(derive_repo_root)
-cd "$REPO_ROOT"
-
-FORMAT_NIX=false
+cd "$REPO_ROOT" || exit
 
 FORMAT_NIX=false
 VERIFY=false
