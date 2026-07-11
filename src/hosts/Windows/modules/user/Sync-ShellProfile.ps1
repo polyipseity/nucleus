@@ -622,8 +622,9 @@ function Sync-ShellProfile {
     '  }'
     '  pip @Args'
     '}'
-    '# Route managed development tools through either an active direnv context'
-    '# or the managed default shell environment for repositories without .envrc.'
+    '# Route managed development tools through an active direnv context, a'
+    '# rust-toolchain.toml project context (cargo/rustc only), or the managed'
+    '# default shell environment for repositories without .envrc.'
     'function Invoke-NucleusManagedDevTool {'
     '  param('
     '    [Parameter(Mandatory = $true)]'
@@ -635,6 +636,12 @@ function Sync-ShellProfile {
     '  if ($null -eq $application) {'
     '    return $false'
     '  }'
+    '  # rust-toolchain.toml in the current directory → project context'
+    '  # for cargo/rustc.'
+    '  if ($ToolName -in @(''cargo'', ''rustc'') -and (Test-Path -Path (Join-Path (Get-Location).Path ''rust-toolchain.toml'') -PathType Leaf)) {'
+    '    & $application.Source @ToolArguments'
+    '    return $true'
+    '  }'
     '  if ($env:DIRENV_DIR -or $env:NUCLEUS_DEFAULT_DEV_ENV) {'
     '    & $application.Source @ToolArguments'
     '    return $true'
@@ -643,11 +650,13 @@ function Sync-ShellProfile {
     '}'
     # System-wide build tool block: redirect bun/cargo/rustc/uv to warnings.
     # These tools are installed globally for system package management only.
-    # When DIRENV_DIR is set, a direnv environment (devShell) is active; when it
-    # is absent, use the managed default shell environment so plain repos still
-    # have a safe baseline toolchain. WHY: Windows does not have a separate
-    # nix-direnv-backed fallback store path in this workflow yet, so parity uses
-    # the user-scoped managed PATH instead of a second binary install root.
+    # When DIRENV_DIR is set, a direnv environment (devShell) is active.
+    # When a rust-toolchain.toml exists in the current directory, cargo/rustc
+    # pass through to the rustup shim.  Otherwise, use the managed default
+    # shell environment so plain repos still have a safe baseline toolchain.
+    # WHY: Windows does not have a separate nix-direnv-backed fallback store
+    # path in this workflow yet, so parity uses the user-scoped managed PATH
+    # instead of a second binary install root.
     'function bun {'
     '  if (Invoke-NucleusManagedDevTool -ToolName "bun" @Args) {'
     '    return'
@@ -666,7 +675,7 @@ function Sync-ShellProfile {
     '  Write-Host "shell: managed cargo is unavailable right now." -ForegroundColor Yellow'
     '  Write-Host "         For Rust development, use one of these managed entrypoints:" -ForegroundColor Yellow'
     '  Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow'
-    '  Write-Host "         - Or use the managed default shell environment installed by apply.ps1" -ForegroundColor Yellow'
+    '  Write-Host "         - Or add a rust-toolchain.toml file to this directory" -ForegroundColor Yellow'
     '  return 1'
     '}'
     'function rustc {'
@@ -676,7 +685,7 @@ function Sync-ShellProfile {
     '  Write-Host "shell: managed rustc is unavailable right now." -ForegroundColor Yellow'
     '  Write-Host "         For Rust development, use one of these managed entrypoints:" -ForegroundColor Yellow'
     '  Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow'
-    '  Write-Host "         - Or use the managed default shell environment installed by apply.ps1" -ForegroundColor Yellow'
+    '  Write-Host "         - Or add a rust-toolchain.toml file to this directory" -ForegroundColor Yellow'
     '  return 1'
     '}'
     'function uv {'
