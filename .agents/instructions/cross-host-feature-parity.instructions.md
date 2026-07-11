@@ -11,6 +11,7 @@ applyTo: "src/**/*.nix, src/**/*.ps1, scripts/gc.*, src/hosts/Windows/**/*.yml"
 - Default to **parity-first** changes: apply new capabilities to as many hosts as practical in the same change.
 - Avoid one-host features unless there is a concrete platform constraint.
 - Keep host orchestration thin and push reusable behavior into shared modules (`src/modules/*.nix` and `src/hosts/Windows/modules/*.ps1`) or declarative state files (`src/hosts/Windows/*.dsc.yml`).
+- **Avoid special-casing in module logic.** When a feature requires per-host differences, refactor shared behavior into parameterized abstractions rather than adding `if-else` branches or duplicating files. Special cases in activation scripts and Nix conditionals should be the exception, not the default.
 
 ## Feature scope triage (required)
 
@@ -64,12 +65,17 @@ When a service declaration is removed or disabled, each platform handles cleanup
 
 When adding a new Windows service module, always implement both the enable and disable paths. Verify disable removes the managed service/task state completely by testing with the toggle off.
 
+### Service startup failure policy
+
+Services that fail to start during activation emit a warning but do not abort the activation. This applies to all hosts. Watchdog retries are handled separately per service.
+
 ## Package parity rules
 
 - When adding a cross-host CLI tool to `src/modules/core.nix`, check whether a Windows equivalent should be added to `src/hosts/Windows/system-packages.dsc.yml`.
 - When adding a Windows CLI package to `system-packages.dsc.yml`, check whether POSIX hosts should also receive it through `core.nix`.
 - **When adding a package that exists in both nixpkgs and Homebrew**, add it to `overlappingPackages` in `src/modules/core.nix` (not spread across host files). Use `platforms` to restrict darwin-only packages and `category` to set the install backend policy.
 - Remove duplicate declarations from `src/hosts/NixOS/desktop.nix` when a package is already delivered via `core.nix`'s `sharedPackages`.
+- **Windows source builds use git hash pinning.** When a tool must be compiled from source on Windows (not available via WinGet/Scoop), pin by git commit hash, not a tag or branch. Document the build steps in a reusable `Build-<Tool>.ps1` module under `src/hosts/Windows/modules/` and wire it into the activation DAG in `apply.ps1`.
 
 ## Secrets and wallpaper parity rules
 
