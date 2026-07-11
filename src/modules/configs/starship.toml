@@ -37,7 +37,7 @@ $shell\
 $shlvl\
 $status\
 $sudo\
-$time \
+$time\
 $line_break\
 $character\
 """
@@ -131,7 +131,7 @@ style = "bold black"
 
 [cmd_duration]
 min_time = 0
-format = "⏱️ [$duration]($style)"
+format = "⏱️ [$duration]($style) "
 style = "bold cyan"
 
 [jobs]
@@ -151,7 +151,7 @@ style = "bold black"
 
 [status]
 disabled = false
-format = "[✖ $status]($style)"
+format = "[✖ $status]($style) "
 style = "bold red"
 recognize_signal_code = true
 
