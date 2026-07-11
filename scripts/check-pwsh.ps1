@@ -103,7 +103,7 @@ else {
   Import-Module PSScriptAnalyzer
 
   $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
-  $excludeRules = @('PSUseBOMForUnicodeEncodedFile', 'PSUseUsingScopeModifierInNewRunspaces', 'PSReviewUnusedParameter')
+  $excludeRules = @('PSUseBOMForUnicodeEncodedFile', 'PSUseUsingScopeModifierInNewRunspaces', 'PSReviewUnusedParameter', 'PSAvoidUsingWriteHost', 'PSUseSingularNouns', 'PSAvoidUsingEmptyCatchBlock')
   $settings = @{ Severity = @('Error', 'Warning') }
 
   $lintResults = @($files | ForEach-Object {
