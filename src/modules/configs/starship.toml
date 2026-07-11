@@ -1,5 +1,5 @@
 # Starship configuration — managed by nucleus (src/modules/configs/starship.toml)
-# See https://starship.rs/config/ for all options.
+# See <https://starship.rs/config/> for all options.
 
 # Informative two-line prompt: directory, git, nix shell, language runtimes,
 # right-aligned time, command duration, exit code, and memory usage.
@@ -24,6 +24,7 @@ error_symbol = '[❯](bold red)'
 
 [directory]
 truncation_length = 3
+style = "bold blue"
 
 [git_branch]
 format = "[$symbol$branch]($style)"
@@ -40,16 +41,17 @@ style = "bold yellow"
 
 [fill]
 symbol = "·"
-style = "dimmed white"
+style = "bold black"
 
 [time]
 disabled = false
 time_format = "%R"
-style = "dimmed white"
+style = "bold black"
 
 [cmd_duration]
 min_time = 0
 format = "⏱️ [$duration]($style)"
+style = "bold cyan"
 
 [status]
 disabled = false
@@ -61,14 +63,14 @@ recognize_signal_code = true
 disabled = false
 threshold = 90
 symbol = "🐏"
-style = "bold dimmed white"
+style = "bold black"
 
 [shell]
 disabled = false
 
 [container]
 format = '[⬢ \[$name\]]($style) '
-style = "bold red dimmed"
+style = "bold red"
 
 [package]
 format = 'is [📦 $version]($style)'
@@ -88,11 +90,11 @@ style = "bold green"
 
 [python]
 format = 'via [🐍 $version]($style)'
-style = "yellow bold"
+style = "bold yellow"
 
 [typst]
 format = 'via [t $version]($style)'
-style = "bold #0093A7"
+style = "bold cyan"
 
 [git_commit]
 format = '[\($hash$tag\)]($style) '
