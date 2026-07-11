@@ -51,6 +51,15 @@ let
       NUCLEUS_DEFAULT_DEV_ENV = "1";
     }
     // lib.optionalAttrs pkgs.stdenv.isDarwin {
+      # WHY: rustc and cargo invoke `/usr/bin/xcrun --sdk macosx --show-sdk-path`
+      # directly during native-code builds (unrelated to $CC resolution).  Without
+      # Xcode CLT installed, xcrun pops the installation dialog.  DEVELOPER_DIR
+      # pointing at the Nix apple-sdk lets xcrun discover the SDK from the Nix store
+      # — no CLT needed.  Verified: `env -i DEVELOPER_DIR=<nix-apple-sdk>
+      # /usr/bin/xcrun --sdk macosx --show-sdk-path` succeeds without dialog.
+      # macOS-only: apple-sdk is not available on NixOS/Windows.
+      DEVELOPER_DIR = "${pkgs.apple-sdk}";
+
       # WHY: rustup-managed cargo on macOS needs libiconv in LIBRARY_PATH when
       # building crates with C dependencies (for example openssl-sys, libgit2-sys).
       # Without this, the system linker fails with "ld: library not found for -liconv".
