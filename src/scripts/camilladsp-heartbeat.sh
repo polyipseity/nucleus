@@ -6,7 +6,7 @@
 # Dependencies (must be in PATH): websocat, jq
 #
 # Usage: camilladsp-heartbeat.sh [--port PORT] [--config FILE]
-set -eu
+set -euo pipefail
 
 # --- Self-contained helpers ---
 require_command() {

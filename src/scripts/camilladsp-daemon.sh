@@ -6,7 +6,7 @@
 # Dependencies (must be in PATH): camilladsp, websocat, jq
 #
 # Usage: camilladsp-daemon.sh [--port PORT] [--statefile PATH] [--config FILE] [--logfile FILE]
-set -eu
+set -euo pipefail
 
 # --- Self-contained helpers (avoid lib.sh dependency for daemon context) ---
 require_command() {

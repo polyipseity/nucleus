@@ -80,6 +80,11 @@ assert containsRegex "show_journald_logs" svcShText;
 assert containsRegex ''services\.json'' svcShText;
 assert containsRegex "launchctl" svcShText;
 assert containsRegex "systemctl" svcShText;
+assert containsRegex "cleanup_service_ports" svcShText;
+assert containsRegex "poll_service_ready" svcShText;
+assert containsRegex "extract_ports" svcShText;
+assert containsRegex "kill_processes_on_port" svcShText;
+assert containsRegex "wait_for_port" svcShText;
 
 # --- svc.ps1 structural assertions ---
 assert containsRegex "Resolve-ServiceName" svcPs1Text;

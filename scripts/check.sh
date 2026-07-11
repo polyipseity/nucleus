@@ -210,6 +210,15 @@ else
   say "skipping nix-search-path tests (path-scoped mode)."
 fi
 
+# Port utility function tests
+section "$((_step += 1))" "Port utility function tests"
+if ! $HAS_ARGS; then
+  bash tests/scripts/lib-port-functions-tests.sh || exit_code=$?
+  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+else
+  say "skipping port utility function tests (path-scoped mode)."
+fi
+
 # Lockfile validation
 section "$((_step += 1))" "Lockfile validation"
 

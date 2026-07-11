@@ -380,6 +380,32 @@ if [[ -f "$GS_PDF_OPT_SH" ]]; then
     test_help_handler "$GS_PDF_OPT_SH"
 fi
 
+# Test src/scripts/camilladsp-daemon.sh
+CAMILLADSP_DAEMON_SH="src/scripts/camilladsp-daemon.sh"
+if [[ -f "$CAMILLADSP_DAEMON_SH" ]]; then
+    test_bash_syntax "$CAMILLADSP_DAEMON_SH"
+    test_has_shebang "$CAMILLADSP_DAEMON_SH"
+    test_is_executable "$CAMILLADSP_DAEMON_SH"
+    test_dependencies_available "$CAMILLADSP_DAEMON_SH" camilladsp websocat jq
+    test_error_handling "$CAMILLADSP_DAEMON_SH"
+    test_has_documentation "$CAMILLADSP_DAEMON_SH"
+    test_no_dangerous_patterns "$CAMILLADSP_DAEMON_SH"
+    test_strict_shell_mode "$CAMILLADSP_DAEMON_SH"
+fi
+
+# Test src/scripts/camilladsp-heartbeat.sh
+CAMILLADSP_HEARTBEAT_SH="src/scripts/camilladsp-heartbeat.sh"
+if [[ -f "$CAMILLADSP_HEARTBEAT_SH" ]]; then
+    test_bash_syntax "$CAMILLADSP_HEARTBEAT_SH"
+    test_has_shebang "$CAMILLADSP_HEARTBEAT_SH"
+    test_is_executable "$CAMILLADSP_HEARTBEAT_SH"
+    test_dependencies_available "$CAMILLADSP_HEARTBEAT_SH" websocat jq
+    test_error_handling "$CAMILLADSP_HEARTBEAT_SH"
+    test_has_documentation "$CAMILLADSP_HEARTBEAT_SH"
+    test_no_dangerous_patterns "$CAMILLADSP_HEARTBEAT_SH"
+    test_strict_shell_mode "$CAMILLADSP_HEARTBEAT_SH"
+fi
+
 # Test scripts/svc.sh (macOS-only: launchctl-based service management)
 SVC_SH="scripts/svc.sh"
 if [[ -f "$SVC_SH" ]]; then
