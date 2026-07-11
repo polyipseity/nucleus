@@ -295,3 +295,73 @@ rotate_logs_in_directory() {
     rotate_log_file "$_rld_logfile" "$_rld_maxsize" "$_rld_maxfiles" "$_rld_compress"
   done
 }
+
+# kill_processes_on_port — Kill all processes listening on PORT.
+# Uses lsof -ti :PORT to find PIDs. Sends SIGTERM, waits 2s, then SIGKILL
+# survivors. No-op if port is free.
+# Returns 0 if port freed, 1 if still occupied.
+kill_processes_on_port() {
+  _klp_port="$1"
+
+  require_command lsof
+
+  _klp_pids="$(lsof -ti :"$_klp_port" 2>/dev/null)" || true
+  [ -z "$_klp_pids" ] && return 0
+
+  # SIGTERM
+  printf '%s\n' "$_klp_pids" | xargs kill -TERM 2>/dev/null || true
+
+  # Wait up to 2s (4 x 0.5s)
+  _klp_i=0
+  while [ "$_klp_i" -lt 4 ]; do
+    _klp_pids="$(lsof -ti :"$_klp_port" 2>/dev/null)" || true
+    [ -z "$_klp_pids" ] && return 0
+    sleep 0.5
+    _klp_i=$((_klp_i + 1))
+  done
+
+  # SIGKILL survivors
+  printf '%s\n' "$_klp_pids" | xargs kill -KILL 2>/dev/null || true
+  sleep 0.5
+
+  _klp_pids="$(lsof -ti :"$_klp_port" 2>/dev/null)" || true
+  [ -z "$_klp_pids" ] && return 0
+  return 1
+}
+
+# wait_for_port — Poll for PORT to enter LISTEN state.
+# Polls lsof -i :PORT every 0.5s up to TIMEOUT seconds (default 5). HOST
+# param is accepted for API consistency but unused on macOS/Linux.
+# Returns 0 when port appears in LISTEN state, 1 on timeout.
+wait_for_port() {
+  _wfp_port="$1"
+  _wfp_host="${2:-}"       # unused on macOS/Linux
+  _wfp_timeout="${3:-5}"
+
+  require_command lsof
+
+  _wfp_max_checks=$((_wfp_timeout * 2))
+  _wfp_i=0
+  while [ "$_wfp_i" -lt "$_wfp_max_checks" ]; do
+    if lsof -i :"$_wfp_port" 2>/dev/null | grep -q LISTEN; then
+      return 0
+    fi
+    sleep 0.5
+    _wfp_i=$((_wfp_i + 1))
+  done
+  return 1
+}
+
+# extract_ports — Parse network endpoints from a service entry JSON.
+# Input: a JSON string (platform-filtered service entry with optional network
+# block). Output: one "host port" line per named endpoint, newline-separated.
+# Returns empty if no network key.
+extract_ports() {
+  _ep_json="$1"
+
+  require_command jq
+
+  printf '%s\n' "$_ep_json" | jq -r '
+    .network // empty | to_entries[] | "\(.value.host // "0.0.0.0") \(.value.port)"
+  ' 2>/dev/null || true
+}
