@@ -3,17 +3,12 @@
 # Adds "open nucleus manual" to Nautilus (GNOME) and Dolphin (KDE) context
 # menus. Both delegate to a shared script that resolves the host manual path
 # via NUCLEUS_REPO_ROOT at runtime and opens it with xdg-open.
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ lib, pkgs, ... }:
 let
   openManualScript = pkgs.writeShellScript "nucleus-open-manual" ''
     set -eu
-    manual="''${NUCLEUS_REPO_ROOT:?NUCLEUS_REPO_ROOT not set}/${config.nucleus.hostManualFile}"
-    exec ${pkgs.xdg-utils}/bin/xdg-open "$manual"
+    _nuc_repo=''${NUCLEUS_REPO_ROOT:?NUCLEUS_REPO_ROOT not set}
+    exec ${pkgs.xdg-utils}/bin/xdg-open "$_nuc_repo/src/hosts/NixOS/MANUAL.md"
   '';
 
   # Ghostscript PDF optimization presets (alphabetically sorted).
@@ -48,13 +43,6 @@ let
   );
 in
 lib.mkIf pkgs.stdenv.isLinux {
-  assertions = [
-    {
-      assertion = config.nucleus.hostManualFile != null;
-      message = "NixOS/services.nix: nucleus.hostManualFile must be set (e.g. in src/hosts/NixOS/default.nix).";
-    }
-  ];
-
   home.file = {
     # Shared script that Nautilus and Dolphin both invoke
     ".local/lib/nucleus/open-manual" = {
