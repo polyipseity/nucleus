@@ -15,11 +15,8 @@ Default operating mode for all agent interactions.
 
 ## Execution
 
-- Break non-trivial tasks into explicit, ordered steps and execute them end-to-end without unnecessary handoffs.
+- Break non-trivial tasks into explicit, ordered steps and execute them end-to-end without unnecessary manual handoffs.
 - Prefer parallel execution for independent reads, searches, and validations to reduce latency and context churn.
-- **Use subagents liberally across all task types.** Delegate planning, implementation, research, and question-answering to `runSubagent` whenever the task has distinct subproblems. The default max concurrency for subagents is 1, but that does not diminish the benefit: each subagent gets a dedicated context window, preventing context overflow and reducing the risk of forgetting earlier details. Using subagents is highly encouraged for every non-trivial task.
-- **Delegate exploration to subagents.** When the user asks a broad exploratory question or says "research only", use `runSubagent` with agentName `"Explore"` as the default approach. The subagent does the file reading and reasoning in its own context; you get a compact summary. Only read files directly when the question is narrow (one or two files). This is a hard rule, not a suggestion.
-- **Prefer subagents for narrow tasks.** Use `Explore` for research and `General Purpose` for focused implementations — they cost 1 turn instead of the N turns an inline `GitHub Copilot Chat` session would consume.
 - After each execution burst, report concise progress and the immediate next action.
 - Keep reasoning explicit but compact: show decision-critical logic, omit filler.
 - Verify changes thoroughly before finishing (syntax/lint/tests/runtime checks relevant to the task).
@@ -30,6 +27,58 @@ Default operating mode for all agent interactions.
 - **Defer privileged operations.** If a task requires `sudo`, admin elevation, or any operation that cannot run as the current user, do not execute it. Instead, note the required privilege in the completion summary and prompt the user to run it.
 - See `.agents/instructions/execution-details.instructions.md` for multi-edit fallback and tool-retry discipline.
 - **Strict scope adherence. When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, or re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
+- **Enumerate subagent opportunities before starting.** Before executing any task, explicitly list which subproblems could be delegated to subagents. Write this list into session memory (`/memories/session/`) if the task is complex. Do not skip this step.
+
+## Subagent delegation
+
+**You MUST use subagents for every delegatable subproblem.** Delegate planning, implementation, research, and question-answering to `runSubagent` whenever a task has distinct subproblems. The default max concurrency for subagents is 1, but that does not diminish the benefit: each subagent gets a dedicated context window, preventing context overflow and reducing the risk of forgetting earlier details. Subagent use is mandatory for any task with separable concerns. This is a hard rule, not a suggestion.
+
+**You MUST delegate exploration to subagents.** When the user asks a broad exploratory question or says "research only", use `runSubagent` with agentName `"Explore"` as the default approach. The subagent does the file reading and reasoning in its own context; you get a compact summary. Only read files directly when the question is narrow (one or two files). This is a hard rule, not a suggestion.
+
+**You MUST prefer subagents for narrow tasks.** Use `Explore` for research and `General Purpose` for focused implementations — they cost 1 turn instead of the N turns an inline chat session would consume. This is a hard rule, not a suggestion.
+
+**Concrete triggering thresholds.** Use these to determine when delegation is required:
+
+- Research requiring **≥3 file reads** → delegate to `Explore` subagent.
+- Task modifying **≥2 independently modifiable files** → consider parallel `General Purpose` subagents (one per file or file group).
+- User asks **≥2 separable questions** → delegate each to its own subagent.
+- **Any research query involving >1 source file** → `Explore` subagent is the default path.
+- A sub-step can be described as "do X in file Y" → delegate it to a `General Purpose` subagent.
+
+**Subagent prompt templates.** Structure every `runSubagent` call as follows:
+
+```text
+runSubagent(
+  prompt: "
+    Context: <2-3 sentences describing the subproblem, file paths involved, and any invariants.>
+    Task: <one sentence describing exactly what to do.>
+    Constraints: <any hard constraints — no git, no deletion, must preserve behavior, etc.>
+    Return: <what information to return — summary of changes, results, or findings.>
+  ",
+  description: "<3-5 word summary of the subproblem>",
+  agentName: "<General Purpose | Explore>"
+)
+```
+
+**Good example (Explore):**
+
+```text
+runSubagent(
+  prompt: "I need to find all callers of function `applyConfig` in the nucleus repo under src/. Search across all .nix and .ps1 files. Return the file paths and line numbers of each call site.",
+  description: "Find applyConfig callers",
+  agentName: "Explore"
+)
+```
+
+**Good example (General Purpose):**
+
+```text
+runSubagent(
+  prompt: "Context: updating the Windows DSC config in src/hosts/Windows/user.dsc.yml. Task: add a WinGet package entry for 'GitHub.cli' with version 'latest'. Constraints: preserve alphabetical sorting of the Packages array. Return: a summary of what was added.",
+  description: "Add gh CLI to DSC",
+  agentName: "General Purpose"
+)
+```
 
 ## Terminal hygiene
 
@@ -76,3 +125,4 @@ When executing a plan with multiple phases:
 - Before finishing, re-read the original plan document and verify every phase is fully implemented.
 - If a phase description is ambiguous, re-read the original source of the plan rather than guessing intent.
 - Do not skip phases unless the plan explicitly marks them as optional.
+- **Review subagent usage.** Did you delegate separable subproblems to subagents? If not, would delegation have improved context management or reduced risk of forgetting earlier requirements? Record the reasoning in session memory.
