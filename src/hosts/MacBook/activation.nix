@@ -12,7 +12,12 @@
 #   and postActivation (after homebrew, last before the gc-root symlink).
 #   lib.mkBefore ensures these fragments are prepended before home-manager's
 #   HM activation call, which is also appended to postActivation.text.
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
 
@@ -116,6 +121,19 @@ in
   #   disableSpotlight                 — disable all Spotlight hotkeys + service
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
+    # ---- configureXcodeSelect --------------------------------------------------
+    # Point the system developer directory at the Nix apple-sdk store path so
+    # xcrun (invoked by rustc/cargo for SDK discovery) works without Xcode CLT
+    # installed.  Without this, every native-code build outside a Nix devShell
+    # triggers the CLT installation dialog.
+    # WHY xcode-select --switch (not just DEVELOPER_DIR):
+    #   DEVELOPER_DIR only helps processes that inherit the shell environment.
+    #   launchd services, VS Code tasks with non-shell exec, and other non-shell
+    #   process trees rely on the system-level developer directory set via
+    #   /usr/bin/xcode-select.  The activation script runs as root during
+    #   darwin-rebuild switch, so no sudo wrapper is needed.
+    /usr/bin/xcode-select --switch "${pkgs.apple-sdk}"
+
     # ---- configureBatteryPolicy ------------------------------------------------
     # Enforce pmset values directly for AC and battery because newer macOS
     # releases can ignore or partially override higher-level power options.
