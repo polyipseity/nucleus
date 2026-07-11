@@ -201,6 +201,32 @@ let
       )
       "shell.nix must set LIBRARY_PATH to the Nix libiconv path on Darwin for rustup-managed cargo builds outside a devShell";
 
+  # Verify that __nucleus_run_managed_dev_tool in shell.nix contains the
+  # rust-toolchain.toml pass-through check for cargo/rustc outside a direnv
+  # context, scoped to cargo and rustc only.
+  test_posix_shell_rust_toolchain_toml_check =
+    assert'
+      (
+        (lib.hasInfix "rust-toolchain.toml" posixShellText) && (lib.hasInfix "cargo|rustc)" posixShellText)
+      )
+      "shell.nix __nucleus_run_managed_dev_tool must check for rust-toolchain.toml scoped to cargo/rustc";
+
+  # Verify that Invoke-NucleusManagedDevTool in pwsh.nix contains the
+  # rust-toolchain.toml pass-through check for cargo/rustc.
+  test_posix_pwsh_rust_toolchain_toml_check = assert' (
+    (lib.hasInfix "rust-toolchain.toml" posixPwshText) && (lib.hasInfix "''cargo''" posixPwshText)
+  ) "pwsh.nix Invoke-NucleusManagedDevTool must check for rust-toolchain.toml scoped to cargo/rustc";
+
+  # Verify that Invoke-NucleusManagedDevTool in Sync-ShellProfile.ps1 contains the
+  # rust-toolchain.toml pass-through check for cargo/rustc on Windows.
+  test_windows_shell_rust_toolchain_toml_check =
+    assert'
+      (
+        (lib.hasInfix "rust-toolchain.toml" windowsShellProfileText)
+        && (lib.hasInfix "''cargo''" windowsShellProfileText)
+      )
+      "Sync-ShellProfile.ps1 Invoke-NucleusManagedDevTool must check for rust-toolchain.toml scoped to cargo/rustc";
+
   # Verify that pkgs.nickel (CLI) and pkgs.nls (Nickel Language Server) are both
   # declared in core.nix baseSharedPackages so that .ncl tooling works on POSIX
   # hosts.  Windows installs nls via cargo-binstall (nickel-lang-lsp crate).
@@ -231,6 +257,9 @@ let
     test_posix_devshell_uses_rust_overlay
     test_rust_toolchain_toml_exists_and_is_stable
     test_posix_shell_darwin_libiconv_library_path
+    test_posix_shell_rust_toolchain_toml_check
+    test_posix_pwsh_rust_toolchain_toml_check
+    test_windows_shell_rust_toolchain_toml_check
     test_core_nickel_lsp_in_shared_packages
   ];
 in
@@ -256,5 +285,8 @@ in
     "15: Windows cargo convergence prunes both cargo install and cargo-binstall packages"
     "16: POSIX devShell uses rust-overlay with fromRustupToolchainFile"
     "17: rust-toolchain.toml exists at repo root with stable channel"
+    "18: POSIX zsh checks rust-toolchain.toml scoped to cargo/rustc"
+    "19: POSIX pwsh checks rust-toolchain.toml scoped to cargo/rustc"
+    "20: Windows shell checks rust-toolchain.toml scoped to cargo/rustc"
   ];
 }
