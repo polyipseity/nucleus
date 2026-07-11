@@ -48,79 +48,72 @@ error_symbol = '[❯](bold red)'
 
 [hostname]
 disabled = false
+format = '[$ssh_symbol$hostname]($style) '
 style = "bold green"
 
 [directory]
-truncation_length = 3
+format = '[$path]($style)[$read_only]($read_only_style) '
 style = "bold blue"
 
 [git_branch]
-format = "[$symbol$branch]($style)"
-style = "bold purple"
-
-[git_commit]
-format = '[\($hash$tag\)]($style) '
-style = "bold green"
+format = '[$symbol$branch(:$remote_branch)]($style) '
 
 [git_state]
-format = '[\($state( $progress_current/$progress_total)\)]($style) '
+format = '\([$state( $progress_current/$progress_total)]($style)\) '
 style = "bold yellow"
 
 [git_status]
+format = '[$all_status$ahead_behind]($style)'
 style = "bold purple"
 
 [container]
-format = '[⬢ \[$name\]]($style) '
+format = '[$symbol\[$name\]]($style) '
 style = "bold red"
 
 [direnv]
 disabled = false
+format = '[$symbol$loaded/$allowed]($style) '
 style = "bold yellow"
 
 [docker_context]
-disabled = false
+format = '[$symbol$context]($style) '
 style = "bold cyan"
 
 [nix_shell]
-format = 'via [ $state( \($name\))]($style)'
-impure_msg = "impure"
-pure_msg = "pure"
+format = '[$symbol$state( \($name\))]($style) '
 style = "bold yellow"
 
 [bun]
-format = 'via [🥟 $version]($style)'
-style = "bold red"
+format = '[$symbol($version )]($style)'
 
 [c]
-format = 'via [$symbol$version]($style) '
+format = '[$symbol($version(-$name) )]($style)'
 style = "bold blue"
 
 [cmake]
-format = 'via [$symbol$version]($style)'
+format = '[$symbol($version )]($style)'
 style = "bold yellow"
 
 [dotnet]
-format = 'via [$symbol$version]($style) '
+format = '[$symbol($version )(🎯 $tfm )]($style)'
 style = "bold purple"
 
 [nodejs]
-format = 'via [ $version]($style)'
-style = "bold green"
+format = '[$symbol($version )]($style)'
 
 [package]
-format = 'is [📦 $version]($style)'
+format = '[$symbol$version]($style) '
 style = "bold yellow"
 
 [python]
-format = 'via [🐍 $version]($style)'
+format = '[${symbol}${pyenv_prefix}(${version} )(\($virtualenv\) )]($style)'
 style = "bold yellow"
 
 [rust]
-format = 'via [🦀 $version]($style)'
-style = "bold red"
+format = '[$symbol($version )]($style)'
 
 [typst]
-format = 'via [t $version]($style)'
+format = '[$symbol($version )]($style)'
 style = "bold cyan"
 
 [fill]
@@ -128,10 +121,11 @@ symbol = "·"
 style = "bold black"
 
 [battery]
+format = '[$symbol$percentage]($style) '
 
 [cmd_duration]
 min_time = 0
-format = "⏱️ [$duration]($style) "
+format = '[⏱️ $duration]($style) '
 style = "bold cyan"
 
 [jobs]
@@ -140,26 +134,28 @@ style = "bold black"
 [memory_usage]
 disabled = false
 threshold = 90
-symbol = "🐏"
+format = '[$symbol${ram}(|${swap})]($style) '
 style = "bold black"
 
 [shell]
 disabled = false
+format = '[$indicator]($style) '
 
 [shlvl]
+format = '[$symbol$shlvl]($style) '
 style = "bold black"
 
 [status]
 disabled = false
-format = "[✖ $status]($style) "
-style = "bold red"
-recognize_signal_code = true
+format = '[$symbol$status]($style) '
 
 [sudo]
 disabled = false
+format = '[$symbol]($style)'
 style = "bold yellow"
 
 [time]
 disabled = false
+format = '[$time]($style) '
 time_format = "%R"
 style = "bold black"
