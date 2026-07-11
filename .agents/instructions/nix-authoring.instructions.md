@@ -240,4 +240,5 @@ Use `scripts/bump-lockfile.sh` / `scripts/bump-lockfile.ps1` to update the lockf
 
 - Do not inline long option lists that are already defined in a dedicated module (e.g. do not duplicate package lists in both `core.nix` and a host file).
 - Do not commit `result` symlinks or `*.drv` paths.
+- Do not guess or fabricate third-party tool behavior. When a bug or unexpected behavior involves an upstream tool (CamillaDSP, Jellyfin, nixpkgs, etc.), consult its source code or official documentation before reasoning about the root cause. Fabricated upstream semantics are not acceptable.
 - Do not use `builtins.fetchTarball` for inputs that should be pinned through the flake lock.
