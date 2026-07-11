@@ -13,9 +13,9 @@
   in dirs.system and dirs.user for every non-omitted service.
 
 .EXAMPLE
-  Invoke-EnsureLogDirs -ServicesJson "C:\nucleus\src\modules\services.json"
+  Invoke-EnsureLogDir -ServicesJson "C:\nucleus\src\modules\services.json"
 #>
-function Invoke-EnsureLogDirs {
+function Invoke-EnsureLogDir {
   [CmdletBinding(SupportsShouldProcess)]
   param(
     [Parameter(Mandatory)]
@@ -53,4 +53,4 @@ function Invoke-EnsureLogDirs {
 }
 
 # Keep module-level state out of global scope: only export the function.
-Export-ModuleMember -Function Invoke-EnsureLogDirs
+Export-ModuleMember -Function Invoke-EnsureLogDir

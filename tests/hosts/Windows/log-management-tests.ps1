@@ -149,11 +149,11 @@ Describe 'Invoke-LogRotation' {
   }
 }
 
-Describe 'Invoke-EnsureLogDirs' {
+Describe 'Invoke-EnsureLogDir' {
   BeforeAll {
     # Source the function.
-    $ensureLogDirsPath = Join-Path $PSScriptRoot '../../../src/hosts/Windows/modules/system/Invoke-EnsureLogDirs.ps1'
-    . $ensureLogDirsPath
+$ensureLogDirPath = Join-Path \$PSScriptRoot '../../../src/hosts/Windows/modules/system/Invoke-EnsureLogDir.ps1'
+    . $ensureLogDirPath
 
     $Script:TestServicesJson = Join-Path $env:TEMP 'nucleus-test-services.json'
     $Script:TestSystemLogDir = Join-Path $env:TEMP 'nucleus-test-system-log'
@@ -188,7 +188,7 @@ Describe 'Invoke-EnsureLogDirs' {
     Mock Get-NucleusSystemLogDir { return $Script:TestSystemLogDir }
     Mock Get-NucleusLogDir { return $Script:TestUserLogDir }
 
-    Invoke-EnsureLogDirs -ServicesJson $Script:TestServicesJson
+  Invoke-EnsureLogDir -ServicesJson \$Script:TestServicesJson
 
     $expectedDir = Join-Path $Script:TestSystemLogDir 'test-svc'
     (Test-Path -LiteralPath $expectedDir -PathType Container) | Should -Be $true
@@ -212,7 +212,7 @@ Describe 'Invoke-EnsureLogDirs' {
     Mock Get-NucleusSystemLogDir { return $Script:TestSystemLogDir }
     Mock Get-NucleusLogDir { return $Script:TestUserLogDir }
 
-    Invoke-EnsureLogDirs -ServicesJson $Script:TestServicesJson
+    Invoke-EnsureLogDir -ServicesJson $Script:TestServicesJson
 
     $expectedDir = Join-Path $Script:TestUserLogDir 'test-user-svc'
     (Test-Path -LiteralPath $expectedDir -PathType Container) | Should -Be $true
@@ -234,6 +234,6 @@ Describe 'Invoke-EnsureLogDirs' {
     Mock Get-NucleusLogDir { return $Script:TestUserLogDir }
 
     # Should not throw.
-    { Invoke-EnsureLogDirs -ServicesJson $Script:TestServicesJson } | Should -Not -Throw
+    { Invoke-EnsureLogDir -ServicesJson $Script:TestServicesJson } | Should -Not -Throw
   }
 }
