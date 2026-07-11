@@ -49,7 +49,7 @@ section "$((_step += 1))" "Nix test suite"
 tmp_failed=$(mktemp) || { error "failed to create temp file"; }
 # shellcheck disable=SC2016
 find tests/modules tests/integration tests/hosts -name '*.nix' -type f | sort \
-  | xargs -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" -I{} sh -c 'f="$1"; echo "Testing: $f" >&2; if ! nix-instantiate --eval "$f"; then echo "FAIL: $f" >&2; echo "$f" >> "$2"; else echo "PASS: $f" >&2; fi' _ {} "$tmp_failed"
+  | xargs -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" -I{} sh -c 'f="$1"; echo "Testing: $f" >&2; if ! nix-instantiate --eval --strict "$f"; then echo "FAIL: $f" >&2; echo "$f" >> "$2"; else echo "PASS: $f" >&2; fi' _ {} "$tmp_failed"
 if [ -s "$tmp_failed" ]; then
   error "FAILED Nix tests:"
   cat "$tmp_failed" >&2
