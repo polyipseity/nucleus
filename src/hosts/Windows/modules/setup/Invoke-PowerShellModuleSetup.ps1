@@ -63,11 +63,11 @@ function Invoke-PowerShellModuleSetup {
     # Remove any existing version to avoid conflicts.
     $existing = Get-Module -ListAvailable -Name $moduleName | Select-Object -First 1
     if ($existing) {
-      Write-Host "Invoke-PowerShellModuleSetup: removing $moduleName version $($existing.Version)..." -ForegroundColor Yellow
+      Write-Output "$($PSStyle.Foreground.Yellow)Invoke-PowerShellModuleSetup: removing $moduleName version $($existing.Version)...$($PSStyle.Reset)"
       Uninstall-Module -Name $moduleName -AllVersions -Force -ErrorAction Stop
     }
 
-    Write-Host "Invoke-PowerShellModuleSetup: installing $moduleName version $requiredVersion..." -ForegroundColor Cyan
+    Write-Output "$($PSStyle.Foreground.Cyan)Invoke-PowerShellModuleSetup: installing $moduleName version $requiredVersion...$($PSStyle.Reset)"
     Install-Module -Name $moduleName -RequiredVersion $requiredVersion -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
   }
 }
