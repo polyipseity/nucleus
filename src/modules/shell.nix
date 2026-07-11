@@ -21,7 +21,7 @@ let
   # Dedicated alias/env fragments keep list-like attrsets isolated so sort order
   # can be audited without scanning unrelated shell options.
   shellAliases = import ./shell/aliases.nix { };
-  sessionVariables = import ./shell/env.nix;
+  sessionVariables = import ./shell/env.nix { inherit pkgs; };
 
   # Single source of truth for AI agent session detection.  Shared with
   # pwsh.nix and Sync-ShellProfile.ps1 (Windows).

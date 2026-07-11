@@ -17,7 +17,7 @@ let
   pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
   pwshYamlVersion = lockfile.pwsh."powershell-yaml" or null;
 
-  shellEnv = import ./shell/env.nix; # CC, CXX, LD from ./shell/env.nix
+  shellEnv = import ./shell/env.nix { inherit pkgs; }; # CC, CXX, LD from ./shell/env.nix
 
   profileContent = ''
         # This file is managed by nucleus (src/modules/pwsh.nix).

@@ -2,15 +2,21 @@
 #
 # Keep keys strictly alphabetical so behavior remains predictable as the set
 # grows and parity reviews can diff key order mechanically.
-{
+{ pkgs }: {
   # Prefer the LLVM toolchain everywhere so native-extension builds and C/C++
   # projects converge on clang/lld instead of host-specific defaults.
   # Sources:
   # https://clang.llvm.org/docs/CommandGuide/clang.html
   # https://lld.llvm.org/
-  CC = "clang";
-  CXX = "clang++";
-  LD = "ld.lld";
+  #
+  # WHY absolute store paths (not bare "clang"): bare names resolve to
+  # /usr/bin/clang outside Nix build environments, which calls xcrun and
+  # triggers the Xcode CLT installation dialog on macOS. Absolute store
+  # paths bypass PATH resolution entirely, so CC/CXX work in sudo, launchd
+  # services, VS Code tasks, and rustup cargo builds without xcrun.
+  CC = "${pkgs.llvmPackages.clang}/bin/clang";
+  CXX = "${pkgs.llvmPackages.clang}/bin/clang++";
+  LD = "${pkgs.llvmPackages.lld}/bin/ld.lld";
 
   # Disable OpenCode auto-update checks globally across all platforms.
   # WHY: Managed environment controls OpenCode pinning; auto-updates can
