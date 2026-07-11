@@ -31,12 +31,6 @@ Agent entry-point mapping by tool:
 
 When a project follows this user's conventions, `AGENTS.md` is the definitive entry point. Tool-specific files (`.cursor/rules/`, `CLAUDE.md`) should defer to `AGENTS.md` rather than duplicate its content.
 
-When to split `AGENTS.md`:
-
-- A section exceeds ~30 lines.
-- A rule applies only to specific file types or directories (use a narrow `applyTo` glob).
-- A rule is reusable across multiple repositories and should travel with the user rather than remain project-scoped.
-
 Instruction file frontmatter structure:
 
 Every `.instructions.md` file must open with valid YAML frontmatter containing `description` (keyword-rich, starting with "Use when"), `name` (short human-readable name), and `applyTo` (narrow glob for applicability). Keep `applyTo` narrow so the instruction is only injected when genuinely relevant. Example:
