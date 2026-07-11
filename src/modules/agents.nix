@@ -665,7 +665,7 @@ in
     #
     # Why best-effort: the system configuration applied successfully.  Skill
     # sync is additive; a missing skill does not break any declared system
-    # state.  Warn and continue so displayHostManualInstructions is reached.
+    # state.
     # -------------------------------------------------------------------------
     syncClawHubSkills = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
       set -eu

@@ -10,7 +10,6 @@
   users ? null,
   managedUsername ? null,
   managedUser ? null,
-  hostManualFile ? null,
   ...
 }:
 let
@@ -134,12 +133,6 @@ in
     };
   };
 
-  options.nucleus.hostManualFile = lib.mkOption {
-    type = lib.types.nullOr lib.types.str;
-    default = null;
-    description = "Host-scoped MANUAL.md path (absolute or repo-relative) printed by OS-specific activation modules at the end of Home Manager activation.";
-  };
-
   imports = [
     ./agent-host-shell.nix
     ./agents.nix
@@ -163,11 +156,6 @@ in
   ];
 
   config = {
-    # Preserve call-site convenience for standalone Home Manager invocations
-    # that pass hostManualFile via module arguments, while keeping the option
-    # default path-free to avoid options.json derivation context warnings.
-    nucleus.hostManualFile = lib.mkDefault hostManualFile;
-
     home = {
       username = effectiveUsername;
       homeDirectory = lib.mkDefault resolvedHomeDirectory;
