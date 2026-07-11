@@ -7,10 +7,8 @@
 #
 # Run with: nix-instantiate --eval tests/modules/package-parity-tests.nix
 
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   inherit (import ../lib.nix) assert';
 
   # Critical packages that should exist on all three platforms.

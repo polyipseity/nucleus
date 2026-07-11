@@ -9,10 +9,8 @@
 #
 # Run with: nix-instantiate --eval tests/modules/sops-mock-tests.nix
 
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   inherit (lib)
     hasAttr
     isList

@@ -7,10 +7,8 @@
 #
 # Run with: nix-instantiate --eval tests/modules/module-imports-tests.nix
 
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   # List of all shared modules under src/modules/ that should be importable.
   # If any import fails, evaluation will throw an error (causing CI to fail).
   moduleImportTests = [

@@ -4,10 +4,8 @@
 # vms.nix module options are wired correctly.
 # Run via: nix-instantiate --eval tests/modules/vm-setup-tests.nix
 
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   inherit (import ../lib.nix) assert';
 
   manifest = builtins.fromJSON (builtins.readFile ../../src/modules/VMs.json);

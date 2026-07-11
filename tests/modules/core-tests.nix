@@ -3,10 +3,8 @@
 #
 # Run via: nix-instantiate --eval tests/modules/core-tests.nix
 
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   inherit (import ../lib.nix) assert';
 
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;

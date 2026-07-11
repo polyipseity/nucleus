@@ -3,10 +3,8 @@
 #
 # Run with: nix-instantiate --eval tests/modules/logging-dirs-tests.nix
 
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   inherit (import ../lib.nix) assert';
 
   services = builtins.fromJSON (builtins.readFile ../../src/modules/services.json);
