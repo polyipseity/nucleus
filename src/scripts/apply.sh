@@ -227,6 +227,18 @@ run_replica_sync() {
   fi
 }
 
+run_manual_display() {
+  # Display the MANUAL.md for the given host after a successful apply.
+  _rmd_host="$1"
+  _rmd_manual="$REPO_ROOT/src/hosts/$_rmd_host/MANUAL.md"
+  if [ ! -f "$_rmd_manual" ]; then
+    return
+  fi
+  printf '\n'
+  cat "$_rmd_manual"
+  printf '\n'
+}
+
 case "$(uname -s)" in
   Darwin)
     # nix-darwin manages both the system layer and the user Home Manager
