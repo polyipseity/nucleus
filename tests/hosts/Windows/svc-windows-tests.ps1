@@ -329,6 +329,8 @@ Describe 'Dispatch' {
         [string]$Action,
         [string[]]$ServiceName
       )
+      # Parameters consumed by the dynamic switch dispatch below.
+      Write-Debug "Invoke-Dispatch: Action=$Action ServiceName=$($ServiceName -join ',')"
       $Registry = $Script:Registry
       $RegistryRaw = $Script:RegistryRaw
       $Platform = $Script:Platform

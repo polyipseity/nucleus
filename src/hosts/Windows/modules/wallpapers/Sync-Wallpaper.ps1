@@ -57,6 +57,7 @@ function Sync-Wallpaper {
         -Users 'admin', 'guest' `
         -SopsExe 'sops.exe'
   #>
+  [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
   param(
     [Parameter(Mandatory = $true)]
     [string]$AssetsDir,

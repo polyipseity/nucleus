@@ -48,6 +48,7 @@ function New-ConfigDir {
 }
 
 function Get-ConfigValue {
+  param([string[]]$Arguments)
   $merged = Merge-Config
   if ($Arguments.Count -eq 0) {
     $merged | ConvertTo-Json
@@ -86,7 +87,7 @@ function DeepMerge($a, $b) {
 
 function Set-ConfigValue {
   [CmdletBinding(SupportsShouldProcess)]
-  param()
+  param([string[]]$Arguments)
   if ($Arguments.Count -lt 2) {
     Write-NucleusError "Usage: nucleus-config set <section.key> <value>"
     exit 1
@@ -137,8 +138,8 @@ function Out-ConfigValueList {
 }
 
 switch ($Command) {
-  'get' { Get-ConfigValue }
-  'set' { Set-ConfigValue }
+  'get' { Get-ConfigValue $Arguments }
+  'set' { Set-ConfigValue $Arguments }
   'list' { Out-ConfigValueList }
   default {
     Write-NucleusError "Usage: nucleus-config get [<section.key>]|set <section.key> <value>|list"
