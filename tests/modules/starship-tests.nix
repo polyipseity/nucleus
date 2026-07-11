@@ -40,6 +40,16 @@ let
   nixShellIsSection = builtins.isAttrs (parsedConfig.nix_shell or { });
   cmdDurationIsSection = builtins.isAttrs (parsedConfig.cmd_duration or { });
   statusIsSection = builtins.isAttrs (parsedConfig.status or { });
+  hostnameIsSection = builtins.isAttrs (parsedConfig.hostname or { });
+  direnvIsSection = builtins.isAttrs (parsedConfig.direnv or { });
+  dockerContextIsSection = builtins.isAttrs (parsedConfig.docker_context or { });
+  cIsSection = builtins.isAttrs (parsedConfig.c or { });
+  cmakeIsSection = builtins.isAttrs (parsedConfig.cmake or { });
+  dotnetIsSection = builtins.isAttrs (parsedConfig.dotnet or { });
+  jobsIsSection = builtins.isAttrs (parsedConfig.jobs or { });
+  shlvlIsSection = builtins.isAttrs (parsedConfig.shlvl or { });
+  sudoIsSection = builtins.isAttrs (parsedConfig.sudo or { });
+  batteryIsSection = builtins.isAttrs (parsedConfig.battery or { });
 
   # Verify XDG config file is wired.
   hasXDGConfig = module.xdg.configFile ? "starship.toml" || false;
@@ -58,6 +68,16 @@ in
   has_nix_shell_section = nixShellIsSection;
   has_cmd_duration_section = cmdDurationIsSection;
   has_status_section = statusIsSection;
+  has_hostname_section = hostnameIsSection;
+  has_direnv_section = direnvIsSection;
+  has_docker_context_section = dockerContextIsSection;
+  has_c_section = cIsSection;
+  has_cmake_section = cmakeIsSection;
+  has_dotnet_section = dotnetIsSection;
+  has_jobs_section = jobsIsSection;
+  has_shlvl_section = shlvlIsSection;
+  has_sudo_section = sudoIsSection;
+  has_battery_section = batteryIsSection;
   has_xdg_config = hasXDGConfig;
   has_starship_cache_var = hasStarShipCache;
   all_tests_pass =
@@ -70,6 +90,16 @@ in
     && nixShellIsSection
     && cmdDurationIsSection
     && statusIsSection
+    && hostnameIsSection
+    && direnvIsSection
+    && dockerContextIsSection
+    && cIsSection
+    && cmakeIsSection
+    && dotnetIsSection
+    && jobsIsSection
+    && shlvlIsSection
+    && sudoIsSection
+    && batteryIsSection
     && hasXDGConfig
     && hasStarShipCache;
 }

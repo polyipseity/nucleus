@@ -1,19 +1,40 @@
 # Starship configuration — managed by nucleus (src/modules/configs/starship.toml)
 # See <https://starship.rs/config/> for all options.
 
-# Informative two-line prompt: directory, git, nix shell, language runtimes,
-# right-aligned time, command duration, exit code, and memory usage.
+# Two-line prompt: host → directory → git → environment → languages →
+# right-aligned status → line break → character.
 # Uses Nerd Font glyphs (CaskaydiaCove Nerd Font).
+# Colors use named ANSI colors for portability across light/dark themes.
 format = """
+$hostname\
 $directory\
 $git_branch\
+$git_commit\
+$git_state\
 $git_status\
+$container\
+$direnv\
+$docker_context\
 $nix_shell\
+$bun\
+$c\
+$cmake\
+$dotnet\
+$nodejs\
+$package\
+$python\
+$rust\
+$typst\
 $fill\
-$time\
+$battery\
 $cmd_duration\
-$status\
+$jobs\
 $memory_usage\
+$shell\
+$shlvl\
+$status\
+$sudo\
+$time\
 $line_break\
 $character\
 """
@@ -21,6 +42,10 @@ $character\
 [character]
 success_symbol = '[❯](bold green)'
 error_symbol = '[❯](bold red)'
+
+[hostname]
+disabled = false
+style = "bold green"
 
 [directory]
 truncation_length = 3
@@ -30,8 +55,28 @@ style = "bold blue"
 format = "[$symbol$branch]($style)"
 style = "bold purple"
 
+[git_commit]
+format = '[\($hash$tag\)]($style) '
+style = "bold green"
+
+[git_state]
+format = '[\($state( $progress_current/$progress_total)\)]($style) '
+style = "bold yellow"
+
 [git_status]
 style = "bold purple"
+
+[container]
+format = '[⬢ \[$name\]]($style) '
+style = "bold red"
+
+[direnv]
+disabled = false
+style = "bold yellow"
+
+[docker_context]
+disabled = false
+style = "bold cyan"
 
 [nix_shell]
 format = 'via [ $state( \($name\))]($style)'
@@ -39,25 +84,55 @@ impure_msg = "impure"
 pure_msg = "pure"
 style = "bold yellow"
 
+[bun]
+format = 'via [🥟 $version]($style)'
+style = "bold red"
+
+[c]
+format = 'via [$symbol$version]($style) '
+style = "bold blue"
+
+[cmake]
+format = 'via [$symbol$version]($style)'
+style = "bold yellow"
+
+[dotnet]
+format = 'via [$symbol$version]($style) '
+style = "bold purple"
+
+[nodejs]
+format = 'via [ $version]($style)'
+style = "bold green"
+
+[package]
+format = 'is [📦 $version]($style)'
+style = "bold yellow"
+
+[python]
+format = 'via [🐍 $version]($style)'
+style = "bold yellow"
+
+[rust]
+format = 'via [🦀 $version]($style)'
+style = "bold red"
+
+[typst]
+format = 'via [t $version]($style)'
+style = "bold cyan"
+
 [fill]
 symbol = "·"
 style = "bold black"
 
-[time]
-disabled = false
-time_format = "%R"
-style = "bold black"
+[battery]
 
 [cmd_duration]
 min_time = 0
 format = "⏱️ [$duration]($style)"
 style = "bold cyan"
 
-[status]
-disabled = false
-format = "[✖ $status]($style)"
-style = "bold red"
-recognize_signal_code = true
+[jobs]
+style = "bold black"
 
 [memory_usage]
 disabled = false
@@ -68,38 +143,20 @@ style = "bold black"
 [shell]
 disabled = false
 
-[container]
-format = '[⬢ \[$name\]]($style) '
+[shlvl]
+style = "bold black"
+
+[status]
+disabled = false
+format = "[✖ $status]($style)"
 style = "bold red"
+recognize_signal_code = true
 
-[package]
-format = 'is [📦 $version]($style)'
-style = "bold 208"
-
-[rust]
-format = 'via [🦀 $version]($style)'
-style = "bold red"
-
-[bun]
-format = 'via [🥟 $version]($style)'
-style = "bold red"
-
-[nodejs]
-format = 'via [ $version]($style)'
-style = "bold green"
-
-[python]
-format = 'via [🐍 $version]($style)'
+[sudo]
+disabled = false
 style = "bold yellow"
 
-[typst]
-format = 'via [t $version]($style)'
-style = "bold cyan"
-
-[git_commit]
-format = '[\($hash$tag\)]($style) '
-style = "bold green"
-
-[git_state]
-format = '[\($state( $progress_current/$progress_total)\)]($style) '
-style = "bold yellow"
+[time]
+disabled = false
+time_format = "%R"
+style = "bold black"
