@@ -301,6 +301,37 @@ poll_service_status() {
   return 1
 }
 
+# poll_service_ready — Poll for service manager readiness AND port readiness.
+# Runs poll_service_status first, then verifies all registered ports are
+# actually listening. Returns 0 only when both checks pass.
+poll_service_ready() {
+  _psr_name="$1"
+  _psr_entry_json="$2"
+
+  local _psr_status_json
+  _psr_status_json=$(poll_service_status "$_psr_name" "$_psr_entry_json") || {
+    printf '%s\n' "$_psr_status_json"
+    return 1
+  }
+
+  local _psr_ports
+  _psr_ports=$(extract_ports "$_psr_entry_json") || true
+  if [ -n "$_psr_ports" ]; then
+    while IFS=' ' read -r _psr_host _psr_port; do
+      wait_for_port "$_psr_port" "$_psr_host" 5 || {
+        warn "$_psr_name — running but port $_psr_port ($_psr_host) not listening"
+        printf '%s\n' "$_psr_status_json"
+        return 1
+      }
+    done <<EOF
+$_psr_ports
+EOF
+  fi
+
+  printf '%s\n' "$_psr_status_json"
+  return 0
+}
+
 # service_diagnostic — Print one-line diagnostic for a failing service.
 # Reads launchctl print / systemctl status and extracts state + exit code.
 service_diagnostic() {
@@ -324,6 +355,20 @@ service_diagnostic() {
         | sed -n 's/.*Active: //p' | head -1
       ;;
   esac
+}
+
+# cleanup_service_ports — Free ports registered for a service by killing
+# any rogue process holding them. Handles manual starts, orphans from
+# previous wrappers, etc. that are outside the service manager's kill domain.
+cleanup_service_ports() {
+  _csp_entry_json="$1"
+  _csp_ports=$(extract_ports "$_csp_entry_json") || true
+  [ -z "$_csp_ports" ] && return 0
+  while IFS=' ' read -r _csp_host _csp_port; do
+    kill_processes_on_port "$_csp_port" || true
+  done <<EOF
+$_csp_ports
+EOF
 }
 
 # svc_action — Perform an action on a single service.
@@ -355,12 +400,13 @@ svc_action() {
       case "$action" in
         status)  svc_status "$name" "$entry_json" ;;
         start)
+          cleanup_service_ports "$entry_json"
           recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
             $sudo_prefix launchctl enable "$target" >/dev/null 2>&1
             $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 || \
               $sudo_prefix launchctl bootstrap "$domain" "$plist" >/dev/null 2>&1
           }
-          poll_service_status "$name" "$entry_json" >/dev/null || {
+          poll_service_ready "$name" "$entry_json" >/dev/null || {
             local _diag
             _diag=$(service_diagnostic "$entry_json")
             warn "$name — started but not running ($_diag); check 'nucleus-svc logs $name'"
@@ -369,6 +415,10 @@ svc_action() {
           ;;
         stop)    $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
         restart)
+          # Pre-cleanup: kill any rogue process holding the service's ports.
+          # This must run before launchd operations because bootout can only
+          # kill processes in its tracked tree.
+          cleanup_service_ports "$entry_json"
           # Three-stage restart strategy for launchctl services:
           #   1. recover_launchctl_service — handles stuck states (EX_CONFIG,
           #      "waiting", "spawn scheduled") via bootout+bootstrap.
@@ -415,7 +465,7 @@ svc_action() {
             fi
           }
           # Verify the service started after all recovery stages.
-          poll_service_status "$name" "$entry_json" >/dev/null || {
+          poll_service_ready "$name" "$entry_json" >/dev/null || {
             local _diag
             _diag=$(service_diagnostic "$entry_json")
             warn "$name — restarted but not running ($_diag); check 'nucleus-svc logs $name'"
@@ -433,8 +483,9 @@ svc_action() {
       case "$action" in
         status)  svc_status "$name" "$entry_json" ;;
         start)
+          cleanup_service_ports "$entry_json"
           systemctl $scope_flag start "$svc_id" >/dev/null 2>&1
-          poll_service_status "$name" "$entry_json" >/dev/null || {
+          poll_service_ready "$name" "$entry_json" >/dev/null || {
             local _diag
             _diag=$(service_diagnostic "$entry_json")
             warn "$name — started but not running ($_diag); check 'nucleus-svc logs $name'"
@@ -443,8 +494,9 @@ svc_action() {
           ;;
         stop)    systemctl $scope_flag stop "$svc_id" >/dev/null 2>&1 ;;
         restart)
+          cleanup_service_ports "$entry_json"
           systemctl $scope_flag restart "$svc_id" >/dev/null 2>&1
-          poll_service_status "$name" "$entry_json" >/dev/null || {
+          poll_service_ready "$name" "$entry_json" >/dev/null || {
             local _diag
             _diag=$(service_diagnostic "$entry_json")
             warn "$name — restarted but not running ($_diag); check 'nucleus-svc logs $name'"
