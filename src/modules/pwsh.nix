@@ -377,8 +377,9 @@ let
           pip @Args
         }
 
-        # Route managed development tools through either an active direnv context
-        # or the user-scoped fallback toolchain for unmanaged repositories.
+        # Route managed development tools through an active direnv context, a
+        # rust-toolchain.toml project context (cargo/rustc only), or the
+        # user-scoped fallback toolchain for unmanaged repositories.
         function Invoke-NucleusManagedDevTool {
           param(
             [Parameter(Mandatory = $true)]
@@ -399,6 +400,18 @@ let
             }
           }
 
+          # rust-toolchain.toml in the current directory → project context
+          # for cargo/rustc.  rustup (default none) reads the toolchain file
+          # and routes cargo/rustc to the pinned toolchain so project builds
+          # work without a full devShell or direnv context.
+          if ($ToolName -in @('cargo', 'rustc') -and (Test-Path -Path (Join-Path (Get-Location).Path 'rust-toolchain.toml') -PathType Leaf)) {
+            $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($null -ne $application) {
+              & $application.Source @ToolArguments
+              return $true
+            }
+          }
+
           if (-not [string]::IsNullOrWhiteSpace($FallbackBinDirectory)) {
             $fallbackToolPath = Join-Path $FallbackBinDirectory $ToolName
             if (Test-Path -Path $fallbackToolPath -PathType Leaf) {
@@ -412,8 +425,10 @@ let
 
         # System-wide build tool block: redirect bun/cargo/rustc/uv to warnings.
         # These tools are installed globally for system package management only.
-        # When DIRENV_DIR is set, a direnv environment (devShell) is active; when it
-        # is absent, fall back to the managed default toolchain installed by apply.
+        # When DIRENV_DIR is set, a direnv environment (devShell) is active.
+        # When a rust-toolchain.toml exists in the current directory, cargo/rustc
+        # pass through to the rustup shim.  Otherwise, fall back to the managed
+        # default toolchain installed by apply.
         function bun {
           if (Invoke-NucleusManagedDevTool -ToolName "bun" -FallbackBinDirectory $env:NUCLEUS_DEFAULT_DEV_BIN @Args) {
             return
@@ -432,8 +447,7 @@ let
           Write-Host "shell: managed cargo is unavailable right now." -ForegroundColor Yellow
           Write-Host "         For Rust development, use one of these managed entrypoints:" -ForegroundColor Yellow
           Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
-          Write-Host "         - Or use: rustup run stable cargo <command>" -ForegroundColor Yellow
-          Write-Host "         - To install a toolchain: rustup toolchain install stable" -ForegroundColor Yellow
+          Write-Host "         - Or add a rust-toolchain.toml file to this directory" -ForegroundColor Yellow
           return 1
         }
         function rustc {
@@ -443,8 +457,7 @@ let
           Write-Host "shell: managed rustc is unavailable right now." -ForegroundColor Yellow
           Write-Host "         For Rust development, use one of these managed entrypoints:" -ForegroundColor Yellow
           Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
-          Write-Host "         - Or use: rustup run stable rustc <command>" -ForegroundColor Yellow
-          Write-Host "         - To install a toolchain: rustup toolchain install stable" -ForegroundColor Yellow
+          Write-Host "         - Or add a rust-toolchain.toml file to this directory" -ForegroundColor Yellow
           return 1
         }
         function uv {
