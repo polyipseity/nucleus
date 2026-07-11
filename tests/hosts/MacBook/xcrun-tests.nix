@@ -4,7 +4,11 @@
 # Verifies that:
 #   1. CC/CXX/LD in shell/env.nix are absolute Nix store paths (not bare
 #      names that could resolve to /usr/bin/clang -> xcrun).
-#   2. ntfs-3g.nix includes llvmPackages.clang in the activation build path
+#   2. DEVELOPER_DIR is set in shell.nix's darwin-only sessionVariables block
+#      so xcrun SDK discovery works in interactive shells without CLT.
+#   3. xcode-select --switch to Nix apple-sdk is wired in activation.nix
+#      so xcrun works for non-shell process trees.
+#   4. ntfs-3g.nix includes llvmPackages.clang in the activation build path
 #      and exports absolute store paths for CC/CXX before ./configure.
 #
 # The old bare-format (CC = "clang") caused the xcrun dialog on macOS when
@@ -15,6 +19,8 @@ let
   lib = import <nixpkgs/lib>;
 
   envNix = builtins.readFile ../../../src/modules/shell/env.nix;
+  shellNix = builtins.readFile ../../../src/modules/shell.nix;
+  activationNix = builtins.readFile ../../../src/hosts/MacBook/activation.nix;
   ntfs3gText = builtins.readFile ../../../src/hosts/MacBook/ntfs-3g.nix;
 in
 
@@ -34,6 +40,24 @@ assert lib.hasInfix "OPENCODE_DISABLE_AUTOUPDATE" envNix;
 
 # Old bare format must NOT be present; CC = "clang" would trigger xcrun.
 assert !lib.hasInfix ''CC = "clang";'' envNix;
+
+# --- shell.nix assertions ---
+
+# DEVELOPER_DIR must be set in the darwin-only sessionVariables block so
+# xcrun --sdk macosx --show-sdk-path finds the Nix SDK from any shell session.
+assert lib.hasInfix "DEVELOPER_DIR" shellNix;
+
+# DEVELOPER_DIR must reference pkgs.apple-sdk (not a stale hardcoded path).
+assert lib.hasInfix "pkgs.apple-sdk" shellNix;
+
+# --- activation.nix assertions ---
+
+# xcode-select --switch must be configured at activation time so xcrun works
+# for launchd services, VS Code non-shell tasks, and other system processes.
+assert lib.hasInfix "xcode-select --switch" activationNix;
+
+# The switch target must reference the Nix apple-sdk path.
+assert lib.hasInfix "apple-sdk" activationNix;
 
 # --- ntfs-3g.nix assertions ---
 
