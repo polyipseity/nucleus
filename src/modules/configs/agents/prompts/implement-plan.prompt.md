@@ -28,9 +28,9 @@ If the user's message that triggered this prompt contains "only plan", "only res
    - If `${input:atomicCommits}` is `yes`, commit each atomic change with a precise message after each meaningful sub-step. Otherwise (default `no`), skip all git operations.
    - Re-read the original plan file regularly — especially after interruptions or context switches — to ensure no phase is skipped or misinterpreted.
 
-3. **Use subagents for parallelism**
-   - Spawn subagents to manage context and work in parallel on independent lanes.
-   - Limit concurrent subagents to `${input:maxConcurrency}` (default 1).
+3. **Use subagents for every opportunity**
+   - Spawn subagents for any sufficiently independent subproblem — planning sub-steps, implementing separate files, researching unknowns, or verifying intermediate results. Subagents prevent context overflow and reduce the risk of forgetting earlier requirements by giving each subproblem a fresh, focused context.
+   - Limit concurrent subagents to `${input:maxConcurrency}` (default 1). Even at maxConcurrency=1, subagents are highly beneficial — do not skip spawning them just because parallelism is limited.
    - Subagents must also follow the step-by-step reasoning and no-filler style.
 
 4. **Verify completeness before finalizing**
