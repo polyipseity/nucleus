@@ -37,6 +37,5 @@
     ./security.nix
     ./sops.nix
     ./service-watchdog.nix
-    ./service-watchdog-user.nix
   ];
 }

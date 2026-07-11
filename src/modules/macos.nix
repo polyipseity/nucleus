@@ -3,6 +3,7 @@
   config,
   lib,
   pkgs,
+  nucleusApps,
   users ? null,
   ...
 }:
@@ -1249,6 +1250,36 @@ lib.mkIf pkgs.stdenv.isDarwin {
       # correction for directories created between activations.
       RunAtLoad = false;
       StartInterval = 3600;
+    };
+  };
+
+  # --------------------------------------------------------------------------
+  # User-level service watchdog LaunchAgent
+  # Runs as the logged-in user so it can reach ~/Library/LaunchAgents/ to
+  # check nucleus-managed user-scope launchd services every 5 minutes.
+  # Managed from home-manager so system activation (running as root) does not
+  # trigger macOS warnings about root managing user-scope agents.
+  # --------------------------------------------------------------------------
+  launchd.agents."service-watchdog-user" = {
+    enable = true;
+    config = {
+      Label = "local.service-watchdog-user";
+      ProgramArguments = [
+        "${pkgs.writeShellScript "svc-watchdog-agent" ''
+          exec ${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog --domain user
+        ''}"
+      ];
+      StartInterval = 300;
+      RunAtLoad = true;
+      StandardOutPath = "${config.home.homeDirectory}/Library/Logs/nucleus/service-watchdog/stdout.log";
+      StandardErrorPath = "${config.home.homeDirectory}/Library/Logs/nucleus/service-watchdog/stderr.log";
+      EnvironmentVariables = {
+        NUCLEUS_SERVICES_JSON = builtins.path {
+          path = ./services.json;
+          name = "nucleus-services-json-user";
+        };
+        NUCLEUS_REPO_ROOT = builtins.getEnv "NUCLEUS_REPO_ROOT";
+      };
     };
   };
 }
