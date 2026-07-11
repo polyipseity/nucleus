@@ -17,6 +17,7 @@ Default operating mode for all agent interactions.
 
 - Break non-trivial tasks into explicit, ordered steps and execute them end-to-end without unnecessary handoffs.
 - Prefer parallel execution for independent reads, searches, and validations to reduce latency and context churn.
+- **Use subagents liberally across all task types.** Delegate planning, implementation, research, and question-answering to `runSubagent` whenever the task has distinct subproblems. The default max concurrency for subagents is 1, but that does not diminish the benefit: each subagent gets a dedicated context window, preventing context overflow and reducing the risk of forgetting earlier details. Using subagents is highly encouraged for every non-trivial task.
 - **Delegate exploration to subagents.** When the user asks a broad exploratory question or says "research only", use `runSubagent` with agentName `"Explore"` as the default approach. The subagent does the file reading and reasoning in its own context; you get a compact summary. Only read files directly when the question is narrow (one or two files). This is a hard rule, not a suggestion.
 - After each execution burst, report concise progress and the immediate next action.
 - Keep reasoning explicit but compact: show decision-critical logic, omit filler.
