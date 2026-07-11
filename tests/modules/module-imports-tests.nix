@@ -82,4 +82,5 @@ in
   # Report the test results.
   message = "All ${builtins.length moduleImportTests} shared modules are importable";
   moduleCount = builtins.length moduleImportTests;
+  success = modulesImportable;
 }

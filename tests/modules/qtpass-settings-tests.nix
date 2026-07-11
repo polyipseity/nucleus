@@ -67,4 +67,7 @@ assert containsRegex "\"kitty\"" editorsText;
 assert containsRegex "\"1\" = \"!\"" editorsText;
 assert containsRegex "local shifted_key = " editorsText;
 assert containsRegex "KITTY_WINDOW_ID" editorsText;
-true
+{
+  success = true;
+  message = "QtPass settings and editor config tests passed";
+}

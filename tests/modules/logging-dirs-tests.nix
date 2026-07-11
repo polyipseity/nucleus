@@ -82,5 +82,6 @@ in
     test_jellyfin_runAsUser
     test_litellm_runAsUser
   ];
+  success = true;
   allPass = true;
 }

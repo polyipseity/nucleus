@@ -19,4 +19,7 @@ assert containsRegex "astral-sh\\.ty" checkShText;
 assert containsRegex "ERROR:" checkShText;
 assert containsRegex "exit 1" checkShText;
 
-true
+{
+  success = true;
+  message = "Check.sh content assertions passed";
+}

@@ -28,4 +28,7 @@ assert containsRegex "cli =" syncObsidianText;
 assert containsRegex "updateDisabled =" syncObsidianText;
 assert containsRegex "WHY nativeMenus is not configured" syncObsidianText;
 assert containsRegex "WHY checkSlowStartup is not configured" syncObsidianText;
-true
+{
+  success = true;
+  message = "Obsidian configuration parity tests passed";
+}

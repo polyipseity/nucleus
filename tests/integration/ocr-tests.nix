@@ -14,4 +14,7 @@ in
 assert containsRegex "paddleocr" agentsText;
 # Windows (Invoke-UvSetup.ps1): paddleocr in desiredPackages array
 assert containsRegex "paddleocr" uvSetupText;
-true
+{
+  success = true;
+  message = "PaddleOCR provisioning cross-host tests passed";
+}

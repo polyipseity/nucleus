@@ -28,4 +28,7 @@ assert containsRegex "does not inject.*pkgs\\.nix" flakeText;
 # After removing all backtick-quoted `pkgs.nix` comment references, any remaining
 # bare pkgs.nix not followed by a letter indicates a regression.
 assert !containsRegex "pkgs\\.nix[^a-zA-Z]" cleaned;
-true
+{
+  success = true;
+  message = "nix-conf-warnings regression tests passed";
+}

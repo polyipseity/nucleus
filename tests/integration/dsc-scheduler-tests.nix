@@ -23,4 +23,7 @@ assert containsRegex "gc\\.ps1" windowsSchedulerDscText;
 # Test-Path $GcScript guard was removed (commit 0d43be2)
 assert notContainsRegex "Test-Path.*GcScript" windowsSchedulerDscText;
 
-true
+{
+  success = true;
+  message = "DSC scheduler configuration tests passed";
+}

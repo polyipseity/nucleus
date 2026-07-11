@@ -14,4 +14,7 @@ assert lib.hasInfix ''taps = [ "cirruslabs/cli" ];'' homebrewText;
 assert lib.hasInfix ''"smudge/smudge/nightlight"'' homebrewText;
 assert lib.hasInfix ''"zackelia/formulae/bclm"'' homebrewText;
 
-true
+{
+  success = true;
+  message = "Homebrew configuration content tests passed";
+}

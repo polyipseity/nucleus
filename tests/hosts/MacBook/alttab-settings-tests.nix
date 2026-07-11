@@ -77,4 +77,7 @@ assert lib.hasInfix ''language = "0";'' defaultsText;
 assert lib.hasInfix ''updatePolicy = "0";'' defaultsText;
 assert lib.hasInfix ''crashPolicy = "2";'' defaultsText;
 
-true
+{
+  success = true;
+  message = "AltTab preferences configuration tests passed";
+}

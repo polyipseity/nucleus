@@ -38,4 +38,7 @@ assert containsRegex "ai_openrouter_api_key" secretsText;
 assert containsRegex "ai_opencode_zen_api_key" secretsText;
 assert containsRegex "opencode.ai/zen/v1" litellmConfigText;
 assert containsRegex "systemd.services.litellm" nixosAiText;
-true
+{
+  success = true;
+  message = "AI model sync configuration tests passed";
+}

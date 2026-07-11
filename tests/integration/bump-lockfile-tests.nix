@@ -28,4 +28,7 @@ assert containsRegex "Test-SectionEnabled" bumpLockfilePs1Text;
 # code / code-insiders alternative selection pattern
 assert containsRegex "code-insiders" bumpLockfilePs1Text;
 
-true
+{
+  success = true;
+  message = "Bump-lockfile content assertions passed";
+}

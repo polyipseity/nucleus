@@ -20,4 +20,7 @@ assert containsRegex "Clipboard History" raycastManualConfigText;
 assert containsRegex "⌥⌘C" raycastManualConfigText;
 assert containsRegex "DesktopViewSettings" macbookDefaultsText;
 assert containsRegex ''arrangeBy = "grid"'' macbookDefaultsText;
-true
+{
+  success = true;
+  message = "Raycast alias and desktop settings tests passed";
+}

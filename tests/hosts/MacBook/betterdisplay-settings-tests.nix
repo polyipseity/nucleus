@@ -12,4 +12,7 @@ assert lib.hasInfix ''"pro.betterdisplay.BetterDisplay"'' defaultsText;
 assert lib.hasInfix "hideMenuIcon = true;" defaultsText;
 assert lib.hasInfix "showInMenuBar = false;" defaultsText;
 
-true
+{
+  success = true;
+  message = "BetterDisplay defaults wiring tests passed";
+}

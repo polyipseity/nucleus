@@ -105,4 +105,7 @@ assert containsRegex "pkgs.jq" flakeText;
 
 # --- Services.json integration ---
 assert containsRegex ''\$schema.*services\.schema\.json'' servicesJsonText;
-true
+{
+  success = true;
+  message = "Service watchdog schema and invariant tests passed";
+}

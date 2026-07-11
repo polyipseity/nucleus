@@ -53,4 +53,5 @@ in
     && test_nucleus_agent_session
     && test_vscode_agent
     && test_exec_shell;
+  success = all_tests_pass;
 }

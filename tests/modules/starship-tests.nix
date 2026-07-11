@@ -102,4 +102,5 @@ in
     && batteryIsSection
     && hasXDGConfig
     && hasStarShipCache;
+  success = all_tests_pass;
 }

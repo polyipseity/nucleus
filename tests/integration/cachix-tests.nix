@@ -17,4 +17,7 @@ assert containsRegex "extra-substituters" posixBaseText;
 assert containsRegex "extra-trusted-public-keys" posixBaseText;
 assert containsRegex "mB9FSh9qf2dCimDSUo8Zy7bkq5CX" posixBaseText;
 
-true
+{
+  success = true;
+  message = "Cachix configuration content assertions passed";
+}

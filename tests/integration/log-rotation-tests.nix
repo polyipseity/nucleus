@@ -63,4 +63,7 @@ assert containsRegex "runtime source: services\\.json" loggingNixText;
 
 # --- scripts/health-check.sh: reads $defaults.logging.maxSize ---
 assert containsRegex "[$]defaults" healthCheckShText;
-true
+{
+  success = true;
+  message = "Log rotation content assertions passed";
+}

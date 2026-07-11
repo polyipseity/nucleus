@@ -153,6 +153,7 @@ rec {
   # =========================================================================
   # All tests passed
   # =========================================================================
+  success = _validation;
   summary = {
     testSuiteName = "Symlink Hardening Regression Tests";
     totalAssertions = 10;

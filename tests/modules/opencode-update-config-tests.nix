@@ -27,4 +27,7 @@ assert containsRegex "[.]agents/skills" userOpenCodeConfigText;
 assert !containsRegex "OPENCODE_NO_UPDATE_CHECK" shellEnvText;
 assert !containsRegex "OPENCODE_NO_UPDATE_CHECK" nixosBaseText;
 assert !containsRegex "OPENCODE_NO_UPDATE_CHECK" windowsUserDscText;
-true
+{
+  success = true;
+  message = "OpenCode configuration parity tests passed";
+}
