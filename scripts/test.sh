@@ -19,27 +19,32 @@ REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT"
 
 usage() {
-  usage_std "test.sh" "" "Run the repository test suite."
+  usage_std "test.sh" "[-q|--quiet] [-v|--verbose]" "Run the repository test suite. With --quiet, only show FAIL lines and nix output for failing tests. With --verbose, show all output (default)."
 }
 
-# No positional arguments accepted.
-if [ "$#" -gt 0 ]; then
+# Flags
+quiet_mode=false
+verbose_mode=false
+while [ "$#" -gt 0 ]; do
   case "$1" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
+    -q|--quiet) quiet_mode=true; shift ;;
+    -v|--verbose) verbose_mode=true; shift ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; break ;;
     -*)
       error "unsupported argument '$1'"
       usage >&2
       exit 1
       ;;
-    *)
-      error "unexpected argument '$1'"
-      usage >&2
-      exit 1
-      ;;
+    *) break ;;
   esac
+done
+
+# No positional arguments accepted.
+if [ "$#" -gt 0 ]; then
+  error "unexpected argument '$1'"
+  usage >&2
+  exit 1
 fi
 
 _step=0
@@ -47,9 +52,26 @@ _step=0
 # 1. Nix test suite — auto-discover and run all *.nix test files
 section "$((_step += 1))" "Nix test suite"
 tmp_failed=$(mktemp) || { error "failed to create temp file"; }
-# shellcheck disable=SC2016
-find tests/modules tests/integration tests/hosts -name '*.nix' -type f | sort \
-  | xargs -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" -I{} sh -c 'f="$1"; echo "Testing: $f" >&2; if ! nix-instantiate --eval --strict "$f"; then echo "FAIL: $f" >&2; echo "$f" >> "$2"; else echo "PASS: $f" >&2; fi' _ {} "$tmp_failed"
+if [ "$quiet_mode" = true ]; then
+  # Quiet: suppress Testing: / PASS: lines and nix output on success.
+  # shellcheck disable=SC2016
+  find tests/modules tests/integration tests/hosts -name '*.nix' -type f | sort \
+    | xargs -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" -I{} sh -c '
+        f="$1"; tmp="$2"
+        if out=$(nix-instantiate --eval --strict "$f" 2>&1); then
+          true
+        else
+          echo "FAIL: $f" >&2
+          echo "$f" >> "$tmp"
+          echo "$out" >&2
+        fi
+      ' _ {} "$tmp_failed"
+else
+  # Normal: show Testing: / PASS: lines and nix output for all tests.
+  # shellcheck disable=SC2016
+  find tests/modules tests/integration tests/hosts -name '*.nix' -type f | sort \
+    | xargs -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" -I{} sh -c 'f="$1"; echo "Testing: $f" >&2; if ! nix-instantiate --eval --strict "$f"; then echo "FAIL: $f" >&2; echo "$f" >> "$2"; else echo "PASS: $f" >&2; fi' _ {} "$tmp_failed"
+fi
 if [ -s "$tmp_failed" ]; then
   error "FAILED Nix tests:"
   cat "$tmp_failed" >&2
