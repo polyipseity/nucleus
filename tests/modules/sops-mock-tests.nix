@@ -237,7 +237,7 @@ in
 {
   success = true;
   testCount = builtins.length allTests;
-  message = "All ${builtins.length allTests} SOPS mock validation tests passed";
+  message = "All ${builtins.toString (builtins.length allTests)} SOPS mock validation tests passed";
   testNames = [
     "1: SOPS keys.age_devices is present"
     "2: Primary GPG key configured"

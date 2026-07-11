@@ -41,7 +41,7 @@ let
   test_vscode_agent = hasInfix "export VSCODE_AGENT=1" wrapperText;
   test_exec_shell = hasInfix "exec " wrapperText && hasInfix "/bin/zsh" wrapperText;
 in
-{
+rec {
   option_exists = optionExists;
   shell_is_zsh = test_shell_is_zsh;
   exports_nucleus_agent_session = test_nucleus_agent_session;

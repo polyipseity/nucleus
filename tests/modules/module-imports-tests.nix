@@ -75,12 +75,12 @@ let
     else
       builtins.throw "Module ${moduleName} not recognized in import test";
 in
-{
+rec {
   # Verify all modules are recognized and can be imported.
   modulesImportable = builtins.all pathExistsOrThrow moduleImportTests;
 
   # Report the test results.
-  message = "All ${builtins.length moduleImportTests} shared modules are importable";
+  message = "All ${builtins.toString (builtins.length moduleImportTests)} shared modules are importable";
   moduleCount = builtins.length moduleImportTests;
   success = modulesImportable;
 }
