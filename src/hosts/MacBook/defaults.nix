@@ -621,6 +621,12 @@ in
       #
       # Source: https://iterm2.com/documentation.html
       "com.googlecode.iterm2" = {
+        # Set the default profile GUID to the Dynamic Profile defined in
+        # src/modules/configs/iterm2/DynamicProfiles/default-profile.json.
+        # This key (KEY_DEFAULT_GUID) tells iTerm2 which profile to use for
+        # new windows/tabs when no other profile is explicitly selected.
+        # Source: ITAddressBookMgr.h
+        "Default Bookmark Guid" = "9B6E253F-0528-4F8A-A025-4FD279C73DB1";
         # Allow clipboard access from terminal applications.
         "AllowClipboardAccess" = true;
         # Bootstrap daemon: supports shell integration without requiring a full
@@ -643,6 +649,7 @@ in
         # that fires when a session ends within shortLivedSessionDuration (default 3s).
         # Source: PTYSession.m _maybeWarnAboutShortLivedSessions
         "NeverWarnAboutShortLivedSessions_743F1344-118A-4E38-8CB0-D7319D34EF8C" = true;
+        "NeverWarnAboutShortLivedSessions_9B6E253F-0528-4F8A-A025-4FD279C73DB1" = true;
         # Suppress the secure-keyboard-entry warning when opening a command.
         "WarnAboutSecureKeyboardInputWithOpenCommand" = false;
       };
