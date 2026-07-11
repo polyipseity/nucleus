@@ -43,6 +43,7 @@ Default operating mode for all agent interactions.
 ## Instruction compliance
 
 - **Re-read instructions when context changes.** When a task transitions into a new domain (e.g., switches from editing notes to running Python, or from writing content to debugging a tool), re-read any instruction files that apply to the new context. Do not rely on memory of rules from earlier in the conversation — instruction files are the ground truth.
+- **Watch Markdown line wrapping specifically.** When editing `.md` files, `authoring.instructions.md` requires no hard line breaks in paragraphs. Re-read that section before editing — this rule is frequently violated.
 - **Critical gotchas (violations cause data loss or task failure):**
   - NEVER `cd` into `.agents/skills/` or any skill subfolder. Always run commands from the repo root. Running inside a skill folder creates `.venv/`/`uv.lock` trash there and fails.
   - NEVER suggest or run `uv run -m init generate` — content generation is automatic. This instruction applies to ALL content in this repo.

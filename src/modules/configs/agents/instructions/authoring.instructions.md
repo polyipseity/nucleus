@@ -8,7 +8,7 @@ Default rule: write for readability in raw form, not for rendered aesthetics.
 
 ## Markdown line wrapping
 
-Do not insert hard line breaks to keep paragraphs under a certain column width. Markdown viewers render content readably — hard-wrapping only makes raw files harder to navigate and edit.
+**CRITICAL: write each Markdown paragraph as a continuous single line — let the viewer handle wrapping. Do not insert hard line breaks.** Markdown viewers render content readably — hard-wrapping only makes raw files harder to navigate and edit.
 
 **Exception**: when a validator or linter enforces a maximum line length, follow the tool's requirement.
 
