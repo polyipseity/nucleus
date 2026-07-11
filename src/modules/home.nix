@@ -164,6 +164,13 @@ in
       stateVersion = "24.11";
     };
 
+    # Change CWD to a safe location before any activation steps. The Nix build
+    # directory that darwin-rebuild inherits as CWD can be deleted during
+    # activation, causing harmless but noisy getcwd errors.
+    home.activation.changeCwdToHome = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
+      cd /
+    '';
+
     # Per-user password store routing for pass/QtPass/gopass.
     # - pass and QtPass respect PASSWORD_STORE_DIR directly.
     # - gopass also supports PASSWORD_STORE_DIR and explicit config overrides;
