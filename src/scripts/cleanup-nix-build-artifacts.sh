@@ -14,11 +14,9 @@
 # Environment variables:
 #   REPO_ROOT  Repository root (must be set before sourcing).
 
-set -euo pipefail
-
 [ -n "${REPO_ROOT:-}" ] || {
   printf '%s\n' "cleanup-nix-build-artifacts: REPO_ROOT is not set" >&2
-  exit 1
+  return 1
 }
 
 _cnba_options="${_cnba_options:-}"
