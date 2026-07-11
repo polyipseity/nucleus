@@ -12,6 +12,7 @@
 #   7. Service registry validation
 #   8. Locked DSC validation
 #   9. Package manager usage enforcement
+#  10. Stale Nix build artifact check
 #
 # With arguments, passes them through to individual checkers that support
 # path filtering (check-pwsh.ps1, check-packer.sh, nixfmt) and skips
@@ -578,6 +579,24 @@ if ! $HAS_ARGS; then
     $FAIL_FAST && exit $exit_code
   fi
   say "no package manager violations found."
+else
+  say "skipping (path-scoped mode)."
+fi
+
+# Stale Nix build artifact check
+section "$((_step += 1))" "Stale Nix build artifact check"
+if ! $HAS_ARGS; then
+  _cnba_output="$("$SCRIPT_DIR/cleanup-nix.sh" --dry-run 2>&1)" || true
+  if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
+    warn "stale Nix build artifacts found:"
+    echo "$_cnba_output" | while IFS= read -r _cnba_line; do
+      warn "  $_cnba_line"
+    done
+    exit_code=1
+  else
+    say "no stale Nix build artifacts found."
+  fi
+  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 else
   say "skipping (path-scoped mode)."
 fi

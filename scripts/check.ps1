@@ -7,6 +7,7 @@
 #   4. Lockfile validation
 #   5. Locked DSC validation
 #   6. Package manager usage enforcement
+#   7. Stale Nix build artifact check
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
 # deadnix, shellcheck, and script validation tests are skipped
@@ -577,7 +578,26 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 7. Online determinism checks (--verify mode only)
+# 7. Stale Nix build artifact check
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Stale Nix build artifact check ===" -f (++$_step))
+if (-not $HAS_ARGS) {
+  $_cnbaOutput = & "$PSScriptRoot\cleanup-nix.ps1" -WhatIf 2>&1
+  $_cnbaFound = $_cnbaOutput | Select-String -Pattern 'would remove stale Nix build symlink'
+  if ($_cnbaFound) {
+    Write-Output "WARNING: stale Nix build artifacts found:"
+    $_cnbaOutput | ForEach-Object { Write-Output "  $_" }
+    $exitCode = 1
+    if ($FAIL_FAST) { exit $exitCode }
+  } else {
+    Write-Output "No stale Nix build artifacts found."
+  }
+} else {
+  Write-Output "Skipping (path-scoped mode)."
+}
+
+# ---------------------------------------------------------------------------
+# 8. Online determinism checks (--verify mode only)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Online determinism checks (--verify) ===" -f (++$_step))
 if ($VERIFY) {
