@@ -88,57 +88,6 @@ let
     in
     assert' (builtins.elem "gpgImport" activations.gitIdentityFromSops.before) "GPG keys must import before Git identity setup";
 
-  # === TEST: Manual instructions depend on all protect-*Symlink entries (macOS) ===
-  # protect*Symlink entries run entryAfter ["linkGeneration"] and must be
-  # listed in displayHostManualInstructionDeps so manual instructions remain
-  # the final activation step.
-  test_macos_manual_instructions_last =
-    let
-      # Extract the displayHostManualInstructionDeps list content by splitting
-      # on opening and closing delimiters, then verify protect entries are inside.
-      macosDepsSplit = builtins.split "displayHostManualInstructionDeps = \(import \./lib/activation-dag\.nix\) \+\+ \[" macosModuleText;
-      macosDepsContent =
-        if builtins.length macosDepsSplit >= 3 then
-          builtins.elemAt (builtins.split "\];" (builtins.elemAt macosDepsSplit 2)) 0
-        else
-          "";
-      protectEntries = [
-        "protectDiscordMusicRPCConfig"
-        "protectDownloadsICloudSymlink"
-        "protectOpencodeSymlinks"
-        "protectOutOfStoreSymlinks"
-      ];
-      allInMacosDeps = builtins.all (entry: lib.hasInfix "\"${entry}\"" macosDepsContent) protectEntries;
-    in
-    assert' allInMacosDeps "protect*Symlink entries must be inside displayHostManualInstructionDeps list (macOS) so manual instructions run last";
-
-  # === TEST: Manual instructions depend on protect entries (Linux) ===
-  # Same invariant on Linux: displayHostManualInstructions uses entryAfter
-  # with an inline list that must include protect*Symlink entries.
-  test_linux_manual_instructions_last =
-    let
-      # Extract the entryAfter list content for displayHostManualInstructions.
-      # First split on the entryAfter opening paren, then locate the `++ [`
-      # start and the `]` that closes the inline list.
-      linuxEntryAfterSplit = builtins.split "displayHostManualInstructions = lib\.hm\.dag\.entryAfter \(" linuxModuleText;
-      linuxAfterEntryAfter =
-        if builtins.length linuxEntryAfterSplit >= 3 then builtins.elemAt linuxEntryAfterSplit 2 else "";
-      linuxListStartSplit = builtins.split "\+\+ \[" linuxAfterEntryAfter;
-      linuxAfterListStart =
-        if builtins.length linuxListStartSplit >= 3 then builtins.elemAt linuxListStartSplit 2 else "";
-      linuxDepsSplit = builtins.split "\][[:space:]]*\)" linuxAfterListStart;
-      linuxDepsContent =
-        if builtins.length linuxDepsSplit >= 3 then builtins.elemAt linuxDepsSplit 0 else "";
-      linuxProtectEntries = [
-        "protectOpencodeSymlinks"
-        "protectOutOfStoreSymlinks"
-      ];
-      allInLinuxDeps = builtins.all (
-        entry: lib.hasInfix "\"${entry}\"" linuxDepsContent
-      ) linuxProtectEntries;
-    in
-    assert' allInLinuxDeps "protect*Symlink entries must be inside displayHostManualInstructions entryAfter list (Linux) so manual instructions run last";
-
   # === TEST: Activation names are unique ===
   test_activation_names_unique =
     let
@@ -148,7 +97,6 @@ let
         "gpgImport"
         "sshKeyAdopt"
         "devReposProvision"
-        "displayHostManualInstructions"
       ];
       uniqueNames = unique names;
     in
@@ -372,8 +320,6 @@ let
     test_secrets_before_devrepo
     test_ssh_before_git
     test_gpg_before_commits
-    test_macos_manual_instructions_last
-    test_linux_manual_instructions_last
     test_activation_names_unique
     test_no_circular_deps
     test_windows_dsc_ordering

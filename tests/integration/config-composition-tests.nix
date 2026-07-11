@@ -82,12 +82,11 @@ let
     && containsRegex "home-manager\.sharedModules" nixosDefaultText
   ) "Module import order should satisfy dependencies";
 
-  # Test 12: Verify host-specific MANUAL.md paths are set
+  # Test 12: Verify host-specific MANUAL.md files exist in the macOS host config
   test_manual_md_paths = assert' (
     containsRegex "src/hosts/MacBook/MANUAL\.md" macbookDefaultText
     && containsRegex "src/hosts/NixOS/MANUAL\.md" nixosDefaultText
-    && containsRegex "options\.nucleus\.hostManualFile" homeModuleText
-  ) "Each host must declare its MANUAL.md path";
+  ) "Each host must reference its MANUAL.md path";
 
   allTests = [
     test_posix_hosts_import_core

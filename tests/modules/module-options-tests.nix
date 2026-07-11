@@ -62,20 +62,20 @@ let
 
   # Test 9: Verify all options have descriptions (required for maintainability)
   test_all_options_have_descriptions = assert' (
-    containsRegex "options\.nucleus\.hostManualFile = lib\.mkOption" homeModuleText
-    && containsRegex "description = \"Host-scoped MANUAL\.md" homeModuleText
+    containsRegex "options\.nucleus\.rclone\.configPassEnabled = lib\.mkOption" homeModuleText
+    && containsRegex "description = \"Whether a managed rclone config passphrase" homeModuleText
   ) "All module options should have meaningful descriptions";
 
   # Test 10: Verify no conflicting option definitions across modules
   test_no_conflicting_options = assert' (
     containsRegex "options\.nucleus\.macos\.packageSelection" coreModuleText
-    && containsRegex "options\.nucleus\.hostManualFile" homeModuleText
+    && containsRegex "options\.nucleus\.rclone\.configPassEnabled" homeModuleText
   ) "No conflicting option definitions should exist across modules";
 
   # Test 11: Verify option defaults are not null when they should have values
   test_option_defaults_meaningful = assert' (
     containsRegex "default = \"policy\";" coreModuleText
-    && containsRegex "default = null;" homeModuleText
+    && containsRegex "default = false;" homeModuleText
   ) "Option defaults should be meaningful, not null";
 
   # Test 12: Verify condition-gated options use mkIf (not mkDefault on conditional content)
