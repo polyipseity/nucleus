@@ -229,8 +229,9 @@ in
             # .zshrc file and before the direnv hook, making them immune to
             # direnv save/restore cycles regardless of when the dirs were created.)
 
-            # Route managed development tools through either the active direnv
-            # environment or the user-scoped default toolchain for repositories
+              # Route managed development tools through the active direnv
+              # environment, a rust-toolchain.toml project context (cargo/rustc
+              # only), or the user-scoped default toolchain for repositories
             # that do not provide their own .envrc / nix develop entrypoint.
             __nucleus_run_managed_dev_tool() {
               _tool_name="$1"
@@ -245,6 +246,19 @@ in
               if [[ -n "''${DIRENV_DIR:-}" ]] && command -v "$_tool_name" >/dev/null 2>&1; then
                 command "$_tool_name" "$@"
                 return $?
+              fi
+
+              # rust-toolchain.toml in the current directory → project context
+              # for cargo/rustc.  rustup (default none) reads the toolchain file
+              # and routes cargo/rustc to the pinned toolchain so project builds
+              # work without a full devShell or direnv context.
+              if [[ -f "''${PWD}/rust-toolchain.toml" ]] && command -v "$_tool_name" >/dev/null 2>&1; then
+                case "$_tool_name" in
+                  cargo|rustc)
+                    command "$_tool_name" "$@"
+                    return $?
+                    ;;
+                esac
               fi
 
               if [[ -n "''${NUCLEUS_DEFAULT_DEV_BIN:-}" && -x "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" ]]; then
@@ -397,16 +411,13 @@ in
             #   rustc  — companion to cargo; both come from the rustup-managed toolchain
             #   uv     — installs system-level Python tooling
             # Direct developer use of these system binaries is blocked.
-            # When DIRENV_DIR is set, a project context is active — this covers
-            # two intended cases:
+            # When DIRENV_DIR is set, a project context is active:
             #   • 'use flake' .envrc: the devShell provides its own cargo/rustc;
             #     its scoped binaries shadow the system tools.
-            #   • empty (or non-flake) .envrc with rust-toolchain.toml: rustup reads
-            #     the toolchain file and routes cargo to the pinned toolchain; the
-            #     shell pass-through is intentional so project builds work without a
-            #     full devShell.  The .envrc (even if empty) serves as an explicit
-            #     signal that the directory is a managed project context.
-            # Outside any .envrc (no DIRENV_DIR): use 'rustup run stable cargo/rustc'.
+            # When a rust-toolchain.toml exists in the current directory, the same
+            # pass-through applies for cargo/rustc: rustup reads the toolchain file
+            # and routes cargo to the pinned toolchain so project builds work
+            # without a full devShell or direnv context.
             bun() {
               __nucleus_run_managed_dev_tool bun "$@"
               _status=$?
@@ -433,8 +444,7 @@ in
       shell: managed cargo is unavailable right now.
                For Rust development, use one of these managed entrypoints:
                - Enter a project directory with .envrc (direnv auto-loads the devShell)
-               - Or use: rustup run stable cargo <command>
-               - To install a toolchain: rustup toolchain install stable
+               - Or add a rust-toolchain.toml file to this directory
       EOF
               return 1
             }
@@ -449,8 +459,7 @@ in
       shell: managed rustc is unavailable right now.
                For Rust development, use one of these managed entrypoints:
                - Enter a project directory with .envrc (direnv auto-loads the devShell)
-               - Or use: rustup run stable rustc <command>
-               - To install a toolchain: rustup toolchain install stable
+               - Or add a rust-toolchain.toml file to this directory
       EOF
               return 1
             }
