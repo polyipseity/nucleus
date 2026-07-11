@@ -1,8 +1,12 @@
-# hosts/MacBook/camilladsp.nix — CamillaDSP launchd service.
+# hosts/MacBook/camilladsp.nix — CamillaDSP launchd services.
 #
 # Runs as the primary user via UserName so the daemon can access user-level
 # config at $HOME/.config/camilladsp/. Config is deployed by Home Manager
 # in modules/home.nix.
+#
+# Heartbeat is a separate timer-driven agent (StartInterval 5s) that
+# re-pushes the config when camilladsp is not in "Running" state, so
+# config re-applies when a disconnected audio device reappears.
 {
   config,
   pkgs,
@@ -14,67 +18,34 @@ let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   userHome = config.users.users.${username}.home;
   wsPort = toString servicesJSON.camilladsp.network.websocket.port;
+
+  daemonScript = ./../../scripts/camilladsp-daemon.sh;
+  heartbeatScript = ./../../scripts/camilladsp-heartbeat.sh;
+
   camilladspDaemon = pkgs.writeShellScript "camilladsp-daemon" ''
-    set -eu
-    camilladsp="${pkgs.camilladsp}/bin/camilladsp"
-    websocat="${pkgs.websocat}/bin/websocat"
-    jq="${pkgs.jq}/bin/jq"
-    ws_port="${wsPort}"
-    config_file="${userHome}/.config/camilladsp/configs/config.yml"
-    state_file="${userHome}/.local/state/camilladsp/statefile.yml"
-    log_dir="${userHome}/Library/Logs/nucleus/camilladsp"
-    log_file="$log_dir/camilladsp.log"
+    export PATH="${
+      pkgs.lib.makeBinPath [
+        pkgs.camilladsp
+        pkgs.websocat
+        pkgs.jq
+      ]
+    }:$PATH"
+    exec ${daemonScript} \
+      --port ${wsPort} \
+      --config ${userHome}/.config/camilladsp/configs/config.yml \
+      --statefile ${userHome}/.local/state/camilladsp/statefile.yml
+  '';
 
-    mkdir -p "$(dirname "$state_file")"
-
-    "$camilladsp" -p "$ws_port" --statefile "$state_file" -w --no_config -o "$log_file" &
-    pid=$!
-
-    for i in $(seq 1 60); do
-      if [ -f "$config_file" ] && \
-         "$jq" -cRs '{SetConfig: .}' "$config_file" | \
-         "$websocat" -1 "ws://127.0.0.1:$ws_port" >/dev/null 2>&1; then
-        break
-      fi
-      sleep 0.5
-    done
-
-    # Heartbeat: re-push config every 5s so config re-applies when a
-    # disconnected audio device reappears.
-    # Checks config.json on each iteration so dynamic changes apply instantly.
-    config_json="${userHome}/.local/state/nucleus/config.json"
-    backoff=5
-    while true; do
-      sleep "$backoff"
-      _hb_enabled=true
-      if [ -f "$config_json" ]; then
-        _val=$("$jq" -r '.camilladsp.heartbeat // true' "$config_json")
-        [ "$_val" = "false" ] && _hb_enabled=false
-      fi
-      [ "$_hb_enabled" = "false" ] && continue
-
-      # Only push config when not already running, to avoid filling
-      # CamillaDSP's bounded command channel (capacity 10).
-      _state_resp=$(echo '{"GetState":null}' | "$websocat" -1 "ws://127.0.0.1:$ws_port" 2>/dev/null)
-      _state=$(echo "$_state_resp" | "$jq" -r '.GetState.value // empty')
-      if [ "$_state" = "Running" ]; then
-        backoff=5
-        continue
-      fi
-
-      # Push config; on failure (device timeout, rate limit), back off.
-      _push_resp=$(echo '{"SetConfig":'"$("$jq" -cRs '.' "$config_file")"'}' | "$websocat" -1 "ws://127.0.0.1:$ws_port" 2>/dev/null)
-      if echo "$_push_resp" | "$jq" -e '.SetConfig.result == "Ok"' >/dev/null 2>&1; then
-        backoff=5
-      else
-        backoff=$((backoff * 2))
-        [ "$backoff" -gt 60 ] && backoff=60
-      fi
-    done &
-    heartbeat_pid=$!
-
-    wait $pid
-    kill "$heartbeat_pid" 2>/dev/null
+  camilladspHeartbeat = pkgs.writeShellScript "camilladsp-heartbeat" ''
+    export PATH="${
+      pkgs.lib.makeBinPath [
+        pkgs.websocat
+        pkgs.jq
+      ]
+    }:$PATH"
+    exec ${heartbeatScript} \
+      --port ${wsPort} \
+      --config ${userHome}/.config/camilladsp/configs/config.yml
   '';
 in
 {
@@ -89,6 +60,19 @@ in
       WorkingDirectory = userHome;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/camilladsp/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/camilladsp/stderr.log";
+    };
+  };
+
+  launchd.daemons."camilladsp-heartbeat" = {
+    serviceConfig = {
+      Label = "local.camilladsp-heartbeat";
+      ProgramArguments = [ "${camilladspHeartbeat}" ];
+      UserName = username;
+      StartInterval = 5;
+      RunAtLoad = false;
+      ThrottleInterval = 1;
+      StandardOutPath = "/dev/null";
+      StandardErrorPath = "${config.nucleus.logging.systemLogDir}/camilladsp/heartbeat-stderr.log";
     };
   };
 }

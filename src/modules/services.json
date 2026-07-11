@@ -78,6 +78,27 @@
       }
     }
   },
+  "camilladsp-heartbeat": {
+    "description": "Periodic config re-push for CamillaDSP audio device recovery",
+    "displayName": "CamillaDSP Heartbeat",
+    "platforms": {
+      "macos": {
+        "domain": "system",
+        "justification": "Launchd agent in camilladsp.nix with StartInterval=5; managed for lifecycle awareness",
+        "service": "local.camilladsp-heartbeat",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "justification": "Systemd timer in camilladsp.nix with OnUnitActiveSec=5s; managed for lifecycle awareness",
+        "scope": "system",
+        "service": "camilladsp-heartbeat.service",
+        "type": "systemctl"
+      },
+      "windows": {
+        "type": "omitted"
+      }
+    }
+  },
   "camillagui-backend": {
     "description": "Web configuration interface for CamillaDSP",
     "displayName": "CamillaDSP GUI",
