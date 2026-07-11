@@ -767,15 +767,6 @@ if (Test-Path -LiteralPath $svcScript) {
 # Health check: verify archiving ecosystem (7-Zip CLI + app) is functional post-apply.
 Test-ArchivingStack | Out-Null
 
-# Display host-scoped one-time manual setup instructions after all main
-# convergence is complete but before post-apply tasks (like AI model downloads)
-# so operators see the checklist while configuration is still in their context,
-# mirroring the displayHostManualInstructions activation on macOS and NixOS hosts.
-$manualPath = Join-Path -Path $PSScriptRoot -ChildPath "MANUAL.md"
-Write-Output "--- MANUAL SETUP (one-time, required) ---"
-Get-Content -Path $manualPath | Write-Output
-Write-Output "-------------------------------------------"
-
 # Converge locally installed Ollama models with the declarative manifest as the
 # final step of every apply.  Model pulls are 2-20 GB, so this runs last to
 # avoid blocking earlier configuration steps.  The sync is best-effort: a
@@ -842,3 +833,10 @@ if (-not (Test-Path -LiteralPath $gcScript)) {
     Write-Warning "gc: GC incomplete (system apply succeeded): $($_.Exception.Message)"
   }
 }
+
+# Display host-scoped one-time manual setup instructions as the final post-apply
+# step so operators see the checklist with no intervening output.
+$manualPath = Join-Path -Path $PSScriptRoot -ChildPath "MANUAL.md"
+Write-Output "--- MANUAL SETUP (one-time, required) ---"
+Get-Content -Path $manualPath | Write-Output
+Write-Output "-------------------------------------------"

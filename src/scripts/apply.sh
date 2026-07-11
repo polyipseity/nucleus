@@ -247,6 +247,7 @@ case "$(uname -s)" in
     run_ai_sync
     run_replica_sync
     run_vm_setup
+    run_manual_display MacBook
     ;;
   Linux)
     if [ -f /etc/NIXOS ]; then
@@ -269,6 +270,7 @@ case "$(uname -s)" in
       run_vm_setup
       run_gc
       run_gc
+      run_manual_display NixOS
     else
       # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
       # no sudo required — keepalive is not started.
@@ -283,6 +285,7 @@ case "$(uname -s)" in
       run_replica_sync
       run_vm_setup
       run_gc
+      run_manual_display NixOS
     fi
     ;;
   *)
