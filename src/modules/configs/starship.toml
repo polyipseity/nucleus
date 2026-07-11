@@ -1,8 +1,8 @@
 # Starship configuration — managed by nucleus (src/modules/configs/starship.toml)
 # See <https://starship.rs/config/> for all options.
 
-# Two-line prompt: host → directory → git → environment → languages →
-# right-aligned status → line break → character.
+# Three-line prompt: host → directory → git / environment → languages /
+# right-aligned status → character.
 # Uses Nerd Font glyphs (CaskaydiaCove Nerd Font).
 # Colors use named ANSI colors for portability across light/dark themes.
 format = """
@@ -12,6 +12,7 @@ $git_branch\
 $git_commit\
 $git_state\
 $git_status\
+$line_break\
 $container\
 $direnv\
 $docker_context\
@@ -25,6 +26,7 @@ $package\
 $python\
 $rust\
 $typst\
+$line_break\
 $fill\
 $battery\
 $cmd_duration\
