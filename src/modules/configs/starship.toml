@@ -1,9 +1,8 @@
 # Starship configuration — managed by nucleus (src/modules/configs/starship.toml)
 # See <https://starship.rs/config/> for all options.
 
-# Three-line prompt: host → directory → git / environment → languages /
-# right-aligned status → character.
-# Uses Nerd Font glyphs (CaskaydiaCove Nerd Font).
+# Four-line prompt: host → directory → git / environment →
+# languages → system status → shell level → character.
 # Colors use named ANSI colors for portability across light/dark themes.
 format = """
 $hostname\
@@ -13,38 +12,34 @@ $git_commit\
 $git_state\
 $git_status\
 $fill\
-$line_break\
 $container\
 $direnv\
 $docker_context\
 $nix_shell\
+$line_break\
+$package\
 $bun\
 $c\
 $cmake\
 $dotnet\
 $nodejs\
-$package\
 $python\
 $rust\
 $typst\
 $line_break\
-$fill\
 $battery\
+$memory_usage\
+$fill\
 $cmd_duration\
 $jobs\
-$memory_usage\
 $shell\
-$shlvl\
 $status\
 $sudo\
 $time\
 $line_break\
+$shlvl\
 $character\
 """
-
-[character]
-success_symbol = '[❯](bold green)'
-error_symbol = '[❯](bold red)'
 
 [hostname]
 disabled = false
@@ -72,15 +67,27 @@ style = "bold red"
 
 [direnv]
 disabled = false
-format = '[$symbol$loaded/$allowed]($style) '
+format = '[$symbol$loaded$allowed]($style) '
 style = "bold yellow"
+symbol = "⇋ "
+allowed_msg = "a"
+denied_msg = "d"
+not_allowed_msg = "?"
+loaded_msg = "✅ "
+unloaded_msg = "❌ "
 
 [docker_context]
 format = '[$symbol$context]($style) '
 style = "bold cyan"
 
 [nix_shell]
-format = '[$symbol$state( \($name\))]($style) '
+format = '[$symbol$state($name)]($style) '
+style = "bold yellow"
+impure_msg = "⚠️ "
+pure_msg = ""
+
+[package]
+format = '[$symbol$version]($style) '
 style = "bold yellow"
 
 [bun]
@@ -101,10 +108,6 @@ style = "bold purple"
 [nodejs]
 format = '[$symbol($version )]($style)'
 
-[package]
-format = '[$symbol$version]($style) '
-style = "bold yellow"
-
 [python]
 format = '[${symbol}${pyenv_prefix}(${version} )(\($virtualenv\) )]($style)'
 style = "bold yellow"
@@ -122,6 +125,20 @@ style = "bold black"
 
 [battery]
 format = '[$symbol$percentage]($style) '
+full_symbol = '🔋 '
+charging_symbol = '⚡️ '
+discharging_symbol = '🪫 '
+empty_symbol = '💀 '
+unknown_symbol = '❓ '
+
+[[battery.display]]
+threshold = 100
+style = 'bold yellow'
+
+[memory_usage]
+disabled = false
+format = '[$symbol${ram}(|${swap})]($style) '
+style = "bold black"
 
 [cmd_duration]
 min_time = 0
@@ -131,19 +148,9 @@ style = "bold cyan"
 [jobs]
 style = "bold black"
 
-[memory_usage]
-disabled = false
-threshold = 90
-format = '[$symbol${ram}(|${swap})]($style) '
-style = "bold black"
-
 [shell]
 disabled = false
 format = '[$indicator]($style) '
-
-[shlvl]
-format = '[$symbol$shlvl]($style) '
-style = "bold black"
 
 [status]
 disabled = false
@@ -159,3 +166,14 @@ disabled = false
 format = '[$time]($style) '
 time_format = "%R"
 style = "bold black"
+
+[shlvl]
+disabled = false
+format = '[$symbol]($style)'
+repeat = true
+symbol = '❯'
+repeat_offset = 1
+
+[character]
+success_symbol = '[❯](bold green)'
+error_symbol = '[❯](bold red)'
