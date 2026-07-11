@@ -19,16 +19,14 @@ REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT"
 
 usage() {
-  usage_std "test.sh" "[-q|--quiet] [-v|--verbose]" "Run the repository test suite. With --quiet, only show FAIL lines and nix output for failing tests. With --verbose, show all output (default)."
+  usage_std "test.sh" "[-q|--quiet]" "Run the repository test suite. With --quiet, only show FAIL lines and nix output for failing tests. By default, all output is shown."
 }
 
 # Flags
 quiet_mode=false
-verbose_mode=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -q|--quiet) quiet_mode=true; shift ;;
-    -v|--verbose) verbose_mode=true; shift ;;
     -h|--help) usage; exit 0 ;;
     --) shift; break ;;
     -*)
