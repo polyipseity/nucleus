@@ -403,59 +403,8 @@ let
     # GC script handles tool availability checks internally.
     exec "$_repo_root/scripts/gc.sh"
   '';
-
-  # Keep displayHostManualInstructions as the final user-visible activation
-  # step.
-  # Any new activation entry added to this module should be appended here so
-  # manual instructions remain the last script to run.
-  # Shared activation entries defined in src/modules/lib/activation-dag.nix;
-  # keep macOS-specific entries below so cross-host additions are single-sourced.
-  displayHostManualInstructionDeps = (import ./lib/activation-dag.nix) ++ [
-    "checkFilesChanged"
-    "checkLinkTargets"
-    "configureDisplayResolutions"
-    "configureFinderSidebar"
-    "configureICloudExclusions"
-    "configureInputAndSiri"
-    "configureLaunchServices"
-    "configureRaycastApplicationAliases"
-    "configureNightlight"
-    "configureSafariDefaults"
-    "configureUniversalAccessDefaults"
-    "ensureHeadlessDisplay"
-    "initRustup"
-    "installCargoBinstallPackages"
-    "installPackages"
-    "linkGeneration"
-    "onFilesChange"
-    "preflightPrivacyPermissions"
-    "protectDiscordMusicRPCConfig"
-    "protectDownloadsICloudSymlink"
-    "protectOpencodeSymlinks"
-    "protectOutOfStoreSymlinks"
-    "relaunchDesktopServices"
-    "reloadDockPreferenceState"
-    "reloadUserPreferenceState"
-    "setupLaunchAgents"
-    "sops-nix"
-    "verifyArchivingStack"
-    "writeBoundary"
-  ];
-  displayHostManualInstructionsBody =
-    import ./lib/manual-instructions.nix { inherit (config.nucleus) hostManualFile; }
-      {
-        osLabel = "macos";
-        inherit repoRoot;
-      };
 in
 lib.mkIf pkgs.stdenv.isDarwin {
-  assertions = [
-    {
-      assertion = config.nucleus.hostManualFile != null;
-      message = "modules/macos.nix requires nucleus.hostManualFile to be set by the Darwin host entrypoint (for example ./MANUAL.md in src/hosts/MacBook/default.nix).";
-    }
-  ];
-
   home.packages = [
     preferenceGc.managedPreferencesGcScript
     pkgs.mysides
@@ -1045,18 +994,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
         echo "macos: warning — Keka.app not found in /Applications; GUI archiving unavailable." >&2
       fi
     '';
-
-    # -------------------------------------------------------------------------
-    # displayHostManualInstructions
-    # Prints host-scoped one-time manual setup instructions from the dedicated
-    # host manual document instead of embedding long reminder strings here.
-    #
-    # Ordering invariant:
-    #   displayHostManualInstructions must remain the terminal activation node so
-    #   users always see one final, consolidated instruction block after every
-    #   automated step has finished.
-    # -------------------------------------------------------------------------
-    displayHostManualInstructions = lib.hm.dag.entryAfter displayHostManualInstructionDeps displayHostManualInstructionsBody;
 
     # -------------------------------------------------------------------------
     # ensureHeadlessDisplay

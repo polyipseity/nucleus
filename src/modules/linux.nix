@@ -24,22 +24,8 @@ let
 
     exec "$_repo_root/scripts/gc.sh"
   '';
-
-  displayHostManualInstructionsBody =
-    import ./lib/manual-instructions.nix { inherit (config.nucleus) hostManualFile; }
-      {
-        osLabel = "linux";
-        inherit repoRoot;
-      };
 in
 lib.mkIf pkgs.stdenv.isLinux {
-  assertions = [
-    {
-      assertion = config.nucleus.hostManualFile != null;
-      message = "modules/linux.nix requires nucleus.hostManualFile to be set by the Linux host entrypoint (for example ./MANUAL.md in src/hosts/NixOS/default.nix).";
-    }
-  ];
-
   # Home Manager exposes GNOME settings via `dconf.*` (not `programs.dconf`).
   # Enabling this keeps `dconf.settings` declarative and idempotent.
   dconf.enable = true;
@@ -214,31 +200,6 @@ lib.mkIf pkgs.stdenv.isLinux {
       fi
     '';
 
-    # -----------------------------------------------------------------------
-    # displayHostManualInstructions
-    # Prints one-time Linux host instructions from the dedicated NixOS manual
-    # document after secrets/wallpaper activation work so operators get one
-    # consolidated, post-automation checklist.
-    # -----------------------------------------------------------------------
-    # Shared activation entries from src/modules/lib/activation-dag.nix;
-    # keep Linux-specific entries below.
-    displayHostManualInstructions = lib.hm.dag.entryAfter (
-      (import ./lib/activation-dag.nix)
-      ++ [
-        "buildNixIndex"
-        "checkFilesChanged"
-        "checkLinkTargets"
-        "initRustup"
-        "installCargoBinstallPackages"
-        "installPackages"
-        "linkGeneration"
-        "onFilesChange"
-        "protectOpencodeSymlinks"
-        "protectOutOfStoreSymlinks"
-        "sops-nix"
-        "writeBoundary"
-      ]
-    ) displayHostManualInstructionsBody;
   };
 
   # --------------------------------------------------------------------------
