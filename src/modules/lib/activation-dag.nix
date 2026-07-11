@@ -8,8 +8,8 @@
 # instead of duplicating the shared set.  When adding a new shared activation
 # entry, add its name here so all hosts inherit it automatically.
 #
-# Usage:
-#   displayHostManualInstructionDeps = (import ../lib/activation-dag.nix) ++ [
+# Usage in host configs:
+#   sharedActivationDeps = (import ../lib/activation-dag.nix) ++ [
 #     "hostSpecificEntry"
 #   ];
 [

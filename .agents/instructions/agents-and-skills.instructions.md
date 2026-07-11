@@ -58,24 +58,6 @@ ClawHub is installed and managed declaratively by the `installBunPackages` Home 
 
 ClawHub is managed by `Invoke-BunSetup` in `src/hosts/Windows/modules/Invoke-BunSetup.ps1`, which is called by `apply.ps1` before `Sync-AgentsClawHubSkills`. `Invoke-BunSetup` manages a `$desiredPackages` list (currently `@mariozechner/pi-coding-agent` and `clawhub`) and writes a manifest to `%USERPROFILE%\.config\nucleus\bun-packages.json`.
 
-## Activation DAG (POSIX)
-
-```
-linkGeneration
-  └─ agentsSymlink      (creates real ~/.agents/; per-subdir symlinks)
-       └─ agentsSkills  (creates real ~/.agents/skills/; bundled skill symlinks)
-            └─ installBunPackages  (installs bun global packages incl. clawhub)
-                 └─ syncClawHubSkills  (inline fetched skill convergence)
-                      └─ displayHostManualInstructions  (terminal node)
-```
-
-Both `installBunPackages` and `syncClawHubSkills` must be added to:
-
-- `displayHostManualInstructionDeps` in `src/modules/macos.nix`
-- `entryAfter` list of `displayHostManualInstructions` in `src/modules/linux.nix`
-
-When a new `home.activation` entry is added to `agents.nix`, update the deps list in **both** `macos.nix` and `linux.nix` in the same change.
-
 ## Windows apply order
 
 ```
@@ -89,9 +71,7 @@ WinGet DSC (all .dsc.yml files)
 
 | File                                                    | Purpose                                                                                          |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `src/modules/agents.nix`                                | POSIX activation DAG: `agentsSymlink`, `agentsSkills`, `installBunPackages`, `syncClawHubSkills` |
-| `src/modules/macos.nix`                                 | `displayHostManualInstructionDeps` must include all activation names                             |
-| `src/modules/linux.nix`                                 | `displayHostManualInstructions` `entryAfter` must include all activation names                   |
+| `src/modules/agents.nix`                                | POSIX activation entries: `agentsSymlink`, `agentsSkills`, `installBunPackages`, `syncClawHubSkills` |
 | `src/hosts/Windows/apply.ps1`                           | Windows orchestrator; displays `MANUAL.md` as the final step after all convergence               |
 | `src/modules/configs/agents/clawhub-skills.json`        | Declarative fetched skill manifest (`{"skills":[...slugs...]}`)                                  |
 | `src/modules/configs/agents/skills/`                    | Bundled (committed, AGPL-compatible) skill directories                                           |
@@ -104,5 +84,5 @@ WinGet DSC (all .dsc.yml files)
 
 - **No fallback installs in sync functions**: the POSIX `syncClawHubSkills` activation logic and Windows `Sync-AgentsClawHubSkills` helper must not attempt to install ClawHub themselves. Provisioning belongs to `installBunPackages` (POSIX) / `Invoke-BunSetup` (Windows).
 - **Stale cleanup scoped to fetched downloads**: only remove directories that carry a `.clawhub/origin.json` marker; never touch bundled symlinks or unknown directories.
-- **Skill sync is best-effort**: a failed sync does not break the activated system. Print a warning and continue so `displayHostManualInstructions` is always reached.
+- **Skill sync is best-effort**: a failed sync does not break the activated system. Print a warning and continue.
 - **Desired-package list sorted alphabetically**: keep `$desiredPackages` in `bun-setup.ps1` and the equivalent list in `installBunPackages` sorted.

@@ -125,17 +125,6 @@ Validation expectation after any pmset change:
 
 - Verify `systemsetup` + `pmset -g custom`, introduce deliberate drift, run `nix run .#apply` from `src/`, then verify convergence back to the declarative target.
 
-## Home Manager activation DAG invariants
-
-- `home.activation.displayHostManualInstructions` MUST remain the **terminal node** of the Home Manager activation DAG on every POSIX host. Nothing — no activation entry, no post-apply task — may execute after it.
-  - macOS: defined in `src/modules/macos.nix` via `displayHostManualInstructionDeps`.
-  - NixOS/Linux: defined in `src/modules/linux.nix` via its `entryAfter` list.
-  - Windows: mirror this by keeping manual-display code after all post-apply best-effort tasks in `src/hosts/Windows/apply.ps1`.
-- **Whenever you add a new `home.activation.<name>` entry** (in any module, shared or host-specific), add `<name>` to the display-host-manual-instructions dependency list on **every host that will run it** in the same change. Missing a host creates a silent ordering gap — the DAG has no edge, so topological sort can place the new entry after manual instructions.
-- Shared activation entries (defined in `src/modules/*.nix` and used by both macOS and Linux) belong in `src/modules/lib/activation-dag.nix` so both hosts inherit them automatically. Host-specific entries go in the per-host `++` list in `macos.nix` or `linux.nix`.
-- Keep the dep lists alphabetically sorted for easy diff review.
-- If a feature needs a one-time manual step that cannot be safely automated, update the host manual file (`src/hosts/MacBook/MANUAL.md`, `src/hosts/NixOS/MANUAL.md`, and/or `src/hosts/Windows/MANUAL.md`) in the same change so activation output remains a complete checklist.
-
 ## sops-nix macOS LaunchAgent async behaviour
 
 sops-nix on macOS installs secrets via a LaunchAgent, not inline during activation. `launchctl bootstrap` returns before `sops-install-secrets` finishes writing files to `~/.config/sops-nix/secrets/`. This means:
@@ -149,7 +138,6 @@ Use the `waitForSopsSecrets` barrier pattern (`entryAfter [ "sops-nix" ]`) to po
 Rules:
 
 - Wire `gitIdentityFromSops`, `gpgImport`, `sshKeyAdopt`, and any other entry that reads sops-materialized secrets to depend on `waitForSopsSecrets`, not `sops-nix` directly.
-- Add `"waitForSopsSecrets"` to `displayHostManualInstructionDeps` in `macos.nix` and to the `entryAfter` list in `linux.nix` in the same change (it must precede the terminal node on both hosts).
 - The sentinel file is the git-identity secret: smallest file, appears early in `sops-install-secrets` output; once it is non-empty (`-s` test), all other secrets are effectively written.
 
 ## Machine age key auto-registration
