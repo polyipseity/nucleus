@@ -1090,20 +1090,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
         fi
       fi
     '';
-
-    # -------------------------------------------------------------------------
-    # cleanupOldWatchdogUser
-    # Remove any stale launchd state for service-watchdog-user left over from
-    # the previous nix-darwin-managed definition.  nix-darwin runs its
-    # launchd.agents removal as root, which can leave launchd in a state where
-    # home-manager's subsequent user-level bootstrap fails with EIO (code 5).
-    # This is a transition cleanup — once all systems have cycled through an
-    # apply with the new home-manager-managed definition, it becomes a no-op.
-    # -------------------------------------------------------------------------
-    cleanupOldWatchdogUser = lib.hm.dag.entryBefore [ "setupLaunchAgents" ] ''
-      _uid="$(id -u)"
-      launchctl bootout "gui/$_uid/local.service-watchdog-user" 2>/dev/null || true
-    '';
   };
 
   # --------------------------------------------------------------------------
