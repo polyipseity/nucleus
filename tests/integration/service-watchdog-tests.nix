@@ -16,7 +16,7 @@ let
   watchdogShText = builtins.readFile ../../scripts/service-watchdog.sh;
   watchdogPs1Text = builtins.readFile ../../scripts/service-watchdog.ps1;
   flakeText = builtins.readFile ../../src/flake.nix;
-  macosNixText = builtins.readFile ../../src/modules/macos.nix;
+  macosWatchdogNixText = builtins.readFile ../../src/hosts/MacBook/service-watchdog.nix;
   nixosActivationText = builtins.readFile ../../src/hosts/NixOS/activation.nix;
   windowsSchedulerDscText = builtins.readFile ../../src/hosts/Windows/system/scheduler.dsc.yml;
   servicesJsonText = builtins.readFile ../../src/modules/services.json;
@@ -73,11 +73,11 @@ assert containsRegex "socketActivated" watchdogPs1Text;
 assert containsRegex "prefixMatch" watchdogPs1Text;
 
 # --- macOS launchd agent config ---
-assert containsRegex "local.service-watchdog" macosNixText;
-assert containsRegex "StartInterval = 300" macosNixText;
-assert containsRegex "RunAtLoad = true" macosNixText;
-assert containsRegex "service-watchdog" macosNixText;
-assert containsRegex "service-watchdog/stdout.log" macosNixText;
+assert containsRegex "local.service-watchdog" macosWatchdogNixText;
+assert containsRegex "StartInterval = 300" macosWatchdogNixText;
+assert containsRegex "RunAtLoad = true" macosWatchdogNixText;
+assert containsRegex "service-watchdog" macosWatchdogNixText;
+assert containsRegex "service-watchdog/stdout.log" macosWatchdogNixText;
 
 # --- NixOS systemd timer config ---
 assert containsRegex "nucleus-service-watchdog" nixosActivationText;
