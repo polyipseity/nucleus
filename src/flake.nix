@@ -299,10 +299,25 @@
         pkgs: args:
         let
           name = args.name;
-          baseDrv = pkgs.writeShellApplication (builtins.removeAttrs args [ "extraBin" ]);
+          baseArgs = builtins.removeAttrs args [
+            "extraBin"
+            "excludeShellChecks"
+            "extraShellCheckFlags"
+            "sourcedFiles"
+          ];
+          baseDrv = pkgs.writeShellApplication (baseArgs // { checkPhase = "true"; });
           extraBin = args.extraBin or { };
+          excludeShellChecks = args.excludeShellChecks or [ ];
+          extraShellCheckFlags = args.extraShellCheckFlags or [ ];
+          sourcedFiles = args.sourcedFiles or { };
+          shellcheckArgs =
+            pkgs.lib.optionals (excludeShellChecks != [ ]) [
+              "--exclude"
+              (pkgs.lib.concatStringsSep "," excludeShellChecks)
+            ]
+            ++ extraShellCheckFlags;
         in
-        pkgs.runCommand "${name}-with-lib" { } ''
+        pkgs.runCommand "${name}-with-lib" { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
           mkdir -p "$out/bin" "$out/src/scripts"
           cp -r "${baseDrv}/bin/." "$out/bin/"
           chmod +w "$out/bin/${name}"
@@ -315,6 +330,13 @@
               cp "${src}" "$out/bin/${target}"
             '') extraBin
           )}
+          ${pkgs.lib.concatStringsSep "\n" (
+            pkgs.lib.mapAttrsToList (target: src: ''
+              cp "${src}" "$out/src/scripts/${target}"
+              chmod +x "$out/src/scripts/${target}"
+            '') sourcedFiles
+          )}
+          shellcheck ${pkgs.lib.escapeShellArgs shellcheckArgs} -x --source-path="$out/bin" "$out/bin/${name}"
         '';
 
       # Like mkApp but returns the derivation directly (no { type, program } wrapper).
@@ -326,6 +348,9 @@
           runtimeInputs,
           extraBin ? { },
           script ? scripts + "/${name}.sh",
+          excludeShellChecks ? [ ],
+          extraShellCheckFlags ? [ ],
+          sourcedFiles ? { },
         }:
         assert pkgs.lib.assertMsg (builtins.baseNameOf script != "nucleus-${name}.sh") ''
           script filename '${builtins.baseNameOf script}' for package '${name}' must not start with 'nucleus-'.
@@ -336,7 +361,12 @@
           name = "nucleus-${name}";
           runtimeInputs = runtimeInputs;
           text = builtins.readFile script;
-          inherit extraBin;
+          inherit
+            extraBin
+            excludeShellChecks
+            extraShellCheckFlags
+            sourcedFiles
+            ;
         };
 
       # Helper for `nix run .#<name>` apps. Delegates to mkNucleusPackage.
@@ -652,6 +682,9 @@
         nucleus-cleanup-nix = mkNucleusPackage pkgs {
           name = "cleanup-nix";
           runtimeInputs = [ pkgs.bash ];
+          sourcedFiles = {
+            "cleanup-nix-build-artifacts.sh" = ./scripts/cleanup-nix-build-artifacts.sh;
+          };
         };
         nucleus-cloud-setup = mkNucleusPackage pkgs {
           name = "cloud-setup";
