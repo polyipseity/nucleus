@@ -125,15 +125,15 @@ style = "bold black"
 
 [battery]
 format = '[$symbol$percentage]($style) '
-full_symbol = '🔋 '
-charging_symbol = '⚡️ '
-discharging_symbol = '🪫 '
-empty_symbol = '💀 '
-unknown_symbol = '❓ '
+full_symbol = "🔋 "
+charging_symbol = "⚡️ "
+discharging_symbol = "🪫 "
+empty_symbol = "💀 "
+unknown_symbol = "❓ "
 
 [[battery.display]]
 threshold = 100
-style = 'bold yellow'
+style = "bold yellow"
 
 [memory_usage]
 disabled = false
@@ -171,7 +171,7 @@ style = "bold black"
 disabled = false
 format = '[$symbol]($style)'
 repeat = true
-symbol = '❯'
+symbol = "❯"
 repeat_offset = 1
 
 [character]
