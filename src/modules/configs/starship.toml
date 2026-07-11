@@ -137,6 +137,7 @@ style = "bold yellow"
 
 [memory_usage]
 disabled = false
+threshold = 0
 format = '[$symbol${ram}(|${swap})]($style) '
 style = "bold black"
 
