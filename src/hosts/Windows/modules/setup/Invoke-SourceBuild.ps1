@@ -67,7 +67,7 @@ function Invoke-SourceBuild {
       if ($dirName -eq '.cache') { continue } # skip cache directory itself
       if (-not $registryIds.ContainsKey($dirName)) {
         $target = Join-Path $installRoot $dirName
-        Write-Host "Invoke-SourceBuild: pruning absent package '$dirName' at '$target'"
+        Write-Output "Invoke-SourceBuild: pruning absent package '$dirName' at '$target'"
         Remove-Item -Recurse -Force $target -ErrorAction Stop
       }
     }
@@ -124,20 +124,21 @@ function Invoke-SourceBuild {
             }
           } catch {
             # Binary exists but is broken; rebuild.
+            Write-Debug "Invoke-SourceBuild: existing binary check failed for '$pkgId': $_"
           }
         }
       }
     }
 
     if ($alreadyInstalled) {
-      Write-Host "Invoke-SourceBuild: '$pkgId' v$version already installed at '$installDir'"
+      Write-Output "Invoke-SourceBuild: '$pkgId' v$version already installed at '$installDir'"
       continue
     }
 
     # --- Clone / fetch the repository ---
     $repoCacheDir = Join-Path $cacheRoot $pkgId
     if (-not (Test-Path $repoCacheDir)) {
-      Write-Host "Invoke-SourceBuild: cloning $pkgId from $sourceUrl"
+      Write-Output "Invoke-SourceBuild: cloning $pkgId from $sourceUrl"
       $null = New-Item -ItemType Directory -Path $repoCacheDir -Force -ErrorAction Stop
       & git clone $sourceUrl $repoCacheDir 2>&1 | Out-Null
       if ($LASTEXITCODE -ne 0) {
@@ -161,7 +162,7 @@ function Invoke-SourceBuild {
     }
 
     # --- Build ---
-    Write-Host "Invoke-SourceBuild: building $pkgId v$version with $buildSystem"
+    Write-Output "Invoke-SourceBuild: building $pkgId v$version with $buildSystem"
     Push-Location $repoCacheDir
     try {
       switch ($buildSystem) {
@@ -191,7 +192,7 @@ function Invoke-SourceBuild {
     $null = New-Item -ItemType Directory -Path $installDir -Force -ErrorAction Stop
     Copy-Item $builtBinary $installDir -Force -ErrorAction Stop
     Set-Content -Path $markerPath -Value $rev -Force -ErrorAction Stop
-    Write-Host "Invoke-SourceBuild: installed $pkgId v$version to '$installDir'"
+    Write-Output "Invoke-SourceBuild: installed $pkgId v$version to '$installDir'"
   }
 
   # --- Update PATH for this session ---
@@ -207,6 +208,6 @@ function Invoke-SourceBuild {
   }
   if ($pathsToAdd.Count -gt 0) {
     $env:PATH = "$($pathsToAdd -join ';');$env:PATH"
-    Write-Host "Invoke-SourceBuild: prepended to PATH: $($pathsToAdd -join ', ')"
+    Write-Output "Invoke-SourceBuild: prepended to PATH: $($pathsToAdd -join ', ')"
   }
 }
