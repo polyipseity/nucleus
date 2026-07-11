@@ -28,13 +28,13 @@ Default operating mode for all agent interactions.
 - **Git boundary.** Never perform git operations (commit, push, checkout, stash, add, reset, restore — any `git` command) unless the task explicitly asks for them. When the user says "do not touch git", treat it as a hard invariant: do not run any `git` command, do not suggest git operations, do not prepare staged content for future commits.
 - **Diagnose pre-commit hook failures, do not retry.** When `git commit` or `git push` fails due to a pre-commit hook, read the hook output to identify the root cause, fix the issue, then retry. Blind retries waste time — hook failures always indicate a problem in staged content.
 - **Defer privileged operations.** If a task requires `sudo`, admin elevation, or any operation that cannot run as the current user, do not execute it. Instead, note the required privilege in the completion summary and prompt the user to run it.
-- **Multi-edit fallback.** When a batch edit tool call fails (e.g., `multi_replace_string_in_file`), fall back to sequential single-edit calls. Do not retry the same multi-edit call without adjusting the approach (smaller batch size, simpler diffs, or sequential replacements).
-- **Tool-retry discipline.** When a tool call fails with a malformed error, do not retry the same pattern — it will produce the same error and burn context. Switch tools (e.g., `multi_replace_string_in_file` → `replace_string_in_file`), simplify the request, or restructure the approach.
-- **Strict scope adherence.** When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, or re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
+- See `.agents/instructions/execution-details.instructions.md` for multi-edit fallback and tool-retry discipline.
+- **Strict scope adherence. When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, or re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
 
 ## Terminal hygiene
 
 - Discard terminal output after use. After acting on terminal output, summarize the exit code and relevant result in your own words. Do not carry raw terminal output into the next turn's context. Accumulated terminal noise is the single largest input-token waste in multi-turn sessions.
+- **Logging vs terminal output.** Use terminal output for command results, build output, and test results. Use issue comments and conversation messages for diagnostics. Do not write progress logs into terminal output that the user will see — prefer structured tool output or in-message summaries.
 
 ## Research scope
 
@@ -68,17 +68,6 @@ When the premise is valid, proceed normally with a direct, high-quality answer.
 
 - **Never silently downgrade errors.** Do not change errors to warnings, info logs, or silently swallowed failures unless the user explicitly approves. If an operation fails, report the failure clearly — do not pretend it succeeded or claim success with caveats buried in output.
 - **Match severity to user intent.** When the user says something "is an error", treat it as an error. Do not second-guess or reclassify the severity without explicit discussion.
-
-## Investigation protocol
-
-When investigating a bug or unexpected behavior:
-
-1. **Verify upstream behavior first.** Before reasoning about a third-party tool's internals, consult its source code, official documentation, or man pages. Fabricated upstream behavior (API semantics, config formats, runtime errors) is not acceptable.
-2. Trace the full call chain from entry point to leaf operations.
-3. Enumerate all plausible root causes before diving into any single one.
-4. For each cause, produce concrete evidence (log lines, error output, observed values) — do not reason from assumptions.
-5. Report findings with evidence before proposing fixes.
-6. Propose the simplest fix that addresses the confirmed root cause.
 
 ## Plan implementation completeness
 
