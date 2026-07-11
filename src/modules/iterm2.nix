@@ -8,7 +8,12 @@
 # Parity note: iTerm2 is macOS-only.  No equivalent exists on NixOS/Windows.
 #
 # Source: https://iterm2.com/documentation.html
-{ lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   # Pinned iTerm2 zsh shell integration script placed at
   # ~/.iterm2_shell_integration.zsh via home.file.  The script enables command
