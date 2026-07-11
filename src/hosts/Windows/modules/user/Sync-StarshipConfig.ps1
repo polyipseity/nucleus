@@ -33,7 +33,7 @@ function Sync-StarshipConfig {
   if (-not $Enabled) {
     if (Test-Path -Path $destPath -PathType Leaf) {
       Remove-Item -Path $destPath -Force
-      Write-Host "Sync-StarshipConfig: removed $destPath" -ForegroundColor DarkCyan
+      Write-Output "$($PSStyle.Foreground.Cyan)Sync-StarshipConfig: removed $destPath$($PSStyle.Reset)"
     }
     return
   }
@@ -58,5 +58,5 @@ function Sync-StarshipConfig {
     Remove-Item -Path $destPath -Force
   }
   New-Item -Path $destPath -ItemType SymbolicLink -Target $sourcePath -Force | Out-Null
-  Write-Host "Sync-StarshipConfig: symlinked $destPath" -ForegroundColor DarkCyan
+  Write-Output "$($PSStyle.Foreground.Cyan)Sync-StarshipConfig: symlinked $destPath$($PSStyle.Reset)"
 }
