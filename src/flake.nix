@@ -649,6 +649,10 @@
             pkgs.shellcheck
           ];
         };
+        nucleus-cleanup-nix = mkNucleusPackage pkgs {
+          name = "cleanup-nix";
+          runtimeInputs = [ pkgs.bash ];
+        };
         nucleus-cloud-setup = mkNucleusPackage pkgs {
           name = "cloud-setup";
           runtimeInputs = [
