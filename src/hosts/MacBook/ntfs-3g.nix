@@ -35,6 +35,7 @@ let
       automake
       gnumake
       libtool
+      llvmPackages.clang
       pkg-config
     ]
   );
@@ -53,11 +54,15 @@ let
   cppFlags = "-I/usr/local/include/fuse/fuse";
   ldFlags = "-L/usr/local/lib -lfuse-t -Wl,-rpath,/usr/local/lib";
   configureFlags = "--with-fuse=external --prefix=/usr/local --disable-crypto";
+  clangBin = "${pkgs.llvmPackages.clang}/bin/clang";
+  clangxxBin = "${pkgs.llvmPackages.clang}/bin/clang++";
   buildFingerprint = builtins.hashString "sha256" (
     builtins.concatStringsSep "\n" [
       ntfs3gSrc.outPath
       buildToolsPath
       aclocalPath
+      clangBin
+      clangxxBin
       cppFlags
       ldFlags
       configureFlags
@@ -85,6 +90,8 @@ in
       cp -r "${ntfs3gSrc}" "$BUILD_DIR/ntfs-3g"
       chmod -R u+w "$BUILD_DIR/ntfs-3g"
       cd "$BUILD_DIR/ntfs-3g"
+      export CC="${clangBin}"
+      export CXX="${clangxxBin}"
       export CPPFLAGS="${cppFlags}"
       export LDFLAGS="${ldFlags}"
 
