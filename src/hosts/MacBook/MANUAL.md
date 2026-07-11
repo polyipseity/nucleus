@@ -5,6 +5,7 @@
 - Grant Accessibility to BetterDisplay, Chrome Remote Desktop Host, and MiddleClick.
 - Grant Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
 - Grant Automation to the terminal running `nucleus-vm-setup` for UTM imports.
+- **Allow full disk access for remote users**: Open System Settings → General → Sharing → Remote Login → click the **(i)** icon → toggle **Allow full disk access for remote users** to **On**.
 - Open `fuse-t.app` once, then enable the extension in System Settings > General > Login Items & Extensions > Extensions.
 - NTFS read-write: launch Mounty, agree to the dialog, plug in an NTFS drive, then re-mount it via the Mounty menu-bar icon. If the drive mounts read-only (e.g. after Windows Fast Startup): unmount the drive, run `sudo ntfsfix /dev/diskXsY`, then reconnect the drive. Fallback: unmount and `sudo ntfs-3g /dev/diskXsY /path/to/mountpoint`. The ntfs-3g binary is built automatically during `nucleus-apply`. If the build fails, see `/Users/Shared/nucleus/logs/ntfs-3g-build.log` for the full output.
 - Open `battery.app` once to install `/usr/local/bin/battery`.
