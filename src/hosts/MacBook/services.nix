@@ -115,6 +115,9 @@ let
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem dict" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem:default string optimize pdf - ${preset}" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMessage string open" "$plist"
+        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes array" "$plist"
+        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes:0 string public.file-url" "$plist"
+        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes:1 string NSFilenamesPboardType" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes array" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes:0 string com.adobe.pdf" "$plist"
 
