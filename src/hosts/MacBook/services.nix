@@ -196,9 +196,17 @@ in
         rm -rf "$wf_dir"
         cp -R "$store_path" "$SERVICE_DIR/"
         chmod -R u+w "$wf_dir"
-        enablement_key="com.nucleus.OptimizePDF-${preset} - optimize PDF - ${preset} - runWorkflowAsService"
+        # Remove stale legacy entries (pre-macOS 14 format).
+        for legacy_key in \
+          "com.nucleus.GSPDFOpt-${preset} - Optimize PDF - ${preset} - runWorkflowAsService" \
+          "com.nucleus.OptimizePDF-${preset} - optimize PDF - ${preset} - runWorkflowAsService"; do
+          /usr/bin/defaults delete pbs NSServicesStatus "$legacy_key" 2>/dev/null || true
+        done
+        # Enable in presentation_modes format (macOS 14+). The (null) bundle ID
+        # is correct because .workflow bundles have no CFBundleIdentifier.
+        enablement_key="(null) - optimize PDF - ${preset} - runWorkflowAsService"
         /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
-          '<dict><key>enabled_context_menu</key><true/><key>enabled_services_menu</key><true/></dict>'
+          '<dict><key>presentation_modes</key><dict><key>ContextMenu</key><true/><key>ServicesMenu</key><true/><key>FinderPreview</key><true/><key>TouchBar</key><true/></dict></dict>'
       '') gsPdfOptPresets
     )}
 
