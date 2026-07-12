@@ -24,7 +24,7 @@
 #   while making the activation script simpler and faster.
 { lib, pkgs, ... }:
 let
-  nucleusManualApp =
+  nucleusManualAppService =
     pkgs.runCommand "nucleus-manual-app"
       {
         preferLocalBuild = true;
@@ -74,9 +74,9 @@ let
   # Import centralized daemon refresh helpers for Phase 4.
   daemonRefresh = import ../../modules/macos/daemon-refresh.nix;
 
-  # Per-preset workflow definitions for Ghostscript PDF optimization.
+  # Per-preset quick action definitions for Ghostscript PDF optimization.
   # Created via Automator GUI, duplicated as files in services/workflows/.
-  gsPdfOptPresets = [
+  optimizePdfPresets = [
     "default"
     "ebook"
     "prepress"
@@ -84,10 +84,10 @@ let
     "screen"
   ];
 
-  # Packages all 5 workflow bundles into a single derivation output.
+  # Packages all 5 quick action bundles into a single derivation output.
   # Each bundle is a committed .workflow directory in services/workflows/,
   # copied verbatim (no build-time processing).
-  nucleusGSPDFOptWorkflows =
+  nucleusOptimizePdfQuickActions =
     pkgs.runCommand "nucleus-gs-pdf-opt-workflows"
       {
         preferLocalBuild = true;
@@ -98,16 +98,16 @@ let
         ${builtins.concatStringsSep "\n" (
           map (preset: ''
             cp -R "${./services/workflows}/optimize PDF - ${preset}.workflow" "$out/"
-          '') gsPdfOptPresets
+          '') optimizePdfPresets
         )}
       '';
 
-  # Known list of historically-removed Nucleus services.
+  # Known list of historically-removed Nucleus app services.
   # When a service is removed, add its metadata here and remove its app dir.
   # The activation script unconditionally removes its NSServicesStatus key
   # and prunes its app directory from disk. Entries can be removed after all
   # machines have applied once after the removal commit.
-  removedNucleusServices = [
+  removedNucleusAppServices = [
     # Old pre-per-preset single .app bundle (replaced by per-preset apps).
     {
       appDir = "NucleusGSPDFOpt.app";
@@ -116,6 +116,10 @@ let
       message = "open";
     }
   ];
+
+  # List of currently deployed app service directories.
+  # Used by tests and documentation to track active app services.
+  currentNucleusAppServiceDirs = [ "NucleusManual.app" ];
 in
 {
   # Symlink the manual to a fixed home path so the .app can find it without
@@ -126,9 +130,9 @@ in
   # be used because LaunchServices doesn't traverse symlinks.
   #
   # Self-pruning: before deploying, unconditionally removes NSServicesStatus
-  # keys and app directories listed in removedNucleusServices. To remove a
-  # service: delete its deploy logic and add its metadata to
-  # removedNucleusServices. The cleanup happens automatically on next apply.
+  # keys and app directories listed in removedNucleusAppServices. To remove an
+  # app service: delete its deploy logic and add its metadata to
+  # removedNucleusAppServices. The cleanup happens automatically on next apply.
   home.activation.deployNucleusServices = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
     APP_DIR="$HOME/Applications"
@@ -146,7 +150,7 @@ in
           chmod -R +w "$app_path" 2>/dev/null || true
           rm -rf "$app_path"
         fi
-      '') removedNucleusServices
+      '') removedNucleusAppServices
     )}
 
     # Force full LaunchServices re-scan to flush stale cache entries.
@@ -164,7 +168,7 @@ in
 
     # ── Phase 2: Deploy NucleusManual ──────────────────────────────────
     app_path="$APP_DIR/NucleusManual.app"
-    store_path="${nucleusManualApp}/NucleusManual.app"
+    store_path="${nucleusManualAppService}/NucleusManual.app"
 
     mkdir -p "$APP_DIR"
     # Nix store outputs are read-only; strip that before deletion to avoid
@@ -188,16 +192,16 @@ in
     /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
       '<dict><key>presentation_modes</key><dict><key>ContextMenu</key><true/><key>ServicesMenu</key><true/><key>FinderPreview</key><true/><key>TouchBar</key><true/></dict></dict>'
 
-    # ── Phase 3: Deploy per-preset OptimizePDF workflows ────────────────
-    SERVICE_DIR="$HOME/Library/Services"
+    # ── Phase 3: Deploy per-preset OptimizePDF quick actions ────────────
+    QUICK_ACTION_DIR="$HOME/Library/Services"
     ${builtins.concatStringsSep "\n" (
       map (preset: ''
-        wf_dir="$SERVICE_DIR/optimize PDF - ${preset}.workflow"
-        store_path="${nucleusGSPDFOptWorkflows}/optimize PDF - ${preset}.workflow"
-        mkdir -p "$SERVICE_DIR"
+        wf_dir="$QUICK_ACTION_DIR/optimize PDF - ${preset}.workflow"
+        store_path="${nucleusOptimizePdfQuickActions}/optimize PDF - ${preset}.workflow"
+        mkdir -p "$QUICK_ACTION_DIR"
         chmod -R +w "$wf_dir" 2>/dev/null || true
         rm -rf "$wf_dir"
-        cp -R "$store_path" "$SERVICE_DIR/"
+        cp -R "$store_path" "$QUICK_ACTION_DIR/"
         chmod -R u+w "$wf_dir"
         # Remove stale legacy entries (pre-macOS 14 format).
         # Uses PlistBuddy instead of `defaults delete` because `defaults`
@@ -213,7 +217,7 @@ in
         enablement_key="com.nucleus.OptimizePDF.${preset} - optimize PDF - ${preset} - runWorkflowAsService"
         /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
           '<dict><key>presentation_modes</key><dict><key>ContextMenu</key><true/><key>ServicesMenu</key><true/><key>FinderPreview</key><true/><key>TouchBar</key><true/></dict></dict>'
-      '') gsPdfOptPresets
+      '') optimizePdfPresets
     )}
 
     # ── Phase 4: Flush daemon caches so changes take effect immediately ─
