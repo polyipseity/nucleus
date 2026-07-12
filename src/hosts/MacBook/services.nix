@@ -2,22 +2,22 @@
 #
 # macOS Services let apps register operations that appear in other apps' menus,
 # including Finder's right-click context menu under Services → [Service Name].
-# An app bundle with NSServices in its Info.plist is deployed to ~/Applications/,
-# then registered with LaunchServices so the service appears in Finder's Services
-# menu.
+#
+# AppleScript droplet .app bundles (NucleusManual) — deployed to
+# ~/Applications/ and registered with LaunchServices.
 #
 # The .app bundle is built at evaluation time via a Nix derivation (osacompile +
-# PlistBuddy) so the activation script only needs to deploy it. The manual file
-# is symlinked to a fixed path via home.file so the .app can find it without
-# needing NUCLEUS_REPO_ROOT at runtime.
+# PlistBuddy) so the activation script only needs to deploy it. The manual
+# file is symlinked to a fixed path via home.file so the .app can find it
+# without needing NUCLEUS_REPO_ROOT at runtime.
 #
 # WHY home.activation instead of home.file:
 #   home.file creates a symlink to the Nix store, but macOS LaunchServices does
-#   not traverse symlinks when discovering Service provider apps. A
+#   not traverse symlinks when discovering Service provider .app bundles. A
 #   home.activation script that deploys the .app on each generation switch
 #   guarantees LaunchServices can find it.
 #
-# WHY compile at evaluation time:
+# WHY compile at evaluation time (.app only):
 #   osacompile runs on the target machine during nix build, producing
 #   macOS-version-specific .scpt bytecode, but only once per `nucleus-apply`
 #   run instead of at every activation. This keeps the same safety property
@@ -71,8 +71,11 @@ let
         rm -rf "$build_dir"
       '';
 
-  # Generate a per-preset .app bundle for Ghostscript PDF optimization.
-  # Each preset gets its own .app so it can have a distinct menu label.
+  # Import centralized daemon refresh helpers for Phase 4.
+  daemonRefresh = import ../../modules/macos/daemon-refresh.nix;
+
+  # Per-preset workflow definitions for Ghostscript PDF optimization.
+  # Created via Automator GUI, duplicated as files in services/workflows/.
   gsPdfOptPresets = [
     "default"
     "ebook"
@@ -81,62 +84,23 @@ let
     "screen"
   ];
 
-  mkGSPDFOptApp =
-    preset:
-    pkgs.runCommand "nucleus-gs-pdf-opt-${preset}-app"
+  # Packages all 5 workflow bundles into a single derivation output.
+  # Each bundle is a committed .workflow directory in services/workflows/,
+  # copied verbatim (no build-time processing).
+  nucleusGSPDFOptWorkflows =
+    pkgs.runCommand "nucleus-gs-pdf-opt-workflows"
       {
         preferLocalBuild = true;
         allowSubstitutes = false;
       }
       ''
-        as_src="$TMPDIR/NucleusGSPDFOpt.applescript"
-        cat > "$as_src" << APPLESCRIPT
-          on open theFiles
-            set fileCount to 0
-            repeat with theFile in theFiles
-              do shell script "export PATH=\"\$HOME/.nix-profile/bin:/etc/profiles/per-user/\$USER/bin:/usr/local/bin:/usr/bin:/bin\" && nucleus-gs-pdf-opt --preset ${preset} " & quoted form of POSIX path of theFile
-              set fileCount to fileCount + 1
-            end repeat
-            display notification "Optimized " & fileCount & " PDF file(s) with preset " & "${preset}" subtitle "nucleus-gs-pdf-opt"
-          end open
-          on run
-            -- No default action without files
-          end run
-        APPLESCRIPT
-
-        build_dir="$(mktemp -d)"
-        /usr/bin/osacompile -l AppleScript -o "$build_dir/NucleusGSPDFOpt-${preset}.app" "$as_src"
-
-        plist="$build_dir/NucleusGSPDFOpt-${preset}.app/Contents/Info.plist"
-        /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.nucleus.GSPDFOpt-${preset}" "$plist"
-        /usr/libexec/PlistBuddy -c "Set :CFBundleName optimize PDF - ${preset}" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices array" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0 dict" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem dict" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem:default string optimize pdf - ${preset}" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMessage string open" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes array" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes:0 string public.file-url" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes:1 string NSFilenamesPboardType" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes array" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes:0 string com.adobe.pdf" "$plist"
-
-        /usr/bin/codesign --force -s - "$build_dir/NucleusGSPDFOpt-${preset}.app"
-
         mkdir -p "$out"
-        cp -R "$build_dir/NucleusGSPDFOpt-${preset}.app" "$out/"
-        rm -rf "$build_dir"
+        ${builtins.concatStringsSep "\n" (
+          map (preset: ''
+            cp -R "${./services/workflows}/optimize PDF - ${preset}.workflow" "$out/"
+          '') gsPdfOptPresets
+        )}
       '';
-
-  nucleusGSPDFOptApps = builtins.listToAttrs (
-    map (p: {
-      name = p;
-      value = mkGSPDFOptApp p;
-    }) gsPdfOptPresets
-  );
-
-  # Import centralized daemon refresh helpers for Phase 4.
-  daemonRefresh = import ../../modules/macos/daemon-refresh.nix;
 
   # Known list of historically-removed Nucleus services.
   # When a service is removed, add its metadata here and remove its app dir.
@@ -144,6 +108,7 @@ let
   # and prunes its app directory from disk. Entries can be removed after all
   # machines have applied once after the removal commit.
   removedNucleusServices = [
+    # Old pre-per-preset single .app bundle (replaced by per-preset apps).
     {
       appDir = "NucleusGSPDFOpt.app";
       bundleId = "com.nucleus.GSPDFOpt";
@@ -157,8 +122,8 @@ in
   # needing NUCLEUS_REPO_ROOT at runtime.
   home.file.".local/share/nucleus/manual.md".source = ./MANUAL.md;
 
-  # Deploy all Nucleus .app bundles and register with LaunchServices.
-  # home.file can't be used because LaunchServices doesn't traverse symlinks.
+  # Deploy NucleusManual.app and register with LaunchServices. home.file can't
+  # be used because LaunchServices doesn't traverse symlinks.
   #
   # Self-pruning: before deploying, unconditionally removes NSServicesStatus
   # keys and app directories listed in removedNucleusServices. To remove a
@@ -185,9 +150,17 @@ in
     )}
 
     # Force full LaunchServices re-scan to flush stale cache entries.
-    # Phase 4's -kill -domain user is stronger and runs after all deploys,
-    # so this call is redundant but kept as a gentle early flush.
+    # Re-scanned again after all deploys below, so this is a gentle early flush.
     "$LSREGISTER" -R 2>/dev/null || true
+
+    # Remove stale OptimizePDF-*.workflow dirs (old naming convention).
+    for _old_wf in OptimizePDF-default.workflow OptimizePDF-ebook.workflow OptimizePDF-prepress.workflow OptimizePDF-printer.workflow OptimizePDF-screen.workflow; do
+      _old_path="$HOME/Library/Services/$_old_wf"
+      if [ -d "$_old_path" ]; then
+        chmod -R +w "$_old_path" 2>/dev/null || true
+        rm -rf "$_old_path"
+      fi
+    done
 
     # ── Phase 2: Deploy NucleusManual ──────────────────────────────────
     app_path="$APP_DIR/NucleusManual.app"
@@ -199,6 +172,9 @@ in
     chmod -R +w "$app_path" 2>/dev/null || true
     rm -rf "$app_path"
     cp -R "$store_path" "$APP_DIR/"
+    # Nix store outputs are read-only; make writable so LaunchServices
+    # does not silently ignore the app bundle.
+    chmod -R u+w "$app_path"
 
     "$LSREGISTER" -R -f "$app_path" || true
 
@@ -209,20 +185,18 @@ in
     /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
       '<dict><key>enabled_context_menu</key><true/><key>enabled_services_menu</key><true/></dict>'
 
-    # ── Phase 3: Deploy GSPDFOpt per-preset apps ───────────────────────
+    # ── Phase 3: Deploy per-preset OptimizePDF workflows ────────────────
+    SERVICE_DIR="$HOME/Library/Services"
     ${builtins.concatStringsSep "\n" (
       map (preset: ''
-        app_path="$APP_DIR/NucleusGSPDFOpt-${preset}.app"
-        store_path="${nucleusGSPDFOptApps.${preset}}/NucleusGSPDFOpt-${preset}.app"
-
-        mkdir -p "$APP_DIR"
-        chmod -R +w "$app_path" 2>/dev/null || true
-        rm -rf "$app_path"
-        cp -R "$store_path" "$APP_DIR/"
-
-        "$LSREGISTER" -R -f "$app_path" || true
-
-        enablement_key="com.nucleus.GSPDFOpt-${preset} - optimize pdf - ${preset} - open"
+        wf_dir="$SERVICE_DIR/optimize PDF - ${preset}.workflow"
+        store_path="${nucleusGSPDFOptWorkflows}/optimize PDF - ${preset}.workflow"
+        mkdir -p "$SERVICE_DIR"
+        chmod -R +w "$wf_dir" 2>/dev/null || true
+        rm -rf "$wf_dir"
+        cp -R "$store_path" "$SERVICE_DIR/"
+        chmod -R u+w "$wf_dir"
+        enablement_key="com.nucleus.OptimizePDF-${preset} - optimize PDF - ${preset} - runWorkflowAsService"
         /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
           '<dict><key>enabled_context_menu</key><true/><key>enabled_services_menu</key><true/></dict>'
       '') gsPdfOptPresets
