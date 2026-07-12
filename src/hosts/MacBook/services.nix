@@ -179,11 +179,14 @@ in
     "$LSREGISTER" -R -f "$app_path" || true
 
     # Enable the service in NSServicesStatus so it appears in the Services
-    # menu without manual toggling in System Settings > Extensions > Services.
+    # menu and right-click context menu without manual toggling in
+    # System Settings > Extensions > Services.
     # Service key format: "<NSBundleIdentifier> - <NSMenuItem.default> - <NSMessage>"
+    # Uses presentation_modes dict (macOS 14+) instead of legacy
+    # enabled_context_menu/enabled_services_menu booleans.
     enablement_key="com.nucleus.OpenNucleusManual - open nucleus manual - open"
     /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
-      '<dict><key>enabled_context_menu</key><true/><key>enabled_services_menu</key><true/></dict>'
+      '<dict><key>presentation_modes</key><dict><key>ContextMenu</key><true/><key>ServicesMenu</key><true/><key>FinderPreview</key><true/><key>TouchBar</key><true/></dict></dict>'
 
     # ── Phase 3: Deploy per-preset OptimizePDF workflows ────────────────
     SERVICE_DIR="$HOME/Library/Services"
@@ -197,14 +200,17 @@ in
         cp -R "$store_path" "$SERVICE_DIR/"
         chmod -R u+w "$wf_dir"
         # Remove stale legacy entries (pre-macOS 14 format).
+        # Uses PlistBuddy instead of `defaults delete` because `defaults`
+        # cannot parse keys containing spaces or dots as sub-key paths.
         for legacy_key in \
           "com.nucleus.GSPDFOpt-${preset} - Optimize PDF - ${preset} - runWorkflowAsService" \
           "com.nucleus.OptimizePDF-${preset} - optimize PDF - ${preset} - runWorkflowAsService"; do
-          /usr/bin/defaults delete pbs NSServicesStatus "$legacy_key" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"$legacy_key\"" \
+            ~/Library/Preferences/pbs.plist 2>/dev/null || true
         done
-        # Enable in presentation_modes format (macOS 14+). The (null) bundle ID
-        # is correct because .workflow bundles have no CFBundleIdentifier.
-        enablement_key="(null) - optimize PDF - ${preset} - runWorkflowAsService"
+        # Enable in presentation_modes format (macOS 14+).
+        # CFBundleIdentifier is set in each workflow's Info.plist.
+        enablement_key="com.nucleus.OptimizePDF.${preset} - optimize PDF - ${preset} - runWorkflowAsService"
         /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
           '<dict><key>presentation_modes</key><dict><key>ContextMenu</key><true/><key>ServicesMenu</key><true/><key>FinderPreview</key><true/><key>TouchBar</key><true/></dict></dict>'
       '') gsPdfOptPresets
