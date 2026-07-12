@@ -50,6 +50,22 @@ assert lib.hasInfix "DEVELOPER_DIR" shellNix;
 # DEVELOPER_DIR must reference pkgs.apple-sdk (not a stale hardcoded path).
 assert lib.hasInfix "pkgs.apple-sdk" shellNix;
 
+# SDKROOT must be set in the darwin block to the MacOSX SDK path so
+# xcrun --show-sdk-path succeeds without a second xcrun invocation.
+assert lib.hasInfix "SDKROOT" shellNix;
+
+# SDKROOT must include the MacOSX.sdk suffix (correct path for the SDK root).
+assert lib.hasInfix "MacOSX.sdk" shellNix;
+
+# ~/.config/direnv/direnvrc must override _nix() to filter apple-sdk vars
+# from nix print-dev-env, preventing direnv from stripping DEVELOPER_DIR
+# and SDKROOT on directory transitions.
+assert lib.hasInfix "direnvrc" shellNix;
+
+# The _nix override must contain the regex that filters DEVELOPER_DIR,
+# SDKROOT, and NIX_APPLE_SDK_VERSION from print-dev-env output.
+assert lib.hasInfix "print-dev-env" shellNix;
+
 # --- activation.nix assertions ---
 
 # xcode-select --switch must be configured at activation time so xcrun works

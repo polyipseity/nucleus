@@ -60,6 +60,12 @@ let
       # macOS-only: apple-sdk is not available on NixOS/Windows.
       DEVELOPER_DIR = "${pkgs.apple-sdk}";
 
+      # WHY: same rationale as DEVELOPER_DIR — xcrun needs the full SDK path.
+      # Without this, xcrun --show-sdk-path fails even when DEVELOPER_DIR is set
+      # correctly, because xcrun looks up SDKROOT internally based on DEVELOPER_DIR
+      # but having it explicit avoids a second xcrun invocation.
+      SDKROOT = "${pkgs.apple-sdk}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
+
       # WHY: rustup-managed cargo on macOS needs libiconv in LIBRARY_PATH when
       # building crates with C dependencies (for example openssl-sys, libgit2-sys).
       # Without this, the system linker fails with "ld: library not found for -liconv".
@@ -666,6 +672,45 @@ in
       [install]
       exact = true
       minimumReleaseAge = 432000
+    '';
+  };
+
+  # ---------------------------------------------------------------------------
+  # nix-direnv _nix override: filter apple-sdk vars from print-dev-env output
+  # ---------------------------------------------------------------------------
+  # apple-sdk's nix-support/setup-hook exports DEVELOPER_DIR, SDKROOT, and
+  # NIX_APPLE_SDK_VERSION during nix print-dev-env evaluation.  These vars enter
+  # direnv's managed environment set via the profile.rc that nix-direnv caches.
+  # When you leave a direnv-managed directory, direnv strips all managed vars,
+  # breaking xcrun until the next login shell re-sources hm-session-vars.
+  #
+  # This direnvrc overrides _nix() to filter those three variables from the
+  # print-dev-env stdout before nix-direnv caches them.  They never enter the
+  # managed set, so they survive directory transitions (either from hm-session-vars
+  # or not at all, depending on the shell startup path).
+  #
+  # direnv auto-sources ~/.config/direnv/lib/*.sh before ~/.config/direnv/direnvrc
+  # and before the .envrc.  Since nix-direnv defines _nix in lib/hm-nix-direnv.sh,
+  # our override in direnvrc takes effect before the .envrc calls use_flake.
+  # The _nix_direnv_nix variable is set by nix-direnv's _nix_direnv_preflight()
+  # at the start of use_flake, so referencing it from the override is safe.
+  home.file.".config/direnv/direnvrc" = {
+    text = ''
+      _nix() {
+        local _has_pe=0
+        for _arg in "$@"; do
+          if [[ "$_arg" == "print-dev-env" ]]; then
+            _has_pe=1
+            break
+          fi
+        done
+        if [[ $_has_pe -eq 1 ]]; then
+          "''${_nix_direnv_nix}" --no-warn-dirty --extra-experimental-features "nix-command flakes" "$@" \
+            | command grep -v -E '^(DEVELOPER_DIR=|SDKROOT=|NIX_APPLE_SDK_VERSION=)|^export (DEVELOPER_DIR|SDKROOT|NIX_APPLE_SDK_VERSION)$|^unset (DEVELOPER_DIR|SDKROOT|NIX_APPLE_SDK_VERSION)$'
+        else
+          "''${_nix_direnv_nix}" --no-warn-dirty --extra-experimental-features "nix-command flakes" "$@"
+        fi
+      }
     '';
   };
 
