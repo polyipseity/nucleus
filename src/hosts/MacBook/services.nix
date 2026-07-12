@@ -1,15 +1,20 @@
-# MacBook/services.nix — macOS Services (right-click context menu items) for Finder.
+# MacBook/services.nix — macOS Quick Actions and App Services for Finder.
 #
-# macOS Services let apps register operations that appear in other apps' menus,
-# including Finder's right-click context menu under Services → [Service Name].
+# Two mechanisms add operations to Finder's context menus:
 #
-# AppleScript droplet .app bundles (NucleusManual) — deployed to
-# ~/Applications/ and registered with LaunchServices.
+#   Quick Actions (Automator .workflow bundles, preferred):
+#     Deployed to ~/Library/Services/, appear in right-click → Quick Actions
+#     and the menu bar → Services. More reliable than App Services.
 #
-# The .app bundle is built at evaluation time via a Nix derivation (osacompile +
-# PlistBuddy) so the activation script only needs to deploy it. The manual
-# file is symlinked to a fixed path via home.file so the .app can find it
-# without needing NUCLEUS_REPO_ROOT at runtime.
+#   App Services (.app bundles):
+#     Deployed to ~/Applications/ via LaunchServices registration, appear in
+#     the Finder menu bar → Services. Also work as Services menu items but
+#     are less reliable for context menu placement.
+#
+# The .app bundle (NucleusManual) is built at evaluation time via a Nix
+# derivation (osacompile + PlistBuddy) so the activation script only needs to
+# deploy it. The manual file is symlinked to a fixed path via home.file so the
+# .app can find it without needing NUCLEUS_REPO_ROOT at runtime.
 #
 # WHY home.activation instead of home.file:
 #   home.file creates a symlink to the Nix store, but macOS LaunchServices does
@@ -120,24 +125,58 @@ let
   # List of currently deployed app service directories.
   # Used by tests and documentation to track active app services.
   currentNucleusAppServiceDirs = [ "NucleusManual.app" ];
+
+  # Known list of historically-removed Quick Actions (old workflow naming).
+  # When a Quick Action is removed, add its metadata here and delete its
+  # workflow directory and pbs enablement key.
+  # Entries can be removed after all machines have applied once after
+  # the removal commit.
+  removedNucleusQuickActions = [
+    {
+      dir = "OptimizePDF-default.workflow";
+      bundleId = "com.nucleus.OptimizePDF-default";
+      enablementKey = "com.nucleus.OptimizePDF-default - optimize PDF - default - runWorkflowAsService";
+    }
+    {
+      dir = "OptimizePDF-ebook.workflow";
+      bundleId = "com.nucleus.OptimizePDF-ebook";
+      enablementKey = "com.nucleus.OptimizePDF-ebook - optimize PDF - ebook - runWorkflowAsService";
+    }
+    {
+      dir = "OptimizePDF-prepress.workflow";
+      bundleId = "com.nucleus.OptimizePDF-prepress";
+      enablementKey = "com.nucleus.OptimizePDF-prepress - optimize PDF - prepress - runWorkflowAsService";
+    }
+    {
+      dir = "OptimizePDF-printer.workflow";
+      bundleId = "com.nucleus.OptimizePDF-printer";
+      enablementKey = "com.nucleus.OptimizePDF-printer - optimize PDF - printer - runWorkflowAsService";
+    }
+    {
+      dir = "OptimizePDF-screen.workflow";
+      bundleId = "com.nucleus.OptimizePDF-screen";
+      enablementKey = "com.nucleus.OptimizePDF-screen - optimize PDF - screen - runWorkflowAsService";
+    }
+  ];
 in
 {
   # Symlink the manual to a fixed home path so the .app can find it without
   # needing NUCLEUS_REPO_ROOT at runtime.
   home.file.".local/share/nucleus/manual.md".source = ./MANUAL.md;
 
-  # Deploy NucleusManual.app and register with LaunchServices. home.file can't
-  # be used because LaunchServices doesn't traverse symlinks.
+  # Deploy Quick Actions and App Services, then register with LaunchServices.
+  # home.file can't be used because LaunchServices doesn't traverse symlinks.
   #
   # Self-pruning: before deploying, unconditionally removes NSServicesStatus
-  # keys and app directories listed in removedNucleusAppServices. To remove an
-  # app service: delete its deploy logic and add its metadata to
-  # removedNucleusAppServices. The cleanup happens automatically on next apply.
+  # keys and app/Quick Action directories listed in removedNucleusAppServices
+  # and removedNucleusQuickActions. To remove an item: delete its deploy logic
+  # and add its metadata to the appropriate removed* list. Cleanup happens
+  # automatically on next apply.
   home.activation.deployNucleusServices = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
     APP_DIR="$HOME/Applications"
 
-    # ── Phase 1: Prune historically-removed services ────────────────────
+    # ── Phase 1a: Prune removed app services ───────────────────────────
     ${builtins.concatStringsSep "\n" (
       map (svc: ''
         # Delete NSServicesStatus key for ${svc.appDir} unconditionally.
@@ -153,20 +192,26 @@ in
       '') removedNucleusAppServices
     )}
 
+    # ── Phase 1b: Prune removed Quick Actions ──────────────────────────
+    ${builtins.concatStringsSep "\n" (
+      map (qa: ''
+        # Delete NSServicesStatus key for ${qa.dir} (old naming convention).
+        /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"${qa.enablementKey}\"" \
+          ~/Library/Preferences/pbs.plist 2>/dev/null || true
+
+        qa_path="$HOME/Library/Services/${qa.dir}"
+        if [ -d "$qa_path" ]; then
+          chmod -R +w "$qa_path" 2>/dev/null || true
+          rm -rf "$qa_path"
+        fi
+      '') removedNucleusQuickActions
+    )}
+
     # Force full LaunchServices re-scan to flush stale cache entries.
     # Re-scanned again after all deploys below, so this is a gentle early flush.
     "$LSREGISTER" -R 2>/dev/null || true
 
-    # Remove stale OptimizePDF-*.workflow dirs (old naming convention).
-    for _old_wf in OptimizePDF-default.workflow OptimizePDF-ebook.workflow OptimizePDF-prepress.workflow OptimizePDF-printer.workflow OptimizePDF-screen.workflow; do
-      _old_path="$HOME/Library/Services/$_old_wf"
-      if [ -d "$_old_path" ]; then
-        chmod -R +w "$_old_path" 2>/dev/null || true
-        rm -rf "$_old_path"
-      fi
-    done
-
-    # ── Phase 2: Deploy NucleusManual ──────────────────────────────────
+    # ── Phase 2: Deploy app services ───────────────────────────────────
     app_path="$APP_DIR/NucleusManual.app"
     store_path="${nucleusManualAppService}/NucleusManual.app"
 
