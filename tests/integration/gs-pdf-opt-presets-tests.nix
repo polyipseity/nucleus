@@ -144,16 +144,25 @@ let
   test_macos_has_removed_services =
     assert'
       (
-        lib.hasInfix "removedNucleusServices" macServicesText
+        lib.hasInfix "removedNucleusAppServices" macServicesText
         && lib.hasInfix "NucleusGSPDFOpt.app" macServicesText
         && lib.hasInfix "com.nucleus.GSPDFOpt" macServicesText
       )
-      "macOS services.nix must define removedNucleusServices containing the old single-preset service metadata";
+      "macOS services.nix must define removedNucleusAppServices containing the old single-preset app service metadata";
 
   test_macos_has_current_app_dirs = assert' (
-    lib.hasInfix "currentNucleusAppDirs" macServicesText
+    lib.hasInfix "currentNucleusAppServiceDirs" macServicesText
     && lib.hasInfix "NucleusManual.app" macServicesText
-  ) "macOS services.nix must define currentNucleusAppDirs containing current service app dirs";
+  ) "macOS services.nix must define currentNucleusAppServiceDirs containing current app service dirs";
+
+  test_macos_has_removed_quick_actions =
+    assert'
+      (
+        lib.hasInfix "removedNucleusQuickActions" macServicesText
+        && lib.hasInfix "OptimizePDF-default.workflow" macServicesText
+        && lib.hasInfix "com.nucleus.OptimizePDF-default" macServicesText
+      )
+      "macOS services.nix must define removedNucleusQuickActions containing old workflow naming metadata";
 
   allTests = [
     test_all_5_presets_in_macos
@@ -169,6 +178,7 @@ let
     test_windows_scoped_to_pdf
     test_macos_has_removed_services
     test_macos_has_current_app_dirs
+    test_macos_has_removed_quick_actions
   ];
 in
 {
