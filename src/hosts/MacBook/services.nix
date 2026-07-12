@@ -109,7 +109,7 @@ let
 
         plist="$build_dir/NucleusGSPDFOpt-${preset}.app/Contents/Info.plist"
         /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.nucleus.GSPDFOpt-${preset}" "$plist"
-        /usr/libexec/PlistBuddy -c "Set :CFBundleName Optimize PDF - ${preset}" "$plist"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleName optimize PDF - ${preset}" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices array" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0 dict" "$plist"
         /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem dict" "$plist"
