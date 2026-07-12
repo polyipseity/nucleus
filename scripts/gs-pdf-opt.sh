@@ -74,6 +74,12 @@ gs_pdf_opt() {
       ;;
   esac
 
+  # Ensure TMPDIR is set for Ghostscript temp files.
+  # From macOS sandboxed contexts (do shell script via Services), TMPDIR may not
+  # be set and /tmp may not be writable.
+  export TMPDIR="${TMPDIR:-$HOME/Library/Caches/nucleus-gs-pdf-opt}"
+  mkdir -p "$TMPDIR"
+
   local gs_cmd
   gs_cmd="$(command -v gs)" || {
     error "gs not found in PATH"
