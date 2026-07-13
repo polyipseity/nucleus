@@ -30,12 +30,12 @@ let
 
   test_all_5_presets_in_macos = assert' (
     allPresetsPresent macQuickActionsText
-    && lib.hasInfix "optimize pdf - default" macQuickActionsText
-    && lib.hasInfix "optimize pdf - ebook" macQuickActionsText
-    && lib.hasInfix "optimize pdf - prepress" macQuickActionsText
-    && lib.hasInfix "optimize pdf - printer" macQuickActionsText
-    && lib.hasInfix "optimize pdf - screen" macQuickActionsText
-  ) "macOS quick-actions.nix must define all 5 presets with 'optimize pdf - X' labels";
+    && lib.hasInfix "optimize PDF - default" macQuickActionsText
+    && lib.hasInfix "optimize PDF - ebook" macQuickActionsText
+    && lib.hasInfix "optimize PDF - prepress" macQuickActionsText
+    && lib.hasInfix "optimize PDF - printer" macQuickActionsText
+    && lib.hasInfix "optimize PDF - screen" macQuickActionsText
+  ) "macOS quick-actions.nix must define all 5 presets with 'optimize PDF - X' labels";
 
   test_no_old_gs_labels_in_macos = assert' (noOldLabel macServicesText) "macOS services.nix must not contain the old 'gs optimize pdf' label";
 
@@ -71,38 +71,41 @@ let
 
   test_all_5_presets_in_nixos = assert' (
     allPresetsPresent nixosServicesText
-    && lib.hasInfix "optimize pdf - default" nixosServicesText
-    && lib.hasInfix "optimize pdf - ebook" nixosServicesText
-    && lib.hasInfix "optimize pdf - prepress" nixosServicesText
-    && lib.hasInfix "optimize pdf - printer" nixosServicesText
-    && lib.hasInfix "optimize pdf - screen" nixosServicesText
-  ) "NixOS services.nix must define all 5 presets with 'optimize pdf - X' labels";
+    && lib.hasInfix "optimize PDF - default" nixosServicesText
+    && lib.hasInfix "optimize PDF - ebook" nixosServicesText
+    && lib.hasInfix "optimize PDF - prepress" nixosServicesText
+    && lib.hasInfix "optimize PDF - printer" nixosServicesText
+    && lib.hasInfix "optimize PDF - screen" nixosServicesText
+  ) "NixOS services.nix must define all 5 presets with 'optimize PDF - X' labels";
 
   test_no_old_gs_labels_in_nixos = assert' (noOldLabel nixosServicesText) "NixOS services.nix must not contain the old 'gs optimize pdf' label";
 
-  test_nixos_presets_sorted = assert' (
-    let
-      posDefault = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf - default" nixosServicesText)
-      );
-      posEbook = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf - ebook" nixosServicesText)
-      );
-      posPrepress = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf - prepress" nixosServicesText)
-      );
-      posPrinter = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf - printer" nixosServicesText)
-      );
-      posScreen = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf - screen" nixosServicesText)
-      );
-    in
-    posDefault < posEbook
-    && posEbook < posPrepress
-    && posPrepress < posPrinter
-    && posPrinter < posScreen
-  ) "NixOS services.nix presets must be in alphabetical order (d < e < p < p < s)";
+  test_nixos_presets_sorted =
+    assert'
+      (
+        let
+          posDefault = builtins.stringLength (
+            builtins.head (builtins.split "optimize PDF - default" nixosServicesText)
+          );
+          posPrepress = builtins.stringLength (
+            builtins.head (builtins.split "optimize PDF - prepress" nixosServicesText)
+          );
+          posPrinter = builtins.stringLength (
+            builtins.head (builtins.split "optimize PDF - printer" nixosServicesText)
+          );
+          posEbook = builtins.stringLength (
+            builtins.head (builtins.split "optimize PDF - ebook" nixosServicesText)
+          );
+          posScreen = builtins.stringLength (
+            builtins.head (builtins.split "optimize PDF - screen" nixosServicesText)
+          );
+        in
+        posDefault < posPrepress
+        && posPrepress < posPrinter
+        && posPrinter < posEbook
+        && posEbook < posScreen
+      )
+      "NixOS services.nix presets must be in quality-descending order (default < prepress < printer < ebook < screen)";
 
   test_nixos_nautilus_has_mime_guard = assert' (
     lib.hasInfix "file --mime-type" nixosServicesText
@@ -111,38 +114,41 @@ let
 
   test_all_5_presets_in_windows = assert' (
     allPresetsPresent windowsDscText
-    && lib.hasInfix "optimize pdf (default)" windowsDscText
-    && lib.hasInfix "optimize pdf (ebook)" windowsDscText
-    && lib.hasInfix "optimize pdf (prepress)" windowsDscText
-    && lib.hasInfix "optimize pdf (printer)" windowsDscText
-    && lib.hasInfix "optimize pdf (screen)" windowsDscText
-  ) "Windows DSC must define all 5 presets with 'optimize pdf (X)' labels";
+    && lib.hasInfix "optimize PDF (default)" windowsDscText
+    && lib.hasInfix "optimize PDF (ebook)" windowsDscText
+    && lib.hasInfix "optimize PDF (prepress)" windowsDscText
+    && lib.hasInfix "optimize PDF (printer)" windowsDscText
+    && lib.hasInfix "optimize PDF (screen)" windowsDscText
+  ) "Windows DSC must define all 5 presets with 'optimize PDF (X)' labels";
 
   test_no_old_gs_labels_in_windows = assert' (noOldLabel windowsDscText) "Windows DSC must not contain the old 'gs optimize pdf' label";
 
-  test_windows_presets_sorted = assert' (
-    let
-      posDefault = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(default\\)" windowsDscText)
-      );
-      posEbook = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(ebook\\)" windowsDscText)
-      );
-      posPrepress = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(prepress\\)" windowsDscText)
-      );
-      posPrinter = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(printer\\)" windowsDscText)
-      );
-      posScreen = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(screen\\)" windowsDscText)
-      );
-    in
-    posDefault < posEbook
-    && posEbook < posPrepress
-    && posPrepress < posPrinter
-    && posPrinter < posScreen
-  ) "Windows DSC presets must be in alphabetical order (d < e < p < p < s)";
+  test_windows_presets_sorted =
+    assert'
+      (
+        let
+          posDefault = builtins.stringLength (
+            builtins.head (builtins.split "optimize PDF \\(default\\)" windowsDscText)
+          );
+          posPrepress = builtins.stringLength (
+            builtins.head (builtins.split "optimize PDF \\(prepress\\)" windowsDscText)
+          );
+          posPrinter = builtins.stringLength (
+            builtins.head (builtins.split "optimize PDF \\(printer\\)" windowsDscText)
+          );
+          posEbook = builtins.stringLength (
+            builtins.head (builtins.split "optimize PDF \\(ebook\\)" windowsDscText)
+          );
+          posScreen = builtins.stringLength (
+            builtins.head (builtins.split "optimize PDF \\(screen\\)" windowsDscText)
+          );
+        in
+        posDefault < posPrepress
+        && posPrepress < posPrinter
+        && posPrinter < posEbook
+        && posEbook < posScreen
+      )
+      "Windows DSC presets must be in quality-descending order (default < prepress < printer < ebook < screen)";
 
   test_windows_scoped_to_pdf = assert' (lib.hasInfix "SystemFileAssociations\\\\.pdf" windowsDscText) "Windows DSC must scope to PDF files via SystemFileAssociations\\.pdf";
 
