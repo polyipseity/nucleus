@@ -351,7 +351,6 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-SourceBuild.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-UvSetup.ps1")
 # user/: per-user home convergence (git/SSH, shell, agents, dev repos, apps).
-. (Join-Path -Path $userModuleDir -ChildPath "Set-NucleusUserPathEntry.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CloudDrive.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsClawHubSkill.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsConfig.ps1")

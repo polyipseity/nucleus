@@ -105,9 +105,6 @@ function Invoke-CamillaGUISetup {
 
     Write-Output "camillagui-backend-setup: v$desiredVersion installed to $installDir"
 
-    # Ensure install directory is on PATH for future sessions.
-    Set-NucleusUserPathEntry -Directory $installDir -Name "camillagui-backend-setup"
-
     # Method 1 (writable symlink): deploy user-level config to $HOME\.config
     # (cross-platform parity with POSIX ~/.config/camillagui-backend/config.yml).
     $configDir = Join-Path -Path $HOME -ChildPath ".config\camillagui-backend"

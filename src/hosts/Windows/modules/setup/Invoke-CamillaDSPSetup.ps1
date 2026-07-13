@@ -104,9 +104,6 @@ function Invoke-CamillaDSPSetup {
 
     Write-Output "camilladsp-setup: v$desiredVersion installed to $binaryPath"
 
-    # Ensure install directory is on PATH for future sessions.
-    Set-NucleusUserPathEntry -Directory $installDir -Name "camilladsp-setup"
-
     # Method 1 (writable symlink): deploy user-level config to $HOME\.config
     # (cross-platform parity with POSIX ~/.config/camilladsp/configs/config.yml).
     $configDir = Join-Path -Path $HOME -ChildPath ".config\camilladsp\configs"
