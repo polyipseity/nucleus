@@ -4,15 +4,21 @@
 #
 # Runs repository checks in sequence:
 #   1. Dead Nix code detection (deadnix)
-#   2. Nix formatting check (nixfmt --verify)
-#   3. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
-#   4. Packer template validation
-#   5. Shell script validation tests
-#   6. Lockfile validation
-#   7. Service registry validation
-#   8. Locked DSC validation
-#   9. Package manager usage enforcement
-#  10. Stale Nix build artifact check
+#   2. Nix flake evaluation
+#   3. Nix formatting check (nixfmt --verify)
+#   4. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
+#   5. Packer template validation
+#   6. Shell script validation tests
+#   7. CWD-independence tests
+#   8. Nix search path tests
+#   9. Port utility function tests
+#  10. Lockfile validation
+#  11. Service registry validation
+#  12. Locked DSC validation
+#  13. Package manager usage enforcement
+#  14. Stale Nix build artifact check
+#  15. Online determinism checks (--verify mode only)
+#  16. Undocumented error suppression check
 #
 # With arguments, passes them through to individual checkers that support
 # path filtering (check-pwsh.ps1, check-packer.sh, nixfmt) and skips
