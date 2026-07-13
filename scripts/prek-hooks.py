@@ -32,10 +32,9 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -
     """Run the check hook.
 
     On POSIX, delegates to ``scripts/check.sh`` directly (tools are available
-    via the user profile or direnv dev shell).  On Windows, dispatches to
-    ``check-pwsh.ps1`` and/or ``check-packer.ps1`` depending on which file
-    extensions are present, or runs all available checks when no files are
-    given.
+    via the user profile or direnv dev shell).  On Windows, delegates to
+    ``scripts/check.ps1`` (which internally handles extension routing to
+    ``check-pwsh.ps1`` and ``check-packer.ps1``).
 
     Args:
         files: List of file paths (relative or absolute) to check.  May be
@@ -66,75 +65,24 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -
             return result.returncode
         return 0
 
-    # Windows
-    if not files:
-        # No files specified: run all available checks, skip shellcheck
-        for script in ("check.ps1", "check-pwsh.ps1", "check-packer.ps1"):
-            cmd = [
-                "pwsh",
-                "-NoLogo",
-                "-NoProfile",
-                "-NonInteractive",
-                "-File",
-                str(repo_root / "scripts" / script),
-            ]
-            result = subprocess.run(cmd, shell=False)
-            if result.returncode != 0:
-                print(
-                    f"scripts/prek-hooks.py: error: check failed (exit {result.returncode})",
-                    file=sys.stderr,
-                )
-                return result.returncode
-        return 0
-
-    # Group files by extension
-    ps1_files = [f for f in files if f.endswith(".ps1")]
-    pkr_files = [f for f in files if f.endswith(".pkr.hcl")]
-    sh_files = [f for f in files if f.endswith(".sh")]
-    nix_files = [f for f in files if f.endswith(".nix")]
-
-    for _ in sh_files:
-        print("scripts/prek-hooks.py: shellcheck skipped (not available on Windows)")
-
-    if not ps1_files and not pkr_files and not sh_files and not nix_files:
-        return 0
-
-    # check.ps1 handles sh/nix/ps1 suppression checks (and ps1 syntax)
-    check_ps1_files = [f for f in files if f.endswith((".sh", ".nix", ".ps1"))]
-    if check_ps1_files:
-        cmd = [
-            "pwsh",
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-File",
-            str(repo_root / "scripts" / "check.ps1"),
-        ] + check_ps1_files
-        result = subprocess.run(cmd, shell=False)
-        if result.returncode != 0:
-            print(
-                f"scripts/prek-hooks.py: error: check failed (exit {result.returncode})",
-                file=sys.stderr,
-            )
-            return result.returncode
-
-    if pkr_files:
-        cmd = [
-            "pwsh",
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-File",
-            str(repo_root / "scripts" / "check-packer.ps1"),
-        ] + pkr_files
-        result = subprocess.run(cmd, shell=False)
-        if result.returncode != 0:
-            print(
-                f"scripts/prek-hooks.py: error: check failed (exit {result.returncode})",
-                file=sys.stderr,
-            )
-            return result.returncode
-
+    # Windows — check.ps1 handles extension routing internally (same as check.sh)
+    cmd = [
+        "pwsh",
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        str(repo_root / "scripts" / "check.ps1"),
+    ]
+    if files:
+        cmd.extend(files)
+    result = subprocess.run(cmd, shell=False)
+    if result.returncode != 0:
+        print(
+            f"scripts/prek-hooks.py: error: check failed (exit {result.returncode})",
+            file=sys.stderr,
+        )
+        return result.returncode
     return 0
 
 
