@@ -14,6 +14,8 @@
     config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/starship.toml";
 
   # Cache directory for Starship's computed state.
+  # Scope: all-process — also set in gui-env LaunchAgent (macOS),
+  # environment.variables (NixOS), and env.dsc.yml (Windows).
   home.sessionVariables = {
     STARSHIP_CACHE = "$HOME/.cache/starship";
     # STARSHIP_CONFIG is unset here — starship defaults to ~/.config/starship.toml

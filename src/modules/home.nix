@@ -175,6 +175,8 @@ in
     # - pass and QtPass respect PASSWORD_STORE_DIR directly.
     # - gopass also supports PASSWORD_STORE_DIR and explicit config overrides;
     #   set config override env keys so gopass always resolves this path.
+    # Scope: all-process — also set in gui-env LaunchAgent (macOS),
+    # environment.variables (NixOS), and env.dsc.yml (Windows).
     home.sessionVariables = {
       GOPASS_CONFIG_COUNT = "1";
       GOPASS_CONFIG_KEY_1 = "path";
@@ -186,6 +188,7 @@ in
       # tree so activation scripts can wire them up without dry-run uncertainty.
       # Resolved from the NUCLEUS_REPO_ROOT env var that apply.sh exports before the
       # rebuild — avoids hard-coding a machine-specific absolute path.
+      # Scope: macOS, all-process — also set in gui-env LaunchAgent.
       NUCLEUS_REPO_ROOT = builtins.getEnv "NUCLEUS_REPO_ROOT";
     };
 
