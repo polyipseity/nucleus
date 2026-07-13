@@ -309,7 +309,7 @@ function Sync-ShellProfile {
     '  $env:PATH = "$llvmBinDir;$env:PATH"'
     '}'
     # LLVM/Clang toolchain defaults for cross-host compiler parity.
-    # Source of truth: src/modules/shell/env.nix — update there, not here.
+    # Source of truth: src/modules/lib/env-vars.nix — update there, not here.
     '$env:CC = "clang"'
     '$env:CXX = "clang++"'
     '$env:LD = "ld.lld"'

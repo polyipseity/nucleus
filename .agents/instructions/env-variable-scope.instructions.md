@@ -6,6 +6,16 @@ applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/*.ps1, src/host
 
 Every environment variable set by this repo must default to all-process availability on the host. Restricting scope (shell-only, service-only) is an exception requiring an inline `# WHY` comment.
 
+## Centralized registry
+
+All Nix-side env vars are declared in `src/modules/lib/env-vars.nix`. The catalog entries specify value, scope, allowed hosts, and rationale. Platform-specific helper functions (`toHomeSessionVariables`, `toNixOSEnvironment`, `toLaunchctlScript`, `toNixOSServiceEnv`) consume the catalog.
+
+- **Adding a new var**: add an entry to `src/modules/lib/env-vars.nix` catalog, then run the appropriate helper in the target module.
+- **Windows parity**: `src/hosts/Windows/user/env.dsc.yml` is the Windows parallel registry.  Parity is enforced by `tests/hosts/Windows/EnvVarParity.Tests.ps1`.  See `docs/env-variable-registry.md` for the cross-reference table.
+- **Overriding per host**: use the `override` attr in the catalog entry (e.g., NixOS vs macOS vs Windows).
+
+## Scope restrictions
+
 Valid reasons to restrict scope:
 - The variable would cause incorrect behavior for unintended consumers (e.g., `CC`/`CXX`/`LD` on macOS: Nix LLVM paths in GUI process env interfere with Xcode toolchain discovery).
 - The concept is inherently platform-specific (e.g., `DEVELOPER_DIR` on non-macOS hosts).
