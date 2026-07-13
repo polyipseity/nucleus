@@ -11,12 +11,12 @@ let
     exec ${pkgs.xdg-utils}/bin/xdg-open "$_nuc_repo/src/hosts/NixOS/MANUAL.md"
   '';
 
-  # Ghostscript PDF optimization presets (alphabetically sorted).
+  # Ghostscript PDF optimization presets (quality descending).
   gsPdfOptPresets = [
     "default"
-    "ebook"
     "prepress"
     "printer"
+    "ebook"
     "screen"
   ];
 
@@ -56,25 +56,25 @@ lib.mkIf pkgs.stdenv.isLinux {
       executable = true;
     };
 
-    # Nautilus: right-click → Scripts → optimize pdf - <preset> (5 presets)
+    # Nautilus: right-click → Scripts → optimize PDF - <preset> (5 presets)
     # Nautilus scripts have no MIME filtering; each script guards with file --mime-type.
-    ".local/share/nautilus/scripts/optimize pdf - default" = {
+    ".local/share/nautilus/scripts/optimize PDF - default" = {
       source = gsPdfOptNautilusScripts.default;
       executable = true;
     };
-    ".local/share/nautilus/scripts/optimize pdf - ebook" = {
-      source = gsPdfOptNautilusScripts.ebook;
-      executable = true;
-    };
-    ".local/share/nautilus/scripts/optimize pdf - prepress" = {
+    ".local/share/nautilus/scripts/optimize PDF - prepress" = {
       source = gsPdfOptNautilusScripts.prepress;
       executable = true;
     };
-    ".local/share/nautilus/scripts/optimize pdf - printer" = {
+    ".local/share/nautilus/scripts/optimize PDF - printer" = {
       source = gsPdfOptNautilusScripts.printer;
       executable = true;
     };
-    ".local/share/nautilus/scripts/optimize pdf - screen" = {
+    ".local/share/nautilus/scripts/optimize PDF - ebook" = {
+      source = gsPdfOptNautilusScripts.ebook;
+      executable = true;
+    };
+    ".local/share/nautilus/scripts/optimize PDF - screen" = {
       source = gsPdfOptNautilusScripts.screen;
       executable = true;
     };
@@ -95,37 +95,37 @@ lib.mkIf pkgs.stdenv.isLinux {
       '';
     };
 
-    # Dolphin: right-click → optimize pdf (5 presets as sub-actions)
+    # Dolphin: right-click → optimize PDF (5 presets as sub-actions)
     ".local/share/kio/servicemenus/nucleus-gs-pdf-opt.desktop" = {
       text = ''
         [Desktop Entry]
         Type=Service
         ServiceTypes=KonqPopupMenu/Plugin
         MimeType=application/pdf;
-        Actions=optimizePdfDefault;optimizePdfEbook;optimizePdfPrepress;optimizePdfPrinter;optimizePdfScreen
+        Actions=optimizePdfDefault;optimizePdfPrepress;optimizePdfPrinter;optimizePdfEbook;optimizePdfScreen
 
         [Desktop Action optimizePdfDefault]
-        Name=optimize pdf - default
+        Name=optimize PDF - default
         Exec=nucleus-gs-pdf-opt --preset default %f
         Icon=application-pdf
 
-        [Desktop Action optimizePdfEbook]
-        Name=optimize pdf - ebook
-        Exec=nucleus-gs-pdf-opt --preset ebook %f
-        Icon=application-pdf
-
         [Desktop Action optimizePdfPrepress]
-        Name=optimize pdf - prepress
+        Name=optimize PDF - prepress
         Exec=nucleus-gs-pdf-opt --preset prepress %f
         Icon=application-pdf
 
         [Desktop Action optimizePdfPrinter]
-        Name=optimize pdf - printer
+        Name=optimize PDF - printer
         Exec=nucleus-gs-pdf-opt --preset printer %f
         Icon=application-pdf
 
+        [Desktop Action optimizePdfEbook]
+        Name=optimize PDF - ebook
+        Exec=nucleus-gs-pdf-opt --preset ebook %f
+        Icon=application-pdf
+
         [Desktop Action optimizePdfScreen]
-        Name=optimize pdf - screen
+        Name=optimize PDF - screen
         Exec=nucleus-gs-pdf-opt --preset screen %f
         Icon=application-pdf
       '';
