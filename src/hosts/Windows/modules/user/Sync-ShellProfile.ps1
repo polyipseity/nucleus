@@ -95,7 +95,7 @@ function Sync-ShellProfile {
     # Source: https://bun.sh/docs/runtime/bunfig#install
     '$bunConfigFile = Join-Path $env:USERPROFILE ".bunfig.toml"'
     'if (-not (Test-Path -Path $bunConfigFile -PathType Leaf)) {'
-    '  Set-Content -Path $bunConfigFile -Value "[install]`nexact = true`nminimumReleaseAge = 432000" -Encoding UTF8'
+    '  Set-Content -Path $bunConfigFile -Value "[install]`nexact = true`nlinker = \"isolated\"`nminimumReleaseAge = 432000" -Encoding UTF8'
     '}'
     # Load rclone config passphrase from materialized secret for automatic config
     # file encryption in interactive and scripted rclone invocations.

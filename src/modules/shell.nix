@@ -671,6 +671,7 @@ in
     text = ''
       [install]
       exact = true
+      linker = "isolated"
       minimumReleaseAge = 432000
     '';
   };
