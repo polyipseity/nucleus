@@ -225,7 +225,7 @@
 [CmdletBinding()]
 param(
   [string]$ConfigDir = $PSScriptRoot,
-  [string[]]$ConfigFiles = @("system/scheduler.dsc.yml", "system/developer-mode.dsc.yml", "system/firewall.dsc.yml", "system/taskbar.dsc.yml", "system/computer-name.dsc.yml", "system/long-paths.dsc.yml", "system/storage-sense.dsc.yml", "system/font-substitutes.dsc.yml", "system/remote-desktop.dsc.yml", "system/packages.dsc.yml"),
+  [string[]]$ConfigFiles = @("system/env.dsc.yml", "system/scheduler.dsc.yml", "system/developer-mode.dsc.yml", "system/firewall.dsc.yml", "system/taskbar.dsc.yml", "system/computer-name.dsc.yml", "system/long-paths.dsc.yml", "system/storage-sense.dsc.yml", "system/font-substitutes.dsc.yml", "system/remote-desktop.dsc.yml", "system/packages.dsc.yml"),
   [Alias("h")]
   [switch]$Help,
   [Parameter(Mandatory)]
@@ -305,6 +305,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Resolve-Executable.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Test-ArchivingStack.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Test-PrimaryUser.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Send-NucleusEnvChangeNotification.ps1")
 # secrets/: decryption, SOPS age key management, and secret materialization.
 # ConvertFrom-SshEd25519PublicKeyToAgePubKey must be loaded before any file that
 # calls it (Register-HostAgeKey, Invoke-SecretVerification).
@@ -350,6 +351,7 @@ $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-SourceBuild.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-UvSetup.ps1")
 # user/: per-user home convergence (git/SSH, shell, agents, dev repos, apps).
+. (Join-Path -Path $userModuleDir -ChildPath "Set-NucleusUserPathEntry.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CloudDrive.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsClawHubSkill.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsConfig.ps1")
@@ -500,8 +502,28 @@ $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 # Nix-side source of truth: src/modules/lib/env-vars.nix
 $env:NUCLEUS_REPO_ROOT = $repoRoot
 $env:NUCLEUS_HOST = "Windows"
-[Environment]::SetEnvironmentVariable("NUCLEUS_HOST", "Windows", "User")
+
+# NUCLEUS_HOST: Phase 1 of two-phase promotion.
+# Phase 1 sets User scope here (runs without elevation).
+# Phase 2 sets Machine scope via system/env.dsc.yml (requires elevation).
+# Only write User scope if neither User nor Machine has the correct value yet.
+$existingUserHost = [Environment]::GetEnvironmentVariable("NUCLEUS_HOST", "User")
+$existingMachineHost = [Environment]::GetEnvironmentVariable("NUCLEUS_HOST", "Machine")
+if ($existingUserHost -ne "Windows" -and $existingMachineHost -ne "Windows") {
+  [Environment]::SetEnvironmentVariable("NUCLEUS_HOST", "Windows", "User")
+  Write-Output "apply: set NUCLEUS_HOST=Windows (User scope)"
+}
+
+# NUCLEUS_REPO_ROOT: set dynamically per-activation because the repo path
+# varies by machine (clone location).  Storing it in DSC (system/env.dsc.yml)
+# would bake in an absolute path, breaking portability.  The env var is
+# persisted here so subprocesses and future sessions inherit it.
 [Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $repoRoot, "User")
+Write-Output "apply: set NUCLEUS_REPO_ROOT=$repoRoot"
+
+# Broadcast WM_SETTINGCHANGE so running processes (Explorer, terminals)
+# pick up the env var changes without a logoff/logon.
+Send-NucleusEnvChangeNotification
 
 # Ensure the SSH host key exists before age key registration.  On a fresh
 # machine the key is absent until the OpenSSH Server service first starts;
