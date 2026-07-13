@@ -55,6 +55,7 @@ function Sync-CloudDrive {
     # ------------------------------------------------------------------
     # Legacy cleanup — remove old Servy-managed mount services
     # ------------------------------------------------------------------
+    # WHY: probe whether legacy mount services exist; Get-Service throws when absent.
     $oldMountServices = Get-Service -Name 'nucleus-cloud-mount-*' -ErrorAction SilentlyContinue
     foreach ($oldSvc in $oldMountServices) {
         Stop-Service -Name $oldSvc.Name -ErrorAction SilentlyContinue

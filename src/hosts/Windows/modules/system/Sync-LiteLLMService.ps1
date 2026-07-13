@@ -69,6 +69,7 @@ function Sync-LiteLLMService {
   }
 
   if (-not $Enabled) {
+    # WHY: probe whether service exists; Get-Service throws when absent.
     $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     if ($null -ne $existingService) {
       Remove-NucleusService -Name $serviceName
@@ -134,6 +135,7 @@ function Sync-LiteLLMService {
 "@
   [System.IO.File]::WriteAllText($wrapperScript, $wrapperContent, [System.Text.UTF8Encoding]::new($false))
 
+  # WHY: probe whether service already exists; Get-Service throws when absent.
   $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
   if ($null -eq $existingService) {
     Set-NucleusService -Name $serviceName -BinaryPath "pwsh.exe -NoLogo -ExecutionPolicy Bypass -File `"$wrapperScript`"" -DisplayName "nucleus LiteLLM AI gateway proxy" -Description "Managed LiteLLM proxy for unified AI model access (http://$($litellmEndpoint.host):$($litellmEndpoint.port))"

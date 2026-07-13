@@ -254,6 +254,7 @@ function Sync-GitAndSshConfig {
   }
 
   if ($Enabled) {
+    # WHY: probe whether ssh-agent is installed; Get-Service throws when absent.
     $sshAgentService = Get-Service -Name 'ssh-agent' -ErrorAction SilentlyContinue
     if ($null -ne $sshAgentService) {
       Set-Service -Name 'ssh-agent' -StartupType Automatic

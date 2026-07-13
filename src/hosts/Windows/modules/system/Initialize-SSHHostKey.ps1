@@ -74,6 +74,7 @@ function Initialize-SSHHostKey {
     return
   }
 
+  # WHY: probe whether sshd is installed; Get-Service throws when absent.
   $sshdService = Get-Service -Name 'sshd' -ErrorAction SilentlyContinue
   if ($null -eq $sshdService) {
     # sshd not yet installed: advisory warning only.  Initialize-SSHHostKey
