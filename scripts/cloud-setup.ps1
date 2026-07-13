@@ -38,8 +38,9 @@ Import-Module $modulePath -Force -DisableNameChecking
 function Resolve-NucleusRoot {
   $repoRoot = $env:NUCLEUS_REPO_ROOT
   if (-not $repoRoot) {
+    # WHY: probe — may be invoked outside repo checkouts; resolution handled below.
     $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
-    if ($candidate -and (Test-Path "$candidate\src\flake.nix")) {
+    if ($candidate) {
       return $candidate
     }
     throw "NUCLEUS_REPO_ROOT is not set. Run via apply.ps1 or run from the repo checkout."
@@ -58,6 +59,7 @@ function Get-RcloneMissingRemote {
 
   # listremotes stderr is suppressed because missing/first-run configs may emit
   # expected setup hints; caller checks for null output and handles failure.
+  # WHY: probe — rclone may not be configured yet; $LASTEXITCODE checked below.
   $listed = & rclone listremotes 2>$null
   if ($LASTEXITCODE -ne 0) {
     return $null

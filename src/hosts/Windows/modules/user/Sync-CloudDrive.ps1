@@ -58,6 +58,7 @@ function Sync-CloudDrive {
     # WHY: probe whether legacy mount services exist; Get-Service throws when absent.
     $oldMountServices = Get-Service -Name 'nucleus-cloud-mount-*' -ErrorAction SilentlyContinue
     foreach ($oldSvc in $oldMountServices) {
+        # WHY: probe — service may already be stopped; harmless to skip.
         Stop-Service -Name $oldSvc.Name -ErrorAction SilentlyContinue
         sc.exe delete $oldSvc.Name
         Write-Verbose "cloud-drives: cleaned up legacy Servy service '$($oldSvc.Name)'"
@@ -107,7 +108,7 @@ function Sync-CloudDrive {
         # Suppress stderr only for this probe so invalid/missing remotes do not
         # emit noisy warnings during expected discovery runs.
         # WHY safe: we immediately check exit code and remote presence below.
-        $remoteList = & $rcloneExe listremotes 2>$null
+        $remoteList = & $rcloneExe listremotes 2>$null  # WHY: probe — remote may not be configured; $LASTEXITCODE checked below
         $remoteListExitCode = $LASTEXITCODE
         if ($remoteListExitCode -ne 0) {
             Write-Warning "cloud-drives: failed to list rclone remotes for mount '$($mount.id)' (exit $remoteListExitCode); skipping."
@@ -206,6 +207,7 @@ function Sync-CloudDrive {
         $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
         $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
 
+        # WHY: probe — task may not be registered yet; $null check handles absence.
         $existingTask = Get-ScheduledTask -TaskName $taskName -TaskPath $taskPath -ErrorAction SilentlyContinue
         if ($existingTask) {
             Unregister-ScheduledTask -TaskName $taskName -Confirm:$false

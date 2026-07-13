@@ -90,7 +90,7 @@ function Test-ScheduledTask {
     if ($task.State -eq "Running") { return }
 
     $status = $task.State.ToString().ToLower()
-    Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction SilentlyContinue
+    Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction SilentlyContinue  # WHY: best-effort stop before restart — task may not be running
     Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop
     Write-RestartLog -Name $DisplayName -Reason $status
   } catch {

@@ -40,7 +40,7 @@ function Invoke-CamillaDSPSetup {
   $alreadyConverged = $false
   if (Test-Path $binaryPath) {
     try {
-      $installedVersion = & $binaryPath --version 2>$null
+      $installedVersion = & $binaryPath --version 2>$null  # WHY: probe — binary may not be installed yet; $LASTEXITCODE checked below
       if ($LASTEXITCODE -eq 0 -and $installedVersion -match "CamillaDSP (\S+)") {
         $installedVersion = $matches[1]
         if ($installedVersion -eq $desiredVersion) {

@@ -152,6 +152,7 @@ $ht['updated'] = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC)
 
 # ---------------------------------------------------------------------------
 # winget — winget show --id <id>
+# WHY: probe — package may not exist; stderr suppressed for clean output.
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'winget') {
   if ($ht.ContainsKey('winget') -and $ht['winget'] -is [hashtable]) {
@@ -171,6 +172,7 @@ if (Test-SectionEnabled 'winget') {
 
 # ---------------------------------------------------------------------------
 # scoop — scoop info <pkg>
+# WHY: probe — package may not exist; stderr suppressed for clean output.
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'scoop') {
   if ($ht.ContainsKey('scoop') -and $ht['scoop'] -is [hashtable]) {
@@ -195,6 +197,7 @@ if (Test-SectionEnabled 'scoop') {
 
 # ---------------------------------------------------------------------------
 # bun — npm view <pkg> version
+# WHY: probe — package may not exist; stderr suppressed for clean output.
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'bun') {
   if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
@@ -214,6 +217,7 @@ if (Test-SectionEnabled 'bun') {
 
 # ---------------------------------------------------------------------------
 # uv — uv tool list
+# WHY: probe — uv may not be installed; stderr suppressed for clean output.
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'uv') {
   $uvOutput = & uv tool list 2>$null
@@ -259,6 +263,7 @@ if (Test-SectionEnabled 'uv') {
 
 # ---------------------------------------------------------------------------
 # rustup — rustc +<channel> --version
+# WHY: probe — rustup may not be installed; stderr suppressed for clean output.
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'rustup') {
   # Get installed toolchains
@@ -279,6 +284,7 @@ if (Test-SectionEnabled 'rustup') {
     foreach ($key in $ht['rustup'].Keys) {
       $old = $ht['rustup'][$key]
       if ($toolchainSet.ContainsKey($key)) {
+        # WHY: probe — toolchain may not be installed; stderr suppressed for clean output.
         $versionOutput = & rustc "+$key" --version 2>$null
         if ($versionOutput) {
           $match = [regex]::Match($versionOutput, '\d{4}-\d{2}-\d{2}')
@@ -297,6 +303,7 @@ if (Test-SectionEnabled 'rustup') {
 
 # ---------------------------------------------------------------------------
 # pwsh — Find-Module via pwsh -NoProfile
+# WHY: probe — module may not exist in PSGallery; stderr suppressed for clean output.
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'pwsh') {
   if ($ht.ContainsKey('pwsh') -and $ht['pwsh'] -is [hashtable]) {
@@ -321,9 +328,11 @@ if (Test-SectionEnabled 'vscode') {
   $vscodeOutput = $null
   # WHY: probe whether tool is installed; Get-Command throws when absent.
   if (Get-Command -Name 'code' -ErrorAction SilentlyContinue) {
+    # WHY: probe — tool may not be installed; stderr suppressed for clean output.
     $vscodeOutput = & code --list-extensions --show-versions 2>$null
   # WHY: probe whether tool is installed; Get-Command throws when absent.
   } elseif (Get-Command -Name 'code-insiders' -ErrorAction SilentlyContinue) {
+    # WHY: probe — tool may not be installed; stderr suppressed for clean output.
     $vscodeOutput = & code-insiders --list-extensions --show-versions 2>$null
   }
 
@@ -377,10 +386,12 @@ if (Test-SectionEnabled 'ollama') {  # Point at the Ollama daemon directly, bypa
         $hasDigest = $entry.ContainsKey('digest')
         $oldDigest = if ($hasDigest) { $entry['digest'] } else { $null }
 
-        $ollamaHostAddr = if ($env:NUCLEUS_OLLAMA_HOST) { $env:NUCLEUS_OLLAMA_HOST } else { $svc = Get-Content -Raw (Join-Path $repoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json; if ($svc.ollama.network.default) { "$($svc.ollama.network.default.host):$($svc.ollama.network.default.port)" } else { '127.0.0.1:11434' } }
+        $ollamaHostAddr = if ($env:NUCLEUS_OLLAMA_HOST) { $env:NUCLEUS_OLLAMA_HOST } else { # WHY: probe — services.json may not exist yet; falls back to default localhost port
+        $svc = Get-Content -Raw (Join-Path $repoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json; if ($svc.ollama.network.default) { "$($svc.ollama.network.default.host):$($svc.ollama.network.default.port)" } else { '127.0.0.1:11434' } }
         try {
           $oldOllamaHost = $env:OLLAMA_HOST
           $env:OLLAMA_HOST = $ollamaHostAddr
+          # WHY: probe — model may not exist in registry; stderr suppressed for clean output.
           $ollamaInfo = & ollama show "${name}:${tag}" --format json 2>$null
           $env:OLLAMA_HOST = $oldOllamaHost
           if ($ollamaInfo) {

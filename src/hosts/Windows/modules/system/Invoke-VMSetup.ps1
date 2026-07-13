@@ -773,7 +773,7 @@ function Test-Qcow2Image {
         return $true
     }
 
-    $infoJson = & $qemuImg.Source info --output=json $ImagePath 2>$null
+    $infoJson = & $qemuImg.Source info --output=json $ImagePath 2>$null  # WHY: probe — image file may not exist or be corrupt; $LASTEXITCODE checked below
     if ($LASTEXITCODE -ne 0 -or -not $infoJson) {
         Write-Warning "vm-setup: qemu-img could not read ${ImageLabel}: $ImagePath"
         return $false

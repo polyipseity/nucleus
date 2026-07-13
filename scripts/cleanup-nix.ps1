@@ -46,8 +46,8 @@ $_found = $false
 
 # Check result and result-* patterns at the repo root.
 foreach ($_pattern in @('result', 'result-*')) {
-  $_paths = Get-ChildItem -Path $RepoRoot -Filter $_pattern -Force -ErrorAction SilentlyContinue
-  foreach ($_item in $_paths) {
+  # WHY: probe — result symlinks may not exist; ForEach-Object handles absent results gracefully.
+  $_paths = Get-ChildItem -Path $RepoRoot -Filter $_pattern -Force -ErrorAction SilentlyContinue | ForEach-Object {
     if ($_item.LinkType -eq 'SymbolicLink') {
       $_target = $_item.Target
       if ($WhatIf) {

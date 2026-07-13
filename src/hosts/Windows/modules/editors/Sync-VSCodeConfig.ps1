@@ -105,7 +105,7 @@ function Sync-VSCodeConfig {
     $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     $devModeKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
     # WHY: probe whether Developer Mode is already enabled; Get-ItemProperty throws when value is absent.
-    $devModeProp = Get-ItemProperty -Path $devModeKey -Name "AllowDevelopmentWithoutDevLicense" -ErrorAction SilentlyContinue
+    $devModeProp = Get-ItemProperty -Path $devModeKey -Name "AllowDevelopmentWithoutDevLicense" -ErrorAction SilentlyContinue  # WHY: probe — registry value may not exist; $null check below handles absence
     $devModeEnabled = $null -ne $devModeProp -and $devModeProp.AllowDevelopmentWithoutDevLicense -eq 1
     if (-not $isAdmin -and -not $devModeEnabled) {
       throw "Sync-VSCodeConfig requires Developer Mode or an elevated session to create symlinks.  Enable Developer Mode in Settings -> System -> For Developers."
@@ -167,7 +167,7 @@ function Sync-VSCodeConfig {
     $repoContent = Get-Content -LiteralPath $RepoFile -Raw | ConvertFrom-Json
     $existingContent = @()
     if (Test-Path -LiteralPath $DestFile -PathType Leaf) {
-      $raw = Get-Content -LiteralPath $DestFile -Raw -ErrorAction SilentlyContinue
+      $raw = Get-Content -LiteralPath $DestFile -Raw -ErrorAction SilentlyContinue  # WHY: probe — guarded by Test-Path above; race-condition guard for file deleted between check and read
       if (-not [string]::IsNullOrWhiteSpace($raw)) {
         $existingContent = $raw | ConvertFrom-Json
       }
@@ -235,7 +235,7 @@ function Sync-VSCodeConfig {
           # not silently discarded on first activation.
           $repoContent = $null
           if (Test-Path -LiteralPath $repoTarget) {
-            $repoContent = Get-Content -LiteralPath $repoTarget -Raw -ErrorAction SilentlyContinue
+            $repoContent = Get-Content -LiteralPath $repoTarget -Raw -ErrorAction SilentlyContinue  # WHY: probe — guarded by Test-Path above; race-condition guard for file deleted between check and read
           }
           if ([string]::IsNullOrEmpty($repoContent)) {
             Copy-Item -LiteralPath $linkPath -Destination $repoTarget -Force
@@ -285,7 +285,9 @@ function Sync-VSCodeConfig {
         } else {
           # Real directory: copy each top-level file to the repo dir without
           # overwriting existing repo content; repo is the source of truth.
-          Get-ChildItem -LiteralPath $linkPath -File -ErrorAction SilentlyContinue | ForEach-Object {
+          # WHY: probe — directory may be empty or inaccessible; ForEach-Object handles absent results gracefully
+          Get-ChildItem -LiteralPath $linkPath -File -ErrorAction SilentlyContinue |
+            ForEach-Object {
             $destFile = Join-Path -Path $repoTarget -ChildPath $_.Name
             if (-not (Test-Path -LiteralPath $destFile)) {
               Copy-Item -LiteralPath $_.FullName -Destination $destFile -Force
@@ -316,7 +318,7 @@ function Sync-VSCodeConfig {
         $item = Get-Item -LiteralPath $chatLmPath
         $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
         if ($isSymlink) {
-          Remove-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $chatLmPath -ErrorAction SilentlyContinue
+          Remove-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $chatLmPath -ErrorAction SilentlyContinue  # WHY: cleanup — symlink may already be removed or never existed; best-effort cleanup before recreation
           Remove-Item -LiteralPath $chatLmPath -Force
         }
       }

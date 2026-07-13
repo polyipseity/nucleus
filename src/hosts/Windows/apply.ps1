@@ -617,7 +617,7 @@ foreach ($configFile in $effectiveConfigFiles) {
 # Set Windows Application Event Log max size to 200 MB.
 # No declarative DSC resource exists for this; wevtutil is the canonical tool.
 try {
-  wevtutil sl Application /ms:209715200 2>$null
+  wevtutil sl Application /ms:209715200 2>$null  # WHY: event log may already be at desired size; wevtutil errors are caught below
 } catch {
   Write-NucleusWarning "Failed to set Application Event Log max size: $($_.Exception.Message)"
 }

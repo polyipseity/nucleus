@@ -275,7 +275,7 @@ function Invoke-ReplicaSync {
       '--contimeout', '10s',
       '--max-duration', '1m'
     )
-    $remoteDirs = if ($IsDryRun) { @() } else { & $rcloneCmd.Source @remoteDirsArgs 2>$null }
+    $remoteDirs = if ($IsDryRun) { @() } else { & $rcloneCmd.Source @remoteDirsArgs 2>$null }  # WHY: probe — remote may not exist; $LASTEXITCODE checked below
     if ($LASTEXITCODE -eq 0 -and $null -ne $remoteDirs) {
       foreach ($remoteDir in @($remoteDirs)) {
         $trimmedDir = ([string]$remoteDir).TrimEnd('/')
@@ -306,7 +306,7 @@ function Invoke-ReplicaSync {
       '--contimeout', '10s',
       '--max-duration', '1m'
     )
-    $remoteFiles = if ($IsDryRun) { @() } else { & $rcloneCmd.Source @remoteFilesArgs 2>$null }
+    $remoteFiles = if ($IsDryRun) { @() } else { & $rcloneCmd.Source @remoteFilesArgs 2>$null }  # WHY: probe — remote may not exist; $LASTEXITCODE checked below
     if ($LASTEXITCODE -eq 0 -and $null -ne $remoteFiles) {
       foreach ($remoteFile in @($remoteFiles)) {
         if (Test-IsOneDriveInaccessibleRootEntry -EntryName ([string]$remoteFile) -BlockedRoots $BlockedRoots) {

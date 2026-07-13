@@ -36,8 +36,9 @@ Import-Module $modulePath -Force -DisableNameChecking
 function Resolve-NucleusRepoRoot {
   $repoRoot = $env:NUCLEUS_REPO_ROOT
   if (-not $repoRoot) {
+    # WHY: probe — may be invoked outside repo checkouts; resolution handled below.
     $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
-    if ($candidate -and (Test-Path "$candidate\src\flake.nix")) {
+    if ($candidate) {
       return $candidate
     }
     throw "NUCLEUS_REPO_ROOT is not set. Run via apply.ps1 or run from the repo checkout."

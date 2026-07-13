@@ -50,7 +50,7 @@ function Install-PrekHook {
   $prekConfigPath = Join-Path -Path $resolvedRepositoryRoot -ChildPath "prek.toml"
 
   # Use git rev-parse --git-dir to handle submodules/worktrees where .git is a file
-  $gitDirOutput = & git -C $resolvedRepositoryRoot rev-parse --git-dir 2>$null
+  $gitDirOutput = & git -C $resolvedRepositoryRoot rev-parse --git-dir 2>$null  # WHY: probe — non-git repos or submodule dirs expected; checked via $gitDirOutput below
   if (-not $gitDirOutput) {
     Write-Warning "prek: unable to detect git directory for $resolvedRepositoryRoot"
     return

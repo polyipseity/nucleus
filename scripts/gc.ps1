@@ -126,6 +126,7 @@ $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   if ($candidate -and (Test-Path "$candidate\src\flake.nix")) {
     $candidate
   } else {
+    # WHY: probe — may not be in a git repo; $null check below handles absence.
     $gitRoot = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Out-String
     $gitRoot = $gitRoot.Trim()
     if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and (Test-Path -Path $gitRoot -PathType Container)) {
