@@ -74,7 +74,6 @@ let
 in
 {
   home.activation.deployNucleusQuickActions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
     QUICK_ACTION_DIR="$HOME/Library/Services"
 
     # ── Phase 1b: Prune removed Quick Actions ──────────────────────────

@@ -87,12 +87,15 @@ let
   # List of currently deployed app service directories.
   # Used by tests and documentation to track active app services.
   currentNucleusAppServiceDirs = [ "NucleusManual.app" ];
+
+  # Import centralized daemon refresh helpers for shared lsregister path.
+  daemonRefresh = import ../../modules/macos/daemon-refresh.nix;
 in
 {
   home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
 
   home.activation.deployNucleusAppServices = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
+    LSREGISTER="${daemonRefresh.lsregisterPath}"
     APP_DIR="$HOME/Applications"
 
     # ── Phase 1a: Prune removed app services ───────────────────────────
@@ -110,10 +113,6 @@ in
         fi
       '') removedNucleusAppServices
     )}
-
-    # Force full LaunchServices re-scan to flush stale cache entries.
-    # Re-scanned again after all deploys below, so this is a gentle early flush.
-    "$LSREGISTER" -R 2>/dev/null || true
 
     # ── Phase 2: Deploy app services ───────────────────────────────────
     app_path="$APP_DIR/NucleusManual.app"

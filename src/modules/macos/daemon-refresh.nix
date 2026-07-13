@@ -10,6 +10,10 @@
 # restarted at most once per activation run — no redundant kills.
 # See: AGENTS.md > Core Conventions for the cross-OS principle.
 rec {
+  # Full path to lsregister (Launch Services database utility).
+  # Used by refreshLsd and by app-services.nix for app registration.
+  lsregisterPath = "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister";
+
   # Kill cfprefsd (CFPreferences daemon).
   # Caches all defaults read/write in process memory. Kill forces re-read from
   # ~/Library/Preferences/*.plist on next access.
@@ -29,7 +33,7 @@ rec {
   # Sends SIGKILL to lsd (Launch Services Daemon); on restart it rebuilds
   # the database from scratch, picking up newly registered .app bundles.
   refreshLsd = ''
-    /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -domain user 2>/dev/null || true
+    ${lsregisterPath} -kill -domain user 2>/dev/null || true
   '';
 
   # Restart Finder via killall. Simpler than launchctl kickstart but loses
