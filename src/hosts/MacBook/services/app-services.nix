@@ -89,13 +89,14 @@ let
   currentNucleusAppServiceDirs = [ "NucleusManual.app" ];
 
   # Import centralized daemon refresh helpers for shared lsregister path.
+  # Import centralized daemon refresh helpers for post-deploy cache flush.
   daemonRefresh = import ../../../modules/macos/daemon-refresh.nix;
 in
 {
   home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
 
   home.activation.deployNucleusAppServices = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    LSREGISTER="${daemonRefresh.lsregisterPath}"
+    LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
     APP_DIR="$HOME/Applications"
 
     # ── Phase 1a: Prune removed app services ───────────────────────────
@@ -103,12 +104,12 @@ in
       map (svc: ''
         # Delete NSServicesStatus key for ${svc.appDir} unconditionally.
         /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"${svc.bundleId} - ${svc.menuItem} - ${svc.message}\"" \
-          ~/Library/Preferences/pbs.plist 2>/dev/null || true
+          ~/Library/Preferences/pbs.plist 2>/dev/null || true  # WHY: key may not exist on first apply
 
         app_path="$APP_DIR/${svc.appDir}"
         if [ -d "$app_path" ]; then
-          "$LSREGISTER" -u "$app_path" 2>/dev/null || true
-          chmod -R +w "$app_path" 2>/dev/null || true
+          "$LSREGISTER" -u "$app_path" 2>/dev/null || true  # WHY: app may not be deployed yet
+          chmod -R +w "$app_path" 2>/dev/null || true  # WHY: dir may not exist on first apply
           rm -rf "$app_path"
         fi
       '') removedNucleusAppServices
@@ -121,14 +122,14 @@ in
     mkdir -p "$APP_DIR"
     # Nix store outputs are read-only; strip that before deletion to avoid
     # Permission denied on the next generation switch.
-    chmod -R +w "$app_path" 2>/dev/null || true
+    chmod -R +w "$app_path" 2>/dev/null || true  # WHY: dir may not exist on first apply
     rm -rf "$app_path"
     cp -R "$store_path" "$APP_DIR/"
     # Nix store outputs are read-only; make writable so LaunchServices
     # does not silently ignore the app bundle.
     chmod -R u+w "$app_path"
 
-    "$LSREGISTER" -R -f "$app_path" || true
+    "$LSREGISTER" -R -f "$app_path" || true  # WHY: LaunchServices may reject unsigned bundles; not fatal
 
     # Enable the service in NSServicesStatus so it appears in the Services
     # menu and right-click context menu without manual toggling in
@@ -139,5 +140,12 @@ in
     enablement_key="com.nucleus.OpenNucleusManual - open nucleus manual - open"
     /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
       '<dict><key>presentation_modes</key><dict><key>ContextMenu</key><true/><key>ServicesMenu</key><true/><key>FinderPreview</key><true/><key>TouchBar</key><true/></dict></dict>'
+
+    # ── Phase 4: Flush daemon caches so changes take effect immediately ─
+    # Without these restarts, cfprefsd, lsd, and pbs all hold stale cached
+    # state in process memory. Finder is intentionally excluded here —
+    # relaunchDesktopServices (DAG-ordered after writeBoundary) restarts it
+    # via launchctl kickstart to preserve window state.
+    ${daemonRefresh.refreshServicesMenu}
   '';
 }

@@ -32,6 +32,7 @@ Guidance-file rule (`AGENTS.md`, `.agents/**`):
 
 - Keep one source of truth per policy.
 - Keep rules testable and concrete.
+- Every `|| true` must have an inline `# WHY` comment explaining why failure is acceptable. Undocumented `|| true` is a violation.
 - Remove speculative guidance instead of preserving it.
 
 Safety rules:

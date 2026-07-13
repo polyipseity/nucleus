@@ -81,11 +81,11 @@ in
       map (qa: ''
         # Delete NSServicesStatus key for ${qa.dir} (old naming convention).
         /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"${qa.enablementKey}\"" \
-          ~/Library/Preferences/pbs.plist 2>/dev/null || true
+          ~/Library/Preferences/pbs.plist 2>/dev/null || true  # WHY: key may not exist on first apply
 
         qa_path="$QUICK_ACTION_DIR/${qa.dir}"
         if [ -d "$qa_path" ]; then
-          chmod -R +w "$qa_path" 2>/dev/null || true
+          chmod -R +w "$qa_path" 2>/dev/null || true  # WHY: dir may not exist on first apply
           rm -rf "$qa_path"
         fi
       '') removedNucleusQuickActions
@@ -97,7 +97,7 @@ in
         wf_dir="$QUICK_ACTION_DIR/optimize PDF - ${preset}.workflow"
         store_path="${nucleusOptimizePdfQuickActions}/optimize PDF - ${preset}.workflow"
         mkdir -p "$QUICK_ACTION_DIR"
-        chmod -R +w "$wf_dir" 2>/dev/null || true
+        chmod -R +w "$wf_dir" 2>/dev/null || true  # WHY: dir may not exist on first apply
         rm -rf "$wf_dir"
         cp -R "$store_path" "$QUICK_ACTION_DIR/"
         chmod -R u+w "$wf_dir"
@@ -108,7 +108,7 @@ in
           "com.nucleus.GSPDFOpt-${preset} - Optimize PDF - ${preset} - runWorkflowAsService" \
           "com.nucleus.OptimizePDF-${preset} - optimize PDF - ${preset} - runWorkflowAsService"; do
           /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"$legacy_key\"" \
-            ~/Library/Preferences/pbs.plist 2>/dev/null || true
+            ~/Library/Preferences/pbs.plist 2>/dev/null || true  # WHY: key may not exist after previous cleanup
         done
         # Enable in presentation_modes format (macOS 14+).
         # CFBundleIdentifier is set in each workflow's Info.plist.
