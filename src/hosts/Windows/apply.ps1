@@ -501,25 +501,32 @@ $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 # Cross-reference: docs/env-variable-registry.md
 # Nix-side source of truth: src/modules/lib/env-vars.nix
 $env:NUCLEUS_REPO_ROOT = $repoRoot
-$env:NUCLEUS_HOST = "Windows"
 
 # NUCLEUS_HOST: Phase 1 of two-phase promotion.
 # Phase 1 sets User scope here (runs without elevation).
 # Phase 2 sets Machine scope via system/env.dsc.yml (requires elevation).
-# Only write User scope if neither User nor Machine has the correct value yet.
-$existingUserHost = [Environment]::GetEnvironmentVariable("NUCLEUS_HOST", "User")
-$existingMachineHost = [Environment]::GetEnvironmentVariable("NUCLEUS_HOST", "Machine")
-if ($existingUserHost -ne "Windows" -and $existingMachineHost -ne "Windows") {
+# Check effective persisted value (User overrides Machine) — skip write if correct.
+$persistedHost = [Environment]::GetEnvironmentVariable("NUCLEUS_HOST", "User")
+if ([string]::IsNullOrEmpty($persistedHost)) {
+  $persistedHost = [Environment]::GetEnvironmentVariable("NUCLEUS_HOST", "Machine")
+}
+if ($persistedHost -ne "Windows") {
   [Environment]::SetEnvironmentVariable("NUCLEUS_HOST", "Windows", "User")
   Write-Output "apply: set NUCLEUS_HOST=Windows (User scope)"
 }
+# Process-level for this run (ensures subprocesses see the value immediately).
+$env:NUCLEUS_HOST = "Windows"
 
 # NUCLEUS_REPO_ROOT: set dynamically per-activation because the repo path
-# varies by machine (clone location).  Storing it in DSC (system/env.dsc.yml)
-# would bake in an absolute path, breaking portability.  The env var is
-# persisted here so subprocesses and future sessions inherit it.
-[Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $repoRoot, "User")
-Write-Output "apply: set NUCLEUS_REPO_ROOT=$repoRoot"
+# varies by machine (clone location).  Storing it in DSC would bake in an
+# absolute path, breaking portability.  The env var is persisted here so
+# subprocesses and future sessions inherit it.  Only write if the value
+# has changed since the last run.
+$existingRoot = [Environment]::GetEnvironmentVariable("NUCLEUS_REPO_ROOT", "User")
+if ($existingRoot -ne $repoRoot) {
+  [Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $repoRoot, "User")
+  Write-Output "apply: set NUCLEUS_REPO_ROOT=$repoRoot"
+}
 
 # Broadcast WM_SETTINGCHANGE so running processes (Explorer, terminals)
 # pick up the env var changes without a logoff/logon.
@@ -640,6 +647,27 @@ $effectiveConfigFiles = @($effectiveConfigFiles | ForEach-Object {
 
 foreach ($configFile in $effectiveConfigFiles) {
   Invoke-WingetConfiguration -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath $configFile) -WallpaperPath $activeWallpaperPath
+}
+
+# Phase 2 cleanup: after system DSC files (system/env.dsc.yml) have been applied,
+# Machine scope is authoritative for NUCLEUS_HOST.  Clear User-scope override
+# to avoid ambiguity about which scope's value applies.
+if ([Environment]::GetEnvironmentVariable("NUCLEUS_HOST", "User") -ne $null) {
+  [Environment]::SetEnvironmentVariable("NUCLEUS_HOST", $null, "User")
+  Write-Output "apply: cleared NUCLEUS_HOST from User scope (Machine scope is authoritative)"
+}
+
+# Promote NUCLEUS_REPO_ROOT to Machine scope (constant within this apply run).
+# Clearing User scope avoids ambiguity about which scope is authoritative.
+# Non-admin runs fall back gracefully to keeping User scope.
+try {
+  [Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $repoRoot, "Machine")
+  if ([Environment]::GetEnvironmentVariable("NUCLEUS_REPO_ROOT", "User") -ne $null) {
+    [Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $null, "User")
+  }
+  Write-Output "apply: promoted NUCLEUS_REPO_ROOT to Machine scope"
+} catch {
+  Write-Warning "apply: cannot promote NUCLEUS_REPO_ROOT to Machine scope (not admin). Staying at User scope."
 }
 
 # Set Windows Application Event Log max size to 200 MB.
