@@ -579,16 +579,6 @@ in
       /bin/mkdir -p "$_camilladsp_user/Library/Logs/nucleus/camilladsp"
     fi
 
-    # Export the canonical host name for downstream VM host-scoping and Host
-    # module consumers (e.g. src/modules/VMs.json hosts field filtering).
-    # undoc-supp: /dev/console may not exist; fallback provides default.
-    console_user="''${console_user:-$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)}"
-    if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
-      # undoc-supp: launchctl setenv may fail if the user session is not yet fully established (during early boot activation). Best-effort export.
-      /bin/launchctl asuser "$(/usr/bin/id -u "$console_user" 2>/dev/null || echo 0)" \
-          /bin/launchctl setenv NUCLEUS_HOST MacBook 2>/dev/null || true  # undoc-supp: best-effort export; user session may not be fully established during early boot activation.
-    fi
-
     # ---- verify-homebrew-unpinnable ----------------------------------------------
     # Warning-only check that installed Homebrew versions match lockfile.  Runs
     # after homebrew bundle (so the cellar is populated) but before other
