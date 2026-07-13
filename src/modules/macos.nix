@@ -22,7 +22,19 @@ let
   finderSidebar = import ./macos/finder-sidebar.nix { inherit config lib pkgs; };
   preferenceGc = import ./macos/preference-gc.nix { inherit config lib pkgs; };
 
-  # UTI list for Chrome: set as the default handler for HTML and XHTML documents.
+  # Shared BD CLI wrapper: soft-fail wrapper for BetterDisplay CLI commands.
+  # Used by both betterdisplayHeartbeat and ensureHeadlessDisplay.
+  bdCliWrapper = ''
+    # _bd_cli args... — Execute BetterDisplay CLI command, soft-fail on error.
+    # WHY || true: BetterDisplay may be unresponsive during app startup/update,
+    # or Pro-only features may be unavailable in the free-tier build. Neither
+    # condition should abort activation or mark the LaunchAgent as failed.
+    _bd_cli() {
+      "$BD_BIN" "$@" || true
+    }
+  '';
+
+  # UTI list for Chrome: set as the default handler for HTML and XHTML documents.: set as the default handler for HTML and XHTML documents.
   # Source: Apple Uniform Type Identifiers.
   # https://developer.apple.com/documentation/uniformtypeidentifiers
   chromeUTIs = [
@@ -244,6 +256,8 @@ let
     BD_APP="/Applications/BetterDisplay.app"
     DISPLAY_NAME="HeadlessDisplay"
 
+    ${bdCliWrapper}
+
     # No-op if BetterDisplay is not installed.
     [ -f "$BD_BIN" ] || exit 0
 
@@ -254,7 +268,7 @@ let
     fi
 
     # Check connection state; soft-fail by treating any CLI error as unknown.
-    connected_state="$("$BD_BIN" get -name="$DISPLAY_NAME" -connected)" || true
+    connected_state="$(_bd_cli get -name="$DISPLAY_NAME" -connected)"
 
     # No-op if already connected.
     [ "$connected_state" = "on" ] && exit 0
@@ -266,18 +280,18 @@ let
     # parameters as ensureHeadlessDisplay so the virtual screen specification
     # stays consistent across both code paths.
     if ! "$BD_BIN" set -name="$DISPLAY_NAME" -connected=on; then
-      tag_ids="$("$BD_BIN" get -identifiers -name="$DISPLAY_NAME" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)" || true
+      tag_ids="$(_bd_cli get -identifiers -name="$DISPLAY_NAME" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
       for tag_id in $tag_ids; do
-        "$BD_BIN" discard -tagID="$tag_id" || true
+        _bd_cli discard -tagID="$tag_id"
       done
-      "$BD_BIN" create \
+      _bd_cli create \
         -type=VirtualScreen \
         -virtualScreenName="$DISPLAY_NAME" \
         -aspectWidth=16 \
         -aspectHeight=10 \
         -multiplierStep=160 \
         -virtualScreenHiDPI=on \
-        -connected=on || true
+        -connected=on
     fi
   '';
 
@@ -1020,6 +1034,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
       BD_APP="/Applications/BetterDisplay.app"
       DISPLAY_NAME="HeadlessDisplay"
 
+      ${bdCliWrapper}
+
       create_headless_display() {
         # Use documented virtual-screen parameters and force connected state at
         # creation time so fallback remains available with the lid closed.
@@ -1051,7 +1067,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
           /bin/sleep 5  # wait for the app to initialise before issuing CLI commands
         fi
 
-        identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME")" || true
+        identifiers_json="$(_bd_cli get -identifiers -name="$DISPLAY_NAME")"
         tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
         tag_count="$(printf '%s\n' "$tag_ids" | /usr/bin/awk 'NF { count += 1 } END { print count + 0 }')"
 
@@ -1064,11 +1080,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
             echo "macos: failed to create BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
           fi
           /bin/sleep 3  # wait for the virtual display to be registered
-          identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME")" || true
+          identifiers_json="$(_bd_cli get -identifiers -name="$DISPLAY_NAME")"
           tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
         else
           tag_id="$(printf '%s\n' "$tag_ids" | /usr/bin/awk 'NF { print; exit }')"
-          connected_state="$($BD_BIN get -tagID="$tag_id" -connected)" || true
+          connected_state="$(_bd_cli get -tagID="$tag_id" -connected)"
 
           if [ "$connected_state" != "on" ]; then
             if ! "$BD_BIN" discard -tagID="$tag_id"; then
@@ -1079,12 +1095,12 @@ lib.mkIf pkgs.stdenv.isDarwin {
               echo "macos: failed to recreate BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
             fi
             /bin/sleep 3  # wait for the virtual display to be registered
-            identifiers_json="$($BD_BIN get -identifiers -name="$DISPLAY_NAME")" || true
+            identifiers_json="$(_bd_cli get -identifiers -name="$DISPLAY_NAME")"
             tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
           fi
         fi
 
-        connected_after="$($BD_BIN get -name="$DISPLAY_NAME" -connected)" || true
+        connected_after="$(_bd_cli get -name="$DISPLAY_NAME" -connected)"
         if [ "$connected_after" != "on" ]; then
           echo "macos: failed to set BetterDisplay virtual screen '$DISPLAY_NAME' connected=on." >&2
         fi
