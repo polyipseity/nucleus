@@ -636,25 +636,25 @@ _check_undoc_supp() {
     # Skip comment-only lines (pattern in a comment, not code)
     [[ "$_rest" =~ ^[[:space:]]*# ]] && continue
     # Skip lines with # WHY: inline
-    case "$_rest" in *'# WHY:'*) continue ;; esac
-    # Skip lines with # WHY: on the immediately preceding line
-    [ "$_ln" -gt 1 ] && sed -n "$((_ln - 1))p" "$_f" | grep -q '# WHY:' && continue
+    case "$_rest" in *'# undoc-supp:'*) continue ;; esac
+    # Skip lines with # undoc-supp: on the immediately preceding line
+    [ "$_ln" -gt 1 ] && sed -n "$((_ln - 1))p" "$_f" | grep -q '# undoc-supp:' && continue
     echo "$_f:$_ln ($_label)"
   done >> "$_undoc_supp_out"
 }
 
 if $HAS_ARGS; then
   # Path-scoped mode: check only provided files
-  # WHY: string argument specifying the suppression pattern for the check function, not a real || true operator.
+  # undoc-supp: string argument specifying the suppression pattern for the check function, not a real || true operator.
   [ ${#SH_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '|| true' '|| true' "${SH_FILES[@]}"
-  # WHY: string argument specifying the suppression pattern for the check function, not a real || true operator.
+  # undoc-supp: string argument specifying the suppression pattern for the check function, not a real || true operator.
   [ ${#NIX_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '|| true' '|| true' "${NIX_FILES[@]}"
   [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '2>$null' '2>$null' "${PS1_FILES[@]}"
   [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '-ErrorAction SilentlyContinue' '-ErrorAction SilentlyContinue' "${PS1_FILES[@]}"
   [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-E' 'catch[[:space:]]*\{[[:space:]]*\}' 'empty catch {}' "${PS1_FILES[@]}"
 else
   # Full mode: find all relevant files
-  # WHY: string argument specifying the suppression pattern for the check function, not a real || true operator.
+  # undoc-supp: string argument specifying the suppression pattern for the check function, not a real || true operator.
   _check_undoc_supp '-F' '|| true' '|| true' $(find . -path ./vendor -prune -o \( -name '*.nix' -print \) -o \( -name '*.sh' -print \))
   _check_undoc_supp '-F' '2>$null' '2>$null' $(find . -path ./vendor -prune -o -name '*.ps1' -print)
   _check_undoc_supp '-F' '-ErrorAction SilentlyContinue' '-ErrorAction SilentlyContinue' $(find . -path ./vendor -prune -o -name '*.ps1' -print)
