@@ -13,6 +13,7 @@
 Describe "Windows Application Parity" {
     Context "QtPass managed registry settings" {
         It "Should configure QtPass clipboard, auto-clear, and visibility values" {
+            # WHY: probe — registry key may not exist.
             $qtpass = Get-ItemProperty -Path 'HKCU:\Software\IJHack\QtPass' -ErrorAction SilentlyContinue
 
             $qtpass.clipBoardType | Should -Be 2
@@ -28,6 +29,7 @@ Describe "Windows Application Parity" {
         }
 
         It "Should configure QtPass generation, Git, and template values" {
+            # WHY: probe — registry key may not exist.
             $qtpass = Get-ItemProperty -Path 'HKCU:\Software\IJHack\QtPass' -ErrorAction SilentlyContinue
 
             $qtpass.addGPGId | Should -Be 1

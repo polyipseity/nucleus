@@ -82,8 +82,7 @@ in
     # Create user-level log dir for camilladsp/camillagui-backend so launchd can
     # open stdout/stderr, then chown to the console user so the daemon process
     # (which runs as that user via UserName) can write to the log files.
-    # WHY || true: /dev/console may not exist (headless/SSH session);
-    # empty result is handled by the [ -n "$_console_user" ] guard.
+    # WHY: /dev/console may not exist (headless/SSH session); empty result is handled by the [ -n "$_console_user" ] guard.
     _console_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     if [ -n "$_console_user" ] && [ "$_console_user" != "/Users/root" ]; then
       _username="''${_console_user#/Users/}"
@@ -97,8 +96,7 @@ in
       # Services running as root (https-proxy, linux-builder, litellm,
       # service-watchdog) can write to any dir, so chowning these is safe.
       for _sub in ${builtins.toString chownLogDirs}; do
-        # WHY || true: system log subdir may not exist on first apply;
-        # best-effort ownership fix for each deployed service.
+        # WHY: system log subdir may not exist on first apply; best-effort ownership fix for each deployed service.
         /usr/sbin/chown "$_username:staff" "$system_log_dir/$_sub" 2>/dev/null || true
       done
     fi
@@ -245,8 +243,7 @@ in
     # in that user's home directory.
     #
     # bclm is retained as a fallback only for older macOS versions.
-    # WHY || true: /dev/console may not exist (headless/SSH session);
-    # empty result is handled by [ -n "$console_user" ] guards downstream.
+    # WHY: /dev/console may not exist (headless/SSH session); empty result is handled by [ -n "$console_user" ] guards downstream.
     console_user="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     macos_major="$(/usr/bin/sw_vers -productVersion 2>/dev/null | /usr/bin/awk -F. '{print $1}')"
 
@@ -318,8 +315,7 @@ in
     # LaunchAgent path.
     if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
       if [ -d "/Applications/MiddleClick.app" ]; then
-        # WHY || true: console_uid probe may fail if console session ended;
-        # empty result is handled by the [ -n "$console_uid" ] guard.
+        # WHY: console_uid probe may fail if console session ended; empty result is handled by the [ -n "$console_uid" ] guard.
         console_uid="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
         if [ -n "$console_uid" ]; then
           if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" \
@@ -345,7 +341,7 @@ in
     # this keeps the declarative converge path consistent with other apps.
     if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
       if [ -d "/Applications/Mounty.app" ]; then
-        # WHY || true: see MiddleClick pattern — console uid probe may fail.
+        # WHY: see MiddleClick pattern — console uid probe may fail.
         console_uid="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
         if [ -n "$console_uid" ]; then
           if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" \
@@ -365,7 +361,7 @@ in
     # These are Sparkle preferences in the app's defaults domain.
     if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
       if [ -d "/Applications/LinearMouse.app" ]; then
-        # WHY || true: see MiddleClick pattern — console uid probe may fail.
+        # WHY: see MiddleClick pattern — console uid probe may fail.
         console_uid="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
         if [ -n "$console_uid" ]; then
           if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" /usr/bin/defaults write com.lujjjh.LinearMouse SUEnableAutomaticChecks -bool false; then
@@ -395,14 +391,13 @@ in
         console_home="/Users/$console_user"
       fi
 
-      # WHY || true: id -gn may fail if console session ended;
-      # empty group is handled by downstream chown guards.
+      # WHY: id -gn may fail if console session ended; empty group is handled by downstream chown guards.
       console_group="$(/usr/bin/id -gn "$console_user" 2>/dev/null || true)"
 
       gimp_app_info="/Applications/GIMP.app/Contents/Info"
       gimp_version_raw=""
       if [ -d "/Applications/GIMP.app" ]; then
-        # WHY || true: GIMP may not be deployed yet; version probe expected to fail.
+        # WHY: GIMP may not be deployed yet; version probe expected to fail.
         gimp_version_raw="$(/usr/bin/defaults read "$gimp_app_info" CFBundleShortVersionString 2>/dev/null || true)"
       fi
 
@@ -462,8 +457,7 @@ in
     #   1. Resolve the active console UID from /dev/console.
     #   2. Skip when no non-root GUI session is present (e.g. headless rebuild).
     #   3. Use launchctl asuser to write the per-user defaults domain as that user.
-    # WHY || true: /dev/console may not exist (headless/SSH session);
-    # empty output is handled by the [ -z "$console_uid" ] guard below.
+    # WHY: /dev/console may not exist (headless/SSH session); empty output is handled by the [ -z "$console_uid" ] guard below.
     console_uid="$(/usr/bin/stat -f%u /dev/console 2>/dev/null || true)"
 
     if [ -z "$console_uid" ] || [ "$console_uid" -eq 0 ]; then
@@ -526,8 +520,7 @@ in
 
     echo "spotlight: disabling..."
 
-    # WHY || true: console uid probe may fail if console session ended;
-    # the [ -n "$console_uid_spotlight" ] guard handles empty output.
+    # WHY: console uid probe may fail if console session ended; the [ -n "$console_uid_spotlight" ] guard handles empty output.
     console_uid_spotlight="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
     if [ -n "$console_user" ] && [ "$console_user" != "root" ] && [ -n "$console_uid_spotlight" ]; then
       for hotkey in 61 64 65; do
@@ -580,7 +573,7 @@ in
         echo "logging: failed to create $system_log_dir/$subdir." >&2
       fi
     done
-    # WHY || true: /dev/console may not exist; guards below handle empty/root.
+    # WHY: /dev/console may not exist; guards below handle empty/root.
     _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     if [ -n "$_camilladsp_user" ] && [ "$_camilladsp_user" != "/Users/root" ]; then
       /bin/mkdir -p "$_camilladsp_user/Library/Logs/nucleus/camilladsp"
@@ -588,13 +581,12 @@ in
 
     # Export the canonical host name for downstream VM host-scoping and Host
     # module consumers (e.g. src/modules/VMs.json hosts field filtering).
-    # WHY || true: /dev/console may not exist; fallback provides default.
+    # WHY: /dev/console may not exist; fallback provides default.
     console_user="''${console_user:-$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)}"
     if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
-      # WHY || true: launchctl setenv may fail if the user session is not yet
-      # fully established (during early boot activation). Best-effort export.
+      # WHY: launchctl setenv may fail if the user session is not yet fully established (during early boot activation). Best-effort export.
       /bin/launchctl asuser "$(/usr/bin/id -u "$console_user" 2>/dev/null || echo 0)" \
-        /bin/launchctl setenv NUCLEUS_HOST MacBook 2>/dev/null || true
+        /bin/launchctl setenv NUCLEUS_HOST MacBook 2>/dev/null || true  # WHY: best-effort export; user session may not be fully established during early boot activation.
     fi
 
     # ---- verify-homebrew-unpinnable ----------------------------------------------
@@ -602,14 +594,11 @@ in
     # after homebrew bundle (so the cellar is populated) but before other
     # post-install scripts.  Never fails activation.
     #
-    # WHY || true: warning-only version check; must not abort activation even
-    # if Homebrew state does not match lockfile or the script encounters an error.
-    #
-    # NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo.  If unset,
-    # skip gracefully.
+    # WHY: warning-only version check; must not abort activation even if Homebrew state does not match lockfile or the script encounters an error.
+    # NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo. If unset, skip gracefully.
     hb_repo_root="$NUCLEUS_REPO_ROOT"
     if [ -n "$hb_repo_root" ] && [ -f "$hb_repo_root/src/scripts/verify-homebrew-unpinnable.sh" ]; then
-      NUCLEUS_REPO_ROOT="$hb_repo_root" sh "$hb_repo_root/src/scripts/verify-homebrew-unpinnable.sh" || true
+      NUCLEUS_REPO_ROOT="$hb_repo_root" sh "$hb_repo_root/src/scripts/verify-homebrew-unpinnable.sh" || true  # WHY: warning-only version check; must not abort activation even if script errors.
     fi
 
     # ---- disableSteamAutoStartup ------------------------------------------------
@@ -623,8 +612,7 @@ in
     #   Windows — Disable-SteamAutoStartup module + apply.ps1
     if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
       if [ -d "/Applications/Steam.app" ]; then
-        # WHY || true: console uid probe may fail if console session ended;
-        # [ -n "$console_uid" ] guard handles empty output.
+        # WHY: console uid probe may fail if console session ended; [ -n "$console_uid" ] guard handles empty output.
         console_uid="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
         if [ -n "$console_uid" ]; then
           if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" \

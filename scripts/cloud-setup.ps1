@@ -312,12 +312,12 @@ Write-NucleusInfo 'all credentials valid.'
 # Ensure acknowledge_abuse is set on GoogleDrive to prevent 403 errors on
 # publicly-shared files. This is required for rclone to download files shared
 # via Google Drive links with "anyone with the link" permissions.
-# WHY: rclone defaults acknowledge_abuse=false, which blocks downloads from
-# shared links on new Drive API versions.
+# WHY: probe — rclone may not be configured yet; exit code checked downstream.
 $gdListed = & rclone listremotes 2>$null
 if ($LASTEXITCODE -eq 0 -and ($gdListed -contains 'GoogleDrive:')) {
   $gdAckAlreadySet = $false
   try {
+    # WHY: probe — rclone may not be configured yet; catch block handles failure.
     $gdDump = & rclone config dump 2>$null | Out-String | ConvertFrom-Json
     if ($gdDump.GoogleDrive.acknowledge_abuse -eq 'true') {
       $gdAckAlreadySet = $true

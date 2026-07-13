@@ -286,6 +286,7 @@ in
       # If bun is still not found, search the nix store for any bun binary
       # and add its parent directory to PATH.
       if ! command -v bun >/dev/null 2>&1; then
+        # WHY: nix store may not have bun yet on first apply; best-effort store probe.
         _bun_store_path="$(find /nix/store -name 'bun' -type f -print -quit 2>/dev/null || true)"
         if [ -n "$_bun_store_path" ] && [ -x "$_bun_store_path" ]; then
           _bun_store_dir="$(dirname "$_bun_store_path")"
@@ -318,9 +319,7 @@ in
       _ibp_global_json="$HOME/.bun/install/global/package.json"
       _ibp_installed="$(mktemp)"
       if [ -f "$_ibp_global_json" ]; then
-        # || true is intentional and benign: parse failure on a malformed or
-        # partially-written file treats the installed set as empty — safe
-        # because desired packages will simply be re-installed on the next run.
+        # WHY: parse failure on a malformed or partially-written file treats the installed set as empty — safe because desired packages will simply be re-installed on the next run.
         "$_ibp_jq_bin" -r '.dependencies // {} | keys[]' "$_ibp_global_json" > "$_ibp_installed" || true
       fi
 
@@ -435,9 +434,7 @@ in
       # "name vX.Y.Z" shape so separator/header lines (for example "-")
       # cannot be misparsed as package names.
       _iut_installed="$(mktemp)"
-      # || true is intentional and benign: if uv tool list fails (e.g. no tool
-      # environment is initialised yet), the installed set is treated as empty
-      # and nothing is erroneously removed.
+      # WHY: uv tool list may fail if no tool environment is initialised yet; treating the installed set as empty is correct — nothing to remove.
       "$_iut_uv_bin" tool list 2>/dev/null | ${pkgs.gawk}/bin/awk '/^[A-Za-z0-9][A-Za-z0-9._-]*[[:space:]]+v[0-9]/{print $1}' > "$_iut_installed" || true
 
       # Tools installed but not desired: zap-style removal.
@@ -598,9 +595,7 @@ in
         # Output format: "crate-name vX.Y.Z:" on header lines; extract the
         # crate name (first field) from lines matching that pattern.
         _icp_installed="$(mktemp)"
-        # || true is intentional and benign: if cargo +stable install --list fails
-        # (e.g. stable toolchain missing or ~/.cargo is uninitialised),
-        # an empty installed set is correct — nothing to remove.
+        # WHY: cargo +stable install --list may fail if stable toolchain is missing or ~/.cargo is uninitialised; empty installed set is correct — nothing to remove.
         cargo +stable install --list 2>/dev/null | ${pkgs.gawk}/bin/awk '/^[a-zA-Z0-9_-]+ v/{print $1}' > "$_icp_installed" || true
 
         # Crates installed but not desired: zap-style removal.

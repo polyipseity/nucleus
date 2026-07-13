@@ -60,8 +60,7 @@ function Sync-LiteLLMService {
   $serviceName = 'nucleus-litellm'
   $oldTaskName = 'NucleusLiteLLM'
 
-  # Clean up the legacy scheduled task unconditionally so a single apply pass
-  # that transitions from schtask→native removes the old task in one go.
+  # WHY: probe — legacy task may not exist; $null check handles missing task.
   $existingTask = Get-ScheduledTask -TaskName $oldTaskName -ErrorAction SilentlyContinue
   if ($null -ne $existingTask) {
     Unregister-ScheduledTask -TaskName $oldTaskName -Confirm:$false
@@ -116,8 +115,8 @@ function Sync-LiteLLMService {
   $opencodeGoKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_go_api_key"
   $opencodeZenKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_zen_api_key"
 
-  # Read the litellm endpoint from the canonical service registry.
   $litellmEndpoint = & {
+    # WHY: probe — services.json may not exist yet; $null check handles absence.
     $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
     if ($svc.litellm.network.default) { $svc.litellm.network.default } else { @{ host = '127.0.0.1'; port = 4000 } }
   }

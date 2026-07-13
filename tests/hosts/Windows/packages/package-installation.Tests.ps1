@@ -62,14 +62,17 @@ Describe "Windows Package Installation" {
         }
 
         It "Should have gitk available from the Git installation" {
+            # WHY: probe — command may not be installed; Should handles absence.
             Get-Command -Name gitk -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
         }
 
         It "Should have pwsh available from the PowerShell installation" {
+            # WHY: probe — command may not be installed; Should handles absence.
             Get-Command -Name pwsh -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
         }
 
         It "Should have nvim available from the Neovim installation" {
+            # WHY: probe — command may not be installed; Should handles absence.
             Get-Command -Name nvim -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
         }
     }

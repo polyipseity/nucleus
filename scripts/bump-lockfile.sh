@@ -310,7 +310,7 @@ if section_enabled ollama; then
       # WHY: model may not be pulled yet; info probe expected to fail.
       ollama_info=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama show "$name:$tag" --format json 2>/dev/null || true)
       if [ -n "$ollama_info" ]; then
-        new_digest=$(printf '%s\n' "$ollama_info" | jq -r '.digest // empty' 2>/dev/null || true)
+        new_digest=$(printf '%s\n' "$ollama_info" | jq -r '.digest // empty' 2>/dev/null || true) # WHY: jq may error on empty/malformed input from failed ollama probe; null check downstream handles the empty case.
         if [ -n "$new_digest" ] && [ "$new_digest" != "$old_digest" ]; then
           log_update "ollama ($host)" "$name:$tag" "${old_digest:-none}" "$new_digest"
           if [ -n "$old_digest" ]; then
@@ -403,13 +403,12 @@ if section_enabled vm-setup || section_enabled tart-images; then
       continue
     fi
 
-    # WHY: network/registry may not be reachable; [ -z ] guard handles failure.
     new_digest=$(curl -sL -D - -o /dev/null \
       -H "Authorization: Bearer $ghcr_token" \
       -H "Accept: application/vnd.oci.image.index.v1+json" \
       -H "Accept: application/vnd.oci.image.manifest.v1+json" \
       -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-      "https://ghcr.io/v2/${image_repo}/manifests/latest" 2>/dev/null | grep -i "^docker-content-digest:" | grep -oE 'sha256:[a-f0-9]{64}' || true)
+      "https://ghcr.io/v2/${image_repo}/manifests/latest" 2>/dev/null | grep -i "^docker-content-digest:" | grep -oE 'sha256:[a-f0-9]{64}' || true) # WHY: network/registry may not be reachable; [ -z ] guard handles failure.
 
     if [ -z "$new_digest" ]; then
       warn "could not fetch digest for $old_image, skipping"

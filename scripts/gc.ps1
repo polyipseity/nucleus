@@ -122,6 +122,7 @@ if ($Help) {
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   $env:NUCLEUS_REPO_ROOT
 } else {
+  # WHY: probe — path may not exist; $null check handles absence.
   $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
   if ($candidate -and (Test-Path "$candidate\src\flake.nix")) {
     $candidate
@@ -314,18 +315,21 @@ if (-not $NoVMGc) {
 
     if (Test-Path -LiteralPath $imagesDir -PathType Container) {
       # Remove temporary Packer build directories.
+      # WHY: probe — temporary build directories may not exist; ForEach-Object handles empty result.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*-build" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
         Remove-VMGcItem -Item $_ -Label "temporary VM build directory" -Recurse
       }
 
       # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
       if (Test-Path -LiteralPath $imagesDir -PathType Container) {
+        # WHY: probe — stale temporary directories may not exist; Where-Object handles empty result.
         Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^\..+' } | ForEach-Object {
           Remove-VMGcItem -Item $_ -Label "stale Packer temporary build directory" -Recurse
         }
       }
 
       # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
+      # WHY: probe — stale disk images may not exist; ForEach-Object handles empty result.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*.qcow2" -File -ErrorAction SilentlyContinue | ForEach-Object {
         $imageName = $_.BaseName
         if ($imageName -notin $declaredVMNames) {
@@ -336,6 +340,7 @@ if (-not $NoVMGc) {
       # GC stale VM scripts from scripts/ subfolder.
       $scriptsDir = Join-Path $vmDir 'scripts'
       if (Test-Path -LiteralPath $scriptsDir -PathType Container) {
+        # WHY: probe — VM scripts may not exist; foreach handles empty result.
         $scripts = Get-ChildItem -LiteralPath $scriptsDir -Include '*.sh', '*.ps1' -File -ErrorAction SilentlyContinue
         foreach ($script in $scripts) {
           $isDeclared = $false

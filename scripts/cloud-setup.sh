@@ -379,10 +379,9 @@ say "all credentials valid."
 # "potentially abusive" and requires explicit acknowledgment before rclone
 # can download them. This is standard for all Google Drive remotes.
 if rclone listremotes | grep -Fxq 'GoogleDrive:'; then
-  # WHY: token/URL may not be resolvable; best-effort extraction with downstream guards.
   _current_abuse="$({
     rclone config dump | jq -r '.GoogleDrive.acknowledge_abuse // "false"'
-  } 2>/dev/null || true)"
+  } 2>/dev/null || true)" # WHY: token/URL may not be resolvable; best-effort extraction with downstream guards.
   if [ "$_current_abuse" != "true" ]; then
     if rclone config update GoogleDrive acknowledge_abuse true; then
       say "enabled acknowledge_abuse on GoogleDrive"
@@ -431,10 +430,9 @@ if [ -f "$USERS_JSON" ] && command -v jq >/dev/null 2>&1; then
 
       # Skip no-op updates to avoid unnecessary provider re-auth prompts.
       # WHY: some backends can launch OAuth/device auth flows on config update.
-      # WHY: token/URL may not be resolvable; best-effort extraction with downstream guards.
       _current_description="$({
         rclone config dump | jq -r --arg remote "$remote_name" '.[$remote].description // empty'
-      } 2>/dev/null || true)"
+      } 2>/dev/null || true)" # WHY: token/URL may not be resolvable; best-effort extraction with downstream guards.
       if [ "$_current_description" = "$display_name" ]; then
         continue
       fi

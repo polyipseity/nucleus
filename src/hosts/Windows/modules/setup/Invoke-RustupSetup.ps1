@@ -48,9 +48,8 @@ function Invoke-RustupSetup {
   )
 
   # Guard: rustup must be accessible after WinGet DSC has installed Rustlang.Rustup.
+  # WHY: probe — rustup may not be installed; if-guard checks absence below.
   if (-not (Get-Command rustup -ErrorAction SilentlyContinue)) {
-    # -ErrorAction SilentlyContinue is intentional: absence of rustup is an
-    # expected probe condition; the if-guard checks the result immediately.
     Write-Error "Invoke-RustupSetup: rustup not found on PATH; ensure Rustlang.Rustup was installed by WinGet DSC before calling this function"
     return
   }

@@ -182,6 +182,7 @@ function Test-LogHealth {
 
     foreach ($dir in @($userDir, $systemDir)) {
       $logGlob = Join-Path -Path (Join-Path -Path $dir -ChildPath $svc) -ChildPath '*.log'
+      # WHY: probe — log files may not exist; foreach handles empty result.
       foreach ($logFile in Get-ChildItem -Path $logGlob -ErrorAction SilentlyContinue) {
         # Check file size against rotation threshold
         $size = $logFile.Length

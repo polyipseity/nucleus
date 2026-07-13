@@ -36,6 +36,7 @@ Import-Module $fmtModulePath -Force -DisableNameChecking
 function Resolve-NucleusRepoRoot {
   $repoRoot = $env:NUCLEUS_REPO_ROOT
   if (-not $repoRoot) {
+    # WHY: probe — path may not exist; $null check handles absence.
     $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
     if ($candidate -and (Test-Path "$candidate\src\flake.nix")) {
       return $candidate

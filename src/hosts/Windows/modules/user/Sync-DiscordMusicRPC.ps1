@@ -45,6 +45,7 @@ function Sync-DiscordMusicRPC {
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   if (-not $Enabled) {
+    # WHY: probe — task may not exist; $null check handles missing task.
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($null -ne $existingTask) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
@@ -58,6 +59,7 @@ function Sync-DiscordMusicRPC {
   $null = New-Item -Path $logDir -ItemType Directory -Force
 
   # Find the discord-music-rpc binary (installed via uv tool install or pip).
+  # WHY: probe — command may not be installed; $null check handles absence.
   $discordMusicRpcCmd = Get-Command -Name "discord-music-rpc" -ErrorAction SilentlyContinue
   if ($null -eq $discordMusicRpcCmd) {
     Write-Output "discord-music-rpc: binary not found in PATH; install via 'uv tool install git+https://github.com/polyipseity/ext.discord-music-rpc'"
@@ -78,6 +80,7 @@ function Sync-DiscordMusicRPC {
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
 
+  # WHY: probe — task may not exist; $null check handles missing task.
   $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
   if ($null -ne $existingTask) {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false

@@ -65,7 +65,7 @@ derive_repo_root() {
     fi
   done
   if command -v git >/dev/null 2>&1; then
-    _drr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || true
+    _drr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || true # WHY: git rev-parse may fail outside a git repo; fallback continues with error message.
     if [ -n "${_drr_git_root:-}" ] && [ -f "$_drr_git_root/src/flake.nix" ]; then
       printf '%s\n' "$_drr_git_root"
       return 0
@@ -376,8 +376,7 @@ extract_ports() {
 
   require_command jq
 
-  # WHY: service entry may not have a network block; jq returns empty, not an error.
   printf '%s\n' "$_ep_json" | jq -r '
     .network // empty | to_entries[] | "\(.value.host // "0.0.0.0") \(.value.port)"
-  ' 2>/dev/null || true
+  ' 2>/dev/null || true # WHY: service entry may not have a network block; jq returns empty, not an error.
 }

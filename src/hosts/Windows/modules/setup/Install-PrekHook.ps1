@@ -79,11 +79,11 @@ function Install-PrekHook {
 
   $resolvedPrekPath = $PrekExecutablePath
   if ([string]::IsNullOrWhiteSpace($resolvedPrekPath)) {
-    # Get-Command is a presence probe here; absence is expected on unmanaged
-    # shells, and the result is checked immediately.
+    # WHY: probe — prek may not be installed; if-guard checks absence below.
     $resolvedPrekPath = Get-Command -Name "prek.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
   }
   if ([string]::IsNullOrWhiteSpace($resolvedPrekPath)) {
+    # WHY: probe — prek (without .exe) may not be installed; if-guard checks absence below.
     $resolvedPrekPath = Get-Command -Name "prek" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
   }
   if ([string]::IsNullOrWhiteSpace($resolvedPrekPath)) {

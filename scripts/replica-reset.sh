@@ -97,7 +97,7 @@ replica_lines="$({
       ]
     | @tsv
   ' "$USERS_JSON"
-} || true)"
+} || true)" # WHY: jq query may fail if users.json is missing; empty result handled by [ -z ] check downstream.
 
 if [ -z "$replica_lines" ]; then
   say "no enabled replicas for user '$username'"

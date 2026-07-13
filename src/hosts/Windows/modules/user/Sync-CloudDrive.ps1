@@ -96,9 +96,7 @@ function Sync-CloudDrive {
 
         $remotePath = if ($mount.remotePath) { $mount.remotePath } else { '/' }
 
-        # Probe for rclone command availability without failing the whole apply.
-        # WHY benign probe: a mount can be intentionally declared before the
-        # package is installed; this function warns and skips that entry.
+        # WHY: probe — rclone may not be installed; $null check handles absence.
         $rcloneExe = (Get-Command rclone -ErrorAction SilentlyContinue)?.Source
         if (-not $rcloneExe) {
             Write-Warning "cloud-drives: rclone not found on PATH; install via 'winget install Rclone.Rclone'."

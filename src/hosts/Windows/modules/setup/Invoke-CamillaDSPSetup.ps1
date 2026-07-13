@@ -71,8 +71,7 @@ function Invoke-CamillaDSPSetup {
     New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 
     Write-Output "camilladsp-setup: downloading v${desiredVersion} from GitHub releases"
-    # -ErrorAction SilentlyContinue is intentional: download failure is a
-    # runtime probe — the if-guard above checks for the binary next.
+    # WHY: probe — download may fail; Test-Path check handles failure downstream.
     Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -ErrorAction SilentlyContinue
     if (-not (Test-Path $zipPath)) {
       Write-Error "camilladsp-setup: download failed from $zipUrl"

@@ -77,14 +77,17 @@ function Sync-PowerPolicy {
 
     Set-ItemProperty -Path $tcpParamsPath -Name 'KeepAliveTime' -Value 60000 -Type DWord
 
+    # WHY: probe — no physical adapters on headless/system.
     $physicalAdapters = Get-NetAdapter -Physical -ErrorAction SilentlyContinue
     foreach ($adapter in $physicalAdapters) {
+      # WHY: probe — adapter may not support power management.
       $pm = $adapter | Get-NetAdapterPowerManagement -ErrorAction SilentlyContinue
       if ($null -eq $pm) {
         Write-Warning "power: could not read power management for adapter '$($adapter.Name)'; skipping WoL."
         continue
       }
       if ($pm.WakeOnMagicPacket -ne 'Enabled') {
+        # WHY: best-effort — adapter may not support power management.
         $adapter | Set-NetAdapterPowerManagement -WakeOnMagicPacket Enabled -ErrorAction SilentlyContinue
         if ($?) {
           Write-Verbose "power: enabled Wake-on-LAN for adapter '$($adapter.Name)'."

@@ -94,12 +94,14 @@ HAS_ARGS=false
 # receives only the files it understands. This allows prek (or other
 # pre-commit tools) to invoke the consolidated check with a combined
 # files pattern matching multiple extensions.
+SH_FILES=()
 PS1_FILES=()
 PKR_FILES=()
 NIX_FILES=()
 if $HAS_ARGS; then
   for _f in "$@"; do
     case "$_f" in
+      *.sh)      SH_FILES+=("$_f") ;;
       *.ps1)     PS1_FILES+=("$_f") ;;
       *.pkr.hcl) PKR_FILES+=("$_f") ;;
       *.nix)     NIX_FILES+=("$_f") ;;
@@ -621,6 +623,55 @@ if $VERIFY; then
 else
   say "skipping (use --verify to run online determinism checks)."
 fi
+
+# Undocumented error suppression check
+section "$((_step += 1))" "Undocumented error suppression"
+_undoc_supp_out="$(mktemp)" || { warn "failed to create temp file"; exit_code=1; $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code; }
+
+_check_undoc_supp() {
+  local _grep_flags="$1" _pattern="$2" _label="$3"
+  shift 3
+  [ $# -eq 0 ] && return
+  grep -Hrn $_grep_flags -- "$_pattern" "$@" 2>/dev/null | while IFS=: read -r _f _ln _rest; do
+    [ -z "$_f" ] && continue
+    # Skip lines with # WHY: inline
+    case "$_rest" in *'# WHY:'*) continue ;; esac
+    # Skip comment-only lines (pattern in a comment, not code)
+    [[ "$_rest" =~ ^[[:space:]]*# ]] && continue
+    # Skip lines where pattern is inside single quotes (function argument, not shell operator)
+    [[ "$_rest" == *"'"* ]] && case "$_rest" in *"'"$_pattern"'"*) continue ;; esac
+    # Skip lines with # WHY: on the immediately preceding line
+    [ "$_ln" -gt 1 ] && sed -n "$((_ln - 1))p" "$_f" | grep -q '# WHY:' && continue
+    echo "$_f:$_ln ($_label)"
+  done >> "$_undoc_supp_out"
+}
+
+if $HAS_ARGS; then
+  # Path-scoped mode: check only provided files
+  [ ${#SH_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '|| true' '|| true' "${SH_FILES[@]}"
+  [ ${#NIX_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '|| true' '|| true' "${NIX_FILES[@]}"
+  [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '2>$null' '2>$null' "${PS1_FILES[@]}"
+  [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '-ErrorAction SilentlyContinue' '-ErrorAction SilentlyContinue' "${PS1_FILES[@]}"
+  [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-E' 'catch[[:space:]]*\{[[:space:]]*\}' 'empty catch {}' "${PS1_FILES[@]}"
+else
+  # Full mode: find all relevant files
+  _check_undoc_supp '-F' '|| true' '|| true' $(find . -path ./vendor -prune -o \( -name '*.nix' -print \) -o \( -name '*.sh' -not -name 'check.sh' -print \))
+  _check_undoc_supp '-F' '2>$null' '2>$null' $(find . -path ./vendor -prune -o -name '*.ps1' -not -name 'Sync-ShellProfile.ps1' -print)
+  _check_undoc_supp '-F' '-ErrorAction SilentlyContinue' '-ErrorAction SilentlyContinue' $(find . -path ./vendor -prune -o -name '*.ps1' -not -name 'Sync-ShellProfile.ps1' -print)
+  _check_undoc_supp '-E' 'catch[[:space:]]*\{[[:space:]]*\}' 'empty catch {}' $(find . -path ./vendor -prune -o -name '*.ps1' -not -name 'Sync-ShellProfile.ps1' -print)
+fi
+
+if [ -s "$_undoc_supp_out" ]; then
+  warn "undocumented error suppressions found:"
+  sort -u "$_undoc_supp_out" | while IFS= read -r _line; do
+    warn "  $_line"
+  done
+  exit_code=1
+else
+  say "no undocumented error suppressions found."
+fi
+rm -f "$_undoc_supp_out"
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
 if [ $exit_code -ne 0 ]; then
   warn "some checks failed with exit code $exit_code"

@@ -349,6 +349,7 @@ function Test-ServiceHasLog {
   }
   $eventLog = Get-EventLogConfig -ServiceKey $ServiceKey
   if ($eventLog -and $eventLog.ContainsKey('provider')) {
+    # WHY: probe — event may not exist; expected on fresh systems.
     $evt = Get-WinEvent -ProviderName $eventLog.provider -MaxEvents 1 -ErrorAction SilentlyContinue
     if ($evt) { return $true }
   }

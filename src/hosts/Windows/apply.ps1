@@ -431,6 +431,7 @@ $machineSshHostKeyPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_ho
 $primarySshKeyPath = Join-Path -Path $HOME -ChildPath ".ssh\ssh_personal_$PrimaryUsername"
 
 # Resolve managed executables before running any decryption/materialization.
+# WHY: probe — SOPS WinGet package directory may not exist; $null check handles absence.
 $sopsPackageDir = Get-ChildItem -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath "Microsoft\WinGet\Packages\SecretsOPerationS.SOPS_*") -Directory -ErrorAction SilentlyContinue |
   Sort-Object -Property Name -Descending |
   Select-Object -First 1
@@ -452,12 +453,14 @@ $gpgCandidates = @(
   (Get-Command -Name "gpg.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
+# WHY: probe — prek WinGet package directory may not exist; $null check handles absence.
 $prekPackageDir = Get-ChildItem -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath "Microsoft\WinGet\Packages\j178.Prek_*") -Directory -ErrorAction SilentlyContinue |
   Sort-Object -Property Name -Descending |
   Select-Object -First 1
 
 $prekExecutableFromWinget = $null
 if ($null -ne $prekPackageDir) {
+  # WHY: probe — prek executable may not be in expected location; $null check handles absence.
   $prekExecutableFromWinget = Get-ChildItem -Path $prekPackageDir.FullName -Filter "prek*.exe" -File -Recurse -ErrorAction SilentlyContinue |
     Sort-Object -Property FullName |
     Select-Object -First 1 -ExpandProperty FullName
@@ -779,9 +782,9 @@ Test-ArchivingStack | Out-Null
 if ($NoAISync) {
   Write-Output "ai-sync: -NoAISync set; skipping post-apply model sync"
 } else {
+  # WHY: probe whether ollama is installed (may not be on first-provision hosts).
   $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaOnPath) {
-    # WHY: probe whether ollama is installed (may not be on first-provision hosts).
     Write-Output "ai-sync: ollama not found in PATH; skipping post-apply model sync"
   } else {
     Write-Output "ai-sync: running post-apply AI model sync..."
@@ -796,7 +799,7 @@ if ($NoAISync) {
 if (-not $ReplicaSync) {
   Write-Output "replica-sync: skipping post-apply replica sync (default; pass -ReplicaSync to run now)"
 } else {
-  # Presence probe: rclone may be absent on first-provision hosts.
+  # WHY: probe — rclone may be absent on first-provision hosts.
   $rcloneOnPath = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
   if ($null -eq $rcloneOnPath) {
     Write-Output "replica-sync: rclone not found in PATH; skipping post-apply replica sync"

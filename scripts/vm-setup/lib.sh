@@ -1344,7 +1344,7 @@ build_windows_image() {
   _efi_code=''
   _efi_vars=''
   _qemu_share=''
-  _qemu_bin="$(command -v qemu-system-x86_64 2>/dev/null || true)"
+  _qemu_bin="$(command -v qemu-system-x86_64 2>/dev/null || true)" # WHY: qemu may not be installed; [ -n ] guard downstream handles the missing case.
   if [ -n "$_qemu_bin" ]; then
     _qemu_resolved="$_qemu_bin"
     _qemu_link_hops=0

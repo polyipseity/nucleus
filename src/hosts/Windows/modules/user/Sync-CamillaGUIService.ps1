@@ -40,6 +40,7 @@ function Sync-CamillaGUIService {
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   if (-not $Enabled) {
+    # WHY: probe — task may not exist; $null check handles missing task.
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($null -ne $existingTask) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
@@ -49,6 +50,7 @@ function Sync-CamillaGUIService {
   }
 
   # Find the camillagui_backend binary.
+  # WHY: probe — command may not be installed; $null check handles absence.
   $camillaguiCmd = Get-Command -Name "camillagui_backend.exe" -ErrorAction SilentlyContinue
   if ($null -eq $camillaguiCmd) {
     Write-Output "camillagui-backend: binary not found in PATH; run Invoke-CamillaGUISetup first"
@@ -68,6 +70,7 @@ function Sync-CamillaGUIService {
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
 
+  # WHY: probe — task may not exist; $null check handles missing task.
   $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
   if ($null -ne $existingTask) {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false

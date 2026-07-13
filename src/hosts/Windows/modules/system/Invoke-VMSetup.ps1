@@ -203,6 +203,7 @@ function Invoke-VMSetup {
         param([string[]] $ExpectedNames)
         $dirs = @($vmDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
         foreach ($dir in $dirs) {
+            # WHY: probe — no disk images may exist; foreach handles empty result.
             foreach ($disk in Get-ChildItem "$dir\*.qcow2" -ErrorAction SilentlyContinue) {
                 $name = [System.IO.Path]::GetFileNameWithoutExtension($disk.Name)
                 if ($name -notin $ExpectedNames) {
@@ -218,6 +219,7 @@ function Invoke-VMSetup {
     function Invoke-GcOrphanMarker {
         $dirs = @($vmDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
         foreach ($dir in $dirs) {
+            # WHY: probe — no credential markers may exist; foreach handles empty result.
             foreach ($marker in Get-ChildItem "$dir\*.vm-guest-credentials-sha256" -ErrorAction SilentlyContinue) {
                 $basePath = $marker.FullName -replace '\.vm-guest-credentials-sha256$'
                 if (-not (Test-Path $basePath -PathType Leaf)) {
@@ -455,6 +457,7 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
 
     # Prune orphaned dot-prefixed Packer build temp dirs from the images dir.
     if (Test-Path -LiteralPath $imagesDir -PathType Container) {
+        # WHY: probe — no stale temp directories may exist; Where-Object handles empty result.
         Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -like '.*' } |
             ForEach-Object {
@@ -761,6 +764,7 @@ function Test-Qcow2Image {
         return $false
     }
 
+    # WHY: probe — image file may be unreadable; $null check handles absence.
     $item = Get-Item $ImagePath -ErrorAction SilentlyContinue
     if (-not $item -or $item.Length -le 0) {
         Write-Warning "vm-setup: $ImageLabel is empty or unreadable: $ImagePath"

@@ -41,9 +41,7 @@ function Sync-ReplicaSyncScheduledTask {
   $taskName = "NucleusReplicaSyncDaily"
 
   if (-not $Enabled) {
-    # WHY explicit cleanup: parity toggles must remove managed state when the
-    # feature is disabled, otherwise tasks keep running outside declarative
-    # intent.
+    # WHY: probe — task may not exist; $null check handles missing task.
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($null -ne $existingTask) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
@@ -58,6 +56,7 @@ function Sync-ReplicaSyncScheduledTask {
     throw "replica-sync: scheduled task script not found at '$scriptPath'."
   }
 
+  # WHY: probe — pwsh may not be installed; throw handles absence.
   $pwshPath = (Get-Command -Name "pwsh" -ErrorAction SilentlyContinue | Select-Object -First 1).Source
   if ([string]::IsNullOrWhiteSpace($pwshPath)) {
     throw "replica-sync: pwsh not found; cannot register scheduled task '$taskName'."
@@ -80,6 +79,7 @@ function Sync-ReplicaSyncScheduledTask {
   if (Test-Path -Path `$PROFILE.CurrentUserAllHosts -PathType Leaf) { . `$PROFILE.CurrentUserAllHosts }
   if (Test-Path -Path `$PROFILE.CurrentUserCurrentHost -PathType Leaf) { . `$PROFILE.CurrentUserCurrentHost }
 
+  # WHY: probe — command may not be installed; `$null check handles absence.
   `$nucleusCommand = Get-Command -Name "nucleus-replica-sync" -ErrorAction SilentlyContinue
   if (`$null -ne `$nucleusCommand) {
     nucleus-replica-sync

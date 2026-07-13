@@ -539,10 +539,9 @@ in
                 if [[ "$target_name" == "$excluded" ]]; then
                   # Missing xattr is expected for newly created paths, so probe the
                   # value quietly and only log when we actually mutate state.
-                  # WHY || true: xattr may not be set yet on newly created path;
-                  # absence is not an error — the check below gates on value "1".
                   current_mark="$(
                     /usr/bin/xattr -p com.apple.fileprovider.ignore#P "$normalized_path" 2>/dev/null
+                    # WHY: xattr may not be set yet on newly created path; absence is not an error — the check below gates on value "1".
                   )" || true
                   if [[ "$current_mark" == "1" ]]; then
                     return 0
@@ -738,7 +737,7 @@ in
   #   * Probes the tool binary directly from the Nix store (no PATH dependency).
   #   * Skips regeneration if the completion file exists and is newer than the
   #     tool binary (mtime freshness check).
-  #   * Fails gracefully if a completion subcommand exits non-zero (|| true).
+  #   * Fails gracefully if a completion subcommand exits non-zero (soft-fail).
   #
   # Why after installCargoBinstallPackages: all Nix and non-Nix package managers
   # (bun, uv, cargo-binstall) have converged by that point, so every tool binary
@@ -778,7 +777,7 @@ in
       # Selection rationale:
       #   * Include every nucleus-provisioned CLI tool whose Nix package MAY
       #     not bundle zsh completions into fpath.
-      #   * Rely on || true to skip tools whose subcommand is absent or broken.
+      #   * Rely on soft-fail to skip tools whose subcommand is absent or broken.
       #   * Omitted: git (bundled), direnv/zoxide (HM integration handles them),
       #     nix (bundled), fzf (source-based, not file-based).
       # -----------------------------------------------------------------------

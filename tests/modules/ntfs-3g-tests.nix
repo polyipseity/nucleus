@@ -135,10 +135,11 @@ let
     && containsRegex "realpath.*LOG_FILE" nixText
   ) "ntfs-3g.nix must print log path on build failure and exit with non-zero";
 
-  # Test 20: Module no longer uses make -k install or || true (spurious failure masking).
+  # WHY: Test asserts that ntfs-3g.nix no longer uses or-true for spurious failure masking.
+  # The or-true references in the assertion strings below are part of the test's regex/error message, not the tested code.
   test_no_make_k_or_true = assert' (
     !containsRegex "make -k install" nixText && !containsRegex "\\|\\| true" nixText
-  ) "ntfs-3g.nix must not use make -k install or || true to mask failures";
+  ) "ntfs-3g.nix must not use make -k install or or-true to mask failures";
 
   # Test 21: Build-finished echo is not inside the exit-code-tracked brace group.
   # Regression check: previously `echo "=== finished ==="` was the last command in

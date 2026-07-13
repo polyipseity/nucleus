@@ -152,12 +152,12 @@ $ht['updated'] = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC)
 
 # ---------------------------------------------------------------------------
 # winget — winget show --id <id>
-# WHY: probe — package may not exist; stderr suppressed for clean output.
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'winget') {
   if ($ht.ContainsKey('winget') -and $ht['winget'] -is [hashtable]) {
     foreach ($key in $ht['winget'].Keys) {
       $old = $ht['winget'][$key]
+      # WHY: probe — package may not exist; stderr suppressed for clean output.
       $result = & winget show --id $key 2>$null | Select-String -Pattern '^Version '
       if ($result) {
         $new = ($result -split ':\s*', 2)[-1].Trim()
@@ -172,12 +172,12 @@ if (Test-SectionEnabled 'winget') {
 
 # ---------------------------------------------------------------------------
 # scoop — scoop info <pkg>
-# WHY: probe — package may not exist; stderr suppressed for clean output.
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'scoop') {
   if ($ht.ContainsKey('scoop') -and $ht['scoop'] -is [hashtable]) {
     foreach ($key in $ht['scoop'].Keys) {
       $old = $ht['scoop'][$key]
+      # WHY: probe — package may not exist; stderr suppressed for clean output.
       $result = & scoop info $key 2>$null | Select-String -Pattern '^Version '
       if ($result) {
         $new = ($result -split ':\s*', 2)[-1].Trim()
@@ -197,12 +197,12 @@ if (Test-SectionEnabled 'scoop') {
 
 # ---------------------------------------------------------------------------
 # bun — npm view <pkg> version
-# WHY: probe — package may not exist; stderr suppressed for clean output.
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'bun') {
   if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
     foreach ($key in $ht['bun'].Keys) {
       $old = $ht['bun'][$key]
+      # WHY: probe — package may not exist; stderr suppressed for clean output.
       $result = & npm view $key version 2>$null
       if ($result) {
         $new = $result.Trim()
@@ -217,9 +217,9 @@ if (Test-SectionEnabled 'bun') {
 
 # ---------------------------------------------------------------------------
 # uv — uv tool list
-# WHY: probe — uv may not be installed; stderr suppressed for clean output.
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'uv') {
+  # WHY: probe — uv may not be installed; stderr suppressed for clean output.
   $uvOutput = & uv tool list 2>$null
   if ($uvOutput) {
     # Build hashtable from uv tool list output.
@@ -263,10 +263,10 @@ if (Test-SectionEnabled 'uv') {
 
 # ---------------------------------------------------------------------------
 # rustup — rustc +<channel> --version
-# WHY: probe — rustup may not be installed; stderr suppressed for clean output.
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'rustup') {
   # Get installed toolchains
+  # WHY: probe — rustup may not be installed; stderr suppressed for clean output.
   $toolchains = & rustup toolchain list 2>$null
   $toolchainSet = @{}
   if ($toolchains) {
@@ -303,12 +303,12 @@ if (Test-SectionEnabled 'rustup') {
 
 # ---------------------------------------------------------------------------
 # pwsh — Find-Module via pwsh -NoProfile
-# WHY: probe — module may not exist in PSGallery; stderr suppressed for clean output.
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'pwsh') {
   if ($ht.ContainsKey('pwsh') -and $ht['pwsh'] -is [hashtable]) {
     foreach ($key in $ht['pwsh'].Keys) {
       $old = $ht['pwsh'][$key]
+      # WHY: probe — module may not exist in PSGallery; stderr suppressed for clean output.
       $result = & pwsh -NoProfile -Command "Find-Module -Name '$key' | Select-Object -ExpandProperty Version" 2>$null
       if ($result) {
         $new = $result.Trim()

@@ -76,6 +76,7 @@ function Sync-CaddyLocalCA {
     return
   }
 
+  # WHY: probe — services.json may not exist yet; $null check handles absence.
   $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
   $adminAddr = if ($svc.caddy.network.admin) { "$($svc.caddy.network.admin.host):$($svc.caddy.network.admin.port)" } else { '127.0.0.1:2019' }
 

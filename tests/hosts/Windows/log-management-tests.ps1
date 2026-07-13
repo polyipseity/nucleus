@@ -20,6 +20,7 @@ BeforeAll {
 
 AfterAll {
   if (Test-Path -LiteralPath $Script:TestDir -PathType Container) {
+    # WHY: cleanup — directory may not exist.
     Remove-Item -LiteralPath $Script:TestDir -Recurse -Force -ErrorAction SilentlyContinue
   }
 }
@@ -72,6 +73,7 @@ Describe 'Invoke-LogRotation' {
 
   AfterEach {
     if (Test-Path -LiteralPath $Script:LogDir -PathType Container) {
+      # WHY: cleanup — directory may not exist.
       Remove-Item -LiteralPath $Script:LogDir -Recurse -Force -ErrorAction SilentlyContinue
     }
   }
@@ -163,6 +165,7 @@ $ensureLogDirPath = Join-Path \$PSScriptRoot '../../../src/hosts/Windows/modules
   AfterAll {
     foreach ($p in @($Script:TestServicesJson, $Script:TestSystemLogDir, $Script:TestUserLogDir)) {
       if (Test-Path -LiteralPath $p) {
+        # WHY: cleanup — item may not exist.
         Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue
       }
     }

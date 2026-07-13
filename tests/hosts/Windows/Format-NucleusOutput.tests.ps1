@@ -12,6 +12,7 @@
 
 BeforeAll {
   $modulePath = Join-Path $PSScriptRoot '../../../src/hosts/Windows/modules/Format-NucleusOutput.psm1'
+  # WHY: cleanup — module may not be loaded.
   Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
   Import-Module $modulePath -Force -DisableNameChecking
 }

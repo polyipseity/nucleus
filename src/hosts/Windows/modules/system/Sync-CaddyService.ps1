@@ -97,7 +97,7 @@ function Sync-CaddyService {
     New-Item -Path $caddyConfigDir -ItemType Directory -Force | Out-Null
     New-Item -Path $caddyDataDir -ItemType Directory -Force | Out-Null
 
-    # Read services from the canonical service registry.
+    # WHY: probe — services.json may not exist yet; $null check handles absence.
     $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
     if ($null -eq $svc) {
       Write-Warning 'caddy-service: failed to read services.json; skipping Caddy service convergence.'

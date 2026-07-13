@@ -140,6 +140,7 @@ function Sync-GitAndSshConfig {
     }
 
     if ($Enabled) {
+      # WHY: probe — git may not be installed; throw handles absence.
       $gitExecutable = Get-Command -Name 'git.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
       if ([string]::IsNullOrWhiteSpace($gitExecutable)) {
         throw 'git.exe is required for managed Git parity but was not found in PATH.'
@@ -225,6 +226,7 @@ function Sync-GitAndSshConfig {
       }
     }
     else {
+      # WHY: probe — git may not be installed; condition handles absence.
       $gitExecutable = Get-Command -Name 'git.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
       if (-not [string]::IsNullOrWhiteSpace($gitExecutable)) {
         $managedGitSettings = [ordered]@{

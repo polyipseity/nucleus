@@ -111,6 +111,7 @@ function Invoke-AISync {
   # model list/pull/rm commands talk to the inference backend directly instead
   # of routing through the AI gateway proxy.  The default user env var in
   # user/env.dsc.yml points at LiteLLM (127.0.0.1:4000).
+  # WHY: probe — services.json may not exist; $null-conditional access handles absence gracefully.
   $svc = Get-Content -Raw (Join-Path $resolvedRepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
   $env:OLLAMA_HOST = if ($svc.ollama.network.default) { "$($svc.ollama.network.default.host):$($svc.ollama.network.default.port)" } else { '127.0.0.1:11434' }
 
@@ -118,9 +119,7 @@ function Invoke-AISync {
   # the default Windows profile, enabling cross-platform testing on Windows.
   $profileName = if ($env:NUCLEUS_AI_SYNC_PROFILE) { $env:NUCLEUS_AI_SYNC_PROFILE } else { "Windows" }
 
-  # Skip gracefully when ollama is not installed or not on PATH.
-  # Existence probe — absent binary is expected and benign before Ollama
-  # has been installed by WinGet (system/packages.dsc.yml).
+  # WHY: probe — ollama may not be installed; $null check handles absence.
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
     Write-Output "ai-sync: ollama not found; skipping sync"
