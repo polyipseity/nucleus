@@ -43,11 +43,14 @@ fi
 
 # --- Skip push if already running ---
 # Avoid filling CamillaDSP's bounded command channel (capacity 10).
+# WHY: CamillaDSP WS may not be reachable yet; heartbeat loop handles this.
 _state_resp=$(printf '{"GetState":null}' | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null) || true
 _state=$(printf '%s' "$_state_resp" | jq -r '.GetState.value // empty')
 [ "$_state" = "Running" ] && exit 0
 
 # --- Push config ---
 [ -f "$config_file" ] || exit 0
+# WHY: CamillaDSP WS may not be reachable yet; heartbeat loop handles this.
 _push_resp=$(jq -cRs '{SetConfig: .}' "$config_file" | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null) || true
+# WHY: CamillaDSP WS response may not be Ok yet; heartbeat loop handles this.
 printf '%s' "$_push_resp" | jq -e '.SetConfig.result == "Ok"' >/dev/null 2>&1 || true

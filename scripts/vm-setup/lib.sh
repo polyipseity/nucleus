@@ -46,6 +46,7 @@ ensure_utm_default_vm_location() {
   _eudvl_utm_docs="$HOME/Library/Containers/com.utmapp.UTM/Data/Documents"
 
   if [ -L "$_eudvl_utm_docs" ]; then
+    # WHY: symlink may not exist yet; readlink exits 1 for broken/missing links.
     _eudvl_target="$(readlink "$_eudvl_utm_docs" 2>/dev/null || true)"
     if [ "$_eudvl_target" = "$VM_DIR" ]; then
       say "UTM default VM location already points to $VM_DIR"
@@ -81,6 +82,7 @@ ensure_tart_vm_dir() {
   mkdir -p "$_etd_target"
 
   if [ -L "$_etd_default" ]; then
+    # WHY: symlink may not exist yet; readlink exits 1 for broken/missing links.
     _etd_current="$(readlink "$_etd_default" 2>/dev/null || true)"
     if [ "$_etd_current" = "$_etd_target" ]; then
       say "tart storage already linked: $_etd_default -> $_etd_target"
@@ -145,7 +147,8 @@ validate_qcow2_image() {
   fi
 
   if command -v qemu-img >/dev/null 2>&1; then
-    _vqi_info="$(qemu-img info --output=json "$_vqi_path" 2>/dev/null || true)"
+    # WHY: image file may not exist; probe expected to fail.
+  _vqi_info="$(qemu-img info --output=json "$_vqi_path" 2>/dev/null || true)"
     if [ -z "$_vqi_info" ]; then
       error "qemu-img could not read $_vqi_label: $_vqi_path"
       return 1
@@ -881,6 +884,7 @@ build_nixos_image() {
   # already-created directory. Use a child path inside our temp dir so the link
   # can be created atomically, then resolve either a direct symlink-to-file or a
   # symlinked directory containing the final QCOW2 image.
+  # WHY: symlink may not exist yet; readlink exits 1 for broken/missing links.
   _img="$(readlink "$_out_link" 2>/dev/null || true)"
   if [ -z "$_img" ] || [ ! -f "$_img" ]; then
     _img="$(find -L "$_out_link" -maxdepth 2 -name '*.qcow2' -print -quit 2>/dev/null)"
@@ -1317,7 +1321,8 @@ build_windows_image() {
   say "building Windows 11 image (disk=$_disk_gib GiB, accelerator=$accelerator)..."
   _display_backend=''
   if [ "$windows_headless" = 'false' ]; then
-    _display_help="$(qemu-system-x86_64 -display help || true)"
+    # WHY: QEMU binary may not be installed; display backend probe expected to fail.
+  _display_help="$(qemu-system-x86_64 -display help || true)"
     for _display_candidate in cocoa gtk sdl spice-app curses; do
       if printf '%s\n' "$_display_help" | grep -Eiq "(^|[[:space:]])${_display_candidate}([[:space:]]|$)"; then
         _display_backend="$_display_candidate"
@@ -1344,11 +1349,13 @@ build_windows_image() {
     _qemu_resolved="$_qemu_bin"
     _qemu_link_hops=0
     while [ "$_qemu_link_hops" -lt 8 ]; do
+      # WHY: symlink may not exist yet; readlink exits 1 for broken/missing links.
       _qemu_next="$(readlink "$_qemu_resolved" 2>/dev/null || true)"
       [ -n "$_qemu_next" ] || break
       _qemu_resolved="$_qemu_next"
       _qemu_link_hops=$((_qemu_link_hops + 1))
     done
+    # WHY: resolved path may not have a parent directory; probe expected to fail.
     _qemu_root="$(cd "$(dirname "$_qemu_resolved")/.." 2>/dev/null && pwd -P || true)"
     if [ -n "$_qemu_root" ] && [ -d "$_qemu_root/share/qemu" ]; then
       _qemu_share="$_qemu_root/share/qemu"
@@ -1771,6 +1778,7 @@ gc_libvirt_vms() {
     if ! printf '%s\n' "$_gcl_expected" | grep -qxF "$_gcl_name"; then
       say "GC — removing non-provisioned libvirt domain: $_gcl_name"
       if [ "$dry_run" = false ]; then
+        # WHY: VM may not exist; virsh undefine exits 1 for non-existent domains.
         virsh undefine "$_gcl_name" 2>/dev/null || true
       fi
     fi

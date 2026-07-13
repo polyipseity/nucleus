@@ -522,6 +522,7 @@ gc_journald_if_available() {
   fi
 
   _jv_expiry="${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}"
+  # WHY: journal may not exist on non-systemd systems; best-effort vacuum.
   journalctl --vacuum-time="$_jv_expiry" 2>/dev/null || true
 }
 

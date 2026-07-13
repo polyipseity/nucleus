@@ -83,6 +83,7 @@ fi
 
 username="$(id -un)"
 current_os="$(uname -s)"
+# WHY: rclone remote may not be configured; best-effort unmount.
 replica_lines="$({
   jq -r --arg username "$username" '
     .[$username].cloudDrives.replicas // []

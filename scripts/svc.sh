@@ -124,6 +124,7 @@ expand_prefix() {
       domain=$(echo "$plat_json" | jq -r '.domain // "user"')
       [ "$domain" = "system" ] && sudo_prefix="sudo"
       local matches
+      # WHY: no matching services found is an expected empty result, not an error.
       matches=$($sudo_prefix launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)
       if [ -z "$matches" ]; then
         printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
@@ -137,6 +138,7 @@ expand_prefix() {
       local scope_flag=""
       [ "$(echo "$plat_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
       local matches
+      # WHY: no matching units found is an expected empty result.
       matches=$(systemctl $scope_flag list-units --all "$prefix*" --no-legend 2>/dev/null | awk '{ print $1 }' || true)
       if [ -z "$matches" ]; then
         printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
@@ -166,6 +168,7 @@ svc_status() {
       [ "$domain" = "system" ] && domain_flag="sudo"
 
       local list_line running=true enabled=true pid=""
+      # WHY: service may not exist or may never have started; probe expected to fail.
       list_line=$($domain_flag launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true)
       local socket_activated
       socket_activated=$(echo "$entry_json" | jq -r '.socketActivated // false')
@@ -185,6 +188,7 @@ svc_status() {
       # trust the authoritative print output.
       if [ "$running" != "true" ]; then
         local print_out
+        # WHY: service may not exist or may never have started; probe expected to fail.
         print_out=$($domain_flag launchctl print "$(launchctl_target "$domain" "$svc_id")" 2>/dev/null || true)
         case "$print_out" in
           *"state = running"*)
@@ -216,8 +220,10 @@ svc_status() {
       [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
 
       local is_active is_enabled
+      # WHY: unit may not exist on this system; probe expected to fail.
       is_active=$(systemctl $scope_flag is-active "$svc_id" 2>/dev/null || true)
       is_active="${is_active:-inactive}"
+      # WHY: unit may not exist on this system; probe expected to fail.
       is_enabled=$(systemctl $scope_flag is-enabled "$svc_id" 2>/dev/null || true)
       is_enabled="${is_enabled:-disabled}"
 
@@ -228,9 +234,11 @@ svc_status() {
 
       local pid="" exit_code=""
       if [ "$running" = true ]; then
+        # WHY: unit may not exist on this system; probe expected to fail.
         pid=$(systemctl $scope_flag show -p MainPID "$svc_id" 2>/dev/null | sed 's/MainPID=//' || true)
         [ -z "$pid" ] || [ "$pid" = "0" ] && pid=""
       else
+        # WHY: unit may not exist on this system; probe expected to fail.
         exit_code=$(systemctl $scope_flag show -p ExecMainStatus "$svc_id" 2>/dev/null | sed 's/ExecMainStatus=//' || true)
         [ -z "$exit_code" ] && exit_code=""
       fi
@@ -260,6 +268,7 @@ recover_launchctl_service() {
   local target
   target=$(launchctl_target "$domain" "$svc_id")
   local print_out
+  # WHY: service may not exist or may never have started; probe expected to fail.
   print_out=$($sudo_prefix launchctl print "$target" 2>/dev/null || true)
   case "$print_out" in
     *"state = spawn scheduled"*|*"state = waiting"*|*"last exit code = 78"*)
@@ -269,6 +278,7 @@ recover_launchctl_service() {
       else
         plist="$HOME/Library/LaunchAgents/$svc_id.plist"
       fi
+      # WHY: service may not be loaded; bootout on absent service exits 1.
       $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
       # If bootstrap fails (e.g. launchd still cleaning up from bootout),
       # return 1 so the caller's || block retries with the full
@@ -315,6 +325,7 @@ poll_service_ready() {
   }
 
   local _psr_ports
+  # WHY: port may not be occupied by this service; extract_ports returns empty for no-network entries.
   _psr_ports=$(extract_ports "$_psr_entry_json") || true
   if [ -n "$_psr_ports" ]; then
     while IFS=' ' read -r _psr_host _psr_port; do
@@ -362,9 +373,11 @@ service_diagnostic() {
 # previous wrappers, etc. that are outside the service manager's kill domain.
 cleanup_service_ports() {
   _csp_entry_json="$1"
+  # WHY: port may not be occupied by this service; extract_ports returns empty for no-network entries.
   _csp_ports=$(extract_ports "$_csp_entry_json") || true
   [ -z "$_csp_ports" ] && return 0
   while IFS=' ' read -r _csp_host _csp_port; do
+    # WHY: port may not be occupied by this service; extract_ports returns empty for no-network entries.
     kill_processes_on_port "$_csp_port" || true
   done <<EOF
 $_csp_ports
@@ -436,16 +449,19 @@ svc_action() {
           # fails to auto-start (transient bootstrap race), a start
           # fallback is attempted as a safety net.
           recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
+            # WHY: service may not be loaded; bootout/enable on absent service exits 1.
             $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || true
             for _i in 1 2 3 4 5; do
               $sudo_prefix launchctl print "$target" 2>/dev/null \
                 | grep -q "state = running" || break
               sleep 1
             done
+            # WHY: service may not be loaded; bootout/enable on absent service exits 1.
             $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
             # Small delay between bootout and bootstrap to give launchd
             # time to finish cleanup and avoid a bootstrap race.
             sleep 0.5
+            # WHY: service may not be loaded; bootout/enable on absent service exits 1.
             $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null || true
             # Verify the service started after bootstrap.  Poll briefly
             # and fall through to enable + start as a safety net.
@@ -459,6 +475,7 @@ svc_action() {
               # launchd may need an explicit enable+start if bootstrap
               # loaded the plist but a transient condition blocked
               # KeepAlive from auto-starting the service.
+              # WHY: service may not be loaded; bootout/enable on absent service exits 1.
               $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 || true
               $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 || \
                 warn "$name — restart: failed to start service after reload"

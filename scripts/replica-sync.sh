@@ -127,6 +127,7 @@ replica_lines="$({
   ' "$USERS_JSON"
 } || true)"
 
+# WHY: rclone remote may not be configured yet; probe expected to fail.
 if [ -z "$replica_lines" ]; then
   say "no enabled replicas for user '$username'"
   exit 0
@@ -196,6 +197,7 @@ build_onedrive_root_filter_file() {
   if [ "$dry_run" = true ]; then
     _remote_dirs=""
   else
+    # WHY: rclone remote may not be configured yet; probe expected to fail.
     _remote_dirs="$(rclone lsf "$_remote_ref" \
       --max-depth 1 --dirs-only --disable ListR --log-level ERROR \
       --retries 1 --low-level-retries 1 --timeout 30s --contimeout 10s \
@@ -224,6 +226,7 @@ build_onedrive_root_filter_file() {
   if [ "$dry_run" = true ]; then
     _remote_files=""
   else
+    # WHY: rclone remote may not be configured yet; probe expected to fail.
     _remote_files="$(rclone lsf "$_remote_ref" \
       --max-depth 1 --files-only --disable ListR --log-level ERROR \
       --retries 1 --low-level-retries 1 --timeout 30s --contimeout 10s \
