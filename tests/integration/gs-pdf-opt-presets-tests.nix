@@ -6,6 +6,8 @@
 let
   lib = import <nixpkgs/lib>;
   macServicesText = builtins.readFile ../../src/hosts/MacBook/services.nix;
+  macQuickActionsText = builtins.readFile ../../src/hosts/MacBook/services/quick-actions.nix;
+  macAppServicesText = builtins.readFile ../../src/hosts/MacBook/services/app-services.nix;
   nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
   windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-pdf-opt.dsc.yml;
 
@@ -27,13 +29,13 @@ let
   noOldLabel = fileText: !lib.hasInfix "gs optimize pdf" fileText;
 
   test_all_5_presets_in_macos = assert' (
-    allPresetsPresent macServicesText
-    && lib.hasInfix "optimize pdf - default" macServicesText
-    && lib.hasInfix "optimize pdf - ebook" macServicesText
-    && lib.hasInfix "optimize pdf - prepress" macServicesText
-    && lib.hasInfix "optimize pdf - printer" macServicesText
-    && lib.hasInfix "optimize pdf - screen" macServicesText
-  ) "macOS services.nix must define all 5 presets with 'optimize pdf - X' labels";
+    allPresetsPresent macQuickActionsText
+    && lib.hasInfix "optimize pdf - default" macQuickActionsText
+    && lib.hasInfix "optimize pdf - ebook" macQuickActionsText
+    && lib.hasInfix "optimize pdf - prepress" macQuickActionsText
+    && lib.hasInfix "optimize pdf - printer" macQuickActionsText
+    && lib.hasInfix "optimize pdf - screen" macQuickActionsText
+  ) "macOS quick-actions.nix must define all 5 presets with 'optimize pdf - X' labels";
 
   test_no_old_gs_labels_in_macos = assert' (noOldLabel macServicesText) "macOS services.nix must not contain the old 'gs optimize pdf' label";
 
@@ -144,25 +146,28 @@ let
   test_macos_has_removed_services =
     assert'
       (
-        lib.hasInfix "removedNucleusAppServices" macServicesText
-        && lib.hasInfix "NucleusGSPDFOpt.app" macServicesText
-        && lib.hasInfix "com.nucleus.GSPDFOpt" macServicesText
+        lib.hasInfix "removedNucleusAppServices" macAppServicesText
+        && lib.hasInfix "NucleusGSPDFOpt.app" macAppServicesText
+        && lib.hasInfix "com.nucleus.GSPDFOpt" macAppServicesText
       )
-      "macOS services.nix must define removedNucleusAppServices containing the old single-preset app service metadata";
+      "macOS app-services.nix must define removedNucleusAppServices containing the old single-preset app service metadata";
 
-  test_macos_has_current_app_dirs = assert' (
-    lib.hasInfix "currentNucleusAppServiceDirs" macServicesText
-    && lib.hasInfix "NucleusManual.app" macServicesText
-  ) "macOS services.nix must define currentNucleusAppServiceDirs containing current app service dirs";
+  test_macos_has_current_app_dirs =
+    assert'
+      (
+        lib.hasInfix "currentNucleusAppServiceDirs" macAppServicesText
+        && lib.hasInfix "NucleusManual.app" macAppServicesText
+      )
+      "macOS app-services.nix must define currentNucleusAppServiceDirs containing current app service dirs";
 
   test_macos_has_removed_quick_actions =
     assert'
       (
-        lib.hasInfix "removedNucleusQuickActions" macServicesText
-        && lib.hasInfix "OptimizePDF-default.workflow" macServicesText
-        && lib.hasInfix "com.nucleus.OptimizePDF-default" macServicesText
+        lib.hasInfix "removedNucleusQuickActions" macQuickActionsText
+        && lib.hasInfix "OptimizePDF-default.workflow" macQuickActionsText
+        && lib.hasInfix "com.nucleus.OptimizePDF-default" macQuickActionsText
       )
-      "macOS services.nix must define removedNucleusQuickActions containing old workflow naming metadata";
+      "macOS quick-actions.nix must define removedNucleusQuickActions containing old workflow naming metadata";
 
   allTests = [
     test_all_5_presets_in_macos
