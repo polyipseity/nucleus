@@ -49,14 +49,12 @@ function Sync-CamillaGUIService {
     return
   }
 
-  # Find the camillagui_backend binary.
-  # undoc-supp: probe — command may not be installed; $null check handles absence.
-  $camillaguiCmd = Get-Command -Name "camillagui_backend.exe" -ErrorAction SilentlyContinue
-  if ($null -eq $camillaguiCmd) {
-    Write-Output "camillagui-backend: binary not found in PATH; run Invoke-CamillaGUISetup first"
+  # Compute deterministic install path (must match Invoke-CamillaGUISetup).
+  $camillaguiBin = Join-Path $HOME ".local\bin\camillagui_backend\camillagui_backend.exe"
+  if (-not (Test-Path $camillaguiBin)) {
+    Write-Output "camillagui-backend: binary not found at $camillaguiBin; run Invoke-CamillaGUISetup first"
     return
   }
-  $camillaguiBin = $camillaguiCmd.Source
 
   $userId = if ([string]::IsNullOrWhiteSpace($env:USERDOMAIN)) {
     $env:USERNAME

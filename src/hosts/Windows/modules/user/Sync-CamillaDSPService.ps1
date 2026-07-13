@@ -48,14 +48,12 @@ function Sync-CamillaDSPService {
     return
   }
 
-  # Find the camilladsp binary.
-  # undoc-supp: probe whether binary is installed; Get-Command throws when absent.
-  $camilladspCmd = Get-Command -Name "camilladsp.exe" -ErrorAction SilentlyContinue
-  if ($null -eq $camilladspCmd) {
-    Write-Output "camilladsp: binary not found in PATH; run Invoke-CamillaDSPSetup first"
+  # Compute deterministic install path (must match Invoke-CamillaDSPSetup).
+  $camilladspBin = Join-Path $HOME ".local\bin\camilladsp.exe"
+  if (-not (Test-Path $camilladspBin)) {
+    Write-Output "camilladsp: binary not found at $camilladspBin; run Invoke-CamillaDSPSetup first"
     return
   }
-  $camilladspBin = $camilladspCmd.Source
 
   # Read port from services.json (single source of truth).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
