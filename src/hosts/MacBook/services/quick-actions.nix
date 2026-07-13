@@ -85,7 +85,7 @@ let
   #
   # Sorting policy: alphabetical by dir by default.
   # Exception: Optimize PDF actions are ordered by quality descending
-  # (printer > prepress > ebook > screen), with "default" always first.
+  # (prepress > printer > ebook > screen), with "default" always first.
   # Deployment order always follows the declared order below.
   currentNucleusQuickActions = [
     {
@@ -104,12 +104,12 @@ let
       };
     }
     {
-      dir = "optimize PDF - printer.workflow";
-      enablementKey = "com.nucleus.OptimizePDF.printer - optimize PDF - printer - runWorkflowAsService";
-      source = "${nucleusOptimizePdfQuickActions}/optimize PDF - printer.workflow";
+      dir = "optimize PDF - prepress.workflow";
+      enablementKey = "com.nucleus.OptimizePDF.prepress - optimize PDF - prepress - runWorkflowAsService";
+      source = "${nucleusOptimizePdfQuickActions}/optimize PDF - prepress.workflow";
       legacyKeys = [
-        "com.nucleus.GSPDFOpt-printer - Optimize PDF - printer - runWorkflowAsService"
-        "com.nucleus.OptimizePDF-printer - optimize PDF - printer - runWorkflowAsService"
+        "com.nucleus.GSPDFOpt-prepress - Optimize PDF - prepress - runWorkflowAsService"
+        "com.nucleus.OptimizePDF-prepress - optimize PDF - prepress - runWorkflowAsService"
       ];
       presentationModes = {
         ContextMenu = true;
@@ -119,12 +119,12 @@ let
       };
     }
     {
-      dir = "optimize PDF - prepress.workflow";
-      enablementKey = "com.nucleus.OptimizePDF.prepress - optimize PDF - prepress - runWorkflowAsService";
-      source = "${nucleusOptimizePdfQuickActions}/optimize PDF - prepress.workflow";
+      dir = "optimize PDF - printer.workflow";
+      enablementKey = "com.nucleus.OptimizePDF.printer - optimize PDF - printer - runWorkflowAsService";
+      source = "${nucleusOptimizePdfQuickActions}/optimize PDF - printer.workflow";
       legacyKeys = [
-        "com.nucleus.GSPDFOpt-prepress - Optimize PDF - prepress - runWorkflowAsService"
-        "com.nucleus.OptimizePDF-prepress - optimize PDF - prepress - runWorkflowAsService"
+        "com.nucleus.GSPDFOpt-printer - Optimize PDF - printer - runWorkflowAsService"
+        "com.nucleus.OptimizePDF-printer - optimize PDF - printer - runWorkflowAsService"
       ];
       presentationModes = {
         ContextMenu = true;

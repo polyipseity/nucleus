@@ -44,16 +44,16 @@ let
       (
         let
           # Patterns match the `dir` field in currentNucleusQuickActions entries.
-          # Sort order: default first, then quality descending (printer > prepress >
+          # Sort order: default first, then quality descending (prepress > printer >
           # ebook > screen). This is the declared order in the explicit list.
           posDefault = builtins.stringLength (
             builtins.head (builtins.split "\"optimize PDF - default.workflow\"" macQuickActionsText)
           );
-          posPrinter = builtins.stringLength (
-            builtins.head (builtins.split "\"optimize PDF - printer.workflow\"" macQuickActionsText)
-          );
           posPrepress = builtins.stringLength (
             builtins.head (builtins.split "\"optimize PDF - prepress.workflow\"" macQuickActionsText)
+          );
+          posPrinter = builtins.stringLength (
+            builtins.head (builtins.split "\"optimize PDF - printer.workflow\"" macQuickActionsText)
           );
           posEbook = builtins.stringLength (
             builtins.head (builtins.split "\"optimize PDF - ebook.workflow\"" macQuickActionsText)
@@ -62,12 +62,12 @@ let
             builtins.head (builtins.split "\"optimize PDF - screen.workflow\"" macQuickActionsText)
           );
         in
-        posDefault < posPrinter
-        && posPrinter < posPrepress
-        && posPrepress < posEbook
+        posDefault < posPrepress
+        && posPrepress < posPrinter
+        && posPrinter < posEbook
         && posEbook < posScreen
       )
-      "macOS quick-actions.nix presets must be in custom order (default < printer < prepress < ebook < screen)";
+      "macOS quick-actions.nix presets must be in custom order (default < prepress < printer < ebook < screen)";
 
   test_all_5_presets_in_nixos = assert' (
     allPresetsPresent nixosServicesText
