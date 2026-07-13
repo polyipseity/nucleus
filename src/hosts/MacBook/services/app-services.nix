@@ -89,7 +89,7 @@ let
   currentNucleusAppServiceDirs = [ "NucleusManual.app" ];
 
   # Import centralized daemon refresh helpers for shared lsregister path.
-  daemonRefresh = import ../../modules/macos/daemon-refresh.nix;
+  daemonRefresh = import ../../../modules/macos/daemon-refresh.nix;
 in
 {
   home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
