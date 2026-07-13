@@ -501,6 +501,7 @@ $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 $env:NUCLEUS_REPO_ROOT = $repoRoot
 $env:NUCLEUS_HOST = "Windows"
 [Environment]::SetEnvironmentVariable("NUCLEUS_HOST", "Windows", "User")
+[Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $repoRoot, "User")
 
 # Ensure the SSH host key exists before age key registration.  On a fresh
 # machine the key is absent until the OpenSSH Server service first starts;
