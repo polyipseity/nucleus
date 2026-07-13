@@ -5,6 +5,7 @@
   config,
   lib,
   pkgs,
+  username,
   nucleusApps,
   ...
 }:
@@ -27,7 +28,7 @@ in
   # username is hardcoded, matching Home Manager's useUserPackages = true layout.
   # ---------------------------------------------------------------------------
   system.activationScripts.nvimLauncher = lib.mkAfter ''
-    _nvim_real="${config.home-manager.users.polyipseity.home.profileDirectory}/bin/nvim"
+    _nvim_real="${config.home-manager.users.${username}.home.profileDirectory}/bin/nvim"
     if [ -x "$_nvim_real" ]; then
       mkdir -p /etc/nucleus-bin
       ln -sfn "$_nvim_real" /etc/nucleus-bin/nvim

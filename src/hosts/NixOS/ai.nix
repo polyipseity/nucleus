@@ -12,6 +12,7 @@
   config,
   lib,
   pkgs,
+  username,
   ...
 }:
 {
@@ -44,7 +45,7 @@
           export OPENCODE_ZEN_API_KEY="$(cat "$_keyfile_oc_zen")"
         fi
         exec ${pkgs.litellm}/bin/litellm \
-          --config ${config.users.users.polyipseity.home}/.config/nucleus/litellm-config.yml \
+          --config ${config.users.users.${username}.home}/.config/nucleus/litellm-config.yml \
           --port 4000 \
           --host 127.0.0.1 \
           --drop_params
