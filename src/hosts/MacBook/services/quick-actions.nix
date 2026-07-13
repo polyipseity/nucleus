@@ -66,6 +66,27 @@ let
       bundleId = "com.nucleus.OptimizePDF-screen";
       enablementKey = "com.nucleus.OptimizePDF-screen - optimize PDF - screen - runWorkflowAsService";
     }
+    # Legacy keys from historical naming conventions.
+    # Entries without dir skip directory removal (only delete NSServicesStatus key).
+    {
+      # Initial GSPDFOpt naming — replaced by per-preset workflows.
+      enablementKey = "com.nucleus.GSPDFOpt-default - Optimize PDF - default - runWorkflowAsService";
+    }
+    { enablementKey = "com.nucleus.GSPDFOpt-ebook - Optimize PDF - ebook - runWorkflowAsService"; }
+    {
+      enablementKey = "com.nucleus.GSPDFOpt-prepress - Optimize PDF - prepress - runWorkflowAsService";
+    }
+    { enablementKey = "com.nucleus.GSPDFOpt-printer - Optimize PDF - printer - runWorkflowAsService"; }
+    { enablementKey = "com.nucleus.GSPDFOpt-screen - Optimize PDF - screen - runWorkflowAsService"; }
+    {
+      # (null) bundle-ID period (ca741218..3702ef93) — before workflow Info.plist
+      # had CFBundleIdentifier set.
+      enablementKey = "(null) - optimize PDF - default - runWorkflowAsService";
+    }
+    { enablementKey = "(null) - optimize PDF - ebook - runWorkflowAsService"; }
+    { enablementKey = "(null) - optimize PDF - prepress - runWorkflowAsService"; }
+    { enablementKey = "(null) - optimize PDF - printer - runWorkflowAsService"; }
+    { enablementKey = "(null) - optimize PDF - screen - runWorkflowAsService"; }
   ];
 
   # Currently deployed Quick Actions. Add new actions here.
@@ -73,7 +94,6 @@ let
   #   - dir: workflow directory name in ~/Library/Services/
   #   - enablementKey: key for NSServicesStatus enablement
   #   - source: derivation path to copy from
-  #   - legacyKeys: list of old NSServicesStatus keys to remove
   #   - presentationModes: dict for NSServicesStatus enablement
   #
   # Sorting policy: alphabetical by dir by default.
@@ -85,14 +105,6 @@ let
       dir = "optimize PDF - default.workflow";
       enablementKey = "com.nucleus.OptimizePDF.default - optimize PDF - default - runWorkflowAsService";
       source = "${nucleusOptimizePdfQuickActions}/optimize PDF - default.workflow";
-      # Three historical formats: initial GSPDFOpt naming (com.nucleus.GSPDFOpt-*),
-      # intermediate OptimizePDF naming (com.nucleus.OptimizePDF-*), and a brief
-      # (null) bundle-ID period (ca741218..3702ef93).
-      legacyKeys = [
-        "com.nucleus.GSPDFOpt-default - Optimize PDF - default - runWorkflowAsService"
-        "com.nucleus.OptimizePDF-default - optimize PDF - default - runWorkflowAsService"
-        "(null) - optimize PDF - default - runWorkflowAsService"
-      ];
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -104,11 +116,6 @@ let
       dir = "optimize PDF - prepress.workflow";
       enablementKey = "com.nucleus.OptimizePDF.prepress - optimize PDF - prepress - runWorkflowAsService";
       source = "${nucleusOptimizePdfQuickActions}/optimize PDF - prepress.workflow";
-      legacyKeys = [
-        "com.nucleus.GSPDFOpt-prepress - Optimize PDF - prepress - runWorkflowAsService"
-        "com.nucleus.OptimizePDF-prepress - optimize PDF - prepress - runWorkflowAsService"
-        "(null) - optimize PDF - prepress - runWorkflowAsService"
-      ];
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -120,11 +127,6 @@ let
       dir = "optimize PDF - printer.workflow";
       enablementKey = "com.nucleus.OptimizePDF.printer - optimize PDF - printer - runWorkflowAsService";
       source = "${nucleusOptimizePdfQuickActions}/optimize PDF - printer.workflow";
-      legacyKeys = [
-        "com.nucleus.GSPDFOpt-printer - Optimize PDF - printer - runWorkflowAsService"
-        "com.nucleus.OptimizePDF-printer - optimize PDF - printer - runWorkflowAsService"
-        "(null) - optimize PDF - printer - runWorkflowAsService"
-      ];
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -136,11 +138,6 @@ let
       dir = "optimize PDF - ebook.workflow";
       enablementKey = "com.nucleus.OptimizePDF.ebook - optimize PDF - ebook - runWorkflowAsService";
       source = "${nucleusOptimizePdfQuickActions}/optimize PDF - ebook.workflow";
-      legacyKeys = [
-        "com.nucleus.GSPDFOpt-ebook - Optimize PDF - ebook - runWorkflowAsService"
-        "com.nucleus.OptimizePDF-ebook - optimize PDF - ebook - runWorkflowAsService"
-        "(null) - optimize PDF - ebook - runWorkflowAsService"
-      ];
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -152,11 +149,6 @@ let
       dir = "optimize PDF - screen.workflow";
       enablementKey = "com.nucleus.OptimizePDF.screen - optimize PDF - screen - runWorkflowAsService";
       source = "${nucleusOptimizePdfQuickActions}/optimize PDF - screen.workflow";
-      legacyKeys = [
-        "com.nucleus.GSPDFOpt-screen - Optimize PDF - screen - runWorkflowAsService"
-        "com.nucleus.OptimizePDF-screen - optimize PDF - screen - runWorkflowAsService"
-        "(null) - optimize PDF - screen - runWorkflowAsService"
-      ];
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -171,18 +163,22 @@ in
     QUICK_ACTION_DIR="$HOME/Library/Services"
 
     # ── Phase 1b: Prune removed Quick Actions ──────────────────────────
+    # First pass: delete all NSServicesStatus keys (entries may or may not have dir).
     ${builtins.concatStringsSep "\n" (
       map (qa: ''
-        # Delete NSServicesStatus key for ${qa.dir} (old naming convention).
         /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"${qa.enablementKey}\"" \
           ~/Library/Preferences/pbs.plist 2>/dev/null || true  # WHY: key may not exist on first apply
-
+      '') removedNucleusQuickActions
+    )}
+    # Second pass: remove workflow dirs for entries that have one.
+    ${builtins.concatStringsSep "\n" (
+      map (qa: ''
         qa_path="$QUICK_ACTION_DIR/${qa.dir}"
         if [ -d "$qa_path" ]; then
           chmod -R +w "$qa_path" 2>/dev/null || true  # WHY: dir may not exist on first apply
           rm -rf "$qa_path"
         fi
-      '') removedNucleusQuickActions
+      '') (builtins.filter (qa: qa ? dir) removedNucleusQuickActions)
     )}
 
     # ── Phase 3: Deploy Quick Actions ──────────────────────────────────
@@ -194,13 +190,6 @@ in
         chmod -R +w "$wf_dir" 2>/dev/null || true  # WHY: dir may not exist on first apply
         rm -rf "$wf_dir"
         cp -R "$store_path" "$QUICK_ACTION_DIR/"
-        # Remove stale legacy entries (pre-macOS 14 format).
-        # Uses PlistBuddy instead of `defaults delete` because `defaults`
-        # cannot parse keys containing spaces or dots as sub-key paths.
-        for legacy_key in ${builtins.concatStringsSep " " (map (k: ''"${k}"'') qa.legacyKeys)}; do
-          /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"$legacy_key\"" \
-            ~/Library/Preferences/pbs.plist 2>/dev/null || true  # WHY: key may not exist after previous cleanup
-        done
         # Enable in presentation_modes format (macOS 14+).
         # CFBundleIdentifier is set in each workflow's Info.plist.
         enablement_key="${qa.enablementKey}"
