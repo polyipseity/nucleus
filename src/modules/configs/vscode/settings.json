@@ -123,7 +123,6 @@
     "~/.agents/prompts": true
   },
   "chat.restoreLastPanelSession": true,
-  "chat.tools.compressOutput.enabled": true,
   "chat.tools.riskAssessment.model": "DeepSeek V4 Flash (High) (customendpoint)",
   "chat.tools.terminal.outputLocation": "chat",
   "chat.useClaudeHooks": true,
