@@ -11,6 +11,7 @@
 # variable, and oterm client.
 {
   config,
+  lib,
   pkgs,
   username,
   ...
@@ -60,12 +61,13 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
-      EnvironmentVariables = {
-        OLLAMA_FLASH_ATTENTION = "1";
-        OLLAMA_HOST = "127.0.0.1:11434";
-        OLLAMA_KV_CACHE_TYPE = "q4_0";
-        OLLAMA_CONTEXT_LENGTH = "32768";
-      };
+      # Source: src/modules/lib/env-vars.nix (OLLAMA_* entries).
+      # The catalog is the single source of truth for these values; the
+      # hardcoded list was removed to prevent drift.  toMacOSDaemonOllamaEnv
+      # returns ALL OLLAMA_* vars (including OLLAMA_HOST) because macOS
+      # launchd system daemons do not inherit the gui-env GUI domain.
+      EnvironmentVariables =
+        (import ../../modules/lib/env-vars.nix { inherit config pkgs lib; }).toMacOSDaemonOllamaEnv;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/ollama/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/ollama/stderr.log";
     };
