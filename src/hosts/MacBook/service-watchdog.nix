@@ -19,9 +19,6 @@ let
     path = ../../modules/services.json;
     name = "nucleus-services-json";
   };
-  # Keep repoRoot for any other flake.nix-relative lookups the script
-  # might need (derive_repo_root fallback, host detection, etc.).
-  repoRoot = "/Users/polyipseity/dev/nucleus";
 in
 {
   launchd.daemons."service-watchdog" = {
@@ -37,7 +34,6 @@ in
       KeepAlive = false;
       EnvironmentVariables = {
         NUCLEUS_SERVICES_JSON = servicesJson;
-        NUCLEUS_REPO_ROOT = repoRoot;
       };
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/service-watchdog/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/service-watchdog/stderr.log";
