@@ -81,6 +81,7 @@ function Sync-LiteLLMService {
   # uv tool install places binaries in ~\.local\bin by default.
   $litellmBin = Join-Path -Path $HOME -ChildPath ".local\bin\litellm.exe"
   if (-not (Test-Path -Path $litellmBin -PathType Leaf)) {
+    # WHY: probe whether the binary is on PATH; Get-Command throws when absent.
     $litellmCmd = Get-Command -Name "litellm" -ErrorAction SilentlyContinue
     if ($null -eq $litellmCmd) {
       Write-Output "litellm: binary not found; ensure Invoke-UvSetup has installed 'litellm[proxy]'"

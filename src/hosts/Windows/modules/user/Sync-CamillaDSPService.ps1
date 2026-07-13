@@ -49,6 +49,7 @@ function Sync-CamillaDSPService {
   }
 
   # Find the camilladsp binary.
+  # WHY: probe whether binary is installed; Get-Command throws when absent.
   $camilladspCmd = Get-Command -Name "camilladsp.exe" -ErrorAction SilentlyContinue
   if ($null -eq $camilladspCmd) {
     Write-Output "camilladsp: binary not found in PATH; run Invoke-CamillaDSPSetup first"

@@ -307,8 +307,10 @@ function Invoke-VMSetup {
             throw "vm-setup: per-user VM secret file not found: $secretFile"
         }
 
+        # WHY: probe whether sops is on PATH; Get-Command throws when absent.
         $sopsCommand = Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue
         if (-not $sopsCommand) {
+            # WHY: fallback probe without .exe suffix.
             $sopsCommand = Get-Command -Name 'sops' -ErrorAction SilentlyContinue
         }
         if (-not $sopsCommand) {
@@ -521,7 +523,8 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
     $scoopQemuDir = Join-Path $env:USERPROFILE 'scoop\apps\qemu\current'
     $qemuImg = Join-Path $scoopQemuDir 'qemu-img.exe'
     if (-not (Test-Path $qemuImg)) {
-        $qemuImgInPath = Get-Command qemu-img -ErrorAction SilentlyContinue
+        # WHY: probe whether qemu-img is on PATH; Get-Command throws when absent.
+    $qemuImgInPath = Get-Command qemu-img -ErrorAction SilentlyContinue
         if ($qemuImgInPath) {
             $qemuImg = $qemuImgInPath.Source
         } else {
@@ -764,6 +767,7 @@ function Test-Qcow2Image {
         return $false
     }
 
+    # WHY: probe whether qemu-img is on PATH; Get-Command throws when absent.
     $qemuImg = Get-Command qemu-img -ErrorAction SilentlyContinue
     if (-not $qemuImg) {
         return $true
@@ -834,6 +838,7 @@ function Invoke-BuildNixosImage {
         }
     }
 
+    # WHY: probe whether packer is installed; Get-Command throws when absent.
     if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
         Write-Warning 'vm-setup: packer not found; install via WinGet (HashiCorp.Packer)'
         return
@@ -1058,6 +1063,7 @@ function Invoke-BuildWindowsImage {
             # Use curl.exe (available on Windows 10 1803+) for large ISO downloads;
             # Invoke-WebRequest buffers the full file in memory before writing to disk.
             # Source: https://curl.se/docs/manpage.html
+            # WHY: probe whether curl.exe is available; Get-Command throws when absent.
             if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
                 Write-Warning 'vm-setup: curl.exe not found; Windows 10 1803+ includes it in system32'
                 return
@@ -1123,6 +1129,7 @@ function Invoke-BuildWindowsImage {
         return
     }
 
+    # WHY: probe whether packer is installed; Get-Command throws when absent.
     if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
         Write-Warning 'vm-setup: packer not found; install via WinGet (HashiCorp.Packer)'
         return

@@ -442,11 +442,13 @@ if ($null -ne $sopsPackageDir) {
 
 $sopsCandidates = @(
   $sopsExecutableFromWinget,
+  # WHY: probe whether sops is on PATH; Get-Command throws when absent.
   (Get-Command -Name "sops.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
 $gpgCandidates = @(
   (Join-Path -Path $env:ProgramFiles -ChildPath "GnuPG\bin\gpg.exe"),
+  # WHY: probe whether gpg is on PATH; Get-Command throws when absent.
   (Get-Command -Name "gpg.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
@@ -463,7 +465,9 @@ if ($null -ne $prekPackageDir) {
 
 $prekCandidates = @(
   $prekExecutableFromWinget,
+  # WHY: probe whether prek is on PATH; Get-Command throws when absent.
   (Get-Command -Name "prek.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source),
+  # WHY: fallback probe without .exe suffix.
   (Get-Command -Name "prek" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
@@ -777,6 +781,7 @@ if ($NoAISync) {
 } else {
   $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaOnPath) {
+    # WHY: probe whether ollama is installed (may not be on first-provision hosts).
     Write-Output "ai-sync: ollama not found in PATH; skipping post-apply model sync"
   } else {
     Write-Output "ai-sync: running post-apply AI model sync..."

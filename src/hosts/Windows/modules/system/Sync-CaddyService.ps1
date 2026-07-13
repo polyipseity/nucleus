@@ -72,8 +72,10 @@ function Sync-CaddyService {
     throw "RepoRoot does not exist: $RepoRoot"
   }
 
+  # WHY: probe whether caddy binary is installed; Get-Command throws when absent.
   $caddyCommand = Get-Command -Name 'caddy.exe' -ErrorAction SilentlyContinue
   if ($null -eq $caddyCommand) {
+    # WHY: fallback probe without .exe suffix for non-Windows or WSL scenarios.
     $caddyCommand = Get-Command -Name 'caddy' -ErrorAction SilentlyContinue
   }
 
