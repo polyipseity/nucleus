@@ -1,7 +1,7 @@
-# MacBook/services/app-services.nix — macOS App Services (.app bundles).
+# MacBook/services/app-bundles.nix — macOS App bundles deployed via LaunchServices.
 #
-# App Services appear in the Finder menu bar → Services. They are .app
-# bundles deployed to ~/Applications/ via LaunchServices registration.
+# These .app bundles appear in the Finder menu bar → Services. They are
+# deployed to ~/Applications/ via LaunchServices registration.
 # Less reliable than Quick Actions for context menu placement but work
 # reliably in the Services menu.
 #
@@ -27,7 +27,7 @@
   ...
 }:
 let
-  nucleusManualAppService =
+  nucleusManualAppBundle =
     pkgs.runCommand "nucleus-manual-app"
       {
         preferLocalBuild = true;
@@ -74,13 +74,14 @@ let
         rm -rf "$build_dir"
       '';
 
-  # Known list of historically-removed Nucleus app services.
-  # When a service is removed, add its metadata here and remove its app dir.
+  # Known list of historically-removed Nucleus app bundles.
+  # When a bundle is removed, add its metadata here and remove its app dir.
   # The activation script unconditionally removes its NSServicesStatus key
   # and prunes its app directory from disk. Entries can be removed after all
   # machines have applied once after the removal commit.
-  removedNucleusAppServices = [
-    # Old pre-per-preset single .app bundle (replaced by per-preset quick actions).
+  removedNucleusAppBundles = [
+    # Old pre-per-preset single .app bundle (replaced by per-preset Automator
+    # workflows).
     {
       appDir = "NucleusGSPDFOpt.app";
       bundleId = "com.nucleus.GSPDFOpt";
@@ -89,7 +90,7 @@ let
     }
   ];
 
-  # Currently deployed app services. Add new services here.
+  # Currently deployed app bundles. Add new bundles here.
   # Each entry has:
   #   - appDir: directory name in ~/Applications/
   #   - bundleId: CFBundleIdentifier (used for NSServicesStatus key)
@@ -101,13 +102,13 @@ let
   # Sorting policy: alphabetical by appDir by default. Delegation order
   # always follows the sorted list. If an exception is needed, document
   # it below with rationale.
-  currentNucleusAppServices = [
+  currentNucleusAppBundles = [
     {
       appDir = "NucleusManual.app";
       bundleId = "com.nucleus.OpenNucleusManual";
       menuItem = "open nucleus manual";
       message = "open";
-      source = "${nucleusManualAppService}/NucleusManual.app";
+      source = "${nucleusManualAppBundle}/NucleusManual.app";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -117,23 +118,21 @@ let
     }
   ];
 
-  # List of currently deployed app service directories (derived).
-  # Used by tests and documentation to track active app services.
-  currentNucleusAppServiceDirs = map (svc: svc.appDir) currentNucleusAppServices;
+  # List of currently deployed app bundle directories (derived).
+  # Used by tests and documentation to track active app bundles.
+  currentNucleusAppBundleDirs = map (svc: svc.appDir) currentNucleusAppBundles;
 
   # Sort alphabetically by appDir for deterministic deployment.
-  sortedCurrentNucleusAppServices = builtins.sort (
-    a: b: a.appDir < b.appDir
-  ) currentNucleusAppServices;
+  sortedCurrentNucleusAppBundles = builtins.sort (a: b: a.appDir < b.appDir) currentNucleusAppBundles;
 in
 {
   home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
 
-  home.activation.deployNucleusAppServices = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.deployNucleusAppBundles = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
     APP_DIR="$HOME/Applications"
 
-    # ── Phase 1a: Prune removed app services ───────────────────────────
+    # ── Phase 1a: Prune removed app bundles ───────────────────────────
     ${builtins.concatStringsSep "\n" (
       map (svc: ''
         # Delete NSServicesStatus key for ${svc.appDir} unconditionally.
@@ -146,10 +145,10 @@ in
           chmod -R +w "$app_path" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
           rm -rf "$app_path"
         fi
-      '') removedNucleusAppServices
+      '') removedNucleusAppBundles
     )}
 
-    # ── Phase 2: Deploy app services ───────────────────────────────────
+    # ── Phase 2: Deploy app bundles ───────────────────────────────────
     ${builtins.concatStringsSep "\n" (
       map (svc: ''
         app_path="$APP_DIR/${svc.appDir}"
@@ -173,7 +172,7 @@ in
         enablement_key="${svc.bundleId} - ${svc.menuItem} - ${svc.message}"
         /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
           '<dict><key>presentation_modes</key>${mkPresentationModes svc.presentationModes}</dict>'
-      '') sortedCurrentNucleusAppServices
+      '') sortedCurrentNucleusAppBundles
     )}
   '';
 }

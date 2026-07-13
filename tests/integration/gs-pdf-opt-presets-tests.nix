@@ -6,8 +6,8 @@
 let
   lib = import <nixpkgs/lib>;
   macServicesText = builtins.readFile ../../src/hosts/MacBook/services.nix;
-  macQuickActionsText = builtins.readFile ../../src/hosts/MacBook/services/quick-actions.nix;
-  macAppServicesText = builtins.readFile ../../src/hosts/MacBook/services/app-services.nix;
+  macAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows.nix;
+  macAppBundlesText = builtins.readFile ../../src/hosts/MacBook/services/app-bundles.nix;
   nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
   windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-pdf-opt.dsc.yml;
 
@@ -29,13 +29,13 @@ let
   noOldLabel = fileText: !lib.hasInfix "gs optimize pdf" fileText;
 
   test_all_5_presets_in_macos = assert' (
-    allPresetsPresent macQuickActionsText
-    && lib.hasInfix "optimize PDF - default" macQuickActionsText
-    && lib.hasInfix "optimize PDF - ebook" macQuickActionsText
-    && lib.hasInfix "optimize PDF - prepress" macQuickActionsText
-    && lib.hasInfix "optimize PDF - printer" macQuickActionsText
-    && lib.hasInfix "optimize PDF - screen" macQuickActionsText
-  ) "macOS quick-actions.nix must define all 5 presets with 'optimize PDF - X' labels";
+    allPresetsPresent macAutomatorWorkflowsText
+    && lib.hasInfix "optimize PDF - default" macAutomatorWorkflowsText
+    && lib.hasInfix "optimize PDF - ebook" macAutomatorWorkflowsText
+    && lib.hasInfix "optimize PDF - prepress" macAutomatorWorkflowsText
+    && lib.hasInfix "optimize PDF - printer" macAutomatorWorkflowsText
+    && lib.hasInfix "optimize PDF - screen" macAutomatorWorkflowsText
+  ) "macOS automator-workflows.nix must define all 5 presets with 'optimize PDF - X' labels";
 
   test_no_old_gs_labels_in_macos = assert' (noOldLabel macServicesText) "macOS services.nix must not contain the old 'gs optimize pdf' label";
 
@@ -47,19 +47,19 @@ let
           # Sort order: default first, then quality descending (prepress > printer >
           # ebook > screen). This is the declared order in the explicit list.
           posDefault = builtins.stringLength (
-            builtins.head (builtins.split "\"optimize PDF - default.workflow\"" macQuickActionsText)
+            builtins.head (builtins.split "\"optimize PDF - default.workflow\"" macAutomatorWorkflowsText)
           );
           posPrepress = builtins.stringLength (
-            builtins.head (builtins.split "\"optimize PDF - prepress.workflow\"" macQuickActionsText)
+            builtins.head (builtins.split "\"optimize PDF - prepress.workflow\"" macAutomatorWorkflowsText)
           );
           posPrinter = builtins.stringLength (
-            builtins.head (builtins.split "\"optimize PDF - printer.workflow\"" macQuickActionsText)
+            builtins.head (builtins.split "\"optimize PDF - printer.workflow\"" macAutomatorWorkflowsText)
           );
           posEbook = builtins.stringLength (
-            builtins.head (builtins.split "\"optimize PDF - ebook.workflow\"" macQuickActionsText)
+            builtins.head (builtins.split "\"optimize PDF - ebook.workflow\"" macAutomatorWorkflowsText)
           );
           posScreen = builtins.stringLength (
-            builtins.head (builtins.split "\"optimize PDF - screen.workflow\"" macQuickActionsText)
+            builtins.head (builtins.split "\"optimize PDF - screen.workflow\"" macAutomatorWorkflowsText)
           );
         in
         posDefault < posPrepress
@@ -67,7 +67,7 @@ let
         && posPrinter < posEbook
         && posEbook < posScreen
       )
-      "macOS quick-actions.nix presets must be in custom order (default < prepress < printer < ebook < screen)";
+      "macOS automator-workflows.nix presets must be in custom order (default < prepress < printer < ebook < screen)";
 
   test_all_5_presets_in_nixos = assert' (
     allPresetsPresent nixosServicesText
@@ -157,28 +157,28 @@ let
   test_macos_has_removed_services =
     assert'
       (
-        lib.hasInfix "removedNucleusAppServices" macAppServicesText
-        && lib.hasInfix "NucleusGSPDFOpt.app" macAppServicesText
-        && lib.hasInfix "com.nucleus.GSPDFOpt" macAppServicesText
+        lib.hasInfix "removedNucleusAppBundles" macAppBundlesText
+        && lib.hasInfix "NucleusGSPDFOpt.app" macAppBundlesText
+        && lib.hasInfix "com.nucleus.GSPDFOpt" macAppBundlesText
       )
-      "macOS app-services.nix must define removedNucleusAppServices containing the old single-preset app service metadata";
+      "macOS app-bundles.nix must define removedNucleusAppBundles containing the old single-preset app bundle metadata";
 
   test_macos_has_current_app_dirs =
     assert'
       (
-        lib.hasInfix "currentNucleusAppServiceDirs" macAppServicesText
-        && lib.hasInfix "NucleusManual.app" macAppServicesText
+        lib.hasInfix "currentNucleusAppBundleDirs" macAppBundlesText
+        && lib.hasInfix "NucleusManual.app" macAppBundlesText
       )
-      "macOS app-services.nix must define currentNucleusAppServiceDirs containing current app service dirs";
+      "macOS app-bundles.nix must define currentNucleusAppBundleDirs containing current app bundle dirs";
 
   test_macos_has_removed_quick_actions =
     assert'
       (
-        lib.hasInfix "removedNucleusQuickActions" macQuickActionsText
-        && lib.hasInfix "OptimizePDF-default.workflow" macQuickActionsText
-        && lib.hasInfix "com.nucleus.OptimizePDF-default" macQuickActionsText
+        lib.hasInfix "removedNucleusWorkflows" macAutomatorWorkflowsText
+        && lib.hasInfix "OptimizePDF-default.workflow" macAutomatorWorkflowsText
+        && lib.hasInfix "com.nucleus.OptimizePDF-default" macAutomatorWorkflowsText
       )
-      "macOS quick-actions.nix must define removedNucleusQuickActions containing old workflow naming metadata";
+      "macOS automator-workflows.nix must define removedNucleusWorkflows containing old workflow naming metadata";
 
   allTests = [
     test_all_5_presets_in_macos

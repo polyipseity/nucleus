@@ -1,16 +1,16 @@
 # MacBook/services.nix — General macOS service configurations.
 #
-# Coordinates Quick Actions (services/quick-actions.nix) and App Services
-# (services/app-services.nix) deployment. This file handles shared daemon
-# cache flush that runs after both sub-modules have deployed, so changes
-# from both Quick Actions (NSServicesStatus) and App Services
+# Coordinates Automator workflow bundles (services/automator-workflows.nix) and
+# App bundles (services/app-bundles.nix) deployment. This file handles shared
+# daemon cache flush that runs after both sub-modules have deployed, so changes
+# from both Automator workflows (NSServicesStatus) and App bundles
 # (LaunchServices registration) take effect in one activation.
 #
-# For Quick Actions (Automator .workflow bundles appearing in right-click →
-# Quick Actions): see services/quick-actions.nix
+# For Automator workflows (.workflow bundles appearing in right-click →
+# Quick Actions or menu bar → Services): see services/automator-workflows.nix
 #
-# For App Services (.app bundles appearing in menu bar → Services):
-# see services/app-services.nix
+# For App bundles (.app bundles appearing in menu bar → Services):
+# see services/app-bundles.nix
 { lib, ... }:
 let
   # Import centralized daemon refresh helpers for post-deploy cache flush.
@@ -28,18 +28,18 @@ let
 in
 {
   imports = [
-    ./services/quick-actions.nix
-    ./services/app-services.nix
+    ./services/automator-workflows.nix
+    ./services/app-bundles.nix
   ];
 
   # Inject shared helpers into sub-modules.
   _module.args = { inherit mkPresentationModes; };
 
-  # Shared cache flush that runs after both Quick Actions and App Services
+  # Shared cache flush that runs after both Automator workflows and App bundles
   # have been deployed. Each sub-module handles its own deploy and prune
   # lifecycle; this entry ensures final cache coherency.
   home.activation.deployNucleusServicesFlush =
-    lib.hm.dag.entryAfter [ "deployNucleusQuickActions" "deployNucleusAppServices" ]
+    lib.hm.dag.entryAfter [ "deployNucleusAutomatorWorkflows" "deployNucleusAppBundles" ]
       ''
         # ── Phase 4: Flush daemon caches so changes take effect immediately ─
         # Without these restarts, cfprefsd and pbs hold stale cached state in

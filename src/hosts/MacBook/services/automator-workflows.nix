@@ -1,14 +1,14 @@
-# MacBook/services/quick-actions.nix — macOS Quick Actions (Automator .workflow bundles).
+# MacBook/services/automator-workflows.nix — macOS Automator workflow bundles.
 #
-# Quick Actions appear in the right-click context menu → Quick Actions and
-# the menu bar → Services in Finder and other apps. They are Automator
-# .workflow bundles deployed to ~/Library/Services/.
+# These Automator .workflow bundles appear in the right-click context menu →
+# Quick Actions and the menu bar → Services in Finder and other apps. They are
+# deployed to ~/Library/Services/.
 #
 # WHY home.activation instead of home.file:
-#   home.file creates a symlink to the Nix store, but Quick Actions stored
-#   as symlinks are not discoverable by the service menu system. A
-#   home.activation script that copies workflows on each generation switch
-#   guarantees they are registered.
+#   home.file creates a symlink to the Nix store, but Automator .workflow
+#   bundles stored as symlinks are not discoverable by the service menu
+#   system. A home.activation script that copies workflows on each generation
+#   switch guarantees they are registered.
 {
   lib,
   pkgs,
@@ -17,10 +17,10 @@
 }:
 let
   # ── Derivation: bundle all workflow directories ───────────────────────
-  # Packages all 5 Quick Action bundles into a single derivation output.
+  # Packages all 5 Automator workflow bundles into a single derivation output.
   # Each bundle is a committed .workflow directory in services/workflows/,
   # copied verbatim (no build-time processing).
-  nucleusOptimizePdfQuickActions =
+  nucleusOptimizePdfWorkflows =
     pkgs.runCommand "nucleus-gs-pdf-opt-workflows"
       {
         preferLocalBuild = true;
@@ -35,12 +35,12 @@ let
         cp -R "${./workflows}/optimize PDF - screen.workflow" "$out/"
       '';
 
-  # Known list of historically-removed Quick Actions (old workflow naming).
-  # When a Quick Action is removed, add its metadata here and delete its
+  # Known list of historically-removed Automator workflows (old workflow naming).
+  # When a workflow is removed, add its metadata here and delete its
   # workflow directory and pbs enablement key.
   # Entries can be removed after all machines have applied once after
   # the removal commit.
-  removedNucleusQuickActions = [
+  removedNucleusWorkflows = [
     {
       dir = "OptimizePDF-default.workflow";
       bundleId = "com.nucleus.OptimizePDF-default";
@@ -89,7 +89,7 @@ let
     { enablementKey = "(null) - optimize PDF - screen - runWorkflowAsService"; }
   ];
 
-  # Currently deployed Quick Actions. Add new actions here.
+  # Currently deployed Automator workflows. Add new workflows here.
   # Each entry has:
   #   - dir: workflow directory name in ~/Library/Services/
   #   - enablementKey: key for NSServicesStatus enablement
@@ -100,11 +100,11 @@ let
   # Exception: Optimize PDF actions are ordered by quality descending
   # (prepress > printer > ebook > screen), with "default" always first.
   # Deployment order always follows the declared order below.
-  currentNucleusQuickActions = [
+  currentNucleusWorkflows = [
     {
       dir = "optimize PDF - default.workflow";
       enablementKey = "com.nucleus.OptimizePDF.default - optimize PDF - default - runWorkflowAsService";
-      source = "${nucleusOptimizePdfQuickActions}/optimize PDF - default.workflow";
+      source = "${nucleusOptimizePdfWorkflows}/optimize PDF - default.workflow";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -115,7 +115,7 @@ let
     {
       dir = "optimize PDF - prepress.workflow";
       enablementKey = "com.nucleus.OptimizePDF.prepress - optimize PDF - prepress - runWorkflowAsService";
-      source = "${nucleusOptimizePdfQuickActions}/optimize PDF - prepress.workflow";
+      source = "${nucleusOptimizePdfWorkflows}/optimize PDF - prepress.workflow";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -126,7 +126,7 @@ let
     {
       dir = "optimize PDF - printer.workflow";
       enablementKey = "com.nucleus.OptimizePDF.printer - optimize PDF - printer - runWorkflowAsService";
-      source = "${nucleusOptimizePdfQuickActions}/optimize PDF - printer.workflow";
+      source = "${nucleusOptimizePdfWorkflows}/optimize PDF - printer.workflow";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -137,7 +137,7 @@ let
     {
       dir = "optimize PDF - ebook.workflow";
       enablementKey = "com.nucleus.OptimizePDF.ebook - optimize PDF - ebook - runWorkflowAsService";
-      source = "${nucleusOptimizePdfQuickActions}/optimize PDF - ebook.workflow";
+      source = "${nucleusOptimizePdfWorkflows}/optimize PDF - ebook.workflow";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -148,7 +148,7 @@ let
     {
       dir = "optimize PDF - screen.workflow";
       enablementKey = "com.nucleus.OptimizePDF.screen - optimize PDF - screen - runWorkflowAsService";
-      source = "${nucleusOptimizePdfQuickActions}/optimize PDF - screen.workflow";
+      source = "${nucleusOptimizePdfWorkflows}/optimize PDF - screen.workflow";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -159,43 +159,43 @@ let
   ];
 in
 {
-  home.activation.deployNucleusQuickActions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    QUICK_ACTION_DIR="$HOME/Library/Services"
+  home.activation.deployNucleusAutomatorWorkflows = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    SERVICES_DIR="$HOME/Library/Services"
 
-    # ── Phase 1b: Prune removed Quick Actions ──────────────────────────
+    # ── Phase 1b: Prune removed Automator workflows ────────────────────
     # First pass: delete all NSServicesStatus keys (entries may or may not have dir).
     ${builtins.concatStringsSep "\n" (
-      map (qa: ''
-        /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"${qa.enablementKey}\"" \
+      map (wf: ''
+        /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"${wf.enablementKey}\"" \
           ~/Library/Preferences/pbs.plist 2>/dev/null || true  # undoc-supp: key may not exist on first apply
-      '') removedNucleusQuickActions
+      '') removedNucleusWorkflows
     )}
     # Second pass: remove workflow dirs for entries that have one.
     ${builtins.concatStringsSep "\n" (
-      map (qa: ''
-        qa_path="$QUICK_ACTION_DIR/${qa.dir}"
-        if [ -d "$qa_path" ]; then
-          chmod -R +w "$qa_path" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
-          rm -rf "$qa_path"
+      map (wf: ''
+        wf_path="$SERVICES_DIR/${wf.dir}"
+        if [ -d "$wf_path" ]; then
+          chmod -R +w "$wf_path" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
+          rm -rf "$wf_path"
         fi
-      '') (builtins.filter (qa: qa ? dir) removedNucleusQuickActions)
+      '') (builtins.filter (wf: wf ? dir) removedNucleusWorkflows)
     )}
 
-    # ── Phase 3: Deploy Quick Actions ──────────────────────────────────
+    # ── Phase 3: Deploy Automator workflows ────────────────────────────
     ${builtins.concatStringsSep "\n" (
-      map (qa: ''
-        wf_dir="$QUICK_ACTION_DIR/${qa.dir}"
-        store_path="${qa.source}"
-        mkdir -p "$QUICK_ACTION_DIR"
+      map (wf: ''
+        wf_dir="$SERVICES_DIR/${wf.dir}"
+        store_path="${wf.source}"
+        mkdir -p "$SERVICES_DIR"
         chmod -R +w "$wf_dir" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
         rm -rf "$wf_dir"
-        cp -R "$store_path" "$QUICK_ACTION_DIR/"
+        cp -R "$store_path" "$SERVICES_DIR/"
         # Enable in presentation_modes format (macOS 14+).
         # CFBundleIdentifier is set in each workflow's Info.plist.
-        enablement_key="${qa.enablementKey}"
+        enablement_key="${wf.enablementKey}"
         /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
-          '<dict><key>presentation_modes</key>${mkPresentationModes qa.presentationModes}</dict>'
-      '') currentNucleusQuickActions
+          '<dict><key>presentation_modes</key>${mkPresentationModes wf.presentationModes}</dict>'
+      '') currentNucleusWorkflows
     )}
   '';
 }

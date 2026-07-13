@@ -1,0 +1,14 @@
+---
+description: "Use when configuring environment variables across hosts. Default scope is all-process; narrower scope requires documented justification. See also the cross-host GUI env var propagation plan in the conversation history."
+name: "Environment Variable Scope"
+applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/*.ps1, src/hosts/Windows/**/*.yml"
+---
+
+Every environment variable set by this repo must default to all-process availability on the host. Restricting scope (shell-only, service-only) is an exception requiring an inline `# WHY` comment.
+
+Valid reasons to restrict scope:
+- The variable would cause incorrect behavior for unintended consumers (e.g., `CC`/`CXX`/`LD` on macOS: Nix LLVM paths in GUI process env interfere with Xcode toolchain discovery).
+- The concept is inherently platform-specific (e.g., `DEVELOPER_DIR` on non-macOS hosts).
+- The value is technically infeasible to compute at build time (e.g., `NUCLEUS_REPO_ROOT` on NixOS — captured at eval time).
+
+"CLI-only tool" or "only shells need it" is not a valid restriction on NixOS or Windows — both CLI and GUI processes inherit the same environment. On macOS, a second propagation mechanism (LaunchAgent calling `launchctl setenv`) is required because `launchd` maintains separate shell and GUI domains.
