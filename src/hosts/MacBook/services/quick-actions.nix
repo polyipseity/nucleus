@@ -9,20 +9,13 @@
 #   as symlinks are not discoverable by the service menu system. A
 #   home.activation script that copies workflows on each generation switch
 #   guarantees they are registered.
-{ lib, pkgs, ... }:
+{
+  lib,
+  pkgs,
+  mkPresentationModes,
+  ...
+}:
 let
-  # ── Helpers ──────────────────────────────────────────────────────────
-
-  # Generate a plist <dict> from an attribute set of booleans.
-  # Used to build NSServicesStatus presentation_modes values.
-  mkPresentationModes =
-    modes:
-    let
-      boolStr = v: if v then "true" else "false";
-      entries = lib.mapAttrsToList (name: value: "<key>${name}</key><${boolStr value}/>") modes;
-    in
-    "<dict>${builtins.concatStringsSep "" entries}</dict>";
-
   # ── Derivation: bundle all workflow directories ───────────────────────
   # Packages all 5 Quick Action bundles into a single derivation output.
   # Each bundle is a committed .workflow directory in services/workflows/,

@@ -15,12 +15,25 @@
 let
   # Import centralized daemon refresh helpers for post-deploy cache flush.
   daemonRefresh = import ../../modules/macos/daemon-refresh.nix;
+
+  # Generate a plist <dict> from an attribute set of booleans.
+  # Used to build NSServicesStatus presentation_modes values.
+  mkPresentationModes =
+    modes:
+    let
+      boolStr = v: if v then "true" else "false";
+      entries = lib.mapAttrsToList (name: value: "<key>${name}</key><${boolStr value}/>") modes;
+    in
+    "<dict>${builtins.concatStringsSep "" entries}</dict>";
 in
 {
   imports = [
     ./services/quick-actions.nix
     ./services/app-services.nix
   ];
+
+  # Inject shared helpers into sub-modules.
+  _module.args = { inherit mkPresentationModes; };
 
   # Shared cache flush that runs after both Quick Actions and App Services
   # have been deployed. Each sub-module handles its own deploy and prune

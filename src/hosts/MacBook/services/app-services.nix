@@ -20,20 +20,13 @@
 #   osacompile runs during nix build, producing macOS-version-specific
 #   .scpt bytecode, but only once per `nucleus-apply` run. This makes the
 #   activation script simpler and faster while keeping build-time safety.
-{ lib, pkgs, ... }:
+{
+  lib,
+  pkgs,
+  mkPresentationModes,
+  ...
+}:
 let
-  # ── Helpers ──────────────────────────────────────────────────────────
-
-  # Generate a plist <dict> from an attribute set of booleans.
-  # Used to build NSServicesStatus presentation_modes values.
-  mkPresentationModes =
-    modes:
-    let
-      boolStr = v: if v then "true" else "false";
-      entries = lib.mapAttrsToList (name: value: "<key>${name}</key><${boolStr value}/>") modes;
-    in
-    "<dict>${builtins.concatStringsSep "" entries}</dict>";
-
   nucleusManualAppService =
     pkgs.runCommand "nucleus-manual-app"
       {
