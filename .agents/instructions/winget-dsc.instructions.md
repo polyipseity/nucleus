@@ -35,7 +35,7 @@ Each DSC file covers exactly one Windows subsystem or functional concern. Do not
 - `src/hosts/Windows/user/shell.dsc.yml` — user-level shell autorun (cmd AutoRun).
 - `src/hosts/Windows/user/env.dsc.yml` — user environment variable declarations.
 - `src/hosts/Windows/user/context-manual.dsc.yml` — right-click "open nucleus manual" entries.
-- `src/hosts/Windows/user/context-pdf-opt.dsc.yml` — right-click "optimize pdf" presets.
+- `src/hosts/Windows/user/context-pdf-opt.dsc.yml` — right-click "optimize PDF" presets.
 - They are applied in-order by `src/hosts/Windows/apply.ps1`.
 - Reusable Windows helper logic is loaded from `src/hosts/Windows/modules/*.ps1`; DSC files should remain state declarations rather than script logic.
 
