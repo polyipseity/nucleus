@@ -85,9 +85,13 @@ let
       dir = "optimize PDF - default.workflow";
       enablementKey = "com.nucleus.OptimizePDF.default - optimize PDF - default - runWorkflowAsService";
       source = "${nucleusOptimizePdfQuickActions}/optimize PDF - default.workflow";
+      # Three historical formats: initial GSPDFOpt naming (com.nucleus.GSPDFOpt-*),
+      # intermediate OptimizePDF naming (com.nucleus.OptimizePDF-*), and a brief
+      # (null) bundle-ID period (ca741218..3702ef93).
       legacyKeys = [
         "com.nucleus.GSPDFOpt-default - Optimize PDF - default - runWorkflowAsService"
         "com.nucleus.OptimizePDF-default - optimize PDF - default - runWorkflowAsService"
+        "(null) - optimize PDF - default - runWorkflowAsService"
       ];
       presentationModes = {
         ContextMenu = true;
@@ -103,6 +107,7 @@ let
       legacyKeys = [
         "com.nucleus.GSPDFOpt-prepress - Optimize PDF - prepress - runWorkflowAsService"
         "com.nucleus.OptimizePDF-prepress - optimize PDF - prepress - runWorkflowAsService"
+        "(null) - optimize PDF - prepress - runWorkflowAsService"
       ];
       presentationModes = {
         ContextMenu = true;
@@ -118,6 +123,7 @@ let
       legacyKeys = [
         "com.nucleus.GSPDFOpt-printer - Optimize PDF - printer - runWorkflowAsService"
         "com.nucleus.OptimizePDF-printer - optimize PDF - printer - runWorkflowAsService"
+        "(null) - optimize PDF - printer - runWorkflowAsService"
       ];
       presentationModes = {
         ContextMenu = true;
@@ -133,6 +139,7 @@ let
       legacyKeys = [
         "com.nucleus.GSPDFOpt-ebook - Optimize PDF - ebook - runWorkflowAsService"
         "com.nucleus.OptimizePDF-ebook - optimize PDF - ebook - runWorkflowAsService"
+        "(null) - optimize PDF - ebook - runWorkflowAsService"
       ];
       presentationModes = {
         ContextMenu = true;
@@ -148,6 +155,7 @@ let
       legacyKeys = [
         "com.nucleus.GSPDFOpt-screen - Optimize PDF - screen - runWorkflowAsService"
         "com.nucleus.OptimizePDF-screen - optimize PDF - screen - runWorkflowAsService"
+        "(null) - optimize PDF - screen - runWorkflowAsService"
       ];
       presentationModes = {
         ContextMenu = true;
