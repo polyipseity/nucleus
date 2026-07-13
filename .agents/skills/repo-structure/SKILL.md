@@ -9,6 +9,13 @@ description: Cached knowledge of the nucleus repository architecture, key files,
      because they duplicate AGENTS.md. When editing, check AGENTS.md for
      overlapping content first. -->
 
+## check.sh pitfalls
+
+- `grep -rn` without `-H` on BSD grep (macOS) omits the filename when searching a single file. Always use `grep -Hrn` in check #16's `_check_undoc_supp`.
+- `IFS=:` parsing of `grep` output fails silently when filenames are missing, causing `[ "$_ln" -gt 1 ]` to error with "integer expected".
+- Path-scoped mode (pre-commit hook) passes individual files as arguments, triggering the BSD grep no-filename issue.
+- When filtering grep results inside a `while IFS=: read` loop, use `case` with single-quote detection to skip patterns inside quoted function arguments, not just shell operators.
+
 # Nucleus Repository Structure
 
 ## Top-level layout
