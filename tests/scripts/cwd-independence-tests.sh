@@ -40,7 +40,7 @@ test_derive_repo_root_from_outside_cwd() {
             . "$SCRIPT_DIR/../src/scripts/lib.sh"
             derive_repo_root
         '
-    ) || true
+    ) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [ "$result" = "$REPO_ROOT" ]; then
         assert_pass "derive_repo_root from /tmp with SCRIPT_DIR=$REPO_ROOT/scripts"
     else
@@ -59,7 +59,7 @@ test_derive_repo_root_from_src_scripts() {
             . "$SCRIPT_DIR/lib.sh"
             derive_repo_root
         '
-    ) || true
+    ) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [ "$result" = "$REPO_ROOT" ]; then
         assert_pass "derive_repo_root from /tmp with SCRIPT_DIR=$REPO_ROOT/src/scripts"
     else
@@ -78,7 +78,7 @@ test_env_var_priority() {
             . "'"$REPO_ROOT"'/src/scripts/lib.sh"
             derive_repo_root
         ' 2>/dev/null
-    ) || true
+    ) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [ "$result" = "$REPO_ROOT" ]; then
         assert_pass "NUCLEUS_REPO_ROOT env var takes priority over invalid SCRIPT_DIR"
     else
@@ -97,7 +97,7 @@ test_derive_repo_root_fails_cleanly() {
             . "'"$REPO_ROOT"'/src/scripts/lib.sh"
             derive_repo_root
         ' 2>&1
-    ) || true
+    ) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if echo "$derr_output" | grep -q "cannot determine nucleus repository root"; then
         assert_pass "derive_repo_root fails with clear error when SCRIPT_DIR=/tmp"
     else
@@ -122,7 +122,7 @@ test_env_var_symlink_resolution() {
             . "$SCRIPT_DIR/lib.sh"
             derive_repo_root
         '
-    ) || true
+    ) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [ "$result" = "$REPO_ROOT" ]; then
         assert_pass "derive_repo_root resolves NUCLEUS_REPO_ROOT symlink to real path"
     else
@@ -150,7 +150,7 @@ test_script_help_from_outside() {
         result=$(
             cd /tmp
             bash "$script" --help 2>/dev/null
-        ) || true
+        ) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
         if [ -n "$result" ]; then
             assert_pass "$name --help from /tmp"
         else

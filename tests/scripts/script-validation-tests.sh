@@ -430,7 +430,7 @@ SUDO_WRAPPER
     chmod +x "$SUDO_WRAPPER_DIR/sudo"
     PATH="$SUDO_WRAPPER_DIR:$PATH"
 
-    SVC_LIST_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list 2>&1 || true)
+    SVC_LIST_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list 2>&1 || true)  # WHY: test probe — capturing output regardless of exit code for assertion below
     if echo "$SVC_LIST_OUTPUT" | grep -q "ID.*Name.*Status.*Running.*PID"; then
         assert_pass "svc list: table headers present"
     else
@@ -457,7 +457,7 @@ SUDO_WRAPPER
         assert_fail "svc list: no unknown services" "Output contains 'unknown' (likely jq parse failure)"
     fi
 
-    SVC_JSON_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list --json 2>&1 || true)
+    SVC_JSON_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list --json 2>&1 || true)  # WHY: test probe — capturing output regardless of exit code for assertion below
     if echo "$SVC_JSON_OUTPUT" | jq -e '.version == "1"' >/dev/null 2>&1; then
         assert_pass "svc list --json: valid JSON with version"
     else
@@ -476,10 +476,10 @@ SUDO_WRAPPER
     fi
 
     # Regression: log-config shows correct capture values for all services (Fix 1 + Fix 3)
-    SVC_LOG_CONFIG_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config 2>&1 || true)
+    SVC_LOG_CONFIG_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config 2>&1 || true)  # WHY: test probe — capturing output regardless of exit code for assertion below
     if echo "$SVC_LOG_CONFIG_OUTPUT" | grep -q "capture: all"; then
-        capture_all_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: all" || true)
-        capture_none_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: none" || true)
+        capture_all_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: all" || true)  # WHY: grep -c exits 1 when count is 0 (no match); expected when services lack capture field
+        capture_none_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: none" || true)  # WHY: same as above
         if [ "$capture_all_lines" -gt 0 ] && [ "$capture_none_lines" -eq 0 ]; then
             assert_pass "svc log-config: all services have capture=all"
         else
@@ -489,7 +489,7 @@ SUDO_WRAPPER
         assert_fail "svc log-config: all services have capture=all" "No capture=all found in output"
     fi
 
-    SVC_LOG_CONFIG_JSON=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config --json 2>&1 || true)
+    SVC_LOG_CONFIG_JSON=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config --json 2>&1 || true)  # WHY: test probe — capturing output regardless of exit code for assertion below
     if echo "$SVC_LOG_CONFIG_JSON" | jq -e --slurp 'all(.[]; .[].capture == "all")' >/dev/null 2>&1; then
         assert_pass "svc log-config --json: all capture=all via jq"
     else
@@ -502,7 +502,7 @@ SUDO_WRAPPER
     fi
 
     # Regression: logs listing shows all services with capture=all (Fix 2 + Fix 4)
-    SVC_LOGS_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" logs 2>&1 || true)
+    SVC_LOGS_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" logs 2>&1 || true)  # WHY: test probe — capturing output regardless of exit code for assertion below
     if echo "$SVC_LOGS_OUTPUT" | grep -q "capture=all"; then
         assert_pass "svc logs: listing shows capture=all"
     else
@@ -517,7 +517,7 @@ SUDO_WRAPPER
     done
 fi
 # Clean up sudo wrapper used by svc tests above.
-rm -rf "${SUDO_WRAPPER_DIR:-}" 2>/dev/null || true
+rm -rf "${SUDO_WRAPPER_DIR:-}" 2>/dev/null || true  # WHY: cleanup trap — dir may already have been cleaned up on test failure
 
 # jq unit test: do_log_config filter resolves fields correctly (Fix 1 regression)
 # shellcheck disable=SC2016 # $svc/$platform are jq variables, not shell variables

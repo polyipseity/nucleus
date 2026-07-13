@@ -62,12 +62,12 @@ Located in `tests/scripts/script-validation-tests.sh`, run via bash in CI.
 2. **Shebang Verification**: All scripts start with `#!/bin/bash` or `#!/bin/sh`
 3. **Executable Bit Validation**: `.sh` files tracked with `100755` permission
 4. **Dependency Availability**: Check for nix, bash, PowerShell availability
-5. **Error Handling**: Verify scripts don't use bare `|| true` without comments
+5. **Error Handling**: Verify scripts have `set -e`, `|| exit`, or `|| return` patterns
 6. **Documentation**: Measure comment coverage and usage documentation
 7. **Dangerous Patterns**: Detect unquoted variables, unsafe `rm -rf`, unescaped globs
 8. **Shell Portability**: Validate scripts work on macOS (zsh/bash) and Linux
 
-**Scripts Tested**: `bootstrap.sh`, `apply.sh`, `health-check.sh`, `update.sh`, `check.sh`
+**Scripts Tested**: `bootstrap.sh`, `apply.sh`, `health-check.sh`, `update.sh`, `check.sh`, `svc.sh`, `gc.sh`, `ai-sync.sh`, `cloud-setup.sh`, `replica-reset.sh`, `replica-sync.sh`, `check-sh.sh`, `gs-pdf-opt.sh`, `camilladsp-daemon.sh`, `camilladsp-heartbeat.sh`, `service-watchdog.sh`
 
 **Shell Test Totals**: **8 validation categories** covering all deployment scripts
 
