@@ -153,5 +153,14 @@ Describe "Windows env var parity with Nix catalog" {
       $content = Get-Content -Raw -Path $applyPath
       $content | Should -Match ('NUCLEUS_HOST.*=.*"Windows"')
     }
+
+    It "apply.ps1 persists NUCLEUS_REPO_ROOT via SetEnvironmentVariable" {
+      $applyPath = Join-Path $RepoRoot "src\hosts\Windows\apply.ps1"
+      $content = Get-Content -Raw -Path $applyPath
+      # NUCLEUS_REPO_ROOT is set dynamically per-activation (not via DSC),
+      # so the test verifies the SetEnvironmentVariable call exists rather
+      # than checking a specific value.
+      $content | Should -Match ('SetEnvironmentVariable\("NUCLEUS_REPO_ROOT"')
+    }
   }
 }
