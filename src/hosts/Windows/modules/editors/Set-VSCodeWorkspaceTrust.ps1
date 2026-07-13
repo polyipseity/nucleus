@@ -137,7 +137,7 @@ for (const dbPath of dbPaths) {
             $env:PATH = "$bunBin;$env:PATH"
         }
 
-        $bunCmd = Get-Command -Name "bun" -ErrorAction SilentlyContinue  # WHY: probe — bun may not be installed; $null check below handles absence
+        $bunCmd = Get-Command -Name "bun" -ErrorAction SilentlyContinue  # undoc-supp: probe — bun may not be installed; $null check below handles absence
         if ($null -eq $bunCmd) {
             Write-Warning "vscode-workspace-trust: Set-VSCodeWorkspaceTrust: bun not found in PATH; skipping workspace trust write"
             return

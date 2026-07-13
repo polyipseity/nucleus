@@ -56,7 +56,7 @@ $NoBrew | Out-Null
 
 $repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path }
 
-# WHY: probe whether tool is installed; Get-Command throws when absent.
+# undoc-supp: probe whether tool is installed; Get-Command throws when absent.
 if (-not $NoFlake -and (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue)) {
   $flakeOutput = & nix.exe --option warn-dirty false flake update --flake (Join-Path -Path $repoRoot -ChildPath 'src') 2>&1
   if ($LASTEXITCODE -ne 0) {
@@ -70,7 +70,7 @@ if (-not $NoFlake -and (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinu
   }
 }
 
-# WHY: probe whether tool is installed; Get-Command throws when absent.
+# undoc-supp: probe whether tool is installed; Get-Command throws when absent.
 if (-not $NoSops -and -not (Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue)) {
   throw 'nucleus: sops.exe is required for update secret rewrap step.'
 }

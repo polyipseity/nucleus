@@ -105,7 +105,7 @@ function Sync-OpenSSHServer {
 
   [System.IO.File]::WriteAllLines($sshdConfigPath, $retainedConfigLines, [System.Text.UTF8Encoding]::new($false))
 
-  # WHY: probe whether sshd is installed; Get-Service throws when absent.
+  # undoc-supp: probe whether sshd is installed; Get-Service throws when absent.
   $sshdService = Get-Service -Name 'sshd' -ErrorAction SilentlyContinue
   if ($null -eq $sshdService) {
     Write-Output "$($PSStyle.Formatting.Warning)OpenSSH service not installed; skipping service and firewall convergence.$($PSStyle.Reset)"

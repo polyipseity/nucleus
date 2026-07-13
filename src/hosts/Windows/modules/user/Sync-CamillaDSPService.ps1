@@ -40,7 +40,7 @@ function Sync-CamillaDSPService {
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   if (-not $Enabled) {
-    $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # WHY: probe — task may not be registered yet; $null check below handles absence
+    $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # undoc-supp: probe — task may not be registered yet; $null check below handles absence
     if ($null -ne $existingTask) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
       Write-Output "camilladsp: removed scheduled task '$taskName' (disabled)"
@@ -49,7 +49,7 @@ function Sync-CamillaDSPService {
   }
 
   # Find the camilladsp binary.
-  # WHY: probe whether binary is installed; Get-Command throws when absent.
+  # undoc-supp: probe whether binary is installed; Get-Command throws when absent.
   $camilladspCmd = Get-Command -Name "camilladsp.exe" -ErrorAction SilentlyContinue
   if ($null -eq $camilladspCmd) {
     Write-Output "camilladsp: binary not found in PATH; run Invoke-CamillaDSPSetup first"
@@ -59,7 +59,7 @@ function Sync-CamillaDSPService {
 
   # Read port from services.json (single source of truth).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
-  # WHY: probe — services.json may not exist yet on first provision; fallback to default port
+  # undoc-supp: probe — services.json may not exist yet on first provision; fallback to default port
   $svc = Get-Content -Raw (Join-Path $repoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
   $wsPort = if ($svc.camilladsp.network.websocket.port) { $svc.camilladsp.network.websocket.port } else { 1234 }
 
@@ -157,7 +157,7 @@ $heartbeatTimer = [System.Threading.Timer]::new({
   $cf, $p, $ncf = $s
   # Check runtime toggle on every tick.
   if (Test-Path $ncf) {
-    # WHY: probe — no-config file may not exist; $null check below handles absence
+    # undoc-supp: probe — no-config file may not exist; $null check below handles absence
     $nc = Get-Content -Raw $ncf -ErrorAction SilentlyContinue | ConvertFrom-Json
     if ($null -ne $nc.camilladsp.heartbeat -and -not $nc.camilladsp.heartbeat) { return }
   }
@@ -203,7 +203,7 @@ $heartbeatTimer.Dispose()
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
 
-  $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # WHY: probe — task may not be registered yet; $null check below handles absence
+  $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # undoc-supp: probe — task may not be registered yet; $null check below handles absence
   if ($null -ne $existingTask) {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
   }

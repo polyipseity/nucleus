@@ -49,7 +49,7 @@ function Test-NucleusWingetPackageInstalled {
         [string]$Id
     )
 
-    # WHY: probe — package may not be installed.
+    # undoc-supp: probe — package may not be installed.
     $pkg = winget list --exact -q $Id 2>$null | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     return @($pkg).Count -gt 0
 }

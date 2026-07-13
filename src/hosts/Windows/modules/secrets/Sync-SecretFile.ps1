@@ -212,13 +212,13 @@ function Sync-SecretFile {
           # This evicts any pre-placed key already loaded in the agent before
           # the managed key was materialized.  Soft-failure so apply proceeds
           # even when no agent is running.  Parity with POSIX sshKeyAdopt behavior.
-          $sshAddCommand = Get-Command 'ssh-add' -ErrorAction SilentlyContinue  # WHY: probe — ssh-add may not be installed; $null check below handles absence
+          $sshAddCommand = Get-Command 'ssh-add' -ErrorAction SilentlyContinue  # undoc-supp: probe — ssh-add may not be installed; $null check below handles absence
           if ($null -ne $sshAddCommand) {
             # 2>$null is intentional: ssh-add -D emits "Could not connect to
             # your authentication agent" when no agent is running.  That
             # failure is benign — nothing to flush — and the noise would
             # obscure the meaningful rotation log line below.
-            & $sshAddCommand.Source -D 2>$null | Out-Null  # WHY: agent may not be running; expected on first provision before key materialization
+            & $sshAddCommand.Source -D 2>$null | Out-Null  # undoc-supp: agent may not be running; expected on first provision before key materialization
             Write-Output "$($PSStyle.Foreground.Cyan)  Flushed SSH agent due to key rotation ($oldSshFingerprint -> $newSshFingerprint)$($PSStyle.Reset)"
           }
         }

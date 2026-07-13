@@ -175,7 +175,7 @@ if section_enabled uv; then
     fi
     ver="${ver#v}"
     [ -n "$pkg" ] && [ -n "$ver" ] && uv_installed["$pkg"]="$ver"
-  # WHY: uv may not be installed yet; empty tool list is expected.
+  # undoc-supp: uv may not be installed yet; empty tool list is expected.
   done < <(uv tool list 2>/dev/null || true)
 
   while IFS= read -r key; do
@@ -252,10 +252,10 @@ fi
 if section_enabled vscode; then
   vscode_output=""
   if command -v code >/dev/null 2>&1; then
-    # WHY: VS Code CLI may not be installed; empty extension list is expected.
+    # undoc-supp: VS Code CLI may not be installed; empty extension list is expected.
     vscode_output=$(code --list-extensions --show-versions 2>/dev/null || true)
   elif command -v code-insiders >/dev/null 2>&1; then
-    # WHY: VS Code CLI may not be installed; empty extension list is expected.
+    # undoc-supp: VS Code CLI may not be installed; empty extension list is expected.
     vscode_output=$(code-insiders --list-extensions --show-versions 2>/dev/null || true)
   fi
 
@@ -307,10 +307,10 @@ if section_enabled ollama; then
       old_digest=$(printf '%s\n' "$entry" | jq -r '.digest // empty')
 
       # Query ollama for current model info
-      # WHY: model may not be pulled yet; info probe expected to fail.
+      # undoc-supp: model may not be pulled yet; info probe expected to fail.
       ollama_info=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama show "$name:$tag" --format json 2>/dev/null || true)
       if [ -n "$ollama_info" ]; then
-        new_digest=$(printf '%s\n' "$ollama_info" | jq -r '.digest // empty' 2>/dev/null || true) # WHY: jq may error on empty/malformed input from failed ollama probe; null check downstream handles the empty case.
+        new_digest=$(printf '%s\n' "$ollama_info" | jq -r '.digest // empty' 2>/dev/null || true) # undoc-supp: jq may error on empty/malformed input from failed ollama probe; null check downstream handles the empty case.
         if [ -n "$new_digest" ] && [ "$new_digest" != "$old_digest" ]; then
           log_update "ollama ($host)" "$name:$tag" "${old_digest:-none}" "$new_digest"
           if [ -n "$old_digest" ]; then
@@ -396,7 +396,7 @@ if section_enabled vm-setup || section_enabled tart-images; then
     fi
 
     # Get an anonymous GHCR token and query the manifest
-    # WHY: network/registry may not be reachable; [ -z ] guard handles failure.
+    # undoc-supp: network/registry may not be reachable; [ -z ] guard handles failure.
     ghcr_token=$(curl -s "https://ghcr.io/token?service=ghcr.io\&scope=repository:${image_repo}:pull" 2>/dev/null | grep -o '"token":"[^"]*"' | cut -d'"' -f4 || true)
     if [ -z "$ghcr_token" ]; then
       warn "could not get GHCR token for $old_image, skipping"
@@ -408,7 +408,7 @@ if section_enabled vm-setup || section_enabled tart-images; then
       -H "Accept: application/vnd.oci.image.index.v1+json" \
       -H "Accept: application/vnd.oci.image.manifest.v1+json" \
       -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-      "https://ghcr.io/v2/${image_repo}/manifests/latest" 2>/dev/null | grep -i "^docker-content-digest:" | grep -oE 'sha256:[a-f0-9]{64}' || true) # WHY: network/registry may not be reachable; [ -z ] guard handles failure.
+      "https://ghcr.io/v2/${image_repo}/manifests/latest" 2>/dev/null | grep -i "^docker-content-digest:" | grep -oE 'sha256:[a-f0-9]{64}' || true) # undoc-supp: network/registry may not be reachable; [ -z ] guard handles failure.
 
     if [ -z "$new_digest" ]; then
       warn "could not fetch digest for $old_image, skipping"
@@ -426,7 +426,7 @@ fi
 
 # Compute the diff for --verify mode
 if $VERIFY; then
-  # WHY: diff exits 1 when files differ; output is needed for the [ -n "$_diff" ] check.
+  # undoc-supp: diff exits 1 when files differ; output is needed for the [ -n "$_diff" ] check.
   _diff=$(diff <(printf '%s\n' "$data") "$LOCKFILE_ABS" 2>/dev/null || true)
   if [ -n "$_diff" ]; then
     say "lockfile out of date — changes would be made:"

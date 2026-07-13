@@ -62,7 +62,7 @@ MOCKSCRIPT
 test_prefix_derivation() {
     local result
     # shellcheck disable=SC2016 # $_nuc_prefix is expanded inside mock_nucleus_script, not here
-    result=$(mock_nucleus_script 'printf "%s" "$_nuc_prefix"' 2>/dev/null) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+    result=$(mock_nucleus_script 'printf "%s" "$_nuc_prefix"' 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [ "$result" = "foo" ]; then
         assert_pass "_nuc_prefix derives 'foo' from 'nucleus-foo'"
     else
@@ -75,7 +75,7 @@ test_prefix_derivation() {
 # ---------------------------------------------------------------------------
 test_say_stdout() {
     local result
-    result=$(mock_nucleus_script 'say "hello world"' 2>/dev/null) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+    result=$(mock_nucleus_script 'say "hello world"' 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [ "$result" = "foo: hello world" ]; then
         assert_pass "say writes 'foo: hello world' to stdout"
     else
@@ -85,7 +85,7 @@ test_say_stdout() {
 
 test_say_multiple_args() {
     local result
-    result=$(mock_nucleus_script 'say "hello" "world"' 2>/dev/null) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+    result=$(mock_nucleus_script 'say "hello" "world"' 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [ "$result" = "foo: hello world" ]; then
         assert_pass "say joins multiple arguments"
     else
@@ -128,7 +128,7 @@ test_warn_stderr() {
 # ---------------------------------------------------------------------------
 test_dry_run_stdout() {
     local result
-    result=$(mock_nucleus_script 'dry_run "would do x"' 2>/dev/null) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+    result=$(mock_nucleus_script 'dry_run "would do x"' 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [ "$result" = "foo: [dry-run] would do x" ]; then
         assert_pass "dry_run writes 'foo: [dry-run] ...' to stdout"
     else
@@ -141,7 +141,7 @@ test_dry_run_stdout() {
 # ---------------------------------------------------------------------------
 test_nuc_done_stdout() {
     local result
-    result=$(mock_nucleus_script 'nuc_done' 2>/dev/null) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+    result=$(mock_nucleus_script 'nuc_done' 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [ "$result" = "foo: done" ]; then
         assert_pass "nuc_done writes 'foo: done' to stdout"
     else
@@ -157,7 +157,7 @@ test_section_format() {
     result=$(mock_nucleus_script '
 section 1 "first"
 section 2 "second"
-' 2>/dev/null) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+' 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if echo "$result" | grep -q "=== \[1\] first ===" && echo "$result" | grep -q "=== \[2\] second ==="; then
         assert_pass "section outputs correct format with step numbers"
     else
@@ -167,7 +167,7 @@ section 2 "second"
 
 test_section_newline_before() {
     local result
-    result=$(mock_nucleus_script 'section 1 "test"' 2>/dev/null) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+    result=$(mock_nucleus_script 'section 1 "test"' 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if echo "$result" | grep -q "^$"; then
         assert_pass "section starts with a blank line"
     else
@@ -180,7 +180,7 @@ test_section_newline_before() {
 # ---------------------------------------------------------------------------
 test_say_empty() {
     local result
-    result=$(mock_nucleus_script 'say ""' 2>/dev/null) || true  # WHY: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+    result=$(mock_nucleus_script 'say ""' 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [ "$result" = "foo: " ]; then
         assert_pass "say handles empty message"
     else

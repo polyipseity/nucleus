@@ -29,7 +29,7 @@ if [ "$HAS_BREW" -eq 1 ]; then
     [ -z "$key" ] && continue
     expected="$(printf '%s' "$LOCKFILE_DATA" | jq -r --arg k "$key" '(.homebrew.brews // {})[$k] // empty')"
     [ -z "$expected" ] && continue
-    # WHY: package may not be installed; brew list exits 1 for absent items.
+    # undoc-supp: package may not be installed; brew list exits 1 for absent items.
     installed="$(brew list --versions "$key" 2>/dev/null | awk '{print $NF}' || true)"
     if [ -n "$installed" ] && [ "$installed" != "$expected" ]; then
       WARNINGS="${WARNINGS}  homebrew.brews.$key: expected $expected, installed $installed${NL}"
@@ -44,7 +44,7 @@ if [ "$HAS_BREW" -eq 1 ]; then
     [ -z "$key" ] && continue
     expected="$(printf '%s' "$LOCKFILE_DATA" | jq -r --arg k "$key" '(.homebrew.casks // {})[$k] // empty')"
     [ -z "$expected" ] && continue
-    # WHY: cask may not be installed; brew list exits 1 for absent items.
+    # undoc-supp: cask may not be installed; brew list exits 1 for absent items.
     installed="$(brew list --cask --versions "$key" 2>/dev/null | awk '{print $NF}' || true)"
     if [ -n "$installed" ] && [ "$installed" != "$expected" ]; then
       WARNINGS="${WARNINGS}  homebrew.casks.$key: expected $expected, installed $installed${NL}"
@@ -55,7 +55,7 @@ KEYEOF
 fi
 
 if [ "$HAS_MAS" -eq 1 ]; then
-  # WHY: mas app may not be installed; mas list exits 1 for absent items.
+  # undoc-supp: mas app may not be installed; mas list exits 1 for absent items.
   mas_list="$(mas list 2>/dev/null || true)"
   while IFS= read -r key; do
     [ -z "$key" ] && continue

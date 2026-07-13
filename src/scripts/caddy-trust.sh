@@ -61,7 +61,7 @@ done
 # stuck in penalty box (EX_CONFIG). Attempt a fresh bootstrap to recover.
 if [ "$_ct_mode" = "sudo" ]; then
   printf '%s\n' "caddy-trust: attempting launchd service recovery via bootout/bootstrap..." >&2
-  # WHY: HTTPS proxy service may not be loaded; bootout on absent service exits 1.
+  # undoc-supp: HTTPS proxy service may not be loaded; bootout on absent service exits 1.
   sudo launchctl bootout system/org.nixos.httpsProxy 2>/dev/null || true
   sleep 1
   if sudo launchctl bootstrap system /Library/LaunchDaemons/org.nixos.httpsProxy.plist 2>/dev/null; then

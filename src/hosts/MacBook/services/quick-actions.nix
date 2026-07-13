@@ -167,7 +167,7 @@ in
     ${builtins.concatStringsSep "\n" (
       map (qa: ''
         /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"${qa.enablementKey}\"" \
-          ~/Library/Preferences/pbs.plist 2>/dev/null || true  # WHY: key may not exist on first apply
+          ~/Library/Preferences/pbs.plist 2>/dev/null || true  # undoc-supp: key may not exist on first apply
       '') removedNucleusQuickActions
     )}
     # Second pass: remove workflow dirs for entries that have one.
@@ -175,7 +175,7 @@ in
       map (qa: ''
         qa_path="$QUICK_ACTION_DIR/${qa.dir}"
         if [ -d "$qa_path" ]; then
-          chmod -R +w "$qa_path" 2>/dev/null || true  # WHY: dir may not exist on first apply
+          chmod -R +w "$qa_path" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
           rm -rf "$qa_path"
         fi
       '') (builtins.filter (qa: qa ? dir) removedNucleusQuickActions)
@@ -187,7 +187,7 @@ in
         wf_dir="$QUICK_ACTION_DIR/${qa.dir}"
         store_path="${qa.source}"
         mkdir -p "$QUICK_ACTION_DIR"
-        chmod -R +w "$wf_dir" 2>/dev/null || true  # WHY: dir may not exist on first apply
+        chmod -R +w "$wf_dir" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
         rm -rf "$wf_dir"
         cp -R "$store_path" "$QUICK_ACTION_DIR/"
         # Enable in presentation_modes format (macOS 14+).

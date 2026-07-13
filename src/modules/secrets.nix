@@ -281,12 +281,12 @@ lib.mkIf isPrimaryUser {
     # Extract the primary fingerprint from the managed secret without importing.
     # The `exit` in awk stops at the first fpr record, giving the primary key
     # fingerprint rather than a subkey fingerprint.
-    # WHY: GPG may emit non-zero exit for malformed/dry-run key material during
+    # undoc-supp: GPG may emit non-zero exit for malformed/dry-run key material during
     # import-options dry-run; the [ -z ] guard below catches and reports
     # an empty result explicitly.
     first_key_fingerprint="$(${pkgs.gnupg}/bin/gpg --batch --import-options show-only --dry-run --with-colons --import "${
       config.sops.secrets.${gpgSecretName}.path
-      # WHY: GPG may emit non-zero exit for malformed/dry-run key material during import-options dry-run; the [ -z ] guard below catches and reports an empty result explicitly.
+      # undoc-supp: GPG may emit non-zero exit for malformed/dry-run key material during import-options dry-run; the [ -z ] guard below catches and reports an empty result explicitly.
     }" | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')" || true
 
     # Remove stale managed keys: those we imported previously (per manifest)
@@ -370,7 +370,7 @@ lib.mkIf isPrimaryUser {
        # upstream sops-nix error with a different message.
        echo "secrets: managed SSH public key not found at $ssh_pub_path; skipping fingerprint adoption." >&2
      else
-       # WHY: SSH public key may not exist yet on first provision; ssh-keygen -lf exits 1 for missing/invalid keys.
+       # undoc-supp: SSH public key may not exist yet on first provision; ssh-keygen -lf exits 1 for missing/invalid keys.
        new_fingerprint="$(${pkgs.openssh}/bin/ssh-keygen -lf "$ssh_pub_path" | /usr/bin/awk '{print $2}')" || true
 
        if [ -z "$new_fingerprint" ]; then
@@ -389,7 +389,7 @@ lib.mkIf isPrimaryUser {
            # AddKeysToAgent=yes in the SSH config re-loads the new key on the
            # next outbound SSH connection.
             echo "secrets: managed SSH key fingerprint changed ($old_fingerprint -> $new_fingerprint); flushing SSH agent." >&2
-            # WHY: ssh-add -D fails when no agent is running; benign since nothing needs flushing.
+            # undoc-supp: ssh-add -D fails when no agent is running; benign since nothing needs flushing.
             ${pkgs.openssh}/bin/ssh-add -D 2>/dev/null || true
          fi
 
@@ -515,7 +515,7 @@ lib.mkIf isPrimaryUser {
       # launching a new agent daemon (which deadlocks on macOS when the agent
       # socket directory is not yet ready during non-interactive activation).
       _vsd_gpg_all_secret_fprs="$(GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
-        # WHY: GnuPG may fail if GNUPGHOME doesn't exist yet on first activation; the subsequent grep check handles empty output.
+        # undoc-supp: GnuPG may fail if GNUPGHOME doesn't exist yet on first activation; the subsequent grep check handles empty output.
         ${pkgs.gnupg}/bin/gpg --with-colons --no-autostart --list-secret-keys)" || true
       if ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_managed_fpr"; then
         echo "secrets: ERROR — managed GPG key $_vsd_managed_fpr not in keyring after gpgImport." >&2
@@ -542,7 +542,7 @@ lib.mkIf isPrimaryUser {
           # Binary SOPS files use JSON format ("fp": "HEX") while YAML SOPS files
           # use "    fp: HEX".  The combined -E pattern matches both; the second
           # grep -oE extracts the hex fingerprint directly, avoiding the need for
-          # WHY: grep may find no match; soft-fail prevents silent set -e exit, allowing [ -z ] below to report cleanly.
+          # undoc-supp: grep may find no match; soft-fail prevents silent set -e exit, allowing [ -z ] below to report cleanly.
           _vsd_sops_gpg_fp="$(/usr/bin/grep -m1 -E '[[:space:]]fp: |"fp": ' "${path}" | /usr/bin/grep -oE '[0-9A-Fa-f]{40,}')" || true
           if [ -z "$_vsd_sops_gpg_fp" ] || \
               ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_sops_gpg_fp"; then
@@ -567,7 +567,7 @@ lib.mkIf isPrimaryUser {
       # No private key material is accessed.
       _vsd_ssh_age_pub=""
       _vsd_ssh_failures=""
-      # WHY: ssh-to-age may fail if the SSH public key hasn't been materialized yet (first bootstrap); empty result is handled below.
+      # undoc-supp: ssh-to-age may fail if the SSH public key hasn't been materialized yet (first bootstrap); empty result is handled below.
       _vsd_ssh_age_pub="$(${pkgs.ssh-to-age}/bin/ssh-to-age -i "${sshPublicKeyPath}")" || true
       if [ -z "$_vsd_ssh_age_pub" ]; then
         echo "secrets: ERROR — personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure ${sshPublicKeyPath} is a valid Ed25519 public key." >&2

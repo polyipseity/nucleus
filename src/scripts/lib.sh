@@ -65,7 +65,7 @@ derive_repo_root() {
     fi
   done
   if command -v git >/dev/null 2>&1; then
-    _drr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || true # WHY: git rev-parse may fail outside a git repo; fallback continues with error message.
+    _drr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || true # undoc-supp: git rev-parse may fail outside a git repo; fallback continues with error message.
     if [ -n "${_drr_git_root:-}" ] && [ -f "$_drr_git_root/src/flake.nix" ]; then
       printf '%s\n' "$_drr_git_root"
       return 0
@@ -176,7 +176,7 @@ launchctl_target() {
 refresh_cfprefsd() {
   case "$(uname -s)" in
     Darwin)
-      # WHY: cfprefsd may not be running; killall exits 1 for absent processes.
+      # undoc-supp: cfprefsd may not be running; killall exits 1 for absent processes.
       /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
       ;;
   esac
@@ -188,7 +188,7 @@ refresh_cfprefsd() {
 refresh_pbs() {
   case "$(uname -s)" in
     Darwin)
-      # WHY: pbs may not be running; killall exits 1 for absent processes.
+      # undoc-supp: pbs may not be running; killall exits 1 for absent processes.
       /usr/bin/killall -KILL pbs 2>/dev/null || true
       ;;
   esac
@@ -200,7 +200,7 @@ refresh_pbs() {
 refresh_lsd() {
   case "$(uname -s)" in
     Darwin)
-      # WHY: lsd may have already been killed by a previous step; best-effort db rebuild.
+      # undoc-supp: lsd may have already been killed by a previous step; best-effort db rebuild.
       /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -domain user 2>/dev/null || true
       ;;
   esac
@@ -211,7 +211,7 @@ refresh_lsd() {
 refresh_finder() {
   case "$(uname -s)" in
     Darwin)
-      # WHY: Finder may not be running on headless session; killall exits 1 for absent processes.
+      # undoc-supp: Finder may not be running on headless session; killall exits 1 for absent processes.
       /usr/bin/killall Finder 2>/dev/null || true
       ;;
   esac
@@ -222,7 +222,7 @@ refresh_finder() {
 refresh_dock() {
   case "$(uname -s)" in
     Darwin)
-      # WHY: Dock may not be running on headless session; killall exits 1 for absent processes.
+      # undoc-supp: Dock may not be running on headless session; killall exits 1 for absent processes.
       /usr/bin/killall Dock 2>/dev/null || true
       ;;
   esac
@@ -236,14 +236,14 @@ refresh_dock() {
 refresh_services_menu() {
   case "$(uname -s)" in
     Darwin)
-      # WHY: see refresh_cfprefsd — daemon may not be running.
+      # undoc-supp: see refresh_cfprefsd — daemon may not be running.
       /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
-      # WHY: see refresh_lsd — LS db may already be fresh.
+      # undoc-supp: see refresh_lsd — LS db may already be fresh.
       /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -domain user 2>/dev/null || true
-      # WHY: see refresh_pbs — pasteboard server may not be running.
+      # undoc-supp: see refresh_pbs — pasteboard server may not be running.
       /usr/bin/killall -KILL pbs 2>/dev/null || true
       /bin/sleep 1
-      # WHY: see refresh_finder — Finder may not be running.
+      # undoc-supp: see refresh_finder — Finder may not be running.
       /usr/bin/killall Finder 2>/dev/null || true
       ;;
   esac
@@ -282,7 +282,7 @@ rotate_log_file() {
 
     # Compress the newest archive if requested
     if [ "$_rlf_compress" = "true" ]; then
-      # WHY: archived log may not exist yet on first rotation; gzip -f exits 1 for missing files.
+      # undoc-supp: archived log may not exist yet on first rotation; gzip -f exits 1 for missing files.
       gzip -f "$_rlf_logfile.1" 2>/dev/null || true
     fi
   else
@@ -315,18 +315,18 @@ kill_processes_on_port() {
 
   require_command lsof
 
-  # WHY: no process may be listening on this port; empty result is expected.
+  # undoc-supp: no process may be listening on this port; empty result is expected.
   _klp_pids="$(lsof -ti :"$_klp_port" 2>/dev/null)" || true
   [ -z "$_klp_pids" ] && return 0
 
   # SIGTERM
-  # WHY: process may have already exited before SIGTERM arrives.
+  # undoc-supp: process may have already exited before SIGTERM arrives.
   printf '%s\n' "$_klp_pids" | xargs kill -TERM 2>/dev/null || true
 
   # Wait up to 2s (4 x 0.5s)
   _klp_i=0
   while [ "$_klp_i" -lt 4 ]; do
-    # WHY: no process may be listening on this port; empty result is expected.
+    # undoc-supp: no process may be listening on this port; empty result is expected.
     _klp_pids="$(lsof -ti :"$_klp_port" 2>/dev/null)" || true
     [ -z "$_klp_pids" ] && return 0
     sleep 0.5
@@ -334,11 +334,11 @@ kill_processes_on_port() {
   done
 
   # SIGKILL survivors
-  # WHY: process may have already exited before SIGKILL arrives.
+  # undoc-supp: process may have already exited before SIGKILL arrives.
   printf '%s\n' "$_klp_pids" | xargs kill -KILL 2>/dev/null || true
   sleep 0.5
 
-  # WHY: no process may be listening on this port; empty result is expected.
+  # undoc-supp: no process may be listening on this port; empty result is expected.
   _klp_pids="$(lsof -ti :"$_klp_port" 2>/dev/null)" || true
   [ -z "$_klp_pids" ] && return 0
   return 1
@@ -378,5 +378,5 @@ extract_ports() {
 
   printf '%s\n' "$_ep_json" | jq -r '
     .network // empty | to_entries[] | "\(.value.host // "0.0.0.0") \(.value.port)"
-  ' 2>/dev/null || true # WHY: service entry may not have a network block; jq returns empty, not an error.
+  ' 2>/dev/null || true # undoc-supp: service entry may not have a network block; jq returns empty, not an error.
 }

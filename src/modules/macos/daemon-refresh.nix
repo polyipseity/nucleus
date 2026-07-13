@@ -15,27 +15,27 @@ rec {
   # ~/Library/Preferences/*.plist on next access.
   # Source: https://www.manpagez.com/man/1/defaults/
   refreshCfprefsd = ''
-    /usr/bin/killall -KILL cfprefsd 2>/dev/null || true  # WHY: daemon may not be running; exit 1 would abort the activation
+    /usr/bin/killall -KILL cfprefsd 2>/dev/null || true  # undoc-supp: daemon may not be running; exit 1 would abort the activation
   '';
 
   # Kill pbs (Pasteboard Server + Services manager).
   # Caches NSServicesStatus (service enablement toggles in pbs.plist) at
   # startup. Kill forces re-read so new/changed services appear in menus.
   refreshPbs = ''
-    /usr/bin/killall -KILL pbs 2>/dev/null || true  # WHY: daemon may not be running; exit 1 would abort the activation
+    /usr/bin/killall -KILL pbs 2>/dev/null || true  # undoc-supp: daemon may not be running; exit 1 would abort the activation
   '';
 
   # Restart Finder via killall. Simpler than launchctl kickstart but loses
   # window state. Used for services-menu refreshes where window state is
   # irrelevant.
   refreshFinderKillall = ''
-    /usr/bin/killall Finder 2>/dev/null || true  # WHY: Finder may not be running
+    /usr/bin/killall Finder 2>/dev/null || true  # undoc-supp: Finder may not be running
   '';
 
   # Restart Finder via launchctl kickstart. Preserves window state.
   # Preferred for desktop configuration reloads.
   refreshFinderLaunchd = ''
-    /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder" 2>/dev/null || true  # WHY: GUI session may not be ready; launchctl can fail silently
+    /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder" 2>/dev/null || true  # undoc-supp: GUI session may not be ready; launchctl can fail silently
   '';
 
   # Convenience alias — favors launchctl for desktop refreshes.
@@ -43,24 +43,24 @@ rec {
 
   # Restart sharedfilelistd (Finder sidebar daemon).
   refreshSharedFilelistd = ''
-    /usr/bin/killall sharedfilelistd 2>/dev/null || true  # WHY: daemon may not be running
+    /usr/bin/killall sharedfilelistd 2>/dev/null || true  # undoc-supp: daemon may not be running
   '';
 
   # Restart Dock.
   refreshDock = ''
-    /usr/bin/killall Dock 2>/dev/null || true  # WHY: Dock may not be running
+    /usr/bin/killall Dock 2>/dev/null || true  # undoc-supp: Dock may not be running
   '';
 
   # Restart SystemUIServer (menu bar extras) and WindowManager (Spaces).
   refreshSystemUI = ''
     for _dr_proc in SystemUIServer WindowManager; do
-      /usr/bin/killall "$_dr_proc" 2>/dev/null || true  # WHY: daemon may not be running on this macOS version
+      /usr/bin/killall "$_dr_proc" 2>/dev/null || true  # undoc-supp: daemon may not be running on this macOS version
     done
   '';
 
   # Restart TISwitcher (input-source switcher daemon).
   refreshTISwitcher = ''
-    /usr/bin/killall -HUP TISwitcher 2>/dev/null || true  # WHY: TISwitcher may not be running
+    /usr/bin/killall -HUP TISwitcher 2>/dev/null || true  # undoc-supp: TISwitcher may not be running
   '';
 
   # Wait for killed daemons to flush and restart.

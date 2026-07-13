@@ -541,7 +541,7 @@ in
                   # value quietly and only log when we actually mutate state.
                   current_mark="$(
                     /usr/bin/xattr -p com.apple.fileprovider.ignore#P "$normalized_path" 2>/dev/null
-                    # WHY: xattr may not be set yet on newly created path; absence is not an error — the check below gates on value "1".
+                    # undoc-supp: xattr may not be set yet on newly created path; absence is not an error — the check below gates on value "1".
                   )" || true
                   if [[ "$current_mark" == "1" ]]; then
                     return 0

@@ -431,7 +431,7 @@ $machineSshHostKeyPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_ho
 $primarySshKeyPath = Join-Path -Path $HOME -ChildPath ".ssh\ssh_personal_$PrimaryUsername"
 
 # Resolve managed executables before running any decryption/materialization.
-# WHY: probe — SOPS WinGet package directory may not exist; $null check handles absence.
+# undoc-supp: probe — SOPS WinGet package directory may not exist; $null check handles absence.
 $sopsPackageDir = Get-ChildItem -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath "Microsoft\WinGet\Packages\SecretsOPerationS.SOPS_*") -Directory -ErrorAction SilentlyContinue |
   Sort-Object -Property Name -Descending |
   Select-Object -First 1
@@ -443,24 +443,24 @@ if ($null -ne $sopsPackageDir) {
 
 $sopsCandidates = @(
   $sopsExecutableFromWinget,
-  # WHY: probe whether sops is on PATH; Get-Command throws when absent.
+  # undoc-supp: probe whether sops is on PATH; Get-Command throws when absent.
   (Get-Command -Name "sops.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
 $gpgCandidates = @(
   (Join-Path -Path $env:ProgramFiles -ChildPath "GnuPG\bin\gpg.exe"),
-  # WHY: probe whether gpg is on PATH; Get-Command throws when absent.
+  # undoc-supp: probe whether gpg is on PATH; Get-Command throws when absent.
   (Get-Command -Name "gpg.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
-# WHY: probe — prek WinGet package directory may not exist; $null check handles absence.
+# undoc-supp: probe — prek WinGet package directory may not exist; $null check handles absence.
 $prekPackageDir = Get-ChildItem -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath "Microsoft\WinGet\Packages\j178.Prek_*") -Directory -ErrorAction SilentlyContinue |
   Sort-Object -Property Name -Descending |
   Select-Object -First 1
 
 $prekExecutableFromWinget = $null
 if ($null -ne $prekPackageDir) {
-  # WHY: probe — prek executable may not be in expected location; $null check handles absence.
+  # undoc-supp: probe — prek executable may not be in expected location; $null check handles absence.
   $prekExecutableFromWinget = Get-ChildItem -Path $prekPackageDir.FullName -Filter "prek*.exe" -File -Recurse -ErrorAction SilentlyContinue |
     Sort-Object -Property FullName |
     Select-Object -First 1 -ExpandProperty FullName
@@ -468,9 +468,9 @@ if ($null -ne $prekPackageDir) {
 
 $prekCandidates = @(
   $prekExecutableFromWinget,
-  # WHY: probe whether prek is on PATH; Get-Command throws when absent.
+  # undoc-supp: probe whether prek is on PATH; Get-Command throws when absent.
   (Get-Command -Name "prek.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source),
-  # WHY: fallback probe without .exe suffix.
+  # undoc-supp: fallback probe without .exe suffix.
   (Get-Command -Name "prek" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
@@ -620,7 +620,7 @@ foreach ($configFile in $effectiveConfigFiles) {
 # Set Windows Application Event Log max size to 200 MB.
 # No declarative DSC resource exists for this; wevtutil is the canonical tool.
 try {
-  wevtutil sl Application /ms:209715200 2>$null  # WHY: event log may already be at desired size; wevtutil errors are caught below
+  wevtutil sl Application /ms:209715200 2>$null  # undoc-supp: event log may already be at desired size; wevtutil errors are caught below
 } catch {
   Write-NucleusWarning "Failed to set Application Event Log max size: $($_.Exception.Message)"
 }
@@ -782,7 +782,7 @@ Test-ArchivingStack | Out-Null
 if ($NoAISync) {
   Write-Output "ai-sync: -NoAISync set; skipping post-apply model sync"
 } else {
-  # WHY: probe whether ollama is installed (may not be on first-provision hosts).
+  # undoc-supp: probe whether ollama is installed (may not be on first-provision hosts).
   $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaOnPath) {
     Write-Output "ai-sync: ollama not found in PATH; skipping post-apply model sync"
@@ -799,7 +799,7 @@ if ($NoAISync) {
 if (-not $ReplicaSync) {
   Write-Output "replica-sync: skipping post-apply replica sync (default; pass -ReplicaSync to run now)"
 } else {
-  # WHY: probe — rclone may be absent on first-provision hosts.
+  # undoc-supp: probe — rclone may be absent on first-provision hosts.
   $rcloneOnPath = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
   if ($null -eq $rcloneOnPath) {
     Write-Output "replica-sync: rclone not found in PATH; skipping post-apply replica sync"

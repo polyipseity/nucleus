@@ -68,7 +68,7 @@ function Get-DecryptedBlob {
       Write-Output "Machine-key decryption failed for '$FilePath'. Falling back to GPG keyring..."
     }
     finally {
-      # WHY: cleanup-after-failure in finally block; env var may not be set.
+      # undoc-supp: cleanup-after-failure in finally block; env var may not be set.
       Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction Ignore
     }
   }
@@ -100,7 +100,7 @@ function Get-DecryptedBlob {
       throw "Primary-ssh decryption failed for '$FilePath' after machine-key and GPG attempts."
     }
     finally {
-      # WHY: cleanup-after-failure in finally block; env var may not be set.
+      # undoc-supp: cleanup-after-failure in finally block; env var may not be set.
       Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction Ignore
     }
   }

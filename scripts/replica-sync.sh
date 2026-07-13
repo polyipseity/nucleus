@@ -125,9 +125,9 @@ replica_lines="$({
       ]
     | @tsv
   ' "$USERS_JSON"
-} || true)" # WHY: jq query may fail if users.json is missing; empty result handled by [ -z ] check downstream.
+} || true)" # undoc-supp: jq query may fail if users.json is missing; empty result handled by [ -z ] check downstream.
 
-# WHY: rclone remote may not be configured yet; probe expected to fail.
+# undoc-supp: rclone remote may not be configured yet; probe expected to fail.
 if [ -z "$replica_lines" ]; then
   say "no enabled replicas for user '$username'"
   exit 0
@@ -200,7 +200,7 @@ build_onedrive_root_filter_file() {
     _remote_dirs="$(rclone lsf "$_remote_ref" \
       --max-depth 1 --dirs-only --disable ListR --log-level ERROR \
       --retries 1 --low-level-retries 1 --timeout 30s --contimeout 10s \
-      --max-duration 1m 2>/dev/null || true)" # WHY: rclone remote may not be configured yet; probe expected to fail.
+      --max-duration 1m 2>/dev/null || true)" # undoc-supp: rclone remote may not be configured yet; probe expected to fail.
   fi
   if [ -n "$_remote_dirs" ]; then
     printf '%s\n' "$_remote_dirs" | while IFS= read -r _remote_dir; do
@@ -228,7 +228,7 @@ build_onedrive_root_filter_file() {
     _remote_files="$(rclone lsf "$_remote_ref" \
       --max-depth 1 --files-only --disable ListR --log-level ERROR \
       --retries 1 --low-level-retries 1 --timeout 30s --contimeout 10s \
-      --max-duration 1m 2>/dev/null || true)" # WHY: rclone remote may not be configured yet; probe expected to fail.
+      --max-duration 1m 2>/dev/null || true)" # undoc-supp: rclone remote may not be configured yet; probe expected to fail.
   fi
   if [ -n "$_remote_files" ]; then
     printf '%s\n' "$_remote_files" | while IFS= read -r _remote_file; do

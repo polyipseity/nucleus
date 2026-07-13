@@ -122,12 +122,12 @@ if ($Help) {
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   $env:NUCLEUS_REPO_ROOT
 } else {
-  # WHY: probe — path may not exist; $null check handles absence.
+  # undoc-supp: probe — path may not exist; $null check handles absence.
   $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
   if ($candidate -and (Test-Path "$candidate\src\flake.nix")) {
     $candidate
   } else {
-    # WHY: probe — may not be in a git repo; $null check below handles absence.
+    # undoc-supp: probe — may not be in a git repo; $null check below handles absence.
     $gitRoot = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Out-String
     $gitRoot = $gitRoot.Trim()
     if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and (Test-Path -Path $gitRoot -PathType Container)) {
@@ -242,7 +242,7 @@ if (-not $NoToolCacheGc) {
   Clear-DirectoryContentsIfPresent -Path $cargoBinstallCacheDir -Label "cargo-binstall cache"
   Clear-DirectoryContentsIfPresent -Path $rustupTmpDir -Label "rustup temporary cache"
 
-  # WHY: probe whether tool is installed; Get-Command throws when absent.
+  # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
   $cargoCacheCmd = Get-Command -Name "cargo-cache" -ErrorAction SilentlyContinue
   if ($null -eq $cargoCacheCmd) {
     Write-NucleusInfo "cargo-cache unavailable; skipping cargo cache gc"
@@ -282,7 +282,7 @@ if (-not $NoScoopGc) {
 
 # ---- Step 4: Ollama orphaned model gc --------------------------------------
 if (-not $NoOllamaGc) {
-  # WHY: probe whether tool is installed; Get-Command throws when absent.
+  # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
     Write-NucleusInfo "ollama not installed; skipping ollama model gc"
@@ -315,21 +315,21 @@ if (-not $NoVMGc) {
 
     if (Test-Path -LiteralPath $imagesDir -PathType Container) {
       # Remove temporary Packer build directories.
-      # WHY: probe — temporary build directories may not exist; ForEach-Object handles empty result.
+      # undoc-supp: probe — temporary build directories may not exist; ForEach-Object handles empty result.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*-build" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
         Remove-VMGcItem -Item $_ -Label "temporary VM build directory" -Recurse
       }
 
       # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
       if (Test-Path -LiteralPath $imagesDir -PathType Container) {
-        # WHY: probe — stale temporary directories may not exist; Where-Object handles empty result.
+        # undoc-supp: probe — stale temporary directories may not exist; Where-Object handles empty result.
         Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^\..+' } | ForEach-Object {
           Remove-VMGcItem -Item $_ -Label "stale Packer temporary build directory" -Recurse
         }
       }
 
       # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
-      # WHY: probe — stale disk images may not exist; ForEach-Object handles empty result.
+      # undoc-supp: probe — stale disk images may not exist; ForEach-Object handles empty result.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*.qcow2" -File -ErrorAction SilentlyContinue | ForEach-Object {
         $imageName = $_.BaseName
         if ($imageName -notin $declaredVMNames) {
@@ -340,7 +340,7 @@ if (-not $NoVMGc) {
       # GC stale VM scripts from scripts/ subfolder.
       $scriptsDir = Join-Path $vmDir 'scripts'
       if (Test-Path -LiteralPath $scriptsDir -PathType Container) {
-        # WHY: probe — VM scripts may not exist; foreach handles empty result.
+        # undoc-supp: probe — VM scripts may not exist; foreach handles empty result.
         $scripts = Get-ChildItem -LiteralPath $scriptsDir -Include '*.sh', '*.ps1' -File -ErrorAction SilentlyContinue
         foreach ($script in $scripts) {
           $isDeclared = $false

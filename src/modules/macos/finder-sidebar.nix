@@ -102,11 +102,11 @@ rec {
   #
   # Sources for default extras: ``/`` reappears after daemon restarts, the
   # user's home-directory alias shows up on new macOS versions, and `.Trash`
-  # WHY: re-emerges on macOS upgrades; mysides is known to segfault on corrupted bookmarks; soft-fail prevents activation abort.
+  # undoc-supp: re-emerges on macOS upgrades; mysides is known to segfault on corrupted bookmarks; soft-fail prevents activation abort.
   finderSidebarPreRemoveShell = ''
     ${builtins.concatStringsSep "\n" (
       map
-        # WHY: mysides is known to segfault on corrupted bookmarks; || true prevents activation abort.
+        # undoc-supp: mysides is known to segfault on corrupted bookmarks; || true prevents activation abort.
         (favoriteName: ''"$MYSIDES_BIN" remove ${lib.escapeShellArg favoriteName} >/dev/null 2>&1 || true'')
         (
           (map (f: f.name) finderSidebarManagedFavorites)
@@ -116,18 +116,18 @@ rec {
           ]
         )
     )}
-    # WHY: see above — mysides segfaults on corrupted bookmarks.
+    # undoc-supp: see above — mysides segfaults on corrupted bookmarks.
     "$MYSIDES_BIN" remove "$(id -un)" >/dev/null 2>&1 || true
   '';
 
   # WHY: Clear all current sidebar favorites so managed order can be rebuilt.
   finderSidebarClearShell = ''
-    # WHY: mysides list output is captured with || true so a segfault in the mysides binary (e.g. from corrupted bookmarks) terminates only the subshell, not the activation script.
+    # undoc-supp: mysides list output is captured with || true so a segfault in the mysides binary (e.g. from corrupted bookmarks) terminates only the subshell, not the activation script.
     _sidebar_lines="$("$MYSIDES_BIN" list 2>/dev/null || true)"
     echo "$_sidebar_lines" | while IFS= read -r _sidebar_line; do
       _sidebar_name="''${_sidebar_line%% -> *}"
       [ -n "$_sidebar_name" ] || continue
-      # WHY: see finderSidebarPreRemoveShell logic — mysides segfaults on corrupted bookmarks.
+      # undoc-supp: see finderSidebarPreRemoveShell logic — mysides segfaults on corrupted bookmarks.
       "$MYSIDES_BIN" remove "$_sidebar_name" >/dev/null 2>&1 || true
     done
   '';
@@ -140,22 +140,22 @@ rec {
   );
 
   # Best-effort add mode for relaunchDesktopServices: preserve soft-fail behavior.
-  # WHY: see finderSidebarPreRemoveShell — mysides segfaults on corrupted bookmarks; best-effort add that must not abort activation.
+  # undoc-supp: see finderSidebarPreRemoveShell — mysides segfaults on corrupted bookmarks; best-effort add that must not abort activation.
   finderSidebarAddManagedBestEffortShell = builtins.concatStringsSep "\n" (
     map (
       favorite:
-      # WHY: mysides segfaults on corrupted bookmarks; || true prevents activation abort.
+      # undoc-supp: mysides segfaults on corrupted bookmarks; || true prevents activation abort.
       ''"$MYSIDES_BIN" add ${lib.escapeShellArg favorite.name} ${lib.escapeShellArg favorite.url} >/dev/null 2>&1 || true''
     ) finderSidebarManagedFavorites
   );
 
   # Remove Finder defaults that can reappear after daemon restarts.
   finderSidebarRemoveDefaultExtrasShell = ''
-    # WHY: see finderSidebarPreRemoveShell — mysides segfaults on corrupted bookmarks; best-effort removal of default sidebar entries.
+    # undoc-supp: see finderSidebarPreRemoveShell — mysides segfaults on corrupted bookmarks; best-effort removal of default sidebar entries.
     "$MYSIDES_BIN" remove "/" >/dev/null 2>&1 || true
-    # WHY: see finderSidebarPreRemoveShell
+    # undoc-supp: see finderSidebarPreRemoveShell
     "$MYSIDES_BIN" remove "$(id -un)" >/dev/null 2>&1 || true
-    # WHY: see finderSidebarPreRemoveShell
+    # undoc-supp: see finderSidebarPreRemoveShell
     "$MYSIDES_BIN" remove ".Trash" >/dev/null 2>&1 || true
   '';
 

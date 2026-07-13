@@ -33,7 +33,7 @@ function Sync-WifiMacRandomization {
     return
   }
 
-  # WHY: probe — WlanSvc path may have no child items; empty result handled downstream.
+  # undoc-supp: probe — WlanSvc path may have no child items; empty result handled downstream.
   $interfaceGuids = Get-ChildItem -Path $wlanSvcPath -ErrorAction SilentlyContinue | Select-Object -ExpandProperty PSChildName
   if ($null -eq $interfaceGuids -or $interfaceGuids.Count -eq 0) {
     Write-Output "$($PSStyle.Formatting.Warning)No WlanSvc interfaces found; skipping Wi-Fi MAC randomization.$($PSStyle.Reset)"
@@ -46,9 +46,9 @@ function Sync-WifiMacRandomization {
 
   foreach ($guid in $interfaceGuids) {
     $ifacePath = Join-Path -Path $wlanSvcPath -ChildPath $guid
-    # WHY: probe whether registry values exist; Get-ItemProperty throws when value is absent.
+    # undoc-supp: probe whether registry values exist; Get-ItemProperty throws when value is absent.
     $ifaceName = (Get-ItemProperty -Path $ifacePath -Name 'InterfaceName' -ErrorAction SilentlyContinue).InterfaceName
-    # WHY: probe whether registry values exist; Get-ItemProperty throws when value is absent.
+    # undoc-supp: probe whether registry values exist; Get-ItemProperty throws when value is absent.
     $ifaceDesc = (Get-ItemProperty -Path $ifacePath -Name 'InterfaceDescription' -ErrorAction SilentlyContinue).InterfaceDescription
 
     # Only process Wi-Fi adapters (skip Bluetooth, virtual, etc.)
@@ -63,7 +63,7 @@ function Sync-WifiMacRandomization {
 
     # Ensure Parameters subkey exists
     if (-not (Test-Path -Path $paramsPath)) {
-      # WHY: best-effort — Parameters subkey may already exist.
+      # undoc-supp: best-effort — Parameters subkey may already exist.
       $null = New-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue
       if (-not (Test-Path -Path $paramsPath)) {
         Write-Warning "Wi-Fi MAC: could not create Parameters subkey for interface $guid ($ifaceName); skipping."
@@ -72,7 +72,7 @@ function Sync-WifiMacRandomization {
     }
 
     try {
-      # WHY: probe whether RandomizationEnabled exists; Get-ItemProperty throws when absent.
+      # undoc-supp: probe whether RandomizationEnabled exists; Get-ItemProperty throws when absent.
       $currentValue = (Get-ItemProperty -Path $paramsPath -Name 'RandomizationEnabled' -ErrorAction SilentlyContinue).RandomizationEnabled
     }
     catch {

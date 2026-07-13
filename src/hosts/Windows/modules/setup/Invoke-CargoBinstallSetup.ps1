@@ -79,7 +79,7 @@ function Invoke-CargoBinstallSetup {
   }
 
   # Guard: cargo-binstall must be accessible after Invoke-ScoopSetup has run.
-  # WHY: probe — cargo-binstall may not be installed; if-guard checks absence below.
+  # undoc-supp: probe — cargo-binstall may not be installed; if-guard checks absence below.
   if (-not (Get-Command cargo-binstall -ErrorAction SilentlyContinue)) {
     Write-Error "Invoke-CargoBinstallSetup: cargo-binstall not found on PATH; ensure Invoke-ScoopSetup has run and installed cargo-binstall from the Scoop main bucket"
     return

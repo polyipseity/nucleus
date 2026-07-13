@@ -30,7 +30,7 @@ function Test-ArchivingStack {
   $healthCheckPassed = $true
 
   # Check: 7z CLI is available in PATH and responds to --help.
-  $sevenZipExe = Get-Command -Name "7z.exe" -ErrorAction SilentlyContinue  # WHY: probe — 7z may not be installed; $null check below handles absence
+  $sevenZipExe = Get-Command -Name "7z.exe" -ErrorAction SilentlyContinue  # undoc-supp: probe — 7z may not be installed; $null check below handles absence
   if ($null -eq $sevenZipExe) {
     Write-Error "archiving-stack: warning — 7z.exe not found in PATH; archive extraction may fail." -ErrorAction Continue
     $healthCheckPassed = $false

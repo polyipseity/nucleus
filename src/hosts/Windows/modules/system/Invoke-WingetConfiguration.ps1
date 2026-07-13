@@ -73,7 +73,7 @@ function Invoke-WingetConfiguration {
       $effectiveWallpaperPath = $WallpaperPath
 
       if ([string]::IsNullOrWhiteSpace($effectiveWallpaperPath)) {
-        # WHY: probe — registry value may not exist on fresh install; $null check handles absence.
+        # undoc-supp: probe — registry value may not exist on fresh install; $null check handles absence.
         $existingWallpaperPath = (Get-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name Wallpaper -ErrorAction SilentlyContinue).Wallpaper
         if (-not [string]::IsNullOrWhiteSpace($existingWallpaperPath)) {
           $effectiveWallpaperPath = $existingWallpaperPath
@@ -99,7 +99,7 @@ function Invoke-WingetConfiguration {
   }
   finally {
     if ($tempConfigPath -and (Test-Path -Path $tempConfigPath)) {
-      # WHY: cleanup-after-failure in finally block; file may already be gone.
+      # undoc-supp: cleanup-after-failure in finally block; file may already be gone.
       Remove-Item -Path $tempConfigPath -Force -ErrorAction Ignore
     }
   }

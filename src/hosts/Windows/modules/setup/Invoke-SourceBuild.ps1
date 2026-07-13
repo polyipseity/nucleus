@@ -98,7 +98,7 @@ function Invoke-SourceBuild {
     # --- Dependency guard ---
     $missingDep = $false
     foreach ($dep in $deps) {
-      # WHY: probe — build dependency may not be installed; if-guard checks absence below.
+      # undoc-supp: probe — build dependency may not be installed; if-guard checks absence below.
       if (-not (Get-Command $dep -ErrorAction SilentlyContinue)) {
         Write-Warning "Invoke-SourceBuild: missing build dependency '$dep' for '$pkgId'; skipping. Ensure $dep is installed via Scoop before calling Invoke-SourceBuild."
         $missingDep = $true

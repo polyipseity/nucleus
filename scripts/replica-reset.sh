@@ -83,7 +83,7 @@ fi
 
 username="$(id -un)"
 current_os="$(uname -s)"
-# WHY: rclone remote may not be configured; best-effort unmount.
+# undoc-supp: rclone remote may not be configured; best-effort unmount.
 replica_lines="$({
   jq -r --arg username "$username" '
     .[$username].cloudDrives.replicas // []
@@ -97,7 +97,7 @@ replica_lines="$({
       ]
     | @tsv
   ' "$USERS_JSON"
-} || true)" # WHY: jq query may fail if users.json is missing; empty result handled by [ -z ] check downstream.
+} || true)" # undoc-supp: jq query may fail if users.json is missing; empty result handled by [ -z ] check downstream.
 
 if [ -z "$replica_lines" ]; then
   say "no enabled replicas for user '$username'"

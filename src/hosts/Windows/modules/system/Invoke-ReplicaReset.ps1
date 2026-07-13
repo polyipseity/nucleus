@@ -109,7 +109,7 @@ function Invoke-ReplicaReset {
     # Never recurse into the symlink target during reset; remove only link.
     if ($isMacOSHost -and $provider -eq 'iCloud' -and $iCloudService -eq 'drive') {
       if (Test-Path -Path $localRoot) {
-        # WHY: probe — path may be inaccessible; $null check handles absence.
+        # undoc-supp: probe — path may be inaccessible; $null check handles absence.
         $localItem = Get-Item -Path $localRoot -Force -ErrorAction SilentlyContinue
         $isSymlink = $null -ne $localItem -and ($localItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint)
         if ($isSymlink) {
@@ -147,7 +147,7 @@ function Invoke-ReplicaReset {
             [System.Security.AccessControl.AccessControlType]::Allow
           )
           $acl.SetAccessRule($rule)
-          # WHY: best-effort ACL modification; failure is non-critical and caught by catch block.
+          # undoc-supp: best-effort ACL modification; failure is non-critical and caught by catch block.
           Set-Acl -Path $localRoot -AclObject $acl -ErrorAction SilentlyContinue
         }
         catch {

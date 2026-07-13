@@ -48,7 +48,7 @@ function Invoke-RustupSetup {
   )
 
   # Guard: rustup must be accessible after WinGet DSC has installed Rustlang.Rustup.
-  # WHY: probe — rustup may not be installed; if-guard checks absence below.
+  # undoc-supp: probe — rustup may not be installed; if-guard checks absence below.
   if (-not (Get-Command rustup -ErrorAction SilentlyContinue)) {
     Write-Error "Invoke-RustupSetup: rustup not found on PATH; ensure Rustlang.Rustup was installed by WinGet DSC before calling this function"
     return
@@ -122,7 +122,7 @@ function Invoke-RustupSetup {
 
   # Set the global default toolchain to none so every project must declare its
   # toolchain explicitly via rust-toolchain.toml or a +channel override.
-  # WHY: a global default channel silently masks missing per-project toolchain
+  # undoc-supp: a global default channel silently masks missing per-project toolchain
   # files and makes the effective compiler version opaque.
   # `rustup default none` is idempotent.
   Write-Output "rustup: setting global default toolchain to none"

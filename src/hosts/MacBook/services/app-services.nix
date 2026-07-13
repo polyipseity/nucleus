@@ -138,12 +138,12 @@ in
       map (svc: ''
         # Delete NSServicesStatus key for ${svc.appDir} unconditionally.
         /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"${svc.bundleId} - ${svc.menuItem} - ${svc.message}\"" \
-          ~/Library/Preferences/pbs.plist 2>/dev/null || true  # WHY: key may not exist on first apply
+          ~/Library/Preferences/pbs.plist 2>/dev/null || true  # undoc-supp: key may not exist on first apply
 
         app_path="$APP_DIR/${svc.appDir}"
         if [ -d "$app_path" ]; then
-          "$LSREGISTER" -u "$app_path" 2>/dev/null || true  # WHY: app may not be deployed yet
-          chmod -R +w "$app_path" 2>/dev/null || true  # WHY: dir may not exist on first apply
+          "$LSREGISTER" -u "$app_path" 2>/dev/null || true  # undoc-supp: app may not be deployed yet
+          chmod -R +w "$app_path" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
           rm -rf "$app_path"
         fi
       '') removedNucleusAppServices
@@ -158,11 +158,11 @@ in
         mkdir -p "$APP_DIR"
         # Nix store outputs are read-only; strip that before deletion to avoid
         # Permission denied on the next generation switch.
-        chmod -R +w "$app_path" 2>/dev/null || true  # WHY: dir may not exist on first apply
+        chmod -R +w "$app_path" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
         rm -rf "$app_path"
         cp -R "$store_path" "$APP_DIR/"
 
-        "$LSREGISTER" -R -f "$app_path" || true  # WHY: LaunchServices may reject unsigned bundles; not fatal
+        "$LSREGISTER" -R -f "$app_path" || true  # undoc-supp: LaunchServices may reject unsigned bundles; not fatal
 
         # Enable the service in NSServicesStatus so it appears in the Services
         # menu and right-click context menu without manual toggling in

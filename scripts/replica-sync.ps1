@@ -36,7 +36,7 @@ Import-Module $modulePath -Force -DisableNameChecking
 function Resolve-NucleusRepoRoot {
   $repoRoot = $env:NUCLEUS_REPO_ROOT
   if (-not $repoRoot) {
-    # WHY: probe — may be invoked outside repo checkouts; resolution handled below.
+    # undoc-supp: probe — may be invoked outside repo checkouts; resolution handled below.
     $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
     if ($candidate) {
       return $candidate

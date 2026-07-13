@@ -143,9 +143,9 @@ if [ "$gc_only" = false ]; then
         _model_tag="${model#*:}"
         [ "$_model_tag" = "$model" ] && _model_tag="latest"
         _expected_digest=$(jq -r --arg p "$profile" --arg n "$_model_name" --arg t "$_model_tag" '
-          .ollama[$p][] | select(.name == $n and .tag == $t) | .digest // empty' "$LOCKFILE" 2>/dev/null || true) # WHY: model may not be pulled yet; digest probe expected to fail.
+          .ollama[$p][] | select(.name == $n and .tag == $t) | .digest // empty' "$LOCKFILE" 2>/dev/null || true) # undoc-supp: model may not be pulled yet; digest probe expected to fail.
         if [ -n "$_expected_digest" ]; then
-          # WHY: model may not be pulled yet; digest probe expected to fail.
+          # undoc-supp: model may not be pulled yet; digest probe expected to fail.
           _actual_digest=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama show --format json "$model" 2>/dev/null | jq -r '.digest // empty' 2>/dev/null || true)
           if [ -n "$_actual_digest" ] && [ "$_actual_digest" != "$_expected_digest" ]; then
             warn "digest mismatch for $model (expected $_expected_digest, got $_actual_digest)"

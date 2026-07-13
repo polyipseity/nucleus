@@ -27,7 +27,7 @@ let
   bdCliWrapper = ''
     # _bd_cli args... — Execute BetterDisplay CLI command, soft-fail on error.
     _bd_cli() {
-      # WHY: BetterDisplay may be unresponsive during app startup/update, or Pro-only features may be unavailable in the free-tier build. Neither condition should abort activation or mark the LaunchAgent as failed.
+      # undoc-supp: BetterDisplay may be unresponsive during app startup/update, or Pro-only features may be unavailable in the free-tier build. Neither condition should abort activation or mark the LaunchAgent as failed.
       "$BD_BIN" "$@" || true
     }
   '';
@@ -261,7 +261,7 @@ let
 
     # Ensure BetterDisplay is running before issuing CLI commands.
     if ! /usr/bin/pgrep -xq "BetterDisplay" 2>/dev/null; then
-      # WHY: BetterDisplay may not be installed yet; best-effort launch.
+      # undoc-supp: BetterDisplay may not be installed yet; best-effort launch.
       /usr/bin/open -g -a "$BD_APP" || true
       /bin/sleep 5
     fi
@@ -950,7 +950,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       ${finderSidebar.finderSidebarRebuildStrictShell}
 
       _finder_expected_order="${finderSidebar.finderSidebarExpectedOrder}"
-      # WHY: mysides list may fail (segfault on corrupted bookmarks); best-effort probe.
+      # undoc-supp: mysides list may fail (segfault on corrupted bookmarks); best-effort probe.
       _finder_list_output=$("$MYSIDES_BIN" list 2>/dev/null || true)
       _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n ${toString finderSidebar.finderSidebarManagedCount} | /usr/bin/paste -sd'|' -)"
       if [ "$_finder_actual_order" != "$_finder_expected_order" ]; then

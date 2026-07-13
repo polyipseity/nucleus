@@ -70,7 +70,7 @@ function Invoke-BunSetup {
   $bunBinDir = Join-Path $HOME ".bun\bin"
 
   # Guard: bun must be accessible after WinGet DSC has installed Oven-sh.Bun.
-  # WHY: probe — bun may not be installed; if-guard checks absence below.
+  # undoc-supp: probe — bun may not be installed; if-guard checks absence below.
   if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
     Write-Error "Invoke-BunSetup: bun not found on PATH; ensure Oven-sh.Bun was installed by WinGet DSC before calling this function"
     return

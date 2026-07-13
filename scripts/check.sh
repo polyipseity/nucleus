@@ -635,7 +635,7 @@ _check_undoc_supp() {
   grep -Hrn $_grep_flags -- "$_pattern" "$@" 2>/dev/null | while IFS=: read -r _f _ln _rest; do
     # Skip comment-only lines (pattern in a comment, not code)
     [[ "$_rest" =~ ^[[:space:]]*# ]] && continue
-    # Skip lines with # WHY: inline
+    # Skip lines with # undoc-supp: inline
     case "$_rest" in *'# undoc-supp:'*) continue ;; esac
     # Skip lines with # undoc-supp: on the immediately preceding line
     [ "$_ln" -gt 1 ] && sed -n "$((_ln - 1))p" "$_f" | grep -q '# undoc-supp:' && continue

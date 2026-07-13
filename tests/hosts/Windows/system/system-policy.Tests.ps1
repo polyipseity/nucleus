@@ -30,7 +30,7 @@ Describe "Windows System Policy Parity" {
         }
 
         It "Should keep all Windows Firewall profiles enabled" {
-            # WHY: probe — firewall may not be available in test container.
+            # undoc-supp: probe — firewall may not be available in test container.
             $firewallProfiles = Get-NetFirewallProfile -ErrorAction SilentlyContinue
             $firewallProfiles | Should -Not -BeNullOrEmpty
             foreach ($firewallProfile in $firewallProfiles) {
