@@ -18,6 +18,13 @@ let
   linuxSystemLogDirs = lib.unique (
     lib.flatten (lib.mapAttrsToList (name: svc: svc.logging.dirs.system or [ ]) linuxServices)
   );
+  # Bundle services.json into the nix store so the systemd watchdog can
+  # read it without needing NUCLEUS_REPO_ROOT.  Same approach as the
+  # macOS launchd watchdog (MacBook/service-watchdog.nix).
+  servicesJson = builtins.path {
+    path = ../../modules/services.json;
+    name = "nucleus-services-json";
+  };
 in
 {
   # ---------------------------------------------------------------------------
@@ -71,7 +78,7 @@ in
       nucleus-service-watchdog
       pkgs.jq
     ];
-    environment.NUCLEUS_REPO_ROOT = "/home/polyipseity/dev/nucleus";
+    environment.NUCLEUS_SERVICES_JSON = "${servicesJson}";
     script = ''
       exec nucleus-service-watchdog
     '';
