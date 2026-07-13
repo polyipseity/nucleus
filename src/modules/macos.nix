@@ -1328,7 +1328,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
       perUser =
         effectiveUsers.${config.home.username}
           or (builtins.abort "macos: user ${config.home.username} not found in src/modules/users.json");
-      passwordStoreDir = "${config.home.homeDirectory}/${perUser.relativePasswordStoreDir}";
+      passwordStoreDir =
+        let
+          rawPath = perUser.passwordStore.path or "${config.home.homeDirectory}/.password-store";
+        in
+        builtins.replaceStrings [ "~" ] [ config.home.homeDirectory ] rawPath;
     in
     {
       enable = true;
