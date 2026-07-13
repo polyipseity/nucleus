@@ -8,6 +8,7 @@
 #   5. Locked DSC validation
 #   6. Package manager usage enforcement
 #   7. Stale Nix build artifact check
+#   8. Undocumented error suppression check
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
 # deadnix, shellcheck, and script validation tests are skipped
@@ -60,10 +61,14 @@ foreach ($_arg in $args) {
 $HAS_ARGS = $positionalArgs.Count -gt 0
 
 # Group paths by extension — each sub-checker receives only files it understands.
+$SH_FILES = @()
+$NIX_FILES = @()
 $PS1_FILES = @()
 $PKR_FILES = @()
 if ($HAS_ARGS) {
   foreach ($_f in $positionalArgs) {
+    if ($_f -like '*.sh')      { $SH_FILES += $_f }
+    if ($_f -like '*.nix')     { $NIX_FILES += $_f }
     if ($_f -like '*.ps1')     { $PS1_FILES += $_f }
     if ($_f -like '*.pkr.hcl') { $PKR_FILES += $_f }
   }
@@ -597,7 +602,81 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 8. Online determinism checks (--verify mode only)
+# 8. Undocumented error suppression check
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_step))
+
+$_undocSuppViolations = @()
+
+function Get-UndocSuppViolation {
+  param([string]$_uPattern, [string]$_uLabel, [switch]$_uIsRegex, [string[]]$_uFiles)
+  $_uResult = @()
+  if ($_uFiles.Count -eq 0) { return $_uResult }
+  try {
+    $_uSelParams = @{ Path = $_uFiles; AllMatches = $true }
+    if ($_uIsRegex) { $_uSelParams['Pattern'] = $_uPattern } else { $_uSelParams['SimpleMatch'] = $_uPattern }
+    $_uMatches = Select-String @_uSelParams
+    foreach ($_um in $_uMatches) {
+      # Skip comment-only lines (PowerShell #, bash #, Nix #)
+      if ($_um.Line -match '^\s*#') { continue }
+      # Skip lines with inline WHY comment
+      if ($_um.Line -match '# WHY:') { continue }
+      # Skip if preceding line has WHY comment
+      if ($_um.LineNumber -gt 1) {
+        $_uPrevLine = Get-Content -Path $_um.Path | Select-Object -Index ($_um.LineNumber - 2)
+        if ($_uPrevLine -match '# WHY:') { continue }
+      }
+      $_uResult += "$($_um.Path):$($_um.LineNumber) ($_uLabel)"
+    }
+  } catch {
+    Write-Warning "Error scanning for $_uLabel`: $_"
+  }
+  return $_uResult
+}
+
+if ($HAS_ARGS) {
+  $_undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files ($SH_FILES + $NIX_FILES)
+  # WHY: string argument specifying the suppression pattern for the check function, not a real suppression operator.
+  $_undocSuppViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files $PS1_FILES
+  # WHY: string argument specifying the suppression pattern for the check function, not a real suppression operator.
+  $_undocSuppViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files $PS1_FILES
+  # WHY: string argument specifying the suppression pattern for the check function, not a real suppression operator.
+  $_undocSuppViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $PS1_FILES
+} else {
+  $_uAllShNix = @(
+    Get-ChildItem -Recurse -Path $RepoRoot -Include '*.sh','*.nix' |
+      Where-Object { $_.FullName -notmatch '[\\\\/]vendor[\\\\/]' } |
+      ForEach-Object { $_.FullName }
+  )
+  $_uAllPs1 = @(
+    Get-ChildItem -Recurse -Path $RepoRoot -Include '*.ps1' |
+      Where-Object { $_.FullName -notmatch '[\\\\/]vendor[\\\\/]' } |
+      ForEach-Object { $_.FullName }
+  )
+  $_undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files $_uAllShNix
+  # WHY: string argument specifying the suppression pattern for the check function, not a real suppression operator.
+  $_undocSuppViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files $_uAllPs1
+  # WHY: string argument specifying the suppression pattern for the check function, not a real suppression operator.
+  $_undocSuppViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files $_uAllPs1
+  # WHY: string argument specifying the suppression pattern for the check function, not a real suppression operator.
+  $_undocSuppViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $_uAllPs1
+}
+
+if ($_undocSuppViolations.Count -gt 0) {
+  foreach ($_uv in ($_undocSuppViolations | Sort-Object -Unique)) {
+    Write-Output $_uv
+  }
+  Write-Output ("ERROR: undocumented error suppression check failed with {0} violation(s)" -f $_undocSuppViolations.Count)
+  Write-Output "  Add '# WHY:' comment to explain intentional suppressions."
+  $exitCode = 1
+  if ($FAIL_FAST) { exit $exitCode }
+} else {
+  Write-Output "No undocumented error suppressions found."
+}
+if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
+
+# ---------------------------------------------------------------------------
+# 9. Online determinism checks (--verify mode only)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Online determinism checks (--verify) ===" -f (++$_step))
 if ($VERIFY) {

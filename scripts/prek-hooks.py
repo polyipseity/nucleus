@@ -69,7 +69,7 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -
     # Windows
     if not files:
         # No files specified: run all available checks, skip shellcheck
-        for script in ("check-pwsh.ps1", "check-packer.ps1"):
+        for script in ("check.ps1", "check-pwsh.ps1", "check-packer.ps1"):
             cmd = [
                 "pwsh",
                 "-NoLogo",
@@ -91,22 +91,25 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -
     ps1_files = [f for f in files if f.endswith(".ps1")]
     pkr_files = [f for f in files if f.endswith(".pkr.hcl")]
     sh_files = [f for f in files if f.endswith(".sh")]
+    nix_files = [f for f in files if f.endswith(".nix")]
 
     for _ in sh_files:
         print("scripts/prek-hooks.py: shellcheck skipped (not available on Windows)")
 
-    if not ps1_files and not pkr_files:
+    if not ps1_files and not pkr_files and not sh_files and not nix_files:
         return 0
 
-    if ps1_files:
+    # check.ps1 handles sh/nix/ps1 suppression checks (and ps1 syntax)
+    check_ps1_files = [f for f in files if f.endswith((".sh", ".nix", ".ps1"))]
+    if check_ps1_files:
         cmd = [
             "pwsh",
             "-NoLogo",
             "-NoProfile",
             "-NonInteractive",
             "-File",
-            str(repo_root / "scripts" / "check-pwsh.ps1"),
-        ] + ps1_files
+            str(repo_root / "scripts" / "check.ps1"),
+        ] + check_ps1_files
         result = subprocess.run(cmd, shell=False)
         if result.returncode != 0:
             print(
