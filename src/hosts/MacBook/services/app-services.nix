@@ -121,9 +121,6 @@ in
     chmod -R +w "$app_path" 2>/dev/null || true  # WHY: dir may not exist on first apply
     rm -rf "$app_path"
     cp -R "$store_path" "$APP_DIR/"
-    # Nix store outputs are read-only; make writable so LaunchServices
-    # does not silently ignore the app bundle.
-    chmod -R u+w "$app_path"
 
     "$LSREGISTER" -R -f "$app_path" || true  # WHY: LaunchServices may reject unsigned bundles; not fatal
 
