@@ -1310,6 +1310,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # The var list is generated from the centralized catalog — see
   # src/modules/lib/env-vars.nix (toLaunchctlScript).  Shell-only vars (CC, CXX,
   # LD) are excluded by the helper: they have scope="shell-only" in the catalog.
+  # User-specific vars (PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.) are also
+  # excluded to keep scoping explicit — they are set by the companion
+  # gui-env-user agent below.
   # --------------------------------------------------------------------------
   launchd.agents."gui-env" = {
     enable = true;
@@ -1321,6 +1324,30 @@ lib.mkIf pkgs.stdenv.isDarwin {
         }"
       ];
       # Run once at login so the GUI domain is populated before any app starts.
+      RunAtLoad = true;
+      KeepAlive = false;
+    };
+  };
+
+  # --------------------------------------------------------------------------
+  # User-specific GUI environment variable propagation LaunchAgent
+  # Companion to gui-env above.  Sets vars whose values contain user-home-
+  # derived paths (PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.).  These are split
+  # into a separate agent to make the scoping intentional and auditable: the
+  # general gui-env agent excludes them, and this agent explicitly includes
+  # them.  Both are safe because macOS launchd GUI domains are per-user.
+  #
+  # See src/modules/lib/env-vars.nix (toUserLaunchctlScript).
+  # --------------------------------------------------------------------------
+  launchd.agents."gui-env-user" = {
+    enable = true;
+    config = {
+      Label = "local.gui-env-user";
+      ProgramArguments = [
+        "${pkgs.writeShellScript "gui-env-user-agent"
+          (import ../lib/env-vars.nix { inherit config pkgs lib; }).toUserLaunchctlScript
+        }"
+      ];
       RunAtLoad = true;
       KeepAlive = false;
     };

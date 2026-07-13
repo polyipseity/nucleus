@@ -28,6 +28,7 @@ in
         toHomeSessionVariables
         toNixOSSystemEnvironment
         toLaunchctlScript
+        toUserLaunchctlScript
         toNixOSServiceEnv
         toJsonManifest
         getAllNixVarNames
