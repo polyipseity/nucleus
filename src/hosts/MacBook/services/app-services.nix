@@ -87,10 +87,6 @@ let
   # List of currently deployed app service directories.
   # Used by tests and documentation to track active app services.
   currentNucleusAppServiceDirs = [ "NucleusManual.app" ];
-
-  # Import centralized daemon refresh helpers for shared lsregister path.
-  # Import centralized daemon refresh helpers for post-deploy cache flush.
-  daemonRefresh = import ../../../modules/macos/daemon-refresh.nix;
 in
 {
   home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
@@ -141,11 +137,5 @@ in
     /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
       '<dict><key>presentation_modes</key><dict><key>ContextMenu</key><true/><key>ServicesMenu</key><true/><key>FinderPreview</key><true/><key>TouchBar</key><true/></dict></dict>'
 
-    # ── Phase 4: Flush daemon caches so changes take effect immediately ─
-    # Without these restarts, cfprefsd, lsd, and pbs all hold stale cached
-    # state in process memory. Finder is intentionally excluded here —
-    # relaunchDesktopServices (DAG-ordered after writeBoundary) restarts it
-    # via launchctl kickstart to preserve window state.
-    ${daemonRefresh.refreshServicesMenu}
   '';
 }
