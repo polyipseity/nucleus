@@ -39,12 +39,13 @@ Safety rules:
 
 - NEVER ask subagents to run git commit. Commit MUST be done by the MAIN agent to prevent race conditions.
 - NEVER use `git reset` (especially `--hard` or `--keep`) under any circumstance. It destroys uncommitted work and can wipe days of progress. Use `git revert` or `git restore` instead.
+- Never use `git commit --amend` without verification. `--amend` does not create a new commit — it merges staged changes into the current HEAD commit instead. Only use it when you can positively verify that HEAD is the commit you just created: run `git rev-parse HEAD` and `git log -1 --format=%s` and confirm both match your intent. If you cannot verify (e.g. after a failed commit where HEAD is still the previous commit), retry with a fresh `git commit`. Never modify pre-existing commits.
 - Never revert or cherry-pick earlier than the captured baseline hash.
 - Do not mix unrelated concerns in the same commit.
 
 ## Atomic commit workflow
 
-See `~/.agents/prompts/commit-staged.prompt.md` for the canonical stash-based atomic commit workflow. The hard rules there (no `git commit --amend`, verify with `git rev-parse HEAD`, never trust terminal output) also apply here.
+See `~/.agents/prompts/commit-staged.prompt.md` for the canonical stash-based atomic commit workflow. The hard rules there (verify with `git rev-parse HEAD`, never trust terminal output) also apply here.
 
 Final check:
 
