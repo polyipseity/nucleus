@@ -114,12 +114,12 @@ let
 
   test_all_5_presets_in_windows = assert' (
     allPresetsPresent windowsDscText
-    && lib.hasInfix "optimize PDF (default)" windowsDscText
-    && lib.hasInfix "optimize PDF (ebook)" windowsDscText
-    && lib.hasInfix "optimize PDF (prepress)" windowsDscText
-    && lib.hasInfix "optimize PDF (printer)" windowsDscText
-    && lib.hasInfix "optimize PDF (screen)" windowsDscText
-  ) "Windows DSC must define all 5 presets with 'optimize PDF (X)' labels";
+    && lib.hasInfix "optimize PDF - default" windowsDscText
+    && lib.hasInfix "optimize PDF - ebook" windowsDscText
+    && lib.hasInfix "optimize PDF - prepress" windowsDscText
+    && lib.hasInfix "optimize PDF - printer" windowsDscText
+    && lib.hasInfix "optimize PDF - screen" windowsDscText
+  ) "Windows DSC must define all 5 presets with 'optimize PDF - X' labels";
 
   test_no_old_gs_labels_in_windows = assert' (noOldLabel windowsDscText) "Windows DSC must not contain the old 'gs optimize pdf' label";
 
@@ -128,19 +128,19 @@ let
       (
         let
           posDefault = builtins.stringLength (
-            builtins.head (builtins.split "optimize PDF \\(default\\)" windowsDscText)
+            builtins.head (builtins.split "optimize PDF - default" windowsDscText)
           );
           posPrepress = builtins.stringLength (
-            builtins.head (builtins.split "optimize PDF \\(prepress\\)" windowsDscText)
+            builtins.head (builtins.split "optimize PDF - prepress" windowsDscText)
           );
           posPrinter = builtins.stringLength (
-            builtins.head (builtins.split "optimize PDF \\(printer\\)" windowsDscText)
+            builtins.head (builtins.split "optimize PDF - printer" windowsDscText)
           );
           posEbook = builtins.stringLength (
-            builtins.head (builtins.split "optimize PDF \\(ebook\\)" windowsDscText)
+            builtins.head (builtins.split "optimize PDF - ebook" windowsDscText)
           );
           posScreen = builtins.stringLength (
-            builtins.head (builtins.split "optimize PDF \\(screen\\)" windowsDscText)
+            builtins.head (builtins.split "optimize PDF - screen" windowsDscText)
           );
         in
         posDefault < posPrepress
