@@ -31,6 +31,7 @@ function Disable-SteamAutoStartup {
     # WHY: probe whether AutoLoginUser value exists (key exists but value may be absent).
     $autoLoginUser = Get-ItemProperty -Path $steamRegPath -Name "AutoLoginUser" -ErrorAction SilentlyContinue
     if ($null -ne $autoLoginUser) {
+      # WHY: best-effort removal (value was confirmed above but may have been removed concurrently).
       Remove-ItemProperty -Path $steamRegPath -Name "AutoLoginUser" -ErrorAction SilentlyContinue
       Write-Output "steam: removed AutoLoginUser registry value"
     }
