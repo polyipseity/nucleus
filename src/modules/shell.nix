@@ -44,6 +44,8 @@ let
   # Publish the fallback toolchain path as a session variable so every managed
   # shell can reach the same user-scoped binaries without duplicating the store
   # path string in multiple helper functions.
+  # Scope: all-process — also set in gui-env LaunchAgent on macOS so GUI apps
+  # (VS Code tasks, Obsidian, oterm) find the fallback toolchain.
   mergedSessionVariables =
     sessionVariables
     // {
@@ -51,6 +53,7 @@ let
       NUCLEUS_DEFAULT_DEV_ENV = "1";
     }
     // lib.optionalAttrs pkgs.stdenv.isDarwin {
+      # Scope: macOS, all-process — also set in gui-env LaunchAgent.
       # WHY: rustc and cargo invoke `/usr/bin/xcrun --sdk macosx --show-sdk-path`
       # directly during native-code builds (unrelated to $CC resolution).  Without
       # Xcode CLT installed, xcrun pops the installation dialog.  DEVELOPER_DIR

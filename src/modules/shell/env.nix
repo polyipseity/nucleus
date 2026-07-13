@@ -14,6 +14,9 @@
   # triggers the Xcode CLT installation dialog on macOS. Absolute store
   # paths bypass PATH resolution entirely, so CC/CXX work in sudo, launchd
   # services, VS Code tasks, and rustup cargo builds without xcrun.
+  #
+  # Scope: shell-only on macOS (WHY Nix LLVM paths in GUI process env
+  # interfere with Xcode toolchain discovery). All-process on NixOS/Windows.
   CC = "${pkgs.llvmPackages.clang}/bin/clang";
   CXX = "${pkgs.llvmPackages.clang}/bin/clang++";
   LD = "${pkgs.llvmPackages.lld}/bin/ld.lld";
@@ -24,6 +27,7 @@
   # flake updates or package manager upgrades only.
   # Source: OpenCode CLI env var table (`OPENCODE_DISABLE_AUTOUPDATE`)
   # https://opencode.ai/docs/zh-tw/cli/#環境變數
+  # Scope: all-process — also set in gui-env LaunchAgent on macOS.
   OPENCODE_DISABLE_AUTOUPDATE = "true";
 
 }
