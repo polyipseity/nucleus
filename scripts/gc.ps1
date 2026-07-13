@@ -240,6 +240,7 @@ if (-not $NoToolCacheGc) {
   Clear-DirectoryContentsIfPresent -Path $cargoBinstallCacheDir -Label "cargo-binstall cache"
   Clear-DirectoryContentsIfPresent -Path $rustupTmpDir -Label "rustup temporary cache"
 
+  # WHY: probe whether tool is installed; Get-Command throws when absent.
   $cargoCacheCmd = Get-Command -Name "cargo-cache" -ErrorAction SilentlyContinue
   if ($null -eq $cargoCacheCmd) {
     Write-NucleusInfo "cargo-cache unavailable; skipping cargo cache gc"
@@ -279,6 +280,7 @@ if (-not $NoScoopGc) {
 
 # ---- Step 4: Ollama orphaned model gc --------------------------------------
 if (-not $NoOllamaGc) {
+  # WHY: probe whether tool is installed; Get-Command throws when absent.
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
     Write-NucleusInfo "ollama not installed; skipping ollama model gc"

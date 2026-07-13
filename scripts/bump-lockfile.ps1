@@ -319,8 +319,10 @@ if (Test-SectionEnabled 'pwsh') {
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'vscode') {
   $vscodeOutput = $null
+  # WHY: probe whether tool is installed; Get-Command throws when absent.
   if (Get-Command -Name 'code' -ErrorAction SilentlyContinue) {
     $vscodeOutput = & code --list-extensions --show-versions 2>$null
+  # WHY: probe whether tool is installed; Get-Command throws when absent.
   } elseif (Get-Command -Name 'code-insiders' -ErrorAction SilentlyContinue) {
     $vscodeOutput = & code-insiders --list-extensions --show-versions 2>$null
   }

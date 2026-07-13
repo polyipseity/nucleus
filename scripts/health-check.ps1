@@ -120,10 +120,12 @@ function Test-SecretTooling {
   .EXAMPLE
     Test-SecretTooling
   #>
+  # WHY: probe whether tool is installed; Get-Command throws when absent.
   if (-not (Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue)) {
     throw 'nucleus: sops.exe not found in PATH.'
   }
 
+  # WHY: probe whether tool is installed; Get-Command throws when absent.
   if (-not (Get-Command -Name 'gpg.exe' -ErrorAction SilentlyContinue)) {
     throw 'nucleus: gpg.exe not found in PATH.'
   }
@@ -141,6 +143,7 @@ function Test-LogHealth {
     Test-LogHealth
   #>
 
+  # WHY: probe whether tool is installed; Get-Command throws when absent.
   if (-not (Get-Command -Name 'jq.exe' -ErrorAction SilentlyContinue)) {
     throw 'nucleus: jq.exe not found in PATH (required for --LogHealth).'
   }

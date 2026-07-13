@@ -204,6 +204,7 @@ function Get-ProviderCreateArgument {
   }
 }
 
+# WHY: probe whether tool is installed; Get-Command throws when absent.
 if (-not (Get-Command rclone -ErrorAction SilentlyContinue)) {
   throw 'cloud-setup: rclone not found on PATH. Run apply/bootstrap first, then retry.'
 }
