@@ -353,7 +353,7 @@ let
   ) "NixOS";
 
   # ── toLaunchctlScript ────────────────────────────────────────────
-  # Shell script for macOS gui-env LaunchAgent (all-process macOS vars).
+  # Shell script for macOS gui-env LaunchAgent (all-process, non-user-specific macOS vars).
   toLaunchctlScript =
     let
       os = "macOS";
@@ -365,6 +365,38 @@ let
         builtins.elem os entry.hosts
         && entry.scope == "all-process"
         && (!entry ? excludeFromLaunchctl || !entry.excludeFromLaunchctl)
+        && (!entry ? userSpecific || !entry.userSpecific)
+        && resolveValue name os != null
+      ) (builtins.attrNames catalog);
+    in
+    builtins.concatStringsSep "\n" (
+      builtins.map (
+        name:
+        let
+          val = resolveValue name os;
+        in
+        if val != null then "/bin/launchctl setenv ${name} ${val}" else ""
+      ) relevant
+    );
+
+  # ── toUserLaunchctlScript ────────────────────────────────────────
+  # Shell script for macOS gui-env-user LaunchAgent (user-specific macOS vars).
+  # User-specific vars (PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.) contain
+  # home-derived paths that resolve correctly per-user because macOS launchd
+  # GUI domains are per-user.  Split into a separate agent to make the
+  # scoping intentional and auditable alongside the general gui-env agent.
+  toUserLaunchctlScript =
+    let
+      os = "macOS";
+      relevant = builtins.filter (
+        name:
+        let
+          entry = catalog.${name};
+        in
+        builtins.elem os entry.hosts
+        && entry.scope == "all-process"
+        && (!entry ? excludeFromLaunchctl || !entry.excludeFromLaunchctl)
+        && (entry ? userSpecific && entry.userSpecific)
         && resolveValue name os != null
       ) (builtins.attrNames catalog);
     in
@@ -417,6 +449,7 @@ in
     toHomeSessionVariables
     toNixOSSystemEnvironment
     toLaunchctlScript
+    toUserLaunchctlScript
     toNixOSServiceEnv
     toJsonManifest
     getAllNixVarNames
