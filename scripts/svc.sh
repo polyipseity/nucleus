@@ -750,7 +750,9 @@ service_log_files() {
   user_dir="$(nucleus_log_dir)/$svc"
   system_dir="$(nucleus_system_log_dir)/$svc"
   for d in "$user_dir" "$system_dir"; do
-    [ -d "$d" ] && find "$d" -name '*.log' -type f 2>/dev/null || true
+    if [ -d "$d" ]; then
+      find "$d" -name '*.log' -type f 2>/dev/null
+    fi
   done
 }
 

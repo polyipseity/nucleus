@@ -187,7 +187,9 @@ in
             pattern="$2"
 
             # Use shell globbing with set -f/+f to safely expand patterns
-            ( cd "$baseDir" 2>/dev/null && ls -1d $pattern 2>/dev/null ) || true
+            if [ -d "$baseDir" ]; then
+              cd "$baseDir" && ls -1d $pattern 2>/dev/null
+            fi
           }
 
           # Read direct submodule paths from the repository .gitmodules file.
