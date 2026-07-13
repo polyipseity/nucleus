@@ -12,7 +12,7 @@
 usage_std() {
   _us_name="$1"
   _us_opts="${2:-}"
-  shift 2 2>/dev/null || true
+  shift 2 2>/dev/null
 
   printf 'usage: %s %s\n' "$_us_name" "$_us_opts"
   if [ "$#" -gt 0 ]; then

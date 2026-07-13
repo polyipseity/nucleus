@@ -26,7 +26,7 @@ let
     pkgs.writeShellScript "nucleus-gs-pdf-opt-nautilus-${preset}" ''
       pdfs=()
       for f in "$@"; do
-        case "$(${pkgs.file}/bin/file --mime-type -b "$f" 2>/dev/null || true)" in
+        case "$(${pkgs.file}/bin/file --mime-type -b "$f")" in
           application/pdf) pdfs+=("$f") ;;
         esac
       done

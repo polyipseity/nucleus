@@ -144,7 +144,7 @@ in
           if [ -L "$_nucleus_link_path" ]; then
             _nucleus_unprotect_symlink "customProvisionSymlinks" "$_nucleus_link_path"
           fi
-        done < <(${pkgs.jq}/bin/jq -r '.[]' "$_nucleus_manifest_path" 2>/dev/null || true)
+        done < <(${pkgs.jq}/bin/jq -r '.[]' "$_nucleus_manifest_path")
       fi
     '';
 

@@ -595,7 +595,7 @@ fi
 # Stale Nix build artifact check
 section "$((_step += 1))" "Stale Nix build artifact check"
 if ! $HAS_ARGS; then
-  _cnba_output="$("$SCRIPT_DIR/cleanup-nix.sh" --dry-run 2>&1)" || true
+  _cnba_output="$("$SCRIPT_DIR/cleanup-nix.sh" --dry-run 2>&1)"
   if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
     warn "stale Nix build artifacts found:"
     echo "$_cnba_output" | while IFS= read -r _cnba_line; do

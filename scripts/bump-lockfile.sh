@@ -356,7 +356,7 @@ if section_enabled vm-setup || section_enabled nixos-iso; then
 
     # Fetch the SHA-256 checksum from the .sha256 sidecar
     sha256_url="${resolved_url}.sha256"
-    sha256_content=$(curl -sL "$sha256_url" 2>/dev/null || true)
+    sha256_content=$(curl -sL "$sha256_url")
     new_sha256=$(printf '%s\n' "$sha256_content" | grep -oE '^[0-9a-f]{64}' | head -1)
     if [ -z "$new_sha256" ]; then
       warn "could not fetch checksum for $arch ($sha256_url)"

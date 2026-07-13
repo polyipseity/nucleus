@@ -620,7 +620,7 @@ _jfs_sync_libraries() {
       _jfsl_create_status="$(_jfs_status_from_response "$_jfsl_create_response")"
       if [ "$_jfsl_create_status" = "204" ]; then
         printf '%s\n' "jellyfin/library: created library '$_jfsl_name' ($_jfsl_collection_type)"
-        _jfs_api_request POST '/Library/Refresh' "$_jfsl_admin_token" '' >/dev/null 2>&1 || true
+        _jfs_api_request POST '/Library/Refresh' "$_jfsl_admin_token" ''
       else
         printf '%s\n' "jellyfin/library: failed to create library '$_jfsl_name' (HTTP $_jfsl_create_status)" >&2
       fi
@@ -630,7 +630,7 @@ _jfs_sync_libraries() {
       _jfsl_update_status="$(_jfs_status_from_response "$_jfsl_update_response")"
       if [ "$_jfsl_update_status" = "204" ]; then
         printf '%s\n' "jellyfin/library: updated library options for '$_jfsl_name'"
-        _jfs_api_request POST '/Library/Refresh' "$_jfsl_admin_token" '' >/dev/null 2>&1 || true
+        _jfs_api_request POST '/Library/Refresh' "$_jfsl_admin_token" ''
       else
         printf '%s\n' "jellyfin/library: failed to update library options for '$_jfsl_name' (HTTP $_jfsl_update_status)" >&2
       fi

@@ -281,7 +281,7 @@ in
         "$HOME/.local/state/nix/profiles/profile/bin" \
         "$HOME/.nix-profile/bin" \
         "$HOME/.local/state/home-manager/profile/bin" \
-        "$HOME/.local/home-manager/profile/bin" || true
+        "$HOME/.local/home-manager/profile/bin"
 
       # If bun is still not found, search the nix store for any bun binary
       # and add its parent directory to PATH.
@@ -520,7 +520,7 @@ in
         "$HOME/.local/state/nix/profiles/profile/bin" \
         "$HOME/.nix-profile/bin" \
         "$HOME/.local/state/home-manager/profile/bin" \
-        "$HOME/.local/home-manager/profile/bin" || true
+        "$HOME/.local/home-manager/profile/bin"
 
       if ! command -v rustup >/dev/null 2>&1; then
         echo "rustup: rustup not found after profile link; skipping initialization" >&2
@@ -584,7 +584,7 @@ in
         "$HOME/.local/state/nix/profiles/profile/bin" \
         "$HOME/.nix-profile/bin" \
         "$HOME/.local/state/home-manager/profile/bin" \
-        "$HOME/.local/home-manager/profile/bin" || true
+        "$HOME/.local/home-manager/profile/bin"
 
       # Guard: cargo is provided by rustup (stable toolchain) via ~/.cargo/bin;
       # initRustup ensures stable is installed before this step runs.
