@@ -100,9 +100,8 @@ function Invoke-WingetConfiguration {
   }
   finally {
     if ($tempConfigPath -and (Test-Path -Path $tempConfigPath)) {
-      # SilentlyContinue in a finally block prevents a temp-file cleanup failure
-      # from masking the original winget configure exception from the try block.
-      Remove-Item -Path $tempConfigPath -Force -ErrorAction SilentlyContinue
+      # WHY: cleanup-after-failure in finally block; file may already be gone.
+      Remove-Item -Path $tempConfigPath -Force -ErrorAction Ignore
     }
   }
 }

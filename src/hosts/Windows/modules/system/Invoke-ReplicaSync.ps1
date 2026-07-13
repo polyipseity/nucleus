@@ -363,13 +363,15 @@ function Invoke-ReplicaSync {
 
     foreach ($pattern in $FileGlobs) {
       Get-ChildItem -Path $TargetDir -Recurse -Force -File -Filter $pattern -ErrorAction SilentlyContinue |
-        Remove-Item -Force -ErrorAction SilentlyContinue
+        # WHY: cleanup-after-failure; matched items may have been deleted between discovery and removal.
+        Remove-Item -Force -ErrorAction Ignore
     }
 
     foreach ($directoryName in $DirectoryNames) {
       Get-ChildItem -Path $TargetDir -Recurse -Force -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -eq $directoryName } |
-        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        # WHY: cleanup-after-failure; matched dirs may have been deleted between discovery and removal.
+        Remove-Item -Recurse -Force -ErrorAction Ignore
     }
   }
 

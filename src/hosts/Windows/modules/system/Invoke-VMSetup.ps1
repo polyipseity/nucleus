@@ -532,7 +532,7 @@ This directory stores VM artifacts managed by `nucleus-vm-setup`.
     # Prune stale start scripts so removed VMs leave no orphaned files.
     $scriptsDir = Join-Path $vmDir 'scripts'
     if (Test-Path $scriptsDir) {
-        Remove-Item -Path (Join-Path $scriptsDir '*.sh'), (Join-Path $scriptsDir '*.ps1') -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path (Join-Path $scriptsDir '*.sh'), (Join-Path $scriptsDir '*.ps1') -Force
     }
 
     foreach ($vm in $vmDef.VMs) {
@@ -985,10 +985,8 @@ function Invoke-FidoWindowsIso {
         Write-Information "vm-setup: Windows ISO downloaded: $cachedIso"
         return $cachedIso
     } finally {
-        # WHY: always clean up the temp dir; -ErrorAction SilentlyContinue is
-        # acceptable here because temp-dir removal is a best-effort cleanup and
-        # failure is benign (the OS will eventually clean it up).
-        Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+        # WHY: cleanup-after-failure in finally block; temp-dir removal is best-effort.
+        Remove-Item $tmpDir -Recurse -Force -ErrorAction Ignore
     }
 }
 
@@ -1340,7 +1338,8 @@ function Invoke-BuildWindowsImage {
 
             if ($LASTEXITCODE -in 130, 143) {
                 Write-Warning "vm-setup: Windows Packer attempt cancelled (exit $LASTEXITCODE); aborting retry matrix"
-                Remove-Item $attemptTempDir -Recurse -Force -ErrorAction SilentlyContinue
+                # WHY: cleanup-after-failure; temp dir may not exist if cancelled early.
+                Remove-Item $attemptTempDir -Recurse -Force -ErrorAction Ignore
                 return
             }
 

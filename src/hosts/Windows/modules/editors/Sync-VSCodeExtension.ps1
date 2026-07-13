@@ -191,12 +191,12 @@ function Sync-VSCodeExtension {
       # extensions.json is a derived manifest VS Code writes on startup; a stale
       # one hides newly added managed extensions on the next launch.  Remove it
       # unconditionally so VS Code rescans the directory from the actual contents.
-      # Absence is expected when VS Code has not yet been launched — benign.
-      Remove-Item -Path (Join-Path $channel.ExtDir 'extensions.json') -Force -ErrorAction SilentlyContinue
+      # WHY: file may not exist before first VS Code launch; best-effort cleanup.
+      Remove-Item -Path (Join-Path $channel.ExtDir 'extensions.json') -Force -ErrorAction Ignore
 
       # .obsolete is VS Code's deferred-deletion marker; remove it so the bridge
-      # fully owns the directory state.  Absence is expected and benign.
-      Remove-Item -Path (Join-Path $channel.ExtDir '.obsolete') -Force -ErrorAction SilentlyContinue
+      # fully owns the directory state.  WHY: file may not exist; best-effort cleanup.
+      Remove-Item -Path (Join-Path $channel.ExtDir '.obsolete') -Force -ErrorAction Ignore
     }
   }
 }

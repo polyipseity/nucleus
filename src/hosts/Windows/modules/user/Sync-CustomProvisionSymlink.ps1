@@ -126,7 +126,7 @@ function Sync-CustomProvisionSymlink {
     if (-not $Enabled) {
       foreach ($previousPath in $previousManagedPaths) {
         if (Test-ManagedSymlink -Path $previousPath) {
-          Remove-Item -LiteralPath $previousPath -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath $previousPath -Force
         }
       }
       if (Test-Path -LiteralPath $manifestPath -PathType Leaf) {
@@ -161,7 +161,7 @@ function Sync-CustomProvisionSymlink {
     $desiredPaths = @($desiredEntries | ForEach-Object { $_.LinkPath })
     foreach ($stalePath in ($previousManagedPaths | Where-Object { $_ -notin $desiredPaths })) {
       if (Test-ManagedSymlink -Path $stalePath) {
-        Remove-Item -LiteralPath $stalePath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $stalePath -Force
       }
     }
 
@@ -193,7 +193,7 @@ function Sync-CustomProvisionSymlink {
           continue
         }
 
-        Remove-Item -LiteralPath $entry.LinkPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $entry.LinkPath -Force
       }
 
       try {

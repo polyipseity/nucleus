@@ -39,7 +39,7 @@ function Disable-SteamAutoStartup {
   $startupPath = [Environment]::GetFolderPath("Startup")
   $steamShortcut = Join-Path -Path $startupPath -ChildPath "Steam.lnk"
   if (Test-Path -Path $steamShortcut) {
-    Remove-Item -Path $steamShortcut -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $steamShortcut -Force
     Write-Output "steam: removed Steam.lnk from Startup folder"
   }
 }

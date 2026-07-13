@@ -71,9 +71,8 @@ function Get-Secret {
       Write-Output "$($PSStyle.Foreground.Yellow)Machine-key decryption failed. Falling back to GPG keyring...$($PSStyle.Reset)"
     }
     finally {
-      # SilentlyContinue in a finally block prevents a cleanup failure from
-      # masking the original exception from the try block above.
-      Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction SilentlyContinue
+      # WHY: cleanup-after-failure in finally block; env var may not be set.
+      Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction Ignore
     }
   }
 
@@ -103,9 +102,8 @@ function Get-Secret {
       throw "Primary-ssh decryption failed for '$FilePath' after machine-key and GPG attempts."
     }
     finally {
-      # SilentlyContinue in a finally block prevents a cleanup failure from
-      # masking the original exception from the try block above.
-      Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction SilentlyContinue
+      # WHY: cleanup-after-failure in finally block; env var may not be set.
+      Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction Ignore
     }
   }
 
