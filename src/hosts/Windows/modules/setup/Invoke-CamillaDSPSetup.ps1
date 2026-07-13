@@ -105,16 +105,7 @@ function Invoke-CamillaDSPSetup {
     Write-Output "camilladsp-setup: v$desiredVersion installed to $binaryPath"
 
     # Ensure install directory is on PATH for future sessions.
-    $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
-    if ($userPath -notlike "*$installDir*") {
-      $newPath = if ($userPath) { "$installDir;$userPath" } else { $installDir }
-      [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
-      Write-Output "camilladsp-setup: added $installDir to user PATH"
-    }
-    # Also update session-level PATH so the binary is immediately available.
-    if ($env:PATH -notlike "*$installDir*") {
-      $env:PATH = "$installDir;$env:PATH"
-    }
+    Set-NucleusUserPathEntry -Directory $installDir -Name "camilladsp-setup"
 
     # Method 1 (writable symlink): deploy user-level config to $HOME\.config
     # (cross-platform parity with POSIX ~/.config/camilladsp/configs/config.yml).

@@ -106,16 +106,7 @@ function Invoke-CamillaGUISetup {
     Write-Output "camillagui-backend-setup: v$desiredVersion installed to $installDir"
 
     # Ensure install directory is on PATH for future sessions.
-    $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
-    if ($userPath -notlike "*$installDir*") {
-      $newPath = if ($userPath) { "$installDir;$userPath" } else { $installDir }
-      [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
-      Write-Output "camillagui-backend-setup: added $installDir to user PATH"
-    }
-    # Also update session-level PATH so the binary is immediately available.
-    if ($env:PATH -notlike "*$installDir*") {
-      $env:PATH = "$installDir;$env:PATH"
-    }
+    Set-NucleusUserPathEntry -Directory $installDir -Name "camillagui-backend-setup"
 
     # Method 1 (writable symlink): deploy user-level config to $HOME\.config
     # (cross-platform parity with POSIX ~/.config/camillagui-backend/config.yml).
