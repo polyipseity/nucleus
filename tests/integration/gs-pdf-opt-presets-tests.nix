@@ -39,30 +39,35 @@ let
 
   test_no_old_gs_labels_in_macos = assert' (noOldLabel macServicesText) "macOS services.nix must not contain the old 'gs optimize pdf' label";
 
-  test_macos_presets_sorted = assert' (
-    let
-      # Check occurrences of preset labels appear in alphabetical order.
-      posDefault = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(default\\)" macServicesText)
-      );
-      posEbook = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(ebook\\)" macServicesText)
-      );
-      posPrepress = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(prepress\\)" macServicesText)
-      );
-      posPrinter = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(printer\\)" macServicesText)
-      );
-      posScreen = builtins.stringLength (
-        builtins.head (builtins.split "optimize pdf \\(screen\\)" macServicesText)
-      );
-    in
-    posDefault < posEbook
-    && posEbook < posPrepress
-    && posPrepress < posPrinter
-    && posPrinter < posScreen
-  ) "macOS services.nix presets must be in alphabetical order (d < e < p < p < s)";
+  test_macos_presets_sorted =
+    assert'
+      (
+        let
+          # Patterns match the `dir` field in currentNucleusQuickActions entries.
+          # Sort order: default first, then quality descending (printer > prepress >
+          # ebook > screen). This is the declared order in the explicit list.
+          posDefault = builtins.stringLength (
+            builtins.head (builtins.split "\"optimize PDF - default.workflow\"" macQuickActionsText)
+          );
+          posPrinter = builtins.stringLength (
+            builtins.head (builtins.split "\"optimize PDF - printer.workflow\"" macQuickActionsText)
+          );
+          posPrepress = builtins.stringLength (
+            builtins.head (builtins.split "\"optimize PDF - prepress.workflow\"" macQuickActionsText)
+          );
+          posEbook = builtins.stringLength (
+            builtins.head (builtins.split "\"optimize PDF - ebook.workflow\"" macQuickActionsText)
+          );
+          posScreen = builtins.stringLength (
+            builtins.head (builtins.split "\"optimize PDF - screen.workflow\"" macQuickActionsText)
+          );
+        in
+        posDefault < posPrinter
+        && posPrinter < posPrepress
+        && posPrepress < posEbook
+        && posEbook < posScreen
+      )
+      "macOS quick-actions.nix presets must be in custom order (default < printer < prepress < ebook < screen)";
 
   test_all_5_presets_in_nixos = assert' (
     allPresetsPresent nixosServicesText

@@ -22,6 +22,18 @@
 #   activation script simpler and faster while keeping build-time safety.
 { lib, pkgs, ... }:
 let
+  # ── Helpers ──────────────────────────────────────────────────────────
+
+  # Generate a plist <dict> from an attribute set of booleans.
+  # Used to build NSServicesStatus presentation_modes values.
+  mkPresentationModes =
+    modes:
+    let
+      boolStr = v: if v then "true" else "false";
+      entries = lib.mapAttrsToList (name: value: "<key>${name}</key><${boolStr value}/>") modes;
+    in
+    "<dict>${builtins.concatStringsSep "" entries}</dict>";
+
   nucleusManualAppService =
     pkgs.runCommand "nucleus-manual-app"
       {
@@ -84,9 +96,42 @@ let
     }
   ];
 
-  # List of currently deployed app service directories.
+  # Currently deployed app services. Add new services here.
+  # Each entry has:
+  #   - appDir: directory name in ~/Applications/
+  #   - bundleId: CFBundleIdentifier (used for NSServicesStatus key)
+  #   - menuItem: NSMenuItem.default (used for NSServicesStatus key)
+  #   - message: NSMessage (used for NSServicesStatus key)
+  #   - source: derivation path to copy from
+  #   - presentationModes: dict for NSServicesStatus enablement
+  #
+  # Sorting policy: alphabetical by appDir by default. Delegation order
+  # always follows the sorted list. If an exception is needed, document
+  # it below with rationale.
+  currentNucleusAppServices = [
+    {
+      appDir = "NucleusManual.app";
+      bundleId = "com.nucleus.OpenNucleusManual";
+      menuItem = "open nucleus manual";
+      message = "open";
+      source = "${nucleusManualAppService}/NucleusManual.app";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+  ];
+
+  # List of currently deployed app service directories (derived).
   # Used by tests and documentation to track active app services.
-  currentNucleusAppServiceDirs = [ "NucleusManual.app" ];
+  currentNucleusAppServiceDirs = map (svc: svc.appDir) currentNucleusAppServices;
+
+  # Sort alphabetically by appDir for deterministic deployment.
+  sortedCurrentNucleusAppServices = builtins.sort (
+    a: b: a.appDir < b.appDir
+  ) currentNucleusAppServices;
 in
 {
   home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
@@ -112,27 +157,30 @@ in
     )}
 
     # ── Phase 2: Deploy app services ───────────────────────────────────
-    app_path="$APP_DIR/NucleusManual.app"
-    store_path="${nucleusManualAppService}/NucleusManual.app"
+    ${builtins.concatStringsSep "\n" (
+      map (svc: ''
+        app_path="$APP_DIR/${svc.appDir}"
+        store_path="${svc.source}"
 
-    mkdir -p "$APP_DIR"
-    # Nix store outputs are read-only; strip that before deletion to avoid
-    # Permission denied on the next generation switch.
-    chmod -R +w "$app_path" 2>/dev/null || true  # WHY: dir may not exist on first apply
-    rm -rf "$app_path"
-    cp -R "$store_path" "$APP_DIR/"
+        mkdir -p "$APP_DIR"
+        # Nix store outputs are read-only; strip that before deletion to avoid
+        # Permission denied on the next generation switch.
+        chmod -R +w "$app_path" 2>/dev/null || true  # WHY: dir may not exist on first apply
+        rm -rf "$app_path"
+        cp -R "$store_path" "$APP_DIR/"
 
-    "$LSREGISTER" -R -f "$app_path" || true  # WHY: LaunchServices may reject unsigned bundles; not fatal
+        "$LSREGISTER" -R -f "$app_path" || true  # WHY: LaunchServices may reject unsigned bundles; not fatal
 
-    # Enable the service in NSServicesStatus so it appears in the Services
-    # menu and right-click context menu without manual toggling in
-    # System Settings > Extensions > Services.
-    # Service key format: "<NSBundleIdentifier> - <NSMenuItem.default> - <NSMessage>"
-    # Uses presentation_modes dict (macOS 14+) instead of legacy
-    # enabled_context_menu/enabled_services_menu booleans.
-    enablement_key="com.nucleus.OpenNucleusManual - open nucleus manual - open"
-    /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
-      '<dict><key>presentation_modes</key><dict><key>ContextMenu</key><true/><key>ServicesMenu</key><true/><key>FinderPreview</key><true/><key>TouchBar</key><true/></dict></dict>'
-
+        # Enable the service in NSServicesStatus so it appears in the Services
+        # menu and right-click context menu without manual toggling in
+        # System Settings > Extensions > Services.
+        # Service key format: "<NSBundleIdentifier> - <NSMenuItem.default> - <NSMessage>"
+        # Uses presentation_modes dict (macOS 14+) instead of legacy
+        # enabled_context_menu/enabled_services_menu booleans.
+        enablement_key="${svc.bundleId} - ${svc.menuItem} - ${svc.message}"
+        /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
+          '<dict><key>presentation_modes</key>${mkPresentationModes svc.presentationModes}</dict>'
+      '') sortedCurrentNucleusAppServices
+    )}
   '';
 }
