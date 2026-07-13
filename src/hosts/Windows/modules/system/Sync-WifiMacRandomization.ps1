@@ -45,7 +45,9 @@ function Sync-WifiMacRandomization {
 
   foreach ($guid in $interfaceGuids) {
     $ifacePath = Join-Path -Path $wlanSvcPath -ChildPath $guid
+    # WHY: probe whether registry values exist; Get-ItemProperty throws when value is absent.
     $ifaceName = (Get-ItemProperty -Path $ifacePath -Name 'InterfaceName' -ErrorAction SilentlyContinue).InterfaceName
+    # WHY: probe whether registry values exist; Get-ItemProperty throws when value is absent.
     $ifaceDesc = (Get-ItemProperty -Path $ifacePath -Name 'InterfaceDescription' -ErrorAction SilentlyContinue).InterfaceDescription
 
     # Only process Wi-Fi adapters (skip Bluetooth, virtual, etc.)
@@ -68,6 +70,7 @@ function Sync-WifiMacRandomization {
     }
 
     try {
+      # WHY: probe whether RandomizationEnabled exists; Get-ItemProperty throws when absent.
       $currentValue = (Get-ItemProperty -Path $paramsPath -Name 'RandomizationEnabled' -ErrorAction SilentlyContinue).RandomizationEnabled
     }
     catch {

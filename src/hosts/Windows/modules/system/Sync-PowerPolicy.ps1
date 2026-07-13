@@ -106,6 +106,7 @@ function Sync-PowerPolicy {
     Invoke-PowerCfgChecked -Arguments @('/change', 'disk-timeout-dc', '10') -FailureMessage 'Failed to restore battery disk timeout.'
     Invoke-PowerCfgChecked -Arguments @('/setactive', $activeSchemeGuid) -FailureMessage 'Failed to reactivate the current power scheme after restoring defaults.'
 
+    # WHY: probe whether KeepAliveTime exists before removing; Get-ItemProperty throws when absent.
     if (Get-ItemProperty -Path $tcpParamsPath -Name 'KeepAliveTime' -ErrorAction SilentlyContinue) {
       Remove-ItemProperty -Path $tcpParamsPath -Name 'KeepAliveTime'
     }
