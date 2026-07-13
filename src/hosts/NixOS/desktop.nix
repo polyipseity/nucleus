@@ -211,7 +211,7 @@
   #   NixOS   — this activation script
   #   Windows — Disable-SteamAutoStartup module + apply.ps1
   system.activationScripts.disableSteamAutostart = lib.mkAfter ''
-    find /home -maxdepth 3 -path '*/autostart/steam.desktop' -delete 2>/dev/null || true
+    # WHY || true: steam autostart entry may not exist on first install;\n    # best-effort cleanup that should not abort activation.\n    find /home -maxdepth 3 -path '*/autostart/steam.desktop' -delete 2>/dev/null || true
   '';
 
   # EasyEffects: graphical PipeWire audio processing GUI with plugin-based

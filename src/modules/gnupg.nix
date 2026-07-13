@@ -26,6 +26,8 @@ lib.mkIf
     # allow-loopback-pinentry is unset, breaking non-interactive signing.
     system.activationScripts.postActivation.text = lib.mkAfter ''
       # ---- configureGpgAgent ----------------------------------------------------
+      # WHY || true: /dev/console may not exist (headless/SSH session);
+      # empty result means no console user, handled downstream.
       _console_home="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
       if [ -n "$_console_home" ] && [ "$_console_home" != "/Users/root" ]; then
         /bin/mkdir -p "$_console_home/.gnupg"

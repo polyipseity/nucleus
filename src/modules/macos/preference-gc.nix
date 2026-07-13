@@ -91,6 +91,8 @@ in
 
       for variant in $domain_variants; do
         # Clear in-memory registration first, then remove persisted payloads.
+        # WHY || true: preference key may not exist; defaults delete exits 1
+        # for missing keys (graceful no-op on first run).
         /usr/bin/defaults delete "$variant" >/dev/null 2>&1 || true
 
         if [ -d "$prefs_root" ]; then

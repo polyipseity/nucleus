@@ -103,6 +103,8 @@ rec {
   # Sources for default extras: ``/`` reappears after daemon restarts, the
   # user's home-directory alias shows up on new macOS versions, and `.Trash`
   # re-emerges on macOS upgrades.
+  # WHY || true on all mysides remove/add calls below: mysides is known to
+  # segfault on corrupted bookmarks; || true prevents activation abort.
   finderSidebarPreRemoveShell = ''
     ${builtins.concatStringsSep "\n" (
       map
@@ -139,6 +141,8 @@ rec {
   );
 
   # Best-effort add mode for relaunchDesktopServices: preserve soft-fail behavior.
+  # WHY || true: see finderSidebarPreRemoveShell — mysides segfaults on
+  # corrupted bookmarks; best-effort add that must not abort activation.
   finderSidebarAddManagedBestEffortShell = builtins.concatStringsSep "\n" (
     map (
       favorite:
@@ -148,6 +152,8 @@ rec {
 
   # Remove Finder defaults that can reappear after daemon restarts.
   finderSidebarRemoveDefaultExtrasShell = ''
+    # WHY || true: see finderSidebarPreRemoveShell — mysides segfaults on
+    # corrupted bookmarks; best-effort removal of default sidebar entries.
     "$MYSIDES_BIN" remove "/" >/dev/null 2>&1 || true
     "$MYSIDES_BIN" remove "$(id -un)" >/dev/null 2>&1 || true
     "$MYSIDES_BIN" remove ".Trash" >/dev/null 2>&1 || true

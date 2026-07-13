@@ -282,7 +282,9 @@ lib.mkIf isPrimaryUser {
     # The `exit` in awk stops at the first fpr record, giving the primary key
     # fingerprint rather than a subkey fingerprint.
     # The || true prevents a silent set -e / pipefail exit if gpg emits errors;
-    # the [ -z ] guard below catches and reports an empty result explicitly.
+    # WHY || true: GPG may emit non-zero exit for malformed/dry-run key material
+    # during import-options dry-run; the [ -z ] guard below catches and reports
+    # an empty result explicitly.
     first_key_fingerprint="$(${pkgs.gnupg}/bin/gpg --batch --import-options show-only --dry-run --with-colons --import "${
       config.sops.secrets.${gpgSecretName}.path
     }" | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')" || true
@@ -368,8 +370,8 @@ lib.mkIf isPrimaryUser {
        # upstream sops-nix error with a different message.
        echo "secrets: managed SSH public key not found at $ssh_pub_path; skipping fingerprint adoption." >&2
      else
-       new_fingerprint=""
-       new_fingerprint="$(${pkgs.openssh}/bin/ssh-keygen -lf "$ssh_pub_path" | /usr/bin/awk '{print $2}')" || true
+       new_fingerprint=""       # WHY || true: SSH public key may not exist yet on first provision;
+       # ssh-keygen -lf exits 1 for missing/invalid keys.       new_fingerprint="$(${pkgs.openssh}/bin/ssh-keygen -lf "$ssh_pub_path" | /usr/bin/awk '{print $2}')" || true
 
        if [ -z "$new_fingerprint" ]; then
          echo "secrets: could not extract fingerprint from $ssh_pub_path; skipping adoption." >&2
@@ -515,6 +517,8 @@ lib.mkIf isPrimaryUser {
       # machine-readable non-interactive output; --no-autostart prevents GPG from
       # launching a new agent daemon (which deadlocks on macOS when the agent
       # socket directory is not yet ready during non-interactive activation).
+      # WHY || true: GnuPG may fail if GNUPGHOME doesn't exist yet on first
+      # activation; the subsequent grep check handles empty output.
       _vsd_gpg_all_secret_fprs="$(GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
         ${pkgs.gnupg}/bin/gpg --with-colons --no-autostart --list-secret-keys)" || true
       if ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_managed_fpr"; then
@@ -569,6 +573,8 @@ lib.mkIf isPrimaryUser {
       # No private key material is accessed.
       _vsd_ssh_age_pub=""
       _vsd_ssh_failures=""
+      # WHY || true: ssh-to-age may fail if the SSH public key hasn't been
+      # materialized yet (first bootstrap); empty result is handled below.
       _vsd_ssh_age_pub="$(${pkgs.ssh-to-age}/bin/ssh-to-age -i "${sshPublicKeyPath}")" || true
       if [ -z "$_vsd_ssh_age_pub" ]; then
         echo "secrets: ERROR — personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure ${sshPublicKeyPath} is a valid Ed25519 public key." >&2
