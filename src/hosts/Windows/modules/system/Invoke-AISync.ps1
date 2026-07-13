@@ -111,7 +111,7 @@ function Invoke-AISync {
   # model list/pull/rm commands talk to the inference backend directly instead
   # of routing through the AI gateway proxy.  The default user env var in
   # user/env.dsc.yml points at LiteLLM (127.0.0.1:4000).
-  $svc = Get-Content -Raw (Join-Path $resolvedRepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+  $svc = Get-Content -Raw (Join-Path $resolvedRepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
   $env:OLLAMA_HOST = if ($svc.ollama.network.default) { "$($svc.ollama.network.default.host):$($svc.ollama.network.default.port)" } else { '127.0.0.1:11434' }
 
   # Determine the active model profile.  NUCLEUS_AI_SYNC_PROFILE env var overrides

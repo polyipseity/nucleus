@@ -74,7 +74,7 @@ function Sync-CaddyLocalCA {
     return
   }
 
-  $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+  $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
   $adminAddr = if ($svc.caddy.network.admin) { "$($svc.caddy.network.admin.host):$($svc.caddy.network.admin.port)" } else { '127.0.0.1:2019' }
 
   for ($attempt = 1; $attempt -le 20; $attempt++) {

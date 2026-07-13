@@ -101,7 +101,7 @@ function Sync-JellyfinAccount {
   )
 
   if ([string]::IsNullOrEmpty($BaseUrl)) {
-    $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
     $BaseUrl = if ($svc.jellyfin.network.http) { "http://$($svc.jellyfin.network.http.host):$($svc.jellyfin.network.http.port)" } else { 'http://127.0.0.1:8096' }
   }
 

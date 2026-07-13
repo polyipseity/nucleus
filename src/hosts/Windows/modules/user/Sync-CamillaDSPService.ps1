@@ -58,7 +58,7 @@ function Sync-CamillaDSPService {
 
   # Read port from services.json (single source of truth).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
-  $svc = Get-Content -Raw (Join-Path $repoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+  $svc = Get-Content -Raw (Join-Path $repoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
   $wsPort = if ($svc.camilladsp.network.websocket.port) { $svc.camilladsp.network.websocket.port } else { 1234 }
 
   $userId = if ([string]::IsNullOrWhiteSpace($env:USERDOMAIN)) {
@@ -155,7 +155,7 @@ $heartbeatTimer = [System.Threading.Timer]::new({
   $cf, $p, $ncf = $s
   # Check runtime toggle on every tick.
   if (Test-Path $ncf) {
-    $nc = Get-Content -Raw $ncf -ErrorAction SilentlyContinue | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $nc = Get-Content -Raw $ncf -ErrorAction SilentlyContinue | ConvertFrom-Json
     if ($null -ne $nc.camilladsp.heartbeat -and -not $nc.camilladsp.heartbeat) { return }
   }
   try {
