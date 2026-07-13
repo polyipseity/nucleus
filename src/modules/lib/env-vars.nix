@@ -155,6 +155,27 @@ let
       why = "Point clients at LiteLLM proxy instead of Ollama directly.";
     };
 
+    # Ollama runtime tunables (NixOS systemd service only — macOS uses
+    # model manifest defaults instead of launchd env overrides).
+    OLLAMA_FLASH_ATTENTION = {
+      value = "1";
+      scope = "all-process";
+      hosts = [ "NixOS" ];
+      why = "Enable flash attention to reduce attention memory overhead.";
+    };
+    OLLAMA_CONTEXT_LENGTH = {
+      value = "32768";
+      scope = "all-process";
+      hosts = [ "NixOS" ];
+      why = "Set 32k token default context window so models that default to 2k/4k do not silently truncate.";
+    };
+    OLLAMA_KV_CACHE_TYPE = {
+      value = "q4_0";
+      scope = "all-process";
+      hosts = [ "NixOS" ];
+      why = "Compress KV cache with 4-bit quantisation to halve RAM footprint.";
+    };
+
     # ── Password store (all-process) ─────────────────────────────────
     PASSWORD_STORE_DIR = {
       value = passwordStoreDir;
@@ -277,8 +298,9 @@ let
   currentOs = if pkgs.stdenv.isDarwin then "macOS" else "NixOS";
 
   # ── Generic filter over attrNames ────────────────────────────────
+  # Takes predicate (name, entry -> bool) and target OS for value resolution.
   filterAttrsByEntry =
-    pred:
+    pred: os:
     builtins.listToAttrs (
       builtins.concatMap (
         name:
@@ -289,7 +311,7 @@ let
           [
             {
               inherit name;
-              value = resolveValue name currentOs;
+              value = resolveValue name os;
             }
           ]
         else
@@ -302,18 +324,16 @@ let
   # null-valued ones (set outside home-manager, e.g. EDITOR).
   toHomeSessionVariables = filterAttrsByEntry (
     name: entry: builtins.elem currentOs entry.hosts && resolveValue name currentOs != null
-  );
+  ) currentOs;
 
   # ── toNixOSEnvironment ───────────────────────────────────────────
   # All-process vars applicable to NixOS for environment.variables.
-  toNixOSEnvironment =
-    let
-      os = "NixOS";
-    in
-    filterAttrsByEntry (
-      name: entry:
-      builtins.elem os entry.hosts && entry.scope == "all-process" && resolveValue name os != null
-    );
+  toNixOSEnvironment = filterAttrsByEntry (
+    name: entry:
+    builtins.elem "NixOS" entry.hosts
+    && entry.scope == "all-process"
+    && resolveValue name "NixOS" != null
+  ) "NixOS";
 
   # ── toLaunchctlScript ────────────────────────────────────────────
   # Shell script for macOS gui-env LaunchAgent (all-process macOS vars).
@@ -343,18 +363,14 @@ let
 
   # ── toNixOSServiceEnv ────────────────────────────────────────────
   # OLLAMA_* vars for services.ollama.environmentVariables.
-  toNixOSServiceEnv =
-    let
-      os = "NixOS";
-    in
-    filterAttrsByEntry (
-      name: entry:
-      builtins.elem os entry.hosts
-      && entry.scope == "all-process"
-      && lib.strings.hasPrefix "OLLAMA_" name
-      && name != "OLLAMA_HOST"
-      && resolveValue name os != null
-    );
+  toNixOSServiceEnv = filterAttrsByEntry (
+    name: entry:
+    builtins.elem "NixOS" entry.hosts
+    && entry.scope == "all-process"
+    && lib.strings.hasPrefix "OLLAMA_" name
+    && name != "OLLAMA_HOST"
+    && resolveValue name "NixOS" != null
+  ) "NixOS";
 
   # ── Introspection for Windows parity tests ───────────────────────
   toJsonManifest = builtins.toJSON (

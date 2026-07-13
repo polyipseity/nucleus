@@ -1307,62 +1307,22 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # setenv for every variable that GUI applications (Obsidian, VS Code, oterm,
   # etc.) need.
   #
-  # Shell-only variables (CC, CXX, LD) are intentionally excluded: absolute
-  # Nix LLVM store paths in GUI process env interfere with Xcode toolchain
-  # discovery — see env-variable-scope.instructions.md and the annotated list
-  # in shell.nix:env.nix.
+  # The var list is generated from the centralized catalog — see
+  # src/modules/lib/env-vars.nix (toLaunchctlScript).  Shell-only vars (CC, CXX,
+  # LD) are excluded by the helper: they have scope="shell-only" in the catalog.
   # --------------------------------------------------------------------------
-  launchd.agents."gui-env" =
-    let
-      defaultDevTools = pkgs.symlinkJoin {
-        name = "default-dev-tools";
-        paths = [
-          pkgs.bun
-          pkgs.prek
-          pkgs.uv
-        ];
-      };
-
-      allUsers = builtins.fromJSON (builtins.readFile ./users.json);
-      effectiveUsers = if users != null then users else allUsers;
-      perUser =
-        effectiveUsers.${config.home.username}
-          or (builtins.abort "macos: user ${config.home.username} not found in src/modules/users.json");
-      passwordStoreDir =
-        let
-          rawPath = perUser.passwordStore.path or "${config.home.homeDirectory}/.password-store";
-        in
-        builtins.replaceStrings [ "~" ] [ config.home.homeDirectory ] rawPath;
-    in
-    {
-      enable = true;
-      config = {
-        Label = "local.gui-env";
-        ProgramArguments = [
-          "${pkgs.writeShellScript "gui-env-agent" ''
-            /bin/launchctl setenv DEVELOPER_DIR "${pkgs.apple-sdk}"
-            /bin/launchctl setenv SDKROOT "${pkgs.apple-sdk}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
-            /bin/launchctl setenv LIBRARY_PATH "${pkgs.libiconv}/lib"
-            /bin/launchctl setenv EDITOR nvim
-            /bin/launchctl setenv VISUAL nvim
-            /bin/launchctl setenv OPENCODE_DISABLE_AUTOUPDATE true
-            /bin/launchctl setenv OLLAMA_HOST 127.0.0.1:4000
-            /bin/launchctl setenv PASSWORD_STORE_DIR "${passwordStoreDir}"
-            /bin/launchctl setenv GOPASS_CONFIG_COUNT 1
-            /bin/launchctl setenv GOPASS_CONFIG_KEY_1 path
-            /bin/launchctl setenv GOPASS_CONFIG_VALUE_1 "${passwordStoreDir}"
-            /bin/launchctl setenv NUCLEUS_DEFAULT_DEV_BIN "${defaultDevTools}/bin"
-            /bin/launchctl setenv NUCLEUS_DEFAULT_DEV_ENV 1
-            /bin/launchctl setenv NUCLEUS_HOST MacBook
-            /bin/launchctl setenv NUCLEUS_REPO_ROOT "${repoRoot}"
-            /bin/launchctl setenv NIX_SSL_CERT_FILE "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
-            /bin/launchctl setenv STARSHIP_CACHE "${config.home.homeDirectory}/.cache/starship"
-            /bin/launchctl setenv STARSHIP_CONFIG "${config.home.homeDirectory}/.config/starship.toml"
-          ''}"
-        ];
-        # Run once at login so the GUI domain is populated before any app starts.
-        RunAtLoad = true;
-        KeepAlive = false;
-      };
+  launchd.agents."gui-env" = {
+    enable = true;
+    config = {
+      Label = "local.gui-env";
+      ProgramArguments = [
+        "${pkgs.writeShellScript "gui-env-agent"
+          (import ../lib/env-vars.nix { inherit config pkgs lib; }).toLaunchctlScript
+        }"
+      ];
+      # Run once at login so the GUI domain is populated before any app starts.
+      RunAtLoad = true;
+      KeepAlive = false;
     };
+  };
 }

@@ -8,7 +8,13 @@
 # The Home Manager module modules/ai/default.nix provides the ollama CLI binary,
 # OLLAMA_HOST session variable, and the oterm client on all POSIX hosts
 # including this one.
-{ config, pkgs, ... }: {
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+{
   # LiteLLM AI gateway — systemd service on 127.0.0.1:4000.
   # Since nixpkgs has no services.litellm module yet, we define the service
   # manually.  ExecStart uses a shell wrapper that reads the SOPS-decrypted
@@ -74,13 +80,11 @@
     # Source: Ollama runtime environment-variable references.
     # https://github.com/ollama/ollama/blob/main/docs/faq.md
     # https://github.com/ollama/ollama/blob/main/envconfig/config.go
-    environmentVariables = {
-      OLLAMA_FLASH_ATTENTION = "1";
-      # Source: Ollama context-window environment variable.
-      # https://docs.ollama.com/faq#how-can-i-specify-the-context-window-size
-      OLLAMA_CONTEXT_LENGTH = "32768";
-      OLLAMA_KV_CACHE_TYPE = "q4_0";
-    };
+    # Ollama runtime env vars sourced from the centralized catalog.
+    # See src/modules/lib/env-vars.nix (OLLAMA_FLASH_ATTENTION,
+    # OLLAMA_CONTEXT_LENGTH, OLLAMA_KV_CACHE_TYPE entries).
+    environmentVariables =
+      (import ../../modules/lib/env-vars.nix { inherit config pkgs lib; }).toNixOSServiceEnv;
   };
 
   # Cap the Ollama systemd service at 16 GB RSS so an oversized model pull

@@ -277,7 +277,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-!/src/modules/env/
 
 # Spyder project settings
 .spyderproject
@@ -341,6 +340,7 @@ __marimo__/
 # }
 
 # self {
+!/src/modules/env/
 !/src/modules/lib/
 /src/hosts/Windows/system/*.locked.dsc.yml
 /src/hosts/Windows/user/*.locked.dsc.yml

@@ -3,9 +3,6 @@
 # host level by which user's Home Manager config imports this module.
 { nixpkgs, pkgs, ... }:
 let
-  servicesJSON = builtins.fromJSON (builtins.readFile ../services.json);
-  litellmEndpoint = servicesJSON.litellm.network.default;
-
   appleSiliconDarwin = pkgs.stdenv.isDarwin && pkgs.stdenv.hostPlatform.system == "aarch64-darwin";
 
   otermPkg =
@@ -27,7 +24,6 @@ in
     otermPkg
   ];
 
-  home.sessionVariables = {
-    OLLAMA_HOST = "${litellmEndpoint.host}:${toString litellmEndpoint.port}";
-  };
+  # OLLAMA_HOST is defined in the centralized env var catalog
+  # (src/modules/lib/env-vars.nix) and injected via home.sessionVariables.
 }

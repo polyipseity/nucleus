@@ -21,7 +21,7 @@ let
   # Dedicated alias/env fragments keep list-like attrsets isolated so sort order
   # can be audited without scanning unrelated shell options.
   shellAliases = import ./shell/aliases.nix { };
-  sessionVariables = import ./shell/env.nix { inherit pkgs; };
+  envVarsHelpers = import ../lib/env-vars.nix { inherit config pkgs lib; };
 
   # Single source of truth for AI agent session detection.  Shared with
   # pwsh.nix and Sync-ShellProfile.ps1 (Windows).
@@ -41,43 +41,14 @@ let
     ];
   };
 
-  # Publish the fallback toolchain path as a session variable so every managed
-  # shell can reach the same user-scoped binaries without duplicating the store
-  # path string in multiple helper functions.
-  # Scope: all-process — also set in gui-env LaunchAgent on macOS so GUI apps
-  # (VS Code tasks, Obsidian, oterm) find the fallback toolchain.
-  mergedSessionVariables =
-    sessionVariables
-    // {
-      NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin";
-      NUCLEUS_DEFAULT_DEV_ENV = "1";
-    }
-    // lib.optionalAttrs pkgs.stdenv.isDarwin {
-      # Scope: macOS, all-process — also set in gui-env LaunchAgent.
-      # WHY: rustc and cargo invoke `/usr/bin/xcrun --sdk macosx --show-sdk-path`
-      # directly during native-code builds (unrelated to $CC resolution).  Without
-      # Xcode CLT installed, xcrun pops the installation dialog.  DEVELOPER_DIR
-      # pointing at the Nix apple-sdk lets xcrun discover the SDK from the Nix store
-      # — no CLT needed.  Verified: `env -i DEVELOPER_DIR=<nix-apple-sdk>
-      # /usr/bin/xcrun --sdk macosx --show-sdk-path` succeeds without dialog.
-      # macOS-only: apple-sdk is not available on NixOS/Windows.
-      DEVELOPER_DIR = "${pkgs.apple-sdk}";
-
-      # WHY: same rationale as DEVELOPER_DIR — xcrun needs the full SDK path.
-      # Without this, xcrun --show-sdk-path fails even when DEVELOPER_DIR is set
-      # correctly, because xcrun looks up SDKROOT internally based on DEVELOPER_DIR
-      # but having it explicit avoids a second xcrun invocation.
-      SDKROOT = "${pkgs.apple-sdk}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
-
-      # WHY: rustup-managed cargo on macOS needs libiconv in LIBRARY_PATH when
-      # building crates with C dependencies (for example openssl-sys, libgit2-sys).
-      # Without this, the system linker fails with "ld: library not found for -liconv".
-      # In devShells (use flake), buildInputs = [libiconv] handles this via NIX_LDFLAGS.
-      # For interactive sessions outside a devShell — including rustup run stable cargo
-      # and cargo in a directory that has only .envrc (even empty) with a rust-toolchain.toml
-      # — this persistent variable ensures the linker finds Nix's libiconv.
-      LIBRARY_PATH = "${pkgs.libiconv}/lib";
-    };
+  # All env vars are sourced from the centralized catalog.  NUCLEUS_DEFAULT_DEV_*
+  # and the macOS-specific vars (DEVELOPER_DIR, SDKROOT, LIBRARY_PATH) are all
+  # included in toHomeSessionVariables.  We overlay NUCLEUS_DEFAULT_DEV_* here
+  # as well so the shell functions below keep their local defaultDevTools ref.
+  mergedSessionVariables = envVarsHelpers.toHomeSessionVariables // {
+    NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin";
+    NUCLEUS_DEFAULT_DEV_ENV = "1";
+  };
 
   # Keep iCloud exclusion names and managed root paths in one declarative source
   # (users.json) so activation-time recursive marking and interactive shell hooks

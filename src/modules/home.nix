@@ -171,26 +171,11 @@ in
       cd /
     '';
 
-    # Per-user password store routing for pass/QtPass/gopass.
-    # - pass and QtPass respect PASSWORD_STORE_DIR directly.
-    # - gopass also supports PASSWORD_STORE_DIR and explicit config overrides;
-    #   set config override env keys so gopass always resolves this path.
-    # Scope: all-process — also set in gui-env LaunchAgent (macOS),
-    # environment.variables (NixOS), and env.dsc.yml (Windows).
-    home.sessionVariables = {
-      GOPASS_CONFIG_COUNT = "1";
-      GOPASS_CONFIG_KEY_1 = "path";
-      GOPASS_CONFIG_VALUE_1 = passwordStoreDir;
-      PASSWORD_STORE_DIR = passwordStoreDir;
-    }
-    // lib.optionalAttrs pkgs.stdenv.isDarwin {
-      # Point out-of-store symlinks (e.g. CamillaDSP config) at the live repo
-      # tree so activation scripts can wire them up without dry-run uncertainty.
-      # Resolved from the NUCLEUS_REPO_ROOT env var that apply.sh exports before the
-      # rebuild — avoids hard-coding a machine-specific absolute path.
-      # Scope: macOS, all-process — also set in gui-env LaunchAgent.
-      NUCLEUS_REPO_ROOT = builtins.getEnv "NUCLEUS_REPO_ROOT";
-    };
+    # Session variables are sourced from the centralized env var catalog
+    # (src/modules/lib/env-vars.nix).  This replaces the previously inline
+    # password-store vars and macOS-specific NUCLEUS_REPO_ROOT.
+    home.sessionVariables =
+      (import ../lib/env-vars.nix { inherit config pkgs lib; }).toHomeSessionVariables;
 
     # QtPass keeps its own persisted settings store, which can override
     # PASSWORD_STORE_DIR and GUI behavior when launched outside the shell.

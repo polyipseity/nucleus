@@ -1,5 +1,10 @@
 # PowerShell profile for POSIX hosts.
-{ lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   # Fallback tool inventory matching shell.nix for repos without direnv/Nix hooks.
   defaultDevTools = pkgs.symlinkJoin {
@@ -17,7 +22,7 @@ let
   pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
   pwshYamlVersion = lockfile.pwsh."powershell-yaml" or null;
 
-  shellEnv = import ./shell/env.nix { inherit pkgs; }; # CC, CXX, LD from ./shell/env.nix
+  envVars = import ../lib/env-vars.nix { inherit config pkgs lib; };
 
   profileContent = ''
         # This file is managed by nucleus (src/modules/pwsh.nix).
@@ -79,11 +84,12 @@ let
           Invoke-Expression (& starship init powershell | Out-String)
         }
 
-        # LLVM/Clang toolchain defaults for cross-host compiler parity.
-        # Values sourced from src/modules/shell/env.nix.
-        $env:CC = "${shellEnv.CC}"
-        $env:CXX = "${shellEnv.CXX}"
-        $env:LD = "${shellEnv.LD}"
+        # LLVM/Clang toolchain defaults sourced from the centralized env var
+        # catalog.  Shell-only on macOS; all-process on NixOS/Windows.
+        # Source: src/modules/lib/env-vars.nix (CC, CXX, LD entries).
+        $env:CC = "${envVars.catalog.CC.value}"
+        $env:CXX = "${envVars.catalog.CXX.value}"
+        $env:LD = "${envVars.catalog.LD.value}"
 
         # ---------------------------------------------------------------
         # AI agent session detection
