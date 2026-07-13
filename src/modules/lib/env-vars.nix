@@ -53,33 +53,33 @@ let
   #   excludeFromLaunchctl: true for shell-only vars (default false)
   #   userSpecific: true if the value depends on the logged-in user (default false)
   catalog = {
-    # ── Shell-only: Nix LLVM paths stay out of GUI env on macOS ─────
+    # ── Compiler toolchain (all-process) ────────────────────────────
     CC = {
       value = "${pkgs.llvmPackages.clang}/bin/clang";
-      scope = "shell-only";
+      scope = "all-process";
       hosts = [
         "macOS"
         "NixOS"
       ];
-      why = "Nix LLVM paths in GUI process env interfere with Xcode toolchain discovery.";
+      why = "Nix CC for native builds. All-process is safe on macOS (no Xcode CLT conflict with apple-sdk DEVELOPER_DIR) and desired on NixOS. Not set on Windows (Nix store paths not meaningful).";
     };
     CXX = {
       value = "${pkgs.llvmPackages.clang}/bin/clang++";
-      scope = "shell-only";
+      scope = "all-process";
       hosts = [
         "macOS"
         "NixOS"
       ];
-      why = "Nix LLVM paths in GUI process env interfere with Xcode toolchain discovery.";
+      why = "Nix CXX for native builds. All-process is safe on macOS (no Xcode CLT conflict with apple-sdk DEVELOPER_DIR) and desired on NixOS. Not set on Windows (Nix store paths not meaningful).";
     };
     LD = {
       value = "${pkgs.llvmPackages.lld}/bin/ld.lld";
-      scope = "shell-only";
+      scope = "all-process";
       hosts = [
         "macOS"
         "NixOS"
       ];
-      why = "Nix LLVM paths in GUI process env interfere with Xcode toolchain discovery.";
+      why = "Nix LD for native builds. All-process is safe on macOS (no Xcode CLT conflict with apple-sdk DEVELOPER_DIR) and desired on NixOS. Not set on Windows (Nix store paths not meaningful).";
     };
 
     # ── macOS-specific developer toolchain (all-process) ─────────────
@@ -104,8 +104,11 @@ let
     NIX_SSL_CERT_FILE = {
       value = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
       scope = "all-process";
-      hosts = [ "macOS" ];
-      why = "Nix-managed SSL cert bundle for processes outside Nix build environments.";
+      hosts = [
+        "macOS"
+        "NixOS"
+      ];
+      why = "Nix-managed SSL cert bundle for all processes outside nix-daemon build environments. On NixOS, nix-daemon sets this for its own builds but GUI/CLI tools outside systemd also need it.";
     };
 
     # ── Editors (all-process) ────────────────────────────────────────
@@ -156,25 +159,35 @@ let
       why = "Point clients at LiteLLM proxy instead of Ollama directly.";
     };
 
-    # Ollama runtime tunables (NixOS systemd service only — macOS uses
-    # model manifest defaults instead of launchd env overrides).
+    # Ollama runtime tunables (all-process, both hosts).
+    # Set on macOS (launchd daemon) and NixOS (systemd service) for
+    # consistent inference behaviour regardless of host OS.
     OLLAMA_FLASH_ATTENTION = {
       value = "1";
       scope = "all-process";
-      hosts = [ "NixOS" ];
-      why = "Enable flash attention to reduce attention memory overhead.";
+      hosts = [
+        "macOS"
+        "NixOS"
+      ];
+      why = "Enable flash attention to reduce attention memory overhead on both macOS and NixOS Ollama daemons.";
     };
     OLLAMA_CONTEXT_LENGTH = {
       value = "32768";
       scope = "all-process";
-      hosts = [ "NixOS" ];
-      why = "Set 32k token default context window so models that default to 2k/4k do not silently truncate.";
+      hosts = [
+        "macOS"
+        "NixOS"
+      ];
+      why = "Set 32k token default context window so models that default to 2k/4k do not silently truncate on either host.";
     };
     OLLAMA_KV_CACHE_TYPE = {
       value = "q4_0";
       scope = "all-process";
-      hosts = [ "NixOS" ];
-      why = "Compress KV cache with 4-bit quantisation to halve RAM footprint.";
+      hosts = [
+        "macOS"
+        "NixOS"
+      ];
+      why = "Compress KV cache with 4-bit quantisation to halve RAM footprint on both hosts.";
     };
 
     # ── Password store (all-process) ─────────────────────────────────
@@ -421,6 +434,36 @@ let
     && resolveValue name "NixOS" != null
   ) "NixOS";
 
+  # ── toMacOSDaemonOllamaEnv ───────────────────────────────────────
+  # Attrset of OLLAMA_* vars for the macOS launchd ollama daemon
+  # EnvironmentVariables section.  Unlike toNixOSServiceEnv, this includes
+  # OLLAMA_HOST because macOS does not have a system-wide env mechanism
+  # that covers launchd system daemons — the gui-env LaunchAgent only
+  # covers the GUI domain (gui/<uid>/), not the system domain.
+  toMacOSDaemonOllamaEnv =
+    let
+      os = "macOS";
+      relevant = builtins.filter (
+        name:
+        let
+          entry = catalog.${name};
+        in
+        builtins.elem os entry.hosts && lib.strings.hasPrefix "OLLAMA_" name && resolveValue name os != null
+      ) (builtins.attrNames catalog);
+    in
+    builtins.listToAttrs (
+      builtins.map (
+        name:
+        let
+          val = resolveValue name os;
+        in
+        {
+          inherit name;
+          value = val;
+        }
+      ) relevant
+    );
+
   # ── Introspection for Windows parity tests ───────────────────────
   toJsonManifest = builtins.toJSON (
     builtins.map (
@@ -451,6 +494,7 @@ in
     toLaunchctlScript
     toUserLaunchctlScript
     toNixOSServiceEnv
+    toMacOSDaemonOllamaEnv
     toJsonManifest
     getAllNixVarNames
     resolveValue
