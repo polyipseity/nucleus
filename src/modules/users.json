@@ -259,6 +259,7 @@
     "passwordStore": {
       "path": "~/dev/monorepo-private/self/passwords"
     },
+    "envVars": {},
     "picard": {
       "settings": {}
     },

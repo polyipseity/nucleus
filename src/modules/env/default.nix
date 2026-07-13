@@ -26,7 +26,7 @@ in
     default = {
       inherit (envLib)
         toHomeSessionVariables
-        toNixOSEnvironment
+        toNixOSSystemEnvironment
         toLaunchctlScript
         toNixOSServiceEnv
         toJsonManifest

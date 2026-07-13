@@ -6,7 +6,7 @@
 # documented in docs/env-variable-registry.md.
 #
 # Use: import ../lib/env-vars.nix { inherit config pkgs lib; }
-# Returns: { catalog, toHomeSessionVariables, toNixOSEnvironment, ... }
+# Returns: { catalog, toHomeSessionVariables, toNixOSSystemEnvironment, ... }
 {
   config,
   pkgs,
@@ -51,6 +51,7 @@ let
   #   why:     inline justification
   #   override: attrset { macOS = ..., NixOS = ... } for per-OS overrides
   #   excludeFromLaunchctl: true for shell-only vars (default false)
+  #   userSpecific: true if the value depends on the logged-in user (default false)
   catalog = {
     # ── Shell-only: Nix LLVM paths stay out of GUI env on macOS ─────
     CC = {
@@ -184,6 +185,7 @@ let
         "macOS"
         "NixOS"
       ];
+      userSpecific = true;
       why = "pass/QtPass/gopass password store location from users.json.";
     };
     GOPASS_CONFIG_COUNT = {
@@ -193,6 +195,7 @@ let
         "macOS"
         "NixOS"
       ];
+      userSpecific = true;
       why = "gopass config override count for password store path.";
     };
     GOPASS_CONFIG_KEY_1 = {
@@ -202,6 +205,7 @@ let
         "macOS"
         "NixOS"
       ];
+      userSpecific = true;
       why = "gopass config override key for password store path.";
     };
     GOPASS_CONFIG_VALUE_1 = {
@@ -211,6 +215,7 @@ let
         "macOS"
         "NixOS"
       ];
+      userSpecific = true;
       why = "gopass config override value for password store path.";
     };
 
@@ -222,6 +227,7 @@ let
         "macOS"
         "NixOS"
       ];
+      userSpecific = true;
       why = "Fallback toolchain bin dir for repos without direnv/Nix devShell.";
     };
     NUCLEUS_DEFAULT_DEV_ENV = {
@@ -231,6 +237,7 @@ let
         "macOS"
         "NixOS"
       ];
+      userSpecific = true;
       why = "Flag that fallback toolchain is configured.";
     };
 
@@ -265,6 +272,7 @@ let
         "macOS"
         "NixOS"
       ];
+      userSpecific = true;
       why = "Starship computed-state cache directory.";
     };
     STARSHIP_CONFIG = {
@@ -274,6 +282,7 @@ let
         "macOS"
         "NixOS"
       ];
+      userSpecific = true;
       why = "Starship config path. POSIX uses out-of-store symlink; Windows sets via env.dsc.yml.";
     };
   };
@@ -286,9 +295,16 @@ let
       entry = catalog.${name};
       hasOs = builtins.elem os entry.hosts;
       hasOverride = entry ? override && entry.override ? ${os};
+      userOverride =
+        if effectiveUser ? envVars && effectiveUser.envVars ? ${name} then
+          effectiveUser.envVars.${name}
+        else
+          null;
     in
     if !hasOs then
       null
+    else if userOverride != null then
+      userOverride
     else if hasOverride then
       entry.override.${os}
     else
@@ -326,12 +342,13 @@ let
     name: entry: builtins.elem currentOs entry.hosts && resolveValue name currentOs != null
   ) currentOs;
 
-  # ── toNixOSEnvironment ───────────────────────────────────────────
-  # All-process vars applicable to NixOS for environment.variables.
-  toNixOSEnvironment = filterAttrsByEntry (
+  # ── toNixOSSystemEnvironment ─────────────────────────────────────
+  # System-scoped (non-user-specific) vars for NixOS environment.variables.
+  toNixOSSystemEnvironment = filterAttrsByEntry (
     name: entry:
     builtins.elem "NixOS" entry.hosts
     && entry.scope == "all-process"
+    && (!entry ? userSpecific || !entry.userSpecific)
     && resolveValue name "NixOS" != null
   ) "NixOS";
 
@@ -382,6 +399,7 @@ let
       {
         inherit name;
         scope = entry.scope;
+        userSpecific = entry ? userSpecific && entry.userSpecific;
         why = entry.why;
         hasNixOsEntry = builtins.elem "NixOS" entry.hosts;
         hasMacOsEntry = builtins.elem "macOS" entry.hosts;
@@ -397,7 +415,7 @@ in
   inherit
     catalog
     toHomeSessionVariables
-    toNixOSEnvironment
+    toNixOSSystemEnvironment
     toLaunchctlScript
     toNixOSServiceEnv
     toJsonManifest

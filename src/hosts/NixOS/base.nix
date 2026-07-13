@@ -35,7 +35,7 @@
   # catalog.  NixOS `environment.variables` propagates to all processes via
   # PAM and systemd.  See src/modules/lib/env-vars.nix for the canonical list.
   environment.variables =
-    (import ../../modules/lib/env-vars.nix { inherit config pkgs lib; }).toNixOSEnvironment;
+    (import ../../modules/lib/env-vars.nix { inherit config pkgs lib; }).toNixOSSystemEnvironment;
 
   # Disable nano to prevent its default EDITOR assignment from overriding
   # home-manager's neovim defaultEditor at the system level.
