@@ -16,8 +16,8 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
 usage() {
-  usage_std "$(basename "$0")" "[--preset <name>] <file>..." \
-    "Optimize PDF files using Ghostscript. Creates .bak backup before processing."
+  usage_std "$(basename "$0")" "[--preset <name>] [--rm-bak] <file>..." \
+    "Optimize PDF files using Ghostscript. Keeps a .bak backup by default."
   cat <<'EOF'
 
 Presets (default: default):
@@ -27,6 +27,9 @@ Presets (default: default):
   printer   - medium quality for printing
   screen    - low quality (smallest file)
 
+Options:
+  --rm-bak  Remove the .bak backup on success (kept by default).
+
 If a .bak file already exists for any input, the command refuses and exits.
 On failure, the original file is restored from backup.
 EOF
@@ -34,6 +37,7 @@ EOF
 
 gs_pdf_opt() {
   local preset="default"
+  local rm_bak=false
   local files=()
 
   while [[ $# -gt 0 ]]; do
@@ -48,6 +52,10 @@ gs_pdf_opt() {
         ;;
       --preset=*)
         preset="${1#*=}"
+        shift
+        ;;
+      --rm-bak)
+        rm_bak=true
         shift
         ;;
       -*)
@@ -103,7 +111,7 @@ gs_pdf_opt() {
     if "$gs_cmd" -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 \
       "-dPDFSETTINGS=/$preset" -dNOPAUSE -dQUIET -dBATCH \
       -sOutputFile="$f" "$bak"; then
-      rm -f "$bak"
+      $rm_bak && rm -f "$bak"
       say "optimized: $f (preset: $preset)"
     else
       mv "$bak" "$f"

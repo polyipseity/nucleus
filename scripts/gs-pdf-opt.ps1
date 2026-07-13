@@ -8,6 +8,8 @@
 .PARAMETER Preset
   Ghostscript PDF settings preset: default, ebook, prepress, printer, screen.
   Default: default.
+.PARAMETER RemoveBackup
+  Switch. Remove the .bak backup file on success (kept by default).
 .PARAMETER File
   One or more PDF file paths to optimize.
 .EXAMPLE
@@ -17,6 +19,9 @@
 param(
   [Parameter(Position = 0)]
   [string]$Preset = "default",
+
+  [Parameter()]
+  [switch]$RemoveBackup,
 
   [Parameter(Position = 1, ValueFromRemainingArguments)]
   [string[]]$File
@@ -47,8 +52,9 @@ if ($validPresets -notcontains $Preset) {
 }
 
 if ($File.Count -eq 0) {
-  Write-NucleusInfo "usage: $(Split-Path -Leaf $PSCommandPath) [[-Preset] <name>] [-File] <path>..."
+  Write-NucleusInfo "usage: $(Split-Path -Leaf $PSCommandPath) [[-Preset] <name>] [[-RemoveBackup]] [-File] <path>..."
   Write-NucleusInfo "presets: $($validPresets -join ', ') (default: default)"
+  Write-NucleusInfo "options: -RemoveBackup  Remove the .bak backup on success (kept by default)."
   exit 1
 }
 
@@ -74,7 +80,7 @@ foreach ($f in $File) {
       "-sOutputFile=$(Resolve-Path $f -Relative)",
       "$bak"
     )
-    Remove-Item -LiteralPath $bak -Force
+    if ($RemoveBackup) { Remove-Item -LiteralPath $bak -Force }
     Write-NucleusInfo "optimized: $f (preset: $Preset)"
   } catch {
     Move-Item -LiteralPath $bak -Destination $f -Force

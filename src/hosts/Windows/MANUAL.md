@@ -29,7 +29,7 @@
 - `nucleus-check-sh` — check POSIX shell syntax
 - `nucleus-cloud-setup` — configure cloud remotes and re-apply
 - `nucleus-gc` — run Nix garbage collection
-- `nucleus-gs-pdf-opt` — optimize PDF files with Ghostscript (creates .bak backup)
+- `nucleus-gs-pdf-opt` — optimize PDF files with Ghostscript (keeps .bak backup by default; use `--rm-bak` to remove)
 - `nucleus-health-check` — run health checks
 - `nucleus-replica-sync` — pull cloud replicas
 - `nucleus-replica-reset` — reset local replica state
