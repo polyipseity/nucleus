@@ -1,19 +1,29 @@
 # check.ps1 — Consolidated repository validation script (Windows).
 #
 # Runs all Windows-compatible repository checks in sequence:
+#
+# Toolchain checks (1-2):
 #   1. PowerShell syntax validation
 #   2. Packer template validation
+#
+# Nix checks (3-6, stubs on Windows):
 #   3. Dead Nix code (stub)
 #   4. Nix flake evaluation (stub)
 #   5. Nix formatting (nixfmt) (stub)
 #   6. Stale Nix build artifact check
+#
+# Test suites (7-10, stubs on Windows):
 #   7. Shell script validation tests (stub)
 #   8. CWD-independence tests (stub)
 #   9. Nix search path tests (stub)
 #  10. Port utility function tests (stub)
+#
+# Data integrity (11-13):
 #  11. Lockfile validation
 #  12. Locked DSC validation
 #  13. Service registry validation
+#
+# Policy/verification (14-16):
 #  14. Package manager usage enforcement
 #  15. Online determinism checks (--verify mode only)
 #  16. Undocumented error suppression check
@@ -26,10 +36,11 @@
 #   for the POSIX-side convention.
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
-# Steps 2-4, 7-10 are stubs (require Nix or bash — not available on Windows).
-# Step 16 only runs with the --verify flag.
+# Steps 3-5, 7-10 are stubs (require Nix or bash — not available on Windows).
+# Steps 15-16 only run with the --verify flag.
 #
 # Prerequisites:
+#   - Ensure-Tool module (imported via pre-flight block) for tool validation
 #   - powershell-yaml module (Install-Module powershell-yaml -Scope CurrentUser)
 #     is required for locked DSC validation.
 #
@@ -97,6 +108,14 @@ if ($HAS_ARGS) {
 }
 
 $_step = 0
+
+# Pre-flight tool availability checks.
+# All tools listed in Prerequisites must be present. Missing tools produce
+# an immediate hard failure — run bootstrap or nucleus-apply to install them.
+$modulesPath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules'
+Import-Module (Join-Path $modulesPath 'Ensure-Tool.psm1') -Force
+Ensure-Tool -Name 'powershell-yaml' -Type 'Module' -InstallCommand "Install-Module powershell-yaml -Scope CurrentUser -Force"
+Ensure-Tool -Name 'packer' -Type 'Command' -InstallCommand "winget install Hashicorp.Packer"
 
 # ---------------------------------------------------------------------------
 # 1. PowerShell syntax validation
@@ -381,9 +400,6 @@ if (-not $HAS_ARGS) {
   $_dscSystemPackages = Join-Path $RepoRoot 'src\hosts\Windows\system\packages.dsc.yml'
   $_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
   $_lfErrors = 0
-
-  # powershell-yaml is a prerequisite — must be available on the system.
-  Import-Module -Name powershell-yaml -ErrorAction Stop
 
   # Helper: convert mixed PSCustomObject/hashtable/list trees to pure hashtable/array.
   function ConvertTo-HashtableDeep ($_obj) {
