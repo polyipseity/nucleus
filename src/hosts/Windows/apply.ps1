@@ -368,7 +368,6 @@ if (-not $Elevated) {
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Resolve-Executable.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Test-ArchivingStack.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Test-PrimaryUser.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Send-NucleusEnvChangeNotification.ps1")
 # secrets/: decryption, SOPS age key management, and secret materialization.
 # ConvertFrom-SshEd25519PublicKeyToAgePubKey must be loaded before any file that
 # calls it (Register-HostAgeKey, Invoke-SecretVerification).
