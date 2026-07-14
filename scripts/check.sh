@@ -3,19 +3,29 @@
 # lives in test.sh.
 #
 # Runs repository checks in sequence:
+#
+# Toolchain checks (1-2):
 #   1. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 #   2. Packer template validation
+#
+# Nix checks (3-6):
 #   3. Dead Nix code detection (deadnix)
 #   4. Nix flake evaluation
 #   5. Nix formatting check (nixfmt --verify)
 #   6. Stale Nix build artifact check
+#
+# Test suites (7-10):
 #   7. Shell script validation tests
 #   8. CWD-independence tests
 #   9. Nix search path tests
 #  10. Port utility function tests
+#
+# Data integrity (11-13):
 #  11. Lockfile validation
 #  12. Locked DSC validation
 #  13. Service registry validation
+#
+# Policy/verification (14-16):
 #  14. Package manager usage enforcement
 #  15. Undocumented error suppression check
 #  16. Online determinism checks (--verify mode only)
@@ -40,8 +50,10 @@
 #   NUCLEUS_REPO_ROOT  Override the detected repository root path.
 #
 # Prerequisites:
-#   - jq, yq (for lockfile, service registry, locked DSC validation)
-#   - deadnix, nixfmt (for Nix checks)
+#   - jq, yq (for lockfile/registry/DSC validation)
+#   - deadnix (for dead Nix code detection)
+#   - nixfmt (for Nix formatting)
+#   - nix (for flake evaluation)
 #   - pwsh (for PowerShell syntax validation)
 #   - packer (for Packer template validation)
 #
@@ -130,9 +142,20 @@ fi
 
 _step=0
 
+# Pre-flight tool availability checks.
+# All tools listed in Prerequisites must be present. Missing tools produce
+# an immediate hard failure — run nucleus-apply to install them, or use
+# nix run .#check to run via the flake wrapper which bundles all deps.
+require_command pwsh
+require_command nixfmt
+require_command yq
+require_command jq
+require_command deadnix
+require_command nix
+require_command packer
+
 # PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 section "$((_step += 1))" "PowerShell syntax validation"
-require_command pwsh
 _ps_exit=0
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly "${PS1_FILES[@]}" || _ps_exit=$?
@@ -184,7 +207,6 @@ fi
 
 # Nix formatting check
 section "$((_step += 1))" "Nix formatting (nixfmt)"
-require_command nixfmt
 if [ "${#NIX_FILES[@]}" -gt 0 ]; then
   if $FORMAT_NIX; then
     if nixfmt -s "${NIX_FILES[@]}"; then
@@ -430,7 +452,6 @@ fi
 section "$((_step += 1))" "Locked DSC validation"
 # Platform parallel: check.ps1 uses powershell-yaml with normalization helpers (Windows-native equivalent).
 if ! $HAS_ARGS; then
-  require_command yq
   _dsc_system_dir="src/hosts/Windows/system"
   _lockfile="src/lockfiles/lockfile.json"
   _lf_errors=0
