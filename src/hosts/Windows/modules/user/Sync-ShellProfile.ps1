@@ -308,11 +308,8 @@ function Sync-ShellProfile {
     'if ((Test-Path $llvmBinDir) -and ($env:PATH -notlike "*$llvmBinDir*")) {'
     '  $env:PATH = "$llvmBinDir;$env:PATH"'
     '}'
-    # LLVM/Clang toolchain defaults for cross-host compiler parity.
-    # Source of truth: src/modules/lib/env-vars.nix — update there, not here.
-    '$env:CC = "clang"'
-    '$env:CXX = "clang++"'
-    '$env:LD = "ld.lld"'
+    # CC/CXX/LD are set at Machine scope via system/env.dsc.yml for
+    # all-process visibility.  Source: src/modules/lib/env-vars.nix.
     'function -g { & git @Args }'
     'function -ga { & git add @Args }'
     'function -gb { & git branch @Args }'
