@@ -118,7 +118,6 @@ let
     # Optimize PDF presets block — quality-descending, internally sorted
     {
       dir = "optimize PDF - default.workflow";
-      dir = "optimize PDF - default.workflow";
       enablementKey = "com.nucleus.OptimizePDF.default - optimize PDF - default - runWorkflowAsService";
       source = "${workflowsDir}/optimize PDF - default.workflow";
       presentationModes = {

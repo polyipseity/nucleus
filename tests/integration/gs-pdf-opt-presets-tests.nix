@@ -44,8 +44,13 @@ let
       (
         let
           # Patterns match the `dir` field in currentNucleusWorkflows entries.
-          # Sort order: default first, then quality descending (prepress > printer >
-          # ebook > screen). This is the declared order in the explicit list.
+          # Primary sort: alphabetical by entry name, so "open nucleus manual"
+          # appears before "optimize PDF - default". Exception: the 5 Optimize
+          # PDF presets are grouped as a block sorted quality-descending
+          # (default → prepress → printer → ebook → screen).
+          posOpenManual = builtins.stringLength (
+            builtins.head (builtins.split "\"open nucleus manual.workflow\"" macAutomatorWorkflowsText)
+          );
           posDefault = builtins.stringLength (
             builtins.head (builtins.split "\"optimize PDF - default.workflow\"" macAutomatorWorkflowsText)
           );
@@ -62,12 +67,13 @@ let
             builtins.head (builtins.split "\"optimize PDF - screen.workflow\"" macAutomatorWorkflowsText)
           );
         in
-        posDefault < posPrepress
+        posOpenManual < posDefault
+        && posDefault < posPrepress
         && posPrepress < posPrinter
         && posPrinter < posEbook
         && posEbook < posScreen
       )
-      "macOS automator-workflows.nix preset order must be quality-descending (default \u2192 prepress \u2192 printer \u2192 ebook \u2192 screen)";
+      "macOS automator-workflows.nix preset order must be alphabetical (open manual before PDF block) with presets quality-descending (default → prepress → printer → ebook → screen)";
 
   test_all_5_presets_in_nixos = assert' (
     allPresetsPresent nixosServicesText
