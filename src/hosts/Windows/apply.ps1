@@ -240,15 +240,37 @@ param(
   [int]$MinFreeDiskGB = 10,
   [switch]$NoAISync,
   [switch]$ReplicaSync,
-  [switch]$VMSetup
+  [switch]$VMSetup,
+  [switch]$Elevated,
+  [string]$ParamsJson = ""
 )
 
 $ErrorActionPreference = "Stop"
 
+# If -ParamsJson was provided (by self-elevation), deserialize all parameters
+# from the temp JSON file instead of from command-line arguments.
+if ($ParamsJson -and (Test-Path $ParamsJson)) {
+  $p = Get-Content $ParamsJson -Raw | ConvertFrom-Json
+  $ConfigDir = $p.ConfigDir
+  $ConfigFiles = [string[]]$p.ConfigFiles
+  $ModuleDir = $p.ModuleDir
+  $Users = [string[]]$p.Users
+  $PrimaryUsername = $p.PrimaryUsername
+  $NoOptionalParity = [bool]$p.NoOptionalParity
+  $NoSecretsParity = [bool]$p.NoSecretsParity
+  $NoUserStateParity = [bool]$p.NoUserStateParity
+  $NoSystemParity = [bool]$p.NoSystemParity
+  $MinFreeDiskGB = [int]$p.MinFreeDiskGB
+  $NoAISync = [bool]$p.NoAISync
+  $ReplicaSync = [bool]$p.ReplicaSync
+  $VMSetup = [bool]$p.VMSetup
+  $Elevated = $true
+}
+
 # Refuse to run as Administrator — privilege escalation is managed internally
 # when needed rather than relying on an already-elevated caller.
 $isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if ($isAdmin) {
+if ($isAdmin -and -not $Elevated) {
   Write-Error "This script must not be run as Administrator. Run as a regular user (elevation is managed internally when needed)."
   exit 1
 }
@@ -299,6 +321,47 @@ $setupModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "setup"
 $userModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "user"
 $editorsModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "editors"
 $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers"
+
+# ── Self-elevation ──────────────────────────────────────────────────────────────
+# Match the POSIX model: non-admin caller → internal elevation → all subsequent
+# operations execute with admin privileges.  No fallback code for "not admin" is
+# needed after this point.
+if (-not $Elevated) {
+  $params = @{
+    ConfigDir        = $ConfigDir
+    ConfigFiles      = $ConfigFiles
+    ModuleDir        = $ModuleDir
+    Users            = $Users
+    PrimaryUsername   = $PrimaryUsername
+    NoOptionalParity  = $NoOptionalParity
+    NoSecretsParity   = $NoSecretsParity
+    NoUserStateParity = $NoUserStateParity
+    NoSystemParity    = $NoSystemParity
+    MinFreeDiskGB     = $MinFreeDiskGB
+    NoAISync         = $NoAISync
+    ReplicaSync      = $ReplicaSync
+    VMSetup          = $VMSetup
+    Elevated         = $true
+  }
+  $paramsJsonPath = [System.IO.Path]::GetTempFileName() + ".json"
+  $params | ConvertTo-Json -Compress | Set-Content $paramsJsonPath -Encoding utf8 -NoNewline
+
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = (Get-Process -Id $PID).Path
+  $psi.Arguments = "-NoProfile -File `"$PSCommandPath`" -ParamsJson `"$paramsJsonPath`""
+  $psi.Verb = "RunAs"
+  $psi.UseShellExecute = $true
+  $proc = [System.Diagnostics.Process]::Start($psi)
+  if ($null -eq $proc) {
+    Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # undoc-supp: cleanup of temp file; failure is harmless (OS will eventually clean %TEMP%)
+    throw "User cancelled the elevation prompt (UAC). nucleus-apply requires elevation for system configuration."
+  }
+  $proc.WaitForExit()
+  $exitCode = $proc.ExitCode
+  Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # undoc-supp: same — temp file in %TEMP%; child may have already cleaned up
+  exit $exitCode
+}
+
 # Root utilities: shared helpers with no single domain affinity.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
