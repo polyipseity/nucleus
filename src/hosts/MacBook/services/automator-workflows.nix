@@ -7,33 +7,16 @@
 # WHY home.activation instead of home.file:
 #   home.file creates a symlink to the Nix store, but Automator .workflow
 #   bundles stored as symlinks are not discoverable by the service menu
-#   system. A home.activation script that copies workflows on each generation
+#   system. This is a required Method 2 (read-only deployment) case;
+#   see .agents/instructions/app-config-policy.instructions.md.
+#   A home.activation script that copies workflows on each generation
 #   switch guarantees they are registered.
-{
-  lib,
-  pkgs,
-  mkPresentationModes,
-  ...
-}:
+{ lib, mkPresentationModes, ... }:
 let
-  # ── Derivation: bundle all workflow directories ───────────────────────
-  # Packages all 5 Automator workflow bundles into a single derivation output.
-  # Each bundle is a committed .workflow directory in services/automator-workflows/,
-  # copied verbatim (no build-time processing).
-  nucleusOptimizePdfWorkflows =
-    pkgs.runCommand "nucleus-gs-pdf-opt-workflows"
-      {
-        preferLocalBuild = true;
-        allowSubstitutes = false;
-      }
-      ''
-        mkdir -p "$out"
-        cp -R "${./automator-workflows}/optimize PDF - default.workflow" "$out/"
-        cp -R "${./automator-workflows}/optimize PDF - printer.workflow" "$out/"
-        cp -R "${./automator-workflows}/optimize PDF - prepress.workflow" "$out/"
-        cp -R "${./automator-workflows}/optimize PDF - ebook.workflow" "$out/"
-        cp -R "${./automator-workflows}/optimize PDF - screen.workflow" "$out/"
-      '';
+  # Base path to committed workflow source directories.
+  # Each workflow source is referenced as "${workflowsDir}/<name>.workflow" to
+  # avoid parsing issues with spaces in path names.
+  workflowsDir = ./automator-workflows;
 
   # Known list of historically-removed Automator workflows (old workflow naming).
   # When a workflow is removed, add its metadata here and delete its
@@ -93,7 +76,7 @@ let
   # Each entry has:
   #   - dir: workflow directory name in ~/Library/Services/
   #   - enablementKey: key for NSServicesStatus enablement
-  #   - source: derivation path to copy from
+  #   - source: path to copy from
   #   - presentationModes: dict for NSServicesStatus enablement
   #
   # Sorting policy: manually maintained in quality-descending order (default → prepress → printer → ebook → screen).
@@ -103,7 +86,7 @@ let
     {
       dir = "optimize PDF - default.workflow";
       enablementKey = "com.nucleus.OptimizePDF.default - optimize PDF - default - runWorkflowAsService";
-      source = "${nucleusOptimizePdfWorkflows}/optimize PDF - default.workflow";
+      source = "${workflowsDir}/optimize PDF - default.workflow";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -114,7 +97,7 @@ let
     {
       dir = "optimize PDF - prepress.workflow";
       enablementKey = "com.nucleus.OptimizePDF.prepress - optimize PDF - prepress - runWorkflowAsService";
-      source = "${nucleusOptimizePdfWorkflows}/optimize PDF - prepress.workflow";
+      source = "${workflowsDir}/optimize PDF - prepress.workflow";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -125,7 +108,7 @@ let
     {
       dir = "optimize PDF - printer.workflow";
       enablementKey = "com.nucleus.OptimizePDF.printer - optimize PDF - printer - runWorkflowAsService";
-      source = "${nucleusOptimizePdfWorkflows}/optimize PDF - printer.workflow";
+      source = "${workflowsDir}/optimize PDF - printer.workflow";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -136,7 +119,7 @@ let
     {
       dir = "optimize PDF - ebook.workflow";
       enablementKey = "com.nucleus.OptimizePDF.ebook - optimize PDF - ebook - runWorkflowAsService";
-      source = "${nucleusOptimizePdfWorkflows}/optimize PDF - ebook.workflow";
+      source = "${workflowsDir}/optimize PDF - ebook.workflow";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -147,7 +130,7 @@ let
     {
       dir = "optimize PDF - screen.workflow";
       enablementKey = "com.nucleus.OptimizePDF.screen - optimize PDF - screen - runWorkflowAsService";
-      source = "${nucleusOptimizePdfWorkflows}/optimize PDF - screen.workflow";
+      source = "${workflowsDir}/optimize PDF - screen.workflow";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;

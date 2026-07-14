@@ -14,8 +14,10 @@
 # WHY home.activation instead of home.file:
 #   home.file creates a symlink to the Nix store, but macOS LaunchServices
 #   does not traverse symlinks when discovering Service provider .app
-#   bundles. A home.activation script that deploys the .app on each
-#   generation switch guarantees LaunchServices can find it.
+#   bundles. This is a required Method 2 (read-only deployment) case;
+#   see .agents/instructions/app-config-policy.instructions.md.
+#   A home.activation script that deploys the .app on each generation
+#   switch guarantees LaunchServices can find it.
 #
 # WHY compile at evaluation time:
 #   osacompile runs during nix build, producing macOS-version-specific
