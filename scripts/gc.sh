@@ -22,6 +22,7 @@ usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
   --tool-cache-gc|--no-tool-cache-gc  Control bun/cargo/rustc/uv cache gc (default: --tool-cache-gc).
+  --git-template-gc|--no-git-template-gc  Control stale .git hooks/description cleanup (default: --git-template-gc).
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
@@ -42,6 +43,7 @@ EOF
 REPO_ROOT="$(derive_repo_root)"
 
 tool_cache_gc=true
+git_template_gc=true
 hm_gc=true
 nix_gc=true
 ollama_gc=true
@@ -65,6 +67,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-tool-cache-gc)
       tool_cache_gc=false
+      ;;
+    --git-template-gc)
+      git_template_gc=true
+      ;;
+    --no-git-template-gc)
+      git_template_gc=false
       ;;
     --hm-gc)
       hm_gc=true
@@ -291,6 +299,28 @@ gc_tool_caches_if_available() {
   fi
 }
 
+gc_git_templates_if_present() {
+  # Remove boilerplate files from existing .git directories under ~/dev that
+  # were created before init.templateDir was configured.  Cleans sample hook
+  # scripts and the legacy description file from every .git found.
+  #
+  # The preventative init.templateDir setting (in git.nix /
+  # Sync-GitAndSshConfig.ps1) stops new repos from getting these files, but
+  # existing repos need a one-time sweep.  After this, git-init and git-clone
+  # on all three platforms will create clean minimal .git dirs.
+  dev_root="$HOME/dev"
+  if [ ! -d "$dev_root" ]; then
+    return 0
+  fi
+
+  while IFS= read -r -d '' gitdir; do
+    # undoc-supp: glob may match nothing; rm -f errors are non-fatal
+    rm -f "$gitdir/hooks/"*.sample 2>/dev/null || true
+    # undoc-supp: description may already be absent; rm -f errors are non-fatal
+    rm -f "$gitdir/description" 2>/dev/null || true
+  done < <(find "$dev_root" -name ".git" -type d -print0 2>/dev/null)
+}
+
 gc_ollama_models_if_available() {
   # Remove locally installed Ollama models that are absent from the declarative
   # manifest at src/modules/ai/models.json.  Delegates to ai-sync.sh with
@@ -459,8 +489,15 @@ if [ "$tool_cache_gc" = true ]; then
     gc_tool_caches_if_available
   fi
 fi
-
-# Step 5: remove orphaned Ollama models not declared in the manifest.
+# Step 5: remove stale .git boilerplate (sample hooks, description) from ~/dev.
+if [ "$git_template_gc" = true ]; then
+  if [ "$dry_run" = true ]; then
+    dry_run "would remove stale .git template boilerplate from ~/dev"
+  else
+    gc_git_templates_if_present
+  fi
+fi
+# Step 6: remove orphaned Ollama models not declared in the manifest.
 if [ "$ollama_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would gc stale Ollama models"
@@ -469,7 +506,7 @@ if [ "$ollama_gc" = true ]; then
   fi
 fi
 
-# Step 6: remove stale VM artifacts (temporary builds, orphaned images).
+# Step 7: remove stale VM artifacts (temporary builds, orphaned images).
 if [ "$vm_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would gc stale VM artifacts"
@@ -479,6 +516,7 @@ if [ "$vm_gc" = true ]; then
 fi
 
 gc_logs() {
+  # Rotate managed log files via copy-truncate (preserves inodes).
   services_json="$REPO_ROOT/src/modules/services.json"
   if [ ! -f "$services_json" ]; then
     say "services.json not found; skipping log rotation"
@@ -499,7 +537,7 @@ gc_logs() {
   fi
 }
 
-# Step 7: rotate managed log files via copy-truncate (preserves inodes).
+# Step 8: rotate managed log files via copy-truncate (preserves inodes).
 if [ "$log_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would rotate managed logs"
@@ -526,7 +564,7 @@ gc_journald_if_available() {
   journalctl --vacuum-time="$_jv_expiry" 2>/dev/null || true
 }
 
-# Step 8: vacuum journald logs (NixOS only; no-op on macOS/Windows).
+# Step 9: vacuum journald logs (NixOS only; no-op on macOS/Windows).
 if [ "$journald_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would vacuum journald logs older than ${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}"
@@ -535,7 +573,7 @@ if [ "$journald_gc" = true ]; then
   fi
 fi
 
-# Step 9: Scoop cache gc (accepted but ignored on POSIX; Windows-only).
+# Step 10: Scoop cache gc (accepted but ignored on POSIX; Windows-only).
 # This flag exists for cross-platform CLI parity with the Windows gc.ps1 script.
 
 nuc_done

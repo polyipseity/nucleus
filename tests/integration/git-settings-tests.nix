@@ -26,6 +26,13 @@ assert containsRegex "'fetch\.pruneTags' = 'true'" windowsGitText;
 assert containsRegex "'push\.autoSetupRemote' = 'true'" windowsGitText;
 assert containsRegex "'push\.followTags' = 'true'" windowsGitText;
 assert containsRegex "'user\.useConfigOnly' = 'true'" windowsGitText;
+
+# --- Preventative: init.templateDir suppresses new-repo boilerplate ---
+assert containsRegex "init\.templateDir" posixGitText;
+assert containsRegex "empty_template" posixGitText;
+assert containsRegex "'init\.templateDir'" windowsGitText;
+assert containsRegex "empty_template" windowsGitText;
+assert containsRegex "gitEmptyTemplate" posixGitText;
 {
   success = true;
   message = "Git settings cross-host parity tests passed";

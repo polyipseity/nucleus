@@ -12,17 +12,20 @@
        environment. cargo-cache remains the authoritative gc path for the
        Cargo registry/git/advisory-db cache when present; rustc-specific temp
        state is cleared via rustup's tmp directory.
-    3. Remove old Scoop app versions and installer caches via `scoop cleanup *`.
+    3. Remove stale .git sample hooks and description files from ~/dev that
+       were created before init.templateDir was configured.  Guarded by the
+       NoGitTemplateGc switch.
+    4. Remove old Scoop app versions and installer caches via `scoop cleanup *`.
        Guarded by a Scoop presence check so the step is a no-op when Scoop is
        not yet installed (e.g. before the first apply.ps1 run).
-    4. Remove locally installed Ollama models absent from the declarative manifest
+    5. Remove locally installed Ollama models absent from the declarative manifest
        at src/modules/ai/models.json.  Uses Invoke-AISync -GcOnly so no new
        model pulls are triggered — GC only reclaims space.  Guarded by an ollama
        presence check so the step is a no-op when Ollama is not installed.
-    5. Remove stale VM build artifacts (Packer directories, pre-built disk
+    6. Remove stale VM build artifacts (Packer directories, pre-built disk
        images) for VMs no longer declared in src/modules/VMs.json.
        Guarded by the NoVMGc switch.
-    6. Rotate managed log files via copy-truncate using rotation parameters
+    7. Rotate managed log files via copy-truncate using rotation parameters
        from src/modules/services.json.
        Guarded by the NoLogGc switch.
 
@@ -42,6 +45,9 @@
 
 .PARAMETER NoToolCacheGc
   Skip bun/cargo/rustc/uv and repo-local .direnv cache gc (default: $false).
+
+.PARAMETER NoGitTemplateGc
+  Skip stale .git sample hooks and description file cleanup under ~/dev (default: $false).
 
 .PARAMETER NoOllamaGc
   Skip Ollama orphaned model removal even when ollama is installed (default: $false).
@@ -84,7 +90,7 @@
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -NoToolCacheGc
 
 .NOTES
-  Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_GC, NUCLEUS_GC_NO_OLLAMA_GC, NUCLEUS_GC_NO_SCOOP_GC, NUCLEUS_GC_NO_WALLPAPER_GC, NUCLEUS_GC_NO_VM_GC, NUCLEUS_GC_EXPIRY, NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_REPO_ROOT.
+  Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_GC, NUCLEUS_GC_NO_GIT_TEMPLATE_GC, NUCLEUS_GC_NO_OLLAMA_GC, NUCLEUS_GC_NO_SCOOP_GC, NUCLEUS_GC_NO_WALLPAPER_GC, NUCLEUS_GC_NO_VM_GC, NUCLEUS_GC_EXPIRY, NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
@@ -93,6 +99,7 @@ param(
   [switch]$NoNixGc = { $env:NUCLEUS_GC_NO_NIX -eq 'true' }.Invoke(),
   [switch]$NoHmGc = { $env:NUCLEUS_GC_NO_HM -eq 'true' }.Invoke(),
   [switch]$NoToolCacheGc = { $env:NUCLEUS_GC_NO_TOOL_CACHE_GC -eq 'true' }.Invoke(),
+  [switch]$NoGitTemplateGc = { $env:NUCLEUS_GC_NO_GIT_TEMPLATE_GC -eq 'true' }.Invoke(),
   [switch]$NoOllamaGc = { $env:NUCLEUS_GC_NO_OLLAMA_GC -eq 'true' }.Invoke(),
   [switch]$NoScoopGc = { $env:NUCLEUS_GC_NO_SCOOP_GC -eq 'true' }.Invoke(),
   [switch]$NoWallpaperGc = { $env:NUCLEUS_GC_NO_WALLPAPER_GC -eq 'true' }.Invoke(),
@@ -218,6 +225,42 @@ function Remove-VMGcItem {
   }
 }
 
+function Clear-GitTemplateFiles {
+  [CmdletBinding(SupportsShouldProcess = $true)]
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$DevRoot
+  )
+
+  if (-not (Test-Path -LiteralPath $DevRoot -PathType Container)) {
+    return
+  }
+
+  # undoc-supp: ~/dev may not exist or contain .git dirs; silent skip is intentional
+  $gitDirs = Get-ChildItem -LiteralPath $DevRoot -Directory -Recurse -Filter '.git' -Force -ErrorAction SilentlyContinue
+  foreach ($gitDir in $gitDirs) {
+    $hooksDir = Join-Path -Path $gitDir.FullName -ChildPath 'hooks'
+    $descPath = Join-Path -Path $gitDir.FullName -ChildPath 'description'
+
+    if (-not $PSCmdlet.ShouldProcess($gitDir.FullName, "Clear Git template boilerplate")) {
+      continue
+    }
+
+    try {
+      if (Test-Path -LiteralPath $hooksDir -PathType Container) {
+        Get-ChildItem -LiteralPath $hooksDir -Filter '*.sample' -Force -ErrorAction Stop |
+          Remove-Item -Force -ErrorAction Stop
+      }
+      if (Test-Path -LiteralPath $descPath -PathType Leaf) {
+        Remove-Item -LiteralPath $descPath -Force -ErrorAction Stop
+      }
+    }
+    catch {
+      Write-NucleusWarning "failed to clear template files in '$($gitDir.FullName)' — $($_.Exception.Message)"
+    }
+  }
+}
+
 # Load only the modules required by this script.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
@@ -262,7 +305,13 @@ if (-not $NoToolCacheGc) {
   }
 }
 
-# ---- Step 3: Scoop cache and old-version cleanup ----------------------------
+# ---- Step 3: remove stale .git boilerplate from ~/dev -----------------------
+if (-not $NoGitTemplateGc) {
+  $devRoot = Join-Path $HOME 'dev'
+  Clear-GitTemplateFiles -DevRoot $devRoot
+}
+
+# ---- Step 4: Scoop cache and old-version cleanup ----------------------------
 if (-not $NoScoopGc) {
   $scoopShims = Join-Path $env:USERPROFILE "scoop\shims"
   $scoopCmd   = Join-Path $scoopShims "scoop.cmd"
@@ -280,7 +329,7 @@ if (-not $NoScoopGc) {
   }
 }
 
-# ---- Step 4: Ollama orphaned model gc --------------------------------------
+# ---- Step 5: Ollama orphaned model gc --------------------------------------
 if (-not $NoOllamaGc) {
   # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
@@ -291,7 +340,7 @@ if (-not $NoOllamaGc) {
   }
 }
 
-# ---- Step 5: stale VM artifact removal ------------------------------------
+# ---- Step 6: stale VM artifact removal ------------------------------------
 if (-not $NoVMGc) {
   $vmDir = Join-Path $env:USERPROFILE "virtual machines"
   $imagesDir = Join-Path $vmDir "images"
@@ -359,7 +408,7 @@ if (-not $NoVMGc) {
   }
 }
 
-# ---- Step 6: log rotation -------------------------------------------------
+# ---- Step 7: log rotation -------------------------------------------------
 if (-not $NoLogGc) {
   $servicesJson = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\services.json"
   if (-not (Test-Path -LiteralPath $servicesJson -PathType Leaf)) {
