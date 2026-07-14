@@ -104,6 +104,18 @@ require_command() {
   fi
 }
 
+# Pre-flight availability check with a hint to run nucleus-apply.
+# Unlike require_command, this is meant for the pre-flight block and
+# gives a user-friendly message linking to the provisioning system.
+# Does NOT attempt nix profile install — see package-installation-scope.
+ensure_tool() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    printf '%s\n' "error: $1 is required but was not found in PATH" >&2
+    printf '%s\n' "  Run nucleus-apply to install it, or use nix run .#check to run via flake." >&2
+    exit 1
+  fi
+}
+
 # Tries sha256sum, shasum -a 256, then openssl dgst -sha256.
 sha256_of_file() {
   _sof_file="$1"
