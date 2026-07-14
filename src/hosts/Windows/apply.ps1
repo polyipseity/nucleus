@@ -429,6 +429,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-QtPassConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ShellProfile.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
 # editors/: VS Code configuration and workspace management.
 . (Join-Path -Path $editorsModuleDir -ChildPath "Set-VSCodeWorkspaceTrust.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeExtension.ps1")
@@ -832,6 +833,7 @@ if ($EnableHostAgeKeyRegistration) {
 }
 Sync-WindowsRDP -Enabled:$EnableRdpParity
 Sync-PowerPolicy -Enabled:$EnablePowerParity
+Sync-UserPath -Enabled:$EnableShellParity
 Sync-WifiMacRandomization -Enabled:$EnableWiFiParity
 Invoke-AgentHostShellSetup
 
