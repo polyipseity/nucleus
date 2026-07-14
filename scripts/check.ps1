@@ -1,20 +1,20 @@
 # check.ps1 — Consolidated repository validation script (Windows).
 #
 # Runs all Windows-compatible repository checks in sequence:
-#   1. Dead Nix code (stub)
-#   2. Nix flake evaluation (stub)
-#   3. Nix formatting (nixfmt) (stub)
-#   4. PowerShell syntax validation
-#   5. Packer template validation
-#   6. Shell script validation tests (stub)
-#   7. CWD-independence tests (stub)
-#   8. Nix search path tests (stub)
-#   9. Port utility function tests (stub)
-#  10. Lockfile validation
-#  11. Service registry validation
+#   1. PowerShell syntax validation
+#   2. Packer template validation
+#   3. Dead Nix code (stub)
+#   4. Nix flake evaluation (stub)
+#   5. Nix formatting (nixfmt) (stub)
+#   6. Stale Nix build artifact check
+#   7. Shell script validation tests (stub)
+#   8. CWD-independence tests (stub)
+#   9. Nix search path tests (stub)
+#  10. Port utility function tests (stub)
+#  11. Lockfile validation
 #  12. Locked DSC validation
-#  13. Package manager usage enforcement
-#  14. Stale Nix build artifact check
+#  13. Service registry validation
+#  14. Package manager usage enforcement
 #  15. Online determinism checks (--verify mode only)
 #  16. Undocumented error suppression check
 #
@@ -26,8 +26,8 @@
 #   for the POSIX-side convention.
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
-# Steps 1-3, 6-9 are stubs (require Nix or bash — not available on Windows).
-# Step 15 only runs with the --verify flag.
+# Steps 2-4, 7-10 are stubs (require Nix or bash — not available on Windows).
+# Step 16 only runs with the --verify flag.
 #
 # Prerequisites:
 #   - powershell-yaml module (Install-Module powershell-yaml -Scope CurrentUser)
@@ -99,25 +99,7 @@ if ($HAS_ARGS) {
 $_step = 0
 
 # ---------------------------------------------------------------------------
-# 1. Dead Nix code
-# ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] Dead Nix code ===" -f (++$_step))
-say "skipping (requires Nix toolchain — not available on Windows)."
-
-# ---------------------------------------------------------------------------
-# 2. Nix flake evaluation
-# ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] Nix flake evaluation ===" -f (++$_step))
-say "skipping (requires Nix toolchain — not available on Windows)."
-
-# ---------------------------------------------------------------------------
-# 3. Nix formatting (nixfmt)
-# ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] Nix formatting (nixfmt) ===" -f (++$_step))
-say "skipping (requires Nix toolchain — not available on Windows)."
-
-# ---------------------------------------------------------------------------
-# 4. PowerShell syntax validation
+# 1. PowerShell syntax validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] PowerShell syntax validation ===" -f (++$_step))
 if ($PS1_FILES.Count -gt 0) {
@@ -131,7 +113,7 @@ if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
-# 5. Packer template validation
+# 2. Packer template validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Packer template validation ===" -f (++$_step))
 if ($PKR_FILES.Count -gt 0) {
@@ -145,31 +127,68 @@ if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
-# 6. Shell script validation tests
+# 3. Dead Nix code
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Dead Nix code ===" -f (++$_step))
+say "skipping (requires Nix toolchain — not available on Windows)."
+
+# ---------------------------------------------------------------------------
+# 4. Nix flake evaluation
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Nix flake evaluation ===" -f (++$_step))
+say "skipping (requires Nix toolchain — not available on Windows)."
+
+# ---------------------------------------------------------------------------
+# 5. Nix formatting (nixfmt)
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Nix formatting (nixfmt) ===" -f (++$_step))
+say "skipping (requires Nix toolchain — not available on Windows)."
+
+# ---------------------------------------------------------------------------
+# 6. Stale Nix build artifact check
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Stale Nix build artifact check ===" -f (++$_step))
+if (-not $HAS_ARGS) {
+  $_cnbaOutput = & "$PSScriptRoot\cleanup-nix.ps1" -WhatIf 2>&1
+  $_cnbaFound = $_cnbaOutput | Select-String -Pattern 'would remove stale Nix build symlink'
+  if ($_cnbaFound) {
+    warn "stale Nix build artifacts found:"
+    $_cnbaOutput | ForEach-Object { warn "  $_" }
+    $exitCode = 1
+    if ($FAIL_FAST) { exit $exitCode }
+  } else {
+    say "no stale Nix build artifacts found."
+  }
+} else {
+  say "skipping (path-scoped mode)."
+}
+
+# ---------------------------------------------------------------------------
+# 7. Shell script validation tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Shell script validation tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 7. CWD-independence tests
+# 8. CWD-independence tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] CWD-independence tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 8. Nix search path tests
+# 9. Nix search path tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix search path tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 9. Port utility function tests
+# 10. Port utility function tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Port utility function tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 10. Lockfile validation
+# 11. Lockfile validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Lockfile validation ===" -f (++$_step))
 
@@ -353,124 +372,6 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 11. Service registry validation
-# ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] Service registry validation ===" -f (++$_step))
-if (-not $HAS_ARGS) {
-  $_svcJson = Join-Path $RepoRoot "src\modules\services.json"
-  $_svcErrors = 0
-
-  if (-not (Test-Path $_svcJson)) {
-    warn "services.json not found at $_svcJson"
-    $_svcErrors++
-  } else {
-    $_svc = Get-Content $_svcJson -Raw | ConvertFrom-Json -AsHashtable
-
-    foreach ($_svcName in $_svc.Keys) {
-      $_entry = $_svc[$_svcName]
-      if ($_entry -isnot [hashtable]) { continue }
-      if (-not $_entry.ContainsKey('displayName') -or [string]::IsNullOrEmpty($_entry.displayName)) {
-        warn "services.json: '$_svcName' missing displayName"
-        $_svcErrors++
-      }
-      if (-not $_entry.ContainsKey('platforms') -or $_entry.platforms.Count -eq 0) {
-        warn "services.json: '$_svcName' missing or empty platforms"
-        $_svcErrors++
-      } else {
-        foreach ($_plat in $_entry.platforms.Keys) {
-          $_pEntry = $_entry.platforms[$_plat]
-          $_type = $_pEntry.type
-          if ($_type -notin @('launchctl', 'systemctl', 'native', 'schtask', 'omitted')) {
-            warn "services.json: '$_svcName' platform '$_plat' has invalid type '$_type'"
-            $_svcErrors++
-          }
-          $_hasRequired = switch ($_type) {
-            'launchctl' { -not [string]::IsNullOrEmpty($_pEntry.service) }
-            'systemctl' { -not [string]::IsNullOrEmpty($_pEntry.service) }
-            'native'    { -not [string]::IsNullOrEmpty($_pEntry.service) }
-            'schtask'   { -not [string]::IsNullOrEmpty($_pEntry.taskPath) }
-            'omitted'   { -not [string]::IsNullOrEmpty($_pEntry.justification) }
-            default     { $false }
-          }
-          if (-not $_hasRequired) {
-            warn "services.json: '$_svcName' platform '$_plat' missing required fields for type '$_type'"
-            $_svcErrors++
-          }
-        }
-      }
-    }
-  }
-
-  if ($_svcErrors -gt 0) {
-    warn "services.json validation failed with $_svcErrors error(s)"
-    $exitCode = 1
-    if ($FAIL_FAST) { exit $exitCode }
-  } else {
-    # Validate user-scoped platform entries have justification.
-    foreach ($_svcName in $_svc.Keys) {
-      $_entry = $_svc[$_svcName]
-      if ($_entry -isnot [hashtable]) { continue }
-      if ($_entry.ContainsKey('platforms')) {
-        foreach ($_plat in $_entry.platforms.Keys) {
-          $_pEntry = $_entry.platforms[$_plat]
-          $_domainScope = if ($_pEntry.ContainsKey('domain')) { $_pEntry.domain } elseif ($_pEntry.ContainsKey('scope')) { $_pEntry.scope } else { $null }
-          $_hasJustification = $_pEntry.ContainsKey('justification') -and -not [string]::IsNullOrEmpty($_pEntry.justification)
-          if ($_domainScope -eq 'user' -and -not $_hasJustification) {
-            warn "services.json: '$_svcName' platform '$_plat' is user-scoped but missing justification"
-            $_svcErrors++
-          }
-        }
-      }
-    }
-
-    # Validate that service names in users.json services blocks exist in services.json.
-    $_usersJson = Join-Path $RepoRoot "src\modules\users.json"
-    if (Test-Path $_usersJson) {
-      $_users = Get-Content $_usersJson -Raw | ConvertFrom-Json -AsHashtable
-      foreach ($_username in $_users.Keys) {
-        $_userEntry = $_users[$_username]
-        if ($_userEntry.ContainsKey('services')) {
-          foreach ($_svcKey in $_userEntry.services.Keys) {
-            if (-not $_svc.ContainsKey($_svcKey)) {
-              warn "${_usersJson}: user '$_username' references unknown service '$_svcKey'"
-              $_svcErrors++
-            }
-          }
-        }
-      }
-    }
-
-    # Windows users.json
-    $_winUsersJson = Join-Path $RepoRoot "src\hosts\Windows\users.json"
-    if (Test-Path $_winUsersJson) {
-      $_winUsers = (Get-Content $_winUsersJson -Raw | ConvertFrom-Json -AsHashtable).users
-      if ($_winUsers) {
-        foreach ($_username in $_winUsers.Keys) {
-          $_userEntry = $_winUsers[$_username]
-          if ($_userEntry.ContainsKey('services')) {
-            foreach ($_svcKey in $_userEntry.services.Keys) {
-              if (-not $_svc.ContainsKey($_svcKey)) {
-                warn "${_winUsersJson}: user '$_username' references unknown service '$_svcKey'"
-                $_svcErrors++
-              }
-            }
-          }
-        }
-      }
-    }
-
-    if ($_svcErrors -gt 0) {
-      warn "services.json validation failed with $_svcErrors error(s)"
-      $exitCode = 1
-      if ($FAIL_FAST) { exit $exitCode }
-    }
-    say "services.json validation passed"
-  }
-} else {
-  say "skipping service registry validation (path-scoped mode)."
-}
-
-# ---------------------------------------------------------------------------
 # 12. Locked DSC validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
@@ -617,7 +518,125 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 13. Package manager usage enforcement
+# 13. Service registry validation
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Service registry validation ===" -f (++$_step))
+if (-not $HAS_ARGS) {
+  $_svcJson = Join-Path $RepoRoot "src\modules\services.json"
+  $_svcErrors = 0
+
+  if (-not (Test-Path $_svcJson)) {
+    warn "services.json not found at $_svcJson"
+    $_svcErrors++
+  } else {
+    $_svc = Get-Content $_svcJson -Raw | ConvertFrom-Json -AsHashtable
+
+    foreach ($_svcName in $_svc.Keys) {
+      $_entry = $_svc[$_svcName]
+      if ($_entry -isnot [hashtable]) { continue }
+      if (-not $_entry.ContainsKey('displayName') -or [string]::IsNullOrEmpty($_entry.displayName)) {
+        warn "services.json: '$_svcName' missing displayName"
+        $_svcErrors++
+      }
+      if (-not $_entry.ContainsKey('platforms') -or $_entry.platforms.Count -eq 0) {
+        warn "services.json: '$_svcName' missing or empty platforms"
+        $_svcErrors++
+      } else {
+        foreach ($_plat in $_entry.platforms.Keys) {
+          $_pEntry = $_entry.platforms[$_plat]
+          $_type = $_pEntry.type
+          if ($_type -notin @('launchctl', 'systemctl', 'native', 'schtask', 'omitted')) {
+            warn "services.json: '$_svcName' platform '$_plat' has invalid type '$_type'"
+            $_svcErrors++
+          }
+          $_hasRequired = switch ($_type) {
+            'launchctl' { -not [string]::IsNullOrEmpty($_pEntry.service) }
+            'systemctl' { -not [string]::IsNullOrEmpty($_pEntry.service) }
+            'native'    { -not [string]::IsNullOrEmpty($_pEntry.service) }
+            'schtask'   { -not [string]::IsNullOrEmpty($_pEntry.taskPath) }
+            'omitted'   { -not [string]::IsNullOrEmpty($_pEntry.justification) }
+            default     { $false }
+          }
+          if (-not $_hasRequired) {
+            warn "services.json: '$_svcName' platform '$_plat' missing required fields for type '$_type'"
+            $_svcErrors++
+          }
+        }
+      }
+    }
+  }
+
+  if ($_svcErrors -gt 0) {
+    warn "services.json validation failed with $_svcErrors error(s)"
+    $exitCode = 1
+    if ($FAIL_FAST) { exit $exitCode }
+  } else {
+    # Validate user-scoped platform entries have justification.
+    foreach ($_svcName in $_svc.Keys) {
+      $_entry = $_svc[$_svcName]
+      if ($_entry -isnot [hashtable]) { continue }
+      if ($_entry.ContainsKey('platforms')) {
+        foreach ($_plat in $_entry.platforms.Keys) {
+          $_pEntry = $_entry.platforms[$_plat]
+          $_domainScope = if ($_pEntry.ContainsKey('domain')) { $_pEntry.domain } elseif ($_pEntry.ContainsKey('scope')) { $_pEntry.scope } else { $null }
+          $_hasJustification = $_pEntry.ContainsKey('justification') -and -not [string]::IsNullOrEmpty($_pEntry.justification)
+          if ($_domainScope -eq 'user' -and -not $_hasJustification) {
+            warn "services.json: '$_svcName' platform '$_plat' is user-scoped but missing justification"
+            $_svcErrors++
+          }
+        }
+      }
+    }
+
+    # Validate that service names in users.json services blocks exist in services.json.
+    $_usersJson = Join-Path $RepoRoot "src\modules\users.json"
+    if (Test-Path $_usersJson) {
+      $_users = Get-Content $_usersJson -Raw | ConvertFrom-Json -AsHashtable
+      foreach ($_username in $_users.Keys) {
+        $_userEntry = $_users[$_username]
+        if ($_userEntry.ContainsKey('services')) {
+          foreach ($_svcKey in $_userEntry.services.Keys) {
+            if (-not $_svc.ContainsKey($_svcKey)) {
+              warn "${_usersJson}: user '$_username' references unknown service '$_svcKey'"
+              $_svcErrors++
+            }
+          }
+        }
+      }
+    }
+
+    # Windows users.json
+    $_winUsersJson = Join-Path $RepoRoot "src\hosts\Windows\users.json"
+    if (Test-Path $_winUsersJson) {
+      $_winUsers = (Get-Content $_winUsersJson -Raw | ConvertFrom-Json -AsHashtable).users
+      if ($_winUsers) {
+        foreach ($_username in $_winUsers.Keys) {
+          $_userEntry = $_winUsers[$_username]
+          if ($_userEntry.ContainsKey('services')) {
+            foreach ($_svcKey in $_userEntry.services.Keys) {
+              if (-not $_svc.ContainsKey($_svcKey)) {
+                warn "${_winUsersJson}: user '$_username' references unknown service '$_svcKey'"
+                $_svcErrors++
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if ($_svcErrors -gt 0) {
+      warn "services.json validation failed with $_svcErrors error(s)"
+      $exitCode = 1
+      if ($FAIL_FAST) { exit $exitCode }
+    }
+    say "services.json validation passed"
+  }
+} else {
+  say "skipping service registry validation (path-scoped mode)."
+}
+
+# ---------------------------------------------------------------------------
+# 14. Package manager usage enforcement
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Package manager usage enforcement ===" -f (++$_step))
 if (-not $HAS_ARGS) {
@@ -656,40 +675,7 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 14. Stale Nix build artifact check
-# ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] Stale Nix build artifact check ===" -f (++$_step))
-if (-not $HAS_ARGS) {
-  $_cnbaOutput = & "$PSScriptRoot\cleanup-nix.ps1" -WhatIf 2>&1
-  $_cnbaFound = $_cnbaOutput | Select-String -Pattern 'would remove stale Nix build symlink'
-  if ($_cnbaFound) {
-    warn "stale Nix build artifacts found:"
-    $_cnbaOutput | ForEach-Object { warn "  $_" }
-    $exitCode = 1
-    if ($FAIL_FAST) { exit $exitCode }
-  } else {
-    say "no stale Nix build artifacts found."
-  }
-} else {
-  say "skipping (path-scoped mode)."
-}
-
-# ---------------------------------------------------------------------------
-# 15. Online determinism checks (--verify mode only)
-# ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] Online determinism checks (--verify) ===" -f (++$_step))
-if ($VERIFY) {
-  & "$PSScriptRoot\bump-lockfile.ps1" -Verify
-  if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
-  if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
-  if ($LASTEXITCODE -eq 0) {
-    say "online determinism checks passed."
-  }
-} else {
-  say "skipping (use --verify to run online determinism checks)."
-}
-
-# 16. Undocumented error suppression check
+# 15. Undocumented error suppression check
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_step))
 
@@ -761,6 +747,21 @@ if ($_undocSuppViolations.Count -gt 0) {
   say "no undocumented error suppressions found."
 }
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
+
+# ---------------------------------------------------------------------------
+# 16. Online determinism checks (--verify mode only)
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Online determinism checks (--verify) ===" -f (++$_step))
+if ($VERIFY) {
+  & "$PSScriptRoot\bump-lockfile.ps1" -Verify
+  if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
+  if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
+  if ($LASTEXITCODE -eq 0) {
+    say "online determinism checks passed."
+  }
+} else {
+  say "skipping (use --verify to run online determinism checks)."
+}
 
 # ---------------------------------------------------------------------------
 if ($exitCode -ne 0) {

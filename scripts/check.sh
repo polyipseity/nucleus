@@ -3,22 +3,22 @@
 # lives in test.sh.
 #
 # Runs repository checks in sequence:
-#   1. Dead Nix code detection (deadnix)
-#   2. Nix flake evaluation
-#   3. Nix formatting check (nixfmt --verify)
-#   4. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
-#   5. Packer template validation
-#   6. Shell script validation tests
-#   7. CWD-independence tests
-#   8. Nix search path tests
-#   9. Port utility function tests
-#  10. Lockfile validation
-#  11. Service registry validation
+#   1. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
+#   2. Packer template validation
+#   3. Dead Nix code detection (deadnix)
+#   4. Nix flake evaluation
+#   5. Nix formatting check (nixfmt --verify)
+#   6. Stale Nix build artifact check
+#   7. Shell script validation tests
+#   8. CWD-independence tests
+#   9. Nix search path tests
+#  10. Port utility function tests
+#  11. Lockfile validation
 #  12. Locked DSC validation
-#  13. Package manager usage enforcement
-#  14. Stale Nix build artifact check
-#  15. Online determinism checks (--verify mode only)
-#  16. Undocumented error suppression check
+#  13. Service registry validation
+#  14. Package manager usage enforcement
+#  15. Undocumented error suppression check
+#  16. Online determinism checks (--verify mode only)
 #
 # Output conventions:
 #   Warnings (warn) and errors (error) go to stderr; info/success/skip
@@ -130,6 +130,31 @@ fi
 
 _step=0
 
+# PowerShell syntax validation (parser only, no PSScriptAnalyzer)
+section "$((_step += 1))" "PowerShell syntax validation"
+require_command pwsh
+_ps_exit=0
+if [ "${#PS1_FILES[@]}" -gt 0 ]; then
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly "${PS1_FILES[@]}" || _ps_exit=$?
+elif ! $HAS_ARGS; then
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly || _ps_exit=$?
+else
+  say "skipping (no PowerShell scripts to check)."
+fi
+if [ $_ps_exit -ne 0 ]; then exit_code=$_ps_exit; fi
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+
+# Packer template validation
+section "$((_step += 1))" "Packer template validation"
+if [ "${#PKR_FILES[@]}" -gt 0 ]; then
+  bash scripts/check-packer.sh "${PKR_FILES[@]}" || exit_code=$?
+elif ! $HAS_ARGS; then
+  bash scripts/check-packer.sh || exit_code=$?
+else
+  say "skipping (no Packer templates to check)."
+fi
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+
 # Dead Nix code detection
 section "$((_step += 1))" "Dead Nix code"
 if ! $HAS_ARGS; then
@@ -179,30 +204,23 @@ else
   say "skipping nixfmt (no Nix files to check)."
 fi
 
-# PowerShell syntax validation (parser only, no PSScriptAnalyzer)
-section "$((_step += 1))" "PowerShell syntax validation"
-require_command pwsh
-_ps_exit=0
-if [ "${#PS1_FILES[@]}" -gt 0 ]; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly "${PS1_FILES[@]}" || _ps_exit=$?
-elif ! $HAS_ARGS; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly || _ps_exit=$?
+# Stale Nix build artifact check
+section "$((_step += 1))" "Stale Nix build artifact check"
+if ! $HAS_ARGS; then
+  _cnba_output="$("$SCRIPT_DIR/cleanup-nix.sh" --dry-run 2>&1)"
+  if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
+    warn "stale Nix build artifacts found:"
+    echo "$_cnba_output" | while IFS= read -r _cnba_line; do
+      warn "  $_cnba_line"
+    done
+    exit_code=1
+  else
+    say "no stale Nix build artifacts found."
+  fi
+  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 else
-  say "skipping (no PowerShell scripts to check)."
+  say "skipping (path-scoped mode)."
 fi
-if [ $_ps_exit -ne 0 ]; then exit_code=$_ps_exit; fi
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
-
-# Packer template validation
-section "$((_step += 1))" "Packer template validation"
-if [ "${#PKR_FILES[@]}" -gt 0 ]; then
-  bash scripts/check-packer.sh "${PKR_FILES[@]}" || exit_code=$?
-elif ! $HAS_ARGS; then
-  bash scripts/check-packer.sh || exit_code=$?
-else
-  say "skipping (no Packer templates to check)."
-fi
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Shell script validation tests
 section "$((_step += 1))" "Shell script validation tests"
@@ -408,6 +426,60 @@ else
   say "skipping lockfile validation (path-scoped mode)."
 fi
 
+# Locked DSC validation
+section "$((_step += 1))" "Locked DSC validation"
+# Platform parallel: check.ps1 uses powershell-yaml with normalization helpers (Windows-native equivalent).
+if ! $HAS_ARGS; then
+  require_command yq
+  _dsc_system_dir="src/hosts/Windows/system"
+  _lockfile="src/lockfiles/lockfile.json"
+  _lf_errors=0
+
+  # Generate locked DSC in-memory from ALL system DSC files + lockfile.
+  # This mirrors check.ps1's behavior — validates version pins across the
+  # full system configuration, not just packages.dsc.yml.
+  _locked_json=$(yq eval -o=j '.' "$_dsc_system_dir"/*.dsc.yml 2>/dev/null | jq -s --argjson locked "$(jq -c '.winget // {}' "$_lockfile")" '
+    { properties: { resources: (map(.properties.resources // []) | add) } } |
+    .properties.resources |= [
+      .[] | if .resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and ($locked[.settings.id] | length > 0) then
+        .settings.version = $locked[.settings.id]
+      else
+        .
+      end
+    ]
+  ')
+
+  # For each pinned resource, verify version matches lockfile.
+  while IFS=$'\t' read -r _id _pinned_ver; do
+    _lf_ver=$(jq -r --arg id "$_id" '.winget[$id] // ""' "$_lockfile")
+    if [ -z "$_lf_ver" ]; then
+      warn "system DSC files: $_id has version $_pinned_ver but no lockfile entry"
+      _lf_errors=$((_lf_errors + 1))
+    elif [ "$_pinned_ver" != "$_lf_ver" ]; then
+      warn "system DSC files: $_id pinned $_pinned_ver but lockfile has $_lf_ver"
+      _lf_errors=$((_lf_errors + 1))
+    fi
+  done < <(echo "$_locked_json" | jq -r '.properties.resources[] | select(.resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and .settings.version != null) | [.settings.id, .settings.version] | @tsv')
+
+  # Check for lockfile entries missing version pins in generated output.
+  while IFS=$'\t' read -r _id _lf_ver; do
+    _pinned=$(echo "$_locked_json" | jq -r --arg id "$_id" '.properties.resources[] | select(.resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and .settings.id == $id) | .settings.version // ""')
+    if [ -z "$_pinned" ]; then
+      warn "$_id ($_lf_ver) is in lockfile but missing version pin after generation"
+      _lf_errors=$((_lf_errors + 1))
+    fi
+  done < <(jq -r '.winget // {} | to_entries[] | [.key, .value] | @tsv' "$_lockfile")
+
+  if [ "$_lf_errors" -gt 0 ]; then
+    warn "locked DSC validation failed with $_lf_errors error(s)"
+    exit_code=1
+    $FAIL_FAST && exit $exit_code
+  fi
+  say "locked DSC validation passed"
+else
+  say "skipping locked DSC validation (path-scoped mode)."
+fi
+
 # Service registry validation
 section "$((_step += 1))" "Service registry validation"
 if ! $HAS_ARGS; then
@@ -542,60 +614,6 @@ else
   say "skipping service registry validation (path-scoped mode)."
 fi
 
-# Locked DSC validation
-section "$((_step += 1))" "Locked DSC validation"
-# Platform parallel: check.ps1 uses powershell-yaml with normalization helpers (Windows-native equivalent).
-if ! $HAS_ARGS; then
-  require_command yq
-  _dsc_system_dir="src/hosts/Windows/system"
-  _lockfile="src/lockfiles/lockfile.json"
-  _lf_errors=0
-
-  # Generate locked DSC in-memory from ALL system DSC files + lockfile.
-  # This mirrors check.ps1's behavior — validates version pins across the
-  # full system configuration, not just packages.dsc.yml.
-  _locked_json=$(yq eval -o=j '.' "$_dsc_system_dir"/*.dsc.yml 2>/dev/null | jq -s --argjson locked "$(jq -c '.winget // {}' "$_lockfile")" '
-    { properties: { resources: (map(.properties.resources // []) | add) } } |
-    .properties.resources |= [
-      .[] | if .resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and ($locked[.settings.id] | length > 0) then
-        .settings.version = $locked[.settings.id]
-      else
-        .
-      end
-    ]
-  ')
-
-  # For each pinned resource, verify version matches lockfile.
-  while IFS=$'\t' read -r _id _pinned_ver; do
-    _lf_ver=$(jq -r --arg id "$_id" '.winget[$id] // ""' "$_lockfile")
-    if [ -z "$_lf_ver" ]; then
-      warn "system DSC files: $_id has version $_pinned_ver but no lockfile entry"
-      _lf_errors=$((_lf_errors + 1))
-    elif [ "$_pinned_ver" != "$_lf_ver" ]; then
-      warn "system DSC files: $_id pinned $_pinned_ver but lockfile has $_lf_ver"
-      _lf_errors=$((_lf_errors + 1))
-    fi
-  done < <(echo "$_locked_json" | jq -r '.properties.resources[] | select(.resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and .settings.version != null) | [.settings.id, .settings.version] | @tsv')
-
-  # Check for lockfile entries missing version pins in generated output.
-  while IFS=$'\t' read -r _id _lf_ver; do
-    _pinned=$(echo "$_locked_json" | jq -r --arg id "$_id" '.properties.resources[] | select(.resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and .settings.id == $id) | .settings.version // ""')
-    if [ -z "$_pinned" ]; then
-      warn "$_id ($_lf_ver) is in lockfile but missing version pin after generation"
-      _lf_errors=$((_lf_errors + 1))
-    fi
-  done < <(jq -r '.winget // {} | to_entries[] | [.key, .value] | @tsv' "$_lockfile")
-
-  if [ "$_lf_errors" -gt 0 ]; then
-    warn "locked DSC validation failed with $_lf_errors error(s)"
-    exit_code=1
-    $FAIL_FAST && exit $exit_code
-  fi
-  say "locked DSC validation passed"
-else
-  say "skipping locked DSC validation (path-scoped mode)."
-fi
-
 # Package manager usage enforcement
 section "$((_step += 1))" "Package manager usage enforcement"
 # Ban bare `pip install` and `npm install` — these bypass the lockfile and
@@ -627,36 +645,6 @@ if ! $HAS_ARGS; then
   say "no package manager violations found."
 else
   say "skipping (path-scoped mode)."
-fi
-
-# Stale Nix build artifact check
-section "$((_step += 1))" "Stale Nix build artifact check"
-if ! $HAS_ARGS; then
-  _cnba_output="$("$SCRIPT_DIR/cleanup-nix.sh" --dry-run 2>&1)"
-  if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
-    warn "stale Nix build artifacts found:"
-    echo "$_cnba_output" | while IFS= read -r _cnba_line; do
-      warn "  $_cnba_line"
-    done
-    exit_code=1
-  else
-    say "no stale Nix build artifacts found."
-  fi
-  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
-else
-  say "skipping (path-scoped mode)."
-fi
-
-# Online determinism checks (--verify mode only)
-section "$((_step += 1))" "Online determinism checks (--verify)"
-if $VERIFY; then
-  bash "$SCRIPT_DIR/bump-lockfile.sh" --verify || exit_code=$?
-  if [ $exit_code -eq 0 ]; then
-    say "online determinism checks passed."
-  fi
-  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
-else
-  say "skipping (use --verify to run online determinism checks)."
 fi
 
 # Undocumented error suppression check
@@ -708,6 +696,18 @@ else
 fi
 rm -f "$_undoc_supp_out"
 $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+# Online determinism checks (--verify mode only)
+section "$((_step += 1))" "Online determinism checks (--verify)"
+if $VERIFY; then
+  bash "$SCRIPT_DIR/bump-lockfile.sh" --verify || exit_code=$?
+  if [ $exit_code -eq 0 ]; then
+    say "online determinism checks passed."
+  fi
+  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+else
+  say "skipping (use --verify to run online determinism checks)."
+fi
+
 
 if [ $exit_code -ne 0 ]; then
   warn "some checks failed with exit code $exit_code"
