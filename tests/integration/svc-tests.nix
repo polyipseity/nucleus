@@ -147,11 +147,17 @@ assert containsRegex ''services\.json'' checkShText;
 assert containsRegex "justification" checkShText;
 assert containsRegex "users.json" checkShText;
 
+# Verdict ordering: "validation passed" must follow "justification" (not precede it)
+assert containsRegex "justification.*validation passed" checkShText;
+
 # --- check.ps1 service registry validation assertions ---
 assert containsRegex "Service registry validation" checkPs1Text;
 assert containsRegex ''services\.json'' checkPs1Text;
 assert containsRegex "justification" checkPs1Text;
 assert containsRegex "users.json" checkPs1Text;
+
+# Verdict ordering: "validation passed" must follow "justification" (not precede it)
+assert containsRegex "justification.*validation passed" checkPs1Text;
 
 # --- Windows profile wiring assertions ---
 assert containsRegex "nucleus-svc" windowsShellProfileText;
