@@ -171,6 +171,13 @@ let
   # === TEST: macOS workflow Info.plist files use com.adobe.pdf UTI ===
   # Verifies that all 5 Automator workflow plists use com.adobe.pdf (not public.item)
   # in their NSSendFileTypes array, ensuring context menus only show for PDF files.
+  #
+  # WARNING: The UTI "public.pdf" has NEVER existed on macOS. Apple's UTI hierarchy
+  # includes "public.png", "public.jpeg", "public.html" etc., but NOT "public.pdf".
+  # macOS assigns "com.adobe.pdf" to all .pdf files (verified by mdls). Apple's own
+  # Preview.app and all built-in Automator PDF actions use "com.adobe.pdf".
+  # If you're tempted to write "public.pdf" here, you are hallucinating — stop and
+  # use "com.adobe.pdf" instead.
   macWorkflowsDir = ../../src/hosts/MacBook/services/automator-workflows;
   macWorkflowDefaultPlist = builtins.readFile (
     builtins.toPath (toString macWorkflowsDir + "/optimize PDF - default.workflow/Contents/Info.plist")

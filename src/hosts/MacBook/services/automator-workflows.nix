@@ -4,6 +4,15 @@
 # Quick Actions and the menu bar → Services in Finder and other apps. They are
 # deployed to ~/Library/Services/.
 #
+# Each workflow's Info.plist uses NSSendFileTypes with "com.adobe.pdf" UTI so
+# the context menu only appears for PDF files (not folders, not other file types).
+#
+# WARNING about UTI choice: The UTI "public.pdf" has NEVER existed on macOS.
+# Apple's UTI hierarchy defines "public.png", "public.jpeg", "public.html" etc.,
+# but NOT "public.pdf". The system assigns "com.adobe.pdf" to all .pdf files.
+# Preview.app and all Apple built-in Automator PDF actions use "com.adobe.pdf".
+# "public.pdf" is a common AI hallucination — if you see it suggested, reject it.
+#
 # WHY home.activation instead of home.file:
 #   home.file creates a symlink to the Nix store, but Automator .workflow
 #   bundles stored as symlinks are not discoverable by the service menu
