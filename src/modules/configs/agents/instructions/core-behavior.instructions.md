@@ -130,3 +130,13 @@ When executing a plan with multiple phases:
 - If a phase description is ambiguous, re-read the original source of the plan rather than guessing intent.
 - Do not skip phases unless the plan explicitly marks them as optional.
 - **Review subagent usage.** Did you delegate separable subproblems to subagents? If not, would delegation have improved context management or reduced risk of forgetting earlier requirements? Record the reasoning in session memory.
+
+### Finding the active plan file
+
+When the user says "refer back to the plan", "verify the plan", "check the plan", or any equivalent phrase:
+
+1. Call `resolve_memory_file_uri("/memories/session/active-plan.md")` to locate the plan.
+2. Read the file at the resolved path — it contains the plan.
+3. Present it to the user or act on it as instructed.
+
+If the session memory file is empty or missing, report that no plan is currently tracked. Do not guess or reconstruct.
