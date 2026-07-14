@@ -51,6 +51,18 @@ Choose the right vehicle:
 
 ## Validation guidance
 
+### Check script structure
+
+- Both `scripts/check.sh` (POSIX) and `scripts/check.ps1` (Windows) follow the same 5-group structure in their header comments:
+  - **Toolchain checks** (1-2): PowerShell syntax, Packer templates.
+  - **Nix checks** (3-6): Dead Nix code, flake eval, formatting, stale artifacts.
+  - **Test suites** (7-10): Shell validation, CWD, search path, port functions.
+  - **Data integrity** (11-13): Lockfile, locked DSC, service registry.
+  - **Policy/verification** (14-16): Package manager enforcement, error suppression, online checks.
+- Pre-flight tool validation runs at the start of both scripts (before `$_step=0`). On POSIX this uses `require_command` from `src/scripts/lib.sh`; on Windows it uses `Ensure-Tool` from `src/hosts/Windows/modules/Ensure-Tool.psm1`.
+- Tool provisioning is handled by `nucleus-apply` (POSIX: `home.packages` in `src/modules/core.nix`; Windows: WinGet DSC). The pre-flight block is a safety net only — `nix profile install` and similar ad-hoc provisioning are banned.
+- When adding new tools to the check suite, add them to both: (a) the pre-flight block, and (b) `src/modules/core.nix` (POSIX) or WinGet DSC (Windows).
+
 - For every detected stack, document what to run and where commands are defined.
 - **Nix check-and-format (pre-commit hook)**: `check.sh` accepts `--format` to auto-fix Nix files (nixfmt). The flag is passed by `prek-hooks.py` when `args = ["--format"]` in `prek.toml`. `nixfmt` is bundled in `mkCheckApp` runtimeInputs in `src/flake.nix` to avoid expensive nixpkgs eval. No separate `format-nix` hook exists.
 - **CI policy**: Do not add new checks or tests to `ci.yml`. Route new validation into repo checks (`scripts/check.sh` / `scripts/check.ps1`) or repo tests (`tests/`). Decouples checks from CI runners so they work locally too.
