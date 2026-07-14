@@ -10,6 +10,7 @@ This document is the cross-reference between the Nix-side centralized registry a
 | NixOS   | `src/modules/lib/env-vars.nix` (catalog)                        | Nix attrs   |
 | Windows | `src/hosts/Windows/user/env.dsc.yml`                            | WinGet DSC  |
 | Windows | `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` (CC/CXX/LD) | PowerShell |
+| Windows | `src/hosts/Windows/modules/user/Sync-UserPath.ps1` (PATH) | PowerShell |
 
 **Nix-side registry** (`src/modules/lib/env-vars.nix`):
 
@@ -53,7 +54,7 @@ This document is the cross-reference between the Nix-side centralized registry a
 | `STARSHIP_CONFIG`          | all-process  | yes           | `~/.config/starship.toml`| `%USERPROFILE%\.config\starship.toml`| —                                                      |
 | `HOME`                     | all-process  | no            | —                      | `%USERPROFILE%`                        | Windows only                                            |
 | `NIX_PATH`                 | all-process  | no            | —                      | `nixpkgs=flake:nixpkgs`                | Windows only                                            |
-| `PATH`                     | all-process  | no            | sessionPath (shell) + launchctl (GUI domain) | User-scope prepend (env.dsc.yml) | macOS: GUI domain via launchctl activation; shell via home.sessionPath. NixOS: shell-only via sessionPath. Windows: User-scope DSC entry merges with system Machine-scope PATH. |
+| `PATH`                     | all-process  | no            | sessionPath (shell) + launchctl (GUI domain) + environment.variables (NixOS) | Machine-scope REG_EXPAND_SZ via Sync-UserPath.ps1 | macOS: GUI domain via launchctl activation; shell via home.sessionPath. NixOS: all-process via environment.variables (GUI gap closed). Windows: Machine-scope REG_EXPAND_SZ with %USERPROFILE% literal entries (resolved per-user by CreateEnvironmentBlock). Sync-UserPath.ps1 replaces old DSC pathEnvVar (which was a literal set, not a prepend). |
 
 ## Adding a new variable
 
