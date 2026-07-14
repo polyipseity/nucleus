@@ -30,13 +30,9 @@ in
   ) envVars.getAllNixVarNames;
 
   # Vars that Windows sets via Sync-ShellProfile.ps1 instead of DSC.
-  profileOnlyVarNames = [
-    "CC"
-    "CXX"
-    "LD"
-  ];
+  profileOnlyVarNames = [ ];
 
-  # Vars that Windows sets via apply.ps1 instead of DSC.
+  # Vars that Windows sets via apply.ps1 instead of DSC (also in system/env.dsc.yml).
   applyOnlyVarNames = [ "NUCLEUS_HOST" ];
 
   # Vars that should be in DSC.

@@ -22,7 +22,8 @@ BeforeAll {
 
   # Paths
   $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
-  $DscFile = Join-Path $RepoRoot "src\hosts\Windows\user\env.dsc.yml"
+  $UserDscFile = Join-Path $RepoRoot "src\hosts\Windows\user\env.dsc.yml"
+  $SystemDscFile = Join-Path $RepoRoot "src\hosts\Windows\system\env.dsc.yml"
   $ManifestFile = Join-Path $RepoRoot "result\env-parity-manifest.json"
   $CatalogNixFile = Join-Path $RepoRoot "src\modules\lib\env-vars.nix"
 
@@ -56,7 +57,7 @@ BeforeAll {
       return Get-Content -Raw -Path $ManifestPath | ConvertFrom-Json
     }
     # Fall back to nix eval
-    $nixTestFile = Join-Path $RepoRoot "src\tests\integration\env-parity-tests.nix"
+    $nixTestFile = Join-Path $RepoRoot "tests\integration\env-parity-tests.nix"
     $evalExpr = "(import ""$nixTestFile"" { }).manifest"
     # undoc-supp: nix eval prints progress to stderr
     $json = & nix eval --impure --expr $evalExpr --json 2>$null
@@ -79,20 +80,18 @@ BeforeAll {
     return $names | Select-Object -Unique
   }
 
-  # Build expected Windows var name list from the catalog.
+  # Build expected Windows var name list from the catalog manifest.
+  # Uses hasWindowsEntry (true if the entry has a Windows-specific value or
+  # applies via default) to determine Windows relevance.
   function Get-ExpectedWindowsVarNames {
     param ($Manifest)
     $expected = @()
     foreach ($entry in $Manifest) {
-      # Only vars relevant to Windows: those with explicit Windows override, or
-      # those that include Windows in their hosts list (default: all hosts).
-      $entry.hosts -contains "Windows" -or
-      ($null -eq $entry.override) -and
-      ($null -eq $entry.hosts -or $entry.hosts.Count -eq 0)
+      if ($entry.hasWindowsEntry) {
+        $expected += $entry.name
+      }
     }
-    # Exclude macOS-only vars
-    $macOnlyVars = @("DEVELOPER_DIR", "SDKROOT", "LIBRARY_PATH", "NIX_SSL_CERT_FILE", "NUCLEUS_REPO_ROOT")
-    return $expected | Where-Object { $_ -notin $macOnlyVars }
+    return $expected
   }
 
   # Read apply.ps1 content (used by multiple tests).
@@ -103,9 +102,9 @@ BeforeAll {
 }
 
 Describe "Windows env var parity with Nix catalog" {
-  Context "DSC parity" {
-    It "env.dsc.yml exists and is readable" {
-      $DscFile | Should -Exist
+  Context "DSC parity — user scope" {
+    It "user/env.dsc.yml exists and is readable" {
+      $UserDscFile | Should -Exist
     }
 
     It "catalog manifest evaluates successfully" {
@@ -113,43 +112,70 @@ Describe "Windows env var parity with Nix catalog" {
       $script:Manifest | Should -Not -BeNullOrEmpty
     }
 
-    It "every catalog var expected on Windows has a DSC entry" {
-      $dscVars = Get-DscEnvVarNames -DscPath $DscFile
-      $expectedVars = Get-ExpectedWindowsVarNames -Manifest $script:Manifest
+    It "every user-specific catalog var has a User-scope DSC entry" {
+      $dscVars = Get-DscEnvVarNames -DscPath $UserDscFile
+      $userSpecificVars = @($script:Manifest | Where-Object { $_.userSpecific -and $_.hasWindowsEntry } | ForEach-Object { $_.name })
 
-      $missing = $expectedVars | Where-Object { $_ -notin $dscVars }
+      $missing = $userSpecificVars | Where-Object { $_ -notin $dscVars }
       if ($missing.Count -gt 0) {
-        Write-Warning "Missing DSC env vars: $($missing -join ', ')"
+        Write-Warning "Missing User-scope DSC env vars: $($missing -join ', ')"
       }
-      $missing.Count | Should -Be 0 -Because "every Nix catalog variable expected on Windows should have a DSC Environment resource"
+      $missing.Count | Should -Be 0 -Because "every user-specific catalog var expected on Windows should have a User-scope DSC Environment resource"
     }
 
-    It "every DSC Env resource has a Nix catalog counterpart" {
-      $dscVars = Get-DscEnvVarNames -DscPath $DscFile
+    It "every User-scope DSC Env resource has a Nix catalog counterpart" {
+      $dscVars = Get-DscEnvVarNames -DscPath $UserDscFile
       $catalogNames = $script:Manifest | ForEach-Object { $_.name }
-      # Exclude expected Windows-only vars
-      $windowsOnlyVars = @("HOME", "NIX_PATH")
-      $catalogNames += $windowsOnlyVars
 
       $extra = $dscVars | Where-Object { $_ -notin $catalogNames }
       if ($extra.Count -gt 0) {
-        Write-Warning "DSC env vars without Nix catalog entry: $($extra -join ', ')"
+        Write-Warning "User-scope DSC env vars without Nix catalog entry: $($extra -join ', ')"
+      }
+      $extra.Count | Should -Be 0 -Because "every DSC Environment resource should have a Nix catalog counterpart"
+    }
+  }
+
+  Context "DSC parity — machine scope" {
+    It "system/env.dsc.yml exists and is readable" {
+      $SystemDscFile | Should -Exist
+    }
+
+    It "every non-user-specific catalog var has a Machine-scope DSC entry" {
+      $dscVars = Get-DscEnvVarNames -DscPath $SystemDscFile
+      $machineSpecificVars = @($script:Manifest | Where-Object { -not $_.userSpecific -and $_.hasWindowsEntry } | ForEach-Object { $_.name })
+
+      $missing = $machineSpecificVars | Where-Object { $_ -notin $dscVars }
+      if ($missing.Count -gt 0) {
+        Write-Warning "Missing Machine-scope DSC env vars: $($missing -join ', ')"
+      }
+      $missing.Count | Should -Be 0 -Because "every non-user-specific catalog var expected on Windows should have a Machine-scope DSC Environment resource"
+    }
+
+    It "every Machine-scope DSC Env resource has a Nix catalog counterpart" {
+      $dscVars = Get-DscEnvVarNames -DscPath $SystemDscFile
+      $catalogNames = $script:Manifest | ForEach-Object { $_.name }
+
+      $extra = $dscVars | Where-Object { $_ -notin $catalogNames }
+      if ($extra.Count -gt 0) {
+        Write-Warning "Machine-scope DSC env vars without Nix catalog entry: $($extra -join ', ')"
       }
       $extra.Count | Should -Be 0 -Because "every DSC Environment resource should have a Nix catalog counterpart"
     }
   }
 
   Context "Shell profile parity" {
-    It "Sync-ShellProfile.ps1 sets CC, CXX, LD matching the catalog" {
+    It "Sync-ShellProfile.ps1 no longer sets CC, CXX, LD (moved to Machine-scope DSC)" {
       $profileVars = Get-ProfileEnvVarNames
-      $profileVars | Should -Contain "CC"
-      $profileVars | Should -Contain "CXX"
-      $profileVars | Should -Contain "LD"
+      $profileVars | Should -Not -Contain "CC"
+      $profileVars | Should -Not -Contain "CXX"
+      $profileVars | Should -Not -Contain "LD"
+    }
 
-      # Verify values match the catalog
-      $ccEntry = $script:Manifest | Where-Object { $_.name -eq "CC" } | Select-Object -First 1
-      $ccEntry | Should -Not -BeNullOrEmpty
-      $ccEntry.scope | Should -Be "shell-only"
+    It "CC, CXX, LD are in system/env.dsc.yml at Machine scope" {
+      $dscVars = Get-DscEnvVarNames -DscPath $SystemDscFile
+      $dscVars | Should -Contain "CC"
+      $dscVars | Should -Contain "CXX"
+      $dscVars | Should -Contain "LD"
     }
   }
 
