@@ -318,6 +318,12 @@ let
       )
       "discord-music-rpc config.yaml must have protectDiscordMusicRPCConfig activation and be listed in home.nix protect/unprotect hooks";
 
+  # === TEST: App bundles Phase 2 uses declared order (no re-sort) ===
+  test_app_bundles_deployment_uses_declared_order = assert' (lib.hasInfix "'') currentNucleusAppBundles" macbookAppBundlesText) "app-bundles.nix Phase 2 must iterate currentNucleusAppBundles directly without re-sorting";
+
+  # === TEST: Automator workflows Phase 3 uses declared order (no re-sort) ===
+  test_workflows_deployment_uses_declared_order = assert' (lib.hasInfix "'') currentNucleusWorkflows" macbookAutomatorWorkflowsText) "automator-workflows.nix Phase 3 must iterate currentNucleusWorkflows directly without re-sorting";
+
   # === TEST: macOS app-bundles DAG orders after linkGeneration ===
   test_services_app_bundles_dag_after_link_generation = assert' (lib.hasInfix "deployNucleusAppBundles = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAppBundlesText) "app-bundles.nix deployNucleusAppBundles must run after linkGeneration";
 
@@ -366,6 +372,8 @@ let
     test_services_workflows_dag_after_link_generation
     test_services_flush_dag_after_both
     test_services_imports_both_submodules
+    test_app_bundles_deployment_uses_declared_order
+    test_workflows_deployment_uses_declared_order
   ];
 in
 {
@@ -399,5 +407,7 @@ in
     "24: automator-workflows deployNucleusAutomatorWorkflows after linkGeneration"
     "25: services.nix deployNucleusServicesFlush after both deploy steps"
     "26: services.nix imports both sub-modules"
+    "27: app-bundles Phase 2 maps currentNucleusAppBundles directly (no re-sort)"
+    "28: automator-workflows Phase 3 maps currentNucleusWorkflows directly (no re-sort)"
   ];
 }

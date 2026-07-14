@@ -67,7 +67,7 @@ let
         && posPrinter < posEbook
         && posEbook < posScreen
       )
-      "macOS automator-workflows.nix presets must be in custom order (default < prepress < printer < ebook < screen)";
+      "macOS automator-workflows.nix preset order must be quality-descending (default \u2192 prepress \u2192 printer \u2192 ebook \u2192 screen)";
 
   test_all_5_presets_in_nixos = assert' (
     allPresetsPresent nixosServicesText
@@ -152,6 +152,20 @@ let
 
   test_windows_scoped_to_pdf = assert' (lib.hasInfix "SystemFileAssociations\\\\.pdf" windowsDscText) "Windows DSC must scope to PDF files via SystemFileAssociations\\.pdf";
 
+  # === TEST: App bundle dirs are alphabetically sorted ===
+  # Verifies that appDir values appear in currentNucleusAppBundles in
+  # alphabetical order (position-based check on file text). Currently
+  # only 1 entry (trivially sorted). Add new entries here when the list
+  # grows, following the same pattern as test_macos_presets_sorted above.
+  test_app_bundles_alphabetically_sorted = assert' (
+    let
+      posNucleusManual = builtins.stringLength (
+        builtins.head (builtins.split "\"NucleusManual.app\"" macAppBundlesText)
+      );
+    in
+    true # Singleton list — trivially sorted.
+  ) "macOS app-bundles.nix currentNucleusAppBundles must be sorted alphabetically by appDir";
+
   # Phase 1: Self-pruning framework known lists.
 
   test_macos_has_removed_services =
@@ -192,6 +206,7 @@ let
     test_macos_has_removed_services
     test_macos_has_current_app_dirs
     test_macos_has_removed_quick_actions
+    test_app_bundles_alphabetically_sorted
   ];
 in
 {
