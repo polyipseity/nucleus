@@ -11,6 +11,13 @@
 #
 # For App bundles (.app bundles appearing in menu bar → Services):
 # see services/app-bundles.nix
+#
+# Sorting policy — all service entry lists across both sub-modules are
+# manually maintained in their declared order; no automatic re-sorting.
+#   currentNucleusAppBundles: alphabetical by appDir.
+#   currentNucleusWorkflows: quality-descending (default → prepress →
+#     printer → ebook → screen). This is the cross-platform Optimize PDF
+#     ordering (same on NixOS and Windows).
 { lib, ... }:
 let
   # Import centralized daemon refresh helpers for post-deploy cache flush.

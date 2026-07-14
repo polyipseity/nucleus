@@ -96,10 +96,9 @@ let
   #   - source: derivation path to copy from
   #   - presentationModes: dict for NSServicesStatus enablement
   #
-  # Sorting policy: alphabetical by dir by default.
-  # Exception: Optimize PDF actions are ordered by quality descending
-  # (prepress > printer > ebook > screen), with "default" always first.
-  # Deployment order always follows the declared order below.
+  # Sorting policy: manually maintained in quality-descending order (default → prepress → printer → ebook → screen).
+  # This is the cross-platform Optimize PDF ordering (same as NixOS and Windows).
+  # Deployment order always follows the declared order below. No automatic sorting.
   currentNucleusWorkflows = [
     {
       dir = "optimize PDF - default.workflow";
@@ -181,7 +180,7 @@ in
       '') (builtins.filter (wf: wf ? dir) removedNucleusWorkflows)
     )}
 
-    # ── Phase 3: Deploy Automator workflows ────────────────────────────
+    # ── Phase 3: Deploy Automator workflows (in declaration order) ────
     ${builtins.concatStringsSep "\n" (
       map (wf: ''
         wf_dir="$SERVICES_DIR/${wf.dir}"

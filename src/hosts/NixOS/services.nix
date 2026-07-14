@@ -12,6 +12,8 @@ let
   '';
 
   # Ghostscript PDF optimization presets (quality descending).
+  # Sorting policy: manually maintained in quality-descending order.
+  # Must match macOS and Windows ordering (default → prepress → printer → ebook → screen).
   gsPdfOptPresets = [
     "default"
     "prepress"

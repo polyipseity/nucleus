@@ -79,9 +79,7 @@ let
   #   - source: derivation path to copy from
   #   - presentationModes: dict for NSServicesStatus enablement
   #
-  # Sorting policy: alphabetical by appDir by default. Delegation order
-  # always follows the sorted list. If an exception is needed, document
-  # it below with rationale.
+  # Sorting policy: manually maintained in alphabetical order by appDir. No automatic sorting.
   currentNucleusAppBundles = [
     {
       appDir = "NucleusManual.app";
@@ -122,7 +120,7 @@ in
       '') removedNucleusAppBundles
     )}
 
-    # ── Phase 2: Deploy app bundles ───────────────────────────────────
+    # ── Phase 2: Deploy app bundles (in declaration order) ────────────
     ${builtins.concatStringsSep "\n" (
       map (svc: ''
         app_path="$APP_DIR/${svc.appDir}"
