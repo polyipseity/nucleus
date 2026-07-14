@@ -441,10 +441,11 @@ let
 
   # ── toMacOSDaemonOllamaEnv ───────────────────────────────────────
   # Attrset of OLLAMA_* vars for the macOS launchd ollama daemon
-  # EnvironmentVariables section.  Unlike toNixOSServiceEnv, this includes
-  # OLLAMA_HOST because macOS does not have a system-wide env mechanism
-  # that covers launchd system daemons — the gui-env LaunchAgent only
-  # covers the GUI domain (gui/<uid>/), not the system domain.
+  # EnvironmentVariables section.  Excludes OLLAMA_HOST because the
+  # server must bind to the default port (11434), not the LiteLLM proxy
+  # port (4000).  OLLAMA_HOST is propagated through home.sessionVariables
+  # (gui domain) for CLI clients (ollama, oterm) that should route through
+  # the proxy.
   toMacOSDaemonOllamaEnv =
     let
       os = "macOS";
@@ -453,7 +454,10 @@ let
         let
           entry = catalog.${name};
         in
-        builtins.elem os entry.hosts && lib.strings.hasPrefix "OLLAMA_" name && resolveValue name os != null
+        builtins.elem os entry.hosts
+        && lib.strings.hasPrefix "OLLAMA_" name
+        && name != "OLLAMA_HOST"
+        && resolveValue name os != null
       ) (builtins.attrNames catalog);
     in
     builtins.listToAttrs (

@@ -411,6 +411,32 @@
       }
     }
   },
+  "service-watchdog-user": {
+    "description": "User-scope watchdog that detects and restarts stuck user-domain nucleus services",
+    "displayName": "Service Watchdog (user)",
+    "logging": {
+      "capture": "all",
+      "dirs": {
+        "system": [],
+        "user": ["service-watchdog"]
+      }
+    },
+    "platforms": {
+      "macos": {
+        "domain": "user",
+        "service": "local.service-watchdog-user",
+        "type": "launchctl"
+      },
+      "nixos": {
+        "type": "omitted",
+        "justification": "User-scope watchdog not needed on NixOS — the system watchdog covers both scopes via systemctl --user"
+      },
+      "windows": {
+        "type": "omitted",
+        "justification": "User-scope watchdog not needed on Windows — scheduled task runs with system scope"
+      }
+    }
+  },
   "ssh-agent": {
     "description": "SSH key authentication agent",
     "displayName": "SSH Agent",

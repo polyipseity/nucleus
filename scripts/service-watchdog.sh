@@ -35,8 +35,6 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/../src/scripts/lib.sh"
 
-REPO_ROOT="$(derive_repo_root)"
-
 usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
@@ -76,7 +74,11 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-SERVICES_JSON="${NUCLEUS_SERVICES_JSON:-$REPO_ROOT/src/modules/services.json}"
+SERVICES_JSON="${NUCLEUS_SERVICES_JSON:-}"
+if [ -z "$SERVICES_JSON" ]; then
+  REPO_ROOT="$(derive_repo_root)"
+  SERVICES_JSON="${REPO_ROOT}/src/modules/services.json"
+fi
 HOST="$(resolve_nucleus_host)"
 
 case "$HOST" in
