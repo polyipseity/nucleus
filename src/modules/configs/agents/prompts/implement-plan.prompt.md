@@ -15,14 +15,27 @@ If the user's message that triggered this prompt contains "only plan", "only res
 ## Workflow
 
 1. **Create the plan file**
+   - **Write the plan with input metadata.** The file must include a metadata header so the input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) survive context compaction alongside the plan. Use this format:
+
+     ```
+     inputs:
+       atomicCommits: ${input:atomicCommits}
+       backwardsCompat: ${input:backwardsCompat}
+       maxConcurrency: ${input:maxConcurrency}
+
+     # Plan
+
+     <plan content>
+     ```
    - **Primary approach — store directly in session memory.** This is the only mechanism that survives context compaction:
      1. Call `resolve_memory_file_uri("/memories/session/active-plan.md")` to get the resolved path.
-     2. Write the full implementation plan into that file using `create_file`.
+     2. Write the plan (with metadata header) into that file using `create_file`.
      3. Verify with `read_file` — confirm the content is nonempty and substantive.
      4. From this point forward, always retrieve the plan via `resolve_memory_file_uri("/memories/session/active-plan.md")` + `read_file`. Do not rely on ephemeral variables.
    - **Fallback — if session memory is unavailable** (the tool errors or `create_file` fails):
      1. Generate a temporary file path: use `mktemp` (Linux/macOS) or `$env:TEMP` joined with a random name (Windows). Write the plan there.
      2. Verify with `[[ -s "$planfile" ]]` (POSIX) or `(Get-Item "$planfile").Length -gt 0` (PowerShell).
+     3. **Still try to persist the temp file path to session memory** — call `resolve_memory_file_uri("/memories/session/active-plan.md")` and write just `planfile=/path/to/temp/file` there. This gives partial survivability across compaction.
    - **Verify the plan is nonempty and substantive.** Also confirm the content is not just whitespace, a placeholder like "TODO", or a title with no body — use `head -c 200 "$planfile"` (or equivalent) to self-audit. If the file is empty or insubstantial, re-generate the plan and re-verify. Do not proceed to step 2 with a degenerate plan.
 
 2. **Implement the plan**
@@ -32,7 +45,7 @@ If the user's message that triggered this prompt contains "only plan", "only res
    - Think and work step by step, explain your reasoning. No filler.
    - If `${input:atomicCommits}` is `yes`, commit each atomic change with a precise message after each meaningful sub-step. Otherwise (default `no`), skip all git operations.
    - Re-read the original plan file regularly — especially after interruptions, subagent returns, or context switches — to ensure no phase is skipped or misinterpreted.
-     **Always retrieve the plan via session memory first:** call `resolve_memory_file_uri("/memories/session/active-plan.md")`, read it. If session memory is empty or missing, fall back to the temp file path from step 1.
+   - **Always retrieve the plan via session memory first:** call `resolve_memory_file_uri("/memories/session/active-plan.md")`, read it. Parse the metadata header to recover input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`). If session memory is empty or missing, fall back to the temp file path from step 1.
 
 3. **Use subagents for every opportunity**
    - Spawn subagents for any sufficiently independent subproblem — planning sub-steps, implementing separate files, researching unknowns, or verifying intermediate results. Subagents prevent context overflow and reduce the risk of forgetting earlier requirements by giving each subproblem a fresh, focused context.
@@ -41,7 +54,7 @@ If the user's message that triggered this prompt contains "only plan", "only res
    - See `~/.agents/prompts/delegate.prompt.md` for the standardized delegation template.
 
 4. **Verify completeness before finalizing**
-   - Retrieve the plan: call `resolve_memory_file_uri("/memories/session/active-plan.md")` and read it. If session memory is empty or missing, fall back to the temp file path from step 1.
+   - Retrieve the plan: call `resolve_memory_file_uri("/memories/session/active-plan.md")` and read it. If session memory is empty or missing, fall back to the temp file path from step 1. Parse the metadata header to recover input variables.
    - Re-read the original plan file. Verify every phase is fully implemented. Confirm the plan file is nonempty — if it is empty at this point, the plan was lost or corrupted; abort with a clear error rather than guessing the remaining work.
    - If any phase was ambiguous, re-read the source context that generated the plan.
    - Do not declare completion for phases that were skipped or only partially done.
@@ -49,6 +62,7 @@ If the user's message that triggered this prompt contains "only plan", "only res
 5. **Finalize**
    - After the plan is fully verified and executed, output a concise summary.
    - Include what was implemented, what files changed, and any deferred items.
+   - **Clean up the session memory file** to prevent stale state: call `resolve_memory_file_uri("/memories/session/active-plan.md")` and delete the file (`rm` on POSIX, `Remove-Item` on Windows). If deletion fails, continue anyway — the next plan will overwrite it.
 
 ## Inputs
 
