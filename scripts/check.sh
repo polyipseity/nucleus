@@ -655,7 +655,7 @@ _check_undoc_supp() {
   local _grep_flags="$1" _pattern="$2" _label="$3"
   shift 3
   [ $# -eq 0 ] && return
-  grep -Hrn $_grep_flags -- "$_pattern" "$@" 2>/dev/null | while IFS=: read -r _f _ln _rest; do
+  grep -Hrn "$_grep_flags" -- "$_pattern" "$@" 2>/dev/null | while IFS=: read -r _f _ln _rest; do
     # Skip comment-only lines (pattern in a comment, not code)
     [[ "$_rest" =~ ^[[:space:]]*# ]] && continue
     # Skip lines with # undoc-supp: inline
@@ -672,16 +672,21 @@ if $HAS_ARGS; then
   [ ${#SH_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '|| true' '|| true' "${SH_FILES[@]}"
   # undoc-supp: string argument specifying the suppression pattern for the check function, not a real || true operator.
   [ ${#NIX_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '|| true' '|| true' "${NIX_FILES[@]}"
+  # shellcheck disable=SC2016 # PowerShell redirection literal, not shell expansion
   [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '2>$null' '2>$null' "${PS1_FILES[@]}"
   [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '-ErrorAction SilentlyContinue' '-ErrorAction SilentlyContinue' "${PS1_FILES[@]}"
   [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-E' 'catch[[:space:]]*\{[[:space:]]*\}' 'empty catch {}' "${PS1_FILES[@]}"
 else
-  # Full mode: find all relevant files
+  # Full mode: find all relevant files.
+  # Use readarray to avoid SC2046 word-splitting warnings from unquoted $(find).
+  readarray -t _nix_sh_files < <(find . -path ./vendor -prune -o \( -name '*.nix' -print \) -o \( -name '*.sh' -print \))
+  readarray -t _ps1_files < <(find . -path ./vendor -prune -o -name '*.ps1' -print)
   # undoc-supp: string argument specifying the suppression pattern for the check function, not a real || true operator.
-  _check_undoc_supp '-F' '|| true' '|| true' $(find . -path ./vendor -prune -o \( -name '*.nix' -print \) -o \( -name '*.sh' -print \))
-  _check_undoc_supp '-F' '2>$null' '2>$null' $(find . -path ./vendor -prune -o -name '*.ps1' -print)
-  _check_undoc_supp '-F' '-ErrorAction SilentlyContinue' '-ErrorAction SilentlyContinue' $(find . -path ./vendor -prune -o -name '*.ps1' -print)
-  _check_undoc_supp '-E' 'catch[[:space:]]*\{[[:space:]]*\}' 'empty catch {}' $(find . -path ./vendor -prune -o -name '*.ps1' -print)
+  _check_undoc_supp '-F' '|| true' '|| true' "${_nix_sh_files[@]}"
+  # shellcheck disable=SC2016 # PowerShell redirection literal, not shell expansion
+  _check_undoc_supp '-F' '2>$null' '2>$null' "${_ps1_files[@]}"
+  _check_undoc_supp '-F' '-ErrorAction SilentlyContinue' '-ErrorAction SilentlyContinue' "${_ps1_files[@]}"
+  _check_undoc_supp '-E' 'catch[[:space:]]*\{[[:space:]]*\}' 'empty catch {}' "${_ps1_files[@]}"
 fi
 
 if [ -s "$_undoc_supp_out" ]; then
