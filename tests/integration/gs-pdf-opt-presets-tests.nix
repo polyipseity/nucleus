@@ -43,7 +43,7 @@ let
     assert'
       (
         let
-          # Patterns match the `dir` field in currentNucleusQuickActions entries.
+          # Patterns match the `dir` field in currentNucleusWorkflows entries.
           # Sort order: default first, then quality descending (prepress > printer >
           # ebook > screen). This is the declared order in the explicit list.
           posDefault = builtins.stringLength (
