@@ -160,12 +160,7 @@ let
   # only 1 entry (trivially sorted). Add new entries here when the list
   # grows, following the same pattern as test_macos_presets_sorted above.
   test_app_bundles_alphabetically_sorted = assert' (
-    let
-      posNucleusManual = builtins.stringLength (
-        builtins.head (builtins.split "\"NucleusManual.app\"" macAppBundlesText)
-      );
-    in
-    true # Singleton list — trivially sorted.
+    true # Empty list — trivially sorted.
   ) "macOS app-bundles.nix currentNucleusAppBundles must be sorted alphabetically by appDir";
 
   # === TEST: macOS workflow Info.plist files use com.adobe.pdf UTI ===
@@ -223,13 +218,12 @@ let
         lib.hasInfix "removedNucleusAppBundles" macAppBundlesText
         && lib.hasInfix "NucleusGSPDFOpt.app" macAppBundlesText
         && lib.hasInfix "com.nucleus.GSPDFOpt" macAppBundlesText
+        && lib.hasInfix "NucleusManual.app" macAppBundlesText
+        && lib.hasInfix "com.nucleus.OpenNucleusManual" macAppBundlesText
       )
-      "macOS app-bundles.nix must define removedNucleusAppBundles containing the old single-preset app bundle metadata";
+      "macOS app-bundles.nix must define removedNucleusAppBundles containing the old single-preset and NucleusManual app bundle metadata";
 
-  test_macos_has_current_app_dirs = assert' (
-    lib.hasInfix "currentNucleusAppBundles" macAppBundlesText
-    && lib.hasInfix "NucleusManual.app" macAppBundlesText
-  ) "macOS app-bundles.nix must define currentNucleusAppBundles containing current app bundles";
+  test_macos_has_current_app_dirs = assert' (lib.hasInfix "currentNucleusAppBundles" macAppBundlesText) "macOS app-bundles.nix must define currentNucleusAppBundles";
 
   test_macos_has_removed_quick_actions =
     assert'

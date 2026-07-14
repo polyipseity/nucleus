@@ -345,6 +345,15 @@ let
     && lib.hasInfix "./services/app-bundles.nix" macbookServicesText
   ) "services.nix must import both automator-workflows.nix and app-bundles.nix";
 
+  # === TEST: macOS Automator workflows has open nucleus manual entry ===
+  test_macos_workflows_has_open_nucleus_manual =
+    assert'
+      (
+        lib.hasInfix "\"open nucleus manual.workflow\"" macbookAutomatorWorkflowsText
+        && lib.hasInfix "com.nucleus.OpenNucleusManual" macbookAutomatorWorkflowsText
+      )
+      "automator-workflows.nix must define currentNucleusWorkflows containing the open nucleus manual workflow entry";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -374,6 +383,7 @@ let
     test_services_imports_both_submodules
     test_app_bundles_deployment_uses_declared_order
     test_workflows_deployment_uses_declared_order
+    test_macos_workflows_has_open_nucleus_manual
   ];
 in
 {

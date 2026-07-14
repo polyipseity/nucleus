@@ -45,9 +45,10 @@
 - Sort unordered lists/blocks alphabetically; preserve semantic/load order where required.
 - Service entry lists (currentNucleusAppBundles, currentNucleusWorkflows,
   gsPdfOptPresets, context-pdf-opt.dsc.yml) are manually maintained in their
-  declared order — alphabetical by appDir for app bundles, quality-descending
-  (default → prepress → printer → ebook → screen) for Optimize PDF presets.
-  No automatic re-sorting; see inline comments in each source file for details.
+  declared order — alphabetical by entry name, with the 5 Optimize PDF presets
+  grouped as a block sorted quality-descending (default → prepress → printer
+  → ebook → screen). No automatic re-sorting; see inline comments in each
+  source file for details.
 - Use sentence case for all user-facing UI labels (right-click menus, dock/folder/script labels, visible text); see `.agents/instructions/documentation.instructions.md` (UI Label Naming Convention section).
 - Use `.yml` for YAML files (except required `.sops.yaml`).
 - Do not hide meaningful errors (`2>/dev/null`, unconditional `|| true`, `-ErrorAction SilentlyContinue`) unless failure is expected, explicitly justified, and still checked.

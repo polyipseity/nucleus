@@ -4,8 +4,11 @@
 # Quick Actions and the menu bar → Services in Finder and other apps. They are
 # deployed to ~/Library/Services/.
 #
-# Each workflow's Info.plist uses NSSendFileTypes with "com.adobe.pdf" UTI so
-# the context menu only appears for PDF files (not folders, not other file types).
+# Each workflow's Info.plist uses NSSendFileTypes with the appropriate UTI:
+# - "open nucleus manual.workflow" uses "public.item" (broad scope, available
+#   for any file or folder selection — the action ignores input anyway).
+# - All "optimize PDF - *.workflow" use "com.adobe.pdf" so the context menu
+#   only appears for PDF files.
 #
 # WARNING about UTI choice: The UTI "public.pdf" has NEVER existed on macOS.
 # Apple's UTI hierarchy defines "public.png", "public.jpeg", "public.html" etc.,
@@ -20,6 +23,11 @@
 #   see .agents/instructions/app-config-policy.instructions.md.
 #   A home.activation script that copies workflows on each generation
 #   switch guarantees they are registered.
+#
+# WHY home.file for manual.md:
+#   The manual.md file is symlinked via home.file so the workflow's shell
+#   script can find it at $HOME/.local/share/nucleus/manual.md without needing
+#   NUCLEUS_REPO_ROOT at runtime.
 { lib, mkPresentationModes, ... }:
 let
   # Base path to committed workflow source directories.
@@ -88,11 +96,28 @@ let
   #   - source: path to copy from
   #   - presentationModes: dict for NSServicesStatus enablement
   #
-  # Sorting policy: manually maintained in quality-descending order (default → prepress → printer → ebook → screen).
-  # This is the cross-platform Optimize PDF ordering (same as NixOS and Windows).
+  # Sorting policy: primary sort is alphabetical by entry name. Exception:
+  # the 5 Optimize PDF presets are grouped as a single block and internally
+  # sorted quality-descending (default → prepress → printer → ebook → screen).
+  # The block is positioned by "optimize PDF" alphabetically. This is the
+  # cross-platform convention (same on NixOS and Windows).
   # Deployment order always follows the declared order below. No automatic sorting.
   currentNucleusWorkflows = [
+    # Alphabetical before "optimize" — open nucleus manual
     {
+      dir = "open nucleus manual.workflow";
+      enablementKey = "com.nucleus.OpenNucleusManual - open nucleus manual - runWorkflowAsService";
+      source = "${workflowsDir}/open nucleus manual.workflow";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+    # Optimize PDF presets block — quality-descending, internally sorted
+    {
+      dir = "optimize PDF - default.workflow";
       dir = "optimize PDF - default.workflow";
       enablementKey = "com.nucleus.OptimizePDF.default - optimize PDF - default - runWorkflowAsService";
       source = "${workflowsDir}/optimize PDF - default.workflow";
@@ -150,6 +175,7 @@ let
   ];
 in
 {
+  home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
   home.activation.deployNucleusAutomatorWorkflows = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     SERVICES_DIR="$HOME/Library/Services"
 

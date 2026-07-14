@@ -1,15 +1,17 @@
 # MacBook/services/app-bundles.nix — macOS App bundles deployed via LaunchServices.
 #
+# !!! WARNING: DO NOT DELETE THIS MODULE, THE current/removed LISTS, OR THE
+# !!! DEPLOY MECHANISM. The self-pruning framework (Phase 1a + Phase 2) is the
+# !!! only way to cleanly remove historically-deployed .app bundles and their
+# !!! NSServicesStatus keys from disk. Deleting this module leaves orphaned
+# !!! NSServicesStatus keys in pbs.plist and stale .app directories in
+# !!! ~/Applications/. If you are tempted to delete this file, STOP and read
+# !!! the full comment. — past agent
+#
 # These .app bundles appear in the Finder menu bar → Services. They are
 # deployed to ~/Applications/ via LaunchServices registration.
 # Less reliable than Quick Actions for context menu placement but work
 # reliably in the Services menu.
-#
-# The .app bundle (NucleusManual) is built at evaluation time via a Nix
-# derivation (osacompile from committed AppleScript source) so the activation
-# script only needs to deploy it. The manual file is symlinked to a fixed path
-# via home.file so the .app can find it without needing NUCLEUS_REPO_ROOT at
-# runtime.
 #
 # WHY home.activation instead of home.file:
 #   home.file creates a symlink to the Nix store, but macOS LaunchServices
@@ -18,44 +20,8 @@
 #   see .agents/instructions/app-config-policy.instructions.md.
 #   A home.activation script that deploys the .app on each generation
 #   switch guarantees LaunchServices can find it.
-#
-# WHY compile at evaluation time:
-#   osacompile runs during nix build, producing macOS-version-specific
-#   .scpt bytecode, but only once per `nucleus-apply` run. This makes the
-#   activation script simpler and faster while keeping build-time safety.
-{
-  lib,
-  pkgs,
-  mkPresentationModes,
-  ...
-}:
+{ lib, mkPresentationModes, ... }:
 let
-  nucleusManualAppBundle =
-    pkgs.runCommand "nucleus-manual-app"
-      {
-        preferLocalBuild = true;
-        allowSubstitutes = false;
-      }
-      ''
-        build_dir="$(mktemp -d)"
-        # osacompile uses CoreServices APIs that fail when writing directly
-        # to the Nix store output path (coreFoundationUnknownErr -4960).
-        # Compile to a temp dir and copy the result to $out.
-        /usr/bin/osacompile -l AppleScript -o "$build_dir/NucleusManual.app" \
-          "${./app-bundles/NucleusManual/NucleusManual.applescript}"
-
-        # Overwrite osacompile's Info.plist with our pre-made one (already has
-        # CFBundleIdentifier, CFBundleName, and NSServices entries). Re-sign
-        # because any replacement invalidates the ad-hoc signature.
-        cp "${./app-bundles/NucleusManual/Info.plist}" \
-          "$build_dir/NucleusManual.app/Contents/Info.plist"
-        /usr/bin/codesign --force -s - "$build_dir/NucleusManual.app"
-
-        mkdir -p "$out"
-        cp -R "$build_dir/NucleusManual.app" "$out/"
-        rm -rf "$build_dir"
-      '';
-
   # Known list of historically-removed Nucleus app bundles.
   # When a bundle is removed, add its metadata here and remove its app dir.
   # The activation script unconditionally removes its NSServicesStatus key
@@ -70,37 +36,26 @@ let
       menuItem = "gs optimize pdf";
       message = "open";
     }
-  ];
-
-  # Currently deployed app bundles. Add new bundles here.
-  # Each entry has:
-  #   - appDir: directory name in ~/Applications/
-  #   - bundleId: CFBundleIdentifier (used for NSServicesStatus key)
-  #   - menuItem: NSMenuItem.default (used for NSServicesStatus key)
-  #   - message: NSMessage (used for NSServicesStatus key)
-  #   - source: derivation path to copy from
-  #   - presentationModes: dict for NSServicesStatus enablement
-  #
-  # Sorting policy: manually maintained in alphabetical order by appDir. No automatic sorting.
-  currentNucleusAppBundles = [
+    # Moved from .app bundle to Automator .workflow (see automator-workflows.nix).
     {
       appDir = "NucleusManual.app";
       bundleId = "com.nucleus.OpenNucleusManual";
       menuItem = "open nucleus manual";
       message = "open";
-      source = "${nucleusManualAppBundle}/NucleusManual.app";
-      presentationModes = {
-        ContextMenu = true;
-        ServicesMenu = true;
-        FinderPreview = true;
-        TouchBar = true;
-      };
     }
   ];
 
+  # Currently deployed app bundles (via .app bundle mechanism).
+  # Currently empty — all active services use Automator .workflow bundles.
+  # Preserved as a wired-up mechanism for future use; entries may be added
+  # here if a future service requires .app deployment.
+  # Sorting policy: alphabetically by appDir (when list is non-empty).
+  currentNucleusAppBundles = [ ];
+
 in
 {
-  home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
+  # home.file for manual.md is now in automator-workflows.nix (where the
+  # consuming workflow lives).
 
   home.activation.deployNucleusAppBundles = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
