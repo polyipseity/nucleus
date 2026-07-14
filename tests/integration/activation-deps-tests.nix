@@ -25,6 +25,9 @@ let
   sharedGitModuleText = builtins.readFile ../../src/modules/git.nix;
   discordMusicRpcModuleText = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
   homeModuleText = builtins.readFile ../../src/modules/home.nix;
+  macbookServicesText = builtins.readFile ../../src/hosts/MacBook/services.nix;
+  macbookAppBundlesText = builtins.readFile ../../src/hosts/MacBook/services/app-bundles.nix;
+  macbookAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows.nix;
 
   inherit (import ../lib.nix) assert';
 
@@ -315,6 +318,27 @@ let
       )
       "discord-music-rpc config.yaml must have protectDiscordMusicRPCConfig activation and be listed in home.nix protect/unprotect hooks";
 
+  # === TEST: macOS app-bundles DAG orders after linkGeneration ===
+  test_services_app_bundles_dag_after_link_generation = assert' (lib.hasInfix "deployNucleusAppBundles = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAppBundlesText) "app-bundles.nix deployNucleusAppBundles must run after linkGeneration";
+
+  # === TEST: macOS automator-workflows DAG orders after linkGeneration ===
+  test_services_workflows_dag_after_link_generation = assert' (lib.hasInfix "deployNucleusAutomatorWorkflows = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAutomatorWorkflowsText) "automator-workflows.nix deployNucleusAutomatorWorkflows must run after linkGeneration";
+
+  # === TEST: macOS services flush DAG orders after both deploy steps ===
+  test_services_flush_dag_after_both =
+    assert'
+      (
+        lib.hasInfix "deployNucleusServicesFlush =" macbookServicesText
+        && lib.hasInfix "entryAfter [ \"deployNucleusAutomatorWorkflows\" \"deployNucleusAppBundles\" ]" macbookServicesText
+      )
+      "services.nix deployNucleusServicesFlush must run after both deployNucleusAutomatorWorkflows and deployNucleusAppBundles";
+
+  # === TEST: macOS services.nix imports both sub-modules ===
+  test_services_imports_both_submodules = assert' (
+    lib.hasInfix "./services/automator-workflows.nix" macbookServicesText
+    && lib.hasInfix "./services/app-bundles.nix" macbookServicesText
+  ) "services.nix must import both automator-workflows.nix and app-bundles.nix";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -338,12 +362,16 @@ let
     test_install_cargo_binstall_dependency_name_alignment
     test_macos_dev_maintenance_is_scheduled
     test_discord_music_rpc_out_of_store_symlink
+    test_services_app_bundles_dag_after_link_generation
+    test_services_workflows_dag_after_link_generation
+    test_services_flush_dag_after_both
+    test_services_imports_both_submodules
   ];
 in
 {
   success = true;
   testCount = builtins.length allTests;
-  message = "All ${builtins.toString (builtins.length allTests)} activation dependency tests passed";
+  message = "All ${builtins.toString (builtins.length allTests)} activation and service dependency tests passed";
   testNames = [
     "1: Secrets materialize before dev repo provision"
     "2: SSH keys load before Git clone"
@@ -367,5 +395,9 @@ in
     "20: installCargoBinstallPackages activation name alignment"
     "21: macOS dev-tree maintenance runs from launchd instead of activation"
     "22: discord-music-rpc out-of-store symlink properly wired"
+    "23: app-bundles deployNucleusAppBundles after linkGeneration"
+    "24: automator-workflows deployNucleusAutomatorWorkflows after linkGeneration"
+    "25: services.nix deployNucleusServicesFlush after both deploy steps"
+    "26: services.nix imports both sub-modules"
   ];
 }
