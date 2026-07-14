@@ -92,6 +92,7 @@ runSubagent(
 ## Research scope
 
 - For queries scoped with "research only", "verify only", or similar boundary markers, produce concise findings (≤~1k chars). Give the key answer and let the user ask for depth. Do not generate comprehensive reports that will be discarded or refined.
+- **Default search sources.** When asked to search, consult GitHub, DuckDuckGo, then any other search engines the model is aware of, in that priority order.
 - **Strict research-only mode.** When the user says "only verify", "only plan", "only report", "do not edit", or similar scoping phrases, treat this as a hard boundary. Do zero edits, zero file modifications, zero git operations. Report findings only. Do not pre-implement, sketch diffs, or suggest code changes unless explicitly asked.
 
 ## Instruction compliance
