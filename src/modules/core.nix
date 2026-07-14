@@ -16,6 +16,7 @@ let
     pkgs.camillagui-backend
     pkgs.cargo-binstall
     pkgs.cargo-cache
+    pkgs.deadnix
     pkgs.direnv
     pkgs.eza
     pkgs.fd
@@ -56,6 +57,7 @@ let
     pkgs.ty
     pkgs.typst
     pkgs.uv
+    pkgs.yq-go
     pkgs.zoxide
   ];
 
