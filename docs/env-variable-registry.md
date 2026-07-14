@@ -63,7 +63,7 @@ must hard-fail — there is no fallback to User scope.
 | `NUCLEUS_REPO_ROOT`        | all-process  | no            | eval-time env var      | —                                      | macOS only (apply.sh export)                           |
 | `STARSHIP_CACHE`           | all-process  | yes           | `~/.cache/starship`    | `%USERPROFILE%\.cache\starship`        | —                                                      |
 | `STARSHIP_CONFIG`          | all-process  | yes           | `~/.config/starship.toml`| `%USERPROFILE%\.config\starship.toml`| —                                                      |
-| `HOME`                     | all-process  | no            | —                      | `%USERPROFILE%`                        | Windows only                                            |
+| `HOME`                     | all-process  | yes           | —                      | `%USERPROFILE%` (`user/env.dsc.yml`)   | Windows only                                            |
 | `NIX_PATH`                 | all-process  | no            | —                      | `nixpkgs=flake:nixpkgs`                | Windows only                                            |
 | `PATH`                     | all-process  | no            | sessionPath (shell) + launchctl (GUI domain) + environment.variables (NixOS) | Machine-scope REG_EXPAND_SZ via Sync-UserPath.ps1 | macOS: GUI domain via launchctl activation; shell via home.sessionPath. NixOS: all-process via environment.variables (GUI gap closed). Windows: Machine-scope REG_EXPAND_SZ with %USERPROFILE% literal entries (resolved per-user by CreateEnvironmentBlock). Sync-UserPath.ps1 replaces old DSC pathEnvVar (which was a literal set, not a prepend). |
 
@@ -74,6 +74,7 @@ must hard-fail — there is no fallback to User scope.
    - Use `values.default` for the primary value, per-OS keys for OS-specific overrides.
    - If the value depends on the logged-in user, set `userSpecific = true`.
    - If the var should be excluded from launchd, set `excludeFromLaunchctl = true`.
+   - `scope` defaults to `"all-process"`. Only set explicitly for `"shell-only"`.
 2. **Windows DSC**: if the var applies to Windows:
    - If `userSpecific = true`, add a DSC `Environment` resource in `src/hosts/Windows/user/env.dsc.yml` (User scope).
    - Otherwise, add the resource in `src/hosts/Windows/system/env.dsc.yml` (Machine scope).
