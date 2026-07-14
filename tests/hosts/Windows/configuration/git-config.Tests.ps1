@@ -31,6 +31,12 @@ Describe "Windows Git Configuration Parity" {
         }
     }
 
+    Context "Git template boilerplate suppression" {
+        It "Should set init.templateDir to empty template directory" {
+            git config --file $script:gitConfigPath --get init.templateDir | Should -Be '~/.config/git/empty_template'
+        }
+    }
+
     Context "Existing cross-host Git parity defaults" {
         It "Should enable signed commits" {
             git config --file $script:gitConfigPath --get commit.gpgsign | Should -Be 'true'

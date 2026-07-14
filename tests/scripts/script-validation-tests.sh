@@ -305,6 +305,26 @@ if [[ -f "$GC_SH" ]]; then
     test_help_handler "$GC_SH"
 fi
 
+# Test scripts/gc.ps1 (Windows: garbage collection)
+GC_PS1="scripts/gc.ps1"
+if [[ -f "$GC_PS1" ]]; then
+    if pwsh -NoProfile -Command "& { if (!(Test-Path '$GC_PS1')) { exit 1 }; \$null = Get-Command '$GC_PS1' -Syntax; exit 0 }" 2>/dev/null; then
+        assert_pass "PowerShell syntax: gc.ps1"
+    else
+        assert_fail "PowerShell syntax: gc.ps1" "Parse error detected by pwsh"
+    fi
+fi
+
+# Test src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1 (Windows: git+ssh config)
+GIT_SSH_CONFIG_PS1="src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1"
+if [[ -f "$GIT_SSH_CONFIG_PS1" ]]; then
+    if pwsh -NoProfile -Command "& { if (!(Test-Path '$GIT_SSH_CONFIG_PS1')) { exit 1 }; \$null = Get-Command '$GIT_SSH_CONFIG_PS1' -Syntax; exit 0 }" 2>/dev/null; then
+        assert_pass "PowerShell syntax: Sync-GitAndSshConfig.ps1"
+    else
+        assert_fail "PowerShell syntax: Sync-GitAndSshConfig.ps1" "Parse error detected by pwsh"
+    fi
+fi
+
 # Test scripts/replica-reset.sh
 REPLICA_RESET_SH="scripts/replica-reset.sh"
 if [[ -f "$REPLICA_RESET_SH" ]]; then
