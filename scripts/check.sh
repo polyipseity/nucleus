@@ -4,6 +4,12 @@
 #
 # Runs repository checks in sequence:
 #
+# Checks are organized into topic groups. Within each group, checks are ordered
+# alphabetically by their display name. Exceptions: dependency constraints may
+# override alphabetical ordering (e.g., Lockfile validation must precede Locked
+# DSC validation). New checks should be inserted at their alphabetical position
+# within the appropriate group, respecting any dependency constraints.
+#
 # Toolchain checks (1-2):
 #   1. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 #   2. Packer template validation
@@ -20,15 +26,16 @@
 #   9. Nix search path tests
 #  10. Port utility function tests
 #
-# Data integrity (11-13):
+# Data integrity (11-14):
 #  11. Lockfile validation
 #  12. Locked DSC validation
 #  13. Service registry validation
+#  14. YAML validation
 #
-# Policy/verification (14-16):
-#  14. Package manager usage enforcement
-#  15. Undocumented error suppression check
-#  16. Online determinism checks (--verify mode only)
+# Policy/verification (15-17):
+#  15. Package manager usage enforcement
+#  16. Undocumented error suppression check
+#  17. Online determinism checks (--verify mode only)
 #
 # Output conventions:
 #   Warnings (warn) and errors (error) go to stderr; info/success/skip
@@ -634,6 +641,37 @@ if ! $HAS_ARGS; then
 else
   say "skipping service registry validation (path-scoped mode)."
 fi
+
+# YAML validation
+section "$((_step += 1))" "YAML validation"
+_yaml_errors=0
+if $HAS_ARGS; then
+  for _yf in "$@"; do
+    case "$_yf" in
+      *.yml|*.yaml) ;;
+      *) continue ;;
+    esac
+    if ! yq eval '.' "$_yf" >/dev/null 2>&1; then
+      warn "$_yf: invalid YAML"
+      _yaml_errors=$((_yaml_errors + 1))
+    fi
+  done
+else
+  while IFS= read -r -d '' _yaml_file; do
+    case "$_yaml_file" in */secrets/*) continue ;; esac
+    if ! yq eval '.' "$_yaml_file" >/dev/null 2>&1; then
+      warn "$_yaml_file: invalid YAML"
+      _yaml_errors=$((_yaml_errors + 1))
+    fi
+  done < <(find . -path ./vendor -prune -o \( -name '*.yml' -o -name '*.yaml' \) -print0)
+fi
+if [ "$_yaml_errors" -gt 0 ]; then
+  warn "YAML validation failed with $_yaml_errors error(s)"
+  exit_code=1
+  $FAIL_FAST && exit $exit_code
+fi
+say "YAML validation passed."
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Package manager usage enforcement
 section "$((_step += 1))" "Package manager usage enforcement"

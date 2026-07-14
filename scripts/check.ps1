@@ -2,6 +2,12 @@
 #
 # Runs all Windows-compatible repository checks in sequence:
 #
+# Checks are organized into topic groups. Within each group, checks are ordered
+# alphabetically by their display name. Exceptions: dependency constraints may
+# override alphabetical ordering (e.g., Lockfile validation must precede Locked
+# DSC validation). New checks should be inserted at their alphabetical position
+# within the appropriate group, respecting any dependency constraints.
+#
 # Toolchain checks (1-2):
 #   1. PowerShell syntax validation
 #   2. Packer template validation
@@ -18,15 +24,16 @@
 #   9. Nix search path tests (stub)
 #  10. Port utility function tests (stub)
 #
-# Data integrity (11-13):
+# Data integrity (11-14):
 #  11. Lockfile validation
 #  12. Locked DSC validation
 #  13. Service registry validation
+#  14. YAML validation
 #
-# Policy/verification (14-16):
-#  14. Package manager usage enforcement
-#  15. Online determinism checks (--verify mode only)
+# Policy/verification (15-17):
+#  15. Package manager usage enforcement
 #  16. Undocumented error suppression check
+#  17. Online determinism checks (--verify mode only)
 #
 # Output conventions:
 #   All messages (info, success, skip, warning) go to stdout.
@@ -37,7 +44,7 @@
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
 # Steps 3-5, 7-10 are stubs (require Nix or bash — not available on Windows).
-# Steps 15-16 only run with the --verify flag.
+# Steps 16-17 only run with the --verify flag.
 #
 # Prerequisites:
 #   - Ensure-Tool module (imported via pre-flight block) for tool validation
@@ -652,7 +659,36 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 14. Package manager usage enforcement
+# 14. YAML validation
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] YAML validation ===" -f (++$_step))
+$_yamlErrors = 0
+$_yamlFiles = @()
+if ($HAS_ARGS) {
+  $_yamlFiles = $positionalArgs | Where-Object { $_ -like '*.yml' -or $_ -like '*.yaml' }
+} else {
+  $_yamlFiles = Get-ChildItem -Recurse -Path $RepoRoot -Include '*.yml','*.yaml' |
+    Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]' } |
+    ForEach-Object { $_.FullName }
+}
+foreach ($_yf in $_yamlFiles) {
+  try {
+    $_content = Get-Content $_yf -Raw -ErrorAction Stop
+    $null = $_content | ConvertFrom-Yaml -ErrorAction Stop
+  } catch {
+    warn "$($_yf): invalid YAML"
+    $_yamlErrors++
+  }
+}
+if ($_yamlErrors -gt 0) {
+  warn "YAML validation failed with $_yamlErrors error(s)"
+  $exitCode = 1
+  if ($FAIL_FAST) { exit $exitCode }
+}
+say "YAML validation passed."
+
+# ---------------------------------------------------------------------------
+# 15. Package manager usage enforcement
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Package manager usage enforcement ===" -f (++$_step))
 if (-not $HAS_ARGS) {
@@ -691,7 +727,7 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 15. Undocumented error suppression check
+# 16. Undocumented error suppression check
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_step))
 
@@ -765,7 +801,7 @@ if ($_undocSuppViolations.Count -gt 0) {
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
-# 16. Online determinism checks (--verify mode only)
+# 17. Online determinism checks (--verify mode only)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Online determinism checks (--verify) ===" -f (++$_step))
 if ($VERIFY) {
