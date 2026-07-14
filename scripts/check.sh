@@ -317,88 +317,93 @@ else
 fi
 
 if ! $HAS_ARGS; then
-  _lf_errors=0
+  if [ -f "$_lfpath" ]; then
+    _lf_errors=0
 
-  # Helper: check a section is non-null, non-empty, and has no placeholder values.
-  _check_section_nonempty() {
-    _section="$1"
-    _lfpath="src/lockfiles/lockfile.json"
-    if ! jq -e ".[\"$_section\"] | type == \"object\" and length > 0" "$_lfpath" >/dev/null 2>&1; then
-      warn "$_section: empty or missing section"
-      _lf_errors=$((_lf_errors + 1))
-      return
-    fi
-    # Check for placeholder values
-    _placeholders=$(jq -r ".[\"$_section\"] | to_entries[] | select(.value == \"\" or .value == \"CHANGEME\" or .value == \"1.0.0\") | .key" "$_lfpath" 2>/dev/null)
-    if [ -n "$_placeholders" ]; then
-      warn "$_section has placeholder versions for:"
-      warn "  ${_placeholders//$'\n'/$'\n'  }"
-      _lf_errors=$((_lf_errors + 1))
-    fi
-  }
-
-  # Check sections that must be non-empty
-  for _section in scoop cargo-binstall bun uv rustup pwsh; do
-    _check_section_nonempty "$_section"
-  done
-
-  # winget: must be non-null; warn if empty, validate non-placeholder if non-empty
-  if ! jq -e '.winget | type == "object"' src/lockfiles/lockfile.json >/dev/null 2>&1; then
-    warn "winget: missing or invalid section"
-    _lf_errors=$((_lf_errors + 1))
-  elif jq '.winget | length == 0' src/lockfiles/lockfile.json >/dev/null 2>&1; then
-    say "winget: empty section (not yet populated)"
-  else
-    _placeholders=$(jq -r '.winget | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' src/lockfiles/lockfile.json 2>/dev/null)
-    if [ -n "$_placeholders" ]; then
-      warn "winget has placeholder versions for:"
-      warn "  ${_placeholders//$'\n'/$'\n'  }"
-      _lf_errors=$((_lf_errors + 1))
-    fi
-  fi
-  # homebrew: must be non-empty
-  if ! jq -e '.homebrew | type == "object" and length > 0' src/lockfiles/lockfile.json >/dev/null 2>&1; then
-    warn "homebrew: empty or missing section"
-    _lf_errors=$((_lf_errors + 1))
-  fi
-  # vscode: must be non-null; warn if empty, validate non-placeholder if non-empty
-  if ! jq -e '.vscode | type == "object"' src/lockfiles/lockfile.json >/dev/null 2>&1; then
-    warn "vscode: missing or invalid section"
-    _lf_errors=$((_lf_errors + 1))
-  elif jq '.vscode | length == 0' src/lockfiles/lockfile.json >/dev/null 2>&1; then
-    say "vscode: empty section (not yet populated)"
-  else
-    _placeholders=$(jq -r '.vscode | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' src/lockfiles/lockfile.json 2>/dev/null)
-    if [ -n "$_placeholders" ]; then
-      warn "vscode has placeholder versions for:"
-      warn "  ${_placeholders//$'\n'/$'\n'  }"
-      _lf_errors=$((_lf_errors + 1))
-    fi
-  fi
-
-  # ollama: must have at least one profile with models
-  if ! jq -e '.ollama | type == "object" and length > 0' src/lockfiles/lockfile.json >/dev/null 2>&1; then
-    warn "ollama: empty or missing section"
-    _lf_errors=$((_lf_errors + 1))
-  else
-    while IFS=$'\t' read -r _profile _idx _name _tag; do
-      if [ -z "$_name" ] || [ -z "$_tag" ]; then
-        warn "ollama.${_profile}[${_idx}]: missing name or tag"
+    # Helper: check a section is non-null, non-empty, and has no placeholder values.
+    _check_section_nonempty() {
+      _section="$1"
+      if ! jq -e ".[\"$_section\"] | type == \"object\" and length > 0" "$_lfpath" >/dev/null 2>&1; then
+        warn "$_section: empty or missing section"
+        _lf_errors=$((_lf_errors + 1))
+        return
+      fi
+      # Check for placeholder values
+      _placeholders=$(jq -r ".[\"$_section\"] | to_entries[] | select(.value == \"\" or .value == \"CHANGEME\" or .value == \"1.0.0\") | .key" "$_lfpath" 2>/dev/null)
+      if [ -n "$_placeholders" ]; then
+        warn "$_section has placeholder versions for:"
+        warn "  ${_placeholders//$'\n'/$'\n'  }"
         _lf_errors=$((_lf_errors + 1))
       fi
-    done < <(jq -r '
-      .ollama | to_entries[] | .key as $profile |
-      (.value // []) | to_entries[] |
-      [$profile, (.key | tostring), (.value.name // ""), (.value.tag // "")] |
-      @tsv' src/lockfiles/lockfile.json)
-  fi
+    }
 
-  if [ "$_lf_errors" -gt 0 ]; then
-    warn "lockfile.json validation failed with $_lf_errors error(s)"
+    # Check sections that must be non-empty
+    for _section in scoop cargo-binstall bun uv rustup pwsh; do
+      _check_section_nonempty "$_section"
+    done
+
+    # winget: must be non-null; warn if empty, validate non-placeholder if non-empty
+    if ! jq -e '.winget | type == "object"' "$_lfpath" >/dev/null 2>&1; then
+      warn "winget: missing or invalid section"
+      _lf_errors=$((_lf_errors + 1))
+    elif jq '.winget | length == 0' "$_lfpath" >/dev/null 2>&1; then
+      say "winget: empty section (not yet populated)"
+    else
+      _placeholders=$(jq -r '.winget | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' "$_lfpath" 2>/dev/null)
+      if [ -n "$_placeholders" ]; then
+        warn "winget has placeholder versions for:"
+        warn "  ${_placeholders//$'\n'/$'\n'  }"
+        _lf_errors=$((_lf_errors + 1))
+      fi
+    fi
+    # homebrew: must be non-empty
+    if ! jq -e '.homebrew | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
+      warn "homebrew: empty or missing section"
+      _lf_errors=$((_lf_errors + 1))
+    fi
+    # vscode: must be non-null; warn if empty, validate non-placeholder if non-empty
+    if ! jq -e '.vscode | type == "object"' "$_lfpath" >/dev/null 2>&1; then
+      warn "vscode: missing or invalid section"
+      _lf_errors=$((_lf_errors + 1))
+    elif jq '.vscode | length == 0' "$_lfpath" >/dev/null 2>&1; then
+      say "vscode: empty section (not yet populated)"
+    else
+      _placeholders=$(jq -r '.vscode | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' "$_lfpath" 2>/dev/null)
+      if [ -n "$_placeholders" ]; then
+        warn "vscode has placeholder versions for:"
+        warn "  ${_placeholders//$'\n'/$'\n'  }"
+        _lf_errors=$((_lf_errors + 1))
+      fi
+    fi
+
+    # ollama: must have at least one profile with models
+    if ! jq -e '.ollama | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
+      warn "ollama: empty or missing section"
+      _lf_errors=$((_lf_errors + 1))
+    else
+      while IFS=$'\t' read -r _profile _idx _name _tag; do
+        if [ -z "$_name" ] || [ -z "$_tag" ]; then
+          warn "ollama.${_profile}[${_idx}]: missing name or tag"
+          _lf_errors=$((_lf_errors + 1))
+        fi
+      done < <(jq -r '
+        .ollama | to_entries[] | .key as $profile |
+        (.value // []) | to_entries[] |
+        [$profile, (.key | tostring), (.value.name // ""), (.value.tag // "")] |
+        @tsv' "$_lfpath")
+    fi
+
+    if [ "$_lf_errors" -gt 0 ]; then
+      warn "lockfile.json validation failed with $_lf_errors error(s)"
+      exit_code=1
+      $FAIL_FAST && exit $exit_code
+    fi
+    say "lockfile.json validation passed"
+  else
+    warn "lockfile.json not found — skipping section validation"
     exit_code=1
     $FAIL_FAST && exit $exit_code
   fi
-  say "lockfile.json validation passed"
 else
   say "skipping lockfile validation (path-scoped mode)."
 fi
