@@ -67,7 +67,14 @@ in
       # returns ALL OLLAMA_* vars (including OLLAMA_HOST) because macOS
       # launchd system daemons do not inherit the gui-env GUI domain.
       EnvironmentVariables =
-        (import ../../modules/lib/env-vars.nix { inherit config pkgs lib; }).toMacOSDaemonOllamaEnv;
+        (import ../../modules/lib/env-vars.nix {
+          inherit
+            config
+            pkgs
+            lib
+            username
+            ;
+        }).toMacOSDaemonOllamaEnv;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/ollama/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/ollama/stderr.log";
     };

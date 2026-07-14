@@ -5,19 +5,24 @@
 # (src/hosts/Windows/user/env.dsc.yml); parity is enforced by tests and
 # documented in docs/env-variable-registry.md.
 #
-# Use: import ../lib/env-vars.nix { inherit config pkgs lib; }
+# Callers MUST pass `username`.  Do NOT add a fallback chain (no default null,
+# no config.home.username fallback, no getEnv "USER" fallback).  Every caller
+# has `username` available via specialArgs or as a local binding — use it.
+#
+# Use: import ./lib/env-vars.nix { inherit config pkgs lib username; }
 # Returns: { catalog, toHomeSessionVariables, toNixOSSystemEnvironment, ... }
 {
   config,
   pkgs,
   lib,
+  username,
   ...
 }:
 let
   # ── Shared values used by multiple catalog entries ──────────────────
 
   allUsers = builtins.fromJSON (builtins.readFile ../users.json);
-  effectiveUsername = config.home.username;
+  effectiveUsername = username;
   effectiveUser =
     if builtins.hasAttr effectiveUsername allUsers then allUsers.${effectiveUsername} else { };
 

@@ -6,10 +6,18 @@
   config,
   lib,
   pkgs,
+  username,
   ...
 }:
 let
-  envLib = import ../lib/env-vars.nix { inherit config pkgs lib; };
+  envLib = import ../lib/env-vars.nix {
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
+  };
 in
 {
   options._nucleus.envVars = lib.mkOption {

@@ -85,7 +85,14 @@
     # See src/modules/lib/env-vars.nix (OLLAMA_FLASH_ATTENTION,
     # OLLAMA_CONTEXT_LENGTH, OLLAMA_KV_CACHE_TYPE entries).
     environmentVariables =
-      (import ../../modules/lib/env-vars.nix { inherit config pkgs lib; }).toNixOSServiceEnv;
+      (import ../../modules/lib/env-vars.nix {
+        inherit
+          config
+          pkgs
+          lib
+          username
+          ;
+      }).toNixOSServiceEnv;
   };
 
   # Cap the Ollama systemd service at 16 GB RSS so an oversized model pull

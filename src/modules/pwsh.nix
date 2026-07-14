@@ -3,6 +3,7 @@
   config,
   lib,
   pkgs,
+  username,
   ...
 }:
 let
@@ -22,7 +23,14 @@ let
   pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
   pwshYamlVersion = lockfile.pwsh."powershell-yaml" or null;
 
-  envVars = import ../lib/env-vars.nix { inherit config pkgs lib; };
+  envVars = import ./lib/env-vars.nix {
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
+  };
 
   profileContent = ''
         # This file is managed by nucleus (src/modules/pwsh.nix).

@@ -3,6 +3,7 @@
   config,
   lib,
   pkgs,
+  username,
   nucleusApps,
   users ? null,
   ...
@@ -1320,7 +1321,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
       Label = "local.gui-env";
       ProgramArguments = [
         "${pkgs.writeShellScript "gui-env-agent"
-          (import ../lib/env-vars.nix { inherit config pkgs lib; }).toLaunchctlScript
+          (import ./lib/env-vars.nix {
+            inherit
+              config
+              pkgs
+              lib
+              username
+              ;
+          }).toLaunchctlScript
         }"
       ];
       # Run once at login so the GUI domain is populated before any app starts.
@@ -1345,7 +1353,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
       Label = "local.gui-env-user";
       ProgramArguments = [
         "${pkgs.writeShellScript "gui-env-user-agent"
-          (import ../lib/env-vars.nix { inherit config pkgs lib; }).toUserLaunchctlScript
+          (import ./lib/env-vars.nix {
+            inherit
+              config
+              pkgs
+              lib
+              username
+              ;
+          }).toUserLaunchctlScript
         }"
       ];
       RunAtLoad = true;

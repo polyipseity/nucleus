@@ -13,6 +13,7 @@
   config,
   lib,
   pkgs,
+  username,
   nucleusApps,
   users ? null,
   ...
@@ -21,7 +22,14 @@ let
   # Dedicated alias/env fragments keep list-like attrsets isolated so sort order
   # can be audited without scanning unrelated shell options.
   shellAliases = import ./shell/aliases.nix { };
-  envVarsHelpers = import ../lib/env-vars.nix { inherit config pkgs lib; };
+  envVarsHelpers = import ./lib/env-vars.nix {
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
+  };
 
   # Single source of truth for AI agent session detection.  Shared with
   # pwsh.nix and Sync-ShellProfile.ps1 (Windows).

@@ -175,7 +175,14 @@ in
     # (src/modules/lib/env-vars.nix).  This replaces the previously inline
     # password-store vars and macOS-specific NUCLEUS_REPO_ROOT.
     home.sessionVariables =
-      (import ../lib/env-vars.nix { inherit config pkgs lib; }).toHomeSessionVariables;
+      (import ./lib/env-vars.nix {
+        inherit
+          config
+          pkgs
+          lib
+          username
+          ;
+      }).toHomeSessionVariables;
 
     # QtPass keeps its own persisted settings store, which can override
     # PASSWORD_STORE_DIR and GUI behavior when launched outside the shell.
