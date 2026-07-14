@@ -6,6 +6,18 @@
   username,
   ...
 }:
+let
+  # Centralized env var catalog — single source of truth for managed
+  # environment variables across all hosts.
+  envVars = import ../../modules/lib/env-vars.nix {
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
+  };
+in
 {
   # Keep device firmware update support enabled (parity with the
   # "automatic critical updates" posture on macOS).
@@ -35,15 +47,18 @@
   # All-process environment variables sourced from the centralized env var
   # catalog.  NixOS `environment.variables` propagates to all processes via
   # PAM and systemd.  See src/modules/lib/env-vars.nix for the canonical list.
-  environment.variables =
-    (import ../../modules/lib/env-vars.nix {
-      inherit
-        config
-        pkgs
-        lib
-        username
-        ;
-    }).toNixOSSystemEnvironment;
+  # Merge a manually managed PATH (user-scope package manager bin dirs
+  # prepended before system defaults) into the catalog-derived set since
+  # PATH's concatenation semantics don't fit the catalog's single-value model.
+  # Uses lib.mkForce because environment.variables is typed
+  # oneOf [str (listOf ...)] — mkBefore on a value inside oneOf acts as full
+  # replacement, not list prepend.  The rendered list includes system defaults
+  # (/run/wrappers/bin, /run/current-system/sw/bin) to preserve setuid wrapper
+  # and system-package resolution.
+  # Mirrors pathComponents in src/modules/lib/env-vars.nix.
+  environment.variables = envVars.toNixOSSystemEnvironment // {
+    PATH = lib.mkForce (envVars.toNixOSPath);
+  };
 
   # Disable nano to prevent its default EDITOR assignment from overriding
   # home-manager's neovim defaultEditor at the system level.
