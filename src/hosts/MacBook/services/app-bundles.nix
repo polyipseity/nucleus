@@ -98,12 +98,6 @@ let
     }
   ];
 
-  # List of currently deployed app bundle directories (derived).
-  # Used by tests and documentation to track active app bundles.
-  currentNucleusAppBundleDirs = map (svc: svc.appDir) currentNucleusAppBundles;
-
-  # Sort alphabetically by appDir for deterministic deployment.
-  sortedCurrentNucleusAppBundles = builtins.sort (a: b: a.appDir < b.appDir) currentNucleusAppBundles;
 in
 {
   home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
@@ -152,7 +146,7 @@ in
         enablement_key="${svc.bundleId} - ${svc.menuItem} - ${svc.message}"
         /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
           '<dict><key>presentation_modes</key>${mkPresentationModes svc.presentationModes}</dict>'
-      '') sortedCurrentNucleusAppBundles
+      '') currentNucleusAppBundles
     )}
   '';
 }

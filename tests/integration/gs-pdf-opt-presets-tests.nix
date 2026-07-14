@@ -163,13 +163,10 @@ let
       )
       "macOS app-bundles.nix must define removedNucleusAppBundles containing the old single-preset app bundle metadata";
 
-  test_macos_has_current_app_dirs =
-    assert'
-      (
-        lib.hasInfix "currentNucleusAppBundleDirs" macAppBundlesText
-        && lib.hasInfix "NucleusManual.app" macAppBundlesText
-      )
-      "macOS app-bundles.nix must define currentNucleusAppBundleDirs containing current app bundle dirs";
+  test_macos_has_current_app_dirs = assert' (
+    lib.hasInfix "currentNucleusAppBundles" macAppBundlesText
+    && lib.hasInfix "NucleusManual.app" macAppBundlesText
+  ) "macOS app-bundles.nix must define currentNucleusAppBundles containing current app bundles";
 
   test_macos_has_removed_quick_actions =
     assert'
