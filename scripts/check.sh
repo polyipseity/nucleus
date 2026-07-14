@@ -534,6 +534,7 @@ fi
 section "$((_step += 1))" "Locked DSC validation"
 # Platform parallel: check.ps1 uses powershell-yaml with normalization helpers (Windows-native equivalent).
 if ! $HAS_ARGS; then
+  require_command yq
   _dsc_system_dir="src/hosts/Windows/system"
   _lockfile="src/lockfiles/lockfile.json"
   _lf_errors=0

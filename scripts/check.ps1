@@ -641,7 +641,7 @@ if (-not $HAS_ARGS) {
     $_violations++
   }
   if ($_violations -gt 0) {
-    $exitCode = $_violations
+    $exitCode = 1
     if ($FAIL_FAST) { exit $exitCode }
   } else {
     say "no package manager violations found."
