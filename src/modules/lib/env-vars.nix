@@ -81,6 +81,38 @@ let
     in
     builtins.concatStringsSep ":" components;
 
+  # ── Helper: render NixOS PATH from pathComponents ──────────────────
+  # Returns a list of absolute directory paths for NixOS
+  # environment.variables.PATH.  NixOS joins lists with `:`, so this
+  # returns a list rather than a colon-joined string.
+  # The systemDirs provide safe fallback entries when no managed overrides
+  # exist, mirroring what NixOS console.nix and the default profile add.
+  toNixOSPath =
+    let
+      homePrefix = resolvedHomeDirectory;
+      prependDirs = map (p: "${homePrefix}/${p}") pathComponents.prepend;
+      appendDirs = map (p: "${homePrefix}/${p}") pathComponents.append;
+      # NixOS system PATH: setuid wrappers + system packages.
+      systemDirs = [
+        "/run/wrappers/bin"
+        "/run/current-system/sw/bin"
+      ];
+    in
+    prependDirs ++ systemDirs ++ appendDirs;
+
+  # ── Helper: render Windows user PATH string from pathComponents ────
+  # Returns a semicolon-joined string with %USERPROFILE%-prefixed paths
+  # for parity documentation and test consumption.  Not consumed at
+  # runtime on Windows (Sync-UserPath.ps1 hardcodes the values since
+  # Nix isn't available during apply).
+  toWindowsUserPathString =
+    let
+      homePrefix = "%USERPROFILE%";
+      prependDirs = map (p: "${homePrefix}\\${p}") pathComponents.prepend;
+      appendDirs = map (p: "${homePrefix}\\${p}") pathComponents.append;
+    in
+    builtins.concatStringsSep ";" (prependDirs ++ appendDirs);
+
   # ── Catalog ─────────────────────────────────────────────────────────
   # Each entry:
   #   value:   string | null  (null = set externally, e.g. EDITOR)
@@ -545,6 +577,8 @@ in
     passwordStoreDir
     currentOs
     toLaunchctlPATH
+    toNixOSPath
+    toWindowsUserPathString
     pathComponents
     ;
 }
