@@ -444,6 +444,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Python 3.13 is installed for cross-host Python interpreter parity with macOS and NixOS (pkgs.python3)
+      settings:
+        id: Python.Python.3.13
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure rclone is installed as the cross-platform cloud storage sync and mount tool for cloud drive parity with macOS and NixOS
       settings:
         id: Rclone.Rclone

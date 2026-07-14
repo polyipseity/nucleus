@@ -48,6 +48,7 @@ let
     pkgs.pi-coding-agent
     pkgs.powershell
     pkgs.prek
+    pkgs.python3
     pkgs.ripgrep
     pkgs.ruff
     pkgs.rustup
