@@ -48,6 +48,39 @@ let
   litellmEndpoint = servicesJSON.litellm.network.default;
   ollamaHost = "${litellmEndpoint.host}:${toString litellmEndpoint.port}";
 
+  # ── PATH components ─────────────────────────────────────────────────
+  # Managed PATH directories split into prepend (before system default) and
+  # append (after system default) groups.  Each consumer renders these as
+  # platform-appropriate PATH strings.
+  # Prepend: user-scope package manager bin directories.
+  # Append: empty for now — reserved for future use.
+  pathComponents = {
+    prepend = [
+      ".bun/bin"
+      ".cargo/bin"
+      ".local/bin"
+    ];
+    append = [ ];
+  };
+
+  # ── Helper: render PATH from pathComponents ────────────────────────
+  # Returns a shell command fragment for macOS launchctl setenv PATH.
+  # The defaultSystemPath provides safe fallback entries when no managed
+  # overrides exist.
+  toLaunchctlPATH =
+    let
+      defaultSystemPath = "/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin";
+      homePrefix = "$HOME";
+      prependStr = builtins.concatStringsSep ":" (map (p: "${homePrefix}/${p}") pathComponents.prepend);
+      appendStr = builtins.concatStringsSep ":" (map (p: "${homePrefix}/${p}") pathComponents.append);
+      components = builtins.filter (s: s != "") [
+        (if pathComponents.prepend != [ ] then prependStr else "")
+        defaultSystemPath
+        (if pathComponents.append != [ ] then appendStr else "")
+      ];
+    in
+    builtins.concatStringsSep ":" components;
+
   # ── Catalog ─────────────────────────────────────────────────────────
   # Each entry:
   #   value:   string | null  (null = set externally, e.g. EDITOR)
@@ -279,7 +312,8 @@ let
       value = builtins.getEnv "NUCLEUS_REPO_ROOT";
       scope = "all-process";
       hosts = [ "macOS" ];
-      why = "Repo root for out-of-store symlinks. Captured at eval time from apply.sh export.";
+      excludeFromLaunchctl = true;
+      why = "Repo root for out-of-store symlinks. Captured at eval time from apply.sh export. Excluded from gui-env agent because builtins.getEnv returns empty string when built outside apply.sh; set via activation script instead.";
     };
 
     # ── Starship prompt (all-process) ───────────────────────────────
@@ -510,5 +544,7 @@ in
     defaultDevTools
     passwordStoreDir
     currentOs
+    toLaunchctlPATH
+    pathComponents
     ;
 }

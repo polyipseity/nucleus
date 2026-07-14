@@ -1338,6 +1338,39 @@ lib.mkIf pkgs.stdenv.isDarwin {
   '';
 
   # --------------------------------------------------------------------------
+  # propagateGuiEnvVars
+  # Propagates env vars that cannot be set via the gui-env LaunchAgent because
+  # they depend on values only available at activation time (not build time).
+  # Runs after setupLaunchAgents so the gui-env agents are loaded first.
+  # --------------------------------------------------------------------------
+  home.activation.propagateGuiEnvVars = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
+    # Propagate NUCLEUS_REPO_ROOT to GUI domain.  The catalog entry has
+    # excludeFromLaunchctl = true because builtins.getEnv returns "" when
+    # built outside apply.sh — reloading from the activation environment
+    # gives us the fresh value on every apply.
+    if [ -n "''${NUCLEUS_REPO_ROOT:-}" ]; then
+      /bin/launchctl setenv NUCLEUS_REPO_ROOT "$NUCLEUS_REPO_ROOT"
+    fi
+
+    # Propagate managed PATH to GUI domain.  Electron apps inherit the GUI
+    # domain PATH which defaults to /usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin,
+    # missing user-scope package manager bin dirs.  Setting it here ensures
+    # every GUI process sees the managed PATH entries.
+    # The value is built from pathComponents in env-vars.nix (toLaunchctlPATH).
+    __nucleus_path="${
+      (import ./lib/env-vars.nix {
+        inherit
+          config
+          pkgs
+          lib
+          username
+          ;
+      }).toLaunchctlPATH
+    }"
+    /bin/launchctl setenv PATH "$__nucleus_path"
+  '';
+
+  # --------------------------------------------------------------------------
   # GUI environment variable propagation LaunchAgent
   # macOS maintains separate shell (user/<uid>/) and GUI (gui/<uid>/) launchd
   # domains.  Shell sessionVariables set via home.sessionVariables never cross
