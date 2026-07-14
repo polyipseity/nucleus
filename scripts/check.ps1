@@ -102,19 +102,19 @@ $_step = 0
 # 1. Dead Nix code
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Dead Nix code ===" -f (++$_step))
-Write-Output "Skipping (requires Nix toolchain — not available on Windows)."
+say "skipping (requires Nix toolchain — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 2. Nix flake evaluation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix flake evaluation ===" -f (++$_step))
-Write-Output "Skipping (requires Nix toolchain — not available on Windows)."
+say "skipping (requires Nix toolchain — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 3. Nix formatting (nixfmt)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix formatting (nixfmt) ===" -f (++$_step))
-Write-Output "Skipping (requires Nix toolchain — not available on Windows)."
+say "skipping (requires Nix toolchain — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 4. PowerShell syntax validation
@@ -125,7 +125,7 @@ if ($PS1_FILES.Count -gt 0) {
 } elseif (-not $HAS_ARGS) {
   & "$RepoRoot\scripts\check-pwsh.ps1" -SyntaxOnly
 } else {
-  Write-Output "Skipping (no PowerShell scripts to check)."
+  say "skipping (no PowerShell scripts to check)."
 }
 if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
@@ -139,7 +139,7 @@ if ($PKR_FILES.Count -gt 0) {
 } elseif (-not $HAS_ARGS) {
   & "$RepoRoot\scripts\check-packer.ps1"
 } else {
-  Write-Output "Skipping (no Packer templates to check)."
+  say "skipping (no Packer templates to check)."
 }
 if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
@@ -148,25 +148,25 @@ if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 # 6. Shell script validation tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Shell script validation tests ===" -f (++$_step))
-Write-Output "Skipping (bash-based test scripts — not available on Windows)."
+say "skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 7. CWD-independence tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] CWD-independence tests ===" -f (++$_step))
-Write-Output "Skipping (bash-based test scripts — not available on Windows)."
+say "skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 8. Nix search path tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix search path tests ===" -f (++$_step))
-Write-Output "Skipping (bash-based test scripts — not available on Windows)."
+say "skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 9. Port utility function tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Port utility function tests ===" -f (++$_step))
-Write-Output "Skipping (bash-based test scripts — not available on Windows)."
+say "skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 10. Lockfile validation
@@ -183,7 +183,7 @@ $_lfPath = Join-Path $RepoRoot "src\lockfiles\lockfile.json"
 $_lf = $null
 $_lfOverlapErrors = 0
 if (-not (Test-Path $_lfPath)) {
-  Write-Output "ERROR: lockfile.json not found at $_lfPath"
+  warn "lockfile.json not found at $_lfPath"
   $exitCode = 1
   if ($FAIL_FAST) { exit $exitCode }
   $_lfOverlapErrors++
@@ -209,15 +209,17 @@ if (-not (Test-Path $_lfPath)) {
   }
   foreach ($_entry in $_pkgToSections.GetEnumerator()) {
     if ($_entry.Value.Count -gt 1 -and $_entry.Key -notin $_lfOverlapExceptions) {
-      Write-Output ("WARNING: package '{0}' appears in both {1}" -f $_entry.Key, ($_entry.Value -join ', '))
+      warn ("package '{0}' appears in both {1}" -f $_entry.Key, ($_entry.Value -join ', '))
       $_lfOverlapErrors++
     }
   }
 }
 if ($_lfOverlapErrors -gt 0) {
-  Write-Output ("lockfile.json consistency: {0} overlap issue(s) (warnings only)" -f $_lfOverlapErrors)
+  warn ("lockfile.json consistency: {0} overlap issue(s)" -f $_lfOverlapErrors)
+  $exitCode = 1
+  if ($FAIL_FAST) { exit $exitCode }
 } else {
-  Write-Output "lockfile.json consistency: no overlapping packages across sections"
+  say "lockfile.json consistency: no overlapping packages across sections"
 }
 
 # Lifecycle script allowlist validation (always run):
@@ -226,7 +228,7 @@ if ($_lfOverlapErrors -gt 0) {
 $_lfAlPath = Join-Path $RepoRoot "src\lockfiles\lifecycle-allowlist.json"
 $_lfAlErrors = 0
 if (-not (Test-Path $_lfAlPath)) {
-  Write-Output "ERROR: lifecycle-allowlist.json not found at $_lfAlPath"
+  warn "lifecycle-allowlist.json not found at $_lfAlPath"
   $_lfAlErrors++
 } else {
   $_lfAlRaw = Get-Content $_lfAlPath -Raw -ErrorAction Stop
@@ -234,33 +236,33 @@ if (-not (Test-Path $_lfAlPath)) {
   try {
     $_lfAl = ConvertFrom-Json $_lfAlRaw -AsHashtable
   } catch {
-    Write-Output "ERROR: lifecycle-allowlist.json is not valid JSON: $_($_.Exception.Message)"
+    warn "lifecycle-allowlist.json is not valid JSON: $_($_.Exception.Message)"
     $_lfAlErrors++
   }
   if ($null -ne $_lfAl -and $_lfAl -isnot [hashtable]) {
-    Write-Output "ERROR: lifecycle-allowlist.json must be a JSON object"
+    warn "lifecycle-allowlist.json must be a JSON object"
     $_lfAlErrors++
   } elseif ($null -ne $_lfAl) {
     foreach ($_entry in $_lfAl.GetEnumerator()) {
       if ($_entry.Value -isnot [string] -or [string]::IsNullOrEmpty($_entry.Value)) {
-        Write-Output "WARNING: lifecycle-allowlist.json: '$($_entry.Key)' has empty or non-string justification"
+        warn "lifecycle-allowlist.json: '$_($_entry.Key)' has empty or non-string justification"
         $_lfAlErrors++
       }
     }
   }
 }
 if ($_lfAlErrors -gt 0) {
-  Write-Output "ERROR: lifecycle-allowlist.json validation failed with $_lfAlErrors error(s)"
+  warn "lifecycle-allowlist.json validation failed with $_lfAlErrors error(s)"
   $exitCode = 1
   if ($FAIL_FAST) { exit $exitCode }
 } else {
   $_lfAlCount = if ($null -ne $_lfAl -and $_lfAl -is [hashtable]) { $_lfAl.Count } else { 0 }
-  Write-Output ("lifecycle-allowlist.json: valid (entry count: {0})" -f $_lfAlCount)
+  say ("lifecycle-allowlist.json: valid (entry count: {0})" -f $_lfAlCount)
 }
 
 if (-not $HAS_ARGS) {
   if ($null -eq $_lf) {
-    Write-Output "ERROR: lockfile.json could not be loaded — skipping section validation"
+    warn "lockfile.json could not be loaded — skipping section validation"
     $exitCode = 1
     if ($FAIL_FAST) { exit $exitCode }
   } else {
@@ -269,12 +271,12 @@ if (-not $HAS_ARGS) {
     # Check sections that must be non-empty
     foreach ($_section in @('scoop', 'cargo-binstall', 'bun', 'uv', 'rustup', 'pwsh')) {
       if (-not $_lf.ContainsKey($_section) -or $_lf[$_section].Count -eq 0) {
-        Write-Output "ERROR: $_section`: empty or missing section"
+        warn "${_section}: empty or missing section"
         $_lfErrors++
       } else {
         foreach ($_entry in $_lf[$_section].GetEnumerator()) {
           if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME', '1.0.0') -contains $_entry.Value) {
-            Write-Output "ERROR: $_section.$($_entry.Key): placeholder version ($($_entry.Value))"
+            warn "${_section}.$($_entry.Key): placeholder version ($($_entry.Value))"
             $_lfErrors++
           }
         }
@@ -283,54 +285,54 @@ if (-not $HAS_ARGS) {
 
     # winget: warn if empty
     if (-not $_lf.ContainsKey('winget')) {
-      Write-Output "ERROR: winget: missing section"
+      warn "winget: missing section"
       $_lfErrors++
     } elseif ($_lf.winget.Count -gt 0) {
       foreach ($_entry in $_lf.winget.GetEnumerator()) {
         if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME', '1.0.0') -contains $_entry.Value) {
-          Write-Output "ERROR: winget.$($_entry.Key): placeholder version ($($_entry.Value))"
+          warn "winget.$($_entry.Key): placeholder version ($($_entry.Value))"
           $_lfErrors++
         }
       }
     } else {
-      Write-Output "WARNING: winget: empty section (not yet populated)"
+      say "warning: winget: empty section (not yet populated)"
     }
 
     # vscode: warn if empty
     if (-not $_lf.ContainsKey('vscode')) {
-      Write-Output "ERROR: vscode: missing section"
+      warn "vscode: missing section"
       $_lfErrors++
     } elseif ($_lf.vscode.Count -gt 0) {
       foreach ($_entry in $_lf.vscode.GetEnumerator()) {
         if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME', '1.0.0') -contains $_entry.Value) {
-          Write-Output "ERROR: vscode.$($_entry.Key): placeholder version ($($_entry.Value))"
+          warn "vscode.$($_entry.Key): placeholder version ($($_entry.Value))"
           $_lfErrors++
         }
       }
     } else {
-      Write-Output "WARNING: vscode: empty section (not yet populated)"
+      say "warning: vscode: empty section (not yet populated)"
     }
 
     # homebrew: must be non-empty
     if (-not $_lf.ContainsKey('homebrew') -or $_lf.homebrew.Count -eq 0) {
-      Write-Output "ERROR: homebrew: empty or missing section"
+      warn "homebrew: empty or missing section"
       $_lfErrors++
     }
 
     # ollama: must have at least one profile with models
     if (-not $_lf.ContainsKey('ollama') -or $_lf.ollama.Count -eq 0) {
-      Write-Output "ERROR: ollama: empty or missing section"
+      warn "ollama: empty or missing section"
       $_lfErrors++
     } else {
       foreach ($_profile in $_lf.ollama.GetEnumerator()) {
         if ($_profile.Value.Count -eq 0) {
-          Write-Output "ERROR: ollama.$($_profile.Key): empty model list"
+          warn "ollama.$_($_profile.Key): empty model list"
           $_lfErrors++
         } else {
           for ($_i = 0; $_i -lt $_profile.Value.Count; $_i++) {
             $_model = $_profile.Value[$_i]
             if ([string]::IsNullOrEmpty($_model.name) -or [string]::IsNullOrEmpty($_model.tag)) {
-              Write-Output "ERROR: ollama.$($_profile.Key)[$_i]: missing name or tag"
+              warn "ollama.$_($_profile.Key)[$_i]: missing name or tag"
               $_lfErrors++
             }
           }
@@ -339,11 +341,11 @@ if (-not $HAS_ARGS) {
     }
 
     if ($_lfErrors -gt 0) {
-      Write-Output "ERROR: lockfile.json validation failed with $_lfErrors error(s)"
+      warn "lockfile.json validation failed with $_lfErrors error(s)"
       $exitCode = 1
       if ($FAIL_FAST) { exit $exitCode }
     } else {
-      Write-Output "lockfile.json validation passed"
+      say "lockfile.json validation passed"
     }
   }
 } else {
@@ -359,7 +361,7 @@ if (-not $HAS_ARGS) {
   $_svcErrors = 0
 
   if (-not (Test-Path $_svcJson)) {
-    Write-Output "ERROR: services.json not found at $_svcJson"
+    warn "services.json not found at $_svcJson"
     $_svcErrors++
   } else {
     $_svc = Get-Content $_svcJson -Raw | ConvertFrom-Json -AsHashtable
@@ -368,18 +370,18 @@ if (-not $HAS_ARGS) {
       $_entry = $_svc[$_svcName]
       if ($_entry -isnot [hashtable]) { continue }
       if (-not $_entry.ContainsKey('displayName') -or [string]::IsNullOrEmpty($_entry.displayName)) {
-        Write-Output "ERROR: services.json: '$_svcName' missing displayName"
+        warn "services.json: '$_svcName' missing displayName"
         $_svcErrors++
       }
       if (-not $_entry.ContainsKey('platforms') -or $_entry.platforms.Count -eq 0) {
-        Write-Output "ERROR: services.json: '$_svcName' missing or empty platforms"
+        warn "services.json: '$_svcName' missing or empty platforms"
         $_svcErrors++
       } else {
         foreach ($_plat in $_entry.platforms.Keys) {
           $_pEntry = $_entry.platforms[$_plat]
           $_type = $_pEntry.type
           if ($_type -notin @('launchctl', 'systemctl', 'native', 'schtask', 'omitted')) {
-            Write-Output "ERROR: services.json: '$_svcName' platform '$_plat' has invalid type '$_type'"
+            warn "services.json: '$_svcName' platform '$_plat' has invalid type '$_type'"
             $_svcErrors++
           }
           $_hasRequired = switch ($_type) {
@@ -391,7 +393,7 @@ if (-not $HAS_ARGS) {
             default     { $false }
           }
           if (-not $_hasRequired) {
-            Write-Output "ERROR: services.json: '$_svcName' platform '$_plat' missing required fields for type '$_type'"
+            warn "services.json: '$_svcName' platform '$_plat' missing required fields for type '$_type'"
             $_svcErrors++
           }
         }
@@ -400,11 +402,11 @@ if (-not $HAS_ARGS) {
   }
 
   if ($_svcErrors -gt 0) {
-    Write-Output "ERROR: services.json validation failed with $_svcErrors error(s)"
+    warn "services.json validation failed with $_svcErrors error(s)"
     $exitCode = 1
     if ($FAIL_FAST) { exit $exitCode }
   } else {
-    Write-Output "services.json validation passed"
+    say "services.json validation passed"
 
     # Validate user-scoped platform entries have justification.
     foreach ($_svcName in $_svc.Keys) {
@@ -416,7 +418,7 @@ if (-not $HAS_ARGS) {
           $_domainScope = if ($_pEntry.ContainsKey('domain')) { $_pEntry.domain } elseif ($_pEntry.ContainsKey('scope')) { $_pEntry.scope } else { $null }
           $_hasJustification = $_pEntry.ContainsKey('justification') -and -not [string]::IsNullOrEmpty($_pEntry.justification)
           if ($_domainScope -eq 'user' -and -not $_hasJustification) {
-            Write-Output "ERROR: services.json: '$_svcName' platform '$_plat' is user-scoped but missing justification"
+            warn "services.json: '$_svcName' platform '$_plat' is user-scoped but missing justification"
             $_svcErrors++
           }
         }
@@ -432,7 +434,7 @@ if (-not $HAS_ARGS) {
         if ($_userEntry.ContainsKey('services')) {
           foreach ($_svcKey in $_userEntry.services.Keys) {
             if (-not $_svc.ContainsKey($_svcKey)) {
-              Write-Output "ERROR: ${_usersJson}: user '$_username' references unknown service '$_svcKey'"
+              warn "${_usersJson}: user '$_username' references unknown service '$_svcKey'"
               $_svcErrors++
             }
           }
@@ -450,7 +452,7 @@ if (-not $HAS_ARGS) {
           if ($_userEntry.ContainsKey('services')) {
             foreach ($_svcKey in $_userEntry.services.Keys) {
               if (-not $_svc.ContainsKey($_svcKey)) {
-                Write-Output "ERROR: ${_winUsersJson}: user '$_username' references unknown service '$_svcKey'"
+                warn "${_winUsersJson}: user '$_username' references unknown service '$_svcKey'"
                 $_svcErrors++
               }
             }
@@ -460,7 +462,7 @@ if (-not $HAS_ARGS) {
     }
   }
 } else {
-  Write-Output "Skipping service registry validation (path-scoped mode)."
+  say "skipping service registry validation (path-scoped mode)."
 }
 
 # ---------------------------------------------------------------------------
@@ -568,10 +570,10 @@ if (-not $HAS_ARGS) {
       $_lfVer = if ($_lockfileData.winget.ContainsKey($_id)) { $_lockfileData.winget[$_id] } else { '' }
 
       if ([string]::IsNullOrEmpty($_lfVer)) {
-        Write-Output "ERROR: system DSC files: $_id has version $_pinnedVer but no lockfile entry"
+        warn "system DSC files: $_id has version $_pinnedVer but no lockfile entry"
         $_lfErrors++
       } elseif ($_pinnedVer -ne $_lfVer) {
-        Write-Output "ERROR: system DSC files: $_id pinned $_pinnedVer but lockfile has $_lfVer"
+        warn "system DSC files: $_id pinned $_pinnedVer but lockfile has $_lfVer"
         $_lfErrors++
       }
     }
@@ -593,20 +595,20 @@ if (-not $HAS_ARGS) {
       }
     }
     if (-not $_foundPin) {
-      Write-Output "ERROR: $_id ($_lfVer) is in lockfile but missing version pin after generation"
+      warn "$_id ($_lfVer) is in lockfile but missing version pin after generation"
       $_lfErrors++
     }
   }
 
   if ($_lfErrors -gt 0) {
-    Write-Output "ERROR: locked DSC validation failed with $_lfErrors error(s)"
+    warn "locked DSC validation failed with $_lfErrors error(s)"
     $exitCode = 1
     if ($FAIL_FAST) { exit $exitCode }
   } else {
-    Write-Output 'Locked DSC validation passed'
+    say "locked DSC validation passed"
   }
 } else {
-  Write-Output 'Skipping locked DSC validation (path-scoped mode).'
+  say "skipping locked DSC validation (path-scoped mode)."
 }
 
 # ---------------------------------------------------------------------------
@@ -625,7 +627,7 @@ if (-not $HAS_ARGS) {
     ) -Pattern '(^|[^a-z])pip install([^-]|$)' `
     | Where-Object { $_.Line -notmatch 'uv pip install' }
   if ($_pipViolations) {
-    Write-Output "ERROR: bare pip install detected (use uv pip install instead)"
+    warn "bare pip install detected (use uv pip install instead)"
     $_violations++
   }
   $_npmViolations = Select-String -Path @(
@@ -635,17 +637,17 @@ if (-not $HAS_ARGS) {
       | ForEach-Object { $_.FullName }
     ) -Pattern '(^|[^a-z])npm install([^-]|$)'
   if ($_npmViolations) {
-    Write-Output "ERROR: bare npm install detected (use bun or nix instead)"
+    warn "bare npm install detected (use bun or nix instead)"
     $_violations++
   }
   if ($_violations -gt 0) {
     $exitCode = $_violations
     if ($FAIL_FAST) { exit $exitCode }
   } else {
-    Write-Output "No package manager violations found."
+    say "no package manager violations found."
   }
 } else {
-  Write-Output "Skipping (path-scoped mode)."
+  say "skipping (path-scoped mode)."
 }
 
 # ---------------------------------------------------------------------------
@@ -656,15 +658,15 @@ if (-not $HAS_ARGS) {
   $_cnbaOutput = & "$PSScriptRoot\cleanup-nix.ps1" -WhatIf 2>&1
   $_cnbaFound = $_cnbaOutput | Select-String -Pattern 'would remove stale Nix build symlink'
   if ($_cnbaFound) {
-    Write-Output "ERROR: stale Nix build artifacts found:"
-    $_cnbaOutput | ForEach-Object { Write-Output "  $_" }
+    warn "stale Nix build artifacts found:"
+    $_cnbaOutput | ForEach-Object { warn "  $_" }
     $exitCode = 1
     if ($FAIL_FAST) { exit $exitCode }
   } else {
-    Write-Output "No stale Nix build artifacts found."
+    say "no stale Nix build artifacts found."
   }
 } else {
-  Write-Output "Skipping (path-scoped mode)."
+  say "skipping (path-scoped mode)."
 }
 
 # ---------------------------------------------------------------------------
@@ -676,10 +678,10 @@ if ($VERIFY) {
   if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
   if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
   if ($LASTEXITCODE -eq 0) {
-    Write-Output "Online determinism checks passed."
+    say "online determinism checks passed."
   }
 } else {
-  Write-Output "Skipping (use --verify to run online determinism checks)."
+  say "skipping (use --verify to run online determinism checks)."
 }
 
 # 16. Undocumented error suppression check
@@ -744,20 +746,20 @@ if ($HAS_ARGS) {
 
 if ($_undocSuppViolations.Count -gt 0) {
   foreach ($_uv in ($_undocSuppViolations | Sort-Object -Unique)) {
-    Write-Output $_uv
+    warn $_uv
   }
-  Write-Output ("ERROR: undocumented error suppression check failed with {0} violation(s)" -f $_undocSuppViolations.Count)
-  Write-Output "  Add '# undoc-supp: reason' comment to explain intentional suppressions."
+  warn ("undocumented error suppression check failed with {0} violation(s)" -f $_undocSuppViolations.Count)
+  say "  add '# undoc-supp: reason' comment to explain intentional suppressions."
   $exitCode = 1
   if ($FAIL_FAST) { exit $exitCode }
 } else {
-  Write-Output "No undocumented error suppressions found."
+  say "no undocumented error suppressions found."
 }
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
 if ($exitCode -ne 0) {
-  Write-Output "`nSome checks failed with exit code $exitCode."
+  warn "some checks failed with exit code $exitCode"
   exit $exitCode
 }
-Write-Output "`nAll checks passed."
+say "all checks passed."
