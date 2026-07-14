@@ -6,9 +6,10 @@
 # reliably in the Services menu.
 #
 # The .app bundle (NucleusManual) is built at evaluation time via a Nix
-# derivation (osacompile + PlistBuddy) so the activation script only needs
-# to deploy it. The manual file is symlinked to a fixed path via home.file
-# so the .app can find it without needing NUCLEUS_REPO_ROOT at runtime.
+# derivation (osacompile from committed AppleScript source) so the activation
+# script only needs to deploy it. The manual file is symlinked to a fixed path
+# via home.file so the .app can find it without needing NUCLEUS_REPO_ROOT at
+# runtime.
 #
 # WHY home.activation instead of home.file:
 #   home.file creates a symlink to the Nix store, but macOS LaunchServices
@@ -34,39 +35,18 @@ let
         allowSubstitutes = false;
       }
       ''
-        as_src="$TMPDIR/NucleusManual.applescript"
-        cat > "$as_src" << 'APPLESCRIPT'
-          on open theFiles
-            do shell script "open \"$HOME/.local/share/nucleus/manual.md\""
-          end open
-          on run
-            do shell script "open \"$HOME/.local/share/nucleus/manual.md\""
-          end run
-        APPLESCRIPT
-
+        build_dir="$(mktemp -d)"
         # osacompile uses CoreServices APIs that fail when writing directly
         # to the Nix store output path (coreFoundationUnknownErr -4960).
         # Compile to a temp dir and copy the result to $out.
-        build_dir="$(mktemp -d)"
-        /usr/bin/osacompile -l AppleScript -o "$build_dir/NucleusManual.app" "$as_src"
+        /usr/bin/osacompile -l AppleScript -o "$build_dir/NucleusManual.app" \
+          "${./app-bundles/NucleusManual/NucleusManual.applescript}"
 
-        # Modify Info.plist, then re-sign (osacompile signs the bundle, but
-        # PlistBuddy invalidates the signature).
-        plist="$build_dir/NucleusManual.app/Contents/Info.plist"
-        /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.nucleus.OpenNucleusManual" "$plist"
-        /usr/libexec/PlistBuddy -c "Set :CFBundleName Nucleus Manual" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices array" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0 dict" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem dict" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMenuItem:default string open nucleus manual" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSMessage string open" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes array" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes:0 string public.file-url" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendTypes:1 string NSFilenamesPboardType" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes array" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes:0 string public.folder" "$plist"
-        /usr/libexec/PlistBuddy -c "Add :NSServices:0:NSSendFileTypes:1 string public.data" "$plist"
-
+        # Overwrite osacompile's Info.plist with our pre-made one (already has
+        # CFBundleIdentifier, CFBundleName, and NSServices entries). Re-sign
+        # because any replacement invalidates the ad-hoc signature.
+        cp "${./app-bundles/NucleusManual/Info.plist}" \
+          "$build_dir/NucleusManual.app/Contents/Info.plist"
         /usr/bin/codesign --force -s - "$build_dir/NucleusManual.app"
 
         mkdir -p "$out"
