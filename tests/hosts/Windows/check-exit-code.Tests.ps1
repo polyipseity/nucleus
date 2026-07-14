@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Pester tests for check.ps1 exit code normalization (step 13 fix).
+  Pester tests for check.ps1 exit code normalization and pre-flight checks.
 
 .DESCRIPTION
   Verifies that the service registry validation section in check.ps1 uses
@@ -8,12 +8,40 @@
   ($exitCode = $_svcErrors). This prevents spurious exit codes that could
   mask or amplify failure severity.
 
+  Also verifies the pre-flight tool validation block imports Ensure-Tool
+  and checks required tools.
+
   Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/check-exit-code.Tests.ps1 -Passthru"
 #>
 
 BeforeAll {
   $checkPs1Path = Join-Path $PSScriptRoot '../../../scripts/check.ps1'
   $checkPs1Content = Get-Content -Path $checkPs1Path -Raw
+  $ensureToolPath = Join-Path $PSScriptRoot '../../../src/hosts/Windows/modules/Ensure-Tool.psm1'
+}
+
+Describe 'Pre-flight — Ensure-Tool module import' {
+  It 'imports Ensure-Tool.psm1 in the pre-flight block' {
+    $checkPs1Content | Should -MatchExactly 'Ensure-Tool\.psm1'
+    $checkPs1Content | Should -MatchExactly 'Import-Module \(Join-Path \$modulesPath'
+  }
+
+  It 'checks powershell-yaml module with Ensure-Tool' {
+    $checkPs1Content | Should -MatchExactly "Ensure-Tool -Name 'powershell-yaml' -Type 'Module'"
+  }
+
+  It 'checks packer command with Ensure-Tool' {
+    $checkPs1Content | Should -MatchExactly "Ensure-Tool -Name 'packer' -Type 'Command'"
+  }
+
+  It 'pre-flight block runs before step 1' {
+    # The pre-flight comment must appear before the step 1 header.
+    $preflightPos = $checkPs1Content.IndexOf('Pre-flight tool')
+    $step1Pos = $checkPs1Content.IndexOf('PowerShell syntax validation')
+    $preflightPos -ge 0 | Should -Be $true
+    $step1Pos -ge 0 | Should -Be $true
+    $preflightPos -lt $step1Pos | Should -Be $true
+  }
 }
 
 Describe 'Step 13 — service registry validation exit code' {
