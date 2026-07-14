@@ -19,8 +19,8 @@ If the user's message that triggered this prompt contains "implement", "do it", 
 
 1. Call `resolve_memory_file_uri("/memories/session/active-plan.md")` to locate the plan.
 2. Read the file at the resolved path.
-3. If the file is missing, empty, or its frontmatter shows `status: completed`, report: "No active plan found — nothing to verify." and stop. `status: completed` means the plan was already fully executed.
-4. Parse the frontmatter to understand current progress (`status`, `current-step`, `committed`).
+3. If the file is missing or empty, report: "No active plan found — nothing to verify." and stop.
+4. Parse the frontmatter for context (`status`, `current-step`, `committed`). Do not short-circuit on any status value — proceed to verify regardless.
 
 ### 2. Verify completeness
 
