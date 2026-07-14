@@ -18,7 +18,7 @@
 let
   # ── Derivation: bundle all workflow directories ───────────────────────
   # Packages all 5 Automator workflow bundles into a single derivation output.
-  # Each bundle is a committed .workflow directory in services/workflows/,
+  # Each bundle is a committed .workflow directory in services/automator-workflows/,
   # copied verbatim (no build-time processing).
   nucleusOptimizePdfWorkflows =
     pkgs.runCommand "nucleus-gs-pdf-opt-workflows"
@@ -28,11 +28,11 @@ let
       }
       ''
         mkdir -p "$out"
-        cp -R "${./workflows}/optimize PDF - default.workflow" "$out/"
-        cp -R "${./workflows}/optimize PDF - printer.workflow" "$out/"
-        cp -R "${./workflows}/optimize PDF - prepress.workflow" "$out/"
-        cp -R "${./workflows}/optimize PDF - ebook.workflow" "$out/"
-        cp -R "${./workflows}/optimize PDF - screen.workflow" "$out/"
+        cp -R "${./automator-workflows}/optimize PDF - default.workflow" "$out/"
+        cp -R "${./automator-workflows}/optimize PDF - printer.workflow" "$out/"
+        cp -R "${./automator-workflows}/optimize PDF - prepress.workflow" "$out/"
+        cp -R "${./automator-workflows}/optimize PDF - ebook.workflow" "$out/"
+        cp -R "${./automator-workflows}/optimize PDF - screen.workflow" "$out/"
       '';
 
   # Known list of historically-removed Automator workflows (old workflow naming).
