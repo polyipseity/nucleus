@@ -406,8 +406,6 @@ if (-not $HAS_ARGS) {
     $exitCode = 1
     if ($FAIL_FAST) { exit $exitCode }
   } else {
-    say "services.json validation passed"
-
     # Validate user-scoped platform entries have justification.
     foreach ($_svcName in $_svc.Keys) {
       $_entry = $_svc[$_svcName]
@@ -460,6 +458,13 @@ if (-not $HAS_ARGS) {
         }
       }
     }
+
+    if ($_svcErrors -gt 0) {
+      warn "services.json validation failed with $_svcErrors error(s)"
+      $exitCode = 1
+      if ($FAIL_FAST) { exit $exitCode }
+    }
+    say "services.json validation passed"
   }
 } else {
   say "skipping service registry validation (path-scoped mode)."

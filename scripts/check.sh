@@ -479,7 +479,7 @@ if ! $HAS_ARGS; then
     exit_code=1
     $FAIL_FAST && exit $exit_code
   fi
-  say "services.json validation passed"
+  # No premature "passed" — verdict is after sub-checks below.
 
   # Validate user-scoped platform entries have justification.
   # User-scoped means domain=user (macOS launchctl) or scope=user (Linux systemctl).
@@ -531,6 +531,13 @@ if ! $HAS_ARGS; then
       select(.value.enable != null) |
       [$user, .key, "true"] | @tsv' "$_win_users_json")
   fi
+
+  if [ "$_svc_errors" -gt 0 ]; then
+    warn "services.json validation failed with $_svc_errors error(s)"
+    exit_code=1
+    $FAIL_FAST && exit $exit_code
+  fi
+  say "services.json validation passed"
 else
   say "skipping service registry validation (path-scoped mode)."
 fi
