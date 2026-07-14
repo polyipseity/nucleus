@@ -333,17 +333,26 @@ in
             add-zsh-hook chpwd _prek_hook_install_if_needed
             _prek_hook_install_if_needed
 
-            # Python/pip are only allowed when a scoped environment is active.
-            # This keeps system Python protected while preserving normal venv/
-            # conda workflows.
+            # Python/pip are only allowed when a scoped environment is active,
+            # OR when the binary is a nix-managed Python from this repo
+            # (pkgs.python3 at a /nix/store/* realpath). Outside those cases,
+            # the python/python3 functions show the educational ban message.
             __nucleus_python_scope_active() {
               [[ -n "''${VIRTUAL_ENV:-}" || -n "''${CONDA_PREFIX:-}" ]]
             }
 
-            # Intercept python/python3 invocations and warn about system-wide Python ban.
-            # These are functions, not aliases, so they can provide helpful context.
+            # Intercept python invocations: pass through only to nix-managed
+            # Python (pkgs.python3 from this repo, realpath /nix/store/*).
+            # Everything else triggers the educational ban message.
             python() {
               if __nucleus_python_scope_active; then
+                command python "$@"
+                return $?
+              fi
+              # Only pass through nix-managed Python from this repo (pkgs.python3).
+              local _nucleus_python_real
+              _nucleus_python_real="$(realpath "$(command -v python 2>/dev/null)" 2>/dev/null)" || _nucleus_python_real=""
+              if [[ "$_nucleus_python_real" == /nix/store/* ]]; then
                 command python "$@"
                 return $?
               fi
@@ -358,11 +367,22 @@ in
               return 1
             }
 
+            # Intercept python3 invocations: pass through only to nix-managed
+            # Python 3 (pkgs.python3 from this repo, realpath /nix/store/*).
+            # Everything else falls through to python() for final resolution.
             python3() {
               if __nucleus_python_scope_active; then
                 command python3 "$@"
                 return $?
               fi
+              # Only pass through nix-managed Python 3 from this repo (pkgs.python3).
+              local _nucleus_python3_real
+              _nucleus_python3_real="$(realpath "$(command -v python3 2>/dev/null)" 2>/dev/null)" || _nucleus_python3_real=""
+              if [[ "$_nucleus_python3_real" == /nix/store/* ]]; then
+                command python3 "$@"
+                return $?
+              fi
+              # Fall back to python() for final resolution (scoped/ban).
               python "$@"
             }
 
