@@ -93,11 +93,11 @@ let
         }
 
         # LLVM/Clang toolchain defaults sourced from the centralized env var
-        # catalog.  Shell-only on macOS; all-process on NixOS/Windows.
+        # catalog.  All-process on all hosts.
         # Source: src/modules/lib/env-vars.nix (CC, CXX, LD entries).
-        $env:CC = "${envVars.catalog.CC.value}"
-        $env:CXX = "${envVars.catalog.CXX.value}"
-        $env:LD = "${envVars.catalog.LD.value}"
+        $env:CC = "${envVars.resolveValue "CC" envVars.currentOs}"
+        $env:CXX = "${envVars.resolveValue "CXX" envVars.currentOs}"
+        $env:LD = "${envVars.resolveValue "LD" envVars.currentOs}"
 
         # ---------------------------------------------------------------
         # AI agent session detection

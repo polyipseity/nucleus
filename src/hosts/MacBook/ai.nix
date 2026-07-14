@@ -64,8 +64,9 @@ in
       # Source: src/modules/lib/env-vars.nix (OLLAMA_* entries).
       # The catalog is the single source of truth for these values; the
       # hardcoded list was removed to prevent drift.  toMacOSDaemonOllamaEnv
-      # returns ALL OLLAMA_* vars (including OLLAMA_HOST) because macOS
-      # launchd system daemons do not inherit the gui-env GUI domain.
+      # returns OLLAMA_* vars excluding OLLAMA_HOST so the daemon binds to
+      # the default port (11434).  OLLAMA_HOST is set by the gui-env
+      # LaunchAgent for CLI clients.
       EnvironmentVariables =
         (import ../../modules/lib/env-vars.nix {
           inherit
