@@ -18,12 +18,14 @@ If the user's message that triggered this prompt contains "only plan", "only res
    - **Write the plan with a lifecycle frontmatter.** The frontmatter tracks progress (`status`, `current-step`) and input variables, all of which survive context compaction. Use this format:
 
      ```
+     ---
      status: in-progress
      current-step: 1
      inputs:
        atomicCommits: ${input:atomicCommits}
        backwardsCompat: ${input:backwardsCompat}
        maxConcurrency: ${input:maxConcurrency}
+     ---
 
      # Plan
 
