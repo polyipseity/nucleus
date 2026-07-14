@@ -18,6 +18,13 @@
 #  15. Online determinism checks (--verify mode only)
 #  16. Undocumented error suppression check
 #
+# Output conventions:
+#   All messages (info, success, skip, warning) go to stdout.
+#   This differs from check.sh, which routes warnings to stderr — the
+#   split is intentional per platform convention.
+#   Use check.sh's header comment as the cross-reference source of truth
+#   for the POSIX-side convention.
+#
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
 # Steps 1-3, 6-9 are stubs (require Nix or bash — not available on Windows).
 # Step 15 only runs with the --verify flag.
@@ -47,6 +54,13 @@ $exitCode = 0
 $FAIL_FAST = $false
 $VERIFY = $false
 $positionalArgs = @()
+
+# Output helpers — structured prefix pattern matching check.sh's lib.sh.
+# Use these instead of raw Write-Output for all validation messages.
+# Warnings are routed to stdout (PowerShell convention);
+# compare with check.sh which routes warn() to stderr (POSIX convention).
+function say { Write-Output "check: $args" }
+function warn { Write-Output "check: warning: $args" }
 
 # Process -h|--help and --verify
 foreach ($_arg in $args) {
@@ -332,6 +346,8 @@ if (-not $HAS_ARGS) {
       Write-Output "lockfile.json validation passed"
     }
   }
+} else {
+  say "skipping lockfile section validation (path-scoped mode)."
 }
 
 # ---------------------------------------------------------------------------

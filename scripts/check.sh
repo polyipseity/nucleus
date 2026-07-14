@@ -20,6 +20,13 @@
 #  15. Online determinism checks (--verify mode only)
 #  16. Undocumented error suppression check
 #
+# Output conventions:
+#   Warnings (warn) and errors (error) go to stderr; info/success/skip
+#   (say) go to stdout. This differs from check.ps1, which routes all
+#   output to stdout. The split is intentional per platform convention.
+#   Use check.ps1's header comment as the cross-reference source of truth
+#   for the Windows-side convention.
+#
 # With arguments, passes them through to individual checkers that support
 # path filtering (check-pwsh.ps1, check-packer.sh, nixfmt) and skips
 # whole-repo checks (deadnix, script validation, lockfile/locked DSC).
@@ -304,8 +311,10 @@ if [ "$_lf_al_errors" -gt 0 ]; then
   warn "lifecycle-allowlist.json validation failed with $_lf_al_errors error(s)"
   exit_code=1
   $FAIL_FAST && exit $exit_code
+else
+  _lf_al_count=$(jq 'length' "$_lf_al_path" 2>/dev/null || echo 0)
+  say "lifecycle-allowlist.json: valid (entry count: $_lf_al_count)"
 fi
-say "lifecycle-allowlist.json: valid (entry count: $(jq 'length' "$_lf_al_path" 2>/dev/null || echo 0))"
 
 if ! $HAS_ARGS; then
   _lf_errors=0
@@ -679,6 +688,7 @@ if [ -s "$_undoc_supp_out" ]; then
   sort -u "$_undoc_supp_out" | while IFS= read -r _line; do
     warn "  $_line"
   done
+  say "  add '# undoc-supp: reason' comment to explain intentional suppressions."
   exit_code=1
 else
   say "no undocumented error suppressions found."
