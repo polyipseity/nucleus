@@ -352,10 +352,18 @@ let
           return $true
         }
 
-        # System-wide Python ban: redirect python/pip to warnings so users are
-        # guided to scoped alternatives instead of modifying the system environment.
+        # Intercept python invocations: pass through only to the
+        # WinGet-managed Python installed by this repo
+        # (Python.Python.3.13 at %LOCALAPPDATA%\Programs\Python\Python313\python.exe).
+        # Everything else triggers the educational ban message.
         function python {
           if (Invoke-NucleusPythonScopedTool -ToolName "python" @Args) {
+            return
+          }
+          # Pass through only to the WinGet-managed Python from this repo.
+          $nucleusPythonPath = Join-Path $env:LOCALAPPDATA "Programs\Python\Python313\python.exe"
+          if (Test-Path $nucleusPythonPath) {
+            & $nucleusPythonPath @Args
             return
           }
           Write-Host "shell: system-wide Python is banned to prevent accidental modifications." -ForegroundColor Yellow
@@ -366,10 +374,20 @@ let
           Write-Host "         - ./venv/bin/python (use pre-existing project venv)" -ForegroundColor Yellow
           return 1
         }
+        # Intercept python3 invocations: pass through only to the
+        # WinGet-managed Python at its install path. On Windows there is no
+        # python3.exe (only python.exe), so both route to the same binary.
         function python3 {
           if (Invoke-NucleusPythonScopedTool -ToolName "python3" @Args) {
             return
           }
+          # Pass through only to the WinGet-managed Python 3 at its install path.
+          $nucleusPython3Path = Join-Path $env:LOCALAPPDATA "Programs\Python\Python313\python.exe"
+          if (Test-Path $nucleusPython3Path) {
+            & $nucleusPython3Path @Args
+            return
+          }
+          # Fall back to python() for final resolution (scoped/ban).
           python @Args
         }
         function pip {
