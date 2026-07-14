@@ -19,12 +19,12 @@
 #  16. Undocumented error suppression check
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
-# Steps 1-3, 6-9 are stubs (Nix-only checks not available on Windows).
+# Steps 1-3, 6-9 are stubs (require Nix or bash — not available on Windows).
 # Step 15 only runs with the --verify flag.
 #
 # Prerequisites:
 #   - powershell-yaml module (Install-Module powershell-yaml -Scope CurrentUser)
-#     is required for locked DSC validation. It is NOT auto-installed.
+#     is required for locked DSC validation.
 #
 # Arguments:
 #   (none)        Paths may be provided as positional arguments; passed
@@ -88,19 +88,19 @@ $_step = 0
 # 1. Dead Nix code
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Dead Nix code ===" -f (++$_step))
-Write-Output "Skipping (not available on Windows)."
+Write-Output "Skipping (requires Nix toolchain — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 2. Nix flake evaluation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix flake evaluation ===" -f (++$_step))
-Write-Output "Skipping (not available on Windows)."
+Write-Output "Skipping (requires Nix toolchain — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 3. Nix formatting (nixfmt)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix formatting (nixfmt) ===" -f (++$_step))
-Write-Output "Skipping (not available on Windows)."
+Write-Output "Skipping (requires Nix toolchain — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 4. PowerShell syntax validation
@@ -134,25 +134,25 @@ if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 # 6. Shell script validation tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Shell script validation tests ===" -f (++$_step))
-Write-Output "Skipping (not available on Windows)."
+Write-Output "Skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 7. CWD-independence tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] CWD-independence tests ===" -f (++$_step))
-Write-Output "Skipping (not available on Windows)."
+Write-Output "Skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 8. Nix search path tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix search path tests ===" -f (++$_step))
-Write-Output "Skipping (not available on Windows)."
+Write-Output "Skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 9. Port utility function tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Port utility function tests ===" -f (++$_step))
-Write-Output "Skipping (not available on Windows)."
+Write-Output "Skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
 # 10. Lockfile validation
@@ -451,13 +451,14 @@ if (-not $HAS_ARGS) {
 # 12. Locked DSC validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
+# Platform parallel: check.sh uses yq+jq pipeline (POSIX-native equivalent).
 if (-not $HAS_ARGS) {
   $_dscSystemDir = Join-Path $RepoRoot 'src\hosts\Windows\system'
   $_dscSystemPackages = Join-Path $RepoRoot 'src\hosts\Windows\system\packages.dsc.yml'
   $_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
   $_lfErrors = 0
 
-  # powershell-yaml is a prerequisite — must be pre-installed.
+  # powershell-yaml is a prerequisite — must be available on the system.
   Import-Module -Name powershell-yaml -ErrorAction Stop
 
   # Helper: convert mixed PSCustomObject/hashtable/list trees to pure hashtable/array.
@@ -639,7 +640,7 @@ if (-not $HAS_ARGS) {
   $_cnbaOutput = & "$PSScriptRoot\cleanup-nix.ps1" -WhatIf 2>&1
   $_cnbaFound = $_cnbaOutput | Select-String -Pattern 'would remove stale Nix build symlink'
   if ($_cnbaFound) {
-    Write-Output "WARNING: stale Nix build artifacts found:"
+    Write-Output "ERROR: stale Nix build artifacts found:"
     $_cnbaOutput | ForEach-Object { Write-Output "  $_" }
     $exitCode = 1
     if ($FAIL_FAST) { exit $exitCode }
@@ -658,7 +659,9 @@ if ($VERIFY) {
   & "$PSScriptRoot\bump-lockfile.ps1" -Verify
   if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
   if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
-  Write-Output "Online determinism checks passed."
+  if ($LASTEXITCODE -eq 0) {
+    Write-Output "Online determinism checks passed."
+  }
 } else {
   Write-Output "Skipping (use --verify to run online determinism checks)."
 }
