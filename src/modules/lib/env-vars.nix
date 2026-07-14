@@ -1,13 +1,14 @@
-# modules/lib/env-vars.nix — Catalog of managed env vars + helper functions.
-#
-# This is the single source of truth for every environment variable managed by
-# nucleus on macOS and NixOS.  Windows has a separate parallel registry
-# (src/hosts/Windows/user/env.dsc.yml); parity is enforced by tests and
-# documented in docs/env-variable-registry.md.
+# modules/lib/env-vars.nix — Single source of truth for every env var on all hosts.
 #
 # Callers MUST pass `username`.  Do NOT add a fallback chain (no default null,
 # no config.home.username fallback, no getEnv "USER" fallback).  Every caller
 # has `username` available via specialArgs or as a local binding — use it.
+#
+# Each catalog entry uses a `values` attrset:
+#   { default?, macOS?, NixOS?, Windows? }
+# - `default` applies to any OS not explicitly keyed.
+# - If an OS key is absent AND `default` is absent, the OS is not applicable.
+# - `scope` defaults to "all-process".  Only set explicitly for "shell-only".
 #
 # Use: import ./lib/env-vars.nix { inherit config pkgs lib username; }
 # Returns: { catalog, toHomeSessionVariables, toNixOSSystemEnvironment, ... }
@@ -115,287 +116,245 @@ let
 
   # ── Catalog ─────────────────────────────────────────────────────────
   # Each entry:
-  #   value:   string | null  (null = set externally, e.g. EDITOR)
-  #   scope:   "all-process" | "shell-only"
-  #   hosts:   list of OS names this applies to
+  #   values:  attrset { default?, macOS?, NixOS?, Windows? }
+  #   scope:   "all-process" (default) | "shell-only"
   #   why:     inline justification
-  #   override: attrset { macOS = ..., NixOS = ... } for per-OS overrides
   #   excludeFromLaunchctl: true for shell-only vars (default false)
   #   userSpecific: true if the value depends on the logged-in user (default false)
   catalog = {
     # ── Compiler toolchain (all-process) ────────────────────────────
     CC = {
-      value = "${pkgs.llvmPackages.clang}/bin/clang";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
-      why = "Nix CC for native builds. All-process is safe on macOS (no Xcode CLT conflict with apple-sdk DEVELOPER_DIR) and desired on NixOS. Not set on Windows (Nix store paths not meaningful).";
+      values = {
+        default = "${pkgs.llvmPackages.clang}/bin/clang";
+        Windows = "clang";
+      };
+      why = "Nix CC for native builds \u2014 all-process on all hosts. On Windows, resolved from PATH by Machine-scope DSC.";
     };
     CXX = {
-      value = "${pkgs.llvmPackages.clang}/bin/clang++";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
-      why = "Nix CXX for native builds. All-process is safe on macOS (no Xcode CLT conflict with apple-sdk DEVELOPER_DIR) and desired on NixOS. Not set on Windows (Nix store paths not meaningful).";
+      values = {
+        default = "${pkgs.llvmPackages.clang}/bin/clang++";
+        Windows = "clang++";
+      };
+      why = "Nix CXX for native builds \u2014 all-process on all hosts. On Windows, resolved from PATH by Machine-scope DSC.";
     };
     LD = {
-      value = "${pkgs.llvmPackages.lld}/bin/ld.lld";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
-      why = "Nix LD for native builds. All-process is safe on macOS (no Xcode CLT conflict with apple-sdk DEVELOPER_DIR) and desired on NixOS. Not set on Windows (Nix store paths not meaningful).";
+      values = {
+        default = "${pkgs.llvmPackages.lld}/bin/ld.lld";
+        Windows = "ld.lld";
+      };
+      why = "Nix LD for native builds \u2014 all-process on all hosts. On Windows, resolved from PATH by Machine-scope DSC.";
     };
 
     # ── macOS-specific developer toolchain (all-process) ─────────────
     DEVELOPER_DIR = {
-      value = "${pkgs.apple-sdk}";
-      scope = "all-process";
-      hosts = [ "macOS" ];
+      values = {
+        macOS = "${pkgs.apple-sdk}";
+      };
       why = "Without Xcode CLT, xcrun needs DEVELOPER_DIR pointing at Nix apple-sdk to discover SDK without installation dialog.";
     };
     SDKROOT = {
-      value = "${pkgs.apple-sdk}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
-      scope = "all-process";
-      hosts = [ "macOS" ];
+      values = {
+        macOS = "${pkgs.apple-sdk}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
+      };
       why = "Explicit SDKROOT avoids second xcrun invocation when DEVELOPER_DIR is set.";
     };
     LIBRARY_PATH = {
-      value = "${pkgs.libiconv}/lib";
-      scope = "all-process";
-      hosts = [ "macOS" ];
+      values = {
+        macOS = "${pkgs.libiconv}/lib";
+      };
       why = "Rustup-managed cargo on macOS needs libiconv in LIBRARY_PATH for crates with C deps.";
     };
     NIX_SSL_CERT_FILE = {
-      value = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
-      why = "Nix-managed SSL cert bundle for all processes outside nix-daemon build environments. On NixOS, nix-daemon sets this for its own builds but GUI/CLI tools outside systemd also need it.";
+      values = {
+        default = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+      };
+      why = "Nix-managed SSL cert bundle for all processes outside nix-daemon build environments. On NixOS, nix-daemon sets this for its own builds but GUI/CLI tools outside systemd also need it. Not applicable on Windows (no Nix store).";
     };
 
     # ── Editors (all-process) ────────────────────────────────────────
     EDITOR = {
-      value = null;
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
-      override = {
+      values = {
         macOS = "nvim";
+        NixOS = null;
+        Windows = "nvim";
       };
-      why = "Set by programs.neovim.defaultEditor. macOS LaunchAgent hardcodes nvim for GUI domain.";
+      why = "Set by programs.neovim.defaultEditor on macOS (nvim activated) and NixOS. Windows Machine-scope DSC sets nvim for all-process parity.";
     };
     VISUAL = {
-      value = null;
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
-      override = {
+      values = {
         macOS = "nvim";
+        NixOS = null;
+        Windows = "nvim";
       };
-      why = "Set by programs.neovim.defaultEditor. macOS LaunchAgent hardcodes nvim for GUI domain.";
+      why = "Set by programs.neovim.defaultEditor on macOS (nvim activated) and NixOS. Windows Machine-scope DSC sets nvim for all-process parity.";
     };
 
     # ── OpenCode (all-process) ───────────────────────────────────────
     OPENCODE_DISABLE_AUTOUPDATE = {
-      value = "true";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
-      why = "Managed environment pins OpenCode; auto-updates introduce version skew.";
+      values = {
+        default = "true";
+      };
+      why = "Managed environment pins OpenCode; auto-updates introduce version skew. Now set on Windows too via Machine-scope DSC.";
     };
 
     # ── AI / Ollama (all-process) ────────────────────────────────────
     OLLAMA_HOST = {
-      value = ollamaHost;
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
-      why = "Point clients at LiteLLM proxy instead of Ollama directly.";
+      values = {
+        default = ollamaHost;
+      };
+      why = "Point CLI clients at LiteLLM proxy (127.0.0.1:4000) on all OSes instead of Ollama directly.";
     };
 
-    # Ollama runtime tunables (all-process, both hosts).
-    # Set on macOS (launchd daemon) and NixOS (systemd service) for
-    # consistent inference behaviour regardless of host OS.
+    # Ollama runtime tunables (all-process, all hosts).
+    # Set on all OSes for consistent inference behaviour.
     OLLAMA_FLASH_ATTENTION = {
-      value = "1";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
-      why = "Enable flash attention to reduce attention memory overhead on both macOS and NixOS Ollama daemons.";
+      values = {
+        default = "1";
+      };
+      why = "Enable flash attention to reduce attention memory overhead on all hosts.";
     };
     OLLAMA_CONTEXT_LENGTH = {
-      value = "32768";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
-      why = "Set 32k token default context window so models that default to 2k/4k do not silently truncate on either host.";
+      values = {
+        default = "32768";
+      };
+      why = "Set 32k token default context window so models that default to 2k/4k do not silently truncate on any host.";
     };
     OLLAMA_KV_CACHE_TYPE = {
-      value = "q4_0";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
-      why = "Compress KV cache with 4-bit quantisation to halve RAM footprint on both hosts.";
+      values = {
+        default = "q4_0";
+      };
+      why = "Compress KV cache with 4-bit quantisation to halve RAM footprint on all hosts.";
     };
 
     # ── Password store (all-process) ─────────────────────────────────
     PASSWORD_STORE_DIR = {
-      value = passwordStoreDir;
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
+      values = {
+        default = passwordStoreDir;
+        Windows = "%USERPROFILE%\\dev\\monorepo-private\\self\\passwords";
+      };
       userSpecific = true;
-      why = "pass/QtPass/gopass password store location from users.json.";
+      why = "pass/QtPass/gopass password store location from users.json. Windows uses literal %USERPROFILE% for User-scope DSC.";
     };
     GOPASS_CONFIG_COUNT = {
-      value = "1";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
+      values = {
+        default = "1";
+      };
       userSpecific = true;
       why = "gopass config override count for password store path.";
     };
     GOPASS_CONFIG_KEY_1 = {
-      value = "path";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
+      values = {
+        default = "path";
+      };
       userSpecific = true;
       why = "gopass config override key for password store path.";
     };
     GOPASS_CONFIG_VALUE_1 = {
-      value = passwordStoreDir;
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
+      values = {
+        default = passwordStoreDir;
+        Windows = "%USERPROFILE%\\dev\\monorepo-private\\self\\passwords";
+      };
       userSpecific = true;
-      why = "gopass config override value for password store path.";
+      why = "gopass config override value for password store path. Windows uses literal %USERPROFILE% for User-scope DSC.";
     };
 
     # ── Fallback toolchain (all-process) ────────────────────────────
     NUCLEUS_DEFAULT_DEV_BIN = {
-      value = "${defaultDevTools}/bin";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
+      values = {
+        default = "${defaultDevTools}/bin";
+        Windows = "%USERPROFILE%\\scoop\\shims";
+      };
       userSpecific = true;
-      why = "Fallback toolchain bin dir for repos without direnv/Nix devShell.";
+      why = "Fallback toolchain bin dir for repos without direnv/Nix devShell. Windows uses Scoop shims path.";
     };
     NUCLEUS_DEFAULT_DEV_ENV = {
-      value = "1";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
+      values = {
+        default = "1";
+      };
       userSpecific = true;
       why = "Flag that fallback toolchain is configured.";
     };
 
-    # ── Host identity (all-process, OS-specific) ────────────────────
+    # ── Host identity (all-process) ──────────────────────────────────
     NUCLEUS_HOST = {
-      value = null;
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
-      override = {
+      values = {
         macOS = "MacBook";
         NixOS = "NixOS";
+        Windows = "Windows";
       };
-      why = "Canonical host name for VM host-scoping and host-aware consumers.";
+      why = "Canonical host name for VM host-scoping and host-aware consumers. Windows set in system/env.dsc.yml at Machine scope.";
     };
 
     # ── macOS-specific: repo root (all-process) ─────────────────────
     NUCLEUS_REPO_ROOT = {
-      value = builtins.getEnv "NUCLEUS_REPO_ROOT";
-      scope = "all-process";
-      hosts = [ "macOS" ];
+      values = {
+        macOS = builtins.getEnv "NUCLEUS_REPO_ROOT";
+      };
       excludeFromLaunchctl = true;
       why = "Repo root for out-of-store symlinks. Captured at eval time from apply.sh export. Excluded from gui-env agent because builtins.getEnv returns empty string when built outside apply.sh; set via activation script instead.";
     };
 
     # ── Starship prompt (all-process) ───────────────────────────────
     STARSHIP_CACHE = {
-      value = "${resolvedHomeDirectory}/.cache/starship";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
+      values = {
+        default = "${resolvedHomeDirectory}/.cache/starship";
+        Windows = "%USERPROFILE%\\.cache\\starship";
+      };
       userSpecific = true;
-      why = "Starship computed-state cache directory.";
+      why = "Starship computed-state cache directory. Windows uses literal %USERPROFILE%.";
     };
     STARSHIP_CONFIG = {
-      value = "${resolvedHomeDirectory}/.config/starship.toml";
-      scope = "all-process";
-      hosts = [
-        "macOS"
-        "NixOS"
-      ];
+      values = {
+        default = "${resolvedHomeDirectory}/.config/starship.toml";
+        Windows = "%USERPROFILE%\\.config\\starship.toml";
+      };
       userSpecific = true;
-      why = "Starship config path. POSIX uses out-of-store symlink; Windows sets via env.dsc.yml.";
+      why = "Starship config path. POSIX uses out-of-store symlink. Windows uses literal %USERPROFILE%.";
+    };
+
+    # ── Cross-OS compatibility (all-process) ────────────────────────
+    HOME = {
+      values = {
+        Windows = "%USERPROFILE%";
+      };
+      userSpecific = true;
+      why = "Cross-OS parity: Unix-heritage tools (git, ssh, curl) expect HOME. Windows doesn't set HOME by default.";
+    };
+    NIX_PATH = {
+      values = {
+        Windows = "nixpkgs=flake:nixpkgs";
+      };
+      why = "Cross-OS parity: nixpkgs flake lookup via <nixpkgs> in Nix expressions.";
     };
   };
 
   # ── Resolve value for an entry on a given OS ─────────────────────
-  # Returns null if entry is not applicable to the OS.
+  # Returns the OS-specific value, or `default` if no OS key exists, or null
+  # if neither the OS key nor `default` is present (OS not applicable).
   resolveValue =
     name: os:
     let
       entry = catalog.${name};
-      hasOs = builtins.elem os entry.hosts;
-      hasOverride = entry ? override && entry.override ? ${os};
       userOverride =
         if effectiveUser ? envVars && effectiveUser.envVars ? ${name} then
           effectiveUser.envVars.${name}
         else
           null;
+      osValue =
+        if entry.values ? ${os} then
+          entry.values.${os}
+        else if entry.values ? default then
+          entry.values.default
+        else
+          null;
     in
-    if !hasOs then
-      null
-    else if userOverride != null then
-      userOverride
-    else if hasOverride then
-      entry.override.${os}
-    else
-      entry.value;
+    if userOverride != null then userOverride else osValue;
 
   # ── Determine current OS name ────────────────────────────────────
   currentOs = if pkgs.stdenv.isDarwin then "macOS" else "NixOS";
+
+  # ── Default scope helper ─────────────────────────────────────────
+  getScope = entry: if entry ? scope then entry.scope else "all-process";
 
   # ── Generic filter over attrNames ────────────────────────────────
   # Takes predicate (name, entry -> bool) and target OS for value resolution.
@@ -419,19 +378,23 @@ let
       ) (builtins.attrNames catalog)
     );
 
+  # ── getScope ─────────────────────────────────────────────────────
+  # Returns entry scope, defaulting to "all-process".
+  # Defined here for access by helper functions below.
+
   # ── toHomeSessionVariables ───────────────────────────────────────
-  # All vars (including shell-only) for current POSIX host, excluding
-  # null-valued ones (set outside home-manager, e.g. EDITOR).
+  # All vars for current POSIX host, excluding null-valued ones (set
+  # outside home-manager, e.g. EDITOR).  OS applicability is implicit
+  # from resolveValue.
   toHomeSessionVariables = filterAttrsByEntry (
-    name: entry: builtins.elem currentOs entry.hosts && resolveValue name currentOs != null
+    name: entry: resolveValue name currentOs != null
   ) currentOs;
 
   # ── toNixOSSystemEnvironment ─────────────────────────────────────
-  # System-scoped (non-user-specific) vars for NixOS environment.variables.
+  # All-process, non-user-specific vars for NixOS environment.variables.
   toNixOSSystemEnvironment = filterAttrsByEntry (
     name: entry:
-    builtins.elem "NixOS" entry.hosts
-    && entry.scope == "all-process"
+    getScope entry == "all-process"
     && (!entry ? userSpecific || !entry.userSpecific)
     && resolveValue name "NixOS" != null
   ) "NixOS";
@@ -446,8 +409,7 @@ let
         let
           entry = catalog.${name};
         in
-        builtins.elem os entry.hosts
-        && entry.scope == "all-process"
+        getScope entry == "all-process"
         && (!entry ? excludeFromLaunchctl || !entry.excludeFromLaunchctl)
         && (!entry ? userSpecific || !entry.userSpecific)
         && resolveValue name os != null
@@ -477,8 +439,7 @@ let
         let
           entry = catalog.${name};
         in
-        builtins.elem os entry.hosts
-        && entry.scope == "all-process"
+        getScope entry == "all-process"
         && (!entry ? excludeFromLaunchctl || !entry.excludeFromLaunchctl)
         && (entry ? userSpecific && entry.userSpecific)
         && resolveValue name os != null
@@ -498,8 +459,7 @@ let
   # OLLAMA_* vars for services.ollama.environmentVariables.
   toNixOSServiceEnv = filterAttrsByEntry (
     name: entry:
-    builtins.elem "NixOS" entry.hosts
-    && entry.scope == "all-process"
+    getScope entry == "all-process"
     && lib.strings.hasPrefix "OLLAMA_" name
     && name != "OLLAMA_HOST"
     && resolveValue name "NixOS" != null
@@ -509,9 +469,8 @@ let
   # Attrset of OLLAMA_* vars for the macOS launchd ollama daemon
   # EnvironmentVariables section.  Excludes OLLAMA_HOST because the
   # server must bind to the default port (11434), not the LiteLLM proxy
-  # port (4000).  OLLAMA_HOST is propagated through home.sessionVariables
-  # (gui domain) for CLI clients (ollama, oterm) that should route through
-  # the proxy.
+  # port (4000).  OLLAMA_HOST is set by the gui-env LaunchAgent for CLI
+  # clients (ollama, oterm) that should route through the proxy.
   toMacOSDaemonOllamaEnv =
     let
       os = "macOS";
@@ -520,10 +479,7 @@ let
         let
           entry = catalog.${name};
         in
-        builtins.elem os entry.hosts
-        && lib.strings.hasPrefix "OLLAMA_" name
-        && name != "OLLAMA_HOST"
-        && resolveValue name os != null
+        lib.strings.hasPrefix "OLLAMA_" name && name != "OLLAMA_HOST" && resolveValue name os != null
       ) (builtins.attrNames catalog);
     in
     builtins.listToAttrs (
@@ -548,13 +504,15 @@ let
       in
       {
         inherit name;
-        scope = entry.scope;
+        scope = getScope entry;
         userSpecific = entry ? userSpecific && entry.userSpecific;
         why = entry.why;
-        hasNixOsEntry = builtins.elem "NixOS" entry.hosts;
-        hasMacOsEntry = builtins.elem "macOS" entry.hosts;
+        hasNixOsEntry = entry.values ? NixOS || entry.values ? default;
+        hasMacOsEntry = entry.values ? macOS || entry.values ? default;
+        hasWindowsEntry = entry.values ? Windows || entry.values ? default;
         nixosValue = resolveValue name "NixOS";
         macosValue = resolveValue name "macOS";
+        windowsValue = resolveValue name "Windows";
       }
     ) (builtins.attrNames catalog)
   );
