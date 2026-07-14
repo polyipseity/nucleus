@@ -112,6 +112,8 @@ let
     && lib.hasInfix "application/pdf" nixosServicesText
   ) "NixOS Nautilus scripts must have MIME-type guards";
 
+  test_nixos_dolphin_scoped_to_pdf = assert' (lib.hasInfix "MimeType=application/pdf;" nixosServicesText) "NixOS Dolphin ServiceMenu must have MimeType=application/pdf;";
+
   test_all_5_presets_in_windows = assert' (
     allPresetsPresent windowsDscText
     && lib.hasInfix "optimize PDF - default" windowsDscText
@@ -166,6 +168,46 @@ let
     true # Singleton list — trivially sorted.
   ) "macOS app-bundles.nix currentNucleusAppBundles must be sorted alphabetically by appDir";
 
+  # === TEST: macOS workflow Info.plist files use com.adobe.pdf UTI ===
+  # Verifies that all 5 Automator workflow plists use com.adobe.pdf (not public.item)
+  # in their NSSendFileTypes array, ensuring context menus only show for PDF files.
+  macWorkflowsDir = ../../src/hosts/MacBook/services/automator-workflows;
+  macWorkflowDefaultPlist = builtins.readFile (
+    builtins.toPath (toString macWorkflowsDir + "/optimize PDF - default.workflow/Contents/Info.plist")
+  );
+  macWorkflowPrepressPlist = builtins.readFile (
+    builtins.toPath (toString macWorkflowsDir + "/optimize PDF - prepress.workflow/Contents/Info.plist")
+  );
+  macWorkflowPrinterPlist = builtins.readFile (
+    builtins.toPath (toString macWorkflowsDir + "/optimize PDF - printer.workflow/Contents/Info.plist")
+  );
+  macWorkflowEbookPlist = builtins.readFile (
+    builtins.toPath (toString macWorkflowsDir + "/optimize PDF - ebook.workflow/Contents/Info.plist")
+  );
+  macWorkflowScreenPlist = builtins.readFile (
+    builtins.toPath (toString macWorkflowsDir + "/optimize PDF - screen.workflow/Contents/Info.plist")
+  );
+
+  test_macos_workflows_scoped_to_pdf =
+    assert'
+      (
+        builtins.all (plist: lib.hasInfix "com.adobe.pdf" plist) [
+          macWorkflowDefaultPlist
+          macWorkflowPrepressPlist
+          macWorkflowPrinterPlist
+          macWorkflowEbookPlist
+          macWorkflowScreenPlist
+        ]
+        && builtins.all (plist: !lib.hasInfix "public.item" plist) [
+          macWorkflowDefaultPlist
+          macWorkflowPrepressPlist
+          macWorkflowPrinterPlist
+          macWorkflowEbookPlist
+          macWorkflowScreenPlist
+        ]
+      )
+      "All macOS workflow Info.plist files must use com.adobe.pdf UTI (not public.item) in NSSendFileTypes";
+
   # Phase 1: Self-pruning framework known lists.
 
   test_macos_has_removed_services =
@@ -199,6 +241,7 @@ let
     test_no_old_gs_labels_in_nixos
     test_nixos_presets_sorted
     test_nixos_nautilus_has_mime_guard
+    test_nixos_dolphin_scoped_to_pdf
     test_all_5_presets_in_windows
     test_no_old_gs_labels_in_windows
     test_windows_presets_sorted
@@ -207,6 +250,7 @@ let
     test_macos_has_current_app_dirs
     test_macos_has_removed_quick_actions
     test_app_bundles_alphabetically_sorted
+    test_macos_workflows_scoped_to_pdf
   ];
 in
 {
