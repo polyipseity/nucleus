@@ -182,6 +182,17 @@ launchctl_target() {
   fi
 }
 
+# launchctl_bootstrap_domain — Build a macOS launchctl bootstrap domain target.
+# bootstrap expects a domain target (system or gui/<uid>), not a service target.
+# macOS 26 dropped the "user" alias; gui/<uid> is the only valid form for user.
+launchctl_bootstrap_domain() {
+  if [ "$1" = "system" ]; then
+    printf 'system'
+  else
+    printf 'gui/%s' "$(id -u)"
+  fi
+}
+
 # refresh_cfprefsd — Kill cfprefsd (CFPreferences daemon) on macOS.
 # Caches all defaults read/write in process memory; kill forces re-read from
 # plist on next access.  No-op on non-macOS.

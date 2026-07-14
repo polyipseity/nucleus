@@ -131,7 +131,7 @@ recover_launchctl() {
   # undoc-supp: service may not be loaded or may fail transiently during recovery.
   $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
   # undoc-supp: service may not be loaded or may fail transiently during recovery.
-  $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null || true
+  $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
 }
 
 check_service_macos() {
@@ -178,7 +178,7 @@ check_service_macos() {
       fi
       if [ -f "$plist" ]; then
         # undoc-supp: service may not be loaded or may fail transiently during recovery.
-        $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null || true
+        $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
         log_restart "$svc_id" "not found — bootstrap"
       fi
       ;;

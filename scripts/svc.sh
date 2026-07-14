@@ -283,7 +283,7 @@ recover_launchctl_service() {
       # If bootstrap fails (e.g. launchd still cleaning up from bootout),
       # return 1 so the caller's || block retries with the full
       # graceful-shutdown path (SIGTERM + wait + bootout + bootstrap).
-      if $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null; then
+      if $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null; then
         return 0
       fi
       return 1
@@ -417,7 +417,7 @@ svc_action() {
           recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
             $sudo_prefix launchctl enable "$target" >/dev/null 2>&1
             $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 || \
-              $sudo_prefix launchctl bootstrap "$domain" "$plist" >/dev/null 2>&1
+              $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" >/dev/null 2>&1
           }
           poll_service_ready "$name" "$entry_json" >/dev/null || {
             local _diag
@@ -462,7 +462,7 @@ svc_action() {
             # time to finish cleanup and avoid a bootstrap race.
             sleep 0.5
             # undoc-supp: service may not be loaded; bootout/enable on absent service exits 1.
-            $sudo_prefix launchctl bootstrap "$domain" "$plist" 2>/dev/null || true
+            $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
             # Verify the service started after bootstrap.  Poll briefly
             # and fall through to enable + start as a safety net.
             for _j in 1 2 3 4; do
