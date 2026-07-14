@@ -162,8 +162,6 @@ if [ "${#NIX_FILES[@]}" -gt 0 ]; then
     fi
   fi
   $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
-elif ! $HAS_ARGS; then
-  say "skipping nixfmt (standalone mode — use \`nix run .#nixfmt\` to check all Nix files)."
 else
   say "skipping nixfmt (no Nix files to check)."
 fi
@@ -176,6 +174,8 @@ if [ "${#PS1_FILES[@]}" -gt 0 ]; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly "${PS1_FILES[@]}" || _ps_exit=$?
 elif ! $HAS_ARGS; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly || _ps_exit=$?
+else
+  say "skipping (no PowerShell scripts to check)."
 fi
 if [ $_ps_exit -ne 0 ]; then exit_code=$_ps_exit; fi
 $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
@@ -683,4 +683,4 @@ if [ $exit_code -ne 0 ]; then
   warn "some checks failed with exit code $exit_code"
   exit $exit_code
 fi
-nuc_done
+say "all checks passed."
