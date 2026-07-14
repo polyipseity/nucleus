@@ -29,13 +29,13 @@ This document is the cross-reference between the Nix-side centralized registry a
 | -------------------------- | ------------ | ------------- | ---------------------- | -------------------------------------- | ------------------------------------------------------ |
 | `EDITOR`                   | all-process  | no            | null (set by neovim)   | `nvim`                                 | macOS LaunchAgent hardcodes `nvim`                     |
 | `VISUAL`                   | all-process  | no            | null (set by neovim)   | `nvim`                                 | macOS LaunchAgent hardcodes `nvim`                     |
-| `CC`                       | shell-only   | no            | LLVM clang store path  | `Sync-ShellProfile.ps1`                | macOS: shell-only; NixOS/Windows: all-process          |
-| `CXX`                      | shell-only   | no            | LLVM clang++ store path| `Sync-ShellProfile.ps1`                | same as CC                                              |
-| `LD`                       | shell-only   | no            | LLVM lld store path    | `Sync-ShellProfile.ps1`                | same as CC                                              |
+| `CC`                       | all-process  | no            | LLVM clang store path  | `Sync-ShellProfile.ps1`                | macOS/NixOS: all-process (set in Nix catalog + GUI domain). Windows: shell-only via Sync-ShellProfile.ps1 (Nix store paths not meaningful on Windows; set to clang/clang++) |
+| `CXX`                      | all-process  | no            | LLVM clang++ store path| `Sync-ShellProfile.ps1`                | same as CC                                              |
+| `LD`                       | all-process  | no            | LLVM lld store path    | `Sync-ShellProfile.ps1`                | same as CC                                              |
 | `DEVELOPER_DIR`            | all-process  | no            | Nix apple-sdk path     | —                                      | macOS only                                              |
 | `SDKROOT`                  | all-process  | no            | macOS SDK path         | —                                      | macOS only                                              |
 | `LIBRARY_PATH`             | all-process  | no            | libiconv store path    | —                                      | macOS only                                              |
-| `NIX_SSL_CERT_FILE`        | all-process  | no            | cacert bundle path     | —                                      | macOS only                                              |
+| `NIX_SSL_CERT_FILE`        | all-process  | no            | cacert bundle path     | —                                      | macOS + NixOS. Windows intentionally absent — Nix upstream uses CURLSSLOPT_NATIVE_CA (Windows native cert store) instead of a file-based CA bundle. |
 | `OPENCODE_DISABLE_AUTOUPDATE`| all-process| no           | `true`                 | `true`                                 | —                                                      |
 | `OLLAMA_HOST`              | all-process  | no            | `127.0.0.1:4000`       | `127.0.0.1:4000`                       | —                                                      |
 | `OLLAMA_FLASH_ATTENTION`   | all-process  | no            | `1`                    | `1`                                    | NixOS + Windows only                                   |
@@ -47,12 +47,13 @@ This document is the cross-reference between the Nix-side centralized registry a
 | `GOPASS_CONFIG_VALUE_1`    | all-process  | yes           | per-user path          | `%USERPROFILE%\dev\...`                | —                                                      |
 | `NUCLEUS_DEFAULT_DEV_BIN`  | all-process  | yes           | defaultDevTools path   | `%USERPROFILE%\scoop\shims`            | Platform-appropriate fallback toolchain path           |
 | `NUCLEUS_DEFAULT_DEV_ENV`  | all-process  | yes           | `1`                    | `1`                                    | —                                                      |
-| `NUCLEUS_HOST`             | all-process  | no            | `MacBook` / `NixOS`    | `Windows` (`apply.ps1`)                | Per-OS identity, Windows set in `apply.ps1`            |
+| `NUCLEUS_HOST`             | all-process  | no            | `MacBook` / `NixOS`    | `Windows` (`system/env.dsc.yml`)       | Per-OS identity. Windows set via DSC at Machine scope; apply.ps1 also sets process-level for subprocess visibility. |
 | `NUCLEUS_REPO_ROOT`        | all-process  | no            | eval-time env var      | —                                      | macOS only (apply.sh export)                           |
 | `STARSHIP_CACHE`           | all-process  | yes           | `~/.cache/starship`    | `%USERPROFILE%\.cache\starship`        | —                                                      |
 | `STARSHIP_CONFIG`          | all-process  | yes           | `~/.config/starship.toml`| `%USERPROFILE%\.config\starship.toml`| —                                                      |
 | `HOME`                     | all-process  | no            | —                      | `%USERPROFILE%`                        | Windows only                                            |
 | `NIX_PATH`                 | all-process  | no            | —                      | `nixpkgs=flake:nixpkgs`                | Windows only                                            |
+| `PATH`                     | all-process  | no            | sessionPath (shell) + launchctl (GUI domain) | User-scope prepend (env.dsc.yml) | macOS: GUI domain via launchctl activation; shell via home.sessionPath. NixOS: shell-only via sessionPath. Windows: User-scope DSC entry merges with system Machine-scope PATH. |
 
 ## Adding a new variable
 
