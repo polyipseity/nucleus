@@ -18,8 +18,6 @@
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>
-			<key>NSRequiredContext</key>
-			<dict/>
 		</dict>
 	</array>
 </dict>
