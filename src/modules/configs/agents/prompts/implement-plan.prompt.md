@@ -20,6 +20,7 @@ If the user's message that triggered this prompt contains "only plan", "only res
      ```
      ---
      status: in-progress
+     committed: no
      current-step: 1
      inputs:
        atomicCommits: ${input:atomicCommits}
@@ -49,8 +50,11 @@ If the user's message that triggered this prompt contains "only plan", "only res
    - Think and work step by step, explain your reasoning. No filler.
    - If `${input:atomicCommits}` is `yes`, commit each atomic change with a precise message after each meaningful sub-step. Otherwise (default `no`), skip all git operations.
    - Re-read the original plan file regularly — especially after interruptions, subagent returns, or context switches — to ensure no phase is skipped or misinterpreted.
-   - **Always retrieve the plan via session memory first:** call `resolve_memory_file_uri("/memories/session/active-plan.md")`, read it. Parse the frontmatter to recover input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) and current progress. If session memory is empty or missing, fall back to the temp file path from step 1.
-   - **Update frontmatter after every meaningful sub-step.** Before switching context, calling a subagent, or at any natural break point: read the session memory file, bump `current-step` to the current workflow number, and write back using `replace_string_in_file` or `create_file`. This is how progress survives context compaction — do not skip it.
+   - **Always retrieve the plan via session memory first:** call `resolve_memory_file_uri("/memories/session/active-plan.md")`, read it. Parse the frontmatter to recover input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) and current progress (`status`, `current-step`, `committed`). If session memory is empty or missing, fall back to the temp file path from step 1.
+   - **Update frontmatter after every meaningful sub-step.** Before switching context, calling a subagent, or at any natural break point: read the session memory file, bump `current-step` to the current workflow number, update `committed`, and write back using `replace_string_in_file` or `create_file`. This is how progress survives context compaction — do not skip it.
+     - `committed` transitions: `no` → `partial` (on first atomic commit made during this plan execution). Stay at `partial` on subsequent commits.
+     - **Do not set `committed` to `yes` here** — that happens only in step 5, to distinguish "some commits made" from "all commits done".
+     - If `inputs.atomicCommits` is `no`, leave `committed` at `no` — no transition needed.
 
 3. **Use subagents for every opportunity**
    - Spawn subagents for any sufficiently independent subproblem — planning sub-steps, implementing separate files, researching unknowns, or verifying intermediate results. Subagents prevent context overflow and reduce the risk of forgetting earlier requirements by giving each subproblem a fresh, focused context.
@@ -69,7 +73,10 @@ If the user's message that triggered this prompt contains "only plan", "only res
 5. **Finalize**
    - After the plan is fully verified and executed, output a concise summary.
    - Include what was implemented, what files changed, and any deferred items.
-   - **Update the frontmatter to mark completion** — do NOT delete the plan file. Read the session memory file, set `status: completed` and `current-step: 5`, then write it back. This preserves the plan for later "verify the plan" or "refer back to the plan" requests.
+   - **Update the frontmatter to mark completion** — do NOT delete the plan file. Read the session memory file, set `status: completed` and `current-step: 5`. Also:
+     - If `inputs.atomicCommits` is `yes` and `committed` is `partial`, set `committed` to `yes`.
+     - If `inputs.atomicCommits` is `yes` and `committed` is still `no`, include a warning in the summary: "atomic commits were requested but none were actually made — verify state manually". Leave `committed` at `no`.
+   - Write the updated frontmatter back. The plan file remains accessible for later "verify the plan" or "refer back to the plan" requests.
 
 ## Inputs
 

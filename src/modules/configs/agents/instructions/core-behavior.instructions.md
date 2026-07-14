@@ -137,7 +137,7 @@ When the user says "refer back to the plan", "verify the plan", "check the plan"
 
 1. Call `resolve_memory_file_uri("/memories/session/active-plan.md")` to locate the plan.
 2. Read the file at the resolved path — it contains the plan with a frontmatter header.
-3. Check the frontmatter: `status: completed` means the plan was fully executed; `status: in-progress` means execution was interrupted. The `current-step` field shows which workflow step was last reached.
+3. Check the frontmatter: `status: completed` means the plan was fully executed; `status: in-progress` means execution was interrupted. The `current-step` field shows which workflow step was last reached. The `committed` field tracks atomic commit progress: `no` (no commits made), `partial` (some commits made), `yes` (all commits done).
 4. Present the plan and its frontmatter status to the user or act as instructed.
 
 If the session memory file is empty or missing, report that no plan is currently tracked. Do not guess or reconstruct.
