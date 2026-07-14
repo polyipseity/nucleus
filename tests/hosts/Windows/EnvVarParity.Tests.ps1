@@ -159,57 +159,58 @@ Describe "Windows env var parity with Nix catalog" {
       $content | Should -Match ('NUCLEUS_HOST.*=.*"Windows"')
     }
 
-    It "apply.ps1 persists NUCLEUS_REPO_ROOT via SetEnvironmentVariable" {
+    It "apply.ps1 persists NUCLEUS_REPO_ROOT via SetEnvironmentVariable (Machine scope)" {
       $content = Get-ApplyPs1Content
       # NUCLEUS_REPO_ROOT is set dynamically per-activation (not via DSC),
-      # so the test verifies the SetEnvironmentVariable call exists rather
-      # than checking a specific value.
-      $content | Should -Match ('SetEnvironmentVariable\("NUCLEUS_REPO_ROOT"')
+      # so the test verifies the Machine-scope SetEnvironmentVariable call
+      # exists rather than checking a specific value.
+      $content | Should -Match ([regex]::Escape('[Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $repoRoot, "Machine")'))
     }
 
-    It "apply.ps1 broadcasts env change notification after pre-DSC writes" {
+    It "apply.ps1 does not broadcast env change notification (removed)" {
       $content = Get-ApplyPs1Content
-      $content | Should -Match '(?s)NUCLEUS_REPO_ROOT.*Send-NucleusEnvChangeNotification'
+      $content | Should -Not -Match ('Send-NucleusEnvChangeNotification')
     }
   }
 
-  Context "apply.ps1 NUCLEUS_HOST guard and promotion" {
-    It "reads effective persisted value with User→Machine fallback" {
-      $content = Get-ApplyPs1Content
-      $content | Should -Match ([regex]::Escape('[Environment]::GetEnvironmentVariable("NUCLEUS_HOST", "User")'))
-      $content | Should -Match ([regex]::Escape('[Environment]::GetEnvironmentVariable("NUCLEUS_HOST", "Machine")'))
-      $content | Should -Match ([regex]::Escape('[string]::IsNullOrEmpty($persistedHost)'))
-    }
-
-    It "only writes User scope if persisted value is not Windows" {
-      $content = Get-ApplyPs1Content
-      $content | Should -Match ([regex]::Escape('if ($persistedHost -ne "Windows")'))
-      $content | Should -Match ([regex]::Escape('[Environment]::SetEnvironmentVariable("NUCLEUS_HOST", "Windows", "User")'))
-    }
-
-    It "sets process-level env var after guard" {
+  Context "apply.ps1 NUCLEUS_HOST handling" {
+    It "sets process-level env var only (no registry persistence in apply.ps1)" {
       $content = Get-ApplyPs1Content
       $content | Should -Match ([regex]::Escape('$env:NUCLEUS_HOST = "Windows"'))
     }
 
-    It "post-DSC clears User-scope NUCLEUS_HOST" {
+    It "does not persist NUCLEUS_HOST via SetEnvironmentVariable (handled by system/env.dsc.yml)" {
       $content = Get-ApplyPs1Content
-      $content | Should -Match ([regex]::Escape('[Environment]::SetEnvironmentVariable("NUCLEUS_HOST", $null, "User")'))
+      $content | Should -Not -Match ([regex]::Escape('[Environment]::SetEnvironmentVariable("NUCLEUS_HOST"'))
+    }
+
+    It "does not read persisted NUCLEUS_HOST value (delegated to DSC)" {
+      $content = Get-ApplyPs1Content
+      $content | Should -Not -Match ([regex]::Escape('GetEnvironmentVariable("NUCLEUS_HOST"'))
+    }
+
+    It "post-DSC does not clear User-scope NUCLEUS_HOST (never written in first place)" {
+      $content = Get-ApplyPs1Content
+      $content | Should -Not -Match ([regex]::Escape('[Environment]::SetEnvironmentVariable("NUCLEUS_HOST", $null, "User")'))
     }
   }
 
-  Context "apply.ps1 NUCLEUS_REPO_ROOT guard and promotion" {
-    It "compare-guard only writes User scope if existing value differs" {
+  Context "apply.ps1 NUCLEUS_REPO_ROOT handling" {
+    It "reads current Machine scope value for compare" {
       $content = Get-ApplyPs1Content
-      $content | Should -Match ([regex]::Escape('$existingRoot = [Environment]::GetEnvironmentVariable("NUCLEUS_REPO_ROOT", "User")'))
+      $content | Should -Match ([regex]::Escape('[Environment]::GetEnvironmentVariable("NUCLEUS_REPO_ROOT", "Machine")'))
       $content | Should -Match ([regex]::Escape('if ($existingRoot -ne $repoRoot)'))
     }
 
-    It "post-DSC promotes to Machine scope with non-admin fallback" {
+    It "writes Machine scope directly if value changed (no post-DSC promotion needed)" {
       $content = Get-ApplyPs1Content
       $content | Should -Match ([regex]::Escape('[Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $repoRoot, "Machine")'))
+      $content | Should -Not -Match ([regex]::Escape('Write-Warning "apply: cannot promote NUCLEUS_REPO_ROOT to Machine scope'))
+    }
+
+    It "clears stale User scope value after Machine scope write" {
+      $content = Get-ApplyPs1Content
       $content | Should -Match ([regex]::Escape('[Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $null, "User")'))
-      $content | Should -Match ([regex]::Escape('Write-Warning "apply: cannot promote NUCLEUS_REPO_ROOT to Machine scope'))
     }
   }
 }
