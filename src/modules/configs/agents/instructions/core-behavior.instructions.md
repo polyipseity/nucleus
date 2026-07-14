@@ -136,7 +136,8 @@ When executing a plan with multiple phases:
 When the user says "refer back to the plan", "verify the plan", "check the plan", or any equivalent phrase:
 
 1. Call `resolve_memory_file_uri("/memories/session/active-plan.md")` to locate the plan.
-2. Read the file at the resolved path — it contains the plan.
-3. Present it to the user or act on it as instructed.
+2. Read the file at the resolved path — it contains the plan with a frontmatter header.
+3. Check the frontmatter: `status: completed` means the plan was fully executed; `status: in-progress` means execution was interrupted. The `current-step` field shows which workflow step was last reached.
+4. Present the plan and its frontmatter status to the user or act as instructed.
 
 If the session memory file is empty or missing, report that no plan is currently tracked. Do not guess or reconstruct.
