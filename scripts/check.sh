@@ -32,6 +32,12 @@
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Override the detected repository root path.
 #
+# Prerequisites:
+#   - jq, yq (for lockfile, service registry, locked DSC validation)
+#   - deadnix, nixfmt (for Nix checks)
+#   - pwsh (for PowerShell syntax validation)
+#   - packer (for Packer template validation)
+#
 # Exit conditions:
 #   0 on success; non-zero on any check failure.
 # By default, all checks run and failures accumulate (report-at-end).
@@ -517,6 +523,7 @@ fi
 
 # Locked DSC validation
 section "$((_step += 1))" "Locked DSC validation"
+# Platform parallel: check.ps1 uses powershell-yaml with normalization helpers (Windows-native equivalent).
 if ! $HAS_ARGS; then
   _dsc_system_dir="src/hosts/Windows/system"
   _lockfile="src/lockfiles/lockfile.json"
