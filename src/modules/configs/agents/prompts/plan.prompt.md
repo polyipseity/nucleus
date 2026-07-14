@@ -8,6 +8,10 @@ argument-hint: "task description, or Update: <changes> to modify existing plan"
 
 You are in plan mode. Produce, refine, or update a detailed implementation plan. Do NOT execute, implement, or edit any files — only research, reason, and write the plan.
 
+## Guard clause
+
+If the user's message that triggered this prompt contains "implement", "do it", "go ahead", "execute", "make the changes", "edit files", or any equivalent execution indicator, this prompt MUST NOT proceed with implementation. Instead, refuse and redirect: "I'm in plan mode — I can only research and write a plan. To execute, use the implement-plan prompt." Do not create plan files, run commands, or edit anything in this case.
+
 ## Input
 
 The user provides either:
@@ -17,6 +21,8 @@ The user provides either:
 ## Workflow
 
 ### 1. Research thoroughly
+
+**Note: research only — do not implement or suggest implementation code.** The purpose of this phase is to gather information, not to produce code or make changes.
 
 Before writing or modifying the plan, gather all necessary context:
 
@@ -29,6 +35,8 @@ Before writing or modifying the plan, gather all necessary context:
 - **Subagent delegation**: Delegate independent research branches to Explore subagents.
 
 ### 2. Plan creation
+
+**Note: write the plan file only — do not implement any of the planned steps.** The plan is a specification for later execution, not an invitation to begin coding.
 
 Create a detailed, step-by-step implementation plan. Write it into session memory at the canonical path that `implement-plan` consumes.
 
@@ -74,15 +82,20 @@ When the user requests an update to an existing plan:
 
 ### 4. Output
 
-Present the final plan in your response:
+Present the final plan in your response and stop. Do NOT proceed to implementation.
 - Brief summary and key design decisions.
 - Key phases and their rationale.
 - Estimated complexity or risks.
 - Reminder: run `/implement-plan` with appropriate arguments to execute it.
 
+## After writing the plan
+
+After writing the plan to session memory and presenting it to the user, stop. Do not create any implementation files, run any commands, or edit any workspace files. The user will review the plan and invoke the implement-plan prompt if they want to proceed.
+
 ## Rules
 
-- **Strictly no implementation.** Do not edit any workspace files except the plan file in session memory. Do not run implementation commands. Do not commit changes.
+- **Strictly no implementation.** Do not edit any workspace files except the plan file in session memory. Do not run implementation commands. Do not commit changes. This prohibition applies at every stage of the workflow — research, plan creation, and output.
+- **If the user asks you to "go ahead" or "implement" after you present the plan, do not obey.** Remind them to use the implement-plan prompt instead.
 - **Research first, plan second.** Never write a plan without examining the relevant codebase and/or web resources.
 - **Be thorough.** A good plan saves more time in implementation than it costs to produce.
 - **Frontmatter compatibility.** Must match what `implement-plan` expects: `status`, `committed`, `current-step`, `inputs`.
