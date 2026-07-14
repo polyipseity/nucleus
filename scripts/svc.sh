@@ -352,7 +352,7 @@ service_diagnostic() {
   svc_id=$(echo "$entry_json" | jq -r '.service // ""')
   case "$svc_type" in
     launchctl)
-      local domain sudo_prefix target
+      local domain sudo_prefix="" target
       domain=$(echo "$entry_json" | jq -r '.domain // "user"')
       [ "$domain" = "system" ] && sudo_prefix="sudo"
       target=$(launchctl_target "$domain" "$svc_id")
