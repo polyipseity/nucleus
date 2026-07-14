@@ -350,8 +350,10 @@ in
                 return $?
               fi
               # Only pass through nix-managed Python from this repo (pkgs.python3).
+              # whence -p resolves the actual binary path, unlike command -v which can
+              # return the shell function name when a function shadows the command.
               local _nucleus_python_real
-              _nucleus_python_real="$(realpath "$(command -v python 2>/dev/null)" 2>/dev/null)" || _nucleus_python_real=""
+              _nucleus_python_real="$(realpath "$(whence -p python 2>/dev/null)" 2>/dev/null)" || _nucleus_python_real=""
               if [[ "$_nucleus_python_real" == /nix/store/* ]]; then
                 command python "$@"
                 return $?
@@ -376,8 +378,10 @@ in
                 return $?
               fi
               # Only pass through nix-managed Python 3 from this repo (pkgs.python3).
+              # whence -p resolves the actual binary path, unlike command -v which can
+              # return the shell function name when a function shadows the command.
               local _nucleus_python3_real
-              _nucleus_python3_real="$(realpath "$(command -v python3 2>/dev/null)" 2>/dev/null)" || _nucleus_python3_real=""
+              _nucleus_python3_real="$(realpath "$(whence -p python3 2>/dev/null)" 2>/dev/null)" || _nucleus_python3_real=""
               if [[ "$_nucleus_python3_real" == /nix/store/* ]]; then
                 command python3 "$@"
                 return $?
