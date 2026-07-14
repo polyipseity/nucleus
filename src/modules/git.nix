@@ -47,6 +47,14 @@ in
         } > "$_git_ignore_effective"
   '';
 
+  home.activation.gitEmptyTemplate = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    # Ensure the empty template directory exists so `init.templateDir` always
+    # points at an existing (but empty) directory.  This suppresses the 15+ sample
+    # hook scripts and description file that Git otherwise copies into every new
+    # .git directory from the system template store.
+    mkdir -p "$HOME/.config/git/empty_template"
+  '';
+
   programs.git = {
     enable = true;
     package = pkgs.gitFull;
@@ -71,6 +79,10 @@ in
       fetch.prune = true;
       fetch.pruneTags = true;
       init.defaultBranch = "main";
+      # Point init.templateDir at an empty directory we manage during activation
+      # so `git init` and `git clone` never create hooks/*.sample or the legacy
+      # description file.  The activation block below ensures the target dir exists.
+      init.templateDir = "~/.config/git/empty_template";
       # Pull in name/email/signingkey written by the gitIdentityFromSops activation
       # hook at ~/.config/git/identity.  Using an include file lets the hook write
       # to a path it owns without touching the HM-managed (read-only) config symlink.

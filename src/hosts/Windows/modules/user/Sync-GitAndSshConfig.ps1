@@ -163,6 +163,14 @@ function Sync-GitAndSshConfig {
         New-Item -ItemType Directory -Path $userGitConfigDir -Force | Out-Null
       }
 
+      # Create an empty template directory so `init.templateDir` points at an
+      # existing (but empty) directory, suppressing the sample hooks and legacy
+      # description file that Git otherwise copies into every new .git.
+      $emptyTemplateDir = Join-Path -Path $userGitConfigDir -ChildPath 'empty_template'
+      if (-not (Test-Path -Path $emptyTemplateDir)) {
+        New-Item -ItemType Directory -Path $emptyTemplateDir -Force | Out-Null
+      }
+
       $globalIgnoreLines = @(
         '# https://github.com/github/gitignore/blob/1046d8fba6b42d367da6314c934cddb6bfe5662e/Nix.gitignore {'
         '# Ignore build outputs from performing a nix-build or `nix build` command'
@@ -201,6 +209,7 @@ function Sync-GitAndSshConfig {
         'fetch.pruneTags' = 'true'
         'gpg.format' = 'openpgp'
         'init.defaultBranch' = 'main'
+        'init.templateDir' = '~/.config/git/empty_template'
         'push.autoSetupRemote' = 'true'
         'push.followTags' = 'true'
         'tag.gpgsign' = 'true'
