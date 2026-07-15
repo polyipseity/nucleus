@@ -35,10 +35,6 @@ Extract runtime imperative logic (SOPS decryption, API calls, service polling) i
 
 See `src/scripts/jellyfin-sync.sh` for an example.
 
-## Open-source typography baseline
-
-Prefer open-source fonts: one shared inventory covering Latin sans/serif/monospace, Nerd Font terminal iconography, and CJK (Simplified + Traditional).
-
 ## Module conventions
 
 - Shared modules must guard NixOS-only options with `lib.mkIf` checks on `options ? environment` or equivalent; Home Manager modules must likewise guard `home.*` options.
@@ -78,7 +74,7 @@ See the [macOS launchd service management](#macos-launchd-service-management) se
 
 Contribution rules:
 
-- Contribute with `system.activationScripts.<hook>.text = lib.mkBefore "..."` so fragments run before Home Manager's default-priority activation call.
+- Use `system.activationScripts.<hook>.text = lib.mkBefore "..."` so fragments run before Home Manager's default-priority activation call.
 - Add `lib` to module arguments whenever `lib.mkBefore` is used.
 - On NixOS, custom `system.activationScripts.<name>.text` entries are supported; platform-conditional logic is acceptable.
 
@@ -173,13 +169,13 @@ Windows equivalent: `Register-HostAgeKey` in `src/hosts/Windows/modules/secrets/
 
 ## Pre-provision key adoption semantics
 
-The `sshKeyAdopt` activation (POSIX) and the SSH fingerprint tracking block in `Sync-NucleusSecretFile` (Windows) flush the SSH agent whenever the recorded fingerprint differs from the newly materialized one. The guard intentionally omits any "manifest must be non-empty" pre-condition:
+`sshKeyAdopt` (POSIX) and the SSH fingerprint tracking block in `Sync-NucleusSecretFile` (Windows) flush the SSH agent whenever the recorded fingerprint differs from the newly materialized one. The guard intentionally omits a "manifest must be non-empty" pre-condition to cover three cases:
 
-- When the manifest is **absent** (first provision): `old_fingerprint` is empty and `new_fingerprint` is non-empty, so they differ and the agent is flushed. This evicts any key that was manually pre-placed in the agent before the managed key arrived.
-- When the manifest **exists** and the key **rotated**: fingerprints differ and the agent is flushed to remove the stale cached entry.
-- When the manifest **exists** and the key **is unchanged**: fingerprints match; no flush occurs (idempotent re-apply is a no-op).
+- **Manifest absent, key present** (first provision): agent flushed, evicting manually pre-placed keys.
+- **Manifest exists, key rotated**: agent flushed, removing the stale cached entry.
+- **Manifest exists, key unchanged**: fingerprints match → no flush (idempotent).
 
-Do not add a `[ -n "$old_fingerprint" ]` guard (POSIX) or an `$oldSshFingerprint -ne ''` guard (Windows) back into this logic. That pattern would silently skip the flush on the first provision, leaving stale keys in the agent when the managed key is newer.
+Do not add `[ -n "$old_fingerprint" ]` (POSIX) or `$oldSshFingerprint -ne ''` (Windows) guards — they would silently skip the flush on first provision, leaving stale keys in the agent when the managed key is newer.
 
 ## Sorting
 
