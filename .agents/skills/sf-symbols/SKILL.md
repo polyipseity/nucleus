@@ -53,6 +53,12 @@ cat symbols_raw_a.txt symbols_raw_b.txt | sort -u > symbols.txt
 rm symbols_raw_a.txt symbols_raw_b.txt
 ```
 
+## Policy reference
+
+The icon convention policy for this project's Automator workflows is documented
+in `src/hosts/MacBook/services/automator-workflows.nix` (header comment section
+"SF Symbol icon policy").
+
 ## macOS version floor
 
 Symbols from SF Symbols 3 require macOS 12 Monterey+. Always check the SF Symbols version in which a symbol was introduced and verify against the host's minimum macOS version.
