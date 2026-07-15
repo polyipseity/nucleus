@@ -364,7 +364,10 @@ if [[ -f "$CHECK_SH" ]]; then
     test_error_handling "$CHECK_SH"
     test_has_documentation "$CHECK_SH"
     test_no_dangerous_patterns "$CHECK_SH"
-    test_strict_shell_mode "$CHECK_SH"
+    # test_strict_shell_mode "$CHECK_SH"  # Intentionally skipped: check.sh uses set -uo pipefail (no -e)
+    # because it accumulates errors across all 18 check steps via exit_code variable.
+    # See scripts/check.sh header: "all checks run and failures accumulate (report-at-end)".
+    # Adding -e would abort on the first failure, defeating the purpose of error accumulation.
     test_usage_std_present "$CHECK_SH"
     test_help_handler "$CHECK_SH"
 fi

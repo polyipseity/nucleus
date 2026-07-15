@@ -70,6 +70,8 @@
 #   0 on success; non-zero on any check failure.
 # By default, all checks run and failures accumulate (report-at-end).
 # Use --fail-fast to exit immediately on the first failure.
+# Intentionally omits -e: errors accumulate via exit_code variable (report-at-end).
+# Use --fail-fast for immediate exit on first failure.
 set -uo pipefail
 
 exit_code=0
