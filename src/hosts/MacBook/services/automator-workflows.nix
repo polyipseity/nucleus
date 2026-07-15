@@ -28,6 +28,25 @@
 #   The manual.md file is symlinked via home.file so the workflow's shell
 #   script can find it at $HOME/.local/share/nucleus/manual.md without needing
 #   NUCLEUS_REPO_ROOT at runtime.
+#
+# SF Symbol icon policy:
+#   - Hard rule: always verify SF Symbol names against the macOS private
+#     framework — never rely on third-party lists alone. Community lists
+#     are often incomplete (e.g. missing entries that the framework includes).
+#     Use `.agents/skills/sf-symbols/symbols.txt` for quick grep-based lookup
+#     — it is extracted from the framework, not downloaded.
+#   - Uniform naming: use the same name for NSIconName (Info.plist) and
+#     systemImageName (document.wflow) for cross-surface consistency.
+#   - No custom TIFF icons: SF Symbols are resolution-independent and
+#     handle dark/light mode natively.
+#   - NSBackgroundColorName only affects the Touch Bar — set to "background".
+#   - QuickLook/Thumbnail.png is optional and only affects Finder bundle
+#     browsing; not used for the action icon anywhere.
+#   - macOS version floor: check the symbol's introduction year in the
+#     framework's name_availability.plist against the host's minimum version.
+#   - Known issue: NSIconName can prevent a Quick Action from appearing
+#     in the Services menu (Apple Community thread). Current workflows
+#     are deployed with it set and are confirmed to appear.
 { lib, mkPresentationModes, ... }:
 let
   # Base path to committed workflow source directories.
