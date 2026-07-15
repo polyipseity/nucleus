@@ -1,8 +1,4 @@
-# tests/hosts/MacBook/homebrew-tests.nix — Homebrew configuration content assertions.
-#
-# Verifies that homebrew.nix declares the expected trust entries for third-party
-# taps and formulae (nix-homebrew integration), and that the module structure is
-# preserved.
+# Homebrew configuration content tests.
 
 let
   lib = import <nixpkgs/lib>;

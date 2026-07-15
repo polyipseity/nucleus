@@ -1,178 +1,70 @@
-# nucleus Test Coverage Summary
+# Nucleus test coverage summary
 
 ## Overview
 
-This document tracks test coverage across all **nucleus** platforms (macOS, NixOS, Windows) and layers (Nix, PowerShell, Shell). The suite validates configuration logic, module composition, package parity, and deployment scripts.
+This document summarizes test coverage across all nucleus platforms (macOS, NixOS, Windows) and layers (Nix, PowerShell, shell). The suite validates configuration logic, module composition, package parity, and deployment scripts. Run `find tests/modules tests/integration tests/hosts -name '*.nix'` for the authoritative list of Nix test files, and `find tests/hosts/Windows -name '*.ps1'` for Windows Pester suites.
 
 ---
 
-## Test Suite Breakdown
+## Test suite structure
 
-### Nix Tests (Pure Evaluation Layer)
+Nix tests live in `tests/modules/`, `tests/integration/`, and `tests/hosts/<host>/`, run via `nix-instantiate --eval` in CI. They cover module options, import graphs, config composition, package parity, option conflict detection, activation dependency ordering, SOPS structure validation, and VS Code extension pruning.
 
-Located in `tests/modules/`, `tests/integration/`, and `tests/hosts/<host>/`, run via `nix-instantiate --eval` in CI.
+Windows tests live in `tests/hosts/Windows/`, organized by concern (`apps/`, `configuration/`, `packages/`, `smoke/`, `system/`), run via Pester. They cover cross-host CLI parity, developer runtimes, GUI applications, registry/policy invariants, and DSC state validation.
 
-**Coverage**: Module options, import graphs, config composition, package parity, option conflict detection, activation dependency ordering, SOPS structure validation, and VS Code extension pruning. Run `find tests/modules tests/integration tests/hosts -name '*.nix'` for the current authoritative list.
+Nucleus apps smoke tests (`tests/scripts/nucleus-apps-smoke-tests.sh`) run via `nix run ./src#test` with three tiers: `--help` invocation (all 18 nucleus-* commands), `--dry-run` (commands with dry-run support), and safe no-op (read-only commands; `svc list --json` is skipped — it requires `sudo` for system-domain services).
 
----
+Shell script validation (`tests/scripts/script-validation-tests.sh`) runs via bash in CI, covering bash syntax, shebangs, executable bits, dependency availability, error handling, dangerous pattern detection, and portability.
 
-### Windows Tests (PowerShell + DSC Layer)
-
-Located in `tests/hosts/Windows/`, organised by concern (`apps/`, `configuration/`, `packages/`, `smoke/`, `system/`) and run via Pester locally on Windows.
-
-#### ✅ **Windows Pester suites**
-
-##### Package Installation Tests
-- Cross-host CLI tooling: 7-Zip, zoxide, uv, Ruff, ty, ripgrep, direnv, GitHub CLI, prek, jq, fzf, bat, fd, ShellCheck, Typst
-- Developer runtimes/editors: Git, PowerShell, VS Code stable + Insiders, Windows Terminal Preview, Neovim, Ollama, Bun, rustup, SOPS
-- GUI applications: Blender, Discord Canary, Chrome Canary, QtPass, Obsidian, Telegram Desktop Beta
-
-All tests validate cross-platform parity with nixpkgs/Homebrew equivalents.
-
-##### Registry, Environment, and Policy Tests
-- User-scoped DSC state: screen saver posture, managed wallpaper path, Explorer visibility/taskbar chrome settings, and managed environment vars
-- System-scoped invariants: long paths, RDP enablement + NLA, firewall, TCP keepalive posture, lid-close power policy, and font substitutions
-- App parity: QtPass registry values and Obsidian advanced-settings JSON
-- Smoke coverage: Windows platform + PowerShell runtime validation
-
-**Windows Test Totals**: multiple focused suites covering package parity, user configuration, system invariants, app-specific parity, and smoke checks
+Consolidated check scripts (`scripts/check.sh` for POSIX, `scripts/check.ps1` for Windows) delegate to existing checkers without logic duplication; path-scoped mode skips whole-repo checks when arguments are provided.
 
 ---
 
-### Nucleus Apps Smoke Tests
+## CI integration
 
-Located in `tests/scripts/nucleus-apps-smoke-tests.sh`, run via `nix run ./src#test`.
-
-#### ✅ **Smoke test tiers**
-
-1. **Tier 1 — --help invocation**: All 18 nucleus-* commands are built via nix and invoked with `--help` to verify they compile and produce output. Covers all `mkNucleusApps` entries + `bump-lockfile` app.
-2. **Tier 2 — --dry-run**: Commands with dry-run support (ai-sync, gc, replica-sync, replica-reset, vm-setup) are run in dry mode to exercise control flow without side effects.
-3. **Tier 3 — Safe no-op commands**: `config list` validates read-only execution against local files. `svc list --json` is a known skip (triggers `sudo` for system-domain services, hangs in non-interactive CI).
-
-**Coverage**: All 19 nucleus commands (18 apps + 1 package-only: check-pwsh, gs-pdf-opt)
-**Status**: ✅ Full
-
-### Shell Script Tests
-
-Located in `tests/scripts/script-validation-tests.sh`, run via bash in CI.
-
-#### ✅ **script-validation-tests.sh** (8 test categories)
-
-1. **Bash Syntax Validation**: Parse-only checks on all `.sh` files
-2. **Shebang Verification**: All scripts start with `#!/bin/bash` or `#!/bin/sh`
-3. **Executable Bit Validation**: `.sh` files tracked with `100755` permission
-4. **Dependency Availability**: Check for nix, bash, PowerShell availability
-5. **Error Handling**: Verify scripts have `set -e`, `|| exit`, or `|| return` patterns
-6. **Documentation**: Measure comment coverage and usage documentation
-7. **Dangerous Patterns**: Detect unquoted variables, unsafe `rm -rf`, unescaped globs
-8. **Shell Portability**: Validate scripts work on macOS (zsh/bash) and Linux
-
-**Scripts Tested**: `bootstrap.sh`, `apply.sh`, `health-check.sh`, `update.sh`, `check.sh`, `svc.sh`, `gc.sh`, `ai-sync.sh`, `cloud-setup.sh`, `replica-reset.sh`, `replica-sync.sh`, `check-sh.sh`, `gs-pdf-opt.sh`, `camilladsp-daemon.sh`, `camilladsp-heartbeat.sh`, `service-watchdog.sh`
-
-**Shell Test Totals**: **8 validation categories** covering all deployment scripts
-
-#### ✅ **Consolidated check scripts**
-
-- `scripts/check.sh` (POSIX): Runs all 5 check categories (deadnix, shellcheck, PowerShell lint, Packer validation, script validation tests)
-- `scripts/check.ps1` (Windows): Runs Windows-compatible checks (PowerShell lint, Packer validation)
-- `scripts/test.sh` / `scripts/test.ps1`: Separate test suite runner (Nix eval on POSIX, placeholder on Windows)
-- Both check scripts delegate to existing individual checkers; no logic duplication
-- Path-scoped mode skips whole-repo checks when arguments provided
+All tests run automatically via `.github/workflows/ci.yml` on every commit: Nix parse (`nix flake check`), POSIX checks (`nix run ./src#check`), POSIX test suite (`nix run ./src#test`), Windows checks (`pwsh -File scripts/check.ps1`), and Windows test suite (`pwsh -File scripts/test.ps1`).
 
 ---
 
-## CI Integration
+## Coverage by platform
 
-### .github/workflows/ci.yml
+### macOS
 
-All tests are automatically run on every commit:
-
-1. **Nix Parse** (`nix flake check`): Verify all `.nix` files parse
-2. **Consolidated POSIX Checks** (`nix run ./src#check`): Runs deadnix, shellcheck, PowerShell lint, Packer validation, and script validation tests in one step (macOS/Linux)
-3. **Repository test suite (POSIX)** (`nix run ./src#test`): Evaluates all Nix test files (macOS/Linux)
-4. **Consolidated Windows Checks** (`pwsh -File scripts/check.ps1`): Runs PowerShell lint and Packer validation (Windows)
-5. **Repository test suite (Windows)** (`pwsh -File scripts/test.ps1`): Placeholder for future Windows test support
-
----
-
-## Coverage by Platform
-
-### macOS (Darwin)
-
-| Layer | Coverage | Status |
-|-------|----------|--------|
-| Nix configuration | ✅ Module composition, options | Full |
-| Package selection | ✅ Homebrew/nixpkgs parity | Full |
-| Activation hooks | ❌ Manual testing only | Partial |
-| Security policies | ✅ Home Manager validation | Full |
+Nix configuration (full), package selection/Homebrew parity (full), activation hooks (partial, manual), security policies (full).
 
 ### NixOS
 
-| Layer | Coverage | Status |
-|-------|----------|--------|
-| Nix configuration | ✅ Module composition, options | Full |
-| Package selection | ✅ nixpkgs parity | Full |
-| Activation hooks | ❌ Manual testing only | Partial |
-| Security policies | ✅ System-wide validation | Full |
+Nix configuration (full), package selection/nixpkgs parity (full), activation hooks (partial, manual), security policies (full).
 
 ### Windows
 
-| Layer | Coverage | Status |
-|-------|----------|--------|
-| WinGet DSC | ✅ Package installation, registry | Full |
-| PowerShell modules | ✅ Syntax validation | Partial |
-| Activation hooks | ❌ Manual testing only | Partial |
-| Security policies | ✅ Registry invariants | Full |
+WinGet DSC (full), PowerShell modules (partial, syntax only), activation hooks (partial, manual), security policies/registry invariants (full).
 
 ---
 
-## Untested Areas
+## Untested areas
 
 Activation hooks, secret decryption, and deployment validation require live systems and are not unit-testable in CI. Mock tests cover secret structure.
 
 ---
 
-## Test Execution
+## Test execution
 
-### Local Testing
-
-**Run all Nix tests:**
 ```bash
+# All Nix tests
 nix flake check src/
 find tests/modules tests/integration tests/hosts -name '*.nix' -exec nix-instantiate --eval {} +
-```
 
-**Run Windows Pester tests:**
-```powershell
+# Windows Pester tests
 pwsh -Command "Invoke-Pester tests/hosts/Windows/"
-```
 
-**Run shell script validation:**
-```bash
+# Shell script validation
 bash tests/scripts/script-validation-tests.sh
-```
 
-### CI Testing
-
-Tests are automatically run via `.github/workflows/ci.yml` on every commit to `main`.
-
-To run locally:
-```bash
-act push --job test  # Requires 'act' (https://github.com/nektos/act)
+# CI locally (requires act: https://github.com/nektos/act)
+act push --job test
 ```
 
 ---
 
-## Test Maintenance Guidelines
-
-1. **Add tests for new modules**: Every `.nix` file in `src/modules/` should have corresponding tests in `tests/modules/module-imports-tests.nix`
-2. **Update parity tests**: When adding a new package, add it to `package-parity-tests.nix` across all platforms
-3. **Validate security policies**: All invariants in `AGENTS.md` must have corresponding tests
-4. **Document untested areas**: Update this file when adding test coverage
-
----
-
-- **Last Updated**: Continuous (update this file whenever suite structure changes)
-- **Nix Suite Status**: See `find tests/modules tests/integration tests/hosts -name '*.nix'` for current list
-- **Windows Suite Status**: hierarchical Pester suites under `tests/hosts/Windows/**`
-- **Shell Suite Status**: script validation checks in `tests/scripts/`
+- **Last updated**: continuous (update when suite structure changes).

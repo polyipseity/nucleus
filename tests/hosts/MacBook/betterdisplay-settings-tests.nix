@@ -1,8 +1,4 @@
-# tests/hosts/MacBook/betterdisplay-settings-tests.nix — Verify BetterDisplay settings wiring on macOS.
-#
-# This suite guards declarative BetterDisplay defaults and activation hooks so
-# menu icon visibility stays converged after app updates and rebuilds.
-# BetterDisplay is macOS-only; NixOS and Windows have no equivalent domain.
+# BetterDisplay defaults wiring tests.
 
 let
   lib = import <nixpkgs/lib>;

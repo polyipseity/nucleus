@@ -1,7 +1,5 @@
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../../lib.nix) containsRegex;
 
   macosText = builtins.readFile ../../../src/modules/macos.nix;
   macbookDefaultsText = builtins.readFile ../../../src/hosts/MacBook/defaults.nix;
