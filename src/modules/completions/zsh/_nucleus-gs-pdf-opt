@@ -1,0 +1,6 @@
+#compdef nucleus-gs-pdf-opt
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--preset[Optimization preset (default\|ebook\|prepress\|printer\|screen)]' \
+  '--rm-bak[Remove .bak backup on success]'

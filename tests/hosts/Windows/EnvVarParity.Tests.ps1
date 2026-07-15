@@ -58,7 +58,7 @@ BeforeAll {
     }
     # Fall back to nix eval
     $nixTestFile = Join-Path $RepoRoot "tests\integration\env-parity-tests.nix"
-    $evalExpr = "(import ""$nixTestFile"" { }).manifest"
+    $evalExpr = "(import ""$nixTestFile"").manifest"
     # undoc-supp: nix eval prints progress to stderr; WHY: progress info on stderr is expected noise, not an error.
     $json = & nix eval --impure --expr $evalExpr --json 2>$null
     if ($LASTEXITCODE -ne 0) {

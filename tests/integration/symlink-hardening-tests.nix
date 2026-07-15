@@ -122,10 +122,10 @@ rec {
   # Assertion 9: Discord Music RPC config symlink protection
   # =========================================================================
   discordMusicRpcConfigProtection =
-    assert containsRegex "protectDiscordMusicRPCConfig" discordMusicRpcText;
-    assert containsRegex "chflags uchg" discordMusicRpcText;
-    assert containsRegex "_nucleus_unprotect_symlink .* discord-music-rpc" homeNixText;
-    assert containsRegex "_nucleus_protect_symlink .* discord-music-rpc" homeNixText;
+    assert containsRegex "mkOutOfStoreSymlink" discordMusicRpcText;
+    assert containsRegex "discord-music-rpc/config.yaml" discordMusicRpcText;
+    assert containsRegex "_nucleus_unprotect_symlink .*discord-music-rpc/config" homeNixText;
+    assert containsRegex "_nucleus_protect_symlink .*discord-music-rpc/config" homeNixText;
     true;
 
   # =========================================================================

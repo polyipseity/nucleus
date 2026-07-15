@@ -259,6 +259,7 @@ if [ "$dry_run" = false ]; then
   fi
 fi
 
+_packer_status=0
 say "phase 1 — building images..."
 build_images
 

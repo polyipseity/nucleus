@@ -423,7 +423,10 @@ let
 
   # vm-setup.sh must capture the Packer exit code for the macOS Tart build so
   # a failed packer invocation does not falsely report success.
-  vm_setup_sh_text = builtins.readFile ../../scripts/vm-setup.sh;
+  # Combined text: lib.sh is sourced by vm-setup.sh, so patterns from both files
+  # belong to the same script.  Checking only vm-setup.sh misses patterns
+  # that were extracted to lib.sh during refactoring.
+  vm_setup_sh_text = builtins.readFile ../../scripts/vm-setup.sh + builtins.readFile ../../scripts/vm-setup/lib.sh;
   windows_vm_setup_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-VMSetup.ps1;
   windows_vm_setup_wrapper_ps1_text = builtins.readFile ../../scripts/vm-setup.ps1;
   readmeTemplateText = builtins.readFile ../../src/vms/templates/README.md;
@@ -456,7 +459,7 @@ let
   # logic does not reject the pre-built image for being too small.
   test_nixos_image_resize_to_manifest_disk = assert' (
     (lib.hasInfix "build_nixos_image NAME DISK_GIB" vm_setup_sh_text)
-    && (lib.hasInfix "qemu-img resize \"$_out\" \"\${_disk_gib}G\"" vm_setup_sh_text)
+    && (lib.hasInfix "resize_and_mark_image \"$_out\" \"$_marker\" \"$_disk_gib\"" vm_setup_sh_text)
   ) "scripts/vm-setup.sh must resize generated NixOS qcow2 images to the manifest disk size";
 
   # The Packer failure branch for the macOS build must print a human-readable
@@ -649,7 +652,7 @@ let
     assert'
       (
         (lib.hasInfix "_prebuilt_valid=false" vm_setup_sh_text)
-        && (lib.hasInfix "cannot replace the %s runtime disk because no valid pre-built image is available" vm_setup_sh_text)
+        && (lib.hasInfix "cannot replace the $vm_name runtime disk because no valid pre-built image is available" vm_setup_sh_text)
       )
       "scripts/vm-setup.sh must refuse to replace UTM runtime disks when the rebuild step did not produce a valid pre-built qcow2";
 
@@ -793,13 +796,13 @@ let
   test_vm_readme_template_content = assert' (
     (lib.hasInfix "nucleus-vm-setup" readmeTemplateText)
     && (lib.hasInfix "## Layout" readmeTemplateText)
-    && (lib.hasInfix "images/<name>-build/" readmeTemplateText)
-    && (lib.hasInfix "images/<name>-installer.iso" readmeTemplateText)
+    && (lib.hasInfix "<name>-build/" readmeTemplateText)
+    && (lib.hasInfix "<name>-installer.iso" readmeTemplateText)
     && (lib.hasInfix "## Start commands" readmeTemplateText)
     && (lib.hasInfix "start-<name>.sh" readmeTemplateText)
     && (lib.hasInfix "start-<name>.ps1" readmeTemplateText)
     && (lib.hasInfix "## UTM bundle portability" readmeTemplateText)
-    && (lib.hasInfix "Copying only \`config.plist\`" readmeTemplateText)
+    && (lib.hasInfix "Copying only `config.plist`" readmeTemplateText)
     && (lib.hasInfix "## Guest configuration" readmeTemplateText)
     && (lib.hasInfix "## Lifecycle" readmeTemplateText)
     && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
@@ -880,8 +883,8 @@ let
     && (lib.hasInfix "disabled in manifest; skipping" vm_setup_sh_text)
     && (lib.hasInfix "function Test-VMEnabled" windows_vm_setup_ps1_text)
     && (lib.hasInfix "$Vm.enabled -isnot [bool]" windows_vm_setup_ps1_text)
-    && (lib.hasInfix "enabledVms = builtins.filter (vm: vm.enabled) vmsData.VMs;" macbook_vms_nix_text)
-    && (lib.hasInfix "enabledVms = builtins.filter (vm: vm.enabled) vmsData.VMs;" (
+    && (lib.hasInfix "enabledVms = builtins.filter (" macbook_vms_nix_text)
+    && (lib.hasInfix "enabledVms = builtins.filter (" (
       builtins.readFile ../../src/hosts/NixOS/vms.nix
     ))
   ) "VM enable/disable policy must be wired in manifest, setup scripts, and host template generation";

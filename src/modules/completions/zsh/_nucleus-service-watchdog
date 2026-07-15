@@ -1,0 +1,5 @@
+#compdef nucleus-service-watchdog
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--domain[Filter to only check services in this domain (user/system)]'

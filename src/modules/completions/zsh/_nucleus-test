@@ -1,0 +1,5 @@
+#compdef nucleus-test
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '(-q --quiet)'{-q,--quiet}'[Only show FAIL lines and output for failing tests]'

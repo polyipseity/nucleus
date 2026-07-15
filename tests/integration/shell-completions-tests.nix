@@ -35,8 +35,8 @@ let
     "nucleus-vm-setup"
   ];
 
-  # Map command name to zsh completion file name (strips nucleus- prefix, adds _)
-  zshCompName = cmd: "_${lib.strings.substring 8 (lib.stringLength cmd) cmd}";
+  # Map command name to zsh completion file name (prepends _ to the full command name)
+  zshCompName = cmd: "_${cmd}";
 
   # --- Zsh completion files exist for every command ---
   test_zsh_completions_exist_for_all = assert' (lib.all

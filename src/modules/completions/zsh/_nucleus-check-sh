@@ -1,0 +1,4 @@
+#compdef nucleus-check-sh
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]'

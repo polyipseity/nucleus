@@ -1,20 +1,40 @@
 # tests/integration/env-parity-tests.nix — Catalog manifest for Windows parity.
 #
-# Evaluates the centralized env var catalog and outputs a JSON manifest of
-# every variable that has a NixOS or Windows entry.  The Windows Pester test
-# consumes this to verify DSC and profile env var parity.
-{
-  lib,
-  pkgs,
-  config,
-  ...
-}:
+# Evaluates the centralized env var catalog and builds a manifest for the
+# Windows Pester test to verify DSC and profile env var parity.
+#
+# Standalone expression: import directly, no function wrapper needed.
+# The Windows Pester test accesses via (import "...").manifest (no arg).
 let
-  envVars = import ../../modules/lib/env-vars.nix { inherit config pkgs lib; };
-in
-{
-  # Full manifest of all vars in the catalog.
-  manifest = builtins.fromJSON envVars.toJsonManifest;
+  lib = import <nixpkgs/lib>;
+  pkgs = import <nixpkgs> { };
+  config = { };
+
+  envVars = import ../../src/modules/lib/env-vars.nix {
+    inherit config pkgs lib;
+    username = "test";
+  };
+
+  # Build manifest directly from catalog, avoiding toJSON/fromJSON round-trip.
+  # (builtins.fromJSON chokes on toJsonManifest output due to a Nix eval issue.)
+  manifest = builtins.map (
+    name:
+    let
+      entry = envVars.catalog.${name};
+    in
+    {
+      inherit name;
+      hasNixOsEntry = entry.values ? NixOS || entry.values ? default;
+      hasWindowsEntry = entry.values ? Windows || entry.values ? default;
+      hasMacOsEntry = entry.values ? macOS || entry.values ? default;
+      nixosValue = envVars.resolveValue name "NixOS";
+      macosValue = envVars.resolveValue name "macOS";
+      windowsValue = envVars.resolveValue name "Windows";
+      scope = entry.scope or "all-process";
+      userSpecific = entry ? userSpecific && entry.userSpecific;
+      why = entry.why;
+    }
+  ) envVars.getAllNixVarNames;
 
   # Subset of vars that have a NixOS entry (should map to a DSC entry).
   nixosVars = builtins.filter (v: v.hasNixOsEntry) manifest;
@@ -39,4 +59,7 @@ in
   dscVarNames = builtins.filter (
     name: !builtins.elem name (profileOnlyVarNames ++ applyOnlyVarNames)
   ) windowsRequiredVarNames;
+in
+{
+  inherit manifest nixosVars windowsRequiredVarNames profileOnlyVarNames applyOnlyVarNames dscVarNames;
 }

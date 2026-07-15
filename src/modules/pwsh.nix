@@ -637,6 +637,11 @@ let
           @('--help', '--sections', '--verify') | Where-Object { $_ -like "$wordToComplete*" }
         }
 
+        Register-ArgumentCompleter -CommandName nucleus-check-packer -ScriptBlock {
+          param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+          @('--help') | Where-Object { $_ -like "$wordToComplete*" }
+        }
+
         Register-ArgumentCompleter -CommandName nucleus-check-pwsh -ScriptBlock {
           param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
           @('--help') | Where-Object { $_ -like "$wordToComplete*" }

@@ -1,0 +1,4 @@
+#compdef nucleus-check-packer
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]'

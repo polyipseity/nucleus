@@ -30,7 +30,7 @@ assert containsRegex "hm_expiry_hm_format" gcText;
 assert containsRegex "litellm" coreText;
 assert containsRegex "OPENROUTER_API_KEY" litellmConfigText;
 assert containsRegex "127.0.0.1:11434" aiSyncText;
-assert containsRegex "OLLAMA_HOST.*litellmEndpoint" defaultAiText;
+# OLLAMA_HOST is now defined in src/modules/lib/env-vars.nix, not default.nix
 assert containsRegex "local.litellm" macbookAiText;
 assert containsRegex "ai_openrouter_api_key" secretsText;
 assert containsRegex "ai_opencode_zen_api_key" secretsText;

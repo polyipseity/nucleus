@@ -6,7 +6,7 @@
 let
   lib = import <nixpkgs/lib>;
 
-  envNix = builtins.readFile ../../../src/modules/shell/env.nix;
+  envNix = builtins.readFile ../../../src/modules/lib/env-vars.nix;
   shellNix = builtins.readFile ../../../src/modules/shell.nix;
   activationNix = builtins.readFile ../../../src/hosts/MacBook/activation.nix;
   ntfs3gText = builtins.readFile ../../../src/hosts/MacBook/ntfs-3g.nix;
@@ -21,9 +21,10 @@ assert !lib.hasInfix ''CC = "clang";'' envNix;
 
 # shell.nix
 assert lib.hasInfix "DEVELOPER_DIR" shellNix;
-assert lib.hasInfix "pkgs.apple-sdk" shellNix;
 assert lib.hasInfix "SDKROOT" shellNix;
-assert lib.hasInfix "MacOSX.sdk" shellNix;
+# apple-sdk values are now defined in the centralized env var catalog
+assert lib.hasInfix "pkgs.apple-sdk" envNix;
+assert lib.hasInfix "MacOSX.sdk" envNix;
 assert lib.hasInfix "direnvrc" shellNix;
 assert lib.hasInfix "print-dev-env" shellNix;
 
