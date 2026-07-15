@@ -95,7 +95,27 @@ nix-darwin refactored the launchd module. The old flat `config` attrset and `ena
 - `StandardOutPath`/`StandardErrorPath` are `null or path` — tilde paths fail type checking.
 - Home Manager's launchd module is unchanged (still `enable` + `config`).
 
-### launchd EX_CONFIG (exit 78)
+### ### nix-darwin launchd.daemons key naming convention
+
+nix-darwin transforms the `launchd.daemons.<name>` key to determine the
+launchd service label:
+
+- **Dot-free key** (e.g. `"camilladsp"`): label becomes `local.camilladsp`.
+  nix-darwin prepends `local.`.
+- **Key with dot** (e.g. `"local.litellm"`): label becomes
+  `org.nixos.local.litellm`. nix-darwin treats this as a fully-qualified name
+  and prepends `org.nixos.`.
+
+Keep `launchd.daemons` keys dot-free so the generated label matches what
+`services.json` expects (`local.<name>`). This is the pattern used by all
+working services (`camilladsp`, `camilladsp-heartbeat`, `camillagui-backend`,
+`service-watchdog`).
+
+Do not use `"local.<name>"` as the key — it silently produces
+`org.nixos.local.<name>` and the service becomes invisible to `nucleus-svc list`
+even though `launchctl list` shows it running.
+
+launchd EX_CONFIG (exit 78)
 
 launchd permanently blacklists services that exit with code 78. `bootout`/`bootstrap` alone does not clear it — run `disable` + `enable` or kill the process. Never silence launchd stderr with `2>/dev/null || true`; always log failures to enable debugging.
 

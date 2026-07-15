@@ -48,7 +48,10 @@ let
     };
 in
 {
-  launchd.daemons."local.litellm" = {
+  # Keys without a dot become `local.<key>` in launchd; keys with a dot become
+  # `org.nixos.<key>`. Keep keys dot-free so the generated label matches
+  # `services.json` (which expects `local.litellm`/`local.ollama`).
+  launchd.daemons."litellm" = {
     serviceConfig = {
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
       # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
@@ -85,7 +88,7 @@ in
     };
   };
 
-  launchd.daemons."local.ollama" = {
+  launchd.daemons."ollama" = {
     serviceConfig = {
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
       # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
