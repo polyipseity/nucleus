@@ -3,26 +3,10 @@
 
 set -euo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/test-lib.sh"
+
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-assert_pass() {
-    local test_name="$1"
-    echo -e "${GREEN}✓${NC} $test_name"
-    ((++TESTS_PASSED))
-}
-
-assert_fail() {
-    local test_name="$1"
-    local reason="$2"
-    echo -e "${RED}✗${NC} $test_name: $reason"
-    ((++TESTS_FAILED))
-}
 
 # Test 1: Verify shell syntax (bash -n does parse-only check)
 test_bash_syntax() {

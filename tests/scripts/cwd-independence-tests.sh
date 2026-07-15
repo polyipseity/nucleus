@@ -4,29 +4,8 @@
 
 set -euo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-assert_pass() {
-    local test_name="$1"
-    echo -e "${GREEN}✓${NC} $test_name"
-    ((++TESTS_PASSED))
-}
-
-assert_fail() {
-    local test_name="$1"
-    local reason="$2"
-    echo -e "${RED}✗${NC} $test_name: $reason"
-    ((++TESTS_FAILED))
-}
-
-# Determine the actual repo root by reading it from the script's own location.
-# Use pwd -P to match derive_repo_root's symlink resolution.
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/test-lib.sh"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
 # Test 1: derive_repo_root works from outside the repo when SCRIPT_DIR points inside it

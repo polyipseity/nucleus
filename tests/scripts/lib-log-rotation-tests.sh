@@ -1,33 +1,13 @@
 #!/usr/bin/env bash
 # Tests the rotate_log_file and rotate_logs_in_directory functions from lib.sh.
-#
-# Run with: bash tests/scripts/lib-log-rotation-tests.sh
 
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+. "$SCRIPT_DIR/test-lib.sh"
+
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/../../src/scripts/lib.sh"
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-assert_pass() {
-    local test_name="$1"
-    echo -e "${GREEN}✓${NC} $test_name"
-    ((++TESTS_PASSED))
-}
-
-assert_fail() {
-    local test_name="$1"
-    local reason="$2"
-    echo -e "${RED}✗${NC} $test_name: $reason"
-    ((++TESTS_FAILED))
-}
 
 # Create a scratch directory for all test artifacts.
 TEST_DIR=$(mktemp -d)
