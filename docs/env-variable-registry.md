@@ -23,7 +23,7 @@ manifest for external consumption is also available via `toJsonManifest`.
 **Nix-side registry** (`src/modules/lib/env-vars.nix`):
 
 - Declares every var in a single `catalog` attrset with `values` (per-OS attrset: `default`, `macOS`, `NixOS`, `Windows`), `why`, optional `userSpecific` (per-user), optional `excludeFromLaunchctl`, and optional `scope` (defaults to `"all-process"`; set explicitly only for `"shell-only"`).
-- Pure helper functions (`toHomeSessionVariables`, `toNixOSSystemEnvironment`, `toLaunchctlScript`, `toUserLaunchctlScript`, `toJsonManifest`) transform the catalog into platform-specific formats.
+- Pure helper functions (`toHomeSessionVariables`, `toNixOSSystemEnvironment`, `toLaunchctlScript`, `toUserLaunchctlScript`, `toLaunchctlPrependPath`, `toLaunchctlAppendPath`, `toJsonManifest`) transform the catalog into platform-specific formats.
 - Daemon env var consumption uses `resolveValue` directly in each daemon file (no daemon-specific helpers).
 - Consumed by: `shell.nix` (via `home.sessionPath`, `home.sessionVariables`), `macos.nix` (gui-env-system/gui-env-user LaunchAgents, guiEnvActivationPathAndRepoRoot activation), `hosts/NixOS/base.nix`, `hosts/NixOS/ai.nix`, and daemon files in `hosts/MacBook/`.
 - The `env/default.nix` Home Manager module exposes `config._nucleus.envVars` for introspection.
