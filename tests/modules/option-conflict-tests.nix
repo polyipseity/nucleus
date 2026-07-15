@@ -30,7 +30,7 @@ let
         module2.config
       ];
     in
-    assert' (true) # mkMerge should succeed without throwing
+    assert' true # mkMerge should succeed without throwing
       "mkIf conditional options should not conflict";
 
   # === TEST: mkDefault allows later overrides ===
@@ -46,7 +46,7 @@ let
         option2
       ];
     in
-    assert' (true) # mkMerge respects priority
+    assert' true # mkMerge respects priority
       "mkDefault should allow later overrides";
 
   # === TEST: Option type consistency across modules ===
@@ -63,7 +63,7 @@ let
         default = [ "git" ];
       };
     in
-    assert' ((optionDef1.type == optionDef2.type)) "Option types should match across modules";
+    assert' (optionDef1.type == optionDef2.type) "Option types should match across modules";
 
   # === TEST: Home Manager state version doesn't conflict ===
   test_home_stateversion_no_conflict =
@@ -77,7 +77,7 @@ let
       };
     in
     assert' (
-      (config1.home.stateVersion == config2.home.stateVersion)
+      config1.home.stateVersion == config2.home.stateVersion
     ) "State version should be identical across modules";
 
   # === TEST: Security options don't conflict across platforms ===
@@ -95,7 +95,7 @@ let
       };
     in
     assert' (
-      (macosSecurity.security.lockTimeout == nixosSecurity.security.lockTimeout)
+      macosSecurity.security.lockTimeout == nixosSecurity.security.lockTimeout
     ) "Security options should have same structure across platforms";
 
   # === TEST: Shell configuration merges cleanly ===
@@ -120,7 +120,7 @@ let
         extraShell
       ];
     in
-    assert' (true) # Should merge without conflict
+    assert' true # Should merge without conflict
       "Shell configuration should merge cleanly";
 
   # === TEST: Package lists can be concatenated ===
@@ -159,7 +159,7 @@ let
       stepNames = builtins.attrNames activation;
     in
     assert' (
-      (builtins.length stepNames == builtins.length (lib.unique stepNames))
+      builtins.length stepNames == builtins.length (lib.unique stepNames)
     ) "Activation hook names should be unique";
 
   # === TEST: Option descriptions don't conflict ===
@@ -181,7 +181,7 @@ let
       config = lib.optionalAttrs isDarwin { nucleus.macos.homebrew.enable = true; };
     in
     assert' (
-      (isDarwin -> (builtins.hasAttr "nucleus" config))
+      isDarwin -> (builtins.hasAttr "nucleus" config)
     ) "Platform-specific options should gate correctly";
 
   # === TEST: Module import order doesn't cause circular deps ===

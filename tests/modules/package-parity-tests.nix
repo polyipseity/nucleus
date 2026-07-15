@@ -102,7 +102,7 @@ let
   # Test 5: Verify naming consistency (no major divergences)
   # nixpkgs often uses lowercase; homebrew/winget may use different casing
   test_naming_consistency =
-    assert' (true) # Naming varies by platform; this is expected and documented
+    assert' true # Naming varies by platform; this is expected and documented
       "Package naming across platforms is documented and intentional";
 
   # Test 6: Verify shell tools are present (critical for scripting)
@@ -225,7 +225,7 @@ let
   ];
 
   test_overlapping_packages_have_nixpkgs = assert' (builtins.all
-    (p: builtins.match ".*" + p.nixpkgsAttr + ".*" coreModuleText != null)
+    (p: builtins.match (".*" + p.nixpkgsAttr + ".*") coreModuleText != null)
     crossPlatformOverlapAttrs
   ) "All cross-platform overlappingPackages entries should be defined in core.nix";
 

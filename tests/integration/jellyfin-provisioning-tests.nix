@@ -31,8 +31,6 @@ let
   jellyfinSyncScript = builtins.readFile ../../src/scripts/jellyfin-sync.sh;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
 
-  inherit (import ../lib.nix) assert';
-
   test_core_installs_jellyfin = assert' (containsRegex ''pkgs\.jellyfin'' coreText) "core.nix must install pkgs.jellyfin on Nix-managed hosts";
 
   test_nixos_imports_host_jellyfin_module = assert' (containsRegex ''\./jellyfin\.nix'' nixosDefaultText) "NixOS host entrypoint must import ./jellyfin.nix";

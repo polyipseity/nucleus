@@ -102,7 +102,7 @@ let
       uniqueNames = unique names;
     in
     assert' (
-      (builtins.length names == builtins.length uniqueNames)
+      builtins.length names == builtins.length uniqueNames
     ) "Activation step names must be unique";
 
   # === TEST: No circular dependencies ===
@@ -123,7 +123,7 @@ let
       # Check simple case: no step depends on itself through transitivity
       # In practice, Home Manager's activation system would error on cycles
     in
-    assert' (true) # Validated by NixOS/Home Manager eval
+    assert' true # Validated by NixOS/Home Manager eval
       "Activation graph should be acyclic";
 
   # === TEST: Windows DSC ordering invariant ===
@@ -205,7 +205,7 @@ let
       testDep = name: builtins.elem name activationNames;
       validRefs = builtins.all testDep activationNames;
     in
-    assert' (validRefs) "All activation dependency references must exist";
+    assert' validRefs "All activation dependency references must exist";
 
   # === TEST: Before/after consistency ===
   test_before_after_consistency =
@@ -282,7 +282,7 @@ let
   ) "MiddleClick startup on macOS must use native Login Items (no custom LaunchAgent)";
 
   # === TEST: Spotlight disables all known launcher hotkey slots ===
-  test_spotlight_disables_all_hotkey_slots = assert' ((lib.hasInfix "for hotkey in 61 64 65; do" macbookActivationText)) "Spotlight disable flow must cover symbolic hotkey IDs 61, 64, and 65";
+  test_spotlight_disables_all_hotkey_slots = assert' (lib.hasInfix "for hotkey in 61 64 65; do" macbookActivationText) "Spotlight disable flow must cover symbolic hotkey IDs 61, 64, and 65";
 
   # === TEST: installCargoBinstallPackages activation name aligned across modules ===
   test_install_cargo_binstall_dependency_name_alignment =

@@ -162,9 +162,9 @@ let
   # alphabetical order (position-based check on file text). Currently
   # only 1 entry (trivially sorted). Add new entries here when the list
   # grows, following the same pattern as test_macos_presets_sorted above.
-  test_app_bundles_alphabetically_sorted = assert' (
-    true # Empty list — trivially sorted.
-  ) "macOS app-bundles.nix currentNucleusAppBundles must be sorted alphabetically by appDir";
+  test_app_bundles_alphabetically_sorted =
+    assert' true # Empty list — trivially sorted.
+      "macOS app-bundles.nix currentNucleusAppBundles must be sorted alphabetically by appDir";
 
   # === TEST: macOS workflow Info.plist files use com.adobe.pdf UTI ===
   # Verifies that all 5 Automator workflow plists use com.adobe.pdf (not public.item)

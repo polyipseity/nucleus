@@ -864,7 +864,7 @@ let
         && (lib.hasInfix "UTM bundle" readmeTemplateText)
       )
       "Invoke-VMSetup.ps1 must write %USERPROFILE%\\virtual machines\\README.md using the cross-host README template with placeholder substitution";
-  test_vm_setup_generates_helper_scripts = assert' ((lib.hasInfix "write_start_script" vm_setup_sh_text)) "VM setup flows must generate discoverable start helper scripts";
+  test_vm_setup_generates_helper_scripts = assert' (lib.hasInfix "write_start_script" vm_setup_sh_text) "VM setup flows must generate discoverable start helper scripts";
   test_macbook_utm_default_location_link =
     assert'
       (
