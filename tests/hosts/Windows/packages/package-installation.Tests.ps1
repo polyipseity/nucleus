@@ -62,17 +62,17 @@ Describe "Windows Package Installation" {
         }
 
         It "Should have gitk available from the Git installation" {
-            # undoc-supp: probe — command may not be installed; Should handles absence.
+            # undoc-supp: probe — command may not be installed; WHY: Get-Command returns null when command is not found; Should handles absence.
             Get-Command -Name gitk -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
         }
 
         It "Should have pwsh available from the PowerShell installation" {
-            # undoc-supp: probe — command may not be installed; Should handles absence.
+            # undoc-supp: probe — command may not be installed; WHY: Get-Command returns null when command is not found; Should handles absence.
             Get-Command -Name pwsh -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
         }
 
         It "Should have nvim available from the Neovim installation" {
-            # undoc-supp: probe — command may not be installed; Should handles absence.
+            # undoc-supp: probe — command may not be installed; WHY: Get-Command returns null when command is not found; Should handles absence.
             Get-Command -Name nvim -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
         }
     }
