@@ -51,11 +51,15 @@ function Sync-UserPath {
   )
 
   # Canonical list mirrors pathComponents in src/modules/lib/env-vars.nix.
-  $nucleusDirs = @(
+  $nucleusPrependDirs = @(
     '%USERPROFILE%\.bun\bin'
     '%USERPROFILE%\.cargo\bin'
     '%USERPROFILE%\.local\bin'
   )
+  $nucleusAppendDirs = @(
+    # Reserved for future use; mirrors pathComponents.append (currently empty).
+  )
+  $nucleusDirs = $nucleusPrependDirs + $nucleusAppendDirs
 
   # ── Machine PATH (HKLM) ──────────────────────────────────────────
   $regPath = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
@@ -68,7 +72,7 @@ function Sync-UserPath {
   }
 
   if ($Enabled) {
-    $newMachinePath = ($nucleusDirs + $cleanedMachine) -join ';'
+    $newMachinePath = ($nucleusPrependDirs + $cleanedMachine + $nucleusAppendDirs) -join ';'
   } else {
     $newMachinePath = $cleanedMachine -join ';'
   }

@@ -23,8 +23,9 @@ manifest for external consumption is also available via `toJsonManifest`.
 **Nix-side registry** (`src/modules/lib/env-vars.nix`):
 
 - Declares every var in a single `catalog` attrset with `values` (per-OS attrset: `default`, `macOS`, `NixOS`, `Windows`), `why`, optional `userSpecific` (per-user), optional `excludeFromLaunchctl`, and optional `scope` (defaults to `"all-process"`; set explicitly only for `"shell-only"`).
-- Pure helper functions (`toHomeSessionVariables`, `toNixOSSystemEnvironment`, `toLaunchctlScript`, `toNixOSServiceEnv`, `toMacOSDaemonOllamaEnv`) transform the catalog into platform-specific formats.
-- Consumed by: `home.nix`, `shell.nix`, `macos.nix` (LaunchAgent), `hosts/NixOS/base.nix`, `hosts/NixOS/ai.nix`.
+- Pure helper functions (`toHomeSessionVariables`, `toNixOSSystemEnvironment`, `toLaunchctlScript`, `toUserLaunchctlScript`, `toJsonManifest`) transform the catalog into platform-specific formats.
+- Daemon env var consumption uses `resolveValue` directly in each daemon file (no daemon-specific helpers).
+- Consumed by: `shell.nix` (via `home.sessionPath`, `home.sessionVariables`), `macos.nix` (gui-env-system/gui-env-user LaunchAgents, guiEnvActivationPathAndRepoRoot activation), `hosts/NixOS/base.nix`, `hosts/NixOS/ai.nix`, and daemon files in `hosts/MacBook/`.
 - The `env/default.nix` Home Manager module exposes `config._nucleus.envVars` for introspection.
 
 **Windows parallel registry** (WinGet DSC v3):
@@ -57,3 +58,18 @@ must hard-fail — there is no fallback to User scope.
 3. **Tests**: ensure the parity test covers the new var:
    - `tests/integration/env-parity-tests.nix` generates a JSON manifest from the catalog.
    - `tests/hosts/Windows/EnvVarParity.Tests.ps1` reads the manifest and checks the DSC entries.
+
+## Cross-host special-case policy
+
+Some environment variables need different treatment per OS — this table documents
+the exceptions and why they exist.
+
+| Var               | macOS | NixOS | Windows | Rationale |
+| ----------------- | ----- | ----- | ------- | --------- |
+| `NIX_SSL_CERT_FILE` | daemon env | — | — | macOS has no system CA bundle in a standard location; NixOS ships `/etc/ssl/certs/ca-certificates.crt` in the system profile. |
+| `NUCLEUS_HOST`    | daemon env | daemon env | — | Identifies which host the daemon runs on; not meaningful on Windows since daemons are managed differently. |
+| `OLLAMA_HOST`     | gui-env-system agent | — | — | macOS Ollama daemon binds to default port; CLI clients route through LiteLLM proxy via gui-env-system. NixOS uses the systemd service env. |
+
+The principle: **same value, same scope** is the default. When a var must have
+different treatment (excluded from a host, different scope, etc.), document it
+here with an explicit why.

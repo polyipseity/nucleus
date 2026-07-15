@@ -67,8 +67,10 @@ let
   # ── Helper: render managed PATH parts from pathComponents ──────────
   # Returns a colon-joined string of managed user-scope bin dirs.
   # Contains only the pathComponents (prepend + append), no system default.
-  # Callers (propagateGuiEnvVars, gui-env-recovery) prepend these to the
-  # actual PATH at runtime so the system default is preserved dynamically.
+  # Callers prepend/append these to the actual PATH at runtime so the system
+  # default is preserved dynamically.
+  # NOTE: Returns only managed PATH components — callers must combine with
+  # the runtime system PATH (prepend + runtime + append).
   toLaunchctlPATH =
     let
       homePrefix = "$HOME";
@@ -87,6 +89,8 @@ let
   # returns a list rather than a colon-joined string.
   # Contains only the managed pathComponents (prepend + append).  The NixOS
   # caller uses mkBefore so system directories are preserved dynamically.
+  # NOTE: Returns only managed PATH components — callers must combine with
+  # the runtime system PATH (prepend + runtime + append).
   toNixOSPath =
     let
       homePrefix = resolvedHomeDirectory;
@@ -100,6 +104,8 @@ let
   # for parity documentation and test consumption.  Not consumed at
   # runtime on Windows (Sync-UserPath.ps1 hardcodes the values since
   # Nix isn't available during apply).
+  # NOTE: Returns only managed PATH components — callers must combine with
+  # the runtime system PATH.
   toWindowsUserPathString =
     let
       homePrefix = "%USERPROFILE%";
