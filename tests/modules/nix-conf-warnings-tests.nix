@@ -1,21 +1,7 @@
-# tests/modules/nix-conf-warnings-tests.nix — Regression guard for nix.conf warnings.
-#
-# Validates that mkCheckApp, mkTestApp, and mkCloudSetupApp intentionally omit
-# pkgs.nix from runtimeInputs, so scripts use the host Nix (Determinate Nix on
-# this repo) rather than nixpkgs' vanilla Nix. Vanilla Nix emits
-#   warning: unknown setting 'eval-cores'
-#   warning: unknown setting 'lazy-trees'
-# when reading /etc/nix/nix.conf.
-#
-# Follows the pattern established by mkUpdateApp's documented omission.
-# Any new app that also omits pkgs.nix should be added here with a matching
-# comment in flake.nix.
-#
-# Run with: nix-instantiate --eval tests/modules/nix-conf-warnings-tests.nix
+# tests/modules/nix-conf-warnings-tests.nix — nix.conf warnings regression guard.
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) flatten containsRegex;
 
   flakeText = builtins.readFile ../../src/flake.nix;
   cleaned = builtins.replaceStrings [ "`pkgs.nix`" ] [ "" ] flakeText;

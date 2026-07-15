@@ -1,7 +1,5 @@
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) flatten containsRegex;
 
   shellEnvText = builtins.readFile ../../src/modules/shell/env.nix;
   nixosBaseText = builtins.readFile ../../src/hosts/NixOS/base.nix;

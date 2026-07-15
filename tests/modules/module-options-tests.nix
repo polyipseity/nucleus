@@ -1,13 +1,7 @@
-# tests/modules/module-options-tests.nix — Comprehensive Nix module option validation.
-#
-# Tests verify that all module options have correct types, defaults, and descriptions.
-# This catches option definition errors before configurations are applied.
-#
-# Run with: nix-instantiate --eval tests/modules/module-options-tests.nix
+# tests/modules/module-options-tests.nix — Module option validation.
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) assert' flatten containsRegex;
 
   homeModuleText = builtins.readFile ../../src/modules/home.nix;
   coreModuleText = builtins.readFile ../../src/modules/core.nix;
@@ -15,8 +9,6 @@ let
   secretsModuleText = builtins.readFile ../../src/modules/secrets.nix;
   flakeText = builtins.readFile ../../src/flake.nix;
   cloudDrivesModuleText = builtins.readFile ../../src/modules/cloud-drives.nix;
-
-  inherit (import ../lib.nix) assert';
 
   # Test 1: Verify home.username option exists and is a string
   test_home_username_type = assert' (

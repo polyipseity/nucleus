@@ -1,10 +1,4 @@
-# tests/modules/starship-tests.nix — Validate starship module and config.
-#
-# Verifies:
-#   • Module can be imported and defines expected options
-#   • Config TOML parses correctly (syntax + expected sections)
-#
-# Run with: nix-instantiate --eval tests/modules/starship-tests.nix
+# tests/modules/starship-tests.nix — Starship module and config validation.
 
 let
   lib = import <nixpkgs/lib>;

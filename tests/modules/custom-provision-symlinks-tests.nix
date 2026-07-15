@@ -1,13 +1,7 @@
-# tests/modules/custom-provision-symlinks-tests.nix — Validate custom provision symlink wiring.
-#
-# Ensures the shared per-user custom symlink mechanism is imported, platform-aware,
-# and configured to expose ~/data using iCloud on macOS and Google Drive elsewhere.
-#
-# Run with: nix-instantiate --eval tests/modules/custom-provision-symlinks-tests.nix
+# tests/modules/custom-provision-symlinks-tests.nix — Custom provision symlink wiring.
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) assert' flatten containsRegex;
 
   homeText = builtins.readFile ../../src/modules/home.nix;
   customModuleText = builtins.readFile ../../src/modules/custom-provision-symlinks.nix;
@@ -17,8 +11,6 @@ let
   windowsUsersText = builtins.readFile ../../src/hosts/Windows/users.json;
   windowsRegistryLoaderText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
-
-  inherit (import ../lib.nix) assert';
 
   test_home_imports_custom_module = assert' (containsRegex ''\.\/custom-provision-symlinks\.nix'' homeText) "home.nix must import the custom provision symlink module";
 

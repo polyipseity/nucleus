@@ -1,22 +1,13 @@
-# tests/modules/ntfs-3g-tests.nix — Validate ntfs-3g patch files and Nix module.
-#
-# Verifies that the checked-in patch files are valid unified diffs, that they
-# produce the correct transformations, and that the Nix module no longer uses
-# inline Python or sed for patching.
-#
-# Run with: nix-instantiate --eval tests/modules/ntfs-3g-tests.nix
+# tests/modules/ntfs-3g-tests.nix — ntfs-3g patch files and Nix module.
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) assert' flatten containsRegex;
   nonEmpty = text: builtins.stringLength text > 0;
 
   nixText = builtins.readFile ../../src/hosts/MacBook/ntfs-3g.nix;
   cryptoPatchText = builtins.readFile ../../src/hosts/MacBook/patches/ntfs-3g-crypto.patch;
   rootbindirPatchText = builtins.readFile ../../src/hosts/MacBook/patches/ntfs-3g-rootbindir.patch;
   installHookPatchText = builtins.readFile ../../src/hosts/MacBook/patches/ntfs-3g-install-hook.patch;
-
-  inherit (import ../lib.nix) assert';
 
   # === Patch file existence and validity ===
 

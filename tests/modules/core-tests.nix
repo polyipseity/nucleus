@@ -1,14 +1,8 @@
-# tests/modules/core-tests.nix — Tests for backend selection, package resolution,
-# and nix-index schedule invariants.
-#
-# Run via: nix-instantiate --eval tests/modules/core-tests.nix
+# tests/modules/core-tests.nix — Backend selection, package resolution, nix-index invariants.
 
 let
   lib = import <nixpkgs/lib>;
-  inherit (import ../lib.nix) assert';
-
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) assert' flatten containsRegex;
 
   # === NIX-INDEX SCHEDULE INVARIANTS ===
   linuxText = builtins.readFile ../../src/modules/linux.nix;
@@ -28,8 +22,6 @@ let
 
   # === BACKEND SELECTION RESOLUTION LOGIC ===
   # Mimics core.nix resolveBackend: check overrides → check policy → fall back to global backend.
-
-  # Test 1: Per-package override takes precedence over everything.
   test_override_precedence =
     let
       overrides = {
@@ -46,7 +38,7 @@ let
     assert' (resolveBackend "google-chrome" == "nixpkgs")
       "Override should take precedence: google-chrome should resolve to nixpkgs despite homebrew global";
 
-  # Test 2: Policy-based categorization when overlapBackend == "policy".
+  # Policy-based categorization when overlapBackend == "policy".
   test_policy_based_categorization =
     let
       overlappingPackages = {
@@ -77,7 +69,7 @@ let
       (resolveBackend "git" == "nixpkgs") && (resolveBackend "visual-studio-code" == "homebrew")
     ) "Policy mode should route CLI to nixpkgs and GUI to homebrew";
 
-  # Test 3: Global backend setting when overlapBackend != "policy".
+  # Global backend setting when overlapBackend != "policy".
   test_global_backend_fallback =
     let
       overlapBackend = "homebrew";
@@ -93,7 +85,7 @@ let
       (resolveBackend "python" == "homebrew") && (resolveBackend "nodejs" == "homebrew")
     ) "Global backend should apply to all packages when not in policy mode";
 
-  # Test 4: Empty overrides with policy mode cascades to category defaults.
+  # Empty overrides with policy mode cascades to category defaults.
   test_policy_with_no_overrides =
     let
       overlappingPackages = {
@@ -124,7 +116,7 @@ let
       (resolveBackend "bat" == "nixpkgs") && (resolveBackend "blender" == "homebrew")
     ) "Policy mode without overrides should use category defaults";
 
-  # Test 5: Override can selectively flip specific packages in policy mode.
+  # Override can selectively flip specific packages in policy mode.
   test_selective_override_in_policy_mode =
     let
       overlappingPackages = {
@@ -157,7 +149,7 @@ let
       (resolveBackend "ripgrep" == "homebrew") && (resolveBackend "fzf" == "nixpkgs")
     ) "Selective override should flip only ripgrep to homebrew while fzf stays on nixpkgs";
 
-  # Test 6: Multiple overrides in policy mode.
+  # Multiple overrides in policy mode.
   test_multiple_overrides =
     let
       overlappingPackages = {
@@ -198,7 +190,6 @@ let
 
   # === BASIC LOGIC VALIDATION ===
 
-  # Test 7: List filtering preserves order.
   test_filter_nulls = assert' (
     (builtins.filter (x: x != null) [
       1

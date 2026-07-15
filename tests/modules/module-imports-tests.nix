@@ -1,11 +1,4 @@
-# tests/modules/module-imports-tests.nix — Verify all shared modules can be imported.
-#
-# This test file attempts to import each shared module to catch:
-#   - Circular import dependencies
-#   - Unresolved module path references
-#   - Missing dependencies or option declarations
-#
-# Run with: nix-instantiate --eval tests/modules/module-imports-tests.nix
+# tests/modules/module-imports-tests.nix — Shared module import verification.
 
 let
   lib = import <nixpkgs/lib>;

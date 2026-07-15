@@ -1,7 +1,5 @@
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) flatten containsRegex;
 
   applyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   flakeText = builtins.readFile ../../src/flake.nix;

@@ -1,7 +1,4 @@
-# tests/modules/logging-dirs-tests.nix — Data consistency for log directory entries
-# in services.json, and their consumption in host activation.nix files.
-#
-# Run with: nix-instantiate --eval tests/modules/logging-dirs-tests.nix
+# tests/modules/logging-dirs-tests.nix — Log directory consistency in services.json and activation.nix.
 
 let
   lib = import <nixpkgs/lib>;

@@ -1,10 +1,4 @@
-# tests/modules/option-conflict-tests.nix — Detect module option conflicts across hosts.
-#
-# Tests verify that option definitions don't conflict when merged across
-# multiple hosts (macOS, NixOS, Windows) and that mkIf/mkDefault precedence
-# is correctly applied to avoid merge conflicts.
-#
-# Run with: nix-instantiate --eval tests/modules/option-conflict-tests.nix
+# tests/modules/option-conflict-tests.nix — Module option conflicts across hosts.
 
 let
   lib = import <nixpkgs/lib>;
