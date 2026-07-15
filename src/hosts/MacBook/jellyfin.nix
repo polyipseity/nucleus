@@ -54,7 +54,11 @@ in
 {
   launchd.daemons.jellyfin = {
     serviceConfig = {
-      ProgramArguments = [ "${jellyfinDaemon}" ];
+      ProgramArguments = [
+        "/bin/sh"
+        "-c"
+        "exec ${jellyfinDaemon}"
+      ];
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;

@@ -116,7 +116,9 @@ in
   launchd.daemons.linux-builder = {
     serviceConfig = {
       ProgramArguments = [
-        "${pkgs.writeShellScript "linux-builder-daemon" ''
+        "/bin/sh"
+        "-c"
+        "exec ${pkgs.writeShellScript "linux-builder-daemon" ''
           export TMPDIR=/run/org.nixos.linux-builder USE_TMPDIR=1
           rm -rf $TMPDIR
           mkdir -p $TMPDIR

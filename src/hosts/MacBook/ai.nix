@@ -39,17 +39,21 @@ let
   # port (11434), not the LiteLLM proxy port (4000).  OLLAMA_HOST is set by
   # the gui-env-system LaunchAgent for CLI clients that should route through the
   # proxy.
-  ollamaEnv = litellmEnv // lib.filterAttrs (_name: value: value != null) {
-    OLLAMA_FLASH_ATTENTION = resolveValue "OLLAMA_FLASH_ATTENTION";
-    OLLAMA_CONTEXT_LENGTH = resolveValue "OLLAMA_CONTEXT_LENGTH";
-    OLLAMA_KV_CACHE_TYPE = resolveValue "OLLAMA_KV_CACHE_TYPE";
-  };
+  ollamaEnv =
+    litellmEnv
+    // lib.filterAttrs (_name: value: value != null) {
+      OLLAMA_FLASH_ATTENTION = resolveValue "OLLAMA_FLASH_ATTENTION";
+      OLLAMA_CONTEXT_LENGTH = resolveValue "OLLAMA_CONTEXT_LENGTH";
+      OLLAMA_KV_CACHE_TYPE = resolveValue "OLLAMA_KV_CACHE_TYPE";
+    };
 in
 {
   launchd.daemons."local.litellm" = {
     serviceConfig = {
       ProgramArguments = [
-        "${pkgs.writeShellScript "litellm-daemon" ''
+        "/bin/sh"
+        "-c"
+        "exec ${pkgs.writeShellScript "litellm-daemon" ''
           _keyfile_oru="${config.sops.secrets."ai_openrouter_api_key".path}"
           if [ -f "$_keyfile_oru" ]; then
             export OPENROUTER_API_KEY="$(cat "$_keyfile_oru")"
@@ -81,8 +85,9 @@ in
   launchd.daemons."local.ollama" = {
     serviceConfig = {
       ProgramArguments = [
-        "${pkgs.ollama}/bin/ollama"
-        "serve"
+        "/bin/sh"
+        "-c"
+        "exec ${pkgs.ollama}/bin/ollama serve"
       ];
       KeepAlive = true;
       RunAtLoad = true;

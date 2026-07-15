@@ -75,7 +75,11 @@ in
 {
   launchd.daemons.httpsProxy = {
     serviceConfig = {
-      ProgramArguments = [ "${proxyDaemon}" ];
+      ProgramArguments = [
+        "/bin/sh"
+        "-c"
+        "exec ${proxyDaemon}"
+      ];
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;

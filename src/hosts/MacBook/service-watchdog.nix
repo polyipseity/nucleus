@@ -41,7 +41,9 @@ in
     serviceConfig = {
       Label = "local.service-watchdog";
       ProgramArguments = [
-        "${pkgs.writeShellScript "svc-watchdog-daemon" ''
+        "/bin/sh"
+        "-c"
+        "exec ${pkgs.writeShellScript "svc-watchdog-daemon" ''
           exec ${nucleusSvcWatchdog} --domain system
         ''}"
       ];

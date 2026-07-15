@@ -67,7 +67,11 @@ in
   launchd.daemons."camilladsp" = {
     serviceConfig = {
       Label = "local.camilladsp";
-      ProgramArguments = [ "${camilladspDaemon}" ];
+      ProgramArguments = [
+        "/bin/sh"
+        "-c"
+        "exec ${camilladspDaemon}"
+      ];
       UserName = username;
       EnvironmentVariables = daemonEnv;
       KeepAlive = true;
