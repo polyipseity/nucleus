@@ -1379,11 +1379,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # etc.) need.
   #
   # The var list is generated from the centralized catalog — see
-  # src/modules/lib/env-vars.nix (toLaunchctlScript).  Shell-only vars (CC, CXX,
-  # LD) are excluded by the helper: they have scope="shell-only" in the catalog.
-  # User-specific vars (PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.) are also
-  # excluded to keep scoping explicit — they are set by the companion
-  # gui-env-user agent below.
+  # src/modules/lib/env-vars.nix (toLaunchctlScript).  Vars CC, CXX, LD have
+  # no explicit scope so getScope defaults them to "all-process" — they pass
+  # the filter and are correctly included.  User-specific vars (PASSWORD_STORE_DIR,
+  # STARSHIP_CACHE, etc.) are excluded from this agent to keep scoping explicit
+  # — they are set by the companion gui-env-user agent below.
   # --------------------------------------------------------------------------
   launchd.agents."gui-env" = {
     enable = true;
@@ -1432,6 +1432,86 @@ lib.mkIf pkgs.stdenv.isDarwin {
               ;
           }).toUserLaunchctlScript
         }"
+      ];
+      RunAtLoad = true;
+      KeepAlive = false;
+    };
+  };
+
+  # --------------------------------------------------------------------------
+  # GUI environment recovery LaunchAgent
+  # Runs at login as a safety net for RC1 (gui-env race with Login Items) and
+  # RC3 (stale Nix store paths for system daemons).  Re-runs setenv for PATH
+  # and NUCLEUS_REPO_ROOT (canonical location), then checks every system daemon
+  # that runs as the primary user and recovers any that are not running.
+  #
+  # Unlike gui-env/gui-env-user, this agent does NOT import the catalog for all
+  # vars — that would add wait4path /nix/store latency.  It only sets PATH and
+  # NUCLEUS_REPO_ROOT, which are the most commonly missing, and recovers failed
+  # system daemons whose store paths were garbage-collected.
+  # --------------------------------------------------------------------------
+  launchd.agents."gui-env-recovery" = {
+    enable = true;
+    config = {
+      Label = "local.gui-env-recovery";
+      ProgramArguments = [
+        "${pkgs.writeShellScript "gui-env-recovery-agent" ''
+          set -eu
+
+          log_dir="$HOME/Library/Logs/nucleus/gui-env-recovery"
+          mkdir -p "$log_dir"
+          exec 2>>"$log_dir/stderr.log"
+
+          echo "[$(date)] gui-env-recovery started" >> "$log_dir/stdout.log"
+
+          # ── Re-set GUI env vars (handles RC1 race window) ──────────
+          /bin/launchctl setenv PATH "${
+            (import ./lib/env-vars.nix {
+              inherit
+                config
+                pkgs
+                lib
+                username
+                ;
+            }).toLaunchctlPATH
+          }"
+
+          if [ -d "$HOME/dev/nucleus" ]; then
+            /bin/launchctl setenv NUCLEUS_REPO_ROOT "$HOME/dev/nucleus"
+          fi
+
+          # ── Recover failed system daemons (handles RC3 stale paths) ─
+          for svc in \
+            local.camilladsp \
+            local.camilladsp-heartbeat \
+            local.camillagui-backend \
+            local.litellm \
+            local.ollama \
+            local.https-proxy \
+            local.jellyfin \
+            local.linux-builder \
+            local.service-watchdog
+          do
+            state="$(/bin/launchctl print "system/$svc" 2>/dev/null | head -1 || echo "missing")"
+            case "$state" in
+              *"running"*)
+                echo "[$(date)] $svc: ok" >> "$log_dir/stdout.log"
+                ;;
+              *"waiting"*)
+                echo "[$(date)] $svc: waiting -> kickstart" >> "$log_dir/stdout.log"
+                /bin/launchctl kickstart -k "system/$svc" 2>>"$log_dir/stderr.log" || true  # undoc-supp: kickstart may fail if service already recovered between check and action
+                ;;
+              *)
+                echo "[$(date)] $svc: $state -> bootout+bootstrap" >> "$log_dir/stdout.log"
+                /bin/launchctl bootout "system/$svc" 2>/dev/null || true  # undoc-supp: bootout fails if service already gone between check and action
+                /bin/launchctl bootstrap system "/Library/LaunchDaemons/$svc.plist" 2>>"$log_dir/stderr.log" || true  # undoc-supp: bootstrap fails if plist missing (service label may differ from filename) or already registered
+                /bin/launchctl kickstart -k "system/$svc" 2>>"$log_dir/stderr.log" || true  # undoc-supp: kickstart may fail if service started after bootout+bootstrap race
+                ;;
+            esac
+          done
+
+          echo "[$(date)] gui-env-recovery done" >> "$log_dir/stdout.log"
+        ''}"
       ];
       RunAtLoad = true;
       KeepAlive = false;

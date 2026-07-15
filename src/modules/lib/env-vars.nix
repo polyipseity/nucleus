@@ -294,6 +294,15 @@ let
       why = "Repo root for out-of-store symlinks. Captured at eval time from apply.sh export. Excluded from gui-env agent because builtins.getEnv returns empty string when built outside apply.sh; set via activation script instead.";
     };
 
+    # ── macOS GUI environment PATH (user-specific) ─────────────────
+    PATH = {
+      values = {
+        macOS = "$HOME/.bun/bin:$HOME/.cargo/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin";
+      };
+      userSpecific = true;
+      why = "Managed PATH for macOS GUI apps, set at login by gui-env-user LaunchAgent. The $HOME literal expands at agent runtime. Mirrors toLaunchctlPATH output from pathComponents.";
+    };
+
     # ── Starship prompt (all-process) ───────────────────────────────
     STARSHIP_CACHE = {
       values = {
@@ -495,6 +504,24 @@ let
       ) relevant
     );
 
+  # ── toMacOSDaemonEnv ───────────────────────────────────────────
+  # Attrset of essential env vars for all macOS launchd system daemons.
+  # Provides NIX_SSL_CERT_FILE (HTTPS), PATH (system default), and
+  # NUCLEUS_HOST (host identity).  Daemons may overlay additional vars.
+  # OLLAMA_* vars are handled separately by toMacOSDaemonOllamaEnv.
+  toMacOSDaemonEnv =
+    let
+      os = "macOS";
+      daemonPath = "/usr/bin:/bin:/usr/sbin:/sbin";
+      nixSslCertFile = resolveValue "NIX_SSL_CERT_FILE" os;
+      nucleusHost = resolveValue "NUCLEUS_HOST" os;
+    in
+    {
+      PATH = daemonPath;
+    }
+    // (if nixSslCertFile != null then { NIX_SSL_CERT_FILE = nixSslCertFile; } else { })
+    // (if nucleusHost != null then { NUCLEUS_HOST = nucleusHost; } else { });
+
   # ── Introspection for Windows parity tests ───────────────────────
   toJsonManifest = builtins.toJSON (
     builtins.map (
@@ -528,6 +555,7 @@ in
     toUserLaunchctlScript
     toNixOSServiceEnv
     toMacOSDaemonOllamaEnv
+    toMacOSDaemonEnv
     toJsonManifest
     getAllNixVarNames
     resolveValue
