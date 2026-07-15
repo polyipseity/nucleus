@@ -1,7 +1,6 @@
 ---
 description: "Use when looking up or verifying SF Symbol names for macOS Automator workflow icons. Covers the hard lookup rule, authoritative sources, and how to grep the bundled symbol list."
-name: "SF Symbol Names"
-applyTo: "src/hosts/MacBook/services/automator-workflows/**/*.plist, src/hosts/MacBook/services/automator-workflows/**/*.wflow"
+name: "sf-symbols"
 ---
 
 # SF Symbol names for Automator workflow icons
