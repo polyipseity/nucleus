@@ -18,8 +18,8 @@ All Nix-side env vars are declared in `src/modules/lib/env-vars.nix`. The catalo
 ## Scope restrictions
 
 Valid reasons to restrict scope:
-- The variable would cause incorrect behavior for unintended consumers (e.g., `CC`/`CXX`/`LD` on macOS: Nix LLVM paths in GUI process env interfere with Xcode toolchain discovery).
-- The concept is inherently platform-specific (e.g., `DEVELOPER_DIR` on non-macOS hosts).
+- The variable would cause incorrect behavior for unintended consumers (e.g., `CC`/`CXX`/`LD` on macOS: Nix LLVM paths in GUI process env interfere with Xcode toolchain discovery). Absolute Nix store paths (`${pkgs.llvmPackages.clang}/bin/clang` etc.) prevent bare-name resolution to `/usr/bin/clang` which triggers the Xcode `xcrun` installation dialog.
+- The concept is inherently platform-specific (e.g., `DEVELOPER_DIR` on non-macOS hosts). On macOS, `DEVELOPER_DIR` points at `pkgs.apple-sdk` so `xcrun --sdk macosx --show-sdk-path` works without Xcode CLT installed. A system-level `xcode-select --switch` (in `src/hosts/MacBook/activation.nix`) covers non-shell process trees.
 - The value is technically infeasible to compute at build time (e.g., `NUCLEUS_REPO_ROOT` on NixOS — captured at eval time).
 
 "CLI-only tool" or "only shells need it" is not a valid restriction on NixOS or Windows — both CLI and GUI processes inherit the same environment. On macOS, a second propagation mechanism (LaunchAgent calling `launchctl setenv`) is required because `launchd` maintains separate shell and GUI domains.
