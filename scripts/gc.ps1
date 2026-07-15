@@ -15,17 +15,22 @@
     3. Remove stale .git sample hooks and description files from ~/dev that
        were created before init.templateDir was configured.  Guarded by the
        NoGitTemplateGc switch.
-    4. Remove old Scoop app versions and installer caches via `scoop cleanup *`.
+    4. Remove stale .git cache/state files (gitk.cache, gc.log, stale lock/state
+       files, deprecated branches/remotes/ dirs, refs/original/) and run
+       `git gc --auto` in repos under ~/dev.  Active operation detection
+       prevents state file removal during in-progress merges/rebase/bisects.
+       Guarded by the NoGitCacheGc switch.
+    5. Remove old Scoop app versions and installer caches via `scoop cleanup *`.
        Guarded by a Scoop presence check so the step is a no-op when Scoop is
        not yet installed (e.g. before the first apply.ps1 run).
-    5. Remove locally installed Ollama models absent from the declarative manifest
+    6. Remove locally installed Ollama models absent from the declarative manifest
        at src/modules/ai/models.json.  Uses Invoke-AISync -GcOnly so no new
        model pulls are triggered — GC only reclaims space.  Guarded by an ollama
        presence check so the step is a no-op when Ollama is not installed.
-    6. Remove stale VM build artifacts (Packer directories, pre-built disk
+    7. Remove stale VM build artifacts (Packer directories, pre-built disk
        images) for VMs no longer declared in src/modules/VMs.json.
        Guarded by the NoVMGc switch.
-    7. Rotate managed log files via copy-truncate using rotation parameters
+    8. Rotate managed log files via copy-truncate using rotation parameters
        from src/modules/services.json.
        Guarded by the NoLogGc switch.
 
@@ -48,6 +53,9 @@
 
 .PARAMETER NoGitTemplateGc
   Skip stale .git sample hooks and description file cleanup under ~/dev (default: $false).
+
+.PARAMETER NoGitCacheGc
+  Skip stale .git cache/state cleanup and git gc --auto in repos under ~/dev (default: $false).
 
 .PARAMETER NoOllamaGc
   Skip Ollama orphaned model removal even when ollama is installed (default: $false).
@@ -90,7 +98,7 @@
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -NoToolCacheGc
 
 .NOTES
-  Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_GC, NUCLEUS_GC_NO_GIT_TEMPLATE_GC, NUCLEUS_GC_NO_OLLAMA_GC, NUCLEUS_GC_NO_SCOOP_GC, NUCLEUS_GC_NO_WALLPAPER_GC, NUCLEUS_GC_NO_VM_GC, NUCLEUS_GC_EXPIRY, NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_REPO_ROOT.
+  Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_GC, NUCLEUS_GC_NO_GIT_TEMPLATE_GC, NUCLEUS_GC_NO_GIT_CACHE_GC, NUCLEUS_GC_NO_OLLAMA_GC, NUCLEUS_GC_NO_SCOOP_GC, NUCLEUS_GC_NO_WALLPAPER_GC, NUCLEUS_GC_NO_VM_GC, NUCLEUS_GC_EXPIRY, NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
@@ -100,6 +108,7 @@ param(
   [switch]$NoHmGc = { $env:NUCLEUS_GC_NO_HM -eq 'true' }.Invoke(),
   [switch]$NoToolCacheGc = { $env:NUCLEUS_GC_NO_TOOL_CACHE_GC -eq 'true' }.Invoke(),
   [switch]$NoGitTemplateGc = { $env:NUCLEUS_GC_NO_GIT_TEMPLATE_GC -eq 'true' }.Invoke(),
+  [switch]$NoGitCacheGc = { $env:NUCLEUS_GC_NO_GIT_CACHE_GC -eq 'true' }.Invoke(),
   [switch]$NoOllamaGc = { $env:NUCLEUS_GC_NO_OLLAMA_GC -eq 'true' }.Invoke(),
   [switch]$NoScoopGc = { $env:NUCLEUS_GC_NO_SCOOP_GC -eq 'true' }.Invoke(),
   [switch]$NoWallpaperGc = { $env:NUCLEUS_GC_NO_WALLPAPER_GC -eq 'true' }.Invoke(),
@@ -261,6 +270,126 @@ function Clear-GitTemplateFiles {
   }
 }
 
+function Clear-GitCacheFiles {
+  [CmdletBinding(SupportsShouldProcess = $true)]
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$DevRoot
+  )
+
+  if (-not (Test-Path -LiteralPath $DevRoot -PathType Container)) {
+    return
+  }
+
+  # undoc-supp: ~/dev may not exist or contain .git dirs; silent skip is intentional
+  $gitDirs = Get-ChildItem -LiteralPath $DevRoot -Directory -Recurse -Filter '.git' -Force -ErrorAction SilentlyContinue
+  foreach ($gitDir in $gitDirs) {
+    $repoRoot = $gitDir.Parent.FullName
+
+    if (-not $PSCmdlet.ShouldProcess($repoRoot, "Clear Git cache and state files")) {
+      continue
+    }
+
+    try {
+      # Detect active Git operation.
+      $activeOp = $false
+      $activeMarkers = @(
+        'MERGE_HEAD', 'rebase-merge', 'rebase-apply', 'BISECT_LOG',
+        'CHERRY_PICK_HEAD', 'REVERT_HEAD'
+      )
+      foreach ($marker in $activeMarkers) {
+        $markerPath = Join-Path $gitDir.FullName $marker
+        # undoc-supp: probe — marker may not exist; silent skip is intentional
+        if (Test-Path -LiteralPath $markerPath -PathType Container -ErrorAction SilentlyContinue) {
+          $activeOp = $true
+          break
+        }
+        # undoc-supp: probe — marker may not exist; silent skip is intentional
+        if (Test-Path -LiteralPath $markerPath -PathType Leaf -ErrorAction SilentlyContinue) {
+          $activeOp = $true
+          break
+        }
+      }
+
+      # Remove gitk cache.
+      $gitkCache = Join-Path $gitDir.FullName 'gitk.cache'
+      if (Test-Path -LiteralPath $gitkCache -PathType Leaf) {
+        Remove-Item -LiteralPath $gitkCache -Force -ErrorAction Stop
+      }
+
+      # Remove gc.log (allows git gc --auto to run again).
+      $gcLog = Join-Path $gitDir.FullName 'gc.log'
+      if (Test-Path -LiteralPath $gcLog -PathType Leaf) {
+        Remove-Item -LiteralPath $gcLog -Force -ErrorAction Stop
+      }
+
+      # Remove lock files except index.lock.
+      # undoc-supp: probe — lock files may not exist; empty result is handled
+      $lockFiles = Get-ChildItem -LiteralPath $gitDir.FullName -Filter '*.lock' -File -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ne 'index.lock' }
+      foreach ($lockFile in $lockFiles) {
+        Remove-Item -LiteralPath $lockFile.FullName -Force -ErrorAction Stop
+      }
+
+      # Remove stale state files when no active operation.
+      if (-not $activeOp) {
+        $stateFiles = @(
+          'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'REBASE_HEAD',
+          'SQUASH_MSG', 'AUTO_MERGE', 'BISECT_LOG',
+          'BISECT_ANCESTORS_OK', 'BISECT_EXPECTED_REV', 'BISECT_NAMES', 'BISECT_RUN'
+        )
+        foreach ($stateFile in $stateFiles) {
+          $statePath = Join-Path $gitDir.FullName $stateFile
+          if (Test-Path -LiteralPath $statePath -PathType Leaf) {
+            Remove-Item -LiteralPath $statePath -Force -ErrorAction Stop
+          }
+        }
+      }
+
+      # Remove deprecated directories if empty.
+      $depDirs = @('branches', 'remotes')
+      foreach ($depDir in $depDirs) {
+        $depPath = Join-Path $gitDir.FullName $depDir
+        if (Test-Path -LiteralPath $depPath -PathType Container) {
+          # undoc-supp: probe — dir may already be empty; empty result is handled
+          $depChildren = Get-ChildItem -LiteralPath $depPath -Force -ErrorAction SilentlyContinue
+          if ($null -eq $depChildren -or $depChildren.Count -eq 0) {
+            Remove-Item -LiteralPath $depPath -Force -ErrorAction Stop
+          }
+        }
+      }
+
+      # Remove refs/original/ via git update-ref (handles packed-refs).
+      # undoc-supp: refs/original/ may not exist; empty/null result is handled
+      $originalRefs = & git -C $repoRoot for-each-ref --format='%(refname)' refs/original/ 2>$null
+      if ($originalRefs) {
+        $originalRefs.Trim() -split "`n" | ForEach-Object {
+          $ref = $_.Trim()
+          if ($ref) {
+            # undoc-supp: ref may have been deleted by concurrent gc
+            & git -C $repoRoot update-ref -d $ref 2>$null
+          }
+        }
+        $originalDir = Join-Path $gitDir.FullName 'refs\original'
+        if (Test-Path -LiteralPath $originalDir -PathType Container) {
+          # undoc-supp: probe — dir may not exist or may have leftover refs
+          $originalChildren = Get-ChildItem -LiteralPath $originalDir -Force -ErrorAction SilentlyContinue
+          if ($null -eq $originalChildren -or $originalChildren.Count -eq 0) {
+            Remove-Item -LiteralPath $originalDir -Force -ErrorAction Stop
+          }
+        }
+      }
+
+      # Run git gc --auto (delegates object pruning, reflog expiry, etc. to Git).
+      # undoc-supp: some repos may fail during gc; best-effort
+      & git -C $repoRoot gc --auto 2>$null
+    }
+    catch {
+      Write-NucleusWarning "failed to clear cache/state files in '$($gitDir.FullName)' — $($_.Exception.Message)"
+    }
+  }
+}
+
 # Load only the modules required by this script.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
@@ -311,7 +440,13 @@ if (-not $NoGitTemplateGc) {
   Clear-GitTemplateFiles -DevRoot $devRoot
 }
 
-# ---- Step 4: Scoop cache and old-version cleanup ----------------------------
+# ---- Step 4: remove stale .git cache/state files from ~/dev -----------------
+if (-not $NoGitCacheGc) {
+  $devRoot = Join-Path $HOME 'dev'
+  Clear-GitCacheFiles -DevRoot $devRoot
+}
+
+# ---- Step 5: Scoop cache and old-version cleanup ----------------------------
 if (-not $NoScoopGc) {
   $scoopShims = Join-Path $env:USERPROFILE "scoop\shims"
   $scoopCmd   = Join-Path $scoopShims "scoop.cmd"
@@ -329,7 +464,7 @@ if (-not $NoScoopGc) {
   }
 }
 
-# ---- Step 5: Ollama orphaned model gc --------------------------------------
+# ---- Step 6: Ollama orphaned model gc --------------------------------------
 if (-not $NoOllamaGc) {
   # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
@@ -340,7 +475,7 @@ if (-not $NoOllamaGc) {
   }
 }
 
-# ---- Step 6: stale VM artifact removal ------------------------------------
+# ---- Step 7: stale VM artifact removal ------------------------------------
 if (-not $NoVMGc) {
   $vmDir = Join-Path $env:USERPROFILE "virtual machines"
   $imagesDir = Join-Path $vmDir "images"
@@ -408,7 +543,7 @@ if (-not $NoVMGc) {
   }
 }
 
-# ---- Step 7: log rotation -------------------------------------------------
+# ---- Step 8: log rotation -------------------------------------------------
 if (-not $NoLogGc) {
   $servicesJson = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\services.json"
   if (-not (Test-Path -LiteralPath $servicesJson -PathType Leaf)) {
