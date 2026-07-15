@@ -62,7 +62,7 @@ Boot out (immediately stop) the running `com.apple.Spotlight` service. `launchct
 
 `bootout` may fail with a non-zero exit code if the service is already absent (e.g., a previous activation already stopped it). This is expected and safe; log it as a warning, not an error.
 
-**SIP nuance (macOS 15+)**: `launchctl bootout gui/<uid>/com.apple.Spotlight` can return `Operation not permitted while System Integrity Protection is engaged` even when `launchctl disable` and `mdutil -i off /` have already converged the effective state. Treat this as an expected classified warning (not a hard error), and avoid printing raw unclassified `launchctl` output directly in activation logs.
+SIP nuance (macOS 15+): `launchctl bootout gui/<uid>/com.apple.Spotlight` can return `Operation not permitted while System Integrity Protection is engaged` even when `launchctl disable` and `mdutil -i off /` have already converged the effective state. Treat this as an expected classified warning (not a hard error), and avoid printing raw unclassified `launchctl` output directly in activation logs.
 
 ### Stage 5: mdutil -i off / — disable Spotlight indexing globally
 

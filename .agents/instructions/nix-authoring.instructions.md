@@ -184,6 +184,7 @@ Do not add `[ -n "$old_fingerprint" ]` (POSIX) or `$oldSshFingerprint -ne ''` (W
 - `extraGroups` lists must be sorted alphabetically.
 - `nix.settings.experimental-features` lists must be sorted alphabetically.
 - Do not sort items whose order is semantically significant: `boot.initrd.availableKernelModules`, ordered `imports` lists where one module precedes another by design.
+- Avoid repository-brand prefixes (for example `nucleus*`) in new Nix identifiers unless the prefix is required for cross-module disambiguation or external integration points.
 
 ## Shell module conventions
 
@@ -192,10 +193,6 @@ Do not add `[ -n "$old_fingerprint" ]` (POSIX) or `$oldSshFingerprint -ne ''` (W
 In zsh, aliases are expanded during the parsing phase, **before** function lookup. This means a `shellAliases` entry with the same name as a function will silently shadow the function — the function's body never executes.
 
 Consequence: never add a `shellAliases` / `programs.zsh.shellAliases` entry whose name matches a function defined in `initContent` or `initExtra`. The canonical example is thefuck: `eval $(thefuck --alias)` defines a `fuck` shell function that captures history and auto-executes corrections; adding `fuck = "thefuck"` as an alias would shadow that function with a bare binary invocation that neither executes the fix nor records it in history.
-
-## Naming
-
-- Avoid repository-brand prefixes (for example `nucleus*`) in new Nix identifiers unless the prefix is required for cross-module disambiguation or external integration points.
 
 ## Lockfile management
 

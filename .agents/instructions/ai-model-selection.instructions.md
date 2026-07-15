@@ -47,35 +47,35 @@ Ollama model tags follow `<base>-<quant>` naming. Key quantizations:
 | Tag suffix      | Typical size vs Q4_K_M       | Quality vs Q4_K_M | When to use                                                                          |
 | --------------- | ---------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
 | `q4_K_M`        | baseline (default)           | baseline          | Default; best quality/size tradeoff for most models                                  |
-| `q8_0`          | ~1.7× larger                 | noticeably better | macbook only when headroom allows; never for nixos/windows                           |
-| `fp16` / `bf16` | ~2× larger                   | near-lossless     | macbook only for small models (e.g. e4b) where size allows                           |
+| `q8_0`          | ~1.7× larger                 | noticeably better | MacBook only when headroom allows; never for NixOS/Windows                           |
+| `fp16` / `bf16` | ~2× larger                   | near-lossless     | MacBook only for small models (e.g. e4b) where size allows                           |
 | `it-qat`        | same as Q4_K_M               | approaches BF16   | Preferred over plain Q4_K_M for Gemma models that ship QAT variants (gemma3, gemma4) |
-| `nvfp4`         | slightly smaller than Q4_K_M | similar           | NVIDIA GPU only (nixos/windows with NVIDIA); not for macbook Metal                   |
+| `nvfp4`         | slightly smaller than Q4_K_M | similar           | NVIDIA GPU only (NixOS/Windows with NVIDIA); not for MacBook Metal                   |
 | `mxfp8`         | ~1.5× Q4_K_M                 | good              | NVIDIA GPU or Apple MLX only                                                         |
-| `mlx-bf16`      | ~2× Q4_K_M                   | near-lossless     | Apple MLX only; macbook with sufficient headroom                                     |
+| `mlx-bf16`      | ~2× Q4_K_M                   | near-lossless     | Apple MLX only; MacBook with sufficient headroom                                     |
 
 ## Model selection preference
 
 When choosing between a larger model at a lower quantization vs a smaller model at a higher quantization, **prefer the larger parameter count** even at the cost of running the lower quantization. Examples:
 
-- Prefer `qwen3.5:27b` (17 GB, 27B params, `q4_K_M`) over `qwen3:14b-q8_0` (16 GB, 14B params, `q8_0`) for the macbook slot.
+- Prefer `qwen3.5:27b` (17 GB, 27B params, `q4_K_M`) over `qwen3:14b-q8_0` (16 GB, 14B params, `q8_0`) for the MacBook slot.
 - Prefer a 27B `q4_K_M` model over a 14B `q8_0` model even if their sizes are similar, because more parameters usually outweigh the quantization quality gap at the same budget.
 - Only choose a smaller model when the larger one genuinely cannot fit in the budget (including the ~17–18 GB slight-excess window for macbook).
 
-This preference applies per-host and does **not** override the VRAM budget ceilings: macbook ≤ ~18 GB (slight excess OK); nixos/windows ≤ 6 GB (strict — the slight-excess allowance applies only to macbook).
+This preference applies per-host and does **not** override the VRAM budget ceilings: MacBook ≤ ~18 GB (slight excess OK); NixOS/Windows ≤ 6 GB (strict — the slight-excess allowance applies only to MacBook).
 
 ## Quantization rules
 
 Ollama's available quantizations for models in the relevant size range are limited to `q4_K_M` (or equivalent), `q8_0`, `fp16`/`bf16`, and selected hardware-specific formats (`nvfp4`, `mxfp8`, `mlx-bf16`). There are **no q3 or lower GGUF variants** available in Ollama for any model in this repository's selection; do not expect or look for them.
 
-- **macbook default**: `q4_K_M` (default tag); use `it-qat` when the model family ships one (e.g. `gemma3:27b-it-qat`). Use `e4b-it-bf16` (16 GB) for `gemma4:e4b` when maximum quality at a single small model is desired.
-- **nixos / windows default**: always `q4_K_M` (default tag) — VRAM is tight; do not use q8_0 or fp16 variants.
+- **MacBook default**: `q4_K_M` (default tag); use `it-qat` when the model family ships one (e.g. `gemma3:27b-it-qat`). Use `e4b-it-bf16` (16 GB) for `gemma4:e4b` when maximum quality at a single small model is desired.
+- **NixOS / Windows default**: always `q4_K_M` (default tag) — VRAM is tight; do not use q8_0 or fp16 variants.
 
 ## Model size reference (verified from Ollama library)
 
 Sizes are download/VRAM footprint at default `q4_K_M` quantization unless noted. All tags below confirmed to exist on Ollama as of 2026-05.
 
-### macbook candidates (≤ 16 GB target; ≤ ~18 GB acceptable — high-param preferred)
+### MacBook candidates (≤ 16 GB target; ≤ ~18 GB acceptable — high-param preferred)
 
 Ordered by preference under the high-param-count policy.
 
@@ -91,14 +91,14 @@ Ordered by preference under the high-param-count policy.
 | `qwen3.5:27b-int4` | 16 GB  | tools thinking              | 27B int4 text-only; just fits budget; no vision                 |
 | `qwen3:30b`        | 19 GB  | tools thinking              | MoE 30B/3B active; 256K ctx; ~3 GB over target — use cautiously |
 
-### nixos / windows candidates (≤ 6 GB VRAM — strict; high-param preferred)
+### NixOS / Windows candidates (≤ 6 GB VRAM — strict; high-param preferred)
 
 `qwen3:8b` (5.2 GB, `q4_K_M`) is the maximum-parameter model that fits within 6 GB VRAM at any Ollama-available quantization. Ollama offers no sub-`q4_K_M` variants for models in this size range. The next size up (`qwen3.5:9b-q4_K_M` = 6.6 GB, `qwen3:14b-q4_K_M` = 9.3 GB) all exceed the strict 6 GB budget. The high-param preference does not change the selection here — `qwen3:8b` is already the optimum.
 
 | Model tag    | Size   | Fits 6 GB? | Capabilities          | Notes                                                                    |
 | ------------ | ------ | ---------- | --------------------- | ------------------------------------------------------------------------ |
 | `qwen3:8b`   | 5.2 GB | Yes        | tools thinking        | Current; maximum params within budget; 40K ctx                           |
-| `qwen3.5:9b` | 6.6 GB | No         | vision tools thinking | 0.6 GB over — viable CPU-only on nixos (MemoryMax=16G); not for GPU slot |
+| `qwen3.5:9b` | 6.6 GB | No         | vision tools thinking | 0.6 GB over — viable CPU-only on NixOS (MemoryMax=16G); not for GPU slot |
 
 ## Tool-calling verification
 
