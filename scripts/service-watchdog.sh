@@ -3,6 +3,11 @@
 # that are stuck in non-running states (EX_CONFIG, waiting, spawn-scheduled,
 # inactive, failed, or not loaded at all).
 #
+# On macOS 26+, SIP blocks unsigned Nix store binaries for system daemons
+# with non-root UserName (exit 78 / EX_CONFIG). All MacBook daemons use
+# /bin/sh wrapper; this watchdog recovers any that get stuck at boot.
+# See .agents/instructions/macos-launchd-sip.instructions.md.
+#
 # Reads services.json, filters to the current platform, skips socket-activated
 # and prefix-match services, and recovers each non-running service via
 # bootout+bootstrap (launchctl) or reset-failed+restart (systemctl).
@@ -164,6 +169,8 @@ check_service_macos() {
       recover_launchctl "$svc" "$domain" "$svc_id"
       log_restart "$svc_id" "waiting"
       ;;
+    # Exit 78 (EX_CONFIG): non-retryable, launchd sets penalty box — needs bootout+bootstrap.
+    # Exit 126 (transient): shell cannot exec; does NOT trigger penalty box.
     *"last exit code = 78"*)
       recover_launchctl "$svc" "$domain" "$svc_id"
       log_restart "$svc_id" "EX_CONFIG"

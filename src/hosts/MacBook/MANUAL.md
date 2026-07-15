@@ -39,6 +39,7 @@
   3. The final `bootout` sends SIGKILL if the process is still alive — designed to clear launchd exit-code memory so services with non-retryable exit codes (EX_CONFIG, code 78) can start again.
 - Service watchdog runs every 5 minutes (`local.service-watchdog`): detects services stuck in non-running states and recovers them automatically. Check status with `launchctl list | grep service-watchdog`.
 - To see if a service is running: `nucleus-svc status <service>` or `sudo launchctl print system/<plist-id>` (e.g. `sudo launchctl print system/org.nixos.local.ollama`).
+- macOS 26+ SIP blocks unsigned Nix store binaries for system launchd daemons with non-root `UserName` (exit 78 / EX_CONFIG at boot). All MacBook daemons use `ProgramArguments = ["/bin/sh", "-c", "exec <nix-path>"]` — Apple-signed `/bin/sh` passes SIP gate. The service watchdog (`local.service-watchdog`) recovers any services that get stuck at boot.
 
 ## nucleus commands
 
