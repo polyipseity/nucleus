@@ -643,29 +643,22 @@ in
     '';
   };
 
-  # User-scope package manager bin directories declared unconditionally so PATH
-  # is stable across direnv activation/deactivation cycles regardless of
-  # whether the directories existed at shell startup time.
+  # User-scope package manager bin directories from the centralized catalog.
   # home.sessionPath writes to ~/.zshenv (via the HM session-vars mechanism)
   # which is sourced before ~/.zshrc (where the direnv hook lives), so these
   # entries are always part of the "original" PATH state that direnv saves and
   # restores — fixing the reliability issue of .zshrc-based PATH guards that
   # only run once at startup.
+  # Sources: see pathComponents.prepend in src/modules/lib/env-vars.nix.
   #   bun install -g   → ~/.bun/bin   (BUN_INSTALL_BIN default)
   #   cargo-binstall   → ~/.cargo/bin  (CARGO_HOME/bin default)
   #   uv tool install  → ~/.local/bin  (XDG_BIN_HOME default)
-  # Sources:
-  # https://bun.sh/docs/cli/install#global-packages
-  # https://doc.rust-lang.org/cargo/commands/cargo-install.html
-  # https://docs.astral.sh/uv/reference/settings/#tool-bin-dir
   # Sole declaration site for home.sessionPath and home.sessionVariables.
   # No other file sets these — all env vars flow through the centralized
   # catalog in src/modules/lib/env-vars.nix.
-  home.sessionPath = [
-    "${config.home.homeDirectory}/.bun/bin"
-    "${config.home.homeDirectory}/.cargo/bin"
-    "${config.home.homeDirectory}/.local/bin"
-  ];
+  home.sessionPath = builtins.map
+    (p: "${config.home.homeDirectory}/${p}")
+    envVarsHelpers.pathComponents.prepend;
 
   home.sessionVariables = mergedSessionVariables;
 
