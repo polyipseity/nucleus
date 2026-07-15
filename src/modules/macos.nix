@@ -1397,17 +1397,17 @@ lib.mkIf pkgs.stdenv.isDarwin {
     old_IFS="$IFS"
     IFS=:
     for __component in $CURRENT_PATH; do
-      case ":${__nucleus_managed_set}:" in
-        *":${__component}:"*) ;;
-        *) __nucleus_cleaned="${__nucleus_cleaned}:${__component}" ;;
+      case ":''${__nucleus_managed_set}:" in
+        *":''${__component}:"*) ;;
+        *) __nucleus_cleaned="''${__nucleus_cleaned}:''${__component}" ;;
       esac
     done
     IFS="$old_IFS"
 
     if [ -n "$__nucleus_cleaned" ]; then
-      /bin/launchctl setenv PATH "${__nucleus_prepend}:${__nucleus_cleaned}:${__nucleus_append}"
+      /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_cleaned}:''${__nucleus_append}"
     else
-      /bin/launchctl setenv PATH "${__nucleus_prepend}:${__nucleus_append}"
+      /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_append}"
     fi
   '';
 
@@ -1451,17 +1451,17 @@ lib.mkIf pkgs.stdenv.isDarwin {
           old_IFS="$IFS"
           IFS=:
           for __component in $PATH; do
-            case ":${__nucleus_managed_set}:" in
-              *":${__component}:"*) ;;
-              *) __nucleus_cleaned="${__nucleus_cleaned}:${__component}" ;;
+            case ":''${__nucleus_managed_set}:" in
+              *":''${__component}:"*) ;;
+              *) __nucleus_cleaned="''${__nucleus_cleaned}:''${__component}" ;;
             esac
           done
           IFS="$old_IFS"
 
           if [ -n "$__nucleus_cleaned" ]; then
-            /bin/launchctl setenv PATH "${__nucleus_prepend}:${__nucleus_cleaned}:${__nucleus_append}"
+            /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_cleaned}:''${__nucleus_append}"
           else
-            /bin/launchctl setenv PATH "${__nucleus_prepend}:${__nucleus_append}"
+            /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_append}"
           fi
 
           # ── All other non-user-specific GUI env vars ──
