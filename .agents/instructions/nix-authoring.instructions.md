@@ -95,7 +95,7 @@ nix-darwin refactored the launchd module. The old flat `config` attrset and `ena
 - `StandardOutPath`/`StandardErrorPath` are `null or path` — tilde paths fail type checking.
 - Home Manager's launchd module is unchanged (still `enable` + `config`).
 
-### ### nix-darwin launchd.daemons label naming
+### nix-darwin launchd.daemons label naming
 
 nix-darwin auto-generates the launchd `Label` from the `launchd.daemons.<name>`
 key. For system daemons (via `launchd.daemons`), the label becomes
