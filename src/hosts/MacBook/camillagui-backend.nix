@@ -5,6 +5,7 @@
 # Manager in modules/home.nix.
 {
   config,
+  lib,
   pkgs,
   username,
   ...
@@ -23,6 +24,15 @@ in
         "exec ${pkgs.camillagui-backend}/bin/camillagui-backend -c ${userHome}/.config/camillagui-backend/config.yml"
       ];
       UserName = username;
+      EnvironmentVariables =
+        (import ../../modules/lib/env-vars.nix {
+          inherit
+            config
+            pkgs
+            lib
+            username
+            ;
+        }).toMacOSDaemonEnv;
       KeepAlive = true;
       RunAtLoad = true;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/camillagui-backend/stdout.log";

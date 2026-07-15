@@ -9,6 +9,7 @@
 # config re-applies when a disconnected audio device reappears.
 {
   config,
+  lib,
   pkgs,
   username,
   ...
@@ -54,6 +55,15 @@ in
       Label = "local.camilladsp";
       ProgramArguments = [ "${camilladspDaemon}" ];
       UserName = username;
+      EnvironmentVariables =
+        (import ../../modules/lib/env-vars.nix {
+          inherit
+            config
+            pkgs
+            lib
+            username
+            ;
+        }).toMacOSDaemonEnv;
       KeepAlive = true;
       RunAtLoad = true;
       ThrottleInterval = 30;
@@ -68,6 +78,15 @@ in
       Label = "local.camilladsp-heartbeat";
       ProgramArguments = [ "${camilladspHeartbeat}" ];
       UserName = username;
+      EnvironmentVariables =
+        (import ../../modules/lib/env-vars.nix {
+          inherit
+            config
+            pkgs
+            lib
+            username
+            ;
+        }).toMacOSDaemonEnv;
       StartInterval = 5;
       RunAtLoad = false;
       ThrottleInterval = 1;

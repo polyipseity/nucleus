@@ -6,8 +6,10 @@
 # code (exit 78 = EX_CONFIG) and would otherwise stay in penalty box forever.
 {
   config,
+  lib,
   pkgs,
   nucleusApps,
+  username,
   ...
 }:
 let
@@ -32,9 +34,18 @@ in
       StartInterval = 300;
       RunAtLoad = true;
       KeepAlive = false;
-      EnvironmentVariables = {
-        NUCLEUS_SERVICES_JSON = servicesJson;
-      };
+      EnvironmentVariables =
+        (import ../../modules/lib/env-vars.nix {
+          inherit
+            config
+            pkgs
+            lib
+            username
+            ;
+        }).toMacOSDaemonEnv
+        // {
+          NUCLEUS_SERVICES_JSON = servicesJson;
+        };
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/service-watchdog/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/service-watchdog/stderr.log";
     };

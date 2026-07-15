@@ -10,6 +10,7 @@
 # - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
 {
   config,
+  lib,
   pkgs,
   username,
   ...
@@ -43,6 +44,15 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
+      EnvironmentVariables =
+        (import ../../modules/lib/env-vars.nix {
+          inherit
+            config
+            pkgs
+            lib
+            username
+            ;
+        }).toMacOSDaemonEnv;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/jellyfin/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/jellyfin/stderr.log";
     };

@@ -116,9 +116,15 @@ in
       WorkingDirectory = workDir;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/linux-builder/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/linux-builder/stderr.log";
-      EnvironmentVariables = {
-        NIX_SSL_CERT_FILE = config.environment.variables.NIX_SSL_CERT_FILE;
-      };
+      EnvironmentVariables =
+        (import ../../modules/lib/env-vars.nix {
+          inherit
+            config
+            pkgs
+            lib
+            username
+            ;
+        }).toMacOSDaemonEnv;
     };
   };
 

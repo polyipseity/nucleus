@@ -19,6 +19,16 @@
 let
   userHome = "/Users/${username}";
   litellmConfig = "${userHome}/.config/nucleus/litellm-config.yml";
+  macosDaemonEnv = (
+    import ../../modules/lib/env-vars.nix {
+      inherit
+        config
+        pkgs
+        lib
+        username
+        ;
+    }
+  );
 in
 {
   launchd.daemons."local.litellm" = {
@@ -47,6 +57,7 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
+      EnvironmentVariables = macosDaemonEnv.toMacOSDaemonEnv;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/litellm/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/litellm/stderr.log";
     };
@@ -67,15 +78,7 @@ in
       # returns OLLAMA_* vars excluding OLLAMA_HOST so the daemon binds to
       # the default port (11434).  OLLAMA_HOST is set by the gui-env
       # LaunchAgent for CLI clients.
-      EnvironmentVariables =
-        (import ../../modules/lib/env-vars.nix {
-          inherit
-            config
-            pkgs
-            lib
-            username
-            ;
-        }).toMacOSDaemonOllamaEnv;
+      EnvironmentVariables = macosDaemonEnv.toMacOSDaemonEnv // macosDaemonEnv.toMacOSDaemonOllamaEnv;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/ollama/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/ollama/stderr.log";
     };

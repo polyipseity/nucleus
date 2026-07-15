@@ -65,6 +65,15 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
+      EnvironmentVariables =
+        (import ../../modules/lib/env-vars.nix {
+          inherit
+            config
+            pkgs
+            lib
+            username
+            ;
+        }).toMacOSDaemonEnv;
       StandardOutPath = "${systemLogDir}/caddy/stdout.log";
       StandardErrorPath = "${systemLogDir}/caddy/stderr.log";
     };
