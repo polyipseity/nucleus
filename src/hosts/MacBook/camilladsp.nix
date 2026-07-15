@@ -67,6 +67,9 @@ in
   launchd.daemons."camilladsp" = {
     serviceConfig = {
       Label = "local.camilladsp";
+      # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
+      # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
+      # passes SIP gate. See .agents/instructions/macos-launchd-sip.instructions.md.
       ProgramArguments = [
         "/bin/sh"
         "-c"
@@ -86,6 +89,9 @@ in
   launchd.daemons."camilladsp-heartbeat" = {
     serviceConfig = {
       Label = "local.camilladsp-heartbeat";
+      # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
+      # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
+      # passes SIP gate. See .agents/instructions/macos-launchd-sip.instructions.md.
       ProgramArguments = [
         "/bin/sh"
         "-c"

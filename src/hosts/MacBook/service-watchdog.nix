@@ -40,6 +40,9 @@ in
   launchd.daemons."service-watchdog" = {
     serviceConfig = {
       Label = "local.service-watchdog";
+      # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
+      # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
+      # passes SIP gate. See .agents/instructions/macos-launchd-sip.instructions.md.
       ProgramArguments = [
         "/bin/sh"
         "-c"

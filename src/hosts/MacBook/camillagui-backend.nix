@@ -31,6 +31,9 @@ in
   launchd.daemons."camillagui-backend" = {
     serviceConfig = {
       Label = "local.camillagui-backend";
+      # NOTE: This /bin/sh wrapper predates the macOS 26+ SIP restriction and
+      # served as the reference pattern for fixing other daemons. See
+      # .agents/instructions/macos-launchd-sip.instructions.md.
       ProgramArguments = [
         "/bin/sh"
         "-c"
