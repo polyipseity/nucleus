@@ -38,6 +38,7 @@ let
     pkgs.ncdu
     pkgs.nickel
     pkgs.nixd
+    pkgs.nixf
     pkgs.nixfmt
     pkgs.nix-index
     pkgs.nls

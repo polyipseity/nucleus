@@ -12,28 +12,29 @@
 #   1. PowerShell syntax validation
 #   2. Packer template validation
 #
-# Nix checks (3-6, stubs on Windows):
+# Nix checks (3-7, stubs on Windows):
 #   3. Dead Nix code (stub)
 #   4. Nix flake evaluation (stub)
 #   5. Nix formatting (nixfmt) (stub)
-#   6. Stale Nix build artifact check
+#   6. Nix lint (nixf-tidy) (stub)
+#   7. Stale Nix build artifact check
 #
-# Test suites (7-10, stubs on Windows):
-#   7. Shell script validation tests (stub)
-#   8. CWD-independence tests (stub)
-#   9. Nix search path tests (stub)
-#  10. Port utility function tests (stub)
+# Test suites (8-11, stubs on Windows):
+#   8. Shell script validation tests (stub)
+#   9. CWD-independence tests (stub)
+#  10. Nix search path tests (stub)
+#  11. Port utility function tests (stub)
 #
-# Data integrity (11-14):
-#  11. Lockfile validation
-#  12. Locked DSC validation
-#  13. Service registry validation
-#  14. YAML validation
+# Data integrity (12-15):
+#  12. Lockfile validation
+#  13. Locked DSC validation
+#  14. Service registry validation
+#  15. YAML validation
 #
-# Policy/verification (15-17):
-#  15. Package manager usage enforcement
-#  16. Undocumented error suppression check
-#  17. Online determinism checks (--verify mode only)
+# Policy/verification (16-18):
+#  16. Package manager usage enforcement
+#  17. Undocumented error suppression check
+#  18. Online determinism checks (--verify mode only)
 #
 # Output conventions:
 #   All messages (info, success, skip, warning) go to stdout.
@@ -43,7 +44,7 @@
 #   for the POSIX-side convention.
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
-# Steps 3-5, 7-10 are stubs (require Nix or bash — not available on Windows).
+# Steps 3-6, 8-11 are stubs (require Nix or bash — not available on Windows).
 # Steps 16-17 only run with the --verify flag.
 #
 # Prerequisites:
@@ -171,7 +172,13 @@ Write-Output ("`n=== [{0}] Nix formatting (nixfmt) ===" -f (++$_step))
 say "skipping (requires Nix toolchain — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 6. Stale Nix build artifact check
+# 6. Nix lint (nixf-tidy)
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Nix lint (nixf-tidy) ===" -f (++$_step))
+say "skipping (requires Nix toolchain — not available on Windows)."
+
+# ---------------------------------------------------------------------------
+# 7. Stale Nix build artifact check
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Stale Nix build artifact check ===" -f (++$_step))
 if (-not $HAS_ARGS) {
@@ -398,7 +405,7 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 12. Locked DSC validation
+# 13. Locked DSC validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
 # Platform parallel: check.sh uses yq+jq pipeline (POSIX-native equivalent).
@@ -541,7 +548,7 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 13. Service registry validation
+# 14. Service registry validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Service registry validation ===" -f (++$_step))
 if (-not $HAS_ARGS) {
@@ -659,7 +666,7 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 14. YAML validation
+# 15. YAML validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] YAML validation ===" -f (++$_step))
 $_yamlErrors = 0
@@ -688,7 +695,7 @@ if ($_yamlErrors -gt 0) {
 say "YAML validation passed."
 
 # ---------------------------------------------------------------------------
-# 15. Package manager usage enforcement
+# 16. Package manager usage enforcement
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Package manager usage enforcement ===" -f (++$_step))
 if (-not $HAS_ARGS) {
@@ -727,7 +734,7 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 16. Undocumented error suppression check
+# 17. Undocumented error suppression check
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_step))
 
@@ -801,7 +808,7 @@ if ($_undocSuppViolations.Count -gt 0) {
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
-# 17. Online determinism checks (--verify mode only)
+# 18. Online determinism checks (--verify mode only)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Online determinism checks (--verify) ===" -f (++$_step))
 if ($VERIFY) {

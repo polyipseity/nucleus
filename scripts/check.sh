@@ -14,28 +14,29 @@
 #   1. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 #   2. Packer template validation
 #
-# Nix checks (3-6):
+# Nix checks (3-7):
 #   3. Dead Nix code detection (deadnix)
 #   4. Nix flake evaluation
 #   5. Nix formatting check (nixfmt --verify)
-#   6. Stale Nix build artifact check
+#   6. Nix lint check (nixf-tidy)
+#   7. Stale Nix build artifact check
 #
-# Test suites (7-10):
-#   7. Shell script validation tests
-#   8. CWD-independence tests
-#   9. Nix search path tests
-#  10. Port utility function tests
+# Test suites (8-11):
+#   8. Shell script validation tests
+#   9. CWD-independence tests
+#  10. Nix search path tests
+#  11. Port utility function tests
 #
-# Data integrity (11-14):
-#  11. Lockfile validation
-#  12. Locked DSC validation
-#  13. Service registry validation
-#  14. YAML validation
+# Data integrity (12-15):
+#  12. Lockfile validation
+#  13. Locked DSC validation
+#  14. Service registry validation
+#  15. YAML validation
 #
-# Policy/verification (15-17):
-#  15. Package manager usage enforcement
-#  16. Undocumented error suppression check
-#  17. Online determinism checks (--verify mode only)
+# Policy/verification (16-18):
+#  16. Package manager usage enforcement
+#  17. Undocumented error suppression check
+#  18. Online determinism checks (--verify mode only)
 #
 # Output conventions:
 #   Warnings (warn) and errors (error) go to stderr; info/success/skip
@@ -59,6 +60,7 @@
 # Prerequisites:
 #   - jq, yq (for lockfile/registry/DSC validation)
 #   - deadnix (for dead Nix code detection)
+#   - nixf (for Nix lint via nixf-tidy)
 #   - nixfmt (for Nix formatting)
 #   - nix (for flake evaluation)
 #   - pwsh (for PowerShell syntax validation)
@@ -158,6 +160,7 @@ require_command nixfmt
 require_command yq
 require_command jq
 require_command deadnix
+require_command nixf-tidy
 require_command nix
 require_command packer
 
@@ -232,6 +235,48 @@ if [ "${#NIX_FILES[@]}" -gt 0 ]; then
 else
   say "skipping nixfmt (no Nix files to check)."
 fi
+
+# Nix lint check (nixf-tidy)
+section "$((_step += 1))" "Nix lint (nixf-tidy)"
+_nixf_errors=0
+if [ "${#NIX_FILES[@]}" -gt 0 ]; then
+  for _nixf_file in "${NIX_FILES[@]}"; do
+    if ! _nixf_out=$(nixf-tidy < "$_nixf_file" 2>&1); then
+      warn "$_nixf_file: nixf-tidy failed"
+      _nixf_errors=$((_nixf_errors + 1))
+    elif [ "$(echo "$_nixf_out" | jq 'length')" -gt 0 ]; then
+      echo "$_nixf_out" | jq -r '.[] | "\(.sname): \(.message)"' | while IFS= read -r _nixf_issue; do
+        warn "$_nixf_file: $_nixf_issue"
+      done
+      _nixf_errors=$((_nixf_errors + 1))
+    fi
+  done
+  if [ "$_nixf_errors" -gt 0 ]; then
+    exit_code=1
+    $FAIL_FAST && exit $exit_code
+  fi
+  say "nixf-tidy lint passed."
+elif ! $HAS_ARGS; then
+  while IFS= read -r -d '' _nixf_file; do
+    if ! _nixf_out=$(nixf-tidy < "$_nixf_file" 2>&1); then
+      warn "$_nixf_file: nixf-tidy failed"
+      _nixf_errors=$((_nixf_errors + 1))
+    elif [ "$(echo "$_nixf_out" | jq 'length')" -gt 0 ]; then
+      echo "$_nixf_out" | jq -r '.[] | "\(.sname): \(.message)"' | while IFS= read -r _nixf_issue; do
+        warn "$_nixf_file: $_nixf_issue"
+      done
+      _nixf_errors=$((_nixf_errors + 1))
+    fi
+  done < <(find . -path ./vendor -prune -o -name '*.nix' -print0)
+  if [ "$_nixf_errors" -gt 0 ]; then
+    exit_code=1
+    $FAIL_FAST && exit $exit_code
+  fi
+  say "nixf-tidy lint passed."
+else
+  say "skipping nixf-tidy (no Nix files to check)."
+fi
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Stale Nix build artifact check
 section "$((_step += 1))" "Stale Nix build artifact check"
