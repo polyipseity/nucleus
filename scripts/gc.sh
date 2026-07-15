@@ -23,6 +23,7 @@ usage() {
   cat <<'EOF'
   --tool-cache-gc|--no-tool-cache-gc  Control bun/cargo/rustc/uv cache gc (default: --tool-cache-gc).
   --git-template-gc|--no-git-template-gc  Control stale .git hooks/description cleanup (default: --git-template-gc).
+  --git-cache-gc|--no-git-cache-gc  Control stale .git cache/state cleanup and git gc --auto (default: --git-cache-gc).
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
@@ -44,6 +45,7 @@ REPO_ROOT="$(derive_repo_root)"
 
 tool_cache_gc=true
 git_template_gc=true
+git_cache_gc="${NUCLEUS_GC_GIT_CACHE_GC:-true}"
 hm_gc=true
 nix_gc=true
 ollama_gc=true
@@ -73,6 +75,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-git-template-gc)
       git_template_gc=false
+      ;;
+    --git-cache-gc)
+      git_cache_gc=true
+      ;;
+    --no-git-cache-gc)
+      git_cache_gc=false
       ;;
     --hm-gc)
       hm_gc=true
@@ -321,6 +329,124 @@ gc_git_templates_if_present() {
   done < <(find "$dev_root" -name ".git" -type d -print0 2>/dev/null)
 }
 
+gc_git_cache_if_present() {
+  # Remove stale .git cache and state files from repos under ~/dev.
+  # Complements gc_git_templates_if_present() with deeper cleanup: gitk
+  # cache, gc.log, stale lock files, abandoned merge/rebase/bisect state,
+  # deprecated directories (branches/, remotes/), refs/original/, and
+  # delegated cleanup via `git gc --auto`.
+  #
+  # Active operation detection (MERGE_HEAD, rebase-merge/, BISECT_LOG, etc.)
+  # is done per-repo; state file removal is skipped for repos with
+  # in-progress operations.
+  dev_root="$HOME/dev"
+  if [ ! -d "$dev_root" ]; then
+    return 0
+  fi
+
+  while IFS= read -r -d '' gitdir; do
+    repo_dir="$(dirname "$gitdir")"
+    (
+      cd "$repo_dir" 2>/dev/null || exit 0
+
+      # Detect active Git operation.
+      active_op=false
+      for marker in ".git/MERGE_HEAD" ".git/rebase-merge" ".git/rebase-apply" ".git/BISECT_LOG" ".git/CHERRY_PICK_HEAD" ".git/REVERT_HEAD"; do
+        if [ -e "$marker" ]; then
+          active_op=true
+          break
+        fi
+      done
+
+      # Remove gitk cache.
+      if [ -f ".git/gitk.cache" ]; then
+        if [ "$dry_run" = true ]; then
+          dry_run "would remove '.git/gitk.cache' in '$repo_dir'"
+        else
+          rm -f ".git/gitk.cache"
+        fi
+      fi
+
+      # Remove gc.log (allows git gc --auto to run again).
+      if [ -f ".git/gc.log" ]; then
+        if [ "$dry_run" = true ]; then
+          dry_run "would remove '.git/gc.log' in '$repo_dir'"
+        else
+          rm -f ".git/gc.log"
+        fi
+      fi
+
+      # Remove lock files except index.lock.
+      while IFS= read -r -d '' _lockfile; do
+        if [ "$dry_run" = true ]; then
+          dry_run "would remove lock file '$(printf '%s' "$_lockfile" | sed "s|^\./\.git/|.git/|")' in '$repo_dir'"
+        else
+          rm -f "$_lockfile"
+        fi
+      done < <(find ".git" -name '*.lock' ! -name 'index.lock' -type f -print0 2>/dev/null)
+
+      # Remove stale state files when no active operation.
+      if [ "$active_op" = false ]; then
+        for _state_file in ".git/MERGE_HEAD" ".git/CHERRY_PICK_HEAD" ".git/REVERT_HEAD" ".git/REBASE_HEAD" ".git/SQUASH_MSG" ".git/AUTO_MERGE" ".git/BISECT_LOG"; do
+          if [ -f "$_state_file" ]; then
+            if [ "$dry_run" = true ]; then
+              dry_run "would remove stale state file '$_state_file' in '$repo_dir'"
+            else
+              rm -f "$_state_file"
+            fi
+          fi
+        done
+        for _bisect_file in ".git/BISECT_ANCESTORS_OK" ".git/BISECT_EXPECTED_REV" ".git/BISECT_NAMES" ".git/BISECT_RUN"; do
+          if [ -f "$_bisect_file" ]; then
+            if [ "$dry_run" = true ]; then
+              dry_run "would remove stale bisect file '$_bisect_file' in '$repo_dir'"
+            else
+              rm -f "$_bisect_file"
+            fi
+          fi
+        done
+      fi
+
+      # Remove deprecated directories if empty.
+      for _dep_dir in ".git/branches" ".git/remotes"; do
+        if [ -d "$_dep_dir" ]; then
+          if ! find "$_dep_dir" -mindepth 1 -maxdepth 1 | head -n 1 | grep -q .; then
+            if [ "$dry_run" = true ]; then
+              dry_run "would remove empty deprecated directory '$_dep_dir' in '$repo_dir'"
+            else
+              # undoc-supp: race — directory may no longer be empty between check and removal
+              rmdir "$_dep_dir" 2>/dev/null || true
+            fi
+          fi
+        fi
+      done
+
+      # Remove refs/original/ via git update-ref (handles packed-refs).
+      if git for-each-ref --format='%(refname)' refs/original/ 2>/dev/null | grep -q .; then
+        if [ "$dry_run" = true ]; then
+          dry_run "would remove refs/original/ in '$repo_dir'"
+        else
+          git for-each-ref --format='%(refname)' refs/original/ 2>/dev/null | while IFS= read -r _ref; do
+            # undoc-supp: ref may have been deleted by concurrent gc
+            git update-ref -d "$_ref" 2>/dev/null || true
+          done
+          # undoc-supp: directory may not exist or may not be empty
+          rmdir ".git/refs/original" 2>/dev/null || true
+        fi
+      fi
+
+      # Run git gc --auto (delegates object pruning, reflog expiry, etc.
+      # to Git).  --auto is a no-op when nothing needs gc.
+      if [ "$dry_run" = true ]; then
+        dry_run "would run 'git gc --auto' in '$repo_dir'"
+      else
+        # undoc-supp: some repos may have errors during gc
+        git gc --auto 2>/dev/null || true
+      fi
+    )
+  done < <(find "$dev_root" -name ".git" -type d -print0 2>/dev/null)
+}
+
 gc_ollama_models_if_available() {
   # Remove locally installed Ollama models that are absent from the declarative
   # manifest at src/modules/ai/models.json.  Delegates to ai-sync.sh with
@@ -497,7 +623,15 @@ if [ "$git_template_gc" = true ]; then
     gc_git_templates_if_present
   fi
 fi
-# Step 6: remove orphaned Ollama models not declared in the manifest.
+# Step 6: remove stale .git cache/state files and run git gc --auto in ~/dev.
+if [ "$git_cache_gc" = true ]; then
+  if [ "$dry_run" = true ]; then
+    dry_run "would remove stale .git cache/state files in ~/dev"
+  else
+    gc_git_cache_if_present
+  fi
+fi
+# Step 7: remove orphaned Ollama models not declared in the manifest.
 if [ "$ollama_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would gc stale Ollama models"
@@ -506,7 +640,7 @@ if [ "$ollama_gc" = true ]; then
   fi
 fi
 
-# Step 7: remove stale VM artifacts (temporary builds, orphaned images).
+# Step 8: remove stale VM artifacts (temporary builds, orphaned images).
 if [ "$vm_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would gc stale VM artifacts"
@@ -537,7 +671,7 @@ gc_logs() {
   fi
 }
 
-# Step 8: rotate managed log files via copy-truncate (preserves inodes).
+# Step 9: rotate managed log files via copy-truncate (preserves inodes).
 if [ "$log_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would rotate managed logs"
@@ -564,7 +698,7 @@ gc_journald_if_available() {
   journalctl --vacuum-time="$_jv_expiry" 2>/dev/null || true
 }
 
-# Step 9: vacuum journald logs (NixOS only; no-op on macOS/Windows).
+# Step 10: vacuum journald logs (NixOS only; no-op on macOS/Windows).
 if [ "$journald_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would vacuum journald logs older than ${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}"
@@ -573,7 +707,7 @@ if [ "$journald_gc" = true ]; then
   fi
 fi
 
-# Step 10: Scoop cache gc (accepted but ignored on POSIX; Windows-only).
+# Step 11: Scoop cache gc (accepted but ignored on POSIX; Windows-only).
 # This flag exists for cross-platform CLI parity with the Windows gc.ps1 script.
 
 nuc_done
