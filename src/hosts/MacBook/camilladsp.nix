@@ -86,7 +86,11 @@ in
   launchd.daemons."camilladsp-heartbeat" = {
     serviceConfig = {
       Label = "local.camilladsp-heartbeat";
-      ProgramArguments = [ "${camilladspHeartbeat}" ];
+      ProgramArguments = [
+        "/bin/sh"
+        "-c"
+        "exec ${camilladspHeartbeat}"
+      ];
       UserName = username;
       EnvironmentVariables = daemonEnv;
       StartInterval = 5;
