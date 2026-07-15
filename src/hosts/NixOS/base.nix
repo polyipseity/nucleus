@@ -47,15 +47,17 @@ in
   # All-process environment variables sourced from the centralized env var
   # catalog.  NixOS `environment.variables` propagates to all processes via
   # PAM and systemd.  See src/modules/lib/env-vars.nix for the canonical list.
-  # Merge a manually managed PATH (user-scope package manager bin dirs
-  # prepended before system defaults) into the catalog-derived set since
-  # PATH's concatenation semantics don't fit the catalog's single-value model.
-  # Uses lib.mkBefore to prepend managed dirs before whatever NixOS sets as
-  # the system PATH (setuid wrappers, system packages), preserving them
-  # dynamically instead of guessing their locations.
-  # Mirrors pathComponents in src/modules/lib/env-vars.nix.
+  # Merge managed PATH directories (user-scope package manager bin dirs) into
+  # the catalog-derived set since PATH's concatenation semantics don't fit the
+  # catalog's single-value model.
+  # Uses lib.mkBefore for prepend dirs (before system default PATH from other
+  # modules) and lib.mkAfter for append dirs (after them), preserving the
+  # prepend/append distinction from pathComponents in the catalog.
   environment.variables = envVars.toNixOSSystemEnvironment // {
-    PATH = lib.mkBefore (envVars.toNixOSPath);
+    PATH = lib.mkMerge [
+      (lib.mkBefore (map (p: "/home/${username}/${p}") envVars.pathComponents.prepend))
+      (lib.mkAfter (map (p: "/home/${username}/${p}") envVars.pathComponents.append))
+    ];
   };
 
   # Disable nano to prevent its default EDITOR assignment from overriding

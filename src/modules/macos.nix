@@ -1367,8 +1367,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Propagate managed PATH to GUI domain.  Reads the current GUI domain PATH
     # at runtime (with fallback to shell PATH), strips stale managed entries,
     # then prepends + appends managed dirs.
-    __nucleus_prepend="${envVars.toLaunchctlPATH}"
-    __nucleus_append=""
+    __nucleus_prepend="${envVars.toLaunchctlPrependPath}"
+    __nucleus_append="${envVars.toLaunchctlAppendPath}"
     __nucleus_managed_dirs="${config.home.homeDirectory}/.bun/bin:${config.home.homeDirectory}/.cargo/bin:${config.home.homeDirectory}/.local/bin"
 
     CURRENT_PATH="$(/bin/launchctl getenv PATH 2>/dev/null || true)"
@@ -1424,8 +1424,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
           set -eu
 
           # ── PATH: strip stale managed entries, then prepend+append ──
-          __nucleus_prepend="${envVars.toLaunchctlPATH}"
-          __nucleus_append=""
+          __nucleus_prepend="${envVars.toLaunchctlPrependPath}"
+          __nucleus_append="${envVars.toLaunchctlAppendPath}"
           __nucleus_managed_dirs="$HOME/.bun/bin:$HOME/.cargo/bin:$HOME/.local/bin"
 
           __nucleus_cleaned=""

@@ -64,55 +64,21 @@ let
     append = [ ];
   };
 
-  # ── Helper: render managed PATH parts from pathComponents ──────────
-  # Returns a colon-joined string of managed user-scope bin dirs.
-  # Contains only the pathComponents (prepend + append), no system default.
-  # Callers prepend/append these to the actual PATH at runtime so the system
-  # default is preserved dynamically.
-  # NOTE: Returns only managed PATH components — callers must combine with
-  # the runtime system PATH (prepend + runtime + append).
-  toLaunchctlPATH =
-    let
-      homePrefix = "$HOME";
-      prependStr = builtins.concatStringsSep ":" (map (p: "${homePrefix}/${p}") pathComponents.prepend);
-      appendStr = builtins.concatStringsSep ":" (map (p: "${homePrefix}/${p}") pathComponents.append);
-      components = builtins.filter (s: s != "") [
-        (if pathComponents.prepend != [ ] then prependStr else "")
-        (if pathComponents.append != [ ] then appendStr else "")
-      ];
-    in
-    builtins.concatStringsSep ":" components;
+  # ── Helper: render macOS launchctl prepend PATH string ─────────────
+  # Returns a colon-joined string of prepend dirs only for use as
+  # __nucleus_prepend in macOS activation/LaunchAgent scripts.
+  # Contains only the managed prepend dirs, no system default.
+  # NOTE: Returns only managed prepend PATH components — callers must
+  # combine with the runtime system PATH.
+  toLaunchctlPrependPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.prepend);
 
-  # ── Helper: render NixOS PATH from pathComponents ──────────────────
-  # Returns a list of absolute directory paths for NixOS
-  # environment.variables.PATH.  NixOS joins lists with `:`, so this
-  # returns a list rather than a colon-joined string.
-  # Contains only the managed pathComponents (prepend + append).  The NixOS
-  # caller uses mkBefore so system directories are preserved dynamically.
-  # NOTE: Returns only managed PATH components — callers must combine with
-  # the runtime system PATH (prepend + runtime + append).
-  toNixOSPath =
-    let
-      homePrefix = resolvedHomeDirectory;
-      prependDirs = map (p: "${homePrefix}/${p}") pathComponents.prepend;
-      appendDirs = map (p: "${homePrefix}/${p}") pathComponents.append;
-    in
-    prependDirs ++ appendDirs;
-
-  # ── Helper: render Windows user PATH string from pathComponents ────
-  # Returns a semicolon-joined string with %USERPROFILE%-prefixed paths
-  # for parity documentation and test consumption.  Not consumed at
-  # runtime on Windows (Sync-UserPath.ps1 hardcodes the values since
-  # Nix isn't available during apply).
-  # NOTE: Returns only managed PATH components — callers must combine with
-  # the runtime system PATH.
-  toWindowsUserPathString =
-    let
-      homePrefix = "%USERPROFILE%";
-      prependDirs = map (p: "${homePrefix}\\${p}") pathComponents.prepend;
-      appendDirs = map (p: "${homePrefix}\\${p}") pathComponents.append;
-    in
-    builtins.concatStringsSep ";" (prependDirs ++ appendDirs);
+  # ── Helper: render macOS launchctl append PATH string ──────────────
+  # Returns a colon-joined string of append dirs only for use as
+  # __nucleus_append in macOS activation/LaunchAgent scripts.
+  # Contains only the managed append dirs, no system default.
+  # NOTE: Returns only managed append PATH components — callers must
+  # combine with the runtime system PATH.
+  toLaunchctlAppendPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.append);
 
   # ── Catalog ─────────────────────────────────────────────────────────
   # Each entry:
@@ -297,7 +263,10 @@ let
     # ── macOS GUI environment PATH (user-specific) ─────────────────
     PATH = {
       values = {
-        macOS = toLaunchctlPATH;
+        macOS = builtins.concatStringsSep ":" (
+          (map (p: "$HOME/${p}") pathComponents.prepend) ++
+          (map (p: "$HOME/${p}") pathComponents.append)
+        );
       };
       excludeFromSessionVariables = true;
       excludeFromLaunchctl = true;
@@ -505,9 +474,8 @@ in
     defaultDevTools
     passwordStoreDir
     currentOs
-    toLaunchctlPATH
-    toNixOSPath
-    toWindowsUserPathString
+    toLaunchctlPrependPath
+    toLaunchctlAppendPath
     pathComponents
     ;
 }
