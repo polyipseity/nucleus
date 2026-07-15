@@ -202,7 +202,7 @@ function Sync-CloudDrive {
 
         $action = New-ScheduledTaskAction -Execute 'pwsh.exe' -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$wrapperPath`""
         $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
-        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
         $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
 
         # undoc-supp: probe — task may not be registered yet; $null check handles absence.

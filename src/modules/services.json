@@ -84,18 +84,20 @@
     "platforms": {
       "macos": {
         "domain": "system",
-        "justification": "Launchd agent in camilladsp.nix with StartInterval=5; managed for lifecycle awareness",
+        "justification": "Launchd daemon with internal 5s loop; runs as console user for audio device access.",
+        "runAsUser": true,
         "service": "local.camilladsp-heartbeat",
         "type": "launchctl"
       },
       "nixos": {
-        "justification": "Systemd timer in camilladsp.nix with OnUnitActiveSec=5s; managed for lifecycle awareness",
+        "justification": "Persistent systemd service with internal 5s loop; restarts config after device reconnection.",
         "scope": "system",
         "service": "camilladsp-heartbeat.service",
         "type": "systemctl"
       },
       "windows": {
-        "type": "omitted"
+        "taskPath": "\\NucleusCamillaDSPHeartbeat",
+        "type": "schtask"
       }
     }
   },
@@ -300,7 +302,7 @@
       "macos": {
         "domain": "system",
         "runAsUser": true,
-        "service": "org.nixos.local.litellm",
+        "service": "local.litellm",
         "type": "launchctl"
       },
       "nixos": {
@@ -339,7 +341,7 @@
       "macos": {
         "domain": "system",
         "runAsUser": true,
-        "service": "org.nixos.local.ollama",
+        "service": "local.ollama",
         "type": "launchctl"
       },
       "nixos": {
@@ -454,8 +456,10 @@
         "type": "launchctl"
       },
       "nixos": {
-        "justification": "SSH agent provided by desktop environment keychain (GNOME Keyring / KDE Wallet); no standalone agent to manage.",
-        "type": "omitted"
+        "justification": "Standalone OpenSSH ssh-agent via programs.ssh.startAgent; user-scoped to isolate key material per login session.",
+        "scope": "user",
+        "service": "ssh-agent.service",
+        "type": "systemctl"
       },
       "windows": {
         "justification": "Runs as SYSTEM SCM service; per-user isolation handled by OpenSSH's per-user ssh-agent.exe spawned on demand.",

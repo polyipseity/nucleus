@@ -442,9 +442,6 @@ in
                   # from the "remote not configured" early-return path above).
                   SuccessfulExit = false;
                 };
-                # Throttle restarts to 30 s to avoid rapid cycling while the
-                # remote is being set up.
-                ThrottleInterval = 30;
                 # Log errors to ~/Library/Logs for easier debugging.
                 # Capture both stdout and stderr so mount activity is fully
                 # inspectable (remote not configured, network unavailable, etc.).
@@ -511,8 +508,7 @@ in
                     )
                   );
                   ExecStop = mkFusermountUnmount mountPoint;
-                  Restart = "on-failure";
-                  RestartSec = "30s";
+                  Restart = "always";
                 };
                 Install = {
                   WantedBy = [ "default.target" ];

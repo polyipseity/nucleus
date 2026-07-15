@@ -42,9 +42,11 @@ let
   # matters.  The prefix argument is "${config.home.homeDirectory}" for
   # the activation script (build-time eval) or "$HOME" for the launchd
   # agent (runtime shell expansion).
-  mkManagedDedupSet = prefix: builtins.concatStringsSep ":" (
-    map (p: "${prefix}/${p}") (envVars.pathComponents.prepend ++ envVars.pathComponents.append)
-  );
+  mkManagedDedupSet =
+    prefix:
+    builtins.concatStringsSep ":" (
+      map (p: "${prefix}/${p}") (envVars.pathComponents.prepend ++ envVars.pathComponents.append)
+    );
 
   # Shared BD CLI wrapper: soft-fail wrapper for BetterDisplay CLI commands.
   # Used by both betterdisplayHeartbeat and ensureHeadlessDisplay.
@@ -280,42 +282,53 @@ let
 
     ${bdCliWrapper}
 
-    # No-op if BetterDisplay is not installed.
-    [ -f "$BD_BIN" ] || exit 0
+    # Persistent daemon loop: check every 30 s.
+    while true; do
+      # No-op if BetterDisplay is not installed.
+      if [ ! -f "$BD_BIN" ]; then
+        sleep 30
+        continue
+      fi
 
-    # Ensure BetterDisplay is running before issuing CLI commands.
-    if ! /usr/bin/pgrep -xq "BetterDisplay" 2>/dev/null; then
-      # undoc-supp: BetterDisplay may not be installed yet; best-effort launch.
-      /usr/bin/open -g -a "$BD_APP" || true
-      /bin/sleep 5
-    fi
+      # Ensure BetterDisplay is running before issuing CLI commands.
+      if ! /usr/bin/pgrep -xq "BetterDisplay" 2>/dev/null; then
+        # undoc-supp: BetterDisplay may not be installed yet; best-effort launch.
+        /usr/bin/open -g -a "$BD_APP" || true
+        /bin/sleep 5
+      fi
 
-    # Check connection state; soft-fail by treating any CLI error as unknown.
-    connected_state="$(_bd_cli get -name="$DISPLAY_NAME" -connected)"
+      # Check connection state; soft-fail by treating any CLI error as unknown.
+      connected_state="$(_bd_cli get -name="$DISPLAY_NAME" -connected)"
 
-    # No-op if already connected.
-    [ "$connected_state" = "on" ] && exit 0
+      # No-op if already connected.
+      if [ "$connected_state" = "on" ]; then
+        sleep 30
+        continue
+      fi
 
-    # Virtual screen is disconnected or status is unknown.  Try the lightweight
-    # set -connected=on toggle first; it is free-tier-compatible for virtual
-    # screens (Pro gating applies only to physical display connection toggles).
-    # If the toggle fails, fall back to a discard-and-recreate using the same
-    # parameters as ensureHeadlessDisplay so the virtual screen specification
-    # stays consistent across both code paths.
-    if ! "$BD_BIN" set -name="$DISPLAY_NAME" -connected=on; then
-      tag_ids="$(_bd_cli get -identifiers -name="$DISPLAY_NAME" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
-      for tag_id in $tag_ids; do
-        _bd_cli discard -tagID="$tag_id"
-      done
-      _bd_cli create \
-        -type=VirtualScreen \
-        -virtualScreenName="$DISPLAY_NAME" \
-        -aspectWidth=16 \
-        -aspectHeight=10 \
-        -multiplierStep=160 \
-        -virtualScreenHiDPI=on \
-        -connected=on
-    fi
+      # Virtual screen is disconnected or status is unknown.  Try the lightweight
+      # set -connected=on toggle first; it is free-tier-compatible for virtual
+      # screens (Pro gating applies only to physical display connection toggles).
+      # If the toggle fails, fall back to a discard-and-recreate using the same
+      # parameters as ensureHeadlessDisplay so the virtual screen specification
+      # stays consistent across both code paths.
+      if ! "$BD_BIN" set -name="$DISPLAY_NAME" -connected=on; then
+        tag_ids="$(_bd_cli get -identifiers -name="$DISPLAY_NAME" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
+        for tag_id in $tag_ids; do
+          _bd_cli discard -tagID="$tag_id"
+        done
+        _bd_cli create \
+          -type=VirtualScreen \
+          -virtualScreenName="$DISPLAY_NAME" \
+          -aspectWidth=16 \
+          -aspectHeight=10 \
+          -multiplierStep=160 \
+          -virtualScreenHiDPI=on \
+          -connected=on
+      fi
+
+      sleep 30
+    done
   '';
 
   # Wrapper script for the nix-index daily database rebuild LaunchAgent.
@@ -1155,40 +1168,37 @@ lib.mkIf pkgs.stdenv.isDarwin {
   };
 
   # --------------------------------------------------------------------------
-  # BetterDisplay heartbeat LaunchAgent
-  # Polls the HeadlessDisplay virtual screen every 30 seconds and reconnects
-  # it if BetterDisplay marks it as disconnected after a lid-close, sleep/wake
-  # cycle, or BetterDisplay restart.
+  # BetterDisplay heartbeat LaunchAgent (macOS-only)
+  # Persistent daemon that polls the HeadlessDisplay virtual screen every
+  # 30 seconds and reconnects it if BetterDisplay marks it as disconnected.
+  # Uses internal sleep loop (while true; do ...; sleep 30; done) so launchd
+  # KeepAlive provides crash recovery.
   #
   # Why a LaunchAgent rather than relying on ensureHeadlessDisplay alone:
   #   ensureHeadlessDisplay runs only during `home-manager switch`.  On a
   #   clamshell Mac that is left closed for hours, BetterDisplay can drop the
   #   virtual screen connection without a new activation run.  A launchd
-  #   periodic agent is the lightest-weight persistent fix without requiring a
-  #   Pro subscription or kernel extension.
+  #   persistent agent with KeepAlive is the lightest-weight fix without
+  #   requiring a Pro subscription or kernel extension.
   #
-  # Output is silenced to prevent log spam from 30-second no-op runs.
+  # Output is silenced to prevent log spam from 30-second no-op loop iterations.
   # --------------------------------------------------------------------------
   launchd.agents."betterdisplay-heartbeat" = {
     enable = true;
     config = {
       Label = "local.betterdisplay-heartbeat";
       ProgramArguments = [ "${betterdisplayHeartbeat}" ];
-      # Poll interval in seconds; 30 s keeps the display available for
-      # remote-desktop without generating excessive CPU or IPC overhead.
-      StartInterval = 30;
-      # Run once at load so the virtual screen is connected immediately after
-      # login or a `home-manager switch` without waiting for the first tick.
+      # Start at login and stay alive; internal loop handles the 30 s interval.
       RunAtLoad = true;
-      # Suppress per-invocation output to avoid filling system logs with
-      # 30-second no-op heartbeat entries.
+      KeepAlive = true;
+      # Suppress per-iteration output to avoid filling system logs.
       StandardOutPath = "/dev/null";
       StandardErrorPath = "/dev/null";
     };
   };
 
   # --------------------------------------------------------------------------
-  # Daily dev-tree maintenance LaunchAgents
+  # Daily dev-tree maintenance LaunchAgents (macOS-only)
   # `.DS_Store` cleanup and Spotlight exclusion markers only make sense on
   # macOS because both mechanisms are Finder/Spotlight-specific filesystem
   # conventions. Keep them as background launchd jobs instead of activation
@@ -1271,7 +1281,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   };
 
   # --------------------------------------------------------------------------
-  # iCloud exclusion LaunchAgent
+  # iCloud exclusion LaunchAgent (macOS-only)
   # Runs the iCloud directory exclusion logic hourly so that newly created
   # build/cache directories inside iCloud-managed trees are marked with
   # com.apple.fileprovider.ignore#P without waiting for the next home-manager
@@ -1294,23 +1304,24 @@ lib.mkIf pkgs.stdenv.isDarwin {
   };
 
   # --------------------------------------------------------------------------
-  # User-level service watchdog LaunchAgent
-  # Runs as the logged-in user so it can reach ~/Library/LaunchAgents/ to
-  # check nucleus-managed user-scope launchd services every 5 minutes.
-  # Managed from home-manager so system activation (running as root) does not
-  # trigger macOS warnings about root managing user-scope agents.
+  # User-level service watchdog LaunchAgent (macOS-only)
+  # Persistent daemon that checks user-scope nucleus services every 5 minutes
+  # with an internal 300s sleep loop.  Runs as the logged-in user so it can
+  # reach ~/Library/LaunchAgents/ to check nucleus-managed user-scope launchd
+  # services.  Kept in home-manager so root-launched activation does not trigger
+  # macOS warnings about root managing user-scope agents.
   # --------------------------------------------------------------------------
   launchd.agents."service-watchdog-user" = {
     enable = true;
     config = {
       Label = "local.service-watchdog-user";
       ProgramArguments = [
-        "${pkgs.writeShellScript "svc-watchdog-agent" ''
-          exec ${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog --domain user
-        ''}"
+        "${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog"
+        "--domain"
+        "user"
       ];
-      StartInterval = 300;
       RunAtLoad = true;
+      KeepAlive = true;
       StandardOutPath = "${config.home.homeDirectory}/Library/Logs/nucleus/service-watchdog/stdout.log";
       StandardErrorPath = "${config.home.homeDirectory}/Library/Logs/nucleus/service-watchdog/stderr.log";
       EnvironmentVariables = {
@@ -1388,7 +1399,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # — it is a dedup membership set (order irrelevant).
     __nucleus_managed_set="${mkManagedDedupSet config.home.homeDirectory}"
 
-    CURRENT_PATH="$(/bin/launchctl getenv PATH 2>/dev/null || true)"
+    CURRENT_PATH="$(/bin/launchctl getenv PATH 2>/dev/null || true)"  # undoc-supp: launchctl may not be available (early boot, non-GUI session); fall back to $PATH
     if [ -z "$CURRENT_PATH" ]; then
       CURRENT_PATH="$PATH"
     fi
@@ -1412,7 +1423,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   '';
 
   # --------------------------------------------------------------------------
-  # GUI environment variable propagation LaunchAgent (system scope)
+  # GUI environment variable propagation LaunchAgent (system scope, macOS-only)
   # macOS maintains separate shell (user/<uid>/) and GUI (gui/<uid>/) launchd
   # domains.  Shell sessionVariables set via home.sessionVariables never cross
   # into the GUI domain.  This agent runs once at login and calls launchctl
@@ -1475,7 +1486,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   };
 
   # --------------------------------------------------------------------------
-  # User-specific GUI environment variable propagation LaunchAgent
+  # User-specific GUI environment variable propagation LaunchAgent (macOS-only)
   # Companion to gui-env-system above.  Sets vars whose values contain
   # user-home-derived paths (PATH, PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.).
   # These are split into a separate agent to make the scoping intentional and

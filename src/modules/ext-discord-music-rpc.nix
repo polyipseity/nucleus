@@ -109,7 +109,7 @@ in
         Service = {
           Type = "simple";
           ExecStart = "${discord-music-rpc}/bin/discord-music-rpc";
-          Restart = "on-failure";
+          Restart = "always";
         };
         Install = {
           WantedBy = [ "default.target" ];

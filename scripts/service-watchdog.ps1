@@ -1,15 +1,20 @@
 <#
 .SYNOPSIS
-  Periodic service watchdog for Windows.
+  Persistent-loop service watchdog for Windows.
 
 .DESCRIPTION
   Detects and restarts nucleus-managed services stuck in a non-running state.
   Reads src/modules/services.json, filters to Windows services, and restarts
-  any native SCM service or scheduled task that is not running.  Mirrors
-  scripts/service-watchdog.sh (POSIX counterpart).
-
-  Intended to run every 5 minutes from a scheduled task (scheduler.dsc.yml).
+  any native SCM service or scheduled task that is not running.
+  Runs indefinitely with 300 s sleep between iterations (persistent daemon
+  pattern — launched by scheduled task AtStartup).
+  Use -Oneshot to run a single iteration (for manual or CI use).
+  Mirrors scripts/service-watchdog.sh (POSIX counterpart).
 #>
+
+param(
+  [switch]$Oneshot
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -98,17 +103,28 @@ function Test-ScheduledTask {
   }
 }
 
-# ── Main ───────────────────────────────────────────────────────────────────
-foreach ($svc in $Services) {
-  switch ($svc.type) {
-    "native" {
-      Test-NativeService -Key $svc.key -DisplayName $svc.displayName -ServiceName $svc.service
+# ── Main loop (persistent daemon pattern) ──────────────────────────────────
+function Invoke-WatchdogIteration {
+  foreach ($svc in $Services) {
+    switch ($svc.type) {
+      "native" {
+        Test-NativeService -Key $svc.key -DisplayName $svc.displayName -ServiceName $svc.service
+      }
+      "schtask" {
+        Test-ScheduledTask -Key $svc.key -DisplayName $svc.displayName -TaskPath $svc.taskPath
+      }
+      default {
+        Write-NucleusInfo "unsupported type $($svc.type) for $($svc.key)"
+      }
     }
-    "schtask" {
-      Test-ScheduledTask -Key $svc.key -DisplayName $svc.displayName -TaskPath $svc.taskPath
-    }
-    default {
-      Write-NucleusInfo "unsupported type $($svc.type) for $($svc.key)"
-    }
+  }
+}
+
+if ($Oneshot) {
+  Invoke-WatchdogIteration
+} else {
+  while ($true) {
+    Invoke-WatchdogIteration
+    Start-Sleep -Seconds 300
   }
 }

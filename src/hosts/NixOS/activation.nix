@@ -55,23 +55,12 @@ in
   '';
 
   # ---------------------------------------------------------------------------
-  # Service watchdog — periodic check for stuck nucleus services.
-  # Every 5 minutes, systemd runs the watchdog script which detects services
-  # stuck in non-running states and recovers them via reset-failed+restart.
-  #
-  # Cross-host parity:
-  #   macOS   — launchd agent/daemon (StartInterval=300)
-  #   NixOS   — this systemd timer (OnUnitActiveSec=5min)
-  #   Windows — scheduled task (scheduler.dsc.yml, PT5M repetition)
+  # Service watchdog — persistent daemon for stuck nucleus services.
+  # Internal 300s sleep loop.  Cross-host parity:
+  #   macOS   — launchd daemon (KeepAlive=true, internal 300s loop)
+  #   NixOS   — systemd service (Restart=always, internal 300s loop)
+  #   Windows — scheduled task AtStartup (internal 300s loop)
   # ---------------------------------------------------------------------------
-  systemd.timers."nucleus-service-watchdog" = {
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnBootSec = "5min";
-      OnUnitActiveSec = "5min";
-    };
-  };
-
   systemd.services."nucleus-service-watchdog" = {
     description = "Nucleus service watchdog — restart stuck services";
     path = with nucleusApps; [
@@ -82,7 +71,11 @@ in
     script = ''
       exec nucleus-service-watchdog
     '';
-    serviceConfig.Type = "oneshot";
+    serviceConfig = {
+      Restart = "always";
+      Type = "simple";
+    };
+    wantedBy = [ "multi-user.target" ];
   };
 
   # ---------------------------------------------------------------------------

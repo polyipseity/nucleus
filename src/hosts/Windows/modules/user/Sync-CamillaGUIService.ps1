@@ -65,7 +65,7 @@ function Sync-CamillaGUIService {
   $configPath = Join-Path -Path $HOME -ChildPath ".config\camillagui-backend\config.yml"
   $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command `"& '$camillaguiBin' -c '$configPath' *>> '$logFile'`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
-  $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+  $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
 
   # undoc-supp: probe — task may not exist; $null check handles missing task.

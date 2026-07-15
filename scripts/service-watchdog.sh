@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# Periodic service watchdog — detects and restarts nucleus-managed services
-# that are stuck in non-running states (EX_CONFIG, waiting, spawn-scheduled,
-# inactive, failed, or not loaded at all).
+# Persistent-loop service watchdog — detects and restarts nucleus-managed
+# services that are stuck in non-running states (EX_CONFIG, waiting,
+# spawn-scheduled, inactive, failed, or not loaded at all).
+#
+# Runs indefinitely with a 300 s sleep between iterations (persistent daemon
+# pattern — launched by KeepAlive / Restart=always / scheduled task AtStartup).
+# Use --oneshot to run a single iteration (for manual or CI use).
 #
 # On macOS 26+, SIP blocks unsigned Nix store binaries for system daemons
 # with non-root UserName (exit 78 / EX_CONFIG). All MacBook daemons use
@@ -11,11 +15,6 @@
 # Reads services.json, filters to the current platform, skips socket-activated
 # and prefix-match services, and recovers each non-running service via
 # bootout+bootstrap (launchctl) or reset-failed+restart (systemctl).
-#
-# Intended to run every 5 minutes from:
-#   - macOS: launchd agent with StartInterval=300
-#   - NixOS: systemd timer with OnUnitActiveSec=5min
-#   - Windows: scheduled task with PT5M repetition (via .ps1 counterpart)
 
 set -euo pipefail
 
@@ -43,20 +42,23 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
-  Periodic service watchdog — detects and restarts nucleus-managed
+  Persistent service watchdog — detects and restarts nucleus-managed
   services stuck in non-running states (EX_CONFIG, waiting,
   spawn-scheduled, inactive, failed, or not loaded at all).
-  Intended to run from a periodic timer (launchd/systemd/schtask).
+  Runs indefinitely with 300 s sleep between iterations.
+  Use --oneshot for a single iteration (manual / CI use).
 
   Options:
   -h|--help     Show usage.
   --domain <d>  Filter to only check services in this domain (user/system).
                 When omitted, checks all services for the current platform.
+  --oneshot     Run once and exit (no persistent loop).
 EOF
 }
 
 # Handle help request before any further processing.
 watchdog_domain=""
+watchdog_oneshot=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help)
@@ -70,6 +72,9 @@ while [ "$#" -gt 0 ]; do
       fi
       watchdog_domain="$2"
       shift
+      ;;
+    --oneshot)
+      watchdog_oneshot=true
       ;;
     *)
       printf 'error: unknown option: %s\n' "$1" >&2
@@ -224,22 +229,33 @@ check_service_nixos() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Main
+# Main loop (persistent daemon pattern)
 # ──────────────────────────────────────────────────────────────────────────────
-while IFS= read -r entry; do
-  [ -z "$entry" ] && continue
-  key=$(echo "$entry" | jq -r '.key')
+_run_watchdog_iteration() {
+  while IFS= read -r entry; do
+    [ -z "$entry" ] && continue
+    key=$(echo "$entry" | jq -r '.key')
 
-  # If --domain was specified, skip services that don't match.
-  if [ -n "$watchdog_domain" ]; then
-    svc_domain=$(echo "$entry" | jq -r '.platform.domain // "user"')
-    if [ "$svc_domain" != "$watchdog_domain" ]; then
-      continue
+    # If --domain was specified, skip services that don't match.
+    if [ -n "$watchdog_domain" ]; then
+      svc_domain=$(echo "$entry" | jq -r '.platform.domain // "user"')
+      if [ "$svc_domain" != "$watchdog_domain" ]; then
+        continue
+      fi
     fi
-  fi
 
-  case "$PLATFORM" in
-    macos) check_service_macos "$key" "$(echo "$entry" | jq -c '.platform')" ;;
-    nixos) check_service_nixos "$key" "$(echo "$entry" | jq -c '.platform')" ;;
-  esac
-done < <(read_watchdog_services)
+    case "$PLATFORM" in
+      macos) check_service_macos "$key" "$(echo "$entry" | jq -c '.platform')" ;;
+      nixos) check_service_nixos "$key" "$(echo "$entry" | jq -c '.platform')" ;;
+    esac
+  done < <(read_watchdog_services)
+}
+
+if [ "$watchdog_oneshot" = true ]; then
+  _run_watchdog_iteration
+else
+  while true; do
+    _run_watchdog_iteration
+    sleep 300
+  done
+fi

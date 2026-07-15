@@ -79,7 +79,6 @@ in
       EnvironmentVariables = daemonEnv;
       KeepAlive = true;
       RunAtLoad = true;
-      ThrottleInterval = 30;
       WorkingDirectory = userHome;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/camilladsp/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/camilladsp/stderr.log";
@@ -99,9 +98,8 @@ in
       ];
       UserName = username;
       EnvironmentVariables = daemonEnv;
-      StartInterval = 5;
-      RunAtLoad = false;
-      ThrottleInterval = 1;
+      KeepAlive = true;
+      RunAtLoad = true;
       StandardOutPath = "/dev/null";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/camilladsp/heartbeat-stderr.log";
     };

@@ -46,13 +46,10 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${pkgs.writeShellScript "svc-watchdog-daemon" ''
-          exec ${nucleusSvcWatchdog} --domain system
-        ''}"
+        "exec ${nucleusSvcWatchdog} --domain system"
       ];
-      StartInterval = 300;
       RunAtLoad = true;
-      KeepAlive = false;
+      KeepAlive = true;
       EnvironmentVariables = daemonEnv // {
         NUCLEUS_SERVICES_JSON = servicesJson;
       };

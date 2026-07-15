@@ -62,8 +62,7 @@ in
       Type = "simple";
       User = username;
       ExecStart = "${camilladspDaemon}";
-      Restart = "on-failure";
-      RestartSec = 30;
+      Restart = "always";
       WorkingDirectory = "%h";
     };
     wantedBy = [ "default.target" ];
@@ -72,19 +71,13 @@ in
   systemd.services.camilladsp-heartbeat = {
     description = "CamillaDSP config heartbeat";
     after = [ "camilladsp.service" ];
+    wants = [ "camilladsp.service" ];
     serviceConfig = {
-      Type = "oneshot";
+      Type = "simple";
       User = username;
+      Restart = "always";
       ExecStart = "${camilladspHeartbeat}";
     };
-  };
-
-  systemd.timers.camilladsp-heartbeat = {
-    description = "CamillaDSP heartbeat timer";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnUnitActiveSec = "5s";
-      OnBootSec = "30s";
-    };
+    wantedBy = [ "default.target" ];
   };
 }

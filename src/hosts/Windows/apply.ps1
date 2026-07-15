@@ -305,6 +305,7 @@ $EnableShellParity = -not $noUserStateParity
 $EnableDevDirectoryParity = -not $noUserStateParity
 $EnableDiscordMusicRPCParity = -not $noUserStateParity
 $EnableCamillaDSPServiceParity = -not $noUserStateParity
+$EnableCamillaDSPHeartbeatServiceParity = -not $noUserStateParity
 $EnableCamillaGUIServiceParity = -not $noUserStateParity
 $EnableSteamAutoStartupParity = -not $noUserStateParity
 # EnableDevReposParity defaults to $null (deferred to devRepos registry).
@@ -421,6 +422,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DevRepo.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DiscordMusicRPC.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CamillaDSPService.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-CamillaDSPHeartbeatService.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CamillaGUIService.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Disable-SteamAutoStartup.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-GitAndSshConfig.ps1")
@@ -814,6 +816,7 @@ Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRe
   New-Item -Path $discordMusicRPCConfig -ItemType SymbolicLink -Target $discordMusicRPCConfigSource -Force | Out-Null
 Sync-DiscordMusicRPC -Enabled:$EnableDiscordMusicRPCParity
 Sync-CamillaDSPService -Enabled:$EnableCamillaDSPServiceParity
+Sync-CamillaDSPHeartbeatService -Enabled:$EnableCamillaDSPHeartbeatServiceParity
 Sync-CamillaGUIService -Enabled:$EnableCamillaGUIServiceParity
 Disable-SteamAutoStartup -Enabled:$EnableSteamAutoStartupParity
 Sync-LiteLLMService -RepoRoot $repoRoot -Enabled:`$true

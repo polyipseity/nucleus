@@ -50,8 +50,7 @@
           --host 127.0.0.1 \
           --drop_params
       ''}";
-      Restart = "on-failure";
-      RestartSec = 5;
+      Restart = "always";
       User = "litellm";
       # Protect against resource exhaustion and information leaks.
       PrivateTmp = true;
@@ -84,21 +83,23 @@
     # Ollama runtime env vars sourced from the centralized catalog.
     # See src/modules/lib/env-vars.nix (OLLAMA_FLASH_ATTENTION,
     # OLLAMA_CONTEXT_LENGTH, OLLAMA_KV_CACHE_TYPE entries).
-    environmentVariables = let
-      envVars' = import ../../modules/lib/env-vars.nix {
-        inherit
-          config
-          pkgs
-          lib
-          username
-          ;
+    environmentVariables =
+      let
+        envVars' = import ../../modules/lib/env-vars.nix {
+          inherit
+            config
+            pkgs
+            lib
+            username
+            ;
+        };
+        resolveValue' = name: envVars'.resolveValue name "NixOS";
+      in
+      lib.filterAttrs (_name: value: value != null) {
+        OLLAMA_FLASH_ATTENTION = resolveValue' "OLLAMA_FLASH_ATTENTION";
+        OLLAMA_CONTEXT_LENGTH = resolveValue' "OLLAMA_CONTEXT_LENGTH";
+        OLLAMA_KV_CACHE_TYPE = resolveValue' "OLLAMA_KV_CACHE_TYPE";
       };
-      resolveValue' = name: envVars'.resolveValue name "NixOS";
-    in lib.filterAttrs (_name: value: value != null) {
-      OLLAMA_FLASH_ATTENTION = resolveValue' "OLLAMA_FLASH_ATTENTION";
-      OLLAMA_CONTEXT_LENGTH = resolveValue' "OLLAMA_CONTEXT_LENGTH";
-      OLLAMA_KV_CACHE_TYPE = resolveValue' "OLLAMA_KV_CACHE_TYPE";
-    };
   };
 
   # Cap the Ollama systemd service at 16 GB RSS so an oversized model pull
