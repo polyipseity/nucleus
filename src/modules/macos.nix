@@ -1352,12 +1352,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
       /bin/launchctl setenv NUCLEUS_REPO_ROOT "$NUCLEUS_REPO_ROOT"
     fi
 
-    # Propagate managed PATH to GUI domain.  Electron apps inherit the GUI
-    # domain PATH which defaults to /usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin,
-    # missing user-scope package manager bin dirs.  Setting it here ensures
-    # every GUI process sees the managed PATH entries.
-    # The value is built from pathComponents in env-vars.nix (toLaunchctlPATH).
-    __nucleus_path="${
+    # Propagate managed PATH to GUI domain.  Prepends user-scope package
+    # manager bin dirs before the existing GUI domain PATH.
+    __nucleus_prepend="${
       (import ./lib/env-vars.nix {
         inherit
           config
@@ -1367,7 +1364,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
           ;
       }).toLaunchctlPATH
     }"
-    /bin/launchctl setenv PATH "$__nucleus_path"
+    if [ -n "$PATH" ]; then
+      /bin/launchctl setenv PATH "$__nucleus_prepend:$PATH"
+    else
+      /bin/launchctl setenv PATH "$__nucleus_prepend"
+    fi
   '';
 
   # --------------------------------------------------------------------------
@@ -1464,8 +1465,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
           echo "[$(date)] gui-env-recovery started" >> "$log_dir/stdout.log"
 
-          # ── Re-set GUI env vars (handles RC1 race window) ──────────
-          /bin/launchctl setenv PATH "${
+          # ── Re-set GUI env vars — prepend managed PATH to current GUI domain PATH
+          __nucleus_prepend="${
             (import ./lib/env-vars.nix {
               inherit
                 config
@@ -1475,6 +1476,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
                 ;
             }).toLaunchctlPATH
           }"
+          if [ -n "$PATH" ]; then
+            /bin/launchctl setenv PATH "$__nucleus_prepend:$PATH"
+          else
+            /bin/launchctl setenv PATH "$__nucleus_prepend"
+          fi
 
           if [ -d "$HOME/dev/nucleus" ]; then
             /bin/launchctl setenv NUCLEUS_REPO_ROOT "$HOME/dev/nucleus"

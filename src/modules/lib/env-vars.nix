@@ -64,19 +64,18 @@ let
     append = [ ];
   };
 
-  # ── Helper: render PATH from pathComponents ────────────────────────
-  # Returns a shell command fragment for macOS launchctl setenv PATH.
-  # The defaultSystemPath provides safe fallback entries when no managed
-  # overrides exist.
+  # ── Helper: render managed PATH parts from pathComponents ──────────
+  # Returns a colon-joined string of managed user-scope bin dirs.
+  # Contains only the pathComponents (prepend + append), no system default.
+  # Callers (propagateGuiEnvVars, gui-env-recovery) prepend these to the
+  # actual PATH at runtime so the system default is preserved dynamically.
   toLaunchctlPATH =
     let
-      defaultSystemPath = "/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin";
       homePrefix = "$HOME";
       prependStr = builtins.concatStringsSep ":" (map (p: "${homePrefix}/${p}") pathComponents.prepend);
       appendStr = builtins.concatStringsSep ":" (map (p: "${homePrefix}/${p}") pathComponents.append);
       components = builtins.filter (s: s != "") [
         (if pathComponents.prepend != [ ] then prependStr else "")
-        defaultSystemPath
         (if pathComponents.append != [ ] then appendStr else "")
       ];
     in
@@ -86,20 +85,15 @@ let
   # Returns a list of absolute directory paths for NixOS
   # environment.variables.PATH.  NixOS joins lists with `:`, so this
   # returns a list rather than a colon-joined string.
-  # The systemDirs provide safe fallback entries when no managed overrides
-  # exist, mirroring what NixOS console.nix and the default profile add.
+  # Contains only the managed pathComponents (prepend + append).  The NixOS
+  # caller uses mkBefore so system directories are preserved dynamically.
   toNixOSPath =
     let
       homePrefix = resolvedHomeDirectory;
       prependDirs = map (p: "${homePrefix}/${p}") pathComponents.prepend;
       appendDirs = map (p: "${homePrefix}/${p}") pathComponents.append;
-      # NixOS system PATH: setuid wrappers + system packages.
-      systemDirs = [
-        "/run/wrappers/bin"
-        "/run/current-system/sw/bin"
-      ];
     in
-    prependDirs ++ systemDirs ++ appendDirs;
+    prependDirs ++ appendDirs;
 
   # ── Helper: render Windows user PATH string from pathComponents ────
   # Returns a semicolon-joined string with %USERPROFILE%-prefixed paths
@@ -300,8 +294,9 @@ let
         macOS = toLaunchctlPATH;
       };
       excludeFromSessionVariables = true;
+      excludeFromLaunchctl = true;
       userSpecific = true;
-      why = "Managed PATH (prepend-based) for macOS GUI apps, set at login by gui-env-user LaunchAgent. Derived from canonical pathComponents via toLaunchctlPATH to avoid drift. Excluded from shell sessionVariables — the shell domain gets prepend from home.sessionPath + system PATH from nix-darwin set-environment.";
+      why = "Managed PATH (managed dirs only, no system default) for macOS GUI apps. The managed dirs are prepended to the actual PATH at runtime by propagateGuiEnvVars (activation) and gui-env-recovery (login agent) — this avoids hardcoding system defaults. Excluded from shell sessionVariables (shell domain gets prepend from home.sessionPath + system PATH from nix-darwin set-environment) and from launchctl agents (handled dynamically by the activation/recovery scripts).";
     };
 
     # ── Starship prompt (all-process) ───────────────────────────────
@@ -509,20 +504,18 @@ let
 
   # ── toMacOSDaemonEnv ───────────────────────────────────────────
   # Attrset of essential env vars for all macOS launchd system daemons.
-  # Provides NIX_SSL_CERT_FILE (HTTPS), PATH (system default), and
-  # NUCLEUS_HOST (host identity).  Daemons may overlay additional vars.
-  # OLLAMA_* vars are handled separately by toMacOSDaemonOllamaEnv.
+  # Provides NIX_SSL_CERT_FILE (HTTPS) and NUCLEUS_HOST (host identity).
+  # Daemons may overlay additional vars.  PATH is not set explicitly —
+  # launchd provides /usr/bin:/bin:/usr/sbin:/sbin by default when PATH
+  # is absent from the plist.  OLLAMA_* vars are handled separately by
+  # toMacOSDaemonOllamaEnv.
   toMacOSDaemonEnv =
     let
       os = "macOS";
-      daemonPath = "/usr/bin:/bin:/usr/sbin:/sbin";
       nixSslCertFile = resolveValue "NIX_SSL_CERT_FILE" os;
       nucleusHost = resolveValue "NUCLEUS_HOST" os;
     in
-    {
-      PATH = daemonPath;
-    }
-    // (if nixSslCertFile != null then { NIX_SSL_CERT_FILE = nixSslCertFile; } else { })
+    (if nixSslCertFile != null then { NIX_SSL_CERT_FILE = nixSslCertFile; } else { })
     // (if nucleusHost != null then { NUCLEUS_HOST = nucleusHost; } else { });
 
   # ── Introspection for Windows parity tests ───────────────────────

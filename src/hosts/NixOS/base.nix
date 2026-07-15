@@ -50,14 +50,12 @@ in
   # Merge a manually managed PATH (user-scope package manager bin dirs
   # prepended before system defaults) into the catalog-derived set since
   # PATH's concatenation semantics don't fit the catalog's single-value model.
-  # Uses lib.mkForce because environment.variables is typed
-  # oneOf [str (listOf ...)] — mkBefore on a value inside oneOf acts as full
-  # replacement, not list prepend.  The rendered list includes system defaults
-  # (/run/wrappers/bin, /run/current-system/sw/bin) to preserve setuid wrapper
-  # and system-package resolution.
+  # Uses lib.mkBefore to prepend managed dirs before whatever NixOS sets as
+  # the system PATH (setuid wrappers, system packages), preserving them
+  # dynamically instead of guessing their locations.
   # Mirrors pathComponents in src/modules/lib/env-vars.nix.
   environment.variables = envVars.toNixOSSystemEnvironment // {
-    PATH = lib.mkForce (envVars.toNixOSPath);
+    PATH = lib.mkBefore (envVars.toNixOSPath);
   };
 
   # Disable nano to prevent its default EDITOR assignment from overriding
