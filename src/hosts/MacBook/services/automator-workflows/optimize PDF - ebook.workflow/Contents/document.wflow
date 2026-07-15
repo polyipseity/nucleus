@@ -222,7 +222,7 @@ done
 		<key>serviceProcessesInput</key>
 		<false/>
 		<key>systemImageName</key>
-		<string>NSActionTemplate</string>
+		<string>doc.richtext</string>
 		<key>useAutomaticInputType</key>
 		<false/>
 		<key>workflowTypeIdentifier</key>
