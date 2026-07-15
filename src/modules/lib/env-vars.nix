@@ -462,62 +462,6 @@ let
       ) relevant
     );
 
-  # ── toNixOSServiceEnv ────────────────────────────────────────────
-  # OLLAMA_* vars for services.ollama.environmentVariables.
-  toNixOSServiceEnv = filterAttrsByEntry (
-    name: entry:
-    getScope entry == "all-process"
-    && lib.strings.hasPrefix "OLLAMA_" name
-    && name != "OLLAMA_HOST"
-    && resolveValue name "NixOS" != null
-  ) "NixOS";
-
-  # ── toMacOSDaemonOllamaEnv ───────────────────────────────────────
-  # Attrset of OLLAMA_* vars for the macOS launchd ollama daemon
-  # EnvironmentVariables section.  Excludes OLLAMA_HOST because the
-  # server must bind to the default port (11434), not the LiteLLM proxy
-  # port (4000).  OLLAMA_HOST is set by the gui-env LaunchAgent for CLI
-  # clients (ollama, oterm) that should route through the proxy.
-  toMacOSDaemonOllamaEnv =
-    let
-      os = "macOS";
-      relevant = builtins.filter (
-        name:
-        let
-          entry = catalog.${name};
-        in
-        lib.strings.hasPrefix "OLLAMA_" name && name != "OLLAMA_HOST" && resolveValue name os != null
-      ) (builtins.attrNames catalog);
-    in
-    builtins.listToAttrs (
-      builtins.map (
-        name:
-        let
-          val = resolveValue name os;
-        in
-        {
-          inherit name;
-          value = val;
-        }
-      ) relevant
-    );
-
-  # ── toMacOSDaemonEnv ───────────────────────────────────────────
-  # Attrset of essential env vars for all macOS launchd system daemons.
-  # Provides NIX_SSL_CERT_FILE (HTTPS) and NUCLEUS_HOST (host identity).
-  # Daemons may overlay additional vars.  PATH is not set explicitly —
-  # launchd provides /usr/bin:/bin:/usr/sbin:/sbin by default when PATH
-  # is absent from the plist.  OLLAMA_* vars are handled separately by
-  # toMacOSDaemonOllamaEnv.
-  toMacOSDaemonEnv =
-    let
-      os = "macOS";
-      nixSslCertFile = resolveValue "NIX_SSL_CERT_FILE" os;
-      nucleusHost = resolveValue "NUCLEUS_HOST" os;
-    in
-    (if nixSslCertFile != null then { NIX_SSL_CERT_FILE = nixSslCertFile; } else { })
-    // (if nucleusHost != null then { NUCLEUS_HOST = nucleusHost; } else { });
-
   # ── Introspection for Windows parity tests ───────────────────────
   toJsonManifest = builtins.toJSON (
     builtins.map (
@@ -549,9 +493,6 @@ in
     toNixOSSystemEnvironment
     toLaunchctlScript
     toUserLaunchctlScript
-    toNixOSServiceEnv
-    toMacOSDaemonOllamaEnv
-    toMacOSDaemonEnv
     toJsonManifest
     getAllNixVarNames
     resolveValue

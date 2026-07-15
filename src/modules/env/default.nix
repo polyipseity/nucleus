@@ -37,7 +37,6 @@ in
         toNixOSSystemEnvironment
         toLaunchctlScript
         toUserLaunchctlScript
-        toNixOSServiceEnv
         toJsonManifest
         getAllNixVarNames
         resolveValue
