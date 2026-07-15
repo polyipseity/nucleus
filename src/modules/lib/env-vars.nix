@@ -297,10 +297,11 @@ let
     # ── macOS GUI environment PATH (user-specific) ─────────────────
     PATH = {
       values = {
-        macOS = "$HOME/.bun/bin:$HOME/.cargo/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin";
+        macOS = toLaunchctlPATH;
       };
+      excludeFromSessionVariables = true;
       userSpecific = true;
-      why = "Managed PATH for macOS GUI apps, set at login by gui-env-user LaunchAgent. The $HOME literal expands at agent runtime. Mirrors toLaunchctlPATH output from pathComponents.";
+      why = "Managed PATH (prepend-based) for macOS GUI apps, set at login by gui-env-user LaunchAgent. Derived from canonical pathComponents via toLaunchctlPATH to avoid drift. Excluded from shell sessionVariables — the shell domain gets prepend from home.sessionPath + system PATH from nix-darwin set-environment.";
     };
 
     # ── Starship prompt (all-process) ───────────────────────────────
@@ -396,7 +397,9 @@ let
   # outside home-manager, e.g. EDITOR).  OS applicability is implicit
   # from resolveValue.
   toHomeSessionVariables = filterAttrsByEntry (
-    name: entry: resolveValue name currentOs != null
+    name: entry:
+    (!entry ? excludeFromSessionVariables || !entry.excludeFromSessionVariables)
+    && resolveValue name currentOs != null
   ) currentOs;
 
   # ── toNixOSSystemEnvironment ─────────────────────────────────────
