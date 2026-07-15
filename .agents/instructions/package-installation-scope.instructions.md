@@ -4,253 +4,93 @@ name: "Package Installation Scope"
 applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, src/scripts/**"
 ---
 
-# Package Installation Scope Policy
+## Core principle
 
-## Core Principle
+All tools and libraries must be installed at user-level only. System-wide installations are prohibited except where explicitly required for system infrastructure (e.g., nix-darwin system packages, WinGet DSC registry settings).
 
-**All tools and libraries must be installed at user-level only.** System-wide installations are prohibited except where explicitly required for system infrastructure (e.g., nix-darwin system packages, WinGet DSC registry settings).
+## Cross-host package manager hierarchy
 
----
+| Scope | macOS (nix-darwin) | NixOS | Windows |
+|---|---|---|---|---|
+| **System packages** | `nixpkgs` via nix-darwin `environment.systemPackages` | `nixpkgs` via NixOS system config | WinGet DSC (`system-packages.dsc.yml`) |
+| **User-level CLI tools** | `nixpkgs` via Home Manager `home.packages` | `nixpkgs` via Home Manager `home.packages` | WinGet DSC (`user.dsc.yml`, `user-env.dsc.yml`) + Scoop |
+| **Managed global packages** | `bun install -g` (JS tools only) | `bun install -g` (JS tools only) | `bun install -g` (JS tools only) |
+| **Prebuilt binaries** | N/A | N/A | `cargo-binstall`, Scoop |
+| **Python tools** | `uv tool install` (isolated venvs) | `uv tool install` (isolated venvs) | `uv tool install` (isolated venvs) |
 
-## Scope Classification
+## System-install-only tools
 
-### User-Level (Permitted)
+The following tools are installed globally (via nixpkgs / WinGet) for system package management only. They are not available for general developer use in interactive sessions:
 
-- **Binaries/CLI tools**: Installed to user-owned directories (`~/.cargo/bin`, `~/.bun/bin`, `~/.local/share/uv/tools/`, `%USERPROFILE%\.cargo\bin`, `%USERPROFILE%\.bun\bin`)
-- **Library caches**: Centralized user caches (`~/.cargo/registry`, `~/.bun/store`, `~/.cache/uv`, `%USERPROFILE%\.bun\store`)
-- **Project dependencies**: Stored locally per project (`.venv`, `node_modules`, `target/`, `Cargo.lock`)
+| Tool | Installed by | Permitted system use |
+|---|---|---|---|
+| `bun` | nixpkgs / `Oven-sh.Bun` | `bun add -g` for global JS system packages |
+| `cargo` | all platforms: via `rustup` stable toolchain | `cargo-binstall` / `cargo install` for system Rust binary installs |
+| `rustup` | all platforms: `pkgs.rustup` (POSIX) / `Rustlang.Rustup` (Windows) | manages Rust toolchains; default = `none`; stable installed for cargo-binstall fallback |
+| `uv` | nixpkgs / WinGet | `uv tool install` for system-level Python tooling |
+| `prek` | nixpkgs | system-wide Git hook manager binary (invoked by managed shell/apply hooks) |
+| `python` / `pip` | **banned** | no permitted system use; all Python via devShell or uv venv |
 
-### System-Level (Blocked)
+Direct developer invocation of any of the above in an interactive shell session must go through a managed development environment rather than the raw system install.
 
-- ❌ `/usr/bin`, `/usr/local/bin`, `C:\Windows\System32`, `Program Files`
-- ❌ System-wide PATH modifications without user scoping
-- ❌ `sudo` or admin invocations for package installation
-- ❌ Package manager `-g` / `--global` flags for development tools (except where explicitly managed)
+## Shell-level enforcement
 
----
+Each blocked tool is overridden as a shell function that intercepts the command and prints a helpful error pointing to the devShell.
 
-## Cross-Host Package Manager Hierarchy
+- **POSIX (zsh)** — `src/modules/shell.nix`: functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`, `pip3` in `programs.zsh.initContent`. Flow: check `$DIRENV_DIR` → invoke devShell-scoped binary → check `$NUCLEUS_DEFAULT_DEV_BIN` → error.
+- **POSIX (pwsh)** — `src/modules/pwsh.nix`: equivalent PowerShell functions in `profileContent`, same flow via `$env:DIRENV_DIR` then `$env:NUCLEUS_DEFAULT_DEV_BIN`.
+- **Windows (PowerShell)** — `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1`: same functions in the managed block. Pass-through uses `$env:DIRENV_DIR` when present, otherwise `$env:NUCLEUS_DEFAULT_DEV_ENV`.
 
-| Scope                       | macOS (nix-darwin)                                    | NixOS                                      | Windows                                                 |
-| --------------------------- | ----------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------- |
-| **System packages**         | `nixpkgs` via nix-darwin `environment.systemPackages` | `nixpkgs` via NixOS system config          | WinGet DSC (`system-packages.dsc.yml`)                  |
-| **User-level CLI tools**    | `nixpkgs` via Home Manager `home.packages`            | `nixpkgs` via Home Manager `home.packages` | WinGet DSC (`user.dsc.yml`, `user-env.dsc.yml`) + Scoop |
-| **Development tools**       | devShell (Nix flake)                                  | devShell (Nix flake)                       | devShell (Nix flake) OR managed fallback                |
-| **Managed global packages** | `bun install -g` (JS tools only)                      | `bun install -g` (JS tools only)           | `bun install -g` (JS tools only)                        |
-| **Prebuilt binaries**       | N/A                                                   | N/A                                        | `cargo-binstall`, Scoop                                 |
-| **Python tools**            | `uv tool install` (isolated venvs)                    | `uv tool install` (isolated venvs)         | `uv tool install` (isolated venvs)                      |
+User-scope bin dir PATH wiring is declared via `home.sessionPath` (→ `~/.zshenv`), not `initContent` PATH guards. This ensures directories survive direnv deactivation.
 
----
+## Development environment (devShell)
 
-## System-Install-Only Tools
+For project-specific development, enter the project devShell. For repositories without direnv/Nix metadata, nucleus also provisions a managed default shell environment with the same baseline tools: `bun`, `cargo`/`rustc`, `prek`, `uv`.
 
-The following tools are installed globally (via nixpkgs / WinGet) for **system package management only**. They are not available for general developer use in interactive sessions:
+- **POSIX — automatic (preferred):** direnv auto-loads the devShell when a directory has an `.envrc` with `use flake`.
+- **POSIX — manual:** `nix develop` from the repo root.
+- **POSIX — default fallback:** outside any active `.envrc`, the managed shell profile exposes the same inventory from `$NUCLEUS_DEFAULT_DEV_BIN`.
+- **Windows:** `nix develop` from WSL when available, or the managed PowerShell profile fallback.
 
-| Tool             | Installed by                                                              | Permitted system use                                                                    |
-| ---------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `bun`            | nixpkgs / `Oven-sh.Bun`                                                   | `bun add -g` for global Node/JS system packages                                         |
-| `cargo`          | all platforms: via `rustup` stable toolchain                              | `cargo-binstall` / `cargo install` for system Rust binary installs                      |
-| `rustup`         | all platforms: `pkgs.rustup` (POSIX) / `Rustlang.Rustup` (Windows WinGet) | manages Rust toolchains; default = `none`; stable installed for cargo-binstall fallback |
-| `uv`             | nixpkgs / WinGet                                                          | `uv tool install` for system-level Python tooling                                       |
-| `prek`           | nixpkgs                                                                   | system-wide Git hook manager binary (invoked by managed shell/apply hooks)              |
-| `python` / `pip` | **banned**                                                                | no permitted system use; all Python via devShell or uv venv                             |
+On POSIX, `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix-patched toolchain from the project's `rust-toolchain.toml` (or falls back to `pkgs.rust-bin.stable.latest.default`) — distinct from the system `pkgs.rustup` install so devShell toolchains are reproducible and version-pinned. On Windows, rustup (`Rustlang.Rustup`) intercepts cargo invocations and reads `rust-toolchain.toml` natively.
 
-Direct developer invocation of any of the above in an interactive shell session must go through a **managed development environment** rather than the raw system install.
-
----
-
-## Shell-Level Enforcement
-
-Each blocked tool is overridden as a **shell function** that intercepts the command and prints a helpful error pointing to the devShell.
-
-### POSIX (zsh) — `src/modules/shell.nix`
-
-Functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`, `pip3` in `programs.zsh.initContent` follow a 4-step flow:
-
-1. Check `$DIRENV_DIR` (set by direnv when `.envrc` is active).
-2. If set, invoke `command <tool>` to reach the devShell-scoped binary.
-3. Otherwise, invoke the managed fallback via `$NUCLEUS_DEFAULT_DEV_BIN`.
-4. If neither context is available, print error and return 1.
-
-**User-scope bin dir PATH wiring**: Declared via `home.sessionPath` (→ `~/.zshenv`), not `initContent` PATH guards. This ensures directories survive direnv deactivation. Do not revert to `initContent` `export PATH=...`.
-
-### POSIX (pwsh) — `src/modules/pwsh.nix`
-
-Equivalent PowerShell functions in `profileContent`, same 4-step flow via `$env:DIRENV_DIR` then `$env:NUCLEUS_DEFAULT_DEV_BIN`.
-
-### Windows (PowerShell) — `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1`
-
-Same functions in the managed block. Pass-through uses `$env:DIRENV_DIR` when present, otherwise `$env:NUCLEUS_DEFAULT_DEV_ENV`. Bin dir PATH is prepended unconditionally (no `Test-Path` guard) before the direnv hook — same rationale as POSIX.
-
----
-
-## devShell — Development Environment
-
-For project-specific development, enter the project devShell. For repositories without direnv/Nix metadata, nucleus also provisions a managed default shell environment with the same baseline tools. The shared inventory is:
-
-| Tool            | Purpose                                                                                         |
-| --------------- | ----------------------------------------------------------------------------------------------- |
-| `bun`           | JS/Node development                                                                             |
-| `cargo`/`rustc` | Rust toolchain via **rust-overlay** (reads project `rust-toolchain.toml`; falls back to stable) |
-| `prek`          | Git hook management during development                                                          |
-| `uv`            | Python development                                                                              |
-
-On all hosts, the devShell Rust toolchain is handled per-project. On POSIX, `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix-patched toolchain from the project's `rust-toolchain.toml` (or falls back to `pkgs.rust-bin.stable.latest.default`) — distinct from the system `pkgs.rustup` install so devShell toolchains are reproducible and version-pinned. On Windows, rustup (`Rustlang.Rustup`) intercepts cargo invocations and reads `rust-toolchain.toml` natively.
-
-**Entering the devShell:**
-
-- **POSIX — automatic (preferred):** direnv auto-loads the devShell when you enter a directory with an `.envrc` that contains `use flake`. No manual action required once direnv is configured.
-- **POSIX — manual:** `nix develop` from the repo root (or any subdirectory).
-- **POSIX — default fallback:** outside any active `.envrc`, the managed shell profile exposes the same bun/cargo/prek/rustc/uv inventory from the user-scoped fallback bundle at `$NUCLEUS_DEFAULT_DEV_BIN`.
-- **Windows:** `nix develop` from WSL when a project provides it, or use the managed PowerShell profile fallback for repositories without direnv/Nix wiring.
-
----
-
-## prek Hook Installation
-
-prek Git hooks are installed by two complementary mechanisms:
-
-| Mechanism                                            | Scope                                                     | Platform             |
-| ---------------------------------------------------- | --------------------------------------------------------- | -------------------- |
-| `src/scripts/apply.sh` `ensure_prek_hooks_installed` | nucleus repo, first apply                                 | POSIX                |
-| zsh `_prek_hook_install_if_needed`                   | any `prek.toml` repo, on shell startup + directory change | POSIX                |
-| PowerShell profile `Invoke-PrekHookInstallIfNeeded`  | any prek.toml repo, on directory entry                    | POSIX pwsh + Windows |
-
-The POSIX zsh hook remains the canonical mechanism for non-direnv repository entry (startup + directory change). PowerShell keeps prompt-hook parity for POSIX pwsh and Windows.
-
----
-
-## Adding or Changing Blocked Tools
+## Adding or changing blocked tools
 
 1. Add the blocking shell function to `src/modules/shell.nix` (`initContent`), following the existing `bun`/`cargo`/`rustc`/`uv` pattern.
 2. Add the equivalent PowerShell function to `src/modules/pwsh.nix` (`profileContent`) for POSIX PowerShell parity.
 3. Add the same function to the `$managedBlock` array in `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` for Windows parity.
-4. Update this instruction file and the `core.nix` policy comment table.
-5. If the tool is also a devShell tool (i.e., developers need it for project work), add it to both `devShells.default` entries in `src/flake.nix` (alphabetically sorted in the `packages` list).
-
----
+4. Update this instruction file.
+5. If the tool is also a devShell tool, add it to `devShells.default` in `src/flake.nix` (alphabetically sorted in the `packages` list).
 
 ## Invariants
 
 - The `DIRENV_DIR` pass-through must be present in every blocking function. Omitting it would prevent the tool from working inside nix devShells.
 - The managed fallback environment must expose the same baseline inventory as `devShells.default`: `bun`, `cargo`, `prek`, `rustc`, and `uv`.
-- `cargo-binstall` and `cargo-cache` are **not** blocked — they are the permitted system-package-management invocations of the Rust toolchain.
-- `rustup` is **not** blocked — it is the toolchain manager and must remain accessible for toolchain lifecycle management.
-- `ruff` and `ty` are **not** blocked — they are linting/formatting tools that must be globally accessible for editor integrations (e.g., VS Code extensions).
+- `cargo-binstall` and `cargo-cache` are not blocked — they are the permitted system-package-management invocations of the Rust toolchain.
+- `rustup` is not blocked — it is the toolchain manager and must remain accessible for toolchain lifecycle management.
+- `ruff` and `ty` are not blocked — they are linting/formatting tools that must be globally accessible for editor integrations (e.g., VS Code extensions).
 
----
+## Tool installation patterns
 
-## Tool Installation Patterns
-
-### Python Tools (`uv`)
-
-**Pattern**: Always use `uv tool install` for isolated, per-tool virtual environments.
-
-```bash
-# ✅ Correct: Installs to ~/.local/share/uv/tools/
-uv tool install black
-
-# ❌ Wrong: System-wide installation
-pip install --system black
-```
-
----
-
-### Rust Tools (`cargo`, `cargo-binstall`)
-
-**Pattern**: Prefer devShell for development, `cargo-binstall` for prebuilt binaries, `cargo install` as fallback.
-
-```bash
-# ✅ devShell (Nix flake): cargo build, cargo test
-# ✅ outside devShell: cargo-binstall for prebuilt binaries
-cargo binstall ripgrep
-# Installs to ~/.cargo/bin
-```
-
----
-
-### JavaScript Tools (`bun`)
-
-**Pattern**: Only `bun install -g` for globally callable JS CLI tools (not dev dependencies).
-
-```bash
-# ✅ Correct: Installs to ~/.bun/bin (or %USERPROFILE%\.bun\bin on Windows)
-bun install -g @tailwindlabs/tailwindcss
-
-# ❌ Wrong: npm install -g (system-wide, unmanaged)
-npm install -g @tailwindlabs/tailwindcss
-```
-
-**Managed via**:
-
-- POSIX: `src/modules/agents.nix` — `installBunPackages` activation hook
-- Windows: `src/hosts/Windows/modules/setup/Invoke-BunSetup.ps1`
-
----
-
-## Declarative vs. Imperative
-
-### Declarative (Preferred)
-
-**Nix packages** (POSIX):
-
-```nix
-# src/modules/core.nix or host config
-home.packages = with pkgs; [
-  ripgrep      # User-level CLI tool
-  fd           # User-level CLI tool
-];
-```
-
-**WinGet DSC** (Windows):
-
-```yaml
-# src/hosts/Windows/system-packages.dsc.yml or user.dsc.yml
-- name: Install ripgrep via WinGet
-  resource: Microsoft.WinGet.DSC/WinGetPackage
-  properties:
-    id: BurntSushi.ripgrep.MSVC
-```
-
-### Imperative (Last Resort)
-
-Only when declarative solutions don't exist:
-
-- `bun install -g` for unpackaged JS tools
-- `uv tool install` for Python CLI tools
-- `cargo-binstall` for precompiled Rust binaries
-
-**Always ensure**:
-
-1. The tool installs to a **user-owned directory** (not system)
-2. The installation is **idempotent** (safe to re-run)
-3. The directory is in the user's `PATH`
-
----
+- **Python tools**: Always use `uv tool install` for isolated, per-tool virtual environments. Never `pip install --system`.
+- **Rust tools**: Prefer devShell for development, `cargo-binstall` for prebuilt binaries, `cargo install` as fallback. Installs to `~/.cargo/bin`.
+- **JavaScript tools**: Only `bun install -g` for globally callable JS CLI tools (not dev dependencies). Managed via `src/modules/agents.nix` (POSIX) or `src/hosts/Windows/modules/setup/Invoke-BunSetup.ps1` (Windows). Never `npm install -g`.
 
 ## Overlapping package classification
 
-Packages available in both nixpkgs and Homebrew use a `category` field in
-`src/modules/core.nix`'s `overlappingPackages` to decide the install backend.
-This mechanism is the single source of truth for all packages that exist in
-both package managers. It works cross-platform:
-
+Packages available in both nixpkgs and Homebrew use a `category` field in `src/modules/core.nix`'s `overlappingPackages` to decide the install backend. This mechanism works cross-platform:
 - **macOS**: routes to either nixpkgs or Homebrew based on `category` and backend policy.
-- **NixOS**: all platform-compatible packages go through nixpkgs unconditionally
-  (no Homebrew on NixOS).
+- **NixOS**: all platform-compatible packages go through nixpkgs unconditionally.
 
 Category rules:
 - `"cli"` → nixpkgs
 - `"gui"` → Homebrew (cask preferred, formula fallback) on macOS; nixpkgs on NixOS
 
-**If a package ships any GUI component** (a graphical binary, a UI frontend,
-a background daemon with a UI), classify it as `"gui"` even if it also
-provides CLI-only tools.
+If a package ships any GUI component (graphical binary, UI frontend, background daemon with a UI), classify it as `"gui"` even if it also provides CLI-only tools.
 
 ### Platform restrictions
 
-Packages that only exist on a specific platform must declare a `platforms`
-field in their `overlappingPackages` entry:
+Packages that only exist on a specific platform must declare a `platforms` field in their `overlappingPackages` entry:
 
 ```nix
 iterm2 = {
@@ -263,33 +103,22 @@ iterm2 = {
 
 Known darwin-only packages: `iterm2`, `rectangle`, `stats`, `utm`.
 
-### Packages not in nixpkgs
-
-For packages that exist in Homebrew but not in nixpkgs, use `missingNixAttrs`
-in `core.nix` to keep them declared in the same central location. These are
-macOS-only and do not apply to NixOS / Windows.
+For packages that exist in Homebrew but not in nixpkgs, use `missingNixAttrs` in `core.nix` to keep them declared in the same central location.
 
 ### Adding a new overlapping package
 
-1. Add an entry to the `overlappingPackages` attribute set in `src/modules/core.nix`.
-2. Use alphabetical ordering within the set.
-3. If the package only exists on macOS (not in nixpkgs on Linux), add `platforms = ["darwin"]`.
-4. Choose the appropriate `category` (see rules above).
-5. On macOS, the package flows to Homebrew or nixpkgs based on `category` / policy.
-6. On NixOS, it automatically flows through `sharedPackages` to `environment.systemPackages`.
-7. If needed, remove any duplicate declaration from `src/hosts/NixOS/desktop.nix`.
+1. Add an entry to `overlappingPackages` in `src/modules/core.nix`, alphabetically sorted.
+2. If the package only exists on macOS, add `platforms = ["darwin"]`.
+3. Choose the appropriate `category`.
+4. Remove any duplicate declaration from `src/hosts/NixOS/desktop.nix` if needed.
 
-## What Violates This Policy
+## What violates this policy
 
-| Pattern                                    | Issue                              | Fix                                         |
-| ------------------------------------------ | ---------------------------------- | ------------------------------------------- |
-| `sudo bun install -g …`                    | Admin escalation                   | Remove `sudo`; use plain `bun install -g`   |
-| `pip install --system …`                   | System-wide Python                 | Use `uv tool install` or devShell           |
-| `npm install -g …` (unmanaged)             | Untracked global package           | Use `bun install -g` with manifest tracking |
-| Installing to `/usr/local/bin`             | Binary pollution                   | Use user-level tool directories             |
-| `cargo install` in `setup.sh`              | Imperative build-time install      | Add to devShell or use `cargo-binstall`     |
-| `Install-Module -Scope Machine`            | System-wide module                 | Use `-Scope CurrentUser`                    |
-
----
-
----
+| Pattern | Issue | Fix |
+|---|---|---|---|
+| `sudo bun install -g ...` | Admin escalation | Remove `sudo`; use plain `bun install -g` |
+| `pip install --system ...` | System-wide Python | Use `uv tool install` or devShell |
+| `npm install -g ...` (unmanaged) | Untracked global package | Use `bun install -g` with manifest tracking |
+| Installing to `/usr/local/bin` | Binary pollution | Use user-level tool directories |
+| `cargo install` in `setup.sh` | Imperative build-time install | Add to devShell or use `cargo-binstall` |
+| `Install-Module -Scope Machine` | System-wide module | Use `-Scope CurrentUser` |

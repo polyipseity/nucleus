@@ -56,33 +56,11 @@ ClawHub is installed and managed declaratively by the `installBunPackages` Home 
 
 ### Windows
 
-ClawHub is managed by `Invoke-BunSetup` in `src/hosts/Windows/modules/Invoke-BunSetup.ps1`, which is called by `apply.ps1` before `Sync-AgentsClawHubSkills`. `Invoke-BunSetup` manages a `$desiredPackages` list (currently `@mariozechner/pi-coding-agent` and `clawhub`) and writes a manifest to `%USERPROFILE%\.config\nucleus\bun-packages.json`.
-
-## Windows apply order
-
-```
-WinGet DSC (all .dsc.yml files)
-  → Invoke-BunSetup        (bun global packages incl. clawhub)
-  → Sync-AgentsSkills      (bundled skill symlinks)
-  → Sync-AgentsClawHubSkills  (fetched skill downloads)
-```
-
-## Key files
-
-| File                                                    | Purpose                                                                                          |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `src/modules/agents.nix`                                | POSIX activation entries: `agentsSymlink`, `agentsSkills`, `installBunPackages`, `syncClawHubSkills` |
-| `src/hosts/Windows/apply.ps1`                           | Windows orchestrator; displays `MANUAL.md` as the final step after all convergence               |
-| `src/modules/configs/agents/clawhub-skills.json`        | Declarative fetched skill manifest (`{"skills":[...slugs...]}`)                                  |
-| `src/modules/configs/agents/skills/`                    | Bundled (committed, AGPL-compatible) skill directories                                           |
-| `src/hosts/Windows/modules/Invoke-BunSetup.ps1`         | Windows bun global package manager; includes clawhub                                             |
-| `src/hosts/Windows/modules/Sync-AgentsSkill.ps1`        | Windows bundled skill sync                                                                       |
-| `src/hosts/Windows/modules/Sync-AgentsClawHubSkill.ps1` | Windows fetched skill sync; expects ClawHub pre-installed by `Invoke-BunSetup`                   |
-| `src/hosts/Windows/apply.ps1`                           | Windows orchestrator; calls `Invoke-BunSetup` before `Sync-AgentsClawHubSkills`                  |
+ClawHub is managed by `Invoke-BunSetup` in `src/hosts/Windows/modules/Invoke-BunSetup.ps1`, which is called by `apply.ps1` before `Sync-AgentsClawHubSkills`. `Invoke-BunSetup` manages a `$desiredPackages` list (currently `@mariozechner/pi-coding-agent` and `clawhub`) and writes a manifest to `%USERPROFILE%\.config\nucleus\bun-packages.json`. Applied in this order: WinGet DSC → `Invoke-BunSetup` (bun global packages) → `Sync-AgentsSkills` (bundled skill symlinks) → `Sync-AgentsClawHubSkills` (fetched skill downloads).
 
 ## Authoring rules
 
-- **No fallback installs in sync functions**: the POSIX `syncClawHubSkills` activation logic and Windows `Sync-AgentsClawHubSkills` helper must not attempt to install ClawHub themselves. Provisioning belongs to `installBunPackages` (POSIX) / `Invoke-BunSetup` (Windows).
-- **Stale cleanup scoped to fetched downloads**: only remove directories that carry a `.clawhub/origin.json` marker; never touch bundled symlinks or unknown directories.
-- **Skill sync is best-effort**: a failed sync does not break the activated system. Print a warning and continue.
-- **Desired-package list sorted alphabetically**: keep `$desiredPackages` in `bun-setup.ps1` and the equivalent list in `installBunPackages` sorted.
+- **No fallback installs in sync functions**: POSIX `syncClawHubSkills` and Windows `Sync-AgentsClawHubSkills` must not install ClawHub themselves. Provisioning belongs to `installBunPackages` / `Invoke-BunSetup`.
+- **Stale cleanup scoped to fetched downloads**: only remove directories with a `.clawhub/origin.json` marker; never touch bundled symlinks or unknown directories.
+- **Skill sync is best-effort**: log a warning on failure and continue.
+- **Desired-package lists sorted alphabetically**: keep `$desiredPackages` and the equivalent list in `installBunPackages` sorted.

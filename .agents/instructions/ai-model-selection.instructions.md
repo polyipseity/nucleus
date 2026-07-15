@@ -24,11 +24,11 @@ These are the authoritative assumptions for model size budgeting. Update this ta
 
 | Host      | Memory budget                                     | Notes                                                                                                                   |
 | --------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `macbook` | ≤ 16 GB GPU (slight excess ~17–18 GB is OK)       | 24 GB unified RAM; Apple Silicon Metal; flash attention + q4_0 KV cache enabled                                         |
-| `nixos`   | ≤ 6 GB discrete VRAM (model file ≤ ~5 GB target)  | GPU acceleration enabled via `services.ollama.acceleration = "cuda"`; `MemoryMax = "16G"` systemd cap remains in effect |
-| `windows` | ≤ 6 GB discrete VRAM (same assumption as `nixos`) | Same hardware class as nixos PC; update if specs differ                                                                 |
+| `MacBook` | ≤ 16 GB GPU (slight excess ~17–18 GB is OK)       | 24 GB unified RAM; Apple Silicon Metal; flash attention + q4_0 KV cache enabled                                         |
+| `NixOS`   | ≤ 6 GB discrete VRAM (model file ≤ ~5 GB target)  | GPU acceleration enabled via `services.ollama.acceleration = "cuda"`; `MemoryMax = "16G"` systemd cap remains in effect |
+| `Windows` | ≤ 6 GB discrete VRAM (same assumption as `NixOS`) | Same hardware class as NixOS PC; update if specs differ                                                                 |
 
-## Required cross-file sync (do not forget)
+## Required cross-file sync
 
 When changing model selections, update all of the following in the **same change** so editor/runtime behavior stays aligned:
 
@@ -108,7 +108,3 @@ Before committing a model change that relies on tool calling:
 2. Run a basic function-call curl test (see `src/modules/ai/default.nix` comment block for an example invocation).
 3. Record the result in the comment block in `default.nix`: `— tool-calling curl-tested on <host>: PASS` or `FAIL`.
 4. Do not deploy a model as the primary agent model on a host until tool calling is verified on that host.
-
-## Sorting
-
-Keep model lists in `models.json` in alphabetical order within each host key.

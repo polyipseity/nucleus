@@ -211,11 +211,9 @@ if (-not (Test-Path $cbBin)) {
 
 After Scoop installs cargo-binstall, `src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1` manages Rust CLI tools that have no WinGet or Scoop equivalent (e.g. `cargo-cache`, `pay-respects`). It maintains a desired-state list and a manifest at `~\.config\nucleus\cargo-binstall-packages.json`; on each apply it installs additions via `cargo binstall --no-confirm` and removes deletions via `cargo uninstall`.
 
-**PATH note**: DSC runs in a fresh session where `~\.cargo\bin` is not on PATH. The setup module prepends `~\.cargo\bin` internally before any `cargo uninstall` call. When invoking cargo-binstall from `apply.ps1` (after the DSC run), Scoop shims at `~\scoop\shims` are already resolvable.
+
 
 ## Imperative fallback safety (Windows modules)
-
-See [cross-host-feature-parity.instructions.md](cross-host-feature-parity.instructions.md) — the same `managed-scope only`, `fail-fast`, `idempotent convergence/cleanup`, and `explicit toggle` rules apply.
 
 See [Imperative fallback safety (Windows)](cross-host-feature-parity.instructions.md#imperative-fallback-safety-windows) for the full policy.
 
@@ -240,4 +238,4 @@ See [Imperative fallback safety (Windows)](cross-host-feature-parity.instruction
 
 ## Naming
 
-- Avoid repository-brand prefixes (for example `nucleus*`) in new PowerShell function names and filenames unless the prefix is required for cross-module disambiguation or external integration points. Use descriptive verb-noun patterns instead (e.g., `Sync-Wallpapers` instead of `Sync-NucleusWallpapers`).
+- Avoid repository-brand prefixes (e.g. `nucleus*`) in new PowerShell function names and filenames unless needed for cross-module disambiguation or external integration points. Use descriptive verb-noun patterns (e.g. `Sync-Wallpapers` instead of `Sync-NucleusWallpapers`).

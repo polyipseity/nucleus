@@ -16,7 +16,7 @@ applyTo: "scripts/vm-setup.*, src/hosts/*/vms.nix, src/modules/VMs.json, src/mod
 
 macOS guest uses Tart (Apple Virtualization.framework) exclusively; automated Tart→UTM runtime handoff is not supported (format mismatch, no tooling).
 
-## Hostname Convention
+## Hostname convention
 
 VM guest OSes must use the same hostname and display name as the corresponding host OS. The canonical values are:
 
@@ -33,7 +33,7 @@ Apply this convention when adding or modifying:
 - `src/vms/windows/Autounattend.xml` — set `<ComputerName>Windows</ComputerName>`
 - `src/modules/VMs.json` — set `display` to the canonical PascalCase name
 
-## Guest Credential Convention
+## Guest credential convention
 
 VM guest credentials must come from per-user SOPS secrets (`src/secrets/users-<username>.yml`), not from host login or defaults.
 
@@ -44,7 +44,7 @@ VM guest credentials must come from per-user SOPS secrets (`src/secrets/users-<u
 
 When changing credential policy, update `tests/modules/vm-setup-tests.nix` in the same commit.
 
-## VM Manifest
+## VM manifest
 
 All virtual machines are declared in `src/modules/VMs.json`. This is the single source of truth for VM names, resources, and options consumed by all three platform setup scripts.
 
@@ -68,7 +68,7 @@ Optional fields:
 | `windowsEdition` | string | Windows edition string passed to Packer (e.g. `"pro"`). Optional for `type: "Windows"` entries; defaults to `"Pro"` when absent.                                                                                                                                                         |
 | `windowsIsoUrl`  | string | URL to auto-download the Windows installer ISO when `--windows-iso` is omitted. Set to a stable direct download URL (e.g. an evaluation ISO from Microsoft's Evaluation Center or an internal mirror). The downloaded ISO is cached at `~/virtual machines/images/<name>-installer.iso`. |
 
-## Disk Format
+## Disk format
 
 QCOW2 throughout all three platforms. Stored at:
 
@@ -120,23 +120,23 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - Start script: `start-<name>.ps1` — a self-contained PowerShell launch command.
 - VirtioFS on Windows requires `virtiofsd` running as a separate process before the VM starts. See `~/virtual machines/README.md` for the exact command.
 
-## Apply Hook
+## Apply hook
 
-`nucleus-vm-setup` (and the `--vm-setup` flag for `nucleus apply`) is **opt-in**:
+`nucleus-vm-setup` (and the `--vm-setup` flag for `nucleus apply`) is opt-in:
 
 - POSIX: `src/scripts/apply.sh` passes `--vm-setup` to enable; skipped by default.
 - Windows: `src/hosts/Windows/apply.ps1` uses `-VMSetup` switch; skipped by default.
 
 The hook is always best-effort: a VM setup failure does not abort a completed system apply.
 
-## Adding a New VM
+## Adding a new VM
 
 1. Add an entry to `src/modules/VMs.json` with all required fields.
 2. Run `nucleus-vm-setup` on all three host platforms.
 3. Add a test in `tests/modules/vm-setup-tests.nix` if the new VM has platform-specific constraints.
 4. Update `src/hosts/<platform>/MANUAL.md` if the VM requires manual steps.
 
-## VM Image Building
+## VM image building
 
 `nucleus-vm-setup` is a two-phase command. Phase 1 builds QCOW2 OS images (if absent); phase 2 provisions VM bundles/domains from those images.
 
