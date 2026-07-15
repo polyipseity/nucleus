@@ -23,6 +23,20 @@ let
   builderMachine = "ssh://builder@linux-builder aarch64-linux /etc/nix/builder_ed25519 4 1 benchmark,big-parallel,kvm - -";
   userSshDir = "/Users/${username}/.ssh";
   userBuilderKeyPath = "${userSshDir}/linux-builder_ed25519";
+
+  envVars = import ../../modules/lib/env-vars.nix {
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
+  };
+  resolveValue = name: envVars.resolveValue name "macOS";
+  daemonEnv = lib.filterAttrs (_name: value: value != null) {
+    NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
+    NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
+  };
 in
 {
   # Register the builder VM so the Nix daemon routes aarch64-linux builds to it.
@@ -116,15 +130,7 @@ in
       WorkingDirectory = workDir;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/linux-builder/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/linux-builder/stderr.log";
-      EnvironmentVariables =
-        (import ../../modules/lib/env-vars.nix {
-          inherit
-            config
-            pkgs
-            lib
-            username
-            ;
-        }).toMacOSDaemonEnv;
+      EnvironmentVariables = daemonEnv;
     };
   };
 

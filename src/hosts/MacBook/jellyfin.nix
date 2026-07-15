@@ -19,6 +19,20 @@ let
   jellyfinHttpPort = 8096;
   jellyfinStateRoot = "/Users/Shared/Jellyfin";
 
+  envVars = import ../../modules/lib/env-vars.nix {
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
+  };
+  resolveValue = name: envVars.resolveValue name "macOS";
+  daemonEnv = lib.filterAttrs (_name: value: value != null) {
+    NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
+    NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
+  };
+
   jellyfinDaemon = pkgs.writeShellScript "jellyfin-daemon" ''
     set -eu
 
@@ -44,15 +58,7 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
-      EnvironmentVariables =
-        (import ../../modules/lib/env-vars.nix {
-          inherit
-            config
-            pkgs
-            lib
-            username
-            ;
-        }).toMacOSDaemonEnv;
+      EnvironmentVariables = daemonEnv;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/jellyfin/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/jellyfin/stderr.log";
     };

@@ -13,6 +13,19 @@
 
 let
   userHome = config.users.users.${username}.home;
+  envVars = import ../../modules/lib/env-vars.nix {
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
+  };
+  resolveValue = name: envVars.resolveValue name "macOS";
+  daemonEnv = lib.filterAttrs (_name: value: value != null) {
+    NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
+    NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
+  };
 in
 {
   launchd.daemons."camillagui-backend" = {
@@ -24,15 +37,7 @@ in
         "exec ${pkgs.camillagui-backend}/bin/camillagui-backend -c ${userHome}/.config/camillagui-backend/config.yml"
       ];
       UserName = username;
-      EnvironmentVariables =
-        (import ../../modules/lib/env-vars.nix {
-          inherit
-            config
-            pkgs
-            lib
-            username
-            ;
-        }).toMacOSDaemonEnv;
+      EnvironmentVariables = daemonEnv;
       KeepAlive = true;
       RunAtLoad = true;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/camillagui-backend/stdout.log";

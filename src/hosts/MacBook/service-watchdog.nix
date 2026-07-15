@@ -21,6 +21,20 @@ let
     path = ../../modules/services.json;
     name = "nucleus-services-json";
   };
+
+  envVars = import ../../modules/lib/env-vars.nix {
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
+  };
+  resolveValue = name: envVars.resolveValue name "macOS";
+  daemonEnv = lib.filterAttrs (_name: value: value != null) {
+    NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
+    NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
+  };
 in
 {
   launchd.daemons."service-watchdog" = {
@@ -34,18 +48,9 @@ in
       StartInterval = 300;
       RunAtLoad = true;
       KeepAlive = false;
-      EnvironmentVariables =
-        (import ../../modules/lib/env-vars.nix {
-          inherit
-            config
-            pkgs
-            lib
-            username
-            ;
-        }).toMacOSDaemonEnv
-        // {
-          NUCLEUS_SERVICES_JSON = servicesJson;
-        };
+      EnvironmentVariables = daemonEnv // {
+        NUCLEUS_SERVICES_JSON = servicesJson;
+      };
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/service-watchdog/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/service-watchdog/stderr.log";
     };

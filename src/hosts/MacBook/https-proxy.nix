@@ -57,6 +57,20 @@ let
   '';
 
   systemLogDir = config.nucleus.logging.systemLogDir;
+
+  envVars = import ../../modules/lib/env-vars.nix {
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
+  };
+  resolveValue = name: envVars.resolveValue name "macOS";
+  daemonEnv = lib.filterAttrs (_name: value: value != null) {
+    NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
+    NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
+  };
 in
 {
   launchd.daemons.httpsProxy = {
@@ -65,15 +79,7 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
-      EnvironmentVariables =
-        (import ../../modules/lib/env-vars.nix {
-          inherit
-            config
-            pkgs
-            lib
-            username
-            ;
-        }).toMacOSDaemonEnv;
+      EnvironmentVariables = daemonEnv;
       StandardOutPath = "${systemLogDir}/caddy/stdout.log";
       StandardErrorPath = "${systemLogDir}/caddy/stderr.log";
     };

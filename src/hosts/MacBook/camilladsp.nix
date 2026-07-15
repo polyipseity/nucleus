@@ -48,6 +48,20 @@ let
       --port ${wsPort} \
       --config ${userHome}/.config/camilladsp/configs/config.yml
   '';
+
+  envVars = import ../../modules/lib/env-vars.nix {
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
+  };
+  resolveValue = name: envVars.resolveValue name "macOS";
+  daemonEnv = lib.filterAttrs (_name: value: value != null) {
+    NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
+    NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
+  };
 in
 {
   launchd.daemons."camilladsp" = {
@@ -55,15 +69,7 @@ in
       Label = "local.camilladsp";
       ProgramArguments = [ "${camilladspDaemon}" ];
       UserName = username;
-      EnvironmentVariables =
-        (import ../../modules/lib/env-vars.nix {
-          inherit
-            config
-            pkgs
-            lib
-            username
-            ;
-        }).toMacOSDaemonEnv;
+      EnvironmentVariables = daemonEnv;
       KeepAlive = true;
       RunAtLoad = true;
       ThrottleInterval = 30;
@@ -78,15 +84,7 @@ in
       Label = "local.camilladsp-heartbeat";
       ProgramArguments = [ "${camilladspHeartbeat}" ];
       UserName = username;
-      EnvironmentVariables =
-        (import ../../modules/lib/env-vars.nix {
-          inherit
-            config
-            pkgs
-            lib
-            username
-            ;
-        }).toMacOSDaemonEnv;
+      EnvironmentVariables = daemonEnv;
       StartInterval = 5;
       RunAtLoad = false;
       ThrottleInterval = 1;
