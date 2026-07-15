@@ -33,6 +33,19 @@ let
       ;
   };
 
+  # ── Managed dirs dedup SET helper ──────────────────────────────────
+  # Returns a colon-joined string of ALL managed dirs (both prepend and
+  # append) for use as a case-pattern LOOKUP SET when stripping stale
+  # entries from the current PATH before re-adding them.
+  # This joins prepend+append as a SET for dedup — NOT as a PATH ordering.
+  # The order within the returned string is irrelevant; only membership
+  # matters.  The prefix argument is "${config.home.homeDirectory}" for
+  # the activation script (build-time eval) or "$HOME" for the launchd
+  # agent (runtime shell expansion).
+  mkManagedDedupSet = prefix: builtins.concatStringsSep ":" (
+    map (p: "${prefix}/${p}") (envVars.pathComponents.prepend ++ envVars.pathComponents.append)
+  );
+
   # Shared BD CLI wrapper: soft-fail wrapper for BetterDisplay CLI commands.
   # Used by both betterdisplayHeartbeat and ensureHeadlessDisplay.
   bdCliWrapper = ''
@@ -1369,7 +1382,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # then prepends + appends managed dirs.
     __nucleus_prepend="${envVars.toLaunchctlPrependPath}"
     __nucleus_append="${envVars.toLaunchctlAppendPath}"
-    __nucleus_managed_dirs="${config.home.homeDirectory}/.bun/bin:${config.home.homeDirectory}/.cargo/bin:${config.home.homeDirectory}/.local/bin"
+    # Build the managed-dir LOOKUP SET for stripping stale entries.
+    # This includes BOTH prepend and append dirs so that any future append
+    # entries are also stripped on re-apply.  This is NOT a PATH ordering
+    # — it is a dedup membership set (order irrelevant).
+    __nucleus_managed_set="${mkManagedDedupSet config.home.homeDirectory}"
 
     CURRENT_PATH="$(/bin/launchctl getenv PATH 2>/dev/null || true)"
     if [ -z "$CURRENT_PATH" ]; then
@@ -1380,7 +1397,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     old_IFS="$IFS"
     IFS=:
     for __component in $CURRENT_PATH; do
-      case ":${__nucleus_managed_dirs}:" in
+      case ":${__nucleus_managed_set}:" in
         *":${__component}:"*) ;;
         *) __nucleus_cleaned="${__nucleus_cleaned}:${__component}" ;;
       esac
@@ -1426,13 +1443,15 @@ lib.mkIf pkgs.stdenv.isDarwin {
           # ── PATH: strip stale managed entries, then prepend+append ──
           __nucleus_prepend="${envVars.toLaunchctlPrependPath}"
           __nucleus_append="${envVars.toLaunchctlAppendPath}"
-          __nucleus_managed_dirs="$HOME/.bun/bin:$HOME/.cargo/bin:$HOME/.local/bin"
+          # Same dedup SET as the activation script, but using $HOME (runtime
+          # shell expansion by launchd) instead of build-time home directory.
+          __nucleus_managed_set="${mkManagedDedupSet "$HOME"}"
 
           __nucleus_cleaned=""
           old_IFS="$IFS"
           IFS=:
           for __component in $PATH; do
-            case ":${__nucleus_managed_dirs}:" in
+            case ":${__nucleus_managed_set}:" in
               *":${__component}:"*) ;;
               *) __nucleus_cleaned="${__nucleus_cleaned}:${__component}" ;;
             esac
