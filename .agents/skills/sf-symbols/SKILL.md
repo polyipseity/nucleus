@@ -5,9 +5,9 @@ name: "sf-symbols"
 
 # SF Symbol names for Automator workflow icons
 
-## Hard rule: always look up from an authoritative source — never rely on third-party lists alone
+## Hard rule: always look up from an authoritative source
 
-Every SF Symbol name used in `NSIconName` (Info.plist) or `systemImageName` (document.wflow) must be verified against the macOS private framework — not just community-maintained lists. Third-party lists (e.g. `sam4096/apple-sf-symbols-list`) are often incomplete and can falsely label valid symbols as missing. The authoritative source is the macOS SFSymbols framework that ships with every macOS.
+Every SF Symbol name must be verified against the macOS SFSymbols private framework, not third-party lists (e.g. `sam4096/apple-sf-symbols-list`), which are often incomplete and can falsely label valid symbols as missing.
 
 ## Authoritative sources
 
