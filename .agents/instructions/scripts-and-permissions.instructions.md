@@ -105,26 +105,9 @@ This standardization makes examples portable and immediately clear about user co
 
 ## health-check.sh SOPS identity resolution
 
-`scripts/health-check.sh` calls `sops -d <file>` to verify that current machine identities can decrypt each managed secret before activation proceeds.
+`scripts/health-check.sh` must export `SOPS_AGE_KEY_FILE` pointing to `/etc/sops/age/machine.txt` (the machine age key written by `deriveHostAgeKey`) before its `sops -d` probe loop, since `sops` does not search that path by default. Without this, `sops` falls through to GPG, which may not have the secret key in the keyring at health-check time.
 
-sops does **not** search `/etc/sops/age/machine.txt` by default — it only checks standard user-level locations (`SOPS_AGE_KEY_FILE` env var, `~/Library/Application Support/sops/age/keys.txt`, `~/.config/sops/age/keys.txt`, etc.). On provisioned machines the machine age private key is written to `/etc/sops/age/machine.txt` by `deriveHostAgeKey` (in `posix-sops.nix`). Without an explicit pointer, every `sops -d` call falls through to GPG, which may not have the secret key in the keyring at health-check time.
-
-**Required pattern** — export `SOPS_AGE_KEY_FILE` before the sops probe loop:
-
-```sh
-# The machine age private key lives at /etc/sops/age/machine.txt (written by
-# deriveHostAgeKey).  sops does not search this path by default; set
-# SOPS_AGE_KEY_FILE so the machine identity is used on provisioned hosts.
-# On first bootstrap before deriveHostAgeKey has run the file is absent;
-# sops falls back to GPG (imported as a bootstrap prerequisite).
-_sch_machine_key="/etc/sops/age/machine.txt"
-if [ -f "$_sch_machine_key" ]; then
-  SOPS_AGE_KEY_FILE="$_sch_machine_key"
-  export SOPS_AGE_KEY_FILE
-fi
-```
-
-Without this, the health-check will fail on provisioned machines whenever the GPG private key is not in the running keyring (common in headless sessions or after a fresh login).
+See the `check_secret_health()` function in `scripts/health-check.sh` for the implementation.
 
 ## CWD independence — all `nucleus-*` commands must work from any working directory
 
@@ -145,13 +128,8 @@ This rule should be consistently suppressed across the repository's PowerShell s
 
 ## Runtime configuration (`nucleus-config`)
 
-The `nucleus-config` CLI manages runtime toggles at `~/.local/state/nucleus/config.json` (outside `~/.config/` so changes survive rebuilds).
+Runtime toggles live at `~/.local/state/nucleus/config.json` (outside `~/.config/` so changes survive rebuilds). All toggles default to `true` when the file or key is absent, enforced by the implementation in `scripts/config.sh` / `scripts/config.ps1`.
 
-- `nucleus-config get [<section.key>]` — print config value(s)
-- `nucleus-config set <section.key> <val>` — set a config key (value is JSON-typed)
-- `nucleus-config list` — print all config as flat key=value pairs
-- Default (file absent or key missing) = enabled for all toggles
+Services read the config file directly (not via `nucleus-config`) for early-boot compatibility, following the same pattern on both POSIX and Windows.
 
-Services read the config file directly (not via `nucleus-config`) so they work during early boot. Both POSIX and Windows follow the same pattern: read file, default `section.key` to `true`. See `scripts/config.sh` / `scripts/config.ps1` for the implementation.
-
-Adding a new toggle: document the key path, update consuming code to read the config with a `true` default, and the CLI handles the file transparently.
+Adding a new toggle: add a default entry to the `DEFAULTS`/`$Defaults` map in both script implementations, then update consuming code to read the key (defaulting to `true`).
