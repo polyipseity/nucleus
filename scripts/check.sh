@@ -580,12 +580,12 @@ if ! $HAS_ARGS; then
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
-      to_entries[] |
+      to_entries[] | select(.value | type == "object") |
       [
         .key,
-        (.value | has("displayName") and (.value.displayName | type == "string") and (.value.displayName | length > 0)) | tostring,
-        (.value | has("platforms") and (.value.platforms | type == "object")) | tostring,
-        (.value.platforms | if type == "object" then (keys | length) else 0 end) | tostring
+        (.value | has("displayName") and (.value.displayName | type == "string") and (.value.displayName | length > 0) | tostring),
+        (.value | has("platforms") and (.value.platforms | type == "object") | tostring),
+        (.value.platforms | if type == "object" then (keys | length) else 0 end | tostring)
       ] | @tsv' "$_svc_json")
 
     # Validate each platform entry has valid type and required fields
@@ -602,7 +602,7 @@ if ! $HAS_ARGS; then
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
-      to_entries[] |
+      to_entries[] | select(.value | type == "object") |
       .key as $name |
       (.value.platforms // {}) | to_entries[] |
       [
@@ -616,8 +616,8 @@ if ! $HAS_ARGS; then
           elif .value.type == "schtask" then (.value.taskPath | type == "string" and length > 0)
           elif .value.type == "omitted" then (.value.justification | type == "string" and length > 0)
           else false
-          end
-        ) | tostring
+          end | tostring
+        )
       ] | @tsv' "$_svc_json")
   fi
 
@@ -636,7 +636,7 @@ if ! $HAS_ARGS; then
       _svc_errors=$((_svc_errors + 1))
     fi
   done < <(jq -r '
-    to_entries[] |
+    to_entries[] | select(.value | type == "object") |
     .key as $name |
     (.value.platforms // {}) | to_entries[] |
     [
