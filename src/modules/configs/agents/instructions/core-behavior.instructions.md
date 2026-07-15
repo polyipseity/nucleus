@@ -123,6 +123,16 @@ When the premise is valid, proceed normally with a direct, high-quality answer.
 - **Never silently downgrade errors.** Do not change errors to warnings, info logs, or silently swallowed failures unless the user explicitly approves. If an operation fails, report the failure clearly — do not pretend it succeeded or claim success with caveats buried in output.
 - **Match severity to user intent.** When the user says something "is an error", treat it as an error. Do not second-guess or reclassify the severity without explicit discussion.
 
+## Typing conventions
+
+Default typing policy for all code:
+
+- **Abstract over concrete in public interfaces.** In function signatures, class attributes, and module-level declarations, use the most general abstract type available (interfaces, protocols, abstract base classes). Use concrete types only for construction/instantiation; annotate variables with abstract types. Local variables may use narrower types.
+- **Match mutability in types.** Use a mutable type when mutation is required; use read-only/immutable types otherwise. The declared type must reflect how the value is used at runtime, not just how it is constructed.
+- **No catch-all types.** Never use `any`, `unknown`, `object` (as catch-all), or equivalent escape-hatch types. Always find or define a precise type.
+- **No type-error suppression.** Do not use `# type: ignore`, `@ts-ignore`, `@ts-expect-error`, `@SuppressWarnings`, `// NOLINT`, or similar suppression mechanisms. When intentionally bypassing the type system (e.g., testing with deliberately wrong types), use an explicit checked cast or conversion that produces a correctly-typed value.
+- **`assert` is test-only.** Use `assert` only in test code. In production code, use proper error handling. The sole exception is runtime invariants whose violation must halt execution immediately.
+
 ## Plan implementation completeness
 
 When executing a plan with multiple phases:
