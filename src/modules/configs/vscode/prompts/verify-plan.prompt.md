@@ -2,7 +2,6 @@
 description: "Research a plan from session memory (active-plan.md) using online searches to verify feasibility, accuracy, and risks before implementation."
 name: "verify-plan"
 argument-hint: "optional: specific phase, file, or question to focus research on"
-agent: "agent"
 ---
 
 # Verify plan with online research
