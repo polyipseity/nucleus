@@ -95,25 +95,30 @@ nix-darwin refactored the launchd module. The old flat `config` attrset and `ena
 - `StandardOutPath`/`StandardErrorPath` are `null or path` — tilde paths fail type checking.
 - Home Manager's launchd module is unchanged (still `enable` + `config`).
 
-### ### nix-darwin launchd.daemons key naming convention
+### ### nix-darwin launchd.daemons label naming
 
-nix-darwin transforms the `launchd.daemons.<name>` key to determine the
-launchd service label:
+nix-darwin auto-generates the launchd `Label` from the `launchd.daemons.<name>`
+key. For system daemons (via `launchd.daemons`), the label becomes
+`org.nixos.<key>`. For user agents (via `launchd.agents` via Home Manager),
+the label becomes the key as-is.
 
-- **Dot-free key** (e.g. `"camilladsp"`): label becomes `local.camilladsp`.
-  nix-darwin prepends `local.`.
-- **Key with dot** (e.g. `"local.litellm"`): label becomes
-  `org.nixos.local.litellm`. nix-darwin treats this as a fully-qualified name
-  and prepends `org.nixos.`.
+To produce a specific label (e.g. `local.camilladsp` for `services.json`
+compatibility), **always set `Label` explicitly** in the `serviceConfig`:
 
-Keep `launchd.daemons` keys dot-free so the generated label matches what
-`services.json` expects (`local.<name>`). This is the pattern used by all
-working services (`camilladsp`, `camilladsp-heartbeat`, `camillagui-backend`,
-`service-watchdog`).
+```nix
+launchd.daemons."myservice" = {
+  serviceConfig = {
+    Label = "local.myservice";
+    # ...
+  };
+};
+```
 
-Do not use `"local.<name>"` as the key — it silently produces
-`org.nixos.local.<name>` and the service becomes invisible to `nucleus-svc list`
-even though `launchctl list` shows it running.
+Do not rely on the auto-generated label — nix-darwin may change its naming
+convention across versions, silently breaking `nucleus-svc list`
+discovery. All working services in this repo (`camilladsp`,
+`camilladsp-heartbeat`, `camillagui-backend`, `service-watchdog`) follow
+this pattern.
 
 launchd EX_CONFIG (exit 78)
 

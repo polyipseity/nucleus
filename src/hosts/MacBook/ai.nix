@@ -53,6 +53,9 @@ in
   # `services.json` (which expects `local.litellm`/`local.ollama`).
   launchd.daemons."litellm" = {
     serviceConfig = {
+      # Explicit label to match services.json (which expects local.litellm).
+      # Without this, nix-darwin auto-generates org.nixos.litellm.
+      Label = "local.litellm";
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
       # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
       # passes SIP gate. See .agents/instructions/macos-launchd-sip.instructions.md.
@@ -90,6 +93,8 @@ in
 
   launchd.daemons."ollama" = {
     serviceConfig = {
+      # Explicit label to match services.json (which expects local.ollama).
+      Label = "local.ollama";
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
       # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
       # passes SIP gate. See .agents/instructions/macos-launchd-sip.instructions.md.
