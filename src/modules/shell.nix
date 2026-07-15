@@ -658,6 +658,9 @@ in
   # https://bun.sh/docs/cli/install#global-packages
   # https://doc.rust-lang.org/cargo/commands/cargo-install.html
   # https://docs.astral.sh/uv/reference/settings/#tool-bin-dir
+  # Sole declaration site for home.sessionPath and home.sessionVariables.
+  # No other file sets these — all env vars flow through the centralized
+  # catalog in src/modules/lib/env-vars.nix.
   home.sessionPath = [
     "${config.home.homeDirectory}/.bun/bin"
     "${config.home.homeDirectory}/.cargo/bin"
