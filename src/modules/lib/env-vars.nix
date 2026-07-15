@@ -260,18 +260,19 @@ let
       why = "Repo root for out-of-store symlinks. Captured at eval time from apply.sh export. Excluded from gui-env-system agent because builtins.getEnv returns empty string when built outside apply.sh; set via activation script instead.";
     };
 
-    # ── macOS GUI environment PATH (user-specific) ─────────────────
+    # ── macOS GUI environment PATH (prepend-only; user-specific) ──
+    # PATH is not a single value at runtime — it is a composition of
+    # (prepend + system default + append).  This catalog entry only holds
+    # the prepend portion.  The append portion is handled separately via
+    # toLaunchctlAppendPath in the activation/agent scripts in macos.nix.
     PATH = {
       values = {
-        macOS = builtins.concatStringsSep ":" (
-          (map (p: "$HOME/${p}") pathComponents.prepend) ++
-          (map (p: "$HOME/${p}") pathComponents.append)
-        );
+        macOS = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.prepend);
       };
       excludeFromSessionVariables = true;
       excludeFromLaunchctl = true;
       userSpecific = true;
-      why = "Managed PATH (managed dirs only, no system default) for macOS GUI apps. The managed dirs are prepended to the actual PATH at runtime by guiEnvActivationPathAndRepoRoot (activation) and gui-env-system (login agent) — this avoids hardcoding system defaults. Excluded from shell sessionVariables (shell domain gets prepend from home.sessionPath + system PATH from nix-darwin set-environment) and from launchctl agents (handled dynamically by the activation/login scripts).";
+      why = "Managed PATH (prepend portion only) for macOS GUI apps. The prepend dirs are set by guiEnvActivationPathAndRepoRoot (activation) and gui-env-system (login agent) in macos.nix. The append portion is handled separately via toLaunchctlAppendPath. This entry does not merge prepend+append because PATH has a prepend/system/append structure at runtime — merging them would misrepresent the architecture.";
     };
 
     # ── Starship prompt (all-process) ───────────────────────────────
