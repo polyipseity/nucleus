@@ -59,7 +59,7 @@ function Sync-UserPath {
   $nucleusAppendDirs = @(
     # Reserved for future use; mirrors pathComponents.append (currently empty).
   )
-  $nucleusDirs = $nucleusPrependDirs + $nucleusAppendDirs
+  $nucleusDirs = $nucleusPrependDirs + $nucleusAppendDirs # dedup SET (membership check), NOT a PATH ordering
 
   # ── Machine PATH (HKLM) ──────────────────────────────────────────
   $regPath = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
