@@ -3,8 +3,6 @@
 # Guards the cross-host prek contract: binary parity, apply-time installation,
 # and shell-driven hook installation across POSIX and Windows.
 #
-# Run with: nix-instantiate --eval tests/integration/prek-integration-tests.nix
-
 {
   lib ? import <nixpkgs/lib>,
 }:
@@ -152,29 +150,4 @@ in
   success = true;
   testCount = builtins.length allTests;
   message = "All ${builtins.toString (builtins.length allTests)} prek integration tests passed";
-  testNames = [
-    "1: POSIX shared package baseline includes pkgs.prek"
-    "2: Windows DSC baseline includes j178.Prek"
-    "3: Apply runtime bundles prek"
-    "4: POSIX apply installs hooks"
-    "5: zsh hook auto-installs hooks"
-    "6: POSIX pwsh hook auto-installs hooks"
-    "7: Windows apply installs hooks"
-    "8: Windows Install-PrekHook module exists"
-    "9: Windows pwsh hook auto-installs hooks"
-    "10: POSIX prek uses git rev-parse --git-dir"
-    "11: Windows prek uses git rev-parse --git-dir"
-    "12: POSIX prek handles relative git-dir paths"
-    "13: Windows prek handles relative git-dir paths"
-    "14: zsh defines __nucleus_is_agent_session and guards pay-respects"
-    "15: Windows defines Test-NucleusAgentSession and guards pay-respects"
-    "16: POSIX pwsh defines Test-NucleusAgentSession and guards pay-respects"
-    "17: Windows profile checks all env vars from agent-env-vars.nix"
-    "18: zsh suppresses ZLE and flattens prompt in agent sessions"
-    "19: POSIX pwsh suppresses PSReadLine and flattens prompt in agent sessions"
-    "20: Windows pwsh suppresses PSReadLine and flattens prompt in agent sessions"
-    "21: Windows cmd.exe AutoRun registry checks all agent env vars"
-    "22: zsh initContent checks all env vars from agent-env-vars.nix"
-    "23: POSIX pwsh profile checks all env vars from agent-env-vars.nix"
-  ];
 }

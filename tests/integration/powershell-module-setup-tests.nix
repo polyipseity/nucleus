@@ -4,8 +4,6 @@
 # correctly across all provisioning layers (POSIX pwsh.nix activation,
 # Windows apply.ps1 setup module, and Invoke-PowerShellModuleSetup.ps1).
 #
-# Run with: nix-instantiate --eval tests/integration/powershell-module-setup-tests.nix
-
 let
   inherit (import ../lib.nix) assert';
 

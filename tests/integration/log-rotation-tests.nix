@@ -1,15 +1,7 @@
-# tests/integration/log-rotation-tests.nix — Content assertions for the
-# cross-platform log rotation feature.
-#
-# Verifies that the rotation functions, GC wiring, services.json defaults,
-# and option doc references are all consistent and present.
-#
-# Run with: nix-instantiate --eval tests/integration/log-rotation-tests.nix
+# tests/integration/log-rotation-tests.nix — Content assertions for cross-platform log rotation.
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) containsRegex flatten;
 
   libShText = builtins.readFile ../../src/scripts/lib.sh;
   gcShText = builtins.readFile ../../scripts/gc.sh;

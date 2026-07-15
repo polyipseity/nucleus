@@ -1,7 +1,4 @@
 # tests/integration/shell-completions-tests.nix — Verify shell completion coverage for nucleus-* commands.
-#
-# Guards the contract: every nucleus command must have a zsh completion file and
-# a PowerShell Register-ArgumentCompleter on both POSIX and Windows.
 
 let
   lib = import <nixpkgs/lib>;

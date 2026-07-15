@@ -1,7 +1,5 @@
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) containsRegex flatten;
 
   aiSyncText = builtins.readFile ../../scripts/ai-sync.sh;
   flakeText = builtins.readFile ../../src/flake.nix;

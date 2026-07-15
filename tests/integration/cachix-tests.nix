@@ -1,12 +1,7 @@
-# tests/integration/cachix-tests.nix — Content assertions for nix-community
-# cachix binary cache configuration in posix-base.nix.
-#
-# Run with: nix-instantiate --eval tests/integration/cachix-tests.nix
+# tests/integration/cachix-tests.nix — Content assertions for nix-community cachix configuration.
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) containsRegex flatten;
 
   posixBaseText = builtins.readFile ../../src/modules/posix-base.nix;
 in

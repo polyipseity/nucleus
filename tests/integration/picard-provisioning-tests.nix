@@ -1,12 +1,9 @@
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
-
   coreText = builtins.readFile ../../src/modules/core.nix;
   nixosDesktopText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
   windowsSystemPackagesText = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
 
-  inherit (import ../lib.nix) assert';
+  inherit (import ../lib.nix) assert' containsRegex flatten;
 
   test_macos_routes_picard_to_homebrew = assert' (
     containsRegex ''"musicbrainz-picard" = \{'' coreText

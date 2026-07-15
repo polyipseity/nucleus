@@ -1,15 +1,7 @@
 # tests/integration/svc-tests.nix — Schema and invariant tests for service management.
-#
-# Validates that the service registry (services.json), backends (svc.sh,
-# svc.ps1), and wiring (flake.nix, shell.nix, check scripts) contain the
-# required structural elements.
-#
-# Run with: nix-instantiate --eval tests/integration/svc-tests.nix
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) containsRegex flatten;
 
   servicesJsonText = builtins.readFile ../../src/modules/services.json;
   svcShText = builtins.readFile ../../scripts/svc.sh;

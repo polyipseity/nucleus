@@ -1,16 +1,7 @@
 # tests/integration/config-composition-tests.nix — Verify host configurations compose correctly.
-#
-# Tests validate that:
-#   - macOS, NixOS, and standalone HM configs don't have conflicting options
-#   - Required modules are imported by all hosts
-#   - Cross-module dependencies are satisfied
-#   - Parity settings exist on supported hosts
-#
-# Run with: nix-instantiate --eval tests/integration/config-composition-tests.nix
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) assert' containsRegex flatten;
 
   flakeText = builtins.readFile ../../src/flake.nix;
   homeModuleText = builtins.readFile ../../src/modules/home.nix;
@@ -20,8 +11,6 @@ let
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   nixosDefaultText = builtins.readFile ../../src/hosts/NixOS/default.nix;
-
-  inherit (import ../lib.nix) assert';
 
   # Test 1: Verify all POSIX hosts import core.nix
   test_posix_hosts_import_core = assert' (

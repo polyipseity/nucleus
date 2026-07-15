@@ -1,7 +1,4 @@
 # tests/integration/shell-shortcuts-tests.nix — Verify managed shell shortcut and command parity.
-#
-# Guards the cross-host shell contract so zsh, POSIX PowerShell, Windows
-# PowerShell, and host manuals stay aligned on the curated shortcut surface.
 
 let
   lib = import <nixpkgs/lib>;

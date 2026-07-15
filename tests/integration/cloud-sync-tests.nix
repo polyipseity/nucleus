@@ -1,13 +1,7 @@
 # tests/integration/cloud-sync-tests.nix — Schema and invariant tests for cloud-drives.nix.
-#
-# Validates that the cloud-drives module text contains the required option
-# definitions, type declarations, and structural invariants.
-#
-# Run with: nix-instantiate --eval tests/integration/cloud-sync-tests.nix
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) assert' containsRegex flatten;
 
   moduleText = builtins.readFile ../../src/modules/cloud-drives.nix;
   posixUsersText = builtins.readFile ../../src/modules/users.json;
@@ -33,8 +27,6 @@ let
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
   macbookCloudOverrideText = builtins.readFile ../../src/hosts/MacBook/cloud-drives.nix;
   macbookHomebrewText = builtins.readFile ../../src/hosts/MacBook/homebrew.nix;
-
-  inherit (import ../lib.nix) assert';
 
   # Test 1: Module defines both mounts and replicas option lists
   test_options_exist = assert' (

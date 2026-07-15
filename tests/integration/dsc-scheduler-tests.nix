@@ -1,16 +1,9 @@
-# tests/integration/dsc-scheduler-tests.nix — Content assertions for the Windows
-# DSC scheduler configuration (scheduler.dsc.yml), specifically the gc-weekly
-# scheduled task and its guard removal.
-#
-# Run with: nix-instantiate --eval tests/integration/dsc-scheduler-tests.nix
+# tests/integration/dsc-scheduler-tests.nix — Content assertions for the Windows DSC scheduler configuration.
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
+  inherit (import ../lib.nix) containsRegex flatten;
 
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
-
-  # Negation: assert that a pattern is NOT present.
-  notContainsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) == null;
+  notContainsRegex = pattern: haystack: !containsRegex pattern haystack;
 
   windowsSchedulerDscText = builtins.readFile ../../src/hosts/Windows/system/scheduler.dsc.yml;
 in

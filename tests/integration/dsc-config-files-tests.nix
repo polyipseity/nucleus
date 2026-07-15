@@ -8,16 +8,11 @@
 # Also validates that apply.ps1 prepends "user/" to each dscConfigFiles entry
 # and prevents path-traversal escape.
 #
-# Run with: nix-instantiate --eval tests/integration/dsc-config-files-tests.nix
-
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
-
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
 
-  inherit (import ../lib.nix) assert';
+  inherit (import ../lib.nix) assert' containsRegex flatten;
 
   # Expected user-level DSC files (bare filenames; apply.ps1 prepends "user/").
   expectedUserDscFiles = [
@@ -133,17 +128,4 @@ in
   success = true;
   testCount = 11;
   message = "All 11 DSC config file declaration tests passed";
-  testNames = [
-    "1:  Default ConfigFiles includes all 10 system-level DSC files"
-    "2:  Default ConfigFiles excludes user-level DSC files"
-    "3:  ConfigFiles param doc describes per-user extension via users.json"
-    "4:  Deduplication mechanism exists in apply.ps1"
-    "5:  Exactly one primary user in users.json"
-    "6:  Primary user has non-empty dscConfigFiles array"
-    "7:  Primary user dscConfigFiles includes all 7 user-level files"
-    "8:  Primary user dscConfigFiles excludes system-level files"
-    "9:  Primary user dscConfigFiles is sorted alphabetically"
-    "10: Per-user loop prepends user/ prefix to dscConfigFiles entries"
-    "11: Per-user loop prevents path traversal escape"
-  ];
 }

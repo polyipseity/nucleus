@@ -70,12 +70,4 @@ in
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} lid-closed agent runtime tests passed";
-  testNames = [
-    "1: macOS keeps remote-session pmset posture"
-    "2: macOS manual documents clamshell limit"
-    "3: NixOS ignores lid switch on all power sources"
-    "4: Windows power policy manages lid action"
-    "5: Windows apply executes power policy"
-    "6: CI executes lid-closed runtime tests"
-  ];
 }

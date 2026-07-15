@@ -1,13 +1,7 @@
 # tests/integration/git-settings-tests.nix — Validate shared Git defaults across POSIX and Windows.
-#
-# Locks the declarative Git baseline in both src/modules/git.nix and the
-# Windows Sync-GitAndSshConfig module so cross-host parity regressions are
-# caught even when the runtime tests are not executed on this platform.
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) containsRegex flatten;
 
   posixGitText = builtins.readFile ../../src/modules/git.nix;
   windowsGitText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1;

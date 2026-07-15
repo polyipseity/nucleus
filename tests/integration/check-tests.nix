@@ -1,12 +1,7 @@
-# tests/integration/check-tests.nix — Content assertions for check.sh
-# lockfile overlap detection and exception handling.
-#
-# Run with: nix-instantiate --eval tests/integration/check-tests.nix
+# tests/integration/check-tests.nix — Content assertions for check.sh lockfile overlap detection.
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) containsRegex flatten;
 
   checkShText = builtins.readFile ../../scripts/check.sh;
 

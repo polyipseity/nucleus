@@ -1,7 +1,5 @@
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) containsRegex flatten;
 
   # Test files that should contain symlink protection code
   editorsText = builtins.readFile ../../src/modules/editors.nix;

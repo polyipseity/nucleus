@@ -1,7 +1,4 @@
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
-
   homeText = builtins.readFile ../../src/modules/home.nix;
   linuxModuleText = builtins.readFile ../../src/modules/linux.nix;
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
@@ -13,7 +10,7 @@ let
   usersRegistry = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
   windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
 
-  inherit (import ../lib.nix) assert';
+  inherit (import ../lib.nix) assert' containsRegex flatten;
 
   test_posix_picard_ini_merge_overwrite_wiring = assert' (
     containsRegex "configurePicardSettings" homeText

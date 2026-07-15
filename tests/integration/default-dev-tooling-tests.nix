@@ -11,8 +11,6 @@
 #   - Windows: user-scope bin dirs prepended unconditionally (no Test-Path
 #     guard) at the top of the managed block, before the direnv hook.
 #
-# Run with: nix-instantiate --eval tests/integration/default-dev-tooling-tests.nix
-
 {
   lib ? import <nixpkgs/lib>,
 }:
@@ -267,26 +265,4 @@ in
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} managed fallback tooling tests passed";
-  testNames = [
-    "1: POSIX zsh exports fallback tool bundle"
-    "2: POSIX pwsh uses fallback tool bundle"
-    "3: Windows shell profile exposes default environment"
-    "4: Windows apply wires shell profile sync"
-    "5: Build tools policy documents fallback environment"
-    "6: CI executes fallback tooling tests"
-    "7: POSIX zsh uses home.sessionPath for user-scope bin dirs (direnv-safe)"
-    "8: Windows managed block prepends user-scope bin dirs unconditionally"
-    "9: POSIX zsh probes tool availability in direnv context before routing"
-    "10: POSIX zsh fallback does not inject libiconv (cargo/rustc removed from fallback bundle)"
-    "11: POSIX hosts use pkgs.rustup (not pkgs.cargo from nixpkgs)"
-    "12: POSIX agents.nix initRustup sets rustup default none"
-    "13: Windows Invoke-RustupSetup calls rustup default none"
-    "14: POSIX cargo convergence prunes both cargo install and cargo-binstall packages"
-    "15: Windows cargo convergence prunes both cargo install and cargo-binstall packages"
-    "16: POSIX devShell uses rust-overlay with fromRustupToolchainFile"
-    "17: rust-toolchain.toml exists at repo root with stable channel"
-    "18: POSIX zsh checks rust-toolchain.toml scoped to cargo/rustc"
-    "19: POSIX pwsh checks rust-toolchain.toml scoped to cargo/rustc"
-    "20: Windows shell checks rust-toolchain.toml scoped to cargo/rustc"
-  ];
 }

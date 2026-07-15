@@ -1,17 +1,7 @@
-# tests/integration/service-watchdog-tests.nix — Schema and invariant tests for service
-# watchdog.
-#
-# Validates that the watchdog scripts (service-watchdog.sh,
-# service-watchdog.ps1), platform scheduling configs (macOS launchd agent,
-# NixOS systemd timer, Windows DSC task), and flake wiring contain the
-# required structural elements.
-#
-# Run with: nix-instantiate --eval tests/integration/service-watchdog-tests.nix
+# tests/integration/service-watchdog-tests.nix — Schema and invariant tests for service watchdog.
 
 let
-  flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
-
-  containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+  inherit (import ../lib.nix) containsRegex flatten;
 
   watchdogShText = builtins.readFile ../../scripts/service-watchdog.sh;
   watchdogPs1Text = builtins.readFile ../../scripts/service-watchdog.ps1;

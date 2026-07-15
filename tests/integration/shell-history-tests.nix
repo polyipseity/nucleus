@@ -1,9 +1,4 @@
 # tests/integration/shell-history-tests.nix — Verify history exclusion feature parity.
-#
-# Guards the cross-host contract: every managed shell must exclude space-prefixed
-# commands and consecutive duplicates from history. Documents impossible cases.
-#
-# Run with: nix-instantiate --eval tests/integration/shell-history-tests.nix
 
 let
   lib = import <nixpkgs/lib>;

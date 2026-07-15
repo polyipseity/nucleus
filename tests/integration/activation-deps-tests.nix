@@ -7,8 +7,6 @@
 # - SSH keys loaded before git clones over SSH
 # - GPG keys imported before signed commits
 #
-# Run with: nix-instantiate --eval tests/integration/activation-deps-tests.nix
-
 let
   lib = import <nixpkgs/lib>;
   inherit (lib) topologicalSort unique;
@@ -390,34 +388,4 @@ in
   success = true;
   testCount = builtins.length allTests;
   message = "All ${builtins.toString (builtins.length allTests)} activation and service dependency tests passed";
-  testNames = [
-    "1: Secrets materialize before dev repo provision"
-    "2: SSH keys load before Git clone"
-    "3: GPG keys import before commit setup"
-    "4: Manual instructions run last"
-    "5: Activation step names are unique"
-    "6: No circular activation dependencies"
-    "7: Windows DSC ordering is correct"
-    "8: Agent skills provision after core setup"
-    "9: Wallpaper setup after shell configuration"
-    "10: System packages available before Home Manager"
-    "11: Activation dependencies reference valid steps"
-    "12: Before/after dependency consistency"
-    "13: syncClawHubSkills dependency name alignment"
-    "14: syncClawHubSkills does not exit activation"
-    "15: GIMP sensitivity tracks installed app version"
-    "16: Windows Git identity targets per-user .gitconfig"
-    "17: POSIX Git defaults enforce signed commits and tags"
-    "18: MiddleClick startup uses native login-item path"
-    "19: Spotlight disables all known launcher hotkey slots"
-    "20: installCargoBinstallPackages activation name alignment"
-    "21: macOS dev-tree maintenance runs from launchd instead of activation"
-    "22: discord-music-rpc out-of-store symlink properly wired"
-    "23: app-bundles deployNucleusAppBundles after linkGeneration"
-    "24: automator-workflows deployNucleusAutomatorWorkflows after linkGeneration"
-    "25: services.nix deployNucleusServicesFlush after both deploy steps"
-    "26: services.nix imports both sub-modules"
-    "27: app-bundles Phase 2 maps currentNucleusAppBundles directly (no re-sort)"
-    "28: automator-workflows Phase 3 maps currentNucleusWorkflows directly (no re-sort)"
-  ];
 }

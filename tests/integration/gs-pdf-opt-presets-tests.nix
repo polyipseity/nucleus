@@ -1,7 +1,4 @@
-# tests/integration/gs-pdf-opt-presets-tests.nix — Verify cross-platform preset parity.
-#
-# Validates that all 5 Ghostscript PDF optimization presets are defined
-# consistently across macOS, NixOS, and Windows context menu configurations.
+# tests/integration/gs-pdf-opt-presets-tests.nix — Verify cross-platform preset parity for all 5 Ghostscript PDF optimization presets.
 
 let
   lib = import <nixpkgs/lib>;
