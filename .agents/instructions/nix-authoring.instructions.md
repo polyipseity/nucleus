@@ -72,6 +72,9 @@ Use these extension points only:
 
 - `extraActivation`: after `createRun`, before `openssh`.
 - `postActivation`: after `homebrew`; use this for most custom work.
+- Home Manager's launchd module runs `setupLaunchAgents` after `entryAfter [ "writeBoundary" ]`. Custom activation steps that verify registration or fix up agents must use `entryAfter [ "setupLaunchAgents" ]`.
+
+See the [macOS launchd service management](#macos-launchd-service-management) section for the `ensureLaunchAgentsLoaded` verification pattern.
 
 Contribution rules:
 
@@ -107,6 +110,14 @@ Root processes launched via launchd (system domain) cannot read files inside iCl
 ### HOME in root launchd processes
 
 When running as root via launchd without `UserName`, `HOME` is unset. Scripts with `set -u` crash on `$HOME` — use `${HOME:-}` for optional HOME access.
+
+### Home Manager launchd activation verification
+
+Home Manager's launchd module runs `setupLaunchAgents` after `entryAfter [ "writeBoundary" ]`, registering or updating user-scope LaunchAgents from the new generation. On macOS 26, `launchctl bootstrap` can spuriously fail with "Input/output error". Since HM uses `cmp -s` to compare old vs. new plists, an agent that failed registration is skipped on subsequent activations (its plist is unchanged on disk).
+
+The `ensureLaunchAgentsLoaded` block in `src/modules/macos.nix` (`home.activation.ensureLaunchAgentsLoaded = lib.hm.dag.entryAfter [ "setupLaunchAgents" ]`) re-verifies all HM-managed agents after `setupLaunchAgents` runs. For each unregistered agent it: `bootout` (best-effort) → `sleep 1` → `bootstrap` → `kickstart -p`.
+
+Any activation step that must run after launchd agents are registered should use `entryAfter [ "setupLaunchAgents" ]`.
 
 ## macOS pmset power policy
 
@@ -230,3 +241,9 @@ Use `scripts/bump-lockfile.sh` / `scripts/bump-lockfile.ps1` to update the lockf
 - Do not commit `result` symlinks or `*.drv` paths.
 - Do not guess or fabricate third-party tool behavior. When a bug or unexpected behavior involves an upstream tool (CamillaDSP, Jellyfin, nixpkgs, etc.), consult its source code or official documentation before reasoning about the root cause. Fabricated upstream semantics are not acceptable.
 - Do not use `builtins.fetchTarball` for inputs that should be pinned through the flake lock.
+
+## Build artifact cleanup
+
+After any `nix build`, `nix run ... -o`, or `nixos-generators`, run `scripts/cleanup-nix.sh` (POSIX) or `scripts/cleanup-nix.ps1` (Windows) to remove `result` / `result-*` symlinks from the repo root. Use `--dry-run` / `-WhatIf` for a preview.
+
+Cleanup is integrated into `scripts/check.sh` and `scripts/check.ps1` in dry-run mode — stale artifacts cause the check to fail.
