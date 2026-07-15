@@ -23,6 +23,16 @@ let
   finderSidebar = import ./macos/finder-sidebar.nix { inherit config lib pkgs; };
   preferenceGc = import ./macos/preference-gc.nix { inherit config lib pkgs; };
 
+  # Cached env-vars.nix import for all env-var-related callsites below.
+  envVars = import ./lib/env-vars.nix {
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
+  };
+
   # Shared BD CLI wrapper: soft-fail wrapper for BetterDisplay CLI commands.
   # Used by both betterdisplayHeartbeat and ensureHeadlessDisplay.
   bdCliWrapper = ''
@@ -1338,12 +1348,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
   '';
 
   # --------------------------------------------------------------------------
-  # propagateGuiEnvVars
-  # Propagates env vars that cannot be set via the gui-env LaunchAgent because
-  # they depend on values only available at activation time (not build time).
-  # Runs after setupLaunchAgents so the gui-env agents are loaded first.
+  # guiEnvActivationPathAndRepoRoot
+  # Propagates env vars that cannot be set via the gui-env-system LaunchAgent
+  # because they depend on values only available at activation time (not build
+  # time).  Sets PATH (prepend+append with runtime read and dedup) and
+  # NUCLEUS_REPO_ROOT.  Runs after setupLaunchAgents so the gui-env-system agent
+  # are loaded first.
   # --------------------------------------------------------------------------
-  home.activation.propagateGuiEnvVars = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
+  home.activation.guiEnvActivationPathAndRepoRoot = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
     # Propagate NUCLEUS_REPO_ROOT to GUI domain.  The catalog entry has
     # excludeFromLaunchctl = true because builtins.getEnv returns "" when
     # built outside apply.sh — reloading from the activation environment
@@ -1352,55 +1364,90 @@ lib.mkIf pkgs.stdenv.isDarwin {
       /bin/launchctl setenv NUCLEUS_REPO_ROOT "$NUCLEUS_REPO_ROOT"
     fi
 
-    # Propagate managed PATH to GUI domain.  Prepends user-scope package
-    # manager bin dirs before the existing GUI domain PATH.
-    __nucleus_prepend="${
-      (import ./lib/env-vars.nix {
-        inherit
-          config
-          pkgs
-          lib
-          username
-          ;
-      }).toLaunchctlPATH
-    }"
-    if [ -n "$PATH" ]; then
-      /bin/launchctl setenv PATH "$__nucleus_prepend:$PATH"
+    # Propagate managed PATH to GUI domain.  Reads the current GUI domain PATH
+    # at runtime (with fallback to shell PATH), strips stale managed entries,
+    # then prepends + appends managed dirs.
+    __nucleus_prepend="${envVars.toLaunchctlPATH}"
+    __nucleus_append=""
+    __nucleus_managed_dirs="${config.home.homeDirectory}/.bun/bin:${config.home.homeDirectory}/.cargo/bin:${config.home.homeDirectory}/.local/bin"
+
+    CURRENT_PATH="$(/bin/launchctl getenv PATH 2>/dev/null || true)"
+    if [ -z "$CURRENT_PATH" ]; then
+      CURRENT_PATH="$PATH"
+    fi
+
+    __nucleus_cleaned=""
+    old_IFS="$IFS"
+    IFS=:
+    for __component in $CURRENT_PATH; do
+      case ":${__nucleus_managed_dirs}:" in
+        *":${__component}:"*) ;;
+        *) __nucleus_cleaned="${__nucleus_cleaned}:${__component}" ;;
+      esac
+    done
+    IFS="$old_IFS"
+
+    if [ -n "$__nucleus_cleaned" ]; then
+      /bin/launchctl setenv PATH "${__nucleus_prepend}:${__nucleus_cleaned}:${__nucleus_append}"
     else
-      /bin/launchctl setenv PATH "$__nucleus_prepend"
+      /bin/launchctl setenv PATH "${__nucleus_prepend}:${__nucleus_append}"
     fi
   '';
 
   # --------------------------------------------------------------------------
-  # GUI environment variable propagation LaunchAgent
+  # GUI environment variable propagation LaunchAgent (system scope)
   # macOS maintains separate shell (user/<uid>/) and GUI (gui/<uid>/) launchd
   # domains.  Shell sessionVariables set via home.sessionVariables never cross
   # into the GUI domain.  This agent runs once at login and calls launchctl
   # setenv for every variable that GUI applications (Obsidian, VS Code, oterm,
   # etc.) need.
   #
-  # The var list is generated from the centralized catalog — see
-  # src/modules/lib/env-vars.nix (toLaunchctlScript).  Vars CC, CXX, LD have
-  # no explicit scope so getScope defaults them to "all-process" — they pass
-  # the filter and are correctly included.  User-specific vars (PASSWORD_STORE_DIR,
-  # STARSHIP_CACHE, etc.) are excluded from this agent to keep scoping explicit
-  # — they are set by the companion gui-env-user agent below.
+  # PATH is handled first: reads the current GUI domain PATH (from the agent's
+  # own $PATH which launchd provides), strips stale managed entries, then
+  # prepends+appends managed dirs.  This ensures login-time PATH setting even
+  # when activation hasn't run yet.
+  #
+  # The var list for non-PATH vars is generated from the centralized catalog
+  # — see src/modules/lib/env-vars.nix (toLaunchctlScript).  Vars CC, CXX, LD
+  # have no explicit scope so getScope defaults them to "all-process" — they
+  # pass the filter and are correctly included.  User-specific vars
+  # (PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.) are excluded from this agent to
+  # keep scoping explicit — they are set by the companion gui-env-user agent
+  # below.
   # --------------------------------------------------------------------------
-  launchd.agents."gui-env" = {
+  launchd.agents."gui-env-system" = {
     enable = true;
     config = {
-      Label = "local.gui-env";
+      Label = "local.gui-env-system";
       ProgramArguments = [
-        "${pkgs.writeShellScript "gui-env-agent"
-          (import ./lib/env-vars.nix {
-            inherit
-              config
-              pkgs
-              lib
-              username
-              ;
-          }).toLaunchctlScript
-        }"
+        "${pkgs.writeShellScript "gui-env-system-agent" ''
+          set -eu
+
+          # ── PATH: strip stale managed entries, then prepend+append ──
+          __nucleus_prepend="${envVars.toLaunchctlPATH}"
+          __nucleus_append=""
+          __nucleus_managed_dirs="$HOME/.bun/bin:$HOME/.cargo/bin:$HOME/.local/bin"
+
+          __nucleus_cleaned=""
+          old_IFS="$IFS"
+          IFS=:
+          for __component in $PATH; do
+            case ":${__nucleus_managed_dirs}:" in
+              *":${__component}:"*) ;;
+              *) __nucleus_cleaned="${__nucleus_cleaned}:${__component}" ;;
+            esac
+          done
+          IFS="$old_IFS"
+
+          if [ -n "$__nucleus_cleaned" ]; then
+            /bin/launchctl setenv PATH "${__nucleus_prepend}:${__nucleus_cleaned}:${__nucleus_append}"
+          else
+            /bin/launchctl setenv PATH "${__nucleus_prepend}:${__nucleus_append}"
+          fi
+
+          # ── All other non-user-specific GUI env vars ──
+          ${envVars.toLaunchctlScript}
+        ''}"
       ];
       # Run once at login so the GUI domain is populated before any app starts.
       RunAtLoad = true;
@@ -1410,11 +1457,12 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
   # --------------------------------------------------------------------------
   # User-specific GUI environment variable propagation LaunchAgent
-  # Companion to gui-env above.  Sets vars whose values contain user-home-
-  # derived paths (PATH, PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.).  These are split
-  # into a separate agent to make the scoping intentional and auditable: the
-  # general gui-env agent excludes them, and this agent explicitly includes
-  # them.  Both are safe because macOS launchd GUI domains are per-user.
+  # Companion to gui-env-system above.  Sets vars whose values contain
+  # user-home-derived paths (PATH, PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.).
+  # These are split into a separate agent to make the scoping intentional and
+  # auditable: the gui-env-system agent excludes them, and this agent
+  # explicitly includes them.  Both are safe because macOS launchd GUI domains
+  # are per-user.
   #
   # See src/modules/lib/env-vars.nix (toUserLaunchctlScript).
   # --------------------------------------------------------------------------
@@ -1423,101 +1471,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     config = {
       Label = "local.gui-env-user";
       ProgramArguments = [
-        "${pkgs.writeShellScript "gui-env-user-agent"
-          (import ./lib/env-vars.nix {
-            inherit
-              config
-              pkgs
-              lib
-              username
-              ;
-          }).toUserLaunchctlScript
-        }"
-      ];
-      RunAtLoad = true;
-      KeepAlive = false;
-    };
-  };
-
-  # --------------------------------------------------------------------------
-  # GUI environment recovery LaunchAgent
-  # Runs at login as a safety net for RC1 (gui-env race with Login Items) and
-  # RC3 (stale Nix store paths for system daemons).  Re-runs setenv for PATH
-  # and NUCLEUS_REPO_ROOT (canonical location), then checks every system daemon
-  # that runs as the primary user and recovers any that are not running.
-  #
-  # Unlike gui-env/gui-env-user, this agent does NOT import the catalog for all
-  # vars — that would add wait4path /nix/store latency.  It only sets PATH and
-  # NUCLEUS_REPO_ROOT, which are the most commonly missing, and recovers failed
-  # system daemons whose store paths were garbage-collected.
-  # --------------------------------------------------------------------------
-  launchd.agents."gui-env-recovery" = {
-    enable = true;
-    config = {
-      Label = "local.gui-env-recovery";
-      ProgramArguments = [
-        "${pkgs.writeShellScript "gui-env-recovery-agent" ''
-          set -eu
-
-          log_dir="$HOME/Library/Logs/nucleus/gui-env-recovery"
-          mkdir -p "$log_dir"
-          exec 2>>"$log_dir/stderr.log"
-
-          echo "[$(date)] gui-env-recovery started" >> "$log_dir/stdout.log"
-
-          # ── Re-set GUI env vars — prepend managed PATH to current GUI domain PATH
-          __nucleus_prepend="${
-            (import ./lib/env-vars.nix {
-              inherit
-                config
-                pkgs
-                lib
-                username
-                ;
-            }).toLaunchctlPATH
-          }"
-          if [ -n "$PATH" ]; then
-            /bin/launchctl setenv PATH "$__nucleus_prepend:$PATH"
-          else
-            /bin/launchctl setenv PATH "$__nucleus_prepend"
-          fi
-
-          if [ -d "$HOME/dev/nucleus" ]; then
-            /bin/launchctl setenv NUCLEUS_REPO_ROOT "$HOME/dev/nucleus"
-          fi
-
-          # ── Recover failed system daemons (handles RC3 stale paths) ─
-          for svc in \
-            local.camilladsp \
-            local.camilladsp-heartbeat \
-            local.camillagui-backend \
-            local.litellm \
-            local.ollama \
-            local.https-proxy \
-            local.jellyfin \
-            local.linux-builder \
-            local.service-watchdog
-          do
-            state="$(/bin/launchctl print "system/$svc" 2>/dev/null | head -1 || echo "missing")"
-            case "$state" in
-              *"running"*)
-                echo "[$(date)] $svc: ok" >> "$log_dir/stdout.log"
-                ;;
-              *"waiting"*)
-                echo "[$(date)] $svc: waiting -> kickstart" >> "$log_dir/stdout.log"
-                /bin/launchctl kickstart -k "system/$svc" 2>>"$log_dir/stderr.log" || true  # undoc-supp: kickstart may fail if service already recovered between check and action
-                ;;
-              *)
-                echo "[$(date)] $svc: $state -> bootout+bootstrap" >> "$log_dir/stdout.log"
-                /bin/launchctl bootout "system/$svc" 2>/dev/null || true  # undoc-supp: bootout fails if service already gone between check and action
-                /bin/launchctl bootstrap system "/Library/LaunchDaemons/$svc.plist" 2>>"$log_dir/stderr.log" || true  # undoc-supp: bootstrap fails if plist missing (service label may differ from filename) or already registered
-                /bin/launchctl kickstart -k "system/$svc" 2>>"$log_dir/stderr.log" || true  # undoc-supp: kickstart may fail if service started after bootout+bootstrap race
-                ;;
-            esac
-          done
-
-          echo "[$(date)] gui-env-recovery done" >> "$log_dir/stdout.log"
-        ''}"
+        "${pkgs.writeShellScript "gui-env-user-agent" envVars.toUserLaunchctlScript}"
       ];
       RunAtLoad = true;
       KeepAlive = false;

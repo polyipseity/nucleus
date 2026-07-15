@@ -285,7 +285,7 @@ let
         macOS = builtins.getEnv "NUCLEUS_REPO_ROOT";
       };
       excludeFromLaunchctl = true;
-      why = "Repo root for out-of-store symlinks. Captured at eval time from apply.sh export. Excluded from gui-env agent because builtins.getEnv returns empty string when built outside apply.sh; set via activation script instead.";
+      why = "Repo root for out-of-store symlinks. Captured at eval time from apply.sh export. Excluded from gui-env-system agent because builtins.getEnv returns empty string when built outside apply.sh; set via activation script instead.";
     };
 
     # ── macOS GUI environment PATH (user-specific) ─────────────────
@@ -296,7 +296,7 @@ let
       excludeFromSessionVariables = true;
       excludeFromLaunchctl = true;
       userSpecific = true;
-      why = "Managed PATH (managed dirs only, no system default) for macOS GUI apps. The managed dirs are prepended to the actual PATH at runtime by propagateGuiEnvVars (activation) and gui-env-recovery (login agent) — this avoids hardcoding system defaults. Excluded from shell sessionVariables (shell domain gets prepend from home.sessionPath + system PATH from nix-darwin set-environment) and from launchctl agents (handled dynamically by the activation/recovery scripts).";
+      why = "Managed PATH (managed dirs only, no system default) for macOS GUI apps. The managed dirs are prepended to the actual PATH at runtime by guiEnvActivationPathAndRepoRoot (activation) and gui-env-system (login agent) — this avoids hardcoding system defaults. Excluded from shell sessionVariables (shell domain gets prepend from home.sessionPath + system PATH from nix-darwin set-environment) and from launchctl agents (handled dynamically by the activation/login scripts).";
     };
 
     # ── Starship prompt (all-process) ───────────────────────────────
@@ -407,7 +407,7 @@ let
   ) "NixOS";
 
   # ── toLaunchctlScript ────────────────────────────────────────────
-  # Shell script for macOS gui-env LaunchAgent (all-process, non-user-specific macOS vars).
+  # Shell script for macOS gui-env-system LaunchAgent (all-process, non-user-specific macOS vars).
   toLaunchctlScript =
     let
       os = "macOS";
@@ -437,7 +437,7 @@ let
   # User-specific vars (PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.) contain
   # home-derived paths that resolve correctly per-user because macOS launchd
   # GUI domains are per-user.  Split into a separate agent to make the
-  # scoping intentional and auditable alongside the general gui-env agent.
+  # scoping intentional and auditable alongside the gui-env-system agent.
   toUserLaunchctlScript =
     let
       os = "macOS";
