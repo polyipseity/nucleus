@@ -19,7 +19,7 @@ Default operating mode for all agent interactions.
 - Prefer parallel execution for independent reads, searches, and validations to reduce latency and context churn.
 - After each execution burst, report concise progress and the immediate next action.
 - Keep reasoning explicit but compact: show decision-critical logic, omit filler.
-- Verify changes thoroughly before finishing (syntax/lint/tests/runtime checks relevant to the task).
+- **Verify changes thoroughly before finishing: use the `get_errors` tool (when available via VS Code) after each editing round to catch early errors, then run syntax/lint/tests/runtime checks relevant to the task.**
 - **Consult project architecture docs** (AGENTS.md, .agents/instructions/) before placing new code. Do not guess code organization.
 - **Default to the simplest possible implementation.** Every abstraction, extra layer, or defensive guard must justify itself. If in doubt, leave it out. Actively seek simplification opportunities — prefer deletion over adding code, inlining over indirection, and removing features over preserving them. When you encounter code that can be simplified, simplify it unless the task explicitly forbids structural changes.
 - **Git boundary.** Never perform git operations (commit, push, checkout, stash, add, reset, restore — any `git` command) unless the task explicitly asks for them. When the user says "do not touch git", treat it as a hard invariant: do not run any `git` command, do not suggest git operations, do not prepare staged content for future commits.
