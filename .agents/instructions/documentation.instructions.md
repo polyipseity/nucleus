@@ -43,25 +43,6 @@ The `directives.description:` field on each resource entry is the formal documen
 - **Setting rationale**: when a resource sets a non-obvious registry value, environment variable, or system flag, the description must explain what enabling or disabling the setting changes in practice.
 - **Dependency rationale**: if a resource uses `dependsOn:`, the description should note why the ordering constraint exists.
 
-## CLI option and variable naming (positive options policy)
-
-Use `--XXX`/`--no-XXX` flag pairs for CLI options and positive variable names for scripts and config knobs. Every feature must support both `--XXX` and `--no-XXX` regardless of its default state.
-
-| Aspect            | Convention                                                |
-| ----------------- | --------------------------------------------------------- |
-| Shell variable    | `ai_sync=true` (positive, no prefix)                      |
-| Conditional check | `if [ "$ai_sync" = false ]` or `if [ "$ai_sync" = true ]` |
-| POSIX CLI flag    | `--ai-sync` (enables) / `--no-ai-sync` (disables)         |
-| PowerShell param  | `[switch]$AISync` + `[switch]$NoAISync`                   |
-| PowerShell call   | `-AISync` (enables) / `-NoAISync` (disables)              |
-
-Rules:
-
-1. Every feature with a boolean CLI flag MUST support both `--XXX` and `--no-XXX` (or PowerShell equivalent: `-XXX` and `-NoXXX`).
-2. Shell variables MUST use bare positive names without prefixes: `ai_sync`, `replica_sync`, `vm_setup`, `secret_health` — not `do_ai_sync`, `with_replica_sync`, etc.
-3. PowerShell internal variables MUST use `$noXXX` (lowercase) for the local copy and `$NoXXX` (PascalCase) for the param variable.
-4. Do not prefix with `do_`, `with_`, or any other semantic qualifier. The variable name itself is the boolean.
-
 ## Shell scripts (`scripts/**`, `src/scripts/**`)
 
 There is no formal documentation tool for POSIX sh or Bash; `#` comments are the documentation mechanism.
@@ -70,7 +51,6 @@ There is no formal documentation tool for POSIX sh or Bash; `#` comments are the
 - **Function-level comments**: every named function definition must have a `#` comment block immediately before it that states: what it does, its arguments (`# Args: $1 — …`), what it outputs or side-effects, and any noteworthy preconditions. See `scripts/bootstrap.sh` for the established pattern.
 - **Non-trivial inline logic**: `case` branches, conditional chains, and environment variable reads that are not self-explanatory must have an inline `#` comment explaining the branch condition and its effect.
 - **Document the WHY**: state why a particular tool or flag was chosen (e.g. "`set -a` exports all variables so child processes inherit version pins") and document any behaviour that a future reader might otherwise change incorrectly.
-- **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
 
 ## Host MANUAL.md (`src/hosts/**/MANUAL.md`)
 
