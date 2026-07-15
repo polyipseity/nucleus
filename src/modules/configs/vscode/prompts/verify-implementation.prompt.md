@@ -1,6 +1,6 @@
 ---
 description: "Verify that a plan from session memory (active-plan.md) is fully implemented. If gaps exist, produce a remediation plan without implementing."
-name: "verify-plan"
+name: "verify-implementation"
 argument-hint: "optional: specific phase or file to focus verification on"
 agent: "agent"
 ---
