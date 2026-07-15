@@ -1410,7 +1410,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # --------------------------------------------------------------------------
   # User-specific GUI environment variable propagation LaunchAgent
   # Companion to gui-env above.  Sets vars whose values contain user-home-
-  # derived paths (PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.).  These are split
+  # derived paths (PATH, PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.).  These are split
   # into a separate agent to make the scoping intentional and auditable: the
   # general gui-env agent excludes them, and this agent explicitly includes
   # them.  Both are safe because macOS launchd GUI domains are per-user.
