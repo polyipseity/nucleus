@@ -70,7 +70,8 @@ function Invoke-CargoBinstallSetup {
   )
 
   # cargo-binstall and `cargo uninstall` both operate on this directory.
-  $cargoBinDir = Join-Path $HOME ".cargo\bin"
+  # Canonical source: ManagedPaths.ps1 -> env-vars.nix (pathComponents).
+  $cargoBinDir = Get-NucleusManagedBinDir "cargo"
 
   # Prepend ~/.cargo/bin so `cargo uninstall` (removal path) finds the cargo
   # binary even when the calling session predates rustup's PATH initialisation.

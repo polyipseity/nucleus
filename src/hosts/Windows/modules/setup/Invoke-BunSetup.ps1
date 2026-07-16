@@ -67,7 +67,8 @@ function Invoke-BunSetup {
   )
 
   # bun install -g places binaries in ~\.bun\bin by default (BUN_INSTALL_BIN).
-  $bunBinDir = Join-Path $HOME ".bun\bin"
+  # Canonical source: ManagedPaths.ps1 -> env-vars.nix (pathComponents).
+  $bunBinDir = Get-NucleusManagedBinDir "bun"
 
   # Guard: bun must be accessible after WinGet DSC has installed Oven-sh.Bun.
   # undoc-supp: probe — bun may not be installed; if-guard checks absence below.
