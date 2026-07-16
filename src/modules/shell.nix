@@ -51,9 +51,8 @@ let
 
   # All env vars are sourced from the centralized catalog.  NUCLEUS_DEFAULT_DEV_*
   # and the macOS-specific vars (DEVELOPER_DIR, SDKROOT, LIBRARY_PATH) are all
-  # included in toHomeSessionVariables.  We overlay NUCLEUS_DEFAULT_DEV_* here
-  # as well so the shell functions below keep their local defaultDevTools ref.
-  mergedSessionVariables = envVarsHelpers.toHomeSessionVariables // {
+  # included in allVars.  We overlay NUCLEUS_DEFAULT_DEV_* here
+  mergedSessionVariables = envVarsHelpers.allVars // {
     NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin";
     NUCLEUS_DEFAULT_DEV_ENV = "1";
   };
@@ -656,9 +655,9 @@ in
   # Sole declaration site for home.sessionPath and home.sessionVariables.
   # No other file sets these — all env vars flow through the centralized
   # catalog in src/modules/lib/env-vars.nix.
-  home.sessionPath = builtins.map
-    (p: "${config.home.homeDirectory}/${p}")
-    envVarsHelpers.pathComponents.prepend;
+  home.sessionPath = builtins.map (
+    p: "${config.home.homeDirectory}/${p}"
+  ) envVarsHelpers.pathComponents.prepend;
 
   home.sessionVariables = mergedSessionVariables;
 
