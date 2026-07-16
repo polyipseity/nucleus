@@ -25,16 +25,18 @@
 #  10. Nix search path tests (stub)
 #  11. Port utility function tests (stub)
 #
-# Data integrity (12-15):
+# Data integrity (12-17):
 #  12. Lockfile validation
 #  13. Locked DSC validation
-#  14. Service registry validation
-#  15. YAML validation
+#  14. Schema validation (JSON/YAML)
+#  15. Service registry validation
+#  16. YAML validation
+#  17. YAML linting (yamllint)
 #
-# Policy/verification (16-18):
-#  16. Package manager usage enforcement
-#  17. Undocumented error suppression check
-#  18. Online determinism checks (--verify mode only)
+# Policy/verification (18-20):
+#  18. Package manager usage enforcement
+#  19. Undocumented error suppression check
+#  20. Online determinism checks (--verify mode only)
 #
 # Output conventions:
 #   All messages (info, success, skip, warning) go to stdout.
@@ -45,7 +47,7 @@
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
 # Steps 3-6, 8-11 are stubs (require Nix or bash — not available on Windows).
-# Steps 16-17 only run with the --verify flag.
+# Step 20 only runs with the --verify flag.
 #
 # Prerequisites:
 #   - Ensure-Tool module (imported via pre-flight block) for tool validation
@@ -548,7 +550,59 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 14. Service registry validation
+# 14. Schema validation (JSON/YAML)
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Schema validation (JSON/YAML) ===" -f (++$_step))
+$_jsonschemaErrors = 0
+if ($HAS_ARGS) {
+  say "skipping schema validation (path-scoped mode)."
+} else {
+  # undoc-supp: tool availability check — skip step gracefully when check-jsonschema not installed
+  $_cjs = Get-Command 'check-jsonschema' -ErrorAction SilentlyContinue
+  if ($null -eq $_cjs) {
+    say "skipping schema validation (check-jsonschema not available)."
+  } else {
+    # Existing schemas
+    & $_cjs --schemafile "$RepoRoot/src/lockfiles/lockfile.schema.json" "$RepoRoot/src/lockfiles/lockfile.json" 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+    & $_cjs --schemafile "$RepoRoot/src/modules/services.schema.json" "$RepoRoot/src/modules/services.json" 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+    & $_cjs --schemafile "$RepoRoot/src/hosts/Windows/source-builds.schema.json" "$RepoRoot/src/hosts/Windows/source-builds.json" 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+    # User/VMs/models schemas
+    & $_cjs --schemafile "$RepoRoot/src/modules/users.schema.json" "$RepoRoot/src/modules/users.json" 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+    & $_cjs --schemafile "$RepoRoot/src/modules/VMs.schema.json" "$RepoRoot/src/modules/VMs.json" 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+    & $_cjs --schemafile "$RepoRoot/src/modules/ai/models.schema.json" "$RepoRoot/src/modules/ai/models.json" 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+    # GitHub schema validation (complements existing prek hooks — CI enforcement)
+    $_ghWorkflows = Join-Path $RepoRoot '.github\workflows\*.yml'
+    & $_cjs --builtin-schema vendor.github-workflows $_ghWorkflows 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+    $_dependabot = Join-Path $RepoRoot '.github\dependabot.yml'
+    if (Test-Path $_dependabot) {
+      & $_cjs --builtin-schema vendor.dependabot $_dependabot 2>&1 | Out-Null
+      if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+    }
+    # DSC schema validation (structural only — resource-specific fields validated by winget)
+    # undoc-supp: DSC files may not exist (non-Windows host or partial checkout); skip gracefully
+    $_dscFiles = @(Get-ChildItem "$RepoRoot/src/hosts/Windows/system/*.dsc.yml", "$RepoRoot/src/hosts/Windows/user/*.dsc.yml" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+    if ($_dscFiles.Count -gt 0) {
+      & $_cjs --schemafile https://aka.ms/configuration-dsc-schema/0.2 $_dscFiles 2>&1 | Out-Null
+      if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+    }
+  }
+}
+if ($_jsonschemaErrors -gt 0) {
+  warn "schema validation failed with $_jsonschemaErrors error(s)"
+  $exitCode = 1
+  if ($FAIL_FAST) { exit $exitCode }
+}
+say "schema validation passed."
+
+# ---------------------------------------------------------------------------
+# 15. Service registry validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Service registry validation ===" -f (++$_step))
 if (-not $HAS_ARGS) {
@@ -695,7 +749,40 @@ if ($_yamlErrors -gt 0) {
 say "YAML validation passed."
 
 # ---------------------------------------------------------------------------
-# 16. Package manager usage enforcement
+# 17. YAML linting (yamllint)
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] YAML linting (yamllint) ===" -f (++$_step))
+$_yamlLintErrors = 0
+# undoc-supp: tool availability check — skip step gracefully when yamllint not installed
+$_ylCmd = Get-Command 'yamllint' -ErrorAction SilentlyContinue
+if ($null -eq $_ylCmd) {
+  say "skipping YAML linting (yamllint not available)."
+} else {
+  $_yamlFiles = @()
+  if ($HAS_ARGS) {
+    $_yamlFiles = $positionalArgs | Where-Object { $_ -like '*.yml' -or $_ -like '*.yaml' }
+  } else {
+    $_yamlFiles = Get-ChildItem -Recurse -Path $RepoRoot -Include '*.yml','*.yaml' |
+      Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } |
+      ForEach-Object { $_.FullName }
+  }
+  foreach ($_yf in $_yamlFiles) {
+    $_result = & $_ylCmd --strict $_yf 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      warn "$($_yf): yamllint violations"
+      $_yamlLintErrors++
+    }
+  }
+}
+if ($_yamlLintErrors -gt 0) {
+  warn "YAML linting failed with $_yamlLintErrors error(s)"
+  $exitCode = 1
+  if ($FAIL_FAST) { exit $exitCode }
+}
+say "YAML linting passed."
+
+# ---------------------------------------------------------------------------
+# 18. Package manager usage enforcement
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Package manager usage enforcement ===" -f (++$_step))
 if (-not $HAS_ARGS) {
@@ -734,7 +821,7 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 17. Undocumented error suppression check
+# 19. Undocumented error suppression check
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_step))
 
@@ -808,7 +895,7 @@ if ($_undocSuppViolations.Count -gt 0) {
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
-# 18. Online determinism checks (--verify mode only)
+# 20. Online determinism checks (--verify mode only)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Online determinism checks (--verify) ===" -f (++$_step))
 if ($VERIFY) {

@@ -27,16 +27,18 @@
 #  10. Nix search path tests
 #  11. Port utility function tests
 #
-# Data integrity (12-15):
+# Data integrity (12-17):
 #  12. Lockfile validation
 #  13. Locked DSC validation
-#  14. Service registry validation
-#  15. YAML validation
+#  14. Schema validation (JSON/YAML)
+#  15. Service registry validation
+#  16. YAML validation
+#  17. YAML linting (yamllint)
 #
-# Policy/verification (16-18):
-#  16. Package manager usage enforcement
-#  17. Undocumented error suppression check
-#  18. Online determinism checks (--verify mode only)
+# Policy/verification (18-20):
+#  18. Package manager usage enforcement
+#  19. Undocumented error suppression check
+#  20. Online determinism checks (--verify mode only)
 #
 # Output conventions:
 #   Warnings (warn) and errors (error) go to stderr; info/success/skip
@@ -555,6 +557,38 @@ else
   say "skipping locked DSC validation (path-scoped mode)."
 fi
 
+# Schema validation (JSON/YAML)
+section "$((_step += 1))" "Schema validation (JSON/YAML)"
+_jsonschema_errors=0
+if $HAS_ARGS; then
+  say "skipping schema validation (path-scoped mode)."
+else
+  if command -v check-jsonschema >/dev/null 2>&1; then
+    # Existing schemas
+    check-jsonschema --schemafile src/lockfiles/lockfile.schema.json src/lockfiles/lockfile.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+    check-jsonschema --schemafile src/modules/services.schema.json src/modules/services.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+    check-jsonschema --schemafile src/hosts/Windows/source-builds.schema.json src/hosts/Windows/source-builds.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+    # User/VMs/models schemas
+    check-jsonschema --schemafile src/modules/users.schema.json src/modules/users.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+    check-jsonschema --schemafile src/modules/VMs.schema.json src/modules/VMs.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+    check-jsonschema --schemafile src/modules/ai/models.schema.json src/modules/ai/models.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+    # GitHub schema validation (complements existing prek hooks — CI enforcement)
+    check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+    check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+    # DSC schema validation (structural only — resource-specific fields validated by winget)
+    check-jsonschema --schemafile https://aka.ms/configuration-dsc-schema/0.2 src/hosts/Windows/system/*.dsc.yml src/hosts/Windows/user/*.dsc.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+  else
+    say "skipping schema validation (check-jsonschema not available)."
+  fi
+fi
+if [ "$_jsonschema_errors" -gt 0 ]; then
+  warn "schema validation failed with $_jsonschema_errors error(s)"
+  exit_code=1
+  $FAIL_FAST && exit $exit_code
+fi
+say "schema validation passed."
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+
 # Service registry validation
 section "$((_step += 1))" "Service registry validation"
 if ! $HAS_ARGS; then
@@ -718,6 +752,40 @@ if [ "$_yaml_errors" -gt 0 ]; then
   $FAIL_FAST && exit $exit_code
 fi
 say "YAML validation passed."
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+
+# YAML linting (yamllint)
+section "$((_step += 1))" "YAML linting (yamllint)"
+_yaml_lint_errors=0
+if command -v yamllint >/dev/null 2>&1; then
+  if $HAS_ARGS; then
+    for _yf in "$@"; do
+      case "$_yf" in
+        *.yml|*.yaml)
+          if ! yamllint --strict "$_yf" >/dev/null 2>&1; then
+            warn "$_yf: yamllint violations"
+            _yaml_lint_errors=$((_yaml_lint_errors + 1))
+          fi
+          ;;
+      esac
+    done
+  else
+    while IFS= read -r -d '' _yaml_file; do
+      if ! yamllint --strict "$_yaml_file" >/dev/null 2>&1; then
+        warn "$_yaml_file: yamllint violations"
+        _yaml_lint_errors=$((_yaml_lint_errors + 1))
+      fi
+    done < <(find . -path ./vendor -prune -o \( -name '*.yml' -o -name '*.yaml' \) -print0)
+  fi
+else
+  say "skipping YAML linting (yamllint not available)."
+fi
+if [ "$_yaml_lint_errors" -gt 0 ]; then
+  warn "YAML linting failed with $_yaml_lint_errors error(s)"
+  exit_code=1
+  $FAIL_FAST && exit $exit_code
+fi
+say "YAML linting passed."
 $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Package manager usage enforcement
