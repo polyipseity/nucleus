@@ -53,7 +53,7 @@ in
   # Uses lib.mkBefore for prepend dirs (before system default PATH from other
   # modules) and lib.mkAfter for append dirs (after them), preserving the
   # prepend/append distinction from pathComponents in the catalog.
-  environment.variables = envVars.toNixOSSystemEnvironment // {
+  environment.variables = envVars.systemVars // {
     PATH = lib.mkMerge [
       (lib.mkBefore (map (p: "/home/${username}/${p}") envVars.pathComponents.prepend))
       (lib.mkAfter (map (p: "/home/${username}/${p}") envVars.pathComponents.append))
