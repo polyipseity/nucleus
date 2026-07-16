@@ -8,10 +8,8 @@
 #   { default?, macOS?, NixOS?, Windows? }
 # - `default` applies to any OS not explicitly keyed.
 # - If an OS key is absent AND `default` is absent, the OS is not applicable.
-# - `scope` defaults to "all-process".  Only set explicitly for "shell-only".
-#
 # Use: import ./lib/env-vars.nix { inherit config pkgs lib username; }
-# Returns: { catalog, toHomeSessionVariables, toNixOSSystemEnvironment, ... }
+# Returns: { catalog, allVars, systemVars, macOSAllVars, ... }
 {
   config,
   pkgs,
@@ -70,7 +68,9 @@ let
   # Contains only the managed prepend dirs, no system default.
   # NOTE: Returns only managed prepend PATH components — callers must
   # combine with the runtime system PATH.
-  toLaunchctlPrependPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.prepend);
+  toLaunchctlPrependPath = builtins.concatStringsSep ":" (
+    map (p: "$HOME/${p}") pathComponents.prepend
+  );
 
   # ── Helper: render macOS launchctl append PATH string ──────────────
   # Returns a colon-joined string of append dirs only for use as
@@ -83,12 +83,10 @@ let
   # ── Catalog ─────────────────────────────────────────────────────────
   # Each entry:
   #   values:  attrset { default?, macOS?, NixOS?, Windows? }
-  #   scope:   "all-process" (default) | "shell-only"
   #   why:     inline justification
-  #   excludeFromLaunchctl: true for shell-only vars (default false)
   #   userSpecific: true if the value depends on the logged-in user (default false)
   catalog = {
-    # ── Compiler toolchain (all-process) ────────────────────────────
+    # ── Compiler toolchain ──────────────────────────────────────────
     CC = {
       values = {
         default = "${pkgs.llvmPackages.clang}/bin/clang";
@@ -111,7 +109,7 @@ let
       why = "Nix LD for native builds \u2014 all-process on all hosts. On Windows, resolved from PATH by Machine-scope DSC.";
     };
 
-    # ── macOS-specific developer toolchain (all-process) ─────────────
+    # ── macOS-specific developer toolchain ───────────────────────────
     DEVELOPER_DIR = {
       values = {
         macOS = "${pkgs.apple-sdk}";
@@ -137,7 +135,7 @@ let
       why = "Nix-managed SSL cert bundle for all processes outside nix-daemon build environments. On NixOS, nix-daemon sets this for its own builds but GUI/CLI tools outside systemd also need it. Not applicable on Windows (no Nix store).";
     };
 
-    # ── Editors (all-process) ────────────────────────────────────────
+    # ── Editors ──────────────────────────────────────────────────────
     EDITOR = {
       values = {
         macOS = "nvim";
@@ -155,7 +153,7 @@ let
       why = "Set by programs.neovim.defaultEditor on macOS (nvim activated) and NixOS. Windows Machine-scope DSC sets nvim for all-process parity.";
     };
 
-    # ── OpenCode (all-process) ───────────────────────────────────────
+    # ── OpenCode ─────────────────────────────────────────────────────
     OPENCODE_DISABLE_AUTOUPDATE = {
       values = {
         default = "true";
@@ -163,7 +161,7 @@ let
       why = "Managed environment pins OpenCode; auto-updates introduce version skew. Now set on Windows too via Machine-scope DSC.";
     };
 
-    # ── AI / Ollama (all-process) ────────────────────────────────────
+    # ── AI / Ollama ──────────────────────────────────────────────────
     OLLAMA_HOST = {
       values = {
         default = ollamaHost;
@@ -171,7 +169,7 @@ let
       why = "Point CLI clients at LiteLLM proxy (127.0.0.1:4000) on all OSes instead of Ollama directly.";
     };
 
-    # Ollama runtime tunables (all-process, all hosts).
+    # Ollama runtime tunables (all hosts).
     # Set on all OSes for consistent inference behaviour.
     OLLAMA_FLASH_ATTENTION = {
       values = {
@@ -192,7 +190,7 @@ let
       why = "Compress KV cache with 4-bit quantisation to halve RAM footprint on all hosts.";
     };
 
-    # ── Password store (all-process) ─────────────────────────────────
+    # ── Password store ───────────────────────────────────────────────
     PASSWORD_STORE_DIR = {
       values = {
         default = passwordStoreDir;
@@ -224,7 +222,7 @@ let
       why = "gopass config override value for password store path. Windows uses literal %USERPROFILE% for User-scope DSC.";
     };
 
-    # ── Fallback toolchain (all-process) ────────────────────────────
+    # ── Fallback toolchain ──────────────────────────────────────────
     NUCLEUS_DEFAULT_DEV_BIN = {
       values = {
         default = "${defaultDevTools}/bin";
@@ -241,7 +239,7 @@ let
       why = "Flag that fallback toolchain is configured.";
     };
 
-    # ── Host identity (all-process) ──────────────────────────────────
+    # ── Host identity ────────────────────────────────────────────────
     NUCLEUS_HOST = {
       values = {
         macOS = "MacBook";
@@ -251,13 +249,12 @@ let
       why = "Canonical host name for VM host-scoping and host-aware consumers. Windows set in system/env.dsc.yml at Machine scope.";
     };
 
-    # ── macOS-specific: repo root (all-process) ─────────────────────
+    # ── macOS-specific: repo root ───────────────────────────────────
     NUCLEUS_REPO_ROOT = {
       values = {
         macOS = builtins.getEnv "NUCLEUS_REPO_ROOT";
       };
-      excludeFromLaunchctl = true;
-      why = "Repo root for out-of-store symlinks. Captured at eval time from apply.sh export. Excluded from gui-env-system agent because builtins.getEnv returns empty string when built outside apply.sh; set via activation script instead.";
+      why = "Repo root for out-of-store symlinks. Baked into store script at build time from apply.sh; activation hook overrides for repo-move edge case.";
     };
 
     # ── macOS GUI environment PATH (prepend-only; user-specific) ──
@@ -269,13 +266,12 @@ let
       values = {
         macOS = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.prepend);
       };
-      excludeFromSessionVariables = true;
-      excludeFromLaunchctl = true;
+      excludeFromAll = true;
       userSpecific = true;
-      why = "Managed PATH (prepend portion only) for macOS GUI apps. The prepend dirs are set by guiEnvActivationPathAndRepoRoot (activation) and gui-env-system (login agent) in macos.nix. The append portion is handled separately via toLaunchctlAppendPath. This entry does not merge prepend+append because PATH has a prepend/system/append structure at runtime — merging them would misrepresent the architecture.";
+      why = "Managed PATH (prepend portion only) for macOS GUI apps. The prepend dirs are set by guiEnvActivationPathAndRepoRoot (activation) and gui-env (login agent) in macos.nix. The append portion is handled separately via toLaunchctlAppendPath. This entry does not merge prepend+append because PATH has a prepend/system/append structure at runtime — merging them would misrepresent the architecture.";
     };
 
-    # ── Starship prompt (all-process) ───────────────────────────────
+    # ── Starship prompt ─────────────────────────────────────────────
     STARSHIP_CACHE = {
       values = {
         default = "${resolvedHomeDirectory}/.cache/starship";
@@ -293,7 +289,7 @@ let
       why = "Starship config path. POSIX uses out-of-store symlink. Windows uses literal %USERPROFILE%.";
     };
 
-    # ── Cross-OS compatibility (all-process) ────────────────────────
+    # ── Cross-OS compatibility ──────────────────────────────────────
     HOME = {
       values = {
         Windows = "%USERPROFILE%";
@@ -334,9 +330,6 @@ let
   # ── Determine current OS name ────────────────────────────────────
   currentOs = if pkgs.stdenv.isDarwin then "macOS" else "NixOS";
 
-  # ── Default scope helper ─────────────────────────────────────────
-  getScope = entry: if entry ? scope then entry.scope else "all-process";
-
   # ── Generic filter over attrNames ────────────────────────────────
   # Takes predicate (name, entry -> bool) and target OS for value resolution.
   filterAttrsByEntry =
@@ -359,32 +352,24 @@ let
       ) (builtins.attrNames catalog)
     );
 
-  # ── getScope ─────────────────────────────────────────────────────
-  # Returns entry scope, defaulting to "all-process".
-  # Defined here for access by helper functions below.
-
-  # ── toHomeSessionVariables ───────────────────────────────────────
-  # All vars for current POSIX host, excluding null-valued ones (set
-  # outside home-manager, e.g. EDITOR).  OS applicability is implicit
-  # from resolveValue.
-  toHomeSessionVariables = filterAttrsByEntry (
+  # ── allVars ───────────────────────────────────────────────────────
+  # All vars for current POSIX host, excluding PATH (handled separately
+  # via activation/profile).  OS applicability is implicit from resolveValue.
+  allVars = filterAttrsByEntry (
     name: entry:
-    (!entry ? excludeFromSessionVariables || !entry.excludeFromSessionVariables)
-    && resolveValue name currentOs != null
+    (!entry ? excludeFromAll || !entry.excludeFromAll) && resolveValue name currentOs != null
   ) currentOs;
 
-  # ── toNixOSSystemEnvironment ─────────────────────────────────────
-  # All-process, non-user-specific vars for NixOS environment.variables.
-  toNixOSSystemEnvironment = filterAttrsByEntry (
-    name: entry:
-    getScope entry == "all-process"
-    && (!entry ? userSpecific || !entry.userSpecific)
-    && resolveValue name "NixOS" != null
+  # ── systemVars ───────────────────────────────────────────────────
+  # Non-user-specific vars for NixOS environment.variables.
+  systemVars = filterAttrsByEntry (
+    name: entry: (!entry ? userSpecific || !entry.userSpecific) && resolveValue name "NixOS" != null
   ) "NixOS";
 
-  # ── toLaunchctlScript ────────────────────────────────────────────
-  # Shell script for macOS gui-env-system LaunchAgent (all-process, non-user-specific macOS vars).
-  toLaunchctlScript =
+  # ── macOSAllVars ─────────────────────────────────────────────────
+  # All macOS vars (both user and non-user) for the gui-env LaunchAgent.
+  # PATH is excluded (handled separately via activation/agent scripts).
+  macOSAllVars =
     let
       os = "macOS";
       relevant = builtins.filter (
@@ -392,40 +377,7 @@ let
         let
           entry = catalog.${name};
         in
-        getScope entry == "all-process"
-        && (!entry ? excludeFromLaunchctl || !entry.excludeFromLaunchctl)
-        && (!entry ? userSpecific || !entry.userSpecific)
-        && resolveValue name os != null
-      ) (builtins.attrNames catalog);
-    in
-    builtins.concatStringsSep "\n" (
-      builtins.map (
-        name:
-        let
-          val = resolveValue name os;
-        in
-        if val != null then "/bin/launchctl setenv ${name} ${val}" else ""
-      ) relevant
-    );
-
-  # ── toUserLaunchctlScript ────────────────────────────────────────
-  # Shell script for macOS gui-env-user LaunchAgent (user-specific macOS vars).
-  # User-specific vars (PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.) contain
-  # home-derived paths that resolve correctly per-user because macOS launchd
-  # GUI domains are per-user.  Split into a separate agent to make the
-  # scoping intentional and auditable alongside the gui-env-system agent.
-  toUserLaunchctlScript =
-    let
-      os = "macOS";
-      relevant = builtins.filter (
-        name:
-        let
-          entry = catalog.${name};
-        in
-        getScope entry == "all-process"
-        && (!entry ? excludeFromLaunchctl || !entry.excludeFromLaunchctl)
-        && (entry ? userSpecific && entry.userSpecific)
-        && resolveValue name os != null
+        (!entry ? excludeFromAll || !entry.excludeFromAll) && resolveValue name os != null
       ) (builtins.attrNames catalog);
     in
     builtins.concatStringsSep "\n" (
@@ -447,7 +399,6 @@ let
       in
       {
         inherit name;
-        scope = getScope entry;
         userSpecific = entry ? userSpecific && entry.userSpecific;
         why = entry.why;
         hasNixOsEntry = entry.values ? NixOS || entry.values ? default;
@@ -465,10 +416,9 @@ in
 {
   inherit
     catalog
-    toHomeSessionVariables
-    toNixOSSystemEnvironment
-    toLaunchctlScript
-    toUserLaunchctlScript
+    allVars
+    systemVars
+    macOSAllVars
     toJsonManifest
     getAllNixVarNames
     resolveValue
