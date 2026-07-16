@@ -19,6 +19,20 @@
 - Repository automation lives in `.github/workflows/ci.yml`, `.github/dependabot.yml`, and `.commitlintrc.mjs`.
 - Formatting and newline behavior comes from `.editorconfig`, `.gitattributes`, `.markdownlint.jsonc`, and `.agents/.markdownlint.jsonc`.
 
+## Conventions
+
+### Inline `$schema` for JSON/YAML data files
+- Every JSON and YAML data file MUST include an inline `$schema` property pointing to its schema file.
+- This replaces editor-level schema mappings (e.g., VS Code `json.schemas` / `yaml.schemas` in `.vscode/settings.json`) so validation works in any editor and CI.
+- Schema files live alongside their data files (e.g., `src/modules/VMs.schema.json` for `src/modules/VMs.json`).
+- Configuration files (JSONC) that already embed `$schema` do not need additional mappings.
+
+### Pre-flight dependency policy (check scripts)
+- Every external tool used by any check in `scripts/check.sh` or `scripts/check.ps1` MUST be declared in the pre-flight block.
+- A missing tool causes an immediate hard failure — checks MUST NEVER silently skip steps due to unavailable dependencies.
+- The pre-flight block is the single source of truth for all tool requirements.
+- To add a new check that requires a new tool: add it to pre-flight first, then provision it on all target hosts (`src/modules/core.nix` for POSIX, `Ensure-Tool` / bootstrap for Windows).
+
 ## Build and Validation
 
 - Discover commands from the repository itself; never assume a default stack.
