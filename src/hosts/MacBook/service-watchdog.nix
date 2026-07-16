@@ -22,7 +22,7 @@ let
     name = "nucleus-services-json";
   };
 
-  envVars = import ../../modules/lib/env-vars.nix {
+  envVars = import ../../modules/lib/env-catalog.nix {
     inherit
       config
       pkgs

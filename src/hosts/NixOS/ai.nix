@@ -85,7 +85,7 @@
     # OLLAMA_CONTEXT_LENGTH, OLLAMA_KV_CACHE_TYPE entries).
     environmentVariables =
       let
-        envVars' = import ../../modules/lib/env-vars.nix {
+        envVars' = import ../../modules/lib/env-catalog.nix {
           inherit
             config
             pkgs

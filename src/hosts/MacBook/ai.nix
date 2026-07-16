@@ -19,7 +19,7 @@
 let
   userHome = "/Users/${username}";
   litellmConfig = "${userHome}/.config/nucleus/litellm-config.yml";
-  envVars = import ../../modules/lib/env-vars.nix {
+  envVars = import ../../modules/lib/env-catalog.nix {
     inherit
       config
       pkgs

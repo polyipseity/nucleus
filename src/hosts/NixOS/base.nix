@@ -9,7 +9,8 @@
 let
   # Centralized env var catalog — single source of truth for managed
   # environment variables across all hosts.
-  envVars = import ../../modules/lib/env-vars.nix {
+  managedPaths = import ../../modules/lib/managed-paths.nix { inherit pkgs; };
+  envVars = import ../../modules/lib/env-catalog.nix {
     inherit
       config
       pkgs
@@ -55,8 +56,8 @@ in
   # prepend/append distinction from pathComponents in the catalog.
   environment.variables = envVars.systemVars // {
     PATH = lib.mkMerge [
-      (lib.mkBefore (map (p: "/home/${username}/${p}") envVars.pathComponents.prepend))
-      (lib.mkAfter (map (p: "/home/${username}/${p}") envVars.pathComponents.append))
+      (lib.mkBefore (map (p: "/home/${username}/${p}") managedPaths.pathComponents.prepend))
+      (lib.mkAfter (map (p: "/home/${username}/${p}") managedPaths.pathComponents.append))
     ];
   };
 

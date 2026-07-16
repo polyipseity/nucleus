@@ -27,9 +27,8 @@ let
   # _nucleus_resolve_repo_root, and _nucleus_prepend_first_executable_dir.
   agentHelpersSh = builtins.readFile ../scripts/agent-helpers.sh;
 
-  envVars = import ./lib/env-vars.nix {
-    inherit config pkgs lib;
-    username = config.home.username;
+  managedPaths = import ./lib/managed-paths.nix {
+    inherit pkgs;
   };
 in
 {
@@ -273,7 +272,7 @@ in
       # pathComponents.prepend) so binaries installed by previous apply runs
       # and by this activation are discoverable in subsequent activation
       # steps without spawning a new shell session.
-      PATH="${envVars.toShellPrependPath}:$PATH"
+      PATH="${managedPaths.toShellPrependPath}:$PATH"
       export PATH
 
       # Also prepend the nix profile bin directory, Home Manager profile bin
@@ -281,7 +280,7 @@ in
       # After linkGeneration the profile symlinks exist, but the activation
       # shell's PATH may not include them.
       _nucleus_prepend_first_executable_dir bun \
-        ${envVars.nixProfileBinDirs} || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
+        ${managedPaths.nixProfileBinDirs} || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
 
       # If bun is still not found, search the nix store for any bun binary
       # and add its parent directory to PATH.
@@ -512,8 +511,8 @@ in
       # activation shell PATH has not yet been updated to reflect the profile, so
       # probe known profile bin directories in priority order.
       _nucleus_prepend_first_executable_dir rustup \
-        ${envVars.nixSystemBinDirs} \
-        ${envVars.nixProfileBinDirs} || true  # undoc-supp: rustup not in profile dir on first apply; fallback follows.
+        ${managedPaths.nixSystemBinDirs} \
+        ${managedPaths.nixProfileBinDirs} || true  # undoc-supp: rustup not in profile dir on first apply; fallback follows.
 
       if ! command -v rustup >/dev/null 2>&1; then
         echo "rustup: rustup not found after profile link; skipping initialization" >&2
@@ -571,9 +570,9 @@ in
       # home-manager-profile bin directories as fallback.  initRustup runs
       # before this step to ensure the stable toolchain is installed.
       _nucleus_prepend_first_executable_dir cargo \
-        "$HOME/${builtins.elemAt envVars.pathComponents.prepend 1}" \
-        ${envVars.nixSystemBinDirs} \
-        ${envVars.nixProfileBinDirs} || true  # undoc-supp: cargo not in any profile dir; fallback follows.
+        "$HOME/${builtins.elemAt managedPaths.pathComponents.prepend 1}" \
+        ${managedPaths.nixSystemBinDirs} \
+        ${managedPaths.nixProfileBinDirs} || true  # undoc-supp: cargo not in any profile dir; fallback follows.
 
       # Guard: cargo is provided by rustup (stable toolchain) via ~/.cargo/bin;
       # initRustup ensures stable is installed before this step runs.
@@ -665,7 +664,7 @@ in
       # Prepend user-scope package manager bin directories (env-vars.nix
       # pathComponents.prepend) so the ClawHub binary installed by
       # installBunPackages is on PATH for this activation step.
-      PATH="${envVars.toShellPrependPath}:$PATH"
+      PATH="${managedPaths.toShellPrependPath}:$PATH"
       export PATH
 
       # Resolve the repo root (same mechanism as agentsSymlink and agentsSkills).

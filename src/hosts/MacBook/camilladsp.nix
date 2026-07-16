@@ -49,7 +49,7 @@ let
       --config ${userHome}/.config/camilladsp/configs/config.yml
   '';
 
-  envVars = import ../../modules/lib/env-vars.nix {
+  envVars = import ../../modules/lib/env-catalog.nix {
     inherit
       config
       pkgs

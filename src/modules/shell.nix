@@ -22,7 +22,8 @@ let
   # Dedicated alias/env fragments keep list-like attrsets isolated so sort order
   # can be audited without scanning unrelated shell options.
   shellAliases = import ./shell/aliases.nix { };
-  envVarsHelpers = import ./lib/env-vars.nix {
+  managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
+  envVarsHelpers = import ./lib/env-catalog.nix {
     inherit
       config
       pkgs
@@ -35,25 +36,11 @@ let
   # pwsh.nix and Sync-ShellProfile.ps1 (Windows).
   agentEnv = import ./agent-env-vars.nix;
 
-  # Keep a user-scoped baseline toolchain available even in repositories that do
-  # not ship direnv or Nix metadata. This preserves the "no direct system tool
-  # invocation" policy while still giving unmanaged projects a predictable bun /
-  # uv / prek bundle.  Rust toolchain management is via rustup on all platforms;
-  # cargo/rustc are not included here so users go through rustup or a devShell.
-  defaultDevTools = pkgs.symlinkJoin {
-    name = "default-dev-tools";
-    paths = [
-      pkgs.bun
-      pkgs.prek
-      pkgs.uv
-    ];
-  };
-
   # All env vars are sourced from the centralized catalog.  NUCLEUS_DEFAULT_DEV_*
   # and the macOS-specific vars (DEVELOPER_DIR, SDKROOT, LIBRARY_PATH) are all
   # included in allVars.  We overlay NUCLEUS_DEFAULT_DEV_* here
   mergedSessionVariables = envVarsHelpers.allVars // {
-    NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin";
+    NUCLEUS_DEFAULT_DEV_BIN = "${managedPaths.defaultDevTools}/bin";
     NUCLEUS_DEFAULT_DEV_ENV = "1";
   };
 
@@ -208,7 +195,7 @@ in
             # `zsh -i` sessions in every launch path, so export the fallback tool
             # coordinates here as well.  This keeps repositories without .envrc
             # usable even when the shell did not start as a login shell.
-            export NUCLEUS_DEFAULT_DEV_BIN="${defaultDevTools}/bin"
+            export NUCLEUS_DEFAULT_DEV_BIN="${managedPaths.defaultDevTools}/bin"
             export NUCLEUS_DEFAULT_DEV_ENV="1"
 
             # (User-scope package manager bin dirs are declared via home.sessionPath
@@ -657,7 +644,7 @@ in
   # catalog in src/modules/lib/env-vars.nix.
   home.sessionPath = builtins.map (
     p: "${config.home.homeDirectory}/${p}"
-  ) envVarsHelpers.pathComponents.prepend;
+) managedPaths.pathComponents.prepend;
 
   home.sessionVariables = mergedSessionVariables;
 

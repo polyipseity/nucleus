@@ -10,7 +10,8 @@
   ...
 }:
 let
-  envLib = import ../lib/env-vars.nix {
+  managedPaths = import ../lib/managed-paths.nix { inherit pkgs; };
+  envLib = import ../lib/env-catalog.nix {
     inherit
       config
       pkgs
@@ -39,7 +40,11 @@ in
         toJsonManifest
         getAllNixVarNames
         resolveValue
+        ;
+      inherit (managedPaths)
         defaultDevTools
+        ;
+      inherit (envLib)
         passwordStoreDir
         currentOs
         ;

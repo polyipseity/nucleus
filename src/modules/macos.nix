@@ -23,8 +23,10 @@ let
   finderSidebar = import ./macos/finder-sidebar.nix { inherit config lib pkgs; };
   preferenceGc = import ./macos/preference-gc.nix { inherit config lib pkgs; };
 
-  # Cached env-vars.nix import for all env-var-related callsites below.
-  envVars = import ./lib/env-vars.nix {
+  # Cached imports for all env-var-related callsites below.
+  # managed-paths.nix for PATH components; env-catalog.nix for catalog/resolution.
+  managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
+  envVars = import ./lib/env-catalog.nix {
     inherit
       config
       pkgs
@@ -45,7 +47,7 @@ let
   mkManagedDedupSet =
     prefix:
     builtins.concatStringsSep ":" (
-      map (p: "${prefix}/${p}") (envVars.pathComponents.prepend ++ envVars.pathComponents.append)
+      map (p: "${prefix}/${p}") (managedPaths.pathComponents.prepend ++ managedPaths.pathComponents.append)
     );
 
   # Shared BD CLI wrapper: soft-fail wrapper for BetterDisplay CLI commands.
@@ -464,8 +466,8 @@ let
     # crash recovery.
     while true; do
       # ── PATH: strip stale managed entries, then prepend+append ──
-      __nucleus_prepend="${envVars.toLaunchctlPrependPath}"
-      __nucleus_append="${envVars.toLaunchctlAppendPath}"
+      __nucleus_prepend="${managedPaths.toLaunchctlPrependPath}"
+      __nucleus_append="${managedPaths.toLaunchctlAppendPath}"
       # Same dedup SET as the activation script, but using $HOME (runtime
       # shell expansion by launchd) instead of build-time home directory.
       __nucleus_managed_set="${mkManagedDedupSet "$HOME"}"
@@ -1426,8 +1428,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Propagate managed PATH to GUI domain.  Reads the current GUI domain PATH
     # at runtime (with fallback to shell PATH), strips stale managed entries,
     # then prepends + appends managed dirs.
-    __nucleus_prepend="${envVars.toLaunchctlPrependPath}"
-    __nucleus_append="${envVars.toLaunchctlAppendPath}"
+    __nucleus_prepend="${managedPaths.toLaunchctlPrependPath}"
+    __nucleus_append="${managedPaths.toLaunchctlAppendPath}"
     # Build the managed-dir LOOKUP SET for stripping stale entries.
     # This includes BOTH prepend and append dirs so that any future append
     # entries are also stripped on re-apply.  This is NOT a PATH ordering

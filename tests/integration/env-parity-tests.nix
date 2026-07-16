@@ -10,7 +10,7 @@ let
   pkgs = import <nixpkgs> { };
   config = { };
 
-  envVars = import ../../src/modules/lib/env-vars.nix {
+  envVars = import ../../src/modules/lib/env-catalog.nix {
     inherit config pkgs lib;
     username = "test";
   };

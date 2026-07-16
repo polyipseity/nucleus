@@ -7,23 +7,8 @@
   ...
 }:
 let
-  # Fallback tool inventory matching shell.nix for repos without direnv/Nix hooks.
-  defaultDevTools = pkgs.symlinkJoin {
-    name = "default-dev-tools";
-    paths = [
-      pkgs.bun
-      pkgs.prek
-      pkgs.uv
-    ];
-  };
-
-  agentEnv = import ./agent-env-vars.nix;
-
-  lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
-  pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
-  pwshYamlVersion = lockfile.pwsh."powershell-yaml" or null;
-
-  envVars = import ./lib/env-vars.nix {
+  managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
+  envVars = import ./lib/env-catalog.nix {
     inherit
       config
       pkgs
@@ -31,6 +16,12 @@ let
       username
       ;
   };
+
+  agentEnv = import ./agent-env-vars.nix;
+
+  lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
+  pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
+  pwshYamlVersion = lockfile.pwsh."powershell-yaml" or null;
 
   profileContent = ''
         # This file is managed by nucleus (src/modules/pwsh.nix).
@@ -43,12 +34,12 @@ let
 
         # Keep a user-scoped fallback toolchain available when the current project
         # does not provide a direnv/devShell entrypoint.
-        $env:NUCLEUS_DEFAULT_DEV_BIN = "${defaultDevTools}/bin"
+        $env:NUCLEUS_DEFAULT_DEV_BIN = "${managedPaths.defaultDevTools}/bin"
         $env:NUCLEUS_DEFAULT_DEV_ENV = "1"
 
         # Expose user-scope package manager bins so globally installed tools are
         # accessible in interactive sessions.  Canonical source: env-vars.nix.
-        ${envVars.toPowerShellPrependSnippet}
+        ${managedPaths.toPowerShellPrependSnippet}
 
         # PSReadLine: predictive history completion and menu-style tab expansion.
         # Guards with module availability probe so the profile loads on hosts where
