@@ -37,9 +37,9 @@ Direct developer invocation of any of the above in an interactive shell session 
 
 Each blocked tool is overridden as a shell function that intercepts the command and prints a helpful error pointing to the devShell.
 
-- **POSIX (zsh)** — `src/modules/shell.nix`: functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`, `pip3` in `programs.zsh.initContent`. Flow: check `$DIRENV_DIR` → invoke devShell-scoped binary → check `$NUCLEUS_DEFAULT_DEV_BIN` → error.
-- **POSIX (pwsh)** — `src/modules/pwsh.nix`: equivalent PowerShell functions in `profileContent`, same flow via `$env:DIRENV_DIR` then `$env:NUCLEUS_DEFAULT_DEV_BIN`.
-- **Windows (PowerShell)** — `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1`: same functions in the managed block. Pass-through uses `$env:DIRENV_DIR` when present, otherwise `$env:NUCLEUS_DEFAULT_DEV_ENV`.
+- **POSIX (zsh)** — `src/modules/shell.nix`: functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`, `pip3` in `programs.zsh.initContent`. Flow: check `$DIRENV_DIR` → invoke devShell-scoped binary → check fallback tool bundle path → error.
+- **POSIX (pwsh)** — `src/modules/pwsh.nix`: equivalent PowerShell functions in `profileContent`, same flow via `$env:DIRENV_DIR` then the fallback tool bundle path.
+- **Windows (PowerShell)** — `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1`: same functions in the managed block. Pass-through uses `$env:DIRENV_DIR` when present.
 
 User-scope bin dir PATH wiring is declared via `home.sessionPath` (→ `~/.zshenv`), not `initContent` PATH guards. This ensures directories survive direnv deactivation.
 
@@ -49,7 +49,7 @@ For project-specific development, enter the project devShell. For repositories w
 
 - **POSIX — automatic (preferred):** direnv auto-loads the devShell when a directory has an `.envrc` with `use flake`.
 - **POSIX — manual:** `nix develop` from the repo root.
-- **POSIX — default fallback:** outside any active `.envrc`, the managed shell profile exposes the same inventory from `$NUCLEUS_DEFAULT_DEV_BIN`.
+- **POSIX — default fallback:** outside any active `.envrc`, the managed shell profile exposes the same inventory from the fallback tool bundle.
 - **Windows:** `nix develop` from WSL when available, or the managed PowerShell profile fallback.
 
 On POSIX, `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix-patched toolchain from the project's `rust-toolchain.toml` (or falls back to `pkgs.rust-bin.stable.latest.default`) — distinct from the system `pkgs.rustup` install so devShell toolchains are reproducible and version-pinned. On Windows, rustup (`Rustlang.Rustup`) intercepts cargo invocations and reads `rust-toolchain.toml` natively.
@@ -58,7 +58,7 @@ On POSIX, `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix
 
 1. Add the blocking shell function to `src/modules/shell.nix` (`initContent`), following the existing `bun`/`cargo`/`rustc`/`uv` pattern.
 2. Add the equivalent PowerShell function to `src/modules/pwsh.nix` (`profileContent`) for POSIX PowerShell parity.
-3. Add the same function to the `$managedBlock` array in `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` for Windows parity.
+3. For Windows, add the function to `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` in the `$managedBlock` array for Windows parity.
 4. Update this instruction file.
 5. If the tool is also a devShell tool, add it to `devShells.default` in `src/flake.nix` (alphabetically sorted in the `packages` list).
 

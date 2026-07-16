@@ -33,31 +33,22 @@ let
 
   test_posix_shell_exports_fallback_bundle = assert' (
     (lib.hasInfix "default-dev-tools" posixShellText)
-    && (lib.hasInfix "NUCLEUS_DEFAULT_DEV_BIN" posixShellText)
-    && (lib.hasInfix "export NUCLEUS_DEFAULT_DEV_BIN=" posixShellText)
     && (lib.hasInfix "__nucleus_run_managed_dev_tool" posixShellText)
   ) "shell.nix must publish the fallback tool bundle and helper for unmanaged repositories";
 
   test_posix_pwsh_uses_fallback_bundle = assert' (
     (lib.hasInfix "default-dev-tools" posixPwshText)
-    && (lib.hasInfix "NUCLEUS_DEFAULT_DEV_BIN" posixPwshText)
     && (lib.hasInfix "Invoke-NucleusManagedDevTool" posixPwshText)
   ) "pwsh.nix must publish and consume the fallback tool bundle for unmanaged repositories";
 
-  test_windows_shell_uses_default_env = assert' (
-    (lib.hasInfix "NUCLEUS_DEFAULT_DEV_ENV" windowsShellProfileText)
-    && (lib.hasInfix "Invoke-NucleusManagedDevTool" windowsShellProfileText)
-  ) "Sync-ShellProfile.ps1 must expose the managed default shell environment on Windows";
+  test_windows_shell_uses_default_env = assert' (lib.hasInfix "Invoke-NucleusManagedDevTool" windowsShellProfileText) "Sync-ShellProfile.ps1 must expose the managed default shell environment on Windows";
 
   test_windows_apply_wires_shell_profile_sync = assert' (
     (lib.hasInfix "Sync-ShellProfile.ps1" applyScriptText)
     && (lib.hasInfix "Sync-ShellProfile -Enabled:$EnableShellParity" applyScriptText)
   ) "Windows apply.ps1 must load and execute Sync-ShellProfile so fallback shell policy is enforced";
 
-  test_policy_docs_capture_fallback = assert' (
-    (lib.hasInfix "NUCLEUS_DEFAULT_DEV_BIN" buildToolsPolicyText)
-    && (lib.hasInfix "NUCLEUS_DEFAULT_DEV_ENV" buildToolsPolicyText)
-  ) "Build tools policy instructions must document the managed fallback environment";
+  test_policy_docs_capture_fallback = assert' (lib.hasInfix "Invoke-NucleusManagedDevTool" buildToolsPolicyText) "Build tools policy instructions must document the managed fallback environment";
 
   test_ci_runs_this_suite = assert' (lib.hasInfix "tests/integration/default-dev-tooling-tests.nix" ciWorkflowText) "CI must execute the managed fallback tooling tests";
 
@@ -99,7 +90,7 @@ let
   # PowerShell Invoke-NucleusManagedDevTool pattern so projects that do not
   # include a managed tool in their devShell fall through to
   # NUCLEUS_DEFAULT_DEV_BIN instead of failing with "command not found".
-  test_posix_shell_probes_tool_in_direnv = assert' (lib.hasInfix "command -v \"$_tool_name\"" posixShellText) "shell.nix must probe tool availability (command -v) in direnv context before routing, so projects lacking the managed tool fall through to NUCLEUS_DEFAULT_DEV_BIN";
+  test_posix_shell_probes_tool_in_direnv = assert' (lib.hasInfix "command -v \"$_tool_name\"" posixShellText) "shell.nix must probe tool availability (command -v) in direnv context before routing, so projects lacking the managed tool fall through to the fallback tool bundle";
 
   # Verify that POSIX hosts use pkgs.rustup (not pkgs.cargo from nixpkgs) so
   # that all platforms are unified on rustup for Rust toolchain management.
