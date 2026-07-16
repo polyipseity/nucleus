@@ -81,8 +81,8 @@ Before absorbing, evaluate each atomic fact for staleness. Break each memory fil
 | **current** | Fact matches current codebase state and isn't superseded. | Proceed to **Absorb** normally. |
 | **discard** | Fact is provably wrong or references removed features. | Remove from memory file; do **not** absorb. |
 | **update** | Useful core but expressed inaccurately for current state. | Correct the fact inline in memory, then proceed to **Absorb** with corrected version. |
-| **ignore** | Outdated but harmless, and you cannot confidently update it. | Leave in memory file; do **not** absorb. |
-| **uncertain** | Cannot determine staleness with available evidence. | Absorb with `# TODO: verify staleness` annotation. |
+| **ignore** | Outdated but harmless, and you cannot confidently update it. | Discard; do **not** absorb (file will be deleted). |
+| **uncertain** | Cannot determine staleness with available evidence. | Discard; do **not** absorb (file will be deleted, no source to reference). |
 
 ### Report before acting
 
@@ -95,7 +95,7 @@ Evaluation summary:
     ❌ "use build.sh" — discard (file removed)
     🔄 "deploy via rsync" — update (now uses nucleus-apply)
     ⚠️ "use port 8080" — ignore (harmless, can't verify)
-    ❓ "prefer UDP" — uncertain, absorbing with TODO
+    ❓ "prefer UDP" — uncertain, discarding (file will be deleted)
   memory-bar.md:
     ... etc
 ```
@@ -104,7 +104,7 @@ Evaluation summary:
 
 ### Analyze and match
 
-Only facts with verdict **current** or **update** proceed to matching. Facts with verdict **discard** or **ignore** are excluded from absorption. Facts with verdict **uncertain** proceed with a `# TODO: verify staleness` annotation in the instruction file.
+Only facts with verdict **current** or **update** proceed to matching. Facts with verdict **discard**, **ignore**, or **uncertain** are excluded from absorption.
 
 For each qualifying fact, find the best target:
 
@@ -143,7 +143,7 @@ Poor: Memory says "macOS watchdog daemon: use launchctl to reload". Appended ver
 
 ## Delete
 
-Only delete a memory file if **all** its facts received verdict **current**, **update**, or **discard**. If any fact was **ignore** or **uncertain**, preserve the file — those facts remain for future reference.
+Delete all specified memory files unconditionally. The file has served its purpose — absorbed facts are in the instruction files, and unabsorbed facts (discard/ignore/uncertain) are not worth preserving.
 
 Use the resolved URI from Step 2 (preferred). Fallback:
 
@@ -158,9 +158,8 @@ If any edit in the previous step failed, keep the file and report the failure.
 
 1. Re-read each modified `.instructions.md` file.
 2. Confirm all facts from the original memory are present and accurately expressed.
-3. For **uncertain** facts absorbed with `# TODO: verify staleness`: verify the fact at least references existing files, commands, or config keys — no dead references.
-4. Prune redundancy: if the same fact appears twice in the same file, keep only the better-placed instance.
-5. Check voice: the result should read as if the knowledge was always there — no awkward transitions, no verbatim memory dumps.
+3. Prune redundancy: if the same fact appears twice in the same file, keep only the better-placed instance.
+4. Check voice: the result should read as if the knowledge was always there — no awkward transitions, no verbatim memory dumps.
 
 ## Rules
 
@@ -168,4 +167,4 @@ If any edit in the previous step failed, keep the file and report the failure.
 - Never verbatim dump memories — rephrase to the target instruction file's voice.
 - If a memory is already fully covered, skip it.
 - No editorial markers ("Added from memory:", "Note:").
-- Delete only after all edits succeed. If any edit fails, report the failure and keep the file.
+- Delete all specified memory files unconditionally. If any edit in the previous step failed, keep the file and report the failure.
