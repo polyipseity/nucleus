@@ -28,9 +28,3 @@
   ],
   "type": "object"
 }
-  },
-  "required": [
-    "models"
-  ],
-  "type": "object"
-}
