@@ -33,6 +33,11 @@ $script:nucleusPrependRegistry = $script:nucleusPathComponents.Prepend | ForEach
   "%USERPROFILE%$_"
 }
 
+# Append-side counterpart for HKLM Path append entries.
+$script:nucleusAppendRegistry = $script:nucleusPathComponents.Append | ForEach-Object {
+  "%USERPROFILE%$_"
+}
+
 <#
 .SYNOPSIS
   Resolves a single managed bin directory by component name.

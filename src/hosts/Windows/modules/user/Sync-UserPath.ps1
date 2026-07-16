@@ -52,7 +52,7 @@ function Sync-UserPath {
 
   # Canonical source: ManagedPaths.ps1 → src/modules/lib/managed-paths.nix (pathComponents).
   $nucleusPrependDirs = $nucleusPrependRegistry
-  $nucleusAppendDirs = $nucleusPathComponents.Append
+  $nucleusAppendDirs = $nucleusAppendRegistry
   $nucleusDirs = $nucleusPrependDirs + $nucleusAppendDirs # dedup SET (membership check), NOT a PATH ordering
 
   # ── Machine PATH (HKLM) ──────────────────────────────────────────
