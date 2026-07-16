@@ -33,9 +33,6 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[markdown]": {
-    "editor.codeActionsOnSave": {
-      "source.fixAll.markdownlint": "explicit"
-    },
     "editor.formatOnSave": false
   },
   "[nix]": {
@@ -144,6 +141,15 @@
   "docker.lsp.telemetry": "off",
   "editor.accessibilitySupport": "auto",
   "editor.aiStats.enabled": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.fixAll.markdownlint": "explicit",
+    "source.fixAll.prettier": "explicit",
+    "source.fixAll.ruff": "explicit",
+    "source.organizeImports.ruff": "explicit",
+    "source.organizeLinkDefinitions": "explicit",
+    "source.sort.json": "explicit"
+  },
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.foldingImportsByDefault": true,
   "editor.fontSize": 14,
@@ -174,7 +180,8 @@
   "extensions.supportNodeGlobalNavigator": true,
   "files.associations": {
     ".prekignore": "ignore",
-    ".prettierignore": "ignore"
+    ".prettierignore": "ignore",
+    ".yamllint": "yaml"
   },
   "files.autoSave": "onFocusChange",
   "files.exclude": {
@@ -290,6 +297,15 @@
       }
     }
   },
+  "notebook.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.fixAll.markdownlint": "explicit",
+    "source.fixAll.prettier": "explicit",
+    "source.fixAll.ruff": "explicit",
+    "source.organizeImports.ruff": "explicit",
+    "source.organizeLinkDefinitions": "explicit",
+    "source.sort.json": "explicit"
+  },
   "notebook.insertFinalNewline": true,
   "notebook.lineNumbers": "on",
   "path-intellisense.extensionOnImport": true,
@@ -333,7 +349,6 @@
   "vscode-neovim.neovimExecutablePaths.darwin": "/etc/nucleus-bin/nvim",
   "vscode-neovim.neovimExecutablePaths.linux": "/etc/nucleus-bin/nvim",
   "window.autoDetectColorScheme": true,
-  "workbench.browser.agentHostChatToolsEnabled": true,
   "workbench.browser.enableChatTools": true,
   "workbench.colorTheme": "Solarized Light",
   "workbench.editor.showTabs": "single",
