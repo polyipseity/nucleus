@@ -118,7 +118,7 @@ let
     "$HOME/.local/state/nix/profiles/profile/bin" \
     "$HOME/.nix-profile/bin" \
     "$HOME/.local/state/home-manager/profile/bin" \
-    "$HOME/.local/home-manager/profile/bin"
+    "$HOME/.local/home-manager/profile/bin" \
   '';
 
   # ── Helper: NixOS system profile probe directories ────────────────
@@ -126,7 +126,7 @@ let
   # Contains $USER reference — expanded at shell runtime, not by Nix.
   nixSystemBinDirs = ''
     "/etc/profiles/per-user/$USER/bin" \
-    "/run/current-system/sw/bin"
+    "/run/current-system/sw/bin" \
   '';
 in
 {
