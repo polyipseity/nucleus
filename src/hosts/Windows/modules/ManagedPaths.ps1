@@ -82,3 +82,39 @@ function Get-NucleusLLVMBinDir {
   param()
   "C:\Program Files\LLVM\bin"
 }
+
+<#
+.SYNOPSIS
+  Prepends or appends a directory to the current session PATH, deduplicating.
+.DESCRIPTION
+  Adds the specified directory to $env:PATH if it is not already present, at
+  the specified position (Prepend or Append).  Uses -notlike wildcard matching
+  to avoid duplicate entries.
+.PARAMETER Path
+  The directory path to add.  Must be a full absolute path.
+.PARAMETER Position
+  Whether to Prepend (default) or Append the entry.
+.EXAMPLE
+  Add-NucleusPathEntry -Path "C:\Tools\bin" -> prepends to PATH
+  Add-NucleusPathEntry -Path "C:\Tools\bin" -Position Append -> appends
+#>
+function Add-NucleusPathEntry {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Path,
+
+    [Parameter()]
+    [ValidateSet('Prepend', 'Append')]
+    [string]$Position = 'Prepend'
+  )
+  if ($Position -eq 'Prepend') {
+    if ($env:PATH -notlike "*$Path*") {
+      $env:PATH = "$Path;$env:PATH"
+    }
+  } else {
+    if ($env:PATH -notlike "*$Path*") {
+      $env:PATH = "$env:PATH;$Path"
+    }
+  }
+}

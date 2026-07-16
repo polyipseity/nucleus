@@ -135,7 +135,7 @@ for (const dbPath of dbPaths) {
         # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).
         $bunBin = Get-NucleusManagedBinDir "bun"
         if (Test-Path -Path (Join-Path -Path $bunBin -ChildPath "bun.exe")) {
-            $env:PATH = "$bunBin;$env:PATH"
+            Add-NucleusPathEntry -Path $bunBin
         }
 
         $bunCmd = Get-Command -Name "bun" -ErrorAction SilentlyContinue  # undoc-supp: probe — bun may not be installed; $null check below handles absence

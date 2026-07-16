@@ -454,9 +454,7 @@ if (-not $NoScoopGc) {
   if (-not (Test-Path $scoopCmd)) {
     Write-NucleusInfo "scoop not installed; skipping scoop gc"
   } else {
-    if ($env:PATH -notlike "*$scoopShims*") {
-      $env:PATH = "$scoopShims;$env:PATH"
-    }
+    Add-NucleusPathEntry -Path $scoopShims
     Write-NucleusInfo "running scoop cleanup..."
     scoop cleanup *
     if ($LASTEXITCODE -ne 0) {

@@ -74,10 +74,7 @@ function Invoke-ScoopSetup {
   # DSC runs in a child process; PATH additions from that process do not
   # propagate back to the parent shell, so the shims path must be added
   # explicitly here after the DSC step completes.
-  $scoopShims = Get-NucleusScoopShimsDir
-  if ($env:PATH -notlike "*$scoopShims*") {
-    $env:PATH = "$scoopShims;$env:PATH"
-  }
+  Add-NucleusPathEntry -Path (Get-NucleusScoopShimsDir)
 
   if (-not (Test-Path (Join-Path $scoopShims "scoop.cmd"))) {
     Write-Error "Invoke-ScoopSetup: scoop not found at '$scoopShims\scoop.cmd'; ensure Scoop.Scoop was installed by WinGet DSC before calling this function"

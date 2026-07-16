@@ -194,18 +194,11 @@ function Invoke-SourceBuild {
   }
 
   # --- Update PATH for this session ---
-  $pathsToAdd = @()
   if (Test-Path $installRoot) {
     $installedDirs = Get-ChildItem -Directory $installRoot | ForEach-Object { $_.Name } | Where-Object { $_ -ne '.cache' }
     foreach ($dirName in $installedDirs) {
       $dir = Join-Path $installRoot $dirName
-      if ($env:PATH -notlike "*$dir*") {
-        $pathsToAdd += $dir
-      }
+      Add-NucleusPathEntry -Path $dir
     }
-  }
-  if ($pathsToAdd.Count -gt 0) {
-    $env:PATH = "$($pathsToAdd -join ';');$env:PATH"
-    Write-Output "Invoke-SourceBuild: prepended to PATH: $($pathsToAdd -join ', ')"
   }
 }
