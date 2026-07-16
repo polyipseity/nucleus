@@ -1,4 +1,5 @@
 {
+  "$schema": "./source-builds.schema.json",
   "packages": [
     {
       "binaryName": "ncdu.exe",

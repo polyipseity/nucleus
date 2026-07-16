@@ -1,4 +1,5 @@
 {
+  "$schema": "./users.schema.json",
   "polyipseity": {
     "cloudDrives": {
       "mounts": [

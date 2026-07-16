@@ -1,4 +1,5 @@
 {
+  "$schema": "./VMs.schema.json",
   "VMs": [
     {
       "cpus": 4,

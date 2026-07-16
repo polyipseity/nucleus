@@ -1,4 +1,5 @@
 {
+  "$schema": "../../modules/users.schema.json",
   "description": "Windows host user registry — defines users managed by this host configuration. Each user has a home directory, role (primary vs secondary), and optional devRepos config. The primary user receives secret materialization; secondary users get base configuration only. This mirrors the Nix users/default.nix structure.",
   "users": {
     "polyipseity": {

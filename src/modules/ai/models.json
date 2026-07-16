@@ -1,4 +1,5 @@
 {
+  "$schema": "./models.schema.json",
   "models": {
     "MacBook": [
       "devstral-small-2:24b",
