@@ -76,8 +76,8 @@ function Invoke-ScoopSetup {
   # explicitly here after the DSC step completes.
   Add-NucleusPathEntry -Path (Get-NucleusScoopShimsDir)
 
-  if (-not (Test-Path (Join-Path $scoopShims "scoop.cmd"))) {
-    Write-Error "Invoke-ScoopSetup: scoop not found at '$scoopShims\scoop.cmd'; ensure Scoop.Scoop was installed by WinGet DSC before calling this function"
+  if (-not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "scoop.cmd"))) {
+    Write-Error "Invoke-ScoopSetup: scoop not found at '$(Get-NucleusScoopShimsDir)\scoop.cmd'; ensure Scoop.Scoop was installed by WinGet DSC before calling this function"
     return
   }
 
@@ -159,9 +159,9 @@ function Invoke-ScoopSetup {
       Write-Error "scoop: 'scoop install $installSpec' failed (exit $LASTEXITCODE)"
       return
     }
-    if (-not (Test-Path (Join-Path $scoopShims "$pkg.cmd")) -and
-        -not (Test-Path (Join-Path $scoopShims "$pkg.exe"))) {
-      Write-Error "scoop: '$pkg' installed but no shim found under '$scoopShims'"
+    if (-not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "$pkg.cmd")) -and
+        -not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "$pkg.exe"))) {
+      Write-Error "scoop: '$pkg' installed but no shim found under '$(Get-NucleusScoopShimsDir)'"
       return
     }
     Write-Output "scoop: '$pkg' installed successfully"

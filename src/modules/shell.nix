@@ -200,8 +200,8 @@ in
               shift
 
               # direnv active: use the devShell tool if present in PATH; fall
-              # through to NUCLEUS_DEFAULT_DEV_BIN otherwise so projects that
-              # do not include the managed tool in their devShell still get
+              # through to the managed default toolchain otherwise so projects
+              # that do not include the managed tool in their devShell still get
               # the baseline inventory.  Mirrors the PowerShell
               # Invoke-NucleusManagedDevTool availability-check pattern.
               # 2>/dev/null: command -v is read-only; failure means absent ← expected.
