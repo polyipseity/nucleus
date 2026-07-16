@@ -192,10 +192,9 @@ let
     NUCLEUS_DEFAULT_DEV_BIN = {
       values = {
         default = "${managedPaths.defaultDevTools}/bin";
-        Windows = "%USERPROFILE%\\scoop\\shims";
       };
       userSpecific = true;
-      why = "Fallback toolchain bin dir for repos without direnv/Nix devShell. Windows uses Scoop shims path.";
+      why = "Fallback toolchain bin dir for repos without direnv/Nix devShell.";
     };
 
     # ── Host identity ────────────────────────────────────────────────
