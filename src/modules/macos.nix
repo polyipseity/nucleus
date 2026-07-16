@@ -1373,17 +1373,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
   # --------------------------------------------------------------------------
   # guiEnvActivationPathAndRepoRoot
-  # Propagates env vars that cannot be set via the gui-env-system LaunchAgent
-  # because they depend on values only available at activation time (not build
-  # time).  Sets PATH (prepend+append with runtime read and dedup) and
-  # NUCLEUS_REPO_ROOT.  Runs after setupLaunchAgents so the gui-env-system agent
-  # are loaded first.
+  # Sets PATH with runtime dedup and NUCLEUS_REPO_ROOT from the activation
+  # environment.  Runs after setupLaunchAgents so the gui-env agent is loaded
+  # first.
   # --------------------------------------------------------------------------
   home.activation.guiEnvActivationPathAndRepoRoot = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
-    # Propagate NUCLEUS_REPO_ROOT to GUI domain.  The catalog entry has
-    # excludeFromLaunchctl = true because builtins.getEnv returns "" when
-    # built outside apply.sh — reloading from the activation environment
-    # gives us the fresh value on every apply.
+    # Propagate NUCLEUS_REPO_ROOT to GUI domain.  Captured at build time from
+    # apply.sh; activation reloads it for freshness on every apply.
     if [ -n "''${NUCLEUS_REPO_ROOT:-}" ]; then
       /bin/launchctl setenv NUCLEUS_REPO_ROOT "$NUCLEUS_REPO_ROOT"
     fi
@@ -1423,7 +1419,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   '';
 
   # --------------------------------------------------------------------------
-  # GUI environment variable propagation LaunchAgent (system scope, macOS-only)
+  # GUI environment variable propagation LaunchAgent (macOS-only)
   # macOS maintains separate shell (user/<uid>/) and GUI (gui/<uid>/) launchd
   # domains.  Shell sessionVariables set via home.sessionVariables never cross
   # into the GUI domain.  This agent runs once at login and calls launchctl
@@ -1436,19 +1432,16 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # when activation hasn't run yet.
   #
   # The var list for non-PATH vars is generated from the centralized catalog
-  # — see src/modules/lib/env-vars.nix (toLaunchctlScript).  Vars CC, CXX, LD
-  # have no explicit scope so getScope defaults them to "all-process" — they
-  # pass the filter and are correctly included.  User-specific vars
-  # (PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.) are excluded from this agent to
-  # keep scoping explicit — they are set by the companion gui-env-user agent
-  # below.
+  # — see src/modules/lib/env-vars.nix (macOSAllVars).  All vars with a macOS
+  # value (both user and non-user) are included — safe because macOS launchd
+  # GUI domains are per-user.
   # --------------------------------------------------------------------------
-  launchd.agents."gui-env-system" = {
+  launchd.agents."gui-env" = {
     enable = true;
     config = {
-      Label = "local.gui-env-system";
+      Label = "local.gui-env";
       ProgramArguments = [
-        "${pkgs.writeShellScript "gui-env-system-agent" ''
+        "${pkgs.writeShellScript "gui-env-agent" ''
           set -eu
 
           # ── PATH: strip stale managed entries, then prepend+append ──
@@ -1475,34 +1468,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
             /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_append}"
           fi
 
-          # ── All other non-user-specific GUI env vars ──
-          ${envVars.toLaunchctlScript}
+          # ── All other GUI env vars (user and non-user) ──
+          ${envVars.macOSAllVars}
         ''}"
       ];
       # Run once at login so the GUI domain is populated before any app starts.
-      RunAtLoad = true;
-      KeepAlive = false;
-    };
-  };
-
-  # --------------------------------------------------------------------------
-  # User-specific GUI environment variable propagation LaunchAgent (macOS-only)
-  # Companion to gui-env-system above.  Sets vars whose values contain
-  # user-home-derived paths (PATH, PASSWORD_STORE_DIR, STARSHIP_CACHE, etc.).
-  # These are split into a separate agent to make the scoping intentional and
-  # auditable: the gui-env-system agent excludes them, and this agent
-  # explicitly includes them.  Both are safe because macOS launchd GUI domains
-  # are per-user.
-  #
-  # See src/modules/lib/env-vars.nix (toUserLaunchctlScript).
-  # --------------------------------------------------------------------------
-  launchd.agents."gui-env-user" = {
-    enable = true;
-    config = {
-      Label = "local.gui-env-user";
-      ProgramArguments = [
-        "${pkgs.writeShellScript "gui-env-user-agent" envVars.toUserLaunchctlScript}"
-      ];
       RunAtLoad = true;
       KeepAlive = false;
     };
