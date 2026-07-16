@@ -48,5 +48,53 @@
   },
   "markdown.validate.enabled": true,
   "python-envs.defaultEnvManager": "ms-python.python:venv",
-  "python-envs.pythonProjects": []
+  "python-envs.pythonProjects": [],
+  "yaml.format.enable": true,
+  "yaml.schemas": {
+    "https://aka.ms/configuration-dsc-schema/0.2": [
+      "src/hosts/Windows/system/*.dsc.yml",
+      "src/hosts/Windows/user/*.dsc.yml"
+    ]
+  },
+  "yaml.validate": true,
+  "json.schemas": [
+    {
+      "fileMatch": ["src/lockfiles/lockfile.json"],
+      "url": "./src/lockfiles/lockfile.schema.json"
+    },
+    {
+      "fileMatch": ["src/modules/services.json"],
+      "url": "./src/modules/services.schema.json"
+    },
+    {
+      "fileMatch": ["src/hosts/Windows/source-builds.json"],
+      "url": "./src/hosts/Windows/source-builds.schema.json"
+    },
+    {
+      "fileMatch": [
+        "src/modules/users.json",
+        "src/hosts/Windows/users.json"
+      ],
+      "url": "./src/modules/users.schema.json"
+    },
+    {
+      "fileMatch": ["src/modules/ai/models.json"],
+      "url": "./src/modules/ai/models.schema.json"
+    },
+    {
+      "fileMatch": ["src/modules/VMs.json"],
+      "url": "./src/modules/VMs.schema.json"
+    },
+    {
+      "fileMatch": ["opencode.jsonc"],
+      "url": "https://opencode.ai/config.json"
+    },
+    {
+      "fileMatch": [
+        ".markdownlint.jsonc",
+        ".agents/.markdownlint.jsonc"
+      ],
+      "url": "https://raw.githubusercontent.com/DavidAnson/markdownlint/main/schema/markdownlint-config-schema.json"
+    }
+  ]
 }
