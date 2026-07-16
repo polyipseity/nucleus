@@ -45,14 +45,24 @@
 #   Use check.sh's header comment as the cross-reference source of truth
 #   for the POSIX-side convention.
 #
+# Dependencies policy:
+# Every external tool required by any check in this script MUST be declared in
+# the pre-flight block below. Missing tools cause an immediate hard failure —
+# checks MUST NEVER silently skip due to missing dependencies.
+# The pre-flight block is the single source of truth for all tool requirements.
+# To add a new tool-using check, first add it to pre-flight, then provision it
+# on all target hosts.
+#
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
 # Steps 3-6, 8-11 are stubs (require Nix or bash — not available on Windows).
 # Step 20 only runs with the --verify flag.
 #
 # Prerequisites:
+#   - check-jsonschema (pip install check-jsonschema) for schema validation
 #   - Ensure-Tool module (imported via pre-flight block) for tool validation
 #   - powershell-yaml module (Install-Module powershell-yaml -Scope CurrentUser)
 #     is required for locked DSC validation.
+#   - yamllint (pip install yamllint) for YAML linting
 #
 # Arguments:
 #   (none)        Paths may be provided as positional arguments; passed
@@ -126,6 +136,8 @@ $modulesPath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules'
 Import-Module (Join-Path $modulesPath 'Ensure-Tool.psm1') -Force
 Ensure-Tool -Name 'powershell-yaml' -Type 'Module' -InstallCommand "Install-Module powershell-yaml -Scope CurrentUser -Force"
 Ensure-Tool -Name 'packer' -Type 'Command' -InstallCommand "winget install Hashicorp.Packer"
+Ensure-Tool -Name 'yamllint' -Type 'Command' -InstallCommand 'pip install yamllint'
+Ensure-Tool -Name 'check-jsonschema' -Type 'Command' -InstallCommand 'pip install check-jsonschema'
 
 # ---------------------------------------------------------------------------
 # 1. PowerShell syntax validation
@@ -557,41 +569,35 @@ $_jsonschemaErrors = 0
 if ($HAS_ARGS) {
   say "skipping schema validation (path-scoped mode)."
 } else {
-  # undoc-supp: tool availability check — skip step gracefully when check-jsonschema not installed
-  $_cjs = Get-Command 'check-jsonschema' -ErrorAction SilentlyContinue
-  if ($null -eq $_cjs) {
-    say "skipping schema validation (check-jsonschema not available)."
-  } else {
-    # Existing schemas
-    & $_cjs --schemafile "$RepoRoot/src/lockfiles/lockfile.schema.json" "$RepoRoot/src/lockfiles/lockfile.json" 2>&1 | Out-Null
+  # Existing schemas
+  check-jsonschema --schemafile "$RepoRoot/src/lockfiles/lockfile.schema.json" "$RepoRoot/src/lockfiles/lockfile.json" 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+  check-jsonschema --schemafile "$RepoRoot/src/modules/services.schema.json" "$RepoRoot/src/modules/services.json" 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+  check-jsonschema --schemafile "$RepoRoot/src/hosts/Windows/source-builds.schema.json" "$RepoRoot/src/hosts/Windows/source-builds.json" 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+  # User/VMs/models schemas
+  check-jsonschema --schemafile "$RepoRoot/src/modules/users.schema.json" "$RepoRoot/src/modules/users.json" 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+  check-jsonschema --schemafile "$RepoRoot/src/modules/VMs.schema.json" "$RepoRoot/src/modules/VMs.json" 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+  check-jsonschema --schemafile "$RepoRoot/src/modules/ai/models.schema.json" "$RepoRoot/src/modules/ai/models.json" 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+  # GitHub schema validation (complements existing prek hooks — CI enforcement)
+  $_ghWorkflows = Join-Path $RepoRoot '.github\workflows\*.yml'
+  check-jsonschema --builtin-schema vendor.github-workflows $_ghWorkflows 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+  $_dependabot = Join-Path $RepoRoot '.github\dependabot.yml'
+  if (Test-Path $_dependabot) {
+    check-jsonschema --builtin-schema vendor.dependabot $_dependabot 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-    & $_cjs --schemafile "$RepoRoot/src/modules/services.schema.json" "$RepoRoot/src/modules/services.json" 2>&1 | Out-Null
+  }
+  # DSC schema validation (structural only — resource-specific fields validated by winget)
+  # undoc-supp: DSC files may not exist (non-Windows host or partial checkout); skip gracefully
+  $_dscFiles = @(Get-ChildItem "$RepoRoot/src/hosts/Windows/system/*.dsc.yml", "$RepoRoot/src/hosts/Windows/user/*.dsc.yml" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+  if ($_dscFiles.Count -gt 0) {
+    check-jsonschema --schemafile https://aka.ms/configuration-dsc-schema/0.2 $_dscFiles 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-    & $_cjs --schemafile "$RepoRoot/src/hosts/Windows/source-builds.schema.json" "$RepoRoot/src/hosts/Windows/source-builds.json" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-    # User/VMs/models schemas
-    & $_cjs --schemafile "$RepoRoot/src/modules/users.schema.json" "$RepoRoot/src/modules/users.json" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-    & $_cjs --schemafile "$RepoRoot/src/modules/VMs.schema.json" "$RepoRoot/src/modules/VMs.json" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-    & $_cjs --schemafile "$RepoRoot/src/modules/ai/models.schema.json" "$RepoRoot/src/modules/ai/models.json" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-    # GitHub schema validation (complements existing prek hooks — CI enforcement)
-    $_ghWorkflows = Join-Path $RepoRoot '.github\workflows\*.yml'
-    & $_cjs --builtin-schema vendor.github-workflows $_ghWorkflows 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-    $_dependabot = Join-Path $RepoRoot '.github\dependabot.yml'
-    if (Test-Path $_dependabot) {
-      & $_cjs --builtin-schema vendor.dependabot $_dependabot 2>&1 | Out-Null
-      if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-    }
-    # DSC schema validation (structural only — resource-specific fields validated by winget)
-    # undoc-supp: DSC files may not exist (non-Windows host or partial checkout); skip gracefully
-    $_dscFiles = @(Get-ChildItem "$RepoRoot/src/hosts/Windows/system/*.dsc.yml", "$RepoRoot/src/hosts/Windows/user/*.dsc.yml" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
-    if ($_dscFiles.Count -gt 0) {
-      & $_cjs --schemafile https://aka.ms/configuration-dsc-schema/0.2 $_dscFiles 2>&1 | Out-Null
-      if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-    }
   }
 }
 if ($_jsonschemaErrors -gt 0) {
@@ -753,25 +759,19 @@ say "YAML validation passed."
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] YAML linting (yamllint) ===" -f (++$_step))
 $_yamlLintErrors = 0
-# undoc-supp: tool availability check — skip step gracefully when yamllint not installed
-$_ylCmd = Get-Command 'yamllint' -ErrorAction SilentlyContinue
-if ($null -eq $_ylCmd) {
-  say "skipping YAML linting (yamllint not available)."
+$_yamlFiles = @()
+if ($HAS_ARGS) {
+  $_yamlFiles = $positionalArgs | Where-Object { $_ -like '*.yml' -or $_ -like '*.yaml' }
 } else {
-  $_yamlFiles = @()
-  if ($HAS_ARGS) {
-    $_yamlFiles = $positionalArgs | Where-Object { $_ -like '*.yml' -or $_ -like '*.yaml' }
-  } else {
-    $_yamlFiles = Get-ChildItem -Recurse -Path $RepoRoot -Include '*.yml','*.yaml' |
-      Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } |
-      ForEach-Object { $_.FullName }
-  }
-  foreach ($_yf in $_yamlFiles) {
-    $_result = & $_ylCmd --strict $_yf 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-      warn "$($_yf): yamllint violations"
-      $_yamlLintErrors++
-    }
+  $_yamlFiles = Get-ChildItem -Recurse -Path $RepoRoot -Include '*.yml','*.yaml' |
+    Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } |
+    ForEach-Object { $_.FullName }
+}
+foreach ($_yf in $_yamlFiles) {
+  yamllint --strict $_yf 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    warn "$($_yf): yamllint violations"
+    $_yamlLintErrors++
   }
 }
 if ($_yamlLintErrors -gt 0) {

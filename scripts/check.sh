@@ -51,6 +51,14 @@
 # path filtering (check-pwsh.ps1, check-packer.sh, nixfmt) and skips
 # whole-repo checks (deadnix, script validation, lockfile/locked DSC).
 #
+# Dependencies policy:
+# Every external tool required by any check in this script MUST be declared in
+# the pre-flight block below. Missing tools cause an immediate hard failure —
+# checks MUST NEVER silently skip due to missing dependencies.
+# The pre-flight block is the single source of truth for all tool requirements.
+# To add a new tool-using check, first add it to pre-flight, then provision it
+# on all target hosts (core.nix for POSIX, Ensure-Tool for Windows).
+#
 # Arguments:
 #   --format      Format Nix files in-place (instead of just validating).
 #   (paths)       Files to check; passes paths through to sub-checkers and
@@ -60,13 +68,15 @@
 #   NUCLEUS_REPO_ROOT  Override the detected repository root path.
 #
 # Prerequisites:
-#   - jq, yq (for lockfile/registry/DSC validation)
+#   - check-jsonschema (for schema validation)
 #   - deadnix (for dead Nix code detection)
+#   - jq, yq (for lockfile/registry/DSC validation)
+#   - nix (for flake evaluation)
 #   - nixf (for Nix lint via nixf-tidy)
 #   - nixfmt (for Nix formatting)
-#   - nix (for flake evaluation)
-#   - pwsh (for PowerShell syntax validation)
 #   - packer (for Packer template validation)
+#   - pwsh (for PowerShell syntax validation)
+#   - yamllint (for YAML linting)
 #
 # Exit conditions:
 #   0 on success; non-zero on any check failure.
@@ -167,6 +177,8 @@ require_command deadnix
 require_command nixf-tidy
 require_command nix
 require_command packer
+require_command check-jsonschema
+require_command yamllint
 
 # PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 section "$((_step += 1))" "PowerShell syntax validation"
@@ -563,23 +575,19 @@ _jsonschema_errors=0
 if $HAS_ARGS; then
   say "skipping schema validation (path-scoped mode)."
 else
-  if command -v check-jsonschema >/dev/null 2>&1; then
-    # Existing schemas
-    check-jsonschema --schemafile src/lockfiles/lockfile.schema.json src/lockfiles/lockfile.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-    check-jsonschema --schemafile src/modules/services.schema.json src/modules/services.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-    check-jsonschema --schemafile src/hosts/Windows/source-builds.schema.json src/hosts/Windows/source-builds.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-    # User/VMs/models schemas
-    check-jsonschema --schemafile src/modules/users.schema.json src/modules/users.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-    check-jsonschema --schemafile src/modules/VMs.schema.json src/modules/VMs.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-    check-jsonschema --schemafile src/modules/ai/models.schema.json src/modules/ai/models.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-    # GitHub schema validation (complements existing prek hooks — CI enforcement)
-    check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-    check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-    # DSC schema validation (structural only — resource-specific fields validated by winget)
-    check-jsonschema --schemafile https://aka.ms/configuration-dsc-schema/0.2 src/hosts/Windows/system/*.dsc.yml src/hosts/Windows/user/*.dsc.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-  else
-    say "skipping schema validation (check-jsonschema not available)."
-  fi
+  # Existing schemas
+  check-jsonschema --schemafile src/lockfiles/lockfile.schema.json src/lockfiles/lockfile.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+  check-jsonschema --schemafile src/modules/services.schema.json src/modules/services.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+  check-jsonschema --schemafile src/hosts/Windows/source-builds.schema.json src/hosts/Windows/source-builds.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+  # User/VMs/models schemas
+  check-jsonschema --schemafile src/modules/users.schema.json src/modules/users.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+  check-jsonschema --schemafile src/modules/VMs.schema.json src/modules/VMs.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+  check-jsonschema --schemafile src/modules/ai/models.schema.json src/modules/ai/models.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+  # GitHub schema validation (complements existing prek hooks — CI enforcement)
+  check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+  check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+  # DSC schema validation (structural only — resource-specific fields validated by winget)
+  check-jsonschema --schemafile https://aka.ms/configuration-dsc-schema/0.2 src/hosts/Windows/system/*.dsc.yml src/hosts/Windows/user/*.dsc.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
 fi
 if [ "$_jsonschema_errors" -gt 0 ]; then
   warn "schema validation failed with $_jsonschema_errors error(s)"
@@ -757,28 +765,24 @@ $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 # YAML linting (yamllint)
 section "$((_step += 1))" "YAML linting (yamllint)"
 _yaml_lint_errors=0
-if command -v yamllint >/dev/null 2>&1; then
-  if $HAS_ARGS; then
-    for _yf in "$@"; do
-      case "$_yf" in
-        *.yml|*.yaml)
-          if ! yamllint --strict "$_yf" >/dev/null 2>&1; then
-            warn "$_yf: yamllint violations"
-            _yaml_lint_errors=$((_yaml_lint_errors + 1))
-          fi
-          ;;
-      esac
-    done
-  else
-    while IFS= read -r -d '' _yaml_file; do
-      if ! yamllint --strict "$_yaml_file" >/dev/null 2>&1; then
-        warn "$_yaml_file: yamllint violations"
-        _yaml_lint_errors=$((_yaml_lint_errors + 1))
-      fi
-    done < <(find . -path ./vendor -prune -o \( -name '*.yml' -o -name '*.yaml' \) -print0)
-  fi
+if $HAS_ARGS; then
+  for _yf in "$@"; do
+    case "$_yf" in
+      *.yml|*.yaml)
+        if ! yamllint --strict "$_yf" >/dev/null 2>&1; then
+          warn "$_yf: yamllint violations"
+          _yaml_lint_errors=$((_yaml_lint_errors + 1))
+        fi
+        ;;
+    esac
+  done
 else
-  say "skipping YAML linting (yamllint not available)."
+  while IFS= read -r -d '' _yaml_file; do
+    if ! yamllint --strict "$_yaml_file" >/dev/null 2>&1; then
+      warn "$_yaml_file: yamllint violations"
+      _yaml_lint_errors=$((_yaml_lint_errors + 1))
+    fi
+  done < <(find . -path ./vendor -prune -o \( -name '*.yml' -o -name '*.yaml' \) -print0)
 fi
 if [ "$_yaml_lint_errors" -gt 0 ]; then
   warn "YAML linting failed with $_yaml_lint_errors error(s)"

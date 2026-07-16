@@ -16,6 +16,7 @@ let
     pkgs.camillagui-backend
     pkgs.cargo-binstall
     pkgs.cargo-cache
+    pkgs.check-jsonschema
     pkgs.deadnix
     pkgs.direnv
     pkgs.eza
