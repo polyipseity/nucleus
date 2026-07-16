@@ -26,6 +26,11 @@ let
   # activation scripts can use _nucleus_protect_symlink, _nucleus_unprotect_symlink,
   # _nucleus_resolve_repo_root, and _nucleus_prepend_first_executable_dir.
   agentHelpersSh = builtins.readFile ../scripts/agent-helpers.sh;
+
+  envVars = import ./lib/env-vars.nix {
+    inherit config pkgs lib;
+    username = config.home.username;
+  };
 in
 {
   home.file = {
@@ -264,14 +269,12 @@ in
       _ibp_jq_bin='${pkgs.jq}/bin/jq'
       ${agentHelpersSh}
 
-      # Prepend ~/.bun/bin so binaries installed by previous apply runs and
-      # by this activation are discoverable in subsequent activation steps
-      # without spawning a new shell session.  bun install -g places binaries
-      # here by default (BUN_INSTALL_BIN defaults to ~/.bun).
-      if [ -d "$HOME/.bun/bin" ]; then
-        PATH="$HOME/.bun/bin:$PATH"
-        export PATH
-      fi
+      # Prepend user-scope package manager bin directories (env-vars.nix
+      # pathComponents.prepend) so binaries installed by previous apply runs
+      # and by this activation are discoverable in subsequent activation
+      # steps without spawning a new shell session.
+      PATH="${envVars.toShellPrependPath}:$PATH"
+      export PATH
 
       # Also prepend the nix profile bin directory, Home Manager profile bin
       # directory, and directly probe the nix store for common package bins.
@@ -670,12 +673,11 @@ in
 
       _scs_do_sync=true
 
-      # Prepend ~/.bun/bin so the ClawHub binary installed by installBunPackages
-      # is on PATH for this activation step.
-      if [ -d "$HOME/.bun/bin" ]; then
-        PATH="$HOME/.bun/bin:$PATH"
-        export PATH
-      fi
+      # Prepend user-scope package manager bin directories (env-vars.nix
+      # pathComponents.prepend) so the ClawHub binary installed by
+      # installBunPackages is on PATH for this activation step.
+      PATH="${envVars.toShellPrependPath}:$PATH"
+      export PATH
 
       # Resolve the repo root (same mechanism as agentsSymlink and agentsSkills).
       _scs_repo_root="$(_nucleus_resolve_repo_root "clawhub" "${repoRoot}")"
