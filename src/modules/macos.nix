@@ -454,6 +454,45 @@ let
     # GC script handles tool availability checks internally.
     exec "$_repo_root/scripts/gc.sh"
   '';
+
+  guiEnvAgent = pkgs.writeShellScript "gui-env-agent" ''
+    set -eu
+
+    # Persistent daemon loop: re-apply env vars every 300 s.
+    # Internal loop (not StartInterval) so the interval is visible in the
+    # script and survives launchd throttle limits.  KeepAlive=true provides
+    # crash recovery.
+    while true; do
+      # ── PATH: strip stale managed entries, then prepend+append ──
+      __nucleus_prepend="${envVars.toLaunchctlPrependPath}"
+      __nucleus_append="${envVars.toLaunchctlAppendPath}"
+      # Same dedup SET as the activation script, but using $HOME (runtime
+      # shell expansion by launchd) instead of build-time home directory.
+      __nucleus_managed_set="${mkManagedDedupSet "$HOME"}"
+
+      __nucleus_cleaned=""
+      old_IFS="$IFS"
+      IFS=:
+      for __component in $PATH; do
+        case ":''${__nucleus_managed_set}:" in
+          *":''${__component}:"*) ;;
+          *) __nucleus_cleaned="''${__nucleus_cleaned}:''${__component}" ;;
+        esac
+      done
+      IFS="$old_IFS"
+
+      if [ -n "$__nucleus_cleaned" ]; then
+        /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_cleaned}:''${__nucleus_append}"
+      else
+        /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_append}"
+      fi
+
+      # ── All other GUI env vars (user and non-user) ──
+      ${envVars.macOSAllVars}
+
+      sleep 300
+    done
+  '';
 in
 lib.mkIf pkgs.stdenv.isDarwin {
   home.packages = [
@@ -1422,9 +1461,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # GUI environment variable propagation LaunchAgent (macOS-only)
   # macOS maintains separate shell (user/<uid>/) and GUI (gui/<uid>/) launchd
   # domains.  Shell sessionVariables set via home.sessionVariables never cross
-  # into the GUI domain.  This agent runs once at login and calls launchctl
-  # setenv for every variable that GUI applications (Obsidian, VS Code, oterm,
-  # etc.) need.
+  # into the GUI domain.  This agent calls launchctl setenv for every variable
+  # that GUI applications (Obsidian, VS Code, oterm, etc.) need.
   #
   # PATH is handled first: reads the current GUI domain PATH (from the agent's
   # own $PATH which launchd provides), strips stale managed entries, then
@@ -1435,46 +1473,22 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # — see src/modules/lib/env-vars.nix (macOSAllVars).  All vars with a macOS
   # value (both user and non-user) are included — safe because macOS launchd
   # GUI domains are per-user.
+  #
+  # The script runs in a persistent daemon loop (300 s interval) so env vars
+  # are periodically refreshed, covering apps launched later and surviving
+  # transient launchd domain resets.  Crash recovery is handled by KeepAlive.
+  #
+  # See .agents/instructions/electron-gui-env.instructions.md for why
+  # Electron apps still ignore the PATH set here.
   # --------------------------------------------------------------------------
   launchd.agents."gui-env" = {
     enable = true;
     config = {
       Label = "local.gui-env";
-      ProgramArguments = [
-        "${pkgs.writeShellScript "gui-env-agent" ''
-          set -eu
-
-          # ── PATH: strip stale managed entries, then prepend+append ──
-          __nucleus_prepend="${envVars.toLaunchctlPrependPath}"
-          __nucleus_append="${envVars.toLaunchctlAppendPath}"
-          # Same dedup SET as the activation script, but using $HOME (runtime
-          # shell expansion by launchd) instead of build-time home directory.
-          __nucleus_managed_set="${mkManagedDedupSet "$HOME"}"
-
-          __nucleus_cleaned=""
-          old_IFS="$IFS"
-          IFS=:
-          for __component in $PATH; do
-            case ":''${__nucleus_managed_set}:" in
-              *":''${__component}:"*) ;;
-              *) __nucleus_cleaned="''${__nucleus_cleaned}:''${__component}" ;;
-            esac
-          done
-          IFS="$old_IFS"
-
-          if [ -n "$__nucleus_cleaned" ]; then
-            /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_cleaned}:''${__nucleus_append}"
-          else
-            /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_append}"
-          fi
-
-          # ── All other GUI env vars (user and non-user) ──
-          ${envVars.macOSAllVars}
-        ''}"
-      ];
-      # Run once at login so the GUI domain is populated before any app starts.
+      ProgramArguments = [ "${guiEnvAgent}" ];
+      # Start at login and stay alive; internal loop handles the 300 s interval.
       RunAtLoad = true;
-      KeepAlive = false;
+      KeepAlive = true;
     };
   };
 }
