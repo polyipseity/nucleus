@@ -64,9 +64,33 @@ The `service-watchdog` (every 5 min) does this automatically via
 
 ## Exit 126 vs exit 78
 
-- **Exit 78 (EX_CONFIG)**: Non-retryable. launchd sets `penalty box` and never
-  retries — requires manual or watchdog recovery via `bootout + bootstrap`.
-- **Exit 126**: Shell "cannot exec" error. launchd does NOT set `penalty box`.
-  Services with `StartInterval` timers will retry on the next interval.
-  Transient at boot (e.g. store path temporarily unavailable), resolves on
-  retry.
+### Exit 78 (EX_CONFIG) — non-retryable penalty box
+
+launchd sets `penalty box` and never retries — requires manual or watchdog
+recovery via `bootout + bootstrap`.
+
+### Exit 126 ("/bin/sh" wrapper artifact) — expected, not an error
+
+All 6 system daemons on the MacBook (`local.litellm`, `local.ollama`,
+`local.camilladsp`, `local.camilladsp-heartbeat`, `local.camillagui-backend`,
+`local.service-watchdog`) show `LastExitStatus=126` in `launchctl list`. This
+is the **expected steady state** of the `/bin/sh -c exec` wrapper — not a
+transient boot condition.
+
+`launchctl error 126` = "Request type is no longer supported". When `/bin/sh`
+tracks a resolved `exec`, it exits with 126, and launchd records the shell's
+exit state rather than the replaced binary's.
+
+This is **expected and harmless**:
+- The actual process (litellm, ollama, camilladsp, etc.) runs under PPID=1
+  (launchd), not as a child of `/bin/sh`
+- Logging, restart, and resource usage all work normally
+- `launchctl kickstart -k` clears the stale exit code to 0, but there is no
+  operational reason to do so
+
+Do not add launchd verification or kickstart logic (like
+`ensureLaunchDaemonsLoaded`) to "fix" this — it is not broken.
+
+launchd does NOT set `penalty box` for exit 126. Services with `StartInterval`
+timers retry on the next interval. For `KeepAlive` daemons (all nucleus
+services), launchd restarts immediately.

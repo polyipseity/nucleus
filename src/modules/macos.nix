@@ -1371,48 +1371,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
     done
   '';
 
-  # Verify nix-darwin-managed system launchd daemons (local.* labels only) are
-  # registered and running, and clear any stale LastExitStatus.  The transient
-  # exit 126 artifact occurs when launchd records the first-start exit code
-  # during the store-path binary transition in nucleus-apply cycles — KeepAlive
-  # retries successfully but the stale code persists.  Uses /run/current-system
-  # (not $newGenPath) because nix-darwin manages system daemons; HM manages
-  # only user-scope LaunchAgents.
-  home.activation.ensureLaunchDaemonsLoaded = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
-    _system_domain="system"
-    _daemon_dir="/run/current-system/Library/LaunchDaemons"
-
-    if [ ! -d "$_daemon_dir" ]; then
-      verboseEcho "No LaunchDaemons directory in /run/current-system — nothing to verify"
-      exit 0
-    fi
-
-    for _plist in "$_daemon_dir"/local.*.plist; do
-      [ -f "$_plist" ] || continue
-      _label="''${_plist##*/}"
-      _label="''${_label%.plist}"
-
-      if /bin/launchctl print "$_system_domain/$_label" >/dev/null 2>&1; then
-        # Registered — kickstart to clear stale LastExitStatus from transient
-        # first-start failures (exit 126 during store-path transition).
-        /bin/launchctl kickstart -k "$_system_domain/$_label" 2>/dev/null || true  # undoc-supp: kickstart may fail if daemon already stopped
-        verboseEcho "Daemon '$_label' verified and kickstarted"
-      else
-        warnEcho "Daemon '$_system_domain/$_label' is NOT registered — bootstrapping..."
-
-        /bin/launchctl bootout "$_system_domain/$_label" 2>/dev/null || true  # undoc-supp: daemon may not be registered, bootout expected to fail
-        sleep 1
-
-        if /bin/launchctl bootstrap "$_system_domain" "$_plist"; then
-          /bin/launchctl kickstart -k "$_system_domain/$_label"
-          verboseEcho "Daemon '$_label' successfully bootstrapped and kickstarted"
-        else
-          warnEcho "Daemon '$_label' bootstrap failed"
-        fi
-      fi
-    done
-  '';
-
   # --------------------------------------------------------------------------
   # guiEnvActivationPathAndRepoRoot
   # Sets PATH with runtime dedup and NUCLEUS_REPO_ROOT from the activation
