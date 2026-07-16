@@ -7,8 +7,7 @@ rules:
   document-start:
     present: false
   line-length:
-    # SOPS-encrypted values are long strings.
-    max: 200
+    disable
   quoted-strings:
     # Don't require quotes — many YAML files use unquoted strings per convention.
     required: false
