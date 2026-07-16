@@ -80,6 +80,31 @@ let
   # combine with the runtime system PATH.
   toLaunchctlAppendPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.append);
 
+  # ── Helper: render generic shell PATH prepend string ───────────────
+  # Same format as toLaunchctlPrependPath but with a generic name for use
+  # in shell scripts that are not macOS-launchctl-specific.
+  toShellPrependPath = builtins.concatStringsSep ":" (
+    map (p: "$HOME/${p}") pathComponents.prepend
+  );
+
+  # ── Helper: render PowerShell PATH-prepend snippet ─────────────────
+  # Returns a complete PowerShell block that prepends all managed dirs to
+  # $env:PATH with existence guards (Test-Path) and dedup guards (notlike).
+  # Used by pwsh.nix to generate the HM-managed PowerShell profile.
+  toPowerShellPrependSnippet = ''
+    $__nucleusBinPaths = @(
+      (Join-Path $HOME ".bun\bin"),
+      (Join-Path $HOME ".cargo\bin"),
+      (Join-Path $HOME ".local\bin")
+    )
+    foreach ($__nucleusBinPath in $__nucleusBinPaths) {
+      if ((Test-Path $__nucleusBinPath) -and ($env:PATH -notlike "*$__nucleusBinPath*")) {
+        $env:PATH = "$__nucleusBinPath;$env:PATH"
+      }
+    }
+    Remove-Variable __nucleusBinPaths, __nucleusBinPath -ErrorAction SilentlyContinue
+  '';
+
   # ── Catalog ─────────────────────────────────────────────────────────
   # Each entry:
   #   values:  attrset { default?, macOS?, NixOS?, Windows? }
@@ -427,6 +452,8 @@ in
     currentOs
     toLaunchctlPrependPath
     toLaunchctlAppendPath
+    toShellPrependPath
+    toPowerShellPrependSnippet
     pathComponents
     ;
 }
