@@ -653,6 +653,37 @@ in
     '';
   };
 
+  # Global Cargo configuration: per-platform linker selection.
+  # Cargo evaluates cfg(target_os = "...") against the host build target at
+  # config-load time — non-matching sections are silently ignored.
+  #
+  #   Linux   → mold via clang -fuse-ld=mold (fastest ELF linker)
+  #   macOS   → native Apple ld64 via cc     (system default, explicit for clarity)
+  #   Windows → rust-lld bundled with Rust    (zero-install, lld-link)
+  home.file.".cargo/config.toml" = {
+    text = ''
+      # ── Linux: mold via Clang ──────────────────────────────────────────────
+      # mold is the fastest linker available. clang is used as the driver because
+      # it correctly passes -fuse-ld=mold to the linker invocation.
+      [target.'cfg(target_os = "linux")']
+      linker = "clang"
+      rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+      # ── macOS: native Apple ld64 via system C compiler ────────────────────
+      # Apple's ld64 is well-optimised for mach-o binaries.  cc resolves to the
+      # Nix-managed clang, which invokes /usr/bin/ld (Apple ld64) for the final
+      # link step.
+      [target.'cfg(target_os = "macos")']
+      linker = "cc"
+
+      # ── Windows: LLVM linker bundled with Rust toolchain ──────────────────
+      # lld-link is a drop-in replacement for MSVC link.exe and requires no
+      # additional installation.
+      [target.'cfg(target_os = "windows")']
+      linker = "rust-lld"
+    '';
+  };
+
   # ---------------------------------------------------------------------------
   # nix-direnv _nix override: filter apple-sdk vars from print-dev-env output
   # ---------------------------------------------------------------------------
