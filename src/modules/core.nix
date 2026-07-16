@@ -33,10 +33,10 @@ let
     pkgs.jellyfin
     pkgs.jq
     pkgs.litellm
-    pkgs.mold
     pkgs.llvmPackages.clang
     pkgs.llvmPackages.lldb
     pkgs.llvmPackages.lld
+    pkgs.mold
     pkgs.ncdu
     pkgs.nickel
     pkgs.nixd
