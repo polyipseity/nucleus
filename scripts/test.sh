@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Runs Nix test suite, ShellCheck, and PSScriptAnalyzer.
+#
+# File discovery policy:
+# Test file discovery is dynamic — the script finds all *.nix files under
+# tests/ automatically. Adding a new test directory does NOT require
+# editing this script.
 set -euo pipefail
 
 # Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.

@@ -53,6 +53,10 @@
 # To add a new tool-using check, first add it to pre-flight, then provision it
 # on all target hosts.
 #
+# File discovery policy:
+# All file lists in this script MUST be auto-discovered (Get-ChildItem, glob
+# patterns). Hard-coded file paths in validation steps are not allowed.
+#
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
 # Steps 3-6, 8-11 are stubs (require Nix or bash — not available on Windows).
 # Step 20 only runs with the --verify flag.

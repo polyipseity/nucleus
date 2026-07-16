@@ -33,6 +33,11 @@
 - The pre-flight block is the single source of truth for all tool requirements.
 - To add a new check that requires a new tool: add it to pre-flight first, then provision it on all target hosts (`src/modules/core.nix` for POSIX, `Ensure-Tool` / bootstrap for Windows).
 
+### Dynamic file discovery in check/test scripts
+- Check scripts (`scripts/check.sh`, `scripts/check.ps1`) and test scripts (`scripts/test.sh`) MUST auto-discover the files they validate rather than hard-coding file lists.
+- Adding a new schema-validation pair, test directory, or file type must NOT require editing the check/test script — it must be automatically picked up via discovery patterns (inline `$schema`, `find` on `tests/`, etc.).
+- Exceptions are allowed only for files that lack an inline `$schema` and use built-in schemas (e.g., GitHub workflow files with `--builtin-schema vendor.github-workflows`).
+
 ## Build and Validation
 
 - Discover commands from the repository itself; never assume a default stack.

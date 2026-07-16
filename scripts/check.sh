@@ -59,6 +59,11 @@
 # To add a new tool-using check, first add it to pre-flight, then provision it
 # on all target hosts (core.nix for POSIX, Ensure-Tool for Windows).
 #
+# File discovery policy:
+# All file lists in this script MUST be auto-discovered (find, glob patterns
+# that pick up new files automatically). Hard-coded file paths in validation
+# steps are not allowed. When adding new checks, implement dynamic discovery.
+#
 # Arguments:
 #   --format      Format Nix files in-place (instead of just validating).
 #   (paths)       Files to check; passes paths through to sub-checkers and
