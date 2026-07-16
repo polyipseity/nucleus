@@ -386,7 +386,7 @@ let
         let
           val = resolveValue name os;
         in
-        if val != null then "/bin/launchctl setenv ${name} ${val}" else ""
+        if val != null then "/bin/launchctl setenv ${name} ${lib.strings.escapeShellArg val}" else ""
       ) relevant
     );
 
