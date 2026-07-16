@@ -662,6 +662,8 @@
             pkgs.nixfmt
             pkgs.packer
             pkgs.powershell
+            pkgs.check-jsonschema
+            pkgs.yamllint
             pkgs.yq-go
           ];
         };

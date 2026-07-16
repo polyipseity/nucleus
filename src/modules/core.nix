@@ -59,6 +59,7 @@ let
     pkgs.ty
     pkgs.typst
     pkgs.uv
+    pkgs.yamllint
     pkgs.yq-go
     pkgs.zoxide
   ];
