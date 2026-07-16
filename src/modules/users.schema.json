@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "User definitions for nucleus. Keys are usernames; each value is a user configuration object.",
+  "patternProperties": {
+    "^[a-z][a-zA-Z0-9_-]*$": {
+      "additionalProperties": false,
+      "description": "Configuration for a single user.",
+      "properties": {
+        "cloudDrives": {
+          "additionalProperties": false,
+          "description": "Cloud drive mounts and replicas.",
+          "properties": {
+            "mounts": {
+              "description": "Cloud drive mount points to create.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "description": "Mount name (used for mount point path).",
+                    "type": "string"
+                  },
+                  "serviceName": {
+                    "description": "Cloud service identifier (e.g. iCloud Drive).",
+                    "type": "string"
+                  }
+                },
+                "required": ["name", "serviceName"],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "replicas": {
+              "description": "Cloud drive replica paths.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "description": "Display name for the replica.",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Absolute path to the replica source.",
+                    "type": "string"
+                  }
+                },
+                "required": ["name", "path"],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "customProvisionSymlinks": {
+          "description": "Custom provision symlinks to create.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "dest": {
+                "description": "Symlink destination path.",
+                "type": "string"
+              },
+              "src": {
+                "description": "Symlink source path.",
+                "type": "string"
+              }
+            },
+            "required": ["dest", "src"],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "devRepos": {
+          "additionalProperties": false,
+          "description": "Development repository configuration.",
+          "properties": {
+            "enable": {
+              "description": "Whether to enable dev repo provisioning.",
+              "type": "boolean"
+            },
+            "gitHubUsername": {
+              "description": "GitHub username for cloning repos.",
+              "type": "string"
+            },
+            "repositories": {
+              "description": "List of repositories to clone.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "description": "Repository name (org/repo format).",
+                    "type": "string"
+                  }
+                },
+                "required": ["name"],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "submoduleDirectories": {
+              "description": "Directories to scan for git submodules.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "path": {
+                    "description": "Path containing submodules.",
+                    "type": "string"
+                  }
+                },
+                "required": ["path"],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": ["enable", "gitHubUsername", "repositories"],
+          "type": "object"
+        },
+        "envVars": {
+          "additionalProperties": {
+            "description": "Environment variable value (string).",
+            "type": "string"
+          },
+          "description": "Per-user environment variable overrides.",
+          "type": "object"
+        },
+        "homeDirectory": {
+          "description": "Absolute path to the user's home directory.",
+          "type": "string"
+        },
+        "iCloudExclusions": {
+          "additionalProperties": false,
+          "description": "iCloud exclusion configuration.",
+          "properties": {
+            "excludedDirNames": {
+              "description": "Directory names to exclude from iCloud sync.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "managedRoots": {
+              "description": "Root directories for iCloud exclusion management.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "isPrimary": {
+          "description": "Whether this is the primary user account.",
+          "type": "boolean"
+        },
+        "jellyfin": {
+          "additionalProperties": false,
+          "description": "Jellyfin media server configuration.",
+          "properties": {
+            "accounts": {
+              "description": "Jellyfin user accounts.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "description": "Jellyfin username.",
+                    "type": "string"
+                  }
+                },
+                "required": ["name"],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "libraries": {
+              "description": "Jellyfin media libraries.",
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "description": "Library display name.",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Path to media content.",
+                    "type": "string"
+                  },
+                  "type": {
+                    "description": "Media type (e.g. movies, tvshows).",
+                    "type": "string"
+                  }
+                },
+                "required": ["name", "path", "type"],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "linearmouse": {
+          "additionalProperties": false,
+          "description": "LinearMouse configuration.",
+          "properties": {
+            "settings": {
+              "description": "LinearMouse settings object.",
+              "type": "object"
+            }
+          },
+          "required": ["settings"],
+          "type": "object"
+        },
+        "neovim": {
+          "additionalProperties": false,
+          "description": "Neovim configuration.",
+          "properties": {
+            "settings": {
+              "description": "Neovim settings object.",
+              "type": "object"
+            }
+          },
+          "required": ["settings"],
+          "type": "object"
+        },
+        "obsidian": {
+          "additionalProperties": false,
+          "description": "Obsidian configuration.",
+          "properties": {
+            "settings": {
+              "description": "Obsidian settings object.",
+              "type": "object"
+            }
+          },
+          "required": ["settings"],
+          "type": "object"
+        },
+        "passwordStore": {
+          "additionalProperties": false,
+          "description": "Password store configuration.",
+          "properties": {
+            "path": {
+              "description": "Path to the password store directory.",
+              "type": "string"
+            }
+          },
+          "required": ["path"],
+          "type": "object"
+        },
+        "picard": {
+          "additionalProperties": false,
+          "description": "MusicBrainz Picard configuration.",
+          "properties": {
+            "settings": {
+              "description": "Picard settings object.",
+              "type": "object"
+            }
+          },
+          "required": ["settings"],
+          "type": "object"
+        },
+        "qtpass": {
+          "additionalProperties": false,
+          "description": "QtPass configuration.",
+          "properties": {
+            "settings": {
+              "description": "QtPass settings object.",
+              "type": "object"
+            }
+          },
+          "required": ["settings"],
+          "type": "object"
+        },
+        "services": {
+          "additionalProperties": {
+            "additionalProperties": false,
+            "description": "Per-service user configuration.",
+            "properties": {
+              "enable": {
+                "description": "Whether the service is enabled for this user.",
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "description": "Per-user service enablements.",
+          "type": "object"
+        },
+        "vmGuest": {
+          "additionalProperties": false,
+          "description": "VM guest credentials.",
+          "properties": {
+            "passwordSecretKey": {
+              "description": "SOPS key name for the VM guest password.",
+              "type": "string"
+            },
+            "usernameSecretKey": {
+              "description": "SOPS key name for the VM guest username.",
+              "type": "string"
+            }
+          },
+          "required": ["passwordSecretKey", "usernameSecretKey"],
+          "type": "object"
+        },
+        "vsCode": {
+          "additionalProperties": false,
+          "description": "VS Code configuration.",
+          "properties": {
+            "settings": {
+              "description": "VS Code settings object.",
+              "type": "object"
+            }
+          },
+          "required": ["settings"],
+          "type": "object"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "type": "object"
+}

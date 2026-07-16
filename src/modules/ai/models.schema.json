@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Ollama model assignments per host.",
+  "properties": {
+    "models": {
+      "additionalProperties": {
+        "description": "List of Ollama model references (name:tag format).",
+        "items": {
+          "pattern": "^[a-zA-Z0-9_.-]+:[a-zA-Z0-9_.-]+$",
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "description": "Map of host name to array of Ollama model references.",
+      "propertyNames": {
+        "enum": [
+          "MacBook",
+          "NixOS",
+          "Windows"
+        ]
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "models"
+  ],
+  "type": "object"
+}
+  },
+  "required": [
+    "models"
+  ],
+  "type": "object"
+}

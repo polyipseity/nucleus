@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Virtual machine definitions for nucleus.",
+  "properties": {
+    "VMs": {
+      "description": "List of virtual machines.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "cpus": {
+            "description": "Number of CPU cores.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "diskBytes": {
+            "description": "Disk size in bytes.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "display": {
+            "description": "Human-readable display name.",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Whether the VM is enabled.",
+            "type": "boolean"
+          },
+          "hosts": {
+            "description": "Hosts where this VM should be provisioned (null = all hosts).",
+            "oneOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "macOSVersion": {
+            "description": "macOS version (e.g. tahoe). Only for type: macOS.",
+            "type": "string"
+          },
+          "name": {
+            "description": "Unique VM identifier.",
+            "type": "string"
+          },
+          "ramBytes": {
+            "description": "RAM size in bytes.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "shareDevDir": {
+            "description": "Whether to share the ~/dev directory.",
+            "type": "boolean"
+          },
+          "type": {
+            "description": "Guest operating system type.",
+            "enum": ["macOS", "NixOS", "Windows"],
+            "type": "string"
+          },
+          "windowsEdition": {
+            "description": "Windows edition. Only for type: Windows.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cpus",
+          "diskBytes",
+          "display",
+          "enabled",
+          "name",
+          "ramBytes",
+          "shareDevDir",
+          "type"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": ["VMs"],
+  "type": "object"
+}
