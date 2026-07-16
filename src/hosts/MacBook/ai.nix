@@ -63,18 +63,43 @@ in
         "/bin/sh"
         "-c"
         "exec ${pkgs.writeShellScript "litellm-daemon" ''
+          # Boot-time race condition: sops-install-secrets may not have
+          # decrypted API keys to /run/secrets/ yet.  Poll for each secret
+          # file with a 5-minute timeout (60 attempts, 5s apart).  This is
+          # preferred over launchd WatchPaths which has no timeout and can
+          # wedge boot indefinitely if the path is never created.
+          _wait_for_keyfile() {
+            _path="$1"
+            _timeout=60
+            while [ ! -f "$_path" ] && [ "$_timeout" -gt 0 ]; do
+              echo "litellm-daemon: waiting for $_path ..." >&2
+              sleep 5
+              _timeout=$((_timeout - 1))
+            done
+            if [ -f "$_path" ]; then
+              cat "$_path"
+              return 0
+            else
+              echo "litellm-daemon: WARNING $_path not found after 5m, continuing without it" >&2
+              return 1
+            fi
+          }
+
           _keyfile_oru="${config.sops.secrets."ai_openrouter_api_key".path}"
-          if [ -f "$_keyfile_oru" ]; then
-            export OPENROUTER_API_KEY="$(cat "$_keyfile_oru")"
+          if _value="$(_wait_for_keyfile "$_keyfile_oru")"; then
+            export OPENROUTER_API_KEY="$_value"
           fi
+
           _keyfile_oc_go="${config.sops.secrets."ai_opencode_go_api_key".path}"
-          if [ -f "$_keyfile_oc_go" ]; then
-            export OPENCODE_GO_API_KEY="$(cat "$_keyfile_oc_go")"
+          if _value="$(_wait_for_keyfile "$_keyfile_oc_go")"; then
+            export OPENCODE_GO_API_KEY="$_value"
           fi
+
           _keyfile_oc_zen="${config.sops.secrets."ai_opencode_zen_api_key".path}"
-          if [ -f "$_keyfile_oc_zen" ]; then
-            export OPENCODE_ZEN_API_KEY="$(cat "$_keyfile_oc_zen")"
+          if _value="$(_wait_for_keyfile "$_keyfile_oc_zen")"; then
+            export OPENCODE_ZEN_API_KEY="$_value"
           fi
+
           exec ${pkgs.litellm}/bin/litellm \
             --config ${litellmConfig} \
             --port 4000 \
