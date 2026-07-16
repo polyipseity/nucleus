@@ -131,7 +131,7 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
-      # Source: src/modules/lib/env-vars.nix (OLLAMA_* entries).
+      # Source: src/modules/lib/env-catalog.nix (OLLAMA_* entries).
       # The catalog is the single source of truth for these values.  OLLAMA_HOST
       # is excluded so the daemon binds to the default port (11434).  OLLAMA_HOST
       # is set by the gui-env LaunchAgent for CLI clients.

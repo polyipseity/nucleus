@@ -6,7 +6,7 @@
 let
   lib = import <nixpkgs/lib>;
 
-  envNix = builtins.readFile ../../../src/modules/lib/env-vars.nix;
+  envNix = builtins.readFile ../../../src/modules/lib/env-catalog.nix;
   shellNix = builtins.readFile ../../../src/modules/shell.nix;
   activationNix = builtins.readFile ../../../src/hosts/MacBook/activation.nix;
   ntfs3gText = builtins.readFile ../../../src/hosts/MacBook/ntfs-3g.nix;

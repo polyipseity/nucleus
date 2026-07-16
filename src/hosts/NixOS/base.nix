@@ -47,7 +47,7 @@ in
 
   # All-process environment variables sourced from the centralized env var
   # catalog.  NixOS `environment.variables` propagates to all processes via
-  # PAM and systemd.  See src/modules/lib/env-vars.nix for the canonical list.
+  # PAM and systemd.  See src/modules/lib/env-catalog.nix for the canonical list.
   # Merge managed PATH directories (user-scope package manager bin dirs) into
   # the catalog-derived set since PATH's concatenation semantics don't fit the
   # catalog's single-value model.

@@ -57,7 +57,7 @@ function Invoke-UvSetup {
   }
 
   # uv tool install places binaries in ~\.local\bin by default (UV_TOOL_BIN_DIR).
-  # Canonical source: ManagedPaths.ps1 -> env-vars.nix (pathComponents).
+  # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).
   $uvBinDir = Get-NucleusManagedBinDir "local"
 
   # Per-tool Python version requirements.  Empty/null = use default.

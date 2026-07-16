@@ -13,7 +13,7 @@ function Sync-UserPath {
     Elevation is required (admin privileges to write to HKLM). The caller
     (apply.ps1) self-elevates before this function runs.
 
-    Canonical PATH component source: src/modules/lib/env-vars.nix (pathComponents).
+    Canonical PATH component source: src/modules/lib/managed-paths.nix (pathComponents).
 
   .PARAMETER Enabled
     Whether managed PATH convergence should be enforced. Mandatory: caller must
@@ -50,7 +50,7 @@ function Sync-UserPath {
     [bool]$Enabled
   )
 
-  # Canonical source: ManagedPaths.ps1 → src/modules/lib/env-vars.nix (pathComponents).
+  # Canonical source: ManagedPaths.ps1 → src/modules/lib/managed-paths.nix (pathComponents).
   $nucleusPrependDirs = $nucleusPrependRegistry
   $nucleusAppendDirs = $nucleusPathComponents.Append
   $nucleusDirs = $nucleusPrependDirs + $nucleusAppendDirs # dedup SET (membership check), NOT a PATH ordering

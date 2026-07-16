@@ -38,7 +38,7 @@ let
         $env:NUCLEUS_DEFAULT_DEV_ENV = "1"
 
         # Expose user-scope package manager bins so globally installed tools are
-        # accessible in interactive sessions.  Canonical source: env-vars.nix.
+        # accessible in interactive sessions.  Canonical source: env-catalog.nix.
         ${managedPaths.toPowerShellPrependSnippet}
 
         # PSReadLine: predictive history completion and menu-style tab expansion.
@@ -68,7 +68,7 @@ let
 
         # LLVM/Clang toolchain defaults sourced from the centralized env var
         # catalog.  All-process on all hosts.
-        # Source: src/modules/lib/env-vars.nix (CC, CXX, LD entries).
+        # Source: src/modules/lib/env-catalog.nix (CC, CXX, LD entries).
         $env:CC = "${envVars.resolveValue "CC" envVars.currentOs}"
         $env:CXX = "${envVars.resolveValue "CXX" envVars.currentOs}"
         $env:LD = "${envVars.resolveValue "LD" envVars.currentOs}"

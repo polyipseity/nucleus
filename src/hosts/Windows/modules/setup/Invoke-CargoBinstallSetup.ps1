@@ -70,7 +70,7 @@ function Invoke-CargoBinstallSetup {
   )
 
   # cargo-binstall and `cargo uninstall` both operate on this directory.
-  # Canonical source: ManagedPaths.ps1 -> env-vars.nix (pathComponents).
+  # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).
   $cargoBinDir = Get-NucleusManagedBinDir "cargo"
 
   # Prepend ~/.cargo/bin so `cargo uninstall` (removal path) finds the cargo

@@ -268,7 +268,7 @@ in
       _ibp_jq_bin='${pkgs.jq}/bin/jq'
       ${agentHelpersSh}
 
-      # Prepend user-scope package manager bin directories (env-vars.nix
+      # Prepend user-scope package manager bin directories (managed-paths.nix
       # pathComponents.prepend) so binaries installed by previous apply runs
       # and by this activation are discoverable in subsequent activation
       # steps without spawning a new shell session.
@@ -661,7 +661,7 @@ in
 
       _scs_do_sync=true
 
-      # Prepend user-scope package manager bin directories (env-vars.nix
+      # Prepend user-scope package manager bin directories (managed-paths.nix
       # pathComponents.prepend) so the ClawHub binary installed by
       # installBunPackages is on PATH for this activation step.
       PATH="${managedPaths.toShellPrependPath}:$PATH"

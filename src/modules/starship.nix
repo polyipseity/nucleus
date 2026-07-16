@@ -14,6 +14,6 @@
     config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/starship.toml";
 
   # STARSHIP_CACHE and STARSHIP_CONFIG are defined in the centralized env var
-  # catalog (src/modules/lib/env-vars.nix) and injected via shell.nix's
+  # catalog (src/modules/lib/env-catalog.nix) and injected via shell.nix's
   # home.sessionVariables.  No separate declaration needed.
 }

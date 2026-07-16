@@ -2,7 +2,7 @@
 .SYNOPSIS
     Pester parity tests verifying Windows env vars match the Nix catalog.
 .DESCRIPTION
-    Evaluates the Nix centralized env var catalog (src/modules/lib/env-vars.nix)
+    Evaluates the Nix centralized env var catalog (src/modules/lib/env-catalog.nix)
     and compares every Windows-relevant variable against the Windows DSC
     registry (user/env.dsc.yml) and Sync-ShellProfile.ps1.
 
@@ -25,7 +25,7 @@ BeforeAll {
   $UserDscFile = Join-Path $RepoRoot "src\hosts\Windows\user\env.dsc.yml"
   $SystemDscFile = Join-Path $RepoRoot "src\hosts\Windows\system\env.dsc.yml"
   $ManifestFile = Join-Path $RepoRoot "result\env-parity-manifest.json"
-  $CatalogNixFile = Join-Path $RepoRoot "src\modules\lib\env-vars.nix"
+  $CatalogNixFile = Join-Path $RepoRoot "src\modules\lib\env-catalog.nix"
 
   # ---- Helpers ----
 

@@ -132,7 +132,7 @@ for (const dbPath of dbPaths) {
 
         # Prepend ~/.bun/bin to PATH so bun is resolvable in this session even
         # if the user PATH has not been refreshed after WinGet installed Bun.
-        # Canonical source: ManagedPaths.ps1 -> env-vars.nix (pathComponents).
+        # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).
         $bunBin = Get-NucleusManagedBinDir "bun"
         if (Test-Path -Path (Join-Path -Path $bunBin -ChildPath "bun.exe")) {
             $env:PATH = "$bunBin;$env:PATH"

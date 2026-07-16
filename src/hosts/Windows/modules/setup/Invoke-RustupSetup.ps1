@@ -57,7 +57,7 @@ function Invoke-RustupSetup {
   # Prepend ~/.cargo/bin so cargo binaries (including cargo uninstall, used
   # by Invoke-CargoBinstallSetup) are accessible after rustup sets up a
   # toolchain in this session.
-  # Canonical source: ManagedPaths.ps1 -> env-vars.nix (pathComponents).
+  # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).
   $cargoBinDir = Get-NucleusManagedBinDir "cargo"
   if ($env:PATH -notlike "*$cargoBinDir*") {
     $env:PATH = "$cargoBinDir;$env:PATH"

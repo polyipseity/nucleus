@@ -568,7 +568,7 @@ $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 # may need to locate repo-relative files.  $env:NUCLEUS_REPO_ROOT is forwarded
 # through to DSC and subsequent activation steps.
 # Cross-reference: env-variable-scope.instructions.md
-# Nix-side source of truth: src/modules/lib/env-vars.nix
+# Nix-side source of truth: src/modules/lib/env-catalog.nix
 $env:NUCLEUS_REPO_ROOT = $repoRoot
 
 # Process-level NUCLEUS_HOST for this run (subprocesses see it immediately).

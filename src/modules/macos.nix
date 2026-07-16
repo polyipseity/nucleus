@@ -1472,7 +1472,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # when activation hasn't run yet.
   #
   # The var list for non-PATH vars is generated from the centralized catalog
-  # — see src/modules/lib/env-vars.nix (macOSAllVars).  All vars with a macOS
+  # — see src/modules/lib/env-catalog.nix (macOSAllVars).  All vars with a macOS
   # value (both user and non-user) are included — safe because macOS launchd
   # GUI domains are per-user.
   #

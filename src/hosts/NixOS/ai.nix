@@ -81,7 +81,7 @@
     # https://github.com/ollama/ollama/blob/main/docs/faq.md
     # https://github.com/ollama/ollama/blob/main/envconfig/config.go
     # Ollama runtime env vars sourced from the centralized catalog.
-    # See src/modules/lib/env-vars.nix (OLLAMA_FLASH_ATTENTION,
+    # See src/modules/lib/env-catalog.nix (OLLAMA_FLASH_ATTENTION,
     # OLLAMA_CONTEXT_LENGTH, OLLAMA_KV_CACHE_TYPE entries).
     environmentVariables =
       let

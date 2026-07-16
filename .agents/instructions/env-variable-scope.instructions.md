@@ -8,19 +8,19 @@ Every environment variable set by this repo must default to all-process availabi
 
 ## Centralized registry
 
-All Nix-side env vars are declared in `src/modules/lib/env-vars.nix`. The catalog entries specify value, allowed hosts, and rationale. Helper functions (`allVars`, `systemVars`, `macOSAllVars`) consume the catalog into platform-specific formats.
+All Nix-side env vars are declared in `src/modules/lib/env-catalog.nix`. The catalog entries specify value, allowed hosts, and rationale. Helper functions (`allVars`, `systemVars`, `macOSAllVars`) consume the catalog into platform-specific formats.
 
 ### Registry locations
 
 | OS      | Location                                                        | Format        |
 | ------- | --------------------------------------------------------------- | ------------- |
-| macOS   | `src/modules/lib/env-vars.nix` (catalog)                        | Nix attrs     |
-| NixOS   | `src/modules/lib/env-vars.nix` (catalog)                        | Nix attrs     |
+| macOS   | `src/modules/lib/env-catalog.nix` (catalog)                        | Nix attrs     |
+| NixOS   | `src/modules/lib/env-catalog.nix` (catalog)                        | Nix attrs     |
 | Windows | `src/hosts/Windows/user/env.dsc.yml` (user-specific vars)       | WinGet DSC v3 |
 | Windows | `src/hosts/Windows/system/env.dsc.yml` (non-user-specific vars) | WinGet DSC v3 |
 | Windows | `src/hosts/Windows/modules/user/Sync-UserPath.ps1` (PATH)       | PowerShell    |
 
-**Nix-side registry** (`src/modules/lib/env-vars.nix`):
+**Nix-side registry** (`src/modules/lib/env-catalog.nix`):
 
 - Declares every var in a single `catalog` attrset with `values` (per-OS attrset: `default`, `macOS`, `NixOS`, `Windows`), `why`, and optional `userSpecific`.
 - Pure helper functions (`allVars`, `systemVars`, `macOSAllVars`, `toLaunchctlPrependPath`, `toLaunchctlAppendPath`, `toJsonManifest`) transform the catalog into platform-specific formats.
@@ -43,7 +43,7 @@ All Nix-side env vars are declared in `src/modules/lib/env-vars.nix`. The catalo
 
 ### Adding a new variable
 
-1. **Nix-side catalog**: add an entry in `src/modules/lib/env-vars.nix` `catalog` attrset.
+1. **Nix-side catalog**: add an entry in `src/modules/lib/env-catalog.nix` `catalog` attrset.
    - Set `values = { default = ...; macOS = ...; NixOS = ...; Windows = ...; }`, `why`.
    - Use `values.default` for the primary value, per-OS keys for OS-specific overrides.
    - If the value depends on the logged-in user, set `userSpecific = true`.

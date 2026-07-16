@@ -1,7 +1,7 @@
 ---
 description: "Use when debugging Electron/Chromium apps on macOS that don't inherit the expected PATH despite correct launchctl setenv, or when modifying env var propagation for Electron apps."
 name: "Electron/Chromium macOS PATH Sanitization"
-applyTo: "src/modules/macos.nix, src/modules/lib/env-vars.nix, src/hosts/MacBook/**"
+applyTo: "src/modules/macos.nix, src/modules/lib/env-catalog.nix, src/hosts/MacBook/**"
 ---
 
 Chromium-based apps on macOS internally sanitize `PATH` at process startup, overriding the value set in the launchd GUI domain via `launchctl setenv`. This affects every Electron app (Obsidian, VS Code, Discord, Slack, etc.) and can cause confusing debugging sessions where `launchctl getenv PATH` shows the correct value but the app's process has a different one.

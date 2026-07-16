@@ -57,7 +57,7 @@ function Sync-ShellProfile {
   # existed at profile load time.  No existence guard: non-existent dirs
   # in PATH are harmless and the unconditional add ensures a new terminal
   # opened after apply sees the correct PATH immediately.
-  # Sources: ManagedPaths.ps1 -> env-vars.nix (pathComponents.prepend).
+  # Sources: ManagedPaths.ps1 -> managed-paths.nix (pathComponents.prepend).
   # Compute from the canonical path list so additions only need updating in
   # one place.  Each entry (e.g. '.bun\bin') produces a variable definition,
   # a guard, and a PATH assignment.
@@ -307,7 +307,7 @@ function Sync-ShellProfile {
     '  $env:PATH = "$llvmBinDir;$env:PATH"'
     '}'
     # CC/CXX/LD are set at Machine scope via system/env.dsc.yml for
-    # all-process visibility.  Source: src/modules/lib/env-vars.nix.
+    # all-process visibility.  Source: src/modules/lib/env-catalog.nix.
     'function -g { & git @Args }'
     'function -ga { & git add @Args }'
     'function -gb { & git branch @Args }'
