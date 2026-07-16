@@ -3,8 +3,8 @@
 The canonical list of every managed environment variable lives in
 `src/modules/lib/env-vars.nix` (the `catalog` attrset). **This file is the
 single source of truth** — the table below would duplicate it and go stale.
-Refer to `env-vars.nix` directly for the current variable list, values, scope,
-and OS-specific overrides.
+Refer to `env-vars.nix` directly for the current variable list, values, and
+OS-specific overrides.
 
 The catalog exposes helpers that transform entries into platform-specific
 formats (LaunchAgent scripts, NixOS system env, DSC entries, etc.). A JSON
@@ -22,10 +22,10 @@ manifest for external consumption is also available via `toJsonManifest`.
 
 **Nix-side registry** (`src/modules/lib/env-vars.nix`):
 
-- Declares every var in a single `catalog` attrset with `values` (per-OS attrset: `default`, `macOS`, `NixOS`, `Windows`), `why`, optional `userSpecific` (per-user), optional `excludeFromLaunchctl`, and optional `scope` (defaults to `"all-process"`; set explicitly only for `"shell-only"`).
-- Pure helper functions (`toHomeSessionVariables`, `toNixOSSystemEnvironment`, `toLaunchctlScript`, `toUserLaunchctlScript`, `toLaunchctlPrependPath`, `toLaunchctlAppendPath`, `toJsonManifest`) transform the catalog into platform-specific formats.
+- Declares every var in a single `catalog` attrset with `values` (per-OS attrset: `default`, `macOS`, `NixOS`, `Windows`), `why`, and optional `userSpecific` (per-user).
+- Pure helper functions (`allVars`, `systemVars`, `macOSAllVars`, `toLaunchctlPrependPath`, `toLaunchctlAppendPath`, `toJsonManifest`) transform the catalog into platform-specific formats.
 - Daemon env var consumption uses `resolveValue` directly in each daemon file (no daemon-specific helpers).
-- Consumed by: `shell.nix` (via `home.sessionPath`, `home.sessionVariables`), `macos.nix` (gui-env-system/gui-env-user LaunchAgents, guiEnvActivationPathAndRepoRoot activation), `hosts/NixOS/base.nix`, `hosts/NixOS/ai.nix`, and daemon files in `hosts/MacBook/`.
+- Consumed by: `shell.nix` (via `home.sessionPath`, `home.sessionVariables`), `macos.nix` (gui-env LaunchAgent, guiEnvActivationPathAndRepoRoot activation), `hosts/NixOS/base.nix`, `hosts/NixOS/ai.nix`, and daemon files in `hosts/MacBook/`.
 - The `env/default.nix` Home Manager module exposes `config._nucleus.envVars` for introspection.
 
 **Windows parallel registry** (WinGet DSC v3):
@@ -50,8 +50,6 @@ must hard-fail — there is no fallback to User scope.
    - Set `values = { default = ...; macOS = ...; NixOS = ...; Windows = ...; }`, `why`.
    - Use `values.default` for the primary value, per-OS keys for OS-specific overrides.
    - If the value depends on the logged-in user, set `userSpecific = true`.
-   - If the var should be excluded from launchd, set `excludeFromLaunchctl = true`.
-   - `scope` defaults to `"all-process"`. Only set explicitly for `"shell-only"`.
 2. **Windows DSC**: if the var applies to Windows:
    - If `userSpecific = true`, add a DSC `Environment` resource in `src/hosts/Windows/user/env.dsc.yml` (User scope).
    - Otherwise, add the resource in `src/hosts/Windows/system/env.dsc.yml` (Machine scope).
@@ -68,7 +66,7 @@ the exceptions and why they exist.
 | ----------------- | ----- | ----- | ------- | --------- |
 | `NIX_SSL_CERT_FILE` | daemon env | — | — | macOS has no system CA bundle in a standard location; NixOS ships `/etc/ssl/certs/ca-certificates.crt` in the system profile. |
 | `NUCLEUS_HOST`    | daemon env | daemon env | — | Identifies which host the daemon runs on; not meaningful on Windows since daemons are managed differently. |
-| `OLLAMA_HOST`     | gui-env-system agent | — | — | macOS Ollama daemon binds to default port; CLI clients route through LiteLLM proxy via gui-env-system. NixOS uses the systemd service env. |
+| `OLLAMA_HOST`     | gui-env agent | — | — | macOS Ollama daemon binds to default port; CLI clients route through LiteLLM proxy via gui-env. NixOS uses the systemd service env. |
 
 The principle: **same value, same scope** is the default. When a var must have
 different treatment (excluded from a host, different scope, etc.), document it
