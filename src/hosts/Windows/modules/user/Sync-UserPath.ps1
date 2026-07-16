@@ -50,15 +50,9 @@ function Sync-UserPath {
     [bool]$Enabled
   )
 
-  # Canonical list mirrors pathComponents in src/modules/lib/env-vars.nix.
-  $nucleusPrependDirs = @(
-    '%USERPROFILE%\.bun\bin'
-    '%USERPROFILE%\.cargo\bin'
-    '%USERPROFILE%\.local\bin'
-  )
-  $nucleusAppendDirs = @(
-    # Reserved for future use; mirrors pathComponents.append (currently empty).
-  )
+  # Canonical source: ManagedPaths.ps1 → src/modules/lib/env-vars.nix (pathComponents).
+  $nucleusPrependDirs = $nucleusPrependRegistry
+  $nucleusAppendDirs = $nucleusPathComponents.Append
   $nucleusDirs = $nucleusPrependDirs + $nucleusAppendDirs # dedup SET (membership check), NOT a PATH ordering
 
   # ── Machine PATH (HKLM) ──────────────────────────────────────────
