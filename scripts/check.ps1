@@ -569,20 +569,39 @@ $_jsonschemaErrors = 0
 if ($HAS_ARGS) {
   say "skipping schema validation (path-scoped mode)."
 } else {
-  # Existing schemas
-  check-jsonschema --schemafile "$RepoRoot/src/lockfiles/lockfile.schema.json" "$RepoRoot/src/lockfiles/lockfile.json" 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-  check-jsonschema --schemafile "$RepoRoot/src/modules/services.schema.json" "$RepoRoot/src/modules/services.json" 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-  check-jsonschema --schemafile "$RepoRoot/src/hosts/Windows/source-builds.schema.json" "$RepoRoot/src/hosts/Windows/source-builds.json" 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-  # User/VMs/models schemas
-  check-jsonschema --schemafile "$RepoRoot/src/modules/users.schema.json" "$RepoRoot/src/modules/users.json" 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-  check-jsonschema --schemafile "$RepoRoot/src/modules/VMs.schema.json" "$RepoRoot/src/modules/VMs.json" 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-  check-jsonschema --schemafile "$RepoRoot/src/modules/ai/models.schema.json" "$RepoRoot/src/modules/ai/models.json" 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+  # JSON files with inline $schema — auto-discover and validate
+  Get-ChildItem -Recurse -Path "$RepoRoot/src" -Filter '*.json' | Where-Object {
+    $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'
+  } | ForEach-Object {
+    $_schema = try { (Get-Content $_.FullName -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
+    if ($_schema) {
+      if ($_schema -match '^\.') {
+        $_schemafile = [System.IO.Path]::GetFullPath((Join-Path $_.DirectoryName $_schema))
+      } else {
+        $_schemafile = $_schema
+      }
+      check-jsonschema --schemafile $_schemafile $_.FullName 2>&1 | Out-Null
+      if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+    }
+  }
+  # YAML files with inline $schema — auto-discover and validate
+  Get-ChildItem -Recurse -Path $RepoRoot -Include '*.yml','*.yaml' | Where-Object {
+    $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]'
+  } | ForEach-Object {
+    $_schema = try {
+      $_content = Get-Content $_.FullName -Raw
+      ($_content | ConvertFrom-Yaml)['$schema']
+    } catch { $null }
+    if ($_schema) {
+      if ($_schema -match '^\.') {
+        $_schemafile = [System.IO.Path]::GetFullPath((Join-Path $_.DirectoryName $_schema))
+      } else {
+        $_schemafile = $_schema
+      }
+      check-jsonschema --schemafile $_schemafile $_.FullName 2>&1 | Out-Null
+      if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+    }
+  }
   # GitHub schema validation (complements existing prek hooks — CI enforcement)
   $_ghWorkflows = Join-Path $RepoRoot '.github\workflows\*.yml'
   check-jsonschema --builtin-schema vendor.github-workflows $_ghWorkflows 2>&1 | Out-Null
@@ -590,13 +609,6 @@ if ($HAS_ARGS) {
   $_dependabot = Join-Path $RepoRoot '.github\dependabot.yml'
   if (Test-Path $_dependabot) {
     check-jsonschema --builtin-schema vendor.dependabot $_dependabot 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-  }
-  # DSC schema validation (structural only — resource-specific fields validated by winget)
-  # undoc-supp: DSC files may not exist (non-Windows host or partial checkout); skip gracefully
-  $_dscFiles = @(Get-ChildItem "$RepoRoot/src/hosts/Windows/system/*.dsc.yml", "$RepoRoot/src/hosts/Windows/user/*.dsc.yml" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
-  if ($_dscFiles.Count -gt 0) {
-    check-jsonschema --schemafile https://aka.ms/configuration-dsc-schema/0.2 $_dscFiles 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
   }
 }

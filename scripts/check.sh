@@ -575,19 +575,31 @@ _jsonschema_errors=0
 if $HAS_ARGS; then
   say "skipping schema validation (path-scoped mode)."
 else
-  # Existing schemas
-  check-jsonschema --schemafile src/lockfiles/lockfile.schema.json src/lockfiles/lockfile.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-  check-jsonschema --schemafile src/modules/services.schema.json src/modules/services.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-  check-jsonschema --schemafile src/hosts/Windows/source-builds.schema.json src/hosts/Windows/source-builds.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-  # User/VMs/models schemas
-  check-jsonschema --schemafile src/modules/users.schema.json src/modules/users.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-  check-jsonschema --schemafile src/modules/VMs.schema.json src/modules/VMs.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-  check-jsonschema --schemafile src/modules/ai/models.schema.json src/modules/ai/models.json 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+  # JSON files with inline $schema — auto-discover and validate
+  while IFS= read -r -d '' _json_file; do
+    _schema=$(jq -r '.["$schema"] // ""' "$_json_file")
+    if [ -n "$_schema" ]; then
+      case "$_schema" in
+        ./*|../*) _schemafile="$(cd "$(dirname "$_json_file")" && echo "$(pwd)/${_schema#./}")" ;;
+        *)        _schemafile="$_schema" ;;
+      esac
+      check-jsonschema --schemafile "$_schemafile" "$_json_file" 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+    fi
+  done < <(find src -name '*.json' -not -path '*/vendor/*' -not -name '*.schema.json' -print0)
+  # YAML files with inline $schema — auto-discover and validate
+  while IFS= read -r -d '' _yaml_file; do
+    _schema=$(yq eval '.$schema // ""' "$_yaml_file" 2>/dev/null)
+    if [ -n "$_schema" ]; then
+      case "$_schema" in
+        ./*|../*) _schemafile="$(cd "$(dirname "$_yaml_file")" && echo "$(pwd)/${_schema#./}")" ;;
+        *)        _schemafile="$_schema" ;;
+      esac
+      check-jsonschema --schemafile "$_schemafile" "$_yaml_file" 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+    fi
+  done < <(find . -not -path '*/vendor/*' -not -path '*/secrets/*' \( -name '*.yml' -o -name '*.yaml' \) -print0)
   # GitHub schema validation (complements existing prek hooks — CI enforcement)
   check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
   check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-  # DSC schema validation (structural only — resource-specific fields validated by winget)
-  check-jsonschema --schemafile https://aka.ms/configuration-dsc-schema/0.2 src/hosts/Windows/system/*.dsc.yml src/hosts/Windows/user/*.dsc.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
 fi
 if [ "$_jsonschema_errors" -gt 0 ]; then
   warn "schema validation failed with $_jsonschema_errors error(s)"
