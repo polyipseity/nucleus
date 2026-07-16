@@ -30,7 +30,6 @@ let
       nixosValue = envVars.resolveValue name "NixOS";
       macosValue = envVars.resolveValue name "macOS";
       windowsValue = envVars.resolveValue name "Windows";
-      scope = entry.scope or "all-process";
       userSpecific = entry ? userSpecific && entry.userSpecific;
       why = entry.why;
     }
@@ -61,5 +60,12 @@ let
   ) windowsRequiredVarNames;
 in
 {
-  inherit manifest nixosVars windowsRequiredVarNames profileOnlyVarNames applyOnlyVarNames dscVarNames;
+  inherit
+    manifest
+    nixosVars
+    windowsRequiredVarNames
+    profileOnlyVarNames
+    applyOnlyVarNames
+    dscVarNames
+    ;
 }
