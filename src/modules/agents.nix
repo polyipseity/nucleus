@@ -30,6 +30,12 @@ let
   managedPaths = import ./lib/managed-paths.nix {
     inherit pkgs;
   };
+
+  # Shell-syntax guard for the append PATH position.  Expands to
+  # ":<append-path>" when pathComponents.append is non-empty, empty
+  # string otherwise.  Computed at Nix time to avoid nested ${}
+  # inside Nix string interpolation (which Nix cannot parse).
+  shellAppendGuard = lib.optionalString (managedPaths.pathComponents.append != []) ":${managedPaths.toShellAppendPath}";
 in
 {
   home.file = {
@@ -272,7 +278,7 @@ in
       # pathComponents.prepend) so binaries installed by previous apply runs
       # and by this activation are discoverable in subsequent activation
       # steps without spawning a new shell session.
-      PATH="${managedPaths.toShellPrependPath}:$PATH${managedPaths.toShellAppendPath:+:${managedPaths.toShellAppendPath}}"
+      PATH="${managedPaths.toShellPrependPath}:$PATH${shellAppendGuard}"
       export PATH
 
       # Also prepend the nix profile bin directory, Home Manager profile bin
@@ -664,7 +670,7 @@ in
       # Prepend user-scope package manager bin directories (managed-paths.nix
       # pathComponents.prepend) so the ClawHub binary installed by
       # installBunPackages is on PATH for this activation step.
-      PATH="${managedPaths.toShellPrependPath}:$PATH${managedPaths.toShellAppendPath:+:${managedPaths.toShellAppendPath}}"
+      PATH="${managedPaths.toShellPrependPath}:$PATH${shellAppendGuard}"
       export PATH
 
       # Resolve the repo root (same mechanism as agentsSymlink and agentsSkills).

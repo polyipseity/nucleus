@@ -88,8 +88,8 @@ let
   # Verify that __nucleus_run_managed_dev_tool probes tool availability via
   # command -v before routing through the direnv context.  This mirrors the
   # PowerShell Invoke-NucleusManagedDevTool pattern so projects that do not
-  # include a managed tool in their devShell fall through to
-  # NUCLEUS_DEFAULT_DEV_BIN instead of failing with "command not found".
+  # include a managed tool in their devShell fall through to the managed
+  # default toolchain (defaultDevTools) instead of failing with "command not found".
   test_posix_shell_probes_tool_in_direnv = assert' (lib.hasInfix "command -v \"$_tool_name\"" posixShellText) "shell.nix must probe tool availability (command -v) in direnv context before routing, so projects lacking the managed tool fall through to the fallback tool bundle";
 
   # Verify that POSIX hosts use pkgs.rustup (not pkgs.cargo from nixpkgs) so
