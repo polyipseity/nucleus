@@ -12,13 +12,13 @@ All Nix-side env vars are declared in `src/modules/lib/env-vars.nix`. The catalo
 
 ### Registry locations
 
-| OS      | Location                                                        | Format         |
-| ------- | --------------------------------------------------------------- | -------------- |
-| macOS   | `src/modules/lib/env-vars.nix` (catalog)                        | Nix attrs      |
-| NixOS   | `src/modules/lib/env-vars.nix` (catalog)                        | Nix attrs      |
-| Windows | `src/hosts/Windows/user/env.dsc.yml` (user-specific vars)       | WinGet DSC v3  |
-| Windows | `src/hosts/Windows/system/env.dsc.yml` (non-user-specific vars) | WinGet DSC v3  |
-| Windows | `src/hosts/Windows/modules/user/Sync-UserPath.ps1` (PATH)       | PowerShell     |
+| OS      | Location                                                        | Format        |
+| ------- | --------------------------------------------------------------- | ------------- |
+| macOS   | `src/modules/lib/env-vars.nix` (catalog)                        | Nix attrs     |
+| NixOS   | `src/modules/lib/env-vars.nix` (catalog)                        | Nix attrs     |
+| Windows | `src/hosts/Windows/user/env.dsc.yml` (user-specific vars)       | WinGet DSC v3 |
+| Windows | `src/hosts/Windows/system/env.dsc.yml` (non-user-specific vars) | WinGet DSC v3 |
+| Windows | `src/hosts/Windows/modules/user/Sync-UserPath.ps1` (PATH)       | PowerShell    |
 
 **Nix-side registry** (`src/modules/lib/env-vars.nix`):
 
@@ -58,19 +58,28 @@ All Nix-side env vars are declared in `src/modules/lib/env-vars.nix`. The catalo
 
 Some environment variables need different treatment per OS — this table documents the exceptions and why they exist.
 
-| Var               | macOS | NixOS | Windows | Rationale |
-| ----------------- | ----- | ----- | ------- | --------- |
-| `NIX_SSL_CERT_FILE` | daemon env | — | — | macOS has no system CA bundle in a standard location; NixOS ships `/etc/ssl/certs/ca-certificates.crt` in the system profile. |
-| `NUCLEUS_HOST`    | daemon env | daemon env | — | Identifies which host the daemon runs on; not meaningful on Windows since daemons are managed differently. |
-| `OLLAMA_HOST`     | gui-env agent | — | — | macOS Ollama daemon binds to default port; CLI clients route through LiteLLM proxy via gui-env. NixOS uses the systemd service env. |
+| Var                 | macOS         | NixOS      | Windows | Rationale                                                                                                                           |
+| ------------------- | ------------- | ---------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `NIX_SSL_CERT_FILE` | daemon env    | —          | —       | macOS has no system CA bundle in a standard location; NixOS ships `/etc/ssl/certs/ca-certificates.crt` in the system profile.       |
+| `NUCLEUS_HOST`      | daemon env    | daemon env | —       | Identifies which host the daemon runs on; not meaningful on Windows since daemons are managed differently.                          |
+| `OLLAMA_HOST`       | gui-env agent | —          | —       | macOS Ollama daemon binds to default port; CLI clients route through LiteLLM proxy via gui-env. NixOS uses the systemd service env. |
 
 The principle: **same value, same scope** is the default. When a var must have different treatment (excluded from a host, different scope, etc.), document it here with an explicit why.
 
 ## Scope restrictions
 
 Valid reasons to restrict scope:
+
 - The variable would cause incorrect behavior for unintended consumers (e.g., `CC`/`CXX`/`LD` on macOS — Nix LLVM paths in GUI process env interfere with Xcode toolchain discovery).
 - The concept is inherently platform-specific (e.g., `DEVELOPER_DIR` on non-macOS hosts).
 - The value is technically infeasible to compute at build time (e.g., `NUCLEUS_REPO_ROOT` on NixOS — captured at eval time).
 
 "CLI-only tool" or "only shells need it" is not a valid restriction on NixOS or Windows — both CLI and GUI processes inherit the same environment. On macOS, a second propagation mechanism (LaunchAgent calling `launchctl setenv`) is required because `launchd` maintains separate shell and GUI domains.
+
+### Electron/Chromium PATH sanitization (macOS)
+
+Electron and Chromium apps on macOS internally sanitize `PATH` at process startup, discarding the value set by `launchctl setenv` in the GUI domain. This is a Chromium security hardening measure (see `base/mac/environment_variables.cc`). It affects all Electron apps (Obsidian, VS Code, Discord, etc.) and can cause confusing debugging sessions where `launchctl getenv PATH` returns the correct value but the app process shows a sanitized system PATH.
+
+Non-PATH env vars (`OLLAMA_HOST`, `EDITOR`, etc.) are **not** affected — they propagate correctly to Electron apps.
+
+See `.agents/instructions/electron-gui-env.instructions.md` for diagnosis procedure, affected scope, and cross-host comparison.
