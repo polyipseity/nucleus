@@ -272,7 +272,7 @@ in
       # pathComponents.prepend) so binaries installed by previous apply runs
       # and by this activation are discoverable in subsequent activation
       # steps without spawning a new shell session.
-      PATH="${managedPaths.toShellPrependPath}:$PATH"
+      PATH="${managedPaths.toShellPrependPath}:$PATH${managedPaths.toShellAppendPath:+:${managedPaths.toShellAppendPath}}"
       export PATH
 
       # Also prepend the nix profile bin directory, Home Manager profile bin
@@ -664,7 +664,7 @@ in
       # Prepend user-scope package manager bin directories (managed-paths.nix
       # pathComponents.prepend) so the ClawHub binary installed by
       # installBunPackages is on PATH for this activation step.
-      PATH="${managedPaths.toShellPrependPath}:$PATH"
+      PATH="${managedPaths.toShellPrependPath}:$PATH${managedPaths.toShellAppendPath:+:${managedPaths.toShellAppendPath}}"
       export PATH
 
       # Resolve the repo root (same mechanism as agentsSymlink and agentsSkills).

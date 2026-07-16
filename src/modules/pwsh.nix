@@ -36,6 +36,9 @@ let
         # accessible in interactive sessions.  Canonical source: env-catalog.nix.
         ${managedPaths.toPowerShellPrependSnippet}
 
+        # Expose user-scope package manager bins in the append position as well.
+        ${managedPaths.toPowerShellAppendSnippet}
+
         # PSReadLine: predictive history completion and menu-style tab expansion.
         # Guards with module availability probe so the profile loads on hosts where
         # PSReadLine is absent or an unexpected version is installed.

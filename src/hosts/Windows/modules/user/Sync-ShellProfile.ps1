@@ -69,7 +69,17 @@ function Sync-ShellProfile {
     "  `$env:PATH = `"`$$__binVar;`$env:PATH`""
     "}"
   }
-  $managedBlock = @($managedBlockStart) + $prependLines + @(
+
+  $appendLines = $nucleusPathComponents.Append | ForEach-Object {
+    $__binName = $_ -replace '^\.(.+)\\bin$', '$1'
+    $__binVar  = "${__binName}BinDir"
+    "`$$__binVar = Join-Path `$env:USERPROFILE `"$_`""
+    "if (`$env:PATH -notlike `"*`$$__binVar*`") {"
+    "  `$env:PATH = `"`$env:PATH;`$$__binVar`""
+    "}"
+  }
+
+  $managedBlock = @($managedBlockStart) + $prependLines + $appendLines + @(
     # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
     'if (Get-Command direnv -ErrorAction SilentlyContinue) {'
     '  (& direnv hook pwsh) | Out-String | Invoke-Expression'
