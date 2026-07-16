@@ -5,7 +5,8 @@
 #
 # Takes only `pkgs` — no config, lib, or username dependency.
 # Returns: { defaultDevTools, pathComponents, toShellPrependPath,
-#   toPowerShellPrependSnippet, toLaunchctlPrependPath,
+#   toShellAppendPath, toPowerShellPrependSnippet,
+#   toPowerShellAppendSnippet, toLaunchctlPrependPath,
 #   toLaunchctlAppendPath, nixProfileBinDirs, nixSystemBinDirs }
 {
   pkgs,
@@ -63,19 +64,49 @@ let
     map (p: "$HOME/${p}") pathComponents.prepend
   );
 
+  # ── Helper: render generic shell PATH append string ────────────────
+  # Same format as toShellPrependPath but for the append position.
+  toShellAppendPath = builtins.concatStringsSep ":" (
+    map (p: "$HOME/${p}") pathComponents.append
+  );
+
   # ── Helper: render PowerShell PATH-prepend snippet ─────────────────
   # Returns a complete PowerShell block that prepends all managed dirs to
   # $env:PATH with existence guards (Test-Path) and dedup guards (notlike).
+  # Derived from pathComponents.prepend — additions need only one update.
   # Used by pwsh.nix to generate the HM-managed PowerShell profile.
-  toPowerShellPrependSnippet = ''
+  toPowerShellPrependSnippet = let
+    entries = builtins.map (p: builtins.replaceStrings [ "/" ] [ "\\" ] p) pathComponents.prepend;
+    entriesStr = builtins.concatStringsSep ",\n      " (
+      builtins.map (entry: "(Join-Path $HOME \"${entry}\")") entries
+    );
+  in ''
     $__nucleusBinPaths = @(
-      (Join-Path $HOME ".bun\bin"),
-      (Join-Path $HOME ".cargo\bin"),
-      (Join-Path $HOME ".local\bin")
+      ${entriesStr}
     )
     foreach ($__nucleusBinPath in $__nucleusBinPaths) {
       if ((Test-Path $__nucleusBinPath) -and ($env:PATH -notlike "*$__nucleusBinPath*")) {
         $env:PATH = "$__nucleusBinPath;$env:PATH"
+      }
+    }
+    Remove-Variable __nucleusBinPaths, __nucleusBinPath -ErrorAction SilentlyContinue
+  '';
+
+  # ── Helper: render PowerShell PATH-append snippet ──────────────────
+  # Same structure as toPowerShellPrependSnippet but appends to PATH
+  # instead of prepending.  Derived from pathComponents.append.
+  toPowerShellAppendSnippet = let
+    entries = builtins.map (p: builtins.replaceStrings [ "/" ] [ "\\" ] p) pathComponents.append;
+    entriesStr = builtins.concatStringsSep ",\n      " (
+      builtins.map (entry: "(Join-Path $HOME \"${entry}\")") entries
+    );
+  in ''
+    $__nucleusBinPaths = @(
+      ${entriesStr}
+    )
+    foreach ($__nucleusBinPath in $__nucleusBinPaths) {
+      if ((Test-Path $__nucleusBinPath) -and ($env:PATH -notlike "*$__nucleusBinPath*")) {
+        $env:PATH = "$env:PATH;$__nucleusBinPath"
       }
     }
     Remove-Variable __nucleusBinPaths, __nucleusBinPath -ErrorAction SilentlyContinue
@@ -107,7 +138,9 @@ in
     toLaunchctlPrependPath
     toLaunchctlAppendPath
     toShellPrependPath
+    toShellAppendPath
     toPowerShellPrependSnippet
+    toPowerShellAppendSnippet
     nixProfileBinDirs
     nixSystemBinDirs
     ;
