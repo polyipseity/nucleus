@@ -36,12 +36,8 @@ let
   # pwsh.nix and Sync-ShellProfile.ps1 (Windows).
   agentEnv = import ./agent-env-vars.nix;
 
-  # All env vars are sourced from the centralized catalog.  NUCLEUS_DEFAULT_DEV_*
-  # and the macOS-specific vars (DEVELOPER_DIR, SDKROOT, LIBRARY_PATH) are all
-  # included in allVars.  We overlay NUCLEUS_DEFAULT_DEV_* here
-  mergedSessionVariables = envVarsHelpers.allVars // {
-    NUCLEUS_DEFAULT_DEV_BIN = "${managedPaths.defaultDevTools}/bin";
-  };
+  # All env vars are sourced from the centralized catalog.
+  mergedSessionVariables = envVarsHelpers.allVars;
 
   # Keep iCloud exclusion names and managed root paths in one declarative source
   # (users.json) so activation-time recursive marking and interactive shell hooks
@@ -190,12 +186,6 @@ in
               eval "$(starship init zsh)"
             fi
 
-            # home.sessionVariables does not reliably populate plain interactive
-            # `zsh -i` sessions in every launch path, so export the fallback tool
-            # coordinates here as well.  This keeps repositories without .envrc
-            # usable even when the shell did not start as a login shell.
-            export NUCLEUS_DEFAULT_DEV_BIN="${managedPaths.defaultDevTools}/bin"
-
             # (User-scope package manager bin dirs are declared via home.sessionPath
             # below; that path goes to ~/.zshenv which is sourced before this
             # .zshrc file and before the direnv hook, making them immune to
@@ -233,8 +223,8 @@ in
                 esac
               fi
 
-              if [[ -n "''${NUCLEUS_DEFAULT_DEV_BIN:-}" && -x "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" ]]; then
-                "''${NUCLEUS_DEFAULT_DEV_BIN}/$_tool_name" "$@"
+              if [[ -x "${managedPaths.defaultDevTools}/bin/$_tool_name" ]]; then
+                "${managedPaths.defaultDevTools}/bin/$_tool_name" "$@"
                 return $?
               fi
 

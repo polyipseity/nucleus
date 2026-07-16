@@ -32,10 +32,6 @@ let
           (& direnv hook pwsh) | Out-String | Invoke-Expression
         }
 
-        # Keep a user-scoped fallback toolchain available when the current project
-        # does not provide a direnv/devShell entrypoint.
-        $env:NUCLEUS_DEFAULT_DEV_BIN = "${managedPaths.defaultDevTools}/bin"
-
         # Expose user-scope package manager bins so globally installed tools are
         # accessible in interactive sessions.  Canonical source: env-catalog.nix.
         ${managedPaths.toPowerShellPrependSnippet}
@@ -435,7 +431,7 @@ let
         # pass through to the rustup shim.  Otherwise, fall back to the managed
         # default toolchain installed by apply.
         function bun {
-          if (Invoke-NucleusManagedDevTool -ToolName "bun" -FallbackBinDirectory $env:NUCLEUS_DEFAULT_DEV_BIN @Args) {
+          if (Invoke-NucleusManagedDevTool -ToolName "bun" -FallbackBinDirectory "${managedPaths.defaultDevTools}/bin" @Args) {
             return
           }
           Write-Host "shell: managed bun is unavailable right now." -ForegroundColor Yellow
@@ -446,7 +442,7 @@ let
           return 1
         }
         function cargo {
-          if (Invoke-NucleusManagedDevTool -ToolName "cargo" -FallbackBinDirectory $env:NUCLEUS_DEFAULT_DEV_BIN @Args) {
+          if (Invoke-NucleusManagedDevTool -ToolName "cargo" -FallbackBinDirectory "${managedPaths.defaultDevTools}/bin" @Args) {
             return
           }
           Write-Host "shell: managed cargo is unavailable right now." -ForegroundColor Yellow
@@ -456,7 +452,7 @@ let
           return 1
         }
         function rustc {
-          if (Invoke-NucleusManagedDevTool -ToolName "rustc" -FallbackBinDirectory $env:NUCLEUS_DEFAULT_DEV_BIN @Args) {
+          if (Invoke-NucleusManagedDevTool -ToolName "rustc" -FallbackBinDirectory "${managedPaths.defaultDevTools}/bin" @Args) {
             return
           }
           Write-Host "shell: managed rustc is unavailable right now." -ForegroundColor Yellow
@@ -466,7 +462,7 @@ let
           return 1
         }
         function uv {
-          if (Invoke-NucleusManagedDevTool -ToolName "uv" -FallbackBinDirectory $env:NUCLEUS_DEFAULT_DEV_BIN @Args) {
+          if (Invoke-NucleusManagedDevTool -ToolName "uv" -FallbackBinDirectory "${managedPaths.defaultDevTools}/bin" @Args) {
             return
           }
           Write-Host "shell: managed uv is unavailable right now." -ForegroundColor Yellow

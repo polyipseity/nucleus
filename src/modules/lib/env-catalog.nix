@@ -188,15 +188,6 @@ let
       why = "gopass config override value for password store path. Windows uses literal %USERPROFILE% for User-scope DSC.";
     };
 
-    # ── Fallback toolchain ──────────────────────────────────────────
-    NUCLEUS_DEFAULT_DEV_BIN = {
-      values = {
-        default = "${managedPaths.defaultDevTools}/bin";
-      };
-      userSpecific = true;
-      why = "Fallback toolchain bin dir for repos without direnv/Nix devShell.";
-    };
-
     # ── Host identity ────────────────────────────────────────────────
     NUCLEUS_HOST = {
       values = {
