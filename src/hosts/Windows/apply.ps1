@@ -363,6 +363,11 @@ if (-not $Elevated) {
   exit $exitCode
 }
 
+# Managed PATH data: canonical list of user-scope bin directories.
+# Must be loaded before any Sync-* or Invoke-* module that references
+# $nucleusPathComponents, $nucleusPrependRegistry, or Get-NucleusManagedBinDir.
+. (Join-Path -Path $resolvedModuleDir -ChildPath "ManagedPaths.ps1")
+
 # Root utilities: shared helpers with no single domain affinity.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
