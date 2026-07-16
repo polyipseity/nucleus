@@ -1,16 +1,4 @@
 extends: default
 
-rules:
-  braces:
-    # Min-spaces-inside-empty-braces is irrelevant.
-    min-spaces-inside-empty-braces: 0
-  document-start:
-    present: false
-  line-length:
-    disable
-  quoted-strings:
-    # Don't require quotes — many YAML files use unquoted strings per convention.
-    required: false
-
 ignore: |
   vendor/**
