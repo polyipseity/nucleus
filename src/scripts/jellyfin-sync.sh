@@ -103,6 +103,7 @@ _jfs_sync_accounts() {
 
   jq -cr '
     to_entries[]
+    | select(.value | type == "object")
     | . as $u
     | (($u.value.jellyfin.accounts // []) | sort_by(.id)[])
     | {
@@ -358,6 +359,7 @@ _jfs_sync_libraries() {
 
   jq -cr '
     to_entries[]
+    | select(.value | type == "object")
     | . as $u
     | (($u.value.jellyfin.libraries // []) | sort_by(.name)[])
     | {
