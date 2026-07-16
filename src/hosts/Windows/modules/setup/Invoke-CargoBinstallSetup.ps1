@@ -76,7 +76,7 @@ function Invoke-CargoBinstallSetup {
   # Prepend ~/.cargo/bin so `cargo uninstall` (removal path) finds the cargo
   # binary even when the calling session predates rustup's PATH initialisation.
   if ($env:PATH -notlike "*$cargoBinDir*") {
-    $env:PATH = "$cargoBinDir;$env:PATH"
+    $env:PATH = "$env:PATH;$cargoBinDir"
   }
 
   # Guard: cargo-binstall must be accessible after Invoke-ScoopSetup has run.

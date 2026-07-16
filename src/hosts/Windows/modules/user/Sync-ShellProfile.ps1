@@ -57,7 +57,7 @@ function Sync-ShellProfile {
   # existed at profile load time.  No existence guard: non-existent dirs
   # in PATH are harmless and the unconditional add ensures a new terminal
   # opened after apply sees the correct PATH immediately.
-  # Sources: ManagedPaths.ps1 -> managed-paths.nix (pathComponents.prepend).
+  # Sources: ManagedPaths.ps1 -> managed-paths.nix (pathComponents.append).
   # Compute from the canonical path list so additions only need updating in
   # one place.  Each entry (e.g. '.bun\bin') produces a variable definition,
   # a guard, and a PATH assignment.
@@ -309,7 +309,7 @@ function Sync-ShellProfile {
     # newly provisioned hosts can run clang/ld.lld immediately.
     '$llvmBinDir = "' + (Get-NucleusLLVMBinDir) + '"'
     'if ((Test-Path $llvmBinDir) -and ($env:PATH -notlike "*$llvmBinDir*")) {'
-    '  $env:PATH = "$llvmBinDir;$env:PATH"'
+    '  $env:PATH = "$env:PATH;$llvmBinDir"'
     '}'
     # CC/CXX/LD are set at Machine scope via system/env.dsc.yml for
     # all-process visibility.  Source: src/modules/lib/env-catalog.nix.

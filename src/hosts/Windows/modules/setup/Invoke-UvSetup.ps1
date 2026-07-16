@@ -81,7 +81,7 @@ function Invoke-UvSetup {
   # Prepend ~/.local/bin so binaries installed during this apply run are
   # accessible in subsequent steps without opening a new terminal session.
   if ($env:PATH -notlike "*$uvBinDir*") {
-    $env:PATH = "$uvBinDir;$env:PATH"
+    $env:PATH = "$env:PATH;$uvBinDir"
   }
 
   # Get actually installed uv tools from `uv tool list` (zap-style: remove

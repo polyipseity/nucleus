@@ -60,7 +60,7 @@ function Invoke-RustupSetup {
   # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).
   $cargoBinDir = Get-NucleusManagedBinDir "cargo"
   if ($env:PATH -notlike "*$cargoBinDir*") {
-    $env:PATH = "$cargoBinDir;$env:PATH"
+    $env:PATH = "$env:PATH;$cargoBinDir"
   }
 
   # Get actually installed toolchains from rustup.  `rustup toolchain list`

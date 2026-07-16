@@ -80,7 +80,7 @@ function Invoke-BunSetup {
   # Prepend ~/.bun/bin so binaries installed during this apply run are
   # accessible in subsequent steps without opening a new terminal session.
   if ($env:PATH -notlike "*$bunBinDir*") {
-    $env:PATH = "$bunBinDir;$env:PATH"
+    $env:PATH = "$env:PATH;$bunBinDir"
   }
 
   # Get actually installed global packages from bun's authoritative package

@@ -8,10 +8,7 @@
 #   toShellAppendPath, toPowerShellPrependSnippet,
 #   toPowerShellAppendSnippet, toLaunchctlPrependPath,
 #   toLaunchctlAppendPath, nixProfileBinDirs, nixSystemBinDirs }
-{
-  pkgs,
-  ...
-}:
+{ pkgs, ... }:
 let
   # ── Fallback toolchain ──────────────────────────────────────────────
   # symlinkJoin of bun + prek + uv for repos without direnv/Nix devShell.
@@ -27,16 +24,17 @@ let
   # ── PATH components ─────────────────────────────────────────────────
   # Managed PATH directories split into prepend (before system default) and
   # append (after system default) groups.  Each consumer renders these as
-  # platform-appropriate PATH strings.
-  # Prepend: user-scope package manager bin directories.
-  # Append: empty for now — reserved for future use.
+  # platform-appropriate PATH strings.  Currently all dirs are in append to
+  # avoid shadowing system-provided executables.
+  # Append: user-scope package manager bin directories.
+  # Prepend: empty — managed dirs are now appended to avoid shadowing system bins.
   pathComponents = {
-    prepend = [
+    prepend = [ ];
+    append = [
       ".bun/bin"
       ".cargo/bin"
       ".local/bin"
     ];
-    append = [ ];
   };
 
   # ── Helper: render macOS launchctl prepend PATH string ─────────────
@@ -60,57 +58,57 @@ let
   # ── Helper: render generic shell PATH prepend string ───────────────
   # Same format as toLaunchctlPrependPath but with a generic name for use
   # in shell scripts that are not macOS-launchctl-specific.
-  toShellPrependPath = builtins.concatStringsSep ":" (
-    map (p: "$HOME/${p}") pathComponents.prepend
-  );
+  toShellPrependPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.prepend);
 
   # ── Helper: render generic shell PATH append string ────────────────
   # Same format as toShellPrependPath but for the append position.
-  toShellAppendPath = builtins.concatStringsSep ":" (
-    map (p: "$HOME/${p}") pathComponents.append
-  );
+  toShellAppendPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.append);
 
   # ── Helper: render PowerShell PATH-prepend snippet ─────────────────
   # Returns a complete PowerShell block that prepends all managed dirs to
   # $env:PATH with existence guards (Test-Path) and dedup guards (notlike).
   # Derived from pathComponents.prepend — additions need only one update.
   # Used by pwsh.nix to generate the HM-managed PowerShell profile.
-  toPowerShellPrependSnippet = let
-    entries = builtins.map (p: builtins.replaceStrings [ "/" ] [ "\\" ] p) pathComponents.prepend;
-    entriesStr = builtins.concatStringsSep ",\n      " (
-      builtins.map (entry: "(Join-Path $HOME \"${entry}\")") entries
-    );
-  in ''
-    $__nucleusBinPaths = @(
-      ${entriesStr}
-    )
-    foreach ($__nucleusBinPath in $__nucleusBinPaths) {
-      if ((Test-Path $__nucleusBinPath) -and ($env:PATH -notlike "*$__nucleusBinPath*")) {
-        $env:PATH = "$__nucleusBinPath;$env:PATH"
+  toPowerShellPrependSnippet =
+    let
+      entries = builtins.map (p: builtins.replaceStrings [ "/" ] [ "\\" ] p) pathComponents.prepend;
+      entriesStr = builtins.concatStringsSep ",\n      " (
+        builtins.map (entry: "(Join-Path $HOME \"${entry}\")") entries
+      );
+    in
+    ''
+      $__nucleusBinPaths = @(
+        ${entriesStr}
+      )
+      foreach ($__nucleusBinPath in $__nucleusBinPaths) {
+        if ((Test-Path $__nucleusBinPath) -and ($env:PATH -notlike "*$__nucleusBinPath*")) {
+          $env:PATH = "$__nucleusBinPath;$env:PATH"
+        }
       }
-    }
-    Remove-Variable __nucleusBinPaths, __nucleusBinPath -ErrorAction SilentlyContinue
-  '';
+      Remove-Variable __nucleusBinPaths, __nucleusBinPath -ErrorAction SilentlyContinue
+    '';
 
   # ── Helper: render PowerShell PATH-append snippet ──────────────────
   # Same structure as toPowerShellPrependSnippet but appends to PATH
   # instead of prepending.  Derived from pathComponents.append.
-  toPowerShellAppendSnippet = let
-    entries = builtins.map (p: builtins.replaceStrings [ "/" ] [ "\\" ] p) pathComponents.append;
-    entriesStr = builtins.concatStringsSep ",\n      " (
-      builtins.map (entry: "(Join-Path $HOME \"${entry}\")") entries
-    );
-  in ''
-    $__nucleusBinPaths = @(
-      ${entriesStr}
-    )
-    foreach ($__nucleusBinPath in $__nucleusBinPaths) {
-      if ((Test-Path $__nucleusBinPath) -and ($env:PATH -notlike "*$__nucleusBinPath*")) {
-        $env:PATH = "$env:PATH;$__nucleusBinPath"
+  toPowerShellAppendSnippet =
+    let
+      entries = builtins.map (p: builtins.replaceStrings [ "/" ] [ "\\" ] p) pathComponents.append;
+      entriesStr = builtins.concatStringsSep ",\n      " (
+        builtins.map (entry: "(Join-Path $HOME \"${entry}\")") entries
+      );
+    in
+    ''
+      $__nucleusBinPaths = @(
+        ${entriesStr}
+      )
+      foreach ($__nucleusBinPath in $__nucleusBinPaths) {
+        if ((Test-Path $__nucleusBinPath) -and ($env:PATH -notlike "*$__nucleusBinPath*")) {
+          $env:PATH = "$env:PATH;$__nucleusBinPath"
+        }
       }
-    }
-    Remove-Variable __nucleusBinPaths, __nucleusBinPath -ErrorAction SilentlyContinue
-  '';
+      Remove-Variable __nucleusBinPaths, __nucleusBinPath -ErrorAction SilentlyContinue
+    '';
 
   # ── Helper: Nix profile probe directories ─────────────────────────
   # Shell-quoted list of Nix/home-manager profile bin directories probed by

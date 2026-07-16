@@ -435,7 +435,7 @@ if [[ -f "$SVC_SH" ]]; then
 exec /usr/bin/sudo -n "$@"
 SUDO_WRAPPER
     chmod +x "$SUDO_WRAPPER_DIR/sudo"
-    PATH="$SUDO_WRAPPER_DIR:$PATH"
+    PATH="$PATH:$SUDO_WRAPPER_DIR"
 
     SVC_LIST_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list 2>&1 || true)  # undoc-supp: test probe — capturing output regardless of exit code for assertion below
     if echo "$SVC_LIST_OUTPUT" | grep -q "ID.*Name.*Status.*Running.*PID"; then

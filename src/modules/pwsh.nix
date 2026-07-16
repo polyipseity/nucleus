@@ -34,9 +34,6 @@ let
 
         # Expose user-scope package manager bins so globally installed tools are
         # accessible in interactive sessions.  Canonical source: env-catalog.nix.
-        ${managedPaths.toPowerShellPrependSnippet}
-
-        # Expose user-scope package manager bins in the append position as well.
         ${managedPaths.toPowerShellAppendSnippet}
 
         # PSReadLine: predictive history completion and menu-style tab expansion.

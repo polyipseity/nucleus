@@ -623,7 +623,7 @@ in
   # entries are always part of the "original" PATH state that direnv saves and
   # restores — fixing the reliability issue of .zshrc-based PATH guards that
   # only run once at startup.
-  # Sources: see pathComponents.prepend in src/modules/lib/managed-paths.nix.
+  # Sources: see pathComponents.append in src/modules/lib/managed-paths.nix.
   #   bun install -g   → ~/.bun/bin   (BUN_INSTALL_BIN default)
   #   cargo-binstall   → ~/.cargo/bin  (CARGO_HOME/bin default)
   #   uv tool install  → ~/.local/bin  (XDG_BIN_HOME default)
@@ -632,7 +632,7 @@ in
   # catalog in src/modules/lib/env-catalog.nix.
   home.sessionPath = builtins.map (
     p: "${config.home.homeDirectory}/${p}"
-  ) managedPaths.pathComponents.prepend;
+  ) managedPaths.pathComponents.append;
 
   home.sessionVariables = mergedSessionVariables;
 

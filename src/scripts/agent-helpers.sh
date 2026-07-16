@@ -76,13 +76,14 @@ _nucleus_resolve_repo_root() {
   fi
 }
 
-# Prepend the first directory containing $1 to PATH.
+# Append the first directory containing $1 to PATH (default to append to avoid
+# shadowing system executables).
 _nucleus_prepend_first_executable_dir() {
   _nped_executable="$1"
   shift
   for _nped_dir in "$@"; do
     if [ -x "$_nped_dir/$_nped_executable" ]; then
-      PATH="$_nped_dir:$PATH"
+      PATH="$PATH:$_nped_dir"
       export PATH
       return 0
     fi

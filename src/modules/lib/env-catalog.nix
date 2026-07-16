@@ -206,18 +206,19 @@ let
       why = "Repo root for out-of-store symlinks. Baked into store script at build time from apply.sh; activation hook overrides for repo-move edge case.";
     };
 
-    # ── macOS GUI environment PATH (prepend-only; user-specific) ──
+    # ── macOS GUI environment PATH (append-only; user-specific) ──
     # PATH is not a single value at runtime — it is a composition of
-    # (prepend + system default + append).  This catalog entry only holds
-    # the prepend portion.  The append portion is handled separately via
-    # toLaunchctlAppendPath in the activation/agent scripts in macos.nix.
+    # (system default + append).  This catalog entry holds the append
+    # portion.  The prepend portion is empty (dirs moved to append).
+    # Set by guiEnvActivationPathAndRepoRoot (activation) and gui-env
+    # (login agent) in macos.nix.
     PATH = {
       values = {
-        macOS = managedPaths.toShellPrependPath;
+        macOS = managedPaths.toShellAppendPath;
       };
       excludeFromAll = true;
       userSpecific = true;
-      why = "Managed PATH (prepend portion only) for macOS GUI apps. The prepend dirs are set by guiEnvActivationPathAndRepoRoot (activation) and gui-env (login agent) in macos.nix. The append portion is handled separately via toLaunchctlAppendPath. This entry does not merge prepend+append because PATH has a prepend/system/append structure at runtime — merging them would misrepresent the architecture.";
+      why = "Managed PATH (append portion) for macOS GUI apps. All managed dirs are appended to avoid shadowing system executables. Set by guiEnvActivationPathAndRepoRoot (activation) and gui-env (login agent) in macos.nix.";
     };
 
     # ── Starship prompt ─────────────────────────────────────────────

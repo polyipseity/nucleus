@@ -113,7 +113,7 @@ in
           set -eu
 
           export HOME="${currentUserHome}"
-          export PATH="${pkgs.git}/bin:$PATH"
+          export PATH="$PATH:${pkgs.git}/bin"
           export GIT_SSH_COMMAND="${sshClient}"
 
           # Track non-fatal provisioning errors so activation output is quiet on

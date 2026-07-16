@@ -66,7 +66,7 @@ function Sync-UserPath {
   }
 
   if ($Enabled) {
-    $newMachinePath = ($nucleusPrependDirs + $cleanedMachine + $nucleusAppendDirs) -join ';'
+    $newMachinePath = ($cleanedMachine + $nucleusAppendDirs) -join ';'
   } else {
     $newMachinePath = $cleanedMachine -join ';'
   }

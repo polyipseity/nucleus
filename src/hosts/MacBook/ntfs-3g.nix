@@ -83,7 +83,7 @@ in
        || ! [ -f "$FINGERPRINT_FILE" ] \
        || [ "$(cat "$FINGERPRINT_FILE")" != "$CURRENT_FINGERPRINT" ]; then
       echo "ntfs-3g: building from source... (log: $LOG_FILE)"
-      export PATH="${buildToolsPath}:$PATH"
+      export PATH="$PATH:${buildToolsPath}"
       export ACLOCAL_PATH="${aclocalPath}"
       BUILD_DIR="$(mktemp -d)"
       trap 'rm -rf "$BUILD_DIR"' EXIT

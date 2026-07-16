@@ -995,7 +995,7 @@ EOF
     # in PWD.  Without this, Mido cd-s to its own directory and writes the
     # ISO there instead of _mido_tmp.
     # Source: path detection logic at bottom of mido.sh
-    PATH="${_mido_tmp}:${_mido_dir}:${PATH}" sh "$_mido_exec_script" "$_mido_media"
+    PATH="${PATH}:${_mido_tmp}:${_mido_dir}" sh "$_mido_exec_script" "$_mido_media"
   ) || _mido_status=$?
 
   # Exit code 4 means verification failed but the ISO was downloaded as

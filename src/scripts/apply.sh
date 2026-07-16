@@ -81,7 +81,7 @@ case ":$PATH:" in
   *":$_nix_profile_bin:"*) ;;
   *)
     if [ -d "$_nix_profile_bin" ]; then
-      PATH="$_nix_profile_bin:$PATH"
+      PATH="$PATH:$_nix_profile_bin"
       export PATH
     fi
     ;;

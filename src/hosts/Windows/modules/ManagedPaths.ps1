@@ -18,12 +18,12 @@
 
 # Canonical source: src/modules/lib/managed-paths.nix (pathComponents)
 $script:nucleusPathComponents = @{
-  Prepend = @(
+  Prepend = @()  # empty; managed dirs moved to Append to avoid shadowing system bins
+  Append  = @(
     '.bun\bin'
     '.cargo\bin'
     '.local\bin'
   )
-  Append  = @()  # reserved; mirrors pathComponents.append (currently empty)
 }
 
 # Registry-format %USERPROFILE%-prefixed paths (REG_EXPAND_SZ) for HKLM Path.
@@ -111,7 +111,7 @@ function Add-NucleusPathEntry {
 
     [Parameter()]
     [ValidateSet('Prepend', 'Append')]
-    [string]$Position = 'Prepend'
+    [string]$Position = 'Append'
   )
   if ($Position -eq 'Prepend') {
     if ($env:PATH -notlike "*$Path*") {
