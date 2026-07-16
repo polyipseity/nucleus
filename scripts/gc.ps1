@@ -394,6 +394,7 @@ function Clear-GitCacheFiles {
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "ManagedPaths.ps1")
 
 # ---- Step 1: stale wallpaper gc ----------------------------------------
 if (-not $NoWallpaperGc) {
@@ -448,7 +449,7 @@ if (-not $NoGitCacheGc) {
 
 # ---- Step 5: Scoop cache and old-version cleanup ----------------------------
 if (-not $NoScoopGc) {
-  $scoopShims = Join-Path $env:USERPROFILE "scoop\shims"
+  $scoopShims = Get-NucleusScoopShimsDir
   $scoopCmd   = Join-Path $scoopShims "scoop.cmd"
   if (-not (Test-Path $scoopCmd)) {
     Write-NucleusInfo "scoop not installed; skipping scoop gc"

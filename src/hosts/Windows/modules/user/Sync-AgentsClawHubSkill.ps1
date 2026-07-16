@@ -102,7 +102,7 @@ function Sync-AgentsClawHubSkill {
   # Provisioning ClawHub is Invoke-BunSetup's responsibility; this function
   # does not attempt a fallback install — if ClawHub is absent, Invoke-BunSetup
   # failed and the operator should investigate.
-  $bunBinDir = Join-Path -Path $HOME -ChildPath ".bun\bin"
+  $bunBinDir = Get-NucleusManagedBinDir "bun"
   # undoc-supp: probe — clawhub may not be installed; $null check handles absence.
   $clawhubExe = Get-Command -Name "clawhub" -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty Source

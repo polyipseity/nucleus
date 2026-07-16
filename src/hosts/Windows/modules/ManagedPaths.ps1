@@ -54,3 +54,31 @@ function Get-NucleusManagedBinDir {
   )
   Join-Path -Path $HOME -ChildPath ".${Name}\bin"
 }
+
+<#
+.SYNOPSIS
+  Returns the path to the Scoop shims directory.
+.DESCRIPTION
+  Returns the full path to the Scoop shims directory (%USERPROFILE%\scoop\shims).
+.EXAMPLE
+  Get-NucleusScoopShimsDir -> C:\Users\user\scoop\shims
+#>
+function Get-NucleusScoopShimsDir {
+  [CmdletBinding()]
+  param()
+  Join-Path -Path $env:USERPROFILE -ChildPath "scoop\shims"
+}
+
+<#
+.SYNOPSIS
+  Returns the path to the LLVM bin directory.
+.DESCRIPTION
+  Returns the full path to the LLVM bin directory (C:\Program Files\LLVM\bin).
+.EXAMPLE
+  Get-NucleusLLVMBinDir -> C:\Program Files\LLVM\bin
+#>
+function Get-NucleusLLVMBinDir {
+  [CmdletBinding()]
+  param()
+  "C:\Program Files\LLVM\bin"
+}

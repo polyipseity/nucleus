@@ -302,7 +302,7 @@ function Sync-ShellProfile {
     'Invoke-PrekHookInstallIfNeeded'
     # LLVM/Clang: add LLVM bin directory to PATH for the current session so
     # newly provisioned hosts can run clang/ld.lld immediately.
-    '$llvmBinDir = "C:\Program Files\LLVM\bin"'
+    '$llvmBinDir = "' + (Get-NucleusLLVMBinDir) + '"'
     'if ((Test-Path $llvmBinDir) -and ($env:PATH -notlike "*$llvmBinDir*")) {'
     '  $env:PATH = "$llvmBinDir;$env:PATH"'
     '}'

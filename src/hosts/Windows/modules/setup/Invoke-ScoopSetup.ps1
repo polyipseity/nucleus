@@ -74,7 +74,7 @@ function Invoke-ScoopSetup {
   # DSC runs in a child process; PATH additions from that process do not
   # propagate back to the parent shell, so the shims path must be added
   # explicitly here after the DSC step completes.
-  $scoopShims = Join-Path $env:USERPROFILE "scoop\shims"
+  $scoopShims = Get-NucleusScoopShimsDir
   if ($env:PATH -notlike "*$scoopShims*") {
     $env:PATH = "$scoopShims;$env:PATH"
   }
