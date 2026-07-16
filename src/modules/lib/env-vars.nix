@@ -105,6 +105,25 @@ let
     Remove-Variable __nucleusBinPaths, __nucleusBinPath -ErrorAction SilentlyContinue
   '';
 
+  # ── Helper: Nix profile probe directories ─────────────────────────
+  # Shell-quoted list of Nix/home-manager profile bin directories probed by
+  # _nucleus_prepend_first_executable_dir in activation steps.
+  # Contains $HOME references — expanded at shell runtime, not by Nix.
+  nixProfileBinDirs = ''
+    "$HOME/.local/state/nix/profiles/profile/bin" \
+    "$HOME/.nix-profile/bin" \
+    "$HOME/.local/state/home-manager/profile/bin" \
+    "$HOME/.local/home-manager/profile/bin"
+  '';
+
+  # ── Helper: NixOS system profile probe directories ────────────────
+  # Shell-quoted list of NixOS system-wide profile bin directories.
+  # Contains $USER reference — expanded at shell runtime, not by Nix.
+  nixSystemBinDirs = ''
+    "/etc/profiles/per-user/$USER/bin" \
+    "/run/current-system/sw/bin"
+  '';
+
   # ── Catalog ─────────────────────────────────────────────────────────
   # Each entry:
   #   values:  attrset { default?, macOS?, NixOS?, Windows? }
@@ -454,6 +473,8 @@ in
     toLaunchctlAppendPath
     toShellPrependPath
     toPowerShellPrependSnippet
+    nixProfileBinDirs
+    nixSystemBinDirs
     pathComponents
     ;
 }
