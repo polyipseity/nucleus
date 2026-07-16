@@ -74,11 +74,6 @@ function Sync-ShellProfile {
     'if (Get-Command direnv -ErrorAction SilentlyContinue) {'
     '  (& direnv hook pwsh) | Out-String | Invoke-Expression'
     '}'
-    '# Keep the managed default dev environment active outside project-specific'
-    '# direnv contexts. Windows does not have a separate nix-direnv-backed store'
-    '# path here, so the fallback reuses the managed user PATH entries applied by'
-    '# WinGet/bootstrap while still gating invocation through this profile layer.'
-    '$env:NUCLEUS_DEFAULT_DEV_ENV = "1"'
     # Configure uv supply-chain defaults via uv.toml.
     # Mirrors the uv.toml created by shell.nix on POSIX hosts.
     # Source: https://docs.astral.sh/uv/reference/settings/#add-bounds
@@ -662,7 +657,7 @@ function Sync-ShellProfile {
     '    & $application.Source @ToolArguments'
     '    return $true'
     '  }'
-    '  if ($env:DIRENV_DIR -or $env:NUCLEUS_DEFAULT_DEV_ENV) {'
+    '  if ($env:DIRENV_DIR) {'
     '    & $application.Source @ToolArguments'
     '    return $true'
     '  }'
