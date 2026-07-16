@@ -27,6 +27,16 @@ let
   # _nucleus_resolve_repo_root, and _nucleus_prepend_first_executable_dir.
   agentHelpersSh = builtins.readFile ../scripts/agent-helpers.sh;
 
+  # Common nix/home-manager profile bin directories probed by
+  # _nucleus_prepend_first_executable_dir across multiple activation steps.
+  # Each call site prepends tool-specific directories before these.
+  nixProfileBinDirs = ''
+    "$HOME/.local/state/nix/profiles/profile/bin" \
+    "$HOME/.nix-profile/bin" \
+    "$HOME/.local/state/home-manager/profile/bin" \
+    "$HOME/.local/home-manager/profile/bin"
+  '';
+
   envVars = import ./lib/env-vars.nix {
     inherit config pkgs lib;
     username = config.home.username;
@@ -281,10 +291,7 @@ in
       # After linkGeneration the profile symlinks exist, but the activation
       # shell's PATH may not include them.
       _nucleus_prepend_first_executable_dir bun \
-        "$HOME/.local/state/nix/profiles/profile/bin" \
-        "$HOME/.nix-profile/bin" \
-        "$HOME/.local/state/home-manager/profile/bin" \
-        "$HOME/.local/home-manager/profile/bin" || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
+        ${nixProfileBinDirs} || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
 
       # If bun is still not found, search the nix store for any bun binary
       # and add its parent directory to PATH.
@@ -517,10 +524,7 @@ in
       _nucleus_prepend_first_executable_dir rustup \
         "/etc/profiles/per-user/$USER/bin" \
         "/run/current-system/sw/bin" \
-        "$HOME/.local/state/nix/profiles/profile/bin" \
-        "$HOME/.nix-profile/bin" \
-        "$HOME/.local/state/home-manager/profile/bin" \
-        "$HOME/.local/home-manager/profile/bin" || true  # undoc-supp: rustup not in profile dir on first apply; fallback follows.
+        ${nixProfileBinDirs} || true  # undoc-supp: rustup not in profile dir on first apply; fallback follows.
 
       if ! command -v rustup >/dev/null 2>&1; then
         echo "rustup: rustup not found after profile link; skipping initialization" >&2
@@ -581,10 +585,7 @@ in
         "$HOME/.cargo/bin" \
         "/etc/profiles/per-user/$USER/bin" \
         "/run/current-system/sw/bin" \
-        "$HOME/.local/state/nix/profiles/profile/bin" \
-        "$HOME/.nix-profile/bin" \
-        "$HOME/.local/state/home-manager/profile/bin" \
-        "$HOME/.local/home-manager/profile/bin" || true  # undoc-supp: cargo not in any profile dir; fallback follows.
+        ${nixProfileBinDirs} || true  # undoc-supp: cargo not in any profile dir; fallback follows.
 
       # Guard: cargo is provided by rustup (stable toolchain) via ~/.cargo/bin;
       # initRustup ensures stable is installed before this step runs.
