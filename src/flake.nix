@@ -79,7 +79,10 @@
     }:
     let
       # Loaded from src/modules/users.json, mirroring the Windows pattern.
-      users = builtins.fromJSON (builtins.readFile ./modules/users.json);
+      # Strip $schema key — it's metadata for JSON Schema validators, not a user entry.
+      users = builtins.removeAttrs (builtins.fromJSON (builtins.readFile ./modules/users.json)) [
+        "$schema"
+      ];
 
       # Filter users by isPrimary=true and extract the attr name.
       username = builtins.head (
@@ -483,6 +486,8 @@
             pkgs.powershell
             pkgs.yq-go
           ];
+          # SC2016: false positive — $schema in yq expressions is intentional.
+          excludeShellChecks = [ "SC2016" ];
         };
 
       # Does NOT inject nixpkgs `pkgs.nix` into PATH — scripts/test.sh uses
@@ -666,6 +671,8 @@
             pkgs.yamllint
             pkgs.yq-go
           ];
+          # SC2016: false positive — $schema in yq expressions is intentional.
+          excludeShellChecks = [ "SC2016" ];
         };
         nucleus-check-packer = mkNucleusPackage pkgs {
           name = "check-packer";
