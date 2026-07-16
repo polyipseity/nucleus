@@ -5,6 +5,7 @@
 # Source for package ID validity: WinGet package index and manifests.
 # https://learn.microsoft.com/windows/package-manager/winget/
 # https://github.com/microsoft/winget-pkgs
+$schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:
   configurationVersion: 0.2.0
   resources:

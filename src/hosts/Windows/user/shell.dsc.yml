@@ -4,6 +4,7 @@
 # Commands prefixed with a space or consecutive duplicates will still appear
 # in doskey /history. This is a fundamental platform limitation; no workaround
 # exists.
+$schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:
   configurationVersion: 0.2.0
   resources:
