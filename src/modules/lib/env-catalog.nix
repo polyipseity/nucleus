@@ -1,4 +1,10 @@
-# modules/lib/env-vars.nix — Single source of truth for every env var on all hosts.
+# modules/lib/env-catalog.nix — Centralized environment variable catalog.
+#
+# This file contains the catalog of all managed environment variables and
+# the resolution logic for rendering them per-OS.  It internally imports
+# managed-paths.nix for PATH-related catalog entries but does NOT re-export
+# those bindings — callers should import managed-paths.nix directly for
+# PATH-specific needs.
 #
 # Callers MUST pass `username`.  Do NOT add a fallback chain (no default null,
 # no config.home.username fallback, no getEnv "USER" fallback).  Every caller
@@ -8,8 +14,8 @@
 #   { default?, macOS?, NixOS?, Windows? }
 # - `default` applies to any OS not explicitly keyed.
 # - If an OS key is absent AND `default` is absent, the OS is not applicable.
-# Use: import ./lib/env-vars.nix { inherit config pkgs lib username; }
-# Returns: { catalog, allVars, systemVars, macOSAllVars, ... }
+# Use: import ./lib/env-catalog.nix { inherit config pkgs lib username; }
+# Returns: { catalog, allVars, systemVars, macOSAllVars, resolveValue, ... }
 {
   config,
   pkgs,
@@ -18,6 +24,8 @@
   ...
 }:
 let
+  managedPaths = import ./managed-paths.nix { inherit pkgs; };
+
   # ── Shared values used by multiple catalog entries ──────────────────
 
   allUsers = builtins.fromJSON (builtins.readFile ../users.json);
@@ -34,95 +42,9 @@ let
     else
       "${resolvedHomeDirectory}/.password-store";
 
-  defaultDevTools = pkgs.symlinkJoin {
-    name = "default-dev-tools";
-    paths = [
-      pkgs.bun
-      pkgs.prek
-      pkgs.uv
-    ];
-  };
-
   servicesJSON = builtins.fromJSON (builtins.readFile ../services.json);
   litellmEndpoint = servicesJSON.litellm.network.default;
   ollamaHost = "${litellmEndpoint.host}:${toString litellmEndpoint.port}";
-
-  # ── PATH components ─────────────────────────────────────────────────
-  # Managed PATH directories split into prepend (before system default) and
-  # append (after system default) groups.  Each consumer renders these as
-  # platform-appropriate PATH strings.
-  # Prepend: user-scope package manager bin directories.
-  # Append: empty for now — reserved for future use.
-  pathComponents = {
-    prepend = [
-      ".bun/bin"
-      ".cargo/bin"
-      ".local/bin"
-    ];
-    append = [ ];
-  };
-
-  # ── Helper: render macOS launchctl prepend PATH string ─────────────
-  # Returns a colon-joined string of prepend dirs only for use as
-  # __nucleus_prepend in macOS activation/LaunchAgent scripts.
-  # Contains only the managed prepend dirs, no system default.
-  # NOTE: Returns only managed prepend PATH components — callers must
-  # combine with the runtime system PATH.
-  toLaunchctlPrependPath = builtins.concatStringsSep ":" (
-    map (p: "$HOME/${p}") pathComponents.prepend
-  );
-
-  # ── Helper: render macOS launchctl append PATH string ──────────────
-  # Returns a colon-joined string of append dirs only for use as
-  # __nucleus_append in macOS activation/LaunchAgent scripts.
-  # Contains only the managed append dirs, no system default.
-  # NOTE: Returns only managed append PATH components — callers must
-  # combine with the runtime system PATH.
-  toLaunchctlAppendPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.append);
-
-  # ── Helper: render generic shell PATH prepend string ───────────────
-  # Same format as toLaunchctlPrependPath but with a generic name for use
-  # in shell scripts that are not macOS-launchctl-specific.
-  toShellPrependPath = builtins.concatStringsSep ":" (
-    map (p: "$HOME/${p}") pathComponents.prepend
-  );
-
-  # ── Helper: render PowerShell PATH-prepend snippet ─────────────────
-  # Returns a complete PowerShell block that prepends all managed dirs to
-  # $env:PATH with existence guards (Test-Path) and dedup guards (notlike).
-  # Used by pwsh.nix to generate the HM-managed PowerShell profile.
-  toPowerShellPrependSnippet = ''
-    $__nucleusBinPaths = @(
-      (Join-Path $HOME ".bun\bin"),
-      (Join-Path $HOME ".cargo\bin"),
-      (Join-Path $HOME ".local\bin")
-    )
-    foreach ($__nucleusBinPath in $__nucleusBinPaths) {
-      if ((Test-Path $__nucleusBinPath) -and ($env:PATH -notlike "*$__nucleusBinPath*")) {
-        $env:PATH = "$__nucleusBinPath;$env:PATH"
-      }
-    }
-    Remove-Variable __nucleusBinPaths, __nucleusBinPath -ErrorAction SilentlyContinue
-  '';
-
-  # ── Helper: Nix profile probe directories ─────────────────────────
-  # Shell-quoted list of Nix/home-manager profile bin directories probed by
-  # _nucleus_prepend_first_executable_dir in activation steps.
-  # Contains $HOME references — expanded at shell runtime, not by Nix.
-  nixProfileBinDirs = ''
-    "$HOME/.local/state/nix/profiles/profile/bin" \
-    "$HOME/.nix-profile/bin" \
-    "$HOME/.local/state/home-manager/profile/bin" \
-    "$HOME/.local/home-manager/profile/bin"
-  '';
-
-  # ── Helper: NixOS system profile probe directories ────────────────
-  # Shell-quoted list of NixOS system-wide profile bin directories.
-  # Contains $USER reference — expanded at shell runtime, not by Nix.
-  nixSystemBinDirs = ''
-    "/etc/profiles/per-user/$USER/bin" \
-    "/run/current-system/sw/bin"
-  '';
 
   # ── Catalog ─────────────────────────────────────────────────────────
   # Each entry:
@@ -269,7 +191,7 @@ let
     # ── Fallback toolchain ──────────────────────────────────────────
     NUCLEUS_DEFAULT_DEV_BIN = {
       values = {
-        default = "${defaultDevTools}/bin";
+        default = "${managedPaths.defaultDevTools}/bin";
         Windows = "%USERPROFILE%\\scoop\\shims";
       };
       userSpecific = true;
@@ -308,7 +230,7 @@ let
     # toLaunchctlAppendPath in the activation/agent scripts in macos.nix.
     PATH = {
       values = {
-        macOS = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.prepend);
+        macOS = managedPaths.toShellPrependPath;
       };
       excludeFromAll = true;
       userSpecific = true;
@@ -466,15 +388,7 @@ in
     toJsonManifest
     getAllNixVarNames
     resolveValue
-    defaultDevTools
     passwordStoreDir
     currentOs
-    toLaunchctlPrependPath
-    toLaunchctlAppendPath
-    toShellPrependPath
-    toPowerShellPrependSnippet
-    nixProfileBinDirs
-    nixSystemBinDirs
-    pathComponents
     ;
 }
