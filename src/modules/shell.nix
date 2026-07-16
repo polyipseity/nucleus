@@ -41,7 +41,6 @@ let
   # included in allVars.  We overlay NUCLEUS_DEFAULT_DEV_* here
   mergedSessionVariables = envVarsHelpers.allVars // {
     NUCLEUS_DEFAULT_DEV_BIN = "${managedPaths.defaultDevTools}/bin";
-    NUCLEUS_DEFAULT_DEV_ENV = "1";
   };
 
   # Keep iCloud exclusion names and managed root paths in one declarative source
@@ -196,7 +195,6 @@ in
             # coordinates here as well.  This keeps repositories without .envrc
             # usable even when the shell did not start as a login shell.
             export NUCLEUS_DEFAULT_DEV_BIN="${managedPaths.defaultDevTools}/bin"
-            export NUCLEUS_DEFAULT_DEV_ENV="1"
 
             # (User-scope package manager bin dirs are declared via home.sessionPath
             # below; that path goes to ~/.zshenv which is sourced before this
@@ -644,7 +642,7 @@ in
   # catalog in src/modules/lib/env-catalog.nix.
   home.sessionPath = builtins.map (
     p: "${config.home.homeDirectory}/${p}"
-) managedPaths.pathComponents.prepend;
+  ) managedPaths.pathComponents.prepend;
 
   home.sessionVariables = mergedSessionVariables;
 

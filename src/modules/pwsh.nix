@@ -35,7 +35,6 @@ let
         # Keep a user-scoped fallback toolchain available when the current project
         # does not provide a direnv/devShell entrypoint.
         $env:NUCLEUS_DEFAULT_DEV_BIN = "${managedPaths.defaultDevTools}/bin"
-        $env:NUCLEUS_DEFAULT_DEV_ENV = "1"
 
         # Expose user-scope package manager bins so globally installed tools are
         # accessible in interactive sessions.  Canonical source: env-catalog.nix.

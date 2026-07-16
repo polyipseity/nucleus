@@ -197,13 +197,6 @@ let
       userSpecific = true;
       why = "Fallback toolchain bin dir for repos without direnv/Nix devShell. Windows uses Scoop shims path.";
     };
-    NUCLEUS_DEFAULT_DEV_ENV = {
-      values = {
-        default = "1";
-      };
-      userSpecific = true;
-      why = "Flag that fallback toolchain is configured.";
-    };
 
     # ── Host identity ────────────────────────────────────────────────
     NUCLEUS_HOST = {
