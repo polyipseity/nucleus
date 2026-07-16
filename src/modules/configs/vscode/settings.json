@@ -298,11 +298,11 @@
     }
   },
   "notebook.codeActionsOnSave": {
+    "notebook.source.fixAll.ruff": "explicit",
+    "notebook.source.organizeImports.ruff": "explicit",
     "source.fixAll.eslint": "explicit",
     "source.fixAll.markdownlint": "explicit",
     "source.fixAll.prettier": "explicit",
-    "source.fixAll.ruff": "explicit",
-    "source.organizeImports.ruff": "explicit",
     "source.organizeLinkDefinitions": "explicit",
     "source.sort.json": "explicit"
   },
