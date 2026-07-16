@@ -33,10 +33,9 @@ in
     description = "Helper functions for transforming the env var catalog.";
     default = {
       inherit (envLib)
-        toHomeSessionVariables
-        toNixOSSystemEnvironment
-        toLaunchctlScript
-        toUserLaunchctlScript
+        allVars
+        systemVars
+        macOSAllVars
         toJsonManifest
         getAllNixVarNames
         resolveValue
