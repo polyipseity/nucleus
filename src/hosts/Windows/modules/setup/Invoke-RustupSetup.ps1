@@ -170,6 +170,23 @@ function Write-CargoConfig {
   }
 
   $configContent = @'
+# ── Build concurrency ──────────────────────────────────────────────────────
+[build]
+jobs = 8
+
+# ── Test concurrency ───────────────────────────────────────────────────────
+[env]
+RUST_TEST_THREADS = "4"
+
+# ── Dev profile: memory-efficient debugging ────────────────────────────────
+[profile.dev]
+debug = "line-tables-only"
+codegen-units = 16
+
+# ── Dev profile: strip external dependency debug info ──────────────────────
+[profile.dev.package."*"]
+debug = false
+
 # ── Linux: mold via Clang ──────────────────────────────────────────────────
 # mold is the fastest linker available. clang is used as the driver because
 # it correctly passes -fuse-ld=mold to the linker invocation.
