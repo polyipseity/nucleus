@@ -51,27 +51,25 @@ function Sync-ShellProfile {
 
   $managedBlockStart = '# >>> config managed shell parity >>>'
   $managedBlockEnd = '# <<< config managed shell parity <<<'
-  $managedBlock = @(
-    $managedBlockStart
-    # User-scope package manager bin directories are prepended before the
-    # direnv hook initializes so they are always part of the environment
-    # direnv saves and restores, regardless of whether the directories
-    # existed at profile load time.  No existence guard: non-existent dirs
-    # in PATH are harmless and the unconditional add ensures a new terminal
-    # opened after apply sees the correct PATH immediately.
-    #   bun install -g   -> ~\.bun\bin  (BUN_INSTALL_BIN default)
-    #   cargo-binstall   -> ~\.cargo\bin (CARGO_HOME/bin default)
-    # Sources:
-    # https://bun.sh/docs/cli/install#global-packages
-    # https://doc.rust-lang.org/cargo/commands/cargo-install.html
-    '$bunBinDir = Join-Path $env:USERPROFILE ".bun\bin"'
-    'if ($env:PATH -notlike "*$bunBinDir*") {'
-    '  $env:PATH = "$bunBinDir;$env:PATH"'
-    '}'
-    '$cargoBinDir = Join-Path $env:USERPROFILE ".cargo\bin"'
-    'if ($env:PATH -notlike "*$cargoBinDir*") {'
-    '  $env:PATH = "$cargoBinDir;$env:PATH"'
-    '}'
+  # User-scope package manager bin directories are prepended before the
+  # direnv hook initializes so they are always part of the environment
+  # direnv saves and restores, regardless of whether the directories
+  # existed at profile load time.  No existence guard: non-existent dirs
+  # in PATH are harmless and the unconditional add ensures a new terminal
+  # opened after apply sees the correct PATH immediately.
+  # Sources: ManagedPaths.ps1 -> env-vars.nix (pathComponents.prepend).
+  # Compute from the canonical path list so additions only need updating in
+  # one place.  Each entry (e.g. '.bun\bin') produces a variable definition,
+  # a guard, and a PATH assignment.
+  $prependLines = $nucleusPathComponents.Prepend | ForEach-Object {
+    $__binName = $_ -replace '^\.(.+)\\bin$', '$1'
+    $__binVar  = "${__binName}BinDir"
+    "`$$__binVar = Join-Path `$env:USERPROFILE `"$_`""
+    "if (`$env:PATH -notlike `"*`$$__binVar*`") {"
+    "  `$env:PATH = `"`$$__binVar;`$env:PATH`""
+    "}"
+  }
+  $managedBlock = @($managedBlockStart) + $prependLines + @(
     # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
     'if (Get-Command direnv -ErrorAction SilentlyContinue) {'
     '  (& direnv hook pwsh) | Out-String | Invoke-Expression'
