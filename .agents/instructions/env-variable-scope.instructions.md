@@ -8,12 +8,12 @@ Every environment variable set by this repo must default to all-process availabi
 
 ## Centralized registry
 
-All Nix-side env vars are declared in `src/modules/lib/env-vars.nix`. The catalog entries specify value, scope, allowed hosts, and rationale. Platform-specific helper functions (`toHomeSessionVariables`, `toNixOSSystemEnvironment`, `toLaunchctlScript`, `toNixOSServiceEnv`) consume the catalog.
+All Nix-side env vars are declared in `src/modules/lib/env-vars.nix`. The catalog entries specify value, allowed hosts, and rationale. Helper functions (`allVars`, `systemVars`, `macOSAllVars`) consume the catalog into platform-specific formats.
 
 - **Adding a new var**: add an entry to `src/modules/lib/env-vars.nix` catalog, then run the appropriate helper in the target module.
 - **Windows parity**: `src/hosts/Windows/user/env.dsc.yml` is the Windows parallel registry. Parity is enforced by `tests/hosts/Windows/EnvVarParity.Tests.ps1`. See `docs/env-variable-registry.md` for the cross-reference table.
 - **Overriding per host**: use the `override` attr in the catalog entry (e.g., NixOS vs macOS vs Windows).
-- **User-specific vars**: set `userSpecific = true` in the catalog entry for vars whose value depends on the logged-in user (e.g. `PASSWORD_STORE_DIR`). These are excluded from `toNixOSSystemEnvironment` (system-wide env) and only set via home-manager session variables.
+- **User-specific vars**: set `userSpecific = true` in the catalog entry for vars whose value depends on the logged-in user (e.g. `PASSWORD_STORE_DIR`). These are excluded from `systemVars` (system-wide env) and only set via home-manager session variables and the macOS LaunchAgent (`macOSAllVars`).
 
 ## Scope restrictions
 
