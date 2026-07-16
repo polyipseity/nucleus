@@ -47,25 +47,8 @@ let
         $env:NUCLEUS_DEFAULT_DEV_ENV = "1"
 
         # Expose user-scope package manager bins so globally installed tools are
-        # accessible in interactive sessions.
-        #   bun install -g   -> ~\.bun\bin   (BUN_INSTALL_BIN default)
-        #   cargo-binstall   -> ~\.cargo\bin (CARGO_HOME\bin default)
-        #   uv tool install  -> ~\.local\bin (XDG_BIN_HOME default)
-        # Guards prevent PATH growth when a directory does not exist yet.
-        # Source: https://bun.sh/docs/cli/install#global-packages
-        # Source: https://doc.rust-lang.org/cargo/commands/cargo-install.html
-        # Source: https://docs.astral.sh/uv/reference/settings/#tool-bin-dir
-        $__nucleusBinPaths = @(
-          (Join-Path $HOME ".bun\bin"),
-          (Join-Path $HOME ".cargo\bin"),
-          (Join-Path $HOME ".local\bin")
-        )
-        foreach ($__nucleusBinPath in $__nucleusBinPaths) {
-          if ((Test-Path $__nucleusBinPath) -and ($env:PATH -notlike "*$__nucleusBinPath*")) {
-            $env:PATH = "$__nucleusBinPath;$env:PATH"
-          }
-        }
-        Remove-Variable __nucleusBinPaths, __nucleusBinPath -ErrorAction SilentlyContinue
+        # accessible in interactive sessions.  Canonical source: env-vars.nix.
+        ${envVars.toPowerShellPrependSnippet}
 
         # PSReadLine: predictive history completion and menu-style tab expansion.
         # Guards with module availability probe so the profile loads on hosts where
