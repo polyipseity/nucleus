@@ -6,5 +6,5 @@ Actions=openNucleusManual
 
 [Desktop Action openNucleusManual]
 Name=open nucleus manual
-Exec=SCRIPT_PATH
+Exec=sh -c "exec $HOME/.local/lib/nucleus/open-manual"
 Icon=help-contents
