@@ -1,7 +1,7 @@
 ---
 status: in-progress
 committed: partial
-current-step: 8
+current-step: 9
 inputs:
   atomicCommits: true
   backwardsCompat: no

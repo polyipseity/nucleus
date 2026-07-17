@@ -9,15 +9,17 @@
 - `scripts/` contains user-facing automation helpers with paired `.sh`/`.ps1` entry points: bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and others.
 - `src/scripts/` contains Nix-internal scripts organized into domain subdirectories:
   - `apply.sh` — POSIX apply dispatcher (kept in root)
-  - `macos/` — macOS-specific scripts
-  - `lib/` — shared library scripts sourced by other scripts
-  - `secrets/` — secret provisioning helpers
-  - `agents/` — AI agent setup scripts
-  - `home/` — Home Manager activation helpers
-  - `dev/` — development environment scripts
-  - `camilladsp/` — CamillaDSP lifecycle scripts
-  - `host/` — host-specific scripts (e.g. `nixos/`, `jellyfin-sync.sh`)
+  - `caddy-trust.sh` — Caddy local CA trust (cross-platform)
   - `cleanup-nix-build-artifacts.sh`, `install-prek-hooks.sh`, `wallpaper-provision.sh` — ungrouped root scripts
+  - `services/` — persistent daemon/service scripts (camilladsp, betterdisplay-heartbeat,
+    gc-weekly, gui-env, nix-index-update, ds-store-gc, spotlight-exclusions)
+  - `lib/` — shared library scripts for symlink hardening, cloud drive setup, dev repo
+    provisioning, iCloud exclusions, VM setup, and the shared lib.sh
+  - `secrets/` — secret provisioning helpers
+  - `home/` — Home Manager activation helpers (INI merge, bun package install)
+  - `host/` — host-specific scripts (e.g. `NixOS/`, `jellyfin-sync.sh`)
+  - `agents/` — AI agent setup scripts
+  - `macos/` — macOS-specific activation scripts (no daemons)
   **Rule**: the filename (including its domain prefix) must equal the activation entry name, ensuring uniqueness. The domain prefix is preserved inside the subdirectory to guarantee uniqueness and match the activation entry name.
 - `tests/` contains automated tests: `tests/modules/`, `tests/integration/`, and `tests/hosts/<host>/` for Nix logic tests, `tests/hosts/Windows/` for Pester DSC validation. All changes require corresponding tests; see `.agents/instructions/testing.instructions.md`.
 - Keep this file short and durable. Put file-type and workflow-specific rules in `.agents/instructions/*.instructions.md`, reusable workflows in `.agents/prompts/*.prompt.md`, and skill assets in `.agents/skills/<skill>/`.
