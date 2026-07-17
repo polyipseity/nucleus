@@ -237,7 +237,7 @@ let
   # apply runs fast.
   nixIndexUpdate = pkgs.writeShellScript "nix-index-update" (
     builtins.replaceStrings [ "NIX_INDEX_BIN" ] [ "${pkgs.nix-index}/bin/nix-index" ] (
-      builtins.readFile ../scripts/nix-index-update.sh
+      builtins.readFile ../scripts/macos/nix-index-update.sh
     )
   );
 
@@ -274,7 +274,7 @@ let
     builtins.replaceStrings
       [ "DEV_SPOTLIGHT_FIND_EXPRESSION" ]
       [ "${devSpotlightExcludedDirectoryFindExpression}" ]
-      (builtins.readFile ../scripts/dev-spotlight-exclusions.sh)
+      (builtins.readFile ../scripts/dev/dev-spotlight-exclusions.sh)
   );
 
   # Daily Finder metadata cleanup for ~/dev.
@@ -282,12 +282,12 @@ let
   # maintenance: deleting stale .DS_Store files can take noticeable time on a
   # large checkout and should not slow synchronous apply/bootstrap flows.
   devDsStoreGc = pkgs.writeShellScript "dev-ds-store-gc" (
-    builtins.readFile ../scripts/dev-ds-store-gc.sh
+    builtins.readFile ../scripts/dev/dev-ds-store-gc.sh
   );
 
   gcWeekly = pkgs.writeShellScript "gc-weekly" ''
     export REPO_ROOT="${repoRoot}"
-    ${builtins.readFile ../scripts/gc-weekly.sh}
+    ${builtins.readFile ../scripts/macos/gc-weekly.sh}
   '';
 
   guiEnvAgent = pkgs.writeShellScript "gui-env-agent" ''

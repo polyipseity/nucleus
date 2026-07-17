@@ -13,7 +13,7 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/../src/scripts/lib.sh"
+. "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT"

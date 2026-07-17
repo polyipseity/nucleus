@@ -28,12 +28,12 @@ in
   # uses a named script (nixos-specific option).
   #
   # WHY a separate script instead of inline shell: see the rationale in
-  # src/scripts/jellyfin-sync.sh header — this is runtime imperative API
+  # src/scripts/host/jellyfin-sync.sh header — this is runtime imperative API
   # convergence that Nix's build-time model cannot express.
   system.activationScripts.jellyfin-sync = lib.mkAfter ''
     jellyfin_repo_root="''${NUCLEUS_REPO_ROOT:-}"
-    if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh" ]; then
-      NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh"
+    if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/host/jellyfin-sync.sh" ]; then
+      NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/host/jellyfin-sync.sh"
     fi
   '';
 }

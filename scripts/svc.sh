@@ -16,7 +16,7 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/../src/scripts/lib.sh"
+. "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 usage() {
   usage_std "$(basename "$0")" "list|status|start|stop|restart|enable|disable|verify|endpoint|logs|log-paths|log-config [service...] [options]"

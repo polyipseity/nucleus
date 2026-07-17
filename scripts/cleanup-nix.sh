@@ -21,7 +21,7 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/../src/scripts/lib.sh"
+. "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 usage() {
   usage_std "$(basename "$0")" "[--dry-run] [--help]" "Remove stale Nix build result symlinks (result, result-*) from the repo root."

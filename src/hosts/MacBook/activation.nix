@@ -197,14 +197,14 @@ in
     # WHY a separate script instead of inline shell: the sync logic performs
     # runtime imperative operations (SOPS decryption, API polling, token auth,
     # diff-and-converge) that Nix's declarative model cannot express.  Keeping
-    # it in src/scripts/jellyfin-sync.sh avoids duplicating 600+ lines of shell
+    # it in src/scripts/host/jellyfin-sync.sh avoids duplicating 600+ lines of shell
     # across hosts and keeps the activation file scoped to macOS-specific hooks.
     #
     # NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo.  If unset,
     # skip gracefully.
     jellyfin_repo_root="$NUCLEUS_REPO_ROOT"
-    if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh" ]; then
-      NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/jellyfin-sync.sh"
+    if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/host/jellyfin-sync.sh" ]; then
+      NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/host/jellyfin-sync.sh"
     fi
 
     # ---- verifyNucleusServices ---------------------------------------------------

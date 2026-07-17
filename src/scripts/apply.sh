@@ -190,9 +190,9 @@ run_gc() {
 }
 
 run_caddy_local_ca_trust() {
-  # Delegate to src/scripts/caddy-trust.sh for Caddy local CA trust
+  # Delegate to src/scripts/macos/caddy-trust.sh for Caddy local CA trust
   # (retry loop with caddy --address 127.0.0.1:2019).
-  _rclct_script="$REPO_ROOT/src/scripts/caddy-trust.sh"
+  _rclct_script="$REPO_ROOT/src/scripts/macos/caddy-trust.sh"
   if [ ! -f "$_rclct_script" ]; then
     printf '%s\n' "caddy-trust: caddy-trust.sh not found at $_rclct_script; skipping local CA trust"
     return

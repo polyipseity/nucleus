@@ -187,7 +187,7 @@ in
     # preserving any user-configured settings outside managed keys.
     home.activation.configureQtPassSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       export AWK_PATH="${pkgs.gawk}/bin/awk"
-      ${builtins.readFile ../scripts/qtpass-merge-ini.sh}
+      ${builtins.readFile ../scripts/home/qtpass-merge-ini.sh}
 
       case "$(uname -s)" in
         Darwin)
@@ -219,7 +219,7 @@ in
     home.activation.configurePicardSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       export AWK_PATH="${pkgs.gawk}/bin/awk"
       export PICARD_DEFAULTS_INI=${lib.escapeShellArg picardDefaultsIniText}
-      ${builtins.readFile ../scripts/picard-merge-ini.sh}
+      ${builtins.readFile ../scripts/home/picard-merge-ini.sh}
       ${picardOverrideCommands}
     '';
 

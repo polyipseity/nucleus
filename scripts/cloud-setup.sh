@@ -16,7 +16,7 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/../src/scripts/lib.sh"
+. "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 # Reads the configured iCloud service for a remote from src/modules/users.json.
 # Args: $1 — repo root; $2 — remote name.

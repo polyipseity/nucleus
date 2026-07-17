@@ -16,7 +16,7 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/../src/scripts/lib.sh"
+. "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 usage() {
   usage_std "health-check.sh" "[options]" "Checks pre-flight readiness before bootstrap/apply/update operations."

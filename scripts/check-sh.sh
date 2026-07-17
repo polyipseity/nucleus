@@ -13,7 +13,7 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/../src/scripts/lib.sh"
+. "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 usage() {
   usage_std "check-sh.sh" "[path ...]" "Validate shell script syntax and lint quality with ShellCheck. With no arguments, checks all tracked *.sh files from Git. With arguments, checks only the provided paths."
