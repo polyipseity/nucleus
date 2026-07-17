@@ -7,10 +7,10 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
-REPO_ROOT="$SCRIPT_DIR/../.."
-. "$REPO_ROOT/src/scripts/lib.sh"
+NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+. "$NUCLEUS_REPO_ROOT/src/scripts/lib.sh"
 
 # Test extract_ports with a minimal service entry
 test_extract_ports_basic() {

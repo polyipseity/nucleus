@@ -128,7 +128,7 @@ test_script_help_from_outside() {
         local result
         result=$(
             cd /tmp
-            bash "$script" --help 2>/dev/null
+            NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" bash "$script" --help 2>/dev/null
         ) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
         if [ -n "$result" ]; then
             assert_pass "$name --help from /tmp"
