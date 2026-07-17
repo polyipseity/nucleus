@@ -342,6 +342,7 @@ __marimo__/
 # self {
 !/src/modules/env/
 !/src/modules/lib/
+!/src/scripts/lib/
 /src/hosts/Windows/system/*.locked.dsc.yml
 /src/hosts/Windows/user/*.locked.dsc.yml
 # }
