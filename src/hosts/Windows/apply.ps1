@@ -564,6 +564,7 @@ $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..
 # POSIX activation. QtPass stores settings in platform-native stores
 # (registry on Windows), so Method 1 (symlink) does not apply.
 $qtPassSettingsPath = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\qtpass\qtpass.json"
+# Method 3 (merge) — Picard defaults INI merged via Sync-PicardConfig on Windows
 $picardDefaultsPath = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\picard\Picard.ini"
 $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 
