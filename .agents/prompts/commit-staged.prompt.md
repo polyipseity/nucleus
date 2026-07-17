@@ -26,6 +26,16 @@ Proceed automatically with best-effort defaults and available context.
    - Optional body (each line wrapped to 72 chars or fewer; bullets allowed)
    - Footer (`BREAKING CHANGE` / `Refs` / `Ticket`), including `${input:extra}` when provided
    Prefer tooling-enforced rules; default to Conventional Commits when unclear.
+   If the commit is rejected by commitlint, rewrap and retry with a fresh
+   `git commit`. NEVER use `git commit --amend` — the commit was not created,
+   so `--amend` would modify whatever HEAD currently points to (a pre-existing
+   commit), potentially destroying history.
+
+2a. **Verify commit**
+   - Run `git rev-parse HEAD` and `git log -1 --format=%s`. Confirm the hash
+     is new and the message is your intended message. If they show the
+     previous commit's message, the commit was not created — retry with a
+     fresh `git commit` (not `--amend`).
 
 3. **Create the commit**
    If `${input:commitNow}` is `no`, skip and only present the message.

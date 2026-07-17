@@ -25,9 +25,15 @@ Never ask for confirmation or clarification. Proceed automatically using best-ef
      - Short subject (~50 chars)
      - Optional body (each line **must be wrapped to 72 characters or fewer**; bullets allowed)
      - Footer (BREAKING CHANGE / Refs / Ticket), including `${input:extra}` if provided
-   - **If the commit is rejected by commitlint due to line length or other formatting, rewrap and retry until the commit passes.**
+   - **If the commit is rejected by commitlint due to line length or other formatting, rewrap and retry with a fresh `git commit`. NEVER use `git commit --amend` — the commit was not created, so `--amend` would modify whatever HEAD currently points to (a pre-existing commit), potentially destroying history.**
    - Prefer tooling-enforced rules. If unsure, default to Conventional Commits. **Strictly enforce commit header and body line length (72 chars max) as required by commitlint.**
    - Do not ask for approval before committing.
+
+2a. **Verify commit**
+   - Run `git rev-parse HEAD` and `git log -1 --format=%s`. Confirm the hash
+     is new and the message is your intended message. If they show the
+     previous commit's message, the commit was not created — retry with a
+     fresh `git commit` (not `--amend`).
 
 3. **Create the commit**
    - If `${input:commitNow}` is `no`, skip this step and only present the message.
