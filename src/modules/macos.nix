@@ -236,7 +236,7 @@ let
   # rebuild when the DB was updated within the past 6 days keeps normal
   # apply runs fast.
   nixIndexUpdate = pkgs.writeShellScript "nix-index-update" (
-    builtins.replaceStrings [ "NIX_INDEX_BIN" ] [ "${pkgs.nix-index}/bin/nix-index" ] (
+    builtins.replaceStrings [ "__NIX_INDEX_BIN__" ] [ "${pkgs.nix-index}/bin/nix-index" ] (
       builtins.readFile ../scripts/services/nix-index-update.sh
     )
   );
@@ -272,7 +272,7 @@ let
   # scan slow enough to noticeably delay `nix run .#apply` and bootstrap apply.
   devSpotlightExclusions = pkgs.writeShellScript "spotlight-exclusions" (
     builtins.replaceStrings
-      [ "DEV_SPOTLIGHT_FIND_EXPRESSION" ]
+      [ "__DEV_SPOTLIGHT_FIND_EXPRESSION__" ]
       [ "${devSpotlightExcludedDirectoryFindExpression}" ]
       (builtins.readFile ../scripts/services/spotlight-exclusions.sh)
   );

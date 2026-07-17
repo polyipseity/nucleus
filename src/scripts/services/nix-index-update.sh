@@ -11,4 +11,4 @@ if [ -f "$db_file" ] && [ -z "$(find "$db_file" -mtime +6)" ]; then
   exit 0
 fi
 
-exec NIX_INDEX_BIN
+exec __NIX_INDEX_BIN__

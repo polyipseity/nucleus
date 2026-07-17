@@ -1,5 +1,5 @@
 # Daily Spotlight exclusion refresh for the mutable ~/dev tree.
-# Uses a Nix-generated find predicate expression (DEV_SPOTLIGHT_FIND_EXPRESSION)
+# Uses a Nix-generated find predicate expression (__DEV_SPOTLIGHT_FIND_EXPRESSION__)
 # that is substituted at eval time.
 set -eu
 
@@ -19,7 +19,7 @@ while IFS= read -r -d "" directory_path; do
   : > "$marker_path"
   updated_count=$((updated_count + 1))
 done < <(
-  /usr/bin/find "$DEV_ROOT" \( DEV_SPOTLIGHT_FIND_EXPRESSION \) -type d -print0
+  /usr/bin/find "$DEV_ROOT" \( __DEV_SPOTLIGHT_FIND_EXPRESSION__ \) -type d -print0
 )
 
 if [ "$updated_count" -gt 0 ]; then
