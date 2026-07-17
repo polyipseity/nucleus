@@ -16,39 +16,12 @@
   ...
 }:
 let
-  qtPassDefaultSettings = {
-    addGPGId = true;
-    alwaysOnTop = true;
-    autoPull = false;
-    autoPush = false;
-    autoclearPanelSeconds = 5;
-    autoclearSeconds = 10;
-    avoidCapitals = false;
-    avoidNumbers = false;
-    clipBoardType = 2;
-    displayAsIs = false;
-    hideContent = false;
-    hideOnClose = true;
-    hidePassword = true;
-    lessRandom = false;
-    noLineWrapping = false;
-    passTemplate = "login\nurl\ndescription\n";
-    passwordCharsselection = 0;
-    passwordLength = 15;
-    startMinimized = false;
-    templateAllFields = true;
-    useAutoclear = true;
-    useAutoclearPanel = true;
-    useGit = true;
-    useMonospace = true;
-    useOtp = true;
-    usePwgen = true;
-    useQrencode = false;
-    useSelection = false;
-    useSymbols = true;
-    useTemplate = true;
-    useTrayIcon = true;
-  };
+  # Method 3 (merge) — shared baseline from declarative JSON. The JSON file is
+  # the single source of truth consumed by both Nix (POSIX merge) and Windows
+  # activation. QtPass settings are merged into platform-native stores
+  # (macOS: defaults, Linux: INI, Windows: registry), so Method 1 (symlink)
+  # does not apply.
+  qtPassDefaultSettings = builtins.fromJSON (builtins.readFile ./qtpass.json);
 
   qtPassPlatformSettings = lib.optionalAttrs pkgs.stdenv.isDarwin {
     # macOS keeps Hide on close disabled, per the requested platform-specific

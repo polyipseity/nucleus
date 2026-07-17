@@ -18,7 +18,7 @@ function Sync-QtPassConfig {
 
   .PARAMETER SettingsPath
     Absolute path to the file containing the shared QtPass settings (typically
-    derived from the Nix qtPassDefaultSettings attrset in home.nix). Callers
+    derived from the Nix qtpass.json source of truth). Callers
     must pass this path explicitly so they are aware of the cross-platform
     source of truth being applied.
 
