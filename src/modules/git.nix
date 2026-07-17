@@ -10,7 +10,7 @@
   # The activation step below assembles both into ~/.config/git/ignore so
   # users can add machine-local patterns without editing declarative files.
   xdg.configFile."git/ignore-global" = {
-    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/ignore-global";
+    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/system.gitignore";
   };
 
   home.activation.gitIgnoreAssemble = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
