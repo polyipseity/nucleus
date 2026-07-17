@@ -2,3 +2,7 @@ extends: default
 
 ignore: |
   vendor/**
+
+rules:
+  line-length:
+    disable
