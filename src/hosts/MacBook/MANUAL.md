@@ -32,6 +32,12 @@
 
 ## service management
 
+- macOS GUI app PATH: The managed PATH for LaunchServices-launched
+  .app bundles is set via `launchctl config system path` (primary) and
+  `launchctl setenv PATH` (secondary). After first `nucleus-apply`, a reboot
+  is required for the primary PATH to take effect. Verify with:
+  `/usr/libexec/PlistBuddy -c 'Print :path' /private/var/db/com.apple.xpc.launchd/config/system.plist`
+  or `/bin/launchctl getenv PATH` (GUI domain).
 - `nucleus-svc list` — list all nucleus-managed services with status
 - `nucleus-svc restart <service>` — restart a service:
   1. If stuck (EX_CONFIG / "waiting" / "spawn scheduled"): full `bootout+bootstrap` recovery.

@@ -113,6 +113,7 @@ in
   # Scripts included:
   #   configureBatteryPolicy           — pmset AC/battery policy
   #   configureChargeLimit             — 80 % charge cap via battery CLI / bclm
+  #   configureLaunchdGuiPath          — persistent system PATH via launchctl config system path
   #   configureSshAccess               — allow all users SSH access by removing com.apple.access_ssh group
   #   configureGimpScrollSensitivity   — GIMP drag-zoom-speed (25% of default)
   #   configureLinearMousePreferences  — LinearMouse update-check suppression
@@ -289,6 +290,37 @@ in
       echo "power: battery.app is installed but the battery CLI is unavailable; open battery.app once and complete setup to install the helper command." >&2
     else
       echo "power: no supported battery charge-limit tool found (expected /usr/local/bin/battery or /opt/homebrew/bin/bclm)." >&2
+    fi
+
+    # ---- configureLaunchdGuiPath ------------------------------------------------
+    # Set the persistent launchd system PATH so LaunchServices-launched .app
+    # bundles inherit the managed PATH.  This is the PRIMARY mechanism for PATH
+    # propagation to macOS GUI apps (the secondary mechanism is launchctl setenv
+    # in guiEnvAgent/guiEnvActivationPathAndRepoRoot).
+    #
+    # This writes to /private/var/db/com.apple.xpc.launchd/config/system.plist
+    # via launchctl config system path.  Reboot required on first set.
+    console_user_launchd="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || echo "")"
+    if [ -n "$console_user_launchd" ] && [ "$console_user_launchd" != "root" ]; then
+      console_home_launchd="$(/usr/bin/dscl . -read "/Users/$console_user_launchd" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}')"
+      if [ -z "$console_home_launchd" ]; then
+        console_home_launchd="/Users/$console_user_launchd"
+      fi
+
+      desired_path="$console_home_launchd/.bun/bin:$console_home_launchd/.cargo/bin:$console_home_launchd/.local/bin:$console_home_launchd/.local/state/nix/profiles/profile/bin:$console_home_launchd/.nix-profile/bin:$console_home_launchd/.local/state/home-manager/profile/bin:$console_home_launchd/.local/home-manager/profile/bin:/etc/profiles/per-user/$console_user_launchd/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+      current_path="$(/usr/libexec/PlistBuddy -c 'Print :path' /private/var/db/com.apple.xpc.launchd/config/system.plist 2>/dev/null || echo "")"
+
+      if [ "$current_path" != "$desired_path" ]; then
+        echo "launchd: updating system PATH (current differs from desired)."
+        if /bin/launchctl config system path "$desired_path" 2>/dev/null; then
+          echo "launchd: system PATH updated.  REBOOT REQUIRED for .app bundles to inherit the new PATH."
+        else
+          echo "launchd: failed to update system PATH (may need manual sudo launchctl config system path)." >&2
+        fi
+      else
+        echo "launchd: system PATH already up-to-date."
+      fi
     fi
 
     # ---- configureSshAccess -----------------------------------------------------

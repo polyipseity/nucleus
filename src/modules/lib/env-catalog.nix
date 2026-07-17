@@ -218,7 +218,7 @@ let
       };
       excludeFromAll = true;
       userSpecific = true;
-      why = "Managed PATH (append portion) for macOS GUI apps. All managed dirs are appended to avoid shadowing system executables. Set by guiEnvActivationPathAndRepoRoot (activation) and gui-env (login agent) in macos.nix.";
+      why = "Managed PATH (append portion) for macOS GUI apps. All managed dirs are appended to avoid shadowing system executables. Primary PATH propagation via launchctl config system path (MacBook/activation.nix); secondary via guiEnvActivationPathAndRepoRoot (activation) and gui-env (login agent) for non-LaunchServices paths.";
     };
 
     # ── Starship prompt ─────────────────────────────────────────────

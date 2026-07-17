@@ -55,6 +55,38 @@ let
   # combine with the runtime system PATH.
   toLaunchctlAppendPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.append);
 
+  # ── Helper: render launchctl config system path string ─────────────
+  # Returns a colon-joined absolute PATH string for use in
+  # sudo launchctl config system path.  Takes homeDir as an argument
+  # (e.g. "${config.home.homeDirectory}") and renders all managed
+  # directories as absolute paths including system fallbacks.
+  # Used by configureLaunchdGuiPath in MacBook/activation.nix and
+  # macos.nix.
+  toLaunchctlConfigPath =
+    homeDir:
+    let
+      username = builtins.baseNameOf homeDir;
+    in
+    builtins.concatStringsSep ":" (
+      (map (p: "${homeDir}/${p}") pathComponents.prepend)
+      ++ [
+        "${homeDir}/.bun/bin"
+        "${homeDir}/.cargo/bin"
+        "${homeDir}/.local/bin"
+        "${homeDir}/.local/state/nix/profiles/profile/bin"
+        "${homeDir}/.nix-profile/bin"
+        "${homeDir}/.local/state/home-manager/profile/bin"
+        "${homeDir}/.local/home-manager/profile/bin"
+        "/etc/profiles/per-user/${username}/bin"
+        "/run/current-system/sw/bin"
+        "/usr/local/bin"
+        "/usr/bin"
+        "/bin"
+        "/usr/sbin"
+        "/sbin"
+      ]
+    );
+
   # ── Helper: render generic shell PATH prepend string ───────────────
   # Same format as toLaunchctlPrependPath but with a generic name for use
   # in shell scripts that are not macOS-launchctl-specific.
@@ -133,6 +165,7 @@ in
   inherit
     defaultDevTools
     pathComponents
+    toLaunchctlConfigPath
     toLaunchctlPrependPath
     toLaunchctlAppendPath
     toShellPrependPath

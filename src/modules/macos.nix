@@ -1477,6 +1477,42 @@ lib.mkIf pkgs.stdenv.isDarwin {
   '';
 
   # --------------------------------------------------------------------------
+  # configureLaunchdGuiPath
+  # Sets the persistent system launchd PATH via launchctl config system path.
+  # This is the PRIMARY mechanism for PATH propagation to macOS GUI apps.
+  # Secondary mechanism (launchctl setenv) is handled by
+  # guiEnvActivationPathAndRepoRoot above and the gui-env agent below.
+  #
+  # Runs after guiEnvActivationPathAndRepoRoot so the setenv PATH is also set.
+  # Uses sudo for launchctl config system path (requires passwordless sudo,
+  # provided by apply.sh).
+  # Reboot required on first set. Settings persist across reboots.
+  # --------------------------------------------------------------------------
+  home.activation.configureLaunchdGuiPath =
+    lib.hm.dag.entryAfter [ "guiEnvActivationPathAndRepoRoot" ]
+      ''
+        # Desired PATH for launchd system config: user-local bins, Nix profiles,
+        # and system default dirs.  Built at eval time from the home directory
+        # (not from $HOME which may be /var/root in activation context).
+        desired_path="${managedPaths.toLaunchctlConfigPath config.home.homeDirectory}"
+
+        # Read current value from system plist (may not exist before first write).
+        current_path="$(/usr/libexec/PlistBuddy -c 'Print :path' /private/var/db/com.apple.xpc.launchd/config/system.plist 2>/dev/null || true)"  # undoc-supp: system.plist may not exist before first launchctl config write; read fails gracefully with empty output
+
+        if [ "$current_path" != "$desired_path" ]; then
+          echo "launchd: updating system PATH (current differs from desired)."
+          if /usr/bin/sudo /bin/launchctl config system path "$desired_path" 2>/dev/null; then
+            echo "launchd: system PATH updated via launchctl config system path."
+            echo "launchd: REBOOT REQUIRED for .app bundles to inherit the new PATH."
+          else
+            echo "launchd: failed to update system PATH (non-fatal)." >&2
+          fi
+        else
+          echo "launchd: system PATH already up-to-date."
+        fi
+      '';
+
+  # --------------------------------------------------------------------------
   # GUI environment variable propagation LaunchAgent (macOS-only)
   # macOS maintains separate shell (user/<uid>/) and GUI (gui/<uid>/) launchd
   # domains.  Shell sessionVariables set via home.sessionVariables never cross

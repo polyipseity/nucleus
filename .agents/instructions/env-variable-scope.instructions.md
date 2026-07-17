@@ -76,5 +76,3 @@ Valid reasons to restrict scope:
 - The value is technically infeasible to compute at build time (e.g., `NUCLEUS_REPO_ROOT` on NixOS — captured at eval time).
 
 "CLI-only tool" or "only shells need it" is not a valid restriction on NixOS or Windows — both CLI and GUI processes inherit the same environment. On macOS, a second propagation mechanism (LaunchAgent calling `launchctl setenv`) is required because `launchd` maintains separate shell and GUI domains. For PATH specifically, `launchctl setenv` is not honored by LaunchServices — see `launchctl config system path` in MacBook/activation.nix for the primary mechanism.
-
-See `.agents/instructions/electron-gui-env.instructions.md` for diagnosis procedure, affected scope, and cross-host comparison.
