@@ -37,3 +37,4 @@ When adding app settings, audit all three hosts (macOS, NixOS, Windows). For eac
 - Activate on all applicable platforms or document exceptions with `# WHY`.
 - Add tests.
 - Verify `nix flake check` and all tests pass.
+- After choosing a config method, verify the `# Method N` comment cites a technical reason, not a preference. Invalid justifications include "system-level path", "no user writes it", and "read-only by convention".
