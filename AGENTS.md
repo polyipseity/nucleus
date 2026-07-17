@@ -9,20 +9,29 @@
 - `scripts/` contains user-facing automation helpers with paired `.sh`/`.ps1` entry points: bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and others.
 - `src/scripts/` contains Nix-internal scripts organized into domain subdirectories:
   - `apply.sh` — POSIX apply dispatcher (kept in root)
-  - `cleanup-nix-build-artifacts.sh`, `install-prek-hooks.sh`, `wallpaper-provision.sh` — ungrouped root scripts
+  - `cleanup-nix-build-artifacts.sh`, `install-prek-hooks.sh`, `wallpaper-provision.sh`,
+    `homebrew-pin-verify.sh`, `nvim-launcher.sh`, `ensure-log-dirs.sh` — ungrouped root scripts
   - `services/` — persistent daemon/service scripts (camilladsp, betterdisplay-heartbeat,
-    gc-weekly, gui-env, nix-index-update, ds-store-gc, spotlight-exclusions, caddy-trust, jellyfin-sync)
+    gc-weekly, gui-env, nix-index-update, ds-store-gc, spotlight-exclusions, caddy-trust,
+    jellyfin-sync, headless-display, preference-gc, verify-nucleus-services)
   - `lib/` — shared library scripts for symlink hardening, cloud drive setup, dev repo
-    provisioning, iCloud exclusions, VM setup, and the shared lib.sh
+    provisioning, iCloud exclusions, VM setup, app bundle variables, LaunchServices
+    handler registration, and the shared lib.sh
   - `secrets/` — secret provisioning helpers
-  - `configs/` — app-config merge helpers (INI merge, JSON merge, bun package install)
-  - `hosts/` — host-specific scripts: `MacBook/` (macOS) and `NixOS/`
+  - `configs/` — app-config merge helpers (INI merge, JSON merge, bun package install,
+    app alias symlinks, LinearMouse config symlinks)
+  - `hosts/` — host-specific scripts: `MacBook/` (macOS) and `NixOS/`. Must be last resort:
+    see placement policy below.
   - `agents/` — AI agent setup scripts
   - **Naming rule**:
     - Files under `hosts/MacBook/` MUST start with `macos-`; entry name = filename.
     - Files under `hosts/NixOS/` MUST start with `nixos-`; entry name = filename.
     - All other subdirs (`services/`, `configs/`, `secrets/`, `agents/`): use natural words/phrases; entry name = filename.
     - Rule does not apply to library scripts (`lib/`), runtime-only scripts, or wrapped derivations.
+  - **Placement policy for `hosts/`**:
+    1. **Platform-specific files → prefer non-hosts folders first.** If a script is platform-specific (macOS-only, Linux-only), first consider placing it in a non-hosts folder (`services/`, `lib/`, `configs/`, `secrets/`, `agents/`, or the root of `src/scripts/`). If it semantically fits one of those folders, put it there regardless of platform-specificity. Only put it under `hosts/<Host>/` when no non-hosts folder fits.
+    2. **Non-platform-specific files → never in `hosts/`.** If a script is cross-platform (no OS-specific commands, no host-specific semantics), it must never go under `hosts/<Host>/`. It belongs in a non-hosts folder or the root of `src/scripts/`.
+    - Rationale: `hosts/<Host>/` is the last resort, not the default. Semantic subdirectories (`services/`, `lib/`, `configs/`, etc.) are better homes for scripts whose primary purpose matches that directory's concern — even if they incidentally use platform-specific APIs. Keeping cross-platform scripts out of `hosts/` prevents accidental platform lock-in and avoids false signals that a script is host-specific.
 - `tests/` contains automated tests: `tests/modules/`, `tests/integration/`, and `tests/hosts/<host>/` for Nix logic tests, `tests/hosts/Windows/` for Pester DSC validation. All changes require corresponding tests; see `.agents/instructions/testing.instructions.md`.
 - Keep this file short and durable. Put file-type and workflow-specific rules in `.agents/instructions/*.instructions.md`, reusable workflows in `.agents/prompts/*.prompt.md`, and skill assets in `.agents/skills/<skill>/`.
 - Inspect the on-disk tree before assuming source files, tests, or runnable commands exist in a given location.

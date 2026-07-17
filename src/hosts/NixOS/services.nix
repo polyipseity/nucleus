@@ -54,7 +54,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     # Shared script that Nautilus and Dolphin both invoke
     # Method 1 (writable symlink): repo edits take effect without rebuild.
     ".local/lib/nucleus/open-manual" = {
-      source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/scripts/open-manual.sh";
+      source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/scripts/hosts/NixOS/nixos-open-manual.sh";
       executable = true;
     };
 

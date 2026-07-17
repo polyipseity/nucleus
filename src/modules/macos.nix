@@ -387,16 +387,16 @@ lib.mkIf pkgs.stdenv.isDarwin {
         '';
 
     # -------------------------------------------------------------------------
-    # macos-linearmouse-config
+    # linearmouse-config
     # Method 1 (writable symlink) — repo changes take effect without rebuild.
     # Creates out-of-store symlinks for LinearMouse's runtime config files
     # pointing into the repository tree. Resolves the repo root at activation
     # time so the link survives repo relocations and rebuilds without stale
     # store paths.
     # -------------------------------------------------------------------------
-    macos-linearmouse-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    linearmouse-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       export REPO_ROOT="${repoRoot}"
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-linearmouse-config.sh}
+      ${builtins.readFile ../scripts/configs/linearmouse-config.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -412,7 +412,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     macos-launch-services = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       export DUTI_BIN="${dutiBin}"
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-launch-services.sh}
+      ${builtins.readFile ../scripts/lib/macos-launch-services-lib.sh}
 
       # Bundle identifiers sourced from app bundles + vendor docs:
       # - Chrome: com.google.chrome
@@ -427,7 +427,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # macos-raycast-aliases
+    # raycast-aliases
     # Raycast currently does not expose a dedicated language toggle for app-name
     # matching. On non-English macOS installations, localized display names can
     # therefore make English queries miss built-in apps.
@@ -436,11 +436,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # under ~/Applications/Nucleus App Aliases so Spotlight/Raycast can index
     # additional English tokens without changing the system UI language.
     # -------------------------------------------------------------------------
-    macos-raycast-aliases = lib.hm.dag.entryAfter [ "macos-launch-services" ] ''
+    raycast-aliases = lib.hm.dag.entryAfter [ "macos-launch-services" ] ''
       _ray_alias_dir="$HOME/Applications/Nucleus App Aliases"
       mkdir -p "$_ray_alias_dir"
       ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-raycast-aliases.sh}
+      ${builtins.readFile ../scripts/configs/raycast-aliases.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -698,7 +698,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if BetterDisplay is not installed.
     # -------------------------------------------------------------------------
     macos-headless-display = lib.hm.dag.entryAfter [ "macos-nightlight" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-headless-display.sh}
+      ${builtins.readFile ../scripts/services/headless-display.sh}
     '';
   };
 

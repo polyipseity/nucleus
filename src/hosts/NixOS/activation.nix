@@ -34,9 +34,9 @@ in
   # Resolves the nvim path from the home-manager profile directory so that no
   # username is hardcoded, matching Home Manager's useUserPackages = true layout.
   # ---------------------------------------------------------------------------
-  system.activationScripts."nixos-nvim-launcher" = lib.mkAfter ''
+  system.activationScripts."nvim-launcher" = lib.mkAfter ''
     NUCLEUS_NVIM_PATH="${config.home-manager.users.${username}.home.profileDirectory}/bin/nvim"
-    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-nvim-launcher.sh}
+    ${builtins.readFile ../../scripts/nvim-launcher.sh}
   '';
 
   # ---------------------------------------------------------------------------
@@ -44,10 +44,10 @@ in
   # Create system log directories for all nucleus systemd services before they
   # start, so journald/stderr redirect targets exist on disk.
   # ---------------------------------------------------------------------------
-  system.activationScripts."nixos-ensure-log-dirs" = lib.mkAfter ''
+  system.activationScripts."ensure-log-dirs" = lib.mkAfter ''
     NUCLEUS_SYSTEM_LOG_DIR="${config.nucleus.logging.systemLogDir}"
     NUCLEUS_LOG_SUBDIRS="${builtins.toString linuxSystemLogDirs}"
-    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-ensure-log-dirs.sh}
+    ${builtins.readFile ../../scripts/ensure-log-dirs.sh}
   '';
 
   # ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ in
   # Failing to start a service should not block activation, but the warning
   # surfaces issues for post-apply investigation.
   # ---------------------------------------------------------------------------
-  system.activationScripts."nixos-verify-nucleus-services" = lib.mkAfter ''
-    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-verify-nucleus-services.sh}
+  system.activationScripts."verify-nucleus-services" = lib.mkAfter ''
+    ${builtins.readFile ../../scripts/services/verify-nucleus-services.sh}
   '';
 }
