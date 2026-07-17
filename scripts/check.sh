@@ -583,9 +583,10 @@ if $HAS_ARGS; then
 else
   # JSON files with inline $schema — auto-discover and validate
   while IFS= read -r -d '' _json_file; do
-    _schema=$(jq -r '.["$schema"] // ""' "$_json_file")
+    _schema=$(jq -r 'if type == "object" then .["$schema"] // "" else "" end' "$_json_file")
     if [ -n "$_schema" ]; then
       case "$_schema" in
+        http://*|https://*) continue ;; # skip remote URL schemas — validated by upstream tooling
         ./*|../*) _schemafile="$(cd "$(dirname "$_json_file")" && echo "$(pwd)/${_schema#./}")" ;;
         *)        _schemafile="$_schema" ;;
       esac
@@ -640,11 +641,11 @@ if ! $HAS_ARGS; then
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
-      to_entries[] | select(.value | type == "object") |
+      to_entries[] | select(.value | type == "object") | select(.key | startswith("$") | not) |
       [
         .key,
-        (.value | has("displayName") and (.value.displayName | type == "string") and (.value.displayName | length > 0) | tostring),
-        (.value | has("platforms") and (.value.platforms | type == "object") | tostring),
+        (.value | has("displayName") and (.displayName | type == "string") and (.displayName | length > 0) | tostring),
+        (.value | has("platforms") and (.platforms | type == "object") | tostring),
         (.value.platforms | if type == "object" then (keys | length) else 0 end | tostring)
       ] | @tsv' "$_svc_json")
 
@@ -662,7 +663,7 @@ if ! $HAS_ARGS; then
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
-      to_entries[] | select(.value | type == "object") |
+      to_entries[] | select(.value | type == "object") | select(.key | startswith("$") | not) |
       .key as $name |
       (.value.platforms // {}) | to_entries[] |
       [
@@ -696,7 +697,7 @@ if ! $HAS_ARGS; then
       _svc_errors=$((_svc_errors + 1))
     fi
   done < <(jq -r '
-    to_entries[] | select(.value | type == "object") |
+    to_entries[] | select(.value | type == "object") | select(.key | startswith("$") | not) |
     .key as $name |
     (.value.platforms // {}) | to_entries[] |
     [
@@ -716,7 +717,7 @@ if ! $HAS_ARGS; then
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
-      to_entries[] |
+    to_entries[] | select(.key | startswith("$") | not) |
       .key as $user |
       (.value.services // {}) | to_entries[] |
       select(.value.enable != null) |

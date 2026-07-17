@@ -639,6 +639,7 @@ if (-not $HAS_ARGS) {
     $_svc = Get-Content $_svcJson -Raw | ConvertFrom-Json -AsHashtable
 
     foreach ($_svcName in $_svc.Keys) {
+      if ($_svcName -like '$*') { continue }
       $_entry = $_svc[$_svcName]
       if ($_entry -isnot [hashtable]) { continue }
       if (-not $_entry.ContainsKey('displayName') -or [string]::IsNullOrEmpty($_entry.displayName)) {
@@ -680,6 +681,7 @@ if (-not $HAS_ARGS) {
   } else {
     # Validate user-scoped platform entries have justification.
     foreach ($_svcName in $_svc.Keys) {
+      if ($_svcName -like '$*') { continue }
       $_entry = $_svc[$_svcName]
       if ($_entry -isnot [hashtable]) { continue }
       if ($_entry.ContainsKey('platforms')) {
