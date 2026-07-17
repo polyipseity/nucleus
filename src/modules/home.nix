@@ -186,86 +186,25 @@ in
     # stores. Merge writes the managed defaults into each store while
     # preserving any user-configured settings outside managed keys.
     home.activation.configureQtPassSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-            _escape_qsettings_ini_string() {
-              printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e ':join' -e 'N' -e '$!b join' -e 's/\n/\\n/g'
-            }
+      export AWK_PATH="${pkgs.gawk}/bin/awk"
+      ${builtins.readFile ./scripts/qtpass-merge-ini.sh}
 
-            _update_qtpass_ini_value() {
-              _conf="$1"
-              _key="$2"
-              _value="$3"
-              _conf_dir="$(dirname "$_conf")"
-              mkdir -p "$_conf_dir"
+      case "$(uname -s)" in
+        Darwin)
+          ${qtpassModule.qtPassDarwinCommands}
+          ;;
+        Linux)
+          # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
+          _primary_conf="$HOME/.config/IJHack/QtPass.conf"
+          # Some builds may resolve via organization-domain pathing.
+          _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
 
-              if [ -f "$_conf" ]; then
-                _tmp="$(mktemp "$_conf.XXXXXX")"
-                awk -v key="$_key" -v value="$_value" '
-                  BEGIN { in_general = 0; wrote = 0 }
-                  {
-                    if ($0 ~ /^\[General\]$/) {
-                      if (in_general && wrote == 0) {
-                        print key "=" value
-                        wrote = 1
-                      }
-                      in_general = 1
-                      print
-                      next
-                    }
-
-                    if ($0 ~ /^\[/ && $0 !~ /^\[General\]$/) {
-                      if (in_general && wrote == 0) {
-                        print key "=" value
-                        wrote = 1
-                      }
-                      in_general = 0
-                      print
-                      next
-                    }
-
-                    if (in_general && $0 ~ ("^" key "=")) {
-                      if (wrote == 0) {
-                        print key "=" value
-                        wrote = 1
-                      }
-                      next
-                    }
-
-                    print
-                  }
-                  END {
-                    if (wrote == 0) {
-                      if (in_general == 0) {
-                        print "[General]"
-                      }
-                      print key "=" value
-                    }
-                  }
-                ' "$_conf" > "$_tmp"
-                mv "$_tmp" "$_conf"
-              else
-                cat > "$_conf" <<EOF
-      [General]
-      $_key=$_value
-      EOF
-              fi
-            }
-
-            case "$(uname -s)" in
-              Darwin)
-                ${qtpassModule.qtPassDarwinCommands}
-                ;;
-              Linux)
-                # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
-                _primary_conf="$HOME/.config/IJHack/QtPass.conf"
-                # Some builds may resolve via organization-domain pathing.
-                _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
-
-                ${qtpassModule.qtPassPrimaryIniCommands}
-                if [ -f "$_secondary_conf" ]; then
-                  ${qtpassModule.qtPassSecondaryIniCommands}
-                fi
-                ;;
-            esac
+          ${qtpassModule.qtPassPrimaryIniCommands}
+          if [ -f "$_secondary_conf" ]; then
+            ${qtpassModule.qtPassSecondaryIniCommands}
+          fi
+          ;;
+      esac
     '';
 
     # Picard reads native INI settings from ~/.config/MusicBrainz/Picard.ini
@@ -278,123 +217,10 @@ in
     # writes reach the repo file. Merge applies managed defaults while
     # preserving all app-owned keys and sections.
     home.activation.configurePicardSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-            _upsert_ini_key() {
-              _conf="$1"
-              _section="$2"
-              _key="$3"
-              _value="$4"
-
-              _conf_dir="$(dirname "$_conf")"
-              mkdir -p "$_conf_dir"
-
-              if [ -f "$_conf" ]; then
-                _tmp="$(mktemp "$_conf.XXXXXX")"
-                # Pass value through ENVIRON instead of -v to prevent AWK from
-                # interpreting escape sequences (e.g. \0, \b, \x41) that appear
-                # literally in Picard's @Variant(…) serialized Qt values.
-                # AWK -v treats the argument as a string constant and processes
-                # backslash escapes; ENVIRON reads the raw bytes unchanged.
-                _UPSERT_VALUE="$_value" ${pkgs.gawk}/bin/awk -v section="$_section" -v key="$_key" '
-                  function write_pair() {
-                    if (wrote == 0) {
-                      print key "=" value
-                      wrote = 1
-                    }
-                  }
-                  BEGIN {
-                    in_target = 0
-                    section_seen = 0
-                    value = ENVIRON["_UPSERT_VALUE"]
-                    wrote = 0
-                  }
-                  {
-                    if ($0 ~ /^\[/) {
-                      if (in_target) {
-                        write_pair()
-                        in_target = 0
-                      }
-                      if ($0 == "[" section "]") {
-                        section_seen = 1
-                        in_target = 1
-                      }
-                      print
-                      next
-                    }
-
-                    if (in_target && $0 ~ ("^" key "=")) {
-                      if (wrote == 0) {
-                        print key "=" value
-                        wrote = 1
-                      }
-                      next
-                    }
-
-                    print
-                  }
-                  END {
-                    if (section_seen == 0) {
-                      print "[" section "]"
-                    }
-                    if (wrote == 0) {
-                      print key "=" value
-                    }
-                  }
-                ' "$_conf" > "$_tmp"
-                mv "$_tmp" "$_conf"
-              else
-                cat > "$_conf" <<EOF
-      [$_section]
-      $_key=$_value
-      EOF
-              fi
-            }
-
-            _apply_picard_defaults_from_file() {
-              _defaults="$1"
-              _conf="$2"
-
-              ${pkgs.gawk}/bin/awk '
-                BEGIN { section = "" }
-
-                /^[[:space:]]*([;#]|$)/ { next }
-
-                /^\[[^]]+\][[:space:]]*$/ {
-                  section = $0
-                  sub(/^\[/, "", section)
-                  sub(/\][[:space:]]*$/, "", section)
-                  next
-                }
-
-                {
-                  if (section == "") {
-                    next
-                  }
-
-                  pos = index($0, "=")
-                  if (pos == 0) {
-                    next
-                  }
-
-                  key = substr($0, 1, pos - 1)
-                  value = substr($0, pos + 1)
-                  gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
-
-                  if (key != "") {
-                    print section "\t" key "\t" value
-                  }
-                }
-              ' "$_defaults" | while IFS=$'\t' read -r _section _key _value; do
-                _upsert_ini_key "$_conf" "$_section" "$_key" "$_value"
-              done
-            }
-
-            _picard_conf="''${XDG_CONFIG_HOME:-$HOME/.config}/MusicBrainz/Picard.ini"
-            _picard_defaults_file="$(mktemp "''${TMPDIR:-/tmp}/picard-defaults.XXXXXX.ini")"
-            trap 'rm -f "$_picard_defaults_file"' EXIT
-            printf '%s' ${lib.escapeShellArg picardDefaultsIniText} > "$_picard_defaults_file"
-
-            _apply_picard_defaults_from_file "$_picard_defaults_file" "$_picard_conf"
-            ${picardOverrideCommands}
+      export AWK_PATH="${pkgs.gawk}/bin/awk"
+      export PICARD_DEFAULTS_INI=${lib.escapeShellArg picardDefaultsIniText}
+      ${builtins.readFile ./scripts/picard-merge-ini.sh}
+      ${picardOverrideCommands}
     '';
 
     # Obsidian stores app-global settings in obsidian.json alongside dynamic
@@ -408,42 +234,22 @@ in
     # mixing managed settings with runtime state that does not belong in the
     # repo. Merge preserves both managed and app-owned keys.
     home.activation.configureObsidianSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-            set -eu
+      set -eu
 
-            case "$(uname -s)" in
-              Darwin)
-                _obsidian_settings_path="$HOME/Library/Application Support/obsidian/obsidian.json"
-                ;;
-              Linux)
-                _obsidian_settings_path="''${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json"
-                ;;
-              *)
-                exit 0
-                ;;
-            esac
+      case "$(uname -s)" in
+        Darwin)
+          _obsidian_settings_path="$HOME/Library/Application Support/obsidian/obsidian.json"
+          ;;
+        Linux)
+          _obsidian_settings_path="''${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json"
+          ;;
+        *)
+          exit 0
+          ;;
+      esac
 
-            mkdir -p "$(dirname "$_obsidian_settings_path")"
-            ${pkgs.python3}/bin/python3 - "$_obsidian_settings_path" ${lib.escapeShellArg obsidianManagedSettingsJson} <<'PY'
-      import json
-      import sys
-      from pathlib import Path
-
-      config_path = Path(sys.argv[1])
-      managed = json.loads(sys.argv[2])
-
-      if config_path.exists():
-          raw = config_path.read_text(encoding="utf-8")
-          existing = json.loads(raw) if raw.strip() else {}
-      else:
-          existing = {}
-
-      if not isinstance(existing, dict):
-          print(f"obsidian: expected top-level JSON object in {config_path}", file=sys.stderr)
-          sys.exit(1)
-
-      existing.update(managed)
-      config_path.write_text(json.dumps(existing, separators=(",", ":")), encoding="utf-8")
-      PY
+      mkdir -p "$(dirname "$_obsidian_settings_path")"
+      ${pkgs.python3}/bin/python3 -c '${builtins.readFile ./scripts/obsidian-merge-json.py}' "$_obsidian_settings_path" ${lib.escapeShellArg obsidianManagedSettingsJson}
     '';
 
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
