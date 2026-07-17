@@ -15,9 +15,9 @@
   # are applied even with nix.enable = false.
   # Method 2 (read-only): Nix daemon overwrites nix.custom.conf on restart —
   # a writable symlink would lose managed settings.
-  environment.etc."nix/nix.custom.conf".text = builtins.replaceStrings [ "USERNAME" ] [ username ] (
-    builtins.readFile ../../modules/configs/nix/nix.custom.conf
-  );
+  environment.etc."nix/nix.custom.conf".text =
+    builtins.replaceStrings [ "__USERNAME__" ] [ username ]
+      (builtins.readFile ../../modules/configs/nix/nix.custom.conf);
 
   # nix-darwin v5+ requires an explicit primary user for single-user tooling.
   system.primaryUser = username;
