@@ -25,6 +25,7 @@ All Nix-side env vars are declared in `src/modules/lib/env-catalog.nix`. The cat
 - Declares every var in a single `catalog` attrset with `values` (per-OS attrset: `default`, `macOS`, `NixOS`, `Windows`), `why`, and optional `userSpecific`.
 - Pure helper functions (`allVars`, `systemVars`, `macOSAllVars`, `toJsonManifest`) transform the catalog into platform-specific formats.
 - Managed PATH components and helpers (`pathComponents`, `toShellPrependPath`, `toShellAppendPath`, `toPowerShellPrependSnippet`, `toPowerShellAppendSnippet`) live in `src/modules/lib/managed-paths.nix`, mirroring `ManagedPaths.ps1` on Windows.
+  > **Invariant**: `pathComponents.prepend` and `pathComponents.append` are always declared as separate lists. Consumers MUST handle both symmetrically — never assume either is empty. Comments MUST describe the conceptual role (before-system-default vs. after-system-default), not the current contents.
 - Daemon env var consumption uses `resolveValue` directly in each daemon file.
 - Consumed by: `shell.nix` (via `home.sessionPath`, `home.sessionVariables`), `macos.nix` (gui-env LaunchAgent, configureGuiEnv activation), `hosts/NixOS/base.nix`, `hosts/NixOS/ai.nix`, and daemon files in `hosts/MacBook/`.
 - The `env/default.nix` Home Manager module exposes `config._nucleus.envVars` for introspection.
