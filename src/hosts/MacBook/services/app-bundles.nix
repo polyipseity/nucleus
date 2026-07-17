@@ -58,7 +58,7 @@ in
   # consuming workflow lives).
 
   home.activation.deployNucleusAppBundles = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    ${builtins.readFile ../../../scripts/host/MacBook/macos-app-bundle-lib.sh}
+    ${builtins.readFile ../../../scripts/hosts/MacBook/macos-app-bundle-lib.sh}
 
     # ── Phase 1a: Prune removed app bundles ───────────────────────────
     ${builtins.concatStringsSep "\n" (

@@ -137,37 +137,37 @@ in
     /usr/bin/xcode-select --switch "${pkgs.apple-sdk}"
 
     # ---- configureBatteryPolicy ------------------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-battery-policy.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-battery-policy.sh}
 
     # ---- configureChargeLimit --------------------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-charge-limit.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-charge-limit.sh}
 
     # ---- configureSshAccess -----------------------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-ssh-access.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-ssh-access.sh}
 
     # ---- configureMiddleClick -------------------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-middle-click.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-middle-click.sh}
     # ---- configureMountyLoginItem ---------------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-mounty-login-item.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-mounty-login-item.sh}
     # ---- configureLinearMousePreferences --------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-linearmouse-prefs.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-linearmouse-prefs.sh}
     # ---- configureGimpScrollSensitivity ---------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-gimp-scroll-sensitivity.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-gimp-scroll-sensitivity.sh}
 
     # ---- configureMissionControlSpansDisplays ----------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-mission-control.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-mission-control.sh}
 
     # ---- configureMonitorColorProfile ------------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-color-profile.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-color-profile.sh}
 
     # ---- clearFinderCache -------------------------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-clear-finder-cache.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-clear-finder-cache.sh}
 
     # ---- disableSpotlight -------------------------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-disable-spotlight.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-disable-spotlight.sh}
 
     # ---- nvimLauncher -----------------------------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-nvim-launcher.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-nvim-launcher.sh}
 
     # ---- ensureSystemLogDirs (duplicated from extraActivation) -----------------
     # Also ensure directories exist during postActivation in case the log dir
@@ -185,10 +185,10 @@ in
     fi
 
     # ---- macos-homebrew-pin-verify ----------------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-verify-homebrew.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-verify-homebrew.sh}
 
     # ---- disableSteamAutoStartup ------------------------------------------------
-    ${builtins.readFile ../../scripts/host/MacBook/macos-disable-steam-autostart.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-disable-steam-autostart.sh}
 
     # ---- jellyfin-sync -----------------------------------------------------------
     # Converge Jellyfin accounts and libraries declared in src/modules/users.json
@@ -197,7 +197,7 @@ in
     # WHY a separate script instead of inline shell: the sync logic performs
     # runtime imperative operations (SOPS decryption, API polling, token auth,
     # diff-and-converge) that Nix's declarative model cannot express.  Keeping
-    # it in src/scripts/host/jellyfin-sync.sh avoids duplicating 600+ lines of shell
+    # it in src/scripts/services/jellyfin-sync.sh avoids duplicating 600+ lines of shell
     # across hosts and keeps the activation file scoped to macOS-specific hooks.
     #
     # NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo.  If unset,

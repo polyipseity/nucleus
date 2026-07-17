@@ -344,7 +344,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if displayplacer is not installed.
     # -------------------------------------------------------------------------
     configureDisplayResolutions = lib.hm.dag.entryAfter [ "ensureHeadlessDisplay" ] ''
-      ${builtins.readFile ../scripts/host/MacBook/macos-display-resolutions.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-display-resolutions.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -365,7 +365,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # now handled declaratively in defaults.nix via CustomUserPreferences.
     # -------------------------------------------------------------------------
     configureInputAndSiri = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      ${builtins.readFile ../scripts/host/MacBook/macos-input-config.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-input-config.sh}
 
       ${daemonRefresh.refreshTISwitcher}
     '';
@@ -394,7 +394,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     configureLinearmouseConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       export REPO_ROOT="${repoRoot}"
-      ${builtins.readFile ../scripts/host/MacBook/macos-linearmouse-config.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-linearmouse-config.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -410,7 +410,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     configureLaunchServices = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       export DUTI_BIN="${dutiBin}"
-      ${builtins.readFile ../scripts/host/MacBook/macos-launch-services.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-launch-services.sh}
 
       # Bundle identifiers sourced from app bundles + vendor docs:
       # - Chrome: com.google.chrome
@@ -438,7 +438,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       _ray_alias_dir="$HOME/Applications/Nucleus App Aliases"
       mkdir -p "$_ray_alias_dir"
       ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-      ${builtins.readFile ../scripts/host/MacBook/macos-raycast-aliases.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-raycast-aliases.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -453,7 +453,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Source: https://github.com/smudge/nightlight
     # -------------------------------------------------------------------------
     configureNightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.readFile ../scripts/host/MacBook/macos-nightlight.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-nightlight.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -536,7 +536,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       ${mkFdaWarningFunction "protected Safari preferences"}
 
-      ${builtins.readFile ../scripts/host/MacBook/macos-safari-defaults.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-safari-defaults.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -550,7 +550,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       ${mkFdaWarningFunction "Accessibility preferences"}
 
-      ${builtins.readFile ../scripts/host/MacBook/macos-universal-access-defaults.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-universal-access-defaults.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -696,7 +696,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if BetterDisplay is not installed.
     # -------------------------------------------------------------------------
     ensureHeadlessDisplay = lib.hm.dag.entryAfter [ "configureNightlight" ] ''
-      ${builtins.readFile ../scripts/host/MacBook/macos-headless-display.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-headless-display.sh}
     '';
   };
 
@@ -894,7 +894,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # spuriously return "Bootstrap failed: 5: Input/output error" — HM detects
   # this but never retries, and subsequent activations skip unchanged agents.
   home.activation.ensureLaunchAgentsLoaded = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
-    ${builtins.readFile ../scripts/host/MacBook/macos-ensure-launchagents.sh}
+    ${builtins.readFile ../scripts/hosts/MacBook/macos-ensure-launchagents.sh}
   '';
 
   # --------------------------------------------------------------------------
@@ -927,7 +927,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     __nucleus_append="${managedPaths.toShellAppendPath}"
     __nucleus_managed_set="${mkManagedDedupSet config.home.homeDirectory}"
 
-    ${builtins.readFile ../scripts/host/MacBook/macos-gui-env-path.sh}
+    ${builtins.readFile ../scripts/hosts/MacBook/macos-gui-env-path.sh}
 
     # ── All other GUI env vars (user and non-user) ──
     ${envVars.macOSAllVars}

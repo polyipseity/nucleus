@@ -86,6 +86,6 @@ in
     CRYPTO_PATCH_PATH="${cryptoPatchPath}"
     ROOTBINDIR_PATCH_PATH="${rootbindirPatchPath}"
     INSTALL_HOOK_PATCH_PATH="${installHookPatchPath}"
-    ${builtins.readFile ../../scripts/host/MacBook/macos-ntfs3g-build.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-ntfs3g-build.sh}
   '';
 }
