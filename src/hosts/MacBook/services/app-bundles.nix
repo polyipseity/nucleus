@@ -58,8 +58,7 @@ in
   # consuming workflow lives).
 
   home.activation.deployNucleusAppBundles = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
-    APP_DIR="$HOME/Applications"
+    ${builtins.readFile ../../../scripts/macos-app-bundle-lib.sh}
 
     # ── Phase 1a: Prune removed app bundles ───────────────────────────
     ${builtins.concatStringsSep "\n" (

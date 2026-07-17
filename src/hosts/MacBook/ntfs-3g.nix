@@ -74,68 +74,18 @@ let
 in
 {
   system.activationScripts.postActivation.text = lib.mkBefore ''
-    # ---- buildNtfs3g ----------------------------------------------------------
-    FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
     CURRENT_FINGERPRINT="${buildFingerprint}"
-    LOG_FILE="/Users/Shared/nucleus/logs/ntfs-3g-build.log"
-
-    if ! [ -x /usr/local/bin/ntfs-3g ] \
-       || ! [ -f "$FINGERPRINT_FILE" ] \
-       || [ "$(cat "$FINGERPRINT_FILE")" != "$CURRENT_FINGERPRINT" ]; then
-      echo "ntfs-3g: building from source... (log: $LOG_FILE)"
-      export PATH="$PATH:${buildToolsPath}"
-      export ACLOCAL_PATH="${aclocalPath}"
-      BUILD_DIR="$(mktemp -d)"
-      trap 'rm -rf "$BUILD_DIR"' EXIT
-      cp -r "${ntfs3gSrc}" "$BUILD_DIR/ntfs-3g"
-      chmod -R u+w "$BUILD_DIR/ntfs-3g"
-      cd "$BUILD_DIR/ntfs-3g"
-      export CC="${clangBin}"
-      export CXX="${clangxxBin}"
-      export CPPFLAGS="${cppFlags}"
-      export LDFLAGS="${ldFlags}"
-
-      /bin/mkdir -p "$(dirname "$LOG_FILE")"
-      {
-        echo "=== ntfs-3g build started at $(date) ==="
-
-        # Patch configure.ac: remove crypto autodetect block (AM_PATH_LIBGCRYPT
-        # and PKG_CHECK_MODULES(GNUTLS macros undefined without library deps),
-        # fix rootbindir/rootlibdir defaults from /bin:/lib to /usr/local/*
-        # (SIP), and fix install-exec-hook to handle missing .so/.dylib files
-        # on Darwin.
-        echo "ntfs-3g: patching..."
-        patch -p1 < ${cryptoPatchPath}
-        patch -p1 < ${rootbindirPatchPath}
-        patch -p1 < ${installHookPatchPath}
-
-        echo "ntfs-3g: running autotools..."
-        libtoolize --copy --force
-        aclocal --force -I m4
-        autoheader --force
-        automake --add-missing --copy --force-missing
-        autoconf --force
-
-        echo "ntfs-3g: configuring..."
-        ./configure ${configureFlags}
-
-        echo "ntfs-3g: building..."
-        make -j"$(sysctl -n hw.ncpu)"
-        echo "ntfs-3g: installing..."
-        make install
-      } >> "$LOG_FILE" 2>&1 || exit_code=$?
-
-      if [ "''${exit_code:-0}" -ne 0 ]; then
-        echo "ntfs-3g: BUILD FAILED (exit ''${exit_code}) — see $(/bin/realpath "$LOG_FILE")" >&2
-        exit "$exit_code"
-      fi
-
-      echo "=== ntfs-3g build finished at $(date) ===" >> "$LOG_FILE" 2>&1
-
-      echo "ntfs-3g: build complete — log at $(/bin/realpath "$LOG_FILE")"
-
-      /bin/mkdir -p "$(dirname "$FINGERPRINT_FILE")"
-      echo "$CURRENT_FINGERPRINT" > "$FINGERPRINT_FILE"
-    fi
+    BUILD_TOOLS_PATH="${buildToolsPath}"
+    ACLOCAL_PATH_VALUE="${aclocalPath}"
+    NTFS3G_SRC="${ntfs3gSrc}"
+    export CC="${clangBin}"
+    export CXX="${clangxxBin}"
+    export CPPFLAGS="${cppFlags}"
+    export LDFLAGS="${ldFlags}"
+    CONFIGURE_FLAGS="${configureFlags}"
+    CRYPTO_PATCH_PATH="${cryptoPatchPath}"
+    ROOTBINDIR_PATCH_PATH="${rootbindirPatchPath}"
+    INSTALL_HOOK_PATCH_PATH="${installHookPatchPath}"
+    ${builtins.readFile ../../scripts/macos-ntfs3g-build.sh}
   '';
 }

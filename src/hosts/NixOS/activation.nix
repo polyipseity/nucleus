@@ -35,11 +35,8 @@ in
   # username is hardcoded, matching Home Manager's useUserPackages = true layout.
   # ---------------------------------------------------------------------------
   system.activationScripts.nvimLauncher = lib.mkAfter ''
-    _nvim_real="${config.home-manager.users.${username}.home.profileDirectory}/bin/nvim"
-    if [ -x "$_nvim_real" ]; then
-      mkdir -p /etc/nucleus-bin
-      ln -sfn "$_nvim_real" /etc/nucleus-bin/nvim
-    fi
+    NUCLEUS_NVIM_PATH="${config.home-manager.users.${username}.home.profileDirectory}/bin/nvim"
+    ${builtins.readFile ../../scripts/nixos-activation-setup.sh}
   '';
 
   # ---------------------------------------------------------------------------
@@ -48,10 +45,9 @@ in
   # start, so journald/stderr redirect targets exist on disk.
   # ---------------------------------------------------------------------------
   system.activationScripts.ensureLogDirs = lib.mkAfter ''
-    system_log_dir="${config.nucleus.logging.systemLogDir}"
-    for subdir in ${builtins.toString linuxSystemLogDirs}; do
-      mkdir -p "$system_log_dir/$subdir"
-    done
+    NUCLEUS_SYSTEM_LOG_DIR="${config.nucleus.logging.systemLogDir}"
+    NUCLEUS_LOG_SUBDIRS="${builtins.toString linuxSystemLogDirs}"
+    ${builtins.readFile ../../scripts/nixos-activation-setup.sh}
   '';
 
   # ---------------------------------------------------------------------------
@@ -85,10 +81,6 @@ in
   # surfaces issues for post-apply investigation.
   # ---------------------------------------------------------------------------
   system.activationScripts.verifyNucleusServices = lib.mkAfter ''
-    if command -v nucleus-svc >/dev/null 2>&1; then
-      if ! nucleus-svc verify; then
-        echo "svc: some services are inactive (non-fatal; check journalctl for details)" >&2
-      fi
-    fi
+    ${builtins.readFile ../../scripts/nixos-activation-setup.sh}
   '';
 }
