@@ -16,7 +16,7 @@
   - `lib/` — shared library scripts for symlink hardening, cloud drive setup, dev repo
     provisioning, iCloud exclusions, VM setup, and the shared lib.sh
   - `secrets/` — secret provisioning helpers
-  - `home/` — Home Manager activation helpers (INI merge, bun package install)
+  - `configs/` — app-config merge helpers (INI merge, JSON merge, bun package install)
   - `host/` — host-specific scripts (e.g. `NixOS/`, `jellyfin-sync.sh`)
   - `agents/` — AI agent setup scripts
   - `host/MacBook/` — macOS-specific activation scripts (no daemons)

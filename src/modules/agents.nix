@@ -131,7 +131,7 @@ in
       _nucleus_prepend_first_executable_dir bun \
         ${managedPaths.nixProfileBinDirs} || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
 
-      ${builtins.readFile ../scripts/home/install-bun-packages.sh}
+      ${builtins.readFile ../scripts/configs/install-bun-packages.sh}
     '';
 
     # -------------------------------------------------------------------------
