@@ -38,7 +38,7 @@
   `gui-env` LaunchAgent provides login-time coverage before the first activation.
   After first `nucleus-apply`, a reboot is required for `launchctl config system
   path` to take effect. Verify with:
-  `/usr/libexec/PlistBuddy -c 'Print :path' /private/var/db/com.apple.xpc.launchd/config/system.plist`
+  `/usr/libexec/PlistBuddy -c 'Print PathEnvironmentVariable' /private/var/db/com.apple.xpc.launchd/config/system.plist`
 - `nucleus-svc list` — list all nucleus-managed services with status
 - `nucleus-svc restart <service>` — restart a service:
   1. If stuck (EX_CONFIG / "waiting" / "spawn scheduled"): full `bootout+bootstrap` recovery.

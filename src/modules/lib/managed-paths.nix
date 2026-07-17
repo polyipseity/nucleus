@@ -6,8 +6,8 @@
 # Takes only `pkgs` — no config, lib, or username dependency.
 # Returns: { defaultDevTools, pathComponents, toShellPrependPath,
 #   toShellAppendPath, toPowerShellPrependSnippet,
-#   toPowerShellAppendSnippet, toLaunchctlPrependPath,
-#   toLaunchctlAppendPath, nixProfileBinDirs, nixSystemBinDirs }
+#   toPowerShellAppendSnippet, toLaunchctlConfigPath,
+#   nixProfileBinDirs, nixSystemBinDirs }
 { pkgs, ... }:
 let
   # ── Fallback toolchain ──────────────────────────────────────────────
@@ -37,24 +37,6 @@ let
     ];
   };
 
-  # ── Helper: render macOS launchctl prepend PATH string ─────────────
-  # Returns a colon-joined string of prepend dirs only for use as
-  # __nucleus_prepend in macOS activation/LaunchAgent scripts.
-  # Contains only the managed prepend dirs, no system default.
-  # NOTE: Returns only managed prepend PATH components — callers must
-  # combine with the runtime system PATH.
-  toLaunchctlPrependPath = builtins.concatStringsSep ":" (
-    map (p: "$HOME/${p}") pathComponents.prepend
-  );
-
-  # ── Helper: render macOS launchctl append PATH string ──────────────
-  # Returns a colon-joined string of append dirs only for use as
-  # __nucleus_append in macOS activation/LaunchAgent scripts.
-  # Contains only the managed append dirs, no system default.
-  # NOTE: Returns only managed append PATH components — callers must
-  # combine with the runtime system PATH.
-  toLaunchctlAppendPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.append);
-
   # ── Helper: render launchctl config system path string ─────────────
   # Returns a colon-joined absolute PATH string for use in
   # sudo launchctl config system path.  Takes homeDir as an argument
@@ -68,10 +50,8 @@ let
     in
     builtins.concatStringsSep ":" (
       (map (p: "${homeDir}/${p}") pathComponents.prepend)
+      ++ (map (p: "${homeDir}/${p}") pathComponents.append)
       ++ [
-        "${homeDir}/.bun/bin"
-        "${homeDir}/.cargo/bin"
-        "${homeDir}/.local/bin"
         "${homeDir}/.local/state/nix/profiles/profile/bin"
         "${homeDir}/.nix-profile/bin"
         "${homeDir}/.local/state/home-manager/profile/bin"
@@ -87,8 +67,7 @@ let
     );
 
   # ── Helper: render generic shell PATH prepend string ───────────────
-  # Same format as toLaunchctlPrependPath but with a generic name for use
-  # in shell scripts that are not macOS-launchctl-specific.
+  # Same format as toShellPrependPath but for the append position.
   toShellPrependPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.prepend);
 
   # ── Helper: render generic shell PATH append string ────────────────
@@ -165,8 +144,6 @@ in
     defaultDevTools
     pathComponents
     toLaunchctlConfigPath
-    toLaunchctlPrependPath
-    toLaunchctlAppendPath
     toShellPrependPath
     toShellAppendPath
     toPowerShellPrependSnippet

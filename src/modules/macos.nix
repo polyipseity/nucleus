@@ -468,8 +468,8 @@ let
     # configureGuiEnv activation step (macos.nix).
 
     # ── PATH: strip stale managed entries, then prepend+append ──
-    __nucleus_prepend="${managedPaths.toLaunchctlPrependPath}"
-    __nucleus_append="${managedPaths.toLaunchctlAppendPath}"
+    __nucleus_prepend="${managedPaths.toShellPrependPath}"
+    __nucleus_append="${managedPaths.toShellAppendPath}"
     # Same dedup SET as the activation script, but using $HOME (runtime
     # shell expansion by launchd) instead of build-time home directory.
     __nucleus_managed_set="${mkManagedDedupSet "$HOME"}"
@@ -1434,8 +1434,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
     fi
 
     # Propagate managed PATH to GUI domain (launchd-direct/XPC path).
-    __nucleus_prepend="${managedPaths.toLaunchctlPrependPath}"
-    __nucleus_append="${managedPaths.toLaunchctlAppendPath}"
+    __nucleus_prepend="${managedPaths.toShellPrependPath}"
+    __nucleus_append="${managedPaths.toShellAppendPath}"
     __nucleus_managed_set="${mkManagedDedupSet config.home.homeDirectory}"
 
     CURRENT_PATH="$(/bin/launchctl getenv PATH 2>/dev/null || true)"  # undoc-supp: launchctl may not be available (early boot, non-GUI session); fall back to $PATH
@@ -1465,7 +1465,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # Set persistent launchd system PATH for LaunchServices .app bundles.
     desired_path="${managedPaths.toLaunchctlConfigPath config.home.homeDirectory}"
-    current_path="$(/usr/libexec/PlistBuddy -c 'Print :path' /private/var/db/com.apple.xpc.launchd/config/system.plist 2>/dev/null || true)"  # undoc-supp: system.plist may not exist before first launchctl config write; read fails gracefully with empty output
+    current_path="$(/usr/libexec/PlistBuddy -c 'Print PathEnvironmentVariable' /private/var/db/com.apple.xpc.launchd/config/system.plist 2>/dev/null || true)"  # undoc-supp: system.plist may not exist before first launchctl config write; read fails gracefully with empty output
 
     if [ "$current_path" != "$desired_path" ]; then
       echo "launchd: updating system PATH (current differs from desired)."
