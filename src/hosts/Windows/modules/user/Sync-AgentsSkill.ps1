@@ -61,9 +61,9 @@ function Sync-AgentsSkill {
         if ($isSymlink) {
           $expectedSource = Join-Path -Path $skillsSource -ChildPath $child.Name
           if ([string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
-            Remove-ManagedSymlinkDeleteProtection -Context "agents-skills" -Path $child.FullName
+            Remove-ManagedSymlinkDeleteProtection -Context "skills" -Path $child.FullName
             Remove-Item -LiteralPath $child.FullName -Force
-            Write-Output "agents-skills: removed managed skill symlink: $($child.FullName)"
+            Write-Output "skills: removed managed skill symlink: $($child.FullName)"
           }
         }
       }
@@ -72,7 +72,7 @@ function Sync-AgentsSkill {
   }
 
   if (-not (Test-Path -LiteralPath $skillsSource -PathType Container)) {
-    Write-Error "agents-skills: Sync-AgentsSkills: skills source dir not found: $skillsSource"
+    Write-Error "skills: Sync-AgentsSkills: skills source dir not found: $skillsSource"
     return
   }
 
@@ -84,7 +84,7 @@ function Sync-AgentsSkill {
                            -and $skillsDirItem.LinkType -eq 'SymbolicLink'
     if ($isWholeDirSymlink) {
       Remove-Item -LiteralPath $skillsDir -Force
-      Write-Output "agents-skills: Sync-AgentsSkills: migrated ~/.agents\skills from symlink to real directory"
+      Write-Output "skills: Sync-AgentsSkills: migrated ~/.agents\skills from symlink to real directory"
     }
   }
 
@@ -92,7 +92,7 @@ function Sync-AgentsSkill {
   # clawhub downloads can land here without entering the tracked repo tree.
   if (-not (Test-Path -LiteralPath $skillsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $skillsDir -Force | Out-Null
-    Write-Output "agents-skills: Sync-AgentsSkills: created $skillsDir"
+    Write-Output "skills: Sync-AgentsSkills: created $skillsDir"
   }
 
   # Remove stale per-skill symlinks: committed skills that have since been
@@ -106,9 +106,9 @@ function Sync-AgentsSkill {
       if ([string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
         # Managed per-skill symlink: remove if its source no longer exists.
         if (-not (Test-Path -LiteralPath $expectedSource)) {
-          Remove-ManagedSymlinkDeleteProtection -Context "agents-skills" -Path $child.FullName
+          Remove-ManagedSymlinkDeleteProtection -Context "skills" -Path $child.FullName
           Remove-Item -LiteralPath $child.FullName -Force
-          Write-Output "agents-skills: Sync-AgentsSkills: removed stale skill link for $($child.Name) (source removed)"
+          Write-Output "skills: Sync-AgentsSkills: removed stale skill link for $($child.Name) (source removed)"
         }
       }
     }
@@ -129,18 +129,18 @@ function Sync-AgentsSkill {
           continue  # Correct symlink — no-op.
         }
         # Wrong target: replace symlink.
-        Remove-ManagedSymlinkDeleteProtection -Context "agents-skills" -Path $linkPath
+        Remove-ManagedSymlinkDeleteProtection -Context "skills" -Path $linkPath
         Remove-Item -LiteralPath $linkPath -Force
       } else {
         # Real directory in place of a committed skill — could be a fetched
         # (clawhub) download with the same name, or user data.  Fail fast to
         # prevent silent overwrites; the operator must resolve the conflict.
-        Write-Error "agents-skills: Sync-AgentsSkills: $linkPath is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply."
+        Write-Error "skills: Sync-AgentsSkills: $linkPath is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply."
         return
       }
     }
     New-Item -ItemType SymbolicLink -Path $linkPath -Target $skillEntry.FullName | Out-Null
-    Set-ManagedSymlinkDeleteProtection -Context "agents-skills" -Path $linkPath
-    Write-Output "agents-skills: Sync-AgentsSkills: linked $linkPath -> $($skillEntry.FullName)"
+    Set-ManagedSymlinkDeleteProtection -Context "skills" -Path $linkPath
+    Write-Output "skills: Sync-AgentsSkills: linked $linkPath -> $($skillEntry.FullName)"
   }
 }

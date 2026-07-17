@@ -1,5 +1,5 @@
 # Declarative ~/.agents directory layout with per-entry symlinks into
-# src/modules/configs/agents/ (skills/ managed by agentsSkills).
+# src/modules/configs/agents/ (skills/ managed by skills).
 # Activation reads $NUCLEUS_REPO_ROOT for out-of-store symlinks.
 {
   config,
@@ -52,23 +52,23 @@ in
 
   home.activation = {
     # -------------------------------------------------------------------------
-    # agentsSymlink
+    # symlink
     # Creates ~/.agents/ as a real directory and populates it with per-entry
     # symlinks for every top-level entry in src/modules/configs/agents/ except
-    # skills/ (which is managed by agentsSkills so fetched ClawHub downloads
+    # skills/ (which is managed by skills so fetched ClawHub downloads
     # land in a real, untracked directory rather than inside the repo tree).
     # -------------------------------------------------------------------------
-    agentsSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    symlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
 
       export REPO_ROOT="${repoRoot}"
       export AGENTS_CONFIG_RELATIVE_PATH="${agentsConfigRelativePath}"
       ${symlinkHardeningLib}
-      ${builtins.readFile ../scripts/agents/agents-symlink.sh}
+      ${builtins.readFile ../scripts/agents/symlink.sh}
     '';
 
     # -------------------------------------------------------------------------
-    # agentsSkills
+    # skills
     # Creates ~/.agents/skills/ as a real (writable) directory, then creates a
     # per-skill symlink inside it for every skill subdirectory committed to
     # src/modules/configs/agents/skills/ (bundled / AGPL-compatible skills).
@@ -87,13 +87,13 @@ in
     # directory in ~/.agents/skills/ (e.g. a fetched download), the activation
     # fails fast rather than silently overwriting the downloaded content.
     # -------------------------------------------------------------------------
-    agentsSkills = lib.hm.dag.entryAfter [ "agentsSymlink" ] ''
+    skills = lib.hm.dag.entryAfter [ "symlink" ] ''
       set -eu
 
       export REPO_ROOT="${repoRoot}"
       export AGENTS_SKILLS_RELATIVE_PATH="${agentsSkillsRelativePath}"
       ${symlinkHardeningLib}
-      ${builtins.readFile ../scripts/agents/agents-skills.sh}
+      ${builtins.readFile ../scripts/agents/skills.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -111,7 +111,7 @@ in
     #   clawhub — fetched skill install vehicle; absent from nixpkgs and
     #             cargo-binstall; bun is the only viable install tier.
     # -------------------------------------------------------------------------
-    installBunPackages = lib.hm.dag.entryAfter [ "agentsSkills" ] ''
+    installBunPackages = lib.hm.dag.entryAfter [ "skills" ] ''
       set -eu
 
       export JQ_BIN='${pkgs.jq}/bin/jq'
@@ -420,7 +420,7 @@ in
       PATH="${managedPaths.toShellPrependGuard}$PATH${managedPaths.toShellAppendGuard}"
       export PATH
 
-      # Resolve the repo root (same mechanism as agentsSymlink and agentsSkills).
+      # Resolve the repo root (same mechanism as symlink and skills).
       _scs_repo_root="$(_nucleus_resolve_repo_root "clawhub" "${repoRoot}")"
 
       # Path to the declarative fetched skill manifest.  Slugs listed here are
@@ -445,7 +445,7 @@ in
 
       _scs_skills_dir="$HOME/.agents/skills"
 
-      # Ensure ~/.agents/skills/ exists.  The agentsSkills activation creates
+      # Ensure ~/.agents/skills/ exists.  The skills activation creates
       # it during home-manager switch; this guards against running before that
       # activation has run.
       if [ ! -d "$_scs_skills_dir" ]; then

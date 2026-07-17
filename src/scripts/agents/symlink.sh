@@ -28,7 +28,7 @@ fi
 # Remove stale per-subdir symlinks: any symlink in ~/.agents/ that once
 # pointed into _as_agents_source/ but whose source entry no longer exists.
 # This keeps ~/.agents/ free of dangling links after source entries are
-# removed from the repo.  skills/ is skipped — agentsSkills owns it.
+# removed from the repo.  skills/ is skipped — skills owns it.
 find "$_as_agents_dir" -mindepth 1 -maxdepth 1 -type l | while IFS= read -r _as_candidate; do
   _as_cname="$(basename "$_as_candidate")"
   [ "$_as_cname" = "skills" ] && continue
@@ -46,11 +46,11 @@ find "$_as_agents_dir" -mindepth 1 -maxdepth 1 -type l | while IFS= read -r _as_
 done
 
 # Create or update per-entry symlinks for every top-level source entry
-# except skills/ (managed independently by agentsSkills).
+# except skills/ (managed independently by skills).
 find "$_as_agents_source" -mindepth 1 -maxdepth 1 | while IFS= read -r _as_entry; do
   _as_name="$(basename "$_as_entry")"
-  # skills/ is managed by agentsSkills; skip it here to avoid conflicts
-  # with the real directory that agentsSkills creates for fetched downloads.
+  # skills/ is managed by skills; skip it here to avoid conflicts
+  # with the real directory that skills creates for fetched downloads.
   [ "$_as_name" = "skills" ] && continue
   _as_link="$_as_agents_dir/$_as_name"
   if [ -L "$_as_link" ]; then

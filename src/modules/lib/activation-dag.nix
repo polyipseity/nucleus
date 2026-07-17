@@ -14,8 +14,8 @@
 #   ];
 [
   "agentHostShellConfig"
-  "agentsSkills"
-  "agentsSymlink"
+  "skills"
+  "symlink"
   "cloudDrivesSetup"
   "configureObsidianSettings"
   "configurePicardSettings"
