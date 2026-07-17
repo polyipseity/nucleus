@@ -39,7 +39,7 @@ applyTo: "src/**/*.nix"
 
 Extract runtime imperative logic (SOPS decryption, API calls, service polling) into separate invocable scripts instead of inlining in Nix indented strings. Keeps activation files readable, allows independent testing, and avoids duplication across hosts.
 
-See `src/scripts/jellyfin-sync.sh` for an example.
+See `src/scripts/services/jellyfin-sync.sh` for an example.
 
 ## Module conventions
 

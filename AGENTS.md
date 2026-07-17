@@ -12,12 +12,12 @@
   - `caddy-trust.sh` — Caddy local CA trust (cross-platform)
   - `cleanup-nix-build-artifacts.sh`, `install-prek-hooks.sh`, `wallpaper-provision.sh` — ungrouped root scripts
   - `services/` — persistent daemon/service scripts (camilladsp, betterdisplay-heartbeat,
-    gc-weekly, gui-env, nix-index-update, ds-store-gc, spotlight-exclusions)
+    gc-weekly, gui-env, nix-index-update, ds-store-gc, spotlight-exclusions, jellyfin-sync)
   - `lib/` — shared library scripts for symlink hardening, cloud drive setup, dev repo
     provisioning, iCloud exclusions, VM setup, and the shared lib.sh
   - `secrets/` — secret provisioning helpers
   - `configs/` — app-config merge helpers (INI merge, JSON merge, bun package install)
-  - `host/` — host-specific scripts (e.g. `NixOS/`, `jellyfin-sync.sh`)
+  - `host/` — host-specific scripts (e.g. `NixOS/`)
   - `agents/` — AI agent setup scripts
   - `host/MacBook/` — macOS-specific activation scripts (no daemons)
     **Rule**: the filename (including its domain prefix) must equal the activation entry name, ensuring uniqueness. The domain prefix is preserved inside the subdirectory to guarantee uniqueness and match the activation entry name.

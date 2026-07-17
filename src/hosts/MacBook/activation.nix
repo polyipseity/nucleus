@@ -203,8 +203,8 @@ in
     # NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo.  If unset,
     # skip gracefully.
     jellyfin_repo_root="$NUCLEUS_REPO_ROOT"
-    if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/host/jellyfin-sync.sh" ]; then
-      NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/host/jellyfin-sync.sh"
+    if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/services/jellyfin-sync.sh" ]; then
+      NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/services/jellyfin-sync.sh"
     fi
 
     # ---- verifyNucleusServices ---------------------------------------------------

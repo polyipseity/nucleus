@@ -28,7 +28,7 @@ let
   windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
   windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
   windowsSystemPackagesText = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
-  jellyfinSyncScript = builtins.readFile ../../src/scripts/host/jellyfin-sync.sh;
+  jellyfinSyncScript = builtins.readFile ../../src/scripts/services/jellyfin-sync.sh;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
 
   test_core_installs_jellyfin = assert' (containsRegex ''pkgs\.jellyfin'' coreText) "core.nix must install pkgs.jellyfin on Nix-managed hosts";
