@@ -18,7 +18,7 @@
 
 # Canonical source: src/modules/lib/managed-paths.nix (pathComponents)
 $script:nucleusPathComponents = @{
-  Prepend = @()  # empty; managed dirs moved to Append to avoid shadowing system bins
+  Prepend = @()  # before system default PATH; Append entries go after system default PATH
   Append  = @(
     '.bun\bin'
     '.cargo\bin'
