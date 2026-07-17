@@ -55,7 +55,10 @@ in
   # modules) and lib.mkAfter for append dirs (after them), preserving the
   # prepend/append distinction from pathComponents in the catalog.
   environment.variables = envVars.systemVars // {
-    PATH = lib.mkAfter (map (p: "/home/${username}/${p}") managedPaths.pathComponents.append);
+    PATH = lib.mkMerge [
+      (lib.mkBefore (map (p: "/home/${username}/${p}") managedPaths.pathComponents.prepend))
+      (lib.mkAfter (map (p: "/home/${username}/${p}") managedPaths.pathComponents.append))
+    ];
   };
 
   # Disable nano to prevent its default EDITOR assignment from overriding
