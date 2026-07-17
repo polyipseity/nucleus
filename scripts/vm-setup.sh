@@ -19,15 +19,15 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 REPO_ROOT="$(derive_repo_root)"
 MANIFEST="$REPO_ROOT/src/modules/VMs.json"
 VMS_DIR="$REPO_ROOT/src/vms"
-# shellcheck disable=SC2034 # consumed by vm-setup/lib.sh (shellcheck can't follow sourced file)
+# shellcheck disable=SC2034 # consumed by vm-setup-lib.sh (shellcheck can't follow sourced file)
 TEMPLATES_DIR="$VMS_DIR/templates"
 
 dry_run=false
-# shellcheck disable=SC2034 # consumed by vm-setup/lib.sh
+# shellcheck disable=SC2034 # consumed by vm-setup-lib.sh
 windows_iso=''
 windows_iso_source='auto'
 windows_iso_retries='0'
-# shellcheck disable=SC2034 # consumed by vm-setup/lib.sh
+# shellcheck disable=SC2034 # consumed by vm-setup-lib.sh
 windows_headless='true'
 accelerator=''
 gc=false
@@ -49,7 +49,7 @@ usage() {
 EOF
 }
 
-# shellcheck disable=SC2034 # consumed by vm-setup/lib.sh (shellcheck can't follow sourced file)
+# shellcheck disable=SC2034 # consumed by vm-setup-lib.sh (shellcheck can't follow sourced file)
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help)
@@ -222,8 +222,8 @@ if ! resolve_vm_guest_credentials; then
   exit 0
 fi
 
-# shellcheck disable=SC2034 # consumed by vm-setup/lib.sh below
-# shellcheck disable=SC2034 # consumed by vm-setup/lib.sh below
+# shellcheck disable=SC2034 # consumed by vm-setup-lib.sh below
+# shellcheck disable=SC2034 # consumed by vm-setup-lib.sh below
 if ! vm_guest_credentials_fingerprint="$(vm_guest_credentials_hash)"; then
   exit 0
 fi

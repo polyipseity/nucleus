@@ -423,10 +423,10 @@ let
 
   # vm-setup.sh must capture the Packer exit code for the macOS Tart build so
   # a failed packer invocation does not falsely report success.
-  # Combined text: lib.sh is sourced by vm-setup.sh, so patterns from both files
+  # Combined text: vm-setup-lib.sh is sourced by vm-setup.sh, so patterns from both files
   # belong to the same script.  Checking only vm-setup.sh misses patterns
-  # that were extracted to lib.sh during refactoring.
-  vm_setup_sh_text = builtins.readFile ../../scripts/vm-setup.sh + builtins.readFile ../../scripts/vm-setup/lib.sh;
+  # that were extracted to vm-setup-lib.sh during refactoring.
+  vm_setup_sh_text = builtins.readFile ../../scripts/vm-setup.sh + builtins.readFile ../../src/scripts/lib/vm-setup-lib.sh;
   windows_vm_setup_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-VMSetup.ps1;
   windows_vm_setup_wrapper_ps1_text = builtins.readFile ../../scripts/vm-setup.ps1;
   readmeTemplateText = builtins.readFile ../../src/vms/templates/README.md;
