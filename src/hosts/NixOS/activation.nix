@@ -28,26 +28,26 @@ let
 in
 {
   # ---------------------------------------------------------------------------
-  # nvimLauncher
+  # nixos-nvim-launcher
   # Creates a deterministic symlink at /etc/nucleus-bin/nvim that
   # vscode-neovim can use (the extension does not expand ${userHome} or ~).
   # Resolves the nvim path from the home-manager profile directory so that no
   # username is hardcoded, matching Home Manager's useUserPackages = true layout.
   # ---------------------------------------------------------------------------
-  system.activationScripts.nvimLauncher = lib.mkAfter ''
+  system.activationScripts."nixos-nvim-launcher" = lib.mkAfter ''
     NUCLEUS_NVIM_PATH="${config.home-manager.users.${username}.home.profileDirectory}/bin/nvim"
-    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-activation-setup.sh}
+    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-nvim-launcher.sh}
   '';
 
   # ---------------------------------------------------------------------------
-  # ensureLogDirs
+  # nixos-ensure-log-dirs
   # Create system log directories for all nucleus systemd services before they
   # start, so journald/stderr redirect targets exist on disk.
   # ---------------------------------------------------------------------------
-  system.activationScripts.ensureLogDirs = lib.mkAfter ''
+  system.activationScripts."nixos-ensure-log-dirs" = lib.mkAfter ''
     NUCLEUS_SYSTEM_LOG_DIR="${config.nucleus.logging.systemLogDir}"
     NUCLEUS_LOG_SUBDIRS="${builtins.toString linuxSystemLogDirs}"
-    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-activation-setup.sh}
+    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-ensure-log-dirs.sh}
   '';
 
   # ---------------------------------------------------------------------------
@@ -75,12 +75,12 @@ in
   };
 
   # ---------------------------------------------------------------------------
-  # Service activation verification
+  # nixos-verify-nucleus-services
   # Warn-only check that all managed services are running after activation.
   # Failing to start a service should not block activation, but the warning
   # surfaces issues for post-apply investigation.
   # ---------------------------------------------------------------------------
-  system.activationScripts.verifyNucleusServices = lib.mkAfter ''
-    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-activation-setup.sh}
+  system.activationScripts."nixos-verify-nucleus-services" = lib.mkAfter ''
+    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-verify-nucleus-services.sh}
   '';
 }
