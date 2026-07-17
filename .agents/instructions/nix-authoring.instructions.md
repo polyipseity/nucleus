@@ -55,6 +55,12 @@ All Nix modules must enforce explicit configuration and avoid implicit assumptio
 - **Explicit option defaults**: when defining `lib.mkOption`, provide meaningful default values only when the default is obvious (e.g. `false` for feature flags, `[ ]` for lists). For complex or context-dependent defaults, require the user to specify them; use `description` to explain the choice.
 - **Documentation examples must use canonical usernames**: any `.example` field in module options or inline code examples must use `admin` for primary/elevated users and `guest` for secondary/unprivileged users. Paths should reference `/home/admin` or `/Users/admin` rather than real usernames from the repo history. This ensures examples are portable and immediately understandable.
 
+### Template placeholder convention
+
+When using `builtins.replaceStrings` to substitute tokens in config/script source files, the placeholder token in the source file MUST use the format `__UPPERCASE_WITH_DOUBLE_UNDERSCORES__` (e.g., `__USERNAME__`, `__NIX_INDEX_BIN__`). Bare uppercase tokens like `USERNAME` are not permitted — they are indistinguishable from real code or misspelled variables.
+
+Exception: well-known mechanical transformations such as `"~"` → home directory, URL percent-encoding, and path separator conversion (`/` → `\`) are not template placeholders and do not need this convention.
+
 ## macOS defaults domain synchronization
 
 - When adding a new managed macOS defaults domain in either:
