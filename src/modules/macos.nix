@@ -45,7 +45,7 @@ let
   # the activation script (build-time eval) or "$HOME" for the launchd
   # agent (runtime shell expansion).
   # Used by guiEnvAgent and configureGuiEnv activation step;
-  # also informs launchctl config system path composition via pathComponents.
+  # also informs launchctl config user path composition via pathComponents.
   mkManagedDedupSet =
     prefix:
     builtins.concatStringsSep ":" (
@@ -1420,7 +1420,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   #   2. launchctl setenv PATH — managed PATH with dedup (launchd-direct/XPC)
   #   3. launchctl setenv for all non-PATH vars from env-catalog (EDITOR,
   #      OLLAMA_HOST, etc.)
-  #   4. sudo launchctl config system path — persistent PATH for LaunchServices
+  #   4. sudo launchctl config user path — persistent per-user PATH for LaunchServices
   #      .app bundles (requires reboot on first set)
   #
   # The gui-env LaunchAgent (below) provides login-time coverage before the
@@ -1463,20 +1463,22 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # ── All other GUI env vars (user and non-user) ──
     ${envVars.macOSAllVars}
 
-    # Set persistent launchd system PATH for LaunchServices .app bundles.
+    # Set persistent per-user launchd PATH for LaunchServices .app bundles.
+    # Uses user.plist (not system.plist) because the PATH contains user-specific
+    # directories (e.g. /Users/.../.bun/bin).
     desired_path="${managedPaths.toLaunchctlConfigPath config.home.homeDirectory}"
-    current_path="$(/usr/libexec/PlistBuddy -c 'Print PathEnvironmentVariable' /private/var/db/com.apple.xpc.launchd/config/system.plist 2>/dev/null || true)"  # undoc-supp: system.plist may not exist before first launchctl config write; read fails gracefully with empty output
+    current_path="$(/usr/libexec/PlistBuddy -c 'Print PathEnvironmentVariable' /private/var/db/com.apple.xpc.launchd/config/user.plist 2>/dev/null || true)"  # undoc-supp: user.plist may not exist before first launchctl config write; read fails gracefully with empty output
 
     if [ "$current_path" != "$desired_path" ]; then
-      echo "launchd: updating system PATH (current differs from desired)."
-      if /usr/bin/sudo /bin/launchctl config system path "$desired_path" 2>/dev/null; then
-        echo "launchd: system PATH updated via launchctl config system path."
+      echo "launchd: updating user PATH (current differs from desired)."
+      if /usr/bin/sudo /bin/launchctl config user path "$desired_path" 2>/dev/null; then
+        echo "launchd: user PATH updated via launchctl config user path."
         echo "launchd: REBOOT REQUIRED for .app bundles to inherit the new PATH."
       else
-        echo "launchd: failed to update system PATH (non-fatal)." >&2
+        echo "launchd: failed to update user PATH (non-fatal)." >&2
       fi
     else
-      echo "launchd: system PATH already up-to-date."
+      echo "launchd: user PATH already up-to-date."
     fi
   '';
 

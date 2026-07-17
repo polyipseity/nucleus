@@ -43,9 +43,9 @@ let
   # of hardcoded indices into pathComponents.append.
   cargoBinDir = builtins.elemAt pathComponents.append 1;
 
-  # ── Helper: render launchctl config system path string ─────────────
+  # ── Helper: render launchctl config user path string ───────────────
   # Returns a colon-joined absolute PATH string for use in
-  # sudo launchctl config system path.  Takes homeDir as an argument
+  # sudo launchctl config user path.  Takes homeDir as an argument
   # (e.g. "${config.home.homeDirectory}") and renders all managed
   # directories as absolute paths including system fallbacks.
   # Used by configureGuiEnv in macos.nix.

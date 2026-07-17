@@ -76,4 +76,4 @@ Valid reasons to restrict scope:
 - The concept is inherently platform-specific (e.g., `DEVELOPER_DIR` on non-macOS hosts).
 - The value is technically infeasible to compute at build time (e.g., `NUCLEUS_REPO_ROOT` on NixOS — captured at eval time).
 
-"CLI-only tool" or "only shells need it" is not a valid restriction on NixOS or Windows — both CLI and GUI processes inherit the same environment. On macOS, `launchd` maintains separate shell and GUI domains. The `configureGuiEnv` activation step bridges this by calling `launchctl setenv` for all managed vars and `launchctl config system path` for LaunchServices PATH; a one-shot LaunchAgent covers login-time gaps.
+"CLI-only tool" or "only shells need it" is not a valid restriction on NixOS or Windows — both CLI and GUI processes inherit the same environment. On macOS, `launchd` maintains separate shell and GUI domains. The `configureGuiEnv` activation step bridges this by calling `launchctl setenv` for all managed vars and `launchctl config user path` for LaunchServices PATH; a one-shot LaunchAgent covers login-time gaps.

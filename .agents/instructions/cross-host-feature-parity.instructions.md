@@ -155,7 +155,7 @@ These services are specific to macOS and have no cross-host equivalent:
 | `dev-ds-store-gc`          | `.DS_Store` is a Finder/Spotlight macOS convention                                                                                                   |
 | `dev-spotlight-exclusions` | `.metadata_never_index` is a macOS filesystem attribute                                                                                              |
 | `icloud-exclusions`        | `com.apple.fileprovider.ignore#P` xattr is macOS-only                                                                                                |
-| `gui-env`                  | `configureGuiEnv` activation step sets all vars via `launchctl setenv` + `launchctl config system path`; one-shot `gui-env` LaunchAgent provides login-time coverage |
+| `gui-env`                  | `configureGuiEnv` activation step sets all vars via `launchctl setenv` + `launchctl config user path`; one-shot `gui-env` LaunchAgent provides login-time coverage |
 | `linux-builder`            | Nix Linux builder VM is macOS-specific (NixOS runs Linux natively)                                                                                   |
 
 ### POSIX-only services
