@@ -230,17 +230,17 @@ The repository uses a consolidated lockfile at `src/lockfiles/lockfile.json` to 
 
 ### Schema
 
-| Key              | Format                          | Description                              |
-| ---------------- | ------------------------------- | ---------------------------------------- |
-| `scoop`          | `string → string`               | Scoop package name → version             |
-| `cargo-binstall` | `string → string`               | Cargo crate name → version               |
-| `bun`            | `string → string`               | Bun package name → version               |
-| `uv`             | `string → string`               | Uv package name → version                |
-| `rustup`         | `string → string`               | Rust toolchain → date                    |
-| `winget`         | `string → string`               | WinGet package ID → version              |
-| `vscode`         | `string → string`               | VS Code extension ID → version           |
-| `homebrew`       | `object with brews/casks/masApps`| Homebrew formula/cask/MAS name → version |
-| `ollama`         | `string → string`               | Ollama model name → digest hash          |
+| Key              | Format                            | Description                              |
+| ---------------- | --------------------------------- | ---------------------------------------- |
+| `scoop`          | `string → string`                 | Scoop package name → version             |
+| `cargo-binstall` | `string → string`                 | Cargo crate name → version               |
+| `bun`            | `string → string`                 | Bun package name → version               |
+| `uv`             | `string → string`                 | Uv package name → version                |
+| `rustup`         | `string → string`                 | Rust toolchain → date                    |
+| `winget`         | `string → string`                 | WinGet package ID → version              |
+| `vscode`         | `string → string`                 | VS Code extension ID → version           |
+| `homebrew`       | `object with brews/casks/masApps` | Homebrew formula/cask/MAS name → version |
+| `ollama`         | `string → string`                 | Ollama model name → digest hash          |
 
 All sections are required but may be empty (`{}`).
 
@@ -290,6 +290,7 @@ Code too small to justify a file — the Nix expression is the entire body. Exam
 Pure-shell logic was extracted to `src/scripts/`, but the Nix-evaluated wrapper (env var interpolation, generated predicates, Nix function calls) stays inline. This is the expected split pattern.
 
 Examples with their extracted helpers:
+
 - `devSpotlightExclusions` → `dev-spotlight-exclusions.sh` (find predicate stays in Nix)
 - `icloudExclusionsScript` → `icloud-exclusions-lib.sh` (JSON args via env vars)
 - `wallpaper-provision` per-wallpaper loop → `wallpaper-provision.sh`

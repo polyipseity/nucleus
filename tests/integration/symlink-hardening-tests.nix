@@ -38,10 +38,10 @@ rec {
 
   # =========================================================================
   # Assertion 3: Agents skills symlink protection — function def in symlink-hardening-lib.sh,
-  #               context string in agents.nix
+  #               activation name in agents.nix
   # =========================================================================
   skillsProtection =
-    assert containsRegex "agents-skills" agentsText;
+    assert containsRegex "agent-skills" agentsText;
     assert containsRegex "_nucleus_protect_symlink" agentsHelpersText;
     assert containsRegex "_nucleus_unprotect_symlink" agentsHelpersText;
     true;
