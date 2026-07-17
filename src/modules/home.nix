@@ -249,7 +249,7 @@ in
       esac
 
       mkdir -p "$(dirname "$_obsidian_settings_path")"
-      ${pkgs.python3}/bin/python3 -c '${builtins.readFile ./scripts/obsidian-merge-json.py}' "$_obsidian_settings_path" ${lib.escapeShellArg obsidianManagedSettingsJson}
+      ${pkgs.python3}/bin/python3 -c '${builtins.readFile ./scripts/configs/obsidian-merge-json.py}' "$_obsidian_settings_path" ${lib.escapeShellArg obsidianManagedSettingsJson}
     '';
 
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
