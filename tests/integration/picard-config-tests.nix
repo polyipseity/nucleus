@@ -13,7 +13,7 @@ let
   inherit (import ../lib.nix) assert' containsRegex flatten;
 
   test_posix_picard_ini_merge_overwrite_wiring = assert' (
-    containsRegex "configurePicardSettings" homeText
+    containsRegex "picard-merge-ini" homeText
     && containsRegex ''builtins\.readFile ./configs/picard/Picard\.ini'' homeText
     && containsRegex "_apply_picard_defaults_from_file" homeText
     && containsRegex "_upsert_ini_key" homeText

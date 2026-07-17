@@ -12,7 +12,7 @@ in
 assert builtins.hasAttr "obsidian" windowsUsers.users.polyipseity;
 assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.obsidian;
 assert containsRegex "\"obsidian\"" usersRegistryText;
-assert containsRegex "configureObsidianSettings" homeText;
+assert containsRegex "obsidian-merge-json" homeText;
 assert containsRegex "obsidianDefaultSettings = builtins.fromJSON" homeText;
 assert containsRegex "WHY nativeMenus is not configured" homeText;
 assert containsRegex "WHY checkSlowStartup is not configured" homeText;

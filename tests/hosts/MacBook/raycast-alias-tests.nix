@@ -6,7 +6,7 @@ let
   macbookManualText = builtins.readFile ../../../src/hosts/MacBook/MANUAL.md;
   raycastManualConfigText = builtins.readFile ../../../src/hosts/MacBook/raycast-manual-config.md;
 in
-assert containsRegex "configureRaycastApplicationAliases" macosText;
+assert containsRegex "macos-raycast-aliases" macosText;
 assert containsRegex "Nucleus App Aliases" macosText;
 assert containsRegex "Books \\(English\\)\\.app" macosText;
 assert containsRegex "Messages \\(English\\)\\.app" macosText;

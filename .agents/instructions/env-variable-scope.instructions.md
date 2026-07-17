@@ -27,7 +27,7 @@ All Nix-side env vars are declared in `src/modules/lib/env-catalog.nix`. The cat
 - Managed PATH components and helpers (`pathComponents`, `toShellPrependPath`, `toShellAppendPath`, `toPowerShellPrependSnippet`, `toPowerShellAppendSnippet`) live in `src/modules/lib/managed-paths.nix`, mirroring `ManagedPaths.ps1` on Windows.
   > **Invariant**: `pathComponents.prepend` and `pathComponents.append` are always declared as separate lists. Consumers MUST handle both symmetrically — never assume either is empty. Comments MUST describe the conceptual role (before-system-default vs. after-system-default), not the current contents.
 - Daemon env var consumption uses `resolveValue` directly in each daemon file.
-- Consumed by: `shell.nix` (via `home.sessionPath`, `home.sessionVariables`), `macos.nix` (gui-env LaunchAgent, configureGuiEnv activation), `hosts/NixOS/base.nix`, `hosts/NixOS/ai.nix`, and daemon files in `hosts/MacBook/`.
+- Consumed by: `shell.nix` (via `home.sessionPath`, `home.sessionVariables`), `macos.nix` (gui-env LaunchAgent, macos-gui-env-path activation), `hosts/NixOS/base.nix`, `hosts/NixOS/ai.nix`, and daemon files in `hosts/MacBook/`.
 - The `env/default.nix` Home Manager module exposes `config._nucleus.envVars` for introspection.
 - **Overriding per host**: use the `override` attr in the catalog entry (e.g., NixOS vs macOS vs Windows).
 - **User-specific vars**: set `userSpecific = true` in the catalog entry for vars whose value depends on the logged-in user (e.g. `PASSWORD_STORE_DIR`). These are excluded from `systemVars` (system-wide env) and only set via home-manager session variables and the macOS LaunchAgent (`macOSAllVars`).
@@ -76,4 +76,4 @@ Valid reasons to restrict scope:
 - The concept is inherently platform-specific (e.g., `DEVELOPER_DIR` on non-macOS hosts).
 - The value is technically infeasible to compute at build time (e.g., `NUCLEUS_REPO_ROOT` on NixOS — captured at eval time).
 
-"CLI-only tool" or "only shells need it" is not a valid restriction on NixOS or Windows — both CLI and GUI processes inherit the same environment. On macOS, `launchd` maintains separate shell and GUI domains. The `configureGuiEnv` activation step bridges this by calling `launchctl setenv` for all managed vars and `launchctl config user path` for LaunchServices PATH; a one-shot LaunchAgent covers login-time gaps.
+"CLI-only tool" or "only shells need it" is not a valid restriction on NixOS or Windows — both CLI and GUI processes inherit the same environment. On macOS, `launchd` maintains separate shell and GUI domains. The `macos-gui-env-path` activation step bridges this by calling `launchctl setenv` for all managed vars and `launchctl config user path` for LaunchServices PATH; a one-shot LaunchAgent covers login-time gaps.

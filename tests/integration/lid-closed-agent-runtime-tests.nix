@@ -11,6 +11,7 @@ let
   ciWorkflowText = builtins.readFile ../../.github/workflows/ci.yml;
   macManualText = builtins.readFile ../../src/hosts/MacBook/MANUAL.md;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
+  macosText = builtins.readFile ../../src/modules/macos.nix;
   nixosDesktopText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   windowsPowerPolicyText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-PowerPolicy.ps1;
@@ -23,7 +24,7 @@ let
         (lib.hasInfix "apply_pmset -a standby 1 ttyskeepawake 1 hibernatemode 3 networkoversleep 0 tcpkeepalive 1 powernap 1 lidwake 1" macbookActivationText)
         && (lib.hasInfix "apply_pmset -c displaysleep 1 sleep 0 disksleep 0 womp 1" macbookActivationText)
         && (lib.hasInfix "apply_pmset -b displaysleep 1 sleep 0 disksleep 0 womp 1" macbookActivationText)
-        && (lib.hasInfix "ensureHeadlessDisplay" macbookActivationText)
+        && (lib.hasInfix "macos-headless-display" macosText)
         && (lib.hasInfix "betterdisplay-heartbeat" macbookActivationText)
       )
       "macOS must keep the no-idle-sleep pmset posture and BetterDisplay heartbeat for closed-lid remote work";

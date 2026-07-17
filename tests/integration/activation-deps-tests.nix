@@ -38,65 +38,67 @@ let
           before = [ ];
           after = [ ];
         };
-        gitIdentityFromSops = {
+        "git-identity" = {
           before = [ "waitForSopsSecrets" ];
           after = [ ];
         };
         devReposProvision = {
-          before = [ "gitIdentityFromSops" ];
+          before = [ "git-identity" ];
           after = [ ];
         };
       };
       # Check order: secrets → git identity → dev repos
       secretsFirst = activations.waitForSopsSecrets;
-      gitSecond = activations.gitIdentityFromSops;
+      gitSecond = activations."git-identity";
       devThird = activations.devReposProvision;
     in
     assert' (
       (builtins.elem "waitForSopsSecrets" gitSecond.before)
-      && (builtins.elem "gitIdentityFromSops" devThird.before)
+      && (builtins.elem "git-identity" devThird.before)
     ) "Secrets must materialize before dev repos provision";
 
   # === TEST: SSH key loading before Git clone ===
   test_ssh_before_git =
     let
       activations = {
-        sshKeyAdopt = {
+        "ssh-key-adopt" = {
           before = [ "waitForSopsSecrets" ];
           after = [ ];
         };
         devReposProvision = {
-          before = [ "sshKeyAdopt" ];
+          before = [ "ssh-key-adopt" ];
           after = [ ];
         };
       };
     in
-    assert' (builtins.elem "sshKeyAdopt" activations.devReposProvision.before) "SSH keys must load before Git clones";
+    assert' (builtins.elem "ssh-key-adopt" activations.devReposProvision.before) "SSH keys must load before Git clones";
 
   # === TEST: GPG keys imported before commits ===
   test_gpg_before_commits =
     let
       activations = {
-        gpgImport = {
+        "gpg-import" = {
           before = [ "waitForSopsSecrets" ];
           after = [ ];
         };
-        gitIdentityFromSops = {
-          before = [ "gpgImport" ];
+        "git-identity" = {
+          before = [ "gpg-import" ];
           after = [ ];
         };
       };
     in
-    assert' (builtins.elem "gpgImport" activations.gitIdentityFromSops.before) "GPG keys must import before Git identity setup";
+    assert' (builtins.elem "gpg-import"
+      activations."git-identity".before
+    ) "GPG keys must import before Git identity setup";
 
   # === TEST: Activation names are unique ===
   test_activation_names_unique =
     let
       names = [
         "waitForSopsSecrets"
-        "gitIdentityFromSops"
-        "gpgImport"
-        "sshKeyAdopt"
+        "git-identity"
+        "gpg-import"
+        "ssh-key-adopt"
         "devReposProvision"
       ];
       uniqueNames = unique names;
@@ -196,9 +198,9 @@ let
     let
       activationNames = [
         "waitForSopsSecrets"
-        "gitIdentityFromSops"
-        "gpgImport"
-        "sshKeyAdopt"
+        "git-identity"
+        "gpg-import"
+        "ssh-key-adopt"
         "devReposProvision"
       ];
       # Each dependency reference should exist in the names list
@@ -323,7 +325,7 @@ let
   test_workflows_deployment_uses_declared_order = assert' (lib.hasInfix "'') currentNucleusWorkflows" macbookAutomatorWorkflowsText) "automator-workflows.nix Phase 3 must iterate currentNucleusWorkflows directly without re-sorting";
 
   # === TEST: macOS app-bundles DAG orders after linkGeneration ===
-  test_services_app_bundles_dag_after_link_generation = assert' (lib.hasInfix "deployNucleusAppBundles = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAppBundlesText) "app-bundles.nix deployNucleusAppBundles must run after linkGeneration";
+  test_services_app_bundles_dag_after_link_generation = assert' (lib.hasInfix "\"macos-app-bundle-lib\" = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAppBundlesText) "app-bundles.nix macos-app-bundle-lib activation must run after linkGeneration";
 
   # === TEST: macOS automator-workflows DAG orders after linkGeneration ===
   test_services_workflows_dag_after_link_generation = assert' (lib.hasInfix "deployNucleusAutomatorWorkflows = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAutomatorWorkflowsText) "automator-workflows.nix deployNucleusAutomatorWorkflows must run after linkGeneration";
@@ -333,9 +335,9 @@ let
     assert'
       (
         lib.hasInfix "deployNucleusServicesFlush =" macbookServicesText
-        && lib.hasInfix "entryAfter [ \"deployNucleusAutomatorWorkflows\" \"deployNucleusAppBundles\" ]" macbookServicesText
+        && lib.hasInfix "entryAfter [ \"deployNucleusAutomatorWorkflows\" \"macos-app-bundle-lib\" ]" macbookServicesText
       )
-      "services.nix deployNucleusServicesFlush must run after both deployNucleusAutomatorWorkflows and deployNucleusAppBundles";
+      "services.nix deployNucleusServicesFlush must run after both deployNucleusAutomatorWorkflows and macos-app-bundle-lib";
 
   # === TEST: macOS services.nix imports both sub-modules ===
   test_services_imports_both_submodules = assert' (

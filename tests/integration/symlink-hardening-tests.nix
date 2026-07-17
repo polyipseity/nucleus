@@ -40,7 +40,7 @@ rec {
   # Assertion 3: Agents skills symlink protection — function def in symlink-hardening-lib.sh,
   #               context string in agents.nix
   # =========================================================================
-  agentsSkillsProtection =
+  skillsProtection =
     assert containsRegex "agents-skills" agentsText;
     assert containsRegex "_nucleus_protect_symlink" agentsHelpersText;
     assert containsRegex "_nucleus_unprotect_symlink" agentsHelpersText;
@@ -136,7 +136,7 @@ rec {
       allResults = [
         vsCodeProtection
         agentsConfigProtection
-        agentsSkillsProtection
+        skillsProtection
         devReposProtection
         customProvisionSymlinkProtection
         raycastAliasProtection
@@ -158,7 +158,7 @@ rec {
     coverage = [
       "VS Code"
       "Agents Config"
-      "Agents Skills"
+      "Skills"
       "Custom Provision Symlinks"
       "Dev Repos"
       "Dev Repos Logging"

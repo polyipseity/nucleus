@@ -75,7 +75,7 @@ Use these extension points only:
 - `postActivation`: after `homebrew`; use this for most custom work.
 - Home Manager's launchd module runs `setupLaunchAgents` after `entryAfter [ "writeBoundary" ]`. Custom activation steps that verify registration or fix up agents must use `entryAfter [ "setupLaunchAgents" ]`.
 
-See the [macOS launchd service management](#macos-launchd-service-management) section for the `ensureLaunchAgentsLoaded` verification pattern.
+See the [macOS launchd service management](#macos-launchd-service-management) section for the `macos-ensure-launchagents` verification pattern.
 
 Contribution rules:
 
@@ -141,7 +141,7 @@ When running as root via launchd without `UserName`, `HOME` is unset. Scripts wi
 
 Home Manager's launchd module runs `setupLaunchAgents` after `entryAfter [ "writeBoundary" ]`, registering or updating user-scope LaunchAgents from the new generation. On macOS 26, `launchctl bootstrap` can spuriously fail with "Input/output error". Since HM uses `cmp -s` to compare old vs. new plists, an agent that failed registration is skipped on subsequent activations (its plist is unchanged on disk).
 
-The `ensureLaunchAgentsLoaded` block in `src/modules/macos.nix` (`home.activation.ensureLaunchAgentsLoaded = lib.hm.dag.entryAfter [ "setupLaunchAgents" ]`) re-verifies all HM-managed agents after `setupLaunchAgents` runs. For each unregistered agent it: `bootout` (best-effort) → `sleep 1` → `bootstrap` → `kickstart -p`.
+The `macos-ensure-launchagents` block in `src/modules/macos.nix` (`home.activation.macos-ensure-launchagents = lib.hm.dag.entryAfter [ "setupLaunchAgents" ]`) re-verifies all HM-managed agents after `setupLaunchAgents` runs. For each unregistered agent it: `bootout` (best-effort) → `sleep 1` → `bootstrap` → `kickstart -p`.
 
 Any activation step that must run after launchd agents are registered should use `entryAfter [ "setupLaunchAgents" ]`.
 
@@ -167,14 +167,14 @@ Validation expectation after any pmset change:
 sops-nix on macOS installs secrets via a LaunchAgent, not inline during activation. `launchctl bootstrap` returns before `sops-install-secrets` finishes writing files to `~/.config/sops-nix/secrets/`. This means:
 
 - `entryAfter = [ "sops-nix" ]` only gates on the Home Manager step that _registers_ the LaunchAgent — it does **not** gate on secret files actually landing on disk.
-- Any activation entry that reads from `~/.config/sops-nix/secrets/` (e.g. `gitIdentityFromSops`, `gpgImport`, `sshKeyAdopt`) must depend on a **polling barrier** instead.
+- Any activation entry that reads from `~/.config/sops-nix/secrets/` (e.g. `git-identity`, `gpg-import`, `ssh-key-adopt`) must depend on a **polling barrier** instead.
 - On Linux, sops-nix writes secrets synchronously; the barrier is a no-op there.
 
 Use the `waitForSopsSecrets` barrier pattern (`entryAfter [ "sops-nix" ]`) to poll the git-identity sentinel until non-empty (with timeout + clear error).
 
 Rules:
 
-- Wire `gitIdentityFromSops`, `gpgImport`, `sshKeyAdopt`, and any other entry that reads sops-materialized secrets to depend on `waitForSopsSecrets`, not `sops-nix` directly.
+- Wire `git-identity`, `gpg-import`, `ssh-key-adopt`, and any other entry that reads sops-materialized secrets to depend on `waitForSopsSecrets`, not `sops-nix` directly.
 - The sentinel file is the git-identity secret: smallest file, appears early in `sops-install-secrets` output; once it is non-empty (`-s` test), all other secrets are effectively written.
 
 ## Machine age key auto-registration
@@ -199,7 +199,7 @@ Windows equivalent: `Register-HostAgeKey` in `src/hosts/Windows/modules/secrets/
 
 ## Pre-provision key adoption semantics
 
-`sshKeyAdopt` (POSIX) and the SSH fingerprint tracking block in `Sync-NucleusSecretFile` (Windows) flush the SSH agent whenever the recorded fingerprint differs from the newly materialized one. The guard intentionally omits a "manifest must be non-empty" pre-condition to cover three cases:
+`ssh-key-adopt` (POSIX) and the SSH fingerprint tracking block in `Sync-NucleusSecretFile` (Windows) flush the SSH agent whenever the recorded fingerprint differs from the newly materialized one. The guard intentionally omits a "manifest must be non-empty" pre-condition to cover three cases:
 
 - **Manifest absent, key present** (first provision): agent flushed, evicting manually pre-placed keys.
 - **Manifest exists, key rotated**: agent flushed, removing the stale cached entry.
@@ -292,9 +292,9 @@ Pure-shell logic was extracted to `src/scripts/`, but the Nix-evaluated wrapper 
 Examples with their extracted helpers:
 - `devSpotlightExclusions` → `dev-spotlight-exclusions.sh` (find predicate stays in Nix)
 - `icloudExclusionsScript` → `icloud-exclusions-lib.sh` (JSON args via env vars)
-- `wallpaperProvision` per-wallpaper loop → `wallpaper-provision.sh`
+- `wallpaper-provision` per-wallpaper loop → `wallpaper-provision.sh`
 - `installBunPackages` entry iteration → `home/install-bun-packages.sh`
 - `devReposProvision` per-repo loop → `dev-repos-provision-lib.sh`
-- `configureGuiEnv` PATH dedup → `gui-env-agent.sh` + `macos-gui-env-path.sh`
+- `macos-gui-env-path` PATH dedup → `gui-env-agent.sh` + `macos-gui-env-path.sh`
 
 **Rule**: when adding a new split-pattern inline script, extract the pure-shell body to `src/scripts/` first, then wrap it in Nix with environment variable injection or `builtins.replaceStrings` for Nix-evaluated values.
