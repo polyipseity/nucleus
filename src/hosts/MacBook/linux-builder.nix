@@ -67,8 +67,8 @@ in
   # not materialized automatically here, so we write it explicitly.
   environment.etc."nix/machines".text = "${builderMachine}\n";
 
-  # Method 2 (read-only): known_hosts is system-level Nix infrastructure.
-  # environment.etc is the correct mechanism for /etc/nix files.
+  # Method 2 (read-only): Derived from SOPS secrets and machine identity —
+  # not user-editable content.
   environment.etc."nix/linux-builder-known_hosts".text =
     builtins.readFile ../../modules/configs/ssh/linux-builder-known_hosts;
 
@@ -78,7 +78,8 @@ in
   # correct for the daemon but unreadable to user-space ssh-ng clients.
   # Route root to the daemon-owned key and the primary user to a dedicated 0600
   # mirror so nix store / nixos-generators probes never fall back to password.
-  # Method 2 (read-only): ssh_config.d includes are system-level SSH config.
+  # Method 2 (read-only): Builder VM wiring — modifying port/address requires
+  # coordinated changes across multiple files, so changes go through Nix eval.
   environment.etc."ssh/ssh_config.d/100-linux-builder.conf".text =
     builtins.replaceStrings [ "USERNAME" "USER_BUILDER_KEY_PATH" ] [ username userBuilderKeyPath ]
       (builtins.readFile ../../modules/configs/ssh/ssh_config.d/100-linux-builder.conf);

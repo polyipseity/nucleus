@@ -23,8 +23,8 @@
   # ssh_personal_<username>.pub to ~/.ssh/ssh_personal_<username>.pub.
   # Both the standard authorized_keys path and the materialized personal key
   # are checked to allow future key additions via authorized_keys.
-  # Method 2 (read-only): sshd_config.d includes are read-only config fragments.
-  # environment.etc is the correct Nix mechanism for system-level files.
+  # Method 2 (read-only): Security-sensitive SSH server config — changes go
+  # through Nix evaluation and are traceable in git.
   environment.etc."ssh/sshd_config.d/50-nucleus.conf".text =
     builtins.readFile ../../modules/configs/ssh/sshd_config.d/50-nucleus.conf;
 }
