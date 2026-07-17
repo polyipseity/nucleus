@@ -205,7 +205,7 @@ lib.mkIf isPrimaryUser {
   home.activation.gitIdentityFromSops = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
     export GIT_SECRET_PATH="${config.sops.secrets.${gitIdentitySecretName}.path}"
     export GIT_BIN="${pkgs.git}/bin/git"
-    ${builtins.readFile ../scripts/secrets-git-identity.sh}
+    ${builtins.readFile ../scripts/secrets/secrets-git-identity.sh}
   '';
 
   # --------------------------------------------------------------------------
@@ -248,7 +248,7 @@ lib.mkIf isPrimaryUser {
     export GNUPGHOME="${config.home.homeDirectory}/.gnupg"
     export GPG_BIN="${pkgs.gnupg}/bin/gpg"
     export GPG_SECRET_PATH="${config.sops.secrets.${gpgSecretName}.path}"
-    ${builtins.readFile ../scripts/secrets-gpg-import.sh}
+    ${builtins.readFile ../scripts/secrets/secrets-gpg-import.sh}
   '';
 
   # --------------------------------------------------------------------------
@@ -280,7 +280,7 @@ lib.mkIf isPrimaryUser {
     export SSH_PUB_PATH="${sshPublicKeyPath}"
     export SSH_KEYGEN_BIN="${pkgs.openssh}/bin/ssh-keygen"
     export SSH_ADD_BIN="${pkgs.openssh}/bin/ssh-add"
-    ${builtins.readFile ../scripts/secrets-ssh-key-adopt.sh}
+    ${builtins.readFile ../scripts/secrets/secrets-ssh-key-adopt.sh}
   '';
 
   # --------------------------------------------------------------------------
