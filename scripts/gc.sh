@@ -652,14 +652,15 @@ fi
 gc_logs() {
   # Rotate managed log files via copy-truncate (preserves inodes).
   services_json="$REPO_ROOT/src/modules/services.json"
+  services_schema_json="$REPO_ROOT/src/modules/services.schema.json"
   if [ ! -f "$services_json" ]; then
     say "services.json not found; skipping log rotation"
     return 0
   fi
 
-  _gl_maxsize="${log_max_size:-$(jq -r '.["$defaults"].logging.maxSize // 10000000' "$services_json")}" # bytes
-  _gl_maxfiles="${log_max_files:-$(jq -r '.["$defaults"].logging.maxFiles // 4' "$services_json")}"
-  _gl_compress="${log_compress:-$(jq -r '.["$defaults"].logging.compress // "true"' "$services_json")}"
+  _gl_maxsize="${log_max_size:-$(jq -r '.definitions.loggingEntry.properties.maxSize.default // 10000000' "$services_schema_json")}" # bytes
+  _gl_maxfiles="${log_max_files:-$(jq -r '.definitions.loggingEntry.properties.maxFiles.default // 4' "$services_schema_json")}"
+  _gl_compress="${log_compress:-$(jq -r '.definitions.loggingEntry.properties.compress.default // "true"' "$services_schema_json")}"
 
   _gl_log_dir="$(nucleus_log_dir)"
   _gl_system_log_dir="$(nucleus_system_log_dir)"

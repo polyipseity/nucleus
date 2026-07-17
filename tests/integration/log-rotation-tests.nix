@@ -26,9 +26,9 @@ assert containsRegex "log_gc=true" gcShText;
 assert containsRegex "gc_logs\\(\\)" gcShText;
 assert containsRegex "rotate_logs_in_directory" gcShText;
 
-# --- scripts/gc.sh: reads services.json ---
-assert containsRegex "services\\.json" gcShText;
-assert containsRegex "[$]defaults" gcShText;
+# --- scripts/gc.sh: reads defaults from schema ---
+assert containsRegex "services\.schema\.json" gcShText;
+assert containsRegex "definitions\.loggingEntry\.properties\.maxSize\.default" gcShText;
 
 # --- scripts/gc.ps1: -NoLogGc switch and log rotation import ---
 assert containsRegex "NoLogGc" gcPs1Text;
@@ -70,8 +70,9 @@ assert containsRegex ''"runAsUser": true'' servicesJsonText;
 assert containsRegex "services\\.json" loggingNixText;
 assert containsRegex "runtime source: services\\.json" loggingNixText;
 
-# --- scripts/health-check.sh: reads $defaults.logging.maxSize ---
-assert containsRegex "[$]defaults" healthCheckShText;
+# --- scripts/health-check.sh: reads schema for logging defaults ---
+assert containsRegex "services\.schema\.json" healthCheckShText;
+assert containsRegex "definitions\.loggingEntry\.properties\.maxSize\.default" healthCheckShText;
 {
   success = true;
   message = "Log rotation content assertions passed";

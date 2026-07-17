@@ -156,6 +156,9 @@ function Test-LogHealth {
     $systemDir = Get-NucleusSystemLogDir
   }
   $servicesJson = "$PSScriptRoot\..\src\modules\services.json"
+  $servicesSchemaJson = "$PSScriptRoot\..\src\modules\services.schema.json"
+  $schemaContent = Get-Content $servicesSchemaJson -Raw | ConvertFrom-Json
+  $maxSizeDefault = [int64]$schemaContent.definitions.loggingEntry.properties.maxSize.default
   $failures = 0
 
   foreach ($dir in @($userDir, $systemDir)) {
@@ -177,7 +180,7 @@ function Test-LogHealth {
     $capture = if ($svcConfig.capture) { $svcConfig.capture } else { 'all' }
     if ($capture -eq 'none') { continue }
 
-    $maxSize = if ($svcConfig.maxSize) { [int64]$svcConfig.maxSize } elseif ($services.'$defaults'.logging.maxSize) { [int64]$services.'$defaults'.logging.maxSize } else { 10000000 } # bytes
+    $maxSize = if ($svcConfig.maxSize) { [int64]$svcConfig.maxSize } else { $maxSizeDefault } # bytes
     $sanitize = if ($null -ne $svcConfig.sanitize) { [bool]$svcConfig.sanitize } else { $true }
 
     foreach ($dir in @($userDir, $systemDir)) {

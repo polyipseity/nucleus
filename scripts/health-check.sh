@@ -131,6 +131,8 @@ check_log_health() {
   log_dir="$(nucleus_log_dir)"
   system_log_dir="$(nucleus_system_log_dir)"
   services_json="$REPO_ROOT/src/modules/services.json"
+  services_schema_json="$REPO_ROOT/src/modules/services.schema.json"
+  _max_size_default=$(jq -r '.definitions.loggingEntry.properties.maxSize.default // 10000000' "$services_schema_json")
   failures=0
 
   for dir in "$log_dir" "$system_log_dir"; do
@@ -147,7 +149,7 @@ check_log_health() {
 
   while IFS= read -r svc; do
     capture=$(jq -r --arg svc "$svc" '.[$svc].logging.capture // "all"' "$services_json")
-    max_size=$(jq -r --arg svc "$svc" '(.[$svc].logging.maxSize // .["$defaults"].logging.maxSize // 10000000)' "$services_json") # bytes
+    max_size=$(jq -r --arg svc "$svc" --arg def "$_max_size_default" '(.[$svc].logging.maxSize // ($def | tonumber))' "$services_json") # bytes
     sanitize=$(jq -r --arg svc "$svc" '.[$svc].logging.sanitize // true' "$services_json")
 
     if [ "$capture" = "none" ]; then

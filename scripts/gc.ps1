@@ -73,13 +73,13 @@
   Accepted but ignored on Windows (POSIX-only) (default: $false).
 
 .PARAMETER LogMaxSize
-  Log rotation max file size in bytes before rotation (default: from services.json $defaults.logging.maxSize).
+  Log rotation max file size in bytes before rotation (default: from services.schema.json loggingEntry default).
 
 .PARAMETER LogMaxFiles
-  Number of rotated archives to keep (default: from services.json $defaults.logging.maxFiles).
+  Number of rotated archives to keep (default: from services.schema.json loggingEntry default).
 
 .PARAMETER LogCompress
-  Whether to compress rotated logs (default: from services.json $defaults.logging.compress).
+  Whether to compress rotated logs (default: from services.schema.json loggingEntry default).
 
 .PARAMETER NoVMGc
   Skip stale VM artifact removal (default: $false).
@@ -545,26 +545,21 @@ if (-not $NoVMGc) {
 # ---- Step 8: log rotation -------------------------------------------------
 if (-not $NoLogGc) {
   $servicesJson = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\services.json"
+  $servicesSchemaJson = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\services.schema.json"
   if (-not (Test-Path -LiteralPath $servicesJson -PathType Leaf)) {
     Write-NucleusWarning "services.json not found; skipping log rotation"
   } else {
     try {
-      $servicesContent = Get-Content -LiteralPath $servicesJson -Raw | ConvertFrom-Json
-      $defaultLogging = $servicesContent.'$defaults'.logging
+      $schemaContent = Get-Content -LiteralPath $servicesSchemaJson -Raw | ConvertFrom-Json
+      $loggingDefaults = $schemaContent.definitions.loggingEntry.properties
     } catch {
-      Write-NucleusWarning "failed to parse services.json; skipping log rotation — $($_.Exception.Message)"
-      $defaultLogging = $null
+      Write-NucleusWarning "failed to parse services.schema.json; using hardcoded defaults — $($_.Exception.Message)"
+      $loggingDefaults = $null
     }
 
-    if ($defaultLogging) {
-      $logMaxSize = if ($LogMaxSize) { [int]$LogMaxSize } elseif ($defaultLogging.maxSize) { [int]$defaultLogging.maxSize } else { 10000000 } # bytes
-      $logMaxFiles = if ($LogMaxFiles) { [int]$LogMaxFiles } elseif ($defaultLogging.maxFiles) { [int]$defaultLogging.maxFiles } else { 4 }
-      $logCompress = if ($LogCompress) { [bool]::Parse($LogCompress) } elseif ($null -ne $defaultLogging.compress) { [bool]$defaultLogging.compress } else { $true }
-    } else {
-      $logMaxSize = 10000000 # bytes
-      $logMaxFiles = 4
-      $logCompress = $true
-    }
+    $logMaxSize = if ($LogMaxSize) { [int]$LogMaxSize } elseif ($loggingDefaults.maxSize.default) { [int]$loggingDefaults.maxSize.default } else { 10000000 } # bytes
+    $logMaxFiles = if ($LogMaxFiles) { [int]$LogMaxFiles } elseif ($loggingDefaults.maxFiles.default) { [int]$loggingDefaults.maxFiles.default } else { 4 }
+    $logCompress = if ($LogCompress) { [bool]::Parse($LogCompress) } elseif ($null -ne $loggingDefaults.compress.default) { [bool]$loggingDefaults.compress.default } else { $true }
 
     $logDir = Get-NucleusLogDir
     $systemLogDir = Get-NucleusSystemLogDir
