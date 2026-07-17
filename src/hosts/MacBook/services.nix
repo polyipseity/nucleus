@@ -47,7 +47,7 @@ in
   # have been deployed. Each sub-module handles its own deploy and prune
   # lifecycle; this entry ensures final cache coherency.
   home.activation.deployNucleusServicesFlush =
-    lib.hm.dag.entryAfter [ "deployNucleusAutomatorWorkflows" "deployNucleusAppBundles" ]
+    lib.hm.dag.entryAfter [ "deployNucleusAutomatorWorkflows" "macos-app-bundle-lib" ]
       ''
         # ── Phase 4: Flush daemon caches so changes take effect immediately ─
         # Without these restarts, cfprefsd and pbs hold stale cached state in

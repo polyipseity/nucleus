@@ -57,7 +57,7 @@ in
   # home.file for manual.md is now in automator-workflows.nix (where the
   # consuming workflow lives).
 
-  home.activation.deployNucleusAppBundles = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation."macos-app-bundle-lib" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     ${builtins.readFile ../../../scripts/hosts/MacBook/macos-app-bundle-lib.sh}
 
     # ── Phase 1a: Prune removed app bundles ───────────────────────────

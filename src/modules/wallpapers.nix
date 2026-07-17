@@ -95,7 +95,7 @@ in
 
   sops.secrets = wallpaperSecrets;
 
-  home.activation.wallpaperProvision = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+  home.activation."wallpaper-provision" = lib.hm.dag.entryAfter [ "sops-nix" ] ''
     export HOME="${currentUserHome}"
     export IS_DARWIN=$([ "$(uname -s)" = "Darwin" ] && echo 1 || echo 0)
     export PICTURES_DIR="$HOME/Pictures/wallpapers"
@@ -117,13 +117,13 @@ in
       targetFile="$PICTURES_DIR/${item.wallpaperName}"
 
       if [ ! -f "$secretPath" ]; then
-        fail_wallpaper_provision "wallpaperProvision: missing decrypted wallpaper secret at $secretPath; cannot apply wallpaper gallery."
+        fail_wallpaper_provision "wallpaper-provision: missing decrypted wallpaper secret at $secretPath; cannot apply wallpaper gallery."
       fi
 
       case "$targetFile" in
         "$PICTURES_DIR"/*) ;;
         *)
-          fail_wallpaper_provision "wallpaperProvision: refusing to write wallpaper outside $PICTURES_DIR: $targetFile"
+          fail_wallpaper_provision "wallpaper-provision: refusing to write wallpaper outside $PICTURES_DIR: $targetFile"
           ;;
       esac
 

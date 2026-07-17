@@ -12,12 +12,12 @@ lock_wallpaper_dir() {
   fi
 
   if ! chmod 555 "$PICTURES_DIR"; then
-    echo "wallpaperProvision: failed to set read-only mode on wallpaper directory $PICTURES_DIR." >&2
+    echo "wallpaper-provision: failed to set read-only mode on wallpaper directory $PICTURES_DIR." >&2
     return 1
   fi
 
   if ! /usr/bin/chflags uchg "$PICTURES_DIR"; then
-    echo "wallpaperProvision: failed to set immutable flag on wallpaper directory $PICTURES_DIR." >&2
+    echo "wallpaper-provision: failed to set immutable flag on wallpaper directory $PICTURES_DIR." >&2
     return 1
   fi
 
@@ -27,7 +27,7 @@ lock_wallpaper_dir() {
 fail_wallpaper_provision() {
   echo "$1" >&2
   if ! lock_wallpaper_dir; then
-    echo "wallpaperProvision: failed to re-lock wallpaper directory after an earlier error." >&2
+    echo "wallpaper-provision: failed to re-lock wallpaper directory after an earlier error." >&2
   fi
   exit 1
 }
@@ -36,22 +36,22 @@ wallpaper_pre_copy_setup() {
   # Refuse to operate on symlinks or non-directories to avoid writing or
   # deleting outside the intended managed wallpaper location.
   if [ -L "$PICTURES_DIR" ]; then
-    fail_wallpaper_provision "wallpaperProvision: wallpaper directory path $PICTURES_DIR is a symlink; refusing to manage wallpapers there."
+    fail_wallpaper_provision "wallpaper-provision: wallpaper directory path $PICTURES_DIR is a symlink; refusing to manage wallpapers there."
   fi
 
   if [ -e "$PICTURES_DIR" ] && [ ! -d "$PICTURES_DIR" ]; then
-    fail_wallpaper_provision "wallpaperProvision: wallpaper path $PICTURES_DIR exists but is not a directory."
+    fail_wallpaper_provision "wallpaper-provision: wallpaper path $PICTURES_DIR exists but is not a directory."
   fi
 
   # Keep the managed wallpaper directory mutable only during activation so
   # users/apps cannot accidentally delete or rename it between runs.
   if [ "$IS_DARWIN" -eq 1 ] && [ -d "$PICTURES_DIR" ]; then
     if ! /usr/bin/chflags nouchg "$PICTURES_DIR"; then
-      fail_wallpaper_provision "wallpaperProvision: failed to clear immutable flag on wallpaper directory $PICTURES_DIR."
+      fail_wallpaper_provision "wallpaper-provision: failed to clear immutable flag on wallpaper directory $PICTURES_DIR."
     fi
 
     if ! chmod 755 "$PICTURES_DIR"; then
-      fail_wallpaper_provision "wallpaperProvision: failed to restore writable mode on wallpaper directory $PICTURES_DIR before managed updates."
+      fail_wallpaper_provision "wallpaper-provision: failed to restore writable mode on wallpaper directory $PICTURES_DIR before managed updates."
     fi
   fi
 
@@ -59,7 +59,7 @@ wallpaper_pre_copy_setup() {
   chmod 755 "$PICTURES_DIR"
   if [ "$IS_DARWIN" -eq 1 ]; then
     if ! /usr/bin/chflags nouchg "$PICTURES_DIR"; then
-      fail_wallpaper_provision "wallpaperProvision: failed to clear immutable flag on wallpaper directory $PICTURES_DIR after create."
+      fail_wallpaper_provision "wallpaper-provision: failed to clear immutable flag on wallpaper directory $PICTURES_DIR after create."
     fi
   fi
 }
@@ -74,7 +74,7 @@ wallpaper_post_copy_teardown() {
     baseName="$(basename "$decryptedFile")"
     if [ ! -e "${WALLPAPERS_DIR}/${CURRENT_USER}/$baseName.sops" ]; then
       rm -f "$decryptedFile"
-      echo "wallpaperProvision: removed stale wallpaper $baseName (no matching .sops source)."
+      echo "wallpaper-provision: removed stale wallpaper $baseName (no matching .sops source)."
     fi
   done
 
@@ -95,7 +95,7 @@ wallpaper_post_copy_teardown() {
   done
 
   if [ "$hasWallpapers" -ne 1 ]; then
-    fail_wallpaper_provision "wallpaperProvision: no decrypted wallpapers found in $PICTURES_DIR; cannot apply wallpaper gallery."
+    fail_wallpaper_provision "wallpaper-provision: no decrypted wallpapers found in $PICTURES_DIR; cannot apply wallpaper gallery."
   fi
 
   if [ "$IS_DARWIN" -eq 1 ]; then
@@ -105,12 +105,12 @@ wallpaper_post_copy_teardown() {
     desktopprTarget="$resolvedPicturesDir/."
 
     if [ ! -x "$DESKTOPPR_BIN" ]; then
-      fail_wallpaper_provision "wallpaperProvision: desktoppr is not executable at $DESKTOPPR_BIN; cannot set macOS wallpaper gallery."
+      fail_wallpaper_provision "wallpaper-provision: desktoppr is not executable at $DESKTOPPR_BIN; cannot set macOS wallpaper gallery."
     elif [ ! -d "$resolvedPicturesDir" ]; then
-      fail_wallpaper_provision "wallpaperProvision: resolved wallpaper directory is not a folder: $resolvedPicturesDir"
+      fail_wallpaper_provision "wallpaper-provision: resolved wallpaper directory is not a folder: $resolvedPicturesDir"
     else
       if ! "$DESKTOPPR_BIN" all "$desktopprTarget"; then
-        fail_wallpaper_provision "wallpaperProvision: desktoppr failed to set wallpaper directory $desktopprTarget."
+        fail_wallpaper_provision "wallpaper-provision: desktoppr failed to set wallpaper directory $desktopprTarget."
       fi
     fi
   elif command -v gsettings >/dev/null 2>&1; then
@@ -152,11 +152,11 @@ wallpaper_post_copy_teardown() {
     chmod 444 "$_xml_tmp_final"
     mv "$_xml_tmp_final" "$xmlFile"
     if ! gsettings set org.gnome.desktop.background picture-uri "file://$xmlFile"; then
-      fail_wallpaper_provision "wallpaperProvision: failed to set GNOME picture-uri to wallpaper gallery XML."
+      fail_wallpaper_provision "wallpaper-provision: failed to set GNOME picture-uri to wallpaper gallery XML."
     fi
 
     if ! gsettings set org.gnome.desktop.background picture-uri-dark "file://$xmlFile"; then
-      fail_wallpaper_provision "wallpaperProvision: failed to set GNOME picture-uri-dark to wallpaper gallery XML."
+      fail_wallpaper_provision "wallpaper-provision: failed to set GNOME picture-uri-dark to wallpaper gallery XML."
     fi
     rm -f "$tmpXml"
   fi

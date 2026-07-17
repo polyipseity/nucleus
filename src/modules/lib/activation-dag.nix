@@ -39,5 +39,5 @@
   "vsCodeSymlinks"
   "vsCodeWorkspaceTrust"
   "waitForSopsSecrets"
-  "wallpaperProvision"
+  "wallpaper-provision"
 ]
