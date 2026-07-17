@@ -54,16 +54,6 @@ let
       )
     );
 
-  # Shared BD CLI wrapper: soft-fail wrapper for BetterDisplay CLI commands.
-  # Used by both betterdisplayHeartbeat and ensureHeadlessDisplay.
-  bdCliWrapper = ''
-    # _bd_cli args... — Execute BetterDisplay CLI command, soft-fail on error.
-    _bd_cli() {
-      # undoc-supp: BetterDisplay may be unresponsive during app startup/update, or Pro-only features may be unavailable in the free-tier build. Neither condition should abort activation or mark the LaunchAgent as failed.
-      "$BD_BIN" "$@" || true
-    }
-  '';
-
   # UTI list for Chrome: set as the default handler for HTML and XHTML documents.: set as the default handler for HTML and XHTML documents.
   # Source: Apple Uniform Type Identifiers.
   # https://developer.apple.com/documentation/uniformtypeidentifiers
@@ -184,61 +174,6 @@ let
       sanitizeICloudManagedRoots [ ]
   );
 
-  # Shared shell body for iCloud exclusion convergence, used by both the
-  # synchronous activation hook and the daily launchd maintenance script.
-  # Keep this as one source of truth so behavior stays aligned.
-  icloudExclusionsShellBody = excludedDirs: managedRoots: ''
-    excluded_dirs=${lib.escapeShellArg excludedDirs}
-    managed_roots=${lib.escapeShellArg managedRoots}
-
-    if [ "$excluded_dirs" = "[]" ]; then
-      echo "macos: iCloud exclusions skipped (no excluded directory names configured)." >&2
-      return 0 2>/dev/null || exit 0
-    fi
-
-    apply_exclusions() {
-      local count=0
-      local start_time
-      start_time=$(date +%s)
-
-      while IFS= read -r rel_root; do
-        [ -z "$rel_root" ] && continue
-        icloud_root="$HOME/$rel_root"
-        [ -d "$icloud_root" ] || continue
-
-        find_args=()
-        first=1
-        while IFS= read -r dir_name; do
-          [ -z "$dir_name" ] && continue
-          if [ "$first" -eq 1 ]; then
-            find_args=( "(" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
-            first=0
-          else
-            find_args+=( "-o" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
-          fi
-        done < <(echo "$excluded_dirs" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
-
-        if [ "$first" -eq 1 ]; then
-          continue
-        fi
-
-        find_args+=( ")" )
-
-        count_batch=$(${pkgs.findutils}/bin/find "$icloud_root" -type d "''${find_args[@]}" -print 2>/dev/null | /usr/bin/wc -l | /usr/bin/tr -d ' ') || count_batch=0
-        count=$(( count + count_batch ))
-      done < <(echo "$managed_roots" | ${pkgs.jq}/bin/jq -r '.[]' 2>/dev/null)
-
-      end_time=$(date +%s)
-      elapsed=$(( end_time - start_time ))
-
-      if [ "$count" -gt 0 ]; then
-        echo "macos: iCloud exclusion applied to $count directories in ''${elapsed}s" >&2
-      fi
-    }
-
-    apply_exclusions
-  '';
-
   # Shared FDA warning printer used by domain-specific defaults hooks.
   mkFdaWarningFunction = target: ''
     print_fda_warning() {
@@ -275,66 +210,20 @@ let
       #!${pkgs.bash}/bin/bash
       set -eu
 
-      ${icloudExclusionsShellBody icloudExcludedDirsJson icloudManagedRootsJson}
+      export JQ_BIN="${pkgs.jq}/bin/jq"
+      export FIND_BIN="${pkgs.findutils}/bin/find"
+      export EXCLUDED_DIRS_JSON=${lib.escapeShellArg icloudExcludedDirsJson}
+      export MANAGED_ROOTS_JSON=${lib.escapeShellArg icloudManagedRootsJson}
+
+      ${builtins.readFile ./scripts/icloud-exclusions-lib.sh}
     '';
   };
 
   betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" ''
-    set +e  # heartbeat is fully soft-fail; never abort on individual check failure
-
-    BD_BIN="/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay"
-    BD_APP="/Applications/BetterDisplay.app"
-    DISPLAY_NAME="HeadlessDisplay"
-
-    ${bdCliWrapper}
-
-    # Persistent daemon loop: check every 30 s.
-    while true; do
-      # No-op if BetterDisplay is not installed.
-      if [ ! -f "$BD_BIN" ]; then
-        sleep 30
-        continue
-      fi
-
-      # Ensure BetterDisplay is running before issuing CLI commands.
-      if ! /usr/bin/pgrep -xq "BetterDisplay" 2>/dev/null; then
-        # undoc-supp: BetterDisplay may not be installed yet; best-effort launch.
-        /usr/bin/open -g -a "$BD_APP" || true
-        /bin/sleep 5
-      fi
-
-      # Check connection state; soft-fail by treating any CLI error as unknown.
-      connected_state="$(_bd_cli get -name="$DISPLAY_NAME" -connected)"
-
-      # No-op if already connected.
-      if [ "$connected_state" = "on" ]; then
-        sleep 30
-        continue
-      fi
-
-      # Virtual screen is disconnected or status is unknown.  Try the lightweight
-      # set -connected=on toggle first; it is free-tier-compatible for virtual
-      # screens (Pro gating applies only to physical display connection toggles).
-      # If the toggle fails, fall back to a discard-and-recreate using the same
-      # parameters as ensureHeadlessDisplay so the virtual screen specification
-      # stays consistent across both code paths.
-      if ! "$BD_BIN" set -name="$DISPLAY_NAME" -connected=on; then
-        tag_ids="$(_bd_cli get -identifiers -name="$DISPLAY_NAME" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
-        for tag_id in $tag_ids; do
-          _bd_cli discard -tagID="$tag_id"
-        done
-        _bd_cli create \
-          -type=VirtualScreen \
-          -virtualScreenName="$DISPLAY_NAME" \
-          -aspectWidth=16 \
-          -aspectHeight=10 \
-          -multiplierStep=160 \
-          -virtualScreenHiDPI=on \
-          -connected=on
-      fi
-
-      sleep 30
-    done
+    export BD_BIN="/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay"
+    export BD_APP="/Applications/BetterDisplay.app"
+    export DISPLAY_NAME="HeadlessDisplay"
+    ${builtins.readFile ./scripts/betterdisplay-heartbeat.sh}
   '';
 
   # Wrapper script for the nix-index daily database rebuild LaunchAgent.
@@ -346,18 +235,11 @@ let
   # Nix store derivation path (which changes per generation).  Skipping the
   # rebuild when the DB was updated within the past 6 days keeps normal
   # apply runs fast.
-  nixIndexUpdate = pkgs.writeShellScript "nix-index-update" ''
-    db_file="$HOME/.cache/nix-index/files"
-
-    # Skip rebuild when the DB file exists and was modified within the last
-    # 6 days.  find -mtime +6 matches files with modification time strictly
-    # greater than 6x24 h ago; empty output means the file is still fresh.
-    if [ -f "$db_file" ] && [ -z "$(find "$db_file" -mtime +6)" ]; then
-      exit 0
-    fi
-
-    exec ${pkgs.nix-index}/bin/nix-index
-  '';
+  nixIndexUpdate = pkgs.writeShellScript "nix-index-update" (
+    builtins.replaceStrings [ "NIX_INDEX_BIN" ] [ "${pkgs.nix-index}/bin/nix-index" ] (
+      builtins.readFile ./scripts/nix-index-update.sh
+    )
+  );
 
   # Directory names inside ~/dev whose contents should stay out of Spotlight.
   # This is intentionally macOS-only because `.metadata_never_index` is a
@@ -388,108 +270,34 @@ let
   # Daily Spotlight exclusion refresh for the mutable ~/dev tree.
   # Kept out of Home Manager activation because large worktrees can make a full
   # scan slow enough to noticeably delay `nix run .#apply` and bootstrap apply.
-  devSpotlightExclusions = pkgs.writeShellScript "dev-spotlight-exclusions" ''
-    set -eu
-
-    DEV_ROOT="$HOME/dev"
-    updated_count=0
-
-    # Create the canonical dev root lazily so the maintenance timer remains
-    # safe even before the first repo checkout populates ~/dev.
-    mkdir -p "$DEV_ROOT"
-
-    while IFS= read -r -d "" directory_path; do
-      marker_path="$directory_path/.metadata_never_index"
-      if [ -f "$marker_path" ]; then
-        continue
-      fi
-
-      : > "$marker_path"
-      updated_count=$((updated_count + 1))
-    done < <(
-      /usr/bin/find "$DEV_ROOT" \( ${devSpotlightExcludedDirectoryFindExpression} \) -type d -print0
-    )
-
-    if [ "$updated_count" -gt 0 ]; then
-      echo "macos: added Spotlight exclusion markers to $updated_count dev directories." >&2
-    fi
-  '';
+  devSpotlightExclusions = pkgs.writeShellScript "dev-spotlight-exclusions" (
+    builtins.replaceStrings
+      [ "DEV_SPOTLIGHT_FIND_EXPRESSION" ]
+      [ "${devSpotlightExcludedDirectoryFindExpression}" ]
+      (builtins.readFile ./scripts/dev-spotlight-exclusions.sh)
+  );
 
   # Daily Finder metadata cleanup for ~/dev.
   # Kept out of Home Manager activation for the same reason as Spotlight marker
   # maintenance: deleting stale .DS_Store files can take noticeable time on a
   # large checkout and should not slow synchronous apply/bootstrap flows.
-  devDsStoreGc = pkgs.writeShellScript "dev-ds-store-gc" ''
-    set -eu
-
-    DEV_ROOT="$HOME/dev"
-    removed_count=0
-
-    # Create the canonical dev root lazily so the maintenance timer remains
-    # safe even before the first repo checkout populates ~/dev.
-    mkdir -p "$DEV_ROOT"
-
-    while IFS= read -r -d "" ds_store_path; do
-      /bin/rm "$ds_store_path"
-      removed_count=$((removed_count + 1))
-    done < <(
-      /usr/bin/find "$DEV_ROOT" -name ".DS_Store" -type f -print0
-    )
-
-    if [ "$removed_count" -gt 0 ]; then
-      echo "macos: removed $removed_count .DS_Store files from ~/dev." >&2
-    fi
-  '';
+  devDsStoreGc = pkgs.writeShellScript "dev-ds-store-gc" (
+    builtins.readFile ./scripts/dev-ds-store-gc.sh
+  );
 
   gcWeekly = pkgs.writeShellScript "gc-weekly" ''
-    set -eu
-
-    # Eval-time fallback for launchd jobs that don't inherit apply.sh env.
-    _repo_root="${repoRoot}"
-    if [ -z "$_repo_root" ] || [ ! -d "$_repo_root" ]; then
-      _repo_root="''${NUCLEUS_REPO_ROOT:?gc: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
-    fi
-
-    if [ ! -f "$_repo_root/scripts/gc.sh" ]; then
-      echo "gc: scripts/gc.sh not found at $_repo_root; skipping weekly GC"
-      exit 1
-    fi
-
-    # Weekly GC is space-reclaim only; skip model pulls and skip any operations
-    # that would block the background launchd job (like waiting for Ollama).
-    # GC script handles tool availability checks internally.
-    exec "$_repo_root/scripts/gc.sh"
+    export REPO_ROOT="${repoRoot}"
+    ${builtins.readFile ./scripts/gc-weekly.sh}
   '';
 
   guiEnvAgent = pkgs.writeShellScript "gui-env-agent" ''
     set -eu
 
-    # One-shot env var propagation at login.  Primary propagation is via
-    # configureGuiEnv activation step (macos.nix).
+    export __nucleus_prepend="${managedPaths.toShellPrependPath}"
+    export __nucleus_append="${managedPaths.toShellAppendPath}"
+    export __nucleus_managed_set="${mkManagedDedupSet "$HOME"}"
 
-    # ── PATH: strip stale managed entries, then prepend+append ──
-    __nucleus_prepend="${managedPaths.toShellPrependPath}"
-    __nucleus_append="${managedPaths.toShellAppendPath}"
-    # Same dedup SET as the activation script, but using $HOME (runtime
-    # shell expansion by launchd) instead of build-time home directory.
-    __nucleus_managed_set="${mkManagedDedupSet "$HOME"}"
-
-    __nucleus_cleaned=""
-    old_IFS="$IFS"
-    IFS=:
-    for __component in $PATH; do
-      case ":''${__nucleus_managed_set}:" in
-        *":''${__component}:"*) ;;
-        *) __nucleus_cleaned="''${__nucleus_cleaned}:''${__component}" ;;
-      esac
-    done
-    IFS="$old_IFS"
-
-    if [ -n "$__nucleus_cleaned" ]; then
-      /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_cleaned}:''${__nucleus_append}"
-    else
-      /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_append}"
-    fi
+    ${builtins.readFile ./scripts/gui-env-agent.sh}
 
     # ── All other GUI env vars (user and non-user) ──
     ${envVars.macOSAllVars}
@@ -536,98 +344,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if displayplacer is not installed.
     # -------------------------------------------------------------------------
     configureDisplayResolutions = lib.hm.dag.entryAfter [ "ensureHeadlessDisplay" ] ''
-      DP_BIN="/opt/homebrew/bin/displayplacer"
-
-      if [ -x "$DP_BIN" ]; then
-        FULL_LIST=$("$DP_BIN" list)
-
-        # Locate the persistent ID of the built-in MacBook screen.
-        PRIMARY_ID=$(echo "$FULL_LIST" | /usr/bin/awk '
-          /^Persistent screen id:/ { last_id=$4 }
-          /Type: MacBook built in screen/ { print last_id; exit }
-        ')
-
-        # Fall back to the first listed display if the built-in label is absent.
-        if [ -z "$PRIMARY_ID" ]; then
-          PRIMARY_ID=$(echo "$FULL_LIST" | /usr/bin/grep "Persistent screen id:" | /usr/bin/head -n 1 | /usr/bin/awk '{print $4}')
-        fi
-
-        # Read the mode 4 string for the primary display (native HiDPI mode).
-        MODE4_STR=$(echo "$FULL_LIST" | /usr/bin/awk -v id="$PRIMARY_ID" '
-          $0 ~ id { found=1 }
-          found && /^  mode 4:/ {
-            sub(/^[ ]*mode 4: /, "");
-            sub(/[ ]*<-- current mode/, "");
-            print $0;
-            exit;
-          }
-        ')
-
-        # If mode 4 is not available, read whichever mode is currently active.
-        if [ -z "$MODE4_STR" ]; then
-          MODE4_STR=$(echo "$FULL_LIST" | /usr/bin/awk -v id="$PRIMARY_ID" '
-            $0 ~ id { found=1 }
-            found && /<-- current mode/ {
-              sub(/^[ ]*mode [0-9]+: /, "");
-              sub(/[ ]*<-- current mode/, "");
-              print $0;
-              exit;
-            }
-          ')
-        fi
-
-        # Apply the target mode on the primary display and refresh the list.
-        if [ -n "$MODE4_STR" ]; then
-          if ! "$DP_BIN" "id:$PRIMARY_ID $MODE4_STR"; then
-            echo "macos: failed to apply primary display mode with displayplacer." >&2
-          fi
-          /bin/sleep 1
-          FULL_LIST=$("$DP_BIN" list)
-        fi
-
-        # Read the mode that is now active on the primary display to use as
-        # the reference resolution for external monitors.
-        TARGET_STR=$(echo "$FULL_LIST" | /usr/bin/awk -v id="$PRIMARY_ID" '
-          $0 ~ id { found=1 }
-          found && /<-- current mode/ {
-            sub(/^[ ]*mode [0-9]+: /, "");
-            sub(/[ ]*<-- current mode/, "");
-            print $0;
-            exit;
-          }
-        ')
-
-        # Extract width, height, and scaling flag from the target mode string.
-        T_W=$(echo "$TARGET_STR" | /usr/bin/sed -E 's/.*res:([0-9]+)x.*/\1/')
-        T_H=$(echo "$TARGET_STR" | /usr/bin/sed -E 's/.*res:[0-9]+x([0-9]+).*/\1/')
-        T_SCALING=""
-        if echo "$TARGET_STR" | /usr/bin/grep -q "scaling:on"; then
-          T_SCALING="scaling:on"
-        fi
-
-        # For each external display, select the best matching mode and apply it.
-        for ID in $(echo "$FULL_LIST" | /usr/bin/grep "Persistent screen id:" | /usr/bin/awk '{print $4}'); do
-          if [ "$ID" = "$PRIMARY_ID" ]; then
-            continue
-          fi
-
-          MODES=$(echo "$FULL_LIST" | /usr/bin/sed -n "/^Persistent screen id: $ID/,/^Persistent screen id:/p" | /usr/bin/grep "^  mode " | /usr/bin/sed 's/^  mode [0-9]*: //')
-          # When the primary uses HiDPI scaling, restrict candidates to HiDPI modes.
-          if [ -n "$T_SCALING" ]; then
-            MODES=$(echo "$MODES" | /usr/bin/grep "scaling:on")
-          fi
-
-          # Pick the mode with the smallest height that is still ≥ target width
-          # and ≤ target height (fits the same logical area, highest PPI wins).
-          BEST_MODE=$(echo "$MODES" | /usr/bin/awk -v tw="$T_W" -v th="$T_H" '{ w=substr($0,index($0,"res:")+4); gsub(/[^0-9].*/,"",w); h=substr($0,index($0,"x")+1); gsub(/[^0-9].*/,"",h); if (w+0>=tw+0 && h+0<=th+0 && h+0>0) print w+0, h+0, $0 }' | /usr/bin/sort -n | /usr/bin/head -n 1 | /usr/bin/cut -d' ' -f3- | /usr/bin/sed 's/ <-- current mode$//')
-
-          if [ -n "$BEST_MODE" ]; then
-            if ! "$DP_BIN" "id:$ID $BEST_MODE"; then
-              echo "macos: failed to apply mode '$BEST_MODE' to display id $ID." >&2
-            fi
-          fi
-        done
-      fi
+      ${builtins.readFile ./scripts/macos-display-resolutions.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -648,16 +365,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # now handled declaratively in defaults.nix via CustomUserPreferences.
     # -------------------------------------------------------------------------
     configureInputAndSiri = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      # Source: symbolic hotkey values are persisted in
-      # com.apple.symbolichotkeys/AppleSymbolicHotKeys via defaults(1).
-      # https://www.manpagez.com/man/1/defaults/
-      if ! /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 176 "<dict><key>enabled</key><false/></dict>"; then
-        echo "macos: failed to update symbolic hotkey 176." >&2
-      fi
-
-      if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-        echo "macos: activateSettings -u failed; input settings may apply on next login." >&2
-      fi
+      ${builtins.readFile ./scripts/macos-input-config.sh}
 
       ${daemonRefresh.refreshTISwitcher}
     '';
@@ -685,18 +393,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # store paths.
     # -------------------------------------------------------------------------
     configureLinearmouseConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      set -eu
-
-      _ll_repo_root="${repoRoot}"
-      if [ -z "$_ll_repo_root" ] || [ ! -d "$_ll_repo_root" ]; then
-        _ll_repo_root="''${NUCLEUS_REPO_ROOT:?LinearMouse: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
-      fi
-      _ll_source="$_ll_repo_root/src/modules/configs/linearmouse/linearmouse.json"
-
-      mkdir -p "$HOME/.config/linearmouse"
-      mkdir -p "$HOME/Library/Application Support/linearmouse"
-      ln -sf "$_ll_source" "$HOME/.config/linearmouse/linearmouse.json"
-      ln -sf "$_ll_source" "$HOME/Library/Application Support/linearmouse/linearmouse.json"
+      export REPO_ROOT="${repoRoot}"
+      ${builtins.readFile ./scripts/macos-linearmouse-config.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -711,18 +409,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #   VLC    — handles the complete set of audio/video UTIs defined above
     # -------------------------------------------------------------------------
     configureLaunchServices = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      # register_handler BUNDLE_ID UTI [UTI ...]
-      # Sets BUNDLE_ID as the default handler for each UTI across all roles.
-      register_handler() {
-        handler="$1"
-        shift
-
-        for uti in "$@"; do
-          if ! "${dutiBin}" -s "$handler" "$uti" all; then
-            echo "macos: failed to register LaunchServices handler $handler for UTI $uti." >&2
-          fi
-        done
-      }
+      export DUTI_BIN="${dutiBin}"
+      ${builtins.readFile ./scripts/macos-launch-services.sh}
 
       # Bundle identifiers sourced from app bundles + vendor docs:
       # - Chrome: com.google.chrome
@@ -750,48 +438,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       _ray_alias_dir="$HOME/Applications/Nucleus App Aliases"
       mkdir -p "$_ray_alias_dir"
       ${builtins.readFile ../scripts/agent-helpers.sh}
-
-      ensure_alias() {
-        _alias_name="$1"
-        _target_app="$2"
-        _alias_path="$_ray_alias_dir/$_alias_name"
-
-        [ -e "$_target_app" ] || return 0
-
-        if [ -L "$_alias_path" ]; then
-          if [ "$(readlink "$_alias_path")" = "$_target_app" ]; then
-            _nucleus_protect_symlink "raycast" "$_alias_path"
-            return 0
-          fi
-          _nucleus_unprotect_symlink "raycast" "$_alias_path"
-          rm "$_alias_path"
-        elif [ -e "$_alias_path" ]; then
-          echo "raycast: keeping unmanaged app alias path $_alias_path (not a symlink)." >&2
-          return 0
-        fi
-
-        ln -s "$_target_app" "$_alias_path"
-        _nucleus_protect_symlink "raycast" "$_alias_path"
-      }
-
-      ensure_alias "Books (English).app" "/System/Applications/Books.app"
-      ensure_alias "Calculator (English).app" "/System/Applications/Calculator.app"
-      ensure_alias "Calendar (English).app" "/System/Applications/Calendar.app"
-      ensure_alias "Contacts (English).app" "/System/Applications/Contacts.app"
-      ensure_alias "FaceTime (English).app" "/System/Applications/FaceTime.app"
-      ensure_alias "Find My (English).app" "/System/Applications/FindMy.app"
-      ensure_alias "Freeform (English).app" "/System/Applications/Freeform.app"
-      ensure_alias "Home (English).app" "/System/Applications/Home.app"
-      ensure_alias "Mail (English).app" "/System/Applications/Mail.app"
-      ensure_alias "Maps (English).app" "/System/Applications/Maps.app"
-      ensure_alias "Messages (English).app" "/System/Applications/Messages.app"
-      ensure_alias "Music (English).app" "/System/Applications/Music.app"
-      ensure_alias "Notes (English).app" "/System/Applications/Notes.app"
-      ensure_alias "Photos (English).app" "/System/Applications/Photos.app"
-      ensure_alias "Reminders (English).app" "/System/Applications/Reminders.app"
-      ensure_alias "Safari (English).app" "/Applications/Safari.app"
-      ensure_alias "TV (English).app" "/System/Applications/TV.app"
-      ensure_alias "Weather (English).app" "/System/Applications/Weather.app"
+      ${builtins.readFile ./scripts/macos-raycast-aliases.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -806,26 +453,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Source: https://github.com/smudge/nightlight
     # -------------------------------------------------------------------------
     configureNightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      if [ -x "/opt/homebrew/bin/nightlight" ]; then
-        if ! /opt/homebrew/bin/nightlight schedule start; then
-          echo "macos: failed to configure Nightlight schedule." >&2
-        fi
-
-        if ! /opt/homebrew/bin/nightlight temp 50; then
-          echo "macos: failed to set Nightlight temperature." >&2
-        fi
-
-        current_hour=$(date +%H)
-        if [ "$current_hour" -ge 18 ] || [ "$current_hour" -lt 6 ]; then
-          if ! /opt/homebrew/bin/nightlight on; then
-            echo "macos: failed to enable Nightlight." >&2
-          fi
-        else
-          if ! /opt/homebrew/bin/nightlight off; then
-            echo "macos: failed to disable Nightlight." >&2
-          fi
-        fi
-      fi
+      ${builtins.readFile ./scripts/macos-nightlight.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -844,7 +472,12 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Source: https://developer.apple.com/documentation/fileprovider
     # -------------------------------------------------------------------------
     configureICloudExclusions = lib.hm.dag.entryAfter [ "cloudDrivesSetup" ] ''
-      ${icloudExclusionsShellBody icloudExcludedDirsJson icloudManagedRootsJson}
+      export JQ_BIN="${pkgs.jq}/bin/jq"
+      export FIND_BIN="${pkgs.findutils}/bin/find"
+      export EXCLUDED_DIRS_JSON=${lib.escapeShellArg icloudExcludedDirsJson}
+      export MANAGED_ROOTS_JSON=${lib.escapeShellArg icloudManagedRootsJson}
+
+      ${builtins.readFile ./scripts/icloud-exclusions-lib.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -903,26 +536,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       ${mkFdaWarningFunction "protected Safari preferences"}
 
-      set_safari_default() {
-        key="$1"
-        value="$2"
-        value_type="$3"
-
-        if ! write_err="$({ /usr/bin/defaults write com.apple.Safari "$key" "-$value_type" "$value"; } 2>&1)"; then
-          if printf '%s' "$write_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
-            print_fda_warning
-            echo "macos: failed to set Safari key $key due to missing privacy authorization." >&2
-          else
-            echo "macos: failed to set Safari key $key ($write_err)." >&2
-          fi
-        fi
-      }
-
-      # Source: Safari preference behavior.
-      # https://support.apple.com/en-us/guide/safari/change-settings-ibrwa005/mac
-      set_safari_default "AutoFillPasswords" "false" "bool"
-      set_safari_default "IncludeDevelopMenu" "true" "bool"
-      set_safari_default "IncludeInternalDebugMenu" "true" "bool"
+      ${builtins.readFile ./scripts/macos-safari-defaults.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -936,32 +550,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
       ${mkFdaWarningFunction "Accessibility preferences"}
 
-      set_default() {
-        domain="$1"
-        key="$2"
-        value="$3"
-        value_type="$4"
-        yellow="$(printf '\033[33m')"
-        bold="$(printf '\033[1m')"
-        reset="$(printf '\033[0m')"
-
-        if ! write_err="$({ /usr/bin/defaults write "$domain" "$key" "-$value_type" "$value"; } 2>&1)"; then
-          if printf '%s' "$write_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
-            print_fda_warning
-            printf '%s![Permission Denied]%s Failed to set %s%s %s%s. Ensure Full Disk Access and Accessibility permissions are granted.\n' "$yellow" "$reset" "$bold" "$domain" "$key" "$reset" >&2
-          else
-            echo "macos: failed to set $domain $key ($write_err)." >&2
-          fi
-        fi
-      }
-
-      # Source: macOS Accessibility preference settings.
-      # https://support.apple.com/en-us/guide/mac-help/accessibility-settings-on-mac-mh40584/mac
-      set_default "com.apple.universalaccess" "FontSizeCategory" "AX1" "string"
-      set_default "com.apple.universalaccess" "cursorSize" "1.33" "float"
-      set_default "com.apple.universalaccess" "reduceMotion" "false" "bool"
-      set_default "com.apple.universalaccess" "reduceTransparency" "false" "bool"
-      set_default "com.apple.universalaccess" "showWindowTitlebarIcons" "true" "bool"
+      ${builtins.readFile ./scripts/macos-universal-access-defaults.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -1107,81 +696,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if BetterDisplay is not installed.
     # -------------------------------------------------------------------------
     ensureHeadlessDisplay = lib.hm.dag.entryAfter [ "configureNightlight" ] ''
-      BD_BIN="/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay"
-      BD_APP="/Applications/BetterDisplay.app"
-      DISPLAY_NAME="HeadlessDisplay"
-
-      ${bdCliWrapper}
-
-      create_headless_display() {
-        # Use documented virtual-screen parameters and force connected state at
-        # creation time so fallback remains available with the lid closed.
-        # Source: BetterDisplay CLI virtual-screen flags.
-        # https://github.com/waydabber/BetterDisplay/wiki
-        "$BD_BIN" create \
-          -type=VirtualScreen \
-          -virtualScreenName="$DISPLAY_NAME" \
-          -aspectWidth=16 \
-          -aspectHeight=10 \
-          -multiplierStep=160 \
-          -virtualScreenHiDPI=on \
-          -connected=on
-      }
-
-      discard_headless_displays() {
-        # Discard by BetterDisplay tag IDs so we only touch managed virtual
-        # screens and avoid affecting physical monitors.
-        for tag_id in $1; do
-          if ! "$BD_BIN" discard -tagID="$tag_id"; then
-            echo "macos: failed to discard duplicate BetterDisplay virtual screen tagID=$tag_id." >&2
-          fi
-        done
-      }
-
-      if [ -f "$BD_BIN" ]; then
-        if ! /usr/bin/pgrep -x "BetterDisplay" > /dev/null; then
-          /usr/bin/open -g -a "$BD_APP"
-          /bin/sleep 5  # wait for the app to initialise before issuing CLI commands
-        fi
-
-        identifiers_json="$(_bd_cli get -identifiers -name="$DISPLAY_NAME")"
-        tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
-        tag_count="$(printf '%s\n' "$tag_ids" | /usr/bin/awk 'NF { count += 1 } END { print count + 0 }')"
-
-        if [ "$tag_count" -ne 1 ]; then
-          if [ "$tag_count" -gt 0 ]; then
-            discard_headless_displays "$tag_ids"
-          fi
-
-          if ! create_headless_display; then
-            echo "macos: failed to create BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
-          fi
-          /bin/sleep 3  # wait for the virtual display to be registered
-          identifiers_json="$(_bd_cli get -identifiers -name="$DISPLAY_NAME")"
-          tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
-        else
-          tag_id="$(printf '%s\n' "$tag_ids" | /usr/bin/awk 'NF { print; exit }')"
-          connected_state="$(_bd_cli get -tagID="$tag_id" -connected)"
-
-          if [ "$connected_state" != "on" ]; then
-            if ! "$BD_BIN" discard -tagID="$tag_id"; then
-              echo "macos: failed to discard disconnected BetterDisplay virtual screen '$DISPLAY_NAME' (tagID=$tag_id)." >&2
-            fi
-
-            if ! create_headless_display; then
-              echo "macos: failed to recreate BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
-            fi
-            /bin/sleep 3  # wait for the virtual display to be registered
-            identifiers_json="$(_bd_cli get -identifiers -name="$DISPLAY_NAME")"
-            tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
-          fi
-        fi
-
-        connected_after="$(_bd_cli get -name="$DISPLAY_NAME" -connected)"
-        if [ "$connected_after" != "on" ]; then
-          echo "macos: failed to set BetterDisplay virtual screen '$DISPLAY_NAME' connected=on." >&2
-        fi
-      fi
+      ${builtins.readFile ./scripts/macos-headless-display.sh}
     '';
   };
 
@@ -1379,36 +894,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # spuriously return "Bootstrap failed: 5: Input/output error" — HM detects
   # this but never retries, and subsequent activations skip unchanged agents.
   home.activation.ensureLaunchAgentsLoaded = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
-    _gui_domain="gui/$(id -u)"
-    _gen_launchagents="$newGenPath/LaunchAgents"
-
-    if [ ! -d "$_gen_launchagents" ]; then
-      verboseEcho "No LaunchAgents directory in new generation — nothing to verify"
-      exit 0
-    fi
-
-    for _plist in "$_gen_launchagents"/*.plist; do
-      [ -f "$_plist" ] || continue
-      _label="''${_plist##*/}"
-      _label="''${_label%.plist}"
-
-      if /bin/launchctl print "$_gui_domain/$_label" >/dev/null 2>&1; then
-        verboseEcho "Agent '$_label' is registered with launchd"
-        continue
-      fi
-
-      warnEcho "Agent '$_gui_domain/$_label' is NOT registered — bootstrapping..."
-
-      /bin/launchctl bootout "$_gui_domain/$_label" 2>/dev/null || true  # undoc-supp: agent may not be registered (that's why we're here), bootout expected to fail
-      sleep 1
-
-      if /bin/launchctl bootstrap "$_gui_domain" "$_plist"; then
-        /bin/launchctl kickstart -p "$_gui_domain/$_label"
-        verboseEcho "Agent '$_label' successfully bootstrapped and kickstarted"
-      else
-        warnEcho "Agent '$_label' bootstrap failed — will be picked up at next login"
-      fi
-    done
+    ${builtins.readFile ./scripts/macos-ensure-launchagents.sh}
   '';
 
   # --------------------------------------------------------------------------
@@ -1441,27 +927,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     __nucleus_append="${managedPaths.toShellAppendPath}"
     __nucleus_managed_set="${mkManagedDedupSet config.home.homeDirectory}"
 
-    CURRENT_PATH="$(/bin/launchctl getenv PATH 2>/dev/null || true)"  # undoc-supp: launchctl may not be available (early boot, non-GUI session); fall back to $PATH
-    if [ -z "$CURRENT_PATH" ]; then
-      CURRENT_PATH="$PATH"
-    fi
-
-    __nucleus_cleaned=""
-    old_IFS="$IFS"
-    IFS=:
-    for __component in $CURRENT_PATH; do
-      case ":''${__nucleus_managed_set}:" in
-        *":''${__component}:"*) ;;
-        *) __nucleus_cleaned="''${__nucleus_cleaned}:''${__component}" ;;
-      esac
-    done
-    IFS="$old_IFS"
-
-    if [ -n "$__nucleus_cleaned" ]; then
-      /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_cleaned}:''${__nucleus_append}"
-    else
-      /bin/launchctl setenv PATH "''${__nucleus_prepend}:''${__nucleus_append}"
-    fi
+    ${builtins.readFile ./scripts/macos-gui-env-path.sh}
 
     # ── All other GUI env vars (user and non-user) ──
     ${envVars.macOSAllVars}
