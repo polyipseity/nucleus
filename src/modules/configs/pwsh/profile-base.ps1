@@ -2,7 +2,6 @@
 # Manual edits will be overwritten on the next `nix run .#apply`.
 
 # direnv: load per-directory environments defined in .envrc files.
-# undoc-supp: tool-availability guard -- direnv may not be installed
 if (Get-Command direnv -ErrorAction SilentlyContinue) {
   (& direnv hook pwsh) | Out-String | Invoke-Expression
 }
@@ -23,13 +22,11 @@ if (Get-Module -ListAvailable -Name PSReadLine) {
 }
 
 # zoxide: smart directory navigation learned from visit history.
-# undoc-supp: tool-availability guard -- zoxide may not be installed
 if (Get-Command zoxide -ErrorAction SilentlyContinue) {
   Invoke-Expression (& zoxide init powershell | Out-String)
 }
 
 # Starship prompt: cross-shell prompt with git/nix/status info.
-# undoc-supp: tool-availability guard -- starship may not be installed
 if (Get-Command starship -ErrorAction SilentlyContinue) {
   Invoke-Expression (& starship init powershell | Out-String)
 }
@@ -40,7 +37,6 @@ if (Get-Command starship -ErrorAction SilentlyContinue) {
 # When an AI agent is detected, disable PSReadLine and other interactive
 # features that serve no purpose and clutter output in non-human sessions.
 if (Test-NucleusAgentSession) {
-  # undoc-supp: module may not be loaded in non-interactive sessions
   Remove-Module PSReadLine -ErrorAction SilentlyContinue
   $ConfirmPreference = 'None'
   $WarningActionPreference = 'SilentlyContinue'
@@ -53,7 +49,6 @@ if (Test-NucleusAgentSession) {
 # Only initialise in interactive, non-agent, and available sessions.
 # In non-interactive or AI agent sessions, pay-respects would block on
 # its interactive prompt with no user to respond.
-# undoc-supp: tool-availability guard -- pay-respects may not be installed
 if ([Environment]::UserInteractive -and -not (Test-NucleusAgentSession) -and (Get-Command pay-respects -ErrorAction SilentlyContinue)) {
   iex (& pay-respects pwsh --alias | Out-String)
 }
@@ -73,7 +68,6 @@ function Test-PrekHooksInstalled {
 
   # WHY git rev-parse: handles .git as file (submodules, worktrees) + directory.
   # Avoids silent failure when .git is a gitlink (file with gitdir: path).
-  # undoc-supp: may run outside a git repo; 2>$null is the explicit guard
   $gitDirOutput = & git -C $RepositoryRoot rev-parse --git-dir 2>$null
   if (-not $gitDirOutput) {
     return $false
@@ -101,18 +95,15 @@ function Test-PrekHooksInstalled {
 function Invoke-PrekHookInstallIfNeeded {
   # Get-Command is a presence probe here; absence is expected on unmanaged
   # shells, and the function returns immediately after the check.
-  # undoc-supp: tool-availability guard -- git may not be installed
   if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     return
   }
-  # undoc-supp: tool-availability guard -- prek may not be installed
   if (-not (Get-Command prek -ErrorAction SilentlyContinue)) {
     return
   }
 
   # git rev-parse is a repo-membership probe here; suppress the expected
   # stderr from non-repository directories and branch on the result.
-  # undoc-supp: repo-membership probe -- expected stderr outside a git repo
   $repoRootOutput = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null
   if ($null -eq $repoRootOutput) {
     return
@@ -181,14 +172,12 @@ Invoke-PrekHookInstallIfNeeded
 # Reads the PSReadLine history file directly so all sessions are searchable.
 # Guard requires both fzf and PSReadLine to avoid silently failing on a
 # host where fzf is installed but the module is missing.
-# undoc-supp: tool-availability guard -- fzf may not be installed
 if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvailable -Name PSReadLine)) {
   Set-PSReadLineKeyHandler -Key "Ctrl+r" -ScriptBlock {
     $line = $null
     $cursor = $null
     [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
     $histFile = (Get-PSReadLineOption).HistorySavePath
-    # undoc-supp: history file may not exist if PSReadLine was never used
     $selected = Get-Content -Path $histFile -ErrorAction SilentlyContinue |
       Where-Object { $_ } | Sort-Object -Unique |
       & fzf --tac --no-sort --height 40% --query $line
@@ -215,17 +204,14 @@ function -gpl { & git pull @Args }
 function -gs { & git status -sb @Args }
 
 function Invoke-NucleusGhostscript {
-  # undoc-supp: tool-availability guard -- Ghostscript CLI may not be installed
   if (Get-Command gs -ErrorAction SilentlyContinue) {
     & gs @Args
     return
   }
-  # undoc-supp: tool-availability guard -- Ghostscript CLI may not be installed
   if (Get-Command gswin64c -ErrorAction SilentlyContinue) {
     & gswin64c @Args
     return
   }
-  # undoc-supp: tool-availability guard -- Ghostscript CLI may not be installed
   if (Get-Command gswin32c -ErrorAction SilentlyContinue) {
     & gswin32c @Args
     return
@@ -246,7 +232,6 @@ function -gsw { & git switch @Args }
 
 # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
 # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
-# undoc-supp: tool-availability guard -- eza may not be installed
 if (Get-Command eza -ErrorAction SilentlyContinue) {
   function -la { & eza -la @Args }
   function -ll { & eza -la @Args }
@@ -278,7 +263,6 @@ function Invoke-NucleusPythonScopedTool {
     return $false
   }
 
-  # undoc-supp: tool-availability guard -- tool may not be installed in venv
   $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($null -eq $application) {
     return $false
@@ -361,7 +345,6 @@ function Invoke-NucleusManagedDevTool {
   )
 
   if ($env:DIRENV_DIR) {
-    # undoc-supp: tool-availability guard -- tool may not be in direnv PATH
     $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -ne $application) {
       & $application.Source @ToolArguments
@@ -374,7 +357,6 @@ function Invoke-NucleusManagedDevTool {
   # and routes cargo/rustc to the pinned toolchain so project builds
   # work without a full devShell or direnv context.
   if ($ToolName -in @('cargo', 'rustc') -and (Test-Path -Path (Join-Path (Get-Location).Path 'rust-toolchain.toml') -PathType Leaf)) {
-    # undoc-supp: tool-availability guard -- tool may not be in project context
     $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -ne $application) {
       & $application.Source @ToolArguments
@@ -450,7 +432,6 @@ function Resolve-NucleusRepoRoot {
   if ($env:NUCLEUS_REPO_ROOT) {
     return $env:NUCLEUS_REPO_ROOT
   }
-  # undoc-supp: repo-membership probe -- may run outside the nucleus repo
   $gitRoot = git rev-parse --show-toplevel 2>$null
   if ($gitRoot -and (Test-Path (Join-Path $gitRoot "src/flake.nix"))) {
     return $gitRoot

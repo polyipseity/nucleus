@@ -109,7 +109,7 @@ function Invoke-CamillaGUISetup {
     # (cross-platform parity with POSIX ~/.config/camillagui-backend/config.yml).
     $configDir = Join-Path -Path $HOME -ChildPath ".config\camillagui-backend"
     $configPath = Join-Path -Path $configDir -ChildPath "config.yml"
-    $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camillagui-backend\config-windows.yml"
+    $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camillagui-backend\config-windows.yml"  # Method 1 (writable symlink)
     if (-not (Test-Path $configDir)) {
       $null = New-Item -ItemType Directory -Path $configDir -Force
     }

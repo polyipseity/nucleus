@@ -61,9 +61,8 @@ let
               return $false
             }
       '';
-      # Method 4 (runtime embedded): profile-base.ps1 is read at eval time and embedded into the
-      # activation block as a literal string. No deployment step needed.
     in
+    # Method 4 (runtime embedded): profile-base.ps1 is read at eval time and embedded into the activation block as a literal string. No deployment step needed.
     nixPreamble + (builtins.readFile ./configs/pwsh/profile-base.ps1);
 in
 {

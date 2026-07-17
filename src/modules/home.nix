@@ -74,7 +74,6 @@ let
   # file also contains dynamic vault metadata written by the app itself. Load
   # the managed settings from a declarative config file so they are versioned
   # and merge them into the live file without clobbering vault data.
-  # Method 3 (merge) — see the activation entry below for full rationale.
   #
   # WHY nativeMenus is not configured: nativeMenus is stored per-vault in
   # appearance.json (.obsidian/appearance.json), not in obsidian.json. We cannot
@@ -83,6 +82,7 @@ let
   #
   # WHY checkSlowStartup is not configured: checkSlowStartup is localStorage-backed
   # and vault-specific. It cannot be declaratively managed via obsidian.json.
+  # Method 3 (merge) — see the activation entry below for full rationale.
   obsidianDefaultSettings = builtins.fromJSON (builtins.readFile ./configs/obsidian/obsidian.json);
 
   obsidianManagedSettings = managedAppSettings "obsidian" obsidianDefaultSettings;
@@ -91,6 +91,7 @@ let
   # Picard baseline defaults are sourced from the canonical native INI file.
   # We apply these defaults with merge-overwrite semantics, then layer
   # user-specific [setting] overrides from users.json.
+  # Method 3 (merge): Picard INI defaults are merged with user overrides.
   picardDefaultsIniText = builtins.readFile ./configs/picard/Picard.ini;
   picardUserSettings = userAppSettings "picard";
 
@@ -305,9 +306,13 @@ in
         in
         {
           # Method 1 (writable symlink): repo changes take effect without rebuild.
+          # camilladsp/configs/macos/default.yml — Method 1 (writable symlink) consumed via directory symlink above
+          # Method 1 (writable symlink): camilladsp/configs/linux/default.yml consumed via directory symlink above
           ".config/camilladsp/configs".source =
             config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camilladsp/configs/${configName}";
           # Method 1 (writable symlink): repo changes take effect without rebuild.
+          # camillagui-backend/config-macos.yml — Method 1 (writable symlink) consumed via dynamic configName above
+          # Method 1 (writable symlink): camillagui-backend/config-linux.yml consumed via dynamic configName above
           ".config/camillagui-backend/config.yml".source =
             config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camillagui-backend/config-${configName}.yml";
         }

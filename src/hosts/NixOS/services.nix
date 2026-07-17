@@ -88,15 +88,14 @@ lib.mkIf pkgs.stdenv.isLinux {
     };
 
     # Dolphin: right-click → open nucleus manual
-    # Method 1 (writable symlink): repo edits take effect without rebuild.
     ".local/share/kio/servicemenus/nucleus-manual.desktop" = {
+      # Method 1 (writable symlink): repo edits take effect without rebuild.
       source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/plasma/nucleus-manual.desktop";
     };
 
     # Dolphin: right-click → optimize PDF (5 presets as sub-actions)
-    # Method 1 (writable symlink): the GS PDF Opt preset file can be updated
-    # in-place; no rebuild needed after adding/changing presets.
     ".local/share/kio/servicemenus/nucleus-gs-pdf-opt.desktop" = {
+      # Method 1 (writable symlink): the GS PDF Opt preset file can be updated in-place; no rebuild needed after adding/changing presets.
       source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/plasma/nucleus-gs-pdf-opt.desktop";
     };
   };

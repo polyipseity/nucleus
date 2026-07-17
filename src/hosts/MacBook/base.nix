@@ -13,8 +13,7 @@
   # Determinate Nix includes /etc/nix/nix.custom.conf from /etc/nix/nix.conf.
   # Manage that file declaratively so builder routing and trusted-user settings
   # are applied even with nix.enable = false.
-  # Method 2 (read-only): Nix daemon overwrites nix.custom.conf on restart —
-  # a writable symlink would lose managed settings.
+  # Method 2 (read-only): Nix daemon overwrites nix.custom.conf on restart — a writable symlink would lose managed settings.
   environment.etc."nix/nix.custom.conf".text =
     builtins.replaceStrings [ "__USERNAME__" ] [ username ]
       (builtins.readFile ../../modules/configs/nix/nix.custom.conf);

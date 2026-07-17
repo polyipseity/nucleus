@@ -11,6 +11,7 @@ _ll_repo_root="${REPO_ROOT}"
 if [ -z "$_ll_repo_root" ] || [ ! -d "$_ll_repo_root" ]; then
   _ll_repo_root="${NUCLEUS_REPO_ROOT:?LinearMouse: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
 fi
+# Method 1 (writable symlink) — read by linearmouse at runtime
 _ll_source="$_ll_repo_root/src/modules/configs/linearmouse/linearmouse.json"
 
 mkdir -p "$HOME/.config/linearmouse"

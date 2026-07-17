@@ -42,10 +42,9 @@ let
   # domain during darwin-rebuild.
   # This is macOS-only (no NixOS/Windows equivalent).
   # ---------------------------------------------------------------------------
-  # Method 4 (runtime embedded at eval time): wordlist.txt is read at Nix evaluation
-  # time and embedded into the Nix store. No deployment step needed.
   autocorrectWords = builtins.filter (w: w != "") (
     builtins.filter builtins.isString (
+      # Method 4 (runtime embedded at eval time): wordlist.txt is read at Nix evaluation time and embedded into the Nix store. No deployment step needed.
       builtins.split "\n" (builtins.readFile ../../modules/configs/autocorrect/wordlist.txt)
     )
   );
@@ -624,7 +623,7 @@ in
       # Source: https://iterm2.com/documentation.html
       "com.googlecode.iterm2" = {
         # Set the default profile GUID to the Dynamic Profile defined in
-        # src/modules/configs/iterm2/DynamicProfiles/default-profile.json.
+        # Method 1 (writable symlink): src/modules/configs/iterm2/DynamicProfiles/default-profile.json via iterm2.nix
         # This key (KEY_DEFAULT_GUID) tells iTerm2 which profile to use for
         # new windows/tabs when no other profile is explicitly selected.
         # Source: ITAddressBookMgr.h

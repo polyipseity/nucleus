@@ -393,6 +393,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # pointing into the repository tree. Resolves the repo root at activation
     # time so the link survives repo relocations and rebuilds without stale
     # store paths.
+    # Method 1 (writable symlink): linearmouse/linearmouse.json deployed via linearmouse-config.sh
     # -------------------------------------------------------------------------
     linearmouse-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       export REPO_ROOT="${repoRoot}"

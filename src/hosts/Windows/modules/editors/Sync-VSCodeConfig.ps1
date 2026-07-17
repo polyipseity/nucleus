@@ -129,9 +129,13 @@ function Sync-VSCodeConfig {
   # file name.  chatLanguageModels is managed separately via
   # Merge-VSChatLanguageModel (name-keyed merge, not a symlink).
   $managedFiles = [ordered]@{
+    # Method 1 (writable symlink) — VS Code reads its keybindings from a known path
     "keybindings.windows.json"        = "keybindings.json"
+    # Method 1 (writable symlink) — read by Copilot MCP extension
     "mcp.json"                        = "mcp.json"
+    # Method 1 (writable symlink) — VS Code reads settings on startup
     "settings.json"                   = "settings.json"
+    # Method 1 (writable symlink) — VS Code task definitions
     "tasks.json"                      = "tasks.json"
   }
 
@@ -322,6 +326,7 @@ function Sync-VSCodeConfig {
           Remove-Item -LiteralPath $chatLmPath -Force
         }
       }
+      # Method 1 (writable symlink)
       $repoFile = Join-Path -Path $vsConfigDir -ChildPath "chatLanguageModels.windows.json"
       Merge-VSChatLanguageModel -RepoFile $repoFile -DestFile $chatLmPath
     }
