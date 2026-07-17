@@ -32,8 +32,11 @@ let
           (& direnv hook pwsh) | Out-String | Invoke-Expression
         }
 
-        # Expose user-scope package manager bins so globally installed tools are
-        # accessible in interactive sessions.  Canonical source: env-catalog.nix.
+        # Managed PATH: prepend dirs (before system default).
+        ${managedPaths.toPowerShellPrependSnippet}
+
+        # Managed PATH: append dirs (after system default).
+        # Canonical source: env-catalog.nix -> managed-paths.nix (pathComponents).
         ${managedPaths.toPowerShellAppendSnippet}
 
         # PSReadLine: predictive history completion and menu-style tab expansion.
