@@ -44,7 +44,7 @@ let
   # matters.  The prefix argument is "${config.home.homeDirectory}" for
   # the activation script (build-time eval) or "$HOME" for the launchd
   # agent (runtime shell expansion).
-  # Used by guiEnvAgent and configureGuiEnv activation step;
+  # Used by guiEnvAgent and macos-gui-env-path activation step;
   # also informs launchctl config user path composition via pathComponents.
   mkManagedDedupSet =
     prefix:
@@ -327,7 +327,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
   home.activation = {
     # -------------------------------------------------------------------------
-    # configureDisplayResolutions
+    # -------------------------------------------------------------------------
+    # macos-display-resolutions
     # Uses displayplacer to match all external monitors to the MacBook's built-in
     # display mode so that remote-desktop clients see a consistent resolution.
     #
@@ -343,12 +344,12 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #
     # No-op if displayplacer is not installed.
     # -------------------------------------------------------------------------
-    configureDisplayResolutions = lib.hm.dag.entryAfter [ "ensureHeadlessDisplay" ] ''
+    macos-display-resolutions = lib.hm.dag.entryAfter [ "macos-headless-display" ] ''
       ${builtins.readFile ../scripts/hosts/MacBook/macos-display-resolutions.sh}
     '';
 
     # -------------------------------------------------------------------------
-    # configureInputAndSiri
+    # macos-input-config
     # Writes input-method defaults that cannot be expressed in the nix-darwin
     # system.defaults tree because they require a running input method daemon
     # reload to take effect at session time.
@@ -364,7 +365,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # TISCapslockLanguageSwitch, AppleDictationAutoEnable, and FnKeyUsage are
     # now handled declaratively in defaults.nix via CustomUserPreferences.
     # -------------------------------------------------------------------------
-    configureInputAndSiri = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    macos-input-config = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       ${builtins.readFile ../scripts/hosts/MacBook/macos-input-config.sh}
 
       ${daemonRefresh.refreshTISwitcher}
@@ -378,7 +379,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     reloadUserPreferenceState =
       lib.hm.dag.entryAfter
-        [ "configureInputAndSiri" "configureSafariDefaults" "configureUniversalAccessDefaults" ]
+        [ "macos-input-config" "macos-safari-defaults" "macos-universal-access-defaults" ]
         ''
           if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
             echo "macos: activateSettings -u failed; some preference updates may require relogin." >&2
@@ -386,19 +387,19 @@ lib.mkIf pkgs.stdenv.isDarwin {
         '';
 
     # -------------------------------------------------------------------------
-    # configureLinearmouseConfig
+    # macos-linearmouse-config
     # Creates out-of-store symlinks for LinearMouse's runtime config files
     # pointing into the repository tree. Resolves the repo root at activation
     # time so the link survives repo relocations and rebuilds without stale
     # store paths.
     # -------------------------------------------------------------------------
-    configureLinearmouseConfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    macos-linearmouse-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       export REPO_ROOT="${repoRoot}"
       ${builtins.readFile ../scripts/hosts/MacBook/macos-linearmouse-config.sh}
     '';
 
     # -------------------------------------------------------------------------
-    # configureLaunchServices
+    # macos-launch-services
     # Registers default application handlers for file types using duti.
     # Running this in a Home Manager activation keeps the associations in sync
     # every time `home-manager switch` is run, which is necessary because
@@ -408,7 +409,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #   Keka   — handles .7z, .rar, and .zip archives
     #   VLC    — handles the complete set of audio/video UTIs defined above
     # -------------------------------------------------------------------------
-    configureLaunchServices = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    macos-launch-services = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       export DUTI_BIN="${dutiBin}"
       ${builtins.readFile ../scripts/hosts/MacBook/macos-launch-services.sh}
 
@@ -425,7 +426,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # configureRaycastApplicationAliases
+    # macos-raycast-aliases
     # Raycast currently does not expose a dedicated language toggle for app-name
     # matching. On non-English macOS installations, localized display names can
     # therefore make English queries miss built-in apps.
@@ -434,7 +435,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # under ~/Applications/Nucleus App Aliases so Spotlight/Raycast can index
     # additional English tokens without changing the system UI language.
     # -------------------------------------------------------------------------
-    configureRaycastApplicationAliases = lib.hm.dag.entryAfter [ "configureLaunchServices" ] ''
+    macos-raycast-aliases = lib.hm.dag.entryAfter [ "macos-launch-services" ] ''
       _ray_alias_dir="$HOME/Applications/Nucleus App Aliases"
       mkdir -p "$_ray_alias_dir"
       ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
@@ -442,7 +443,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # configureNightlight
+    # macos-nightlight
     # Enables the macOS Night Shift schedule via the nightlight CLI tool and
     # applies a colour temperature of 50 % (roughly 4000 K).  Immediately
     # activates or deactivates the filter based on the current hour so the
@@ -452,7 +453,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if nightlight is not installed.
     # Source: https://github.com/smudge/nightlight
     # -------------------------------------------------------------------------
-    configureNightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    macos-nightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       ${builtins.readFile ../scripts/hosts/MacBook/macos-nightlight.sh}
     '';
 
@@ -525,13 +526,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # configureSafariDefaults
+    # macos-safari-defaults
     # Safari is sandboxed and stores preferences in a containerized domain that
     # `system.defaults.CustomUserPreferences` cannot always write during system
     # activation. Apply these settings from user activation instead so Safari
     # hardening remains declarative without breaking `darwin-rebuild switch`.
     # -------------------------------------------------------------------------
-    configureSafariDefaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
+    macos-safari-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
       fda_warning_emitted=0
 
       ${mkFdaWarningFunction "protected Safari preferences"}
@@ -540,12 +541,12 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # configureUniversalAccessDefaults
+    # macos-universal-access-defaults
     # Accessibility defaults are user/session scoped and may be protected from
     # system-level defaults writes during `darwin-rebuild`. Apply them from the
     # user activation phase to keep accessibility intent without system errors.
     # -------------------------------------------------------------------------
-    configureUniversalAccessDefaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
+    macos-universal-access-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
       fda_warning_emitted=0
 
       ${mkFdaWarningFunction "Accessibility preferences"}
@@ -659,7 +660,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Health check for archiving tools: verifies 7z CLI, Keka app registration,
     # and archive handler associations are functional after activation.
     # -------------------------------------------------------------------------
-    verifyArchivingStack = lib.hm.dag.entryAfter [ "configureLaunchServices" "installPackages" ] ''
+    verifyArchivingStack = lib.hm.dag.entryAfter [ "macos-launch-services" "installPackages" ] ''
       # Verify 7z CLI is available and functional using direct Nix store path.
       # Do not rely on PATH lookup since Home Manager activation runs in a minimal
       # shell that may not have nix-darwin system package paths available yet.
@@ -677,7 +678,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # ensureHeadlessDisplay
+    # macos-headless-display
     # Maintains exactly one BetterDisplay virtual screen named "HeadlessDisplay"
     # and keeps it connected for clamshell remote-desktop fallback.
     #
@@ -695,7 +696,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #
     # No-op if BetterDisplay is not installed.
     # -------------------------------------------------------------------------
-    ensureHeadlessDisplay = lib.hm.dag.entryAfter [ "configureNightlight" ] ''
+    macos-headless-display = lib.hm.dag.entryAfter [ "macos-nightlight" ] ''
       ${builtins.readFile ../scripts/hosts/MacBook/macos-headless-display.sh}
     '';
   };
@@ -729,8 +730,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # Uses internal sleep loop (while true; do ...; sleep 30; done) so launchd
   # KeepAlive provides crash recovery.
   #
-  # Why a LaunchAgent rather than relying on ensureHeadlessDisplay alone:
-  #   ensureHeadlessDisplay runs only during `home-manager switch`.  On a
+  # Why a LaunchAgent rather than relying on macos-headless-display alone:
+  #   macos-headless-display runs only during `home-manager switch`.  On a
   #   clamshell Mac that is left closed for hours, BetterDisplay can drop the
   #   virtual screen connection without a new activation run.  A launchd
   #   persistent agent with KeepAlive is the lightest-weight fix without
@@ -893,12 +894,12 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # after setupLaunchAgents runs.  On macOS 26, launchctl bootstrap can
   # spuriously return "Bootstrap failed: 5: Input/output error" — HM detects
   # this but never retries, and subsequent activations skip unchanged agents.
-  home.activation.ensureLaunchAgentsLoaded = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
+  home.activation."macos-ensure-launchagents" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
     ${builtins.readFile ../scripts/hosts/MacBook/macos-ensure-launchagents.sh}
   '';
 
   # --------------------------------------------------------------------------
-  # configureGuiEnv
+  # macos-gui-env-path
   # Single activation-time mechanism for macOS GUI environment variables.
   #
   # This step handles ALL GUI env var propagation at activation time:
@@ -915,7 +916,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # The gui-env LaunchAgent (below) provides login-time coverage before the
   # first activation runs.
   # --------------------------------------------------------------------------
-  home.activation.configureGuiEnv = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
+  home.activation."macos-gui-env-path" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
     # Propagate NUCLEUS_REPO_ROOT to GUI domain.  Captured at build time from
     # apply.sh; activation reloads it for freshness on every apply.
     if [ -n "''${NUCLEUS_REPO_ROOT:-}" ]; then
@@ -965,7 +966,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # GUI domains are per-user.
   #
   # This is a one-shot script (no loop) — launchctl setenv values persist in
-  # the GUI domain until explicitly changed or reboot.  The configureGuiEnv
+  # the GUI domain until explicitly changed or reboot.  The macos-gui-env-path
   # activation step re-applies all vars on every nucleus-apply.
   # --------------------------------------------------------------------------
   launchd.agents."gui-env" = {
@@ -973,7 +974,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     config = {
       Label = "local.gui-env";
       ProgramArguments = [ "${guiEnvAgent}" ];
-      # One-shot at login; configureGuiEnv activation step covers subsequent applies.
+      # One-shot at login; macos-gui-env-path activation step covers subsequent applies.
       RunAtLoad = true;
     };
   };

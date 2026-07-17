@@ -48,7 +48,7 @@ let
   # sudo launchctl config user path.  Takes homeDir as an argument
   # (e.g. "${config.home.homeDirectory}") and renders all managed
   # directories as absolute paths including system fallbacks.
-  # Used by configureGuiEnv in macos.nix.
+  # Used by macos-gui-env-path in macos.nix.
   toLaunchctlConfigPath =
     homeDir:
     let

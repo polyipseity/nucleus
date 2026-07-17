@@ -32,7 +32,7 @@
 
 ## service management
 
-- macOS GUI env vars: propagated at activation time via `configureGuiEnv`
+- macOS GUI env vars: propagated at activation time via `macos-gui-env-path`
   (src/modules/macos.nix), which runs `launchctl setenv` for all managed vars
   and `launchctl config user path` for LaunchServices PATH. A one-shot
   `gui-env` LaunchAgent provides login-time coverage before the first activation.

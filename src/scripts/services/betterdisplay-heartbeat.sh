@@ -42,7 +42,7 @@ while true; do
   # set -connected=on toggle first; it is free-tier-compatible for virtual
   # screens (Pro gating applies only to physical display connection toggles).
   # If the toggle fails, fall back to a discard-and-recreate using the same
-  # parameters as ensureHeadlessDisplay so the virtual screen specification
+  # parameters as macos-headless-display so the virtual screen specification
   # stays consistent across both code paths.
   if ! "$BD_BIN" set -name="$DISPLAY_NAME" -connected=on; then
     tag_ids="$(_bd_cli get -identifiers -name="$DISPLAY_NAME" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
