@@ -33,10 +33,11 @@
 #  16. YAML validation
 #  17. YAML linting (yamllint)
 #
-# Policy/verification (18-20):
+# Policy/verification (18-21):
 #  18. Package manager usage enforcement
 #  19. Undocumented error suppression check
 #  20. Online determinism checks (--verify mode only)
+#  21. Config method compliance
 #
 # Output conventions:
 #   All messages (info, success, skip, warning) go to stdout.
@@ -924,6 +925,81 @@ if ($VERIFY) {
 } else {
   say "skipping (use --verify to run online determinism checks)."
 }
+
+# ---------------------------------------------------------------------------
+# 21. Config method compliance
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Config method compliance ===" -f (++$_step))
+$_cfgDir = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs"
+$_cfgErrors = 0
+
+if (-not $HAS_ARGS) {
+  $_cfgFiles = Get-ChildItem -Path $_cfgDir -Recurse -File
+
+  # Build source file list once for efficiency
+  $_srcFiles = Get-ChildItem -Path (Join-Path $RepoRoot "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
+    Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' -and $_.FullName -notmatch '[\\/]configs[\\/]' }
+
+  foreach ($_cfgFile in $_cfgFiles) {
+    $_basename = $_cfgFile.Name
+
+    # Skip infrastructure files and Nix modules inside configs/
+    if ($_basename -in '.gitkeep', '.gitignore') { continue }
+    if ($_basename -like '*.schema.json') { continue }
+    if ($_basename -eq 'qtpass.nix') { continue }
+
+    # Skip agent customization files (consumed as a directory via Method 4)
+    $_relPath = $_cfgFile.FullName.Substring($_cfgDir.Length + 1) -replace '\\', '/'
+    if ($_relPath -like 'agents/*') { continue }
+
+    # Search using relative path first (avoids false matches on generic names like config.toml)
+    $_refs = @($_srcFiles | Select-String -Pattern ([regex]::Escape($_relPath)) -SimpleMatch)
+
+    if ($_refs.Count -eq 0) {
+      # Fall back to basename
+      $_refs = @($_srcFiles | Select-String -Pattern ([regex]::Escape($_basename)) -SimpleMatch)
+    }
+
+    if ($_refs.Count -eq 0) {
+      warn "$_relPath : no references found in src/ (excluding configs/) — orphaned config?"
+      $_cfgErrors++
+    } else {
+      $_hasMethod = $false
+      foreach ($_ref in $_refs) {
+        if ($_ref.Line -match '# Method') {
+          $_hasMethod = $true
+          break
+        }
+        # Check preceding line
+        if ($_ref.LineNumber -gt 1) {
+          $_prevLines = Get-Content -Path $_ref.Path -TotalCount $_ref.LineNumber
+          if ($_prevLines.Count -ge 2) {
+            $_prevLine = $_prevLines[$_prevLines.Count - 2]
+            if ($_prevLine -match '# Method') {
+              $_hasMethod = $true
+              break
+            }
+          }
+        }
+      }
+      if (-not $_hasMethod) {
+        warn "$_relPath : referenced but no '# Method N' comment found on or before reference lines"
+        $_cfgErrors++
+      }
+    }
+  }
+} else {
+  say "skipping (path-scoped mode)."
+}
+
+if ($_cfgErrors -gt 0) {
+  warn ("config method compliance check failed with {0} error(s)" -f $_cfgErrors)
+  $exitCode = 1
+  if ($FAIL_FAST) { exit $exitCode }
+} else {
+  say "config method compliance passed."
+}
+if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
 if ($exitCode -ne 0) {

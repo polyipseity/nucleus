@@ -35,10 +35,11 @@
 #  16. YAML validation
 #  17. YAML linting (yamllint)
 #
-# Policy/verification (18-20):
+# Policy/verification (18-21):
 #  18. Package manager usage enforcement
 #  19. Undocumented error suppression check
 #  20. Online determinism checks (--verify mode only)
+#  21. Config method compliance
 #
 # Output conventions:
 #   Warnings (warn) and errors (error) go to stderr; info/success/skip
@@ -907,6 +908,67 @@ if $VERIFY; then
 else
   say "skipping (use --verify to run online determinism checks)."
 fi
+
+# Config method compliance
+section "$((_step += 1))" "Config method compliance"
+_cfg_dir="src/modules/configs"
+_cfg_errors=0
+if ! $HAS_ARGS; then
+  while IFS= read -r -d '' _cfg_file; do
+    _basename=$(basename "$_cfg_file")
+    # Skip infrastructure files and Nix modules inside configs/
+    case "$_basename" in
+      .gitkeep|.gitignore|*.schema.json|qtpass.nix) continue ;;
+    esac
+    # Skip agent customization files (consumed as a directory via Method 4)
+    case "$_cfg_file" in
+      src/modules/configs/agents/*) continue ;;
+    esac
+    _relpath="${_cfg_file#src/modules/configs/}"
+    # Search using relative path first (avoids false matches on generic names like config.toml)
+    _refs_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
+      -F "$_relpath" \
+      src/ --exclude-dir='vendor' --exclude-dir='configs' \
+      2>/dev/null || true)  # undoc-supp: grep returns non-zero when no matches — valid case (no references).
+    if [ -z "$_refs_output" ]; then
+      _refs_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
+        -F "$_basename" \
+        src/ --exclude-dir='vendor' --exclude-dir='configs' \
+        2>/dev/null || true)  # undoc-supp: same rationale as relative-path search above.
+    fi
+    _refs_lines=0
+    _method_lines=0
+    if [ -n "$_refs_output" ]; then
+      _refs_lines=$(echo "$_refs_output" | wc -l | tr -d ' ')
+      # Count lines with # Method on the matched line or preceding line
+      _method_lines=0
+      while IFS=: read -r _f _ln _rest; do
+        if echo "$_rest" | grep -q '# Method'; then
+          _method_lines=$((_method_lines + 1))
+        elif [ "$_ln" -gt 1 ]; then
+          sed -n "$((_ln - 1))p" "$_f" | grep -q '# Method' && _method_lines=$((_method_lines + 1))
+        fi
+      # undoc-supp: here-string with empty/malformed output should not abort the check.
+      done <<< "$_refs_output" 2>/dev/null || true
+    fi
+    if [ "$_refs_lines" -eq 0 ]; then
+      warn "$_relpath: no references found in src/ (excluding configs/) — orphaned config?"
+      _cfg_errors=$((_cfg_errors + 1))
+    elif [ "$_method_lines" -eq 0 ]; then
+      warn "$_relpath: referenced but no '# Method N' comment found on or before reference lines"
+      _cfg_errors=$((_cfg_errors + 1))
+    fi
+  done < <(find "$_cfg_dir" -type f -print0)
+else
+  say "skipping (path-scoped mode)."
+fi
+if [ "$_cfg_errors" -gt 0 ]; then
+  warn "config method compliance check failed with $_cfg_errors error(s)"
+  exit_code=1
+  $FAIL_FAST && exit $exit_code
+fi
+say "config method compliance passed."
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
 
 if [ $exit_code -ne 0 ]; then
