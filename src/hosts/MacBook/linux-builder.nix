@@ -67,9 +67,8 @@ in
   # not materialized automatically here, so we write it explicitly.
   environment.etc."nix/machines".text = "${builderMachine}\n";
 
-  # Root (Nix daemon) must verify the builder host key without an interactive
-  # prompt. Keep a deterministic pinned entry in /etc/nix so ssh-ng can use it
-  # even when /var/root/.ssh/known_hosts does not exist.
+  # Method 2 (read-only): known_hosts is system-level Nix infrastructure.
+  # environment.etc is the correct mechanism for /etc/nix files.
   environment.etc."nix/linux-builder-known_hosts".text =
     builtins.readFile ../../modules/configs/ssh/linux-builder-known_hosts;
 
@@ -79,6 +78,7 @@ in
   # correct for the daemon but unreadable to user-space ssh-ng clients.
   # Route root to the daemon-owned key and the primary user to a dedicated 0600
   # mirror so nix store / nixos-generators probes never fall back to password.
+  # Method 2 (read-only): ssh_config.d includes are system-level SSH config.
   environment.etc."ssh/ssh_config.d/100-linux-builder.conf".text =
     builtins.replaceStrings [ "USERNAME" "USER_BUILDER_KEY_PATH" ] [ username userBuilderKeyPath ]
       (builtins.readFile ../../modules/configs/ssh/ssh_config.d/100-linux-builder.conf);

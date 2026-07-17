@@ -388,6 +388,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # -------------------------------------------------------------------------
     # macos-linearmouse-config
+    # Method 1 (writable symlink) — repo changes take effect without rebuild.
     # Creates out-of-store symlinks for LinearMouse's runtime config files
     # pointing into the repository tree. Resolves the repo root at activation
     # time so the link survives repo relocations and rebuilds without stale

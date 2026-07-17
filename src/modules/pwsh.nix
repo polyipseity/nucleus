@@ -23,44 +23,48 @@ let
   pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
   pwshYamlVersion = lockfile.pwsh."powershell-yaml" or null;
 
-  profileContent = let
-    nixPreamble = ''
-        # This file is managed by nucleus (src/modules/pwsh.nix).
-        # Manual edits will be overwritten on the next `nix run .#apply`.
+  profileContent =
+    let
+      nixPreamble = ''
+            # This file is managed by nucleus (src/modules/pwsh.nix).
+            # Manual edits will be overwritten on the next `nix run .#apply`.
 
 
 
-        # Managed PATH: prepend dirs (before system default).
-        ${managedPaths.toPowerShellPrependSnippet}
+            # Managed PATH: prepend dirs (before system default).
+            ${managedPaths.toPowerShellPrependSnippet}
 
-        # Managed PATH: append dirs (after system default).
-        # Canonical source: env-catalog.nix -> managed-paths.nix (pathComponents).
-        ${managedPaths.toPowerShellAppendSnippet}
+            # Managed PATH: append dirs (after system default).
+            # Canonical source: env-catalog.nix -> managed-paths.nix (pathComponents).
+            ${managedPaths.toPowerShellAppendSnippet}
 
 
-        # LLVM/Clang toolchain defaults sourced from the centralized env var
-        # catalog.  All-process on all hosts.
-        # Source: src/modules/lib/env-catalog.nix (CC, CXX, LD entries).
-        $env:CC = "${envVars.resolveValue "CC" envVars.currentOs}"
-        $env:CXX = "${envVars.resolveValue "CXX" envVars.currentOs}"
-        $env:LD = "${envVars.resolveValue "LD" envVars.currentOs}"
+            # LLVM/Clang toolchain defaults sourced from the centralized env var
+            # catalog.  All-process on all hosts.
+            # Source: src/modules/lib/env-catalog.nix (CC, CXX, LD entries).
+            $env:CC = "${envVars.resolveValue "CC" envVars.currentOs}"
+            $env:CXX = "${envVars.resolveValue "CXX" envVars.currentOs}"
+            $env:LD = "${envVars.resolveValue "LD" envVars.currentOs}"
 
-        # Managed default dev tools path for profile functions.
-        $global:NUCLEUS_DEFAULT_DEV_TOOLS = "${managedPaths.defaultDevTools}"
+            # Managed default dev tools path for profile functions.
+            $global:NUCLEUS_DEFAULT_DEV_TOOLS = "${managedPaths.defaultDevTools}"
 
-        # ---------------------------------------------------------------
-        # AI agent session detection
-        # ---------------------------------------------------------------
-        # Environment variable names sourced from src/modules/agent-env-vars.nix.
-        function Test-NucleusAgentSession {
-    ${lib.concatStringsSep "\n" (
-      map (v: "      if (Test-Path env:${v}) { return $true }") agentEnv.agentEnvVarNames
-    )}
-          if (Test-Path "${agentEnv.devinPosixPath}") { return $true }
-          return $false
-        }
-  '';
-  in nixPreamble + (builtins.readFile ./configs/pwsh/profile-base.ps1);
+            # ---------------------------------------------------------------
+            # AI agent session detection
+            # ---------------------------------------------------------------
+            # Environment variable names sourced from src/modules/agent-env-vars.nix.
+            function Test-NucleusAgentSession {
+        ${lib.concatStringsSep "\n" (
+          map (v: "      if (Test-Path env:${v}) { return $true }") agentEnv.agentEnvVarNames
+        )}
+              if (Test-Path "${agentEnv.devinPosixPath}") { return $true }
+              return $false
+            }
+      '';
+      # Method 4 (runtime embedded): profile-base.ps1 is read at eval time and embedded into the
+      # activation block as a literal string. No deployment step needed.
+    in
+    nixPreamble + (builtins.readFile ./configs/pwsh/profile-base.ps1);
 in
 {
   # Place the PowerShell profile at the CurrentUserCurrentHost location for

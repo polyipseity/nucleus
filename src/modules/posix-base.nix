@@ -50,6 +50,8 @@ in
       # Commit/tag signing is required by default, symlinks are enabled, and
       # POSIX hosts keep core.autocrlf=false so Git never rejects an invalid
       # boolean value and newline policy remains controlled by .gitattributes.
+      # Method 2 (read-only): /etc/gitconfig is a system-wide config read by Git —
+      # no user writes it. environment.etc is the correct mechanism.
       environment.etc."gitconfig".text = builtins.readFile ./configs/git/system.gitconfig;
 
       # Ensure zsh is available as a valid login shell system-wide.

@@ -645,6 +645,7 @@ in
   # installs (bun install -g, bun add, etc.) and enable exact version pinning
   # in package.json (no caret ranges). Bun reads bunfig.toml from $HOME by default.
   # Source: https://bun.sh/docs/runtime/bunfig#install
+  # Method 1 (writable symlink): repo changes take effect without rebuild.
   home.file.".bunfig.toml" = {
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/bun/bunfig.toml";
   };
@@ -656,6 +657,7 @@ in
   #   Linux   → mold via clang -fuse-ld=mold (fastest ELF linker)
   #   macOS   → native Apple ld64 via cc     (system default, explicit for clarity)
   #   Windows → rust-lld bundled with Rust    (zero-install, lld-link)
+  # Method 1 (writable symlink): repo changes take effect without rebuild.
   home.file.".cargo/config.toml" = {
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/cargo/config.toml";
   };
@@ -679,6 +681,7 @@ in
   # our override in direnvrc takes effect before the .envrc calls use_flake.
   # The _nix_direnv_nix variable is set by nix-direnv's _nix_direnv_preflight()
   # at the start of use_flake, so referencing it from the override is safe.
+  # Method 1 (writable symlink): repo changes take effect without rebuild.
   home.file.".config/direnv/direnvrc" = {
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/direnv/direnvrc";
   };
@@ -687,6 +690,7 @@ in
   # uv reads uv.toml from $XDG_CONFIG_HOME/uv/uv.toml (~/.config/uv/uv.toml).
   # Source: https://docs.astral.sh/uv/reference/settings/#add-bounds
   # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
+  # Method 1 (writable symlink): repo changes take effect without rebuild.
   home.file."${config.xdg.configHome}/uv/uv.toml" = {
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/uv/uv.toml";
   };

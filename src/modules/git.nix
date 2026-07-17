@@ -9,6 +9,7 @@
   # Keep a managed global ignore baseline plus a user-writable overlay file.
   # The activation step below assembles both into ~/.config/git/ignore so
   # users can add machine-local patterns without editing declarative files.
+  # Method 1 (writable symlink): repo changes take effect without rebuild.
   xdg.configFile."git/ignore-global" = {
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/system.gitignore";
   };

@@ -90,12 +90,16 @@ lib.mkIf pkgs.stdenv.isLinux {
     ".local/share/kio/servicemenus/nucleus-manual.desktop" = {
       # openManualScript is a Nix store path (pkgs.writeShellScript derivation);
       # use builtins.replaceStrings to substitute the placeholder at eval time.
+      # Method 2 (read-only): embedded at eval time — the desktop file is read-only
+      # by convention; a writable symlink is not needed since Plasma caches it.
       text = builtins.replaceStrings [ "SCRIPT_PATH" ] [ "${openManualScript}" ] (
         builtins.readFile ../../modules/configs/plasma/nucleus-manual.desktop
       );
     };
 
     # Dolphin: right-click → optimize PDF (5 presets as sub-actions)
+    # Method 1 (writable symlink): the GS PDF Opt preset file can be updated
+    # in-place; no rebuild needed after adding/changing presets.
     ".local/share/kio/servicemenus/nucleus-gs-pdf-opt.desktop" = {
       source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/plasma/nucleus-gs-pdf-opt.desktop";
     };

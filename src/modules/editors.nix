@@ -443,6 +443,7 @@ in
   home.activation = {
     # -------------------------------------------------------------------------
     # vsCodeSymlinks
+    # Method 1 (writable symlink) — repo changes take effect without rebuild.
     # Replaces VS Code's per-channel config files with symlinks into the live
     # repo tree (src/modules/configs/vscode/) so that every VS Code write
     # (settings change, keybinding edit, MCP server addition, Copilot memory)

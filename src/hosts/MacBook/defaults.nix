@@ -42,6 +42,8 @@ let
   # domain during darwin-rebuild.
   # This is macOS-only (no NixOS/Windows equivalent).
   # ---------------------------------------------------------------------------
+  # Method 4 (runtime embedded at eval time): wordlist.txt is read at Nix evaluation
+  # time and embedded into the Nix store. No deployment step needed.
   autocorrectWords = builtins.filter (w: w != "") (
     builtins.filter builtins.isString (
       builtins.split "\n" (builtins.readFile ../../modules/configs/autocorrect/wordlist.txt)

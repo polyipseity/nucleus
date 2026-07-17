@@ -304,8 +304,10 @@ in
           configName = if pkgs.stdenv.isDarwin then "macos" else "linux";
         in
         {
+          # Method 1 (writable symlink): repo changes take effect without rebuild.
           ".config/camilladsp/configs".source =
             config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camilladsp/configs/${configName}";
+          # Method 1 (writable symlink): repo changes take effect without rebuild.
           ".config/camillagui-backend/config.yml".source =
             config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camillagui-backend/config-${configName}.yml";
         }
