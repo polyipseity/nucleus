@@ -1421,7 +1421,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
   #   3. launchctl setenv for all non-PATH vars from env-catalog (EDITOR,
   #      OLLAMA_HOST, etc.)
   #   4. sudo launchctl config user path — persistent per-user PATH for LaunchServices
-  #      .app bundles (requires reboot on first set)
+  #      .app bundles (requires reboot on first set).
+  #      KNOWN BROKEN: https://github.com/nix-darwin/nix-darwin/issues/1080 —
+  #      `launchctl config` is unreliable or broken on many macOS versions;
+  #      .app bundles launched via LaunchServices fall back to the default PATH.
   #
   # The gui-env LaunchAgent (below) provides login-time coverage before the
   # first activation runs.

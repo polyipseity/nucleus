@@ -37,7 +37,9 @@
   and `launchctl config user path` for LaunchServices PATH. A one-shot
   `gui-env` LaunchAgent provides login-time coverage before the first activation.
   After first `nucleus-apply`, a reboot is required for `launchctl config user
-path` to take effect. Verify with:
+path` to take effect (though it is known to be unreliable — see
+  [nix-darwin#1080](https://github.com/nix-darwin/nix-darwin/issues/1080)).
+  Verify with:
   `/usr/libexec/PlistBuddy -c 'Print PathEnvironmentVariable' /private/var/db/com.apple.xpc.launchd/config/user.plist`
 - `nucleus-svc list` — list all nucleus-managed services with status
 - `nucleus-svc restart <service>` — restart a service:
