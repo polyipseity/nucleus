@@ -44,10 +44,15 @@ let
   # matters.  The prefix argument is "${config.home.homeDirectory}" for
   # the activation script (build-time eval) or "$HOME" for the launchd
   # agent (runtime shell expansion).
+  # Used by guiEnvAgent and guiEnvActivationPathAndRepoRoot (secondary
+  # launchctl setenv mechanism); also informs the primary launchctl
+  # config system path composition via pathComponents.
   mkManagedDedupSet =
     prefix:
     builtins.concatStringsSep ":" (
-      map (p: "${prefix}/${p}") (managedPaths.pathComponents.prepend ++ managedPaths.pathComponents.append)
+      map (p: "${prefix}/${p}") (
+        managedPaths.pathComponents.prepend ++ managedPaths.pathComponents.append
+      )
     );
 
   # Shared BD CLI wrapper: soft-fail wrapper for BetterDisplay CLI commands.
@@ -464,8 +469,14 @@ let
     # Internal loop (not StartInterval) so the interval is visible in the
     # script and survives launchd throttle limits.  KeepAlive=true provides
     # crash recovery.
+    #
+    # PATH PROPAGATION (dual mechanism):
+    # - Primary (LaunchServices .app bundles): launchctl config system path
+    #   in MacBook/activation.nix. Reboot required on first set.
+    # - Secondary (launchd-direct, XPC services, non-LaunchServices): this
+    #   launchctl setenv call below. Provides immediate coverage until reboot.
     while true; do
-      # ── PATH: strip stale managed entries, then prepend+append ──
+      # ── PATH: strip stale managed entries, then prepend+append (secondary) ──
       __nucleus_prepend="${managedPaths.toLaunchctlPrependPath}"
       __nucleus_append="${managedPaths.toLaunchctlAppendPath}"
       # Same dedup SET as the activation script, but using $HOME (runtime
@@ -1414,9 +1425,15 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
   # --------------------------------------------------------------------------
   # guiEnvActivationPathAndRepoRoot
-  # Sets PATH with runtime dedup and NUCLEUS_REPO_ROOT from the activation
+  # Sets PATH (secondary mechanism) and NUCLEUS_REPO_ROOT from the activation
   # environment.  Runs after setupLaunchAgents so the gui-env agent is loaded
   # first.
+  #
+  # PATH PROPAGATION (dual mechanism):
+  # - Primary (LaunchServices .app bundles): launchctl config system path
+  #   in MacBook/activation.nix. Reboot required on first set.
+  # - Secondary (launchd-direct, XPC services, non-LaunchServices): this
+  #   launchctl setenv call below. Provides immediate coverage until reboot.
   # --------------------------------------------------------------------------
   home.activation.guiEnvActivationPathAndRepoRoot = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
     # Propagate NUCLEUS_REPO_ROOT to GUI domain.  Captured at build time from
@@ -1425,9 +1442,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
       /bin/launchctl setenv NUCLEUS_REPO_ROOT "$NUCLEUS_REPO_ROOT"
     fi
 
-    # Propagate managed PATH to GUI domain.  Reads the current GUI domain PATH
-    # at runtime (with fallback to shell PATH), strips stale managed entries,
-    # then prepends + appends managed dirs.
+    # Propagate managed PATH to GUI domain (secondary).  Reads the current GUI
+    # domain PATH at runtime (with fallback to shell PATH), strips stale managed
+    # entries, then prepends + appends managed dirs.
     __nucleus_prepend="${managedPaths.toLaunchctlPrependPath}"
     __nucleus_append="${managedPaths.toLaunchctlAppendPath}"
     # Build the managed-dir LOOKUP SET for stripping stale entries.
@@ -1466,10 +1483,15 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # into the GUI domain.  This agent calls launchctl setenv for every variable
   # that GUI applications (Obsidian, VS Code, oterm, etc.) need.
   #
-  # PATH is handled first: reads the current GUI domain PATH (from the agent's
-  # own $PATH which launchd provides), strips stale managed entries, then
-  # prepends+appends managed dirs.  This ensures login-time PATH setting even
-  # when activation hasn't run yet.
+  # PATH PROPAGATION (dual mechanism):
+  # - Primary (LaunchServices .app bundles): launchctl config system path
+  #   in MacBook/activation.nix. This writes to the persistent system config
+  #   plist (/private/var/db/com.apple.xpc.launchd/config/system.plist).
+  #   Reboot required on first set. Settings persist across reboots.
+  # - Secondary (launchd-direct, XPC services, non-LaunchServices): the
+  #   launchctl setenv call below in guiEnvAgent, which re-applies PATH to
+  #   the GUI domain on a 300 s interval. Also see
+  #   guiEnvActivationPathAndRepoRoot which does the same during activation.
   #
   # The var list for non-PATH vars is generated from the centralized catalog
   # — see src/modules/lib/env-catalog.nix (macOSAllVars).  All vars with a macOS
@@ -1479,9 +1501,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # The script runs in a persistent daemon loop (300 s interval) so env vars
   # are periodically refreshed, covering apps launched later and surviving
   # transient launchd domain resets.  Crash recovery is handled by KeepAlive.
-  #
-  # See .agents/instructions/electron-gui-env.instructions.md for why
-  # Electron apps still ignore the PATH set here.
   # --------------------------------------------------------------------------
   launchd.agents."gui-env" = {
     enable = true;
