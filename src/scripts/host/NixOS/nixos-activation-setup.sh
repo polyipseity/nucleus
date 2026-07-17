@@ -47,4 +47,4 @@ fi
 #   Windows — Disable-SteamAutoStartup module + apply.ps1
 # undoc-supp: steam autostart entry may not exist on first install;
 # best-effort cleanup that should not abort activation.
-find /home -maxdepth 3 -path '*/autostart/steam.desktop' -delete 2>/dev/null || true
+find /home -maxdepth 3 -path '*/autostart/steam.desktop' -delete 2>/dev/null || true  # undoc-supp: steam autostart entry may not exist on first install; best-effort cleanup that should not abort activation.

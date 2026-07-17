@@ -36,7 +36,7 @@ in
   # ---------------------------------------------------------------------------
   system.activationScripts.nvimLauncher = lib.mkAfter ''
     NUCLEUS_NVIM_PATH="${config.home-manager.users.${username}.home.profileDirectory}/bin/nvim"
-    ${builtins.readFile ../../scripts/host/nixos/nixos-activation-setup.sh}
+    ${builtins.readFile ../../scripts/host/NixOS/nixos-activation-setup.sh}
   '';
 
   # ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ in
   system.activationScripts.ensureLogDirs = lib.mkAfter ''
     NUCLEUS_SYSTEM_LOG_DIR="${config.nucleus.logging.systemLogDir}"
     NUCLEUS_LOG_SUBDIRS="${builtins.toString linuxSystemLogDirs}"
-    ${builtins.readFile ../../scripts/host/nixos/nixos-activation-setup.sh}
+    ${builtins.readFile ../../scripts/host/NixOS/nixos-activation-setup.sh}
   '';
 
   # ---------------------------------------------------------------------------
@@ -81,6 +81,6 @@ in
   # surfaces issues for post-apply investigation.
   # ---------------------------------------------------------------------------
   system.activationScripts.verifyNucleusServices = lib.mkAfter ''
-    ${builtins.readFile ../../scripts/host/nixos/nixos-activation-setup.sh}
+    ${builtins.readFile ../../scripts/host/NixOS/nixos-activation-setup.sh}
   '';
 }
