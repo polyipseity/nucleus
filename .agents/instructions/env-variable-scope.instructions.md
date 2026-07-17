@@ -75,12 +75,6 @@ Valid reasons to restrict scope:
 - The concept is inherently platform-specific (e.g., `DEVELOPER_DIR` on non-macOS hosts).
 - The value is technically infeasible to compute at build time (e.g., `NUCLEUS_REPO_ROOT` on NixOS — captured at eval time).
 
-"CLI-only tool" or "only shells need it" is not a valid restriction on NixOS or Windows — both CLI and GUI processes inherit the same environment. On macOS, a second propagation mechanism (LaunchAgent calling `launchctl setenv`) is required because `launchd` maintains separate shell and GUI domains.
-
-### Electron/Chromium PATH sanitization (macOS)
-
-Electron and Chromium apps on macOS internally sanitize `PATH` at process startup, discarding the value set by `launchctl setenv` in the GUI domain. This is a Chromium security hardening measure (see `base/mac/environment_variables.cc`). It affects all Electron apps (Obsidian, VS Code, Discord, etc.) and can cause confusing debugging sessions where `launchctl getenv PATH` returns the correct value but the app process shows a sanitized system PATH.
-
-Non-PATH env vars (`OLLAMA_HOST`, `EDITOR`, etc.) are **not** affected — they propagate correctly to Electron apps.
+"CLI-only tool" or "only shells need it" is not a valid restriction on NixOS or Windows — both CLI and GUI processes inherit the same environment. On macOS, a second propagation mechanism (LaunchAgent calling `launchctl setenv`) is required because `launchd` maintains separate shell and GUI domains. For PATH specifically, `launchctl setenv` is not honored by LaunchServices — see `launchctl config system path` in MacBook/activation.nix for the primary mechanism.
 
 See `.agents/instructions/electron-gui-env.instructions.md` for diagnosis procedure, affected scope, and cross-host comparison.
