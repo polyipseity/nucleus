@@ -7,6 +7,7 @@ let
   gcShText = builtins.readFile ../../scripts/gc.sh;
   gcPs1Text = builtins.readFile ../../scripts/gc.ps1;
   servicesJsonText = builtins.readFile ../../src/modules/services.json;
+  servicesSchemaText = builtins.readFile ../../src/modules/services.schema.json;
   loggingNixText = builtins.readFile ../../src/modules/logging.nix;
   healthCheckShText = builtins.readFile ../../scripts/health-check.sh;
 in
@@ -56,11 +57,10 @@ assert containsRegex "\\.sample" gcPs1Text;
 assert containsRegex "Git template boilerplate" gcPs1Text;
 assert containsRegex "description" gcPs1Text;
 
-# --- src/modules/services.json: $defaults.logging block ---
-assert containsRegex "[$]defaults" servicesJsonText;
-assert containsRegex ''"maxSize": 10000000'' servicesJsonText;
-assert containsRegex ''"maxFiles": 4'' servicesJsonText;
-assert containsRegex ''"compress": true'' servicesJsonText;
+# --- src/modules/services.schema.json: loggingEntry defaults ---
+assert containsRegex ''"default": 10000000'' servicesSchemaText;
+assert containsRegex ''"default": 4'' servicesSchemaText;
+assert containsRegex ''"default": true'' servicesSchemaText;
 
 # --- src/modules/services.json: dirs and runAsUser fields ---
 assert containsRegex ''"dirs"'' servicesJsonText;

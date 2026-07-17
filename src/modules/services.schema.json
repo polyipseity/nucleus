@@ -5,34 +5,6 @@
     "$schema": {
       "description": "Reference to the JSON Schema file that validates this data file.",
       "type": "string"
-    },
-    "$defaults": {
-      "additionalProperties": false,
-      "description": "Default values inherited by all service entries. Individual service properties override these defaults.",
-      "properties": {
-        "logging": {
-          "additionalProperties": false,
-          "description": "Default log rotation settings applied to all services.",
-          "properties": {
-            "maxSize": {
-              "description": "Maximum log file size in bytes before rotation.",
-              "type": "integer",
-              "minimum": 1024
-            },
-            "maxFiles": {
-              "description": "Number of rotated archives to keep.",
-              "type": "integer",
-              "minimum": 0
-            },
-            "compress": {
-              "description": "Compress rotated archives with gzip.",
-              "type": "boolean"
-            }
-          },
-          "type": "object"
-        }
-      },
-      "type": "object"
     }
   },
   "additionalProperties": {

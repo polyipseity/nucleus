@@ -1,12 +1,5 @@
 {
   "$schema": "./services.schema.json",
-  "$defaults": {
-    "logging": {
-      "maxSize": 10000000,
-      "maxFiles": 4,
-      "compress": true
-    }
-  },
   "caddy": {
     "description": "Local TLS reverse proxy engine",
     "displayName": "Caddy",
