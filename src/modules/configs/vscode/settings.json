@@ -33,7 +33,16 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[markdown]": {
-    "editor.formatOnSave": false
+    "editor.codeActionsOnSave": {
+      "source.fixAll.markdownlint": "explicit",
+      "source.fixAll.prettier": "never"
+    },
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false,
+    "notebook.codeActionsOnSave": {
+      "source.fixAll.markdownlint": "explicit",
+      "source.fixAll.prettier": "never"
+    }
   },
   "[nix]": {
     "editor.defaultFormatter": "jnoortheen.nix-ide"
