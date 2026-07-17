@@ -207,9 +207,9 @@ let
     };
 
     # ── macOS GUI environment PATH (append-only; user-specific) ──
-    # PATH is not a single value at runtime — it is a composition of
-    # (system default + append).  This catalog entry holds the append
-    # portion.  The prepend portion is empty (dirs moved to append).
+    # PATH at runtime is (system default) with managed dirs prepended before and
+    # appended after.  This catalog entry holds only the append portion — the
+    # prepend portion is handled in guiEnvAgent and configureGuiEnv in macos.nix.
     # Set by configureGuiEnv (activation) and gui-env (login agent) in macos.nix.
     PATH = {
       values = {
