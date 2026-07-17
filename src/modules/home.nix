@@ -255,7 +255,7 @@ in
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
     # deletion between rebuilds.
     home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      ${builtins.readFile ../scripts/agent-helpers.sh}
+      ${builtins.readFile ../scripts/lib/agent-helpers.sh}
       _nucleus_unprotect_symlink "home.nix" "$HOME/iCloud"
       _nucleus_unprotect_symlink "home.nix" "$HOME/.config/camilladsp/configs"
       _nucleus_unprotect_symlink "home.nix" "$HOME/.config/camillagui-backend/config.yml"
@@ -265,7 +265,7 @@ in
     '';
 
     home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.readFile ../scripts/agent-helpers.sh}
+      ${builtins.readFile ../scripts/lib/agent-helpers.sh}
       _nucleus_protect_symlink "home.nix" "$HOME/iCloud"
       _nucleus_protect_symlink "home.nix" "$HOME/.config/camilladsp/configs"
       _nucleus_protect_symlink "home.nix" "$HOME/.config/camillagui-backend/config.yml"

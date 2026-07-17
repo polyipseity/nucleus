@@ -13,7 +13,7 @@
 let
   # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh).
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
-  agentHelpersSh = builtins.readFile ../scripts/agent-helpers.sh;
+  agentHelpersSh = builtins.readFile ../scripts/lib/agent-helpers.sh;
 in
 {
   # ---------------------------------------------------------------------------

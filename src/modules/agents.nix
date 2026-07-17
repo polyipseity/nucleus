@@ -25,7 +25,7 @@ let
   # Inline shell helpers from the shared library file at build time so
   # activation scripts can use _nucleus_protect_symlink, _nucleus_unprotect_symlink,
   # _nucleus_resolve_repo_root, and _nucleus_prepend_first_executable_dir.
-  agentHelpersSh = builtins.readFile ../scripts/agent-helpers.sh;
+  agentHelpersSh = builtins.readFile ../scripts/lib/agent-helpers.sh;
 
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
 

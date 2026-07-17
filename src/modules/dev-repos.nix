@@ -134,10 +134,10 @@ in
           mkdir -p "$devDir" || { echo "devReposProvision: failed to create $devDir" >&2; exit 1; }
 
           # Source shared symlink protection helpers from agent-helpers.sh
-          ${builtins.readFile ../scripts/agent-helpers.sh}
+          ${builtins.readFile ../scripts/lib/agent-helpers.sh}
 
           # Source dev-repos helper functions
-          ${builtins.readFile ../scripts/dev-repos-provision-lib.sh}"
+          ${builtins.readFile ../scripts/lib/dev-repos-provision-lib.sh}"
                 fi
               fi
             done

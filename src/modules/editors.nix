@@ -475,7 +475,7 @@ in
     # -------------------------------------------------------------------------
     vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
-      ${builtins.readFile ../scripts/agent-helpers.sh}
+      ${builtins.readFile ../scripts/lib/agent-helpers.sh}
 
       # Locate the live repo checkout so the activation can resolve the
       # src/modules/configs/vscode/ path regardless of where the repo lives.
@@ -602,7 +602,7 @@ in
     # -----------------------------------------------------------------------
     vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
-      ${builtins.readFile ../scripts/agent-helpers.sh}
+      ${builtins.readFile ../scripts/lib/agent-helpers.sh}
 
       source_extensions='${extensionStore}/share/vscode/extensions'
       stable_extensions="$HOME/.vscode/extensions"

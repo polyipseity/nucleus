@@ -342,7 +342,7 @@ in
         home.activation.cloudDrivesSetup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           set -eu
 
-          ${builtins.readFile ../scripts/cloud-drive-setup-lib.sh}
+          ${builtins.readFile ../scripts/lib/cloud-drive-setup-lib.sh}
 
           # Create the top-level clouds/ directory tree.
           mkdir -p "$HOME/clouds"
