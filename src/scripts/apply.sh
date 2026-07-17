@@ -248,15 +248,15 @@ case "$(uname -s)" in
       printf '%s\n' "apply: --target-user is ignored on Darwin system rebuilds (host-level configuration selects the Home Manager user)."
     fi
     start_sudo_keepalive
-    "$_ash_script_dir/generate-ssh-host-key.sh"
-    "$_ash_script_dir/register-host-age-key.sh" --repo-root "$REPO_ROOT"
+    "$_ash_script_dir/secrets/generate-ssh-host-key.sh"
+    "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
     run_nix run "$REPO_ROOT/src#health-check"
     # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
     # while running as root (which otherwise produces ownership warnings).
     run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --impure --flake "$REPO_ROOT/src#macbook"
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust sudo
-    NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/jellyfin-sync.sh"
+    NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/host/jellyfin-sync.sh"
     run_ai_sync
     run_replica_sync
     run_vm_setup
@@ -270,14 +270,14 @@ case "$(uname -s)" in
         printf '%s\n' "apply: --target-user is ignored on NixOS system rebuilds (host-level configuration selects the Home Manager user)."
       fi
       start_sudo_keepalive
-      "$_ash_script_dir/generate-ssh-host-key.sh"
-      "$_ash_script_dir/register-host-age-key.sh" --repo-root "$REPO_ROOT"
+      "$_ash_script_dir/secrets/generate-ssh-host-key.sh"
+      "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
       run_nix run "$REPO_ROOT/src#health-check"
       # Keep root invocations on root-owned HOME for consistent Nix behavior.
       run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
       "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
       run_caddy_local_ca_trust sudo
-      NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/jellyfin-sync.sh"
+      NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/host/jellyfin-sync.sh"
       run_ai_sync
       run_replica_sync
       run_vm_setup
@@ -293,7 +293,7 @@ case "$(uname -s)" in
       run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
       "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
       run_caddy_local_ca_trust user
-      NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/jellyfin-sync.sh"
+      NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/host/jellyfin-sync.sh"
       run_ai_sync
       run_replica_sync
       run_vm_setup

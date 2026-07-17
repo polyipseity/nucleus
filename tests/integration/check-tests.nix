@@ -8,7 +8,7 @@ let
   # Also read check.ps1 for cross-validation
   checkPs1Text = builtins.readFile ../../scripts/check.ps1;
 
-  libShText = builtins.readFile ../../src/scripts/lib.sh;
+  libShText = builtins.readFile ../../src/scripts/lib/lib.sh;
 in
 
 # Overlap exception list

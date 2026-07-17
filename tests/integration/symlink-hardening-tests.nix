@@ -8,7 +8,7 @@ let
   customProvisionSymlinksText = builtins.readFile ../../src/modules/custom-provision-symlinks.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   finderSidebarText = builtins.readFile ../../src/modules/macos/finder-sidebar.nix;
-  agentsHelpersText = builtins.readFile ../../src/scripts/agent-helpers.sh;
+  agentsHelpersText = builtins.readFile ../../src/scripts/lib/agent-helpers.sh;
   discordMusicRpcText = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
 in

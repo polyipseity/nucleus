@@ -20,8 +20,8 @@ let
   userHome = config.users.users.${username}.home;
   wsPort = toString servicesJSON.camilladsp.network.websocket.port;
 
-  daemonScript = ./../../scripts/camilladsp/camilladsp-daemon.sh;
-  heartbeatScript = ./../../scripts/camilladsp/camilladsp-heartbeat.sh;
+  daemonScript = ./../../scripts/services/camilladsp-daemon.sh;
+  heartbeatScript = ./../../scripts/services/camilladsp-heartbeat.sh;
 
   camilladspDaemon = pkgs.writeShellScript "camilladsp-daemon" ''
     export PATH="${

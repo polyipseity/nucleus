@@ -223,7 +223,7 @@ let
     export BD_BIN="/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay"
     export BD_APP="/Applications/BetterDisplay.app"
     export DISPLAY_NAME="HeadlessDisplay"
-    ${builtins.readFile ../scripts/macos/betterdisplay-heartbeat.sh}
+    ${builtins.readFile ../scripts/services/betterdisplay-heartbeat.sh}
   '';
 
   # Wrapper script for the nix-index daily database rebuild LaunchAgent.
@@ -237,7 +237,7 @@ let
   # apply runs fast.
   nixIndexUpdate = pkgs.writeShellScript "nix-index-update" (
     builtins.replaceStrings [ "NIX_INDEX_BIN" ] [ "${pkgs.nix-index}/bin/nix-index" ] (
-      builtins.readFile ../scripts/macos/nix-index-update.sh
+      builtins.readFile ../scripts/services/nix-index-update.sh
     )
   );
 
@@ -270,34 +270,34 @@ let
   # Daily Spotlight exclusion refresh for the mutable ~/dev tree.
   # Kept out of Home Manager activation because large worktrees can make a full
   # scan slow enough to noticeably delay `nix run .#apply` and bootstrap apply.
-  devSpotlightExclusions = pkgs.writeShellScript "dev-spotlight-exclusions" (
+  devSpotlightExclusions = pkgs.writeShellScript "spotlight-exclusions" (
     builtins.replaceStrings
       [ "DEV_SPOTLIGHT_FIND_EXPRESSION" ]
       [ "${devSpotlightExcludedDirectoryFindExpression}" ]
-      (builtins.readFile ../scripts/dev/dev-spotlight-exclusions.sh)
+      (builtins.readFile ../scripts/services/spotlight-exclusions.sh)
   );
 
   # Daily Finder metadata cleanup for ~/dev.
   # Kept out of Home Manager activation for the same reason as Spotlight marker
   # maintenance: deleting stale .DS_Store files can take noticeable time on a
   # large checkout and should not slow synchronous apply/bootstrap flows.
-  devDsStoreGc = pkgs.writeShellScript "dev-ds-store-gc" (
-    builtins.readFile ../scripts/dev/dev-ds-store-gc.sh
+  devDsStoreGc = pkgs.writeShellScript "ds-store-gc" (
+    builtins.readFile ../scripts/services/ds-store-gc.sh
   );
 
   gcWeekly = pkgs.writeShellScript "gc-weekly" ''
     export REPO_ROOT="${repoRoot}"
-    ${builtins.readFile ../scripts/macos/gc-weekly.sh}
+    ${builtins.readFile ../scripts/services/gc-weekly.sh}
   '';
 
-  guiEnvAgent = pkgs.writeShellScript "gui-env-agent" ''
+  guiEnvAgent = pkgs.writeShellScript "gui-env" ''
     set -eu
 
     export __nucleus_prepend="${managedPaths.toShellPrependPath}"
     export __nucleus_append="${managedPaths.toShellAppendPath}"
     export __nucleus_managed_set="${mkManagedDedupSet "$HOME"}"
 
-    ${builtins.readFile ../scripts/macos/gui-env-agent.sh}
+    ${builtins.readFile ../scripts/services/gui-env.sh}
 
     # ── All other GUI env vars (user and non-user) ──
     ${envVars.macOSAllVars}
@@ -760,10 +760,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # hooks so `nix run .#apply` and bootstrap apply stay synchronous only for
   # configuration work that must happen immediately.
   # --------------------------------------------------------------------------
-  launchd.agents."dev-ds-store-gc" = {
+  launchd.agents."ds-store-gc" = {
     enable = true;
     config = {
-      Label = "local.dev-ds-store-gc";
+      Label = "local.ds-store-gc";
       ProgramArguments = [ "${devDsStoreGc}" ];
       # Do not run on every agent reload during apply/bootstrap apply; daily
       # noon maintenance is sufficient for repository hygiene.
@@ -777,10 +777,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
     };
   };
 
-  launchd.agents."dev-spotlight-exclusions" = {
+  launchd.agents."spotlight-exclusions" = {
     enable = true;
     config = {
-      Label = "local.dev-spotlight-exclusions";
+      Label = "local.spotlight-exclusions";
       ProgramArguments = [ "${devSpotlightExclusions}" ];
       # Do not run on every agent reload during apply/bootstrap apply; daily
       # noon maintenance is sufficient for dev-tree indexing hygiene.

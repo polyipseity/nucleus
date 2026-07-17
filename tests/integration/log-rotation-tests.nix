@@ -3,7 +3,7 @@
 let
   inherit (import ../lib.nix) containsRegex flatten;
 
-  libShText = builtins.readFile ../../src/scripts/lib.sh;
+  libShText = builtins.readFile ../../src/scripts/lib/lib.sh;
   gcShText = builtins.readFile ../../scripts/gc.sh;
   gcPs1Text = builtins.readFile ../../scripts/gc.ps1;
   servicesJsonText = builtins.readFile ../../src/modules/services.json;
