@@ -342,22 +342,14 @@ in
         home.activation.cloudDrivesSetup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           set -eu
 
+          ${builtins.readFile ../scripts/cloud-drive-setup-lib.sh}
+
           # Create the top-level clouds/ directory tree.
           mkdir -p "$HOME/clouds"
 
           ${lib.concatStringsSep "\n" (
             map (m: ''
-              # Enforce real-directory mountpoints. Symlinked paths (for example
-              # old /Volumes indirections) can leave mounts looking empty because
-              # modern FSKit/direct-path mounts expect a writable directory target.
-              if [ -L "$HOME/${m.localPath}" ]; then
-                _legacy_target="$(readlink "$HOME/${m.localPath}")"
-                rm "$HOME/${m.localPath}"
-                mkdir -p "$HOME/${m.localPath}"
-                printf '%s\n' "cloud-drives: replaced legacy symlink $HOME/${m.localPath} -> $_legacy_target with a managed directory."
-              else
-                mkdir -p "$HOME/${m.localPath}"
-              fi
+              _cd_ensure_real_directory "$HOME/${m.localPath}" "${m.localPath}"
             '') enabledMounts
           )}
 
@@ -402,18 +394,9 @@ in
                   ''
                 else
                   ''
-                    # Default invariant for replica roots: real directories so
-                    # rclone sync writes into managed paths directly.
-                    if [ -L "$HOME/${r.localPath}" ]; then
-                      _legacy_target="$(readlink "$HOME/${r.localPath}")"
-                      rm "$HOME/${r.localPath}"
-                      mkdir -p "$HOME/${r.localPath}"
-                      printf '%s\n' "cloud-drives (${
-                        if r.displayName != null then r.displayName else r.id
-                      }): replaced legacy symlink $HOME/${r.localPath} -> $_legacy_target with a managed directory."
-                    else
-                      mkdir -p "$HOME/${r.localPath}"
-                    fi
+                    _cd_ensure_real_directory "$HOME/${r.localPath}" "${
+                      if r.displayName != null then r.displayName else r.id
+                    }"
                   ''
               }
             '') enabledReplicas

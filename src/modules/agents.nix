@@ -61,99 +61,10 @@ in
     agentsSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
 
+      export REPO_ROOT="${repoRoot}"
+      export AGENTS_CONFIG_RELATIVE_PATH="${agentsConfigRelativePath}"
       ${agentHelpersSh}
-
-      # Resolve the repo root so the activation can construct an absolute path
-      # to src/modules/configs/agents/ regardless of where the repo is checked
-      # out.  $NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo.
-      _as_repo_root="$(_nucleus_resolve_repo_root "agents-config" "${repoRoot}")"
-
-      _as_agents_source="$_as_repo_root/${agentsConfigRelativePath}"
-      if [ ! -d "$_as_agents_source" ]; then
-        echo "agents-config: agents config dir not found: $_as_agents_source" >&2
-        exit 1
-      fi
-
-      _as_agents_dir="$HOME/.agents"
-
-      # Ensure ~/.agents exists as a real (writable) directory.
-      if [ ! -d "$_as_agents_dir" ]; then
-        mkdir "$_as_agents_dir"
-        echo "agents-config: created $HOME/.agents"
-      elif [ -e "$_as_agents_dir" ] && [ ! -d "$_as_agents_dir" ]; then
-        # Unexpected non-directory file: fail fast.
-        echo "agents-config: $HOME/.agents exists but is not a directory — remove it and re-run apply." >&2
-        exit 1
-      fi
-
-      # Remove stale per-subdir symlinks: any symlink in ~/.agents/ that once
-      # pointed into _as_agents_source/ but whose source entry no longer exists.
-      # This keeps ~/.agents/ free of dangling links after source entries are
-      # removed from the repo.  skills/ is skipped — agentsSkills owns it.
-      find "$_as_agents_dir" -mindepth 1 -maxdepth 1 -type l | while IFS= read -r _as_candidate; do
-        _as_cname="$(basename "$_as_candidate")"
-        [ "$_as_cname" = "skills" ] && continue
-        _as_ctarget="$(readlink "$_as_candidate")"
-        case "$_as_ctarget" in
-          "$_as_agents_source"/*)
-            # Managed per-subdir symlink: remove if its source no longer exists.
-            if [ ! -e "$_as_ctarget" ] && [ ! -L "$_as_ctarget" ]; then
-              _nucleus_unprotect_symlink "agents-config" "$_as_candidate"
-              rm "$_as_candidate"
-              echo "agents-config: removed stale link for $_as_cname (source removed)"
-            fi
-            ;;
-        esac
-      done
-
-      # Create or update per-entry symlinks for every top-level source entry
-      # except skills/ (managed independently by agentsSkills).
-      find "$_as_agents_source" -mindepth 1 -maxdepth 1 | while IFS= read -r _as_entry; do
-        _as_name="$(basename "$_as_entry")"
-        # skills/ is managed by agentsSkills; skip it here to avoid conflicts
-        # with the real directory that agentsSkills creates for fetched downloads.
-        [ "$_as_name" = "skills" ] && continue
-        _as_link="$_as_agents_dir/$_as_name"
-        if [ -L "$_as_link" ]; then
-          if [ "$(readlink "$_as_link")" = "$_as_entry" ]; then
-            continue  # Correct symlink — no-op.
-          fi
-          # Wrong target (e.g. leftover from a previous checkout path): replace.
-          _nucleus_unprotect_symlink "agents-config" "$_as_link"
-          rm "$_as_link"
-          ln -s "$_as_entry" "$_as_link"
-          _nucleus_protect_symlink "agents-config" "$_as_link"
-          echo "agents-config: updated $HOME/.agents/$_as_name -> $_as_entry"
-        elif [ -e "$_as_link" ]; then
-          # Real file or directory: fail fast to prevent silent data loss.
-          echo "agents-config: $HOME/.agents/$_as_name is not a managed symlink — merge any wanted content into $_as_entry and remove it, then re-run apply." >&2
-          exit 1
-        else
-          ln -s "$_as_entry" "$_as_link"
-          _nucleus_protect_symlink "agents-config" "$_as_link"
-          echo "agents-config: linked $HOME/.agents/$_as_name -> $_as_entry"
-        fi
-      done
-
-      # Create the ~/.config/opencode/opencode.jsonc symlink to the repo-hosted
-      # user config. Resolved at activation time (rather than via Nix-level
-      # mkOutOfStoreSymlink) so the link still works after the repo root path
-      # changes between rebuilds.
-      mkdir -p "$HOME/.config/opencode"
-      _as_opencode_source="$_as_repo_root/${agentsConfigRelativePath}/opencode.user.jsonc"
-      _as_opencode_link="$HOME/.config/opencode/opencode.jsonc"
-      if [ -L "$_as_opencode_link" ]; then
-        if [ "$(readlink "$_as_opencode_link")" != "$_as_opencode_source" ]; then
-          rm "$_as_opencode_link"
-        fi
-      elif [ -e "$_as_opencode_link" ]; then
-        echo "agents-config: $_as_opencode_link exists and is not a managed symlink — remove or back it up, then re-run apply." >&2
-        exit 1
-      fi
-      if [ ! -e "$_as_opencode_link" ]; then
-        ln -s "$_as_opencode_source" "$_as_opencode_link"
-        echo "agents-config: linked $HOME/.config/opencode/opencode.jsonc"
-      fi
+      ${builtins.readFile ../scripts/agents-symlink.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -179,71 +90,10 @@ in
     agentsSkills = lib.hm.dag.entryAfter [ "agentsSymlink" ] ''
       set -eu
 
+      export REPO_ROOT="${repoRoot}"
+      export AGENTS_SKILLS_RELATIVE_PATH="${agentsSkillsRelativePath}"
       ${agentHelpersSh}
-
-      # Resolve the repo root (same mechanism as agentsSymlink above).
-      _ask_repo_root="$(_nucleus_resolve_repo_root "agents-skills" "${repoRoot}")"
-
-      _ask_skills_source="$_ask_repo_root/${agentsSkillsRelativePath}"
-      if [ ! -d "$_ask_skills_source" ]; then
-        echo "agents-skills: skills source dir not found: $_ask_skills_source" >&2
-        exit 1
-      fi
-
-      _ask_skills_dir="$HOME/.agents/skills"
-
-      # Ensure ~/.agents/skills/ exists as a real directory so fetched ClawHub
-      # downloads can be written here without entering the tracked repo tree.
-      if [ ! -d "$_ask_skills_dir" ]; then
-        mkdir -p "$_ask_skills_dir"
-        echo "agents-skills: created $HOME/.agents/skills"
-      fi
-
-      # Remove stale per-skill symlinks: skill dirs that once existed in the
-      # source but have since been removed from the repo.
-      find "$_ask_skills_dir" -mindepth 1 -maxdepth 1 -type l | while IFS= read -r _ask_candidate; do
-        _ask_cname="$(basename "$_ask_candidate")"
-        _ask_ctarget="$(readlink "$_ask_candidate")"
-        case "$_ask_ctarget" in
-          "$_ask_skills_source"/*)
-            # Managed per-skill symlink: remove if its source no longer exists.
-            if [ ! -e "$_ask_ctarget" ] && [ ! -L "$_ask_ctarget" ]; then
-              _nucleus_unprotect_symlink "agents-skills" "$_ask_candidate"
-              rm "$_ask_candidate"
-              echo "agents-skills: removed stale skill link for $_ask_cname (source removed)"
-            fi
-            ;;
-        esac
-      done
-
-      # Create or update per-skill symlinks for every subdirectory committed to
-      # src/modules/configs/agents/skills/.  Non-directory entries (.gitkeep etc.)
-      # are skipped; only skill directories are linked.
-      find "$_ask_skills_source" -mindepth 1 -maxdepth 1 -type d | while IFS= read -r _ask_skill_dir; do
-        _ask_skill_name="$(basename "$_ask_skill_dir")"
-        _ask_link="$_ask_skills_dir/$_ask_skill_name"
-        if [ -L "$_ask_link" ]; then
-          if [ "$(readlink "$_ask_link")" = "$_ask_skill_dir" ]; then
-            continue  # Correct symlink — no-op.
-          fi
-          # Wrong target: replace symlink.
-          _nucleus_unprotect_symlink "agents-skills" "$_ask_link"
-          rm "$_ask_link"
-          ln -s "$_ask_skill_dir" "$_ask_link"
-          _nucleus_protect_symlink "agents-skills" "$_ask_link"
-          echo "agents-skills: updated $HOME/.agents/skills/$_ask_skill_name -> $_ask_skill_dir"
-        elif [ -d "$_ask_link" ]; then
-          # Real directory in place of a committed skill — could be a fetched
-          # download with the same name, or user data.  Fail fast to prevent
-          # silent overwrites; the operator must resolve the conflict manually.
-          echo "agents-skills: $HOME/.agents/skills/$_ask_skill_name is a real directory — if it is a fetched ClawHub download for a skill that has been re-committed, remove it and re-run apply." >&2
-          exit 1
-        else
-          ln -s "$_ask_skill_dir" "$_ask_link"
-          _nucleus_protect_symlink "agents-skills" "$_ask_link"
-          echo "agents-skills: linked $HOME/.agents/skills/$_ask_skill_name -> $_ask_skill_dir"
-        fi
-      done
+      ${builtins.readFile ../scripts/agents-skills.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -264,7 +114,7 @@ in
     installBunPackages = lib.hm.dag.entryAfter [ "agentsSkills" ] ''
       set -eu
 
-      _ibp_jq_bin='${pkgs.jq}/bin/jq'
+      export JQ_BIN='${pkgs.jq}/bin/jq'
       ${agentHelpersSh}
 
       # Add managed bin directories (managed-paths.nix pathComponents) to PATH
@@ -281,103 +131,7 @@ in
       _nucleus_prepend_first_executable_dir bun \
         ${managedPaths.nixProfileBinDirs} || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
 
-      # If bun is still not found, search the nix store for any bun binary
-      # and add its parent directory to PATH.
-      if ! command -v bun >/dev/null 2>&1; then
-        # undoc-supp: nix store may not have bun yet on first apply; best-effort store probe.
-        _bun_store_path="$(find /nix/store -name 'bun' -type f -print -quit 2>/dev/null || true)"
-        if [ -n "$_bun_store_path" ] && [ -x "$_bun_store_path" ]; then
-          _bun_store_dir="$(dirname "$_bun_store_path")"
-          PATH="$_bun_store_dir:$PATH"
-          export PATH
-        fi
-      fi
-
-      # bun is provided by pkgs.bun in core.nix (baseSharedPackages).  Verify
-      # bun is now on PATH after the profile directory probes above.  Fail fast
-      # if bun remains absent so the operator knows a full apply is needed.
-      if ! command -v bun >/dev/null 2>&1; then
-        echo "bun: bun not found in PATH; cannot install bun global packages" >&2
-        exit 1
-      fi
-
-      # Declarative desired-state list.  One package per line.
-      # Add a package name here to install it; remove it to trigger uninstall
-      # on the next apply.  Only add packages absent from nixpkgs and
-      # cargo-binstall (install preference: nixpkgs > cargo binstall > bun > uv).
-      _ibp_desired="$(mktemp)"
-      printf '%s\n' \
-        'clawhub' \
-        > "$_ibp_desired"
-
-      # Get actually installed global packages from bun's authoritative package
-      # registry (zap-style: remove any installed package absent from the desired
-      # list, regardless of prior managed state).  The global package.json is
-      # bun's canonical record of all globally-installed packages.
-      _ibp_global_json="$HOME/.bun/install/global/package.json"
-      _ibp_installed="$(mktemp)"
-      if [ -f "$_ibp_global_json" ]; then
-        # undoc-supp: parse failure on a malformed or partially-written file treats the installed set as empty — safe because desired packages will simply be re-installed on the next run.
-        "$_ibp_jq_bin" -r '.dependencies // {} | keys[]' "$_ibp_global_json" > "$_ibp_installed" || true
-      fi
-
-      # Packages installed but not desired: zap-style removal.
-      # Mirrors homebrew cleanup = "zap": removes anything installed but absent
-      # from the declared desired set, regardless of how it was installed.
-      _ibp_to_remove="$(mktemp)"
-      while IFS= read -r _ibp_pkg; do
-        [ -z "$_ibp_pkg" ] && continue
-        if ! grep -qxF "$_ibp_pkg" "$_ibp_desired"; then
-          printf '%s\n' "$_ibp_pkg" >> "$_ibp_to_remove"
-        fi
-      done < "$_ibp_installed"
-
-      # Desired packages not yet in bun's global package.json, or whose binary
-      # is absent from ~/.bun/bin (re-install needed).  Binary name = last path
-      # component after '/' so @scope/name becomes name (bun uses the unscoped
-      # basename as the binary name).
-      _ibp_to_install="$(mktemp)"
-      while IFS= read -r _ibp_pkg; do
-        [ -z "$_ibp_pkg" ] && continue
-        _ibp_bin="''${_ibp_pkg##*/}"
-        if ! grep -qxF "$_ibp_pkg" "$_ibp_installed" || \
-           { [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] && \
-             [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; }; then
-          printf '%s\n' "$_ibp_pkg" >> "$_ibp_to_install"
-        fi
-      done < "$_ibp_desired"
-
-      # Remove packages no longer in the desired list.
-      while IFS= read -r _ibp_pkg; do
-        [ -z "$_ibp_pkg" ] && continue
-        echo "bun: removing $_ibp_pkg"
-        if ! bun remove -g "$_ibp_pkg"; then
-          echo "bun: 'bun remove -g $_ibp_pkg' failed" >&2
-          rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
-          exit 1
-        fi
-      done < "$_ibp_to_remove"
-
-      # Install packages whose binary is absent from ~/.bun/bin.
-      while IFS= read -r _ibp_pkg; do
-        [ -z "$_ibp_pkg" ] && continue
-        echo "bun: installing $_ibp_pkg"
-        if ! bun install -g --ignore-scripts "$_ibp_pkg"; then
-          echo "bun: 'bun install -g $_ibp_pkg' failed" >&2
-          rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
-          exit 1
-        fi
-        _ibp_bin="''${_ibp_pkg##*/}"
-        if [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] && \
-           [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; then
-          echo "bun: $_ibp_pkg installed but binary '$_ibp_bin' not found in '$HOME/.bun/bin'" >&2
-          rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
-          exit 1
-        fi
-        echo "bun: $_ibp_pkg installed successfully"
-      done < "$_ibp_to_install"
-
-      rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
+      ${builtins.readFile ../scripts/agents-install-bun-packages.sh}
     '';
 
     # -------------------------------------------------------------------------
