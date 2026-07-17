@@ -203,31 +203,9 @@ lib.mkIf isPrimaryUser {
   #      idempotently on repeated activation runs.
   # --------------------------------------------------------------------------
   home.activation.gitIdentityFromSops = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
-    identity_path="${config.sops.secrets.${gitIdentitySecretName}.path}"
-
-    if [ ! -f "$identity_path" ]; then
-      echo "gitIdentityFromSops: missing decrypted Git identity secret at $identity_path." >&2
-      exit 1
-    fi
-
-    identity_name="$(/usr/bin/grep -m1 '^name=' "$identity_path" | /usr/bin/cut -d '=' -f 2-)"
-    identity_email="$(/usr/bin/grep -m1 '^email=' "$identity_path" | /usr/bin/cut -d '=' -f 2-)"
-    identity_signing_key="$(/usr/bin/grep -m1 '^signingKey=' "$identity_path" | /usr/bin/cut -d '=' -f 2-)"
-
-    if [ -z "$identity_name" ] || [ -z "$identity_email" ] || [ -z "$identity_signing_key" ]; then
-      echo "gitIdentityFromSops: git identity payload must include name/email/signingKey entries." >&2
-      exit 1
-    fi
-
-    # Write to the dedicated identity include file, not to the HM-managed config.
-    identity_file="$HOME/.config/git/identity"
-    mkdir -p "$(dirname "$identity_file")"
-    ${pkgs.git}/bin/git config --file "$identity_file" user.name "$identity_name"
-    ${pkgs.git}/bin/git config --file "$identity_file" user.email "$identity_email"
-    ${pkgs.git}/bin/git config --file "$identity_file" user.signingkey "$identity_signing_key"
-    # Restrict the identity include file to owner-read-only: it contains the
-    # GPG signing key reference, which minimises visibility to other local users.
-    chmod 600 "$identity_file"
+    export GIT_SECRET_PATH="${config.sops.secrets.${gitIdentitySecretName}.path}"
+    export GIT_BIN="${pkgs.git}/bin/git"
+    ${builtins.readFile ./scripts/secrets-git-identity.sh}
   '';
 
   # --------------------------------------------------------------------------
@@ -268,70 +246,9 @@ lib.mkIf isPrimaryUser {
   # --------------------------------------------------------------------------
   home.activation.gpgImport = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
     export GNUPGHOME="${config.home.homeDirectory}/.gnupg"
-    mkdir -p "$GNUPGHOME"
-    chmod 700 "$GNUPGHOME"
-
-    if [ ! -f "${config.sops.secrets.${gpgSecretName}.path}" ]; then
-      echo "gpgImport: missing decrypted GPG secret at ${
-        config.sops.secrets.${gpgSecretName}.path
-      }; cannot import key material." >&2
-      exit 1
-    fi
-
-    # Extract the primary fingerprint from the managed secret without importing.
-    # The `exit` in awk stops at the first fpr record, giving the primary key
-    # fingerprint rather than a subkey fingerprint.
-    # undoc-supp: GPG may emit non-zero exit for malformed/dry-run key material during
-    # import-options dry-run; the [ -z ] guard below catches and reports
-    # an empty result explicitly.
-    first_key_fingerprint="$(${pkgs.gnupg}/bin/gpg --batch --import-options show-only --dry-run --with-colons --import "${
-      config.sops.secrets.${gpgSecretName}.path
-      # undoc-supp: GPG may emit non-zero exit for malformed/dry-run key material during import-options dry-run; the [ -z ] guard below catches and reports an empty result explicitly.
-    }" | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')" || true
-
-    # Remove stale managed keys: those we imported previously (per manifest)
-    # that are no longer the current managed key.  Guard on a non-empty
-    # first_key_fingerprint so a dry-run parse failure never triggers deletion.
-    nucleus_config_dir="$HOME/.config/nucleus"
-    managed_keys_manifest="$nucleus_config_dir/managed-gpg-keys"
-    if [ -n "$first_key_fingerprint" ] && [ -f "$managed_keys_manifest" ]; then
-      while IFS= read -r stale_fpr; do
-        [ -z "$stale_fpr" ] && continue
-        if [ "$stale_fpr" != "$first_key_fingerprint" ]; then
-          # Only delete if the key is actually present in the keyring.
-          if ${pkgs.gnupg}/bin/gpg --batch --list-secret-keys "$stale_fpr" >/dev/null 2>&1; then
-            if ! ${pkgs.gnupg}/bin/gpg --batch --yes --delete-secret-and-public-key "$stale_fpr"; then
-              echo "gpgImport: warning — failed to delete stale managed GPG key $stale_fpr from keyring." >&2
-            else
-              echo "gpgImport: deleted stale managed GPG key $stale_fpr." >&2
-            fi
-          fi
-        fi
-      done < "$managed_keys_manifest"
-    fi
-
-    if ! ${pkgs.gnupg}/bin/gpg --import "${config.sops.secrets.${gpgSecretName}.path}"; then
-      echo "secrets: gpg import failed for ${gpgSecretName}." >&2
-      exit 1
-    fi
-
-    if [ -z "$first_key_fingerprint" ]; then
-      echo "secrets: imported GPG keyring material but could not determine the managed primary fingerprint for ownertrust enforcement." >&2
-      exit 1
-    fi
-
-    # Record the managed fingerprint immediately after a successful import so
-    # this key is tracked for stale-cleanup even if the ownertrust step fails
-    # (e.g., GnuPG 2.5 + Kyber IPC edge cases on first bootstrap).
-    mkdir -p "$nucleus_config_dir"
-    printf '%s\n' "$first_key_fingerprint" > "$managed_keys_manifest"
-    # Restrict manifest to owner-read-only: the fingerprint identifies the
-    # managed key; excess visibility could aid key targeting.
-    chmod 600 "$managed_keys_manifest"
-
-    if ! printf '%s:6:\n' "$first_key_fingerprint" | ${pkgs.gnupg}/bin/gpg --import-ownertrust; then
-      echo "secrets: warning — failed to enforce ultimate ownertrust for managed primary fingerprint $first_key_fingerprint; key is imported and tracked but trust state may require manual repair." >&2
-    fi
+    export GPG_BIN="${pkgs.gnupg}/bin/gpg"
+    export GPG_SECRET_PATH="${config.sops.secrets.${gpgSecretName}.path}"
+    ${builtins.readFile ./scripts/secrets-gpg-import.sh}
   '';
 
   # --------------------------------------------------------------------------
@@ -360,46 +277,10 @@ lib.mkIf isPrimaryUser {
   #   5. Write the current fingerprint to the manifest.
   # --------------------------------------------------------------------------
   home.activation.sshKeyAdopt = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
-     ssh_pub_path="${sshPublicKeyPath}"
-     nucleus_config_dir="$HOME/.config/nucleus"
-     managed_ssh_manifest="$nucleus_config_dir/managed-ssh-keys"
-
-     if [ ! -f "$ssh_pub_path" ]; then
-       # Not a hard error: sops-nix reports its own failure if materialization
-       # did not complete.  Warn and skip so this activation does not mask the
-       # upstream sops-nix error with a different message.
-       echo "secrets: managed SSH public key not found at $ssh_pub_path; skipping fingerprint adoption." >&2
-     else
-       # undoc-supp: SSH public key may not exist yet on first provision; ssh-keygen -lf exits 1 for missing/invalid keys.
-       new_fingerprint="$(${pkgs.openssh}/bin/ssh-keygen -lf "$ssh_pub_path" | /usr/bin/awk '{print $2}')" || true
-
-       if [ -z "$new_fingerprint" ]; then
-         echo "secrets: could not extract fingerprint from $ssh_pub_path; skipping adoption." >&2
-       else
-         old_fingerprint=""
-         if [ -f "$managed_ssh_manifest" ]; then
-           old_fingerprint="$(cat "$managed_ssh_manifest")" || old_fingerprint=""
-         fi
-
-         if [ "$old_fingerprint" != "$new_fingerprint" ]; then
-           # Flush in-memory SSH agent so stale cached key material is cleared.
-           # The guard intentionally omits the `[ -n "$old_fingerprint" ]` check
-           # so that on first provision (absent manifest, empty old_fingerprint)
-           # any pre-placed key already loaded in the agent is also evicted.
-           # AddKeysToAgent=yes in the SSH config re-loads the new key on the
-           # next outbound SSH connection.
-            echo "secrets: managed SSH key fingerprint changed ($old_fingerprint -> $new_fingerprint); flushing SSH agent." >&2
-            # undoc-supp: ssh-add -D fails when no agent is running; benign since nothing needs flushing.
-            ${pkgs.openssh}/bin/ssh-add -D 2>/dev/null || true
-         fi
-
-        mkdir -p "$nucleus_config_dir"
-        printf '%s\n' "$new_fingerprint" > "$managed_ssh_manifest"
-        # Restrict manifest to owner-read-only: SSH fingerprint data can be
-        # used to correlate keys across systems; minimise unnecessary visibility.
-        chmod 600 "$managed_ssh_manifest"
-      fi
-    fi
+    export SSH_PUB_PATH="${sshPublicKeyPath}"
+    export SSH_KEYGEN_BIN="${pkgs.openssh}/bin/ssh-keygen"
+    export SSH_ADD_BIN="${pkgs.openssh}/bin/ssh-add"
+    ${builtins.readFile ./scripts/secrets-ssh-key-adopt.sh}
   '';
 
   # --------------------------------------------------------------------------
