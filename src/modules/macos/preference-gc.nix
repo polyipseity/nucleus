@@ -70,7 +70,7 @@ in
   managedPreferencesGcScript = pkgs.writeShellScriptBin "gc-managed-user-preferences" ''
     NIX_STORE_BIN="${pkgs.nix}/bin/nix-store"
     MANAGED_PREF_DOMAINS="${builtins.concatStringsSep " " resetUserPreferenceDomains}"
-    ${builtins.readFile ../../scripts/macos/macos-preference-gc.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-preference-gc.sh}
     ${daemonRefresh.refreshCfprefsd}
     ${daemonRefresh.waitForDaemons}
 

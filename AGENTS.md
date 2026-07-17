@@ -19,8 +19,8 @@
   - `home/` — Home Manager activation helpers (INI merge, bun package install)
   - `host/` — host-specific scripts (e.g. `NixOS/`, `jellyfin-sync.sh`)
   - `agents/` — AI agent setup scripts
-  - `macos/` — macOS-specific activation scripts (no daemons)
-  **Rule**: the filename (including its domain prefix) must equal the activation entry name, ensuring uniqueness. The domain prefix is preserved inside the subdirectory to guarantee uniqueness and match the activation entry name.
+  - `host/MacBook/` — macOS-specific activation scripts (no daemons)
+    **Rule**: the filename (including its domain prefix) must equal the activation entry name, ensuring uniqueness. The domain prefix is preserved inside the subdirectory to guarantee uniqueness and match the activation entry name.
 - `tests/` contains automated tests: `tests/modules/`, `tests/integration/`, and `tests/hosts/<host>/` for Nix logic tests, `tests/hosts/Windows/` for Pester DSC validation. All changes require corresponding tests; see `.agents/instructions/testing.instructions.md`.
 - Keep this file short and durable. Put file-type and workflow-specific rules in `.agents/instructions/*.instructions.md`, reusable workflows in `.agents/prompts/*.prompt.md`, and skill assets in `.agents/skills/<skill>/`.
 - Inspect the on-disk tree before assuming source files, tests, or runnable commands exist in a given location.
@@ -36,18 +36,21 @@
 ## Conventions
 
 ### Inline `$schema` for JSON/YAML data files
+
 - Every JSON and YAML data file MUST include an inline `$schema` property pointing to its schema file.
 - This replaces editor-level schema mappings (e.g., VS Code `json.schemas` / `yaml.schemas` in `.vscode/settings.json`) so validation works in any editor and CI.
 - Schema files live alongside their data files (e.g., `src/modules/VMs.schema.json` for `src/modules/VMs.json`).
 - Configuration files (JSONC) that already embed `$schema` do not need additional mappings.
 
 ### Pre-flight dependency policy (check scripts)
+
 - Every external tool used by any check in `scripts/check.sh` or `scripts/check.ps1` MUST be declared in the pre-flight block.
 - A missing tool causes an immediate hard failure — checks MUST NEVER silently skip steps due to unavailable dependencies.
 - The pre-flight block is the single source of truth for all tool requirements.
 - To add a new check that requires a new tool: add it to pre-flight first, then provision it on all target hosts (`src/modules/core.nix` for POSIX, `Ensure-Tool` / bootstrap for Windows).
 
 ### Dynamic file discovery in check/test scripts
+
 - Check scripts (`scripts/check.sh`, `scripts/check.ps1`) and test scripts (`scripts/test.sh`) MUST auto-discover the files they validate rather than hard-coding file lists.
 - Adding a new schema-validation pair, test directory, or file type must NOT require editing the check/test script — it must be automatically picked up via discovery patterns (inline `$schema`, `find` on `tests/`, etc.).
 - Exceptions are allowed only for files that lack an inline `$schema` and use built-in schemas (e.g., GitHub workflow files with `--builtin-schema vendor.github-workflows`).

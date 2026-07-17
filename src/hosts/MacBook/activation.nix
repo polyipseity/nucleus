@@ -137,37 +137,37 @@ in
     /usr/bin/xcode-select --switch "${pkgs.apple-sdk}"
 
     # ---- configureBatteryPolicy ------------------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-battery-policy.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-battery-policy.sh}
 
     # ---- configureChargeLimit --------------------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-charge-limit.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-charge-limit.sh}
 
     # ---- configureSshAccess -----------------------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-ssh-access.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-ssh-access.sh}
 
     # ---- configureMiddleClick -------------------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-middle-click.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-middle-click.sh}
     # ---- configureMountyLoginItem ---------------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-mounty-login-item.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-mounty-login-item.sh}
     # ---- configureLinearMousePreferences --------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-linearmouse-prefs.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-linearmouse-prefs.sh}
     # ---- configureGimpScrollSensitivity ---------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-gimp-scroll-sensitivity.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-gimp-scroll-sensitivity.sh}
 
     # ---- configureMissionControlSpansDisplays ----------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-mission-control.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-mission-control.sh}
 
     # ---- configureMonitorColorProfile ------------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-color-profile.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-color-profile.sh}
 
     # ---- clearFinderCache -------------------------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-clear-finder-cache.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-clear-finder-cache.sh}
 
     # ---- disableSpotlight -------------------------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-disable-spotlight.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-disable-spotlight.sh}
 
     # ---- nvimLauncher -----------------------------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-nvim-launcher.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-nvim-launcher.sh}
 
     # ---- ensureSystemLogDirs (duplicated from extraActivation) -----------------
     # Also ensure directories exist during postActivation in case the log dir
@@ -184,11 +184,11 @@ in
       /bin/mkdir -p "$_camilladsp_user/Library/Logs/nucleus/camilladsp"
     fi
 
-    # ---- verify-homebrew-unpinnable ----------------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-verify-homebrew.sh}
+    # ---- macos-homebrew-pin-verify ----------------------------------------------
+    ${builtins.readFile ../../scripts/host/MacBook/macos-verify-homebrew.sh}
 
     # ---- disableSteamAutoStartup ------------------------------------------------
-    ${builtins.readFile ../../scripts/macos/macos-disable-steam-autostart.sh}
+    ${builtins.readFile ../../scripts/host/MacBook/macos-disable-steam-autostart.sh}
 
     # ---- jellyfin-sync -----------------------------------------------------------
     # Converge Jellyfin accounts and libraries declared in src/modules/users.json

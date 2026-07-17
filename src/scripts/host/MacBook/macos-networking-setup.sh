@@ -23,7 +23,7 @@
 #
 # undoc-supp: Screen Sharing daemon may already be loaded; launchctl load -w
 # exits 1 for already-loaded services.
-/bin/launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
+/bin/launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true  # undoc-supp: Screen Sharing daemon may already be loaded; launchctl load -w exits 1 for already-loaded services.
 if ! /bin/launchctl list com.apple.screensharing > /dev/null 2>&1; then
       echo "RDP: Screen Sharing daemon not listed after load; remote desktop may not be active." >&2
 fi
