@@ -64,7 +64,7 @@ in
       export REPO_ROOT="${repoRoot}"
       export AGENTS_CONFIG_RELATIVE_PATH="${agentsConfigRelativePath}"
       ${agentHelpersSh}
-      ${builtins.readFile ../scripts/agents-symlink.sh}
+      ${builtins.readFile ../scripts/agents/agents-symlink.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -93,7 +93,7 @@ in
       export REPO_ROOT="${repoRoot}"
       export AGENTS_SKILLS_RELATIVE_PATH="${agentsSkillsRelativePath}"
       ${agentHelpersSh}
-      ${builtins.readFile ../scripts/agents-skills.sh}
+      ${builtins.readFile ../scripts/agents/agents-skills.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -131,7 +131,7 @@ in
       _nucleus_prepend_first_executable_dir bun \
         ${managedPaths.nixProfileBinDirs} || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
 
-      ${builtins.readFile ../scripts/agents-install-bun-packages.sh}
+      ${builtins.readFile ../scripts/agents/agents-install-bun-packages.sh}
     '';
 
     # -------------------------------------------------------------------------
