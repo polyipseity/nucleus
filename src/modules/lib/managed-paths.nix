@@ -60,8 +60,7 @@ let
   # sudo launchctl config system path.  Takes homeDir as an argument
   # (e.g. "${config.home.homeDirectory}") and renders all managed
   # directories as absolute paths including system fallbacks.
-  # Used by configureLaunchdGuiPath in MacBook/activation.nix and
-  # macos.nix.
+  # Used by configureGuiEnv in macos.nix.
   toLaunchctlConfigPath =
     homeDir:
     let

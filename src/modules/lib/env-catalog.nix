@@ -210,15 +210,14 @@ let
     # PATH is not a single value at runtime — it is a composition of
     # (system default + append).  This catalog entry holds the append
     # portion.  The prepend portion is empty (dirs moved to append).
-    # Set by guiEnvActivationPathAndRepoRoot (activation) and gui-env
-    # (login agent) in macos.nix.
+    # Set by configureGuiEnv (activation) and gui-env (login agent) in macos.nix.
     PATH = {
       values = {
         macOS = managedPaths.toShellAppendPath;
       };
       excludeFromAll = true;
       userSpecific = true;
-      why = "Managed PATH (append portion) for macOS GUI apps. All managed dirs are appended to avoid shadowing system executables. Primary PATH propagation via launchctl config system path (MacBook/activation.nix); secondary via guiEnvActivationPathAndRepoRoot (activation) and gui-env (login agent) for non-LaunchServices paths.";
+      why = "Managed PATH (append portion) for macOS GUI apps. All managed dirs are appended to avoid shadowing system executables. Propagated via configureGuiEnv activation step (launchctl setenv + launchctl config system path) and the one-shot gui-env LaunchAgent at login.";
     };
 
     # ── Starship prompt ─────────────────────────────────────────────

@@ -14,8 +14,8 @@ All Nix-side env vars are declared in `src/modules/lib/env-catalog.nix`. The cat
 
 | OS      | Location                                                        | Format        |
 | ------- | --------------------------------------------------------------- | ------------- |
-| macOS   | `src/modules/lib/env-catalog.nix` (catalog)                        | Nix attrs     |
-| NixOS   | `src/modules/lib/env-catalog.nix` (catalog)                        | Nix attrs     |
+| macOS   | `src/modules/lib/env-catalog.nix` (catalog)                     | Nix attrs     |
+| NixOS   | `src/modules/lib/env-catalog.nix` (catalog)                     | Nix attrs     |
 | Windows | `src/hosts/Windows/user/env.dsc.yml` (user-specific vars)       | WinGet DSC v3 |
 | Windows | `src/hosts/Windows/system/env.dsc.yml` (non-user-specific vars) | WinGet DSC v3 |
 | Windows | `src/hosts/Windows/modules/user/Sync-UserPath.ps1` (PATH)       | PowerShell    |
@@ -26,7 +26,7 @@ All Nix-side env vars are declared in `src/modules/lib/env-catalog.nix`. The cat
 - Pure helper functions (`allVars`, `systemVars`, `macOSAllVars`, `toJsonManifest`) transform the catalog into platform-specific formats.
 - Managed PATH components and helpers (`pathComponents`, `toShellPrependPath`, `toPowerShellPrependSnippet`, `toLaunchctlPrependPath`, `toLaunchctlAppendPath`) live in `src/modules/lib/managed-paths.nix`, mirroring `ManagedPaths.ps1` on Windows.
 - Daemon env var consumption uses `resolveValue` directly in each daemon file.
-- Consumed by: `shell.nix` (via `home.sessionPath`, `home.sessionVariables`), `macos.nix` (gui-env LaunchAgent, guiEnvActivationPathAndRepoRoot activation), `hosts/NixOS/base.nix`, `hosts/NixOS/ai.nix`, and daemon files in `hosts/MacBook/`.
+- Consumed by: `shell.nix` (via `home.sessionPath`, `home.sessionVariables`), `macos.nix` (gui-env LaunchAgent, configureGuiEnv activation), `hosts/NixOS/base.nix`, `hosts/NixOS/ai.nix`, and daemon files in `hosts/MacBook/`.
 - The `env/default.nix` Home Manager module exposes `config._nucleus.envVars` for introspection.
 - **Overriding per host**: use the `override` attr in the catalog entry (e.g., NixOS vs macOS vs Windows).
 - **User-specific vars**: set `userSpecific = true` in the catalog entry for vars whose value depends on the logged-in user (e.g. `PASSWORD_STORE_DIR`). These are excluded from `systemVars` (system-wide env) and only set via home-manager session variables and the macOS LaunchAgent (`macOSAllVars`).
@@ -75,4 +75,4 @@ Valid reasons to restrict scope:
 - The concept is inherently platform-specific (e.g., `DEVELOPER_DIR` on non-macOS hosts).
 - The value is technically infeasible to compute at build time (e.g., `NUCLEUS_REPO_ROOT` on NixOS — captured at eval time).
 
-"CLI-only tool" or "only shells need it" is not a valid restriction on NixOS or Windows — both CLI and GUI processes inherit the same environment. On macOS, a second propagation mechanism (LaunchAgent calling `launchctl setenv`) is required because `launchd` maintains separate shell and GUI domains. For PATH specifically, `launchctl setenv` is not honored by LaunchServices — see `launchctl config system path` in MacBook/activation.nix for the primary mechanism.
+"CLI-only tool" or "only shells need it" is not a valid restriction on NixOS or Windows — both CLI and GUI processes inherit the same environment. On macOS, `launchd` maintains separate shell and GUI domains. The `configureGuiEnv` activation step bridges this by calling `launchctl setenv` for all managed vars and `launchctl config system path` for LaunchServices PATH; a one-shot LaunchAgent covers login-time gaps.

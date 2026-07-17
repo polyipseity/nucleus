@@ -44,6 +44,7 @@ If a parity feature requires imperative Windows code, enforce all of the followi
 ## Service lifecycle cleanup
 
 When a service declaration is removed or disabled:
+
 - **macOS (launchd) / NixOS (systemd)** — Automatic. Nix removes the unit file and stops the service on re-apply.
 - **Windows native SCM services** (Caddy, LiteLLM) — Explicit. Each `Sync-*Service.ps1` module implements its own cleanup when `-Enabled:$false`: `Stop-Service` + `sc.exe delete`.
 - **Windows scheduled tasks** (cloud-drive, CamillaDSP, Discord Music RPC, etc.) — Same explicit pattern. Each `Sync-*` module calls `Unregister-ScheduledTask` when disabled.
@@ -60,42 +61,42 @@ All nucleus-managed services use persistent-daemon semantics by default: auto-st
 
 #### Default templates per platform
 
-| | Persistent daemon (auto-start + crash recovery) | Periodic oneshot (timer-triggered, exit between runs) |
-|---|---|---|
-| **macOS launchd** | `RunAtLoad = true; KeepAlive = true;` | `StartInterval` or `StartCalendarInterval`; `KeepAlive = false`; `RunAtLoad = false` (or `true` if an immediate first tick is desired) |
-| **NixOS systemd** | `wantedBy = ["multi-user.target"]` (system) or `["default.target"]` (user); `serviceConfig.Restart = "always"` | `systemd.timers` (calendar or `OnUnitActiveSec`) + `Type = "oneshot"` service |
-| **Windows** | SCM: `StartType = Automatic`; scheduled task: `AtLogOn` (user) or `AtStartup` (system) with `AllowStartIfOnBatteries`, `DontStopIfGoingOnBatteries`, `StartWhenAvailable`. Scripts with internal `while ($true)` loop for keepalive. | Scheduled task with calendar trigger or `Once` + `Repetition` |
+|                   | Persistent daemon (auto-start + crash recovery)                                                                                                                                                                                      | Periodic oneshot (timer-triggered, exit between runs)                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **macOS launchd** | `RunAtLoad = true; KeepAlive = true;`                                                                                                                                                                                                | `StartInterval` or `StartCalendarInterval`; `KeepAlive = false`; `RunAtLoad = false` (or `true` if an immediate first tick is desired) |
+| **NixOS systemd** | `wantedBy = ["multi-user.target"]` (system) or `["default.target"]` (user); `serviceConfig.Restart = "always"`                                                                                                                       | `systemd.timers` (calendar or `OnUnitActiveSec`) + `Type = "oneshot"` service                                                          |
+| **Windows**       | SCM: `StartType = Automatic`; scheduled task: `AtLogOn` (user) or `AtStartup` (system) with `AllowStartIfOnBatteries`, `DontStopIfGoingOnBatteries`, `StartWhenAvailable`. Scripts with internal `while ($true)` loop for keepalive. | Scheduled task with calendar trigger or `Once` + `Repetition`                                                                          |
 
 #### Persistent daemons (default)
 
-| Service | macOS | NixOS | Windows |
-|---|---|---|---|
-| `caddy` | launchd `daemon`, system | SCM | SCM |
-| `camilladsp` | launchd `daemon`, system | systemd `service`, system | scheduled task, user |
-| `camilladsp-heartbeat` | launchd `daemon`, system | systemd `service`, system | scheduled task, user |
-| `camillagui-backend` | launchd `daemon`, system | systemd `service`, system | scheduled task, user |
-| `cloud-drive` | launchd `agent`, user | systemd `service`, user | scheduled task, user |
-| `discord-music-rpc` | launchd `agent`, user | systemd `service`, user | scheduled task, user |
-| `jellyfin` | launchd `daemon`, system | systemd `service`, system | SCM |
-| `linux-builder` | launchd `daemon`, system | — (N/A) | — (N/A) |
-| `litellm` | launchd `daemon`, system | systemd `service`, system | SCM |
-| `ollama` | launchd `daemon`, system | systemd `service`, system | SCM |
-| `rdp` | — (N/A) | — (N/A) | SCM |
-| `service-watchdog` | launchd `daemon`, system | systemd `service`, system | scheduled task, system |
-| `service-watchdog-user` | launchd `agent`, user | — (N/A) | — (N/A) |
-| `ssh-agent` | launchd `agent`, user (built-in) | systemd `service`, user | SCM |
-| `sshd` | launchd `daemon`, system (socket-activated) | systemd `service`, system | SCM |
-| `betterdisplay-heartbeat` | launchd `agent`, user | — (N/A) | — (N/A) |
+| Service                   | macOS                                       | NixOS                     | Windows                |
+| ------------------------- | ------------------------------------------- | ------------------------- | ---------------------- |
+| `caddy`                   | launchd `daemon`, system                    | SCM                       | SCM                    |
+| `camilladsp`              | launchd `daemon`, system                    | systemd `service`, system | scheduled task, user   |
+| `camilladsp-heartbeat`    | launchd `daemon`, system                    | systemd `service`, system | scheduled task, user   |
+| `camillagui-backend`      | launchd `daemon`, system                    | systemd `service`, system | scheduled task, user   |
+| `cloud-drive`             | launchd `agent`, user                       | systemd `service`, user   | scheduled task, user   |
+| `discord-music-rpc`       | launchd `agent`, user                       | systemd `service`, user   | scheduled task, user   |
+| `jellyfin`                | launchd `daemon`, system                    | systemd `service`, system | SCM                    |
+| `linux-builder`           | launchd `daemon`, system                    | — (N/A)                   | — (N/A)                |
+| `litellm`                 | launchd `daemon`, system                    | systemd `service`, system | SCM                    |
+| `ollama`                  | launchd `daemon`, system                    | systemd `service`, system | SCM                    |
+| `rdp`                     | — (N/A)                                     | — (N/A)                   | SCM                    |
+| `service-watchdog`        | launchd `daemon`, system                    | systemd `service`, system | scheduled task, system |
+| `service-watchdog-user`   | launchd `agent`, user                       | — (N/A)                   | — (N/A)                |
+| `ssh-agent`               | launchd `agent`, user (built-in)            | systemd `service`, user   | SCM                    |
+| `sshd`                    | launchd `daemon`, system (socket-activated) | systemd `service`, system | SCM                    |
+| `betterdisplay-heartbeat` | launchd `agent`, user                       | — (N/A)                   | — (N/A)                |
 
 #### Periodic oneshots (exceptions)
 
-| Service | macOS | NixOS | Windows | Rationale |
-|---|---|---|---|---|
-| `gc-weekly` | launchd `agent`, StartCalendarInterval (Sun 12:00) | systemd `timer`, user (Sun 12:00, `Persistent=true`) | scheduled task (Weekly, Sun 12:00) | Weekly 7-day sleep loop in a daemon is wasteful; periodic oneshot is the natural pattern |
-| `nix-index-update` | launchd `agent`, StartCalendarInterval (daily 12:00) | systemd `timer`, user (daily 12:00, `Persistent=true`) | — (N/A) | Daily rebuild with freshness guard; not applicable on Windows (no nix ecosystem) |
-| `dev-ds-store-gc` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A) | — (N/A) | macOS-only; Finder `.DS_Store` cleanup |
-| `dev-spotlight-exclusions` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A) | — (N/A) | macOS-only; Spotlight metadata markers |
-| `icloud-exclusions` | launchd `agent`, StartInterval=3600 | — (N/A) | — (N/A) | macOS-only; iCloud ignore xattr drift correction |
+| Service                    | macOS                                                | NixOS                                                  | Windows                            | Rationale                                                                                |
+| -------------------------- | ---------------------------------------------------- | ------------------------------------------------------ | ---------------------------------- | ---------------------------------------------------------------------------------------- |
+| `gc-weekly`                | launchd `agent`, StartCalendarInterval (Sun 12:00)   | systemd `timer`, user (Sun 12:00, `Persistent=true`)   | scheduled task (Weekly, Sun 12:00) | Weekly 7-day sleep loop in a daemon is wasteful; periodic oneshot is the natural pattern |
+| `nix-index-update`         | launchd `agent`, StartCalendarInterval (daily 12:00) | systemd `timer`, user (daily 12:00, `Persistent=true`) | — (N/A)                            | Daily rebuild with freshness guard; not applicable on Windows (no nix ecosystem)         |
+| `dev-ds-store-gc`          | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A)                                                | — (N/A)                            | macOS-only; Finder `.DS_Store` cleanup                                                   |
+| `dev-spotlight-exclusions` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A)                                                | — (N/A)                            | macOS-only; Spotlight metadata markers                                                   |
+| `icloud-exclusions`        | launchd `agent`, StartInterval=3600                  | — (N/A)                                                | — (N/A)                            | macOS-only; iCloud ignore xattr drift correction                                         |
 
 ### Explicit recovery settings removed
 
@@ -132,12 +133,14 @@ The `camilladsp-heartbeat` script uses exponential backoff instead of a fixed sl
 The service-watchdog and betterdisplay-heartbeat use fixed intervals (300 s and 30 s, respectively) because their work is lightweight and failure recovery does not benefit from backoff.
 
 This pattern applies to:
+
 - `camilladsp-heartbeat` (5 s base, exponential backoff to 300 s max)
 - `service-watchdog` (300 s fixed loop, system scope)
 - `service-watchdog-user` (300 s fixed loop, user scope)
 - `betterdisplay-heartbeat` (30 s fixed loop)
 
 Benefits:
+
 - Platform timer mechanisms (StartInterval, systemd timers, scheduled-task repetition) become crash recovery only — the daemon always looks "running" instead of repeatedly spawning short-lived processes.
 - Unified service lifecycle monitoring (process is always alive).
 - Fixes the Windows scheduled-task `Duration` cap (P1D on the watchdog was causing the task to stop repeating after 24 h).
@@ -146,32 +149,32 @@ Benefits:
 
 These services are specific to macOS and have no cross-host equivalent:
 
-| Service | Reason |
-|---|---|
-| `betterdisplay-heartbeat` | BetterDisplay is a macOS-only app for virtual screens |
-| `dev-ds-store-gc` | `.DS_Store` is a Finder/Spotlight macOS convention |
-| `dev-spotlight-exclusions` | `.metadata_never_index` is a macOS filesystem attribute |
-| `icloud-exclusions` | `com.apple.fileprovider.ignore#P` xattr is macOS-only |
-| `gui-env` | Launchd GUI domain env var propagation (macOS session management); primary PATH via `launchctl config system path`, secondary via `launchctl setenv` |
-| `linux-builder` | Nix Linux builder VM is macOS-specific (NixOS runs Linux natively) |
+| Service                    | Reason                                                                                                                                               |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `betterdisplay-heartbeat`  | BetterDisplay is a macOS-only app for virtual screens                                                                                                |
+| `dev-ds-store-gc`          | `.DS_Store` is a Finder/Spotlight macOS convention                                                                                                   |
+| `dev-spotlight-exclusions` | `.metadata_never_index` is a macOS filesystem attribute                                                                                              |
+| `icloud-exclusions`        | `com.apple.fileprovider.ignore#P` xattr is macOS-only                                                                                                |
+| `gui-env`                  | `configureGuiEnv` activation step sets all vars via `launchctl setenv` + `launchctl config system path`; one-shot `gui-env` LaunchAgent provides login-time coverage |
+| `linux-builder`            | Nix Linux builder VM is macOS-specific (NixOS runs Linux natively)                                                                                   |
 
 ### POSIX-only services
 
 Services that exist on macOS and NixOS but not on Windows:
 
-| Service | Rationale |
-|---|---|
+| Service            | Rationale                                                                         |
+| ------------------ | --------------------------------------------------------------------------------- |
 | `nix-index-update` | nix-index is part of the Nix ecosystem; Windows uses Scoop for package management |
 
 ### ssh-agent and sshd
 
 All hosts use the OS-native SSH agent and server, with no custom service definitions:
 
-| Host | ssh-agent | sshd |
-|---|---|---|
-| **macOS** | Built-in `com.openssh.ssh-agent` launchd user agent (defined by OS) | Built-in `com.openssh.sshd` launchd system daemon (socket-activated) |
-| **NixOS** | `programs.ssh.startAgent = true` (systemd user service) | `services.openssh.enable = true` (systemd system service) |
-| **Windows** | Built-in `ssh-agent` SCM service (Windows OpenSSH) | Built-in `sshd` SCM service (Windows OpenSSH, installed via WinGet) |
+| Host        | ssh-agent                                                           | sshd                                                                 |
+| ----------- | ------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| **macOS**   | Built-in `com.openssh.ssh-agent` launchd user agent (defined by OS) | Built-in `com.openssh.sshd` launchd system daemon (socket-activated) |
+| **NixOS**   | `programs.ssh.startAgent = true` (systemd user service)             | `services.openssh.enable = true` (systemd system service)            |
+| **Windows** | Built-in `ssh-agent` SCM service (Windows OpenSSH)                  | Built-in `sshd` SCM service (Windows OpenSSH, installed via WinGet)  |
 
 ## Package parity rules
 
@@ -206,16 +209,16 @@ Single-host implementation is allowed only when the feature depends on platform-
 
 Timing values are specified directly at their point of use. Find or change a retention interval in the relevant source file:
 
-| Category | Source files |
-|---|---|
-| Nix store GC, HM expiry | `src/modules/posix-base.nix`, `scripts/gc.sh` |
-| macOS timers & defaults | `src/modules/macos.nix`, `src/hosts/MacBook/defaults.nix` |
-| Linux timers & timeouts | `src/modules/linux.nix`, `src/modules/posix-security.nix` |
+| Category                     | Source files                                                                                                                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Nix store GC, HM expiry      | `src/modules/posix-base.nix`, `scripts/gc.sh`                                                                                                                                                                                               |
+| macOS timers & defaults      | `src/modules/macos.nix`, `src/hosts/MacBook/defaults.nix`                                                                                                                                                                                   |
+| Linux timers & timeouts      | `src/modules/linux.nix`, `src/modules/posix-security.nix`                                                                                                                                                                                   |
 | Windows schedules & timeouts | `src/hosts/Windows/system.dsc.yml`, `src/hosts/Windows/system-packages.dsc.yml`, `src/hosts/Windows/user.dsc.yml`, `src/hosts/Windows/user-env.dsc.yml`, `src/hosts/Windows/user-context.dsc.yml`, `src/hosts/Windows/modules/system/*.ps1` |
-| Cloud drive caches | `src/modules/cloud-drives.nix` |
-| AI/LLM timeouts | `scripts/ai-sync.sh`, `scripts/gc.sh` |
-| Declarative-diff GC items | `scripts/gc.sh`, `scripts/gc.ps1` |
-| App-level timeouts | `src/modules/editors.nix`, `src/modules/configs/picard/Picard.ini` |
+| Cloud drive caches           | `src/modules/cloud-drives.nix`                                                                                                                                                                                                              |
+| AI/LLM timeouts              | `scripts/ai-sync.sh`, `scripts/gc.sh`                                                                                                                                                                                                       |
+| Declarative-diff GC items    | `scripts/gc.sh`, `scripts/gc.ps1`                                                                                                                                                                                                           |
+| App-level timeouts           | `src/modules/editors.nix`, `src/modules/configs/picard/Picard.ini`                                                                                                                                                                          |
 
 Runtime overrides via `--expiry`/`NUCLEUS_GC_EXPIRY` etc. have precedence: CLI flag > per-tool env var > master flag/env > Nix config default > `7d`. When changing a timing value, update the actual configuration in the source file listed above. No separate timing manifest needs updating.
 
@@ -231,6 +234,6 @@ When a symlink exists on both POSIX and Windows, writability semantics MUST matc
 
 ### Known exceptions
 
-| Symlink | Reason | Platform |
-|---|---|---|
+| Symlink                                   | Reason                                                                                                         | Platform        |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------- |
 | `~/.config/discord-music-rpc/config.yaml` | discord-music-rpc overwrites config on startup; read-only target prevents app from discarding managed settings | POSIX + Windows |
