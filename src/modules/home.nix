@@ -60,7 +60,7 @@ let
 
   managedAppSettings = appName: defaults: defaults // (userAppSettings appName);
 
-  qtpassModule = import ./configs/qtpass.nix {
+  qtpassModule = import ./configs/qtpass/qtpass.nix {
     inherit
       config
       lib
@@ -82,7 +82,7 @@ let
   #
   # WHY checkSlowStartup is not configured: checkSlowStartup is localStorage-backed
   # and vault-specific. It cannot be declaratively managed via obsidian.json.
-  obsidianDefaultSettings = builtins.fromJSON (builtins.readFile ./configs/obsidian.json);
+  obsidianDefaultSettings = builtins.fromJSON (builtins.readFile ./configs/obsidian/obsidian.json);
 
   obsidianManagedSettings = managedAppSettings "obsidian" obsidianDefaultSettings;
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;

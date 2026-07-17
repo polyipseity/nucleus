@@ -32,7 +32,7 @@ let
 
   # ---------------------------------------------------------------------------
   # Autocorrect suppression word list
-  # Loaded from src/modules/configs/wordlist.txt: one word per line, sorted
+  # Loaded from src/modules/configs/autocorrect/wordlist.txt: one word per line, sorted
   # alphabetically. Identity substitutions (word → word) prevent macOS from
   # autocorrecting technical terms and product names.
   # Method 3 (merge / defaults-based) — not Method 1 (symlink) because macOS
@@ -44,7 +44,7 @@ let
   # ---------------------------------------------------------------------------
   autocorrectWords = builtins.filter (w: w != "") (
     builtins.filter builtins.isString (
-      builtins.split "\n" (builtins.readFile ../../modules/configs/wordlist.txt)
+      builtins.split "\n" (builtins.readFile ../../modules/configs/autocorrect/wordlist.txt)
     )
   );
 in
@@ -113,7 +113,7 @@ in
         # This key is not available as a typed nix-darwin NSGlobalDomain
         # option, so it is declared as a custom preference payload.
         # Source: https://developer.apple.com/documentation/foundation/userdefaults
-        # Word list is loaded from src/modules/configs/wordlist.txt — edit that
+        # Word list is loaded from src/modules/configs/autocorrect/wordlist.txt — edit that
         # file to add or remove terms. All entries are identity substitutions
         # (word → word) so macOS leaves them unchanged instead of autocorrecting.
         NSUserDictionaryReplacementItems = builtins.map (w: {

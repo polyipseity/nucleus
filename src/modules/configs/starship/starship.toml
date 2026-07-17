@@ -1,4 +1,4 @@
-# Starship configuration — managed by nucleus (src/modules/configs/starship.toml)
+# Starship configuration — managed by nucleus (src/modules/configs/starship/starship.toml)
 # See <https://starship.rs/config/> for all options.
 
 # Four-line prompt: host → directory → git / environment →

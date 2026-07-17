@@ -5,13 +5,13 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   editorsText = builtins.readFile ../../src/modules/editors.nix;
   homeText = builtins.readFile ../../src/modules/home.nix;
-  qtpassText = builtins.readFile ../../src/modules/configs/qtpass.nix;
+  qtpassText = builtins.readFile ../../src/modules/configs/qtpass/qtpass.nix;
   loadUserRegistryText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
   syncQtPassText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-QtPassConfig.ps1;
   usersRegistryText = builtins.readFile ../../src/modules/users.json;
   windowsUsers = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
 in
-# Verify QtPass settings are now stored in configs/qtpass.nix (not home.nix)
+# Verify QtPass settings are now stored in configs/qtpass/qtpass.nix (not home.nix)
 assert containsRegex "qtPassDefaultSettings = " qtpassText;
 assert containsRegex "addGPGId = true" qtpassText;
 assert containsRegex "alwaysOnTop = true" qtpassText;
@@ -34,7 +34,7 @@ assert containsRegex "useTrayIcon = true" qtpassText;
 # Verify platform override (macOS sets hideOnClose = false)
 assert containsRegex "hideOnClose = false" qtpassText;
 # Verify home.nix still imports and wires the module
-assert containsRegex "qtpassModule = import ./configs/qtpass.nix" homeText;
+assert containsRegex "qtpassModule = import ./configs/qtpass/qtpass.nix" homeText;
 # Verify integration points
 assert containsRegex "Sync-QtPassConfig -Enabled:" applyText;
 assert containsRegex "qtPassSettingsPath" applyText;

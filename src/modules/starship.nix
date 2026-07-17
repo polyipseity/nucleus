@@ -11,7 +11,7 @@
   home.packages = [ pkgs.starship ];
 
   home.file.".config/starship.toml".source =
-    config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/starship.toml";
+    config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/starship/starship.toml";
 
   # STARSHIP_CACHE and STARSHIP_CONFIG are defined in the centralized env var
   # catalog (src/modules/lib/env-catalog.nix) and injected via shell.nix's

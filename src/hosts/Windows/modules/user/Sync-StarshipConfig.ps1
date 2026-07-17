@@ -27,7 +27,7 @@ function Sync-StarshipConfig {
     [bool]$Enabled
   )
 
-  $configRelPath = 'src\modules\configs\starship.toml'
+  `$configRelPath = 'src\modules\configs\starship\starship.toml'
   $destPath = Join-Path $env:USERPROFILE '.config\starship.toml'
 
   if (-not $Enabled) {

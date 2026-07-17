@@ -4,7 +4,7 @@ let
   homeText = builtins.readFile ../../src/modules/home.nix;
   loadUserRegistryText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
   syncObsidianText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ObsidianConfig.ps1;
-  obsidianConfig = builtins.fromJSON (builtins.readFile ../../src/modules/configs/obsidian.json);
+  obsidianConfig = builtins.fromJSON (builtins.readFile ../../src/modules/configs/obsidian/obsidian.json);
   usersRegistryText = builtins.readFile ../../src/modules/users.json;
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   windowsUsers = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);

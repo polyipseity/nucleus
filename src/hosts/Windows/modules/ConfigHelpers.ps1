@@ -28,7 +28,7 @@ function Deploy-WritableSymlink {
   .PARAMETER TargetPath
     Absolute target path for the symlink.
   .EXAMPLE
-    Deploy-WritableSymlink -Name "starship" -RepoRoot $env:NUCLEUS_REPO_ROOT -RepoRelPath "src\modules\configs\starship.toml" -TargetPath "$env:USERPROFILE\.config\starship.toml"
+    Deploy-WritableSymlink -Name "starship" -RepoRoot `$env:NUCLEUS_REPO_ROOT -RepoRelPath "src\modules\configs\starship\starship.toml" -TargetPath "`$env:USERPROFILE\.config\starship.toml"
   #>
   [CmdletBinding()]
   param(

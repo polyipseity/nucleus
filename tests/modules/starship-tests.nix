@@ -20,7 +20,7 @@ let
   packagesNonEmpty = builtins.length module.home.packages > 0;
 
   # Verify config TOML file exists and is non-empty.
-  configFile = builtins.readFile ../../src/modules/configs/starship.toml;
+  configFile = builtins.readFile ../../src/modules/configs/starship/starship.toml;
   configNonEmpty = builtins.stringLength configFile > 0;
 
   # Parse TOML — throws at eval time if syntax is invalid (e.g., bad escape
