@@ -406,8 +406,8 @@
           };
           siblingScripts = pkgs.runCommand "apply-siblings" { } ''
             mkdir -p "$out/bin"
-            install -m755 "${./scripts/generate-ssh-host-key.sh}" "$out/bin/generate-ssh-host-key.sh"
-            install -m755 "${./scripts/register-host-age-key.sh}" "$out/bin/register-host-age-key.sh"
+            install -m755 "${./scripts/secrets/generate-ssh-host-key.sh}" "$out/bin/generate-ssh-host-key.sh"
+            install -m755 "${./scripts/secrets/register-host-age-key.sh}" "$out/bin/register-host-age-key.sh"
             install -m755 "${./scripts/install-prek-hooks.sh}" "$out/bin/install-prek-hooks.sh"
           '';
         in
