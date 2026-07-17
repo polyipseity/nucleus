@@ -6,7 +6,19 @@
 - `src/` contains the Nix-based declarative configuration: `flake.nix`, `hosts/` (per-machine configs), and `modules/` (shared logic).
   - `src/flake.lock` is the Nix-mandated lockfile location — Nix requires `flake.lock` adjacent to `flake.nix`. The canonical lockfile storage is under `src/lockfiles/` but `flake.lock` cannot be moved there due to this Nix limitation. It is not duplicated; the `src/lockfiles/` directory holds all other lockfiles (`lockfile.json`, etc.) alongside a symlinked copy of `flake.lock` for organizational consistency.
 - Use single-file modules only in `src/modules/`. Do not create `src/modules/<name>/` directories. The only allowed exceptions are `src/modules/macos/` (daemon-refresh.nix, finder-sidebar.nix, preference-gc.nix) and `src/modules/env/` (centralized env var introspection module).
-- `scripts/` contains automation helpers with paired `.sh`/`.ps1` entry points: bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and others.
+- `scripts/` contains user-facing automation helpers with paired `.sh`/`.ps1` entry points: bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and others.
+- `src/scripts/` contains Nix-internal scripts organized into domain subdirectories:
+  - `apply.sh` — POSIX apply dispatcher (kept in root)
+  - `macos/` — macOS-specific scripts
+  - `lib/` — shared library scripts sourced by other scripts
+  - `secrets/` — secret provisioning helpers
+  - `agents/` — AI agent setup scripts
+  - `home/` — Home Manager activation helpers
+  - `dev/` — development environment scripts
+  - `camilladsp/` — CamillaDSP lifecycle scripts
+  - `host/` — host-specific scripts (e.g. `nixos/`, `jellyfin-sync.sh`)
+  - `cleanup-nix-build-artifacts.sh`, `install-prek-hooks.sh`, `wallpaper-provision.sh` — ungrouped root scripts
+  **Rule**: the filename (including its domain prefix) must equal the activation entry name, ensuring uniqueness. The domain prefix is preserved inside the subdirectory to guarantee uniqueness and match the activation entry name.
 - `tests/` contains automated tests: `tests/modules/`, `tests/integration/`, and `tests/hosts/<host>/` for Nix logic tests, `tests/hosts/Windows/` for Pester DSC validation. All changes require corresponding tests; see `.agents/instructions/testing.instructions.md`.
 - Keep this file short and durable. Put file-type and workflow-specific rules in `.agents/instructions/*.instructions.md`, reusable workflows in `.agents/prompts/*.prompt.md`, and skill assets in `.agents/skills/<skill>/`.
 - Inspect the on-disk tree before assuming source files, tests, or runnable commands exist in a given location.
