@@ -106,7 +106,7 @@ in
     export SOPS_SYMLINK_PATH="${config.sops.defaultSymlinkPath}"
 
     # Define helper functions
-    ${builtins.readFile ./scripts/wallpaper-provision.sh}
+    ${builtins.readFile ../scripts/wallpaper-provision.sh}
 
     # Pre-copy setup
     wallpaper_pre_copy_setup
