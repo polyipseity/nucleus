@@ -25,7 +25,7 @@ let
   # Inline shell helpers from the shared library file at build time so
   # activation scripts can use _nucleus_protect_symlink, _nucleus_unprotect_symlink,
   # _nucleus_resolve_repo_root, and _nucleus_prepend_first_executable_dir.
-  agentHelpersSh = builtins.readFile ../scripts/lib/agent-helpers.sh;
+  symlinkHardeningLib = builtins.readFile ../scripts/lib/symlink-hardening-lib.sh;
 
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
 
@@ -39,13 +39,13 @@ in
   };
 
   home.activation.unprotectOpencodeSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-    ${agentHelpersSh}
+    ${symlinkHardeningLib}
     _nucleus_unprotect_symlink "agents.nix" "$HOME/.config/opencode/agents"
     _nucleus_unprotect_symlink "agents.nix" "$HOME/.config/opencode/commands"
   '';
 
   home.activation.protectOpencodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    ${agentHelpersSh}
+    ${symlinkHardeningLib}
     _nucleus_protect_symlink "agents.nix" "$HOME/.config/opencode/agents"
     _nucleus_protect_symlink "agents.nix" "$HOME/.config/opencode/commands"
   '';
@@ -63,7 +63,7 @@ in
 
       export REPO_ROOT="${repoRoot}"
       export AGENTS_CONFIG_RELATIVE_PATH="${agentsConfigRelativePath}"
-      ${agentHelpersSh}
+      ${symlinkHardeningLib}
       ${builtins.readFile ../scripts/agents/agents-symlink.sh}
     '';
 
@@ -92,7 +92,7 @@ in
 
       export REPO_ROOT="${repoRoot}"
       export AGENTS_SKILLS_RELATIVE_PATH="${agentsSkillsRelativePath}"
-      ${agentHelpersSh}
+      ${symlinkHardeningLib}
       ${builtins.readFile ../scripts/agents/agents-skills.sh}
     '';
 
@@ -115,7 +115,7 @@ in
       set -eu
 
       export JQ_BIN='${pkgs.jq}/bin/jq'
-      ${agentHelpersSh}
+      ${symlinkHardeningLib}
 
       # Add managed bin directories (managed-paths.nix pathComponents) to PATH
       # so binaries installed by previous apply runs and by this activation are
@@ -258,7 +258,7 @@ in
     # -------------------------------------------------------------------------
     initRustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
-      ${agentHelpersSh}
+      ${symlinkHardeningLib}
 
       # Locate pkgs.rustup in the newly linked home-manager profile.  The
       # activation shell PATH has not yet been updated to reflect the profile, so
@@ -308,7 +308,7 @@ in
     # -------------------------------------------------------------------------
     installCargoBinstallPackages = lib.hm.dag.entryAfter [ "initRustup" ] ''
       set -eu
-      ${agentHelpersSh}
+      ${symlinkHardeningLib}
 
       # Declarative desired-state list.  On POSIX hosts this list is
       # intentionally empty because all managed Rust tools are provided by
@@ -410,7 +410,7 @@ in
       set -eu
 
       _scs_jq_bin='${pkgs.jq}/bin/jq'
-      ${agentHelpersSh}
+      ${symlinkHardeningLib}
 
       _scs_do_sync=true
 

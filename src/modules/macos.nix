@@ -316,12 +316,12 @@ lib.mkIf pkgs.stdenv.isDarwin {
   };
 
   home.activation.unprotectDownloadsICloudSymlink = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-    ${builtins.readFile ../scripts/lib/agent-helpers.sh}
+    ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
     _nucleus_unprotect_symlink "macos.nix" "$HOME/Downloads/iCloud"
   '';
 
   home.activation.protectDownloadsICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    ${builtins.readFile ../scripts/lib/agent-helpers.sh}
+    ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
     _nucleus_protect_symlink "macos.nix" "$HOME/Downloads/iCloud"
   '';
 
@@ -437,7 +437,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     configureRaycastApplicationAliases = lib.hm.dag.entryAfter [ "configureLaunchServices" ] ''
       _ray_alias_dir="$HOME/Applications/Nucleus App Aliases"
       mkdir -p "$_ray_alias_dir"
-      ${builtins.readFile ../scripts/lib/agent-helpers.sh}
+      ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
       ${builtins.readFile ../scripts/macos/macos-raycast-aliases.sh}
     '';
 

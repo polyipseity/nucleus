@@ -13,7 +13,7 @@
 let
   # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh).
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
-  agentHelpersSh = builtins.readFile ../scripts/lib/agent-helpers.sh;
+  symlinkHardeningLib = builtins.readFile ../scripts/lib/symlink-hardening-lib.sh;
 in
 {
   # ---------------------------------------------------------------------------
@@ -31,12 +31,12 @@ in
       config.lib.file.mkOutOfStoreSymlink "${repoRoot}/${repoRelPath}";
 
     home.activation."unprotectSymlink_${name}" = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      ${agentHelpersSh}
+      ${symlinkHardeningLib}
       _nucleus_unprotect_symlink "${name}" "$HOME/${targetRelPath}"
     '';
 
     home.activation."protectSymlink_${name}" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${agentHelpersSh}
+      ${symlinkHardeningLib}
       _nucleus_protect_symlink "${name}" "$HOME/${targetRelPath}"
     '';
   };

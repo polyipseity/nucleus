@@ -133,8 +133,8 @@ in
           devDir="$HOME/dev"
           mkdir -p "$devDir" || { echo "devReposProvision: failed to create $devDir" >&2; exit 1; }
 
-          # Source shared symlink protection helpers from agent-helpers.sh
-          ${builtins.readFile ../scripts/lib/agent-helpers.sh}
+          # Source shared symlink protection helpers from symlink-hardening-lib.sh
+          ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
 
           # Source dev-repos helper functions
           ${builtins.readFile ../scripts/lib/dev-repos-provision-lib.sh}"

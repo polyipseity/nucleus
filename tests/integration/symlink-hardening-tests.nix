@@ -8,7 +8,7 @@ let
   customProvisionSymlinksText = builtins.readFile ../../src/modules/custom-provision-symlinks.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   finderSidebarText = builtins.readFile ../../src/modules/macos/finder-sidebar.nix;
-  agentsHelpersText = builtins.readFile ../../src/scripts/lib/agent-helpers.sh;
+  agentsHelpersText = builtins.readFile ../../src/scripts/lib/symlink-hardening-lib.sh;
   discordMusicRpcText = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
 in
@@ -16,7 +16,7 @@ rec {
   # =========================================================================
   # Assertion 1: VS Code symlink protection in editors.nix
   #               (shell helpers that implement chflags/chattr live in
-  #                agent-helpers.sh — verified below via agentsHelpersText)
+  #                symlink-hardening-lib.sh — verified below via agentsHelpersText)
   # =========================================================================
   vsCodeProtection =
     assert containsRegex "_nucleus_protect_symlink" editorsText;
@@ -27,7 +27,7 @@ rec {
     true;
 
   # =========================================================================
-  # Assertion 2: Agents config symlink protection — function def in agent-helpers.sh,
+  # Assertion 2: Agents config symlink protection — function def in symlink-hardening-lib.sh,
   #               symlink target name in agents.nix
   # =========================================================================
   agentsConfigProtection =
@@ -37,7 +37,7 @@ rec {
     true;
 
   # =========================================================================
-  # Assertion 3: Agents skills symlink protection — function def in agent-helpers.sh,
+  # Assertion 3: Agents skills symlink protection — function def in symlink-hardening-lib.sh,
   #               context string in agents.nix
   # =========================================================================
   agentsSkillsProtection =

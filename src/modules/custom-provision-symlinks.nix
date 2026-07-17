@@ -136,7 +136,7 @@ in
       set -eu
 
       _nucleus_manifest_path=${lib.escapeShellArg managedSymlinkManifestPath}
-      ${builtins.readFile ../scripts/lib/agent-helpers.sh}
+      ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
 
       if [ -f "$_nucleus_manifest_path" ]; then
         while IFS= read -r _nucleus_link_path; do
@@ -153,7 +153,7 @@ in
 
       _nucleus_manifest_path=${lib.escapeShellArg managedSymlinkManifestPath}
       mkdir -p "$(dirname "$_nucleus_manifest_path")"
-      ${builtins.readFile ../scripts/lib/agent-helpers.sh}
+      ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
 
       ${lib.concatMapStringsSep "\n" (entry: ''
         if [ -L ${lib.escapeShellArg entry.linkAbsolutePath} ]; then
