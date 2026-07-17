@@ -23,15 +23,66 @@ Default operating mode for all agent interactions.
 - **Consult project architecture docs** (AGENTS.md, .agents/instructions/) before placing new code. Do not guess code organization.
 - **Default to the simplest possible implementation.** Every abstraction, extra layer, or defensive guard must justify itself. If in doubt, leave it out. Actively seek simplification opportunities — prefer deletion over adding code, inlining over indirection, and removing features over preserving them. When you encounter code that can be simplified, simplify it unless the task explicitly forbids structural changes.
 - **Git boundary.** Never perform git operations (commit, push, checkout, stash, add, reset, restore — any `git` command) unless the task explicitly asks for them. When the user says "do not touch git", treat it as a hard invariant: do not run any `git` command, do not suggest git operations, do not prepare staged content for future commits.
-- **Diagnose pre-commit hook failures, fix the root cause, then retry.** When `git commit` or `git push` fails due to a pre-commit hook, read the hook output to identify the root cause. Common cases:
-  - Auto-formatting hook (nixfmt, prettier, etc.) modified files — re-stage the formatted files (`git add <files>`), then retry a fresh `git commit`. Never use `git commit --amend` after a failed commit — it merges staged changes into the current HEAD instead of creating a new commit.
-  - Lint/validation failure — fix the underlying issue, re-stage, and retry.
-  Blind retries waste time — hook failures always indicate a problem in staged content or a tool that modified it.
-- **Verify every git commit.** After running `git commit`, confirm it created a new commit with the intended message. Check `git rev-parse HEAD` and `git log -1 --format=%s` — if they show the previous commit's message (not your intended one), the commit was not created. Investigate why instead of using `git commit --amend`.
 - **Defer privileged operations.** If a task requires `sudo`, admin elevation, or any operation that cannot run as the current user, do not execute it. Instead, note the required privilege in the completion summary and prompt the user to run it.
 - See `.agents/instructions/execution-details.instructions.md` for multi-edit fallback and tool-retry discipline.
 - **Strict scope adherence. When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, or re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
 - **Enumerate subagent opportunities before starting.** Before executing any task, explicitly list which subproblems could be delegated to subagents. Write this list into session memory (`/memories/session/`) if the task is complex. Do not skip this step.
+
+## Git commit safety
+
+### Verify every commit attempt
+
+After EVERY `git commit` command (whether it succeeds or fails):
+
+1. Run `git rev-parse HEAD` and `git log -1 --format=%s`.
+2. Confirm the hash is new (different from before the attempt) and the message
+   matches your intended message.
+3. If the hash/message match the PREVIOUS commit (not the one you tried to
+   create), the commit was NOT created. HEAD did not move.
+
+### Recovery from a failed commit
+
+When a commit fails (pre-commit hook, commitlint, etc.), the commit was NOT
+created. HEAD is still at whatever it was before the attempt.
+
+Recovery steps:
+1. **Read the hook output.** Identify the root cause.
+2. **If an auto-formatting hook modified files**, re-stage them:
+   `git add <files>`.
+3. **If a lint/validation hook rejected the message**, fix the underlying issue.
+   For commitlint: correct the message format (add type prefix, wrap lines at
+   72 chars).
+4. **Retry with a FRESH `git commit`. NEVER use `git commit --amend`.**
+
+### AMEND PROHIBITION — hard rule
+
+`git commit --amend` is FORBIDDEN after a failed commit. It is also FORBIDDEN
+without positive verification that HEAD points to the commit you just created.
+
+Why: a failed commit means HEAD did not move. `git commit --amend` modifies
+whatever HEAD currently points to — which is a pre-existing commit, not the
+one you tried to create. This destroys history by altering an existing commit.
+
+The ONLY safe use of `git commit --amend`:
+1. You just ran `git commit` and it SUCCEEDED (exit code 0).
+2. You verified with `git rev-parse HEAD` that the hash is new.
+3. You need to amend the message of that NEW commit.
+4. You run `git commit --amend` to modify only that new commit.
+
+After a commit failure: always retry with a fresh `git commit`. Never amend.
+
+### Concrete failure modes
+
+**Commitlint rejection:** The message format was rejected. The commit was not
+created. HEAD is still at the previous commit. Fix the message and retry:
+`git commit -m "type(scope): correct message"`. Do NOT use `--amend`.
+
+**Auto-formatting hook (nixfmt, prettier):** The hook modified staged files.
+The commit was not created (hooks run before commit finalization). Re-stage:
+`git add <files>`, then retry with a fresh `git commit`.
+
+**Blind retries waste time.** Hook failures always indicate a problem in
+staged content or a tool that modified it. Diagnose before re-attempting.
 
 ## Subagent delegation
 
