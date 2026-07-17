@@ -154,7 +154,7 @@ lib.mkIf isPrimaryUser {
   # LaunchAgent (org.nix-community.home.sops-nix) that runs
   # sops-install-secrets asynchronously.  launchctl bootstrap returns before
   # decryption completes, so without this barrier the hooks
-  # gitIdentityFromSops, gpgImport, and sshKeyAdopt would fail with "missing
+  # git-identity, gpg-import, and ssh-key-adopt would fail with "missing
   # decrypted secret" on first apply or after a clean bootstrap.
   #
   # We poll the git identity secret as a sentinel: it is the smallest file
@@ -182,7 +182,7 @@ lib.mkIf isPrimaryUser {
   '';
 
   # --------------------------------------------------------------------------
-  # gitIdentityFromSops
+  # git-identity
   # Reads SOPS-managed git_identity_<user> and writes name/email/signingkey
   # into ~/.config/git/identity so identity stays in secret material rather
   # than hard-coded module attrsets.
@@ -202,14 +202,14 @@ lib.mkIf isPrimaryUser {
   #      git config --file creates the file if absent and overwrites values
   #      idempotently on repeated activation runs.
   # --------------------------------------------------------------------------
-  home.activation.gitIdentityFromSops = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
+  home.activation."git-identity" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
     export GIT_SECRET_PATH="${config.sops.secrets.${gitIdentitySecretName}.path}"
     export GIT_BIN="${pkgs.git}/bin/git"
-    ${builtins.readFile ../scripts/secrets/secrets-git-identity.sh}
+    ${builtins.readFile ../scripts/secrets/git-identity.sh}
   '';
 
   # --------------------------------------------------------------------------
-  # gpgImport
+  # gpg-import
   # Imports the managed GPG private key from SOPS into the keyring and
   # enforces ultimate ownertrust on the managed primary fingerprint.
   #
@@ -244,15 +244,15 @@ lib.mkIf isPrimaryUser {
   # `--batch` (`IPC parameter error`) on this key format. We intentionally use
   # a non-batch import invocation to ensure a successful secret-key import.
   # --------------------------------------------------------------------------
-  home.activation.gpgImport = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
+  home.activation."gpg-import" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
     export GNUPGHOME="${config.home.homeDirectory}/.gnupg"
     export GPG_BIN="${pkgs.gnupg}/bin/gpg"
     export GPG_SECRET_PATH="${config.sops.secrets.${gpgSecretName}.path}"
-    ${builtins.readFile ../scripts/secrets/secrets-gpg-import.sh}
+    ${builtins.readFile ../scripts/secrets/gpg-import.sh}
   '';
 
   # --------------------------------------------------------------------------
-  # sshKeyAdopt
+  # ssh-key-adopt
   # Tracks the fingerprint of the managed personal SSH public key in
   # ~/.config/nucleus/managed-ssh-keys and flushes the in-memory SSH agent
   # when the fingerprint changes (i.e., the key was rotated in the SOPS secret).
@@ -276,17 +276,17 @@ lib.mkIf isPrimaryUser {
   #      provision), flush the SSH agent (ssh-add -D).
   #   5. Write the current fingerprint to the manifest.
   # --------------------------------------------------------------------------
-  home.activation.sshKeyAdopt = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
+  home.activation."ssh-key-adopt" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
     export SSH_PUB_PATH="${sshPublicKeyPath}"
     export SSH_KEYGEN_BIN="${pkgs.openssh}/bin/ssh-keygen"
     export SSH_ADD_BIN="${pkgs.openssh}/bin/ssh-add"
-    ${builtins.readFile ../scripts/secrets/secrets-ssh-key-adopt.sh}
+    ${builtins.readFile ../scripts/secrets/ssh-key-adopt.sh}
   '';
 
   # --------------------------------------------------------------------------
   # verifySecretDecryption
   # Post-activation health check that verifies ALL SOPS files can be decrypted
-  # by each registered backend after gpgImport and sshKeyAdopt have completed.
+  # by each registered backend after gpg-import and ssh-key-adopt have completed.
   #
   # Covers:
   #   - src/secrets/git-identities.yml
@@ -299,7 +299,7 @@ lib.mkIf isPrimaryUser {
   #   1. Materialization sanity: all sops-nix secret paths exist and are
   #      non-empty.  Guards against silent sops-nix failures.
   #   2. GPG key presence: managed primary fingerprint is in the keyring.
-  #      Complements gpgImport — catches keyring state divergence.
+  #      Complements gpg-import — catches keyring state divergence.
   #   3. GPG SOPS recipient check: extract the fp: value from each SOPS file's
   #      plaintext sops.pgp[].fp metadata and verify that fingerprint is present
   #      in the secret keyring.  SOPS records the encryption subkey fingerprint
@@ -370,7 +370,7 @@ lib.mkIf isPrimaryUser {
         displayName = "${primaryUsername}.yml";
       };
     in
-    lib.hm.dag.entryAfter [ "gitIdentityFromSops" "gpgImport" "sshKeyAdopt" ] ''
+    lib.hm.dag.entryAfter [ "git-identity" "gpg-import" "ssh-key-adopt" ] ''
       # --- 1. Materialization sanity check ---
       for _vsd_path in \
           "${config.sops.secrets.${sshSecretName}.path}" \
@@ -386,7 +386,7 @@ lib.mkIf isPrimaryUser {
       # --- 2. GPG key presence in keyring ---
       _vsd_gpg_manifest="$HOME/.config/nucleus/managed-gpg-keys"
       if [ ! -s "$_vsd_gpg_manifest" ]; then
-        echo "secrets: ERROR — managed-gpg-keys manifest missing or empty; gpgImport may have failed." >&2
+        echo "secrets: ERROR — managed-gpg-keys manifest missing or empty; gpg-import may have failed." >&2
         exit 1
       fi
       _vsd_managed_fpr="$(head -n1 "$_vsd_gpg_manifest")"
@@ -399,7 +399,7 @@ lib.mkIf isPrimaryUser {
         # undoc-supp: GnuPG may fail if GNUPGHOME doesn't exist yet on first activation; the subsequent grep check handles empty output.
         ${pkgs.gnupg}/bin/gpg --with-colons --no-autostart --list-secret-keys)" || true
       if ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_managed_fpr"; then
-        echo "secrets: ERROR — managed GPG key $_vsd_managed_fpr not in keyring after gpgImport." >&2
+        echo "secrets: ERROR — managed GPG key $_vsd_managed_fpr not in keyring after gpg-import." >&2
         exit 1
       fi
 

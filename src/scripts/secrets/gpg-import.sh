@@ -6,7 +6,7 @@ mkdir -p "$GNUPGHOME"
 chmod 700 "$GNUPGHOME"
 
 if [ ! -f "$GPG_SECRET_PATH" ]; then
-  echo "gpgImport: missing decrypted GPG secret at $GPG_SECRET_PATH; cannot import key material." >&2
+  echo "gpg-import: missing decrypted GPG secret at $GPG_SECRET_PATH; cannot import key material." >&2
   exit 1
 fi
 
@@ -30,9 +30,9 @@ if [ -n "$first_key_fingerprint" ] && [ -f "$managed_keys_manifest" ]; then
       # Only delete if the key is actually present in the keyring.
       if "$GPG_BIN" --batch --list-secret-keys "$stale_fpr" >/dev/null 2>&1; then
         if ! "$GPG_BIN" --batch --yes --delete-secret-and-public-key "$stale_fpr"; then
-          echo "gpgImport: warning — failed to delete stale managed GPG key $stale_fpr from keyring." >&2
+          echo "gpg-import: warning — failed to delete stale managed GPG key $stale_fpr from keyring." >&2
         else
-          echo "gpgImport: deleted stale managed GPG key $stale_fpr." >&2
+          echo "gpg-import: deleted stale managed GPG key $stale_fpr." >&2
         fi
       fi
     fi

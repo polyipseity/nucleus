@@ -1,7 +1,7 @@
 # Decrypts SOPS-encrypted wallpaper blobs from assets/wallpapers/<user>/
 # into ~/Pictures/wallpapers/ with a 10-minute rotating slideshow
 # on macOS (desktoppr folder mode) and GNOME (wallpaper-gallery.xml).
-# Activation runs after gpgImport so the keyring import has already
+# Activation runs after gpg-import so the keyring import has already
 # happened before wallpaper decryption attempts.
 # Multi-user aware: discovers user subdirectories dynamically, uses
 # config.home.username for current-user wallpaper provisioning.

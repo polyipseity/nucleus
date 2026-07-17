@@ -6,7 +6,7 @@
     Decrypts one SOPS file and converges only managed SSH/GPG payloads for the
     configured primary user.  Also maintains managed-key manifest files in
     ~/.config/nucleus/ to enable rotation detection and agent flush on rotation,
-    mirroring the POSIX gpgImport and sshKeyAdopt Home Manager activations.
+    mirroring the POSIX gpg-import and ssh-key-adopt Home Manager activations.
 
 .NOTES
     Environment variables: (none)
@@ -117,7 +117,7 @@ function Sync-SecretFile {
   $gitIdentityPath = Join-Path -Path $gitIdentityConfigDir -ChildPath "git-identity.env"
   $gitIdentitySecretName = "git_identity_$PrimaryUsername"
   # Manifest files record managed key fingerprints for rotation detection,
-  # mirroring the POSIX gpgImport and sshKeyAdopt Home Manager activations.
+  # mirroring the POSIX gpg-import and ssh-key-adopt Home Manager activations.
   $managedGpgKeysManifest = Join-Path -Path $gitIdentityConfigDir -ChildPath 'managed-gpg-keys'
   $managedSshKeysManifest = Join-Path -Path $gitIdentityConfigDir -ChildPath 'managed-ssh-keys'
   $sshDir = Join-Path -Path $HOME -ChildPath ".ssh"
@@ -190,7 +190,7 @@ function Sync-SecretFile {
 
     # Track the SHA-256 fingerprint of the SSH public key for rotation
     # detection and SSH agent flush on rotation.  Mirrors the POSIX
-    # sshKeyAdopt Home Manager activation in secrets.nix.
+    # ssh-key-adopt Home Manager activation in secrets.nix.
     try {
       $sshKeyParts = $sshPublicKeyValue.Trim() -split '\s+'
       if ($sshKeyParts.Length -ge 2) {
@@ -211,7 +211,7 @@ function Sync-SecretFile {
           # (absent manifest → empty $oldSshFingerprint differs from new key).
           # This evicts any pre-placed key already loaded in the agent before
           # the managed key was materialized.  Soft-failure so apply proceeds
-          # even when no agent is running.  Parity with POSIX sshKeyAdopt behavior.
+          # even when no agent is running.  Parity with POSIX ssh-key-adopt behavior.
           $sshAddCommand = Get-Command 'ssh-add' -ErrorAction SilentlyContinue  # undoc-supp: probe — ssh-add may not be installed; $null check below handles absence
           if ($null -ne $sshAddCommand) {
             # 2>$null is intentional: ssh-add -D emits "Could not connect to
@@ -294,7 +294,7 @@ function Sync-SecretFile {
 
       # Write the manifest before ownertrust so the key is tracked even if
       # ownertrust enforcement fails transiently (e.g. GnuPG 2.5 + Kyber IPC
-      # edge cases on first bootstrap).  Mirrors the POSIX gpgImport order in
+      # edge cases on first bootstrap).  Mirrors the POSIX gpg-import order in
       # secrets.nix.
       $firstFingerprint | Out-File -FilePath $managedGpgKeysManifest -Encoding ascii -NoNewline
       # Restrict ACL unconditionally; manifest contains the managed GPG

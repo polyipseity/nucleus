@@ -102,9 +102,9 @@ in
     home.activation.devReposProvision =
       lib.hm.dag.entryAfter
         [
-          "gitIdentityFromSops"
-          "gpgImport"
-          "sshKeyAdopt"
+          "git-identity"
+          "gpg-import"
+          "ssh-key-adopt"
           "verifySecretDecryption"
           "waitForSopsSecrets"
           "writeBoundary"

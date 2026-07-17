@@ -2,7 +2,7 @@
 # Requires: GIT_SECRET_PATH, GIT_BIN env vars.
 
 if [ ! -f "$GIT_SECRET_PATH" ]; then
-  echo "gitIdentityFromSops: missing decrypted Git identity secret at $GIT_SECRET_PATH." >&2
+  echo "git-identity: missing decrypted Git identity secret at $GIT_SECRET_PATH." >&2
   exit 1
 fi
 
@@ -11,7 +11,7 @@ identity_email="$(/usr/bin/grep -m1 '^email=' "$GIT_SECRET_PATH" | /usr/bin/cut 
 identity_signing_key="$(/usr/bin/grep -m1 '^signingKey=' "$GIT_SECRET_PATH" | /usr/bin/cut -d '=' -f 2-)"
 
 if [ -z "$identity_name" ] || [ -z "$identity_email" ] || [ -z "$identity_signing_key" ]; then
-  echo "gitIdentityFromSops: git identity payload must include name/email/signingKey entries." >&2
+  echo "git-identity: git identity payload must include name/email/signingKey entries." >&2
   exit 1
 fi
 

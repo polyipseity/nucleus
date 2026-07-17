@@ -146,7 +146,7 @@ function Invoke-SecretVerification {
   Write-Output "$($PSStyle.Foreground.BrightBlack)verification: [2/5] checking GPG key presence...$($PSStyle.Foreground.Default)"
   $managedFpr = (Get-Content -Path $managedGpgKeysManifest -Raw).Trim()
   if ([string]::IsNullOrWhiteSpace($managedFpr)) {
-    throw "verification: ERROR — managed-gpg-keys manifest is empty; gpgImport may have failed."
+    throw "verification: ERROR — managed-gpg-keys manifest is empty; gpg-import may have failed."
   }
   $allSecretKeysFpr = (& $GpgExe --with-colons --no-autostart --list-secret-keys 2>&1) -join "`n"
   if (-not ($allSecretKeysFpr -like "*$managedFpr*")) {

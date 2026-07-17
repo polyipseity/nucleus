@@ -70,7 +70,7 @@
       # so `git init` and `git clone` never create hooks/*.sample or the legacy
       # description file.  The activation block below ensures the target dir exists.
       init.templateDir = "~/.config/git/empty_template";
-      # Pull in name/email/signingkey written by the gitIdentityFromSops activation
+      # Pull in name/email/signingkey written by the git-identity activation
       # hook at ~/.config/git/identity.  Using an include file lets the hook write
       # to a path it owns without touching the HM-managed (read-only) config symlink.
       # Pin the OpenPGP binary path so Git uses the same managed gnupg build as
