@@ -30,7 +30,7 @@ assert containsRegex "# Method 1" shellText;
 assert containsRegex "# Method 2" macbookBaseText;
 assert containsRegex "# Method 2" macbookSecurityText;
 assert containsRegex "# Method 2" macbookLinuxBuilderText;
-assert containsRegex "# Method 2" posixBaseText;
+assert containsRegex "# Method 1" posixBaseText;
 # Method 3 (merge) consumers:
 assert containsRegex "# Method 3" homeText;
 assert containsRegex "# Method 3" qtpassText;
