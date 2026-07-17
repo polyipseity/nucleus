@@ -560,7 +560,7 @@ $secretsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets"
 $wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wallpapers"
 $machineSshHostKeyPubPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key.pub"
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\")).Path
-# QtPass shared settings JSON — Method 3 (merge) source of truth shared with
+# Method 3 (merge) — QtPass shared settings JSON source of truth shared with
 # POSIX activation. QtPass stores settings in platform-native stores
 # (registry on Windows), so Method 1 (symlink) does not apply.
 $qtPassSettingsPath = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\qtpass\qtpass.json"
