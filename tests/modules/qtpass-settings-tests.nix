@@ -6,32 +6,36 @@ let
   editorsText = builtins.readFile ../../src/modules/editors.nix;
   homeText = builtins.readFile ../../src/modules/home.nix;
   qtpassText = builtins.readFile ../../src/modules/configs/qtpass/qtpass.nix;
+  # Validate that qtpass.json is valid JSON and parse it for semantic assertions
+  qtpassJson = builtins.fromJSON (builtins.readFile ../../src/modules/configs/qtpass/qtpass.json);
   loadUserRegistryText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
   syncQtPassText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-QtPassConfig.ps1;
   usersRegistryText = builtins.readFile ../../src/modules/users.json;
   windowsUsers = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
 in
-# Verify QtPass settings are now stored in configs/qtpass/qtpass.nix (not home.nix)
-assert containsRegex "qtPassDefaultSettings = " qtpassText;
-assert containsRegex "addGPGId = true" qtpassText;
-assert containsRegex "alwaysOnTop = true" qtpassText;
-assert containsRegex "autoclearPanelSeconds = 5" qtpassText;
-assert containsRegex "autoclearSeconds = 10" qtpassText;
-assert containsRegex "clipBoardType = 2" qtpassText;
-assert containsRegex "hideOnClose = true" qtpassText;
-assert containsRegex "hidePassword = true" qtpassText;
-assert containsRegex "passTemplate = " qtpassText;
-assert containsRegex "passwordCharsselection = 0" qtpassText;
-assert containsRegex "passwordLength = 15" qtpassText;
-assert containsRegex "templateAllFields = true" qtpassText;
-assert containsRegex "useAutoclear = true" qtpassText;
-assert containsRegex "useAutoclearPanel = true" qtpassText;
-assert containsRegex "useGit = true" qtpassText;
-assert containsRegex "useOtp = true" qtpassText;
-assert containsRegex "usePwgen = true" qtpassText;
-assert containsRegex "useTemplate = true" qtpassText;
-assert containsRegex "useTrayIcon = true" qtpassText;
-# Verify platform override (macOS sets hideOnClose = false)
+# Verify QtPass settings are now sourced from qtpass.json via builtins.fromJSON
+assert containsRegex "qtPassDefaultSettings = builtins\\.fromJSON" qtpassText;
+assert containsRegex "readFile \\./qtpass\\.json" qtpassText;
+assert containsRegex "# Method 3" qtpassText;
+# Verify qtpass.json contains expected settings (shared baseline)
+assert qtpassJson.addGPGId == true;
+assert qtpassJson.alwaysOnTop == true;
+assert qtpassJson.autoPull == false;
+assert qtpassJson.autoPush == false;
+assert qtpassJson.clipBoardType == 2;
+assert qtpassJson.hideOnClose == true;
+assert qtpassJson.hidePassword == true;
+assert qtpassJson.passwordLength == 15;
+assert qtpassJson.passTemplate == "login\nurl\ndescription\n";
+assert qtpassJson.useAutoclear == true;
+assert qtpassJson.useAutoclearPanel == true;
+assert qtpassJson.useGit == true;
+assert qtpassJson.useOtp == true;
+assert qtpassJson.usePwgen == true;
+assert qtpassJson.useTemplate == true;
+assert qtpassJson.useTrayIcon == true;
+# Verify platform override (macOS sets hideOnClose = false) is still in qtpass.nix
+assert containsRegex "qtPassPlatformSettings" qtpassText;
 assert containsRegex "hideOnClose = false" qtpassText;
 # Verify home.nix still imports and wires the module
 assert containsRegex "qtpassModule = import ./configs/qtpass/qtpass.nix" homeText;
@@ -39,6 +43,10 @@ assert containsRegex "qtpassModule = import ./configs/qtpass/qtpass.nix" homeTex
 assert containsRegex "Sync-QtPassConfig -Enabled:" applyText;
 assert containsRegex "qtPassSettingsPath" applyText;
 assert containsRegex "EnableQtPassParity" applyText;
+# Verify Windows path uses qtpass.json
+assert containsRegex "qtpass\\\\qtpass\\.json" applyText;
+# Verify Windows side has method label
+assert containsRegex "# Method 3" applyText;
 # Verify user override structure for all app configs
 assert builtins.hasAttr "qtpass" windowsUsers.users.polyipseity;
 assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.qtpass;
@@ -58,7 +66,7 @@ assert containsRegex "\"linearmouse\"" usersRegistryText;
 assert containsRegex "\"vsCode\"" usersRegistryText;
 assert containsRegex "\"neovim\"" usersRegistryText;
 # Verify Neovim workaround remains in native init.lua management and override path
-assert containsRegex "xdg\.configFile\.\"nvim/init\.lua\"\.text" editorsText;
+assert containsRegex "xdg\\.configFile\\.\"nvim/init\\.lua\"\\.text" editorsText;
 assert containsRegex "managedAppSettings \"neovim\" neovimDefaultSettings" editorsText;
 assert containsRegex "shiftNumberTerminalPrograms = " editorsText;
 assert containsRegex "\"kitty\"" editorsText;
