@@ -4,12 +4,15 @@
 # Mirrors ManagedPaths.ps1 (Windows) — keep the two files in sync.
 #
 # Takes only `pkgs` — no config, lib, or username dependency.
-# Returns: { defaultDevTools, pathComponents, toShellPrependPath,
-#   toShellAppendPath, toPowerShellPrependSnippet,
+# Returns: { defaultDevTools, pathComponents, cargoBinDir,
+#   toShellPrependPath, toShellAppendPath, toShellPrependGuard,
+#   toShellAppendGuard, toPowerShellPrependSnippet,
 #   toPowerShellAppendSnippet, toLaunchctlConfigPath,
 #   nixProfileBinDirs, nixSystemBinDirs }
 { pkgs, ... }:
 let
+  lib = pkgs.lib;
+
   # ── Fallback toolchain ──────────────────────────────────────────────
   # symlinkJoin of bun + prek + uv for repos without direnv/Nix devShell.
   defaultDevTools = pkgs.symlinkJoin {
@@ -24,10 +27,9 @@ let
   # ── PATH components ─────────────────────────────────────────────────
   # Managed PATH directories split into prepend (before system default) and
   # append (after system default) groups.  Each consumer renders these as
-  # platform-appropriate PATH strings.  Currently all dirs are in append to
-  # avoid shadowing system-provided executables.
-  # Append: user-scope package manager bin directories.
-  # Prepend: empty — managed dirs are now appended to avoid shadowing system bins.
+  # platform-appropriate PATH strings.
+  # Prepend: directories that appear before the system default PATH.
+  # Append: directories that appear after the system default PATH.
   pathComponents = {
     prepend = [ ];
     append = [
@@ -36,6 +38,10 @@ let
       ".local/bin"
     ];
   };
+
+  # Named reference: .cargo/bin (rustup shim).  Consumers must use this instead
+  # of hardcoded indices into pathComponents.append.
+  cargoBinDir = builtins.elemAt pathComponents.append 1;
 
   # ── Helper: render launchctl config system path string ─────────────
   # Returns a colon-joined absolute PATH string for use in
@@ -73,6 +79,18 @@ let
   # ── Helper: render generic shell PATH append string ────────────────
   # Same format as toShellPrependPath but for the append position.
   toShellAppendPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.append);
+
+  # ── Helper: shell prepend guard (:suffix) ─────────────────────────
+  # Expands to "<prepend>:" when prepend renders non-empty, empty string
+  # otherwise.  Computed at Nix time to avoid nested ${} in Nix string
+  # interpolation (which Nix cannot parse).
+  toShellPrependGuard = lib.optionalString (toShellPrependPath != "") "${toShellPrependPath}:";
+
+  # ── Helper: shell append guard (:prefix) ──────────────────────────
+  # Expands to ":<append>" when append renders non-empty, empty string
+  # otherwise.  Computed at Nix time to avoid nested ${} in Nix string
+  # interpolation (which Nix cannot parse).
+  toShellAppendGuard = lib.optionalString (toShellAppendPath != "") ":${toShellAppendPath}";
 
   # ── Helper: render PowerShell PATH-prepend snippet ─────────────────
   # Returns a complete PowerShell block that prepends all managed dirs to
@@ -141,13 +159,16 @@ let
 in
 {
   inherit
+    cargoBinDir
     defaultDevTools
     pathComponents
     toLaunchctlConfigPath
-    toShellPrependPath
+    toShellAppendGuard
     toShellAppendPath
-    toPowerShellPrependSnippet
+    toShellPrependGuard
+    toShellPrependPath
     toPowerShellAppendSnippet
+    toPowerShellPrependSnippet
     nixProfileBinDirs
     nixSystemBinDirs
     ;
