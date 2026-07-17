@@ -3,6 +3,10 @@
   "additionalProperties": false,
   "description": "Ollama model assignments per host.",
   "properties": {
+    "$schema": {
+      "description": "Reference to the JSON Schema file that validates this data file.",
+      "type": "string"
+    },
     "models": {
       "additionalProperties": {
         "description": "List of Ollama model references (name:tag format).",

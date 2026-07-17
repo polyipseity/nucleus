@@ -3,6 +3,10 @@
   "additionalProperties": false,
   "description": "Virtual machine definitions for nucleus.",
   "properties": {
+    "$schema": {
+      "description": "Reference to the JSON Schema file that validates this data file.",
+      "type": "string"
+    },
     "VMs": {
       "description": "List of virtual machines.",
       "items": {

@@ -1,5 +1,5 @@
 {
-  "$schema": "lockfile.schema.json",
+  "$schema": "./lockfile.schema.json",
   "bun": {
     "@mariozechner/pi-coding-agent": "0.73.1",
     "clawhub": "0.20.0"
