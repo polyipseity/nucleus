@@ -185,7 +185,7 @@ in
     # Windows: registry). A symlink does not apply to these platform-native
     # stores. Merge writes the managed defaults into each store while
     # preserving any user-configured settings outside managed keys.
-    home.activation.configureQtPassSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation."qtpass-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       export AWK_PATH="${pkgs.gawk}/bin/awk"
       ${builtins.readFile ../scripts/configs/qtpass-merge-ini.sh}
 
@@ -216,7 +216,7 @@ in
     # settings that should persist across applies). A symlink would let app
     # writes reach the repo file. Merge applies managed defaults while
     # preserving all app-owned keys and sections.
-    home.activation.configurePicardSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation."picard-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       export AWK_PATH="${pkgs.gawk}/bin/awk"
       export PICARD_DEFAULTS_INI=${lib.escapeShellArg picardDefaultsIniText}
       ${builtins.readFile ../scripts/configs/picard-merge-ini.sh}
@@ -233,7 +233,7 @@ in
     # it. A symlink would let those app-owned writes reach the repo file,
     # mixing managed settings with runtime state that does not belong in the
     # repo. Merge preserves both managed and app-owned keys.
-    home.activation.configureObsidianSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation."obsidian-merge-json" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       set -eu
 
       case "$(uname -s)" in
@@ -249,7 +249,7 @@ in
       esac
 
       mkdir -p "$(dirname "$_obsidian_settings_path")"
-      ${pkgs.python3}/bin/python3 -c '${builtins.readFile ./scripts/configs/obsidian-merge-json.py}' "$_obsidian_settings_path" ${lib.escapeShellArg obsidianManagedSettingsJson}
+      ${pkgs.python3}/bin/python3 -c '${builtins.readFile ../scripts/configs/obsidian-merge-json.py}' "$_obsidian_settings_path" ${lib.escapeShellArg obsidianManagedSettingsJson}
     '';
 
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
