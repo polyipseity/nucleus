@@ -4,72 +4,63 @@ description: Produce a commit message for the currently staged changes and commi
 argument-hint: Optional extras (e.g., ticket=ABC-123). To skip committing, pass `commitNow=no`.
 ---
 
-# Commit Staged Change
+# Commit staged change
 
-Never ask for confirmation or clarification. Proceed automatically using best-effort defaults and available context.
+Proceed automatically with best-effort defaults and available context.
 
 ## Workflow
 
 1. **Read staged changes**
-   - Run one compound command to print staged file list and full staged patch:
+   Run this exact command:
 
    ```shell
    git diff --cached --name-status --no-color && git --no-pager diff --cached --staged --patch --no-color
    ```
 
-   - Present the exact command. If it cannot run, produce a best-effort message from available context and stop.
+   If not executed, produce a best-effort commit message from available context and stop.
 
 2. **Compose commit message**
-   - Use Command 1 output and repository conventions (for example `CONTRIBUTING.md`, `.agents/`, `package.json`, `commitlint`, `prek.toml`, `CHANGELOG.md`).
-   - Produce a commit message with:
-     - Short subject (~50 chars)
-     - Optional body (each line **must be wrapped to 72 characters or fewer**; bullets allowed)
-     - Footer (BREAKING CHANGE / Refs / Ticket), including `${input:extra}` if provided
-   - **If the commit is rejected by commitlint due to line length or other formatting, rewrap and retry with a fresh `git commit`. NEVER use `git commit --amend` — the commit was not created, so `--amend` would modify whatever HEAD currently points to (a pre-existing commit), potentially destroying history.**
-   - Prefer tooling-enforced rules. If unsure, default to Conventional Commits. **Strictly enforce commit header and body line length (72 chars max) as required by commitlint.**
-   - Do not ask for approval before committing.
+   Inspect Command 1 output and repository conventions (`CONTRIBUTING.md`, `.agents/`, `package.json`, `commitlint`, `prek.toml`, `CHANGELOG.md`, etc.). Build a commit message with:
+   - Short subject (~50 chars)
+   - Optional body (each line wrapped to 72 chars or fewer; bullets allowed)
+   - Footer (`BREAKING CHANGE` / `Refs` / `Ticket`), including `${input:extra}` when provided
 
-2a. **Verify commit**
-   - Run `git rev-parse HEAD` and `git log -1 --format=%s`. Confirm the hash
-     is new and the message is your intended message. If they show the
-     previous commit's message, the commit was not created — retry with a
-     fresh `git commit` (not `--amend`).
+   Prefer tooling-enforced rules; default to Conventional Commits when unclear. If the commit is rejected by commitlint, rewrap and retry with a fresh `git commit`. NEVER use `git commit --amend` — the commit was not created, so `--amend` would modify whatever HEAD currently points to (a pre-existing commit), potentially destroying history.
+
+2a. **Verify commit** - Run `git rev-parse HEAD` and `git log -1 --format=%s`. Confirm the hash is new and the message is your intended message. If they show the previous commit's message, the commit was not created — retry with a fresh `git commit` (not `--amend`).
 
 3. **Create the commit**
-   - If `${input:commitNow}` is `no`, skip this step and only present the message.
-   - Otherwise, present the exact command to create the commit from stdin and print the new SHA. Run both commands in the same shell command block. Use the right syntax for the detected shell:
-     - **PowerShell (Windows):**
-       ```powershell
-       (@'
-       <full commit message>
-       '@ | git commit --file=-) ; git rev-parse HEAD
-       ```
-       Use a single-quoted here-string (`@'...'@`) to avoid variable expansion.
-     - **Bash/zsh (Linux/macOS):**
-       ```bash
-       (git commit --file - <<'MSG'
-       <full commit message>
-       MSG
-       ) && git rev-parse HEAD
-       ```
-       Use a single-quoted heredoc delimiter (`<<'MSG'`) to avoid shell expansion. If `MSG` appears in the message, use a different delimiter.
-   - If Command 2 fails due to quoting/heredoc syntax, retry up to 3 corrected forms. For other failures, report the error and do not modify the index.
+   If `${input:commitNow}` is `no`, skip and only present the message.
+   Otherwise, run the appropriate command:
+   - **PowerShell (Windows):**
+
+     ```powershell
+     (@'
+     <full commit message>
+     '@ | git commit --file=-) ; git rev-parse HEAD
+     ```
+
+     Use single-quoted here-strings (`@'...'@`) to avoid expansion.
+
+   - **Bash/zsh (Linux/macOS):**
+     ```bash
+     (git commit --file - <<'MSG'
+     <full commit message>
+     MSG
+     ) && git rev-parse HEAD
+     ```
+     Use `<<'MSG'` to prevent shell expansion. If `MSG` appears in the message, choose another delimiter.
+
+   If heredoc quoting fails, retry up to 3 times with a different delimiter. For other failures, report the error and do not modify the index.
 
 4. **Output**
-   - 1–2 line summary: staged files and detected convention
-   - Commit message block labelled `Commit message` (header/body/footer)
-   - If Command 2 ran: `Commit result` with exit status and new commit SHA
-   - 1–3 line justification why this message fits the change
+   Summary of staged files, detected convention, commit message, and result (SHA or skip reason).
 
 ## Rules
 
-- Never ask for confirmation or clarification.
-- Only run the two approved shell commands. Do not run `git add`, `git reset`, or otherwise change the index.
-- If Command 1 is denied, still propose a best-effort commit message using available context.
+- Only run the two approved shell commands. Do not change the index (`git add`, `git reset`, etc.).
 
 ## Inputs
 
-- `${input:extra}` — optional extra text for footer
-- `${input:commitNow}` — `no` to skip committing; default is to commit
-
-End of prompt.
+- `${input:extra}` — optional footer text
+- `${input:commitNow}` — `no` to skip committing; defaults to commit
