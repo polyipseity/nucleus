@@ -29,13 +29,6 @@ let
 
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
 
-  # Shell-syntax guard for the append PATH position.  Expands to
-  # ":<append-path>" when pathComponents.append is non-empty, empty
-  # string otherwise.  Computed at Nix time to avoid nested ${}
-  # inside Nix string interpolation (which Nix cannot parse).
-  shellAppendGuard = lib.optionalString (
-    managedPaths.pathComponents.append != [ ]
-  ) ":${managedPaths.toShellAppendPath}";
 in
 {
   home.file = {
@@ -274,11 +267,11 @@ in
       _ibp_jq_bin='${pkgs.jq}/bin/jq'
       ${agentHelpersSh}
 
-      # Prepend user-scope package manager bin directories (managed-paths.nix
-      # pathComponents.append) so binaries installed by previous apply runs
-      # and by this activation are discoverable in subsequent activation
-      # steps without spawning a new shell session.
-      PATH="$PATH${shellAppendGuard}"
+      # Add managed bin directories (managed-paths.nix pathComponents) to PATH
+      # so binaries installed by previous apply runs and by this activation are
+      # discoverable in subsequent activation steps without spawning a new
+      # shell session.
+      PATH="${managedPaths.toShellPrependGuard}$PATH${managedPaths.toShellAppendGuard}"
       export PATH
 
       # Also prepend the nix profile bin directory, Home Manager profile bin
@@ -576,7 +569,7 @@ in
       # home-manager-profile bin directories as fallback.  initRustup runs
       # before this step to ensure the stable toolchain is installed.
       _nucleus_prepend_first_executable_dir cargo \
-        "$HOME/${builtins.elemAt managedPaths.pathComponents.append 1}" \
+        "$HOME/${managedPaths.cargoBinDir}" \
         ${managedPaths.nixSystemBinDirs} \
         ${managedPaths.nixProfileBinDirs} || true  # undoc-supp: cargo not in any profile dir; fallback follows.
 
@@ -667,10 +660,10 @@ in
 
       _scs_do_sync=true
 
-      # Prepend user-scope package manager bin directories (managed-paths.nix
-      # pathComponents.append) so the ClawHub binary installed by
-      # installBunPackages is on PATH for this activation step.
-      PATH="$PATH${shellAppendGuard}"
+      # Add managed bin directories (managed-paths.nix pathComponents) to PATH
+      # so the ClawHub binary installed by installBunPackages is on PATH for
+      # this activation step.
+      PATH="${managedPaths.toShellPrependGuard}$PATH${managedPaths.toShellAppendGuard}"
       export PATH
 
       # Resolve the repo root (same mechanism as agentsSymlink and agentsSkills).
