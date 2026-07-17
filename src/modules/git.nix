@@ -1,30 +1,17 @@
 # Shared Git behavior; identity is sourced from managed secrets.
-{ lib, pkgs, ... }:
-let
-  gitIgnoreGlobalText = ''
-    # https://github.com/github/gitignore/blob/1046d8fba6b42d367da6314c934cddb6bfe5662e/Nix.gitignore {
-    # Ignore build outputs from performing a nix-build or `nix build` command
-    result
-    result-*
-
-    # Ignore automatically generated direnv output
-    .direnv
-
-    # Ignore NixOS interactive test driver history
-    **/.nixos-test-history
-    # }
-
-    # self {
-    # Suppress macOS Spotlight "never index" marker files from being tracked.
-    .metadata_never_index
-    # }
-  '';
-in
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 {
   # Keep a managed global ignore baseline plus a user-writable overlay file.
   # The activation step below assembles both into ~/.config/git/ignore so
   # users can add machine-local patterns without editing declarative files.
-  xdg.configFile."git/ignore-global".text = gitIgnoreGlobalText;
+  xdg.configFile."git/ignore-global" = {
+    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/ignore-global";
+  };
 
   home.activation.gitIgnoreAssemble = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
         set -eu

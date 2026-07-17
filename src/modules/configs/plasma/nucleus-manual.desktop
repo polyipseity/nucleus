@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=KonqPopupMenu/Plugin
+MimeType=all/all;
+Actions=openNucleusManual
+
+[Desktop Action openNucleusManual]
+Name=open nucleus manual
+Exec=SCRIPT_PATH
+Icon=help-contents

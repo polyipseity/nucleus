@@ -13,17 +13,9 @@
   # Determinate Nix includes /etc/nix/nix.custom.conf from /etc/nix/nix.conf.
   # Manage that file declaratively so builder routing and trusted-user settings
   # are applied even with nix.enable = false.
-  environment.etc."nix/nix.custom.conf".text = ''
-    builders = @/etc/nix/machines
-    builders-use-substitutes = true
-    extra-platforms = x86_64-darwin aarch64-darwin
-    # Fallback for standalone nix commands (e.g. manual nix build/eval).
-    # The apply fix uses apply.sh's explicit NIX_PATH env var prepended
-    # to each nix invocation because darwin-rebuild overrides file-based
-    # config by clearing NIX_PATH to its default empty value.
-    nix-path = nixpkgs=flake:nixpkgs
-    trusted-users = root ${username}
-  '';
+  environment.etc."nix/nix.custom.conf".text = builtins.replaceStrings [ "USERNAME" ] [ username ] (
+    builtins.readFile ../../modules/configs/nix/nix.custom.conf
+  );
 
   # nix-darwin v5+ requires an explicit primary user for single-user tooling.
   system.primaryUser = username;

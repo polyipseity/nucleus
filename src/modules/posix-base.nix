@@ -50,15 +50,7 @@ in
       # Commit/tag signing is required by default, symlinks are enabled, and
       # POSIX hosts keep core.autocrlf=false so Git never rejects an invalid
       # boolean value and newline policy remains controlled by .gitattributes.
-      environment.etc."gitconfig".text = ''
-        [commit]
-          gpgsign = true
-        [core]
-          autocrlf = false
-          symlinks = true
-        [tag]
-          gpgsign = true
-      '';
+      environment.etc."gitconfig".text = builtins.readFile ./configs/git/gitconfig-system;
 
       # Ensure zsh is available as a valid login shell system-wide.
       programs.zsh.enable = true;

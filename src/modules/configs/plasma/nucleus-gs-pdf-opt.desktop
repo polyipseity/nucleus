@@ -1,0 +1,30 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=KonqPopupMenu/Plugin
+MimeType=application/pdf;
+Actions=optimizePdfDefault;optimizePdfPrepress;optimizePdfPrinter;optimizePdfEbook;optimizePdfScreen
+
+[Desktop Action optimizePdfDefault]
+Name=optimize PDF - default
+Exec=nucleus-gs-pdf-opt --preset default %f
+Icon=application-pdf
+
+[Desktop Action optimizePdfPrepress]
+Name=optimize PDF - prepress
+Exec=nucleus-gs-pdf-opt --preset prepress %f
+Icon=application-pdf
+
+[Desktop Action optimizePdfPrinter]
+Name=optimize PDF - printer
+Exec=nucleus-gs-pdf-opt --preset printer %f
+Icon=application-pdf
+
+[Desktop Action optimizePdfEbook]
+Name=optimize PDF - ebook
+Exec=nucleus-gs-pdf-opt --preset ebook %f
+Icon=application-pdf
+
+[Desktop Action optimizePdfScreen]
+Name=optimize PDF - screen
+Exec=nucleus-gs-pdf-opt --preset screen %f
+Icon=application-pdf

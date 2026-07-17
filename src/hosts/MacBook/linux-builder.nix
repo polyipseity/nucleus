@@ -70,9 +70,8 @@ in
   # Root (Nix daemon) must verify the builder host key without an interactive
   # prompt. Keep a deterministic pinned entry in /etc/nix so ssh-ng can use it
   # even when /var/root/.ssh/known_hosts does not exist.
-  environment.etc."nix/linux-builder-known_hosts".text = ''
-    linux-builder ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJBWcxb/Blaqt1auOtE+F8QUWrUotiC5qBJ+UuEWdVCb
-  '';
+  environment.etc."nix/linux-builder-known_hosts".text =
+    builtins.readFile ../../modules/configs/ssh/linux-builder-known_hosts;
 
   # SSH config so the Nix daemon and user-level nix commands reach the builder
   # VM on its fixed port without interactive host-key confirmation.
@@ -80,22 +79,9 @@ in
   # correct for the daemon but unreadable to user-space ssh-ng clients.
   # Route root to the daemon-owned key and the primary user to a dedicated 0600
   # mirror so nix store / nixos-generators probes never fall back to password.
-  environment.etc."ssh/ssh_config.d/100-linux-builder.conf".text = ''
-    Host linux-builder
-      User builder
-      Hostname localhost
-      HostKeyAlias linux-builder
-      Port 31022
-      IdentitiesOnly yes
-      UserKnownHostsFile /etc/nix/linux-builder-known_hosts
-      StrictHostKeyChecking yes
-
-    Match originalhost linux-builder localuser root
-      IdentityFile /etc/nix/builder_ed25519
-
-    Match originalhost linux-builder localuser ${username}
-      IdentityFile ${userBuilderKeyPath}
-  '';
+  environment.etc."ssh/ssh_config.d/100-linux-builder.conf".text =
+    builtins.replaceStrings [ "USERNAME" "USER_BUILDER_KEY_PATH" ] [ username userBuilderKeyPath ]
+      (builtins.readFile ../../modules/configs/ssh/ssh_config.d/100-linux-builder.conf);
 
   # Mirror the builder key into the primary user's SSH directory without
   # weakening the daemon key permissions. This macOS-only copy is the smallest

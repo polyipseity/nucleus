@@ -23,10 +23,6 @@
   # ssh_personal_<username>.pub to ~/.ssh/ssh_personal_<username>.pub.
   # Both the standard authorized_keys path and the materialized personal key
   # are checked to allow future key additions via authorized_keys.
-  environment.etc."ssh/sshd_config.d/50-nucleus.conf".text = ''
-    PasswordAuthentication no
-    KbdInteractiveAuthentication no
-    ChallengeResponseAuthentication no
-    AuthorizedKeysFile .ssh/authorized_keys .ssh/ssh_personal_%u.pub
-  '';
+  environment.etc."ssh/sshd_config.d/50-nucleus.conf".text =
+    builtins.readFile ../../modules/configs/ssh/sshd_config.d/50-nucleus.conf;
 }

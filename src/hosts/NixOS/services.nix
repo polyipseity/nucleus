@@ -3,7 +3,12 @@
 # Adds "open nucleus manual" to Nautilus (GNOME) and Dolphin (KDE) context
 # menus. Both delegate to a shared script that resolves the host manual path
 # via NUCLEUS_REPO_ROOT at runtime and opens it with xdg-open.
-{ lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   openManualScript = pkgs.writeShellScript "nucleus-open-manual" ''
     set -eu
@@ -83,54 +88,16 @@ lib.mkIf pkgs.stdenv.isLinux {
 
     # Dolphin: right-click → open nucleus manual
     ".local/share/kio/servicemenus/nucleus-manual.desktop" = {
-      text = ''
-        [Desktop Entry]
-        Type=Service
-        ServiceTypes=KonqPopupMenu/Plugin
-        MimeType=all/all;
-        Actions=openNucleusManual
-
-        [Desktop Action openNucleusManual]
-        Name=open nucleus manual
-        Exec=${openManualScript}
-        Icon=help-contents
-      '';
+      # openManualScript is a Nix store path (pkgs.writeShellScript derivation);
+      # use builtins.replaceStrings to substitute the placeholder at eval time.
+      text = builtins.replaceStrings [ "SCRIPT_PATH" ] [ "${openManualScript}" ] (
+        builtins.readFile ../../modules/configs/plasma/nucleus-manual.desktop
+      );
     };
 
     # Dolphin: right-click → optimize PDF (5 presets as sub-actions)
     ".local/share/kio/servicemenus/nucleus-gs-pdf-opt.desktop" = {
-      text = ''
-        [Desktop Entry]
-        Type=Service
-        ServiceTypes=KonqPopupMenu/Plugin
-        MimeType=application/pdf;
-        Actions=optimizePdfDefault;optimizePdfPrepress;optimizePdfPrinter;optimizePdfEbook;optimizePdfScreen
-
-        [Desktop Action optimizePdfDefault]
-        Name=optimize PDF - default
-        Exec=nucleus-gs-pdf-opt --preset default %f
-        Icon=application-pdf
-
-        [Desktop Action optimizePdfPrepress]
-        Name=optimize PDF - prepress
-        Exec=nucleus-gs-pdf-opt --preset prepress %f
-        Icon=application-pdf
-
-        [Desktop Action optimizePdfPrinter]
-        Name=optimize PDF - printer
-        Exec=nucleus-gs-pdf-opt --preset printer %f
-        Icon=application-pdf
-
-        [Desktop Action optimizePdfEbook]
-        Name=optimize PDF - ebook
-        Exec=nucleus-gs-pdf-opt --preset ebook %f
-        Icon=application-pdf
-
-        [Desktop Action optimizePdfScreen]
-        Name=optimize PDF - screen
-        Exec=nucleus-gs-pdf-opt --preset screen %f
-        Icon=application-pdf
-      '';
+      source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/plasma/nucleus-gs-pdf-opt.desktop";
     };
   };
 }

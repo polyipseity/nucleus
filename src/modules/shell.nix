@@ -646,12 +646,7 @@ in
   # in package.json (no caret ranges). Bun reads bunfig.toml from $HOME by default.
   # Source: https://bun.sh/docs/runtime/bunfig#install
   home.file.".bunfig.toml" = {
-    text = ''
-      [install]
-      exact = true
-      linker = "isolated"
-      minimumReleaseAge = 432000
-    '';
+    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/bun/bunfig.toml";
   };
 
   # Global Cargo configuration: per-platform linker selection.
@@ -662,44 +657,7 @@ in
   #   macOS   → native Apple ld64 via cc     (system default, explicit for clarity)
   #   Windows → rust-lld bundled with Rust    (zero-install, lld-link)
   home.file.".cargo/config.toml" = {
-    text = ''
-      # ── Build concurrency ──────────────────────────────────────────────────
-      [build]
-      jobs = 8
-
-      # ── Test concurrency ───────────────────────────────────────────────────
-      [env]
-      RUST_TEST_THREADS = "4"
-
-      # ── Dev profile: memory-efficient debugging ────────────────────────────
-      [profile.dev]
-      debug = "line-tables-only"
-      codegen-units = 16
-
-      # ── Dev profile: strip external dependency debug info ──────────────────
-      [profile.dev.package."*"]
-      debug = false
-
-      # ── Linux: mold via Clang ──────────────────────────────────────────────
-      # mold is the fastest linker available. clang is used as the driver because
-      # it correctly passes -fuse-ld=mold to the linker invocation.
-      [target.'cfg(target_os = "linux")']
-      linker = "clang"
-      rustflags = ["-C", "link-arg=-fuse-ld=mold"]
-
-      # ── macOS: native Apple ld64 via system C compiler ────────────────────
-      # Apple's ld64 is well-optimised for mach-o binaries.  cc resolves to the
-      # Nix-managed clang, which invokes /usr/bin/ld (Apple ld64) for the final
-      # link step.
-      [target.'cfg(target_os = "macos")']
-      linker = "cc"
-
-      # ── Windows: LLVM linker bundled with Rust toolchain ──────────────────
-      # lld-link is a drop-in replacement for MSVC link.exe and requires no
-      # additional installation.
-      [target.'cfg(target_os = "windows")']
-      linker = "rust-lld"
-    '';
+    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/cargo/config.toml";
   };
 
   # ---------------------------------------------------------------------------
@@ -722,23 +680,7 @@ in
   # The _nix_direnv_nix variable is set by nix-direnv's _nix_direnv_preflight()
   # at the start of use_flake, so referencing it from the override is safe.
   home.file.".config/direnv/direnvrc" = {
-    text = ''
-      _nix() {
-        local _has_pe=0
-        for _arg in "$@"; do
-          if [[ "$_arg" == "print-dev-env" ]]; then
-            _has_pe=1
-            break
-          fi
-        done
-        if [[ $_has_pe -eq 1 ]]; then
-          "''${_nix_direnv_nix}" --no-warn-dirty --extra-experimental-features "nix-command flakes" "$@" \
-            | command grep -v -E '^(DEVELOPER_DIR=|SDKROOT=|NIX_APPLE_SDK_VERSION=)|^export (DEVELOPER_DIR|SDKROOT|NIX_APPLE_SDK_VERSION)$|^unset (DEVELOPER_DIR|SDKROOT|NIX_APPLE_SDK_VERSION)$'
-        else
-          "''${_nix_direnv_nix}" --no-warn-dirty --extra-experimental-features "nix-command flakes" "$@"
-        fi
-      }
-    '';
+    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/direnv/direnvrc";
   };
 
   # Global uv configuration: exact pinning and supply-chain hardening.
@@ -746,10 +688,7 @@ in
   # Source: https://docs.astral.sh/uv/reference/settings/#add-bounds
   # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
   home.file."${config.xdg.configHome}/uv/uv.toml" = {
-    text = ''
-      add-bounds = "exact"
-      exclude-newer = "P5D"
-    '';
+    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/uv/uv.toml";
   };
 
   # ---------------------------------------------------------------------------
