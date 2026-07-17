@@ -81,7 +81,9 @@ in
   # Method 2 (read-only): Builder VM wiring — modifying port/address requires
   # coordinated changes across multiple files, so changes go through Nix eval.
   environment.etc."ssh/ssh_config.d/100-linux-builder.conf".text =
-    builtins.replaceStrings [ "USERNAME" "USER_BUILDER_KEY_PATH" ] [ username userBuilderKeyPath ]
+    builtins.replaceStrings
+      [ "__USERNAME__" "__USER_BUILDER_KEY_PATH__" ]
+      [ username userBuilderKeyPath ]
       (builtins.readFile ../../modules/configs/ssh/ssh_config.d/100-linux-builder.conf);
 
   # Mirror the builder key into the primary user's SSH directory without

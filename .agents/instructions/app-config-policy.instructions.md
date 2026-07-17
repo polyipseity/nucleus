@@ -23,10 +23,12 @@ A read-only copy (Nix store path or copied file with ReadOnly attribute) at the 
 **Implementation:** Nix `xdg.configFile` (POSIX); PowerShell `Copy-Item` + `ReadOnly` (Windows).
 
 **Use when:**
+
 - The app overwrites the config file with auto-generated state on startup (e.g., serializing full internal state, discarding managed settings).
 - A platform limitation requires a read-only copy (e.g., macOS LaunchServices refuses symlinks for .app bundles).
 
 **NOT valid reasons for Method 2:**
+
 - The config path is system-level (`/etc/`, `/etc/ssh/`, etc.) — system paths do not inherently require read-only deployment. Use an activation script to create a writable symlink instead.
 - "No user writes it" or "read-only by convention" — if the app tolerates a symlink without overwriting it, Method 1 is the correct choice.
 - Preference for immutability — Method 2 is a technical fallback, not a stylistic choice.
