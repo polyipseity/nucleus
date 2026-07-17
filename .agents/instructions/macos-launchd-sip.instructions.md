@@ -1,7 +1,7 @@
 ---
 description: "Use when creating or editing macOS launchd daemons with non-root UserName, or working with service recovery scripts. Covers macOS 26+ SIP restriction blocking unsigned Nix store binaries at boot, the /bin/sh wrapper workaround, and penalty-box recovery."
 name: "macOS SIP / launchd Daemon Restriction"
-applyTo: "src/hosts/MacBook/*.nix, scripts/svc.sh, scripts/service-watchdog.sh, src/scripts/caddy-trust.sh"
+applyTo: "src/hosts/MacBook/*.nix, scripts/svc.sh, scripts/service-watchdog.sh, src/scripts/services/caddy-trust.sh"
 ---
 
 # macOS SIP / launchd daemon restriction

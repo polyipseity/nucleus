@@ -21,7 +21,7 @@ let
   usersRegistry = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   windowsCaddyTrustText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyLocalCA.ps1;
-  caddyTrustScriptText = builtins.readFile ../../src/scripts/caddy-trust.sh;
+  caddyTrustScriptText = builtins.readFile ../../src/scripts/services/caddy-trust.sh;
   windowsCaddyServiceText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyService.ps1;
   windowsJellyfinAccountText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinAccount.ps1;
   windowsJellyfinLibraryText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinLibrary.ps1;

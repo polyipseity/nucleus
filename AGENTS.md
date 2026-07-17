@@ -9,10 +9,9 @@
 - `scripts/` contains user-facing automation helpers with paired `.sh`/`.ps1` entry points: bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and others.
 - `src/scripts/` contains Nix-internal scripts organized into domain subdirectories:
   - `apply.sh` — POSIX apply dispatcher (kept in root)
-  - `caddy-trust.sh` — Caddy local CA trust (cross-platform)
   - `cleanup-nix-build-artifacts.sh`, `install-prek-hooks.sh`, `wallpaper-provision.sh` — ungrouped root scripts
   - `services/` — persistent daemon/service scripts (camilladsp, betterdisplay-heartbeat,
-    gc-weekly, gui-env, nix-index-update, ds-store-gc, spotlight-exclusions, jellyfin-sync)
+    gc-weekly, gui-env, nix-index-update, ds-store-gc, spotlight-exclusions, caddy-trust, jellyfin-sync)
   - `lib/` — shared library scripts for symlink hardening, cloud drive setup, dev repo
     provisioning, iCloud exclusions, VM setup, and the shared lib.sh
   - `secrets/` — secret provisioning helpers
