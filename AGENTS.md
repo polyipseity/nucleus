@@ -16,10 +16,13 @@
     provisioning, iCloud exclusions, VM setup, and the shared lib.sh
   - `secrets/` — secret provisioning helpers
   - `configs/` — app-config merge helpers (INI merge, JSON merge, bun package install)
-  - `host/` — host-specific scripts (e.g. `NixOS/`)
+  - `hosts/` — host-specific scripts: `MacBook/` (macOS) and `NixOS/`
   - `agents/` — AI agent setup scripts
-  - `host/MacBook/` — macOS-specific activation scripts (no daemons)
-    **Rule**: the filename (including its domain prefix) must equal the activation entry name, ensuring uniqueness. The domain prefix is preserved inside the subdirectory to guarantee uniqueness and match the activation entry name.
+  - **Naming rule**:
+    - Files under `hosts/MacBook/` MUST start with `macos-`; entry name = filename.
+    - Files under `hosts/NixOS/` MUST start with `nixos-`; entry name = filename.
+    - All other subdirs (`services/`, `configs/`, `secrets/`, `agents/`): use natural words/phrases; entry name = filename.
+    - Rule does not apply to library scripts (`lib/`), runtime-only scripts, or wrapped derivations.
 - `tests/` contains automated tests: `tests/modules/`, `tests/integration/`, and `tests/hosts/<host>/` for Nix logic tests, `tests/hosts/Windows/` for Pester DSC validation. All changes require corresponding tests; see `.agents/instructions/testing.instructions.md`.
 - Keep this file short and durable. Put file-type and workflow-specific rules in `.agents/instructions/*.instructions.md`, reusable workflows in `.agents/prompts/*.prompt.md`, and skill assets in `.agents/skills/<skill>/`.
 - Inspect the on-disk tree before assuming source files, tests, or runnable commands exist in a given location.

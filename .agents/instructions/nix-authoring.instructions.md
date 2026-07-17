@@ -13,8 +13,7 @@ applyTo: "src/**/*.nix"
   - From `src/modules/*.nix`: `builtins.readFile ../scripts/<subdir>/<filename>`
   - From `src/hosts/*/*.nix`: `builtins.readFile ../../scripts/<subdir>/<filename>`
   - From `src/flake.nix`: `./scripts/<subdir>/<filename>`
-  - The filename (with its domain prefix) must equal the activation entry name. The domain prefix is preserved inside the subdirectory to guarantee uniqueness.
-  - See `AGENTS.md` Repository Shape section for the full subdirectory listing.
+  - See `AGENTS.md` Repository Shape section for the naming rule (two-tier policy: prefix-mandated for `hosts/`, natural names for other subdirs) and full subdirectory listing.
 - `src/scripts/apply.sh` is the POSIX apply dispatcher behind `nix run .#apply` (kept in root).
 - `src/hosts/<Host>/` contains host entrypoints and host-only fragments. Current Nix hosts are `MacBook` and `NixOS`; `Windows/` is WinGet DSC-managed (no `.nix` files).
 - `src/modules/*.nix` contains shared modules reused across hosts and Home Manager. Keep host-specific hardware/runtime details in host files, not shared modules.
