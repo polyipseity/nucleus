@@ -83,7 +83,7 @@ function Deploy-ReadOnly {
   .PARAMETER SkipIfIdentical
     When true, skip copy if destination content matches source.
   .EXAMPLE
-    Deploy-ReadOnly -Name "starship" -RepoRoot $env:NUCLEUS_REPO_ROOT -RepoRelPath "src\modules\configs\starship.toml" -TargetPath "$env:USERPROFILE\.config\starship.toml" -SkipIfIdentical
+    Deploy-ReadOnly -Name "starship" -RepoRoot $env:NUCLEUS_REPO_ROOT -RepoRelPath "src\modules\configs\starship\starship.toml" -TargetPath "$env:USERPROFILE\.config\starship.toml" -SkipIfIdentical
   #>
   [CmdletBinding()]
   param(

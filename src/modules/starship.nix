@@ -1,6 +1,7 @@
-# Starship cross-shell prompt — shared config for all POSIX hosts.
+# Starship cross-shell prompt — shared config for all hosts.
 # Method 1 (writable symlink): repo changes take effect without reactivation
 # since starship reads ~/.config/starship.toml at shell start.
+# Windows: deployed via Deploy-WritableSymlink in ConfigHelpers.ps1 (same method).
 {
   lib,
   pkgs,

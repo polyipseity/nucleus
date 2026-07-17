@@ -74,6 +74,7 @@ let
   # file also contains dynamic vault metadata written by the app itself. Load
   # the managed settings from a declarative config file so they are versioned
   # and merge them into the live file without clobbering vault data.
+  # Method 3 (merge) — see the activation entry below for full rationale.
   #
   # WHY nativeMenus is not configured: nativeMenus is stored per-vault in
   # appearance.json (.obsidian/appearance.json), not in obsidian.json. We cannot
@@ -244,6 +245,7 @@ in
           _obsidian_settings_path="''${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json"
           ;;
         *)
+          # Windows: handled separately via Sync-ObsidianConfig.ps1.
           exit 0
           ;;
       esac
