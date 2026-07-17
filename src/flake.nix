@@ -600,7 +600,7 @@
           name = "vm-setup";
           runtimeInputs = [ pkgs.jq ];
           extraBin = {
-            "vm-setup/lib.sh" = scripts + "/vm-setup/lib.sh";
+            "vm-setup-lib.sh" = ./scripts/lib/vm-setup-lib.sh;
           };
         };
 
@@ -774,7 +774,7 @@
           name = "vm-setup";
           runtimeInputs = [ pkgs.jq ];
           extraBin = {
-            "vm-setup/lib.sh" = scripts + "/vm-setup/lib.sh";
+            "vm-setup-lib.sh" = ./scripts/lib/vm-setup-lib.sh;
           };
         };
       };

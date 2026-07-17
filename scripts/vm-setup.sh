@@ -235,7 +235,7 @@ export NUCLEUS_VM_GUEST_PASSWORD="$vm_guest_password"
 # Source shared VM setup library (function definitions).
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/vm-setup/lib.sh"
+. "$SCRIPT_DIR/../src/scripts/lib/vm-setup-lib.sh"
 
 # ---------------------------------------------------------------------------
 # Main
