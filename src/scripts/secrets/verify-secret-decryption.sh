@@ -1,8 +1,5 @@
 # Secret decryption health verification (5 checks).
-# Consumes __ALL_SOPS_FILES_JSON__, __SSH_PUBKEY_PATH__, __SSH_TO_AGE_BIN__,
-# __GNUPG_BIN__, __JQ_BIN__, __GIT_IDENTITY_SECRET_PATH__, __SSH_SECRET_PATH__,
-# __SSH_PUBLIC_SECRET_PATH__, __GPG_SECRET_PATH__, __GPG_MANIFEST_PATH__,
-# __GNUPG_HOME__ at activation time.
+# Consumes SOPS file manifest, secret paths, and tool paths at activation time.
 # Expects set -eu and the symlink hardening lib to be sourced before this
 # script runs.
 set -eu

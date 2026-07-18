@@ -1,6 +1,5 @@
 # Cloud drive directory structure setup.
-# Consumes __CLOUD_DRIVE_SETUP_LIB__, __JQ_BIN__, __ENABLED_MOUNTS_JSON__,
-# __ENABLED_REPLICAS_JSON__ at activation time.
+# Tokens (described below) are substituted at build time by Nix.
 # Expects set -eu to be sourced before this script runs.
 set -eu
 

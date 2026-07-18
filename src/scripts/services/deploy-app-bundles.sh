@@ -1,6 +1,5 @@
 # Deploy and prune macOS app bundles via LaunchServices.
-# Consumes __MACOS_APP_BUNDLE_LIB__, __JQ_BIN__, __CURRENT_BUNDLES_JSON__,
-# __REMOVED_BUNDLES_JSON__ at activation time.
+# Tokens are substituted at build time by Nix.
 # Expects set -eu to be sourced before this script runs.
 set -eu
 

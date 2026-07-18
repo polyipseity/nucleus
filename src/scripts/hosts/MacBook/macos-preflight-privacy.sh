@@ -1,6 +1,6 @@
 # Preflight macOS privacy permissions before defaults writes.
-# Token __FDA_LIB__ is replaced with the FDA warning library (with
-# __FDA_TARGET__ resolved by the Nix caller).
+# Full Disk Access privacy preflight. Runs FDA checks before defaults writes.
+# The FDA warning library and target are injected by Nix at build time.
 set -eu
 
 echo "macos: checking macOS privacy permissions before defaults writes..." >&2

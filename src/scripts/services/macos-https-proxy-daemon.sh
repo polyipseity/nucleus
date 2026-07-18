@@ -1,6 +1,5 @@
 # HTTPS proxy daemon — runs Caddy for all configured virtual hosts.
-# Tokens substituted at build time by Nix:
-#   __CADDY_BIN__, __CADDYFILE__
+# Binaries and config path provided via Nix substitution at build time.
 set -eu
 
 state_root="/Users/Shared/https-proxy"

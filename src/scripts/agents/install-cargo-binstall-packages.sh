@@ -1,6 +1,5 @@
 # Managed cargo-binstall package convergence (install + zap).
-# Consumes __JQ_BIN__, __GAWK_BIN__, __DESIRED_CRATES_JSON__, __CARGO_BIN_DIR__,
-# __NIX_SYSTEM_BIN_DIRS__, and __NIX_PROFILE_BIN_DIRS__ at activation time.
+# Consumes crate-description tokens at activation time.
 # Expects set -eu and the symlink hardening lib to be sourced before this
 # script runs.
 set -eu

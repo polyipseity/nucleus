@@ -1,6 +1,5 @@
 # Managed uv tool convergence (install + zap).
-# Consumes __UV_BIN__, __GAWK_BIN__, __GREP_BIN__, __JQ_BIN__,
-# and __DESIRED_UV_TOOLS_JSON__ at activation time.
+# Consumes tool paths and desired tools JSON at activation time.
 # Expects the symlink hardening lib (symlink-hardening-lib.sh) to be sourced
 # before this script runs.
 set -eu
@@ -13,7 +12,7 @@ _iut_jq_bin='__JQ_BIN__'
 # Desired tools as JSON object: {"tool_name": "python_version_or_null", ...}
 # Read into a temp file in "tool python_version" format.
 _iut_desired="$(mktemp)"
-printf '%s\n' '__DESIRED_UV_TOOLS_JSON__' | "$_iut_jq_bin" -r 'to_entries[] | "\(.key) \(.value // "")' > "$_iut_desired"
+printf '%s\n' '__DESIRED_UV_TOOLS_JSON__' | "$_iut_jq_bin" -r 'to_entries[] | "\(.key) \(.value // "")"' > "$_iut_desired"
 
 # Build name-only list for comparison (strip version column).
 _iut_desired_names="$(mktemp)"

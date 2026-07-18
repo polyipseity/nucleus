@@ -1,6 +1,6 @@
 # Rustup initialisation for POSIX hosts.
-# Consumes __MANAGED_NIX_SYSTEM_BIN_DIRS__ and __MANAGED_NIX_PROFILE_BIN_DIRS__
-# at activation time.  Expects set -eu and the symlink hardening lib to be
+# Consumes Nix profile bin directory lists at activation time.
+# Expects set -eu and the symlink hardening lib to be
 # sourced before this script runs.
 set -eu
 

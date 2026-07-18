@@ -1,9 +1,7 @@
 # LiteLLM AI gateway daemon for macOS.
 # Polls for SOPS-decrypted API key files at boot (5m timeout, 5s between
 # attempts) to handle the race with sops-install-secrets on launchd startup.
-# Tokens substituted at build time by Nix:
-#   __OPENROUTER_API_KEY_PATH__, __OPENCODE_GO_API_KEY_PATH__,
-#   __OPENCODE_ZEN_API_KEY_PATH__, __LITELLM_BIN__, __LITELLM_CONFIG__
+# API key paths, binary, and config provided via Nix substitution.
 
 # Boot-time race condition: sops-install-secrets may not have decrypted API keys
 # to /run/secrets/ yet.  Poll for each secret file with a 5-minute timeout (60

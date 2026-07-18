@@ -1,7 +1,5 @@
 # ClawHub fetched skill convergence (install + stale cleanup).
-# Consumes __JQ_BIN__, __PATH_PREPEND_GUARD__, __PATH_APPEND_GUARD__,
-# __REPO_ROOT__ (fallback Nix-time NUCLEUS_REPO_ROOT), and
-# __CLAWHUB_MANIFEST_RELATIVE_PATH__ at activation time.
+# Consumes tool paths and repo root token at activation time.
 # Expects set -eu and the symlink hardening lib to be sourced before this
 # script runs.
 set -eu

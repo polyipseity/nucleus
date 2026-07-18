@@ -1,6 +1,5 @@
 # Jellyfin media server daemon.
-# Tokens substituted at build time by Nix:
-#   __JELLYFIN_STATE_ROOT__, __JELLYFIN_LOG_DIR__, __JELLYFIN_BIN__
+# State root, log dir, and binary path provided via Nix substitution at build time.
 set -eu
 
 state_root="__JELLYFIN_STATE_ROOT__"

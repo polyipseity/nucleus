@@ -3,7 +3,7 @@
 # Starts camilladsp with --no_config, pushes the initial config via websocket,
 # then blocks until camilladsp exits.  The heartbeat is a separate service.
 #
-# Dependencies: camilladsp, websocat, jq (PATH provided via __CAMILLADSP_DAEMON_PATH__ token)
+# Dependencies: camilladsp, websocat, jq (PATH provided via Nix substitution)
 #
 # Usage: camilladsp-daemon.sh [--port PORT] [--statefile PATH] [--config FILE] [--logfile FILE]
 set -euo pipefail

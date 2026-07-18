@@ -1,5 +1,5 @@
 # Deploy and prune macOS Automator workflow bundles.
-# Consumes __JQ_BIN__, __CURRENT_WORKFLOWS_JSON__, __REMOVED_WORKFLOWS_JSON__.
+# Consumes jq binary and workflow JSON arrays at activation time.
 # Expects set -eu to be sourced before this script runs.
 set -eu
 
