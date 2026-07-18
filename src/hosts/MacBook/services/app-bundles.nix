@@ -20,7 +20,12 @@
 #   see .agents/instructions/app-config-policy.instructions.md.
 #   A home.activation script that deploys the .app on each generation
 #   switch guarantees LaunchServices can find it.
-{ lib, mkPresentationModes, ... }:
+{
+  lib,
+  pkgs,
+  mkPresentationModes,
+  ...
+}:
 let
   # Known list of historically-removed Nucleus app bundles.
   # When a bundle is removed, add its metadata here and remove its app dir.
@@ -57,50 +62,39 @@ in
   # home.file for manual.md is now in automator-workflows.nix (where the
   # consuming workflow lives).
 
-  home.activation."macos-app-bundle-lib" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    ${builtins.readFile ../../../scripts/lib/macos-app-bundle-lib.sh}
-
-    # ── Phase 1a: Prune removed app bundles ───────────────────────────
-    ${builtins.concatStringsSep "\n" (
-      map (svc: ''
-        # Delete NSServicesStatus key for ${svc.appDir} unconditionally.
-        /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"${svc.bundleId} - ${svc.menuItem} - ${svc.message}\"" \
-          ~/Library/Preferences/pbs.plist 2>/dev/null || true  # undoc-supp: key may not exist on first apply
-
-        app_path="$APP_DIR/${svc.appDir}"
-        if [ -d "$app_path" ]; then
-          "$LSREGISTER" -u "$app_path" 2>/dev/null || true  # undoc-supp: app may not be deployed yet
-          chmod -R +w "$app_path" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
-          rm -rf "$app_path"
-        fi
-      '') removedNucleusAppBundles
-    )}
-
-    # ── Phase 2: Deploy app bundles (in declaration order) ────────────
-    ${builtins.concatStringsSep "\n" (
-      map (svc: ''
-        app_path="$APP_DIR/${svc.appDir}"
-        store_path="${svc.source}"
-
-        mkdir -p "$APP_DIR"
-        # Nix store outputs are read-only; strip that before deletion to avoid
-        # Permission denied on the next generation switch.
-        chmod -R +w "$app_path" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
-        rm -rf "$app_path"
-        cp -R "$store_path" "$APP_DIR/"
-
-        "$LSREGISTER" -R -f "$app_path" || true  # undoc-supp: LaunchServices may reject unsigned bundles; not fatal
-
-        # Enable the service in NSServicesStatus so it appears in the Services
-        # menu and right-click context menu without manual toggling in
-        # System Settings > Extensions > Services.
-        # Service key format: "<NSBundleIdentifier> - <NSMenuItem.default> - <NSMessage>"
-        # Uses presentation_modes dict (macOS 14+) instead of legacy
-        # enabled_context_menu/enabled_services_menu booleans.
-        enablement_key="${svc.bundleId} - ${svc.menuItem} - ${svc.message}"
-        /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
-          '<dict><key>presentation_modes</key>${mkPresentationModes svc.presentationModes}</dict>'
-      '') currentNucleusAppBundles
-    )}
-  '';
+  home.activation."macos-app-bundle-lib" = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+    ''
+      set -eu
+    ''
+    +
+      builtins.replaceStrings
+        [ "__MACOS_APP_BUNDLE_LIB__" "__JQ_BIN__" "__REMOVED_BUNDLES_JSON__" "__CURRENT_BUNDLES_JSON__" ]
+        [
+          (builtins.readFile ../../../scripts/lib/macos-app-bundle-lib.sh)
+          "${pkgs.jq}/bin/jq"
+          (builtins.toJSON (
+            map (svc: {
+              inherit (svc)
+                appDir
+                bundleId
+                menuItem
+                message
+                ;
+            }) removedNucleusAppBundles
+          ))
+          (builtins.toJSON (
+            map (svc: {
+              inherit (svc)
+                appDir
+                bundleId
+                menuItem
+                message
+                ;
+              source = "${svc.source}";
+              presentationModesDict = "<dict>${mkPresentationModes svc.presentationModes}</dict>";
+            }) currentNucleusAppBundles
+          ))
+        ]
+        (builtins.readFile ../../../scripts/services/deploy-app-bundles.sh)
+  );
 }
