@@ -24,46 +24,30 @@ let
   pwshYamlVersion = lockfile.pwsh."powershell-yaml" or null;
 
   profileContent =
-    let
-      nixPreamble = ''
-            # This file is managed by nucleus (src/modules/pwsh.nix).
-            # Manual edits will be overwritten on the next `nix run .#apply`.
-
-
-
-            # Managed PATH: prepend dirs (before system default).
-            ${managedPaths.toPowerShellPrependSnippet}
-
-            # Managed PATH: append dirs (after system default).
-            # Canonical source: env-catalog.nix -> managed-paths.nix (pathComponents).
-            ${managedPaths.toPowerShellAppendSnippet}
-
-
-            # LLVM/Clang toolchain defaults sourced from the centralized env var
-            # catalog.  All-process on all hosts.
-            # Source: src/modules/lib/env-catalog.nix (CC, CXX, LD entries).
-            $env:CC = "${envVars.resolveValue "CC" envVars.currentOs}"
-            $env:CXX = "${envVars.resolveValue "CXX" envVars.currentOs}"
-            $env:LD = "${envVars.resolveValue "LD" envVars.currentOs}"
-
-            # Managed default dev tools path for profile functions.
-            $global:NUCLEUS_DEFAULT_DEV_TOOLS = "${managedPaths.defaultDevTools}"
-
-            # ---------------------------------------------------------------
-            # AI agent session detection
-            # ---------------------------------------------------------------
-            # Environment variable names sourced from src/modules/agent-env-vars.nix.
-            function Test-NucleusAgentSession {
-        ${lib.concatStringsSep "\n" (
-          map (v: "      if (Test-Path env:${v}) { return $true }") agentEnv.agentEnvVarNames
-        )}
-              if (Test-Path "${agentEnv.devinPosixPath}") { return $true }
-              return $false
-            }
-      '';
-    in
-    # Method 4 (runtime embedded): profile-base.ps1 is read at eval time and embedded into the activation block as a literal string. No deployment step needed.
-    nixPreamble + (builtins.readFile ./configs/pwsh/profile-base.ps1);
+    # Method 4 (runtime embedded): init.ps1 and profile-base.ps1 are read at eval time and embedded into the activation block as a literal string. No deployment step needed.
+    builtins.replaceStrings
+      [
+        "__MANAGED_PREPEND_PATH__"
+        "__MANAGED_APPEND_PATH__"
+        "__ENV_CC__"
+        "__ENV_CXX__"
+        "__ENV_LD__"
+        "__DEFAULT_DEV_TOOLS_PATH__"
+        "__AGENT_ENV_VAR_NAMES__"
+        "__AGENT_DEVIN_POSIX_PATH__"
+      ]
+      [
+        managedPaths.toPowerShellPrependSnippet
+        managedPaths.toPowerShellAppendSnippet
+        (envVars.resolveValue "CC" envVars.currentOs)
+        (envVars.resolveValue "CXX" envVars.currentOs)
+        (envVars.resolveValue "LD" envVars.currentOs)
+        managedPaths.defaultDevTools
+        (lib.concatStringsSep " " agentEnv.agentEnvVarNames)
+        agentEnv.devinPosixPath
+      ]
+      (builtins.readFile ../scripts/shell/init.ps1)
+    + (builtins.readFile ./configs/pwsh/profile-base.ps1);
 in
 {
   # Place the PowerShell profile at the CurrentUserCurrentHost location for
@@ -73,41 +57,19 @@ in
 
   # Install PSScriptAnalyzer for PowerShell linting if pwsh is available.
   # This enables the lint phase in scripts/check-pwsh.ps1.
-  home.activation.installPwshScriptAnalyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    _pwsh="${pkgs.powershell}/bin/pwsh"
-    if [ -x "$_pwsh" ] && [ -n "${pwshAnalyzerVersion}" ]; then
-      "$_pwsh" -NoProfile -Command "
-        \$requiredVersion = '${pwshAnalyzerVersion}'
-        \$installed = Get-Module -ListAvailable -Name PSScriptAnalyzer | Select-Object -First 1
-        if (-not \$installed -or \$installed.Version -ne [Version]\$requiredVersion) {
-          if (\$installed) {
-            Write-Host 'installPwshScriptAnalyzer: removing PSScriptAnalyzer version '\$(\$installed.Version)'...' -ForegroundColor Yellow
-            Uninstall-Module -Name PSScriptAnalyzer -AllVersions -Force
-          }
-          Write-Host 'installPwshScriptAnalyzer: installing PSScriptAnalyzer version \$requiredVersion...' -ForegroundColor Cyan
-          Install-Module -Name PSScriptAnalyzer -RequiredVersion \$requiredVersion -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
-        }
-      "
-    fi
-  '';
+  home.activation.installPwshScriptAnalyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+    builtins.replaceStrings
+      [ "__PWSH_BIN__" "__MODULE_NAME__" "__MODULE_VERSION__" ]
+      [ "${pkgs.powershell}/bin/pwsh" "PSScriptAnalyzer" pwshAnalyzerVersion ]
+      (builtins.readFile ../scripts/lib/install-pwsh-module.sh)
+  );
 
   # Install powershell-yaml for locked DSC validation if pwsh is available.
   # This enables the locked DSC validation phase in scripts/check.ps1.
-  home.activation.installPwshYaml = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    _pwsh="${pkgs.powershell}/bin/pwsh"
-    if [ -x "$_pwsh" ] && [ -n "${pwshYamlVersion}" ]; then
-      "$_pwsh" -NoProfile -Command "
-        \$requiredVersion = '${pwshYamlVersion}'
-        \$installed = Get-Module -ListAvailable -Name powershell-yaml | Select-Object -First 1
-        if (-not \$installed -or \$installed.Version -ne [Version]\$requiredVersion) {
-          if (\$installed) {
-            Write-Host 'installPwshYaml: removing powershell-yaml version '\$(\$installed.Version)'...' -ForegroundColor Yellow
-            Uninstall-Module -Name powershell-yaml -AllVersions -Force
-          }
-          Write-Host 'installPwshYaml: installing powershell-yaml version \$requiredVersion...' -ForegroundColor Cyan
-          Install-Module -Name powershell-yaml -RequiredVersion \$requiredVersion -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
-        }
-      "
-    fi
-  '';
+  home.activation.installPwshYaml = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+    builtins.replaceStrings
+      [ "__PWSH_BIN__" "__MODULE_NAME__" "__MODULE_VERSION__" ]
+      [ "${pkgs.powershell}/bin/pwsh" "powershell-yaml" pwshYamlVersion ]
+      (builtins.readFile ../scripts/lib/install-pwsh-module.sh)
+  );
 }
