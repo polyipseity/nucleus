@@ -1,13 +1,8 @@
 # shellcheck shell=sh
 # Finder sidebar favorites library functions.
 #
-# Source this file via builtins.readFile within activation blocks, then call
-# the functions below. The caller MUST set these variables before calling
-# any function:
-#   _finder_favorites_json  — JSON array of [{name, url}, ...] with
-#                             URI-encoded file:// URLs
-#   _finder_jq_bin          — absolute path to jq binary
-#   _finder_mysides_bin     — absolute path to mysides binary
+# All functions take their required data as function parameters. The caller
+# (activation script) passes Nix-derived values.
 
 # ---------------------------------------------------------------------------
 # Ensure directories referenced by managed Finder favorites exist.
@@ -15,8 +10,10 @@
 # unconditionally; managed favorites use a symlink-safe guard.
 # ---------------------------------------------------------------------------
 finder_ensure_directories() {
+  local favorites_json="$1"
+  local jq_bin="$2"
   _ensure_tmp=$(mktemp)
-  printf '%s\n' "$_finder_favorites_json" | "$_finder_jq_bin" -r '.[] | .name' > "$_ensure_tmp"
+  printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | .name' > "$_ensure_tmp"
   while IFS= read -r _name; do
     # System-owned favorites (Applications, Desktop, Documents, Downloads,
     # Music, Movies, Pictures) always exist; managed favorites may be
@@ -44,20 +41,23 @@ finder_ensure_directories() {
 # bookmarks — activation must not abort.
 # ---------------------------------------------------------------------------
 finder_pre_remove() {
+  local favorites_json="$1"
+  local jq_bin="$2"
+  local mysides_bin="$3"
   _pr_tmp=$(mktemp)
-  printf '%s\n' "$_finder_favorites_json" | "$_finder_jq_bin" -r '.[] | .name' > "$_pr_tmp"
+  printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | .name' > "$_pr_tmp"
   while IFS= read -r _name; do
     # undoc-supp: mysides is known to segfault on corrupted bookmarks; soft-fail prevents activation abort.
-    "$_finder_mysides_bin" remove "$_name" >/dev/null 2>&1 || true
+    "$mysides_bin" remove "$_name" >/dev/null 2>&1 || true
   done < "$_pr_tmp"
   rm -f "$_pr_tmp"
   # Default extras that reappear after daemon restarts
   # undoc-supp: see finder_pre_remove — mysides segfaults.
-  "$_finder_mysides_bin" remove "/" >/dev/null 2>&1 || true
+  "$mysides_bin" remove "/" >/dev/null 2>&1 || true
   # undoc-supp: see finder_pre_remove.
-  "$_finder_mysides_bin" remove "$(id -un)" >/dev/null 2>&1 || true
+  "$mysides_bin" remove "$(id -un)" >/dev/null 2>&1 || true
   # undoc-supp: see finder_pre_remove.
-  "$_finder_mysides_bin" remove ".Trash" >/dev/null 2>&1 || true
+  "$mysides_bin" remove ".Trash" >/dev/null 2>&1 || true
   unset _pr_tmp
 }
 
@@ -67,14 +67,15 @@ finder_pre_remove() {
 # pipelines creates a subshell in POSIX sh).
 # ---------------------------------------------------------------------------
 finder_clear_all() {
+  local mysides_bin="$1"
   _clear_tmp=$(mktemp)
   # undoc-supp: mysides list may segfault on corrupted bookmarks; soft-fail prevents activation abort.
-  "$_finder_mysides_bin" list 2>/dev/null > "$_clear_tmp" || true
+  "$mysides_bin" list 2>/dev/null > "$_clear_tmp" || true
   while IFS= read -r _line; do
     _name="${_line%% -> *}"
     [ -n "$_name" ] || continue
     # undoc-supp: mysides remove may segfault; soft-fail prevents activation abort.
-    "$_finder_mysides_bin" remove "$_name" >/dev/null 2>&1 || true
+    "$mysides_bin" remove "$_name" >/dev/null 2>&1 || true
   done < "$_clear_tmp"
   rm -f "$_clear_tmp"
   unset _clear_tmp
@@ -86,14 +87,17 @@ finder_clear_all() {
 # Returns 1 if any addition fails (caller must decide how to propagate).
 # ---------------------------------------------------------------------------
 finder_add_managed_strict() {
+  local favorites_json="$1"
+  local jq_bin="$2"
+  local mysides_bin="$3"
   _add_tmp=$(mktemp)
-  printf '%s\n' "$_finder_favorites_json" | "$_finder_jq_bin" -r '.[] | @base64' > "$_add_tmp"
+  printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | @base64' > "$_add_tmp"
   _add_failed=0
   while IFS= read -r _item; do
-    _jq() { printf '%s\n' "$_item" | base64 -d | "$_finder_jq_bin" -r "$1"; }
+    _jq() { printf '%s\n' "$_item" | base64 -d | "$jq_bin" -r "$1"; }
     _name=$(_jq '.name')
     _url=$(_jq '.url')
-    if ! "$_finder_mysides_bin" add "$_name" "$_url" >/dev/null 2>&1; then
+    if ! "$mysides_bin" add "$_name" "$_url" >/dev/null 2>&1; then
       echo "macos: failed to add Finder favorite '$_name' ($_url)." >&2
       _add_failed=1
     fi
@@ -109,14 +113,17 @@ finder_add_managed_strict() {
 # restore favorites without aborting if mysides encounters transient errors.
 # ---------------------------------------------------------------------------
 finder_add_managed_best_effort() {
+  local favorites_json="$1"
+  local jq_bin="$2"
+  local mysides_bin="$3"
   _add_tmp=$(mktemp)
-  printf '%s\n' "$_finder_favorites_json" | "$_finder_jq_bin" -r '.[] | @base64' > "$_add_tmp"
+  printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | @base64' > "$_add_tmp"
   while IFS= read -r _item; do
-    _jq() { printf '%s\n' "$_item" | base64 -d | "$_finder_jq_bin" -r "$1"; }
+    _jq() { printf '%s\n' "$_item" | base64 -d | "$jq_bin" -r "$1"; }
     _name=$(_jq '.name')
     _url=$(_jq '.url')
     # undoc-supp: mysides add may segfault; best-effort add must not abort activation.
-    "$_finder_mysides_bin" add "$_name" "$_url" >/dev/null 2>&1 || true
+    "$mysides_bin" add "$_name" "$_url" >/dev/null 2>&1 || true
   done < "$_add_tmp"
   rm -f "$_add_tmp"
   unset _add_tmp _jq
@@ -126,12 +133,13 @@ finder_add_managed_best_effort() {
 # Remove default extras that reappear after daemon restarts.
 # ---------------------------------------------------------------------------
 finder_remove_default_extras() {
+  local mysides_bin="$1"
   # undoc-supp: mysides is known to segfault on corrupted bookmarks; soft-fail prevents activation abort.
-  "$_finder_mysides_bin" remove "/" >/dev/null 2>&1 || true
+  "$mysides_bin" remove "/" >/dev/null 2>&1 || true
   # undoc-supp: see finder_remove_default_extras — mysides segfaults.
-  "$_finder_mysides_bin" remove "$(id -un)" >/dev/null 2>&1 || true
+  "$mysides_bin" remove "$(id -un)" >/dev/null 2>&1 || true
   # undoc-supp: see finder_remove_default_extras.
-  "$_finder_mysides_bin" remove ".Trash" >/dev/null 2>&1 || true
+  "$mysides_bin" remove ".Trash" >/dev/null 2>&1 || true
 }
 
 # ---------------------------------------------------------------------------
@@ -142,49 +150,54 @@ finder_remove_default_extras() {
 # Returns 1 if any favorite addition failed (caller propagates to
 # _finder_sidebar_failed).
 finder_reconcile_strict() {
-  finder_pre_remove
-  finder_clear_all
+  local favorites_json="$1"
+  local jq_bin="$2"
+  local mysides_bin="$3"
+  finder_pre_remove "$favorites_json" "$jq_bin" "$mysides_bin"
+  finder_clear_all "$mysides_bin"
   _strict_failed=0
-  finder_add_managed_strict || _strict_failed=1
-  finder_remove_default_extras
+  finder_add_managed_strict "$favorites_json" "$jq_bin" "$mysides_bin" || _strict_failed=1
+  finder_remove_default_extras "$mysides_bin"
   return "$_strict_failed"
 }
 
 # Best-effort mode — used after Finder desktop restart to restore favorites
 # without aborting if mysides encounters transient errors.
 finder_reconcile_best_effort() {
-  finder_pre_remove
-  finder_clear_all
-  finder_add_managed_best_effort
-  finder_remove_default_extras
+  local favorites_json="$1"
+  local jq_bin="$2"
+  local mysides_bin="$3"
+  finder_pre_remove "$favorites_json" "$jq_bin" "$mysides_bin"
+  finder_clear_all "$mysides_bin"
+  finder_add_managed_best_effort "$favorites_json" "$jq_bin" "$mysides_bin"
+  finder_remove_default_extras "$mysides_bin"
 }
 
 # ---------------------------------------------------------------------------
 # Full Finder sidebar activation orchestration.
 # Called from configureFinderSidebar activation block.
-# Variables MUST be set before calling:
-#   _finder_favorites_json  — JSON array of [{name, url}, ...]
-#   _finder_jq_bin          — jq binary path
-#   _finder_mysides_bin     — mysides binary path
-#   _finder_expected_order  — expected sidebar order (pipe-separated names)
-#   _finder_managed_count   — number of managed favorites
 # ---------------------------------------------------------------------------
 finder_configure_sidebar() {
-  if [ ! -x "$_finder_mysides_bin" ]; then
+  local favorites_json="$1"
+  local jq_bin="$2"
+  local mysides_bin="$3"
+  local expected_order="$4"
+  local managed_count="$5"
+  if [ ! -x "$mysides_bin" ]; then
     echo "macos: mysides is unavailable; Finder favorites were not updated automatically." >&2
     exit 0
   fi
 
   _finder_sidebar_failed=0
 
-  finder_ensure_directories
-  finder_reconcile_strict || _finder_sidebar_failed=1
+  finder_ensure_directories "$favorites_json" "$jq_bin"
+  finder_reconcile_strict "$favorites_json" "$jq_bin" "$mysides_bin" || _finder_sidebar_failed=1
 
   # undoc-supp: mysides list may fail (segfault on corrupted bookmarks); best-effort probe.
-  _finder_list_output=$("$_finder_mysides_bin" list 2>/dev/null || true)
-  _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n "$_finder_managed_count" | /usr/bin/paste -sd'|' -)"
-  if [ "$_finder_actual_order" != "$_finder_expected_order" ]; then
-    echo "macos: warning — mysides reported sidebar order mismatch (expected: $_finder_expected_order, actual: $_finder_actual_order)." >&2
+  _finder_list_output=$("$mysides_bin" list 2>/dev/null || true)
+  _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n "$managed_count" | /usr/bin/paste -sd'|' -)"
+  if [ "$_finder_actual_order" != "$expected_order" ]; then
+    echo "macos: warning — mysides reported sidebar order mismatch (expected: $expected_order, actual: $_finder_actual_order)." >&2
     _finder_sidebar_failed=1
   fi
 

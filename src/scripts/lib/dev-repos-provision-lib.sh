@@ -43,7 +43,9 @@ resolve_repo_path() {
 # Repo-root-backed symlinks are only valid when apply.sh has recorded the
 # live checkout path. Failing fast here avoids quietly linking dev repos
 # to an empty string or a stale store path.
+# Takes the repo root as argument.
 resolve_repo_root_target() {
+  local repoRoot="$1"
   if [ -z "$repoRoot" ]; then
     report_error "repo root not set; run via apply.sh or export NUCLEUS_REPO_ROOT."
     return 1

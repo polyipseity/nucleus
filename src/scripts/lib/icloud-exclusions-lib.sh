@@ -1,20 +1,14 @@
 # iCloud exclusion convergence for directories matching configured names.
 # Called by activation hook and daily launchd agent.
 #
-# Environment variables:
-#   JQ_BIN              — path to jq binary
-#   FIND_BIN            — path to findutils find binary
-#   EXCLUDED_DIRS_JSON  — JSON array of directory names to exclude
-#   MANAGED_ROOTS_JSON  — JSON array of iCloud managed root paths (relative to $HOME)
-
-set -eu
-
-if [ "$EXCLUDED_DIRS_JSON" = "[]" ]; then
-  echo "macos: iCloud exclusions skipped (no excluded directory names configured)." >&2
-  return 0 2>/dev/null || exit 0
-fi
+# apply_exclusions JQ_BIN FIND_BIN EXCLUDED_DIRS_JSON MANAGED_ROOTS_JSON
+# Returns 0 on success, 1 on error.
 
 apply_exclusions() {
+  local jq_bin="$1"
+  local find_bin="$2"
+  local excluded_dirs_json="$3"
+  local managed_roots_json="$4"
   local count=0
   local start_time
   start_time=$(date +%s)
@@ -34,7 +28,7 @@ apply_exclusions() {
       else
         find_args+=( "-o" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
       fi
-    done < <(echo "$EXCLUDED_DIRS_JSON" | "$JQ_BIN" -r '.[]' 2>/dev/null)
+    done < <(echo "$excluded_dirs_json" | "$jq_bin" -r '.[]' 2>/dev/null)
 
     if [ "$first" -eq 1 ]; then
       continue
@@ -42,9 +36,9 @@ apply_exclusions() {
 
     find_args+=( ")" )
 
-    count_batch=$("$FIND_BIN" "$icloud_root" -type d "${find_args[@]}" -print 2>/dev/null | /usr/bin/wc -l | /usr/bin/tr -d ' ') || count_batch=0
+    count_batch=$("$find_bin" "$icloud_root" -type d "${find_args[@]}" -print 2>/dev/null | /usr/bin/wc -l | /usr/bin/tr -d ' ') || count_batch=0
     count=$(( count + count_batch ))
-  done < <(echo "$MANAGED_ROOTS_JSON" | "$JQ_BIN" -r '.[]' 2>/dev/null)
+  done < <(echo "$managed_roots_json" | "$jq_bin" -r '.[]' 2>/dev/null)
 
   end_time=$(date +%s)
   elapsed=$(( end_time - start_time ))
@@ -53,5 +47,3 @@ apply_exclusions() {
     echo "macos: iCloud exclusion applied to $count directories in ${elapsed}s" >&2
   fi
 }
-
-apply_exclusions
