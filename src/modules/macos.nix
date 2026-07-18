@@ -174,28 +174,7 @@ let
       sanitizeICloudManagedRoots [ ]
   );
 
-  # Shared FDA warning printer used by domain-specific defaults hooks.
-  mkFdaWarningFunction = target: ''
-    print_fda_warning() {
-      if [ "$fda_warning_emitted" -eq 1 ]; then
-        return
-      fi
-
-      bold="$(printf '\033[1m')"
-      red="$(printf '\033[31m')"
-      reset="$(printf '\033[0m')"
-      yellow="$(printf '\033[33m')"
-
-      printf '%s%sERROR: Full Disk Access Required%s\n' "$red" "$bold" "$reset" >&2
-      printf '%sNucleus cannot write ${target} from this terminal session.%s\n' "$yellow" "$reset" >&2
-      printf '%s\n' "To fix this:" >&2
-      printf '  1. Open %sSystem Settings > Privacy & Security > Full Disk Access%s\n' "$bold" "$reset" >&2
-      printf '  2. Toggle %sOn%s for your terminal emulator\n' "$bold" "$reset" >&2
-      printf '  3. If already enabled, remove and re-add it, then restart the terminal\n' >&2
-
-      fda_warning_emitted=1
-    }
-  '';
+  # fdaWarningFunction extracted to src/scripts/lib/macos-fda-warning-lib.sh
 
   # Standalone script for the daily icloud-exclusions LaunchAgent.
   # Uses bash (from the Nix store) rather than /bin/sh because the array-based
@@ -530,13 +509,17 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # activation. Apply these settings from user activation instead so Safari
     # hardening remains declarative without breaking `darwin-rebuild switch`.
     # -------------------------------------------------------------------------
-    macos-safari-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
-      fda_warning_emitted=0
-
-      ${mkFdaWarningFunction "protected Safari preferences"}
-
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-safari-defaults.sh}
-    '';
+    macos-safari-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
+      ''
+        fda_warning_emitted=0
+      ''
+      + (builtins.replaceStrings [ "__FDA_TARGET__" ] [ "protected Safari preferences" ] (
+        builtins.readFile ../scripts/lib/macos-fda-warning-lib.sh
+      ))
+      + ''
+        ${builtins.readFile ../scripts/hosts/MacBook/macos-safari-defaults.sh}
+      ''
+    );
 
     # -------------------------------------------------------------------------
     # macos-universal-access-defaults
@@ -544,13 +527,17 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # system-level defaults writes during `darwin-rebuild`. Apply them from the
     # user activation phase to keep accessibility intent without system errors.
     # -------------------------------------------------------------------------
-    macos-universal-access-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
-      fda_warning_emitted=0
-
-      ${mkFdaWarningFunction "Accessibility preferences"}
-
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-universal-access-defaults.sh}
-    '';
+    macos-universal-access-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
+      ''
+        fda_warning_emitted=0
+      ''
+      + (builtins.replaceStrings [ "__FDA_TARGET__" ] [ "Accessibility preferences" ] (
+        builtins.readFile ../scripts/lib/macos-fda-warning-lib.sh
+      ))
+      + ''
+        ${builtins.readFile ../scripts/hosts/MacBook/macos-universal-access-defaults.sh}
+      ''
+    );
 
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
