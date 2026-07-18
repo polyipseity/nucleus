@@ -130,7 +130,7 @@ in
               ))
               "${pkgs.jq}/bin/jq"
             ]
-            (builtins.readFile ../scripts/lib/ensure-symlink-targets.sh)
+            (builtins.readFile ../scripts/configs/ensure-symlink-targets.sh)
         );
 
     home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
@@ -165,7 +165,7 @@ in
           managedSymlinkManifestJson
           "${pkgs.jq}/bin/jq"
         ]
-        (builtins.readFile ../scripts/lib/finalize-symlinks.sh)
+        (builtins.readFile ../scripts/configs/finalize-symlinks.sh)
     );
   };
 }
