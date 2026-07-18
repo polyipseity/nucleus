@@ -61,7 +61,7 @@ in
     builtins.replaceStrings
       [ "__PWSH_BIN__" "__MODULE_NAME__" "__MODULE_VERSION__" ]
       [ "${pkgs.powershell}/bin/pwsh" "PSScriptAnalyzer" pwshAnalyzerVersion ]
-      (builtins.readFile ../scripts/lib/install-pwsh-module.sh)
+      (builtins.readFile ../scripts/configs/install-pwsh-module.sh)
   );
 
   # Install powershell-yaml for locked DSC validation if pwsh is available.
@@ -70,6 +70,6 @@ in
     builtins.replaceStrings
       [ "__PWSH_BIN__" "__MODULE_NAME__" "__MODULE_VERSION__" ]
       [ "${pkgs.powershell}/bin/pwsh" "powershell-yaml" pwshYamlVersion ]
-      (builtins.readFile ../scripts/lib/install-pwsh-module.sh)
+      (builtins.readFile ../scripts/configs/install-pwsh-module.sh)
   );
 }
