@@ -18,15 +18,17 @@
     provisioning, iCloud exclusions, VM setup, app bundle variables, LaunchServices
     handler registration, and the shared lib.sh
   - `secrets/` — secret provisioning helpers
+  - `shell/` — shell integration scripts (zsh init, PowerShell init, completion installation)
   - `configs/` — app-config merge helpers (INI merge, JSON merge, bun package install,
     app alias symlinks, LinearMouse config symlinks)
+  - `editors/` — editor-specific scripts (VS Code workspace trust)
   - `hosts/` — host-specific scripts: `MacBook/` (macOS) and `NixOS/`. Must be last resort:
     see placement policy below.
   - `agents/` — AI agent setup scripts
   - **Naming rule**:
     - Files under `hosts/MacBook/` MUST start with `macos-`; entry name = filename.
     - Files under `hosts/NixOS/` MUST start with `nixos-`; entry name = filename.
-    - All other subdirs (`services/`, `configs/`, `secrets/`, `agents/`): use natural words/phrases; entry name = filename.
+    - All other subdirs (`services/`, `configs/`, `editors/`, `secrets/`, `agents/`): use natural words/phrases; entry name = filename.
     - Rule does not apply to library scripts (`lib/`), runtime-only scripts, or wrapped derivations.
   - **Placement policy for `hosts/`**:
     1. **Platform-specific files → prefer non-hosts folders first.** If a script is platform-specific (macOS-only, Linux-only), first consider placing it in a non-hosts folder (`services/`, `lib/`, `configs/`, `secrets/`, `agents/`, or the root of `src/scripts/`). If it semantically fits one of those folders, put it there regardless of platform-specificity. Only put it under `hosts/<Host>/` when no non-hosts folder fits.
