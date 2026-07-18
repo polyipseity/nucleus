@@ -53,53 +53,34 @@ let
 
   # Libvirt domain XML template.  Indented strings in Nix strip the common
   # leading whitespace (6 spaces here), producing a 0-based XML document.
-  mkDomainXml = vm: ''
-    <domain type='kvm'>
-      <name>${vm.name}</name>
-      <title>${vm.display}</title>
-      <memory unit='MB'>${toString (vm.ramBytes / 1000000)}</memory>
-      <vcpu>${toString vm.cpus}</vcpu>
-      <os>
-        <type arch='${arch}' machine='${machine}'>hvm</type>
-        <boot dev='hd'/>
-      </os>
-      <cpu mode='host-passthrough'/>
-      <features>
-        <acpi/>
-        <apic/>
-      </features>
-      <devices>
-        <emulator>${emulator}</emulator>
-        <disk type='file' device='disk'>
-          <driver name='qemu' type='qcow2'/>
-          <source file='${vmDir}/${vm.name}.qcow2'/>
-          <target dev='vda' bus='virtio'/>
-        </disk>
-        <interface type='network'>
-          <source network='default'/>
-          <model type='virtio'/>
-        </interface>
-        <video>
-          <model type='${videoModel vm}'/>
-        </video>
-        <graphics type='spice' autoport='yes'>
-          <listen type='address'/>
-          <image compression='off'/>
-        </graphics>
-        <channel type='spicevmc'>
-          <target type='virtio' name='com.redhat.spice.0'/>
-        </channel>
-        <channel type='unix'>
-          <source mode='bind'/>
-          <target type='virtio' name='org.qemu.guest_agent.0'/>
-        </channel>${virtiofsDev vm}
-        <memballoon model='virtio'/>
-        <rng model='virtio'>
-          <backend model='random'>/dev/urandom</backend>
-        </rng>
-      </devices>
-    </domain>
-  '';
+  mkDomainXml =
+    vm:
+    builtins.replaceStrings
+      [
+        "__VM_NAME__"
+        "__VM_DISPLAY__"
+        "__VM_RAM_MB__"
+        "__VM_CPUS__"
+        "__VM_ARCH__"
+        "__VM_MACHINE__"
+        "__VM_EMULATOR__"
+        "__VM_DIR__"
+        "__VM_VIDEO_MODEL__"
+        "__VM_VIRTIOFS_DEV__"
+      ]
+      [
+        vm.name
+        vm.display
+        (toString (vm.ramBytes / 1000000))
+        (toString vm.cpus)
+        arch
+        machine
+        emulator
+        vmDir
+        (videoModel vm)
+        (virtiofsDev vm)
+      ]
+      (builtins.readFile ../../modules/configs/vms/nixos-domain.xml);
 in
 {
   # Enable KVM-accelerated QEMU virtualisation via the libvirt management API.
