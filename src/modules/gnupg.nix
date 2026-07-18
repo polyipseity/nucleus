@@ -24,15 +24,9 @@ lib.mkIf
     # pinned revision (a1fa429) does not expose programs.gnupg.agent.settings.
     # Without this file, pinentry-program defaults to the first on PATH and
     # allow-loopback-pinentry is unset, breaking non-interactive signing.
-    system.activationScripts.postActivation.text = lib.mkAfter ''
-      # ---- configureGpgAgent ----------------------------------------------------
-      # undoc-supp: /dev/console may not exist (headless/SSH session); empty result means no console user, handled downstream.
-      _console_home="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
-      if [ -n "$_console_home" ] && [ "$_console_home" != "/Users/root" ]; then
-        /bin/mkdir -p "$_console_home/.gnupg"
-        /bin/chmod 700 "$_console_home/.gnupg"
-        echo "pinentry-program ${pkgs.pinentry_mac}/bin/pinentry-mac" > "$_console_home/.gnupg/gpg-agent.conf"
-        echo "allow-loopback-pinentry" >> "$_console_home/.gnupg/gpg-agent.conf"
-      fi
-    '';
+    system.activationScripts.postActivation.text = lib.mkAfter (
+      builtins.replaceStrings [ "__PINENTRY_MAC_BIN__" ] [ "${pkgs.pinentry_mac}/bin/pinentry-mac" ] (
+        builtins.readFile ../scripts/lib/configure-gpg-agent.sh
+      )
+    );
   }
