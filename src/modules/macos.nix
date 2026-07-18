@@ -559,40 +559,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
       _finder_favorites_json='${builtins.toJSON finderSidebar.finderSidebarManagedFavorites}'
       _finder_jq_bin="${pkgs.jq}/bin/jq"
       _finder_mysides_bin="${pkgs.mysides}/bin/mysides"
+      _finder_expected_order="${finderSidebar.finderSidebarExpectedOrder}"
+      _finder_managed_count="${toString finderSidebar.finderSidebarManagedCount}"
 
       # Source finder sidebar functions
       ${builtins.readFile ../scripts/lib/macos-finder-sidebar.sh}
 
-      if [ ! -x "$_finder_mysides_bin" ]; then
-        echo "macos: mysides is unavailable; Finder favorites were not updated automatically." >&2
-        exit 0
-      fi
-
-      _finder_sidebar_failed=0
-
-      finder_ensure_directories
-      finder_reconcile_strict || _finder_sidebar_failed=1
-
-      _finder_expected_order="${finderSidebar.finderSidebarExpectedOrder}"
-      # undoc-supp: mysides list may fail (segfault on corrupted bookmarks); best-effort probe.
-      _finder_list_output=$("$_finder_mysides_bin" list 2>/dev/null || true)
-      _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n ${toString finderSidebar.finderSidebarManagedCount} | /usr/bin/paste -sd'|' -)"
-      if [ "$_finder_actual_order" != "$_finder_expected_order" ]; then
-        echo "macos: warning — mysides reported sidebar order mismatch (expected: $_finder_expected_order, actual: $_finder_actual_order)." >&2
-        _finder_sidebar_failed=1
-      fi
-
-      # Refresh finder-related daemons in-session
-      # undoc-supp: daemon may not be running; killall exits 1, activation must not abort.
-      /usr/bin/killall sharedfilelistd 2>/dev/null || true
-      # undoc-supp: see killall sharedfilelistd — daemon may not be running.
-      /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
-
-      if [ "$_finder_sidebar_failed" -eq 1 ]; then
-        echo "macos: Finder favorites were partially updated; if stale entries persist, log out and log back in once." >&2
-      else
-        echo "macos: Finder favorites updated automatically." >&2
-      fi
+      finder_configure_sidebar
     '';
 
     # -------------------------------------------------------------------------
