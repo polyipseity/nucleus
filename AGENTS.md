@@ -22,7 +22,8 @@
   - `configs/` — app config/install scripts and merge helpers (INI merge, JSON merge, GPG config,
     PowerShell module install, NixOS desktop actions, bun package install,
     app alias symlinks, LinearMouse config symlinks)
-  - `editors/` — editor-specific scripts (VS Code workspace trust)
+  - `editors/` — editor-specific scripts (VS Code workspace trust, extension symlink bridge,
+    config symlinks)
   - `hosts/` — host-specific scripts: `MacBook/` (macOS) and `NixOS/`. Must be last resort:
     see placement policy below.
   - `agents/` — AI agent setup scripts
