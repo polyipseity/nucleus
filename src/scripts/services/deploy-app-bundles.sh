@@ -1,10 +1,10 @@
 # Deploy and prune macOS app bundles via LaunchServices.
 # Tokens are substituted at build time by Nix.
-# Expects set -eu to be sourced before this script runs.
+# Expects set -eu and REPO_ROOT to be set before this script runs.
 set -eu
 
 # Source library helpers (provides LSREGISTER, APP_DIR).
-__MACOS_APP_BUNDLE_LIB__
+. "$REPO_ROOT/src/scripts/lib/macos-app-bundle-lib.sh"
 
 _vsd_jq_bin='__JQ_BIN__'
 _vsd_removed_bundles_json='__REMOVED_BUNDLES_JSON__'

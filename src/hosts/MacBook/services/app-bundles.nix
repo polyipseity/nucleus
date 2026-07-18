@@ -27,6 +27,12 @@
   ...
 }:
 let
+  # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh). Used for
+  # runtime sourcing of lib scripts in activation blocks. Cannot use a
+  # runtime env var because darwin-rebuild uses sudo, which strips
+  # NUCLEUS_REPO_ROOT from the activation environment.
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+
   # Known list of historically-removed Nucleus app bundles.
   # When a bundle is removed, add its metadata here and remove its app dir.
   # The activation script unconditionally removes its NSServicesStatus key
@@ -65,12 +71,12 @@ in
   home.activation."macos-app-bundle-lib" = lib.hm.dag.entryAfter [ "linkGeneration" ] (
     ''
       set -eu
+      REPO_ROOT="${repoRoot}"
     ''
     +
       builtins.replaceStrings
-        [ "__MACOS_APP_BUNDLE_LIB__" "__JQ_BIN__" "__REMOVED_BUNDLES_JSON__" "__CURRENT_BUNDLES_JSON__" ]
+        [ "__JQ_BIN__" "__REMOVED_BUNDLES_JSON__" "__CURRENT_BUNDLES_JSON__" ]
         [
-          (builtins.readFile ../../../scripts/lib/macos-app-bundle-lib.sh)
           "${pkgs.jq}/bin/jq"
           (builtins.toJSON (
             map (svc: {
