@@ -12,7 +12,7 @@
 let
   openManualScript = pkgs.writeShellScript "nucleus-open-manual" (
     builtins.replaceStrings [ "__XDG_OPEN_BIN__" ] [ "${pkgs.xdg-utils}/bin/xdg-open" ] (
-      builtins.readFile ./../../scripts/lib/nixos-open-manual.sh
+      builtins.readFile ./../../scripts/configs/open-manual.sh
     )
   );
 
