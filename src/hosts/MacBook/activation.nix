@@ -121,9 +121,11 @@ in
   #   configureGimpScrollSensitivity   — GIMP drag-zoom-speed (25% of default)
   #   configureLinearMousePreferences  — LinearMouse update-check suppression
   #   configureMiddleClick             — 4-finger gesture + native login item
+  #   configureMountyLoginItem         — native login item registration
   #   configureMissionControlSpansDisplays — spans-displays per-user pref
   #   configureMonitorColorProfile     — clear ColorSync device cache
   #   clearFinderCache                 — purge stale Finder state for desktop visibility
+  #   configureNvimLauncher            — macOS-specific neovim launcher
   #   disableSpotlight                 — disable all Spotlight hotkeys + service
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
@@ -150,19 +152,19 @@ in
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-ssh-access.sh}
 
     # ---- configureMiddleClick -------------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-middle-click.sh}
+    ${builtins.readFile ../../scripts/configs/middle-click.sh}
     # ---- configureMountyLoginItem ---------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-mounty-login-item.sh}
+    ${builtins.readFile ../../scripts/configs/mounty-login-item.sh}
     # ---- configureLinearMousePreferences --------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-linearmouse-prefs.sh}
+    ${builtins.readFile ../../scripts/configs/linearmouse-prefs.sh}
     # ---- configureGimpScrollSensitivity ---------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-gimp-scroll-sensitivity.sh}
+    ${builtins.readFile ../../scripts/configs/gimp-scroll-sensitivity.sh}
 
     # ---- configureMissionControlSpansDisplays ----------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-mission-control.sh}
+    ${builtins.readFile ../../scripts/configs/mission-control.sh}
 
     # ---- configureMonitorColorProfile ------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-color-profile.sh}
+    ${builtins.readFile ../../scripts/configs/color-profile.sh}
 
     # ---- clearFinderCache -------------------------------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-clear-finder-cache.sh}
@@ -171,7 +173,7 @@ in
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-disable-spotlight.sh}
 
     # ---- nvimLauncher -----------------------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-nvim-launcher.sh}
+    ${builtins.readFile ../../scripts/configs/nvim-launcher.sh}
 
     # ---- ensureSystemLogDirs (duplicated from extraActivation) -----------------
     # Also ensure directories exist during postActivation in case the log dir
