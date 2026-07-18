@@ -88,6 +88,19 @@ let
   obsidianManagedSettings = managedAppSettings "obsidian" obsidianDefaultSettings;
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;
 
+  # Out-of-store symlink paths protected across activation cycles.
+  # Expanded from $HOME to resolvedHomeDirectory at eval time so the JSON
+  # token carries absolute paths and no shell expansion is needed at runtime.
+  managedSymlinkPaths = [
+    "${resolvedHomeDirectory}/iCloud"
+    "${resolvedHomeDirectory}/.config/camilladsp/configs"
+    "${resolvedHomeDirectory}/.config/camillagui-backend/config.yml"
+    "${resolvedHomeDirectory}/.config/discord-music-rpc/config.yaml"
+    "${resolvedHomeDirectory}/.config/starship.toml"
+    "${resolvedHomeDirectory}/Library/Application Support/iTerm2/DynamicProfiles"
+  ];
+  managedSymlinkPathsJson = builtins.toJSON managedSymlinkPaths;
+
   # Picard baseline defaults are sourced from the canonical native INI file.
   # We apply these defaults with merge-overwrite semantics, then layer
   # user-specific [setting] overrides from users.json.
@@ -257,25 +270,33 @@ in
 
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
     # deletion between rebuilds.
-    home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-      _nucleus_unprotect_symlink "home.nix" "$HOME/iCloud"
-      _nucleus_unprotect_symlink "home.nix" "$HOME/.config/camilladsp/configs"
-      _nucleus_unprotect_symlink "home.nix" "$HOME/.config/camillagui-backend/config.yml"
-      _nucleus_unprotect_symlink "home.nix" "$HOME/.config/discord-music-rpc/config.yaml"
-      _nucleus_unprotect_symlink "home.nix" "$HOME/.config/starship.toml"
-      _nucleus_unprotect_symlink "home.nix" "$HOME/Library/Application Support/iTerm2/DynamicProfiles"
-    '';
+    home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] (
+      builtins.replaceStrings
+        [ "__MANAGED_SYMLINK_PATHS_JSON__" "__JQ_BIN__" ]
+        [ managedSymlinkPathsJson "${pkgs.jq}/bin/jq" ]
+        (
+          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+          + "\n"
+          + builtins.readFile ../scripts/lib/manage-out-of-store-symlinks.sh
+          + ''
+            _nucleus_unprotect_managed_paths "home.nix" "__MANAGED_SYMLINK_PATHS_JSON__" "__JQ_BIN__"
+          ''
+        )
+    );
 
-    home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-      _nucleus_protect_symlink "home.nix" "$HOME/iCloud"
-      _nucleus_protect_symlink "home.nix" "$HOME/.config/camilladsp/configs"
-      _nucleus_protect_symlink "home.nix" "$HOME/.config/camillagui-backend/config.yml"
-      _nucleus_protect_symlink "home.nix" "$HOME/.config/discord-music-rpc/config.yaml"
-      _nucleus_protect_symlink "home.nix" "$HOME/.config/starship.toml"
-      _nucleus_protect_symlink "home.nix" "$HOME/Library/Application Support/iTerm2/DynamicProfiles"
-    '';
+    home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+      builtins.replaceStrings
+        [ "__MANAGED_SYMLINK_PATHS_JSON__" "__JQ_BIN__" ]
+        [ managedSymlinkPathsJson "${pkgs.jq}/bin/jq" ]
+        (
+          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+          + "\n"
+          + builtins.readFile ../scripts/lib/manage-out-of-store-symlinks.sh
+          + ''
+            _nucleus_protect_managed_paths "home.nix" "__MANAGED_SYMLINK_PATHS_JSON__" "__JQ_BIN__"
+          ''
+        )
+    );
 
     # Override the default logDir (which uses ~) with a proper absolute path.
     # The launchd StandardErrorPath/StandardOutPath option types require an
