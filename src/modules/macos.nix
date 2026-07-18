@@ -288,18 +288,17 @@ let
     )
   );
 
-  guiEnvAgent = pkgs.writeShellScript "gui-env" ''
-    set -eu
-
-    export __nucleus_prepend="${managedPaths.toShellPrependPath}"
-    export __nucleus_append="${managedPaths.toShellAppendPath}"
-    export __nucleus_managed_set="${mkManagedDedupSet "$HOME"}"
-
-    ${builtins.readFile ../scripts/services/gui-env.sh}
-
-    # ── All other GUI env vars (user and non-user) ──
-    ${envVars.macOSAllVars}
-  '';
+  guiEnvAgent = pkgs.writeShellScript "gui-env" (
+    builtins.replaceStrings
+      [ "__NUCLEUS_PREPEND__" "__NUCLEUS_APPEND__" "__NUCLEUS_MANAGED_SET__" "__MACOS_ALL_VARS__" ]
+      [
+        managedPaths.toShellPrependPath
+        managedPaths.toShellAppendPath
+        (mkManagedDedupSet "$HOME")
+        envVars.macOSAllVars
+      ]
+      (builtins.readFile ../scripts/services/gui-env.sh)
+  );
 in
 lib.mkIf pkgs.stdenv.isDarwin {
   home.packages = [
