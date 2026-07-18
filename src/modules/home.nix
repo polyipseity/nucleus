@@ -88,6 +88,12 @@ let
   obsidianManagedSettings = managedAppSettings "obsidian" obsidianDefaultSettings;
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;
 
+  # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh). Used for
+  # runtime sourcing of lib scripts in activation blocks. Cannot use a
+  # runtime env var because darwin-rebuild/nixos-rebuild use sudo, which
+  # strips NUCLEUS_REPO_ROOT from the activation environment.
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+
   # Out-of-store symlink paths protected across activation cycles.
   # Expanded from $HOME to resolvedHomeDirectory at eval time so the JSON
   # token carries absolute paths and no shell expansion is needed at runtime.
@@ -270,33 +276,21 @@ in
 
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
     # deletion between rebuilds.
-    home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] (
-      builtins.replaceStrings
-        [ "__MANAGED_SYMLINK_PATHS_JSON__" "__JQ_BIN__" ]
-        [ managedSymlinkPathsJson "${pkgs.jq}/bin/jq" ]
-        (
-          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
-          + "\n"
-          + builtins.readFile ../scripts/lib/manage-out-of-store-symlinks.sh
-          + ''
-            _nucleus_unprotect_managed_paths "home.nix" '__MANAGED_SYMLINK_PATHS_JSON__' "__JQ_BIN__"
-          ''
-        )
-    );
+    home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+      set -eu
+      REPO_ROOT="${repoRoot}"
+      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
+      . "$REPO_ROOT/src/scripts/lib/manage-out-of-store-symlinks.sh"
+      _nucleus_unprotect_managed_paths "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
+    '';
 
-    home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      builtins.replaceStrings
-        [ "__MANAGED_SYMLINK_PATHS_JSON__" "__JQ_BIN__" ]
-        [ managedSymlinkPathsJson "${pkgs.jq}/bin/jq" ]
-        (
-          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
-          + "\n"
-          + builtins.readFile ../scripts/lib/manage-out-of-store-symlinks.sh
-          + ''
-            _nucleus_protect_managed_paths "home.nix" '__MANAGED_SYMLINK_PATHS_JSON__' "__JQ_BIN__"
-          ''
-        )
-    );
+    home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      set -eu
+      REPO_ROOT="${repoRoot}"
+      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
+      . "$REPO_ROOT/src/scripts/lib/manage-out-of-store-symlinks.sh"
+      _nucleus_protect_managed_paths "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
+    '';
 
     # Override the default logDir (which uses ~) with a proper absolute path.
     # The launchd StandardErrorPath/StandardOutPath option types require an
