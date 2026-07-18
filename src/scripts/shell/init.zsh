@@ -342,3 +342,5 @@ shell: managed uv is unavailable right now.
 EOF
   return 1
 }
+
+__MACOS_ICLOUD_HOOKS__
