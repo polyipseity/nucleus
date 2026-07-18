@@ -233,7 +233,7 @@ let
             )
           ))
         ]
-        (builtins.readFile ../scripts/services/macos-rclone-mount.sh)
+        (builtins.readFile ../scripts/services/rclone-mount.sh)
     );
 
   # Build a systemd ExecStop unmount command (NixOS only).
