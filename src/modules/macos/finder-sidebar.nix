@@ -60,6 +60,8 @@ let
   ];
 in
 rec {
+  inherit finderSidebarManagedFavorites;
+
   # Number of managed favorites; used to scope the sidebar-order comparison
   # to the exact count of expected entries.
   finderSidebarManagedCount = builtins.length finderSidebarManagedFavorites;
