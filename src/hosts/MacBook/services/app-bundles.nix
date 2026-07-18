@@ -91,7 +91,7 @@ in
                 message
                 ;
               source = "${svc.source}";
-              presentationModesDict = "<dict>${mkPresentationModes svc.presentationModes}</dict>";
+              presentationModesDict = mkPresentationModes svc.presentationModes;
             }) currentNucleusAppBundles
           ))
         ]

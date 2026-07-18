@@ -212,7 +212,7 @@ in
             map (wf: {
               inherit (wf) dir enablementKey;
               source = "${wf.source}";
-              presentationModesDict = "<dict>${mkPresentationModes wf.presentationModes}</dict>";
+              presentationModesDict = mkPresentationModes wf.presentationModes;
             }) currentNucleusWorkflows
           ))
           (builtins.toJSON (
