@@ -4,10 +4,12 @@
 # backoff.  Designed as a persistent daemon (KeepAlive / Restart=always /
 # scheduled task AtLogOn) — not a timer-driven oneshot.
 #
-# Dependencies (must be in PATH): websocat, jq
+# Dependencies: websocat, jq (PATH provided via __CAMILLADSP_HEARTBEAT_PATH__ token)
 #
 # Usage: camilladsp-heartbeat.sh [--port PORT] [--config FILE]
 set -euo pipefail
+
+export PATH="__CAMILLADSP_HEARTBEAT_PATH__:$PATH"
 
 # --- Self-contained helpers ---
 require_command() {
@@ -19,7 +21,7 @@ require_command() {
 # -------------------------------------------------------------------
 
 # --- Argument parsing ---
-ws_port=1234
+ws_port=__CAMILLADSP_WS_PORT__
 config_file="$HOME/.config/camilladsp/configs/config.yml"
 
 while [ $# -gt 0 ]; do

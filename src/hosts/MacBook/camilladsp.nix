@@ -17,37 +17,34 @@
 
 let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
-  userHome = config.users.users.${username}.home;
   wsPort = toString servicesJSON.camilladsp.network.websocket.port;
 
-  daemonScript = ./../../scripts/services/camilladsp-daemon.sh;
-  heartbeatScript = ./../../scripts/services/camilladsp-heartbeat.sh;
-
-  camilladspDaemon = pkgs.writeShellScript "camilladsp-daemon" ''
-    export PATH="${
-      pkgs.lib.makeBinPath [
-        pkgs.camilladsp
-        pkgs.websocat
-        pkgs.jq
+  camilladspDaemon = pkgs.writeShellScript "camilladsp-daemon" (
+    builtins.replaceStrings
+      [ "__CAMILLADSP_DAEMON_PATH__" "__CAMILLADSP_WS_PORT__" ]
+      [
+        (pkgs.lib.makeBinPath [
+          pkgs.camilladsp
+          pkgs.websocat
+          pkgs.jq
+        ])
+        wsPort
       ]
-    }:$PATH"
-    exec ${daemonScript} \
-      --port ${wsPort} \
-      --config ${userHome}/.config/camilladsp/configs/config.yml \
-      --statefile ${userHome}/.local/state/camilladsp/statefile.yml
-  '';
+      (builtins.readFile ./../../scripts/services/camilladsp-daemon.sh)
+  );
 
-  camilladspHeartbeat = pkgs.writeShellScript "camilladsp-heartbeat" ''
-    export PATH="${
-      pkgs.lib.makeBinPath [
-        pkgs.websocat
-        pkgs.jq
+  camilladspHeartbeat = pkgs.writeShellScript "camilladsp-heartbeat" (
+    builtins.replaceStrings
+      [ "__CAMILLADSP_HEARTBEAT_PATH__" "__CAMILLADSP_WS_PORT__" ]
+      [
+        (pkgs.lib.makeBinPath [
+          pkgs.websocat
+          pkgs.jq
+        ])
+        wsPort
       ]
-    }:$PATH"
-    exec ${heartbeatScript} \
-      --port ${wsPort} \
-      --config ${userHome}/.config/camilladsp/configs/config.yml
-  '';
+      (builtins.readFile ./../../scripts/services/camilladsp-heartbeat.sh)
+  );
 
   envVars = import ../../modules/lib/env-catalog.nix {
     inherit
@@ -79,7 +76,7 @@ in
       EnvironmentVariables = daemonEnv;
       KeepAlive = true;
       RunAtLoad = true;
-      WorkingDirectory = userHome;
+      WorkingDirectory = config.users.users.${username}.home;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/camilladsp/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/camilladsp/stderr.log";
     };
