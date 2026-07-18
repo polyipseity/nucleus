@@ -63,6 +63,12 @@ let
   managedSymlinkManifestJson = builtins.toJSON (
     map (entry: entry.linkAbsolutePath) selectedSymlinksResolved
   );
+
+  # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh). Used for
+  # runtime sourcing of lib scripts in activation blocks. Cannot use a
+  # runtime env var because darwin-rebuild/nixos-rebuild use sudo, which
+  # strips NUCLEUS_REPO_ROOT from the activation environment.
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 in
 {
   options.nucleus.customProvisionSymlinks = lib.mkOption {
@@ -136,8 +142,10 @@ in
     home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       set -eu
 
+      REPO_ROOT="${repoRoot}"
+      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
+
       _nucleus_manifest_path=${lib.escapeShellArg managedSymlinkManifestPath}
-      ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
 
       if [ -f "$_nucleus_manifest_path" ]; then
         while IFS= read -r _nucleus_link_path; do
@@ -150,22 +158,25 @@ in
     '';
 
     home.activation.finalizeCustomProvisionSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      builtins.replaceStrings
-        [
-          "__SYMLINK_HARDENING_LIB__"
-          "__MANAGED_SYMLINK_MANIFEST_PATH__"
-          "__SYMLINK_ENTRIES_JSON__"
-          "__MANAGED_SYMLINK_MANIFEST_JSON__"
-          "__JQ_BIN__"
-        ]
-        [
-          (builtins.readFile ../scripts/lib/symlink-hardening-lib.sh)
-          managedSymlinkManifestPath
-          (builtins.toJSON (map (entry: entry.linkAbsolutePath) selectedSymlinksResolved))
-          managedSymlinkManifestJson
-          "${pkgs.jq}/bin/jq"
-        ]
-        (builtins.readFile ../scripts/configs/finalize-symlinks.sh)
+      # Set REPO_ROOT before the script so it can source libs at runtime.
+      ''
+        REPO_ROOT="${repoRoot}"
+      ''
+      +
+        builtins.replaceStrings
+          [
+            "__MANAGED_SYMLINK_MANIFEST_PATH__"
+            "__SYMLINK_ENTRIES_JSON__"
+            "__MANAGED_SYMLINK_MANIFEST_JSON__"
+            "__JQ_BIN__"
+          ]
+          [
+            managedSymlinkManifestPath
+            (builtins.toJSON (map (entry: entry.linkAbsolutePath) selectedSymlinksResolved))
+            managedSymlinkManifestJson
+            "${pkgs.jq}/bin/jq"
+          ]
+          (builtins.readFile ../scripts/configs/finalize-symlinks.sh)
     );
   };
 }
