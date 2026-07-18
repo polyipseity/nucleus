@@ -351,7 +351,8 @@ in
     # -------------------------------------------------------------------------
     vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
-      ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
+      REPO_ROOT="${repoRoot}"
+      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
       ${builtins.replaceStrings
         [
           "__REPO_ROOT__"
@@ -388,7 +389,8 @@ in
     # -----------------------------------------------------------------------
     vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
-      ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
+      REPO_ROOT="${repoRoot}"
+      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
       ${builtins.replaceStrings [ "__EXTENSION_STORE__" ] [ "${extensionStore}" ] (
         builtins.readFile ../scripts/editors/vscode-extension-bridge.sh
       )}
