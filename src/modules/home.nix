@@ -279,7 +279,7 @@ in
           + "\n"
           + builtins.readFile ../scripts/lib/manage-out-of-store-symlinks.sh
           + ''
-            _nucleus_unprotect_managed_paths "home.nix" "__MANAGED_SYMLINK_PATHS_JSON__" "__JQ_BIN__"
+            _nucleus_unprotect_managed_paths "home.nix" '__MANAGED_SYMLINK_PATHS_JSON__' "__JQ_BIN__"
           ''
         )
     );
@@ -293,7 +293,7 @@ in
           + "\n"
           + builtins.readFile ../scripts/lib/manage-out-of-store-symlinks.sh
           + ''
-            _nucleus_protect_managed_paths "home.nix" "__MANAGED_SYMLINK_PATHS_JSON__" "__JQ_BIN__"
+            _nucleus_protect_managed_paths "home.nix" '__MANAGED_SYMLINK_PATHS_JSON__' "__JQ_BIN__"
           ''
         )
     );
