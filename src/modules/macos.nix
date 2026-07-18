@@ -588,43 +588,38 @@ lib.mkIf pkgs.stdenv.isDarwin {
     configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       set -eu
 
-      ${finderSidebar.finderSidebarEnsureDirectoriesShell}
+      # Variables consumed by the finder sidebar library
+      _finder_favorites_json='${builtins.toJSON finderSidebar.finderSidebarManagedFavorites}'
+      _finder_jq_bin="${pkgs.jq}/bin/jq"
+      _finder_mysides_bin="${pkgs.mysides}/bin/mysides"
 
-      MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
+      # Source finder sidebar functions
+      ${builtins.readFile ../scripts/lib/macos-finder-sidebar.sh}
 
-      if [ ! -x "$MYSIDES_BIN" ]; then
+      if [ ! -x "$_finder_mysides_bin" ]; then
         echo "macos: mysides is unavailable; Finder favorites were not updated automatically." >&2
         exit 0
       fi
 
       _finder_sidebar_failed=0
 
-      add_favorite() {
-        _name="$1"
-        _url="$2"
-
-        if ! "$MYSIDES_BIN" add "$_name" "$_url" >/dev/null 2>&1; then
-          echo "macos: failed to add Finder favorite '$_name' ($_url)." >&2
-          _finder_sidebar_failed=1
-        fi
-      }
-
-      # Clear current favorites first so the final list order is deterministic.
-      # `mysides list` is now considered healthy in this environment.
-      # Rebuild the exact managed order requested for Finder favorites.
-      ${finderSidebar.finderSidebarRebuildStrictShell}
+      finder_ensure_directories
+      finder_reconcile_strict || _finder_sidebar_failed=1
 
       _finder_expected_order="${finderSidebar.finderSidebarExpectedOrder}"
       # undoc-supp: mysides list may fail (segfault on corrupted bookmarks); best-effort probe.
-      _finder_list_output=$("$MYSIDES_BIN" list 2>/dev/null || true)
+      _finder_list_output=$("$_finder_mysides_bin" list 2>/dev/null || true)
       _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n ${toString finderSidebar.finderSidebarManagedCount} | /usr/bin/paste -sd'|' -)"
       if [ "$_finder_actual_order" != "$_finder_expected_order" ]; then
         echo "macos: warning — mysides reported sidebar order mismatch (expected: $_finder_expected_order, actual: $_finder_actual_order)." >&2
         _finder_sidebar_failed=1
       fi
 
-      # Refresh finder-related daemons in-session (sharedfilelistd, cfprefsd).
-      ${finderSidebar.finderRefreshDaemonsShell}
+      # Refresh finder-related daemons in-session
+      # undoc-supp: daemon may not be running; killall exits 1, activation must not abort.
+      /usr/bin/killall sharedfilelistd 2>/dev/null || true
+      # undoc-supp: see killall sharedfilelistd — daemon may not be running.
+      /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
 
       if [ "$_finder_sidebar_failed" -eq 1 ]; then
         echo "macos: Finder favorites were partially updated; if stale entries persist, log out and log back in once." >&2
@@ -645,11 +640,16 @@ lib.mkIf pkgs.stdenv.isDarwin {
     relaunchDesktopServices = lib.hm.dag.entryAfter [ "configureFinderSidebar" ] ''
       ${daemonRefresh.refreshDesktopServices}
 
-      # Finder restarts can reintroduce default favorites ordering.
-      # Re-apply managed favorites to keep deterministic output.
-      MYSIDES_BIN="${pkgs.mysides}/bin/mysides"
-      if [ -x "$MYSIDES_BIN" ]; then
-        ${finderSidebar.finderSidebarRebuildBestEffortShell}
+      # Variables consumed by the finder sidebar library
+      _finder_favorites_json='${builtins.toJSON finderSidebar.finderSidebarManagedFavorites}'
+      _finder_jq_bin="${pkgs.jq}/bin/jq"
+      _finder_mysides_bin="${pkgs.mysides}/bin/mysides"
+
+      # Source finder sidebar functions
+      ${builtins.readFile ../scripts/lib/macos-finder-sidebar.sh}
+
+      if [ -x "$_finder_mysides_bin" ]; then
+        finder_reconcile_best_effort
       fi
     '';
 
