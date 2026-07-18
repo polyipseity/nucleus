@@ -28,7 +28,7 @@ let
 in
 {
   # ---------------------------------------------------------------------------
-  # nixos-nvim-launcher
+  # nixos-nvim-launcher.sh
   # Creates a deterministic symlink at /etc/nucleus-bin/nvim that
   # vscode-neovim can use (the extension does not expand ${userHome} or ~).
   # Resolves the nvim path from the home-manager profile directory so that no
@@ -36,7 +36,7 @@ in
   # ---------------------------------------------------------------------------
   system.activationScripts."nvim-launcher" = lib.mkAfter ''
     NUCLEUS_NVIM_PATH="${config.home-manager.users.${username}.home.profileDirectory}/bin/nvim"
-    ${builtins.readFile ../../scripts/nvim-launcher.sh}
+    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-nvim-launcher.sh}
   '';
 
   # ---------------------------------------------------------------------------
