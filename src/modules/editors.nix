@@ -369,7 +369,7 @@ in
           vsCodeChatLanguageModelsFile
           "${pkgs.jq}/bin/jq"
         ]
-        (builtins.readFile ../scripts/lib/vscode-symlinks.sh)
+        (builtins.readFile ../scripts/editors/vscode-symlinks.sh)
       }
     '';
 
@@ -390,7 +390,7 @@ in
       set -eu
       ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
       ${builtins.replaceStrings [ "__EXTENSION_STORE__" ] [ "${extensionStore}" ] (
-        builtins.readFile ../scripts/lib/vscode-extension-bridge.sh
+        builtins.readFile ../scripts/editors/vscode-extension-bridge.sh
       )}
     '';
 
