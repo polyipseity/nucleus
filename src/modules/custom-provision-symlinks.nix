@@ -118,19 +118,20 @@ in
 
     home.activation.ensureCustomProvisionSymlinkTargets =
       lib.hm.dag.entryBefore [ "prepareCustomProvisionSymlinks" ]
-        ''
-          set -eu
-
-          mkdir -p "$(dirname ${lib.escapeShellArg managedSymlinkManifestPath})"
-
-          ${lib.concatMapStringsSep "\n" (
-            entry:
-            if entry.createTargetDirectory then
-              "mkdir -p \"$(dirname ${lib.escapeShellArg entry.linkAbsolutePath})\""
-            else
-              ""
-          ) selectedSymlinksResolved}
-        '';
+        (
+          builtins.replaceStrings
+            [ "__MANAGED_SYMLINK_MANIFEST_PATH__" "__SYMLINK_TARGET_DIRS_JSON__" "__JQ_BIN__" ]
+            [
+              managedSymlinkManifestPath
+              (builtins.toJSON (
+                map (entry: entry.linkAbsolutePath) (
+                  builtins.filter (entry: entry.createTargetDirectory) selectedSymlinksResolved
+                )
+              ))
+              "${pkgs.jq}/bin/jq"
+            ]
+            (builtins.readFile ../scripts/lib/ensure-symlink-targets.sh)
+        );
 
     home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       set -eu
@@ -148,24 +149,23 @@ in
       fi
     '';
 
-    home.activation.finalizeCustomProvisionSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      set -eu
-
-      _nucleus_manifest_path=${lib.escapeShellArg managedSymlinkManifestPath}
-      mkdir -p "$(dirname "$_nucleus_manifest_path")"
-      ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-
-      ${lib.concatMapStringsSep "\n" (entry: ''
-        if [ -L ${lib.escapeShellArg entry.linkAbsolutePath} ]; then
-          _nucleus_protect_symlink "customProvisionSymlinks" ${lib.escapeShellArg entry.linkAbsolutePath}
-        else
-          echo "customProvisionSymlinks: warning — expected managed symlink at ${entry.linkAbsolutePath}." >&2
-        fi
-      '') selectedSymlinksResolved}
-
-      cat > "$_nucleus_manifest_path" <<'EOF'
-      ${managedSymlinkManifestJson}
-      EOF
-    '';
+    home.activation.finalizeCustomProvisionSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+      builtins.replaceStrings
+        [
+          "__SYMLINK_HARDENING_LIB__"
+          "__MANAGED_SYMLINK_MANIFEST_PATH__"
+          "__SYMLINK_ENTRIES_JSON__"
+          "__MANAGED_SYMLINK_MANIFEST_JSON__"
+          "__JQ_BIN__"
+        ]
+        [
+          (builtins.readFile ../scripts/lib/symlink-hardening-lib.sh)
+          managedSymlinkManifestPath
+          (builtins.toJSON (map (entry: entry.linkAbsolutePath) selectedSymlinksResolved))
+          managedSymlinkManifestJson
+          "${pkgs.jq}/bin/jq"
+        ]
+        (builtins.readFile ../scripts/lib/finalize-symlinks.sh)
+    );
   };
 }
