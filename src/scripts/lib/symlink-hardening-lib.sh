@@ -90,3 +90,51 @@ _nucleus_prepend_first_executable_dir() {
   done
   return 1
 }
+
+# ensure_file_symlink TARGET LINK
+# Creates LINK as a symlink pointing to TARGET (a file).
+# Handles migration from real files/directories and old wrong symlinks.
+ensure_file_symlink() {
+  _efs_target="$1"
+  _efs_link="$2"
+
+  if [ -L "$_efs_link" ]; then
+    [ "$(readlink "$_efs_link")" = "$_efs_target" ] && return 0
+    _nucleus_unprotect_symlink "VS Code" "$_efs_link"
+    rm "$_efs_link"
+  elif [ -f "$_efs_link" ]; then
+    if [ ! -s "$_efs_target" ]; then
+      cp "$_efs_link" "$_efs_target"
+    fi
+    rm "$_efs_link"
+  fi
+
+  mkdir -p "$(dirname "$_efs_link")"
+  ln -s "$_efs_target" "$_efs_link"
+  _nucleus_protect_symlink "VS Code" "$_efs_link"
+}
+
+# ensure_dir_symlink TARGET LINK
+# Creates LINK as a symlink pointing to TARGET (a directory).
+ensure_dir_symlink() {
+  _eds_target="$1"
+  _eds_link="$2"
+
+  if [ -L "$_eds_link" ]; then
+    [ "$(readlink "$_eds_link")" = "$_eds_target" ] && return 0
+    _nucleus_unprotect_symlink "VS Code" "$_eds_link"
+    rm "$_eds_link"
+  elif [ -d "$_eds_link" ]; then
+    find "$_eds_link" -maxdepth 1 -mindepth 1 -type f | while IFS= read -r _f; do
+      _fname="$(basename "$_f")"
+      if [ ! -e "$_eds_target/$_fname" ]; then
+        cp "$_f" "$_eds_target/$_fname"
+      fi
+    done
+    rm -rf "$_eds_link"
+  fi
+
+  mkdir -p "$(dirname "$_eds_link")"
+  ln -s "$_eds_target" "$_eds_link"
+  _nucleus_protect_symlink "VS Code" "$_eds_link"
+}

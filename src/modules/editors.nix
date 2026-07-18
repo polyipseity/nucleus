@@ -479,115 +479,25 @@ in
     vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
       ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-
-      # Locate the live repo checkout so the activation can resolve the
-      # src/modules/configs/vscode/ path regardless of where the repo lives.
-      # $NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo.  The
-      # eval-time fallback covers home-manager activation, which runs as the
-      # user and does not inherit the sudo-level env var.
-      _vsym_repo_root="${repoRoot}"
-      if [ -z "$_vsym_repo_root" ] || [ ! -d "$_vsym_repo_root" ]; then
-        _vsym_repo_root="''${NUCLEUS_REPO_ROOT:?VS Code: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
-      fi
-
-      _vsym_config_dir="$_vsym_repo_root/src/modules/configs/vscode"
-      if [ ! -d "$_vsym_config_dir" ]; then
-        echo "VS Code: config dir not found: $_vsym_config_dir" >&2
-        exit 1
-      fi
-
-      # ensure_file_symlink TARGET LINK
-      # Creates LINK as a symlink pointing to TARGET (a file).
-      ensure_file_symlink() {
-        _efs_target="$1"
-        _efs_link="$2"
-
-        if [ -L "$_efs_link" ]; then
-          # Already a symlink: skip when correct, remove when wrong (e.g. old
-          # Nix-store path left over after removing home.file entry).
-          [ "$(readlink "$_efs_link")" = "$_efs_target" ] && return 0
-          _nucleus_unprotect_symlink "VS Code" "$_efs_link"
-          rm "$_efs_link"
-        elif [ -f "$_efs_link" ]; then
-          # Real file: migrate content to repo target only when the repo does
-          # not already contain meaningful content, so local VS Code edits that
-          # pre-date this activation are not silently discarded.
-          if [ ! -s "$_efs_target" ]; then
-            cp "$_efs_link" "$_efs_target"
-          fi
-          rm "$_efs_link"
-        fi
-
-        mkdir -p "$(dirname "$_efs_link")"
-        ln -s "$_efs_target" "$_efs_link"
-        _nucleus_protect_symlink "VS Code" "$_efs_link"
+      ${builtins.replaceStrings
+        [
+          "__REPO_ROOT__"
+          "__VSCODE_STABLE_BASE_DIR__"
+          "__VSCODE_INSIDERS_BASE_DIR__"
+          "__VSCODE_KEYBINDINGS_FILE__"
+          "__VSCODE_CHAT_LANGUAGE_MODELS_FILE__"
+          "__JQ_BIN__"
+        ]
+        [
+          repoRoot
+          stableBaseDir
+          insidersBaseDir
+          vsCodeKeybindingsFile
+          vsCodeChatLanguageModelsFile
+          "${pkgs.jq}/bin/jq"
+        ]
+        (builtins.readFile ../scripts/lib/vscode-symlinks.sh)
       }
-
-      # ensure_dir_symlink TARGET LINK
-      # Creates LINK as a symlink pointing to TARGET (a directory).
-      ensure_dir_symlink() {
-        _eds_target="$1"
-        _eds_link="$2"
-
-        if [ -L "$_eds_link" ]; then
-          [ "$(readlink "$_eds_link")" = "$_eds_target" ] && return 0
-          _nucleus_unprotect_symlink "VS Code" "$_eds_link"
-          rm "$_eds_link"
-        elif [ -d "$_eds_link" ]; then
-          # Real directory: copy each top-level file to the repo dir without
-          # overwriting existing repo content (repo is the source of truth).
-          find "$_eds_link" -maxdepth 1 -mindepth 1 -type f | while IFS= read -r _f; do
-            _fname="$(basename "$_f")"
-            if [ ! -e "$_eds_target/$_fname" ]; then
-              cp "$_f" "$_eds_target/$_fname"
-            fi
-          done
-          rm -rf "$_eds_link"
-        fi
-
-        mkdir -p "$(dirname "$_eds_link")"
-        ln -s "$_eds_target" "$_eds_link"
-        _nucleus_protect_symlink "VS Code" "$_eds_link"
-      }
-
-      for _vsym_base_dir in "${stableBaseDir}" "${insidersBaseDir}"; do
-        ensure_file_symlink "$_vsym_config_dir/settings.json"    "$_vsym_base_dir/settings.json"
-        ensure_file_symlink "$_vsym_config_dir/${vsCodeKeybindingsFile}" "$_vsym_base_dir/keybindings.json"
-
-        # chatLanguageModels is merge-copied rather than symlinked so that
-        # per-machine Ollama model entries added by VS Code directly are
-        # preserved across activations while repo-source entries are refreshed.
-        _chat_lm_repo="$_vsym_config_dir/${vsCodeChatLanguageModelsFile}"
-        _chat_lm_path="$_vsym_base_dir/chatLanguageModels.json"
-        if [ -L "$_chat_lm_path" ]; then
-          _nucleus_unprotect_symlink "VS Code" "$_chat_lm_path"
-          rm "$_chat_lm_path"
-        fi
-        if [ -s "$_chat_lm_path" ] 2>/dev/null; then
-          if ! ${pkgs.jq}/bin/jq -s \
-            '.[0] as $existing | reduce .[1][] as $item ($existing; (map(.name) | index($item.name)) as $idx | if $idx then .[$idx] = $item else . + [$item] end)' \
-            "$_chat_lm_path" "$_chat_lm_repo" > "$_chat_lm_path.tmp" 2>"$_chat_lm_path.jqerr"; then
-            echo "VS Code: warning — jq merge failed for $_chat_lm_path, keeping existing." >&2
-            cat "$_chat_lm_path.jqerr" >&2
-            rm -f "$_chat_lm_path.tmp" "$_chat_lm_path.jqerr"
-          else
-            mv "$_chat_lm_path.tmp" "$_chat_lm_path"
-            rm -f "$_chat_lm_path.jqerr"
-          fi
-        else
-          cp "$_chat_lm_repo" "$_chat_lm_path"
-        fi
-
-        ensure_file_symlink "$_vsym_config_dir/mcp.json"         "$_vsym_base_dir/mcp.json"
-        ensure_file_symlink "$_vsym_config_dir/tasks.json"       "$_vsym_base_dir/tasks.json"
-        ensure_dir_symlink  "$_vsym_config_dir/snippets"         "$_vsym_base_dir/snippets"
-        ensure_dir_symlink  "$_vsym_config_dir/prompts"          "$_vsym_base_dir/prompts"
-        ensure_dir_symlink  "$_vsym_config_dir/profiles"         "$_vsym_base_dir/profiles"
-        # Copilot Chat stores memories under a deep per-extension subpath;
-        # the repo uses a flat alias so the directory is easy to navigate.
-        ensure_dir_symlink  "$_vsym_config_dir/copilot-memories" \
-          "$_vsym_base_dir/globalStorage/github.copilot-chat/memory-tool/memories"
-      done
     '';
 
     # -----------------------------------------------------------------------
@@ -606,97 +516,9 @@ in
     vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
       ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-
-      source_extensions='${extensionStore}/share/vscode/extensions'
-      stable_extensions="$HOME/.vscode/extensions"
-      insiders_extensions="$HOME/.vscode-insiders/extensions"
-
-      # setup_extension_dir CHANNEL_EXTENSIONS
-      # Ensures CHANNEL_EXTENSIONS is a real writable directory containing
-      # per-extension symlinks into the Nix-managed source tree.  VS Code must
-      # write extensions.json inside this directory; a whole-directory symlink
-      # to the immutable Nix store prevents that with EACCES.
-      #
-      # Algorithm:
-      #   1. Migrate the old whole-directory Nix-store symlink (if present) to
-      #      a real writable directory so VS Code can write files inside it.
-      #   2. Add a per-extension symlink for every entry under source_extensions.
-      #      Correct symlinks → no-op; wrong symlinks → replaced; non-symlinks
-      #      (user-installed extensions) → left untouched.
-      #   3. Prune all entries not in the Nix-managed extension set (both stale
-      #      symlinks and non-managed real directories/files) and remove
-      #      .obsolete (VS Code deferred-deletion dotfile).
-      #   4. Remove extensions.json so VS Code rescans the directory on next
-      #      invocation.  When absent, VS Code derives the manifest from the
-      #      directory; when present it trusts the file and skips the scan.
-      setup_extension_dir() {
-        _sed_dir="$1"
-
-        # Step 1: migrate old whole-directory symlink to a real writable directory.
-        # The previous approach linked the entire extensions/ dir to the Nix store,
-        # which made VS Code's extensions.json writes fail with EACCES.
-        if [ -L "$_sed_dir" ]; then
-          _nucleus_unprotect_symlink "VS Code" "$_sed_dir"
-          rm "$_sed_dir"
-        fi
-        mkdir -p "$_sed_dir"
-
-        # Step 2: add a per-extension symlink for each Nix-managed extension.
-        # Trailing-slash glob only matches actual directories (and symlinked dirs);
-        # the -d guard handles the empty-source no-op without error.
-        for _sed_src in "$source_extensions"/*/; do
-          [ -d "$_sed_src" ] || continue
-          _sed_src="''${_sed_src%/}"
-          _sed_ext_name="''${_sed_src##*/}"
-          _sed_link="$_sed_dir/$_sed_ext_name"
-
-          if [ -L "$_sed_link" ]; then
-            # Correct symlink → no-op; wrong target (e.g. after store upgrade) → replace.
-            [ "$(readlink "$_sed_link")" = "$_sed_src" ] && continue
-            _nucleus_unprotect_symlink "VS Code" "$_sed_link"
-            rm "$_sed_link"
-          elif [ -e "$_sed_link" ]; then
-            # Non-symlink entry (user-installed extension): leave untouched.
-            continue
-          fi
-
-          ln -s "$_sed_src" "$_sed_link"
-          _nucleus_protect_symlink "VS Code" "$_sed_link"
-        done
-
-        # Step 3: prune all entries not in the Nix-managed extension set.
-        # Removes both stale symlinks and non-managed real directories/files so the
-        # bridge is the sole source of truth for the directory contents.  Use a
-        # bare-star glob (no trailing /) to catch broken symlinks as well.
-        for _sed_existing in "$_sed_dir"/*; do
-          [ -e "$_sed_existing" ] || [ -L "$_sed_existing" ] || continue
-          _sed_ext_name="''${_sed_existing##*/}"
-          [ -e "$source_extensions/$_sed_ext_name" ] && continue
-          if [ -L "$_sed_existing" ]; then
-            _nucleus_unprotect_symlink "VS Code" "$_sed_existing"
-          fi
-          rm -rf "$_sed_existing"
-        done
-        # .obsolete is a VS Code deferred-deletion marker written as a dotfile
-        # (not matched by the * glob above); remove it unconditionally so the
-        # bridge fully owns the directory state.
-        rm -f "$_sed_dir/.obsolete"
-
-        # Step 4: remove extensions.json so VS Code rescans the directory on
-        # next invocation and derives a fresh manifest from the symlink set.
-        # VS Code creates this file from a directory scan when absent; when the
-        # file is present VS Code trusts it and skips the scan, so a stale file
-        # (e.g. from a previous apply with fewer managed extensions) would make
-        # newly added extensions invisible.  The bridge owns the directory
-        # state; extensions.json is a derived artifact, not a source of truth.
-        rm -f "$_sed_dir/extensions.json"
-      }
-
-      mkdir -p "$HOME/.vscode"
-      setup_extension_dir "$stable_extensions"
-
-      mkdir -p "$HOME/.vscode-insiders"
-      setup_extension_dir "$insiders_extensions"
+      ${builtins.replaceStrings [ "__EXTENSION_STORE__" ] [ extensionStore ] (
+        builtins.readFile ../scripts/lib/vscode-extension-bridge.sh
+      )}
     '';
 
     # -----------------------------------------------------------------------
