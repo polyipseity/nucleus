@@ -31,25 +31,24 @@
     path = [ pkgs.litellm ];
     serviceConfig = {
       Type = "simple";
-      ExecStart = "${pkgs.writeShellScript "litellm-wrapper" ''
-        _keyfile_oru="${config.sops.secrets."ai_openrouter_api_key".path}"
-        if [ -f "$_keyfile_oru" ]; then
-          export OPENROUTER_API_KEY="$(cat "$_keyfile_oru")"
-        fi
-        _keyfile_oc_go="${config.sops.secrets."ai_opencode_go_api_key".path}"
-        if [ -f "$_keyfile_oc_go" ]; then
-          export OPENCODE_GO_API_KEY="$(cat "$_keyfile_oc_go")"
-        fi
-        _keyfile_oc_zen="${config.sops.secrets."ai_opencode_zen_api_key".path}"
-        if [ -f "$_keyfile_oc_zen" ]; then
-          export OPENCODE_ZEN_API_KEY="$(cat "$_keyfile_oc_zen")"
-        fi
-        exec ${pkgs.litellm}/bin/litellm \
-          --config ${config.users.users.${username}.home}/.config/nucleus/litellm-config.yml \
-          --port 4000 \
-          --host 127.0.0.1 \
-          --drop_params
-      ''}";
+      ExecStart = "${pkgs.writeShellScript "litellm-wrapper" (
+        builtins.replaceStrings
+          [
+            "__OPENROUTER_API_KEY_PATH__"
+            "__OPENCODE_GO_API_KEY_PATH__"
+            "__OPENCODE_ZEN_API_KEY_PATH__"
+            "__LITELLM_BIN__"
+            "__LITELLM_CONFIG__"
+          ]
+          [
+            config.sops.secrets."ai_openrouter_api_key".path
+            config.sops.secrets."ai_opencode_go_api_key".path
+            config.sops.secrets."ai_opencode_zen_api_key".path
+            "${pkgs.litellm}/bin/litellm"
+            "${config.users.users.${username}.home}/.config/nucleus/litellm-config.yml"
+          ]
+          (builtins.readFile ../../scripts/services/nixos-litellm-wrapper.sh)
+      )}";
       Restart = "always";
       User = "litellm";
       # Protect against resource exhaustion and information leaks.
