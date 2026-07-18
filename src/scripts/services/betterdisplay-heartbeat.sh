@@ -1,12 +1,16 @@
 # BetterDisplay virtual screen heartbeat.  Polls the HeadlessDisplay every 30
 # seconds and reconnects it if BetterDisplay marks it as disconnected.
 #
-# Environment variables:
+# Environment variables (with built-in defaults):
 #   BD_BIN  — path to BetterDisplay executable
 #   BD_APP  — path to BetterDisplay .app bundle
 #   DISPLAY_NAME — virtual display name to monitor
 
 set +e  # heartbeat is fully soft-fail; never abort on individual check failure
+
+: "${BD_BIN:=/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay}" \
+  "${BD_APP:=/Applications/BetterDisplay.app}" \
+  "${DISPLAY_NAME:=HeadlessDisplay}"
 
 # _bd_cli args... — Execute BetterDisplay CLI command, soft-fail on error.
 _bd_cli() {

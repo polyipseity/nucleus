@@ -219,12 +219,9 @@ let
     '';
   };
 
-  betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" ''
-    export BD_BIN="/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay"
-    export BD_APP="/Applications/BetterDisplay.app"
-    export DISPLAY_NAME="HeadlessDisplay"
-    ${builtins.readFile ../scripts/services/betterdisplay-heartbeat.sh}
-  '';
+  betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" (
+    builtins.readFile ../scripts/services/betterdisplay-heartbeat.sh
+  );
 
   # Wrapper script for the nix-index daily database rebuild LaunchAgent.
   # Lives in the Nix store so the ProgramArguments path is stable across
