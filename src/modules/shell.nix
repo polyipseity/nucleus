@@ -239,122 +239,33 @@ in
   # that could provide completions is present before we try to generate them.
   # ---------------------------------------------------------------------------
   home.activation = {
-    installZshCompletions = lib.hm.dag.entryAfter [ "installCargoBinstallPackages" ] ''
-      set -eu
-
-      _zsh_comp_dir="$HOME/.local/share/zsh/completions"
-      mkdir -p "$_zsh_comp_dir"
-
-      # Generate completion file for a tool if the file is absent or stale.
-      # Args: <binary-path> <completion-file> <shell-command>
-      _generate_if_stale() {
-        local _bin_path="$1"
-        local _comp_file="$2"
-        local _gen_cmd="$3"
-
-        if [ -f "$_comp_file" ] && [ "$_comp_file" -nt "$_bin_path" ]; then
-          return 0  # already current, skip
-        fi
-
-        echo "zsh-completions: generating ''${_comp_file##*/}"
-        mkdir -p "$(dirname "$_comp_file")"
-        eval "$_gen_cmd" > "$_comp_file" 2>/dev/null || {
-          echo "  (failed, skipping)" >&2
-          rm -f "$_comp_file"
-        }
-      }
-
-      # -----------------------------------------------------------------------
-      # Tool completion table
-      # Each entry probes the Nix store path directly so PATH state (which
-      # changes during activation) does not matter.
-      #
-      # Selection rationale:
-      #   * Include every nucleus-provisioned CLI tool whose Nix package MAY
-      #     not bundle zsh completions into fpath.
-      #   * Rely on soft-fail to skip tools whose subcommand is absent or broken.
-      #   * Omitted: git (bundled), direnv/zoxide (HM integration handles them),
-      #     nix (bundled), fzf (source-based, not file-based).
-      # -----------------------------------------------------------------------
-      _generate_if_stale \
-        "${pkgs.bat}/bin/bat" \
-        "$_zsh_comp_dir/_bat" \
-        "'${pkgs.bat}/bin/bat' --completion zsh"
-
-      _generate_if_stale \
-        "${pkgs.bun}/bin/bun" \
-        "$_zsh_comp_dir/_bun" \
-        "'${pkgs.bun}/bin/bun' completions"
-
-      # cargo-binstall skipped: --completion flag not supported in current
-      # version (confirmed 2026-07-01). No replacement available.
-      #_generate_if_stale \
-      #  "${pkgs.cargo-binstall}/bin/cargo-binstall" \
-      #  "$_zsh_comp_dir/_cargo-binstall" \
-      #  "'${pkgs.cargo-binstall}/bin/cargo-binstall' --completion zsh"
-
-      # eza skipped: --generate-completion / --completion flags not supported
-      # in current version (confirmed 2026-07-01). No replacement available.
-      #_generate_if_stale \
-      #  "${pkgs.eza}/bin/eza" \
-      #  "$_zsh_comp_dir/_eza" \
-      #  "'${pkgs.eza}/bin/eza' --generate-completion zsh"
-
-      _generate_if_stale \
-        "${pkgs.fd}/bin/fd" \
-        "$_zsh_comp_dir/_fd" \
-        "'${pkgs.fd}/bin/fd' --gen-completions zsh"
-
-      _generate_if_stale \
-        "${pkgs.gh}/bin/gh" \
-        "$_zsh_comp_dir/_gh" \
-        "'${pkgs.gh}/bin/gh' completion -s zsh"
-
-      _generate_if_stale \
-        "${pkgs.opencode}/bin/opencode" \
-        "$_zsh_comp_dir/_opencode" \
-        "'${pkgs.opencode}/bin/opencode' completion zsh"
-
-      # prek skipped: no completion subcommand exists in current version
-      # (confirmed 2026-07-01). "prek completion zsh" is interpreted as hook
-      # selectors, not a completion command.
-      #_generate_if_stale \
-      #  "${pkgs.prek}/bin/prek" \
-      #  "$_zsh_comp_dir/_prek" \
-      #  "'${pkgs.prek}/bin/prek' completion zsh"
-
-      _generate_if_stale \
-        "${pkgs.ruff}/bin/ruff" \
-        "$_zsh_comp_dir/_ruff" \
-        "'${pkgs.ruff}/bin/ruff' generate-shell-completion zsh"
-
-      _generate_if_stale \
-        "${pkgs.rustup}/bin/rustup" \
-        "$_zsh_comp_dir/_rustup" \
-        "'${pkgs.rustup}/bin/rustup' completions zsh"
-
-      _generate_if_stale \
-        "${pkgs.typst}/bin/typst" \
-        "$_zsh_comp_dir/_typst" \
-        "'${pkgs.typst}/bin/typst' completions zsh"
-
-      _generate_if_stale \
-        "${pkgs.uv}/bin/uv" \
-        "$_zsh_comp_dir/_uv" \
-        "'${pkgs.uv}/bin/uv' generate-shell-completion zsh"
-
-      # -----------------------------------------------------------------------
-      # Nucleus-command completions: static zsh completion files shipped with
-      # the repository. Copied directly (no generation needed).
-      # -----------------------------------------------------------------------
-      _zsh_nucleus_comp_src="${./completions/zsh}"
-      for _zsh_nuc_f in "$_zsh_nucleus_comp_src"/_nucleus-* "$_zsh_nucleus_comp_src"/_nucleus; do
-        [ -f "$_zsh_nuc_f" ] || continue
-        cp -f "$_zsh_nuc_f" "$_zsh_comp_dir/"
-      done
-      unset _zsh_nucleus_comp_src _zsh_nuc_f
-
-      echo "zsh-completions: done"
-    '';
+    installZshCompletions = lib.hm.dag.entryAfter [ "installCargoBinstallPackages" ] (
+      builtins.replaceStrings
+        [
+          "__BAT_BIN__"
+          "__BUN_BIN__"
+          "__FD_BIN__"
+          "__GH_BIN__"
+          "__OPENCODE_BIN__"
+          "__RUFF_BIN__"
+          "__RUSTUP_BIN__"
+          "__TYPST_BIN__"
+          "__UV_BIN__"
+          "__ZSH_COMPLETIONS_SRC__"
+        ]
+        [
+          "${pkgs.bat}/bin/bat"
+          "${pkgs.bun}/bin/bun"
+          "${pkgs.fd}/bin/fd"
+          "${pkgs.gh}/bin/gh"
+          "${pkgs.opencode}/bin/opencode"
+          "${pkgs.ruff}/bin/ruff"
+          "${pkgs.rustup}/bin/rustup"
+          "${pkgs.typst}/bin/typst"
+          "${pkgs.uv}/bin/uv"
+          ./completions/zsh
+        ]
+        (builtins.readFile ../scripts/shell/install-zsh-completions.sh)
+    );
   };
 }
