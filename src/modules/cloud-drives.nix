@@ -337,12 +337,12 @@ in
         home.activation.cloudDrivesSetup = lib.hm.dag.entryAfter [ "writeBoundary" ] (
           ''
             set -eu
+            REPO_ROOT="${repoRoot}"
           ''
           +
             builtins.replaceStrings
-              [ "__CLOUD_DRIVE_SETUP_LIB__" "__JQ_BIN__" "__ENABLED_MOUNTS_JSON__" "__ENABLED_REPLICAS_JSON__" ]
+              [ "__JQ_BIN__" "__ENABLED_MOUNTS_JSON__" "__ENABLED_REPLICAS_JSON__" ]
               [
-                (builtins.readFile ../scripts/lib/cloud-drive-setup-lib.sh)
                 "${pkgs.jq}/bin/jq"
                 (builtins.toJSON (map (m: { inherit (m) localPath; }) enabledMounts))
                 (builtins.toJSON (
