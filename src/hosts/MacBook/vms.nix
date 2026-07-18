@@ -76,159 +76,38 @@ let
 
   # UTM 4.x QEMU-backend plist template.  Indented strings in Nix strip the
   # common leading whitespace (6 spaces here), producing a 0-based document.
-  mkConfigPlist = vm: ''
-    <?xml version="1.0" encoding="UTF-8"?>
-    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-    <plist version="1.0">
-    <dict>
-        <key>Backend</key>
-        <string>QEMU</string>
-        <key>ConfigurationVersion</key>
-        <integer>4</integer>
-        <key>Drive</key>
-        <array>
-            <dict>
-                <key>Identifier</key>
-                <string>${vm.name}-disk-main</string>
-                <key>ImageName</key>
-                <string>disk-main.qcow2</string>
-                <key>ImageType</key>
-                <string>Disk</string>
-                <key>Interface</key>
-                <string>VirtIO</string>
-                <key>InterfaceVersion</key>
-                <integer>1</integer>
-                <key>ReadOnly</key>
-                <false/>
-            </dict>
-        </array>
-        <key>Display</key>
-        <array>
-            <dict>
-            <key>DownscalingFilter</key>
-            <string>Linear</string>
-                <key>Hardware</key>
-                <string>${displayCard vm}</string>
-            <key>NativeResolution</key>
-            <false/>
-            <key>UpscalingFilter</key>
-            <string>Nearest</string>
-                <key>DynamicResolution</key>
-            <false/>
-            </dict>
-        </array>
-        <key>Sound</key>
-        <array>
-          <dict>
-            <key>Hardware</key>
-            <string>intel-hda</string>
-          </dict>
-        </array>
-        <key>Information</key>
-        <dict>
-          <key>IconCustom</key>
-          <false/>
-            <key>Name</key>
-            <string>${vm.display}</string>
-            <key>UUID</key>
-            <string>${mkUuid vm.name}</string>
-        </dict>
-        <key>Network</key>
-        <array>
-            <dict>
-                <key>Hardware</key>
-                <string>virtio-net-pci</string>
-              <key>IsolateFromHost</key>
-              <false/>
-              <key>MacAddress</key>
-              <string>${mkMacAddress vm.name}</string>
-                <key>Mode</key>
-                <string>Shared</string>
-              <key>PortForward</key>
-              <array>
-                <dict>
-                  <key>Protocol</key>
-                  <string>TCP</string>
-                  <key>GuestPort</key>
-                  <integer>22</integer>
-                  <key>HostPort</key>
-                  <integer>2222</integer>
-                </dict>
-              </array>
-            </dict>
-        </array>
-        <key>Serial</key>
-        <array/>
-        <key>Sharing</key>
-        <dict>
-          <key>ClipboardSharing</key>
-          <true/>
-          <key>DirectoryShareMode</key>
-          ${directoryShareMode vm}
-          <key>DirectoryShareReadOnly</key>
-          <false/>
-        </dict>
-        <key>QEMU</key>
-        <dict>
-          <key>AdditionalArguments</key>
-          <array>
-            <string>-chardev</string>
-            <string>socket,id=qga,path=/tmp/qga-${vm.name}.sock,server=on,wait=off</string>
-            <string>-device</string>
-            <string>virtio-serial</string>
-            <string>-device</string>
-            <string>virtserialport,chardev=qga,name=org.qemu.guest_agent.0</string>
-          </array>
-          <key>BalloonDevice</key>
-          <false/>
-          <key>DebugLog</key>
-          <false/>
-            <key>Hypervisor</key>
-            ${if qemuHypervisor vm then "<true/>" else "<false/>"}
-          <key>PS2Controller</key>
-          <false/>
-          <key>RNGDevice</key>
-          <true/>
-          <key>RTCLocalTime</key>
-          <false/>
-          <key>TPMDevice</key>
-          <false/>
-            <key>UEFIBoot</key>
-            ${if qemuUefiBoot vm then "<true/>" else "<false/>"}
-        </dict>
-        <key>Input</key>
-        <dict>
-          <key>MaximumUsbShare</key>
-          <integer>3</integer>
-          <key>UsbBusSupport</key>
-          <string>3.0</string>
-          <key>UsbSharing</key>
-          <false/>
-        </dict>
-        <key>System</key>
-        <dict>
-            <key>Architecture</key>
-            <string>${vmArch vm}</string>
-            <key>CPU</key>
-            <string>default</string>
-            <key>CPUCount</key>
-            <integer>${toString vm.cpus}</integer>
-          <key>CPUFlagsAdd</key>
-          <array/>
-          <key>CPUFlagsRemove</key>
-          <array/>
-          <key>ForceMulticore</key>
-          <false/>
-          <key>JITCacheSize</key>
-          <integer>0</integer>
-            <key>MemorySize</key>
-            <integer>${toString ((vm.ramBytes + 524288) / 1048576)}</integer>
-            <key>Target</key>
-            <string>${vmMachine vm}</string>
-        </dict>
-    </dict>
-    </plist>
-  '';
+  mkConfigPlist =
+    vm:
+    builtins.replaceStrings
+      [
+        "__VM_NAME__"
+        "__VM_DISPLAY__"
+        "__VM_DISPLAY_CARD__"
+        "__VM_DIR_SHARE_MODE__"
+        "__VM_UUID__"
+        "__VM_MAC_ADDRESS__"
+        "__VM_ARCH__"
+        "__VM_CPUS__"
+        "__VM_RAM_MB__"
+        "__VM_MACHINE__"
+        "__VM_HYPERVISOR__"
+        "__VM_UEFI_BOOT__"
+      ]
+      [
+        vm.name
+        vm.display
+        (displayCard vm)
+        (directoryShareMode vm)
+        (mkUuid vm.name)
+        (mkMacAddress vm.name)
+        (vmArch vm)
+        (toString vm.cpus)
+        (toString ((vm.ramBytes + 524288) / 1048576))
+        (vmMachine vm)
+        (if qemuHypervisor vm then "<true/>" else "<false/>")
+        (if qemuUefiBoot vm then "<true/>" else "<false/>")
+      ]
+      (builtins.readFile ../../modules/configs/vms/utm-config.plist.xml);
 in
 {
   # Write a UTM config.plist template for each VM declared in VMs.json.
