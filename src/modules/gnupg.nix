@@ -26,7 +26,7 @@ lib.mkIf
     # allow-loopback-pinentry is unset, breaking non-interactive signing.
     system.activationScripts.postActivation.text = lib.mkAfter (
       builtins.replaceStrings [ "__PINENTRY_MAC_BIN__" ] [ "${pkgs.pinentry_mac}/bin/pinentry-mac" ] (
-        builtins.readFile ../scripts/lib/configure-gpg-agent.sh
+        builtins.readFile ../scripts/configs/configure-gpg-agent.sh
       )
     );
   }
