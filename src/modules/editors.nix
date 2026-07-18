@@ -389,7 +389,7 @@ in
     vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
       ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-      ${builtins.replaceStrings [ "__EXTENSION_STORE__" ] [ extensionStore ] (
+      ${builtins.replaceStrings [ "__EXTENSION_STORE__" ] [ "${extensionStore}" ] (
         builtins.readFile ../scripts/lib/vscode-extension-bridge.sh
       )}
     '';

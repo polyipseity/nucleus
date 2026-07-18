@@ -40,7 +40,9 @@ let
   );
 
   proxyDaemon = pkgs.writeShellScript "https-proxy-daemon" (
-    builtins.replaceStrings [ "__CADDY_BIN__" "__CADDYFILE__" ] [ "${pkgs.caddy}/bin/caddy" caddyfile ]
+    builtins.replaceStrings
+      [ "__CADDY_BIN__" "__CADDYFILE__" ]
+      [ "${pkgs.caddy}/bin/caddy" "${caddyfile}" ]
       (builtins.readFile ../../scripts/services/macos-https-proxy-daemon.sh)
   );
 

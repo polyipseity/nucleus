@@ -42,7 +42,7 @@ let
         (envVars.resolveValue "CC" envVars.currentOs)
         (envVars.resolveValue "CXX" envVars.currentOs)
         (envVars.resolveValue "LD" envVars.currentOs)
-        managedPaths.defaultDevTools
+        "${managedPaths.defaultDevTools}"
         (lib.concatStringsSep " " agentEnv.agentEnvVarNames)
         agentEnv.devinPosixPath
       ]

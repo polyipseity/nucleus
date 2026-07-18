@@ -130,7 +130,7 @@ in
             map (v: "  [[ -n \"\${${v}:-}\" ]] && return 0") agentEnv.agentEnvVarNames
           ))
           agentEnv.devinPosixPath
-          managedPaths.defaultDevTools
+          "${managedPaths.defaultDevTools}"
           (lib.optionalString pkgs.stdenv.isDarwin (
             builtins.replaceStrings
               [ "__ICLOUD_EXCLUDED_NAMES__" "__ICLOUD_MANAGED_ROOTS__" ]
@@ -263,7 +263,7 @@ in
           "${pkgs.rustup}/bin/rustup"
           "${pkgs.typst}/bin/typst"
           "${pkgs.uv}/bin/uv"
-          ./completions/zsh
+          "${./completions/zsh}"
         ]
         (builtins.readFile ../scripts/shell/install-zsh-completions.sh)
     );
