@@ -10,11 +10,11 @@
   ...
 }:
 let
-  openManualScript = pkgs.writeShellScript "nucleus-open-manual" ''
-    set -eu
-    _nuc_repo=''${NUCLEUS_REPO_ROOT:?NUCLEUS_REPO_ROOT not set}
-    exec ${pkgs.xdg-utils}/bin/xdg-open "$_nuc_repo/src/hosts/NixOS/MANUAL.md"
-  '';
+  openManualScript = pkgs.writeShellScript "nucleus-open-manual" (
+    builtins.replaceStrings [ "__XDG_OPEN_BIN__" ] [ "${pkgs.xdg-utils}/bin/xdg-open" ] (
+      builtins.readFile ./../../scripts/lib/nixos-open-manual.sh
+    )
+  );
 
   # Ghostscript PDF optimization presets (quality descending).
   # Sorting policy: manually maintained in quality-descending order.
@@ -30,17 +30,12 @@ let
   # Per-preset Nautilus script with MIME-type guard (Nautilus scripts have no built-in MIME filtering).
   mkGSPdfOptNautilus =
     preset:
-    pkgs.writeShellScript "nucleus-gs-pdf-opt-nautilus-${preset}" ''
-      pdfs=()
-      for f in "$@"; do
-        case "$(${pkgs.file}/bin/file --mime-type -b "$f")" in
-          application/pdf) pdfs+=("$f") ;;
-        esac
-      done
-      if [ ''${#pdfs[@]} -gt 0 ]; then
-        exec nucleus-gs-pdf-opt --preset ${preset} "''${pdfs[@]}"
-      fi
-    '';
+    pkgs.writeShellScript "nucleus-gs-pdf-opt-nautilus-${preset}" (
+      builtins.replaceStrings
+        [ "__FILE_BIN__" "__GS_PDF_OPT_PRESET__" ]
+        [ "${pkgs.file}/bin/file" preset ]
+        (builtins.readFile ./../../scripts/lib/nixos-gs-pdf-opt-nautilus.sh)
+    );
 
   gsPdfOptNautilusScripts = builtins.listToAttrs (
     map (p: {
