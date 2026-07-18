@@ -1,6 +1,7 @@
 # Declarative ~/.agents directory layout with per-entry symlinks into
 # src/modules/configs/agents/ (skills/ managed by skills).
-# Activation reads $NUCLEUS_REPO_ROOT for out-of-store symlinks.
+# The repo root is baked at build time from $NUCLEUS_REPO_ROOT for out-of-store
+# symlink sources and lib runtime-sourcing paths.
 {
   config,
   lib,
@@ -8,12 +9,11 @@
   ...
 }:
 let
-  # Activation scripts resolve the repo root dynamically from $NUCLEUS_REPO_ROOT
-  # (set by apply.sh and forwarded through sudo), so out-of-store symlinks
-  # survive repo relocations and rebuilds without stale store paths.
-  # As a fallback, capture NUCLEUS_REPO_ROOT at eval time (where the env var IS
-  # available) so home-manager activation, which runs as the user and does not
-  # inherit the sudo-level env var, can still locate the repo root.
+  # Activation scripts embed the repo root path at build time (from
+  # $NUCLEUS_REPO_ROOT, set by apply.sh) so lib files can be sourced
+  # at runtime without builtins.readFile.  The baked path is the same
+  # one used for mkOutOfStoreSymlink — if NUCLEUS_REPO_ROOT is unset,
+  # both symlink targets and lib sourcing will fail identically.
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   # Keep path fragments centralized so activation entries reference one source
@@ -21,11 +21,6 @@ let
   agentsConfigRelativePath = "src/modules/configs/agents";
   agentsSkillsRelativePath = "${agentsConfigRelativePath}/skills";
   clawhubManifestRelativePath = "${agentsConfigRelativePath}/clawhub-skills.json";
-
-  # Inline shell helpers from the shared library file at build time so
-  # activation scripts can use _nucleus_protect_symlink, _nucleus_unprotect_symlink,
-  # _nucleus_resolve_repo_root, and _nucleus_prepend_first_executable_dir.
-  symlinkHardeningLib = builtins.readFile ../scripts/lib/symlink-hardening-lib.sh;
 
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
 
@@ -39,13 +34,15 @@ in
   };
 
   home.activation.unprotectOpencodeSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-    ${symlinkHardeningLib}
+    REPO_ROOT="${repoRoot}"
+    . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
     _nucleus_unprotect_symlink "agents.nix" "$HOME/.config/opencode/agents"
     _nucleus_unprotect_symlink "agents.nix" "$HOME/.config/opencode/commands"
   '';
 
   home.activation.protectOpencodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    ${symlinkHardeningLib}
+    REPO_ROOT="${repoRoot}"
+    . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
     _nucleus_protect_symlink "agents.nix" "$HOME/.config/opencode/agents"
     _nucleus_protect_symlink "agents.nix" "$HOME/.config/opencode/commands"
   '';
@@ -67,7 +64,7 @@ in
 
       export REPO_ROOT="${repoRoot}"
       export AGENTS_CONFIG_RELATIVE_PATH="${agentsConfigRelativePath}"
-      ${symlinkHardeningLib}
+      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
       ${builtins.readFile ../scripts/agents/agents-symlink.sh}
     '';
 
@@ -96,7 +93,7 @@ in
 
       export REPO_ROOT="${repoRoot}"
       export AGENTS_SKILLS_RELATIVE_PATH="${agentsSkillsRelativePath}"
-      ${symlinkHardeningLib}
+      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
       ${builtins.readFile ../scripts/agents/agent-skills.sh}
     '';
 
@@ -118,8 +115,9 @@ in
     installBunPackages = lib.hm.dag.entryAfter [ "agent-skills" ] ''
       set -eu
 
+      export REPO_ROOT="${repoRoot}"
       export JQ_BIN='${pkgs.jq}/bin/jq'
-      ${symlinkHardeningLib}
+      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
 
       # Add managed bin directories (managed-paths.nix pathComponents) to PATH
       # so binaries installed by previous apply runs and by this activation are
@@ -156,7 +154,8 @@ in
       # being available at activation time.
       ''
         set -eu
-        ${symlinkHardeningLib}
+        REPO_ROOT="${repoRoot}"
+        . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
       ''
       +
         builtins.replaceStrings
@@ -195,7 +194,8 @@ in
     initRustup = lib.hm.dag.entryAfter [ "linkGeneration" ] (
       ''
         set -eu
-        ${symlinkHardeningLib}
+        REPO_ROOT="${repoRoot}"
+        . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
       ''
       +
         builtins.replaceStrings
@@ -225,7 +225,8 @@ in
     installCargoBinstallPackages = lib.hm.dag.entryAfter [ "initRustup" ] (
       ''
         set -eu
-        ${symlinkHardeningLib}
+        REPO_ROOT="${repoRoot}"
+        . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
       ''
       +
         builtins.replaceStrings
@@ -268,7 +269,8 @@ in
     syncClawHubSkills = lib.hm.dag.entryAfter [ "installBunPackages" ] (
       ''
         set -eu
-        ${symlinkHardeningLib}
+        REPO_ROOT="${repoRoot}"
+        . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
       ''
       +
         builtins.replaceStrings

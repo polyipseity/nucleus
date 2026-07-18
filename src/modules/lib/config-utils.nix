@@ -11,9 +11,10 @@
   ...
 }:
 let
-  # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh).
+  # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh). Used for
+  # mkOutOfStoreSymlink source paths (build-time) and for lib sourcing paths
+  # (baked into activation scripts at build time, resolved at runtime).
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
-  symlinkHardeningLib = builtins.readFile ../scripts/lib/symlink-hardening-lib.sh;
 in
 {
   # ---------------------------------------------------------------------------
@@ -31,12 +32,14 @@ in
       config.lib.file.mkOutOfStoreSymlink "${repoRoot}/${repoRelPath}";
 
     home.activation."unprotectSymlink_${name}" = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      ${symlinkHardeningLib}
+      REPO_ROOT="${repoRoot}"
+      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
       _nucleus_unprotect_symlink "${name}" "$HOME/${targetRelPath}"
     '';
 
     home.activation."protectSymlink_${name}" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${symlinkHardeningLib}
+      REPO_ROOT="${repoRoot}"
+      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
       _nucleus_protect_symlink "${name}" "$HOME/${targetRelPath}"
     '';
   };
