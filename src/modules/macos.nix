@@ -282,10 +282,11 @@ let
     builtins.readFile ../scripts/services/ds-store-gc.sh
   );
 
-  gcWeekly = pkgs.writeShellScript "gc-weekly" ''
-    export REPO_ROOT="${repoRoot}"
-    ${builtins.readFile ../scripts/services/gc-weekly.sh}
-  '';
+  gcWeekly = pkgs.writeShellScript "gc-weekly" (
+    builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
+      builtins.readFile ../scripts/services/gc-weekly.sh
+    )
+  );
 
   guiEnvAgent = pkgs.writeShellScript "gui-env" ''
     set -eu
