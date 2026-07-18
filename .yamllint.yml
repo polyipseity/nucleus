@@ -1,11 +1,10 @@
+---
 extends: default
 
 ignore: |
   src/modules/configs/discord-music-rpc/config.yaml
+  src/secrets/
   vendor/**
 
 rules:
-  comments:
-    require-starting-space: false
-  line-length:
-    disable
+  line-length: disable
