@@ -14,26 +14,9 @@
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/system.gitignore";
   };
 
-  home.activation.gitIgnoreAssemble = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-        set -eu
-
-        _git_ignore_global="$HOME/.config/git/ignore-global"
-        _git_ignore_user="$HOME/.config/git/ignore-user"
-        _git_ignore_effective="$HOME/.config/git/ignore"
-
-        if [ ! -f "$_git_ignore_user" ]; then
-          cat > "$_git_ignore_user" <<'EOF'
-    # User-specific Git ignore patterns.
-    # Add one pattern per line; these are appended after ignore-global.
-    EOF
-        fi
-
-        {
-          cat "$_git_ignore_global"
-          printf '\n'
-          cat "$_git_ignore_user"
-        } > "$_git_ignore_effective"
-  '';
+  home.activation.gitIgnoreAssemble = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+    builtins.readFile ../scripts/configs/git-ignore-assemble.sh
+  );
 
   home.activation.gitEmptyTemplate = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     # Ensure the empty template directory exists so `init.templateDir` always
