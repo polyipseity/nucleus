@@ -39,22 +39,10 @@ let
     globalConfig + "\n" + builtins.concatStringsSep "\n" virtualHostConfigs
   );
 
-  proxyDaemon = pkgs.writeShellScript "https-proxy-daemon" ''
-    set -eu
-
-    state_root="/Users/Shared/https-proxy"
-    caddy_root="$state_root/caddy"
-    caddy_config_dir="$caddy_root/config"
-    caddy_data_dir="$caddy_root/data"
-    log_dir="$state_root/log"
-
-    mkdir -p "$caddy_config_dir" "$caddy_data_dir" "$log_dir"
-
-    export XDG_CONFIG_HOME="$caddy_config_dir"
-    export XDG_DATA_HOME="$caddy_data_dir"
-
-    exec ${pkgs.caddy}/bin/caddy run --config ${caddyfile} --adapter caddyfile
-  '';
+  proxyDaemon = pkgs.writeShellScript "https-proxy-daemon" (
+    builtins.replaceStrings [ "__CADDY_BIN__" "__CADDYFILE__" ] [ "${pkgs.caddy}/bin/caddy" caddyfile ]
+      (builtins.readFile ../../scripts/services/macos-https-proxy-daemon.sh)
+  );
 
   systemLogDir = config.nucleus.logging.systemLogDir;
 

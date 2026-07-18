@@ -108,14 +108,14 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${pkgs.writeShellScript "linux-builder-daemon" ''
-          export TMPDIR=/run/org.nixos.linux-builder USE_TMPDIR=1
-          rm -rf $TMPDIR
-          mkdir -p $TMPDIR
-          mkdir -p "${workDir}"
-          trap "rm -rf $TMPDIR" EXIT
-          exec ${pkg}/bin/create-builder
-        ''}"
+        "exec ${
+          pkgs.writeShellScript "linux-builder-daemon" (
+            builtins.replaceStrings
+              [ "__WORK_DIR__" "__CREATE_BUILDER_BIN__" ]
+              [ workDir "${pkg}/bin/create-builder" ]
+              (builtins.readFile ../../scripts/services/macos-linux-builder-daemon.sh)
+          )
+        }"
       ];
       KeepAlive = true;
       RunAtLoad = true;

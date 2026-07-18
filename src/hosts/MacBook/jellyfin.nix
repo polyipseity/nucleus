@@ -33,23 +33,16 @@ let
     NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
   };
 
-  jellyfinDaemon = pkgs.writeShellScript "jellyfin-daemon" ''
-    set -eu
-
-    state_root="${jellyfinStateRoot}"
-    config_dir="$state_root/config"
-    data_dir="$state_root/data"
-    cache_dir="$state_root/cache"
-    log_dir="${config.nucleus.logging.systemLogDir}/jellyfin-app"
-
-    mkdir -p "$config_dir" "$data_dir" "$cache_dir" "$log_dir"
-
-    exec ${pkgs.jellyfin}/bin/jellyfin \
-      --configdir "$config_dir" \
-      --datadir "$data_dir" \
-      --cachedir "$cache_dir" \
-      --logdir "$log_dir"
-  '';
+  jellyfinDaemon = pkgs.writeShellScript "jellyfin-daemon" (
+    builtins.replaceStrings
+      [ "__JELLYFIN_STATE_ROOT__" "__JELLYFIN_LOG_DIR__" "__JELLYFIN_BIN__" ]
+      [
+        jellyfinStateRoot
+        "${config.nucleus.logging.systemLogDir}/jellyfin-app"
+        "${pkgs.jellyfin}/bin/jellyfin"
+      ]
+      (builtins.readFile ../../scripts/services/macos-jellyfin-daemon.sh)
+  );
 in
 {
   launchd.daemons.jellyfin = {
