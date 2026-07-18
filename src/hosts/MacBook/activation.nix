@@ -41,6 +41,15 @@ let
       ) macosServices
     )
   );
+
+  ensureSystemLogDirs = ''
+    system_log_dir="${config.nucleus.logging.systemLogDir}"
+    for subdir in ${builtins.toString systemLogDirs}; do
+      if ! /bin/mkdir -p "$system_log_dir/$subdir"; then
+        echo "logging: failed to create $system_log_dir/$subdir." >&2
+      fi
+    done
+  '';
 in
 {
   # ---------------------------------------------------------------------------
@@ -73,12 +82,7 @@ in
     # start, so launchd can open StandardOutPath / StandardErrorPath files.
     # Runs in extraActivation (before nix-darwin's launchd step) so the dirs
     # exist before launchd tries to start daemons.
-    system_log_dir="${config.nucleus.logging.systemLogDir}"
-    for subdir in ${builtins.toString systemLogDirs}; do
-      if ! /bin/mkdir -p "$system_log_dir/$subdir"; then
-        echo "logging: failed to create $system_log_dir/$subdir." >&2
-      fi
-    done
+    ${ensureSystemLogDirs}
     # Create user-level log dir for camilladsp/camillagui-backend so launchd can
     # open stdout/stderr, then chown to the console user so the daemon process
     # (which runs as that user via UserName) can write to the log files.
@@ -172,12 +176,7 @@ in
     # ---- ensureSystemLogDirs (duplicated from extraActivation) -----------------
     # Also ensure directories exist during postActivation in case the log dir
     # config changed (systemLogDir is evaluated at activation time).
-    system_log_dir="${config.nucleus.logging.systemLogDir}"
-    for subdir in ${builtins.toString systemLogDirs}; do
-      if ! /bin/mkdir -p "$system_log_dir/$subdir"; then
-        echo "logging: failed to create $system_log_dir/$subdir." >&2
-      fi
-    done
+    ${ensureSystemLogDirs}
     # undoc-supp: /dev/console may not exist; guards below handle empty/root.
     _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     if [ -n "$_camilladsp_user" ] && [ "$_camilladsp_user" != "/Users/root" ]; then
