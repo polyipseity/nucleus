@@ -9,7 +9,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/lib.sh"
+. "$(dirname "$SCRIPT_DIR")/lib.sh"
 
 usage() {
   usage_std "$(basename "$0")" "" "Generate SSH host keys if missing. No arguments accepted."

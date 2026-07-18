@@ -321,7 +321,7 @@
             ++ extraShellCheckFlags;
         in
         pkgs.runCommand "${name}-with-lib" { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
-          mkdir -p "$out/bin" "$out/src/scripts"
+          mkdir -p "$out/bin" "$out/src/scripts/lib"
           cp -r "${baseDrv}/bin/." "$out/bin/"
           chmod +w "$out/bin/${name}"
           cp "${./scripts/lib/lib.sh}" "$out/src/scripts/lib/lib.sh"
@@ -405,9 +405,9 @@
             text = builtins.readFile ./scripts/apply.sh;
           };
           siblingScripts = pkgs.runCommand "apply-siblings" { } ''
-            mkdir -p "$out/bin"
-            install -m755 "${./scripts/secrets/generate-ssh-host-key.sh}" "$out/bin/generate-ssh-host-key.sh"
-            install -m755 "${./scripts/secrets/register-host-age-key.sh}" "$out/bin/register-host-age-key.sh"
+            mkdir -p "$out/bin" "$out/bin/secrets"
+            install -m755 "${./scripts/secrets/generate-ssh-host-key.sh}" "$out/bin/secrets/generate-ssh-host-key.sh"
+            install -m755 "${./scripts/secrets/register-host-age-key.sh}" "$out/bin/secrets/register-host-age-key.sh"
             install -m755 "${./scripts/install-prek-hooks.sh}" "$out/bin/install-prek-hooks.sh"
           '';
         in

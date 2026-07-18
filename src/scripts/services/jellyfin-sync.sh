@@ -8,7 +8,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/lib.sh"
+. "$SCRIPT_DIR/../lib/lib.sh"
 
 usage() {
   usage_std "$(basename "$0")" "[options]"
