@@ -214,9 +214,8 @@ let
       export FIND_BIN="${pkgs.findutils}/bin/find"
       export EXCLUDED_DIRS_JSON=${lib.escapeShellArg icloudExcludedDirsJson}
       export MANAGED_ROOTS_JSON=${lib.escapeShellArg icloudManagedRootsJson}
-
-      ${builtins.readFile ../scripts/lib/icloud-exclusions-lib.sh}
-    '';
+    ''
+    + (builtins.readFile ../scripts/lib/icloud-exclusions-lib.sh);
   };
 
   betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" (
