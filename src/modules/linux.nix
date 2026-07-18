@@ -14,16 +14,11 @@ let
   # Wrapper that resolves the nucleus repo root at runtime so the systemd unit
   # works regardless of the checkout location. Uses eval-time fallback for
   # contexts where NUCLEUS_REPO_ROOT may not be inherited.
-  gcWeekly = pkgs.writeShellScript "gc-weekly" ''
-    set -eu
-
-    _repo_root="${repoRoot}"
-    if [ -z "$_repo_root" ] || [ ! -d "$_repo_root" ]; then
-      _repo_root="''${NUCLEUS_REPO_ROOT:?gc: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
-    fi
-
-    exec "$_repo_root/scripts/gc.sh"
-  '';
+  gcWeekly = pkgs.writeShellScript "gc-weekly" (
+    builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
+      builtins.readFile ../scripts/services/gc-weekly.sh
+    )
+  );
 in
 lib.mkIf pkgs.stdenv.isLinux {
   # Home Manager exposes GNOME settings via `dconf.*` (not `programs.dconf`).
