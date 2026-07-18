@@ -34,7 +34,7 @@ let
     builtins.replaceStrings
       [ "__SSH_TO_AGE_BIN__" "__USERNAME__" ]
       [ "${pkgs.ssh-to-age}/bin/ssh-to-age" "${username}" ]
-      (builtins.readFile ../scripts/lib/derive-host-age-key.sh);
+      (builtins.readFile ../scripts/secrets/derive-host-age-key.sh);
 in
 {
   # ---------------------------------------------------------------------------
