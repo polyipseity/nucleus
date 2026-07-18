@@ -854,41 +854,24 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # The gui-env LaunchAgent (below) provides login-time coverage before the
   # first activation runs.
   # --------------------------------------------------------------------------
-  home.activation."macos-gui-env-path" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
-    # Propagate NUCLEUS_REPO_ROOT to GUI domain.  Captured at build time from
-    # apply.sh; activation reloads it for freshness on every apply.
-    if [ -n "''${NUCLEUS_REPO_ROOT:-}" ]; then
-      /bin/launchctl setenv NUCLEUS_REPO_ROOT "$NUCLEUS_REPO_ROOT"
-    fi
-
-    # Propagate managed PATH to GUI domain (launchd-direct/XPC path).
-    __nucleus_prepend="${managedPaths.toShellPrependPath}"
-    __nucleus_append="${managedPaths.toShellAppendPath}"
-    __nucleus_managed_set="${mkManagedDedupSet config.home.homeDirectory}"
-
-    ${builtins.readFile ../scripts/hosts/MacBook/macos-gui-env-path.sh}
-
-    # ── All other GUI env vars (user and non-user) ──
-    ${envVars.macOSAllVars}
-
-    # Set persistent per-user launchd PATH for LaunchServices .app bundles.
-    # Uses user.plist (not system.plist) because the PATH contains user-specific
-    # directories (e.g. /Users/.../.bun/bin).
-    desired_path="${managedPaths.toLaunchctlConfigPath config.home.homeDirectory}"
-    current_path="$(/usr/libexec/PlistBuddy -c 'Print PathEnvironmentVariable' /private/var/db/com.apple.xpc.launchd/config/user.plist 2>/dev/null || true)"  # undoc-supp: user.plist may not exist before first launchctl config write; read fails gracefully with empty output
-
-    if [ "$current_path" != "$desired_path" ]; then
-      echo "launchd: updating user PATH (current differs from desired)."
-      if /usr/bin/sudo /bin/launchctl config user path "$desired_path" 2>/dev/null; then
-        echo "launchd: user PATH updated via launchctl config user path."
-        echo "launchd: REBOOT REQUIRED for .app bundles to inherit the new PATH."
-      else
-        echo "launchd: failed to update user PATH (non-fatal)." >&2
-      fi
-    else
-      echo "launchd: user PATH already up-to-date."
-    fi
-  '';
+  home.activation."macos-gui-env-path" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] (
+    builtins.replaceStrings
+      [
+        "__MANAGED_PREPEND_PATH__"
+        "__MANAGED_APPEND_PATH__"
+        "__MANAGED_DEDUP_SET__"
+        "__MACOS_ALL_VARS__"
+        "__MANAGED_LAUNCHCTL_CONFIG_PATH__"
+      ]
+      [
+        managedPaths.toShellPrependPath
+        managedPaths.toShellAppendPath
+        (mkManagedDedupSet config.home.homeDirectory)
+        envVars.macOSAllVars
+        (managedPaths.toLaunchctlConfigPath config.home.homeDirectory)
+      ]
+      (builtins.readFile ../scripts/hosts/MacBook/macos-gui-env-path.sh)
+  );
 
   # --------------------------------------------------------------------------
   # GUI environment variable propagation LaunchAgent (macOS-only)
