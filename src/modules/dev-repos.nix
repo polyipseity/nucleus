@@ -109,106 +109,20 @@ in
           "waitForSopsSecrets"
           "writeBoundary"
         ]
-        ''
-          set -eu
-
-          export HOME="${currentUserHome}"
-          export PATH="$PATH:${pkgs.git}/bin"
-          export GIT_SSH_COMMAND="${sshClient}"
-
-          # Resolve the live checkout root from $NUCLEUS_REPO_ROOT (set by apply.sh
-          # before the rebuild and forwarded through sudo), with an eval-time
-          # fallback for home-manager activation (which runs as the user and
-          # does not inherit the sudo-level env var). Repo-root symlinks must
-          # target the mutable working tree rather than the Nix store copy of
-          # flake inputs, or ~/dev/nucleus drifts away from the user's actual
-          # checkout after every rebuild.
-          repoRoot="${repoRoot}"
-          if [ -z "$repoRoot" ] || [ ! -d "$repoRoot" ]; then
-            if [ -n "''${NUCLEUS_REPO_ROOT:-}" ]; then
-              repoRoot="$NUCLEUS_REPO_ROOT"
-            fi
-          fi
-
-          devDir="$HOME/dev"
-          mkdir -p "$devDir" || { echo "devReposProvision: failed to create $devDir" >&2; exit 1; }
-
-          # Source shared symlink protection helpers from symlink-hardening-lib.sh
-          ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-
-          # Source dev-repos helper functions
-          ${builtins.readFile ../scripts/lib/dev-repos-provision-lib.sh}"
-                fi
-              fi
-            done
-          }
-
-          # Step 1: Provision configured repositories
-          ${lib.concatMapStringsSep "\n" (
-            repo:
-            if repo.symlinkFromRepoRoot then
-              ''
-                repoTargetPath="$(resolve_repo_path "${repo.target}")"
-                if repoSymlinkTarget="$(resolve_repo_root_target)"; then
-                  ensure_symlink "$repoSymlinkTarget" "$repoTargetPath" "${repo.name}"
-                else
-                  report_error "repo-root symlink target unavailable for ${repo.name}"
-                fi
-              ''
-            else if repo.symlink != null then
-              ''ensure_symlink "$(resolve_repo_path "${repo.symlink}")" "$(resolve_repo_path "${repo.target}")" "${repo.name}"''
-            else if repo.url != null then
-              ''ensure_repo "${repo.url}" "$(resolve_repo_path "${repo.target}")" "${repo.name}"''
-            else
-              ''report_error "repository '${repo.name}' has neither symlink nor url configured"''
-          ) config.nucleus.devRepos.repositories}
-
-          # Step 2: Clone submodules from specified directories (sequential processing)
-          ${lib.concatMapStringsSep "\n" (
-            submoduleDir:
-            let
-              recursive = if submoduleDir.recursive then "1" else "0";
-            in
-            ''
-              # Expand glob patterns in submodule directory paths
-              resolvedPath="$(resolve_repo_path "${submoduleDir.path}")"
-
-              # Check if path contains glob characters
-              case "$resolvedPath" in
-                *\*|*\?|*\[*)
-                  # Glob pattern detected; expand it
-                  baseDir=$(dirname "$resolvedPath")
-                  pattern=$(basename "$resolvedPath")
-                  if [ -d "$baseDir" ]; then
-                    expandedPaths=$(expand_glob_paths "$baseDir" "$pattern")
-                    if [ -z "$expandedPaths" ]; then
-                      # No matches for configured glob; benign no-op.
-                      :
-                    else
-                      while IFS= read -r matchedPath; do
-                        clone_directory_submodules "$matchedPath" "${recursive}" "''${matchedPath#$HOME/}"
-                      done <<< "$expandedPaths"
-                    fi
-                  else
-                    report_error "base directory $baseDir does not exist for glob pattern '${submoduleDir.path}'"
-                  fi
-                  ;;
-                *)
-                  # No glob; process literal path
-                  if [ -d "$resolvedPath" ]; then
-                    clone_directory_submodules "$resolvedPath" "${recursive}" "${submoduleDir.path}"
-                  else
-                    report_error "directory '${submoduleDir.path}' does not exist"
-                  fi
-                  ;;
-              esac
-            ''
-          ) config.nucleus.devRepos.submoduleDirectories}
-
-          echo "devReposProvision: completed provisioning dev repositories and submodules"
-          if [ "$devReposErrors" -gt 0 ]; then
-            echo "devReposProvision: completed with $devReposErrors non-fatal error(s); see messages above." >&2
-          fi
-        '';
+        (
+          let
+            tokens = {
+              __REPO_ROOT__ = repoRoot;
+              __CURRENT_USER_HOME__ = currentUserHome;
+              __SSH_CLIENT__ = sshClient;
+              __GIT_BIN__ = "${pkgs.git}/bin";
+              __JQ_BIN__ = "${pkgs.jq}/bin/jq";
+              __DEV_REPOS_JSON__ = builtins.toJSON config.nucleus.devRepos;
+            };
+          in
+          builtins.replaceStrings (builtins.attrNames tokens) (builtins.attrValues tokens) (
+            builtins.readFile ../scripts/lib/dev-repos-activation.sh
+          )
+        );
   };
 }
