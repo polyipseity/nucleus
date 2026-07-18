@@ -1,3 +1,4 @@
+---
 # WinGet DSC v3 - taskbar alignment and size
 $schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:

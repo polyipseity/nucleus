@@ -1,3 +1,4 @@
+---
 # WinGet DSC v3 - HKLM Remote Desktop policy values
 $schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:

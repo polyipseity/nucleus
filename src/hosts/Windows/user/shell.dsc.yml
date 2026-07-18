@@ -1,3 +1,4 @@
+---
 # WinGet DSC v3 - user-level shell autorun (cmd AutoRun)
 #
 # Note: cmd.exe has no equivalent of HIST_IGNORE_SPACE or ignoredups.

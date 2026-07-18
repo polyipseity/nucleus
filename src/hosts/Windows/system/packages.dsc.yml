@@ -1,3 +1,4 @@
+---
 # WinGet DSC v3 - system-level package baseline for Windows host
 # Package ID policy: prefer human-readable named IDs (for example
 # `Microsoft.PowerToys`) over opaque Microsoft Store-generated IDs. Use

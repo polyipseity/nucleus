@@ -1,3 +1,4 @@
+---
 # WinGet DSC v3 - user-level "optimize PDF" context menu presets
 # Sorting policy: quality-descending order (default → prepress → printer → ebook → screen).
 # Must match macOS and NixOS ordering. No automatic sorting.

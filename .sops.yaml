@@ -1,3 +1,4 @@
+---
 keys:
   # Age recipients shared across encrypted files.
   # Keep real machine recipients first, then keep the primary personal SSH

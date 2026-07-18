@@ -1,3 +1,4 @@
+---
 description: null
 devices:
   adjust_period: null
@@ -39,16 +40,16 @@ filters:
     type: Gain
 mixers: {}
 pipeline:
-- bypassed: null
-  channels: null
-  description: null
-  names:
-  - compressor pre-gain
-  type: Filter
-- bypassed: null
-  description: null
-  name: compressor
-  type: Processor
+  - bypassed: null
+    channels: null
+    description: null
+    names:
+      - compressor pre-gain
+    type: Filter
+  - bypassed: null
+    description: null
+    name: compressor
+    type: Processor
 processors:
   compressor:
     description: null

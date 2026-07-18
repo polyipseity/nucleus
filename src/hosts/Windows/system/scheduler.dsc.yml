@@ -1,3 +1,4 @@
+---
 # WinGet DSC v3 - scheduled task for weekly garbage collection
 $schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:

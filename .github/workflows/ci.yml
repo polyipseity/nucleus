@@ -1,3 +1,4 @@
+---
 # CI: Build & Test
 #
 # Purpose:
@@ -13,14 +14,14 @@
 
 name: "CI: Build & Test"
 
-on:
-  pull_request:
-  push:
+"on":
+  "pull_request":
+  "push":
     branches:
-      - "**" # Listen to pushes on all branches
+      - "**"  # Listen to pushes on all branches
     tags-ignore:
-      - "**" # Ignore tag pushes
-  workflow_dispatch:
+      - "**"  # Ignore tag pushes
+  "workflow_dispatch":
 
 # Use concurrency to deduplicate runs.
 # - For pull requests: group by `pr-<number>` so multiple commits to the same PR
@@ -34,7 +35,7 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write # Needed by magic-nix-cache-action for GHA cache API
+  id-token: write  # Needed by magic-nix-cache-action for GHA cache API
 
 jobs:
   build:

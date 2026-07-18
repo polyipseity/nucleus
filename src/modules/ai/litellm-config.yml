@@ -1,3 +1,4 @@
+---
 # LiteLLM proxy configuration — shared across all hosts.
 #
 # AI gateway on 127.0.0.1:4000 routing to:
