@@ -150,103 +150,35 @@ in
     # Only tools absent from nixpkgs, cargo-binstall, and bun are managed here
     # (install preference: nixpkgs > cargo binstall > bun > uv).
     # -------------------------------------------------------------------------
-    installUvTools = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
-      set -eu
-
-      _iut_uv_bin='${pkgs.uv}/bin/uv'
-
-      # Declarative desired-state list.  One tool per line.
-      # Add a PyPI package name here to install it; remove it to trigger
-      # uninstall on the next apply.  Only add tools absent from nixpkgs and
-      # cargo-binstall and bun (install preference: nixpkgs > cargo binstall > bun > uv).
-      _iut_desired="$(mktemp)"
-      # PaddleOCR: cross-platform OCR with GPU auto-detection.  uv for
-      # cross-host version consistency (nixpkgs v3.5.0, PyPI v3.6.0).
-      # Pinned to Python 3.11 via --python flag because its dependency
-      # opencv-contrib-python cannot build on Python >=3.12 (distutils removed).
-      printf '%s\n' 'paddleocr' >> "$_iut_desired"
-
-      # Per-tool Python version requirements.  Empty string = use default.
-      _iut_python_for_tool() {
-        case "$1" in
-          paddleocr) echo "3.11" ;;
-          *) echo "" ;;
-        esac
-      }
-
-      # Install required Python versions before attempting tool installs.
-      # Stderr suppressed: uv emits a cosmetic "Failed to patch install name"
-      # warning on macOS 15+ when installing older CPython that does not affect
-      # functionality.  Real failures surface at tool-install time below.
-      while IFS= read -r _iut_tool; do
-        [ -z "$_iut_tool" ] && continue
-        _iut_python=$(_iut_python_for_tool "$_iut_tool")
-        [ -n "$_iut_python" ] && "$_iut_uv_bin" python install "$_iut_python" 2>/dev/null
-      done < "$_iut_desired"
-
-      # Get actually installed uv tools from `uv tool list` (zap-style: remove
-      # any installed tool absent from the desired list, regardless of prior
-      # managed state).  Parse only lines that match the documented
-      # "name vX.Y.Z" shape so separator/header lines (for example "-")
-      # cannot be misparsed as package names.
-      _iut_installed="$(mktemp)"
-      # undoc-supp: uv tool list may fail if no tool environment is initialised yet; treating the installed set as empty is correct — nothing to remove.
-      "$_iut_uv_bin" tool list 2>/dev/null | ${pkgs.gawk}/bin/awk '/^[A-Za-z0-9][A-Za-z0-9._-]*[[:space:]]+v[0-9]/{print $1}' > "$_iut_installed" || true
-
-      # Tools installed but not desired: zap-style removal.
-      # Mirrors homebrew cleanup = "zap": removes anything installed but absent
-      # from the declared desired set, regardless of how it was installed.
-      _iut_to_remove="$(mktemp)"
-      while IFS= read -r _iut_tool; do
-        [ -z "$_iut_tool" ] && continue
-        if ! grep -qxF "$_iut_tool" "$_iut_desired"; then
-          printf '%s\n' "$_iut_tool" >> "$_iut_to_remove"
-        fi
-      done < "$_iut_installed"
-
-      # Desired tools not yet installed according to `uv tool list`.
-      _iut_to_install="$(mktemp)"
-      while IFS= read -r _iut_tool; do
-        [ -z "$_iut_tool" ] && continue
-        if ! grep -qxF "$_iut_tool" "$_iut_installed"; then
-          printf '%s\n' "$_iut_tool" >> "$_iut_to_install"
-        fi
-      done < "$_iut_desired"
-
-      # Prune tools removed from the desired list.
-      while IFS= read -r _iut_tool; do
-        [ -z "$_iut_tool" ] && continue
-        if ! printf '%s' "$_iut_tool" | ${pkgs.gnugrep}/bin/grep -Eq '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
-          echo "uv: skipping invalid uninstall token '$_iut_tool'"
-          continue
-        fi
-        echo "uv: uninstalling removed tool '$_iut_tool'"
-        "$_iut_uv_bin" tool uninstall "$_iut_tool"
-      done < "$_iut_to_remove"
-
-      # Install additions.
-      while IFS= read -r _iut_tool; do
-        [ -z "$_iut_tool" ] && continue
-        if ! printf '%s' "$_iut_tool" | ${pkgs.gnugrep}/bin/grep -Eq '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
-          echo "uv: skipping invalid install token '$_iut_tool'"
-          continue
-        fi
-        _iut_python=$(_iut_python_for_tool "$_iut_tool")
-        if [ -n "$_iut_python" ]; then
-          echo "uv: installing tool '$_iut_tool' with Python $_iut_python"
-          "$_iut_uv_bin" tool install --no-build --python "$_iut_python" "$_iut_tool"
-        else
-          echo "uv: installing tool '$_iut_tool'"
-          "$_iut_uv_bin" tool install --no-build "$_iut_tool"
-        fi
-      done < "$_iut_to_install"
-
-      if [ ! -s "$_iut_to_install" ] && [ ! -s "$_iut_to_remove" ]; then
-        echo "uv: all managed tools already converged — skipping"
-      fi
-
-      rm -f "$_iut_desired" "$_iut_installed" "$_iut_to_remove" "$_iut_to_install"
-    '';
+    installUvTools = lib.hm.dag.entryAfter [ "installBunPackages" ] (
+      # Preamble: set -eu and source symlink hardening lib.
+      # The external script depends on functions from the hardening lib
+      # being available at activation time.
+      ''
+        set -eu
+        ${symlinkHardeningLib}
+      ''
+      +
+        builtins.replaceStrings
+          [ "__UV_BIN__" "__GAWK_BIN__" "__GREP_BIN__" "__JQ_BIN__" "__DESIRED_UV_TOOLS_JSON__" ]
+          [
+            "${pkgs.uv}/bin/uv"
+            "${pkgs.gawk}/bin/awk"
+            "${pkgs.gnugrep}/bin/grep"
+            "${pkgs.jq}/bin/jq"
+            # Desired tools as JSON object mapping tool name → Python version
+            # (empty string = use default).  Only add tools absent from nixpkgs,
+            # cargo-binstall, and bun (install preference: nixpkgs > cargo binstall > bun > uv).
+            (builtins.toJSON {
+              # PaddleOCR: cross-platform OCR with GPU auto-detection.  uv for
+              # cross-host version consistency (nixpkgs v3.5.0, PyPI v3.6.0).
+              # Pinned to Python 3.11 because its dependency opencv-contrib-python
+              # cannot build on Python >=3.12 (distutils removed).
+              paddleocr = "3.11";
+            })
+          ]
+          (builtins.readFile ../scripts/agents/install-uv-tools.sh)
+    );
 
     # -------------------------------------------------------------------------
     # initRustup
