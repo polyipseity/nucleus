@@ -10,7 +10,7 @@
 - `src/scripts/` contains Nix-internal scripts organized into domain subdirectories:
   - `apply.sh` — POSIX apply dispatcher (kept in root)
   - `cleanup-nix-build-artifacts.sh`, `install-prek-hooks.sh`, `wallpaper-provision.sh`,
-    `homebrew-pin-verify.sh`, `nvim-launcher.sh`, `ensure-log-dirs.sh` — ungrouped root scripts
+    `homebrew-pin-verify.sh`, `ensure-log-dirs.sh` — ungrouped root scripts
   - `services/` — persistent daemon/service scripts (camilladsp, betterdisplay-heartbeat,
     gc-weekly, gui-env, nix-index-update, ds-store-gc, spotlight-exclusions, caddy-trust,
     jellyfin-sync, headless-display, preference-gc, verify-nucleus-services)
@@ -19,7 +19,8 @@
     handler registration, and the shared lib.sh
   - `secrets/` — secret provisioning helpers
   - `shell/` — shell integration scripts (zsh init, PowerShell init, completion installation)
-  - `configs/` — app-config merge helpers (INI merge, JSON merge, bun package install,
+  - `configs/` — app config/install scripts and merge helpers (INI merge, JSON merge, GPG config,
+    PowerShell module install, NixOS desktop actions, bun package install,
     app alias symlinks, LinearMouse config symlinks)
   - `editors/` — editor-specific scripts (VS Code workspace trust)
   - `hosts/` — host-specific scripts: `MacBook/` (macOS) and `NixOS/`. Must be last resort:
