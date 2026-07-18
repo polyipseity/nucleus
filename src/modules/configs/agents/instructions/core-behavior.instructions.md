@@ -139,6 +139,7 @@ runSubagent(
 
 - Discard terminal output after use. After acting on terminal output, summarize the exit code and relevant result in your own words. Do not carry raw terminal output into the next turn's context. Accumulated terminal noise is the single largest input-token waste in multi-turn sessions.
 - **Logging vs terminal output.** Use terminal output for command results, build output, and test results. Use issue comments and conversation messages for diagnostics. Do not write progress logs into terminal output that the user will see — prefer structured tool output or in-message summaries.
+- **Never filter terminal output with pipes.** Do not pipe terminal output through `grep`, `tail`, `head`, `awk`, `sed`, or any filter — universally, not just for "long-running" commands. The agent cannot reliably distinguish fast from slow commands, so the ban covers all terminal output. Instead, redirect the full output to a temporary file and read that file. If the filter was wrong or the tail was too short, re-grep the saved file — no need to re-run the command. Use `mktemp` or a fixed path under `/tmp/`. Exceptions: reading from a file (grep/tail/head/awk/sed on file paths, not terminal output) is fine; when the user's task is explicitly about text processing ("extract these lines", "find this pattern"), piping is part of the work.
 
 ## Research scope
 
