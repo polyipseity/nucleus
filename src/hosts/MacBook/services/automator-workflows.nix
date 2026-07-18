@@ -47,7 +47,12 @@
 #   - Known issue: NSIconName can prevent a Quick Action from appearing
 #     in the Services menu (Apple Community thread). Current workflows
 #     are deployed with it set and are confirmed to appear.
-{ lib, mkPresentationModes, ... }:
+{
+  lib,
+  pkgs,
+  mkPresentationModes,
+  ...
+}:
 let
   # Base path to committed workflow source directories.
   # Each workflow source is referenced as "${workflowsDir}/<name>.workflow" to
@@ -194,43 +199,29 @@ let
 in
 {
   home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
-  home.activation.deployNucleusAutomatorWorkflows = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    SERVICES_DIR="$HOME/Library/Services"
-
-    # ── Phase 1b: Prune removed Automator workflows ────────────────────
-    # First pass: delete all NSServicesStatus keys (entries may or may not have dir).
-    ${builtins.concatStringsSep "\n" (
-      map (wf: ''
-        /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"${wf.enablementKey}\"" \
-          ~/Library/Preferences/pbs.plist 2>/dev/null || true  # undoc-supp: key may not exist on first apply
-      '') removedNucleusWorkflows
-    )}
-    # Second pass: remove workflow dirs for entries that have one.
-    ${builtins.concatStringsSep "\n" (
-      map (wf: ''
-        wf_path="$SERVICES_DIR/${wf.dir}"
-        if [ -d "$wf_path" ]; then
-          chmod -R +w "$wf_path" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
-          rm -rf "$wf_path"
-        fi
-      '') (builtins.filter (wf: wf ? dir) removedNucleusWorkflows)
-    )}
-
-    # ── Phase 3: Deploy Automator workflows (in declaration order) ────
-    ${builtins.concatStringsSep "\n" (
-      map (wf: ''
-        wf_dir="$SERVICES_DIR/${wf.dir}"
-        store_path="${wf.source}"
-        mkdir -p "$SERVICES_DIR"
-        chmod -R +w "$wf_dir" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
-        rm -rf "$wf_dir"
-        cp -R "$store_path" "$SERVICES_DIR/"
-        # Enable in presentation_modes format (macOS 14+).
-        # CFBundleIdentifier is set in each workflow's Info.plist.
-        enablement_key="${wf.enablementKey}"
-        /usr/bin/defaults write pbs NSServicesStatus -dict-add "$enablement_key" \
-          '<dict><key>presentation_modes</key>${mkPresentationModes wf.presentationModes}</dict>'
-      '') currentNucleusWorkflows
-    )}
-  '';
+  home.activation.deployNucleusAutomatorWorkflows = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+    ''
+      set -eu
+    ''
+    +
+      builtins.replaceStrings
+        [ "__JQ_BIN__" "__CURRENT_WORKFLOWS_JSON__" "__REMOVED_WORKFLOWS_JSON__" ]
+        [
+          "${pkgs.jq}/bin/jq"
+          (builtins.toJSON (
+            map (wf: {
+              inherit (wf) dir enablementKey;
+              source = "${wf.source}";
+              presentationModesDict = "<dict>${mkPresentationModes wf.presentationModes}</dict>";
+            }) currentNucleusWorkflows
+          ))
+          (builtins.toJSON (
+            map (wf: {
+              enablementKey = wf.enablementKey;
+              dir = wf.dir or null;
+            }) removedNucleusWorkflows
+          ))
+        ]
+        (builtins.readFile ../../../scripts/services/deploy-automator-workflows.sh)
+  );
 }
