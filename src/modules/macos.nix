@@ -471,36 +471,16 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #   3. Continue activation either way so non-privacy-gated settings still
     #      converge in the same run.
     # -------------------------------------------------------------------------
-    preflightPrivacyPermissions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      echo "macos: checking macOS privacy permissions before defaults writes..." >&2
-
-      print_fda_warning() {
-        bold="$(printf '\033[1m')"
-        red="$(printf '\033[31m')"
-        reset="$(printf '\033[0m')"
-        yellow="$(printf '\033[33m')"
-
-        printf '%s%sERROR: Full Disk Access Required%s\n' "$red" "$bold" "$reset" >&2
-        printf '%sNucleus detected that this terminal session lacks permission to modify protected user preferences.%s\n' "$yellow" "$reset" >&2
-        printf '%s\n' "To fix this:" >&2
-        printf '  1. Open %sSystem Settings > Privacy & Security > Full Disk Access%s\n' "$bold" "$reset" >&2
-        printf '  2. Toggle %sOn%s for your terminal emulator\n' "$bold" "$reset" >&2
-        printf '  3. Restart the terminal and run activation again\n' >&2
-      }
-
-      probe_domain="com.apple.universalaccess"
-      probe_key="NucleusActivationProbe"
-      if ! probe_err="$({
-        /usr/bin/defaults write "$probe_domain" "$probe_key" -bool false
-        /usr/bin/defaults delete "$probe_domain" "$probe_key"
-      } 2>&1)"; then
-        if printf '%s' "$probe_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
-          print_fda_warning
-        else
-          echo "macos: privacy preflight probe failed unexpectedly ($probe_err); continuing with best-effort defaults writes." >&2
-        fi
-      fi
-    '';
+    preflightPrivacyPermissions = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+      let
+        fdaResolved = builtins.replaceStrings [ "__FDA_TARGET__" ] [ "protected user preferences" ] (
+          builtins.readFile ../scripts/lib/macos-fda-warning-lib.sh
+        );
+      in
+      builtins.replaceStrings [ "__FDA_LIB__" ] [ fdaResolved ] (
+        builtins.readFile ../scripts/hosts/MacBook/macos-preflight-privacy.sh
+      )
+    );
 
     # -------------------------------------------------------------------------
     # macos-safari-defaults
