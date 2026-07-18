@@ -200,35 +200,41 @@ let
       extraArgsList =
         iCloudServiceArgs ++ fsKitBackendArgs ++ volumeNameArgs ++ rclonePasswordArgs ++ mount.extraArgs;
     in
-    pkgs.writeShellScript "cloud-mount-${mount.id}" ''
-      set -eu
-
-      # Verify the rclone remote is configured; exit 0 (no restart) if not.
-      if ! rclone_remotes="$(${pkgs.rclone}/bin/rclone listremotes)"; then
-        echo "cloud-drives: failed to list rclone remotes for '${mount.remoteName}' mount; check the config passphrase and remote configuration." >&2
-        exit 1
-      fi
-
-      case "$rclone_remotes" in
-        *${lib.escapeShellArg "${mount.remoteName}:"}*)
-          ;;
-        *)
-        echo "cloud-drives: rclone remote '${mount.remoteName}' not configured; mount skipped." >&2
-        echo "cloud-drives: run 'rclone config' to set up the remote, then re-run 'home-manager switch'." >&2
-        exit 0
-          ;;
-      esac
-
-      exec ${pkgs.rclone}/bin/rclone mount \
-        ${lib.escapeShellArg rcloneRemote} \
-        ${lib.escapeShellArg mountPoint} \
-        --vfs-cache-mode full \
-        --vfs-cache-max-age 1h \
-        --dir-cache-time 5m \
-        --poll-interval 1m \
-        --log-level ERROR \
-        ${lib.concatStringsSep " \\\n    " (map lib.escapeShellArg (readOnlyFlag ++ extraArgsList))}
-    '';
+    pkgs.writeShellScript "cloud-mount-${mount.id}" (
+      builtins.replaceStrings
+        [
+          "__RCLONE_BIN__"
+          "__RCLONE_REMOTE_NAME__"
+          "__RCLONE_REMOTE__"
+          "__RCLONE_MOUNT_POINT__"
+          "__RCLONE_ARGS__"
+        ]
+        [
+          "${pkgs.rclone}/bin/rclone"
+          mount.remoteName
+          (lib.escapeShellArg rcloneRemote)
+          (lib.escapeShellArg mountPoint)
+          (lib.concatStringsSep " \\\n    " (
+            map lib.escapeShellArg (
+              [
+                "--vfs-cache-mode"
+                "full"
+                "--vfs-cache-max-age"
+                "1h"
+                "--dir-cache-time"
+                "5m"
+                "--poll-interval"
+                "1m"
+                "--log-level"
+                "ERROR"
+              ]
+              ++ readOnlyFlag
+              ++ extraArgsList
+            )
+          ))
+        ]
+        (builtins.readFile ../scripts/services/macos-rclone-mount.sh)
+    );
 
   # Build a systemd ExecStop unmount command (NixOS only).
   mkFusermountUnmount =
