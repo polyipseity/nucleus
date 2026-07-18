@@ -209,15 +209,15 @@ let
     # ── macOS GUI environment PATH (append-only; user-specific) ──
     # PATH at runtime is (system default) with managed dirs prepended before and
     # appended after.  This catalog entry holds only the append portion — the
-    # prepend portion is handled in guiEnvAgent and macos-gui-env-path in macos.nix.
-    # Set by macos-gui-env-path (activation) and gui-env (login agent) in macos.nix.
+    # prepend portion is handled in guiEnvAgent and gui-env-path in macos.nix.
+    # Set by gui-env-path (activation) and gui-env (login agent) in macos.nix.
     PATH = {
       values = {
         macOS = managedPaths.toShellAppendPath;
       };
       excludeFromAll = true;
       userSpecific = true;
-      why = "Managed PATH (append portion) for macOS GUI apps. All managed dirs are appended to avoid shadowing system executables. Propagated via macos-gui-env-path activation step (launchctl setenv + launchctl config user path) and the one-shot gui-env LaunchAgent at login.";
+      why = "Managed PATH (append portion) for macOS GUI apps. All managed dirs are appended to avoid shadowing system executables. Propagated via gui-env-path activation step (launchctl setenv + launchctl config user path) and the one-shot gui-env LaunchAgent at login.";
     };
 
     # ── Starship prompt ─────────────────────────────────────────────

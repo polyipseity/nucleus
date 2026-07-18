@@ -44,7 +44,7 @@ let
   # matters.  The prefix argument is "${config.home.homeDirectory}" for
   # the activation script (build-time eval) or "$HOME" for the launchd
   # agent (runtime shell expansion).
-  # Used by guiEnvAgent and macos-gui-env-path activation step;
+  # Used by guiEnvAgent and gui-env-path activation step;
   # also informs launchctl config user path composition via pathComponents.
   mkManagedDedupSet =
     prefix:
@@ -303,7 +303,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   home.activation = {
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
-    # macos-display-resolutions
+    # display-resolutions
     # Uses displayplacer to match all external monitors to the MacBook's built-in
     # display mode so that remote-desktop clients see a consistent resolution.
     #
@@ -319,8 +319,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #
     # No-op if displayplacer is not installed.
     # -------------------------------------------------------------------------
-    macos-display-resolutions = lib.hm.dag.entryAfter [ "macos-headless-display" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-display-resolutions.sh}
+    display-resolutions = lib.hm.dag.entryAfter [ "macos-headless-display" ] ''
+      ${builtins.readFile ../scripts/services/display-resolutions.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -419,7 +419,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # macos-nightlight
+    # nightlight
     # Enables the macOS Night Shift schedule via the nightlight CLI tool and
     # applies a colour temperature of 50 % (roughly 4000 K).  Immediately
     # activates or deactivates the filter based on the current hour so the
@@ -429,8 +429,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if nightlight is not installed.
     # Source: https://github.com/smudge/nightlight
     # -------------------------------------------------------------------------
-    macos-nightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-nightlight.sh}
+    nightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      ${builtins.readFile ../scripts/services/nightlight.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -633,7 +633,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #
     # No-op if BetterDisplay is not installed.
     # -------------------------------------------------------------------------
-    macos-headless-display = lib.hm.dag.entryAfter [ "macos-nightlight" ] ''
+    macos-headless-display = lib.hm.dag.entryAfter [ "nightlight" ] ''
       ${builtins.readFile ../scripts/services/headless-display.sh}
     '';
   };
@@ -831,12 +831,12 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # after setupLaunchAgents runs.  On macOS 26, launchctl bootstrap can
   # spuriously return "Bootstrap failed: 5: Input/output error" — HM detects
   # this but never retries, and subsequent activations skip unchanged agents.
-  home.activation."macos-ensure-launchagents" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
-    ${builtins.readFile ../scripts/hosts/MacBook/macos-ensure-launchagents.sh}
+  home.activation."ensure-launchagents" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
+    ${builtins.readFile ../scripts/services/ensure-launchagents.sh}
   '';
 
   # --------------------------------------------------------------------------
-  # macos-gui-env-path
+  # gui-env-path
   # Single activation-time mechanism for macOS GUI environment variables.
   #
   # This step handles ALL GUI env var propagation at activation time:
@@ -853,7 +853,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # The gui-env LaunchAgent (below) provides login-time coverage before the
   # first activation runs.
   # --------------------------------------------------------------------------
-  home.activation."macos-gui-env-path" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] (
+  home.activation."gui-env-path" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] (
     builtins.replaceStrings
       [
         "__MANAGED_PREPEND_PATH__"
@@ -869,7 +869,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         envVars.macOSAllVars
         (managedPaths.toLaunchctlConfigPath config.home.homeDirectory)
       ]
-      (builtins.readFile ../scripts/hosts/MacBook/macos-gui-env-path.sh)
+      (builtins.readFile ../scripts/services/gui-env-path.sh)
   );
 
   # --------------------------------------------------------------------------
@@ -886,7 +886,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # GUI domains are per-user.
   #
   # This is a one-shot script (no loop) — launchctl setenv values persist in
-  # the GUI domain until explicitly changed or reboot.  The macos-gui-env-path
+  # the GUI domain until explicitly changed or reboot.  The gui-env-path
   # activation step re-applies all vars on every nucleus-apply.
   # --------------------------------------------------------------------------
   launchd.agents."gui-env" = {
@@ -894,7 +894,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     config = {
       Label = "local.gui-env";
       ProgramArguments = [ "${guiEnvAgent}" ];
-      # One-shot at login; macos-gui-env-path activation step covers subsequent applies.
+      # One-shot at login; gui-env-path activation step covers subsequent applies.
       RunAtLoad = true;
     };
   };
