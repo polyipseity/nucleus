@@ -324,7 +324,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # macos-input-config
+    # input-config
     # Writes input-method defaults that cannot be expressed in the nix-darwin
     # system.defaults tree because they require a running input method daemon
     # reload to take effect at session time.
@@ -340,8 +340,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # TISCapslockLanguageSwitch, AppleDictationAutoEnable, and FnKeyUsage are
     # now handled declaratively in defaults.nix via CustomUserPreferences.
     # -------------------------------------------------------------------------
-    macos-input-config = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-input-config.sh}
+    input-config = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      ${builtins.readFile ../scripts/configs/input-config.sh}
 
       ${daemonRefresh.refreshTISwitcher}
     '';
@@ -353,8 +353,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # in memory until logout/login after a rebuild.
     # -------------------------------------------------------------------------
     reloadUserPreferenceState =
-      lib.hm.dag.entryAfter
-        [ "macos-input-config" "macos-safari-defaults" "macos-universal-access-defaults" ]
+      lib.hm.dag.entryAfter [ "input-config" "safari-defaults" "universal-access-defaults" ]
         ''
           if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
             echo "macos: activateSettings -u failed; some preference updates may require relogin." >&2
@@ -483,13 +482,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
     );
 
     # -------------------------------------------------------------------------
-    # macos-safari-defaults
+    # safari-defaults
     # Safari is sandboxed and stores preferences in a containerized domain that
     # `system.defaults.CustomUserPreferences` cannot always write during system
     # activation. Apply these settings from user activation instead so Safari
     # hardening remains declarative without breaking `darwin-rebuild switch`.
     # -------------------------------------------------------------------------
-    macos-safari-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
+    safari-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
       ''
         fda_warning_emitted=0
       ''
@@ -497,17 +496,17 @@ lib.mkIf pkgs.stdenv.isDarwin {
         builtins.readFile ../scripts/lib/macos-fda-warning-lib.sh
       ))
       + ''
-        ${builtins.readFile ../scripts/hosts/MacBook/macos-safari-defaults.sh}
+        ${builtins.readFile ../scripts/configs/safari-defaults.sh}
       ''
     );
 
     # -------------------------------------------------------------------------
-    # macos-universal-access-defaults
+    # universal-access-defaults
     # Accessibility defaults are user/session scoped and may be protected from
     # system-level defaults writes during `darwin-rebuild`. Apply them from the
     # user activation phase to keep accessibility intent without system errors.
     # -------------------------------------------------------------------------
-    macos-universal-access-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
+    universal-access-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
       ''
         fda_warning_emitted=0
       ''
@@ -515,7 +514,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         builtins.readFile ../scripts/lib/macos-fda-warning-lib.sh
       ))
       + ''
-        ${builtins.readFile ../scripts/hosts/MacBook/macos-universal-access-defaults.sh}
+        ${builtins.readFile ../scripts/configs/universal-access-defaults.sh}
       ''
     );
 
