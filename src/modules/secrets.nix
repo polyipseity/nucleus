@@ -327,12 +327,15 @@ lib.mkIf isPrimaryUser {
   #      first bootstrap the host key may not yet be registered in .sops.yaml
   #      (step 3 of the bootstrap docs at the top of this file).
   #
-  # Why lib.concatMapStrings for checks 3 & 4:
-  #   Generating static inline shell commands at Nix evaluation time avoids
-  #   shell loops/arrays and keeps each invocation independently visible in
-  #   the activation trace.  The Nix store paths for each SOPS file are
-  #   baked in at eval time; shell variables such as _vsd_sops_gpg_fp and
-  #   _vsd_ssh_age_pub are expanded at activation runtime.
+  # Why JSON-tokenized while-read loop (checks 3 & 4):
+  #   All SOPS file paths are baked into a JSON array at Nix evaluation
+  #   time (builtins.toJSON), then injected at activation runtime via
+  #   builtins.replaceStrings.  The external shell script iterates entries
+  #   with a jq-powered while-read loop — eliminating concatMapStrings
+  #   without sacrificing traceability: each iteration's command is still
+  #   independently visible in the activation log via the displayName.
+  #   Shell variables (_vsd_sops_gpg_fp, _vsd_ssh_age_pub) are expanded
+  #   at activation runtime.
   # --------------------------------------------------------------------------
   home.activation.verifySecretDecryption =
     let
@@ -370,115 +373,38 @@ lib.mkIf isPrimaryUser {
         displayName = "${primaryUsername}.yml";
       };
     in
-    lib.hm.dag.entryAfter [ "git-identity" "gpg-import" "ssh-key-adopt" ] ''
-      # --- 1. Materialization sanity check ---
-      for _vsd_path in \
-          "${config.sops.secrets.${sshSecretName}.path}" \
-          "${config.sops.secrets.${sshPublicSecretName}.path}" \
-          "${config.sops.secrets.${gpgSecretName}.path}" \
-          "${config.sops.secrets.${gitIdentitySecretName}.path}"; do
-        if [ ! -s "$_vsd_path" ]; then
-          echo "secrets: ERROR — decrypted secret missing or empty at '$_vsd_path'." >&2
-          exit 1
-        fi
-      done
-
-      # --- 2. GPG key presence in keyring ---
-      _vsd_gpg_manifest="$HOME/.config/nucleus/managed-gpg-keys"
-      if [ ! -s "$_vsd_gpg_manifest" ]; then
-        echo "secrets: ERROR — managed-gpg-keys manifest missing or empty; gpg-import may have failed." >&2
-        exit 1
-      fi
-      _vsd_managed_fpr="$(head -n1 "$_vsd_gpg_manifest")"
-      # Dump all secret-key fingerprints once and cache the colon-format output;
-      # reused by check 3 to avoid repeated invocations.  --with-colons forces
-      # machine-readable non-interactive output; --no-autostart prevents GPG from
-      # launching a new agent daemon (which deadlocks on macOS when the agent
-      # socket directory is not yet ready during non-interactive activation).
-      _vsd_gpg_all_secret_fprs="$(GNUPGHOME="${config.home.homeDirectory}/.gnupg" \
-        # undoc-supp: GnuPG may fail if GNUPGHOME doesn't exist yet on first activation; the subsequent grep check handles empty output.
-        ${pkgs.gnupg}/bin/gpg --with-colons --no-autostart --list-secret-keys)" || true
-      if ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_managed_fpr"; then
-        echo "secrets: ERROR — managed GPG key $_vsd_managed_fpr not in keyring after gpg-import." >&2
-        exit 1
-      fi
-
-      # --- 3. GPG SOPS recipient check for all SOPS files ---
-      # Rather than live-decrypting with GPG (which requires the private key
-      # passphrase and fails non-interactively), extract the fp: value from each
-      # SOPS file's plaintext sops.pgp[].fp metadata (always unencrypted) and
-      # verify that fingerprint is present in our secret keyring.  SOPS records
-      # the encryption SUBKEY fingerprint in the fp: field, not the primary key
-      # fingerprint, so comparing the primary fingerprint directly produces false
-      # failures when SOPS chose a subkey (e.g., a Kyber encryption subkey).
-      # Combined with check 2 (primary key in keyring), this confirms we have the
-      # private key material to decrypt once the passphrase is provided.
-      # YAML SOPS files store fp as "    fp: HEX" (unquoted); binary SOPS files
-      # (e.g. wallpaper blobs) use JSON format with "\"fp\": \"HEX\"".  The
-      # extraction below handles both formats.
-      _vsd_gpg_failures=""
-      ${lib.concatMapStrings (
-        { path, displayName }:
-        ''
-          # Binary SOPS files use JSON format ("fp": "HEX") while YAML SOPS files
-          # use "    fp: HEX".  The combined -E pattern matches both; the second
-          # grep -oE extracts the hex fingerprint directly, avoiding the need for
-          # undoc-supp: grep may find no match; soft-fail prevents silent set -e exit, allowing [ -z ] below to report cleanly.
-          _vsd_sops_gpg_fp="$(/usr/bin/grep -m1 -E '[[:space:]]fp: |"fp": ' "${path}" | /usr/bin/grep -oE '[0-9A-Fa-f]{40,}')" || true
-          if [ -z "$_vsd_sops_gpg_fp" ] || \
-              ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_sops_gpg_fp"; then
-            _vsd_gpg_failures="$_vsd_gpg_failures ${displayName}"
-          fi
-        ''
-      ) allSopsFiles}
-      if [ -n "$_vsd_gpg_failures" ]; then
-        echo "secrets: ERROR — GPG SOPS decryption check failed for:$_vsd_gpg_failures; managed GPG key may not be registered in .sops.yaml." >&2
-        exit 1
-      fi
-
-      # --- 4. Personal SSH age recipient check for all SOPS files ---
-      # Rather than live-decrypting with the SSH private key (which requires the
-      # key passphrase and fails non-interactively), derive the age public key
-      # from the managed personal SSH public key via ssh-to-age -i (passphrase-
-      # free public-key conversion) and verify it appears in each SOPS file's
-      # plaintext sops.age[] metadata.  YAML SOPS files store the key as
-      # "recipient: age1..." (unquoted); binary SOPS files (e.g. wallpaper blobs)
-      # use JSON format "\"recipient\": \"age1...\"" (quoted key and value).
-      # Searching for the bare age key value with grep -qF handles both formats.
-      # No private key material is accessed.
-      _vsd_ssh_age_pub=""
-      _vsd_ssh_failures=""
-      # undoc-supp: ssh-to-age may fail if the SSH public key hasn't been materialized yet (first bootstrap); empty result is handled below.
-      _vsd_ssh_age_pub="$(${pkgs.ssh-to-age}/bin/ssh-to-age -i "${sshPublicKeyPath}")" || true
-      if [ -z "$_vsd_ssh_age_pub" ]; then
-        echo "secrets: ERROR — personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure ${sshPublicKeyPath} is a valid Ed25519 public key." >&2
-        exit 1
-      fi
-      ${lib.concatMapStrings (
-        { path, displayName }:
-        ''
-          # Search for the bare age key value rather than the full "recipient: KEY"
-          # string: YAML SOPS stores "recipient: KEY" (unquoted) while binary SOPS
-          # uses JSON "\"recipient\": \"KEY\"" (quoted key and value).  The age key
-          # is a unique 59+ character bech32 string that identifies the recipient
-          # unambiguously without the surrounding field label.
-          /usr/bin/grep -qF "$_vsd_ssh_age_pub" "${path}" \
-            || _vsd_ssh_failures="$_vsd_ssh_failures ${displayName}"
-        ''
-      ) allSopsFiles}
-      if [ -n "$_vsd_ssh_failures" ]; then
-        echo "secrets: ERROR — personal SSH key age-backend SOPS decryption check failed for:$_vsd_ssh_failures; SSH key may not be registered in .sops.yaml as an age recipient." >&2
-        exit 1
-      fi
-
-      # --- 5. Machine age key existence check (warning-only) ---
-      # Warning-only: on first bootstrap the host SSH key may not yet be registered
-      # in .sops.yaml as a device age recipient, so the derived key file may be
-      # absent.  Once deriveHostAgeKey (posix-sops.nix) has run and the machine
-      # age recipient is in .sops.yaml, this check will pass silently on every
-      # subsequent apply.
-      if [ ! -f "/etc/sops/age/machine.txt" ]; then
-        echo "secrets: warning — /etc/sops/age/machine.txt missing; this machine cannot be a SOPS age device recipient until the host key is registered in .sops.yaml and deriveHostAgeKey has run successfully." >&2
-      fi
-    '';
+    lib.hm.dag.entryAfter [ "git-identity" "gpg-import" "ssh-key-adopt" ] (
+      ''
+        set -eu
+      ''
+      +
+        builtins.replaceStrings
+          [
+            "__ALL_SOPS_FILES_JSON__"
+            "__SSH_PUBKEY_PATH__"
+            "__SSH_TO_AGE_BIN__"
+            "__GNUPG_BIN__"
+            "__JQ_BIN__"
+            "__GIT_IDENTITY_SECRET_PATH__"
+            "__SSH_SECRET_PATH__"
+            "__SSH_PUBLIC_SECRET_PATH__"
+            "__GPG_SECRET_PATH__"
+            "__GPG_MANIFEST_PATH__"
+            "__GNUPG_HOME__"
+          ]
+          [
+            (builtins.toJSON allSopsFiles)
+            "${sshPublicKeyPath}"
+            "${pkgs.ssh-to-age}/bin/ssh-to-age"
+            "${pkgs.gnupg}/bin/gpg"
+            "${pkgs.jq}/bin/jq"
+            "${config.sops.secrets.${gitIdentitySecretName}.path}"
+            "${config.sops.secrets.${sshSecretName}.path}"
+            "${config.sops.secrets.${sshPublicSecretName}.path}"
+            "${config.sops.secrets.${gpgSecretName}.path}"
+            "${config.home.homeDirectory}/.config/nucleus/managed-gpg-keys"
+            "${config.home.homeDirectory}/.gnupg"
+          ]
+          (builtins.readFile ../scripts/secrets/verify-secret-decryption.sh)
+    );
 }
