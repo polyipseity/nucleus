@@ -95,51 +95,38 @@ in
 
   sops.secrets = wallpaperSecrets;
 
-  home.activation."wallpaper-provision" = lib.hm.dag.entryAfter [ "sops-nix" ] ''
-    export HOME="${currentUserHome}"
-    export IS_DARWIN=$([ "$(uname -s)" = "Darwin" ] && echo 1 || echo 0)
-    export PICTURES_DIR="$HOME/Pictures/wallpapers"
-    export DESKTOPPR_BIN="${desktopprBinPath}"
-    export COREUTILS_BIN="${pkgs.coreutils}"
-    export WALLPAPERS_DIR="${wallpapersDir}"
-    export CURRENT_USER="${currentUsername}"
-    export SOPS_SYMLINK_PATH="${config.sops.defaultSymlinkPath}"
+  home.activation."wallpaper-provision" = lib.hm.dag.entryAfter [ "sops-nix" ] (
+    builtins.replaceStrings
+      [ "__WALLPAPER_ITEMS_JSON__" "__JQ_BIN__" ]
+      [
+        (builtins.toJSON (
+          map (item: {
+            secretName = item.secretName;
+            wallpaperName = item.wallpaperName;
+          }) wallpaperItemsForCurrentUser
+        ))
+        "${pkgs.jq}/bin/jq"
+      ]
+      ''
+        export HOME="${currentUserHome}"
+        export IS_DARWIN=$([ "$(uname -s)" = "Darwin" ] && echo 1 || echo 0)
+        export PICTURES_DIR="$HOME/Pictures/wallpapers"
+        export DESKTOPPR_BIN="${desktopprBinPath}"
+        export COREUTILS_BIN="${pkgs.coreutils}"
+        export WALLPAPERS_DIR="${wallpapersDir}"
+        export CURRENT_USER="${currentUsername}"
+        export SOPS_SYMLINK_PATH="${config.sops.defaultSymlinkPath}"
 
-    # Define helper functions
-    ${builtins.readFile ../scripts/wallpaper-provision.sh}
+        ${builtins.readFile ../scripts/wallpaper-provision.sh}
 
-    # Pre-copy setup
-    wallpaper_pre_copy_setup
+        # Pre-copy setup
+        wallpaper_pre_copy_setup
 
-    # Per-wallpaper copy loop (generated at eval time)
-    ${lib.concatMapStringsSep "\n" (item: ''
-      secretPath="$SOPS_SYMLINK_PATH/${item.secretName}"
-      targetFile="$PICTURES_DIR/${item.wallpaperName}"
+        # Per-wallpaper copy loop
+        wallpaper_provision_copy_items '__WALLPAPER_ITEMS_JSON__' '__JQ_BIN__' "$SOPS_SYMLINK_PATH"
 
-      if [ ! -f "$secretPath" ]; then
-        fail_wallpaper_provision "wallpaper-provision: missing decrypted wallpaper secret at $secretPath; cannot apply wallpaper gallery."
-      fi
-
-      case "$targetFile" in
-        "$PICTURES_DIR"/*) ;;
-        *)
-          fail_wallpaper_provision "wallpaper-provision: refusing to write wallpaper outside $PICTURES_DIR: $targetFile"
-          ;;
-      esac
-
-      # Copy decrypted material out of the runtime secret symlink directory
-      # so GUI consumers can read a normal file under ~/Pictures.
-      if [ -L "$targetFile" ] || [ ! -f "$targetFile" ] || ! cmp -s "$secretPath" "$targetFile"; then
-        tmpTarget="$(mktemp)"
-        cp "$secretPath" "$tmpTarget"
-        # 444: managed wallpaper content must not be modified outside
-        # activation; GUI consumers and desktoppr need only read access.
-        chmod 444 "$tmpTarget"
-        mv "$tmpTarget" "$targetFile"
-      fi
-    '') wallpaperItemsForCurrentUser}
-
-    # Post-copy teardown
-    wallpaper_post_copy_teardown
-  '';
+        # Post-copy teardown
+        wallpaper_post_copy_teardown
+      ''
+  );
 }

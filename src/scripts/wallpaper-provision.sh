@@ -64,6 +64,54 @@ wallpaper_pre_copy_setup() {
   fi
 }
 
+# Copy each wallpaper from the SOPS decrypted secret directory into
+# $PICTURES_DIR.  Takes a JSON array of wallpaper items, the path to jq,
+# and the SOPS symlink path.
+wallpaper_provision_copy_items() {
+  _items_json="$1"
+  _jq_bin="$2"
+  _sops_symlink_path="$3"
+
+  _nucleus_wp_failed=0
+
+  while IFS=$'\t' read -r _secretName _wallpaperName; do
+    [ -n "$_secretName" ] || continue
+    _secretPath="$_sops_symlink_path/$_secretName"
+    _targetFile="$PICTURES_DIR/$_wallpaperName"
+
+    if [ ! -f "$_secretPath" ]; then
+      echo "wallpaper-provision: missing decrypted secret at $_secretPath; cannot apply wallpaper gallery." >&2
+      _nucleus_wp_failed=1
+      break
+    fi
+
+    case "$_targetFile" in
+      "$PICTURES_DIR"/*) ;;
+      *)
+        echo "wallpaper-provision: refusing to write wallpaper outside $PICTURES_DIR: $_targetFile" >&2
+        _nucleus_wp_failed=1
+        break
+        ;;
+    esac
+
+    # Copy decrypted material out of the runtime secret symlink directory
+    # so GUI consumers can read a normal file under ~/Pictures.
+    if [ -L "$_targetFile" ] || [ ! -f "$_targetFile" ] || ! cmp -s "$_secretPath" "$_targetFile"; then
+      _tmpTarget="$(mktemp)"
+      cp "$_secretPath" "$_tmpTarget"
+      # 444: managed wallpaper content must not be modified outside
+      # activation; GUI consumers and desktoppr need only read access.
+      chmod 444 "$_tmpTarget"
+      mv "$_tmpTarget" "$_targetFile"
+    fi
+  done < <("$_jq_bin" -r '.[] | [.secretName, .wallpaperName] | @tsv' <<< "$_items_json")
+
+  if [ "$_nucleus_wp_failed" -eq 1 ]; then
+    lock_wallpaper_dir
+    return 1
+  fi
+}
+
 wallpaper_post_copy_teardown() {
   # Stale gc: remove decrypted files that no longer have a matching
   # .sops source so the gallery does not show deleted assets.
