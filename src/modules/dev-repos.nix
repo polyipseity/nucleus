@@ -121,7 +121,7 @@ in
             };
           in
           builtins.replaceStrings (builtins.attrNames tokens) (builtins.attrValues tokens) (
-            builtins.readFile ../scripts/lib/dev-repos-activation.sh
+            builtins.readFile ../scripts/configs/dev-repos-activation.sh
           )
         );
   };
