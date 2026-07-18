@@ -125,13 +125,16 @@ function Sync-LiteLLMService {
   # launches litellm.  Using a wrapper file avoids the nested-quoting problem
   # that would arise from embedding this logic inline in sc.exe binPath.
   $wrapperScript = Join-Path -Path $programDataDir -ChildPath "run-litellm.ps1"
-  $wrapperContent = @"
-`$env:LITELLM_LOG = 'WARNING'
-`$env:OPENROUTER_API_KEY = if (Test-Path '$openrouterKeyFile') { Get-Content '$openrouterKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
-`$env:OPENCODE_GO_API_KEY = if (Test-Path '$opencodeGoKeyFile') { Get-Content '$opencodeGoKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
-`$env:OPENCODE_ZEN_API_KEY = if (Test-Path '$opencodeZenKeyFile') { Get-Content '$opencodeZenKeyFile' -Raw | ForEach-Object { `$_.Trim() } } else { '' }
-& "$litellmBin" --config "$configLink" --port $($litellmEndpoint.port) --host $($litellmEndpoint.host) --drop_params *>> "$logFile"
-"@
+  $wrapperContent = Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\LiteLLM-run.ps1")
+  $wrapperContent = $wrapperContent `
+    -replace '__LITELLM_BIN__', $litellmBin `
+    -replace '__CONFIG_LINK__', $configLink `
+    -replace '__LOGFILE__', $logFile `
+    -replace '__HOST__', $($litellmEndpoint.host) `
+    -replace '__PORT__', $($litellmEndpoint.port) `
+    -replace '__OPENROUTER_KEY_FILE__', $openrouterKeyFile `
+    -replace '__OPENCODE_GO_KEY_FILE__', $opencodeGoKeyFile `
+    -replace '__OPENCODE_ZEN_KEY_FILE__', $opencodeZenKeyFile
   [System.IO.File]::WriteAllText($wrapperScript, $wrapperContent, [System.Text.UTF8Encoding]::new($false))
 
   # undoc-supp: probe whether service already exists; Get-Service throws when absent.

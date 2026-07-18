@@ -74,22 +74,8 @@ function Sync-ReplicaSyncScheduledTask {
   # WHY command wrapper first: daily fallback should follow the same user-facing
   # nucleus-replica-sync entrypoint as manual runs. If managed profile blocks
   # are not loaded yet, fall back to the scripts/replica-sync.ps1 wrapper.
-  $actionCommand = @"
-& {
-  if (Test-Path -Path `$PROFILE.CurrentUserAllHosts -PathType Leaf) { . `$PROFILE.CurrentUserAllHosts }
-  if (Test-Path -Path `$PROFILE.CurrentUserCurrentHost -PathType Leaf) { . `$PROFILE.CurrentUserCurrentHost }
-
-  # undoc-supp: probe — command may not be installed; `$null check handles absence.
-  `$nucleusCommand = Get-Command -Name "nucleus-replica-sync" -ErrorAction SilentlyContinue
-  if (`$null -ne `$nucleusCommand) {
-    nucleus-replica-sync
-    exit `$LASTEXITCODE
-  }
-
-  & "$scriptPath"
-  exit `$LASTEXITCODE
-}
-"@
+  $actionTemplate = Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\ReplicaSync-task-action.ps1")
+  $actionCommand = $actionTemplate -replace '__SCRIPT_PATH__', $scriptPath
   $action = New-ScheduledTaskAction -Execute $pwshPath -Argument "-NoLogo -ExecutionPolicy Bypass -Command `"$actionCommand`""
   $trigger = New-ScheduledTaskTrigger -Daily -At "12:00"
   $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType InteractiveToken -RunLevel Limited

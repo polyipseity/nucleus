@@ -75,59 +75,11 @@ function Set-VSCodeWorkspaceTrust {
         (Join-Path -Path $appData -ChildPath "Code - Insiders\User\globalStorage\state.vscdb")
     )
 
-    # Write the Bun/SQLite script to a temp file.  Single-quote here-string (@'...'@)
-    # prevents PowerShell from expanding $-variables inside the script body;
-    # the URI path and DB file paths are passed as CLI arguments instead so
-    # the script body remains a literal and requires no escaping.
+    # Write the Bun/SQLite script to a temp file.  Read from the external
+    # script file to keep the function body out of this wrapper.
     $tempScript = [System.IO.Path]::GetTempFileName() + ".mjs"
     try {
-        $scriptContent = @'
-import { Database } from "bun:sqlite";
-import { existsSync } from "node:fs";
-
-// argv[2] = uriPath to trust; argv[3+] = absolute paths to state.vscdb files.
-const TRUST_KEY = "content.trust.model.key";
-const uriPath = process.argv[2];
-const dbPaths = process.argv.slice(3);
-
-for (const dbPath of dbPaths) {
-    if (!existsSync(dbPath)) continue;
-    let db;
-    try {
-        db = new Database(dbPath, { readwrite: true });
-        const row = db.query("SELECT value FROM ItemTable WHERE key = ?").get(TRUST_KEY);
-        let data;
-        if (row) {
-            data = JSON.parse(row.value);
-            const entries = data.uriTrustInfo ?? [];
-            const alreadyTrusted = entries.some(
-                e => e.uri?.path === uriPath && e.uri?.scheme === "file"
-            );
-            if (alreadyTrusted) {
-                db.close();
-                continue;
-            }
-            // Append the trust entry to the existing list rather than replacing
-            // it so that any other paths the user has manually trusted are preserved.
-            entries.push({ uri: { "$mid": 1, path: uriPath, scheme: "file" }, trusted: true });
-            data.uriTrustInfo = entries;
-        } else {
-            data = { uriTrustInfo: [{ uri: { "$mid": 1, path: uriPath, scheme: "file" }, trusted: true }] };
-        }
-        db.run(
-            "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)",
-            [TRUST_KEY, JSON.stringify(data)]
-        );
-        console.error("vscode-workspace-trust: Set-VSCodeWorkspaceTrust: trusted", uriPath, "in", dbPath);
-    } catch (e) {
-        // Non-fatal: DB may be locked by a running VS Code instance.
-        // Writing a warning so the operator knows to re-run apply after closing VS Code.
-        console.error("vscode-workspace-trust: Set-VSCodeWorkspaceTrust: warning:", dbPath, "-", e.message);
-    } finally {
-        if (db) db.close();
-    }
-}
-'@
+        $scriptContent = Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\VSCode-workspace-trust.mjs")
         [System.IO.File]::WriteAllText($tempScript, $scriptContent, [System.Text.Encoding]::UTF8)
 
         # Prepend ~/.bun/bin to PATH so bun is resolvable in this session even
