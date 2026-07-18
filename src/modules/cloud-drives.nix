@@ -334,69 +334,31 @@ in
       # cloudDrivesSetup: creates ~/clouds/ and per-entry subdirectories.
       # -----------------------------------------------------------------------
       {
-        home.activation.cloudDrivesSetup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-          set -eu
-
-          ${builtins.readFile ../scripts/lib/cloud-drive-setup-lib.sh}
-
-          # Create the top-level clouds/ directory tree.
-          mkdir -p "$HOME/clouds"
-
-          ${lib.concatStringsSep "\n" (
-            map (m: ''
-              _cd_ensure_real_directory "$HOME/${m.localPath}" "${m.localPath}"
-            '') enabledMounts
-          )}
-
-          ${lib.concatStringsSep "\n" (
-            map (r: ''
-              ${
-                if
-                  pkgs.stdenv.isDarwin
-                  && r.provider == "iCloud"
-                  && r.id == "iCloud"
-                  && r.localPath == "clouds/iCloudReplica"
-                then
-                  ''
-                    # macOS-only exception: iCloudReplica must point to native
-                    # CloudDocs storage so we do not duplicate Apple's iCloud
-                    # integration with a second managed tree.
-                    _icloud_native_target="$HOME/Library/Mobile Documents"
-                    _icloud_replica_path="$HOME/${r.localPath}"
-
-                    if [ -L "$_icloud_replica_path" ]; then
-                      if [ "$(readlink "$_icloud_replica_path")" != "$_icloud_native_target" ]; then
-                        _legacy_target="$(readlink "$_icloud_replica_path")"
-                        rm "$_icloud_replica_path"
-                        ln -s "$_icloud_native_target" "$_icloud_replica_path"
-                        printf '%s\n' "cloud-drives (${
-                          if r.displayName != null then r.displayName else r.id
-                        }): updated iCloudReplica symlink $_icloud_replica_path -> $_icloud_native_target (was $_legacy_target)."
-                      fi
-                    elif [ -e "$_icloud_replica_path" ]; then
-                      _migration_backup="$_icloud_replica_path.pre-native-icloud.$(date +%Y%m%d%H%M%S)"
-                      mv "$_icloud_replica_path" "$_migration_backup"
-                      ln -s "$_icloud_native_target" "$_icloud_replica_path"
-                      printf '%s\n' "cloud-drives (${
-                        if r.displayName != null then r.displayName else r.id
-                      }): migrated $_icloud_replica_path to native iCloud symlink target $_icloud_native_target (backup: $_migration_backup)."
-                    else
-                      ln -s "$_icloud_native_target" "$_icloud_replica_path"
-                      printf '%s\n' "cloud-drives (${
-                        if r.displayName != null then r.displayName else r.id
-                      }): linked $_icloud_replica_path -> $_icloud_native_target (native iCloud replica path)."
-                    fi
-                  ''
-                else
-                  ''
-                    _cd_ensure_real_directory "$HOME/${r.localPath}" "${
-                      if r.displayName != null then r.displayName else r.id
-                    }"
-                  ''
-              }
-            '') enabledReplicas
-          )}
-        '';
+        home.activation.cloudDrivesSetup = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+          ''
+            set -eu
+          ''
+          +
+            builtins.replaceStrings
+              [ "__CLOUD_DRIVE_SETUP_LIB__" "__JQ_BIN__" "__ENABLED_MOUNTS_JSON__" "__ENABLED_REPLICAS_JSON__" ]
+              [
+                (builtins.readFile ../scripts/lib/cloud-drive-setup-lib.sh)
+                "${pkgs.jq}/bin/jq"
+                (builtins.toJSON (map (m: { inherit (m) localPath; }) enabledMounts))
+                (builtins.toJSON (
+                  map (r: {
+                    localPath = r.localPath;
+                    displayName = if r.displayName != null then r.displayName else r.id;
+                    isSpecialICloud =
+                      pkgs.stdenv.isDarwin
+                      && r.provider == "iCloud"
+                      && r.id == "iCloud"
+                      && r.localPath == "clouds/iCloudReplica";
+                  }) enabledReplicas
+                ))
+              ]
+              (builtins.readFile ../scripts/services/cloud-drives-setup.sh)
+        );
       }
 
       # -----------------------------------------------------------------------
