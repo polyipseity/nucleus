@@ -47,7 +47,7 @@
             "${pkgs.litellm}/bin/litellm"
             "${config.users.users.${username}.home}/.config/nucleus/litellm-config.yml"
           ]
-          (builtins.readFile ../../scripts/services/litellm-wrapper.sh)
+          (builtins.readFile ../../scripts/hosts/NixOS/nixos-litellm-wrapper.sh)
       )}";
       Restart = "always";
       User = "litellm";

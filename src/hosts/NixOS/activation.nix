@@ -81,6 +81,6 @@ in
   # surfaces issues for post-apply investigation.
   # ---------------------------------------------------------------------------
   system.activationScripts."verify-nucleus-services" = lib.mkAfter ''
-    ${builtins.readFile ../../scripts/services/verify-nucleus-services.sh}
+    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-verify-nucleus-services.sh}
   '';
 }
