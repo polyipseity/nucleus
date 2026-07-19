@@ -543,22 +543,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Health check for archiving tools: verifies 7z CLI, Keka app registration,
     # and archive handler associations are functional after activation.
     # -------------------------------------------------------------------------
-    verifyArchivingStack = lib.hm.dag.entryAfter [ "macos-launch-services" "installPackages" ] ''
-      # Verify 7z CLI is available and functional using direct Nix store path.
-      # Do not rely on PATH lookup since Home Manager activation runs in a minimal
-      # shell that may not have nix-darwin system package paths available yet.
-      seven_z_exe="${pkgs.p7zip}/bin/7z"
-      if [ ! -x "$seven_z_exe" ]; then
-        echo "macos: warning — 7z binary not found at $seven_z_exe; archive extraction may fail." >&2
-      elif ! "$seven_z_exe" --help >/dev/null 2>&1; then
-        echo "macos: warning — 7z exists but --help failed; archive handling may be broken." >&2
-      fi
-
-      # Verify Keka application is installed and registered.
-      if [ ! -d "/Applications/Keka.app" ]; then
-        echo "macos: warning — Keka.app not found in /Applications; GUI archiving unavailable." >&2
-      fi
-    '';
+    verifyArchivingStack = lib.hm.dag.entryAfter [ "macos-launch-services" "installPackages" ] (
+      builtins.replaceStrings [ "__P7ZIP_BIN__" ] [ "${pkgs.p7zip}/bin/7z" ] (
+        builtins.readFile ../scripts/hosts/MacBook/macos-verify-archiving-stack.sh
+      )
+    );
 
     # -------------------------------------------------------------------------
     # macos-headless-display
