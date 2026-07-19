@@ -18,8 +18,7 @@
     handler registration, and the shared lib.sh
   - `secrets/` — secret provisioning helpers
   - `shell/` — shell integration scripts (zsh init, PowerShell init, completion installation)
-  - `configs/` — app config/install scripts and merge helpers (INI merge, JSON merge, GPG config,
-    app alias symlinks, LinearMouse config symlinks)
+  - `configs/` — app config/install scripts and merge helpers (INI merge, JSON merge, GPG config)
   - `packages/` — package-manager installer scripts (init-rustup, install-cargo-binstall-packages,
     install-uv-tools, install-bun-packages, install-pwsh-module)
   - `editors/` — editor-specific scripts (VS Code workspace trust, extension symlink bridge,
@@ -30,7 +29,9 @@
     - Files under `hosts/MacBook/` MUST start with `macos-`; entry name = filename.
     - Files under `hosts/NixOS/` MUST start with `nixos-`; entry name = filename.
     - All other subdirs (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `agents/`): use natural words/phrases; entry name = filename.
-    - Rule does not apply to library scripts (`lib/`), runtime-only scripts, or wrapped derivations.
+    - Rule does not apply to runtime-only scripts or wrapped derivations. Library scripts in
+      `lib/` that are host-specific MUST still use the host prefix (e.g., `macos-`). Generic
+      cross-platform lib scripts may use natural names.
   - **Placement policy for `hosts/`**:
     1. **Host-specific scripts belong in `hosts/<Host>/`.** If a script is macOS-only,
        NixOS-only, or Linux-only, place it under the corresponding `hosts/<Host>/`
@@ -41,6 +42,8 @@
        `packages/`, `editors/`, `lib/`, `secrets/`, `shell/`, `agents/`, or the root
        of `src/scripts/`).
     - The `hosts/<Host>/` directory exists for host-specific scripts only.
+    - Library scripts (`lib/`) are exempt from the host-specific placement rule — they stay
+      in `lib/` regardless of platform specificity.
 - `tests/` contains automated tests: `tests/modules/`, `tests/integration/`, and `tests/hosts/<host>/` for Nix logic tests, `tests/hosts/Windows/` for Pester DSC validation. All changes require corresponding tests; see `.agents/instructions/testing.instructions.md`.
 - Keep this file short and durable. Put file-type and workflow-specific rules in `.agents/instructions/*.instructions.md`, reusable workflows in `.agents/prompts/*.prompt.md`, and skill assets in `.agents/skills/<skill>/`.
 - Inspect the on-disk tree before assuming source files, tests, or runnable commands exist in a given location.
