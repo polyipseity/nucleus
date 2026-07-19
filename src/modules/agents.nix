@@ -133,7 +133,7 @@ in
       _nucleus_prepend_first_executable_dir bun \
         ${managedPaths.nixProfileBinDirs} || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
 
-      ${builtins.readFile ../scripts/configs/install-bun-packages.sh}
+      ${builtins.readFile ../scripts/packages/install-bun-packages.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -176,7 +176,7 @@ in
               paddleocr = "3.11";
             })
           ]
-          (builtins.readFile ../scripts/agents/install-uv-tools.sh)
+          (builtins.readFile ../scripts/packages/install-uv-tools.sh)
     );
 
     # -------------------------------------------------------------------------
@@ -201,7 +201,7 @@ in
         builtins.replaceStrings
           [ "__MANAGED_NIX_SYSTEM_BIN_DIRS__" "__MANAGED_NIX_PROFILE_BIN_DIRS__" ]
           [ "${managedPaths.nixSystemBinDirs}" "${managedPaths.nixProfileBinDirs}" ]
-          (builtins.readFile ../scripts/agents/init-rustup.sh)
+          (builtins.readFile ../scripts/packages/init-rustup.sh)
     );
 
     # -------------------------------------------------------------------------
@@ -249,7 +249,7 @@ in
             "${managedPaths.nixSystemBinDirs}"
             "${managedPaths.nixProfileBinDirs}"
           ]
-          (builtins.readFile ../scripts/agents/install-cargo-binstall-packages.sh)
+          (builtins.readFile ../scripts/packages/install-cargo-binstall-packages.sh)
     );
 
     # -------------------------------------------------------------------------
