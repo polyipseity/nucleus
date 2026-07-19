@@ -409,9 +409,11 @@ in
     # The Python script exits immediately when ~/dev is absent (edge case:
     # first-run race before provisionDevDirectory completes).
     # -----------------------------------------------------------------------
-    vsCodeWorkspaceTrust = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      set -eu
-      ${pkgs.python3}/bin/python3 '${vsCodeWorkspaceTrustPy}'
-    '';
+    vsCodeWorkspaceTrust = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+      builtins.replaceStrings
+        [ "__PYTHON3_BIN__" "__VSCODE_WORKSPACE_TRUST_PY__" ]
+        [ "${pkgs.python3}" "${vsCodeWorkspaceTrustPy}" ]
+        (builtins.readFile ../scripts/editors/vscode-workspace-trust.sh)
+    );
   };
 }
