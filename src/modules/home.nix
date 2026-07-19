@@ -259,25 +259,31 @@ in
     # it. A symlink would let those app-owned writes reach the repo file,
     # mixing managed settings with runtime state that does not belong in the
     # repo. Merge preserves both managed and app-owned keys.
-    home.activation."obsidian-merge-json" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      set -eu
+    home.activation."obsidian-merge-json" = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+      builtins.replaceStrings
+        [ "__PYTHON_SCRIPT__" ]
+        [ (builtins.readFile ../scripts/configs/obsidian-merge-json.py) ]
+        (builtins.readFile ../scripts/configs/obsidian-merge-json.sh)
+      + ''
+        set -eu
 
-      case "$(uname -s)" in
-        Darwin)
-          _obsidian_settings_path="$HOME/Library/Application Support/obsidian/obsidian.json"
-          ;;
-        Linux)
-          _obsidian_settings_path="''${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json"
-          ;;
-        *)
-          # Windows: handled separately via Sync-ObsidianConfig.ps1.
-          exit 0
-          ;;
-      esac
+        case "$(uname -s)" in
+          Darwin)
+            _obsidian_settings_path="$HOME/Library/Application Support/obsidian/obsidian.json"
+            ;;
+          Linux)
+            _obsidian_settings_path="''${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json"
+            ;;
+          *)
+            # Windows: handled separately via Sync-ObsidianConfig.ps1.
+            exit 0
+            ;;
+        esac
 
-      mkdir -p "$(dirname "$_obsidian_settings_path")"
-      ${pkgs.python3}/bin/python3 -c '${builtins.readFile ../scripts/configs/obsidian-merge-json.py}' "$_obsidian_settings_path" ${lib.escapeShellArg obsidianManagedSettingsJson}
-    '';
+        mkdir -p "$(dirname "$_obsidian_settings_path")"
+        _obsidian_merge_json "${pkgs.python3}/bin/python3" "$_obsidian_settings_path" ${lib.escapeShellArg obsidianManagedSettingsJson}
+      ''
+    );
 
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
     # deletion between rebuilds.
