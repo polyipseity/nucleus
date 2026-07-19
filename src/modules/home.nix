@@ -278,16 +278,14 @@ in
     # deletion between rebuilds.
     home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       set -eu
-      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
-      ${builtins.readFile ../scripts/lib/import-manage-out-of-store-symlinks.sh}
-      _nucleus_unprotect_managed_paths "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
+      ${builtins.readFile ../scripts/lib/nucleus-managed-paths.sh}
+      _nmp_unprotect "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
     '';
 
     home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
-      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
-      ${builtins.readFile ../scripts/lib/import-manage-out-of-store-symlinks.sh}
-      _nucleus_protect_managed_paths "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
+      ${builtins.readFile ../scripts/lib/nucleus-managed-paths.sh}
+      _nmp_protect "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
     '';
 
     # Override the default logDir (which uses ~) with a proper absolute path.

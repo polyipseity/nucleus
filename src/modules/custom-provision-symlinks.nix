@@ -140,20 +140,8 @@ in
         );
 
     home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      set -eu
-
-      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
-
-      _nucleus_manifest_path=${lib.escapeShellArg managedSymlinkManifestPath}
-
-      if [ -f "$_nucleus_manifest_path" ]; then
-        while IFS= read -r _nucleus_link_path; do
-          [ -n "$_nucleus_link_path" ] || continue
-          if [ -L "$_nucleus_link_path" ]; then
-            _nucleus_unprotect_symlink "customProvisionSymlinks" "$_nucleus_link_path"
-          fi
-        done < <(${pkgs.jq}/bin/jq -r '.[]' "$_nucleus_manifest_path")
-      fi
+      ${builtins.readFile ../scripts/configs/provision-symlinks.sh}
+      _cps_prepare ${lib.escapeShellArg managedSymlinkManifestPath} "${pkgs.jq}/bin/jq"
     '';
 
     home.activation.finalizeCustomProvisionSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (

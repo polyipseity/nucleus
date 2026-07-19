@@ -32,13 +32,15 @@ in
       config.lib.file.mkOutOfStoreSymlink "${repoRoot}/${repoRelPath}";
 
     home.activation."unprotectSymlink_${name}" = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      ${builtins.readFile ../../scripts/lib/import-symlink-hardening.sh}
-      _nucleus_unprotect_symlink "${name}" "$HOME/${targetRelPath}"
+      export NUS_SOURCE_NAME="${name}"
+      export NUS_TARGET_PATH="$HOME/${targetRelPath}"
+      ${builtins.readFile ../../scripts/lib/nucleus-unprotect-symlink.sh}
     '';
 
     home.activation."protectSymlink_${name}" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.readFile ../../scripts/lib/import-symlink-hardening.sh}
-      _nucleus_protect_symlink "${name}" "$HOME/${targetRelPath}"
+      export NPS_SOURCE_NAME="${name}"
+      export NPS_TARGET_PATH="$HOME/${targetRelPath}"
+      ${builtins.readFile ../../scripts/lib/nucleus-protect-symlink.sh}
     '';
   };
 
