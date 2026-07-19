@@ -1,10 +1,10 @@
 # Cloud drive directory structure setup.
 # Tokens (described below) are substituted at build time by Nix.
-# Expects set -eu and REPO_ROOT to be set before this script runs.
 set -eu
 
 # Source library helpers
-. "$REPO_ROOT/src/scripts/lib/cloud-drive-setup-lib.sh"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/cloud-drive-setup-lib.sh"
 
 _vsd_jq_bin='__JQ_BIN__'
 _vsd_mounts_json='__ENABLED_MOUNTS_JSON__'

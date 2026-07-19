@@ -145,25 +145,20 @@ in
     '';
 
     home.activation.finalizeCustomProvisionSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      # Set REPO_ROOT before the script so it can source libs at runtime.
-      ''
-        REPO_ROOT="${repoRoot}"
-      ''
-      +
-        builtins.replaceStrings
-          [
-            "__MANAGED_SYMLINK_MANIFEST_PATH__"
-            "__SYMLINK_ENTRIES_JSON__"
-            "__MANAGED_SYMLINK_MANIFEST_JSON__"
-            "__JQ_BIN__"
-          ]
-          [
-            managedSymlinkManifestPath
-            (builtins.toJSON (map (entry: entry.linkAbsolutePath) selectedSymlinksResolved))
-            managedSymlinkManifestJson
-            "${pkgs.jq}/bin/jq"
-          ]
-          (builtins.readFile ../scripts/configs/finalize-symlinks.sh)
+      builtins.replaceStrings
+        [
+          "__MANAGED_SYMLINK_MANIFEST_PATH__"
+          "__SYMLINK_ENTRIES_JSON__"
+          "__MANAGED_SYMLINK_MANIFEST_JSON__"
+          "__JQ_BIN__"
+        ]
+        [
+          managedSymlinkManifestPath
+          (builtins.toJSON (map (entry: entry.linkAbsolutePath) selectedSymlinksResolved))
+          managedSymlinkManifestJson
+          "${pkgs.jq}/bin/jq"
+        ]
+        (builtins.readFile ../scripts/configs/finalize-symlinks.sh)
     );
   };
 }

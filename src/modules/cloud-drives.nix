@@ -335,29 +335,24 @@ in
       # -----------------------------------------------------------------------
       {
         home.activation.cloudDrivesSetup = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-          ''
-            set -eu
-            REPO_ROOT="${repoRoot}"
-          ''
-          +
-            builtins.replaceStrings
-              [ "__JQ_BIN__" "__ENABLED_MOUNTS_JSON__" "__ENABLED_REPLICAS_JSON__" ]
-              [
-                "${pkgs.jq}/bin/jq"
-                (builtins.toJSON (map (m: { inherit (m) localPath; }) enabledMounts))
-                (builtins.toJSON (
-                  map (r: {
-                    localPath = r.localPath;
-                    displayName = if r.displayName != null then r.displayName else r.id;
-                    isSpecialICloud =
-                      pkgs.stdenv.isDarwin
-                      && r.provider == "iCloud"
-                      && r.id == "iCloud"
-                      && r.localPath == "clouds/iCloudReplica";
-                  }) enabledReplicas
-                ))
-              ]
-              (builtins.readFile ../scripts/services/cloud-drives-setup.sh)
+          builtins.replaceStrings
+            [ "__JQ_BIN__" "__ENABLED_MOUNTS_JSON__" "__ENABLED_REPLICAS_JSON__" ]
+            [
+              "${pkgs.jq}/bin/jq"
+              (builtins.toJSON (map (m: { inherit (m) localPath; }) enabledMounts))
+              (builtins.toJSON (
+                map (r: {
+                  localPath = r.localPath;
+                  displayName = if r.displayName != null then r.displayName else r.id;
+                  isSpecialICloud =
+                    pkgs.stdenv.isDarwin
+                    && r.provider == "iCloud"
+                    && r.id == "iCloud"
+                    && r.localPath == "clouds/iCloudReplica";
+                }) enabledReplicas
+              ))
+            ]
+            (builtins.readFile ../scripts/services/cloud-drives-setup.sh)
         );
       }
 

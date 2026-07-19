@@ -1,7 +1,6 @@
 # shellcheck shell=sh
 # Finalize custom-provision-symlinks: protect each managed symlink and persist
-# the manifest.  REPO_ROOT must be set by the caller (baked at build time by
-# Nix).  The symlink-hardening library is sourced at runtime from the repo.
+# the manifest.  The symlink-hardening library is sourced via SCRIPT_DIR.
 #
 # Tokens:
 #   __MANAGED_SYMLINK_MANIFEST_PATH__  — path to the managed symlink manifest
@@ -10,7 +9,8 @@
 #   __JQ_BIN__                        — path to jq
 
 set -eu
-. "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
 _nucleus_manifest_path='__MANAGED_SYMLINK_MANIFEST_PATH__'
 _nucleus_manifest_dir="$(dirname "$_nucleus_manifest_path")"
