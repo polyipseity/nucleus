@@ -1,12 +1,11 @@
 # Preflight macOS privacy permissions before defaults writes.
 # Full Disk Access privacy preflight. Runs FDA checks before defaults writes.
-# Source this within an activation block.  REPO_ROOT must be set (baked at
-# build time by Nix, or exported by apply.sh at runtime).
+# __REPO_ROOT__ is substituted at build time by Nix (replaceStrings).
 set -eu
 
 echo "macos: checking macOS privacy permissions before defaults writes..." >&2
 
-. "$REPO_ROOT/src/scripts/lib/macos-fda-warning-lib.sh"
+. "__REPO_ROOT__/src/scripts/lib/macos-fda-warning-lib.sh"
 
 fda_warning_emitted=0
 

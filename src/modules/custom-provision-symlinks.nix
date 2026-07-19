@@ -139,10 +139,15 @@ in
             (builtins.readFile ../scripts/configs/ensure-symlink-targets.sh)
         );
 
-    home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      ${builtins.readFile ../scripts/configs/provision-symlinks.sh}
-      _cps_prepare ${lib.escapeShellArg managedSymlinkManifestPath} "${pkgs.jq}/bin/jq"
-    '';
+    home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] (
+      builtins.replaceStrings
+        [ "__MANIFEST_PATH__" "__JQ_BIN__" ]
+        [
+          managedSymlinkManifestPath
+          "${pkgs.jq}/bin/jq"
+        ]
+        (builtins.readFile ../scripts/configs/provision-symlinks.sh)
+    );
 
     home.activation.finalizeCustomProvisionSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (
       builtins.replaceStrings
