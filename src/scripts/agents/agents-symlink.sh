@@ -1,14 +1,12 @@
 # shellcheck shell=sh
 # Sets up ~/.agents/ with per-entry symlinks into
 # src/modules/configs/agents/.
-# Requires: REPO_ROOT, AGENTS_CONFIG_RELATIVE_PATH env vars.
 set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
-_as_repo_root="$(_nucleus_resolve_repo_root "agents-config" "$REPO_ROOT")"
-
-_as_agents_source="$_as_repo_root/$AGENTS_CONFIG_RELATIVE_PATH"
+_as_repo_root="$(CDPATH='' cd -- "$SCRIPT_DIR/../../.." && pwd -P)"
+_as_agents_source="$_as_repo_root/src/modules/configs/agents"
 if [ ! -d "$_as_agents_source" ]; then
   echo "agents-config: agents config dir not found: $_as_agents_source" >&2
   exit 1

@@ -23,15 +23,11 @@ export HOME="__CURRENT_USER_HOME__"
 export PATH="$PATH:__GIT_BIN__"
 export GIT_SSH_COMMAND="__SSH_CLIENT__"
 
-# Resolve the live checkout root from $NUCLEUS_REPO_ROOT (set by apply.sh
-# before the rebuild and forwarded through sudo), with an eval-time
-# fallback for home-manager activation (which runs as the user and
-# does not inherit the sudo-level env var).
+# Resolve the repo checkout root at build time via __REPO_ROOT__ token.
 repoRoot="__REPO_ROOT__"
 if [ -z "$repoRoot" ] || [ ! -d "$repoRoot" ]; then
-  if [ -n "${NUCLEUS_REPO_ROOT:-}" ]; then
-    repoRoot="$NUCLEUS_REPO_ROOT"
-  fi
+  echo "devReposProvision: __REPO_ROOT__ is empty or invalid — check NUCLEUS_REPO_ROOT at build time" >&2
+  exit 1
 fi
 
 devDir="$HOME/dev"

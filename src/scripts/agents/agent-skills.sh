@@ -2,14 +2,12 @@
 # Creates ~/.agents/skills/ as a real directory then populates it with
 # per-skill symlinks for every skill subdirectory committed to
 # src/modules/configs/agents/skills/.
-# Requires: REPO_ROOT, AGENTS_SKILLS_RELATIVE_PATH env vars.
 set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
-_ask_repo_root="$(_nucleus_resolve_repo_root "skills" "$REPO_ROOT")"
-
-_ask_skills_source="$_ask_repo_root/$AGENTS_SKILLS_RELATIVE_PATH"
+_ask_repo_root="$(CDPATH='' cd -- "$SCRIPT_DIR/../../.." && pwd -P)"
+_ask_skills_source="$_ask_repo_root/src/modules/configs/agents/skills"
 if [ ! -d "$_ask_skills_source" ]; then
   echo "skills: skills source dir not found: $_ask_skills_source" >&2
   exit 1

@@ -1,9 +1,11 @@
 set -eu
 
-# Eval-time fallback for launchd jobs that don't inherit apply.sh env.
+# __REPO_ROOT__ is substituted at build time by Nix.  Hard-fail if
+# the token was not substituted.
 _repo_root="__REPO_ROOT__"
 if [ -z "$_repo_root" ] || [ ! -d "$_repo_root" ]; then
-  _repo_root="${NUCLEUS_REPO_ROOT:?cloud-drives: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
+  echo "cloud-drives: __REPO_ROOT__ is empty or not a directory — set NUCLEUS_REPO_ROOT at build time" >&2
+  exit 1
 fi
 _nucleus_replica_cmd="__CURRENT_USER_HOME__/.nix-profile/bin/nucleus-replica-sync"
 if [ ! -x "$_nucleus_replica_cmd" ]; then

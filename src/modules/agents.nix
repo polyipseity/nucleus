@@ -54,8 +54,6 @@ in
     # land in a real, untracked directory rather than inside the repo tree).
     # -------------------------------------------------------------------------
     agents-symlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      export REPO_ROOT="${repoRoot}"
-      export AGENTS_CONFIG_RELATIVE_PATH="${agentsConfigRelativePath}"
       ${builtins.readFile ../scripts/agents/agents-symlink.sh}
     '';
 
@@ -80,8 +78,6 @@ in
     # fails fast rather than silently overwriting the downloaded content.
     # -------------------------------------------------------------------------
     agent-skills = lib.hm.dag.entryAfter [ "agents-symlink" ] ''
-      export REPO_ROOT="${repoRoot}"
-      export AGENTS_SKILLS_RELATIVE_PATH="${agentsSkillsRelativePath}"
       ${builtins.readFile ../scripts/agents/agent-skills.sh}
     '';
 
@@ -101,7 +97,6 @@ in
     #             cargo-binstall; bun is the only viable install tier.
     # -------------------------------------------------------------------------
     installBunPackages = lib.hm.dag.entryAfter [ "agent-skills" ] ''
-      export REPO_ROOT="${repoRoot}"
       export JQ_BIN='${pkgs.jq}/bin/jq'
       ${builtins.readFile ../scripts/packages/install-bun-packages.sh}
       _ibp_setup_path ${managedPaths.toShellPrependGuard} ${managedPaths.toShellAppendGuard} \
