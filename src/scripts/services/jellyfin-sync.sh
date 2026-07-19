@@ -5,10 +5,13 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
-
-# shellcheck disable=SC1091
-. "$SCRIPT_DIR/../lib/lib.sh"
+# When NUCLEUS_REPO_ROOT is already set (embedded mode), skip SCRIPT_DIR and
+# lib.sh resolution — derive_repo_root returns NUCLEUS_REPO_ROOT directly.
+if [ -z "${NUCLEUS_REPO_ROOT:-}" ]; then
+  SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+  # shellcheck disable=SC1091
+  . "$SCRIPT_DIR/../lib/lib.sh"
+fi
 
 usage() {
   usage_std "$(basename "$0")" "[options]"
@@ -41,7 +44,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-REPO_ROOT="$(derive_repo_root)"
+REPO_ROOT="${NUCLEUS_REPO_ROOT:-$(derive_repo_root)}"
 
 if ! command -v curl >/dev/null 2>&1; then
   printf '%s\n' "jellyfin-sync: curl is not available; skipping sync"

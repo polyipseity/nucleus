@@ -27,18 +27,17 @@ in
   # Jellyfin service is running.  Mirrors the Darwin postActivation fragment but
   # uses a named script (nixos-specific option).
   #
-  # WHY a separate script instead of inline shell: see the rationale in
-  # src/scripts/services/jellyfin-sync.sh header — this is runtime imperative API
-  # convergence that Nix's build-time model cannot express.
+  # WHY embedded via readFile with NUCLEUS_REPO_ROOT token (not runtime sh):
+  # see the rationale in activation.nix (MacBook) — the script is
+  # self-contained when NUCLEUS_REPO_ROOT is set at build time, eliminating
+  # the runtime file-system dependency on the repo checkout path.
   system.activationScripts.jellyfin-sync = lib.mkAfter (
     let
       repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
     in
     ''
-      jellyfin_sync_script="${repoRoot}/src/scripts/services/jellyfin-sync.sh"
-      if [ -n "${repoRoot}" ] && [ -f "$jellyfin_sync_script" ]; then
-        sh "$jellyfin_sync_script"
-      fi
+      NUCLEUS_REPO_ROOT="${repoRoot}"; export NUCLEUS_REPO_ROOT
+      ${builtins.readFile ../../scripts/services/jellyfin-sync.sh}
     ''
   );
 }

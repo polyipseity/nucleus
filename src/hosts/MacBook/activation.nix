@@ -208,15 +208,14 @@ in
     # Converge Jellyfin accounts and libraries declared in src/modules/users.json
     # with a running Jellyfin server.
     #
-    # WHY a separate script instead of inline shell: the sync logic performs
-    # runtime imperative operations (SOPS decryption, API polling, token auth,
-    # diff-and-converge) that Nix's declarative model cannot express.  Keeping
-    # it in src/scripts/services/jellyfin-sync.sh avoids duplicating 600+ lines of shell
-    # across hosts and keeps the activation file scoped to macOS-specific hooks.
-    jellyfin_sync_script="${repoRoot}/src/scripts/services/jellyfin-sync.sh"
-    if [ -n "${repoRoot}" ] && [ -f "$jellyfin_sync_script" ]; then
-      sh "$jellyfin_sync_script"
-    fi
+    # WHY embedded via readFile with NUCLEUS_REPO_ROOT token (not runtime sh):
+    # the script is self-contained when NUCLEUS_REPO_ROOT is set at build time,
+    # eliminating the runtime file-system dependency on the repo checkout path.
+    # The sync logic performs runtime imperative operations (SOPS decryption,
+    # API polling, token auth, diff-and-converge) that Nix's declarative model
+    # cannot express.
+    NUCLEUS_REPO_ROOT="${repoRoot}"; export NUCLEUS_REPO_ROOT
+    ${builtins.readFile ../../scripts/services/jellyfin-sync.sh}
 
     # ---- verifyNucleusServices ---------------------------------------------------
     # Warn-only verification that all managed services are running.
