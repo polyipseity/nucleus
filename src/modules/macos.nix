@@ -292,14 +292,12 @@ lib.mkIf pkgs.stdenv.isDarwin {
   };
 
   home.activation.unprotectDownloadsICloudSymlink = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-    REPO_ROOT="${repoRoot}"
-    . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
+    ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
     _nucleus_unprotect_symlink "macos.nix" "$HOME/Downloads/iCloud"
   '';
 
   home.activation.protectDownloadsICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    REPO_ROOT="${repoRoot}"
-    . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
+    ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
     _nucleus_protect_symlink "macos.nix" "$HOME/Downloads/iCloud"
   '';
 
@@ -388,8 +386,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #   VLC    — handles the complete set of audio/video UTIs defined above
     # -------------------------------------------------------------------------
     macos-launch-services = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/lib/macos-launch-services-lib.sh"
+      ${builtins.readFile ../scripts/lib/import-macos-launch-services-lib.sh}
 
       # Bundle identifiers sourced from app bundles + vendor docs:
       # - Chrome: com.google.chrome
@@ -414,8 +411,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # additional English tokens without changing the system UI language.
     # -------------------------------------------------------------------------
     raycast-aliases = lib.hm.dag.entryAfter [ "macos-launch-services" ] ''
-      REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
+      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
       _ray_alias_dir="$HOME/Applications/Nucleus App Aliases"
       mkdir -p "$_ray_alias_dir"
       ${builtins.readFile ../scripts/hosts/MacBook/macos-raycast-aliases.sh}
@@ -452,8 +448,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Source: https://developer.apple.com/documentation/fileprovider
     # -------------------------------------------------------------------------
     configureICloudExclusions = lib.hm.dag.entryAfter [ "cloudDrivesSetup" ] ''
-      REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/lib/macos-icloud-exclusions-lib.sh"
+      ${builtins.readFile ../scripts/lib/import-macos-icloud-exclusions.sh}
 
       apply_exclusions "${pkgs.jq}/bin/jq" "${pkgs.findutils}/bin/find" ${lib.escapeShellArg icloudExcludedDirsJson} ${lib.escapeShellArg icloudManagedRootsJson}
     '';
@@ -472,8 +467,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #      converge in the same run.
     # -------------------------------------------------------------------------
     preflightPrivacyPermissions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/hosts/MacBook/macos-preflight-privacy.sh"
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-preflight-privacy.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -485,8 +479,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     safari-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
       ''
-        REPO_ROOT="${repoRoot}"
-        . "$REPO_ROOT/src/scripts/lib/macos-fda-warning-lib.sh"
+        ${builtins.readFile ../scripts/lib/import-macos-fda-warning.sh}
         fda_warning_emitted=0
         print_fda_warning "protected Safari preferences"
       ''
@@ -503,8 +496,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     universal-access-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
       ''
-        REPO_ROOT="${repoRoot}"
-        . "$REPO_ROOT/src/scripts/lib/macos-fda-warning-lib.sh"
+        ${builtins.readFile ../scripts/lib/import-macos-fda-warning.sh}
         fda_warning_emitted=0
         print_fda_warning "Accessibility preferences"
       ''
@@ -547,8 +539,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # in-session flush but a full restart is required for order to appear correctly.
     # Source: https://github.com/mosen/mysides
     configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/lib/macos-finder-sidebar.sh"
+      ${builtins.readFile ../scripts/lib/import-macos-finder-sidebar.sh}
 
       _finder_favorites_json='${builtins.toJSON finderSidebar.finderSidebarManagedFavorites}'
       _finder_jq_bin="${pkgs.jq}/bin/jq"
@@ -571,8 +562,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     relaunchDesktopServices = lib.hm.dag.entryAfter [ "configureFinderSidebar" ] ''
       ${builtins.readFile ../scripts/hosts/MacBook/macos-refresh-desktop-services.sh}
 
-      REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/lib/macos-finder-sidebar.sh"
+      ${builtins.readFile ../scripts/lib/import-macos-finder-sidebar.sh}
 
       _finder_favorites_json='${builtins.toJSON finderSidebar.finderSidebarManagedFavorites}'
       _finder_jq_bin="${pkgs.jq}/bin/jq"
