@@ -1,7 +1,8 @@
 # shellcheck shell=sh
 # Obsidian settings merge: merges managed advanced-setting keys into
 # obsidian.json while preserving app-owned vault metadata.
-# Token: __PYTHON_SCRIPT__ (replaced by Nix replaceStrings with the Python code).
+# Tokens: __PYTHON_SCRIPT__, __PYTHON3_BIN__, __OBSIDIAN_SETTINGS_JSON__
+#   (replaced by Nix replaceStrings).
 #
 # Usage: _obsidian_merge_json <python3_bin> <settings_path> <managed_json>
 _obsidian_merge_json() {
@@ -12,3 +13,20 @@ _obsidian_merge_json() {
 __PYTHON_SCRIPT__
 PYEOF
 }
+
+set -eu
+
+case "$(uname -s)" in
+  Darwin)
+    _obsidian_settings_path="$HOME/Library/Application Support/obsidian/obsidian.json"
+    ;;
+  Linux)
+    _obsidian_settings_path="${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json"
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+
+mkdir -p "$(dirname "$_obsidian_settings_path")"
+_obsidian_merge_json "__PYTHON3_BIN__" "$_obsidian_settings_path" "__OBSIDIAN_SETTINGS_JSON__"

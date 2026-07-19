@@ -97,13 +97,15 @@ in
     #             cargo-binstall; bun is the only viable install tier.
     # -------------------------------------------------------------------------
     installBunPackages = lib.hm.dag.entryAfter [ "agent-skills" ] (
-      builtins.replaceStrings [ "__JQ_BIN__" ] [ "${pkgs.jq}/bin/jq" ] (
-        builtins.readFile ../scripts/packages/install-bun-packages.sh
-      )
-      + ''
-        _ibp_setup_path ${managedPaths.toShellPrependGuard} ${managedPaths.toShellAppendGuard} \
-          ${managedPaths.nixProfileBinDirs}
-      ''
+      builtins.replaceStrings
+        [ "__JQ_BIN__" "__MANAGED_PREPEND_GUARD__" "__MANAGED_APPEND_GUARD__" "__NIX_PROFILE_BIN_DIRS__" ]
+        [
+          "${pkgs.jq}/bin/jq"
+          managedPaths.toShellPrependGuard
+          managedPaths.toShellAppendGuard
+          managedPaths.nixProfileBinDirs
+        ]
+        (builtins.readFile ../scripts/packages/install-bun-packages.sh)
     );
 
     # -------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 # QtPass INI merge shell helpers.
-# Token: __AWK_PATH__ (replaced by Nix replaceStrings).
+# Tokens: __AWK_PATH__, __QTPASS_DARWIN_COMMANDS__, __QTPASS_LINUX_PRIMARY_COMMANDS__,
+#   __QTPASS_LINUX_SECONDARY_COMMANDS__ (replaced by Nix replaceStrings).
 
 _escape_qsettings_ini_string() {
   printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e ':join' -e 'N' -e '$!b join' -e 's/\n/\\n/g'
@@ -64,3 +65,20 @@ $_key=$_value
 EOF
   fi
 }
+
+case "$(uname -s)" in
+  Darwin)
+__QTPASS_DARWIN_COMMANDS__
+    ;;
+  Linux)
+    # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
+    _primary_conf="$HOME/.config/IJHack/QtPass.conf"
+    # Some builds may resolve via organization-domain pathing.
+    _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
+
+__QTPASS_LINUX_PRIMARY_COMMANDS__
+    if [ -f "$_secondary_conf" ]; then
+__QTPASS_LINUX_SECONDARY_COMMANDS__
+    fi
+    ;;
+esac

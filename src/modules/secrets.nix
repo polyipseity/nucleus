@@ -308,6 +308,34 @@ lib.mkIf isPrimaryUser {
   #      formats are handled by the extraction logic below.
   #      Combined with check 2 (primary key in keyring), this confirms we have the
   #      private key material to decrypt once the passphrase is provided.
+
+  # --------------------------------------------------------------------------
+  # verifySecretDecryption
+  # Post-activation health check that verifies ALL SOPS files can be decrypted
+  # by each registered backend after gpg-import and ssh-key-adopt have completed.
+  #
+  # Covers:
+  #   - src/secrets/git-identities.yml
+  #   - src/secrets/gpg-personal.yml
+  #   - src/secrets/ssh-personal.yml
+  #   - src/assets/wallpapers/*.sops  (enumerated dynamically via builtins.readDir)
+  # All use the same .sops.yaml key groups (age_devices + primary_gpg).
+  #
+  # Five checks (in order):
+  #   1. Materialization sanity: all sops-nix secret paths exist and are
+  #      non-empty.  Guards against silent sops-nix failures.
+  #   2. GPG key presence: managed primary fingerprint is in the keyring.
+  #      Complements gpg-import — catches keyring state divergence.
+  #   3. GPG SOPS recipient check: extract the fp: value from each SOPS file's
+  #      plaintext sops.pgp[].fp metadata and verify that fingerprint is present
+  #      in the secret keyring.  SOPS records the encryption subkey fingerprint
+  #      (not the primary key fingerprint) in the fp: field; comparing the primary
+  #      fingerprint directly produces false failures when SOPS chose a subkey.
+  #      YAML SOPS files store fp as "    fp: HEX" (unquoted); binary SOPS files
+  #      (e.g. wallpaper blobs) use JSON format with "\"fp\": \"HEX\""; both
+  #      formats are handled by the extraction logic below.
+  #      Combined with check 2 (primary key in keyring), this confirms we have the
+  #      private key material to decrypt once the passphrase is provided.
   #      Accumulates failures, reports all failing files.
   #      Hard error — GPG is the last-resort global backup.
   #   4. Personal SSH age recipient check: derive the age public key from the
@@ -372,37 +400,33 @@ lib.mkIf isPrimaryUser {
       };
     in
     lib.hm.dag.entryAfter [ "git-identity" "gpg-import" "ssh-key-adopt" ] (
-      ''
-        set -eu
-      ''
-      +
-        builtins.replaceStrings
-          [
-            "__ALL_SOPS_FILES_JSON__"
-            "__SSH_PUBKEY_PATH__"
-            "__SSH_TO_AGE_BIN__"
-            "__GNUPG_BIN__"
-            "__JQ_BIN__"
-            "__GIT_IDENTITY_SECRET_PATH__"
-            "__SSH_SECRET_PATH__"
-            "__SSH_PUBLIC_SECRET_PATH__"
-            "__GPG_SECRET_PATH__"
-            "__GPG_MANIFEST_PATH__"
-            "__GNUPG_HOME__"
-          ]
-          [
-            (builtins.toJSON allSopsFiles)
-            "${sshPublicKeyPath}"
-            "${pkgs.ssh-to-age}/bin/ssh-to-age"
-            "${pkgs.gnupg}/bin/gpg"
-            "${pkgs.jq}/bin/jq"
-            "${config.sops.secrets.${gitIdentitySecretName}.path}"
-            "${config.sops.secrets.${sshSecretName}.path}"
-            "${config.sops.secrets.${sshPublicSecretName}.path}"
-            "${config.sops.secrets.${gpgSecretName}.path}"
-            "${config.home.homeDirectory}/.config/nucleus/managed-gpg-keys"
-            "${config.home.homeDirectory}/.gnupg"
-          ]
-          (builtins.readFile ../scripts/secrets/verify-secret-decryption.sh)
+      builtins.replaceStrings
+        [
+          "__ALL_SOPS_FILES_JSON__"
+          "__SSH_PUBKEY_PATH__"
+          "__SSH_TO_AGE_BIN__"
+          "__GNUPG_BIN__"
+          "__JQ_BIN__"
+          "__GIT_IDENTITY_SECRET_PATH__"
+          "__SSH_SECRET_PATH__"
+          "__SSH_PUBLIC_SECRET_PATH__"
+          "__GPG_SECRET_PATH__"
+          "__GPG_MANIFEST_PATH__"
+          "__GNUPG_HOME__"
+        ]
+        [
+          (builtins.toJSON allSopsFiles)
+          "${sshPublicKeyPath}"
+          "${pkgs.ssh-to-age}/bin/ssh-to-age"
+          "${pkgs.gnupg}/bin/gpg"
+          "${pkgs.jq}/bin/jq"
+          "${config.sops.secrets.${gitIdentitySecretName}.path}"
+          "${config.sops.secrets.${sshSecretName}.path}"
+          "${config.sops.secrets.${sshPublicSecretName}.path}"
+          "${config.sops.secrets.${gpgSecretName}.path}"
+          "${config.home.homeDirectory}/.config/nucleus/managed-gpg-keys"
+          "${config.home.homeDirectory}/.gnupg"
+        ]
+        (builtins.readFile ../scripts/secrets/verify-secret-decryption.sh)
     );
 }

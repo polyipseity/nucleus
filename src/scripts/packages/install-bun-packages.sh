@@ -1,6 +1,7 @@
 # shellcheck shell=sh
 # Idempotently converges the declarative bun global package set.
-# Tokens: __JQ_BIN__ (replaced with jq binary path by Nix replaceStrings).
+# Tokens: __JQ_BIN__, __MANAGED_PREPEND_GUARD__, __MANAGED_APPEND_GUARD__,
+#   __NIX_PROFILE_BIN_DIRS__ (replaced by Nix replaceStrings).
 # Requires: bun on PATH.
 set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -22,6 +23,9 @@ _ibp_setup_path() {
   # shell's PATH may not include them.
   _nucleus_prepend_first_executable_dir bun "$@" || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
 }
+
+# Call _ibp_setup_path with managed-path guard tokens.
+_ibp_setup_path "__MANAGED_PREPEND_GUARD__" "__MANAGED_APPEND_GUARD__" "__NIX_PROFILE_BIN_DIRS__"
 
 # If bun is still not found after _ibp_setup_path was called, search the
 if ! command -v bun >/dev/null 2>&1; then

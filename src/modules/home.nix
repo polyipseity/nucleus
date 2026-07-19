@@ -207,27 +207,20 @@ in
     # stores. Merge writes the managed defaults into each store while
     # preserving any user-configured settings outside managed keys.
     home.activation."qtpass-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.replaceStrings [ "__AWK_PATH__" ] [ "${pkgs.gawk}/bin/awk" ] (
-        builtins.readFile ../scripts/configs/qtpass-merge-ini.sh
-      )
-      + ''
-        case "$(uname -s)" in
-          Darwin)
-            ${qtpassModule.qtPassDarwinCommands}
-            ;;
-          Linux)
-            # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
-            _primary_conf="$HOME/.config/IJHack/QtPass.conf"
-            # Some builds may resolve via organization-domain pathing.
-            _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
-
-            ${qtpassModule.qtPassPrimaryIniCommands}
-            if [ -f "$_secondary_conf" ]; then
-              ${qtpassModule.qtPassSecondaryIniCommands}
-            fi
-            ;;
-        esac
-      ''
+      builtins.replaceStrings
+        [
+          "__AWK_PATH__"
+          "__QTPASS_DARWIN_COMMANDS__"
+          "__QTPASS_LINUX_PRIMARY_COMMANDS__"
+          "__QTPASS_LINUX_SECONDARY_COMMANDS__"
+        ]
+        [
+          "${pkgs.gawk}/bin/awk"
+          qtpassModule.qtPassDarwinCommands
+          qtpassModule.qtPassPrimaryIniCommands
+          qtpassModule.qtPassSecondaryIniCommands
+        ]
+        (builtins.readFile ../scripts/configs/qtpass-merge-ini.sh)
     );
 
     # Picard reads native INI settings from ~/.config/MusicBrainz/Picard.ini
@@ -241,12 +234,9 @@ in
     # preserving all app-owned keys and sections.
     home.activation."picard-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] (
       builtins.replaceStrings
-        [ "__AWK_PATH__" "__PICARD_DEFAULTS_INI__" ]
-        [ "${pkgs.gawk}/bin/awk" (lib.escapeShellArg picardDefaultsIniText) ]
+        [ "__AWK_PATH__" "__PICARD_DEFAULTS_INI__" "__PICARD_OVERRIDE_COMMANDS__" ]
+        [ "${pkgs.gawk}/bin/awk" (lib.escapeShellArg picardDefaultsIniText) picardOverrideCommands ]
         (builtins.readFile ../scripts/configs/picard-merge-ini.sh)
-      + ''
-        ${picardOverrideCommands}
-      ''
     );
 
     # Obsidian stores app-global settings in obsidian.json alongside dynamic

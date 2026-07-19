@@ -1,5 +1,6 @@
 # Picard INI merge orchestration.
-# Tokens: __AWK_PATH__, __PICARD_DEFAULTS_INI__ (replaced by Nix replaceStrings).
+# Tokens: __AWK_PATH__, __PICARD_DEFAULTS_INI__, __PICARD_OVERRIDE_COMMANDS__
+#   (replaced by Nix replaceStrings).
 
 _upsert_ini_key() {
   _conf="$1"
@@ -117,3 +118,5 @@ trap 'rm -f "$_picard_defaults_file"' EXIT
 printf '%s' __PICARD_DEFAULTS_INI__ > "$_picard_defaults_file"
 
 _apply_picard_defaults_from_file "$_picard_defaults_file" "$_picard_conf"
+
+__PICARD_OVERRIDE_COMMANDS__
