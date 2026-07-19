@@ -21,9 +21,6 @@
 #     convention (same on NixOS and Windows).
 { lib, ... }:
 let
-  # Import centralized daemon refresh helpers for post-deploy cache flush.
-  daemonRefresh = import ../../modules/macos/daemon-refresh.nix;
-
   # Generate a plist <dict> from an attribute set of booleans.
   # Used to build NSServicesStatus presentation_modes values.
   mkPresentationModes =
@@ -54,6 +51,6 @@ in
         # process memory. Finder is intentionally excluded here —
         # relaunchDesktopServices (DAG-ordered after writeBoundary) restarts it
         # via launchctl kickstart to preserve window state.
-        ${daemonRefresh.refreshServicesMenu}
+        ${builtins.readFile ../../scripts/hosts/MacBook/macos-flush-services-menu.sh}
       '';
 }

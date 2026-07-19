@@ -57,8 +57,6 @@ let
     "com.googlecode.iterm2"
     "com.raycast.macos"
   ];
-
-  daemonRefresh = import ./daemon-refresh.nix;
 in
 {
   inherit resetUserPreferenceDomains;
@@ -71,8 +69,7 @@ in
     NIX_STORE_BIN="${pkgs.nix}/bin/nix-store"
     MANAGED_PREF_DOMAINS="${builtins.concatStringsSep " " resetUserPreferenceDomains}"
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-preference-gc.sh}
-    ${daemonRefresh.refreshCfprefsd}
-    ${daemonRefresh.waitForDaemons}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-refresh-cfprefsd.sh}
 
     echo "Managed preference domains purged. Run your apply flow to re-assert declarative defaults."
   '';

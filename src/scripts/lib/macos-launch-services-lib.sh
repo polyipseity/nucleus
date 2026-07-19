@@ -3,15 +3,21 @@
 # home-manager activation scripts.  All functions are no-ops on non-macOS.
 #
 # Provided functions:
-#   register_handler           — set default UTI handler via duti
-#   launchctl_target           — build a launchctl service target specifier
-#   launchctl_bootstrap_domain — build a launchctl bootstrap domain target
-#   refresh_cfprefsd           — kill cfprefsd (CFPreferences daemon)
-#   refresh_pbs                — kill pbs (Pasteboard Server)
-#   refresh_lsd                — rebuild Launch Services database
-#   refresh_finder             — restart Finder
-#   refresh_dock               — restart Dock
-#   refresh_services_menu      — full Services menu pipeline flush
+#   register_handler             — set default UTI handler via duti
+#   launchctl_target             — build a launchctl service target specifier
+#   launchctl_bootstrap_domain   — build a launchctl bootstrap domain target
+#   refresh_cfprefsd             — kill cfprefsd (CFPreferences daemon)
+#   refresh_pbs                  — kill pbs (Pasteboard Server)
+#   refresh_lsd                  — rebuild Launch Services database
+#   refresh_finder               — restart Finder (killall)
+#   refresh_finder_launchd       — restart Finder (launchctl, preserves windows)
+#   refresh_dock                 — restart Dock
+#   refresh_tiswitcher           — refresh TISwitcher input-source daemon
+#   refresh_system_ui            — restart SystemUIServer + WindowManager
+#   refresh_shared_filelistd     — restart sharedfilelistd
+#   wait_for_daemons             — brief sleep for daemon flush settlement
+#   refresh_desktop_services     — composite: Finder+SystemUI (launchctl)
+#   refresh_services_menu        — composite: cfprefsd+pbs+sleep
 
 # register_handler DUTI_BIN BUNDLE_ID UTI [UTI ...]
 # Sets BUNDLE_ID as the default handler for each UTI across all roles.
@@ -105,7 +111,59 @@ refresh_dock() {
       ;;
   esac
 }
+# refresh_tiswitcher — Refresh TISwitcher (input-source switcher daemon).
+# Sends HUP so custom key layout / TIS preferences reload without restarting
+# the whole input-method pipeline.
+refresh_tiswitcher() {
+  case "$(uname -s)" in
+    Darwin)
+      /usr/bin/killall -HUP TISwitcher 2>/dev/null || true
+      ;;
+  esac
+}
 
+# refresh_system_ui — Restart SystemUIServer (menu bar extras) and
+# WindowManager (Spaces) on macOS.
+refresh_system_ui() {
+  case "$(uname -s)" in
+    Darwin)
+      for _sui_proc in SystemUIServer WindowManager; do
+        /usr/bin/killall "$_sui_proc" 2>/dev/null || true
+      done
+      ;;
+  esac
+}
+
+# refresh_shared_filelistd — Restart sharedfilelistd (Finder sidebar daemon).
+refresh_shared_filelistd() {
+  case "$(uname -s)" in
+    Darwin)
+      /usr/bin/killall sharedfilelistd 2>/dev/null || true
+      ;;
+  esac
+}
+
+# refresh_finder_launchd — Restart Finder via launchctl kickstart.
+# Preserves window state. Preferred over killall for desktop refreshes.
+refresh_finder_launchd() {
+  case "$(uname -s)" in
+    Darwin)
+      /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder" 2>/dev/null || true
+      ;;
+  esac
+}
+
+# wait_for_daemons — Brief sleep for killed daemons to flush and restart.
+wait_for_daemons() {
+  /bin/sleep 1
+}
+
+# refresh_desktop_services — Composite: restart UI daemons for desktop config
+# changes. Preserves Finder window state via launchctl kickstart.
+refresh_desktop_services() {
+  refresh_finder_launchd
+  refresh_system_ui
+}
 # refresh_services_menu — Full flush of the Services menu pipeline on macOS.
 # Kills cfprefsd, lsd, pbs, waits 1 s, then restarts Finder.
 # Call this after deploying or removing .app bundles so the Services menu

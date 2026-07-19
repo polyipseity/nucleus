@@ -19,7 +19,6 @@ let
   liveICloudDownloads = "${config.home.homeDirectory}/Library/Mobile Documents/com~apple~CloudDocs/Downloads";
 
   # Sub-module imports extracted from this file for focused maintainability.
-  daemonRefresh = import ./macos/daemon-refresh.nix;
   finderSidebar = import ./macos/finder-sidebar.nix { inherit config lib pkgs; };
   preferenceGc = import ./macos/preference-gc.nix { inherit config lib pkgs; };
 
@@ -346,8 +345,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     input-config = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       ${builtins.readFile ../scripts/hosts/MacBook/macos-input-config.sh}
-
-      ${daemonRefresh.refreshTISwitcher}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-refresh-tiswitcher.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -536,7 +534,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # maintenance. Keeping it independent avoids fake coupling with ~/dev work.
     # -------------------------------------------------------------------------
     reloadDockPreferenceState = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      ${daemonRefresh.refreshDock}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-refresh-dock.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -571,7 +569,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # default ordering.
     # -------------------------------------------------------------------------
     relaunchDesktopServices = lib.hm.dag.entryAfter [ "configureFinderSidebar" ] ''
-      ${daemonRefresh.refreshDesktopServices}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-refresh-desktop-services.sh}
 
       REPO_ROOT="${repoRoot}"
       . "$REPO_ROOT/src/scripts/lib/macos-finder-sidebar.sh"
