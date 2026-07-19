@@ -43,9 +43,9 @@
   #       the system service table so a genuine load failure (e.g. missing
   #       plist) is still caught.
   # ---------------------------------------------------------------------------
-  system.activationScripts.postActivation.text = lib.mkBefore ''
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-networking-setup.sh}
-  '';
+  system.activationScripts.postActivation.text = lib.mkBefore (
+    builtins.readFile ../../scripts/hosts/MacBook/macos-networking-setup.sh
+  );
 
   # Hostname values are intentionally titlecase to match the machine identity
   # and preserve local discovery semantics on macOS.

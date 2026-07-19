@@ -33,13 +33,13 @@ in
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
   };
 
-  home.activation.unprotectOpencodeSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-    ${builtins.readFile ../scripts/agents/agents-unprotect-opencode-symlinks.sh}
-  '';
+  home.activation.unprotectOpencodeSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] (
+    builtins.readFile ../scripts/agents/agents-unprotect-opencode-symlinks.sh
+  );
 
-  home.activation.protectOpencodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    ${builtins.readFile ../scripts/agents/agents-protect-opencode-symlinks.sh}
-  '';
+  home.activation.protectOpencodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+    builtins.readFile ../scripts/agents/agents-protect-opencode-symlinks.sh
+  );
 
   # Method 4 (activation script manages whole-directory symlinks): the agents/
   # config directory is deployed via agents-symlink.sh which creates per-entry
@@ -53,9 +53,9 @@ in
     # skills/ (which is managed by agent-skills so fetched ClawHub downloads
     # land in a real, untracked directory rather than inside the repo tree).
     # -------------------------------------------------------------------------
-    agents-symlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.readFile ../scripts/agents/agents-symlink.sh}
-    '';
+    agents-symlink = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+      builtins.readFile ../scripts/agents/agents-symlink.sh
+    );
 
     # -------------------------------------------------------------------------
     # agent-skills
@@ -77,9 +77,9 @@ in
     # directory in ~/.agents/skills/ (e.g. a fetched download), the activation
     # fails fast rather than silently overwriting the downloaded content.
     # -------------------------------------------------------------------------
-    agent-skills = lib.hm.dag.entryAfter [ "agents-symlink" ] ''
-      ${builtins.readFile ../scripts/agents/agent-skills.sh}
-    '';
+    agent-skills = lib.hm.dag.entryAfter [ "agents-symlink" ] (
+      builtins.readFile ../scripts/agents/agent-skills.sh
+    );
 
     # -------------------------------------------------------------------------
     # installBunPackages

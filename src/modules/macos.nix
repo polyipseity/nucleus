@@ -291,13 +291,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
     "Downloads/iCloud".source = config.lib.file.mkOutOfStoreSymlink liveICloudDownloads;
   };
 
-  home.activation.unprotectDownloadsICloudSymlink = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-    ${builtins.readFile ../scripts/hosts/MacBook/macos-unprotect-downloads-icloud-symlink.sh}
-  '';
+  home.activation.unprotectDownloadsICloudSymlink = lib.hm.dag.entryBefore [ "linkGeneration" ] (
+    builtins.readFile ../scripts/hosts/MacBook/macos-unprotect-downloads-icloud-symlink.sh
+  );
 
-  home.activation.protectDownloadsICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    ${builtins.readFile ../scripts/hosts/MacBook/macos-protect-downloads-icloud-symlink.sh}
-  '';
+  home.activation.protectDownloadsICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+    builtins.readFile ../scripts/hosts/MacBook/macos-protect-downloads-icloud-symlink.sh
+  );
 
   home.activation = {
     # -------------------------------------------------------------------------
@@ -318,9 +318,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #
     # No-op if displayplacer is not installed.
     # -------------------------------------------------------------------------
-    display-resolutions = lib.hm.dag.entryAfter [ "macos-headless-display" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-display-resolutions.sh}
-    '';
+    display-resolutions = lib.hm.dag.entryAfter [ "macos-headless-display" ] (
+      builtins.readFile ../scripts/hosts/MacBook/macos-display-resolutions.sh
+    );
 
     # -------------------------------------------------------------------------
     # input-config
@@ -401,9 +401,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # under ~/Applications/Nucleus App Aliases so Spotlight/Raycast can index
     # additional English tokens without changing the system UI language.
     # -------------------------------------------------------------------------
-    raycast-aliases = lib.hm.dag.entryAfter [ "macos-launch-services" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-raycast-aliases.sh}
-    '';
+    raycast-aliases = lib.hm.dag.entryAfter [ "macos-launch-services" ] (
+      builtins.readFile ../scripts/hosts/MacBook/macos-raycast-aliases.sh
+    );
 
     # -------------------------------------------------------------------------
     # nightlight
@@ -416,9 +416,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if nightlight is not installed.
     # Source: https://github.com/smudge/nightlight
     # -------------------------------------------------------------------------
-    nightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-nightlight.sh}
-    '';
+    nightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+      builtins.readFile ../scripts/hosts/MacBook/macos-nightlight.sh
+    );
 
     # -------------------------------------------------------------------------
     # configureICloudExclusions
@@ -466,9 +466,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # activation. Apply these settings from user activation instead so Safari
     # hardening remains declarative without breaking `darwin-rebuild switch`.
     # -------------------------------------------------------------------------
-    safari-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-safari-defaults.sh}
-    '';
+    safari-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
+      builtins.readFile ../scripts/hosts/MacBook/macos-safari-defaults.sh
+    );
 
     # -------------------------------------------------------------------------
     # universal-access-defaults
@@ -476,9 +476,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # system-level defaults writes during `darwin-rebuild`. Apply them from the
     # user activation phase to keep accessibility intent without system errors.
     # -------------------------------------------------------------------------
-    universal-access-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-universal-access-defaults.sh}
-    '';
+    universal-access-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
+      builtins.readFile ../scripts/hosts/MacBook/macos-universal-access-defaults.sh
+    );
 
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
@@ -500,9 +500,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # WHY separate activation: Dock refresh is a UI cache reload, not dev-tree
     # maintenance. Keeping it independent avoids fake coupling with ~/dev work.
     # -------------------------------------------------------------------------
-    reloadDockPreferenceState = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-refresh-dock.sh}
-    '';
+    reloadDockPreferenceState = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+      builtins.readFile ../scripts/hosts/MacBook/macos-refresh-dock.sh
+    );
 
     # -------------------------------------------------------------------------
     # configureFinderSidebar
@@ -568,9 +568,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #
     # No-op if BetterDisplay is not installed.
     # -------------------------------------------------------------------------
-    macos-headless-display = lib.hm.dag.entryAfter [ "nightlight" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-headless-display.sh}
-    '';
+    macos-headless-display = lib.hm.dag.entryAfter [ "nightlight" ] (
+      builtins.readFile ../scripts/hosts/MacBook/macos-headless-display.sh
+    );
   };
 
   # --------------------------------------------------------------------------
@@ -766,9 +766,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # after setupLaunchAgents runs.  On macOS 26, launchctl bootstrap can
   # spuriously return "Bootstrap failed: 5: Input/output error" — HM detects
   # this but never retries, and subsequent activations skip unchanged agents.
-  home.activation."ensure-launchagents" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
-    ${builtins.readFile ../scripts/hosts/MacBook/macos-ensure-launchagents.sh}
-  '';
+  home.activation."ensure-launchagents" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] (
+    builtins.readFile ../scripts/hosts/MacBook/macos-ensure-launchagents.sh
+  );
 
   # --------------------------------------------------------------------------
   # gui-env-path

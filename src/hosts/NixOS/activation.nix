@@ -83,7 +83,7 @@ in
   # Failing to start a service should not block activation, but the warning
   # surfaces issues for post-apply investigation.
   # ---------------------------------------------------------------------------
-  system.activationScripts."verify-nucleus-services" = lib.mkAfter ''
-    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-verify-nucleus-services.sh}
-  '';
+  system.activationScripts."verify-nucleus-services" = lib.mkAfter (
+    builtins.readFile ../../scripts/hosts/NixOS/nixos-verify-nucleus-services.sh
+  );
 }

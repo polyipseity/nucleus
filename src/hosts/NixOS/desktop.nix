@@ -210,9 +210,9 @@
   #   macOS   — login item removal in MacBook/activation.nix (osascript)
   #   NixOS   — this activation script
   #   Windows — Disable-SteamAutoStartup module + apply.ps1
-  system.activationScripts."nixos-disable-steam-autostart" = lib.mkAfter ''
-    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-disable-steam-autostart.sh}
-  '';
+  system.activationScripts."nixos-disable-steam-autostart" = lib.mkAfter (
+    builtins.readFile ../../scripts/hosts/NixOS/nixos-disable-steam-autostart.sh
+  );
 
   # EasyEffects: graphical PipeWire audio processing GUI with plugin-based
   # limiter, compressor, equalizer, and other DSP effects.
