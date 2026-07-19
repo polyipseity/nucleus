@@ -138,7 +138,7 @@ in
                 (lib.concatStringsSep " " (map lib.escapeShellArg iCloudExcludedDirNames))
                 (lib.concatStringsSep " " (map lib.escapeShellArg iCloudManagedRoots))
               ]
-              (builtins.readFile ../scripts/shell/icloud-hooks.zsh)
+              (builtins.readFile ../scripts/hosts/MacBook/macos-icloud-hooks.zsh)
           ))
         ]
         (builtins.readFile ../scripts/shell/init.zsh);
