@@ -34,21 +34,24 @@ in
   # Resolves the nvim path from the home-manager profile directory so that no
   # username is hardcoded, matching Home Manager's useUserPackages = true layout.
   # ---------------------------------------------------------------------------
-  system.activationScripts."nvim-launcher" = lib.mkAfter ''
-    NUCLEUS_NVIM_PATH="${config.home-manager.users.${username}.home.profileDirectory}/bin/nvim"
-    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-nvim-launcher.sh}
-  '';
+  system.activationScripts."nvim-launcher" = lib.mkAfter (
+    builtins.replaceStrings
+      [ "__NUCLEUS_NVIM_PATH__" ]
+      [ "${config.home-manager.users.${username}.home.profileDirectory}/bin/nvim" ]
+      (builtins.readFile ../../scripts/hosts/NixOS/nixos-nvim-launcher.sh)
+  );
 
   # ---------------------------------------------------------------------------
   # nixos-ensure-log-dirs
   # Create system log directories for all nucleus systemd services before they
   # start, so journald/stderr redirect targets exist on disk.
   # ---------------------------------------------------------------------------
-  system.activationScripts."ensure-log-dirs" = lib.mkAfter ''
-    NUCLEUS_SYSTEM_LOG_DIR="${config.nucleus.logging.systemLogDir}"
-    NUCLEUS_LOG_SUBDIRS="${builtins.toString linuxSystemLogDirs}"
-    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-ensure-log-dirs.sh}
-  '';
+  system.activationScripts."ensure-log-dirs" = lib.mkAfter (
+    builtins.replaceStrings
+      [ "__NUCLEUS_SYSTEM_LOG_DIR__" "__NUCLEUS_LOG_SUBDIRS__" ]
+      [ "${config.nucleus.logging.systemLogDir}" "${builtins.toString linuxSystemLogDirs}" ]
+      (builtins.readFile ../../scripts/hosts/NixOS/nixos-ensure-log-dirs.sh)
+  );
 
   # ---------------------------------------------------------------------------
   # Service watchdog — persistent daemon for stuck nucleus services.
