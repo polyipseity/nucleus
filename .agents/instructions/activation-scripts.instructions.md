@@ -1,7 +1,71 @@
 ---
-description: "Use when adding or editing Home Manager activation scripts in Nix modules. Covers the direct-inline pattern (readFile library + inline call), replaceStrings for standalone scripts, and when to keep vs eliminate wrapper scripts."
+description: "Use when adding or editing activation scripts in Nix modules. Covers the five acceptable styles (A-D, H), prohibited patterns (E, F, G, I), the direct-inline canonical pattern, replaceStrings for standalone scripts, and when to keep vs eliminate wrapper scripts."
 name: "Activation Script Conventions"
 applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/services/*.nix"
+---
+
+## Acceptable styles
+
+Every activation block in this repo must use exactly one of these styles. No mixing, no hybrids.
+
+### Style A — pure inline (string literal)
+
+```nix
+activation-block = lib.hm.dag.entry<Phase> [ "dependency" ] ''
+  mkdir -p "$HOME/some-dir"
+'';
+```
+
+**Only for trivially simple scripts**: ≤2 lines, no external tool dependencies, no conditional logic, no loops. Anything more complex must use Style B/C/D.
+
+### Style B — bare `builtins.readFile`
+
+```nix
+activation-block = lib.hm.dag.entry<Phase> [ "dependency" ] (
+  builtins.readFile ../scripts/some-script.sh
+);
+```
+
+No outer string interpolation — the `readFile` result is returned directly. Use when the script needs **no Nix-valued data** injected.
+
+### Style C — direct-inline (readFile lib + inline function calls)
+
+```nix
+activation-block = lib.hm.dag.entry<Phase> [ "dependency" ] ''
+  ${builtins.readFile ../scripts/lib/some-lib.sh}
+  some_function ${lib.escapeShellArg arg1} "${arg2}" ${toString arg3}
+'';
+```
+
+The canonical pattern for library-backed blocks. See detailed rules below.
+
+### Style D — `replaceStrings` standalone script
+
+```nix
+activation-block = lib.hm.dag.entry<Phase> [ "dependency" ] (
+  builtins.replaceStrings [ "__TOKEN__" ] [ "${nixValue}" ] (
+    builtins.readFile ../scripts/some-script.sh
+  )
+);
+```
+
+For standalone scripts that need Nix-valued data injected via tokens. The `.sh` file must contain only the shell code with `__TOKEN__` placeholders — no inline shell appended in the Nix expression.
+
+### Style H — system megascript (nix-darwin `postActivation.text`)
+
+Only for nix-darwin `system.activationScripts.postActivation.text` concatenation, where the Nix evaluation model requires multiple scripts to be assembled into one string. Each constituent fragment must follow one of Styles B/C/D.
+
+### Prohibited patterns
+
+- **No Style E** (replaceStrings readFile + inline shell appended) — move appended code into the `.sh` file with more tokens.
+- **No Style F** (outer string wrapping a replaceStrings readFile) — the `replaceStrings` expression returns a string; return it directly (Style D), don't wrap in `''...''`.
+- **No Style G** (inline Python invocation) — create a wrapper script (Style B/D) that invokes Python.
+- **No Style I** (runtime `sh` invocation of an external script path) — embed the script content via `builtins.readFile` (Style B/D).
+
+### Exception documentation
+
+Every exception to these style rules must have an inline `# WHY` comment in the Nix expression explaining the technical constraint that prevents using an acceptable style.
+
 ---
 
 ## Canonical pattern: direct-inline
@@ -24,17 +88,18 @@ Rules:
 5. **`lib.escapeShellArg` for Nix values** going into shell single-quoted context. Use double quotes for simple store paths (`"${pkgs.jq}/bin/jq"`).
 6. **`$HOME` preserved.** In Nix `''` strings, `$` passes literally unless followed by `{`. `$HOME` works at runtime.
 
-## Standalone scripts (for complex logic)
+## Standalone scripts — Styles B and D (for complex logic)
 
-When a script has substantive logic beyond sourcing + calling (loops, conditionals, file operations, error handling), keep it as a standalone `.sh` under `src/scripts/` and embed it with bare `readFile` (or `replaceStrings` for Nix-valued data):
+When a script has substantive logic beyond sourcing + calling (loops, conditionals, file operations, error handling), keep it as a standalone `.sh` under `src/scripts/`:
 
-```nix
-# Preferred: with Nix-valued arguments via replaceStrings
-builtins.replaceStrings [tokens] [values] (builtins.readFile ./script.sh)
-
-# Simpler: no Nix-valued arguments needed
-builtins.readFile ./script.sh
-```
+- **Style D** (with Nix-valued arguments via `replaceStrings`):
+  ```nix
+  builtins.replaceStrings [tokens] [values] (builtins.readFile ./script.sh)
+  ```
+- **Style B** (no Nix-valued arguments needed — bare `readFile`):
+  ```nix
+  builtins.readFile ./script.sh
+  ```
 
 Standalone scripts are also required when:
 - Shebang needed (launchd agents, cron jobs, direct execution)
