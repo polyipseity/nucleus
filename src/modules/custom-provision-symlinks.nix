@@ -142,8 +142,7 @@ in
     home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       set -eu
 
-      REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
+      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
 
       _nucleus_manifest_path=${lib.escapeShellArg managedSymlinkManifestPath}
 

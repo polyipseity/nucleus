@@ -278,17 +278,15 @@ in
     # deletion between rebuilds.
     home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       set -eu
-      REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
-      . "$REPO_ROOT/src/scripts/lib/manage-out-of-store-symlinks.sh"
+      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
+      ${builtins.readFile ../scripts/lib/import-manage-out-of-store-symlinks.sh}
       _nucleus_unprotect_managed_paths "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
     '';
 
     home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
-      REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
-      . "$REPO_ROOT/src/scripts/lib/manage-out-of-store-symlinks.sh"
+      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
+      ${builtins.readFile ../scripts/lib/import-manage-out-of-store-symlinks.sh}
       _nucleus_protect_managed_paths "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
     '';
 

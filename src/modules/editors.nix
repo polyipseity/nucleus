@@ -351,8 +351,7 @@ in
     # -------------------------------------------------------------------------
     vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
-      REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
+      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
       ${builtins.replaceStrings
         [
           "__REPO_ROOT__"
