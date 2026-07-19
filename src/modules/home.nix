@@ -251,28 +251,13 @@ in
     # repo. Merge preserves both managed and app-owned keys.
     home.activation."obsidian-merge-json" = lib.hm.dag.entryAfter [ "writeBoundary" ] (
       builtins.replaceStrings
-        [ "__PYTHON_SCRIPT__" ]
-        [ (builtins.readFile ../scripts/configs/obsidian-merge-json.py) ]
+        [ "__PYTHON_SCRIPT__" "__PYTHON3_BIN__" "__OBSIDIAN_SETTINGS_JSON__" ]
+        [
+          (builtins.readFile ../scripts/configs/obsidian-merge-json.py)
+          "${pkgs.python3}/bin/python3"
+          (lib.escapeShellArg obsidianManagedSettingsJson)
+        ]
         (builtins.readFile ../scripts/configs/obsidian-merge-json.sh)
-      + ''
-        set -eu
-
-        case "$(uname -s)" in
-          Darwin)
-            _obsidian_settings_path="$HOME/Library/Application Support/obsidian/obsidian.json"
-            ;;
-          Linux)
-            _obsidian_settings_path="''${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json"
-            ;;
-          *)
-            # Windows: handled separately via Sync-ObsidianConfig.ps1.
-            exit 0
-            ;;
-        esac
-
-        mkdir -p "$(dirname "$_obsidian_settings_path")"
-        _obsidian_merge_json "${pkgs.python3}/bin/python3" "$_obsidian_settings_path" ${lib.escapeShellArg obsidianManagedSettingsJson}
-      ''
     );
 
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
