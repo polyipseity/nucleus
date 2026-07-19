@@ -384,17 +384,12 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #   Keka   — handles .7z, .rar, and .zip archives
     #   VLC    — handles the complete set of audio/video UTIs defined above
     # -------------------------------------------------------------------------
-    macos-launch-services = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      builtins.replaceStrings
-        [ "__DUTI_BIN__" "__CHROME_UTIS__" "__KEKA_UTIS__" "__VLC_UTIS__" ]
-        [
-          "${dutiBin}"
-          (builtins.concatStringsSep " " chromeUTIs)
-          (builtins.concatStringsSep " " kekaUTIs)
-          (builtins.concatStringsSep " " vlcUTIs)
-        ]
-        (builtins.readFile ../scripts/hosts/MacBook/macos-register-handlers.sh)
-    );
+    macos-launch-services = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      ${builtins.readFile ../scripts/lib/macos-launch-services-lib.sh}
+      register_handler "${dutiBin}" "com.google.chrome" ${builtins.concatStringsSep " " chromeUTIs}
+      register_handler "${dutiBin}" "com.aone.keka" ${builtins.concatStringsSep " " kekaUTIs}
+      register_handler "${dutiBin}" "org.videolan.vlc" ${builtins.concatStringsSep " " vlcUTIs}
+    '';
 
     # -------------------------------------------------------------------------
     # raycast-aliases
@@ -440,12 +435,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Configuration: excludedDirNames from users.json (e.g., ["node_modules"])
     # Source: https://developer.apple.com/documentation/fileprovider
     # -------------------------------------------------------------------------
-    configureICloudExclusions = lib.hm.dag.entryAfter [ "cloudDrivesSetup" ] (
-      builtins.replaceStrings
-        [ "__JQ_BIN__" "__FIND_BIN__" "__EXCLUDED_DIRS_JSON__" "__MANAGED_ROOTS_JSON__" ]
-        [ "${pkgs.jq}/bin/jq" "${pkgs.findutils}/bin/find" icloudExcludedDirsJson icloudManagedRootsJson ]
-        (builtins.readFile ../scripts/hosts/MacBook/macos-apply-icloud-exclusions.sh)
-    );
+    configureICloudExclusions = lib.hm.dag.entryAfter [ "cloudDrivesSetup" ] ''
+      ${builtins.readFile ../scripts/lib/macos-icloud-exclusions-lib.sh}
+      apply_exclusions "${pkgs.jq}/bin/jq" "${pkgs.findutils}/bin/find" ${lib.escapeShellArg icloudExcludedDirsJson} ${lib.escapeShellArg icloudManagedRootsJson}
+    '';
 
     # -------------------------------------------------------------------------
     # preflightPrivacyPermissions
@@ -461,10 +454,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #      converge in the same run.
     # -------------------------------------------------------------------------
     preflightPrivacyPermissions = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.replaceStrings
-        [ "__REPO_ROOT__" ]
-        [ repoRoot ]
-        (builtins.readFile ../scripts/hosts/MacBook/macos-preflight-privacy.sh)
+      builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
+        builtins.readFile ../scripts/hosts/MacBook/macos-preflight-privacy.sh
+      )
     );
 
     # -------------------------------------------------------------------------
@@ -521,18 +513,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # after a macOS logout/reboot. The daemon restarts below provide a partial
     # in-session flush but a full restart is required for order to appear correctly.
     # Source: https://github.com/mosen/mysides
-    configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.replaceStrings
-        [ "__FAVORITES_JSON__" "__JQ_BIN__" "__MYSIDES_BIN__" "__EXPECTED_ORDER__" "__MANAGED_COUNT__" ]
-        [
-          (builtins.toJSON finderSidebar.finderSidebarManagedFavorites)
-          "${pkgs.jq}/bin/jq"
-          "${pkgs.mysides}/bin/mysides"
-          finderSidebar.finderSidebarExpectedOrder
-          (toString finderSidebar.finderSidebarManagedCount)
-        ]
-        (builtins.readFile ../scripts/hosts/MacBook/macos-configure-finder-sidebar.sh)
-    );
+    configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      ${builtins.readFile ../scripts/lib/macos-finder-sidebar.sh}
+      finder_configure_sidebar ${lib.escapeShellArg (builtins.toJSON finderSidebar.finderSidebarManagedFavorites)} "${pkgs.jq}/bin/jq" "${pkgs.mysides}/bin/mysides" ${lib.escapeShellArg finderSidebar.finderSidebarExpectedOrder} ${toString finderSidebar.finderSidebarManagedCount}
+    '';
 
     # -------------------------------------------------------------------------
     # relaunchDesktopServices
@@ -544,17 +528,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # default ordering.
     # -------------------------------------------------------------------------
     relaunchDesktopServices = lib.hm.dag.entryAfter [ "configureFinderSidebar" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-refresh-desktop-services.sh}
+      ${builtins.readFile ../scripts/lib/macos-launch-services-lib.sh}
+      refresh_desktop_services
 
-      ${builtins.replaceStrings
-        [ "__FAVORITES_JSON__" "__JQ_BIN__" "__MYSIDES_BIN__" ]
-        [
-          (builtins.toJSON finderSidebar.finderSidebarManagedFavorites)
-          "${pkgs.jq}/bin/jq"
-          "${pkgs.mysides}/bin/mysides"
-        ]
-        (builtins.readFile ../scripts/hosts/MacBook/macos-reconcile-finder-sidebar.sh)
-      }
+      ${builtins.readFile ../scripts/lib/macos-finder-sidebar.sh}
+      _mysides_bin="${pkgs.mysides}/bin/mysides"
+      if [ -x "$_mysides_bin" ]; then
+        finder_reconcile_best_effort ${lib.escapeShellArg (builtins.toJSON finderSidebar.finderSidebarManagedFavorites)} "${pkgs.jq}/bin/jq" "$_mysides_bin"
+      fi
     '';
 
     # -------------------------------------------------------------------------

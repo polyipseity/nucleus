@@ -31,17 +31,15 @@ in
     home.file."${targetRelPath}".source =
       config.lib.file.mkOutOfStoreSymlink "${repoRoot}/${repoRelPath}";
 
-    home.activation."unprotectSymlink_${name}" = lib.hm.dag.entryBefore [ "linkGeneration" ] (
-      builtins.replaceStrings [ "__NAME__" "__TARGET_PATH__" ] [ "${name}" "$HOME/${targetRelPath}" ] (
-        builtins.readFile ../../scripts/lib/nucleus-unprotect-symlink.sh
-      )
-    );
+    home.activation."unprotectSymlink_${name}" = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+      ${builtins.readFile ../../scripts/lib/symlink-hardening-lib.sh}
+      _nucleus_unprotect_symlink ${lib.escapeShellArg name} "$HOME/${targetRelPath}"
+    '';
 
-    home.activation."protectSymlink_${name}" = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      builtins.replaceStrings [ "__NAME__" "__TARGET_PATH__" ] [ "${name}" "$HOME/${targetRelPath}" ] (
-        builtins.readFile ../../scripts/lib/nucleus-protect-symlink.sh
-      )
-    );
+    home.activation."protectSymlink_${name}" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      ${builtins.readFile ../../scripts/lib/symlink-hardening-lib.sh}
+      _nucleus_protect_symlink ${lib.escapeShellArg name} "$HOME/${targetRelPath}"
+    '';
   };
 
   # ---------------------------------------------------------------------------
