@@ -404,8 +404,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # additional English tokens without changing the system UI language.
     # -------------------------------------------------------------------------
     raycast-aliases = lib.hm.dag.entryAfter [ "macos-launch-services" ] ''
-      _ray_alias_dir="$HOME/Applications/Nucleus App Aliases"
-      mkdir -p "$_ray_alias_dir"
       ${builtins.readFile ../scripts/hosts/MacBook/macos-raycast-aliases.sh}
     '';
 
