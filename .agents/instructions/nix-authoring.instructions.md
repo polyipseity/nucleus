@@ -40,6 +40,24 @@ Extract runtime imperative logic (SOPS decryption, API calls, service polling) i
 
 See `src/scripts/services/jellyfin-sync.sh` for an example.
 
+## No library sourcing in activation blocks
+
+Libraries under `src/scripts/lib/` must never be sourced directly inside Nix
+activation blocks. The `REPO_ROOT="${repoRoot}"` +
+`. "$REPO_ROOT/src/scripts/..."` pattern couples activation timing to library
+file-system layout and makes activation scripts opaque to shell analysis tools.
+
+Instead, create a small import wrapper script under `src/scripts/lib/` that
+sources the library (using `SCRIPT_DIR`-based path resolution). Activation
+blocks use `builtins.readFile` of the import wrapper only.
+
+See `src/scripts/lib/import-symlink-hardening.sh` for the canonical pattern.
+
+The only exception is standalone scripts under `src/scripts/` that are not
+libraries (e.g. scripts executed for their side effects, like
+`src/scripts/hosts/MacBook/macos-preflight-privacy.sh`). These may be run
+directly via `builtins.readFile` without an import wrapper.
+
 ## Module conventions
 
 - Shared modules must guard NixOS-only options with `lib.mkIf` checks on `options ? environment` or equivalent; Home Manager modules must likewise guard `home.*` options.

@@ -133,3 +133,19 @@ Runtime toggles live at `~/.local/state/nucleus/config.json` (outside `~/.config
 Services read the config file directly (not via `nucleus-config`) for early-boot compatibility, following the same pattern on both POSIX and Windows.
 
 Adding a new toggle: add a default entry to the `DEFAULTS`/`$Defaults` map in both script implementations, then update consuming code to read the key (defaulting to `true`).
+
+## Centralized daemon/service refresh
+
+All program/daemon/service killing, refresh, and restart operations must go
+through centralized library functions:
+
+- **macOS**: `src/scripts/lib/macos-launch-services-lib.sh` (`refresh_*` functions)
+- **Windows**: `src/hosts/Windows/modules/Set-NucleusService.ps1`
+
+Do not inline killall/Stop-Service commands in activation blocks or individual
+scripts. This ensures a single point of control per OS and prevents redundant
+kills in the same activation run.
+
+For macOS activation blocks that need daemon refresh, use wrapper scripts under
+`src/scripts/hosts/MacBook/` that source the library and call the appropriate
+`refresh_*` function. Activate them via `builtins.readFile`.
