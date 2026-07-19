@@ -34,15 +34,11 @@ in
   };
 
   home.activation.unprotectOpencodeSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-    ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
-    _nucleus_unprotect_symlink "agents.nix" "$HOME/.config/opencode/agents"
-    _nucleus_unprotect_symlink "agents.nix" "$HOME/.config/opencode/commands"
+    ${builtins.readFile ../scripts/agents/agents-unprotect-opencode-symlinks.sh}
   '';
 
   home.activation.protectOpencodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
-    _nucleus_protect_symlink "agents.nix" "$HOME/.config/opencode/agents"
-    _nucleus_protect_symlink "agents.nix" "$HOME/.config/opencode/commands"
+    ${builtins.readFile ../scripts/agents/agents-protect-opencode-symlinks.sh}
   '';
 
   # Method 4 (activation script manages whole-directory symlinks): the agents/

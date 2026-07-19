@@ -292,13 +292,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
   };
 
   home.activation.unprotectDownloadsICloudSymlink = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-    ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
-    _nucleus_unprotect_symlink "macos.nix" "$HOME/Downloads/iCloud"
+    ${builtins.readFile ../scripts/hosts/MacBook/macos-unprotect-downloads-icloud-symlink.sh}
   '';
 
   home.activation.protectDownloadsICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
-    _nucleus_protect_symlink "macos.nix" "$HOME/Downloads/iCloud"
+    ${builtins.readFile ../scripts/hosts/MacBook/macos-protect-downloads-icloud-symlink.sh}
   '';
 
   home.activation = {
