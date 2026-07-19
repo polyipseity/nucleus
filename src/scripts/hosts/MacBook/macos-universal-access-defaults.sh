@@ -2,8 +2,13 @@
 # These are user/session scoped and applied from user activation to keep
 # accessibility intent without system errors.
 #
-# Requires print_fda_warning function (set by Nix wrapper).
+# Requires print_fda_warning function (self-sourced below).
 set -eu
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../../lib/macos-fda-warning-lib.sh"
+fda_warning_emitted=0
+print_fda_warning "Accessibility preferences"
 
 set_default() {
   domain="$1"

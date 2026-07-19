@@ -1,9 +1,11 @@
 # Create English-named .app symlink aliases for Raycast compatibility
 # on non-English macOS installations.
 #
-# Requires _nucleus_protect_symlink and _nucleus_unprotect_symlink from
-# agent-helpers.sh (sourced by Nix wrapper).
+# Requires _nucleus_protect_symlink and _nucleus_unprotect_symlink (self-sourced below).
 set -eu
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../../lib/symlink-hardening-lib.sh"
 
 _ray_alias_dir="$HOME/Applications/Nucleus App Aliases"
 mkdir -p "$_ray_alias_dir"

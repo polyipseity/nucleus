@@ -2,8 +2,13 @@
 # These are applied from user activation because Safari is sandboxed and stores
 # preferences in a containerized domain.
 #
-# Requires print_fda_warning function (set by Nix wrapper).
+# Requires print_fda_warning function (self-sourced below).
 set -eu
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../../lib/macos-fda-warning-lib.sh"
+fda_warning_emitted=0
+print_fda_warning "protected Safari preferences"
 
 set_safari_default() {
   key="$1"
