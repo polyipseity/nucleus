@@ -47,7 +47,7 @@ in
   system.activationScripts."ensure-log-dirs" = lib.mkAfter ''
     NUCLEUS_SYSTEM_LOG_DIR="${config.nucleus.logging.systemLogDir}"
     NUCLEUS_LOG_SUBDIRS="${builtins.toString linuxSystemLogDirs}"
-    ${builtins.readFile ../../scripts/ensure-log-dirs.sh}
+    ${builtins.readFile ../../scripts/hosts/NixOS/nixos-ensure-log-dirs.sh}
   '';
 
   # ---------------------------------------------------------------------------
