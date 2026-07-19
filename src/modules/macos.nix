@@ -193,7 +193,7 @@ let
       #!${pkgs.bash}/bin/bash
       set -eu
     ''
-    + (builtins.readFile ../scripts/lib/icloud-exclusions-lib.sh)
+    + (builtins.readFile ../scripts/lib/macos-icloud-exclusions-lib.sh)
     + ''
       apply_exclusions "${pkgs.jq}/bin/jq" "${pkgs.findutils}/bin/find" ${lib.escapeShellArg icloudExcludedDirsJson} ${lib.escapeShellArg icloudManagedRootsJson}
     '';
@@ -455,7 +455,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     configureICloudExclusions = lib.hm.dag.entryAfter [ "cloudDrivesSetup" ] ''
       REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/lib/icloud-exclusions-lib.sh"
+      . "$REPO_ROOT/src/scripts/lib/macos-icloud-exclusions-lib.sh"
 
       apply_exclusions "${pkgs.jq}/bin/jq" "${pkgs.findutils}/bin/find" ${lib.escapeShellArg icloudExcludedDirsJson} ${lib.escapeShellArg icloudManagedRootsJson}
     '';
