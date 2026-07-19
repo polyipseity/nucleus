@@ -349,8 +349,8 @@ in
     # Repo root is resolved from $NUCLEUS_REPO_ROOT (set by apply.sh before invoking
     # darwin-rebuild / nixos-rebuild and forwarded through sudo).
     # -------------------------------------------------------------------------
-    vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.replaceStrings
+    vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+      builtins.replaceStrings
         [
           "__REPO_ROOT__"
           "__VSCODE_STABLE_BASE_DIR__"
@@ -368,8 +368,7 @@ in
           "${pkgs.jq}/bin/jq"
         ]
         (builtins.readFile ../scripts/editors/vscode-symlinks.sh)
-      }
-    '';
+    );
 
     # -----------------------------------------------------------------------
     # vsCodeExtensionBridge
@@ -384,11 +383,11 @@ in
     # a whole-directory store symlink would cause EACCES.  Instead, keep a real
     # writable directory and populate it with per-extension symlinks.
     # -----------------------------------------------------------------------
-    vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.replaceStrings [ "__EXTENSION_STORE__" ] [ "${extensionStore}" ] (
+    vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+      builtins.replaceStrings [ "__EXTENSION_STORE__" ] [ "${extensionStore}" ] (
         builtins.readFile ../scripts/editors/vscode-extension-bridge.sh
-      )}
-    '';
+      )
+    );
 
     # -----------------------------------------------------------------------
     # vsCodeWorkspaceTrust
