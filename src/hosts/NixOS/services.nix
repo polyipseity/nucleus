@@ -12,7 +12,7 @@
 let
   openManualScript = pkgs.writeShellScript "nucleus-open-manual" (
     builtins.replaceStrings [ "__XDG_OPEN_BIN__" ] [ "${pkgs.xdg-utils}/bin/xdg-open" ] (
-      builtins.readFile ./../../scripts/configs/open-manual.sh
+      builtins.readFile ./../../scripts/hosts/NixOS/nixos-open-manual-config.sh
     )
   );
 
@@ -34,7 +34,7 @@ let
       builtins.replaceStrings
         [ "__FILE_BIN__" "__GS_PDF_OPT_PRESET__" ]
         [ "${pkgs.file}/bin/file" preset ]
-        (builtins.readFile ./../../scripts/configs/gs-pdf-opt-nautilus.sh)
+        (builtins.readFile ./../../scripts/hosts/NixOS/nixos-gs-pdf-opt-nautilus.sh)
     );
 
   gsPdfOptNautilusScripts = builtins.listToAttrs (
