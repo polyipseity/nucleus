@@ -3,7 +3,7 @@
 # Exits with an error if the sentinel secret hasn't appeared within the deadline.
 # Expects WSS_SENTINEL env var set by the Nix caller to the secret file path.
 
-_wss_sentinel="${WSS_SENTINEL:?}"
+_wss_sentinel="__WSS_SENTINEL__"
 _wss_deadline=30
 _wss_waited=0
 while [ ! -s "$_wss_sentinel" ] && [ "$_wss_waited" -lt "$_wss_deadline" ]; do

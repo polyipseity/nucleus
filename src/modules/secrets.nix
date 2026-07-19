@@ -167,10 +167,12 @@ lib.mkIf isPrimaryUser {
   # the sentinel already exists when this hook fires; the loop exits
   # immediately with no added latency.
   # --------------------------------------------------------------------------
-  home.activation.waitForSopsSecrets = lib.hm.dag.entryAfter [ "sops-nix" ] ''
-    export WSS_SENTINEL="${config.sops.secrets.${gitIdentitySecretName}.path}"
-    ${builtins.readFile ../scripts/secrets/wait-for-sops-secrets.sh}
-  '';
+  home.activation.waitForSopsSecrets = lib.hm.dag.entryAfter [ "sops-nix" ] (
+    builtins.replaceStrings
+      [ "__WSS_SENTINEL__" ]
+      [ "${config.sops.secrets.${gitIdentitySecretName}.path}" ]
+      (builtins.readFile ../scripts/secrets/wait-for-sops-secrets.sh)
+  );
 
   # --------------------------------------------------------------------------
   # git-identity
@@ -193,11 +195,12 @@ lib.mkIf isPrimaryUser {
   #      git config --file creates the file if absent and overwrites values
   #      idempotently on repeated activation runs.
   # --------------------------------------------------------------------------
-  home.activation."git-identity" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
-    export GIT_SECRET_PATH="${config.sops.secrets.${gitIdentitySecretName}.path}"
-    export GIT_BIN="${pkgs.git}/bin/git"
-    ${builtins.readFile ../scripts/secrets/git-identity.sh}
-  '';
+  home.activation."git-identity" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] (
+    builtins.replaceStrings
+      [ "__GIT_SECRET_PATH__" "__GIT_BIN__" ]
+      [ "${config.sops.secrets.${gitIdentitySecretName}.path}" "${pkgs.git}/bin/git" ]
+      (builtins.readFile ../scripts/secrets/git-identity.sh)
+  );
 
   # --------------------------------------------------------------------------
   # gpg-import
@@ -235,12 +238,16 @@ lib.mkIf isPrimaryUser {
   # `--batch` (`IPC parameter error`) on this key format. We intentionally use
   # a non-batch import invocation to ensure a successful secret-key import.
   # --------------------------------------------------------------------------
-  home.activation."gpg-import" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
-    export GNUPGHOME="${config.home.homeDirectory}/.gnupg"
-    export GPG_BIN="${pkgs.gnupg}/bin/gpg"
-    export GPG_SECRET_PATH="${config.sops.secrets.${gpgSecretName}.path}"
-    ${builtins.readFile ../scripts/secrets/gpg-import.sh}
-  '';
+  home.activation."gpg-import" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] (
+    builtins.replaceStrings
+      [ "__GNUPGHOME__" "__GPG_BIN__" "__GPG_SECRET_PATH__" ]
+      [
+        "${config.home.homeDirectory}/.gnupg"
+        "${pkgs.gnupg}/bin/gpg"
+        "${config.sops.secrets.${gpgSecretName}.path}"
+      ]
+      (builtins.readFile ../scripts/secrets/gpg-import.sh)
+  );
 
   # --------------------------------------------------------------------------
   # ssh-key-adopt
@@ -267,12 +274,12 @@ lib.mkIf isPrimaryUser {
   #      provision), flush the SSH agent (ssh-add -D).
   #   5. Write the current fingerprint to the manifest.
   # --------------------------------------------------------------------------
-  home.activation."ssh-key-adopt" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
-    export SSH_PUB_PATH="${sshPublicKeyPath}"
-    export SSH_KEYGEN_BIN="${pkgs.openssh}/bin/ssh-keygen"
-    export SSH_ADD_BIN="${pkgs.openssh}/bin/ssh-add"
-    ${builtins.readFile ../scripts/secrets/ssh-key-adopt.sh}
-  '';
+  home.activation."ssh-key-adopt" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] (
+    builtins.replaceStrings
+      [ "__SSH_PUB_PATH__" "__SSH_KEYGEN_BIN__" "__SSH_ADD_BIN__" ]
+      [ "${sshPublicKeyPath}" "${pkgs.openssh}/bin/ssh-keygen" "${pkgs.openssh}/bin/ssh-add" ]
+      (builtins.readFile ../scripts/secrets/ssh-key-adopt.sh)
+  );
 
   # --------------------------------------------------------------------------
   # verifySecretDecryption

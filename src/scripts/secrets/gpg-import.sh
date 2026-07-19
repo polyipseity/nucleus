@@ -2,11 +2,11 @@
 # enforces ultimate ownertrust on the managed primary fingerprint.
 # Requires: GNUPGHOME, GPG_BIN, GPG_SECRET_PATH env vars.
 
-mkdir -p "$GNUPGHOME"
-chmod 700 "$GNUPGHOME"
+mkdir -p '__GNUPGHOME__'
+chmod 700 '__GNUPGHOME__'
 
-if [ ! -f "$GPG_SECRET_PATH" ]; then
-  echo "gpg-import: missing decrypted GPG secret at $GPG_SECRET_PATH; cannot import key material." >&2
+if [ ! -f '__GPG_SECRET_PATH__' ]; then
+  echo "gpg-import: missing decrypted GPG secret at '__GPG_SECRET_PATH__'; cannot import key material." >&2
   exit 1
 fi
 
@@ -16,7 +16,7 @@ fi
 # undoc-supp: GPG may emit non-zero exit for malformed/dry-run key material during
 # import-options dry-run; the [ -z ] guard below catches and reports
 # an empty result explicitly.
-first_key_fingerprint="$("$GPG_BIN" --batch --import-options show-only --dry-run --with-colons --import "$GPG_SECRET_PATH" | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')" || true  # undoc-supp: GPG may exit non-zero on dry-run parse issues; [ -z ] guard below catches empty result explicitly.
+first_key_fingerprint="$('__GPG_BIN__' --batch --import-options show-only --dry-run --with-colons --import '__GPG_SECRET_PATH__' | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')" || true  # undoc-supp: GPG may exit non-zero on dry-run parse issues; [ -z ] guard below catches empty result explicitly.
 
 # Remove stale managed keys: those we imported previously (per manifest)
 # that are no longer the current managed key.  Guard on a non-empty
@@ -28,8 +28,8 @@ if [ -n "$first_key_fingerprint" ] && [ -f "$managed_keys_manifest" ]; then
     [ -z "$stale_fpr" ] && continue
     if [ "$stale_fpr" != "$first_key_fingerprint" ]; then
       # Only delete if the key is actually present in the keyring.
-      if "$GPG_BIN" --batch --list-secret-keys "$stale_fpr" >/dev/null 2>&1; then
-        if ! "$GPG_BIN" --batch --yes --delete-secret-and-public-key "$stale_fpr"; then
+      if '__GPG_BIN__' --batch --list-secret-keys "$stale_fpr" >/dev/null 2>&1; then
+        if ! '__GPG_BIN__' --batch --yes --delete-secret-and-public-key "$stale_fpr"; then
           echo "gpg-import: warning — failed to delete stale managed GPG key $stale_fpr from keyring." >&2
         else
           echo "gpg-import: deleted stale managed GPG key $stale_fpr." >&2
@@ -39,7 +39,7 @@ if [ -n "$first_key_fingerprint" ] && [ -f "$managed_keys_manifest" ]; then
   done < "$managed_keys_manifest"
 fi
 
-if ! "$GPG_BIN" --import "$GPG_SECRET_PATH"; then
+if ! '__GPG_BIN__' --import '__GPG_SECRET_PATH__'; then
   echo "secrets: gpg import failed for GPG secret." >&2
   exit 1
 fi
