@@ -206,27 +206,29 @@ in
     # Windows: registry). A symlink does not apply to these platform-native
     # stores. Merge writes the managed defaults into each store while
     # preserving any user-configured settings outside managed keys.
-    home.activation."qtpass-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      export AWK_PATH="${pkgs.gawk}/bin/awk"
-      ${builtins.readFile ../scripts/configs/qtpass-merge-ini.sh}
+    home.activation."qtpass-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+      builtins.replaceStrings [ "__AWK_PATH__" ] [ "${pkgs.gawk}/bin/awk" ] (
+        builtins.readFile ../scripts/configs/qtpass-merge-ini.sh
+      )
+      + ''
+        case "$(uname -s)" in
+          Darwin)
+            ${qtpassModule.qtPassDarwinCommands}
+            ;;
+          Linux)
+            # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
+            _primary_conf="$HOME/.config/IJHack/QtPass.conf"
+            # Some builds may resolve via organization-domain pathing.
+            _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
 
-      case "$(uname -s)" in
-        Darwin)
-          ${qtpassModule.qtPassDarwinCommands}
-          ;;
-        Linux)
-          # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
-          _primary_conf="$HOME/.config/IJHack/QtPass.conf"
-          # Some builds may resolve via organization-domain pathing.
-          _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
-
-          ${qtpassModule.qtPassPrimaryIniCommands}
-          if [ -f "$_secondary_conf" ]; then
-            ${qtpassModule.qtPassSecondaryIniCommands}
-          fi
-          ;;
-      esac
-    '';
+            ${qtpassModule.qtPassPrimaryIniCommands}
+            if [ -f "$_secondary_conf" ]; then
+              ${qtpassModule.qtPassSecondaryIniCommands}
+            fi
+            ;;
+        esac
+      ''
+    );
 
     # Picard reads native INI settings from ~/.config/MusicBrainz/Picard.ini
     # on macOS and Linux. Merge-overwrite defaults from the canonical
@@ -237,12 +239,15 @@ in
     # settings that should persist across applies). A symlink would let app
     # writes reach the repo file. Merge applies managed defaults while
     # preserving all app-owned keys and sections.
-    home.activation."picard-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      export AWK_PATH="${pkgs.gawk}/bin/awk"
-      export PICARD_DEFAULTS_INI=${lib.escapeShellArg picardDefaultsIniText}
-      ${builtins.readFile ../scripts/configs/picard-merge-ini.sh}
-      ${picardOverrideCommands}
-    '';
+    home.activation."picard-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+      builtins.replaceStrings
+        [ "__AWK_PATH__" "__PICARD_DEFAULTS_INI__" ]
+        [ "${pkgs.gawk}/bin/awk" (lib.escapeShellArg picardDefaultsIniText) ]
+        (builtins.readFile ../scripts/configs/picard-merge-ini.sh)
+      + ''
+        ${picardOverrideCommands}
+      ''
+    );
 
     # Obsidian stores app-global settings in obsidian.json alongside dynamic
     # vault metadata.  Merge only the managed advanced-setting keys into that

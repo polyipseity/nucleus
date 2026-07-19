@@ -1,5 +1,5 @@
 # Picard INI merge orchestration.
-# Expects: AWK_PATH, PICARD_DEFAULTS_INI env vars (set by Nix activation block).
+# Tokens: __AWK_PATH__, __PICARD_DEFAULTS_INI__ (replaced by Nix replaceStrings).
 
 _upsert_ini_key() {
   _conf="$1"
@@ -17,7 +17,7 @@ _upsert_ini_key() {
     # literally in Picard's @Variant(…) serialized Qt values.
     # AWK -v treats the argument as a string constant and processes
     # backslash escapes; ENVIRON reads the raw bytes unchanged.
-    _UPSERT_VALUE="$_value" "$AWK_PATH" -v section="$_section" -v key="$_key" '
+    _UPSERT_VALUE="$_value" "__AWK_PATH__" -v section="$_section" -v key="$_key" '
       function write_pair() {
         if (wrote == 0) {
           print key "=" value
@@ -76,7 +76,7 @@ _apply_picard_defaults_from_file() {
   _defaults="$1"
   _conf="$2"
 
-  "$AWK_PATH" '
+  "__AWK_PATH__" '
     BEGIN { section = "" }
 
     /^[[:space:]]*([;#]|$)/ { next }
@@ -114,6 +114,6 @@ _apply_picard_defaults_from_file() {
 _picard_conf="${XDG_CONFIG_HOME:-$HOME/.config}/MusicBrainz/Picard.ini"
 _picard_defaults_file="$(mktemp "${TMPDIR:-/tmp}/picard-defaults.XXXXXX.ini")"
 trap 'rm -f "$_picard_defaults_file"' EXIT
-printf '%s' "$PICARD_DEFAULTS_INI" > "$_picard_defaults_file"
+printf '%s' __PICARD_DEFAULTS_INI__ > "$_picard_defaults_file"
 
 _apply_picard_defaults_from_file "$_picard_defaults_file" "$_picard_conf"
