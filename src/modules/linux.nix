@@ -175,13 +175,11 @@ lib.mkIf pkgs.stdenv.isLinux {
     # packages), (2) this comment explains why, and (3) the timer and any
     # subsequent provision run serve as implicit follow-up checks.
     # -----------------------------------------------------------------------
-    buildNixIndex = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      _db_file="$HOME/.cache/nix-index/files"
-      if [ ! -f "$_db_file" ]; then
-        ${pkgs.nix-index}/bin/nix-index >/dev/null 2>&1 &
-        echo "linux: nix-index database build started in background; this may take a few minutes." >&2
-      fi
-    '';
+    buildNixIndex = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+      builtins.replaceStrings [ "__NIX_INDEX_BIN__" ] [ "${pkgs.nix-index}/bin/nix-index" ] (
+        builtins.readFile ../scripts/hosts/NixOS/nixos-build-nix-index.sh
+      )
+    );
 
     # -----------------------------------------------------------------------
     # provisionDevDirectory
