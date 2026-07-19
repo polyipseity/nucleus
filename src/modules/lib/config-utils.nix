@@ -32,14 +32,12 @@ in
       config.lib.file.mkOutOfStoreSymlink "${repoRoot}/${repoRelPath}";
 
     home.activation."unprotectSymlink_${name}" = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
+      ${builtins.readFile ../../scripts/lib/import-symlink-hardening.sh}
       _nucleus_unprotect_symlink "${name}" "$HOME/${targetRelPath}"
     '';
 
     home.activation."protectSymlink_${name}" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      REPO_ROOT="${repoRoot}"
-      . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
+      ${builtins.readFile ../../scripts/lib/import-symlink-hardening.sh}
       _nucleus_protect_symlink "${name}" "$HOME/${targetRelPath}"
     '';
   };
