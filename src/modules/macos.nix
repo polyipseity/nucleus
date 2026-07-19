@@ -367,10 +367,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # store paths.
     # Method 1 (writable symlink): linearmouse/linearmouse.json deployed via linearmouse-config.sh
     # -------------------------------------------------------------------------
-    linearmouse-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      export REPO_ROOT="${repoRoot}"
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-linearmouse-config.sh}
-    '';
+    linearmouse-config = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+      builtins.replaceStrings [ "__REPO_ROOT__" ] [ "${repoRoot}" ] (
+        builtins.readFile ../scripts/hosts/MacBook/macos-linearmouse-config.sh
+      )
+    );
 
     # -------------------------------------------------------------------------
     # macos-launch-services

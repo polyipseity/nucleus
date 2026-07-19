@@ -4,4 +4,4 @@
 set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/./symlink-hardening-lib.sh"
-_nucleus_protect_symlink "${NPS_SOURCE_NAME:?}" "${NPS_TARGET_PATH:?}"
+_nucleus_protect_symlink '__NAME__' '__TARGET_PATH__'
