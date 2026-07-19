@@ -42,6 +42,11 @@ let
     )
   );
 
+  # Baked at eval time from NUCLEUS_REPO_ROOT (set by apply.sh). Used to
+  # resolve the repo checkout root in activation blocks that embed or invoke
+  # repo-local scripts.
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+
   ensureSystemLogDirs = ''
     system_log_dir="${config.nucleus.logging.systemLogDir}"
     for subdir in ${builtins.toString systemLogDirs}; do
@@ -186,16 +191,15 @@ in
     fi
 
     # ---- homebrew-pin-verify ----------------------------------------------
-    # Warning-only check that installed Homebrew versions match lockfile.  Runs
-    # after homebrew bundle (so the cellar is populated) but before other
-    # post-install scripts.  Never fails activation.
-    #
-    # undoc-supp: warning-only version check; must not abort activation even if Homebrew state does not match lockfile or the script encounters an error.
-    # NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo. If unset, skip gracefully.
-    hb_repo_root="$NUCLEUS_REPO_ROOT"
-    if [ -n "$hb_repo_root" ] && [ -f "$hb_repo_root/src/scripts/hosts/MacBook/macos-homebrew-pin-verify.sh" ]; then
-      NUCLEUS_REPO_ROOT="$hb_repo_root" sh "$hb_repo_root/src/scripts/hosts/MacBook/macos-homebrew-pin-verify.sh" || true  # undoc-supp: warning-only version check; must not abort activation even if script errors.
-    fi
+    # Warning-only check that installed Homebrew versions match lockfile.
+    # Embedded via readFile + replaceStrings at build time so the script
+    # does not depend on NUCLEUS_REPO_ROOT at activation time.
+    # Never fails activation.
+    ${
+      builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
+        builtins.readFile ../../scripts/hosts/MacBook/macos-homebrew-pin-verify.sh
+      )
+    } || true  # undoc-supp: warning-only version check; must not abort activation even if script errors.
 
     # ---- disableSteamAutoStartup ------------------------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-disable-steam-autostart.sh}
@@ -209,12 +213,9 @@ in
     # diff-and-converge) that Nix's declarative model cannot express.  Keeping
     # it in src/scripts/services/jellyfin-sync.sh avoids duplicating 600+ lines of shell
     # across hosts and keeps the activation file scoped to macOS-specific hooks.
-    #
-    # NUCLEUS_REPO_ROOT is set by apply.sh and forwarded through sudo.  If unset,
-    # skip gracefully.
-    jellyfin_repo_root="$NUCLEUS_REPO_ROOT"
-    if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/services/jellyfin-sync.sh" ]; then
-      NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/services/jellyfin-sync.sh"
+    jellyfin_sync_script="${repoRoot}/src/scripts/services/jellyfin-sync.sh"
+    if [ -n "${repoRoot}" ] && [ -f "$jellyfin_sync_script" ]; then
+      sh "$jellyfin_sync_script"
     fi
 
     # ---- verifyNucleusServices ---------------------------------------------------

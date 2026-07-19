@@ -30,10 +30,15 @@ in
   # WHY a separate script instead of inline shell: see the rationale in
   # src/scripts/services/jellyfin-sync.sh header — this is runtime imperative API
   # convergence that Nix's build-time model cannot express.
-  system.activationScripts.jellyfin-sync = lib.mkAfter ''
-    jellyfin_repo_root="''${NUCLEUS_REPO_ROOT:-}"
-    if [ -n "$jellyfin_repo_root" ] && [ -f "$jellyfin_repo_root/src/scripts/services/jellyfin-sync.sh" ]; then
-      NUCLEUS_REPO_ROOT="$jellyfin_repo_root" sh "$jellyfin_repo_root/src/scripts/services/jellyfin-sync.sh"
-    fi
-  '';
+  system.activationScripts.jellyfin-sync = lib.mkAfter (
+    let
+      repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+    in
+    ''
+      jellyfin_sync_script="${repoRoot}/src/scripts/services/jellyfin-sync.sh"
+      if [ -n "${repoRoot}" ] && [ -f "$jellyfin_sync_script" ]; then
+        sh "$jellyfin_sync_script"
+      fi
+    ''
+  );
 }
