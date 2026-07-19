@@ -1,13 +1,28 @@
 # shellcheck shell=sh
 # Idempotently converges the declarative bun global package set.
 # Requires: JQ_BIN env var (path to jq binary), bun on PATH.
-# Agent helpers (_nucleus_protect_symlink, _nucleus_unprotect_symlink,
-# _nucleus_resolve_repo_root, _nucleus_prepend_first_executable_dir) must be
-# sourced before this script.
+set -euo pipefail
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
-# If bun is still not found after _nucleus_prepend_first_executable_dir was
-# called in the Nix wrapper, search the nix store for any bun binary and add
-# its parent directory to PATH.
+# _ibp_setup_path PREPEND_GUARD APPEND_GUARD NIX_PROFILE_BIN_DIRS
+# Sets up PATH with managed bin directories and prepends nix profile dirs.
+_ibp_setup_path() {
+  _ibp_prepend_guard="$1"
+  _ibp_append_guard="$2"
+  shift 2
+
+  PATH="${_ibp_prepend_guard}$PATH${_ibp_append_guard}"
+  export PATH
+
+  # Also prepend the nix profile bin directory, Home Manager profile bin
+  # directory, and directly probe the nix store for common package bins.
+  # After linkGeneration the profile symlinks exist, but the activation
+  # shell's PATH may not include them.
+  _nucleus_prepend_first_executable_dir bun "$@" || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
+}
+
+# If bun is still not found after _ibp_setup_path was called, search the
 if ! command -v bun >/dev/null 2>&1; then
   # undoc-supp: nix store may not have bun yet on first apply; best-effort store probe.
   _bun_store_path="$(find /nix/store -name 'bun' -type f -print -quit 2>/dev/null || true)"

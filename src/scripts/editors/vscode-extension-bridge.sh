@@ -6,7 +6,9 @@
 # Tokens (replaced by Nix builtins.replaceStrings):
 #   __EXTENSION_STORE__ — path to Nix-managed extension store
 
-set -eu
+set -euo pipefail
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
 source_extensions='__EXTENSION_STORE__/share/vscode/extensions'
 stable_extensions="$HOME/.vscode/extensions"

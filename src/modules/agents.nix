@@ -54,11 +54,8 @@ in
     # land in a real, untracked directory rather than inside the repo tree).
     # -------------------------------------------------------------------------
     agents-symlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      set -eu
-
       export REPO_ROOT="${repoRoot}"
       export AGENTS_CONFIG_RELATIVE_PATH="${agentsConfigRelativePath}"
-      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
       ${builtins.readFile ../scripts/agents/agents-symlink.sh}
     '';
 
@@ -83,11 +80,8 @@ in
     # fails fast rather than silently overwriting the downloaded content.
     # -------------------------------------------------------------------------
     agent-skills = lib.hm.dag.entryAfter [ "agents-symlink" ] ''
-      set -eu
-
       export REPO_ROOT="${repoRoot}"
       export AGENTS_SKILLS_RELATIVE_PATH="${agentsSkillsRelativePath}"
-      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
       ${builtins.readFile ../scripts/agents/agent-skills.sh}
     '';
 
@@ -107,27 +101,11 @@ in
     #             cargo-binstall; bun is the only viable install tier.
     # -------------------------------------------------------------------------
     installBunPackages = lib.hm.dag.entryAfter [ "agent-skills" ] ''
-      set -eu
-
       export REPO_ROOT="${repoRoot}"
       export JQ_BIN='${pkgs.jq}/bin/jq'
-      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
-
-      # Add managed bin directories (managed-paths.nix pathComponents) to PATH
-      # so binaries installed by previous apply runs and by this activation are
-      # discoverable in subsequent activation steps without spawning a new
-      # shell session.
-      PATH="${managedPaths.toShellPrependGuard}$PATH${managedPaths.toShellAppendGuard}"
-      export PATH
-
-      # Also prepend the nix profile bin directory, Home Manager profile bin
-      # directory, and directly probe the nix store for common package bins.
-      # After linkGeneration the profile symlinks exist, but the activation
-      # shell's PATH may not include them.
-      _nucleus_prepend_first_executable_dir bun \
-        ${managedPaths.nixProfileBinDirs} || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
-
       ${builtins.readFile ../scripts/packages/install-bun-packages.sh}
+      _ibp_setup_path ${managedPaths.toShellPrependGuard} ${managedPaths.toShellAppendGuard} \
+        ${managedPaths.nixProfileBinDirs}
     '';
 
     # -------------------------------------------------------------------------
@@ -143,33 +121,25 @@ in
     # (install preference: nixpkgs > cargo binstall > bun > uv).
     # -------------------------------------------------------------------------
     installUvTools = lib.hm.dag.entryAfter [ "installBunPackages" ] (
-      # Preamble: set -eu and source symlink hardening lib.
-      # The external script depends on functions from the hardening lib
-      # being available at activation time.
-      ''
-        set -eu
-        ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
-      ''
-      +
-        builtins.replaceStrings
-          [ "__UV_BIN__" "__GAWK_BIN__" "__GREP_BIN__" "__JQ_BIN__" "__DESIRED_UV_TOOLS_JSON__" ]
-          [
-            "${pkgs.uv}/bin/uv"
-            "${pkgs.gawk}/bin/awk"
-            "${pkgs.gnugrep}/bin/grep"
-            "${pkgs.jq}/bin/jq"
-            # Desired tools as JSON object mapping tool name → Python version
-            # (empty string = use default).  Only add tools absent from nixpkgs,
-            # cargo-binstall, and bun (install preference: nixpkgs > cargo binstall > bun > uv).
-            (builtins.toJSON {
-              # PaddleOCR: cross-platform OCR with GPU auto-detection.  uv for
-              # cross-host version consistency (nixpkgs v3.5.0, PyPI v3.6.0).
-              # Pinned to Python 3.11 because its dependency opencv-contrib-python
-              # cannot build on Python >=3.12 (distutils removed).
-              paddleocr = "3.11";
-            })
-          ]
-          (builtins.readFile ../scripts/packages/install-uv-tools.sh)
+      builtins.replaceStrings
+        [ "__UV_BIN__" "__GAWK_BIN__" "__GREP_BIN__" "__JQ_BIN__" "__DESIRED_UV_TOOLS_JSON__" ]
+        [
+          "${pkgs.uv}/bin/uv"
+          "${pkgs.gawk}/bin/awk"
+          "${pkgs.gnugrep}/bin/grep"
+          "${pkgs.jq}/bin/jq"
+          # Desired tools as JSON object mapping tool name → Python version
+          # (empty string = use default).  Only add tools absent from nixpkgs,
+          # cargo-binstall, and bun (install preference: nixpkgs > cargo binstall > bun > uv).
+          (builtins.toJSON {
+            # PaddleOCR: cross-platform OCR with GPU auto-detection.  uv for
+            # cross-host version consistency (nixpkgs v3.5.0, PyPI v3.6.0).
+            # Pinned to Python 3.11 because its dependency opencv-contrib-python
+            # cannot build on Python >=3.12 (distutils removed).
+            paddleocr = "3.11";
+          })
+        ]
+        (builtins.readFile ../scripts/packages/install-uv-tools.sh)
     );
 
     # -------------------------------------------------------------------------
@@ -185,15 +155,10 @@ in
     # on PATH before this step invokes it to configure the toolchain state.
     # -------------------------------------------------------------------------
     initRustup = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      ''
-        set -eu
-        ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
-      ''
-      +
-        builtins.replaceStrings
-          [ "__MANAGED_NIX_SYSTEM_BIN_DIRS__" "__MANAGED_NIX_PROFILE_BIN_DIRS__" ]
-          [ "${managedPaths.nixSystemBinDirs}" "${managedPaths.nixProfileBinDirs}" ]
-          (builtins.readFile ../scripts/packages/init-rustup.sh)
+      builtins.replaceStrings
+        [ "__MANAGED_NIX_SYSTEM_BIN_DIRS__" "__MANAGED_NIX_PROFILE_BIN_DIRS__" ]
+        [ "${managedPaths.nixSystemBinDirs}" "${managedPaths.nixProfileBinDirs}" ]
+        (builtins.readFile ../scripts/packages/init-rustup.sh)
     );
 
     # -------------------------------------------------------------------------
@@ -215,32 +180,27 @@ in
     # Windows Invoke-RustupSetup + Invoke-CargoBinstallSetup behavior.
     # -------------------------------------------------------------------------
     installCargoBinstallPackages = lib.hm.dag.entryAfter [ "initRustup" ] (
-      ''
-        set -eu
-        ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
-      ''
-      +
-        builtins.replaceStrings
-          [
-            "__JQ_BIN__"
-            "__GAWK_BIN__"
-            "__DESIRED_CRATES_JSON__"
-            "__CARGO_BIN_DIR__"
-            "__NIX_SYSTEM_BIN_DIRS__"
-            "__NIX_PROFILE_BIN_DIRS__"
-          ]
-          [
-            "${pkgs.jq}/bin/jq"
-            "${pkgs.gawk}/bin/awk"
-            # On POSIX hosts this list is intentionally empty because all
-            # managed Rust tools are provided by nixpkgs (install preference:
-            # nixpkgs > cargo binstall > bun > uv).
-            (builtins.toJSON [ ])
-            "${managedPaths.cargoBinDir}"
-            "${managedPaths.nixSystemBinDirs}"
-            "${managedPaths.nixProfileBinDirs}"
-          ]
-          (builtins.readFile ../scripts/packages/install-cargo-binstall-packages.sh)
+      builtins.replaceStrings
+        [
+          "__JQ_BIN__"
+          "__GAWK_BIN__"
+          "__DESIRED_CRATES_JSON__"
+          "__CARGO_BIN_DIR__"
+          "__NIX_SYSTEM_BIN_DIRS__"
+          "__NIX_PROFILE_BIN_DIRS__"
+        ]
+        [
+          "${pkgs.jq}/bin/jq"
+          "${pkgs.gawk}/bin/awk"
+          # On POSIX hosts this list is intentionally empty because all
+          # managed Rust tools are provided by nixpkgs (install preference:
+          # nixpkgs > cargo binstall > bun > uv).
+          (builtins.toJSON [ ])
+          "${managedPaths.cargoBinDir}"
+          "${managedPaths.nixSystemBinDirs}"
+          "${managedPaths.nixProfileBinDirs}"
+        ]
+        (builtins.readFile ../scripts/packages/install-cargo-binstall-packages.sh)
     );
 
     # -------------------------------------------------------------------------
@@ -258,27 +218,22 @@ in
     # state.
     # -------------------------------------------------------------------------
     syncClawHubSkills = lib.hm.dag.entryAfter [ "installBunPackages" ] (
-      ''
-        set -eu
-        ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
-      ''
-      +
-        builtins.replaceStrings
-          [
-            "__JQ_BIN__"
-            "__PATH_PREPEND_GUARD__"
-            "__PATH_APPEND_GUARD__"
-            "__REPO_ROOT__"
-            "__CLAWHUB_MANIFEST_RELATIVE_PATH__"
-          ]
-          [
-            "${pkgs.jq}/bin/jq"
-            "${managedPaths.toShellPrependGuard}"
-            "${managedPaths.toShellAppendGuard}"
-            "${repoRoot}"
-            "${clawhubManifestRelativePath}"
-          ]
-          (builtins.readFile ../scripts/agents/sync-clawhub-skills.sh)
+      builtins.replaceStrings
+        [
+          "__JQ_BIN__"
+          "__PATH_PREPEND_GUARD__"
+          "__PATH_APPEND_GUARD__"
+          "__REPO_ROOT__"
+          "__CLAWHUB_MANIFEST_RELATIVE_PATH__"
+        ]
+        [
+          "${pkgs.jq}/bin/jq"
+          "${managedPaths.toShellPrependGuard}"
+          "${managedPaths.toShellAppendGuard}"
+          "${repoRoot}"
+          "${clawhubManifestRelativePath}"
+        ]
+        (builtins.readFile ../scripts/agents/sync-clawhub-skills.sh)
     );
   };
 }

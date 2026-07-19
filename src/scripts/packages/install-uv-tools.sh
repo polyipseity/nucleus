@@ -1,8 +1,8 @@
 # Managed uv tool convergence (install + zap).
 # Consumes tool paths and desired tools JSON at activation time.
-# Expects the symlink hardening lib (symlink-hardening-lib.sh) to be sourced
-# before this script runs.
-set -eu
+set -euo pipefail
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
 _iut_uv_bin='__UV_BIN__'
 _iut_gawk_bin='__GAWK_BIN__'

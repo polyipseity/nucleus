@@ -1,8 +1,8 @@
 # Managed cargo-binstall package convergence (install + zap).
 # Consumes crate-description tokens at activation time.
-# Expects set -eu and the symlink hardening lib to be sourced before this
-# script runs.
-set -eu
+set -euo pipefail
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
 _icp_jq_bin='__JQ_BIN__'
 _icp_gawk_bin='__GAWK_BIN__'

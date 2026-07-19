@@ -3,8 +3,9 @@
 # per-skill symlinks for every skill subdirectory committed to
 # src/modules/configs/agents/skills/.
 # Requires: REPO_ROOT, AGENTS_SKILLS_RELATIVE_PATH env vars.
-# Agent helpers (_nucleus_protect_symlink, _nucleus_unprotect_symlink,
-# _nucleus_resolve_repo_root) must be sourced before this script.
+set -euo pipefail
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
 _ask_repo_root="$(_nucleus_resolve_repo_root "skills" "$REPO_ROOT")"
 

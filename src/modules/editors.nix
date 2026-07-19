@@ -350,8 +350,6 @@ in
     # darwin-rebuild / nixos-rebuild and forwarded through sudo).
     # -------------------------------------------------------------------------
     vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      set -eu
-      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
       ${builtins.replaceStrings
         [
           "__REPO_ROOT__"
@@ -387,8 +385,6 @@ in
     # writable directory and populate it with per-extension symlinks.
     # -----------------------------------------------------------------------
     vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      set -eu
-      ${builtins.readFile ../scripts/lib/import-symlink-hardening.sh}
       ${builtins.replaceStrings [ "__EXTENSION_STORE__" ] [ "${extensionStore}" ] (
         builtins.readFile ../scripts/editors/vscode-extension-bridge.sh
       )}

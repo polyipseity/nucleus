@@ -2,8 +2,9 @@
 # Sets up ~/.agents/ with per-entry symlinks into
 # src/modules/configs/agents/.
 # Requires: REPO_ROOT, AGENTS_CONFIG_RELATIVE_PATH env vars.
-# Agent helpers (_nucleus_protect_symlink, _nucleus_unprotect_symlink,
-# _nucleus_resolve_repo_root) must be sourced before this script.
+set -euo pipefail
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
 _as_repo_root="$(_nucleus_resolve_repo_root "agents-config" "$REPO_ROOT")"
 

@@ -1,8 +1,8 @@
 # ClawHub fetched skill convergence (install + stale cleanup).
 # Consumes tool paths and repo root token at activation time.
-# Expects set -eu and the symlink hardening lib to be sourced before this
-# script runs.
-set -eu
+set -euo pipefail
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
 _scs_jq_bin='__JQ_BIN__'
 
