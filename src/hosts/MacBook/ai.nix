@@ -63,7 +63,7 @@ let
         "${pkgs.litellm}/bin/litellm"
         litellmConfig
       ]
-      (builtins.readFile ../../scripts/services/litellm-daemon.sh)
+      (builtins.readFile ../../scripts/hosts/MacBook/macos-litellm-daemon.sh)
   );
 in
 {

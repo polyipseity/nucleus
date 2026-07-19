@@ -101,6 +101,6 @@ in
             }) currentNucleusAppBundles
           ))
         ]
-        (builtins.readFile ../../../scripts/services/deploy-app-bundles.sh)
+        (builtins.readFile ../../../scripts/hosts/MacBook/macos-deploy-app-bundles.sh)
   );
 }

@@ -43,7 +43,7 @@ let
     builtins.replaceStrings
       [ "__CADDY_BIN__" "__CADDYFILE__" ]
       [ "${pkgs.caddy}/bin/caddy" "${caddyfile}" ]
-      (builtins.readFile ../../scripts/services/https-proxy-daemon.sh)
+      (builtins.readFile ../../scripts/hosts/MacBook/macos-https-proxy-daemon.sh)
   );
 
   systemLogDir = config.nucleus.logging.systemLogDir;

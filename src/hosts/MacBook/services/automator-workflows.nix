@@ -222,6 +222,6 @@ in
             }) removedNucleusWorkflows
           ))
         ]
-        (builtins.readFile ../../../scripts/services/deploy-automator-workflows.sh)
+        (builtins.readFile ../../../scripts/hosts/MacBook/macos-deploy-automator-workflows.sh)
   );
 }

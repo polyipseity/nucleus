@@ -167,7 +167,7 @@ in
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-color-profile.sh}
 
     # ---- clearFinderCache -------------------------------------------------------
-    ${builtins.readFile ../../scripts/services/clear-finder-cache.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-clear-finder-cache.sh}
 
     # ---- disableSpotlight -------------------------------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-disable-spotlight.sh}

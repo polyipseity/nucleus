@@ -113,7 +113,7 @@ in
             builtins.replaceStrings
               [ "__WORK_DIR__" "__CREATE_BUILDER_BIN__" ]
               [ workDir "${pkg}/bin/create-builder" ]
-              (builtins.readFile ../../scripts/services/linux-builder-daemon.sh)
+              (builtins.readFile ../../scripts/hosts/MacBook/macos-linux-builder-daemon.sh)
           )
         }"
       ];

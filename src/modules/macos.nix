@@ -200,7 +200,7 @@ let
   };
 
   betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" (
-    builtins.readFile ../scripts/services/betterdisplay-heartbeat.sh
+    builtins.readFile ../scripts/hosts/MacBook/macos-betterdisplay-heartbeat.sh
   );
 
   # Wrapper script for the nix-index daily database rebuild LaunchAgent.
@@ -214,7 +214,7 @@ let
   # apply runs fast.
   nixIndexUpdate = pkgs.writeShellScript "nix-index-update" (
     builtins.replaceStrings [ "__NIX_INDEX_BIN__" ] [ "${pkgs.nix-index}/bin/nix-index" ] (
-      builtins.readFile ../scripts/services/nix-index-update.sh
+      builtins.readFile ../scripts/hosts/MacBook/macos-nix-index-update.sh
     )
   );
 
@@ -251,7 +251,7 @@ let
     builtins.replaceStrings
       [ "__DEV_SPOTLIGHT_FIND_EXPRESSION__" ]
       [ "${devSpotlightExcludedDirectoryFindExpression}" ]
-      (builtins.readFile ../scripts/services/spotlight-exclusions.sh)
+      (builtins.readFile ../scripts/hosts/MacBook/macos-spotlight-exclusions.sh)
   );
 
   # Daily Finder metadata cleanup for ~/dev.
@@ -259,7 +259,7 @@ let
   # maintenance: deleting stale .DS_Store files can take noticeable time on a
   # large checkout and should not slow synchronous apply/bootstrap flows.
   devDsStoreGc = pkgs.writeShellScript "ds-store-gc" (
-    builtins.readFile ../scripts/services/ds-store-gc.sh
+    builtins.readFile ../scripts/hosts/MacBook/macos-ds-store-gc.sh
   );
 
   gcWeekly = pkgs.writeShellScript "gc-weekly" (
@@ -277,7 +277,7 @@ let
         (mkManagedDedupSet "$HOME")
         envVars.macOSAllVars
       ]
-      (builtins.readFile ../scripts/services/gui-env.sh)
+      (builtins.readFile ../scripts/hosts/MacBook/macos-gui-env.sh)
   );
 in
 lib.mkIf pkgs.stdenv.isDarwin {
@@ -324,7 +324,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if displayplacer is not installed.
     # -------------------------------------------------------------------------
     display-resolutions = lib.hm.dag.entryAfter [ "macos-headless-display" ] ''
-      ${builtins.readFile ../scripts/services/display-resolutions.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-display-resolutions.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -435,7 +435,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Source: https://github.com/smudge/nightlight
     # -------------------------------------------------------------------------
     nightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.readFile ../scripts/services/nightlight.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-nightlight.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -627,7 +627,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if BetterDisplay is not installed.
     # -------------------------------------------------------------------------
     macos-headless-display = lib.hm.dag.entryAfter [ "nightlight" ] ''
-      ${builtins.readFile ../scripts/services/headless-display.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-headless-display.sh}
     '';
   };
 
@@ -825,7 +825,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # spuriously return "Bootstrap failed: 5: Input/output error" — HM detects
   # this but never retries, and subsequent activations skip unchanged agents.
   home.activation."ensure-launchagents" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
-    ${builtins.readFile ../scripts/services/ensure-launchagents.sh}
+    ${builtins.readFile ../scripts/hosts/MacBook/macos-ensure-launchagents.sh}
   '';
 
   # --------------------------------------------------------------------------
@@ -862,7 +862,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         envVars.macOSAllVars
         (managedPaths.toLaunchctlConfigPath config.home.homeDirectory)
       ]
-      (builtins.readFile ../scripts/services/gui-env-path.sh)
+      (builtins.readFile ../scripts/hosts/MacBook/macos-gui-env-path.sh)
   );
 
   # --------------------------------------------------------------------------
