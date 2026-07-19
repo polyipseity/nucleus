@@ -105,6 +105,15 @@ in
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
       # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
       # passes SIP gate. See .agents/instructions/macos-launchd-sip.instructions.md.
+      #
+      # WHY pkgs.writeShellScript (Style J) instead of inline readFile:
+      #   launchd's ProgramArguments requires an executable file path, not
+      #   inline shell code.  pkgs.writeShellScript creates a derivation (a
+      #   Nix store executable) at build time, which is then referenced by
+      #   store path inside the exec wrapper.  The inner replaceStrings +
+      #   readFile pattern is purely for token substitution — the outer
+      #   writeShellScript is the only way to produce a launchd-compatible
+      #   executable from the tokenized script content.
       ProgramArguments = [
         "/bin/sh"
         "-c"
