@@ -1,12 +1,8 @@
-# Wrapper for configuring Finder sidebar favorites. Sources macos-finder-sidebar.sh
-# and defines _cfs_configure which forwards args to finder_configure_sidebar.
-#
-# Provided functions:
-#   _cfs_configure FAVORITES_JSON JQ_BIN MYSIDES_BIN EXPECTED_ORDER MANAGED_COUNT
+# Self-executing configuration of Finder sidebar favorites.
+# Sources macos-finder-sidebar.sh and calls finder_configure_sidebar
+# with token placeholders substituted at Nix eval time.
 set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../../lib/macos-finder-sidebar.sh"
 
-_cfs_configure() {
-  finder_configure_sidebar "$1" "$2" "$3" "$4" "$5"
-}
+finder_configure_sidebar '__FAVORITES_JSON__' '__JQ_BIN__' '__MYSIDES_BIN__' '__EXPECTED_ORDER__' '__MANAGED_COUNT__'
