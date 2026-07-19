@@ -27,12 +27,6 @@
   ...
 }:
 let
-  # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh). Used for
-  # runtime sourcing of lib scripts in activation blocks. Cannot use a
-  # runtime env var because darwin-rebuild uses sudo, which strips
-  # NUCLEUS_REPO_ROOT from the activation environment.
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
-
   # Known list of historically-removed Nucleus app bundles.
   # When a bundle is removed, add its metadata here and remove its app dir.
   # The activation script unconditionally removes its NSServicesStatus key
@@ -69,38 +63,33 @@ in
   # consuming workflow lives).
 
   home.activation."macos-app-bundle-lib" = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-    ''
-      set -eu
-      REPO_ROOT="${repoRoot}"
-    ''
-    +
-      builtins.replaceStrings
-        [ "__JQ_BIN__" "__REMOVED_BUNDLES_JSON__" "__CURRENT_BUNDLES_JSON__" ]
-        [
-          "${pkgs.jq}/bin/jq"
-          (builtins.toJSON (
-            map (svc: {
-              inherit (svc)
-                appDir
-                bundleId
-                menuItem
-                message
-                ;
-            }) removedNucleusAppBundles
-          ))
-          (builtins.toJSON (
-            map (svc: {
-              inherit (svc)
-                appDir
-                bundleId
-                menuItem
-                message
-                ;
-              source = "${svc.source}";
-              presentationModesDict = mkPresentationModes svc.presentationModes;
-            }) currentNucleusAppBundles
-          ))
-        ]
-        (builtins.readFile ../../../scripts/hosts/MacBook/macos-deploy-app-bundles.sh)
+    builtins.replaceStrings
+      [ "__JQ_BIN__" "__REMOVED_BUNDLES_JSON__" "__CURRENT_BUNDLES_JSON__" ]
+      [
+        "${pkgs.jq}/bin/jq"
+        (builtins.toJSON (
+          map (svc: {
+            inherit (svc)
+              appDir
+              bundleId
+              menuItem
+              message
+              ;
+          }) removedNucleusAppBundles
+        ))
+        (builtins.toJSON (
+          map (svc: {
+            inherit (svc)
+              appDir
+              bundleId
+              menuItem
+              message
+              ;
+            source = "${svc.source}";
+            presentationModesDict = mkPresentationModes svc.presentationModes;
+          }) currentNucleusAppBundles
+        ))
+      ]
+      (builtins.readFile ../../../scripts/hosts/MacBook/macos-deploy-app-bundles.sh)
   );
 }

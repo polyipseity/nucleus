@@ -1,6 +1,5 @@
 # Deploy and prune macOS Automator workflow bundles.
 # Consumes jq binary and workflow JSON arrays at activation time.
-# Expects set -eu to be sourced before this script runs.
 set -eu
 
 _vsd_jq_bin='__JQ_BIN__'
