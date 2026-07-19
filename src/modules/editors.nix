@@ -281,7 +281,7 @@ let
         neovimTerminalProgramsLua
         shiftNumberLuaTable
       ]
-      (builtins.readFile ../scripts/configs/neovim-init.lua);
+      (builtins.readFile ../scripts/editors/neovim-init.lua);
 in
 {
   programs.neovim = {
