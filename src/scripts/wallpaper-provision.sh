@@ -1,23 +1,33 @@
-# Helper functions for wallpaper provisioning.
-# Intended to be sourced from a Nix activation script.
-# Requires: PICTURES_DIR, IS_DARWIN env vars.
+# Self-contained wallpaper provisioning script.
+# Tokens are substituted at build time by Nix.
+set -eu
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_is_darwin='__IS_DARWIN__'
+_pictures_dir='__PICTURES_DIR__'
+_desktoppr_bin='__DESKTOPPR_BIN__'
+_coreutils_bin='__COREUTILS_BIN__'
+_wallpapers_dir='__WALLPAPERS_DIR__'
+_current_user='__CURRENT_USER__'
+_sops_symlink_path='__SOPS_SYMLINK_PATH__'
 
 lock_wallpaper_dir() {
-  if [ "$IS_DARWIN" -ne 1 ]; then
+  if [ "$_is_darwin" -ne 1 ]; then
     return 0
   fi
 
-  if [ ! -d "$PICTURES_DIR" ]; then
+  if [ ! -d "$_pictures_dir" ]; then
     return 0
   fi
 
-  if ! chmod 555 "$PICTURES_DIR"; then
-    echo "wallpaper-provision: failed to set read-only mode on wallpaper directory $PICTURES_DIR." >&2
+  if ! chmod 555 "$_pictures_dir"; then
+    echo "wallpaper-provision: failed to set read-only mode on wallpaper directory $_pictures_dir." >&2
     return 1
   fi
 
-  if ! /usr/bin/chflags uchg "$PICTURES_DIR"; then
-    echo "wallpaper-provision: failed to set immutable flag on wallpaper directory $PICTURES_DIR." >&2
+  if ! /usr/bin/chflags uchg "$_pictures_dir"; then
+    echo "wallpaper-provision: failed to set immutable flag on wallpaper directory $_pictures_dir." >&2
     return 1
   fi
 
@@ -35,37 +45,37 @@ fail_wallpaper_provision() {
 wallpaper_pre_copy_setup() {
   # Refuse to operate on symlinks or non-directories to avoid writing or
   # deleting outside the intended managed wallpaper location.
-  if [ -L "$PICTURES_DIR" ]; then
-    fail_wallpaper_provision "wallpaper-provision: wallpaper directory path $PICTURES_DIR is a symlink; refusing to manage wallpapers there."
+  if [ -L "$_pictures_dir" ]; then
+    fail_wallpaper_provision "wallpaper-provision: wallpaper directory path $_pictures_dir is a symlink; refusing to manage wallpapers there."
   fi
 
-  if [ -e "$PICTURES_DIR" ] && [ ! -d "$PICTURES_DIR" ]; then
-    fail_wallpaper_provision "wallpaper-provision: wallpaper path $PICTURES_DIR exists but is not a directory."
+  if [ -e "$_pictures_dir" ] && [ ! -d "$_pictures_dir" ]; then
+    fail_wallpaper_provision "wallpaper-provision: wallpaper path $_pictures_dir exists but is not a directory."
   fi
 
   # Keep the managed wallpaper directory mutable only during activation so
   # users/apps cannot accidentally delete or rename it between runs.
-  if [ "$IS_DARWIN" -eq 1 ] && [ -d "$PICTURES_DIR" ]; then
-    if ! /usr/bin/chflags nouchg "$PICTURES_DIR"; then
-      fail_wallpaper_provision "wallpaper-provision: failed to clear immutable flag on wallpaper directory $PICTURES_DIR."
+  if [ "$_is_darwin" -eq 1 ] && [ -d "$_pictures_dir" ]; then
+    if ! /usr/bin/chflags nouchg "$_pictures_dir"; then
+      fail_wallpaper_provision "wallpaper-provision: failed to clear immutable flag on wallpaper directory $_pictures_dir."
     fi
 
-    if ! chmod 755 "$PICTURES_DIR"; then
-      fail_wallpaper_provision "wallpaper-provision: failed to restore writable mode on wallpaper directory $PICTURES_DIR before managed updates."
+    if ! chmod 755 "$_pictures_dir"; then
+      fail_wallpaper_provision "wallpaper-provision: failed to restore writable mode on wallpaper directory $_pictures_dir before managed updates."
     fi
   fi
 
-  mkdir -p "$PICTURES_DIR"
-  chmod 755 "$PICTURES_DIR"
-  if [ "$IS_DARWIN" -eq 1 ]; then
-    if ! /usr/bin/chflags nouchg "$PICTURES_DIR"; then
-      fail_wallpaper_provision "wallpaper-provision: failed to clear immutable flag on wallpaper directory $PICTURES_DIR after create."
+  mkdir -p "$_pictures_dir"
+  chmod 755 "$_pictures_dir"
+  if [ "$_is_darwin" -eq 1 ]; then
+    if ! /usr/bin/chflags nouchg "$_pictures_dir"; then
+      fail_wallpaper_provision "wallpaper-provision: failed to clear immutable flag on wallpaper directory $_pictures_dir after create."
     fi
   fi
 }
 
 # Copy each wallpaper from the SOPS decrypted secret directory into
-# $PICTURES_DIR.  Takes a JSON array of wallpaper items, the path to jq,
+# $_pictures_dir.  Takes a JSON array of wallpaper items, the path to jq,
 # and the SOPS symlink path.
 wallpaper_provision_copy_items() {
   _items_json="$1"
@@ -77,7 +87,7 @@ wallpaper_provision_copy_items() {
   while IFS=$'\t' read -r _secretName _wallpaperName; do
     [ -n "$_secretName" ] || continue
     _secretPath="$_sops_symlink_path/$_secretName"
-    _targetFile="$PICTURES_DIR/$_wallpaperName"
+    _targetFile="$_pictures_dir/$_wallpaperName"
 
     if [ ! -f "$_secretPath" ]; then
       echo "wallpaper-provision: missing decrypted secret at $_secretPath; cannot apply wallpaper gallery." >&2
@@ -86,9 +96,9 @@ wallpaper_provision_copy_items() {
     fi
 
     case "$_targetFile" in
-      "$PICTURES_DIR"/*) ;;
+      "$_pictures_dir"/*) ;;
       *)
-        echo "wallpaper-provision: refusing to write wallpaper outside $PICTURES_DIR: $_targetFile" >&2
+        echo "wallpaper-provision: refusing to write wallpaper outside $_pictures_dir: $_targetFile" >&2
         _nucleus_wp_failed=1
         break
         ;;
@@ -115,12 +125,12 @@ wallpaper_provision_copy_items() {
 wallpaper_post_copy_teardown() {
   # Stale gc: remove decrypted files that no longer have a matching
   # .sops source so the gallery does not show deleted assets.
-  for decryptedFile in "$PICTURES_DIR"/*; do
+  for decryptedFile in "$_pictures_dir"/*; do
     [ -e "$decryptedFile" ] || continue
     [ -f "$decryptedFile" ] || continue
     case "$decryptedFile" in *.xml) continue;; esac
     baseName="$(basename "$decryptedFile")"
-    if [ ! -e "${WALLPAPERS_DIR}/${CURRENT_USER}/$baseName.sops" ]; then
+    if [ ! -e "${_wallpapers_dir}/${_current_user}/$baseName.sops" ]; then
       rm -f "$decryptedFile"
       echo "wallpaper-provision: removed stale wallpaper $baseName (no matching .sops source)."
     fi
@@ -134,7 +144,7 @@ wallpaper_post_copy_teardown() {
   #        point picture-uri at the XML file.  Each image displays for 595 s
   #        with a 5 s overlay transition (600 s / 10 min total per slide).
   hasWallpapers=0
-  for img in "$PICTURES_DIR"/*; do
+  for img in "$_pictures_dir"/*; do
     [ -e "$img" ] || continue
     [ -f "$img" ] || continue
     case "$img" in *.xml) continue;; esac
@@ -143,31 +153,31 @@ wallpaper_post_copy_teardown() {
   done
 
   if [ "$hasWallpapers" -ne 1 ]; then
-    fail_wallpaper_provision "wallpaper-provision: no decrypted wallpapers found in $PICTURES_DIR; cannot apply wallpaper gallery."
+    fail_wallpaper_provision "wallpaper-provision: no decrypted wallpapers found in $_pictures_dir; cannot apply wallpaper gallery."
   fi
 
-  if [ "$IS_DARWIN" -eq 1 ]; then
-    resolvedPicturesDir="$("$COREUTILS_BIN/readlink" -f "$PICTURES_DIR" 2>/dev/null || printf '%s' "$PICTURES_DIR")"
+  if [ "$_is_darwin" -eq 1 ]; then
+    resolvedPicturesDir="$("$_coreutils_bin/readlink" -f "$_pictures_dir" 2>/dev/null || printf '%s' "$_pictures_dir")"
     # desktoppr interprets bare directory paths as their parent; appending
     # '/.' preserves the intended directory so all Spaces follow the gallery.
     desktopprTarget="$resolvedPicturesDir/."
 
-    if [ ! -x "$DESKTOPPR_BIN" ]; then
-      fail_wallpaper_provision "wallpaper-provision: desktoppr is not executable at $DESKTOPPR_BIN; cannot set macOS wallpaper gallery."
+    if [ ! -x "$_desktoppr_bin" ]; then
+      fail_wallpaper_provision "wallpaper-provision: desktoppr is not executable at $_desktoppr_bin; cannot set macOS wallpaper gallery."
     elif [ ! -d "$resolvedPicturesDir" ]; then
       fail_wallpaper_provision "wallpaper-provision: resolved wallpaper directory is not a folder: $resolvedPicturesDir"
     else
-      if ! "$DESKTOPPR_BIN" all "$desktopprTarget"; then
+      if ! "$_desktoppr_bin" all "$desktopprTarget"; then
         fail_wallpaper_provision "wallpaper-provision: desktoppr failed to set wallpaper directory $desktopprTarget."
       fi
     fi
   elif command -v gsettings >/dev/null 2>&1; then
-    xmlFile="$PICTURES_DIR/wallpaper-gallery.xml"
+    xmlFile="$_pictures_dir/wallpaper-gallery.xml"
     tmpXml="$(mktemp)"
     firstImg=""
     prevImg=""
 
-    for img in "$PICTURES_DIR"/*; do
+    for img in "$_pictures_dir"/*; do
       [ -e "$img" ] || continue
       case "$img" in *.xml) continue;; esac
 
@@ -216,3 +226,8 @@ wallpaper_post_copy_teardown() {
     exit 1
   fi
 }
+
+# Entry point
+wallpaper_pre_copy_setup
+wallpaper_provision_copy_items '__WALLPAPER_ITEMS_JSON__' '__JQ_BIN__' "$_sops_symlink_path"
+wallpaper_post_copy_teardown

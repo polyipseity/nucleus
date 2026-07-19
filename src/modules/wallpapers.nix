@@ -97,7 +97,17 @@ in
 
   home.activation."wallpaper-provision" = lib.hm.dag.entryAfter [ "sops-nix" ] (
     builtins.replaceStrings
-      [ "__WALLPAPER_ITEMS_JSON__" "__JQ_BIN__" ]
+      [
+        "__WALLPAPER_ITEMS_JSON__"
+        "__JQ_BIN__"
+        "__IS_DARWIN__"
+        "__PICTURES_DIR__"
+        "__DESKTOPPR_BIN__"
+        "__COREUTILS_BIN__"
+        "__WALLPAPERS_DIR__"
+        "__CURRENT_USER__"
+        "__SOPS_SYMLINK_PATH__"
+      ]
       [
         (builtins.toJSON (
           map (item: {
@@ -106,27 +116,14 @@ in
           }) wallpaperItemsForCurrentUser
         ))
         "${pkgs.jq}/bin/jq"
+        (if pkgs.stdenv.isDarwin then "1" else "0")
+        "${currentUserHome}/Pictures/wallpapers"
+        desktopprBinPath
+        "${pkgs.coreutils}"
+        wallpapersDir
+        currentUsername
+        config.sops.defaultSymlinkPath
       ]
-      ''
-        export HOME="${currentUserHome}"
-        export IS_DARWIN=$([ "$(uname -s)" = "Darwin" ] && echo 1 || echo 0)
-        export PICTURES_DIR="$HOME/Pictures/wallpapers"
-        export DESKTOPPR_BIN="${desktopprBinPath}"
-        export COREUTILS_BIN="${pkgs.coreutils}"
-        export WALLPAPERS_DIR="${wallpapersDir}"
-        export CURRENT_USER="${currentUsername}"
-        export SOPS_SYMLINK_PATH="${config.sops.defaultSymlinkPath}"
-
-        ${builtins.readFile ../scripts/wallpaper-provision.sh}
-
-        # Pre-copy setup
-        wallpaper_pre_copy_setup
-
-        # Per-wallpaper copy loop
-        wallpaper_provision_copy_items '__WALLPAPER_ITEMS_JSON__' '__JQ_BIN__' "$SOPS_SYMLINK_PATH"
-
-        # Post-copy teardown
-        wallpaper_post_copy_teardown
-      ''
+      (builtins.readFile ../scripts/wallpaper-provision.sh)
   );
 }
