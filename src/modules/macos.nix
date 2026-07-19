@@ -345,7 +345,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # now handled declaratively in defaults.nix via CustomUserPreferences.
     # -------------------------------------------------------------------------
     input-config = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      ${builtins.readFile ../scripts/configs/input-config.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-input-config.sh}
 
       ${daemonRefresh.refreshTISwitcher}
     '';
@@ -375,7 +375,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     linearmouse-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       export REPO_ROOT="${repoRoot}"
-      ${builtins.readFile ../scripts/configs/linearmouse-config.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-linearmouse-config.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -420,7 +420,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       . "$REPO_ROOT/src/scripts/lib/symlink-hardening-lib.sh"
       _ray_alias_dir="$HOME/Applications/Nucleus App Aliases"
       mkdir -p "$_ray_alias_dir"
-      ${builtins.readFile ../scripts/configs/raycast-aliases.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-raycast-aliases.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -493,7 +493,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         print_fda_warning "protected Safari preferences"
       ''
       + ''
-        ${builtins.readFile ../scripts/configs/safari-defaults.sh}
+        ${builtins.readFile ../scripts/hosts/MacBook/macos-safari-defaults.sh}
       ''
     );
 
@@ -511,7 +511,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         print_fda_warning "Accessibility preferences"
       ''
       + ''
-        ${builtins.readFile ../scripts/configs/universal-access-defaults.sh}
+        ${builtins.readFile ../scripts/hosts/MacBook/macos-universal-access-defaults.sh}
       ''
     );
 

@@ -152,19 +152,19 @@ in
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-ssh-access.sh}
 
     # ---- configureMiddleClick -------------------------------------------------
-    ${builtins.readFile ../../scripts/configs/middle-click.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-middle-click.sh}
     # ---- configureMountyLoginItem ---------------------------------------------
-    ${builtins.readFile ../../scripts/configs/mounty-login-item.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-mounty-login-item.sh}
     # ---- configureLinearMousePreferences --------------------------------------
-    ${builtins.readFile ../../scripts/configs/linearmouse-prefs.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-linearmouse-prefs.sh}
     # ---- configureGimpScrollSensitivity ---------------------------------------
-    ${builtins.readFile ../../scripts/configs/gimp-scroll-sensitivity.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-gimp-scroll-sensitivity.sh}
 
     # ---- configureMissionControlSpansDisplays ----------------------------------
-    ${builtins.readFile ../../scripts/configs/mission-control.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-mission-control.sh}
 
     # ---- configureMonitorColorProfile ------------------------------------------
-    ${builtins.readFile ../../scripts/configs/color-profile.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-color-profile.sh}
 
     # ---- clearFinderCache -------------------------------------------------------
     ${builtins.readFile ../../scripts/services/clear-finder-cache.sh}
