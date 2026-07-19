@@ -96,12 +96,15 @@ in
     #   clawhub — fetched skill install vehicle; absent from nixpkgs and
     #             cargo-binstall; bun is the only viable install tier.
     # -------------------------------------------------------------------------
-    installBunPackages = lib.hm.dag.entryAfter [ "agent-skills" ] ''
-      export JQ_BIN='${pkgs.jq}/bin/jq'
-      ${builtins.readFile ../scripts/packages/install-bun-packages.sh}
-      _ibp_setup_path ${managedPaths.toShellPrependGuard} ${managedPaths.toShellAppendGuard} \
-        ${managedPaths.nixProfileBinDirs}
-    '';
+    installBunPackages = lib.hm.dag.entryAfter [ "agent-skills" ] (
+      builtins.replaceStrings [ "__JQ_BIN__" ] [ "${pkgs.jq}/bin/jq" ] (
+        builtins.readFile ../scripts/packages/install-bun-packages.sh
+      )
+      + ''
+        _ibp_setup_path ${managedPaths.toShellPrependGuard} ${managedPaths.toShellAppendGuard} \
+          ${managedPaths.nixProfileBinDirs}
+      ''
+    );
 
     # -------------------------------------------------------------------------
     # installUvTools

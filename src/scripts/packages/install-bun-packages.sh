@@ -1,6 +1,7 @@
 # shellcheck shell=sh
 # Idempotently converges the declarative bun global package set.
-# Requires: JQ_BIN env var (path to jq binary), bun on PATH.
+# Tokens: __JQ_BIN__ (replaced with jq binary path by Nix replaceStrings).
+# Requires: bun on PATH.
 set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
@@ -58,7 +59,7 @@ _ibp_global_json="$HOME/.bun/install/global/package.json"
 _ibp_installed="$(mktemp)"
 if [ -f "$_ibp_global_json" ]; then
   # undoc-supp: parse failure on a malformed or partially-written file treats the installed set as empty — safe because desired packages will simply be re-installed on the next run.
-  "$JQ_BIN" -r '.dependencies // {} | keys[]' "$_ibp_global_json" > "$_ibp_installed" || true
+  __JQ_BIN__ -r '.dependencies // {} | keys[]' "$_ibp_global_json" > "$_ibp_installed" || true
 fi
 
 # Packages installed but not desired: zap-style removal.
