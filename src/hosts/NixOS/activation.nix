@@ -38,7 +38,7 @@ in
     builtins.replaceStrings
       [ "__NUCLEUS_NVIM_PATH__" ]
       [ "${config.home-manager.users.${username}.home.profileDirectory}/bin/nvim" ]
-      (builtins.readFile ../../scripts/hosts/NixOS/nixos-nvim-launcher.sh)
+      (builtins.readFile ../../scripts/editors/nvim-launcher.sh)
   );
 
   # ---------------------------------------------------------------------------
