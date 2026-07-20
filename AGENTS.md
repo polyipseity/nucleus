@@ -30,7 +30,7 @@
   - **Naming rule**:
     - Files under `hosts/MacBook/` MUST start with `macos-`; entry name = filename.
     - Files under `hosts/NixOS/` MUST start with `nixos-`; entry name = filename.
-    - All other subdirs (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `agents/`, `integrations/`): use natural words/phrases; entry name = filename.
+    - All other subdirs follow a two-track convention: **verb-first** for action scripts, **entity-first** for service scripts (see `.agents/instructions/scripts-and-permissions.instructions.md` for the full per-directory table).
     - Rule does not apply to runtime-only scripts or wrapped derivations. Library scripts in
       `lib/` that are host-specific MUST still use the host prefix (e.g., `macos-`). Generic
       cross-platform lib scripts may use natural names.

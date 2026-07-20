@@ -26,6 +26,29 @@ applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
 - `src/scripts/apply.sh` (the Nix apply dispatcher) lives under `src/` because it is embedded in the flake as `apps.apply`; it follows the same doc and line-ending rules as `scripts/` shell scripts.
 - **Host-specific placement rule**: scripts under `hosts/<Host>/` must implement a semantically host-specific feature. Cross-platform features belong in non-host subdirectories (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `shell/`, `agents/`, `lib/`, `integrations/`). See [cross-host-feature-parity.instructions.md](cross-host-feature-parity.instructions.md) for the script deduplication policy.
 
+## Per-directory naming patterns
+
+Non-host subdirectories follow a two-track convention:
+
+- **Verb-first** (most subdirs): `<verb>-<target>.<ext>` — the first word tells what action the script performs.
+- **Entity-first** (`services/` only): `<entity>-<role>.<ext>` — the first word tells which component is managed.
+- **Library scripts** (`lib/`): `<domain>[-lib].sh` — descriptive, no action verb. `lib.sh` is the universal library; `*-lib.sh` marks domain-specific libraries.
+
+| Subdirectory | Pattern | First-word role |
+|---|---:|---|
+| `root/` (in `scripts/`) | `<verb>-<target>.sh` | What action? |
+| `agents/` | `<verb>-<target>.sh` | What action? |
+| `configs/` | `<verb>-<target>.sh` | What action? |
+| `editors/` | `<verb>-<target>.sh` | What action? |
+| `integrations/` | `<verb>-<target>.sh` | What action? |
+| `lib/` | `<domain>[-lib].sh` | What domain? |
+| `packages/` | `<verb>-<target>.sh` | What action? |
+| `secrets/` | `<verb>-<target>.sh` | What action? |
+| `services/` | `<entity>-<role>.sh` | Which component? |
+| `shell/` | `init.*` or `<verb>-<target>.sh` | Varies |
+
+Scripts under `hosts/<Host>/` use the prefix rule (`macos-` for MacBook, `nixos-` for NixOS) and do not follow the table above.
+
 ## Argument convention for extracted scripts
 
 - **All extracted inline scripts must accept inputs via positional arguments, not environment variables.** This keeps reasoning local, avoids hidden coupling between source and consumer, and makes each script independently testable.
