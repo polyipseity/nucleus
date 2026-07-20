@@ -262,7 +262,7 @@ let
 
   gcWeekly = pkgs.writeShellScript "gc-weekly" (
     builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
-      builtins.readFile ../scripts/services/gc-weekly.sh
+      builtins.readFile ../scripts/services/gc-sweep.sh
     )
   );
 

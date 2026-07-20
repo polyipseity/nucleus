@@ -89,7 +89,7 @@ in
         "${builtins.toString userLogDirs}"
         "${builtins.toString chownLogDirs}"
       ]
-      (builtins.readFile ../../scripts/services/ensure-log-dirs.sh)
+      (builtins.readFile ../../scripts/services/log-dirs-init.sh)
     }
   '';
 
@@ -178,7 +178,7 @@ in
         "${builtins.toString userLogDirs}"
         "${builtins.toString chownLogDirs}"
       ]
-      (builtins.readFile ../../scripts/services/ensure-log-dirs.sh)
+      (builtins.readFile ../../scripts/services/log-dirs-init.sh)
     }
     # undoc-supp: /dev/console may not exist; guards below handle empty/root.
     _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
@@ -217,6 +217,6 @@ in
     # Warn-only verification that all managed services are running.
     # Failing to start a service should not block activation, but the warning
     # surfaces issues that operators can investigate post-apply.
-    ${builtins.readFile ../../scripts/services/verify-nucleus-services.sh}
+    ${builtins.readFile ../../scripts/services/nucleus-services-verify.sh}
   '';
 }
