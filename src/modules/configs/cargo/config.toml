@@ -4,7 +4,7 @@ jobs = 4
 
 # ── Test concurrency ───────────────────────────────────────────────────
 [env]
-RUST_TEST_THREADS = "2"
+RUST_TEST_THREADS = "4"
 
 # ── Dev profile: memory-efficient debugging ────────────────────────────
 [profile.dev]
