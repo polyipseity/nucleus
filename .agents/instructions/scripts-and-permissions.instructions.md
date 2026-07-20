@@ -24,7 +24,6 @@ applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
 - If a script becomes application code rather than repo automation, move it into the appropriate source tree instead of leaving it in `scripts/`.
 - Detect a script's runtime from its extension, shebang, adjacent config files, and the commands it invokes before adding stack-specific script guidance.
 - `src/scripts/apply.sh` (the Nix apply dispatcher) lives under `src/` because it is embedded in the flake as `apps.apply`; it follows the same doc and line-ending rules as `scripts/` shell scripts.
-- `src/scripts/apps/` holds nucleus app scripts — app lifecycle, app metadata, app bundling helpers, and other nucleus-* command support scripts.
 
 ## Argument convention for extracted scripts
 
