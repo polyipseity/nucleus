@@ -35,11 +35,12 @@
 #  16. YAML validation
 #  17. YAML linting (yamllint)
 #
-# Policy/verification (18-21):
+# Policy/verification (18-22):
 #  18. Package manager usage enforcement
 #  19. Undocumented error suppression check
 #  20. Online determinism checks (--verify mode only)
 #  21. Config method compliance
+#  22. Activation script token placeholder in comment check
 #
 # Output conventions:
 #   Warnings (warn) and errors (error) go to stderr; info/success/skip
@@ -973,6 +974,33 @@ fi
 say "config method compliance passed."
 $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
+# Activation script token placeholder in comment check
+section "$((_step += 1))" "Activation script token placeholder in comment check"
+_act_temp="$(mktemp)" || { warn "failed to create temp file"; exit_code=1; $FAIL_FAST && exit $exit_code; }
+
+if $HAS_ARGS; then
+  for _f in "$@"; do
+    case "$_f" in
+      *.sh|*.zsh) grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' "$_f" 2>/dev/null >> "$_act_temp" || true  # undoc-supp: grep returns 1 when no matches found
+    esac
+  done
+else
+  while IFS= read -r -d '' _f; do
+    grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' "$_f" 2>/dev/null >> "$_act_temp" || true  # undoc-supp: grep returns 1 when no matches found
+  done < <(find src/scripts -type f \( -name '*.sh' -o -name '*.zsh' \) -print0)
+fi
+
+if [ -s "$_act_temp" ]; then
+  warn "token placeholder strings found in script comments:"
+  sort -u "$_act_temp" | while IFS= read -r _line; do
+    warn "  $_line"
+  done
+  exit_code=1
+else
+  say "no token placeholder strings in script comments."
+fi
+rm -f "$_act_temp"
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
 if [ $exit_code -ne 0 ]; then
   warn "some checks failed with exit code $exit_code"

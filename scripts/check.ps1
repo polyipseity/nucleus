@@ -33,11 +33,12 @@
 #  16. YAML validation
 #  17. YAML linting (yamllint)
 #
-# Policy/verification (18-21):
+# Policy/verification (18-22):
 #  18. Package manager usage enforcement
 #  19. Undocumented error suppression check
 #  20. Online determinism checks (--verify mode only)
 #  21. Config method compliance
+#  22. Activation script token placeholder in comment check
 #
 # Output conventions:
 #   All messages (info, success, skip, warning) go to stdout.
@@ -1002,6 +1003,31 @@ if ($_cfgErrors -gt 0) {
   say "config method compliance passed."
 }
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
+
+# ---------------------------------------------------------------------------
+# 22. Activation script token placeholder in comment check
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Activation script token placeholder in comment check ===" -f (++$_step))
+$_actPattern = '^\s*#.*__[A-Z][A-Z_]*__'
+$_actViolations = @()
+if ($HAS_ARGS) {
+  foreach ($_f in $positionalArgs) {
+    if ($_f -like '*.sh' -or $_f -like '*.zsh') {
+      $_actViolations += Select-String -Path $_f -Pattern $_actPattern | ForEach-Object { "$($_.Path):$($_.LineNumber)" }
+    }
+  }
+} else {
+  $_actFiles = Get-ChildItem -Recurse -Path (Join-Path $RepoRoot "src\scripts") -Include '*.sh','*.zsh' | ForEach-Object { $_.FullName }
+  $_actViolations += Select-String -Path $_actFiles -Pattern $_actPattern | ForEach-Object { "$($_.Path):$($_.LineNumber)" }
+}
+if ($_actViolations.Count -gt 0) {
+  foreach ($_av in ($_actViolations | Sort-Object -Unique)) { warn $_av }
+  warn "token placeholder strings found in script comments"
+  $exitCode = 1
+  if ($FAIL_FAST) { exit $exitCode }
+} else {
+  say "no token placeholder strings in script comments."
+}
 
 # ---------------------------------------------------------------------------
 if ($exitCode -ne 0) {
