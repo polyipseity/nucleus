@@ -39,10 +39,12 @@ For every phase and step in the plan:
 ### 3. Report or remediate
 
 **If all steps are fully implemented with no gaps:**
+
 - Report: "Plan fully implemented — no gaps found."
 - Optionally include a summary of what was implemented (phases and key files).
 
 **If gaps exist:**
+
 - Report which steps are incomplete or missing, with specific evidence (expected vs actual).
 - **Do NOT implement fixes.** Instead, create a remediation sub-plan:
   1. Find the latest plan file (find-latest-plan pattern). If none exists, create a new datetime-suffixed plan file.
@@ -54,11 +56,13 @@ For every phase and step in the plan:
   - Ordered steps to close each gap, referencing exact file paths.
   - Any dependencies between remediation steps.
   - The `current-step` set to the first gap's phase number.
+
 - Then stop. Present the verification findings and the remediation plan to the user. Remind them to run `/implement-plan` to execute the remediation.
 
 ### 4. Output format
 
 **Success output:**
+
 ```
 ## Verification result: OK
 
@@ -70,6 +74,7 @@ Plan "<title>" is fully implemented.
 ```
 
 **Gap output:**
+
 ```
 ## Verification result: GAPS FOUND
 

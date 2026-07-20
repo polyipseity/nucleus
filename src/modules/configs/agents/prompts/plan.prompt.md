@@ -15,6 +15,7 @@ If the user's message that triggered this prompt contains "implement", "do it", 
 ## Input
 
 The user provides either:
+
 - A task description → create a new plan from scratch.
 - An update request (`Update: ...`) → modify the existing plan. Assume the existing plan was sound and apply the requested changes.
 
@@ -83,6 +84,7 @@ When the user requests an update to an existing plan:
 ### 4. Output
 
 Present the final plan in your response and stop. Do NOT proceed to implementation.
+
 - Brief summary and key design decisions.
 - Key phases and their rationale.
 - Estimated complexity or risks.

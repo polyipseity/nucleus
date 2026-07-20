@@ -32,6 +32,7 @@ If the user's message that triggered this prompt contains "only plan", "only res
 
      <plan content>
      ```
+
    - **Primary approach — store directly in session memory.** This is the only mechanism that survives context compaction:
      1. Generate an ISO datetime in UTC: run `date -u +%Y-%m-%dT%H%M%S` (produces e.g. `2026-07-20T212315`).
      2. Construct the path as `/memories/session/plan-<datetime>.md` and resolve it via `resolve_memory_file_uri`.

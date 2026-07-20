@@ -48,10 +48,12 @@ For every phase and step in the plan, determine what needs verification and sear
 ### 3. Report or approve
 
 **If all steps check out:**
+
 - Report: "Plan verified — no issues found."
 - Optionally include a summary of what was researched.
 
 **If issues are found:**
+
 - Report which steps have problems with specific evidence (include URLs or search result summaries).
 - Classify each issue:
   - **Blocking** — will prevent implementation from working correctly.
@@ -63,6 +65,7 @@ For every phase and step in the plan, determine what needs verification and sear
 ### 4. Output format
 
 **Success output:**
+
 ```
 ## Verification result: OK
 
@@ -74,6 +77,7 @@ Plan "<title>" verified — no issues found.
 ```
 
 **Issues found output:**
+
 ```
 ## Verification result: Issues found
 
