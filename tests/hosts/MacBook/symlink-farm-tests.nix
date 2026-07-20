@@ -27,12 +27,16 @@ assert lib.hasInfix "git" appleSdkToolsNix;
 assert lib.hasInfix "FARM_DIR" symlinkFarmSh;
 assert lib.hasInfix "FARM_MARKER" symlinkFarmSh;
 assert lib.hasInfix "active_symlinks" symlinkFarmSh;
-assert lib.hasInfix "first-run GC" symlinkFarmSh;
-assert lib.hasInfix "GC removed" symlinkFarmSh;
-assert lib.hasInfix "/nix/store/*" symlinkFarmSh;
+assert lib.hasInfix "_log" symlinkFarmSh;
+assert lib.hasInfix "LOG_FILE" symlinkFarmSh;
+assert lib.hasInfix "NUCLEUS_VERBOSE" symlinkFarmSh;
+assert lib.hasInfix "active symlinks" symlinkFarmSh;
 
 # Safety guarantees: only removes symlinks
 assert lib.hasInfix "-L \"$link" symlinkFarmSh || lib.hasInfix "-L \"\\$link" symlinkFarmSh;
+
+# References the Nix store path guard
+assert lib.hasInfix "/nix/store/*" symlinkFarmSh;
 
 {
   success = true;

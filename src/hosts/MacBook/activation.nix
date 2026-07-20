@@ -148,6 +148,8 @@ in
     # via PATH directly (without xcrun).  Only operates on Nix store symlinks
     # and leaves regular files and non-Nix symlinks untouched.
     __nucleus_symlink_farm="${symlinkFarmEntries}"
+    LOG_FILE="${config.nucleus.logging.systemLogDir}/symlink-farm.log"
+    export LOG_FILE
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-symlink-farm.sh}
 
     # ---- configureBatteryPolicy ------------------------------------------------
