@@ -191,9 +191,7 @@ let
     text = ''
       #!${pkgs.bash}/bin/bash
       set -eu
-    ''
-    + (builtins.readFile ../scripts/lib/macos-icloud-exclusions-lib.sh)
-    + ''
+      ${builtins.readFile ../scripts/lib/macos-icloud-exclusions-lib.sh}
       apply_exclusions "${pkgs.jq}/bin/jq" "${pkgs.findutils}/bin/find" ${lib.escapeShellArg icloudExcludedDirsJson} ${lib.escapeShellArg icloudManagedRootsJson}
     '';
   };
