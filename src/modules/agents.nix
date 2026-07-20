@@ -34,31 +34,31 @@ in
   };
 
   home.activation.unprotectOpencodeSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] (
-    builtins.readFile ../scripts/agents/agents-unprotect-opencode-symlinks.sh
+    builtins.readFile ../scripts/agents/unprotect-opencode-symlinks.sh
   );
 
   home.activation.protectOpencodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-    builtins.readFile ../scripts/agents/agents-protect-opencode-symlinks.sh
+    builtins.readFile ../scripts/agents/protect-opencode-symlinks.sh
   );
 
   # Method 4 (activation script manages whole-directory symlinks): the agents/
-  # config directory is deployed via agents-symlink.sh which creates per-entry
+  # config directory is deployed via symlink-agent-config.sh which creates per-entry
   # symlinks in ~/.agents/. No Nix-level deployment needed — the scripts read
   # directly from the repo tree at activation time.
   home.activation = {
     # -------------------------------------------------------------------------
-    # agents-symlink
+    # symlink-agent-config
     # Creates ~/.agents/ as a real directory and populates it with per-entry
     # symlinks for every top-level entry in src/modules/configs/agents/ except
-    # skills/ (which is managed by agent-skills so fetched ClawHub downloads
+    # skills/ (which is managed by install-agent-skills so fetched ClawHub downloads
     # land in a real, untracked directory rather than inside the repo tree).
     # -------------------------------------------------------------------------
-    agents-symlink = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      builtins.readFile ../scripts/agents/agents-symlink.sh
+    symlink-agent-config = lib.hm.dag.entryAfter [ "linkGeneration" ] (
+      builtins.readFile ../scripts/agents/symlink-agent-config.sh
     );
 
     # -------------------------------------------------------------------------
-    # agent-skills
+    # install-agent-skills
     # Creates ~/.agents/skills/ as a real (writable) directory, then creates a
     # per-skill symlink inside it for every skill subdirectory committed to
     # src/modules/configs/agents/skills/ (bundled / AGPL-compatible skills).
@@ -77,8 +77,8 @@ in
     # directory in ~/.agents/skills/ (e.g. a fetched download), the activation
     # fails fast rather than silently overwriting the downloaded content.
     # -------------------------------------------------------------------------
-    agent-skills = lib.hm.dag.entryAfter [ "agents-symlink" ] (
-      builtins.readFile ../scripts/agents/agents-skills.sh
+    install-agent-skills = lib.hm.dag.entryAfter [ "symlink-agent-config" ] (
+      builtins.readFile ../scripts/agents/install-agent-skills.sh
     );
 
     # -------------------------------------------------------------------------
@@ -96,7 +96,7 @@ in
     #   clawhub — fetched skill install vehicle; absent from nixpkgs and
     #             cargo-binstall; bun is the only viable install tier.
     # -------------------------------------------------------------------------
-    installBunPackages = lib.hm.dag.entryAfter [ "agent-skills" ] (
+    installBunPackages = lib.hm.dag.entryAfter [ "install-agent-skills" ] (
       builtins.replaceStrings
         [ "__JQ_BIN__" "__MANAGED_PREPEND_GUARD__" "__MANAGED_APPEND_GUARD__" "__NIX_PROFILE_BIN_DIRS__" ]
         [

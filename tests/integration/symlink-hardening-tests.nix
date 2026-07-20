@@ -41,7 +41,7 @@ rec {
   #               activation name in agents.nix
   # =========================================================================
   skillsProtection =
-    assert containsRegex "agent-skills" agentsText;
+    assert containsRegex "install-agent-skills" agentsText;
     assert containsRegex "_nucleus_protect_symlink" agentsHelpersText;
     assert containsRegex "_nucleus_unprotect_symlink" agentsHelpersText;
     true;

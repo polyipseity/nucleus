@@ -14,8 +14,8 @@
 #   ];
 [
   "agentHostShellConfig"
-  "agent-skills"
-  "agents-symlink"
+  "install-agent-skills"
+  "symlink-agent-config"
   "cloudDrivesSetup"
   "obsidian-merge-json"
   "picard-merge-ini"

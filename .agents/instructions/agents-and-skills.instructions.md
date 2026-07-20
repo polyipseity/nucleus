@@ -12,16 +12,16 @@ The `~/.agents/` directory is the runtime home for all agent configuration, prom
 
 | Path                                  | Owner                                            | Purpose                                                                                            |
 | ------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| `~/.agents/`                          | `agents-symlink` activation                             | Real directory; per-subdir symlinks for every `src/modules/configs/agents/` entry except `skills/` |
-| `~/.agents/skills/`                   | `agent-skills` activation                              | Real directory; per-skill symlinks for bundled skills + real dirs for fetched skills               |
-| `~/.agents/skills/<name>/` (symlink)  | `agent-skills`                                   | Bundled skill committed to `src/modules/configs/agents/skills/<name>/`                             |
+| `~/.agents/`                          | `symlink-agent-config` activation                      | Real directory; per-subdir symlinks for every `src/modules/configs/agents/` entry except `skills/` |
+| `~/.agents/skills/`                   | `install-agent-skills` activation                      | Real directory; per-skill symlinks for bundled skills + real dirs for fetched skills               |
+| `~/.agents/skills/<name>/` (symlink)  | `install-agent-skills`                                 | Bundled skill committed to `src/modules/configs/agents/skills/<name>/`                             |
 | `~/.agents/skills/<name>/` (real dir) | `syncClawHubSkills` / `Sync-AgentsClawHubSkills` | Fetched skill downloaded by ClawHub; contains a `.clawhub/origin.json` marker                      |
 
 The per-subdir layout replaces an older whole-dir symlink scheme. The old scheme forced every clawhub download into the tracked repo tree; the real-dir layout lets the `skills/` subtree be writable without any writes entering Git.
 
 ## Bundled vs. fetched skills
 
-**Bundled**: AGPL-compatible license → commit all skill files to `src/modules/configs/agents/skills/<name>/`. The `agent-skills` activation creates a symlink at `~/.agents/skills/<name>` that points into the store.
+**Bundled**: AGPL-compatible license → commit all skill files to `src/modules/configs/agents/skills/<name>/`. The `install-agent-skills` activation creates a symlink at `~/.agents/skills/<name>` that points into the store.
 
 **Fetched**: non-AGPL-compatible license → never commit; list the skill slug in `src/modules/configs/agents/clawhub-skills.json` under `"skills"`. The `syncClawHubSkills` activation runs the fetched skill convergence logic inline, downloading skills at apply time via the ClawHub CLI.
 
