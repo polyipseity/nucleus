@@ -55,6 +55,7 @@ let
         "__OPENCODE_ZEN_API_KEY_PATH__"
         "__LITELLM_BIN__"
         "__LITELLM_CONFIG__"
+        "__LITELLM_POLL_TIMEOUT__"
       ]
       [
         config.sops.secrets."ai_openrouter_api_key".path
@@ -62,8 +63,9 @@ let
         config.sops.secrets."ai_opencode_zen_api_key".path
         "${pkgs.litellm}/bin/litellm"
         litellmConfig
+        "60"
       ]
-      (builtins.readFile ../../scripts/hosts/MacBook/macos-litellm-daemon.sh)
+      (builtins.readFile ../../scripts/services/litellm-daemon.sh)
   );
 in
 {

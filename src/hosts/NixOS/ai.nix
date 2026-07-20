@@ -39,6 +39,7 @@
             "__OPENCODE_ZEN_API_KEY_PATH__"
             "__LITELLM_BIN__"
             "__LITELLM_CONFIG__"
+            "__LITELLM_POLL_TIMEOUT__"
           ]
           [
             config.sops.secrets."ai_openrouter_api_key".path
@@ -46,8 +47,9 @@
             config.sops.secrets."ai_opencode_zen_api_key".path
             "${pkgs.litellm}/bin/litellm"
             "${config.users.users.${username}.home}/.config/nucleus/litellm-config.yml"
+            "0"
           ]
-          (builtins.readFile ../../scripts/hosts/NixOS/nixos-litellm-wrapper.sh)
+          (builtins.readFile ../../scripts/services/litellm-daemon.sh)
       )}";
       Restart = "always";
       User = "litellm";
