@@ -38,9 +38,8 @@ Before writing or modifying the plan, gather all necessary context:
 
 **Note: write the plan file only — do not implement any of the planned steps.** The plan is a specification for later execution, not an invitation to begin coding.
 
-Create a detailed, step-by-step implementation plan. Write it into session memory at the canonical path that `implement-plan` consumes.
+Create a detailed, step-by-step implementation plan. Write it into a new session memory file with a datetime-suffixed name (see "Create a new plan file" below). Each plan iteration gets its own file; only update an existing file in-place when the changes are extremely small and certain.
 
-- Call `resolve_memory_file_uri("/memories/session/active-plan.md")` to get the resolved path.
 - Write the plan with a lifecycle frontmatter compatible with `implement-plan`:
 
   ```
@@ -72,13 +71,14 @@ Create a detailed, step-by-step implementation plan. Write it into session memor
 
 When the user requests an update to an existing plan:
 
-1. Retrieve the existing plan: `resolve_memory_file_uri("/memories/session/active-plan.md")` → read it.
-2. Assume the existing plan is correct and sound — commit to its structure.
-3. Apply the user's requested changes:
+1. Find the latest plan file (see "Find the latest plan file" below). Read it.
+2. Assess whether the changes are small and confined enough to update in-place. If yes, keep the existing file. If not, create a new datetime-suffixed plan file (see "Create a new plan file" below).
+3. Assume the existing plan is correct and sound — commit to its structure.
+4. Apply the user's requested changes:
    - Add, modify, or reorder phases; refine details.
    - If more research is needed, go back to step 1 and incorporate findings.
-4. Preserve existing frontmatter (`status`, `committed`, `current-step`, `inputs`). Update `inputs` only if the user explicitly requests different settings.
-5. Write the updated plan back to the same session memory path.
+5. Preserve existing frontmatter (`status`, `committed`, `current-step`, `inputs`). Update `inputs` only if the user explicitly requests different settings.
+6. Write the updated plan back.
 
 ### 4. Output
 
@@ -87,6 +87,21 @@ Present the final plan in your response and stop. Do NOT proceed to implementati
 - Key phases and their rationale.
 - Estimated complexity or risks.
 - Reminder: run `/implement-plan` with appropriate arguments to execute it.
+
+## Create a new plan file
+
+1. Generate an ISO datetime in UTC: run `date -u +%Y-%m-%dT%H%M%S` (produces e.g. `2026-07-20T212315`).
+2. Construct the path: `/memories/session/plan-<datetime>.md`.
+3. Call `resolve_memory_file_uri` on that path to get the resolved URI.
+4. Write the plan file there using `create_file`.
+5. Verify with `read_file` — confirm content is nonempty and substantive.
+
+## Find the latest plan file
+
+1. Call `resolve_memory_file_uri("/memories/session/")` to get the base session memory path.
+2. Run `ls -1 <base-path>/plan-*.md 2>/dev/null | sort -r | head -1` in a terminal to find the latest file.
+3. If no files match, report "no active plan found" and stop.
+4. Read the plan file at the returned path.
 
 ## After writing the plan
 
@@ -99,4 +114,4 @@ After writing the plan to session memory and presenting it to the user, stop. Do
 - **Research first, plan second.** Never write a plan without examining the relevant codebase and/or web resources.
 - **Be thorough.** A good plan saves more time in implementation than it costs to produce.
 - **Frontmatter compatibility.** Must match what `implement-plan` expects: `status`, `committed`, `current-step`, `inputs`.
-- **Do not delete the plan file.** It is read by `implement-plan` and `continue`.
+- **Do not delete plan files.** They are read by `implement-plan`, `continue`, `verify-plan`, and `verify-implementation`.
