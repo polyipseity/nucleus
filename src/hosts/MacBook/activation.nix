@@ -236,6 +236,7 @@ in
     # API polling, token auth, diff-and-converge) that Nix's declarative model
     # cannot express.
     NUCLEUS_REPO_ROOT="${repoRoot}"; export NUCLEUS_REPO_ROOT
+    PATH="${pkgs.sops}/bin:$PATH"; export PATH
     ${builtins.readFile ../../scripts/services/jellyfin-sync.sh}
 
     # ---- verifyNucleusServices ---------------------------------------------------

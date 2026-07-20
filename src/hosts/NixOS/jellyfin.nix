@@ -7,7 +7,12 @@
 #
 # Sources:
 # - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
-{ lib, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   jellyfinHttpPort = 8096;
 in
@@ -37,6 +42,7 @@ in
     in
     ''
       NUCLEUS_REPO_ROOT="${repoRoot}"; export NUCLEUS_REPO_ROOT
+      PATH="${pkgs.sops}/bin:$PATH"; export PATH
       ${builtins.readFile ../../scripts/services/jellyfin-sync.sh}
     ''
   );
