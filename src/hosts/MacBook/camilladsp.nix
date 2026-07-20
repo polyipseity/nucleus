@@ -30,7 +30,10 @@ let
         ])
         wsPort
       ]
-      (builtins.readFile ./../../scripts/services/camilladsp-daemon.sh)
+      (
+        (builtins.readFile ./../../scripts/lib/require-command-lib.sh) +
+        (builtins.readFile ./../../scripts/services/camilladsp-daemon.sh)
+      )
   );
 
   camilladspHeartbeat = pkgs.writeShellScript "camilladsp-heartbeat" (
@@ -43,7 +46,10 @@ let
         ])
         wsPort
       ]
-      (builtins.readFile ./../../scripts/services/camilladsp-heartbeat.sh)
+      (
+        (builtins.readFile ./../../scripts/lib/require-command-lib.sh) +
+        (builtins.readFile ./../../scripts/services/camilladsp-heartbeat.sh)
+      )
   );
 
   envVars = import ../../modules/lib/env-catalog.nix {

@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # shellcheck shell=sh
 # Remove stale `result` and `result-*` symlinks left by `nix build`,
 # `nix run ... -o result`, or `nixos-generators`.
@@ -24,6 +23,7 @@ _cnba_dry_run=false
 for _cnba_opt in $_cnba_options; do
   case "$_cnba_opt" in
     --dry-run) _cnba_dry_run=true ;;
+    *) printf '%s\n' "cleanup-nix-build-artifacts: unknown option: $_cnba_opt" >&2; return 1 ;;
   esac
 done
 

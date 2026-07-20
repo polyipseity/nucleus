@@ -249,7 +249,10 @@ let
       builtins.replaceStrings
         [ "__REPO_ROOT__" "__CURRENT_USER_HOME__" "__REPLICA_ID__" ]
         [ repoRoot currentUserHome (lib.escapeShellArg replica.id) ]
-        (builtins.readFile ../scripts/services/replica-scheduled-sync.sh)
+        (
+          (builtins.readFile ../scripts/lib/repo-root-lib.sh) +
+          (builtins.readFile ../scripts/services/replica-scheduled-sync.sh)
+        )
     );
 
   # Canonical scheduled-sync timer mapping. Repository policy mandates 12:00 slots.

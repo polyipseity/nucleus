@@ -1,12 +1,8 @@
 set -eu
 
-# __REPO_ROOT__ is substituted at build time by Nix.  Hard-fail if
-# the token was not substituted.
-_repo_root="__REPO_ROOT__"
-if [ -z "$_repo_root" ] || [ ! -d "$_repo_root" ]; then
-  echo "cloud-drives: __REPO_ROOT__ is empty or not a directory — set NUCLEUS_REPO_ROOT at build time" >&2
-  exit 1
-fi
+# require_repo_root() is provided via repo-root-lib.sh (prepended at build time).
+require_repo_root cloud-drives
+
 _nucleus_replica_cmd="__CURRENT_USER_HOME__/.nix-profile/bin/nucleus-replica-sync"
 if [ ! -x "$_nucleus_replica_cmd" ]; then
   echo "cloud-drives: nucleus replica command not found at $_nucleus_replica_cmd" >&2

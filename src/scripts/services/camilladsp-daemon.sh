@@ -10,13 +10,7 @@ set -euo pipefail
 
 export PATH="__CAMILLADSP_DAEMON_PATH__:$PATH"
 
-# --- Self-contained helpers (avoid lib.sh dependency for daemon context) ---
-require_command() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    printf '%s\n' "error: $1 is required but was not found in PATH" >&2
-    exit 1
-  fi
-}
+# require_command() is provided via require-command-lib.sh (prepended at build time).
 
 nucleus_log_dir() {
   case "$(uname -s)" in
@@ -25,7 +19,6 @@ nucleus_log_dir() {
     *)      printf '%s\n' "${HOME}/.local/state/nucleus/log" ;;
   esac
 }
-# --------------------------------------------------------------------------
 
 # --- Argument parsing ---
 ws_port=__CAMILLADSP_WS_PORT__

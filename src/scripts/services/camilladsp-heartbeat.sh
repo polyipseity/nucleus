@@ -11,14 +11,7 @@ set -euo pipefail
 
 export PATH="__CAMILLADSP_HEARTBEAT_PATH__:$PATH"
 
-# --- Self-contained helpers ---
-require_command() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    printf '%s\n' "error: $1 is required but was not found in PATH" >&2
-    exit 1
-  fi
-}
-# -------------------------------------------------------------------
+# require_command() is provided via require-command-lib.sh (prepended at build time).
 
 # --- Argument parsing ---
 ws_port=__CAMILLADSP_WS_PORT__

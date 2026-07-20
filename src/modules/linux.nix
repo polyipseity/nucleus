@@ -16,7 +16,8 @@ let
   # contexts where NUCLEUS_REPO_ROOT may not be inherited.
   gcWeekly = pkgs.writeShellScript "gc-weekly" (
     builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
-      builtins.readFile ../scripts/services/gc-sweep.sh
+      (builtins.readFile ../scripts/lib/repo-root-lib.sh) +
+      (builtins.readFile ../scripts/services/gc-sweep.sh)
     )
   );
 in
