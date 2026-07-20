@@ -276,8 +276,9 @@ if [ "${#NIX_FILES[@]}" -gt 0 ]; then
   if [ "$_nixf_errors" -gt 0 ]; then
     exit_code=1
     $FAIL_FAST && exit $exit_code
+  else
+    say "nixf-tidy lint passed."
   fi
-  say "nixf-tidy lint passed."
 elif ! $HAS_ARGS; then
   while IFS= read -r -d '' _nixf_file; do
     if ! _nixf_out=$(nixf-tidy < "$_nixf_file" 2>&1); then
@@ -293,8 +294,9 @@ elif ! $HAS_ARGS; then
   if [ "$_nixf_errors" -gt 0 ]; then
     exit_code=1
     $FAIL_FAST && exit $exit_code
+  else
+    say "nixf-tidy lint passed."
   fi
-  say "nixf-tidy lint passed."
 else
   say "skipping nixf-tidy (no Nix files to check)."
 fi
