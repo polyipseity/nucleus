@@ -89,7 +89,7 @@ let
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;
 
   obsidianMergeJsonPy = pkgs.writeText "obsidian-merge-json.py" (
-    builtins.readFile ../scripts/configs/obsidian-merge-json.py
+    builtins.readFile ../scripts/configs/merge-obsidian-json.py
   );
 
   # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh). Used for
@@ -224,7 +224,7 @@ in
           qtpassModule.qtPassPrimaryIniCommands
           qtpassModule.qtPassSecondaryIniCommands
         ]
-        (builtins.readFile ../scripts/configs/qtpass-merge-ini.sh)
+        (builtins.readFile ../scripts/configs/merge-qtpass-ini.sh)
     );
 
     # Picard reads native INI settings from ~/.config/MusicBrainz/Picard.ini
@@ -240,7 +240,7 @@ in
       builtins.replaceStrings
         [ "__AWK_PATH__" "__PICARD_DEFAULTS_INI__" "__PICARD_OVERRIDE_COMMANDS__" ]
         [ "${pkgs.gawk}/bin/awk" (lib.escapeShellArg picardDefaultsIniText) picardOverrideCommands ]
-        (builtins.readFile ../scripts/configs/picard-merge-ini.sh)
+        (builtins.readFile ../scripts/configs/merge-picard-ini.sh)
     );
 
     # Obsidian stores app-global settings in obsidian.json alongside dynamic
@@ -261,7 +261,7 @@ in
           "${obsidianMergeJsonPy}"
           (lib.escapeShellArg obsidianManagedSettingsJson)
         ]
-        (builtins.readFile ../scripts/configs/obsidian-merge-json.sh)
+        (builtins.readFile ../scripts/configs/merge-obsidian-json.sh)
     );
 
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
