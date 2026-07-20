@@ -317,7 +317,7 @@ Examples with their extracted helpers:
 
 - `devSpotlightExclusions` → `dev-spotlight-exclusions.sh` (find predicate stays in Nix)
 - `icloudExclusionsScript` → `icloud-exclusions-lib.sh` (JSON args via env vars)
-- `wallpaper-provision` per-wallpaper loop → `wallpaper-provision.sh`
+- `wallpaper-provision` per-wallpaper loop → `provision-wallpaper.sh`
 - `installBunPackages` entry iteration → `home/install-bun-packages.sh`
 - `devReposProvision` per-repo loop → `dev-repos-provision-lib.sh`
 - `macos-gui-env-path` PATH dedup → `gui-env-agent.sh` + `macos-gui-env-path.sh`

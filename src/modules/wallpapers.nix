@@ -124,6 +124,6 @@ in
         currentUsername
         config.sops.defaultSymlinkPath
       ]
-      (builtins.readFile ../scripts/wallpaper-provision.sh)
+      (builtins.readFile ../scripts/provision-wallpaper.sh)
   );
 }

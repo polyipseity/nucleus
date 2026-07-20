@@ -22,12 +22,12 @@ lock_wallpaper_dir() {
   fi
 
   if ! chmod 555 "$_pictures_dir"; then
-    echo "wallpaper-provision: failed to set read-only mode on wallpaper directory $_pictures_dir." >&2
+    echo "provision-wallpaper: failed to set read-only mode on wallpaper directory $_pictures_dir." >&2
     return 1
   fi
 
   if ! /usr/bin/chflags uchg "$_pictures_dir"; then
-    echo "wallpaper-provision: failed to set immutable flag on wallpaper directory $_pictures_dir." >&2
+    echo "provision-wallpaper: failed to set immutable flag on wallpaper directory $_pictures_dir." >&2
     return 1
   fi
 
@@ -37,7 +37,7 @@ lock_wallpaper_dir() {
 fail_wallpaper_provision() {
   echo "$1" >&2
   if ! lock_wallpaper_dir; then
-    echo "wallpaper-provision: failed to re-lock wallpaper directory after an earlier error." >&2
+    echo "provision-wallpaper: failed to re-lock wallpaper directory after an earlier error." >&2
   fi
   exit 1
 }
@@ -46,22 +46,22 @@ wallpaper_pre_copy_setup() {
   # Refuse to operate on symlinks or non-directories to avoid writing or
   # deleting outside the intended managed wallpaper location.
   if [ -L "$_pictures_dir" ]; then
-    fail_wallpaper_provision "wallpaper-provision: wallpaper directory path $_pictures_dir is a symlink; refusing to manage wallpapers there."
+    fail_wallpaper_provision "provision-wallpaper: wallpaper directory path $_pictures_dir is a symlink; refusing to manage wallpapers there."
   fi
 
   if [ -e "$_pictures_dir" ] && [ ! -d "$_pictures_dir" ]; then
-    fail_wallpaper_provision "wallpaper-provision: wallpaper path $_pictures_dir exists but is not a directory."
+    fail_wallpaper_provision "provision-wallpaper: wallpaper path $_pictures_dir exists but is not a directory."
   fi
 
   # Keep the managed wallpaper directory mutable only during activation so
   # users/apps cannot accidentally delete or rename it between runs.
   if [ "$_is_darwin" -eq 1 ] && [ -d "$_pictures_dir" ]; then
     if ! /usr/bin/chflags nouchg "$_pictures_dir"; then
-      fail_wallpaper_provision "wallpaper-provision: failed to clear immutable flag on wallpaper directory $_pictures_dir."
+      fail_wallpaper_provision "provision-wallpaper: failed to clear immutable flag on wallpaper directory $_pictures_dir."
     fi
 
     if ! chmod 755 "$_pictures_dir"; then
-      fail_wallpaper_provision "wallpaper-provision: failed to restore writable mode on wallpaper directory $_pictures_dir before managed updates."
+      fail_wallpaper_provision "provision-wallpaper: failed to restore writable mode on wallpaper directory $_pictures_dir before managed updates."
     fi
   fi
 
@@ -69,7 +69,7 @@ wallpaper_pre_copy_setup() {
   chmod 755 "$_pictures_dir"
   if [ "$_is_darwin" -eq 1 ]; then
     if ! /usr/bin/chflags nouchg "$_pictures_dir"; then
-      fail_wallpaper_provision "wallpaper-provision: failed to clear immutable flag on wallpaper directory $_pictures_dir after create."
+      fail_wallpaper_provision "provision-wallpaper: failed to clear immutable flag on wallpaper directory $_pictures_dir after create."
     fi
   fi
 }
@@ -90,7 +90,7 @@ wallpaper_provision_copy_items() {
     _targetFile="$_pictures_dir/$_wallpaperName"
 
     if [ ! -f "$_secretPath" ]; then
-      echo "wallpaper-provision: missing decrypted secret at $_secretPath; cannot apply wallpaper gallery." >&2
+      echo "provision-wallpaper: missing decrypted secret at $_secretPath; cannot apply wallpaper gallery." >&2
       _nucleus_wp_failed=1
       break
     fi
@@ -98,7 +98,7 @@ wallpaper_provision_copy_items() {
     case "$_targetFile" in
       "$_pictures_dir"/*) ;;
       *)
-        echo "wallpaper-provision: refusing to write wallpaper outside $_pictures_dir: $_targetFile" >&2
+        echo "provision-wallpaper: refusing to write wallpaper outside $_pictures_dir: $_targetFile" >&2
         _nucleus_wp_failed=1
         break
         ;;
@@ -132,7 +132,7 @@ wallpaper_post_copy_teardown() {
     baseName="$(basename "$decryptedFile")"
     if [ ! -e "${_wallpapers_dir}/${_current_user}/$baseName.sops" ]; then
       rm -f "$decryptedFile"
-      echo "wallpaper-provision: removed stale wallpaper $baseName (no matching .sops source)."
+      echo "provision-wallpaper: removed stale wallpaper $baseName (no matching .sops source)."
     fi
   done
 
@@ -153,7 +153,7 @@ wallpaper_post_copy_teardown() {
   done
 
   if [ "$hasWallpapers" -ne 1 ]; then
-    fail_wallpaper_provision "wallpaper-provision: no decrypted wallpapers found in $_pictures_dir; cannot apply wallpaper gallery."
+    fail_wallpaper_provision "provision-wallpaper: no decrypted wallpapers found in $_pictures_dir; cannot apply wallpaper gallery."
   fi
 
   if [ "$_is_darwin" -eq 1 ]; then
@@ -163,12 +163,12 @@ wallpaper_post_copy_teardown() {
     desktopprTarget="$resolvedPicturesDir/."
 
     if [ ! -x "$_desktoppr_bin" ]; then
-      fail_wallpaper_provision "wallpaper-provision: desktoppr is not executable at $_desktoppr_bin; cannot set macOS wallpaper gallery."
+      fail_wallpaper_provision "provision-wallpaper: desktoppr is not executable at $_desktoppr_bin; cannot set macOS wallpaper gallery."
     elif [ ! -d "$resolvedPicturesDir" ]; then
-      fail_wallpaper_provision "wallpaper-provision: resolved wallpaper directory is not a folder: $resolvedPicturesDir"
+      fail_wallpaper_provision "provision-wallpaper: resolved wallpaper directory is not a folder: $resolvedPicturesDir"
     else
       if ! "$_desktoppr_bin" all "$desktopprTarget"; then
-        fail_wallpaper_provision "wallpaper-provision: desktoppr failed to set wallpaper directory $desktopprTarget."
+        fail_wallpaper_provision "provision-wallpaper: desktoppr failed to set wallpaper directory $desktopprTarget."
       fi
     fi
   elif command -v gsettings >/dev/null 2>&1; then
@@ -210,11 +210,11 @@ wallpaper_post_copy_teardown() {
     chmod 444 "$_xml_tmp_final"
     mv "$_xml_tmp_final" "$xmlFile"
     if ! gsettings set org.gnome.desktop.background picture-uri "file://$xmlFile"; then
-      fail_wallpaper_provision "wallpaper-provision: failed to set GNOME picture-uri to wallpaper gallery XML."
+      fail_wallpaper_provision "provision-wallpaper: failed to set GNOME picture-uri to wallpaper gallery XML."
     fi
 
     if ! gsettings set org.gnome.desktop.background picture-uri-dark "file://$xmlFile"; then
-      fail_wallpaper_provision "wallpaper-provision: failed to set GNOME picture-uri-dark to wallpaper gallery XML."
+      fail_wallpaper_provision "provision-wallpaper: failed to set GNOME picture-uri-dark to wallpaper gallery XML."
     fi
     rm -f "$tmpXml"
   fi
