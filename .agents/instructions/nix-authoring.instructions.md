@@ -58,6 +58,13 @@ libraries (e.g. scripts executed for their side effects, like
 `src/scripts/hosts/MacBook/macos-configure-preflight-privacy.sh`). These may be run
 directly via `builtins.readFile` without an import wrapper.
 
+A second exception covers **thin library wrappers** (scripts that only source a
+library and call functions, with no loops or conditionals): embed the library
+via `${builtins.readFile <lib-path>}` in the activation block and call the
+functions inline. This is already practiced in `macos.nix`, `home.nix`, and
+`config-utils.nix` (see `scripts-and-permissions.instructions.md` — "When a
+script needs its own file" for the full policy).
+
 ## Module conventions
 
 - Shared modules must guard NixOS-only options with `lib.mkIf` checks on `options ? environment` or equivalent; Home Manager modules must likewise guard `home.*` options.
