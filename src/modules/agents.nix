@@ -78,7 +78,7 @@ in
     # fails fast rather than silently overwriting the downloaded content.
     # -------------------------------------------------------------------------
     agent-skills = lib.hm.dag.entryAfter [ "agents-symlink" ] (
-      builtins.readFile ../scripts/agents/agent-skills.sh
+      builtins.readFile ../scripts/agents/agents-skills.sh
     );
 
     # -------------------------------------------------------------------------
