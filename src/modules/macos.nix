@@ -511,7 +511,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # in-session flush but a full restart is required for order to appear correctly.
     # Source: https://github.com/mosen/mysides
     configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      ${builtins.readFile ../scripts/lib/macos-finder-sidebar.sh}
+      ${builtins.readFile ../scripts/lib/macos-finder-sidebar-lib.sh}
       finder_configure_sidebar ${lib.escapeShellArg (builtins.toJSON finderSidebar.finderSidebarManagedFavorites)} "${pkgs.jq}/bin/jq" "${pkgs.mysides}/bin/mysides" ${lib.escapeShellArg finderSidebar.finderSidebarExpectedOrder} ${toString finderSidebar.finderSidebarManagedCount}
     '';
 
@@ -528,7 +528,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       ${builtins.readFile ../scripts/lib/macos-launch-services-lib.sh}
       refresh_desktop_services
 
-      ${builtins.readFile ../scripts/lib/macos-finder-sidebar.sh}
+      ${builtins.readFile ../scripts/lib/macos-finder-sidebar-lib.sh}
       _mysides_bin="${pkgs.mysides}/bin/mysides"
       if [ -x "$_mysides_bin" ]; then
         finder_reconcile_best_effort ${lib.escapeShellArg (builtins.toJSON finderSidebar.finderSidebarManagedFavorites)} "${pkgs.jq}/bin/jq" "$_mysides_bin"

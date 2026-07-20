@@ -269,14 +269,14 @@ in
     home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       set -eu
       ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-      ${builtins.readFile ../scripts/lib/manage-out-of-store-symlinks.sh}
+      ${builtins.readFile ../scripts/lib/manage-out-of-store-symlinks-lib.sh}
       _nucleus_unprotect_managed_paths "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
     '';
 
     home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
       ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-      ${builtins.readFile ../scripts/lib/manage-out-of-store-symlinks.sh}
+      ${builtins.readFile ../scripts/lib/manage-out-of-store-symlinks-lib.sh}
       _nucleus_protect_managed_paths "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
     '';
 
