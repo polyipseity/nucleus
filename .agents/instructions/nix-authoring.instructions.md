@@ -64,6 +64,7 @@ via `${builtins.readFile <lib-path>}` in the activation block and call the
 functions inline. This is already practiced in `macos.nix`, `home.nix`, and
 `config-utils.nix` (see `scripts-and-permissions.instructions.md` — "When a
 script needs its own file" for the full policy).
+
 ## Activation script value injection
 
 When injecting Nix-evaluated values (store paths, JSON, repo root) into
@@ -114,6 +115,7 @@ fi
 See `src/scripts/services/jellyfin-sync.sh` and its callers
 (`src/hosts/MacBook/activation.nix`, `src/hosts/NixOS/jellyfin.nix`) for the
 canonical implementation.
+
 ## Module conventions
 
 - Shared modules must guard NixOS-only options with `lib.mkIf` checks on `options ? environment` or equivalent; Home Manager modules must likewise guard `home.*` options.
