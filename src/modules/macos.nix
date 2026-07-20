@@ -341,7 +341,20 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # now handled declaratively in defaults.nix via CustomUserPreferences.
     # -------------------------------------------------------------------------
     input-config = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-configure-input.sh}
+      # Configure input method settings and disable conflicting hotkeys.
+      set -eu
+
+      # Source: symbolic hotkey values are persisted in
+      # com.apple.symbolichotkeys/AppleSymbolicHotKeys via defaults(1).
+      # https://www.manpagez.com/man/1/defaults/
+      if ! /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 176 "<dict><key>enabled</key><false/></dict>"; then
+        echo "macos: failed to update symbolic hotkey 176." >&2
+      fi
+
+      if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
+        echo "macos: activateSettings -u failed; input settings may apply on next login." >&2
+      fi
+
       ${builtins.readFile ../scripts/lib/macos-launch-services-lib.sh}
       refresh_tiswitcher
     '';
@@ -356,7 +369,15 @@ lib.mkIf pkgs.stdenv.isDarwin {
       "input-config"
       "safari-defaults"
       "universal-access-defaults"
-    ] (builtins.readFile ../scripts/hosts/MacBook/macos-reload-user-prefs.sh);
+    ] ''
+      # Reload macOS user preference state after all managed defaults writes.
+      # Without this, cfprefsd and related daemons hold stale values in memory
+      # until logout/login.
+      set -eu
+      if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
+        echo "macos: activateSettings -u failed; some preference updates may require relogin." >&2
+      fi
+    '';
 
     # -------------------------------------------------------------------------
     # linearmouse-config
@@ -489,9 +510,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # state, while the macOS-only cleanup/indexing steps below are session-side
     # maintenance concerns.
     # -------------------------------------------------------------------------
-    provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.readFile ../scripts/configs/provision-dev-directory.sh
-    );
+    provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      mkdir -p "$HOME/dev"
+    '';
 
     # -------------------------------------------------------------------------
     # reloadDockPreferenceState

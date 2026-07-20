@@ -136,7 +136,16 @@ in
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-charge-limit.sh}
 
     # ---- configureSshAccess -----------------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-configure-ssh-access.sh}
+    # Allow all users to connect via SSH by removing the macOS access-control
+    # group. When com.apple.access_ssh does not exist, sshd allows any user
+    # (subject to sshd_config AllowUsers/AllowGroups).
+    # See: System Settings → General → Sharing → Remote Login → (i) → "Allow
+    # access for: All Users"
+    if /usr/sbin/dseditgroup -o delete -q com.apple.access_ssh 2>/dev/null; then
+      echo "ssh: removed com.apple.access_ssh group; all users can now connect via SSH."
+    else
+      echo "ssh: com.apple.access_ssh group does not exist (already allowing all users)." >&2
+    fi
 
     # ---- configureMiddleClick -------------------------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-enable-middle-click.sh}
@@ -151,7 +160,19 @@ in
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-configure-mission-control.sh}
 
     # ---- configureMonitorColorProfile ------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-configure-color-profile.sh}
+    # Clears the ColorSync device-profile cache so that newly connected monitors
+    # re-trigger profile detection and pick up the correct ICC profile.
+    # ColorSync is a macOS-only subsystem; NixOS uses colord for ICC profile
+    # management (handled by GNOME) and Windows has its own Color Management
+    # subsystem — neither requires an equivalent cache-clearing step here.
+    # Guard with a file-existence check: on fresh installs or machines with no
+    # custom color profile the plist never exists, and `defaults delete` on a
+    # missing domain emits a noisy "Domain not found" error that is neither a
+    # real failure nor actionable.  Using [ -f ] avoids that entirely — if the
+    # file is present we delete it; if not, there is nothing to do.
+    if [ -f /Library/Preferences/com.apple.ColorSync.DeviceCache.plist ]; then
+      /usr/bin/defaults delete /Library/Preferences/com.apple.ColorSync.DeviceCache
+    fi
 
     # ---- clearFinderCache -------------------------------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-clear-finder-cache.sh}

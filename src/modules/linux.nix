@@ -188,9 +188,9 @@ lib.mkIf pkgs.stdenv.isLinux {
     # configureSystemHardening behaviour.  VS Code workspace trust and editor
     # tooling rely on the directory existing on all hosts.
     # -----------------------------------------------------------------------
-    provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.readFile ../scripts/configs/provision-dev-directory.sh
-    );
+    provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      mkdir -p "$HOME/dev"
+    '';
 
   };
 
