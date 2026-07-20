@@ -210,9 +210,10 @@ let
   # rebuild when the DB was updated within the past 6 days keeps normal
   # apply runs fast.
   nixIndexUpdate = pkgs.writeShellScript "nix-index-update" (
-    builtins.replaceStrings [ "__NIX_INDEX_BIN__" ] [ "${pkgs.nix-index}/bin/nix-index" ] (
-      builtins.readFile ../scripts/hosts/MacBook/macos-nix-index-update.sh
-    )
+    builtins.replaceStrings
+      [ "__NIX_INDEX_BIN__" "__NIX_INDEX_MAX_AGE_DAYS__" ]
+      [ "${pkgs.nix-index}/bin/nix-index" "6" ]
+      (builtins.readFile ../scripts/packages/nix-index-update.sh)
   );
 
   # Directory names inside ~/dev whose contents should stay out of Spotlight.

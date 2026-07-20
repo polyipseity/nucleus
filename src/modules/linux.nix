@@ -176,9 +176,10 @@ lib.mkIf pkgs.stdenv.isLinux {
     # subsequent provision run serve as implicit follow-up checks.
     # -----------------------------------------------------------------------
     buildNixIndex = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.replaceStrings [ "__NIX_INDEX_BIN__" ] [ "${pkgs.nix-index}/bin/nix-index" ] (
-        builtins.readFile ../scripts/hosts/NixOS/nixos-build-nix-index.sh
-      )
+      builtins.replaceStrings
+        [ "__NIX_INDEX_BIN__" "__NIX_INDEX_MAX_AGE_DAYS__" ]
+        [ "${pkgs.nix-index}/bin/nix-index" "" ]
+        (builtins.readFile ../scripts/packages/nix-index-update.sh)
     );
 
     # -----------------------------------------------------------------------
