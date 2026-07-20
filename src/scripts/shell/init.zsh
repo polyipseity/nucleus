@@ -343,4 +343,48 @@ EOF
   return 1
 }
 
+# Intercept npm/npx/node/corepack invocations.
+# These tools are NOT installed by this repository. The sole JS runtime
+# and package manager is bun.  Users who separately installed Node.js
+# should use bun equivalents instead.
+# No DIRENV_DIR pass-through: no devShell in this repo provides these tools.
+npm() {
+  cat >&2 << 'EOF'
+shell: system-wide npm is not used in this environment.
+         Use bun equivalents instead:
+         - bun install     (install packages)
+         - bun add <pkg>   (add a dependency)
+         - bun x <cmd>     (run one-shot package commands, replaces npx)
+         - bun run         (run package.json scripts)
+         Shell shortcuts -ni/-nr/-nx also work.
+EOF
+  return 1
+}
+
+npx() {
+  cat >&2 << 'EOF'
+shell: system-wide npx is not used in this environment.
+         Use bun x <cmd> for one-shot package execution instead.
+EOF
+  return 1
+}
+
+node() {
+  cat >&2 << 'EOF'
+shell: system-wide Node.js is not used in this environment.
+         Use bun as the JavaScript runtime instead:
+         - bun <script>   (run a script)
+         - bun run        (run package.json scripts)
+EOF
+  return 1
+}
+
+corepack() {
+  cat >&2 << 'EOF'
+shell: corepack is not used in this environment.
+         Use bun for package management instead.
+EOF
+  return 1
+}
+
 __MACOS_ICLOUD_HOOKS__

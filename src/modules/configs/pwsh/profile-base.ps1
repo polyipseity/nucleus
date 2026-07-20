@@ -499,6 +499,38 @@ function uv {
   return 1
 }
 
+# Intercept npm/npx/node/corepack invocations.
+# These tools are NOT installed by this repository. The sole JS runtime
+# and package manager is bun.  Users who separately installed Node.js
+# should use bun equivalents instead.
+function npm {
+  Write-Host "shell: system-wide npm is not used in this environment." -ForegroundColor Yellow
+  Write-Host "         Use bun equivalents instead:" -ForegroundColor Yellow
+  Write-Host "         - bun install     (install packages)" -ForegroundColor Yellow
+  Write-Host "         - bun add <pkg>   (add a dependency)" -ForegroundColor Yellow
+  Write-Host "         - bun x <cmd>     (run one-shot package commands, replaces npx)" -ForegroundColor Yellow
+  Write-Host "         - bun run         (run package.json scripts)" -ForegroundColor Yellow
+  Write-Host "         Shell shortcuts -ni/-nr/-nx also work." -ForegroundColor Yellow
+  return 1
+}
+function npx {
+  Write-Host "shell: system-wide npx is not used in this environment." -ForegroundColor Yellow
+  Write-Host "         Use bun x <cmd> for one-shot package execution instead." -ForegroundColor Yellow
+  return 1
+}
+function node {
+  Write-Host "shell: system-wide Node.js is not used in this environment." -ForegroundColor Yellow
+  Write-Host "         Use bun as the JavaScript runtime instead:" -ForegroundColor Yellow
+  Write-Host "         - bun <script>   (run a script)" -ForegroundColor Yellow
+  Write-Host "         - bun run        (run package.json scripts)" -ForegroundColor Yellow
+  return 1
+}
+function corepack {
+  Write-Host "shell: corepack is not used in this environment." -ForegroundColor Yellow
+  Write-Host "         Use bun for package management instead." -ForegroundColor Yellow
+  return 1
+}
+
 # --- nucleus-* argument completers ---
 # Register argument completers for all nucleus commands to provide
 # tab-completion for subcommands, flags, and dynamic values.
