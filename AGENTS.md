@@ -24,11 +24,13 @@
   - `editors/` — editor-specific scripts (VS Code workspace trust, extension symlink bridge,
     config symlinks, neovim init)
   - `hosts/` — host-specific scripts: `MacBook/` (macOS) and `NixOS/`.
+  - `integrations/` — file-manager and desktop-environment integration scripts
+    (open-host-manual, file-manager-pdf-opt)
   - `agents/` — AI agent setup scripts (agent-skills, agents-symlink, sync-clawhub-skills)
   - **Naming rule**:
     - Files under `hosts/MacBook/` MUST start with `macos-`; entry name = filename.
     - Files under `hosts/NixOS/` MUST start with `nixos-`; entry name = filename.
-    - All other subdirs (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `agents/`): use natural words/phrases; entry name = filename.
+    - All other subdirs (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `agents/`, `integrations/`): use natural words/phrases; entry name = filename.
     - Rule does not apply to runtime-only scripts or wrapped derivations. Library scripts in
       `lib/` that are host-specific MUST still use the host prefix (e.g., `macos-`). Generic
       cross-platform lib scripts may use natural names.
@@ -39,7 +41,7 @@
     2. **Cross-platform scripts → never in `hosts/`.** If a script is cross-platform
        (no OS-specific commands, no host-specific semantics), it must never go under
        `hosts/<Host>/`. It belongs in a non-host folder (`services/`, `configs/`,
-       `packages/`, `editors/`, `lib/`, `secrets/`, `shell/`, `agents/`, or the root
+       `packages/`, `editors/`, `lib/`, `secrets/`, `shell/`, `agents/`, `integrations/`, or the root
        of `src/scripts/`).
     - The `hosts/<Host>/` directory exists for host-specific scripts only.
     - Library scripts (`lib/`) are exempt from the host-specific placement rule — they stay
