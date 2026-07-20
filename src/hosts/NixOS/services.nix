@@ -11,9 +11,13 @@
 }:
 let
   openManualScript = pkgs.writeShellScript "nucleus-open-manual" (
-    builtins.replaceStrings [ "__XDG_OPEN_BIN__" ] [ "${pkgs.xdg-utils}/bin/xdg-open" ] (
-      builtins.readFile ./../../scripts/hosts/NixOS/nixos-open-manual-config.sh
-    )
+    builtins.replaceStrings
+      [ "__MANUAL_OPENER__" "__HOST_MANUAL_PATH__" ]
+      [
+        "${pkgs.xdg-utils}/bin/xdg-open"
+        "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/hosts/NixOS/MANUAL.md"
+      ]
+      (builtins.readFile ./../../scripts/integrations/open-host-manual.sh)
   );
 
   # Ghostscript PDF optimization presets (quality descending).
@@ -34,7 +38,7 @@ let
       builtins.replaceStrings
         [ "__FILE_BIN__" "__GS_PDF_OPT_PRESET__" ]
         [ "${pkgs.file}/bin/file" preset ]
-        (builtins.readFile ./../../scripts/hosts/NixOS/nixos-gs-pdf-opt-nautilus.sh)
+        (builtins.readFile ./../../scripts/integrations/file-manager-pdf-opt.sh)
     );
 
   gsPdfOptNautilusScripts = builtins.listToAttrs (
@@ -49,7 +53,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     # Shared script that Nautilus and Dolphin both invoke
     # Method 1 (writable symlink): repo edits take effect without rebuild.
     ".local/lib/nucleus/open-manual" = {
-      source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/scripts/hosts/NixOS/nixos-open-manual.sh";
+      source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/scripts/integrations/open-host-manual.sh";
       executable = true;
     };
 

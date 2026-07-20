@@ -59,6 +59,9 @@ let
   # avoid parsing issues with spaces in path names.
   workflowsDir = ./automator-workflows;
 
+  # Baked at eval time from NUCLEUS_REPO_ROOT (set by apply.sh).
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+
   # Known list of historically-removed Automator workflows (old workflow naming).
   # When a workflow is removed, add its metadata here and delete its
   # workflow directory and pbs enablement key.
@@ -199,6 +202,19 @@ let
 in
 {
   home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
+
+  # CLI entry: `nucleus-open-manual` on PATH. Uses shared script with token
+  # substitution so the script works without NUCLEUS_REPO_ROOT at runtime.
+  home.file.".local/lib/nucleus/open-manual" = {
+    source = pkgs.writeShellScript "nucleus-open-manual" (
+      builtins.replaceStrings
+        [ "__MANUAL_OPENER__" "__HOST_MANUAL_PATH__" ]
+        [ "/usr/bin/open" "${repoRoot}/src/hosts/MacBook/MANUAL.md" ]
+        (builtins.readFile ../../scripts/integrations/open-host-manual.sh)
+    );
+    executable = true;
+  };
+
   home.activation.deployNucleusAutomatorWorkflows = lib.hm.dag.entryAfter [ "linkGeneration" ] (
     builtins.replaceStrings
       [ "__JQ_BIN__" "__CURRENT_WORKFLOWS_JSON__" "__REMOVED_WORKFLOWS_JSON__" ]
