@@ -1,6 +1,5 @@
 # Picard INI merge orchestration.
-# Tokens: __AWK_PATH__, __PICARD_DEFAULTS_INI__, __PICARD_OVERRIDE_COMMANDS__
-#   (replaced by Nix replaceStrings).
+# Tokens: __AWK_PATH__, __PICARD_OVERRIDE_COMMANDS__
 
 _upsert_ini_key() {
   _conf="$1"
