@@ -1,4 +1,5 @@
 {
+  "$schema": "./replica-gc.schema.json",
   "GoogleDrive": {
     "blockedRoots": [],
     "dirs": [
