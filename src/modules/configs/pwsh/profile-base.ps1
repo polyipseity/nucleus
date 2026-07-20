@@ -199,20 +199,69 @@ if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvaila
   }
 }
 
+# Git shell aliases — mirrors src/modules/shell/aliases.nix
+# Naming conventions:
+# - Prefix = base git command (all `git log` aliases start with `-gl`).
+# - `-gca*` = amend (every alias starting with `-gca` expands to `git commit --amend ...`).
+# - No casing distinction (case-insensitive on Windows).
+# - Double letter = more: more verbose, more forceful, or full form.
 function -g { & git @Args }
 function -ga { & git add @Args }
+function -gap { & git add -p @Args }
 function -gb { & git branch @Args }
+function -gba { & git branch -a @Args }
+function -gbd { & git branch -d @Args }
+function -gbdd { & git branch -D @Args }
+function -gbm { & git branch -m @Args }
 function -gc { & git commit @Args }
 function -gca { & git commit --amend @Args }
+function -gcaa { & git commit -a --amend @Args }
+function -gcam { & git commit --amend -m @Args }
 function -gcl { & git clone @Args }
+function -gclean { & git clean -fdn @Args }
+function -gcleanf { & git clean -fd @Args }
+function -gcm { & git commit -m @Args }
+function -gcma { & git commit -am @Args }
 function -gco { & git checkout @Args }
+function -gcob { & git checkout -b @Args }
 function -gd { & git diff @Args }
+function -gdc { & git diff --cached @Args }
+function -gds { & git diff --stat @Args }
 function -gf { & git fetch @Args }
+function -gfa { & git fetch --all @Args }
+function -gg { & git grep @Args }
 function -gl { & git log --oneline --decorate --graph @Args }
+function -gla { & git log --oneline --decorate --graph --all @Args }
+function -gll { & git log --decorate --graph --show-signature --stat @Args }
+function -glla { & git log --decorate --graph --show-signature --stat --all @Args }
+function -glp { & git log --oneline --decorate --graph -p @Args }
+function -gls { & git log --oneline --decorate --graph --stat @Args }
+function -gm { & git merge @Args }
+function -gma { & git merge --abort @Args }
+function -gmnff { & git merge --no-ff @Args }
 function -gp { & git push @Args }
+function -gpf { & git push --force-with-lease @Args }
+function -gpff { & git push --force @Args }
 function -gpl { & git pull @Args }
+function -gplo { & git pull origin @Args }
+function -gplr { & git pull --rebase @Args }
+function -gpo { & git push origin @Args }
+function -gr { & git remote @Args }
+function -grb { & git rebase @Args }
+function -grba { & git rebase --abort @Args }
+function -grbc { & git rebase --continue @Args }
+function -grbi { & git rebase -i @Args }
+function -grbm { & git rebase main @Args }
+function -grbo { & git rebase --onto @Args }
+function -grbs { & git rebase --skip @Args }
+function -grev { & git revert @Args }
+function -grs { & git reset @Args }
+function -grsh { & git reset --soft HEAD~ @Args }
+function -grshh { & git reset --hard HEAD~ @Args }
+function -grv { & git remote -v @Args }
 # git status in short format with branch info, restored from git history.
 function -gs { & git status -sb @Args }
+function -gsh { & git show @Args }
 
 function Invoke-NucleusGhostscript {
   # undoc-supp: tool-availability guard -- Ghostscript CLI may not be installed
@@ -241,8 +290,17 @@ function -gs-pdf-opt-ebook    { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCo
 function -gs-pdf-opt-prepress { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }
 function -gs-pdf-opt-printer  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }
 function -gs-pdf-opt-screen   { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }
-function -gst { & git status @Args }
+function -gss { & git status @Args }
+function -gst { & git stash push @Args }
+function -gstd { & git stash drop @Args }
+function -gstl { & git stash list @Args }
+function -gstp { & git stash pop @Args }
+function -gstsh { & git stash show -p @Args }
 function -gsw { & git switch @Args }
+function -gswc { & git switch -c @Args }
+function -gt { & git tag @Args }
+function -gtd { & git tag -d @Args }
+function -gtl { & git tag -l @Args }
 
 # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
 # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
