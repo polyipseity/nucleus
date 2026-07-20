@@ -30,6 +30,7 @@ The following tools are installed globally (via nixpkgs / WinGet) for system pac
 | `uv` | nixpkgs / WinGet | `uv tool install` for system-level Python tooling |
 | `prek` | nixpkgs | system-wide Git hook manager binary (invoked by managed shell/apply hooks) |
 | `python` / `pip` | **banned** | no permitted system use; all Python via devShell or uv venv |
+| `npm` / `npx` / `node` / `corepack` | **banned** | no permitted system use; all JS via bun |
 
 Direct developer invocation of any of the above in an interactive shell session must go through a managed development environment rather than the raw system install.
 
@@ -37,8 +38,8 @@ Direct developer invocation of any of the above in an interactive shell session 
 
 Each blocked tool is overridden as a shell function that intercepts the command and prints a helpful error pointing to the devShell.
 
-- **POSIX (zsh)** — `src/modules/shell.nix`: functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`, `pip3` in `programs.zsh.initContent`. Flow: check `$DIRENV_DIR` → invoke devShell-scoped binary → check fallback tool bundle path → error.
-- **POSIX (pwsh)** — `src/modules/pwsh.nix`: equivalent PowerShell functions in `profileContent`, same flow via `$env:DIRENV_DIR` then the fallback tool bundle path.
+- **POSIX (zsh)** — `src/scripts/shell/init.zsh`: functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`, `pip3`, `npm`, `npx`, `node`, `corepack` in `programs.zsh.initContent`. Flow: check `$DIRENV_DIR` → invoke devShell-scoped binary → check fallback tool bundle path → error. Pure educational blocks (`npm`/`npx`/`node`/`corepack`, `pip`/`pip3`, `python`/`python3`) skip the pass-through flow and print a ban message directly.
+- **POSIX (pwsh)** — `src/modules/configs/pwsh/profile-base.ps1`: equivalent PowerShell functions, same flow via `$env:DIRENV_DIR` then the fallback tool bundle path.
 - **Windows (PowerShell)** — `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1`: same functions in the managed block. Pass-through uses `$env:DIRENV_DIR` when present.
 
 User-scope bin dir PATH wiring is declared via `home.sessionPath` (→ `~/.zshenv`), not `initContent` PATH guards. This ensures directories survive direnv deactivation.
@@ -118,6 +119,7 @@ For packages that exist in Homebrew but not in nixpkgs, use `missingNixAttrs` in
 |---|---|---|---|
 | `sudo bun install -g ...` | Admin escalation | Remove `sudo`; use plain `bun install -g` |
 | `pip install --system ...` | System-wide Python | Use `uv tool install` or devShell |
+| `npm install -g` / `npx ...` / `node` (unmanaged) | Untracked JS ecosystem usage | Use `bun install -g` / `bun x` |
 | `npm install -g ...` (unmanaged) | Untracked global package | Use `bun install -g` with manifest tracking |
 | Installing to `/usr/local/bin` | Binary pollution | Use user-level tool directories |
 | `cargo install` in `setup.sh` | Imperative build-time install | Add to devShell or use `cargo-binstall` |
