@@ -42,6 +42,12 @@
     "type": "object"
   },
   "description": "Per-provider GC rules for cloud drive replicas.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to the JSON Schema file that validates this data file.",
+      "type": "string"
+    }
+  },
   "title": "nucleus replica GC config",
   "type": "object"
 }
