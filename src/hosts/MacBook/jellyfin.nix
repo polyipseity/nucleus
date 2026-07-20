@@ -41,7 +41,7 @@ let
         "${config.nucleus.logging.systemLogDir}/jellyfin-app"
         "${pkgs.jellyfin}/bin/jellyfin"
       ]
-      (builtins.readFile ../../scripts/hosts/MacBook/macos-jellyfin-daemon.sh)
+      (builtins.readFile ../../scripts/services/jellyfin-daemon.sh)
   );
 in
 {

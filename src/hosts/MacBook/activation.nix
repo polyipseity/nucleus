@@ -163,7 +163,7 @@ in
     # ---- configureLinearMousePreferences --------------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-linearmouse-prefs.sh}
     # ---- configureGimpScrollSensitivity ---------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-gimp-scroll-sensitivity.sh}
+    ${builtins.readFile ../../scripts/configs/gimp-scroll-sensitivity.sh}
 
     # ---- configureMissionControlSpansDisplays ----------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-mission-control.sh}

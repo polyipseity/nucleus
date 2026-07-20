@@ -50,7 +50,7 @@ in
     builtins.replaceStrings
       [ "__NUCLEUS_SYSTEM_LOG_DIR__" "__NUCLEUS_LOG_SUBDIRS__" ]
       [ "${config.nucleus.logging.systemLogDir}" "${builtins.toString linuxSystemLogDirs}" ]
-      (builtins.readFile ../../scripts/hosts/NixOS/nixos-ensure-log-dirs.sh)
+      (builtins.readFile ../../scripts/services/ensure-log-dirs.sh)
   );
 
   # ---------------------------------------------------------------------------
@@ -84,6 +84,6 @@ in
   # surfaces issues for post-apply investigation.
   # ---------------------------------------------------------------------------
   system.activationScripts."verify-nucleus-services" = lib.mkAfter (
-    builtins.readFile ../../scripts/hosts/NixOS/nixos-verify-nucleus-services.sh
+    builtins.readFile ../../scripts/services/verify-nucleus-services.sh
   );
 }

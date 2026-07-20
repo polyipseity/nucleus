@@ -542,7 +542,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     verifyArchivingStack = lib.hm.dag.entryAfter [ "macos-launch-services" "installPackages" ] (
       builtins.replaceStrings [ "__P7ZIP_BIN__" ] [ "${pkgs.p7zip}/bin/7z" ] (
-        builtins.readFile ../scripts/hosts/MacBook/macos-verify-archiving-stack.sh
+        builtins.readFile ../scripts/packages/verify-archiving-stack.sh
       )
     );
 
