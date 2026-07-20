@@ -252,12 +252,12 @@ let
       (builtins.readFile ../scripts/hosts/MacBook/macos-spotlight-exclusions.sh)
   );
 
-  # Daily Finder metadata cleanup for ~/dev.
+  # Daily .DS_Store cleanup for ~/dev.
   # Kept out of Home Manager activation for the same reason as Spotlight marker
   # maintenance: deleting stale .DS_Store files can take noticeable time on a
   # large checkout and should not slow synchronous apply/bootstrap flows.
   devDsStoreGc = pkgs.writeShellScript "ds-store-gc" (
-    builtins.readFile ../scripts/hosts/MacBook/macos-ds-store-gc.sh
+    builtins.readFile ../scripts/services/ds-store-gc.sh
   );
 
   gcWeekly = pkgs.writeShellScript "gc-weekly" (
@@ -624,10 +624,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
   # --------------------------------------------------------------------------
   # Daily dev-tree maintenance LaunchAgents (macOS-only)
-  # `.DS_Store` cleanup and Spotlight exclusion markers only make sense on
-  # macOS because both mechanisms are Finder/Spotlight-specific filesystem
-  # conventions. Keep them as background launchd jobs instead of activation
-  # hooks so `nix run .#apply` and bootstrap apply stay synchronous only for
+  # .DS_Store cleanup removes stale Finder metadata files from ~/dev.
+  # Spotlight exclusion markers prevent Spotlight from indexing dev trees.
+  # Keep them as background launchd jobs instead of activation hooks so
+  # `nix run .#apply` and bootstrap apply stay synchronous only for
   # configuration work that must happen immediately.
   # --------------------------------------------------------------------------
   launchd.agents."ds-store-gc" = {
