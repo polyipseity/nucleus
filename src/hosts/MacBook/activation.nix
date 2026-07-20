@@ -46,15 +46,6 @@ let
   # resolve the repo checkout root in activation blocks that embed or invoke
   # repo-local scripts.
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
-
-  ensureSystemLogDirs = ''
-    system_log_dir="${config.nucleus.logging.systemLogDir}"
-    for subdir in ${builtins.toString systemLogDirs}; do
-      if ! /bin/mkdir -p "$system_log_dir/$subdir"; then
-        echo "logging: failed to create $system_log_dir/$subdir." >&2
-      fi
-    done
-  '';
 in
 {
   # ---------------------------------------------------------------------------
@@ -82,33 +73,24 @@ in
     # leaving ntfs-3g build with no fuse headers.  Create it pre-emptively.
     /bin/mkdir -p /usr/local/include
 
-    # ---- ensureSystemLogDirs ----------------------------------------------------
-    # Create system log directories for all nucleus launchd daemons before they
-    # start, so launchd can open StandardOutPath / StandardErrorPath files.
-    # Runs in extraActivation (before nix-darwin's launchd step) so the dirs
-    # exist before launchd tries to start daemons.
-    ${ensureSystemLogDirs}
-    # Create user-level log dir for camilladsp/camillagui-backend so launchd can
-    # open stdout/stderr, then chown to the console user so the daemon process
-    # (which runs as that user via UserName) can write to the log files.
-    # undoc-supp: /dev/console may not exist (headless/SSH session); empty result is handled by the [ -n "$_console_user" ] guard.
-    _console_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
-    if [ -n "$_console_user" ] && [ "$_console_user" != "/Users/root" ]; then
-      _username="''${_console_user#/Users/}"
-      for _sub in ${builtins.toString userLogDirs}; do
-        /bin/mkdir -p "$_console_user/Library/Logs/nucleus/$_sub"
-      done
-      /usr/sbin/chown -R "$_username:staff" "$_console_user/Library/Logs/nucleus"
-
-      # Chown system log subdirs used by UserName=polyipseity services so launchd
-      # can create StandardOutPath/StandardErrorPath files as that user.
-      # Services running as root (https-proxy, linux-builder, litellm,
-      # service-watchdog) can write to any dir, so chowning these is safe.
-      for _sub in ${builtins.toString chownLogDirs}; do
-        # undoc-supp: system log subdir may not exist on first apply; best-effort ownership fix for each deployed service.
-        /usr/sbin/chown "$_username:staff" "$system_log_dir/$_sub" 2>/dev/null || true
-      done
-    fi
+    # ---- ensureLogDirs -----------------------------------------------------------
+    # Create system log dirs (all hosts) and macOS-specific user log dirs (console
+    # user + chown). Shared with NixOS via ensure-log-dirs.sh.
+    ${builtins.replaceStrings
+      [
+        "__NUCLEUS_SYSTEM_LOG_DIR__"
+        "__NUCLEUS_LOG_SUBDIRS__"
+        "__NUCLEUS_USER_LOG_SUBDIRS__"
+        "__NUCLEUS_CHOWN_LOG_SUBDIRS__"
+      ]
+      [
+        "${config.nucleus.logging.systemLogDir}"
+        "${builtins.toString systemLogDirs}"
+        "${builtins.toString userLogDirs}"
+        "${builtins.toString chownLogDirs}"
+      ]
+      (builtins.readFile ../../scripts/services/ensure-log-dirs.sh)
+    }
   '';
 
   # ---------------------------------------------------------------------------
@@ -180,10 +162,24 @@ in
     # ---- nvimLauncher -----------------------------------------------------------
     ${builtins.readFile ../../scripts/editors/nvim-launcher.sh}
 
-    # ---- ensureSystemLogDirs (duplicated from extraActivation) -----------------
-    # Also ensure directories exist during postActivation in case the log dir
-    # config changed (systemLogDir is evaluated at activation time).
-    ${ensureSystemLogDirs}
+    # ---- ensureLogDirs (repeated from extraActivation) --------------------------
+    # Also ensure log directories exist during postActivation (belt-and-suspenders
+    # in case systemLogDir was reconfigured at activation time).
+    ${builtins.replaceStrings
+      [
+        "__NUCLEUS_SYSTEM_LOG_DIR__"
+        "__NUCLEUS_LOG_SUBDIRS__"
+        "__NUCLEUS_USER_LOG_SUBDIRS__"
+        "__NUCLEUS_CHOWN_LOG_SUBDIRS__"
+      ]
+      [
+        "${config.nucleus.logging.systemLogDir}"
+        "${builtins.toString systemLogDirs}"
+        "${builtins.toString userLogDirs}"
+        "${builtins.toString chownLogDirs}"
+      ]
+      (builtins.readFile ../../scripts/services/ensure-log-dirs.sh)
+    }
     # undoc-supp: /dev/console may not exist; guards below handle empty/root.
     _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     if [ -n "$_camilladsp_user" ] && [ "$_camilladsp_user" != "/Users/root" ]; then
