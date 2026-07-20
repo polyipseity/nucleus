@@ -1,5 +1,5 @@
 ---
-description: "Verify that a plan from session memory (active-plan.md) is fully implemented. If gaps exist, produce a remediation plan without implementing."
+description: "Verify that the active plan (plan-*.md in session memory) is fully implemented. If gaps exist, produce a remediation plan without implementing."
 name: "verify-implementation"
 argument-hint: "optional: specific phase or file to focus verification on"
 ---
@@ -16,10 +16,12 @@ If the user's message that triggered this prompt contains "implement", "do it", 
 
 ### 1. Retrieve the plan
 
-1. Call `resolve_memory_file_uri("/memories/session/active-plan.md")` to locate the plan.
-2. Read the file at the resolved path.
-3. If the file is missing or empty, report: "No active plan found — nothing to verify." and stop.
-4. Parse the frontmatter for context (`status`, `current-step`, `committed`). Do not short-circuit on any status value — proceed to verify regardless.
+1. Find the latest plan file:
+   - Call `resolve_memory_file_uri("/memories/session/")` to get the base session memory path.
+   - Run `ls -1 <base-path>/plan-*.md 2>/dev/null | sort -r | head -1` in a terminal.
+   - If no files match, report: "No active plan found — nothing to verify." and stop.
+2. Read the plan file at the returned path.
+3. Parse the frontmatter for context (`status`, `current-step`, `committed`). Do not short-circuit on any status value — proceed to verify regardless.
 
 ### 2. Verify completeness
 
@@ -43,7 +45,7 @@ For every phase and step in the plan:
 **If gaps exist:**
 - Report which steps are incomplete or missing, with specific evidence (expected vs actual).
 - **Do NOT implement fixes.** Instead, create a remediation sub-plan:
-  1. Call `resolve_memory_file_uri("/memories/session/active-plan.md")` to get the session memory path.
+  1. Find the latest plan file (find-latest-plan pattern). If none exists, create a new datetime-suffixed plan file.
   2. Read the existing plan, update its `status` back to `in-progress` if it was marked `completed`, and adjust `current-step` to the first failed step.
   3. Write the updated plan back — this preserves the original plan as the single source of truth, augmented with remediation steps.
 
@@ -76,7 +78,7 @@ Plan "<title>" is fully implemented.
 - Phase 2, step 1: `<description>` — file `<path>` does not exist
 
 ### Remediation plan
-Updated active-plan.md with remediation steps. Run `/implement-plan` to execute.
+Updated plan file with remediation steps. Run `/implement-plan` to execute.
 ```
 
 ## Rules
