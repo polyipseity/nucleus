@@ -1,5 +1,5 @@
 ---
-description: "Research a plan from session memory (active-plan.md) using online searches to verify feasibility, accuracy, and risks before implementation."
+description: "Research the active plan (plan-*.md in session memory) using online searches to verify feasibility, accuracy, and risks before implementation."
 name: "verify-plan"
 argument-hint: "optional: specific phase, file, or question to focus research on"
 ---
@@ -16,10 +16,12 @@ If the user's message that triggered this prompt contains "implement", "do it", 
 
 ### 1. Retrieve the plan
 
-1. Call `resolve_memory_file_uri("/memories/session/active-plan.md")` to locate the plan.
-2. Read the file at the resolved path.
-3. If the file is missing or empty, report: "No active plan found — nothing to verify." and stop.
-4. Parse the frontmatter for context (`status`, `current-step`, `committed`).
+1. Find the latest plan file:
+   - Call `resolve_memory_file_uri("/memories/session/")` to get the base session memory path.
+   - Run `ls -1 <base-path>/plan-*.md 2>/dev/null | sort -r | head -1` in a terminal.
+   - If no files match, report: "No active plan found — nothing to verify." and stop.
+2. Read the plan file at the returned path.
+3. Parse the frontmatter for context (`status`, `current-step`, `committed`).
 
 ### 2. Research each phase and step
 
