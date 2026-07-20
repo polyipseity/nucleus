@@ -160,7 +160,7 @@ in
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-disable-spotlight.sh}
 
     # ---- nvimLauncher -----------------------------------------------------------
-    ${builtins.readFile ../../scripts/editors/nvim-launcher.sh}
+    ${builtins.readFile ../../scripts/editors/launch-nvim.sh}
 
     # ---- ensureLogDirs (repeated from extraActivation) --------------------------
     # Also ensure log directories exist during postActivation (belt-and-suspenders

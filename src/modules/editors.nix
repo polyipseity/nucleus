@@ -199,8 +199,8 @@ let
   #
   # The script exits immediately when ~/dev does not yet exist (no-op for
   # edge cases such as a first-run race before provisionDevDirectory completes).
-  vsCodeWorkspaceTrustPy = pkgs.writeText "vscode-workspace-trust.py" (
-    builtins.readFile ../scripts/editors/vscode-workspace-trust.py
+  vsCodeWorkspaceTrustPy = pkgs.writeText "trust-vscode-workspace.py" (
+    builtins.readFile ../scripts/editors/trust-vscode-workspace.py
   );
 
   # Resolve the active managed user record so Neovim settings can follow the
@@ -367,7 +367,7 @@ in
           vsCodeChatLanguageModelsFile
           "${pkgs.jq}/bin/jq"
         ]
-        (builtins.readFile ../scripts/editors/vscode-symlinks.sh)
+        (builtins.readFile ../scripts/editors/symlink-vscode-config.sh)
     );
 
     # -----------------------------------------------------------------------
@@ -385,7 +385,7 @@ in
     # -----------------------------------------------------------------------
     vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] (
       builtins.replaceStrings [ "__EXTENSION_STORE__" ] [ "${extensionStore}" ] (
-        builtins.readFile ../scripts/editors/vscode-extension-bridge.sh
+        builtins.readFile ../scripts/editors/bridge-vscode-extensions.sh
       )
     );
 
@@ -413,7 +413,7 @@ in
       builtins.replaceStrings
         [ "__PYTHON3_BIN__" "__VSCODE_WORKSPACE_TRUST_PY__" ]
         [ "${pkgs.python3}" "${vsCodeWorkspaceTrustPy}" ]
-        (builtins.readFile ../scripts/editors/vscode-workspace-trust.sh)
+        (builtins.readFile ../scripts/editors/trust-vscode-workspace.sh)
     );
   };
 }

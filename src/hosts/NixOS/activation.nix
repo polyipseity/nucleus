@@ -28,7 +28,7 @@ let
 in
 {
   # ---------------------------------------------------------------------------
-  # nixos-nvim-launcher.sh
+  # nixos-launch-nvim.sh
   # Creates a deterministic symlink at /etc/nucleus-bin/nvim that
   # vscode-neovim can use (the extension does not expand ${userHome} or ~).
   # Resolves the nvim path from the home-manager profile directory so that no
@@ -38,7 +38,7 @@ in
     builtins.replaceStrings
       [ "__NUCLEUS_NVIM_PATH__" ]
       [ "${config.home-manager.users.${username}.home.profileDirectory}/bin/nvim" ]
-      (builtins.readFile ../../scripts/editors/nvim-launcher.sh)
+      (builtins.readFile ../../scripts/editors/launch-nvim.sh)
   );
 
   # ---------------------------------------------------------------------------
