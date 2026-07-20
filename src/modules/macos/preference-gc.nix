@@ -68,7 +68,7 @@ in
   managedPreferencesGcScript = pkgs.writeShellScriptBin "gc-managed-user-preferences" ''
     NIX_STORE_BIN="${pkgs.nix}/bin/nix-store"
     MANAGED_PREF_DOMAINS="${builtins.concatStringsSep " " resetUserPreferenceDomains}"
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-preference-gc.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-gc-preferences.sh}
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-refresh-cfprefsd.sh}
 
     echo "Managed preference domains purged. Run your apply flow to re-assert declarative defaults."

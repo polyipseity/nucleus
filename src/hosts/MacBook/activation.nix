@@ -130,28 +130,28 @@ in
     /usr/bin/xcode-select --switch "${pkgs.apple-sdk}"
 
     # ---- configureBatteryPolicy ------------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-battery-policy.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-configure-battery-policy.sh}
 
     # ---- configureChargeLimit --------------------------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-charge-limit.sh}
 
     # ---- configureSshAccess -----------------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-ssh-access.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-configure-ssh-access.sh}
 
     # ---- configureMiddleClick -------------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-middle-click.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-enable-middle-click.sh}
     # ---- configureMountyLoginItem ---------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-mounty-login-item.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-register-mounty-login-item.sh}
     # ---- configureLinearMousePreferences --------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-linearmouse-prefs.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-set-linearmouse-prefs.sh}
     # ---- configureGimpScrollSensitivity ---------------------------------------
     ${builtins.readFile ../../scripts/configs/configure-gimp-scroll-sensitivity.sh}
 
     # ---- configureMissionControlSpansDisplays ----------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-mission-control.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-configure-mission-control.sh}
 
     # ---- configureMonitorColorProfile ------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-color-profile.sh}
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-configure-color-profile.sh}
 
     # ---- clearFinderCache -------------------------------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-clear-finder-cache.sh}
@@ -193,7 +193,7 @@ in
     # Never fails activation.
     ${
       builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
-        builtins.readFile ../../scripts/hosts/MacBook/macos-homebrew-pin-verify.sh
+        builtins.readFile ../../scripts/hosts/MacBook/macos-verify-homebrew-pin.sh
       )
     } || true  # undoc-supp: warning-only version check; must not abort activation even if script errors.
 

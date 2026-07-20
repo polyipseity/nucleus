@@ -197,7 +197,7 @@ let
   };
 
   betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" (
-    builtins.readFile ../scripts/hosts/MacBook/macos-betterdisplay-heartbeat.sh
+    builtins.readFile ../scripts/hosts/MacBook/macos-heartbeat-betterdisplay.sh
   );
 
   # Wrapper script for the nix-index daily database rebuild LaunchAgent.
@@ -249,7 +249,7 @@ let
     builtins.replaceStrings
       [ "__DEV_SPOTLIGHT_FIND_EXPRESSION__" ]
       [ "${devSpotlightExcludedDirectoryFindExpression}" ]
-      (builtins.readFile ../scripts/hosts/MacBook/macos-spotlight-exclusions.sh)
+      (builtins.readFile ../scripts/hosts/MacBook/macos-configure-spotlight-exclusions.sh)
   );
 
   # Daily .DS_Store cleanup for ~/dev.
@@ -275,7 +275,7 @@ let
         (mkManagedDedupSet "$HOME")
         envVars.macOSAllVars
       ]
-      (builtins.readFile ../scripts/hosts/MacBook/macos-gui-env.sh)
+      (builtins.readFile ../scripts/hosts/MacBook/macos-set-gui-env.sh)
   );
 in
 lib.mkIf pkgs.stdenv.isDarwin {
@@ -339,7 +339,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # now handled declaratively in defaults.nix via CustomUserPreferences.
     # -------------------------------------------------------------------------
     input-config = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-input-config.sh}
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-configure-input.sh}
       ${builtins.readFile ../scripts/hosts/MacBook/macos-refresh-tiswitcher.sh}
     '';
 
@@ -366,7 +366,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     linearmouse-config = lib.hm.dag.entryAfter [ "linkGeneration" ] (
       builtins.replaceStrings [ "__REPO_ROOT__" ] [ "${repoRoot}" ] (
-        builtins.readFile ../scripts/hosts/MacBook/macos-linearmouse-config.sh
+        builtins.readFile ../scripts/hosts/MacBook/macos-configure-linearmouse.sh
       )
     );
 
@@ -399,7 +399,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # additional English tokens without changing the system UI language.
     # -------------------------------------------------------------------------
     raycast-aliases = lib.hm.dag.entryAfter [ "macos-launch-services" ] (
-      builtins.readFile ../scripts/hosts/MacBook/macos-raycast-aliases.sh
+      builtins.readFile ../scripts/hosts/MacBook/macos-install-raycast-aliases.sh
     );
 
     # -------------------------------------------------------------------------
@@ -414,7 +414,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Source: https://github.com/smudge/nightlight
     # -------------------------------------------------------------------------
     nightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      builtins.readFile ../scripts/hosts/MacBook/macos-nightlight.sh
+      builtins.readFile ../scripts/hosts/MacBook/macos-install-nightlight.sh
     );
 
     # -------------------------------------------------------------------------
@@ -452,7 +452,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     preflightPrivacyPermissions = lib.hm.dag.entryAfter [ "writeBoundary" ] (
       builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
-        builtins.readFile ../scripts/hosts/MacBook/macos-preflight-privacy.sh
+        builtins.readFile ../scripts/hosts/MacBook/macos-configure-preflight-privacy.sh
       )
     );
 
@@ -464,7 +464,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # hardening remains declarative without breaking `darwin-rebuild switch`.
     # -------------------------------------------------------------------------
     safari-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
-      builtins.readFile ../scripts/hosts/MacBook/macos-safari-defaults.sh
+      builtins.readFile ../scripts/hosts/MacBook/macos-configure-safari-defaults.sh
     );
 
     # -------------------------------------------------------------------------
@@ -474,7 +474,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # user activation phase to keep accessibility intent without system errors.
     # -------------------------------------------------------------------------
     universal-access-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
-      builtins.readFile ../scripts/hosts/MacBook/macos-universal-access-defaults.sh
+      builtins.readFile ../scripts/hosts/MacBook/macos-configure-universal-access.sh
     );
 
     # -------------------------------------------------------------------------
@@ -566,7 +566,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if BetterDisplay is not installed.
     # -------------------------------------------------------------------------
     macos-headless-display = lib.hm.dag.entryAfter [ "nightlight" ] (
-      builtins.readFile ../scripts/hosts/MacBook/macos-headless-display.sh
+      builtins.readFile ../scripts/hosts/MacBook/macos-configure-headless-display.sh
     );
   };
 
@@ -801,7 +801,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         envVars.macOSAllVars
         (managedPaths.toLaunchctlConfigPath config.home.homeDirectory)
       ]
-      (builtins.readFile ../scripts/hosts/MacBook/macos-gui-env-path.sh)
+      (builtins.readFile ../scripts/hosts/MacBook/macos-set-gui-env-path.sh)
   );
 
   # --------------------------------------------------------------------------

@@ -31,6 +31,6 @@
   # in base.nix via `nix.extraOptions` / `extra-platforms`.
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore (
-    builtins.readFile ../../scripts/hosts/MacBook/macos-rosetta-install.sh
+    builtins.readFile ../../scripts/hosts/MacBook/macos-install-rosetta.sh
   );
 }

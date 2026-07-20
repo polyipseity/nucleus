@@ -44,7 +44,7 @@
   #       plist) is still caught.
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore (
-    builtins.readFile ../../scripts/hosts/MacBook/macos-networking-setup.sh
+    builtins.readFile ../../scripts/hosts/MacBook/macos-setup-networking.sh
   );
 
   # Hostname values are intentionally titlecase to match the machine identity
