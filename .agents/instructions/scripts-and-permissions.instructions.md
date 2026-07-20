@@ -46,8 +46,9 @@ Non-host subdirectories follow a two-track convention:
 | `secrets/`              |             `<verb>-<target>.sh` | What action?     |
 | `services/`             |             `<entity>-<role>.sh` | Which component? |
 | `shell/`                | `init.*` or `<verb>-<target>.sh` | Varies           |
+| `hosts/<Host>/`         |   `<prefix>-<verb>-<target>.<ext>` | What action?     |
 
-Scripts under `hosts/<Host>/` use the prefix rule (`macos-` for MacBook, `nixos-` for NixOS) and do not follow the table above.
+`<prefix>` is `macos-` for MacBook, `nixos-` for NixOS, etc.
 
 ## Argument convention for extracted scripts
 

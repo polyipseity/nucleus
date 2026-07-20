@@ -28,8 +28,8 @@
     (open-host-manual, file-manager-pdf-opt)
   - `agents/` — AI agent setup scripts (agent-skills, agents-symlink, sync-clawhub-skills)
   - **Naming rule**:
-    - Files under `hosts/MacBook/` MUST start with `macos-`; entry name = filename.
-    - Files under `hosts/NixOS/` MUST start with `nixos-`; entry name = filename.
+    - Files under `hosts/MacBook/` MUST start with `macos-` followed by a verb-first name: `macos-<verb>-<target>.<ext>`; entry name = filename.
+    - Files under `hosts/NixOS/` MUST start with `nixos-` followed by a verb-first name: `nixos-<verb>-<target>.<ext>`; entry name = filename.
     - All other subdirs follow a two-track convention: **verb-first** for action scripts, **entity-first** for service scripts (see `.agents/instructions/scripts-and-permissions.instructions.md` for the full per-directory table).
     - Rule does not apply to runtime-only scripts or wrapped derivations. Library scripts in
       `lib/` that are host-specific MUST still use the host prefix (e.g., `macos-`). Generic
