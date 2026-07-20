@@ -269,14 +269,48 @@ in
     home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       set -eu
       ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-      ${builtins.readFile ../scripts/lib/manage-out-of-store-symlinks-lib.sh}
+      _nucleus_unprotect_managed_paths() {
+        _context="$1"
+        _paths_json="$2"
+        _jq_bin="$3"
+        echo "$_paths_json" | "$_jq_bin" -r '.[]' | while IFS= read -r _p; do
+          [ -n "$_p" ] || continue
+          _nucleus_unprotect_symlink "$_context" "$_p"
+        done
+      }
+      _nucleus_protect_managed_paths() {
+        _context="$1"
+        _paths_json="$2"
+        _jq_bin="$3"
+        echo "$_paths_json" | "$_jq_bin" -r '.[]' | while IFS= read -r _p; do
+          [ -n "$_p" ] || continue
+          _nucleus_protect_symlink "$_context" "$_p"
+        done
+      }
       _nucleus_unprotect_managed_paths "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
     '';
 
     home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       set -eu
       ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-      ${builtins.readFile ../scripts/lib/manage-out-of-store-symlinks-lib.sh}
+      _nucleus_unprotect_managed_paths() {
+        _context="$1"
+        _paths_json="$2"
+        _jq_bin="$3"
+        echo "$_paths_json" | "$_jq_bin" -r '.[]' | while IFS= read -r _p; do
+          [ -n "$_p" ] || continue
+          _nucleus_unprotect_symlink "$_context" "$_p"
+        done
+      }
+      _nucleus_protect_managed_paths() {
+        _context="$1"
+        _paths_json="$2"
+        _jq_bin="$3"
+        echo "$_paths_json" | "$_jq_bin" -r '.[]' | while IFS= read -r _p; do
+          [ -n "$_p" ] || continue
+          _nucleus_protect_symlink "$_context" "$_p"
+        done
+      }
       _nucleus_protect_managed_paths "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
     '';
 

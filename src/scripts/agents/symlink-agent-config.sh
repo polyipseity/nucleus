@@ -4,6 +4,7 @@
 set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+. "$SCRIPT_DIR/../lib/symlink-convergence-lib.sh"
 
 _as_repo_root="$(CDPATH='' cd -- "$SCRIPT_DIR/../../.." && pwd -P)"
 _as_agents_source="$_as_repo_root/src/modules/configs/agents"
@@ -24,54 +25,14 @@ elif [ -e "$_as_agents_dir" ] && [ ! -d "$_as_agents_dir" ]; then
   exit 1
 fi
 
-# Remove stale per-subdir symlinks: any symlink in ~/.agents/ that once
-# pointed into _as_agents_source/ but whose source entry no longer exists.
-# This keeps ~/.agents/ free of dangling links after source entries are
-# removed from the repo.  skills/ is skipped — skills owns it.
-find "$_as_agents_dir" -mindepth 1 -maxdepth 1 -type l | while IFS= read -r _as_candidate; do
-  _as_cname="$(basename "$_as_candidate")"
-  [ "$_as_cname" = "skills" ] && continue
-  _as_ctarget="$(readlink "$_as_candidate")"
-  case "$_as_ctarget" in
-    "$_as_agents_source"/*)
-      # Managed per-subdir symlink: remove if its source no longer exists.
-      if [ ! -e "$_as_ctarget" ] && [ ! -L "$_as_ctarget" ]; then
-        _nucleus_unprotect_symlink "agents-config" "$_as_candidate"
-        rm "$_as_candidate"
-        echo "agents-config: removed stale link for $_as_cname (source removed)"
-      fi
-      ;;
-  esac
-done
+_nucleus_remove_stale_symlinks \
+  "$_as_agents_dir" "$_as_agents_source" "agents-config" "skills"
 
-# Create or update per-entry symlinks for every top-level source entry
-# except skills/ (managed independently by skills).
-find "$_as_agents_source" -mindepth 1 -maxdepth 1 | while IFS= read -r _as_entry; do
-  _as_name="$(basename "$_as_entry")"
-  # skills/ is managed by skills; skip it here to avoid conflicts
-  # with the real directory that skills creates for fetched downloads.
-  [ "$_as_name" = "skills" ] && continue
-  _as_link="$_as_agents_dir/$_as_name"
-  if [ -L "$_as_link" ]; then
-    if [ "$(readlink "$_as_link")" = "$_as_entry" ]; then
-      continue  # Correct symlink — no-op.
-    fi
-    # Wrong target (e.g. leftover from a previous checkout path): replace.
-    _nucleus_unprotect_symlink "agents-config" "$_as_link"
-    rm "$_as_link"
-    ln -s "$_as_entry" "$_as_link"
-    _nucleus_protect_symlink "agents-config" "$_as_link"
-    echo "agents-config: updated $HOME/.agents/$_as_name -> $_as_entry"
-  elif [ -e "$_as_link" ]; then
-    # Real file or directory: fail fast to prevent silent data loss.
-    echo "agents-config: $HOME/.agents/$_as_name is not a managed symlink — merge any wanted content into $_as_entry and remove it, then re-run apply." >&2
-    exit 1
-  else
-    ln -s "$_as_entry" "$_as_link"
-    _nucleus_protect_symlink "agents-config" "$_as_link"
-    echo "agents-config: linked $HOME/.agents/$_as_name -> $_as_entry"
-  fi
-done
+_nucleus_converge_symlinks \
+  "$_as_agents_source" "$_as_agents_dir" "agents-config" \
+  "" "-e" \
+  "is not a managed symlink — merge any wanted content into the source entry and remove it, then re-run apply." \
+  "skills"
 
 # Create the ~/.config/opencode/opencode.jsonc symlink to the repo-hosted
 # user config. Resolved at activation time (rather than via Nix-level

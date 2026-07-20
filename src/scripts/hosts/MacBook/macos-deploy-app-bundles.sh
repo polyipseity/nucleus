@@ -4,8 +4,10 @@ set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
-# Source library helpers (provides LSREGISTER, APP_DIR).
-. "$SCRIPT_DIR/../../lib/macos-app-bundle-lib.sh"
+# LSREGISTER path: /usr/bin/lsregister does not exist on macOS; the binary
+# lives inside the LaunchServices framework bundle.
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
+APP_DIR="$HOME/Applications"
 
 _vsd_jq_bin='__JQ_BIN__'
 _vsd_removed_bundles_json='__REMOVED_BUNDLES_JSON__'

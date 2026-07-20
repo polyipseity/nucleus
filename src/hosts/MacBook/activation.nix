@@ -238,6 +238,10 @@ in
     # Warn-only verification that all managed services are running.
     # Failing to start a service should not block activation, but the warning
     # surfaces issues that operators can investigate post-apply.
-    ${builtins.readFile ../../scripts/services/nucleus-services-verify.sh}
+    if command -v nucleus-svc >/dev/null 2>&1; then
+      if ! nucleus-svc verify; then
+        echo "svc: some services are inactive (non-fatal; check journalctl for details)" >&2
+      fi
+    fi
   '';
 }
