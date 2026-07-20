@@ -194,6 +194,12 @@ All hosts use the OS-native SSH agent and server, with no custom service definit
 
 Treat cloud-drive capabilities as parity-first across all hosts for both mounts and replicas. Mounts are live/bidirectional access surfaces; replicas are pull-only read-only mirrors (remote -> local) for automation. Do not add push/bisync execution paths for replicas. Preserve stable provider identity keys (`id`, `remoteName`) while allowing host-appropriate presentation labels. Keep managed mount/replica local paths as real directories on every host unless a documented platform exception applies. The current documented exception is macOS-only: `~/clouds/iCloudReplica` may be a symlink to `~/Library/Mobile Documents` to avoid duplicating native iCloud storage. When implementing or changing a cloud-drive exception, document WHY in code and add/update tests proving the exception is scoped to the intended host.
 
+## Cross-platform script deduplication
+
+Scripts under `hosts/<Host>/` must implement a feature that is semantically host-specific. If the feature could apply to any POSIX host, the script belongs in a non-host subdirectory (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `shell/`, `agents/`, `lib/`, or root of `src/scripts/`).
+
+When the same feature exists on both macOS and NixOS with host-specific implementations, the scripts SHOULD be merged into a single POSIX-compatible script using `builtins.replaceStrings` token substitution (preferred) or `case "$(uname)"` dispatch in the script body. Merged scripts MUST NOT use the `macos-` or `nixos-` prefix; they use natural names per the naming rule. After merging, delete the original host-specific scripts — no backwards-compatibility shims.
+
 ## Allowed platform-specific exceptions
 
 Single-host implementation is allowed only when the feature depends on platform-specific primitives (for example: macOS defaults domains, NixOS kernel modules, Windows registry/DSC resources). When that happens, add a short WHY comment in code explaining why parity is not possible or not desirable. If an exception hides information or controls (for example auto-hide, taskbar/menu toggles, or hidden-file toggles), the WHY comment must explain the tradeoff and name the alternate access path (shortcut, command, or menu route).
