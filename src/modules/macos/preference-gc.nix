@@ -69,7 +69,9 @@ in
     NIX_STORE_BIN="${pkgs.nix}/bin/nix-store"
     MANAGED_PREF_DOMAINS="${builtins.concatStringsSep " " resetUserPreferenceDomains}"
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-gc-preferences.sh}
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-refresh-cfprefsd.sh}
+    ${builtins.readFile ../../scripts/lib/macos-launch-services-lib.sh}
+    refresh_cfprefsd
+    wait_for_daemons
 
     echo "Managed preference domains purged. Run your apply flow to re-assert declarative defaults."
   '';

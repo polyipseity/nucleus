@@ -46,11 +46,12 @@ in
   home.activation.deployNucleusServicesFlush =
     lib.hm.dag.entryAfter [ "deployNucleusAutomatorWorkflows" "macos-app-bundle-lib" ]
       ''
-        # ── Phase 4: Flush daemon caches so changes take effect immediately ─
-        # Without these restarts, cfprefsd and pbs hold stale cached state in
-        # process memory. Finder is intentionally excluded here —
-        # relaunchDesktopServices (DAG-ordered after writeBoundary) restarts it
-        # via launchctl kickstart to preserve window state.
-        ${builtins.readFile ../../scripts/hosts/MacBook/macos-flush-services-menu.sh}
+          # ── Phase 4: Flush daemon caches so changes take effect immediately ─
+          # Without these restarts, cfprefsd and pbs hold stale cached state in
+          # process memory. Finder is intentionally excluded here —
+          # relaunchDesktopServices (DAG-ordered after writeBoundary) restarts it
+          # via launchctl kickstart to preserve window state.
+          ${builtins.readFile ../../scripts/lib/macos-launch-services-lib.sh}
+        refresh_services_menu
       '';
 }
