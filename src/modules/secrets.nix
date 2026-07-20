@@ -199,7 +199,7 @@ lib.mkIf isPrimaryUser {
     builtins.replaceStrings
       [ "__GIT_SECRET_PATH__" "__GIT_BIN__" ]
       [ "${config.sops.secrets.${gitIdentitySecretName}.path}" "${pkgs.git}/bin/git" ]
-      (builtins.readFile ../scripts/secrets/git-identity.sh)
+      (builtins.readFile ../scripts/secrets/configure-git-identity.sh)
   );
 
   # --------------------------------------------------------------------------
@@ -246,7 +246,7 @@ lib.mkIf isPrimaryUser {
         "${pkgs.gnupg}/bin/gpg"
         "${config.sops.secrets.${gpgSecretName}.path}"
       ]
-      (builtins.readFile ../scripts/secrets/gpg-import.sh)
+      (builtins.readFile ../scripts/secrets/import-gpg-key.sh)
   );
 
   # --------------------------------------------------------------------------
@@ -278,7 +278,7 @@ lib.mkIf isPrimaryUser {
     builtins.replaceStrings
       [ "__SSH_PUB_PATH__" "__SSH_KEYGEN_BIN__" "__SSH_ADD_BIN__" ]
       [ "${sshPublicKeyPath}" "${pkgs.openssh}/bin/ssh-keygen" "${pkgs.openssh}/bin/ssh-add" ]
-      (builtins.readFile ../scripts/secrets/ssh-key-adopt.sh)
+      (builtins.readFile ../scripts/secrets/adopt-ssh-key.sh)
   );
 
   # --------------------------------------------------------------------------
