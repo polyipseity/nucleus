@@ -210,7 +210,7 @@ in
       builtins.replaceStrings
         [ "__MANUAL_OPENER__" "__HOST_MANUAL_PATH__" ]
         [ "/usr/bin/open" "${repoRoot}/src/hosts/MacBook/MANUAL.md" ]
-        (builtins.readFile ../../scripts/integrations/open-host-manual.sh)
+        (builtins.readFile ../../../scripts/integrations/open-host-manual.sh)
     );
     executable = true;
   };

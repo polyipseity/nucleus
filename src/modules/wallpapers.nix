@@ -120,7 +120,7 @@ in
         "${currentUserHome}/Pictures/wallpapers"
         desktopprBinPath
         "${pkgs.coreutils}"
-        wallpapersDir
+        "${wallpapersDir}"
         currentUsername
         config.sops.defaultSymlinkPath
       ]
