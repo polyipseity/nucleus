@@ -416,7 +416,7 @@ else
   else
     # Validate each entry has a non-empty justification string.
     _al_invalid=$(jq -r '
-      to_entries[] | select(.value | type != "string" or .value == "") |
+      to_entries[] | select((.value | type) != "string" or .value == "") |
       "WARNING: lifecycle-allowlist.json: \"\(.key)\" has empty or non-string justification"' "$_lf_al_path")
     if [ -n "$_al_invalid" ]; then
       warn "$_al_invalid"
