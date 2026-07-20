@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # LiteLLM AI gateway daemon.
 # Reads SOPS-decrypted API key files and starts litellm.
-# Tokens:
-#   __OPENROUTER_API_KEY_PATH__, __OPENCODE_GO_API_KEY_PATH__, __OPENCODE_ZEN_API_KEY_PATH__
-#   __LITELLM_BIN__, __LITELLM_CONFIG__
-#   __LITELLM_POLL_TIMEOUT__ — polling timeout in 5-second ticks (macOS: 60 = 5m, NixOS: 0 = no polling)
+# Variables below are substituted via Nix replaceStrings at build time.
+# _poll_ticks: polling timeout in 5-second ticks (macOS: 60 = 5m, NixOS: 0 = no polling)
 set -euo pipefail
 
 _poll_ticks='__LITELLM_POLL_TIMEOUT__'

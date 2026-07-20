@@ -116,6 +116,11 @@ See `src/scripts/services/jellyfin-sync.sh` and its callers
 (`src/hosts/MacBook/activation.nix`, `src/hosts/NixOS/jellyfin.nix`) for the
 canonical implementation.
 
+**Comments must never contain token placeholder strings.** Since
+`builtins.replaceStrings` replaces all occurrences, any token string
+(e.g. `__NUCLEUS_REPO_ROOT__`) appearing in a comment will also be
+substituted, leaving meaningless text.
+
 ## Module conventions
 
 - Shared modules must guard NixOS-only options with `lib.mkIf` checks on `options ? environment` or equivalent; Home Manager modules must likewise guard `home.*` options.

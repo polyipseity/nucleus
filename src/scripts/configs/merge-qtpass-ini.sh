@@ -1,5 +1,5 @@
 # QtPass INI merge shell helpers.
-# Tokens: __AWK_PATH__
+# Variable below is substituted via Nix replaceStrings at build time.
 
 _escape_qsettings_ini_string() {
   printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e ':join' -e 'N' -e '$!b join' -e 's/\n/\\n/g'

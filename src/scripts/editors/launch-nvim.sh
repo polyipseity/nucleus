@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Create deterministic /etc/nucleus-bin/nvim symlink for vscode-neovim.
-# Token: __NUCLEUS_NVIM_PATH__ (resolved by Nix at build time per host).
+# _nvim_path is substituted via Nix replaceStrings at build time per host.
 # When the token is unset (empty), resolve at runtime from /dev/console (macOS).
 set -euo pipefail
 

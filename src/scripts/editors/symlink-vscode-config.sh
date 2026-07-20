@@ -3,13 +3,7 @@
 # Called by home-manager activation vsCodeSymlinks.
 # Provides: ensure_file_symlink, ensure_dir_symlink (from symlink-hardening-lib.sh)
 #
-# Tokens (replaced by Nix builtins.replaceStrings):
-#   __REPO_ROOT__                    — repo checkout root
-#   __VSCODE_STABLE_BASE_DIR__       — stable User data dir ($HOME/...)
-#   __VSCODE_INSIDERS_BASE_DIR__     — insiders User data dir ($HOME/...)
-#   __VSCODE_KEYBINDINGS_FILE__      — host-specific keybindings filename
-#   __VSCODE_CHAT_LANGUAGE_MODELS_FILE__ — host-specific chat models filename
-#   __JQ_BIN__                       — path to jq binary
+# Variables below are substituted via Nix replaceStrings at build time.
 
 set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"

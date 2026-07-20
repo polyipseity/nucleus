@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Open host documentation via the OS-default URL handler.
-# Tokens: __MANUAL_OPENER__, __HOST_MANUAL_PATH__
+# Variables below are substituted via Nix replaceStrings at build time.
 # When tokens remain literal (writable symlink deployment), fall back to
 # runtime resolution via NUCLEUS_REPO_ROOT and xdg-open.
 set -eu

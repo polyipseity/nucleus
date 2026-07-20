@@ -2,10 +2,7 @@
 # Idempotently generate zsh completion files for CLI tools whose Nix packages
 # do not auto-bundle them into fpath.
 #
-# Tokens (replaced by Nix builtins.replaceStrings at build time):
-#   __BAT_BIN__, __BUN_BIN__, __FD_BIN__, __GH_BIN__, __OPENCODE_BIN__,
-#   __RUFF_BIN__, __RUSTUP_BIN__, __TYPST_BIN__, __UV_BIN__,
-#   __ZSH_COMPLETIONS_SRC__
+# Variables below are substituted via Nix replaceStrings at build time.
 #
 # Each token expands to a Nix store path (e.g. "${pkgs.bat}/bin/bat").
 

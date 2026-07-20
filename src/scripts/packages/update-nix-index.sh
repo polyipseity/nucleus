@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build/update nix-index file database.
-# Tokens: __NIX_INDEX_BIN__, __NIX_INDEX_MAX_AGE_DAYS__
+# Variables below are substituted via Nix replaceStrings at build time.
 set -euo pipefail
 
 _db_file="$HOME/.cache/nix-index/files"

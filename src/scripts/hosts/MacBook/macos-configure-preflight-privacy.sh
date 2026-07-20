@@ -1,6 +1,6 @@
 # Preflight macOS privacy permissions before defaults writes.
 # Full Disk Access privacy preflight. Runs FDA checks before defaults writes.
-# __REPO_ROOT__ is substituted at build time by Nix (replaceStrings).
+# REPO_ROOT is substituted at build time via Nix replaceStrings.
 set -eu
 
 echo "macos: checking macOS privacy permissions before defaults writes..." >&2

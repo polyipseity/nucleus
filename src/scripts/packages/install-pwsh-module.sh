@@ -1,5 +1,5 @@
 # Install/update a PowerShell module to a pinned version.
-# Tokens: __PWSH_BIN__, __MODULE_NAME__, __MODULE_VERSION__
+# Variables below are substituted via Nix replaceStrings at build time.
 set -euo pipefail
 
 _pwsh="__PWSH_BIN__"

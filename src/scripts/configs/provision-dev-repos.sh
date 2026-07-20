@@ -5,17 +5,11 @@
 # This is a data-driven replacement for the previous Nix-generated inline
 # shell code. Instead of concatMapStringsSep producing per-repo shell lines
 # at eval time, the entire config.nucleus.devRepos structure is serialized
-# as JSON (__DEV_REPOS_JSON__) and consumed at activation time via jq
+# as JSON and consumed at activation time via jq
 # iteration. This keeps the Nix side pure data and moves all iteration
 # logic into a single maintainable shell script.
 #
-# Tokens (replaced at eval time via builtins.replaceStrings):
-#   __REPO_ROOT__          — repo checkout root
-#   __CURRENT_USER_HOME__  — $HOME of the managed user
-#   __SSH_CLIENT__         — SSH client binary path
-#   __GIT_BIN__            — git binary path
-#   __JQ_BIN__             — jq binary path
-#   __DEV_REPOS_JSON__     — JSON serialization of config.nucleus.devRepos
+# Variables below are substituted via Nix replaceStrings at build time.
 
 set -eu
 
@@ -23,7 +17,7 @@ export HOME="__CURRENT_USER_HOME__"
 export PATH="$PATH:__GIT_BIN__"
 export GIT_SSH_COMMAND="__SSH_CLIENT__"
 
-# Resolve the repo checkout root at build time via __REPO_ROOT__ token.
+# Resolve the repo checkout root at build time via replaceStrings.
 repoRoot="__REPO_ROOT__"
 if [ -z "$repoRoot" ] || [ ! -d "$repoRoot" ]; then
   echo "devReposProvision: __REPO_ROOT__ is empty or invalid — check NUCLEUS_REPO_ROOT at build time" >&2

@@ -5,9 +5,7 @@
 
 set -euo pipefail
 
-# Token placeholders replaced by builtins.replaceStrings in activation contexts.
-# __NUCLEUS_REPO_ROOT__ becomes the repository root path.
-# __NUCLEUS_PATH_PREPEND__ becomes "dir1:dir2" of tool store paths.
+# Variables below are substituted via Nix replaceStrings at build time.
 REPO_ROOT='__NUCLEUS_REPO_ROOT__'
 _path_prepend='__NUCLEUS_PATH_PREPEND__'
 

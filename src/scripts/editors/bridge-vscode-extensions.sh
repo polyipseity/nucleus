@@ -3,8 +3,7 @@
 # Called by home-manager activation vsCodeExtensionBridge.
 # Provides: _nucleus_protect_symlink, _nucleus_unprotect_symlink (from symlink-hardening-lib.sh)
 #
-# Tokens (replaced by Nix builtins.replaceStrings):
-#   __EXTENSION_STORE__ — path to Nix-managed extension store
+# Variable below is substituted via Nix replaceStrings at build time.
 
 set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"

@@ -4,7 +4,7 @@
 # backoff.  Designed as a persistent daemon (KeepAlive / Restart=always /
 # scheduled task AtLogOn) — not a timer-driven oneshot.
 #
-# Dependencies: websocat, jq (PATH provided via __CAMILLADSP_HEARTBEAT_PATH__ token)
+# Dependencies: websocat, jq (PATH is set via Nix replaceStrings at build time)
 #
 # Usage: camilladsp-heartbeat.sh [--port PORT] [--config FILE]
 set -euo pipefail

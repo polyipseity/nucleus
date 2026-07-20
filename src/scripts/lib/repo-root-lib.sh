@@ -1,5 +1,5 @@
 # shellcheck shell=sh
-# Validate __REPO_ROOT__ build-time token substitution and set $_repo_root.
+# Validate build-time token substitution and set $_repo_root.
 # Prepended at build time by Nix packaging.
 # Usage: require_repo_root <label>
 #   <label> — prefix for error messages (e.g. "gc", "cloud-drives").

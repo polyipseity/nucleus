@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Warn-only check that installed Homebrew versions match lockfile.
 # Silent when all versions match.
-# __REPO_ROOT__ is substituted at build time by Nix (replaceStrings).
+# REPO_ROOT is substituted at build time via Nix replaceStrings.
 
 set -eu
 

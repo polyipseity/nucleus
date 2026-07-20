@@ -7,8 +7,7 @@ fi
 # Strip stale managed entries from launchctl PATH, then prepend + append
 # managed dirs for the GUI launchd domain.
 #
-# Tokens substituted at build time by Nix:
-#   __MANAGED_PREPEND_PATH__, __MANAGED_APPEND_PATH__, __MANAGED_DEDUP_SET__
+# Variables below are substituted via Nix replaceStrings at build time.
 
 __nucleus_prepend="__MANAGED_PREPEND_PATH__"
 __nucleus_append="__MANAGED_APPEND_PATH__"

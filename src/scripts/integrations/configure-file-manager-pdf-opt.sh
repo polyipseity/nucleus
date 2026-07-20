@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Nautilus right-click script for PDF optimization.
 # MIME guard: only process application/pdf files.
-# Tokens: __FILE_BIN__, __GS_PDF_OPT_PRESET__
+# Variables below are substituted via Nix replaceStrings at build time.
 set -eu
 
 pdfs=()

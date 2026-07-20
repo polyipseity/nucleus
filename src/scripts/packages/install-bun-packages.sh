@@ -1,7 +1,6 @@
 # shellcheck shell=sh
 # Idempotently converges the declarative bun global package set.
-# Tokens: __JQ_BIN__, __MANAGED_PREPEND_GUARD__, __MANAGED_APPEND_GUARD__,
-#   __NIX_PROFILE_BIN_DIRS__
+# Variables below are substituted via Nix replaceStrings at build time.
 # Requires: bun on PATH.
 set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"

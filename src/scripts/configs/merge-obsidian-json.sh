@@ -1,7 +1,7 @@
 # shellcheck shell=sh
 # Obsidian settings merge: merges managed advanced-setting keys into
 # obsidian.json while preserving app-owned vault metadata.
-# Tokens: __PYTHON3_BIN__, __OBSIDIAN_MERGE_JSON_PY__
+# Variables below are substituted via Nix replaceStrings at build time.
 _obsidian_merge_json() {
   _python3_bin="$1"
   _python_script="$2"

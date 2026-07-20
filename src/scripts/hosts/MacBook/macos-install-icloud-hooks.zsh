@@ -2,7 +2,7 @@
 # WHY macOS-only: com.apple.fileprovider.ignore#P is a macOS FileProvider
 # xattr with no equivalent on NixOS/Windows.
 #
-# Tokens: __ICLOUD_EXCLUDED_NAMES__, __ICLOUD_MANAGED_ROOTS__
+# Variables below are substituted via Nix replaceStrings at build time.
 #
 # Trigger paths:
 #   1) chpwd hook: entering directories performs a best-effort recursive

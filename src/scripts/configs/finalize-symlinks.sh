@@ -2,11 +2,7 @@
 # Finalize custom-provision-symlinks: protect each managed symlink and persist
 # the manifest.  The symlink-hardening library is sourced via SCRIPT_DIR.
 #
-# Tokens:
-#   __MANAGED_SYMLINK_MANIFEST_PATH__  — path to the managed symlink manifest
-#   __SYMLINK_ENTRIES_JSON__           — JSON array of absolute symlink paths
-#   __MANAGED_SYMLINK_MANIFEST_JSON__  — JSON content to write to the manifest
-#   __JQ_BIN__                        — path to jq
+# Variables below are substituted via Nix replaceStrings at build time.
 
 set -eu
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
