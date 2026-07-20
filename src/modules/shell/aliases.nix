@@ -65,19 +65,6 @@
   "-grv" = "git remote -v";
   "-gs" = "git status -sb";
   "-gsh" = "git show";
-  # Ghostscript PDF optimization presets.
-  # CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
-  # newer PDF compatibility target is released by Ghostscript.
-  "-gs-pdf-opt-default" =
-    "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default -dNOPAUSE -dQUIET -dBATCH";
-  "-gs-pdf-opt-ebook" =
-    "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH";
-  "-gs-pdf-opt-prepress" =
-    "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH";
-  "-gs-pdf-opt-printer" =
-    "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer -dNOPAUSE -dQUIET -dBATCH";
-  "-gs-pdf-opt-screen" =
-    "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH";
   "-gss" = "git status";
   "-gst" = "git stash push";
   "-gstd" = "git stash drop";
@@ -89,6 +76,19 @@
   "-gt" = "git tag";
   "-gtd" = "git tag -d";
   "-gtl" = "git tag -l";
+  # --- Ghostscript PDF optimization presets ---
+  # CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
+  # newer PDF compatibility target is released by Ghostscript.
+  "-gs-pdf-opt-default" =
+    "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default -dNOPAUSE -dQUIET -dBATCH";
+  "-gs-pdf-opt-prepress" =
+    "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH";
+  "-gs-pdf-opt-printer" =
+    "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer -dNOPAUSE -dQUIET -dBATCH";
+  "-gs-pdf-opt-ebook" =
+    "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH";
+  "-gs-pdf-opt-screen" =
+    "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH";
   # --- Non-git aliases ---
   "-la" = "eza -la";
   "-ll" = "eza -la";

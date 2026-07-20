@@ -375,6 +375,18 @@ function Sync-ShellProfile {
     'function -grv { & git remote -v @Args }'
     'function -gs { & git status -sb @Args }'
     'function -gsh { & git show @Args }'
+    'function -gss { & git status @Args }'
+    'function -gst { & git stash push @Args }'
+    'function -gstd { & git stash drop @Args }'
+    'function -gstl { & git stash list @Args }'
+    'function -gstp { & git stash pop @Args }'
+    'function -gstsh { & git stash show -p @Args }'
+    'function -gsw { & git switch @Args }'
+    'function -gswc { & git switch -c @Args }'
+    'function -gt { & git tag @Args }'
+    'function -gtd { & git tag -d @Args }'
+    'function -gtl { & git tag -l @Args }'
+    # --- Ghostscript PDF optimization aliases ---
     'function Invoke-NucleusGhostscript {'
     # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
     '  if (Get-Command gs -ErrorAction SilentlyContinue) { & gs @Args; return }'
@@ -384,25 +396,13 @@ function Sync-ShellProfile {
     '  if (Get-Command gswin32c -ErrorAction SilentlyContinue) { & gswin32c @Args; return }'
     '  throw "Ghostscript CLI not found. Expected one of: gs, gswin64c, gswin32c"'
     '}'
-    # Ghostscript PDF optimization presets.
     # CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
     # newer PDF compatibility target is released by Ghostscript.
     'function -gs-pdf-opt-default  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default  -dNOPAUSE -dQUIET -dBATCH @Args }'
-    'function -gs-pdf-opt-ebook    { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args }'
     'function -gs-pdf-opt-prepress { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }'
     'function -gs-pdf-opt-printer  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }'
+    'function -gs-pdf-opt-ebook    { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args }'
     'function -gs-pdf-opt-screen   { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }'
-    'function -gsw { & git switch @Args }'
-    'function -gss { & git status @Args }'
-    'function -gst { & git stash push @Args }'
-    'function -gstd { & git stash drop @Args }'
-    'function -gstl { & git stash list @Args }'
-    'function -gstp { & git stash pop @Args }'
-    'function -gstsh { & git stash show -p @Args }'
-    'function -gswc { & git switch -c @Args }'
-    'function -gt { & git tag @Args }'
-    'function -gtd { & git tag -d @Args }'
-    'function -gtl { & git tag -l @Args }'
     # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
     # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
     # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
