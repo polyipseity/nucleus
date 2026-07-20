@@ -1,1 +1,3 @@
-{}
+{
+  "$schema": "./lifecycle-allowlist.schema.json"
+}

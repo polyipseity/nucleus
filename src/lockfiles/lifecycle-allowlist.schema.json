@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": {
+    "description": "Justification for allowing lifecycle scripts on this package.",
+    "minLength": 1,
+    "type": "string"
+  },
+  "description": "Packages explicitly permitted to run lifecycle scripts during installation.",
+  "propertyNames": {
+    "pattern": "^[a-zA-Z0-9@/_.-]+$"
+  },
+  "title": "nucleus lifecycle-script allowlist",
+  "type": "object"
+}
