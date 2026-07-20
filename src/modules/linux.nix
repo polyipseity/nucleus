@@ -187,11 +187,9 @@ lib.mkIf pkgs.stdenv.isLinux {
     # configureSystemHardening behaviour.  VS Code workspace trust and editor
     # tooling rely on the directory existing on all hosts.
     # -----------------------------------------------------------------------
-    provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      if [ ! -d "$HOME/dev" ]; then
-        mkdir -p "$HOME/dev"
-      fi
-    '';
+    provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+      builtins.readFile ../scripts/hosts/NixOS/nixos-provision-dev-directory.sh
+    );
 
   };
 

@@ -348,13 +348,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # writes and domain-specific hooks.  This minimizes "ghost" values staying
     # in memory until logout/login after a rebuild.
     # -------------------------------------------------------------------------
-    reloadUserPreferenceState =
-      lib.hm.dag.entryAfter [ "input-config" "safari-defaults" "universal-access-defaults" ]
-        ''
-          if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-            echo "macos: activateSettings -u failed; some preference updates may require relogin." >&2
-          fi
-        '';
+    reloadUserPreferenceState = lib.hm.dag.entryAfter [
+      "input-config"
+      "safari-defaults"
+      "universal-access-defaults"
+    ] (builtins.readFile ../scripts/hosts/MacBook/macos-reload-user-prefs.sh);
 
     # -------------------------------------------------------------------------
     # linearmouse-config
