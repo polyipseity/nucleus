@@ -179,7 +179,7 @@ lib.mkIf pkgs.stdenv.isLinux {
       builtins.replaceStrings
         [ "__NIX_INDEX_BIN__" "__NIX_INDEX_MAX_AGE_DAYS__" ]
         [ "${pkgs.nix-index}/bin/nix-index" "" ]
-        (builtins.readFile ../scripts/packages/nix-index-update.sh)
+        (builtins.readFile ../scripts/packages/update-nix-index.sh)
     );
 
     # -----------------------------------------------------------------------

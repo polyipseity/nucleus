@@ -213,7 +213,7 @@ let
     builtins.replaceStrings
       [ "__NIX_INDEX_BIN__" "__NIX_INDEX_MAX_AGE_DAYS__" ]
       [ "${pkgs.nix-index}/bin/nix-index" "6" ]
-      (builtins.readFile ../scripts/packages/nix-index-update.sh)
+      (builtins.readFile ../scripts/packages/update-nix-index.sh)
   );
 
   # Directory names inside ~/dev whose contents should stay out of Spotlight.
