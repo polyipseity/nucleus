@@ -33,17 +33,17 @@ in
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
   };
 
-  home.activation.unprotectOpencodeSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] (''
+  home.activation.unprotectOpencodeSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
     ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
     _nucleus_unprotect_symlink "agents.nix" "$HOME/.config/opencode/agents"
     _nucleus_unprotect_symlink "agents.nix" "$HOME/.config/opencode/commands"
-  '');
+  '';
 
-  home.activation.protectOpencodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (''
+  home.activation.protectOpencodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
     _nucleus_protect_symlink "agents.nix" "$HOME/.config/opencode/agents"
     _nucleus_protect_symlink "agents.nix" "$HOME/.config/opencode/commands"
-  '');
+  '';
 
   # Method 4 (activation script manages whole-directory symlinks): the agents/
   # config directory is deployed via symlink-agent-config.sh which creates per-entry

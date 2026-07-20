@@ -290,15 +290,15 @@ lib.mkIf pkgs.stdenv.isDarwin {
     "Downloads/iCloud".source = config.lib.file.mkOutOfStoreSymlink liveICloudDownloads;
   };
 
-  home.activation.unprotectDownloadsICloudSymlink = lib.hm.dag.entryBefore [ "linkGeneration" ] (''
+  home.activation.unprotectDownloadsICloudSymlink = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
     ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
     _nucleus_unprotect_symlink "macos.nix" "$HOME/Downloads/iCloud"
-  '');
+  '';
 
-  home.activation.protectDownloadsICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] (''
+  home.activation.protectDownloadsICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
     _nucleus_protect_symlink "macos.nix" "$HOME/Downloads/iCloud"
-  '');
+  '';
 
   home.activation = {
     # -------------------------------------------------------------------------
@@ -521,10 +521,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # WHY separate activation: Dock refresh is a UI cache reload, not dev-tree
     # maintenance. Keeping it independent avoids fake coupling with ~/dev work.
     # -------------------------------------------------------------------------
-    reloadDockPreferenceState = lib.hm.dag.entryAfter [ "writeBoundary" ] (''
+    reloadDockPreferenceState = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       ${builtins.readFile ../scripts/lib/macos-launch-services-lib.sh}
       refresh_dock
-    '');
+    '';
 
     # -------------------------------------------------------------------------
     # configureFinderSidebar
