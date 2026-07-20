@@ -46,6 +46,17 @@ let
   # resolve the repo checkout root in activation blocks that embed or invoke
   # repo-local scripts.
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+
+  # Enhanced apple-sdk with real tool symlinks in usr/bin/ so xcrun shims
+  # resolve to nixpkgs tools.  Used by configureXcodeSelect below.
+  appleSdkEnhanced = import ../../modules/lib/apple-sdk-enhanced.nix { inherit pkgs lib; };
+
+  # Symlink farm tool entries for /usr/local/bin/.  GUI apps that spawn()
+  # tools by name (python3, git, make) resolve via PATH without xcrun.
+  appleSdkTools = import ../../modules/lib/apple-sdk-tools.nix { inherit pkgs; };
+  symlinkFarmEntries = lib.concatStringsSep " " (
+    lib.mapAttrsToList (name: target: "${target}->${name}") appleSdkTools.symlinkFarmTools
+  );
 in
 {
   # ---------------------------------------------------------------------------
@@ -130,7 +141,14 @@ in
     #   process trees rely on the system-level developer directory set via
     #   /usr/bin/xcode-select.  The activation script runs as root during
     #   darwin-rebuild switch, so no sudo wrapper is needed.
-    /usr/bin/xcode-select --switch "${pkgs.apple-sdk}"
+    /usr/bin/xcode-select --switch "${appleSdkEnhanced}"
+
+    # ---- configureSymlinkFarm ------------------------------------------------
+    # Create/update symlinks in /usr/local/bin for tools that GUI apps resolve
+    # via PATH directly (without xcrun).  Only operates on Nix store symlinks
+    # and leaves regular files and non-Nix symlinks untouched.
+    __nucleus_symlink_farm="${symlinkFarmEntries}"
+    ${builtins.readFile ../../scripts/hosts/MacBook/macos-symlink-farm.sh}
 
     # ---- configureBatteryPolicy ------------------------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-configure-battery-policy.sh}

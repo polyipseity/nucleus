@@ -25,6 +25,8 @@
 }:
 let
   managedPaths = import ./managed-paths.nix { inherit pkgs; };
+  appleSdkTools = import ./apple-sdk-tools.nix { inherit pkgs; };
+  appleSdkEnhanced = import ./apple-sdk-enhanced.nix { inherit pkgs lib; };
 
   # ── Shared values used by multiple catalog entries ──────────────────
 
@@ -78,13 +80,13 @@ let
     # ── macOS-specific developer toolchain ───────────────────────────
     DEVELOPER_DIR = {
       values = {
-        macOS = "${pkgs.apple-sdk}";
+        macOS = "${appleSdkEnhanced}";
       };
-      why = "Without Xcode CLT, xcrun needs DEVELOPER_DIR pointing at Nix apple-sdk to discover SDK without installation dialog.";
+      why = "Enhanced apple-sdk with real tool symlinks, so xcrun resolves python3, git, make, etc. without Xcode CLT.";
     };
     SDKROOT = {
       values = {
-        macOS = "${pkgs.apple-sdk}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
+        macOS = "${appleSdkEnhanced}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
       };
       why = "Explicit SDKROOT avoids second xcrun invocation when DEVELOPER_DIR is set.";
     };
@@ -364,6 +366,7 @@ let
 in
 {
   inherit
+    appleSdkEnhanced
     catalog
     allVars
     systemVars
