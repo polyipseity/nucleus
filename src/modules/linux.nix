@@ -189,7 +189,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     # tooling rely on the directory existing on all hosts.
     # -----------------------------------------------------------------------
     provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.readFile ../scripts/hosts/NixOS/nixos-provision-dev-directory.sh
+      builtins.readFile ../scripts/configs/provision-dev-directory.sh
     );
 
   };

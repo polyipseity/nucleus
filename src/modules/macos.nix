@@ -486,9 +486,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # state, while the macOS-only cleanup/indexing steps below are session-side
     # maintenance concerns.
     # -------------------------------------------------------------------------
-    provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      mkdir -p "$HOME/dev"
-    '';
+    provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] (
+      builtins.readFile ../scripts/configs/provision-dev-directory.sh
+    );
 
     # -------------------------------------------------------------------------
     # reloadDockPreferenceState
