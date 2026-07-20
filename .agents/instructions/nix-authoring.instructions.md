@@ -64,7 +64,56 @@ via `${builtins.readFile <lib-path>}` in the activation block and call the
 functions inline. This is already practiced in `macos.nix`, `home.nix`, and
 `config-utils.nix` (see `scripts-and-permissions.instructions.md` — "When a
 script needs its own file" for the full policy).
+## Activation script value injection
 
+When injecting Nix-evaluated values (store paths, JSON, repo root) into
+activation scripts embedded via `builtins.readFile`, use
+`builtins.replaceStrings` to substitute `__UPPERCASE_WITH_DOUBLE_UNDERSCORES__`
+tokens in the script source. Do NOT use shell-level variable exports (`PATH=...;
+export PATH`, `VAR="..."; export VAR`) before the script invocation — this is
+fragile, bypasses PATH isolation, and mixes compile-time and runtime concerns.
+
+The script file declares token placeholders as variable values only (not variable
+names, since `builtins.replaceStrings` replaces all occurrences including
+names). A distinct prefix on the token value enables fallback detection via
+`case`:
+
+```bash
+VAR='__NUCLEUS_UNIQUE_TOKEN__'
+case "$VAR" in __NUCLEUS_*)
+  VAR='default_value'
+  ;;
+esac
+```
+
+Then in the Nix activation block, replace each token with its Nix-evaluated
+value:
+
+```nix
+builtins.replaceStrings
+  [ "__NUCLEUS_UNIQUE_TOKEN__" ]
+  [ repoRoot ]
+  (builtins.readFile ./script.sh)
+```
+
+For tool paths, prefer prepending a token-replaced bin directory to `PATH`
+inside the script (after fallback detection), which resolves all bare commands
+without touching every invocation:
+
+```bash
+_path_prepend='__NUCLEUS_PATH_PREPEND__'
+case "$_path_prepend" in __NUCLEUS_*)
+  _path_prepend=''
+  ;;
+esac
+if [ -n "$_path_prepend" ]; then
+  export PATH="$_path_prepend:$PATH"
+fi
+```
+
+See `src/scripts/services/jellyfin-sync.sh` and its callers
+(`src/hosts/MacBook/activation.nix`, `src/hosts/NixOS/jellyfin.nix`) for the
+canonical implementation.
 ## Module conventions
 
 - Shared modules must guard NixOS-only options with `lib.mkIf` checks on `options ? environment` or equivalent; Home Manager modules must likewise guard `home.*` options.

@@ -5,12 +5,28 @@
 
 set -euo pipefail
 
-# When NUCLEUS_REPO_ROOT is already set (embedded mode), skip SCRIPT_DIR and
-# lib.sh resolution — derive_repo_root returns NUCLEUS_REPO_ROOT directly.
-if [ -z "${NUCLEUS_REPO_ROOT:-}" ]; then
-  SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
-  # shellcheck disable=SC1091
-  . "$SCRIPT_DIR/../lib/lib.sh"
+# Token placeholders replaced by builtins.replaceStrings in activation contexts.
+# __NUCLEUS_REPO_ROOT__ becomes the repository root path.
+# __NUCLEUS_PATH_PREPEND__ becomes "dir1:dir2" of tool store paths.
+REPO_ROOT='__NUCLEUS_REPO_ROOT__'
+_path_prepend='__NUCLEUS_PATH_PREPEND__'
+
+# Fallback when run outside activation context (tokens not substituted).
+case "$REPO_ROOT" in __NUCLEUS_*)
+  if [ -n "${NUCLEUS_REPO_ROOT:-}" ]; then
+    REPO_ROOT="$NUCLEUS_REPO_ROOT"
+  else
+    SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+    # shellcheck disable=SC1091
+    . "$SCRIPT_DIR/../lib/lib.sh"
+    REPO_ROOT="$(derive_repo_root)"
+  fi
+  _path_prepend=''
+  ;;
+esac
+
+if [ -n "$_path_prepend" ]; then
+  export PATH="$_path_prepend:$PATH"
 fi
 
 usage() {
@@ -29,7 +45,7 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     --repo-root)
-      NUCLEUS_REPO_ROOT="$2"
+      REPO_ROOT="$2"
       shift 2
       ;;
     --jellyfin-base-url)
@@ -43,8 +59,6 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-
-REPO_ROOT="${NUCLEUS_REPO_ROOT:-$(derive_repo_root)}"
 
 if ! command -v curl >/dev/null 2>&1; then
   printf '%s\n' "jellyfin-sync: curl is not available; skipping sync"

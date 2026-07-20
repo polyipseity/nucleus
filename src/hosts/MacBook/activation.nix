@@ -235,9 +235,11 @@ in
     # The sync logic performs runtime imperative operations (SOPS decryption,
     # API polling, token auth, diff-and-converge) that Nix's declarative model
     # cannot express.
-    NUCLEUS_REPO_ROOT="${repoRoot}"; export NUCLEUS_REPO_ROOT
-    PATH="${pkgs.sops}/bin:$PATH"; export PATH
-    ${builtins.readFile ../../scripts/services/jellyfin-sync.sh}
+    ${builtins.replaceStrings
+      [ "__NUCLEUS_REPO_ROOT__" "__NUCLEUS_PATH_PREPEND__" ]
+      [ repoRoot "${pkgs.jq}/bin:${pkgs.sops}/bin" ]
+      (builtins.readFile ../../scripts/services/jellyfin-sync.sh)
+    }
 
     # ---- verifyNucleusServices ---------------------------------------------------
     # Warn-only verification that all managed services are running.

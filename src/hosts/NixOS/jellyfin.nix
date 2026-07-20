@@ -41,9 +41,11 @@ in
       repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
     in
     ''
-      NUCLEUS_REPO_ROOT="${repoRoot}"; export NUCLEUS_REPO_ROOT
-      PATH="${pkgs.sops}/bin:$PATH"; export PATH
-      ${builtins.readFile ../../scripts/services/jellyfin-sync.sh}
+      ${builtins.replaceStrings
+        [ "__NUCLEUS_REPO_ROOT__" "__NUCLEUS_PATH_PREPEND__" ]
+        [ repoRoot "${pkgs.jq}/bin:${pkgs.sops}/bin" ]
+        (builtins.readFile ../../scripts/services/jellyfin-sync.sh)
+      }
     ''
   );
 }
