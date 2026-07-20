@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Manifest of fetched ClawHub skill slugs for activation-time convergence.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to the JSON Schema file that validates this data file.",
+      "type": "string"
+    },
+    "skills": {
+      "description": "Skill slugs fetched from ClawHub. Empty array = none fetched.",
+      "items": {
+        "description": "ClawHub skill slug (lowercase, hyphen-separated).",
+        "pattern": "^[a-z][a-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "skills"
+  ],
+  "title": "nucleus ClawHub skills manifest",
+  "type": "object"
+}

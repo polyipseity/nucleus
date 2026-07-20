@@ -1,3 +1,4 @@
 {
+  "$schema": "./clawhub-skills.schema.json",
   "skills": []
 }
