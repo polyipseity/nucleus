@@ -59,8 +59,9 @@
 				<key>ActionParameters</key>
 				<dict>
 					<key>COMMAND_STRING</key>
-					<string>for f in "$@"; do
-    "$HOME/.nix-profile/bin/nucleus-gs-pdf-opt" --preset printer "$f"
+					<string>export PATH="/etc/profiles/per-user/$USER/bin:$PATH"
+for f in "$@"; do
+    nucleus-gs-pdf-opt --preset printer "$f"
 done
 </string>
 					<key>CheckedForUserDefaultShell</key>
