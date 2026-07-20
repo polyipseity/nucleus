@@ -34,18 +34,18 @@ Non-host subdirectories follow a two-track convention:
 - **Entity-first** (`services/` only): `<entity>-<role>.<ext>` — the first word tells which component is managed.
 - **Library scripts** (`lib/`): `<domain>[-lib].sh` — descriptive, no action verb. `lib.sh` is the universal library; `*-lib.sh` marks domain-specific libraries.
 
-| Subdirectory | Pattern | First-word role |
-|---|---:|---|
-| `root/` (in `scripts/`) | `<verb>-<target>.sh` | What action? |
-| `agents/` | `<verb>-<target>.sh` | What action? |
-| `configs/` | `<verb>-<target>.sh` | What action? |
-| `editors/` | `<verb>-<target>.sh` | What action? |
-| `integrations/` | `<verb>-<target>.sh` | What action? |
-| `lib/` | `<domain>[-lib].sh` | What domain? |
-| `packages/` | `<verb>-<target>.sh` | What action? |
-| `secrets/` | `<verb>-<target>.sh` | What action? |
-| `services/` | `<entity>-<role>.sh` | Which component? |
-| `shell/` | `init.*` or `<verb>-<target>.sh` | Varies |
+| Subdirectory            |                          Pattern | First-word role  |
+| ----------------------- | -------------------------------: | ---------------- |
+| `root/` (in `scripts/`) |             `<verb>-<target>.sh` | What action?     |
+| `agents/`               |             `<verb>-<target>.sh` | What action?     |
+| `configs/`              |             `<verb>-<target>.sh` | What action?     |
+| `editors/`              |             `<verb>-<target>.sh` | What action?     |
+| `integrations/`         |             `<verb>-<target>.sh` | What action?     |
+| `lib/`                  |              `<domain>[-lib].sh` | What domain?     |
+| `packages/`             |             `<verb>-<target>.sh` | What action?     |
+| `secrets/`              |             `<verb>-<target>.sh` | What action?     |
+| `services/`             |             `<entity>-<role>.sh` | Which component? |
+| `shell/`                | `init.*` or `<verb>-<target>.sh` | Varies           |
 
 Scripts under `hosts/<Host>/` use the prefix rule (`macos-` for MacBook, `nixos-` for NixOS) and do not follow the table above.
 
