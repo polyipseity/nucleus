@@ -55,7 +55,7 @@ See `src/scripts/lib/import-symlink-hardening.sh` for the canonical pattern.
 
 The only exception is standalone scripts under `src/scripts/` that are not
 libraries (e.g. scripts executed for their side effects, like
-`src/scripts/hosts/MacBook/macos-preflight-privacy.sh`). These may be run
+`src/scripts/hosts/MacBook/macos-configure-preflight-privacy.sh`). These may be run
 directly via `builtins.readFile` without an import wrapper.
 
 ## Module conventions
@@ -320,6 +320,6 @@ Examples with their extracted helpers:
 - `wallpaper-provision` per-wallpaper loop → `provision-wallpaper.sh`
 - `installBunPackages` entry iteration → `home/install-bun-packages.sh`
 - `devReposProvision` per-repo loop → `dev-repos-provision-lib.sh`
-- `macos-gui-env-path` PATH dedup → `gui-env-agent.sh` + `macos-gui-env-path.sh`
+- `macos-set-gui-env-path` PATH dedup → `gui-env-agent.sh` + `macos-set-gui-env-path.sh`
 
 **Rule**: when adding a new split-pattern inline script, extract the pure-shell body to `src/scripts/` first, then wrap it in Nix with environment variable injection or `builtins.replaceStrings` for Nix-evaluated values.
