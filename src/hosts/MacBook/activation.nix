@@ -202,7 +202,7 @@ in
     } || true  # undoc-supp: warning-only version check; must not abort activation even if script errors.
 
     # ---- disableSteamAutoStartup ------------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-disable-steam-autostart.sh}
+    ${builtins.readFile ../../scripts/configs/disable-steam-autostart.sh}
 
     # ---- jellyfin-sync -----------------------------------------------------------
     # Converge Jellyfin accounts and libraries declared in src/modules/users.json

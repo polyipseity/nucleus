@@ -211,7 +211,7 @@
   #   NixOS   — this activation script
   #   Windows — Disable-SteamAutoStartup module + apply.ps1
   system.activationScripts."nixos-disable-steam-autostart" = lib.mkAfter (
-    builtins.readFile ../../scripts/hosts/NixOS/nixos-disable-steam-autostart.sh
+    builtins.readFile ../../scripts/configs/disable-steam-autostart.sh
   );
 
   # EasyEffects: graphical PipeWire audio processing GUI with plugin-based
