@@ -10,27 +10,27 @@ All tools and libraries must be installed at user-level only. System-wide instal
 
 ## Cross-host package manager hierarchy
 
-| Scope | macOS (nix-darwin) | NixOS | Windows |
-|---|---|---|---|---|
-| **System packages** | `nixpkgs` via nix-darwin `environment.systemPackages` | `nixpkgs` via NixOS system config | WinGet DSC (`system-packages.dsc.yml`) |
-| **User-level CLI tools** | `nixpkgs` via Home Manager `home.packages` | `nixpkgs` via Home Manager `home.packages` | WinGet DSC (`user.dsc.yml`, `user-env.dsc.yml`) + Scoop |
-| **Managed global packages** | `bun install -g` (JS tools only) | `bun install -g` (JS tools only) | `bun install -g` (JS tools only) |
-| **Prebuilt binaries** | N/A | N/A | `cargo-binstall`, Scoop |
-| **Python tools** | `uv tool install` (isolated venvs) | `uv tool install` (isolated venvs) | `uv tool install` (isolated venvs) |
+| Scope                       | macOS (nix-darwin)                                    | NixOS                                      | Windows                                                 |
+| --------------------------- | ----------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------- |
+| **System packages**         | `nixpkgs` via nix-darwin `environment.systemPackages` | `nixpkgs` via NixOS system config          | WinGet DSC (`system-packages.dsc.yml`)                  |
+| **User-level CLI tools**    | `nixpkgs` via Home Manager `home.packages`            | `nixpkgs` via Home Manager `home.packages` | WinGet DSC (`user.dsc.yml`, `user-env.dsc.yml`) + Scoop |
+| **Managed global packages** | `bun install -g` (JS tools only)                      | `bun install -g` (JS tools only)           | `bun install -g` (JS tools only)                        |
+| **Prebuilt binaries**       | N/A                                                   | N/A                                        | `cargo-binstall`, Scoop                                 |
+| **Python tools**            | `uv tool install` (isolated venvs)                    | `uv tool install` (isolated venvs)         | `uv tool install` (isolated venvs)                      |
 
 ## System-install-only tools
 
 The following tools are installed globally (via nixpkgs / WinGet) for system package management only. They are not available for general developer use in interactive sessions:
 
-| Tool | Installed by | Permitted system use |
-|---|---|---|---|
-| `bun` | nixpkgs / `Oven-sh.Bun` | `bun add -g` for global JS system packages |
-| `cargo` | all platforms: via `rustup` stable toolchain | `cargo-binstall` / `cargo install` for system Rust binary installs |
-| `rustup` | all platforms: `pkgs.rustup` (POSIX) / `Rustlang.Rustup` (Windows) | manages Rust toolchains; default = `none`; stable installed for cargo-binstall fallback |
-| `uv` | nixpkgs / WinGet | `uv tool install` for system-level Python tooling |
-| `prek` | nixpkgs | system-wide Git hook manager binary (invoked by managed shell/apply hooks) |
-| `python` / `pip` | **banned** | no permitted system use; all Python via devShell or uv venv |
-| `npm` / `npx` / `node` / `corepack` | **banned** | no permitted system use; all JS via bun |
+| Tool                                | Installed by                                                       | Permitted system use                                                                    |
+| ----------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `bun`                               | nixpkgs / `Oven-sh.Bun`                                            | `bun add -g` for global JS system packages                                              |
+| `cargo`                             | all platforms: via `rustup` stable toolchain                       | `cargo-binstall` / `cargo install` for system Rust binary installs                      |
+| `rustup`                            | all platforms: `pkgs.rustup` (POSIX) / `Rustlang.Rustup` (Windows) | manages Rust toolchains; default = `none`; stable installed for cargo-binstall fallback |
+| `uv`                                | nixpkgs / WinGet                                                   | `uv tool install` for system-level Python tooling                                       |
+| `prek`                              | nixpkgs                                                            | system-wide Git hook manager binary (invoked by managed shell/apply hooks)              |
+| `python` / `pip`                    | **banned**                                                         | no permitted system use; all Python via devShell or uv venv                             |
+| `npm` / `npx` / `node` / `corepack` | **banned**                                                         | no permitted system use; all JS via bun                                                 |
 
 Direct developer invocation of any of the above in an interactive shell session must go through a managed development environment rather than the raw system install.
 
@@ -80,10 +80,12 @@ On POSIX, `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix
 ## Overlapping package classification
 
 Packages available in both nixpkgs and Homebrew use a `category` field in `src/modules/core.nix`'s `overlappingPackages` to decide the install backend. This mechanism works cross-platform:
+
 - **macOS**: routes to either nixpkgs or Homebrew based on `category` and backend policy.
 - **NixOS**: all platform-compatible packages go through nixpkgs unconditionally.
 
 Category rules:
+
 - `"cli"` → nixpkgs
 - `"gui"` → Homebrew (cask preferred, formula fallback) on macOS; nixpkgs on NixOS
 
@@ -115,12 +117,12 @@ For packages that exist in Homebrew but not in nixpkgs, use `missingNixAttrs` in
 
 ## What violates this policy
 
-| Pattern | Issue | Fix |
-|---|---|---|---|
-| `sudo bun install -g ...` | Admin escalation | Remove `sudo`; use plain `bun install -g` |
-| `pip install --system ...` | System-wide Python | Use `uv tool install` or devShell |
-| `npm install -g` / `npx ...` / `node` (unmanaged) | Untracked JS ecosystem usage | Use `bun install -g` / `bun x` |
-| `npm install -g ...` (unmanaged) | Untracked global package | Use `bun install -g` with manifest tracking |
-| Installing to `/usr/local/bin` | Binary pollution | Use user-level tool directories |
-| `cargo install` in `setup.sh` | Imperative build-time install | Add to devShell or use `cargo-binstall` |
-| `Install-Module -Scope Machine` | System-wide module | Use `-Scope CurrentUser` |
+| Pattern                                           | Issue                         | Fix                                         |
+| ------------------------------------------------- | ----------------------------- | ------------------------------------------- |
+| `sudo bun install -g ...`                         | Admin escalation              | Remove `sudo`; use plain `bun install -g`   |
+| `pip install --system ...`                        | System-wide Python            | Use `uv tool install` or devShell           |
+| `npm install -g` / `npx ...` / `node` (unmanaged) | Untracked JS ecosystem usage  | Use `bun install -g` / `bun x`              |
+| `npm install -g ...` (unmanaged)                  | Untracked global package      | Use `bun install -g` with manifest tracking |
+| Installing to `/usr/local/bin`                    | Binary pollution              | Use user-level tool directories             |
+| `cargo install` in `setup.sh`                     | Imperative build-time install | Add to devShell or use `cargo-binstall`     |
+| `Install-Module -Scope Machine`                   | System-wide module            | Use `-Scope CurrentUser`                    |
