@@ -38,7 +38,7 @@ let
       builtins.replaceStrings
         [ "__FILE_BIN__" "__GS_PDF_OPT_PRESET__" ]
         [ "${pkgs.file}/bin/file" preset ]
-        (builtins.readFile ./../../scripts/integrations/file-manager-pdf-opt.sh)
+        (builtins.readFile ./../../scripts/integrations/configure-file-manager-pdf-opt.sh)
     );
 
   gsPdfOptNautilusScripts = builtins.listToAttrs (
