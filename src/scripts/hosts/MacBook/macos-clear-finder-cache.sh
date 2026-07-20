@@ -9,8 +9,8 @@
     # ignore system default changes. Clearing it on every apply ensures the
     # live system state matches declared configuration without requiring manual
     # user intervention (Cmd+Opt+Esc, cache deletion, etc.).
-    if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
-      finder_cache_dir="/Users/$console_user/Library/Saved Application State/com.apple.finder.savedState"
+    if _nucleus_resolve_console_user; then
+      finder_cache_dir="/Users/$_nucleus_console_user/Library/Saved Application State/com.apple.finder.savedState"
       if [ -d "$finder_cache_dir" ]; then
         if /bin/rm -rf "$finder_cache_dir"; then
           echo "finder: cleared cached application state from $finder_cache_dir"

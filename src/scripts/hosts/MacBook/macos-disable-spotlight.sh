@@ -10,18 +10,16 @@
 
     echo "spotlight: disabling..."
 
-    # undoc-supp: console uid probe may fail if console session ended; the [ -n "$console_uid_spotlight" ] guard handles empty output.
-    console_uid_spotlight="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
-    if [ -n "$console_user" ] && [ "$console_user" != "root" ] && [ -n "$console_uid_spotlight" ]; then
+    if _nucleus_resolve_console_user; then
       for hotkey in 61 64 65; do
-        if ! /bin/launchctl asuser "$console_uid_spotlight" /usr/bin/sudo -H -u "$console_user" \
+        if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
           /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add "$hotkey" \
           "<dict><key>enabled</key><false/></dict>"; then
           echo "spotlight: failed to disable hotkey $hotkey." >&2
         fi
       done
 
-      if ! /bin/launchctl asuser "$console_uid_spotlight" /usr/bin/sudo -H -u "$console_user" \
+      if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
         /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
         echo "spotlight: hotkey changes applied; log out/in once to fully activate." >&2
       fi

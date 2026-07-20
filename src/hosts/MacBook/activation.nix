@@ -116,6 +116,9 @@ in
   #   disableSpotlight                 — disable all Spotlight hotkeys + service
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
+    # ---- sharedConsoleUserLib --------------------------------------------------
+    ${builtins.readFile ../../scripts/lib/macos-console-user-lib.sh}
+
     # ---- configureXcodeSelect --------------------------------------------------
     # Point the system developer directory at the Nix apple-sdk store path so
     # xcrun (invoked by rustc/cargo for SDK discovery) works without Xcode CLT
@@ -149,6 +152,7 @@ in
 
     # ---- configureMiddleClick -------------------------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-enable-middle-click.sh}
+
     # ---- configureMountyLoginItem ---------------------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-register-mounty-login-item.sh}
     # ---- configureLinearMousePreferences --------------------------------------

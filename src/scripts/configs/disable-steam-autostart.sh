@@ -9,20 +9,17 @@ set -euo pipefail
 case "$(uname)" in
   Darwin)
     # Remove Steam from macOS Login Items via System Events.
-    # console_user is expected from the activation context.
-    if [ -n "$console_user" ] && [ "$console_user" != "root" ] && [ -d "/Applications/Steam.app" ]; then
-      # undoc-supp: console uid probe may fail if console session ended; [ -n "$console_uid" ] guard handles empty output.
-      console_uid="$(/usr/bin/id -u "$console_user" 2>/dev/null || true)"
-      if [ -n "$console_uid" ]; then
-        if ! /bin/launchctl asuser "$console_uid" /usr/bin/sudo -H -u "$console_user" \
-          /usr/bin/osascript \
-            -e 'tell application "System Events"' \
-            -e 'if exists login item "Steam" then' \
-            -e 'delete login item "Steam"' \
-            -e 'end if' \
-            -e 'end tell' 2>/dev/null; then
-          echo "steam: failed to remove login item." >&2
-        fi
+    # The shared console-user resolution function is provided by the
+    # activation context (MacBook/activation.nix inlines the lib).
+    if _nucleus_resolve_console_user && [ -d "/Applications/Steam.app" ]; then
+      if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
+        /usr/bin/osascript \
+          -e 'tell application "System Events"' \
+          -e 'if exists login item "Steam" then' \
+          -e 'delete login item "Steam"' \
+          -e 'end if' \
+          -e 'end tell' 2>/dev/null; then
+        echo "steam: failed to remove login item." >&2
       fi
     fi
     ;;

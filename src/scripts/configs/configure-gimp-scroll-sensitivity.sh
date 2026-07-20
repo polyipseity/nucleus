@@ -9,14 +9,14 @@
     # Version tracking rule: always target the major.minor branch of the GIMP
     # app provisioned by Nucleus (/Applications/GIMP.app), rather than using a
     # hardcoded version list, so new app upgrades keep working automatically.
-    if [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
-      console_home="$(/usr/bin/dscl . -read "/Users/$console_user" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}')"
+    if _nucleus_resolve_console_user; then
+      console_home="$(/usr/bin/dscl . -read "/Users/$_nucleus_console_user" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}')"
       if [ -z "$console_home" ]; then
-        console_home="/Users/$console_user"
+        console_home="/Users/$_nucleus_console_user"
       fi
 
       # undoc-supp: id -gn may fail if console session ended; empty group is handled by downstream chown guards.
-      console_group="$(/usr/bin/id -gn "$console_user" 2>/dev/null || true)"
+      console_group="$(/usr/bin/id -gn "$_nucleus_console_user" 2>/dev/null || true)"
 
       gimp_app_info="/Applications/GIMP.app/Contents/Info"
       gimp_version_raw=""
@@ -58,11 +58,11 @@
             fi
 
             if [ -n "$console_group" ]; then
-              if ! /usr/sbin/chown "$console_user:$console_group" "$gimprc_file"; then
+              if ! /usr/sbin/chown "$_nucleus_console_user:$console_group" "$gimprc_file"; then
                 echo "gimp: failed to set ownership on $gimprc_file." >&2
               fi
             else
-              if ! /usr/sbin/chown "$console_user" "$gimprc_file"; then
+              if ! /usr/sbin/chown "$_nucleus_console_user" "$gimprc_file"; then
                 echo "gimp: failed to set ownership on $gimprc_file." >&2
               fi
             fi

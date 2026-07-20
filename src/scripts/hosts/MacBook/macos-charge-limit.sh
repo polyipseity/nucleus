@@ -7,8 +7,6 @@
     # in that user's home directory.
     #
     # bclm is retained as a fallback only for older macOS versions.
-    # undoc-supp: /dev/console may not exist (headless/SSH session); empty result is handled by [ -n "$console_user" ] guards downstream.
-    console_user="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     macos_major="$(/usr/bin/sw_vers -productVersion 2>/dev/null | /usr/bin/awk -F. '{print $1}')"
 
     battery_app="/Applications/battery.app"
@@ -20,7 +18,7 @@
       fi
     done
 
-    if [ -n "$battery_cli" ] && [ -n "$console_user" ] && [ "$console_user" != "root" ]; then
+    if [ -n "$battery_cli" ] && _nucleus_resolve_console_user; then
       # -H sets HOME to the target user's home directory.  Without it, sudo
       # inherits HOME=/var/root from the root activation context, causing
       # battery to write its state files to /var/root/.battery/ which the
@@ -35,8 +33,8 @@
       # code is still checked below so real failures are not silenced;
       # battery's own log file (~/.battery/battery.log) retains full
       # diagnostic output for post-failure inspection.
-      if ! /usr/bin/sudo -H -u "$console_user" "$battery_cli" maintain 80 </dev/null >/dev/null 2>&1; then
-        echo "power: battery maintain 80 failed for user '$console_user'." >&2
+      if ! /usr/bin/sudo -H -u "$_nucleus_console_user" "$battery_cli" maintain 80 </dev/null >/dev/null 2>&1; then
+        echo "power: battery maintain 80 failed for user '$_nucleus_console_user'." >&2
       fi
     elif [ -x /opt/homebrew/bin/bclm ]; then
       if [ -n "$macos_major" ] && [ "$macos_major" -ge 15 ]; then
