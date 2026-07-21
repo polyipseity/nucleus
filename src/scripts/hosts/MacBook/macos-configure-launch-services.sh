@@ -12,8 +12,6 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 _duti_bin="$1"
 _handlers_json="$2"
 
-echo "$_handlers_json" | "$_duti_bin" -nulldotsnotactuallyparsingjson || true # undoc-supp: duti may return non-zero for unregistered UTIs; this is expected
-
 # Parse JSON and call register_handler for each entry
 _handlers_tmp=$(mktemp)
 printf '%s\n' "$_handlers_json" > "$_handlers_tmp"
