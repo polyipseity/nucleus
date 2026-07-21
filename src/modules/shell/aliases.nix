@@ -2,7 +2,16 @@
 #
 # Keep keys strictly alphabetical so diffs stay deterministic and accidental
 # duplicate alias intent is easy to detect during review.
-{ }: {
+{ }:
+#
+# Policy: full form
+# All option values MUST use long-form names (--patch, --all, --message, etc.)
+# wherever a long form exists. Short-form single-letter flags are prohibited.
+#
+# Exceptions (options with no long-form equivalent):
+# - git clean -d (no --directory long form in git clean)
+# - Ghostscript -sDEVICE=/-d* options (option-type prefixes, not short flags)
+{
   # --- Git aliases ---
   # Naming conventions:
   # - Prefix = base git command (all `git log` aliases start with `-gl`).
@@ -11,23 +20,23 @@
   # - Double letter = more: more verbose, more forceful, or full form.
   "-g" = "git";
   "-ga" = "git add";
-  "-gap" = "git add -p";
+  "-gap" = "git add --patch";
   "-gb" = "git branch";
-  "-gba" = "git branch -a";
-  "-gbd" = "git branch -d";
-  "-gbdd" = "git branch -D";
-  "-gbm" = "git branch -m";
+  "-gba" = "git branch --all";
+  "-gbd" = "git branch --delete";
+  "-gbdd" = "git branch --delete --force";
+  "-gbm" = "git branch --move";
   "-gc" = "git commit";
   "-gca" = "git commit --amend";
-  "-gcaa" = "git commit -a --amend";
-  "-gcam" = "git commit --amend -m";
+  "-gcaa" = "git commit --all --amend";
+  "-gcam" = "git commit --amend --message";
   "-gcl" = "git clone";
-  "-gclean" = "git clean -fdn";
-  "-gcleanf" = "git clean -fd";
-  "-gcm" = "git commit -m";
-  "-gcma" = "git commit -am";
+  "-gclean" = "git clean --force -d --dry-run";
+  "-gcleanf" = "git clean --force -d";
+  "-gcm" = "git commit --message";
+  "-gcma" = "git commit --all --message";
   "-gco" = "git checkout";
-  "-gcob" = "git checkout -b";
+  "-gcob" = "git checkout --branch";
   "-gd" = "git diff";
   "-gdc" = "git diff --cached";
   "-gds" = "git diff --stat";
@@ -38,7 +47,7 @@
   "-gla" = "git log --oneline --decorate --graph --all";
   "-gll" = "git log --decorate --graph --show-signature --stat";
   "-glla" = "git log --decorate --graph --show-signature --stat --all";
-  "-glp" = "git log --oneline --decorate --graph -p";
+  "-glp" = "git log --oneline --decorate --graph --patch";
   "-gls" = "git log --oneline --decorate --graph --stat";
   "-gm" = "git merge";
   "-gma" = "git merge --abort";
@@ -54,7 +63,7 @@
   "-grb" = "git rebase";
   "-grba" = "git rebase --abort";
   "-grbc" = "git rebase --continue";
-  "-grbi" = "git rebase -i";
+  "-grbi" = "git rebase --interactive";
   "-grbm" = "git rebase main";
   "-grbo" = "git rebase --onto";
   "-grbs" = "git rebase --skip";
@@ -62,20 +71,20 @@
   "-grs" = "git reset";
   "-grsh" = "git reset --soft HEAD~";
   "-grshh" = "git reset --hard HEAD~";
-  "-grv" = "git remote -v";
-  "-gs" = "git status -sb";
+  "-grv" = "git remote --verbose";
+  "-gs" = "git status --short --branch";
   "-gsh" = "git show";
   "-gss" = "git status";
   "-gst" = "git stash push";
   "-gstd" = "git stash drop";
   "-gstl" = "git stash list";
   "-gstp" = "git stash pop";
-  "-gstsh" = "git stash show -p";
+  "-gstsh" = "git stash show --patch";
   "-gsw" = "git switch";
-  "-gswc" = "git switch -c";
+  "-gswc" = "git switch --create";
   "-gt" = "git tag";
-  "-gtd" = "git tag -d";
-  "-gtl" = "git tag -l";
+  "-gtd" = "git tag --delete";
+  "-gtl" = "git tag --list";
   # --- Ghostscript PDF optimization presets ---
   # CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
   # newer PDF compatibility target is released by Ghostscript.
@@ -90,8 +99,8 @@
   "-gs-pdf-opt-screen" =
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH";
   # --- Non-git aliases ---
-  "-la" = "eza -la";
-  "-ll" = "eza -la";
+  "-la" = "eza --long --all";
+  "-ll" = "eza --long --all";
   # bun shortcuts — mirror the Windows bun function aliases in shell.ps1 managed block.
   # -ni/-nr/-nx are concise but unambiguous; `bun x` replaces npx for one-shot package execution.
   "-ni" = "bun install";
