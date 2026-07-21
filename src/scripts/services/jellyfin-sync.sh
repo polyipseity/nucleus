@@ -8,6 +8,7 @@ set -euo pipefail
 # Variables below are substituted via Nix replaceStrings at build time.
 REPO_ROOT='__NUCLEUS_REPO_ROOT__'
 _path_prepend='__NUCLEUS_PATH_PREPEND__'
+_sops_age_key_file='__SOPS_AGE_KEY_FILE__'
 
 # Fallback when run outside activation context (tokens not substituted).
 case "$REPO_ROOT" in __NUCLEUS_*)
@@ -25,6 +26,16 @@ esac
 
 if [ -n "$_path_prepend" ]; then
   export PATH="$_path_prepend:$PATH"
+fi
+
+# Export machine age key path for sops decryption during system activation.
+# Works in both activation mode (token substituted → $_sops_age_key_file) and
+# standalone mode (file at the same known path on disk).
+_sops_age_key_file_fallback='/etc/sops/age/machine.txt'
+if [ -f "$_sops_age_key_file" ]; then
+  export SOPS_AGE_KEY_FILE="$_sops_age_key_file"
+elif [ "$_sops_age_key_file" = '__SOPS_AGE_KEY_FILE__' ] && [ -f "$_sops_age_key_file_fallback" ]; then
+  export SOPS_AGE_KEY_FILE="$_sops_age_key_file_fallback"
 fi
 
 usage() {
