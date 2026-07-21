@@ -12,10 +12,9 @@ let
     pkgs.bottom
     pkgs.bun
     pkgs.caddy
-    # cargo install fallback when cargo-binstall has no binary.  Also used by
-    # installCargoBinstallPackages activation script for list/uninstall (via
-    # store-path arg; no ~/.cargo/bin probing).
-    pkgs.cargo
+    # REMOVED: pkgs.cargo conflicts with pkgs.rustup (both provide bin/cargo).
+    # Activation script installCargoBinstallPackages gets pkgs.cargo as
+    # a store-path argument directly — no PATH dependency needed.
     pkgs.camilladsp
     pkgs.camillagui-backend
     pkgs.cargo-binstall
