@@ -15,5 +15,4 @@
 
 pkgs.runCommand "nucleus-activation-bundle" { preferLocalBuild = true; } ''
   cp -r "${../../../src/scripts}/." "$out/"
-  find "$out" -name '*.sh' -type f -exec chmod +x {} +
 ''
