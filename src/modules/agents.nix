@@ -140,8 +140,7 @@ in
     # the Windows Invoke-RustupSetup behaviour.
     #
     # Sets rustup default to none so rust-toolchain.toml is always authoritative
-    # and installs the stable toolchain for cargo-binstall compilation fallback
-    # and for cargo +stable list/uninstall operations in the next step.
+    # and installs the stable toolchain for cargo-binstall compilation fallback.
     #
     # Why after linkGeneration: must run before installCargoBinstallPackages
     # (enforced by that step's entryAfter).
@@ -161,20 +160,15 @@ in
     # `cargo install` or `cargo binstall` that is NOT in the desired list will
     # be uninstalled (zap).
     #
-    # Mirrors homebrew cleanup = "zap": removes anything installed but absent
-    # from the declared desired set, regardless of how it was installed.
-    #
-    # Cargo resolution: this step probes `~/.cargo/bin` for the rustup cargo
-    # proxy (provisioned by initRustup).  No fallback to nixpkgs cargo is
-    # used — `pkgs.cargo` activation-fallback is prohibited (ban policy in
-    # core-behavior.instructions.md).  If the rustup proxy is absent, the
-    # step gracefully skips.
+    # Cargo resolution: uses nixpkgs cargo directly (store-path arg) for
+    # list/uninstall operations.  Runtime path probing (~/.cargo/bin) is
+    # prohibited.
     #
     # Install priority: nixpkgs > cargo binstall > cargo > bun > uv.
     #
-    # Why after initRustup: cargo is provided by rustup's stable toolchain via
-    # ~/.cargo/bin; initRustup ensures stable is installed before this step
-    # invokes `cargo +stable` for list and uninstall operations.  Unified with
+    # Why after initRustup: the stable toolchain is needed for
+    # cargo-binstall's compilation fallback strategy (--strategies compile);
+    # initRustup ensures stable is installed before this step.  Unified with
     # Windows Invoke-RustupSetup + Invoke-CargoBinstallSetup behavior.
     # -------------------------------------------------------------------------
     installCargoBinstallPackages = lib.hm.dag.entryAfter [ "initRustup" ] ''
@@ -182,7 +176,7 @@ in
         "${pkgs.jq}/bin/jq" \
         "${pkgs.gawk}/bin/awk" \
         '${builtins.toJSON [ ]}' \
-        "${managedPaths.cargoBinDir}"
+        "${pkgs.cargo}/bin/cargo"
     '';
 
     # -------------------------------------------------------------------------
