@@ -282,6 +282,8 @@ let
         shiftNumberLuaTable
       ]
       (builtins.readFile ../scripts/editors/neovim-init.lua);
+
+  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
 in
 {
   programs.neovim = {
@@ -349,30 +351,15 @@ in
     # Repo root is resolved from $NUCLEUS_REPO_ROOT (set by apply.sh before invoking
     # darwin-rebuild / nixos-rebuild and forwarded through sudo).
     # -------------------------------------------------------------------------
-    vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      builtins.replaceStrings
-        [
-          "__REPO_ROOT__"
-          "__VSCODE_STABLE_BASE_DIR__"
-          "__VSCODE_INSIDERS_BASE_DIR__"
-          "__VSCODE_KEYBINDINGS_FILE__"
-          "__VSCODE_CHAT_LANGUAGE_MODELS_FILE__"
-          "__JQ_BIN__"
-        ]
-        [
-          repoRoot
-          stableBaseDir
-          insidersBaseDir
-          vsCodeKeybindingsFile
-          vsCodeChatLanguageModelsFile
-          "${pkgs.jq}/bin/jq"
-        ]
-        (
-          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
-          + "\n"
-          + builtins.readFile ../scripts/editors/symlink-vscode-config.sh
-        )
-    );
+    vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/bin/symlink-vscode-config" \
+        "${repoRoot}" \
+        "${stableBaseDir}" \
+        "${insidersBaseDir}" \
+        "${vsCodeKeybindingsFile}" \
+        "${vsCodeChatLanguageModelsFile}" \
+        "${pkgs.jq}/bin/jq"
+    '';
 
     # -----------------------------------------------------------------------
     # vsCodeExtensionBridge
@@ -387,13 +374,9 @@ in
     # a whole-directory store symlink would cause EACCES.  Instead, keep a real
     # writable directory and populate it with per-extension symlinks.
     # -----------------------------------------------------------------------
-    vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      builtins.replaceStrings [ "__EXTENSION_STORE__" ] [ "${extensionStore}" ] (
-        builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
-        + "\n"
-        + builtins.readFile ../scripts/editors/bridge-vscode-extensions.sh
-      )
-    );
+    vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/bin/bridge-vscode-extensions" "${extensionStore}"
+    '';
 
     # -----------------------------------------------------------------------
     # vsCodeWorkspaceTrust
@@ -415,11 +398,8 @@ in
     # The Python script exits immediately when ~/dev is absent (edge case:
     # first-run race before provisionDevDirectory completes).
     # -----------------------------------------------------------------------
-    vsCodeWorkspaceTrust = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.replaceStrings
-        [ "__PYTHON3_BIN__" "__VSCODE_WORKSPACE_TRUST_PY__" ]
-        [ "${pkgs.python3}" "${vsCodeWorkspaceTrustPy}" ]
-        (builtins.readFile ../scripts/editors/trust-vscode-workspace.sh)
-    );
+    vsCodeWorkspaceTrust = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      "${activationBundle}/bin/trust-vscode-workspace" "${pkgs.python3}" "${vsCodeWorkspaceTrustPy}"
+    '';
   };
 }

@@ -15,6 +15,8 @@ let
   # mkOutOfStoreSymlink source paths (build-time) and for lib sourcing paths
   # (baked into activation scripts at build time, resolved at runtime).
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+
+  activationBundle = pkgs.callPackage ./activation-bundle.nix { };
 in
 {
   # ---------------------------------------------------------------------------
@@ -32,13 +34,11 @@ in
       config.lib.file.mkOutOfStoreSymlink "${repoRoot}/${repoRelPath}";
 
     home.activation."unprotectSymlink_${name}" = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      ${builtins.readFile ../../scripts/lib/symlink-hardening-lib.sh}
-      _nucleus_unprotect_symlink ${lib.escapeShellArg name} "$HOME/${targetRelPath}"
+      "${activationBundle}/bin/managed-symlink" "unprotect" ${lib.escapeShellArg name} "$HOME/${targetRelPath}"
     '';
 
     home.activation."protectSymlink_${name}" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.readFile ../../scripts/lib/symlink-hardening-lib.sh}
-      _nucleus_protect_symlink ${lib.escapeShellArg name} "$HOME/${targetRelPath}"
+      "${activationBundle}/bin/managed-symlink" "protect" ${lib.escapeShellArg name} "$HOME/${targetRelPath}"
     '';
   };
 

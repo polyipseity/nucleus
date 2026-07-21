@@ -69,6 +69,8 @@ let
   # runtime env var because darwin-rebuild/nixos-rebuild use sudo, which
   # strips NUCLEUS_REPO_ROOT from the activation environment.
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+
+  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
 in
 {
   options.nucleus.customProvisionSymlinks = lib.mkOption {
@@ -123,52 +125,29 @@ in
     );
 
     home.activation.ensureCustomProvisionSymlinkTargets =
-      lib.hm.dag.entryBefore [ "prepareCustomProvisionSymlinks" ]
-        (
-          builtins.replaceStrings
-            [ "__MANAGED_SYMLINK_MANIFEST_PATH__" "__SYMLINK_TARGET_DIRS_JSON__" "__JQ_BIN__" ]
-            [
-              managedSymlinkManifestPath
-              (builtins.toJSON (
-                map (entry: entry.linkAbsolutePath) (
-                  builtins.filter (entry: entry.createTargetDirectory) selectedSymlinksResolved
-                )
-              ))
-              "${pkgs.jq}/bin/jq"
-            ]
-            (builtins.readFile ../scripts/configs/ensure-symlink-targets.sh)
-        );
-
-    home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] (
-      builtins.replaceStrings
-        [ "__MANIFEST_PATH__" "__JQ_BIN__" ]
-        [ managedSymlinkManifestPath "${pkgs.jq}/bin/jq" ]
-        (
-          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
-          + "\n"
-          + builtins.readFile ../scripts/configs/provision-symlinks.sh
-        )
-    );
-
-    home.activation.finalizeCustomProvisionSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      builtins.replaceStrings
-        [
-          "__MANAGED_SYMLINK_MANIFEST_PATH__"
-          "__SYMLINK_ENTRIES_JSON__"
-          "__MANAGED_SYMLINK_MANIFEST_JSON__"
-          "__JQ_BIN__"
-        ]
-        [
-          managedSymlinkManifestPath
-          (builtins.toJSON (map (entry: entry.linkAbsolutePath) selectedSymlinksResolved))
-          managedSymlinkManifestJson
+      lib.hm.dag.entryBefore [ "prepareCustomProvisionSymlinks" ] ''
+        "${activationBundle}/bin/ensure-symlink-targets" \
+          "${managedSymlinkManifestPath}" \
+          '${builtins.toJSON (
+            map (entry: entry.linkAbsolutePath) (
+              builtins.filter (entry: entry.createTargetDirectory) selectedSymlinksResolved
+            )
+          )}' \
           "${pkgs.jq}/bin/jq"
-        ]
-        (
-          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
-          + "\n"
-          + builtins.readFile ../scripts/configs/finalize-symlinks.sh
-        )
-    );
+      '';
+
+    home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+      "${activationBundle}/bin/provision-symlinks" \
+        "${managedSymlinkManifestPath}" \
+        "${pkgs.jq}/bin/jq"
+    '';
+
+    home.activation.finalizeCustomProvisionSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/bin/finalize-symlinks" \
+        "${managedSymlinkManifestPath}" \
+        "${pkgs.jq}/bin/jq" \
+        '${builtins.toJSON (map (entry: entry.linkAbsolutePath) selectedSymlinksResolved)}' \
+        '${managedSymlinkManifestJson}'
+    '';
   };
 }

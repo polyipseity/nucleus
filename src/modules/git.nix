@@ -5,6 +5,9 @@
   pkgs,
   ...
 }:
+let
+  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+in
 {
   # Keep a managed global ignore baseline plus a user-writable overlay file.
   # The activation step below assembles both into ~/.config/git/ignore so
@@ -14,9 +17,9 @@
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/system.gitignore";
   };
 
-  home.activation.gitIgnoreAssemble = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-    builtins.readFile ../scripts/configs/assemble-git-ignore.sh
-  );
+  home.activation.gitIgnoreAssemble = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    "${activationBundle}/bin/assemble-git-ignore"
+  '';
 
   home.activation.gitEmptyTemplate = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     # Ensure the empty template directory exists so `init.templateDir` always

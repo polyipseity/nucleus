@@ -6,8 +6,11 @@
   ...
 }:
 let
+  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+in
+{
   # ---------------------------------------------------------------------------
-  # deriveHostAgeKey script text
+  # deriveHostAgeKey
   # Derives the age secret identity from the machine's SSH host key and writes
   # it to /etc/sops/age/machine.txt so the Home Manager sops-nix instance can
   # decrypt SOPS secrets without requiring root privileges.
@@ -30,23 +33,15 @@ let
   #   produce identical output.  We always overwrite to keep the file current
   #   if the host key is ever rotated.
   # ---------------------------------------------------------------------------
-  deriveHostAgeKeyText =
-    builtins.replaceStrings
-      [ "__SSH_TO_AGE_BIN__" "__USERNAME__" ]
-      [ "${pkgs.ssh-to-age}/bin/ssh-to-age" "${username}" ]
-      (builtins.readFile ../scripts/secrets/derive-host-age-key.sh);
-in
-{
-  # ---------------------------------------------------------------------------
-  # nix-darwin only allows hardcoded named scripts; deriveHostAgeKey must run
-  # after openssh (which writes the host key), so use postActivation + mkBefore.
-  # NixOS accepts any script name.
-  # ---------------------------------------------------------------------------
   system.activationScripts =
     if pkgs.stdenv.isDarwin then
-      { postActivation.text = lib.mkBefore deriveHostAgeKeyText; }
+      { postActivation.text = lib.mkBefore ''
+        "${activationBundle}/bin/derive-host-age-key" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${username}"
+      ''; }
     else
-      { deriveHostAgeKey.text = deriveHostAgeKeyText; };
+      { deriveHostAgeKey.text = ''
+        "${activationBundle}/bin/derive-host-age-key" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${username}"
+      ''; };
 
   sops = {
     age = {

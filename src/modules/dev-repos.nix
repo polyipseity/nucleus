@@ -24,6 +24,8 @@ let
       repositories = [ ];
       submoduleDirectories = [ ];
     };
+
+  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
 in
 {
   options.nucleus.devRepos = {
@@ -109,20 +111,14 @@ in
           "waitForSopsSecrets"
           "writeBoundary"
         ]
-        (
-          let
-            tokens = {
-              __REPO_ROOT__ = repoRoot;
-              __CURRENT_USER_HOME__ = currentUserHome;
-              __SSH_CLIENT__ = sshClient;
-              __GIT_BIN__ = "${pkgs.git}/bin";
-              __JQ_BIN__ = "${pkgs.jq}/bin/jq";
-              __DEV_REPOS_JSON__ = builtins.toJSON config.nucleus.devRepos;
-            };
-          in
-          builtins.replaceStrings (builtins.attrNames tokens) (builtins.attrValues tokens) (
-            builtins.readFile ../scripts/configs/provision-dev-repos.sh
-          )
-        );
+        ''
+          "${activationBundle}/bin/provision-dev-repos" \
+            "${currentUserHome}" \
+            "${pkgs.git}/bin" \
+            "${sshClient}" \
+            "${repoRoot}" \
+            "${pkgs.jq}/bin/jq" \
+            '${builtins.toJSON config.nucleus.devRepos}'
+        '';
   };
 }

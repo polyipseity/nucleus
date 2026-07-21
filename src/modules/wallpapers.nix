@@ -80,6 +80,8 @@ let
   # desktoppr is darwin-only; keep this reference lazy so Linux evaluation
   # does not attempt to instantiate an unsupported package.
   desktopprBinPath = if pkgs.stdenv.isDarwin then "${pkgs.desktoppr}/bin/desktoppr" else "";
+
+  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
 in
 {
   assertions = [
@@ -95,35 +97,21 @@ in
 
   sops.secrets = wallpaperSecrets;
 
-  home.activation."wallpaper-provision" = lib.hm.dag.entryAfter [ "sops-nix" ] (
-    builtins.replaceStrings
-      [
-        "__WALLPAPER_ITEMS_JSON__"
-        "__JQ_BIN__"
-        "__IS_DARWIN__"
-        "__PICTURES_DIR__"
-        "__DESKTOPPR_BIN__"
-        "__COREUTILS_BIN__"
-        "__WALLPAPERS_DIR__"
-        "__CURRENT_USER__"
-        "__SOPS_SYMLINK_PATH__"
-      ]
-      [
-        (builtins.toJSON (
-          map (item: {
-            secretName = item.secretName;
-            wallpaperName = item.wallpaperName;
-          }) wallpaperItemsForCurrentUser
-        ))
-        "${pkgs.jq}/bin/jq"
-        (if pkgs.stdenv.isDarwin then "1" else "0")
-        "${currentUserHome}/Pictures/wallpapers"
-        desktopprBinPath
-        "${pkgs.coreutils}"
-        "${wallpapersDir}"
-        currentUsername
-        config.sops.defaultSymlinkPath
-      ]
-      (builtins.readFile ../scripts/provision-wallpaper.sh)
-  );
+  home.activation."wallpaper-provision" = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+    "${activationBundle}/bin/provision-wallpaper" \
+      "${if pkgs.stdenv.isDarwin then "1" else "0"}" \
+      "${currentUserHome}/Pictures/wallpapers" \
+      "${desktopprBinPath}" \
+      "${pkgs.coreutils}" \
+      "${wallpapersDir}" \
+      "${currentUsername}" \
+      "${config.sops.defaultSymlinkPath}" \
+      '${builtins.toJSON (
+        map (item: {
+          secretName = item.secretName;
+          wallpaperName = item.wallpaperName;
+        }) wallpaperItemsForCurrentUser
+      )}' \
+      "${pkgs.jq}/bin/jq"
+  '';
 }

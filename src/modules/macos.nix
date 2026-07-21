@@ -278,6 +278,8 @@ let
       ]
       (builtins.readFile ../scripts/hosts/MacBook/macos-set-gui-env.sh)
   );
+
+  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
 in
 lib.mkIf pkgs.stdenv.isDarwin {
   home.packages = [
@@ -292,13 +294,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
   };
 
   home.activation.unprotectDownloadsICloudSymlink = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-    ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-    _nucleus_unprotect_symlink "macos.nix" "$HOME/Downloads/iCloud"
+    "${activationBundle}/bin/managed-symlink" "unprotect" "macos.nix" "$HOME/Downloads/iCloud"
   '';
 
   home.activation.protectDownloadsICloudSymlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-    _nucleus_protect_symlink "macos.nix" "$HOME/Downloads/iCloud"
+    "${activationBundle}/bin/managed-symlink" "protect" "macos.nix" "$HOME/Downloads/iCloud"
   '';
 
   home.activation = {
@@ -320,9 +320,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #
     # No-op if displayplacer is not installed.
     # -------------------------------------------------------------------------
-    display-resolutions = lib.hm.dag.entryAfter [ "macos-headless-display" ] (
-      builtins.readFile ../scripts/hosts/MacBook/macos-display-resolutions.sh
-    );
+    display-resolutions = lib.hm.dag.entryAfter [ "macos-headless-display" ] ''
+      "${activationBundle}/bin/display-resolutions"
+    '';
 
     # -------------------------------------------------------------------------
     # input-config
@@ -342,22 +342,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # now handled declaratively in defaults.nix via CustomUserPreferences.
     # -------------------------------------------------------------------------
     input-config = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      # Configure input method settings and disable conflicting hotkeys.
-      set -eu
-
-      # Source: symbolic hotkey values are persisted in
-      # com.apple.symbolichotkeys/AppleSymbolicHotKeys via defaults(1).
-      # https://www.manpagez.com/man/1/defaults/
-      if ! /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 176 "<dict><key>enabled</key><false/></dict>"; then
-        echo "macos: failed to update symbolic hotkey 176." >&2
-      fi
-
-      if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-        echo "macos: activateSettings -u failed; input settings may apply on next login." >&2
-      fi
-
-      ${builtins.readFile ../scripts/lib/macos-launch-services-lib.sh}
-      refresh_tiswitcher
+      "${activationBundle}/bin/configure-input-config"
     '';
 
     # -------------------------------------------------------------------------
@@ -371,13 +356,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       "safari-defaults"
       "universal-access-defaults"
     ] ''
-      # Reload macOS user preference state after all managed defaults writes.
-      # Without this, cfprefsd and related daemons hold stale values in memory
-      # until logout/login.
-      set -eu
-      if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-        echo "macos: activateSettings -u failed; some preference updates may require relogin." >&2
-      fi
+      "${activationBundle}/bin/reload-user-preference-state"
     '';
 
     # -------------------------------------------------------------------------
@@ -389,11 +368,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # store paths.
     # Method 1 (writable symlink): linearmouse/linearmouse.json deployed via linearmouse-config.sh
     # -------------------------------------------------------------------------
-    linearmouse-config = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      builtins.replaceStrings [ "__REPO_ROOT__" ] [ "${repoRoot}" ] (
-        builtins.readFile ../scripts/hosts/MacBook/macos-configure-linearmouse.sh
-      )
-    );
+    linearmouse-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/bin/configure-linearmouse" "${repoRoot}"
+    '';
 
     # -------------------------------------------------------------------------
     # macos-launch-services
@@ -407,10 +384,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #   VLC    — handles the complete set of audio/video UTIs defined above
     # -------------------------------------------------------------------------
     macos-launch-services = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.readFile ../scripts/lib/macos-launch-services-lib.sh}
-      register_handler "${dutiBin}" "com.google.chrome" ${builtins.concatStringsSep " " chromeUTIs}
-      register_handler "${dutiBin}" "com.aone.keka" ${builtins.concatStringsSep " " kekaUTIs}
-      register_handler "${dutiBin}" "org.videolan.vlc" ${builtins.concatStringsSep " " vlcUTIs}
+      "${activationBundle}/bin/configure-launch-services" "${dutiBin}" '${builtins.toJSON [
+        { bundle_id = "com.google.chrome"; utis = chromeUTIs; }
+        { bundle_id = "com.aone.keka"; utis = kekaUTIs; }
+        { bundle_id = "org.videolan.vlc"; utis = vlcUTIs; }
+      ]}'
     '';
 
     # -------------------------------------------------------------------------
@@ -423,9 +401,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # under ~/Applications/Nucleus App Aliases so Spotlight/Raycast can index
     # additional English tokens without changing the system UI language.
     # -------------------------------------------------------------------------
-    raycast-aliases = lib.hm.dag.entryAfter [ "macos-launch-services" ] (
-      builtins.readFile ../scripts/hosts/MacBook/macos-install-raycast-aliases.sh
-    );
+    raycast-aliases = lib.hm.dag.entryAfter [ "macos-launch-services" ] ''
+      "${activationBundle}/bin/raycast-aliases"
+    '';
 
     # -------------------------------------------------------------------------
     # nightlight
@@ -438,9 +416,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if nightlight is not installed.
     # Source: https://github.com/smudge/nightlight
     # -------------------------------------------------------------------------
-    nightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      builtins.readFile ../scripts/hosts/MacBook/macos-install-nightlight.sh
-    );
+    nightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/bin/nightlight"
+    '';
 
     # -------------------------------------------------------------------------
     # configureICloudExclusions
@@ -458,8 +436,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Source: https://developer.apple.com/documentation/fileprovider
     # -------------------------------------------------------------------------
     configureICloudExclusions = lib.hm.dag.entryAfter [ "cloudDrivesSetup" ] ''
-      ${builtins.readFile ../scripts/lib/macos-icloud-exclusions-lib.sh}
-      apply_exclusions "${pkgs.jq}/bin/jq" "${pkgs.findutils}/bin/find" ${lib.escapeShellArg icloudExcludedDirsJson} ${lib.escapeShellArg icloudManagedRootsJson}
+      "${activationBundle}/bin/configure-icloud-exclusions" "${pkgs.jq}/bin/jq" "${pkgs.findutils}/bin/find" ${lib.escapeShellArg icloudExcludedDirsJson} ${lib.escapeShellArg icloudManagedRootsJson}
     '';
 
     # -------------------------------------------------------------------------
@@ -475,11 +452,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #   3. Continue activation either way so non-privacy-gated settings still
     #      converge in the same run.
     # -------------------------------------------------------------------------
-    preflightPrivacyPermissions = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
-        builtins.readFile ../scripts/hosts/MacBook/macos-configure-preflight-privacy.sh
-      )
-    );
+    preflightPrivacyPermissions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      "${activationBundle}/bin/preflight-privacy" "${repoRoot}"
+    '';
 
     # -------------------------------------------------------------------------
     # safari-defaults
@@ -488,9 +463,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # activation. Apply these settings from user activation instead so Safari
     # hardening remains declarative without breaking `darwin-rebuild switch`.
     # -------------------------------------------------------------------------
-    safari-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
-      builtins.readFile ../scripts/hosts/MacBook/macos-configure-safari-defaults.sh
-    );
+    safari-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
+      "${activationBundle}/bin/safari-defaults"
+    '';
 
     # -------------------------------------------------------------------------
     # universal-access-defaults
@@ -498,9 +473,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # system-level defaults writes during `darwin-rebuild`. Apply them from the
     # user activation phase to keep accessibility intent without system errors.
     # -------------------------------------------------------------------------
-    universal-access-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] (
-      builtins.readFile ../scripts/hosts/MacBook/macos-configure-universal-access.sh
-    );
+    universal-access-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
+      "${activationBundle}/bin/universal-access-defaults"
+    '';
 
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
@@ -523,8 +498,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # maintenance. Keeping it independent avoids fake coupling with ~/dev work.
     # -------------------------------------------------------------------------
     reloadDockPreferenceState = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      ${builtins.readFile ../scripts/lib/macos-launch-services-lib.sh}
-      refresh_dock
+      "${activationBundle}/bin/reload-dock-preference-state"
     '';
 
     # -------------------------------------------------------------------------
@@ -537,8 +511,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # in-session flush but a full restart is required for order to appear correctly.
     # Source: https://github.com/mosen/mysides
     configureFinderSidebar = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      ${builtins.readFile ../scripts/lib/macos-finder-sidebar-lib.sh}
-      finder_configure_sidebar ${lib.escapeShellArg (builtins.toJSON finderSidebar.finderSidebarManagedFavorites)} "${pkgs.jq}/bin/jq" "${pkgs.mysides}/bin/mysides" ${lib.escapeShellArg finderSidebar.finderSidebarExpectedOrder} ${toString finderSidebar.finderSidebarManagedCount}
+      "${activationBundle}/bin/configure-finder-sidebar" ${lib.escapeShellArg (builtins.toJSON finderSidebar.finderSidebarManagedFavorites)} "${pkgs.jq}/bin/jq" "${pkgs.mysides}/bin/mysides" ${lib.escapeShellArg finderSidebar.finderSidebarExpectedOrder} ${toString finderSidebar.finderSidebarManagedCount}
     '';
 
     # -------------------------------------------------------------------------
@@ -551,14 +524,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # default ordering.
     # -------------------------------------------------------------------------
     relaunchDesktopServices = lib.hm.dag.entryAfter [ "configureFinderSidebar" ] ''
-      ${builtins.readFile ../scripts/lib/macos-launch-services-lib.sh}
-      refresh_desktop_services
-
-      ${builtins.readFile ../scripts/lib/macos-finder-sidebar-lib.sh}
-      _mysides_bin="${pkgs.mysides}/bin/mysides"
-      if [ -x "$_mysides_bin" ]; then
-        finder_reconcile_best_effort ${lib.escapeShellArg (builtins.toJSON finderSidebar.finderSidebarManagedFavorites)} "${pkgs.jq}/bin/jq" "$_mysides_bin"
-      fi
+      "${activationBundle}/bin/relaunch-desktop-services" ${lib.escapeShellArg (builtins.toJSON finderSidebar.finderSidebarManagedFavorites)} "${pkgs.jq}/bin/jq" "${pkgs.mysides}/bin/mysides"
     '';
 
     # -------------------------------------------------------------------------
@@ -566,11 +532,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Health check for archiving tools: verifies 7z CLI, Keka app registration,
     # and archive handler associations are functional after activation.
     # -------------------------------------------------------------------------
-    verifyArchivingStack = lib.hm.dag.entryAfter [ "macos-launch-services" "installPackages" ] (
-      builtins.replaceStrings [ "__P7ZIP_BIN__" ] [ "${pkgs.p7zip}/bin/7z" ] (
-        builtins.readFile ../scripts/packages/verify-archiving-stack.sh
-      )
-    );
+    verifyArchivingStack = lib.hm.dag.entryAfter [ "macos-launch-services" "installPackages" ] ''
+      "${activationBundle}/bin/verify-archiving-stack" "${pkgs.p7zip}/bin/7z"
+    '';
 
     # -------------------------------------------------------------------------
     # macos-headless-display
@@ -591,9 +555,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #
     # No-op if BetterDisplay is not installed.
     # -------------------------------------------------------------------------
-    macos-headless-display = lib.hm.dag.entryAfter [ "nightlight" ] (
-      builtins.readFile ../scripts/hosts/MacBook/macos-configure-headless-display.sh
-    );
+    macos-headless-display = lib.hm.dag.entryAfter [ "nightlight" ] ''
+      "${activationBundle}/bin/headless-display"
+    '';
   };
 
   # --------------------------------------------------------------------------
@@ -789,9 +753,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # after setupLaunchAgents runs.  On macOS 26, launchctl bootstrap can
   # spuriously return "Bootstrap failed: 5: Input/output error" — HM detects
   # this but never retries, and subsequent activations skip unchanged agents.
-  home.activation."ensure-launchagents" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] (
-    builtins.readFile ../scripts/hosts/MacBook/macos-ensure-launchagents.sh
-  );
+  home.activation."ensure-launchagents" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
+    "${activationBundle}/bin/ensure-launchagents" "$newGenPath"
+  '';
 
   # --------------------------------------------------------------------------
   # gui-env-path
@@ -811,24 +775,14 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # The gui-env LaunchAgent (below) provides login-time coverage before the
   # first activation runs.
   # --------------------------------------------------------------------------
-  home.activation."gui-env-path" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] (
-    builtins.replaceStrings
-      [
-        "__MANAGED_PREPEND_PATH__"
-        "__MANAGED_APPEND_PATH__"
-        "__MANAGED_DEDUP_SET__"
-        "__MACOS_ALL_VARS__"
-        "__MANAGED_LAUNCHCTL_CONFIG_PATH__"
-      ]
-      [
-        managedPaths.toShellPrependPath
-        managedPaths.toShellAppendPath
-        (mkManagedDedupSet config.home.homeDirectory)
-        envVars.macOSAllVars
-        (managedPaths.toLaunchctlConfigPath config.home.homeDirectory)
-      ]
-      (builtins.readFile ../scripts/hosts/MacBook/macos-set-gui-env-path.sh)
-  );
+  home.activation."gui-env-path" = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
+    "${activationBundle}/bin/gui-env-path" \
+      "${managedPaths.toShellPrependPath}" \
+      "${managedPaths.toShellAppendPath}" \
+      "${mkManagedDedupSet config.home.homeDirectory}" \
+      ${lib.escapeShellArg envVars.macOSAllVars} \
+      "${managedPaths.toLaunchctlConfigPath config.home.homeDirectory}"
+  '';
 
   # --------------------------------------------------------------------------
   # GUI environment variable propagation LaunchAgent (macOS-only)

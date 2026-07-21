@@ -198,7 +198,8 @@ let
         TouchBar = true;
       };
     }
-  ];
+  ];  activationBundle = pkgs.callPackage ../../../modules/lib/activation-bundle.nix { };
+
 in
 {
   home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
@@ -215,25 +216,21 @@ in
     executable = true;
   };
 
-  home.activation.deployNucleusAutomatorWorkflows = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-    builtins.replaceStrings
-      [ "__JQ_BIN__" "__CURRENT_WORKFLOWS_JSON__" "__REMOVED_WORKFLOWS_JSON__" ]
-      [
-        "${pkgs.jq}/bin/jq"
-        (builtins.toJSON (
-          map (wf: {
-            inherit (wf) dir enablementKey;
-            source = "${wf.source}";
-            presentationModesDict = mkPresentationModes wf.presentationModes;
-          }) currentNucleusWorkflows
-        ))
-        (builtins.toJSON (
-          map (wf: {
-            enablementKey = wf.enablementKey;
-            dir = wf.dir or null;
-          }) removedNucleusWorkflows
-        ))
-      ]
-      (builtins.readFile ../../../scripts/hosts/MacBook/macos-deploy-automator-workflows.sh)
-  );
+  home.activation.deployNucleusAutomatorWorkflows = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    "${activationBundle}/bin/macos-deploy-automator-workflows" \
+      "${pkgs.jq}/bin/jq" \
+      '${builtins.toJSON (
+        map (wf: {
+          inherit (wf) dir enablementKey;
+          source = "${wf.source}";
+          presentationModesDict = mkPresentationModes wf.presentationModes;
+        }) currentNucleusWorkflows
+      )}' \
+      '${builtins.toJSON (
+        map (wf: {
+          enablementKey = wf.enablementKey;
+          dir = wf.dir or null;
+        }) removedNucleusWorkflows
+      )}'
+  '';
 }

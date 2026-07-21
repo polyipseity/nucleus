@@ -143,6 +143,8 @@ let
 
   # Path to the checked-out dotfiles/ directory at the root of this repo.
   dotfilesRoot = ../dotfiles;
+
+  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
 in
 {
   options.nucleus.rclone = {
@@ -210,22 +212,13 @@ in
     # Windows: registry). A symlink does not apply to these platform-native
     # stores. Merge writes the managed defaults into each store while
     # preserving any user-configured settings outside managed keys.
-    home.activation."qtpass-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.replaceStrings
-        [
-          "__AWK_PATH__"
-          "__QTPASS_DARWIN_COMMANDS__"
-          "__QTPASS_LINUX_PRIMARY_COMMANDS__"
-          "__QTPASS_LINUX_SECONDARY_COMMANDS__"
-        ]
-        [
-          "${pkgs.gawk}/bin/awk"
-          qtpassModule.qtPassDarwinCommands
-          qtpassModule.qtPassPrimaryIniCommands
-          qtpassModule.qtPassSecondaryIniCommands
-        ]
-        (builtins.readFile ../scripts/configs/merge-qtpass-ini.sh)
-    );
+    home.activation."qtpass-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      "${activationBundle}/bin/merge-qtpass-ini" \
+        "${pkgs.gawk}/bin/awk" \
+        ${lib.escapeShellArg qtpassModule.qtPassDarwinCommands} \
+        ${lib.escapeShellArg qtpassModule.qtPassPrimaryIniCommands} \
+        ${lib.escapeShellArg qtpassModule.qtPassSecondaryIniCommands}
+    '';
 
     # Picard reads native INI settings from ~/.config/MusicBrainz/Picard.ini
     # on macOS and Linux. Merge-overwrite defaults from the canonical
@@ -236,12 +229,12 @@ in
     # settings that should persist across applies). A symlink would let app
     # writes reach the repo file. Merge applies managed defaults while
     # preserving all app-owned keys and sections.
-    home.activation."picard-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.replaceStrings
-        [ "__AWK_PATH__" "__PICARD_DEFAULTS_INI__" "__PICARD_OVERRIDE_COMMANDS__" ]
-        [ "${pkgs.gawk}/bin/awk" (lib.escapeShellArg picardDefaultsIniText) picardOverrideCommands ]
-        (builtins.readFile ../scripts/configs/merge-picard-ini.sh)
-    );
+    home.activation."picard-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      "${activationBundle}/bin/merge-picard-ini" \
+        "${pkgs.gawk}/bin/awk" \
+        ${lib.escapeShellArg picardDefaultsIniText} \
+        ${lib.escapeShellArg picardOverrideCommands}
+    '';
 
     # Obsidian stores app-global settings in obsidian.json alongside dynamic
     # vault metadata.  Merge only the managed advanced-setting keys into that
@@ -253,65 +246,21 @@ in
     # it. A symlink would let those app-owned writes reach the repo file,
     # mixing managed settings with runtime state that does not belong in the
     # repo. Merge preserves both managed and app-owned keys.
-    home.activation."obsidian-merge-json" = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.replaceStrings
-        [ "__PYTHON3_BIN__" "__OBSIDIAN_MERGE_JSON_PY__" "__OBSIDIAN_SETTINGS_JSON__" ]
-        [
-          "${pkgs.python3}/bin/python3"
-          "${obsidianMergeJsonPy}"
-          (lib.escapeShellArg obsidianManagedSettingsJson)
-        ]
-        (builtins.readFile ../scripts/configs/merge-obsidian-json.sh)
-    );
+    home.activation."obsidian-merge-json" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      "${activationBundle}/bin/merge-obsidian-json" \
+        "${pkgs.python3}/bin/python3" \
+        "${obsidianMergeJsonPy}" \
+        ${lib.escapeShellArg obsidianManagedSettingsJson}
+    '';
 
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
     # deletion between rebuilds.
     home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      set -eu
-      ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-      _nucleus_unprotect_managed_paths() {
-        _context="$1"
-        _paths_json="$2"
-        _jq_bin="$3"
-        echo "$_paths_json" | "$_jq_bin" -r '.[]' | while IFS= read -r _p; do
-          [ -n "$_p" ] || continue
-          _nucleus_unprotect_symlink "$_context" "$_p"
-        done
-      }
-      _nucleus_protect_managed_paths() {
-        _context="$1"
-        _paths_json="$2"
-        _jq_bin="$3"
-        echo "$_paths_json" | "$_jq_bin" -r '.[]' | while IFS= read -r _p; do
-          [ -n "$_p" ] || continue
-          _nucleus_protect_symlink "$_context" "$_p"
-        done
-      }
-      _nucleus_unprotect_managed_paths "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
+      "${activationBundle}/bin/manage-out-of-store-symlinks" "unprotect" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
     '';
 
     home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      set -eu
-      ${builtins.readFile ../scripts/lib/symlink-hardening-lib.sh}
-      _nucleus_unprotect_managed_paths() {
-        _context="$1"
-        _paths_json="$2"
-        _jq_bin="$3"
-        echo "$_paths_json" | "$_jq_bin" -r '.[]' | while IFS= read -r _p; do
-          [ -n "$_p" ] || continue
-          _nucleus_unprotect_symlink "$_context" "$_p"
-        done
-      }
-      _nucleus_protect_managed_paths() {
-        _context="$1"
-        _paths_json="$2"
-        _jq_bin="$3"
-        echo "$_paths_json" | "$_jq_bin" -r '.[]' | while IFS= read -r _p; do
-          [ -n "$_p" ] || continue
-          _nucleus_protect_symlink "$_context" "$_p"
-        done
-      }
-      _nucleus_protect_managed_paths "home.nix" '${managedSymlinkPathsJson}' ${lib.escapeShellArg "${pkgs.jq}/bin/jq"}
+      "${activationBundle}/bin/manage-out-of-store-symlinks" "protect" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
     '';
 
     # Override the default logDir (which uses ~) with a proper absolute path.

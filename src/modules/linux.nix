@@ -20,6 +20,8 @@ let
       (builtins.readFile ../scripts/services/gc-sweep.sh)
     )
   );
+
+  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
 in
 lib.mkIf pkgs.stdenv.isLinux {
   # Home Manager exposes GNOME settings via `dconf.*` (not `programs.dconf`).
@@ -176,12 +178,11 @@ lib.mkIf pkgs.stdenv.isLinux {
     # packages), (2) this comment explains why, and (3) the timer and any
     # subsequent provision run serve as implicit follow-up checks.
     # -----------------------------------------------------------------------
-    buildNixIndex = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-      builtins.replaceStrings
-        [ "__NIX_INDEX_BIN__" "__NIX_INDEX_MAX_AGE_DAYS__" ]
-        [ "${pkgs.nix-index}/bin/nix-index" "" ]
-        (builtins.readFile ../scripts/packages/update-nix-index.sh)
-    );
+    buildNixIndex = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      "${activationBundle}/bin/update-nix-index" \
+        "${pkgs.nix-index}/bin/nix-index" \
+        ""
+    '';
 
     # -----------------------------------------------------------------------
     # provisionDevDirectory

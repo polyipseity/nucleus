@@ -48,6 +48,8 @@ let
       ]
       (builtins.readFile ../scripts/shell/init.ps1)
     + (builtins.readFile ./configs/pwsh/profile-base.ps1);
+
+  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
 in
 {
   # Place the PowerShell profile at the CurrentUserCurrentHost location for
@@ -57,19 +59,19 @@ in
 
   # Install PSScriptAnalyzer for PowerShell linting if pwsh is available.
   # This enables the lint phase in scripts/check-pwsh.ps1.
-  home.activation.installPwshScriptAnalyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-    builtins.replaceStrings
-      [ "__PWSH_BIN__" "__MODULE_NAME__" "__MODULE_VERSION__" ]
-      [ "${pkgs.powershell}/bin/pwsh" "PSScriptAnalyzer" pwshAnalyzerVersion ]
-      (builtins.readFile ../scripts/packages/install-pwsh-module.sh)
-  );
+  home.activation.installPwshScriptAnalyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    "${activationBundle}/bin/install-pwsh-module" \
+      "${pkgs.powershell}/bin/pwsh" \
+      "PSScriptAnalyzer" \
+      "${pwshAnalyzerVersion}"
+  '';
 
   # Install powershell-yaml for locked DSC validation if pwsh is available.
   # This enables the locked DSC validation phase in scripts/check.ps1.
-  home.activation.installPwshYaml = lib.hm.dag.entryAfter [ "writeBoundary" ] (
-    builtins.replaceStrings
-      [ "__PWSH_BIN__" "__MODULE_NAME__" "__MODULE_VERSION__" ]
-      [ "${pkgs.powershell}/bin/pwsh" "powershell-yaml" pwshYamlVersion ]
-      (builtins.readFile ../scripts/packages/install-pwsh-module.sh)
-  );
+  home.activation.installPwshYaml = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    "${activationBundle}/bin/install-pwsh-module" \
+      "${pkgs.powershell}/bin/pwsh" \
+      "powershell-yaml" \
+      "${pwshYamlVersion}"
+  '';
 }

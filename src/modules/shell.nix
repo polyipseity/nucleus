@@ -79,6 +79,8 @@ let
   iCloudExcludedDirNames = _iCloudCfg.excludedDirNames;
   iCloudManagedRoots = _iCloudCfg.managedRoots;
 
+  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+
 in
 {
   home.packages = builtins.attrValues nucleusApps;
@@ -238,34 +240,20 @@ in
   # (bun, uv, cargo-binstall) have converged by that point, so every tool binary
   # that could provide completions is present before we try to generate them.
   # ---------------------------------------------------------------------------
+
   home.activation = {
-    installZshCompletions = lib.hm.dag.entryAfter [ "installCargoBinstallPackages" ] (
-      builtins.replaceStrings
-        [
-          "__BAT_BIN__"
-          "__BUN_BIN__"
-          "__FD_BIN__"
-          "__GH_BIN__"
-          "__OPENCODE_BIN__"
-          "__RUFF_BIN__"
-          "__RUSTUP_BIN__"
-          "__TYPST_BIN__"
-          "__UV_BIN__"
-          "__ZSH_COMPLETIONS_SRC__"
-        ]
-        [
-          "${pkgs.bat}/bin/bat"
-          "${pkgs.bun}/bin/bun"
-          "${pkgs.fd}/bin/fd"
-          "${pkgs.gh}/bin/gh"
-          "${pkgs.opencode}/bin/opencode"
-          "${pkgs.ruff}/bin/ruff"
-          "${pkgs.rustup}/bin/rustup"
-          "${pkgs.typst}/bin/typst"
-          "${pkgs.uv}/bin/uv"
-          "${./completions/zsh}"
-        ]
-        (builtins.readFile ../scripts/shell/install-zsh-completions.sh)
-    );
+    installZshCompletions = lib.hm.dag.entryAfter [ "installCargoBinstallPackages" ] ''
+      "${activationBundle}/bin/install-zsh-completions" \
+        "${pkgs.bat}/bin/bat" \
+        "${pkgs.bun}/bin/bun" \
+        "${pkgs.fd}/bin/fd" \
+        "${pkgs.gh}/bin/gh" \
+        "${pkgs.opencode}/bin/opencode" \
+        "${pkgs.ruff}/bin/ruff" \
+        "${pkgs.rustup}/bin/rustup" \
+        "${pkgs.typst}/bin/typst" \
+        "${pkgs.uv}/bin/uv" \
+        "${./completions/zsh}"
+    '';
   };
 }

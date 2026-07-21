@@ -57,39 +57,27 @@ let
   # Sorting policy: alphabetically by appDir (when list is non-empty).
   currentNucleusAppBundles = [ ];
 
+  activationBundle = pkgs.callPackage ../../../modules/lib/activation-bundle.nix { };
+
 in
 {
   # home.file for manual.md is now in automator-workflows.nix (where the
   # consuming workflow lives).
 
-  home.activation."macos-app-bundle-lib" = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-    builtins.replaceStrings
-      [ "__JQ_BIN__" "__REMOVED_BUNDLES_JSON__" "__CURRENT_BUNDLES_JSON__" ]
-      [
-        "${pkgs.jq}/bin/jq"
-        (builtins.toJSON (
-          map (svc: {
-            inherit (svc)
-              appDir
-              bundleId
-              menuItem
-              message
-              ;
-          }) removedNucleusAppBundles
-        ))
-        (builtins.toJSON (
-          map (svc: {
-            inherit (svc)
-              appDir
-              bundleId
-              menuItem
-              message
-              ;
-            source = "${svc.source}";
-            presentationModesDict = mkPresentationModes svc.presentationModes;
-          }) currentNucleusAppBundles
-        ))
-      ]
-      (builtins.readFile ../../../scripts/hosts/MacBook/macos-deploy-app-bundles.sh)
-  );
+  home.activation."macos-app-bundle-lib" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    "${activationBundle}/bin/macos-deploy-app-bundles" \
+      "${pkgs.jq}/bin/jq" \
+      '${builtins.toJSON (
+        map (svc: {
+          inherit (svc) appDir bundleId menuItem message;
+        }) removedNucleusAppBundles
+      )}' \
+      '${builtins.toJSON (
+        map (svc: {
+          inherit (svc) appDir bundleId menuItem message;
+          source = "${svc.source}";
+          presentationModesDict = mkPresentationModes svc.presentationModes;
+        }) currentNucleusAppBundles
+      )}'
+  '';
 }
