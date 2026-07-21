@@ -3,8 +3,6 @@
 # Variables below are substituted via Nix replaceStrings at build time.
 # Requires: bun on PATH.
 set -euo pipefail
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
 # _ibp_setup_path PREPEND_GUARD APPEND_GUARD NIX_PROFILE_BIN_DIRS
 # Sets up PATH with managed bin directories and prepends nix profile dirs.

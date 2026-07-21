@@ -58,7 +58,16 @@ in
     # land in a real, untracked directory rather than inside the repo tree).
     # -------------------------------------------------------------------------
     symlink-agent-config = lib.hm.dag.entryAfter [ "linkGeneration" ] (
-      builtins.readFile ../scripts/agents/symlink-agent-config.sh
+      builtins.replaceStrings
+        [ "__REPO_ROOT__" "__AGENTS_CONFIG_RELATIVE_PATH__" ]
+        [ repoRoot agentsConfigRelativePath ]
+        (
+          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+          + "\n"
+          + builtins.readFile ../scripts/lib/symlink-convergence-lib.sh
+          + "\n"
+          + builtins.readFile ../scripts/agents/symlink-agent-config.sh
+        )
     );
 
     # -------------------------------------------------------------------------
@@ -82,7 +91,13 @@ in
     # fails fast rather than silently overwriting the downloaded content.
     # -------------------------------------------------------------------------
     install-agent-skills = lib.hm.dag.entryAfter [ "symlink-agent-config" ] (
-      builtins.readFile ../scripts/agents/install-agent-skills.sh
+      builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
+        builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+        + "\n"
+        + builtins.readFile ../scripts/lib/symlink-convergence-lib.sh
+        + "\n"
+        + builtins.readFile ../scripts/agents/install-agent-skills.sh
+      )
     );
 
     # -------------------------------------------------------------------------
@@ -109,7 +124,11 @@ in
           managedPaths.toShellAppendGuard
           managedPaths.nixProfileBinDirs
         ]
-        (builtins.readFile ../scripts/packages/install-bun-packages.sh)
+        (
+          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+          + "\n"
+          + builtins.readFile ../scripts/packages/install-bun-packages.sh
+        )
     );
 
     # -------------------------------------------------------------------------
@@ -143,7 +162,11 @@ in
             paddleocr = "3.11";
           })
         ]
-        (builtins.readFile ../scripts/packages/install-uv-tools.sh)
+        (
+          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+          + "\n"
+          + builtins.readFile ../scripts/packages/install-uv-tools.sh
+        )
     );
 
     # -------------------------------------------------------------------------
@@ -162,7 +185,11 @@ in
       builtins.replaceStrings
         [ "__MANAGED_NIX_SYSTEM_BIN_DIRS__" "__MANAGED_NIX_PROFILE_BIN_DIRS__" ]
         [ "${managedPaths.nixSystemBinDirs}" "${managedPaths.nixProfileBinDirs}" ]
-        (builtins.readFile ../scripts/packages/init-rustup.sh)
+        (
+          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+          + "\n"
+          + builtins.readFile ../scripts/packages/init-rustup.sh
+        )
     );
 
     # -------------------------------------------------------------------------
@@ -204,7 +231,11 @@ in
           "${managedPaths.nixSystemBinDirs}"
           "${managedPaths.nixProfileBinDirs}"
         ]
-        (builtins.readFile ../scripts/packages/install-cargo-binstall-packages.sh)
+        (
+          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+          + "\n"
+          + builtins.readFile ../scripts/packages/install-cargo-binstall-packages.sh
+        )
     );
 
     # -------------------------------------------------------------------------
@@ -237,7 +268,11 @@ in
           "${repoRoot}"
           "${clawhubManifestRelativePath}"
         ]
-        (builtins.readFile ../scripts/agents/sync-clawhub-skills.sh)
+        (
+          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+          + "\n"
+          + builtins.readFile ../scripts/agents/sync-clawhub-skills.sh
+        )
     );
   };
 }

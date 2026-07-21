@@ -367,7 +367,11 @@ in
           vsCodeChatLanguageModelsFile
           "${pkgs.jq}/bin/jq"
         ]
-        (builtins.readFile ../scripts/editors/symlink-vscode-config.sh)
+        (
+          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+          + "\n"
+          + builtins.readFile ../scripts/editors/symlink-vscode-config.sh
+        )
     );
 
     # -----------------------------------------------------------------------
@@ -385,7 +389,9 @@ in
     # -----------------------------------------------------------------------
     vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] (
       builtins.replaceStrings [ "__EXTENSION_STORE__" ] [ "${extensionStore}" ] (
-        builtins.readFile ../scripts/editors/bridge-vscode-extensions.sh
+        builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+        + "\n"
+        + builtins.readFile ../scripts/editors/bridge-vscode-extensions.sh
       )
     );
 

@@ -6,8 +6,6 @@
 # Variables below are substituted via Nix replaceStrings at build time.
 
 set -euo pipefail
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
 # Locate the live repo checkout so the activation can resolve the
 # src/modules/configs/vscode/ path regardless of where the repo lives.

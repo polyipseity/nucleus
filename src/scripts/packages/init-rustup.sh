@@ -1,8 +1,6 @@
 # Rustup initialisation for POSIX hosts.
 # Consumes Nix profile bin directory lists at activation time.
 set -euo pipefail
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
 # Locate pkgs.rustup in the newly linked home-manager profile.  The
 # activation shell PATH has not yet been updated to reflect the profile, so

@@ -1,12 +1,11 @@
 # shellcheck shell=sh
 # Finalize custom-provision-symlinks: protect each managed symlink and persist
-# the manifest.  The symlink-hardening library is sourced via SCRIPT_DIR.
+# the manifest.  symlink-hardening-lib.sh is inlined at build time via
+# builtins.readFile.
 #
 # Variables below are substituted via Nix replaceStrings at build time.
 
 set -eu
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
 _nucleus_manifest_path='__MANAGED_SYMLINK_MANIFEST_PATH__'
 _nucleus_manifest_dir="$(dirname "$_nucleus_manifest_path")"

@@ -142,11 +142,12 @@ in
     home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] (
       builtins.replaceStrings
         [ "__MANIFEST_PATH__" "__JQ_BIN__" ]
-        [
-          managedSymlinkManifestPath
-          "${pkgs.jq}/bin/jq"
-        ]
-        (builtins.readFile ../scripts/configs/provision-symlinks.sh)
+        [ managedSymlinkManifestPath "${pkgs.jq}/bin/jq" ]
+        (
+          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+          + "\n"
+          + builtins.readFile ../scripts/configs/provision-symlinks.sh
+        )
     );
 
     home.activation.finalizeCustomProvisionSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] (
@@ -163,7 +164,11 @@ in
           managedSymlinkManifestJson
           "${pkgs.jq}/bin/jq"
         ]
-        (builtins.readFile ../scripts/configs/finalize-symlinks.sh)
+        (
+          builtins.readFile ../scripts/lib/symlink-hardening-lib.sh
+          + "\n"
+          + builtins.readFile ../scripts/configs/finalize-symlinks.sh
+        )
     );
   };
 }
