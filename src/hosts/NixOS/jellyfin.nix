@@ -42,8 +42,8 @@ in
     in
     ''
       ${builtins.replaceStrings
-        [ "__NUCLEUS_REPO_ROOT__" "__NUCLEUS_PATH_PREPEND__" ]
-        [ repoRoot "${pkgs.jq}/bin:${pkgs.sops}/bin" ]
+        [ "__NUCLEUS_REPO_ROOT__" "__NUCLEUS_PATH_PREPEND__" "__SOPS_AGE_KEY_FILE__" ]
+        [ repoRoot "${pkgs.jq}/bin:${pkgs.sops}/bin" "/etc/sops/age/machine.txt" ]
         (builtins.readFile ../../scripts/services/jellyfin-sync.sh)
       }
     ''
