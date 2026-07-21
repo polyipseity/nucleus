@@ -16,8 +16,8 @@ let
   # contexts where NUCLEUS_REPO_ROOT may not be inherited.
   gcWeekly = pkgs.writeShellScript "gc-weekly" (
     builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
-      (builtins.readFile ../scripts/lib/repo-root-lib.sh) +
-      (builtins.readFile ../scripts/services/gc-sweep.sh)
+      (builtins.readFile ../scripts/lib/repo-root-lib.sh)
+      + (builtins.readFile ../scripts/services/gc-sweep.sh)
     )
   );
 
@@ -179,7 +179,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     # subsequent provision run serve as implicit follow-up checks.
     # -----------------------------------------------------------------------
     buildNixIndex = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      "${activationBundle}/bin/update-nix-index" \
+      "${activationBundle}/packages/update-nix-index.sh" \
         "${pkgs.nix-index}/bin/nix-index" \
         ""
     '';

@@ -98,7 +98,7 @@ in
   sops.secrets = wallpaperSecrets;
 
   home.activation."wallpaper-provision" = lib.hm.dag.entryAfter [ "sops-nix" ] ''
-    "${activationBundle}/bin/provision-wallpaper" \
+    "${activationBundle}/provision-wallpaper.sh" \
       "${if pkgs.stdenv.isDarwin then "1" else "0"}" \
       "${currentUserHome}/Pictures/wallpapers" \
       "${desktopprBinPath}" \
@@ -106,12 +106,14 @@ in
       "${wallpapersDir}" \
       "${currentUsername}" \
       "${config.sops.defaultSymlinkPath}" \
-      '${builtins.toJSON (
-        map (item: {
-          secretName = item.secretName;
-          wallpaperName = item.wallpaperName;
-        }) wallpaperItemsForCurrentUser
-      )}' \
+      '${
+        builtins.toJSON (
+          map (item: {
+            secretName = item.secretName;
+            wallpaperName = item.wallpaperName;
+          }) wallpaperItemsForCurrentUser
+        )
+      }' \
       "${pkgs.jq}/bin/jq"
   '';
 }

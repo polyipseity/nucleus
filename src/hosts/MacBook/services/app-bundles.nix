@@ -65,19 +65,33 @@ in
   # consuming workflow lives).
 
   home.activation."macos-app-bundle-lib" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    "${activationBundle}/bin/macos-deploy-app-bundles" \
+    "${activationBundle}/hosts/MacBook/macos-deploy-app-bundles.sh" \
       "${pkgs.jq}/bin/jq" \
-      '${builtins.toJSON (
-        map (svc: {
-          inherit (svc) appDir bundleId menuItem message;
-        }) removedNucleusAppBundles
-      )}' \
-      '${builtins.toJSON (
-        map (svc: {
-          inherit (svc) appDir bundleId menuItem message;
-          source = "${svc.source}";
-          presentationModesDict = mkPresentationModes svc.presentationModes;
-        }) currentNucleusAppBundles
-      )}'
+      '${
+        builtins.toJSON (
+          map (svc: {
+            inherit (svc)
+              appDir
+              bundleId
+              menuItem
+              message
+              ;
+          }) removedNucleusAppBundles
+        )
+      }' \
+      '${
+        builtins.toJSON (
+          map (svc: {
+            inherit (svc)
+              appDir
+              bundleId
+              menuItem
+              message
+              ;
+            source = "${svc.source}";
+            presentationModesDict = mkPresentationModes svc.presentationModes;
+          }) currentNucleusAppBundles
+        )
+      }'
   '';
 }

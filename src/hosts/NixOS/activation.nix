@@ -37,7 +37,9 @@ in
   # username is hardcoded, matching Home Manager's useUserPackages = true layout.
   # ---------------------------------------------------------------------------
   system.activationScripts."nvim-launcher" = lib.mkAfter ''
-    "${activationBundle}/bin/launch-nvim" "${config.home-manager.users.${username}.home.profileDirectory}/bin/nvim"
+    "${activationBundle}/editors/launch-nvim.sh" "${
+      config.home-manager.users.${username}.home.profileDirectory
+    }/bin/nvim"
   '';
 
   # ---------------------------------------------------------------------------
@@ -46,7 +48,7 @@ in
   # start, so journald/stderr redirect targets exist on disk.
   # ---------------------------------------------------------------------------
   system.activationScripts."ensure-log-dirs" = lib.mkAfter ''
-    "${activationBundle}/bin/log-dirs-init" \
+    "${activationBundle}/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
       "${builtins.toString linuxSystemLogDirs}" \
       "" \

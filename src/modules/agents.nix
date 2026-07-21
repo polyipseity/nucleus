@@ -35,13 +35,13 @@ in
   };
 
   home.activation.unprotectOpencodeSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-    "${activationBundle}/bin/managed-symlink" "unprotect" "agents.nix" "$HOME/.config/opencode/agents"
-    "${activationBundle}/bin/managed-symlink" "unprotect" "agents.nix" "$HOME/.config/opencode/commands"
+    "${activationBundle}/configs/managed-symlink.sh" "unprotect" "agents.nix" "$HOME/.config/opencode/agents"
+    "${activationBundle}/configs/managed-symlink.sh" "unprotect" "agents.nix" "$HOME/.config/opencode/commands"
   '';
 
   home.activation.protectOpencodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    "${activationBundle}/bin/managed-symlink" "protect" "agents.nix" "$HOME/.config/opencode/agents"
-    "${activationBundle}/bin/managed-symlink" "protect" "agents.nix" "$HOME/.config/opencode/commands"
+    "${activationBundle}/configs/managed-symlink.sh" "protect" "agents.nix" "$HOME/.config/opencode/agents"
+    "${activationBundle}/configs/managed-symlink.sh" "protect" "agents.nix" "$HOME/.config/opencode/commands"
   '';
 
   # Method 4 (activation script manages whole-directory symlinks): the agents/
@@ -57,7 +57,7 @@ in
     # land in a real, untracked directory rather than inside the repo tree).
     # -------------------------------------------------------------------------
     symlink-agent-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      "${activationBundle}/bin/symlink-agent-config" "${repoRoot}" "${agentsConfigRelativePath}"
+      "${activationBundle}/agents/symlink-agent-config.sh" "${repoRoot}" "${agentsConfigRelativePath}"
     '';
 
     # -------------------------------------------------------------------------
@@ -81,7 +81,7 @@ in
     # fails fast rather than silently overwriting the downloaded content.
     # -------------------------------------------------------------------------
     install-agent-skills = lib.hm.dag.entryAfter [ "symlink-agent-config" ] ''
-      "${activationBundle}/bin/install-agent-skills" "${repoRoot}"
+      "${activationBundle}/agents/install-agent-skills.sh" "${repoRoot}"
     '';
 
     # -------------------------------------------------------------------------
@@ -100,7 +100,7 @@ in
     #             cargo-binstall; bun is the only viable install tier.
     # -------------------------------------------------------------------------
     installBunPackages = lib.hm.dag.entryAfter [ "install-agent-skills" ] ''
-      "${activationBundle}/bin/install-bun-packages" \
+      "${activationBundle}/packages/install-bun-packages.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.bun}/bin/bun"
     '';
@@ -118,7 +118,7 @@ in
     # (install preference: nixpkgs > cargo binstall > cargo > bun > uv).
     # -------------------------------------------------------------------------
     installUvTools = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
-      "${activationBundle}/bin/install-uv-tools" \
+      "${activationBundle}/packages/install-uv-tools.sh" \
         "${pkgs.uv}/bin/uv" \
         "${pkgs.gawk}/bin/awk" \
         "${pkgs.gnugrep}/bin/grep" \
@@ -146,7 +146,7 @@ in
     # (enforced by that step's entryAfter).
     # -------------------------------------------------------------------------
     initRustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      "${activationBundle}/bin/init-rustup" \
+      "${activationBundle}/packages/init-rustup.sh" \
         "${pkgs.rustup}/bin/rustup"
     '';
 
@@ -172,7 +172,7 @@ in
     # Windows Invoke-RustupSetup + Invoke-CargoBinstallSetup behavior.
     # -------------------------------------------------------------------------
     installCargoBinstallPackages = lib.hm.dag.entryAfter [ "initRustup" ] ''
-      "${activationBundle}/bin/install-cargo-binstall-packages" \
+      "${activationBundle}/packages/install-cargo-binstall-packages.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.gawk}/bin/awk" \
         '${builtins.toJSON [ ]}' \
@@ -194,7 +194,7 @@ in
     # state.
     # -------------------------------------------------------------------------
     syncClawHubSkills = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
-      "${activationBundle}/bin/sync-clawhub-skills" \
+      "${activationBundle}/agents/sync-clawhub-skills.sh" \
         "${pkgs.jq}/bin/jq" \
         "${managedPaths.toShellPrependGuard}" \
         "${managedPaths.toShellAppendGuard}" \

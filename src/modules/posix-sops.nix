@@ -35,13 +35,17 @@ in
   # ---------------------------------------------------------------------------
   system.activationScripts =
     if pkgs.stdenv.isDarwin then
-      { postActivation.text = lib.mkBefore ''
-        "${activationBundle}/bin/derive-host-age-key" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${username}"
-      ''; }
+      {
+        postActivation.text = lib.mkBefore ''
+          "${activationBundle}/secrets/derive-host-age-key.sh" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${username}"
+        '';
+      }
     else
-      { deriveHostAgeKey.text = ''
-        "${activationBundle}/bin/derive-host-age-key" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${username}"
-      ''; };
+      {
+        deriveHostAgeKey.text = ''
+          "${activationBundle}/secrets/derive-host-age-key.sh" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${username}"
+        '';
+      };
 
   sops = {
     age = {

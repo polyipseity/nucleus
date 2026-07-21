@@ -214,7 +214,7 @@ in
     # stores. Merge writes the managed defaults into each store while
     # preserving any user-configured settings outside managed keys.
     home.activation."qtpass-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      "${activationBundle}/bin/merge-qtpass-ini" \
+      "${activationBundle}/configs/merge-qtpass-ini.sh" \
         "${pkgs.gawk}/bin/awk" \
         ${lib.escapeShellArg qtpassModule.qtPassDarwinCommands} \
         ${lib.escapeShellArg qtpassModule.qtPassPrimaryIniCommands} \
@@ -231,7 +231,7 @@ in
     # writes reach the repo file. Merge applies managed defaults while
     # preserving all app-owned keys and sections.
     home.activation."picard-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      "${activationBundle}/bin/merge-picard-ini" \
+      "${activationBundle}/configs/merge-picard-ini.sh" \
         "${pkgs.gawk}/bin/awk" \
         ${lib.escapeShellArg picardDefaultsIniText} \
         ${lib.escapeShellArg picardOverrideCommands}
@@ -248,7 +248,7 @@ in
     # mixing managed settings with runtime state that does not belong in the
     # repo. Merge preserves both managed and app-owned keys.
     home.activation."obsidian-merge-json" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      "${activationBundle}/bin/merge-obsidian-json" \
+      "${activationBundle}/configs/merge-obsidian-json.sh" \
         "${pkgs.python3}/bin/python3" \
         "${obsidianMergeJsonPy}" \
         ${lib.escapeShellArg obsidianManagedSettingsJson}
@@ -257,11 +257,11 @@ in
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
     # deletion between rebuilds.
     home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      "${activationBundle}/bin/manage-out-of-store-symlinks" "unprotect" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
+      "${activationBundle}/configs/manage-out-of-store-symlinks.sh" "unprotect" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
     '';
 
     home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      "${activationBundle}/bin/manage-out-of-store-symlinks" "protect" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
+      "${activationBundle}/configs/manage-out-of-store-symlinks.sh" "protect" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
     '';
 
     # Override the default logDir (which uses ~) with a proper absolute path.

@@ -125,25 +125,28 @@ in
     );
 
     home.activation.ensureCustomProvisionSymlinkTargets =
-      lib.hm.dag.entryBefore [ "prepareCustomProvisionSymlinks" ] ''
-        "${activationBundle}/bin/ensure-symlink-targets" \
-          "${managedSymlinkManifestPath}" \
-          '${builtins.toJSON (
-            map (entry: entry.linkAbsolutePath) (
-              builtins.filter (entry: entry.createTargetDirectory) selectedSymlinksResolved
-            )
-          )}' \
-          "${pkgs.jq}/bin/jq"
-      '';
+      lib.hm.dag.entryBefore [ "prepareCustomProvisionSymlinks" ]
+        ''
+          "${activationBundle}/configs/ensure-symlink-targets.sh" \
+            "${managedSymlinkManifestPath}" \
+            '${
+              builtins.toJSON (
+                map (entry: entry.linkAbsolutePath) (
+                  builtins.filter (entry: entry.createTargetDirectory) selectedSymlinksResolved
+                )
+              )
+            }' \
+            "${pkgs.jq}/bin/jq"
+        '';
 
     home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      "${activationBundle}/bin/provision-symlinks" \
+      "${activationBundle}/configs/provision-symlinks.sh" \
         "${managedSymlinkManifestPath}" \
         "${pkgs.jq}/bin/jq"
     '';
 
     home.activation.finalizeCustomProvisionSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      "${activationBundle}/bin/finalize-symlinks" \
+      "${activationBundle}/configs/finalize-symlinks.sh" \
         "${managedSymlinkManifestPath}" \
         "${pkgs.jq}/bin/jq" \
         '${builtins.toJSON (map (entry: entry.linkAbsolutePath) selectedSymlinksResolved)}' \

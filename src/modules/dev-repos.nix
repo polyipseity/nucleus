@@ -112,7 +112,7 @@ in
           "writeBoundary"
         ]
         ''
-          "${activationBundle}/bin/provision-dev-repos" \
+          "${activationBundle}/configs/provision-dev-repos.sh" \
             "${currentUserHome}" \
             "${pkgs.git}/bin" \
             "${sshClient}" \

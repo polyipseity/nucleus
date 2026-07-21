@@ -250,8 +250,8 @@ let
         [ "__REPO_ROOT__" "__CURRENT_USER_HOME__" "__REPLICA_ID__" ]
         [ repoRoot currentUserHome (lib.escapeShellArg replica.id) ]
         (
-          (builtins.readFile ../scripts/lib/repo-root-lib.sh) +
-          (builtins.readFile ../scripts/services/replica-scheduled-sync.sh)
+          (builtins.readFile ../scripts/lib/repo-root-lib.sh)
+          + (builtins.readFile ../scripts/services/replica-scheduled-sync.sh)
         )
     );
 
@@ -340,20 +340,22 @@ in
       # -----------------------------------------------------------------------
       {
         home.activation.cloudDrivesSetup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-          "${activationBundle}/bin/cloud-drives-setup" \
+          "${activationBundle}/services/cloud-drives-setup.sh" \
             "${pkgs.jq}/bin/jq" \
             '${builtins.toJSON (map (m: { inherit (m) localPath; }) enabledMounts)}' \
-            '${builtins.toJSON (
-              map (r: {
-                localPath = r.localPath;
-                displayName = if r.displayName != null then r.displayName else r.id;
-                isSpecialICloud =
-                  pkgs.stdenv.isDarwin
-                  && r.provider == "iCloud"
-                  && r.id == "iCloud"
-                  && r.localPath == "clouds/iCloudReplica";
-              }) enabledReplicas
-            )}'
+            '${
+              builtins.toJSON (
+                map (r: {
+                  localPath = r.localPath;
+                  displayName = if r.displayName != null then r.displayName else r.id;
+                  isSpecialICloud =
+                    pkgs.stdenv.isDarwin
+                    && r.provider == "iCloud"
+                    && r.id == "iCloud"
+                    && r.localPath == "clouds/iCloudReplica";
+                }) enabledReplicas
+              )
+            }'
         '';
       }
 

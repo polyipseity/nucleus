@@ -89,7 +89,7 @@ in
     # ---- ensureLogDirs -----------------------------------------------------------
     # Create system log dirs (all hosts) and macOS-specific user log dirs (console
     # user + chown). Shared with NixOS via ensure-log-dirs.sh.
-    "${activationBundle}/bin/log-dirs-init" \
+    "${activationBundle}/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
       "${builtins.toString systemLogDirs}" \
       "${builtins.toString userLogDirs}" \
@@ -198,12 +198,12 @@ in
 
     # ---- nvimLauncher -----------------------------------------------------------
     # Pass empty arg to trigger runtime resolution from /dev/console (macOS).
-    "${activationBundle}/bin/launch-nvim" ""
+    "${activationBundle}/editors/launch-nvim.sh" ""
 
     # ---- ensureLogDirs (repeated from extraActivation) --------------------------
     # Also ensure log directories exist during postActivation (belt-and-suspenders
     # in case systemLogDir was reconfigured at activation time).
-    "${activationBundle}/bin/log-dirs-init" \
+    "${activationBundle}/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
       "${builtins.toString systemLogDirs}" \
       "${builtins.toString userLogDirs}" \
