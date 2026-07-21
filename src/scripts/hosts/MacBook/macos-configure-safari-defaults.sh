@@ -8,7 +8,6 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/macos-fda-warning-lib.sh"
 fda_warning_emitted=0
-print_fda_warning "protected Safari preferences"
 
 set_safari_default() {
   key="$1"
@@ -17,7 +16,7 @@ set_safari_default() {
 
   if ! write_err="$({ /usr/bin/defaults write com.apple.Safari "$key" "-$value_type" "$value"; } 2>&1)"; then
     if printf '%s' "$write_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
-      print_fda_warning
+      print_fda_warning "protected Safari preferences"
       echo "macos: failed to set Safari key $key due to missing privacy authorization." >&2
     else
       echo "macos: failed to set Safari key $key ($write_err)." >&2

@@ -8,7 +8,6 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/macos-fda-warning-lib.sh"
 fda_warning_emitted=0
-print_fda_warning "Accessibility preferences"
 
 set_default() {
   domain="$1"
@@ -21,7 +20,7 @@ set_default() {
 
   if ! write_err="$({ /usr/bin/defaults write "$domain" "$key" "-$value_type" "$value"; } 2>&1)"; then
     if printf '%s' "$write_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
-      print_fda_warning
+      print_fda_warning "Accessibility preferences"
       printf '%s![Permission Denied]%s Failed to set %s%s %s%s. Ensure Full Disk Access and Accessibility permissions are granted.\n' "$yellow" "$reset" "$bold" "$domain" "$key" "$reset" >&2
     else
       echo "macos: failed to set $domain $key ($write_err)." >&2
