@@ -4,7 +4,7 @@ name: "Activation Script Conventions"
 applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/services/*.nix"
 ---
 
-All activation blocks in this repo must use the **activation bundle subprocess pattern**: scripts live in `src/scripts/` (or `src/scripts/activation/bin/`), are assembled into a single Nix derivation (`src/modules/lib/activation-bundle.nix`), and are invoked as subprocesses from activation blocks.
+All activation blocks in this repo must use the **activation bundle subprocess pattern**: scripts live in `src/scripts/`, are assembled into a single Nix derivation (`src/modules/lib/activation-bundle.nix`), and are invoked as subprocesses from activation blocks.
 
 This eliminates `builtins.readFile` embedding, `__TOKEN__` placeholders, and `+` concatenation from activation blocks entirely.
 

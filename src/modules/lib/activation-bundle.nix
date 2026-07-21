@@ -26,7 +26,7 @@ let
       macos-finder-sidebar-lib = ../../../scripts/lib/macos-finder-sidebar-lib.sh;
       repo-root-lib = ../../../scripts/lib/repo-root-lib.sh;
       require-command-lib = ../../../scripts/lib/require-command-lib.sh;
-      argparse-lib = ../../../scripts/activation/lib/argparse-lib.sh;
+      argparse-lib = ../../../scripts/lib/argparse-lib.sh;
     };
     bin = {
       symlink-agent-config = ../../../scripts/agents/symlink-agent-config.sh;
@@ -72,17 +72,17 @@ let
       update-nix-index = ../../../scripts/packages/update-nix-index.sh;
 
       # Thin wrappers consolidated from inline activation blocks
-      managed-symlink = ../../../scripts/activation/bin/managed-symlink.sh;
-      manage-out-of-store-symlinks = ../../../scripts/activation/bin/manage-out-of-store-symlinks.sh;
-      configure-launch-services = ../../../scripts/activation/bin/configure-launch-services.sh;
-      configure-icloud-exclusions = ../../../scripts/activation/bin/configure-icloud-exclusions.sh;
-      configure-finder-sidebar = ../../../scripts/activation/bin/configure-finder-sidebar.sh;
-      relaunch-desktop-services = ../../../scripts/activation/bin/relaunch-desktop-services.sh;
-      reload-dock-preference-state = ../../../scripts/activation/bin/reload-dock-preference-state.sh;
-      configure-input-config = ../../../scripts/activation/bin/configure-input-config.sh;
+      managed-symlink = ../../../scripts/configs/managed-symlink.sh;
+      manage-out-of-store-symlinks = ../../../scripts/configs/manage-out-of-store-symlinks.sh;
+      configure-launch-services = ../../../scripts/hosts/MacBook/macos-configure-launch-services.sh;
+      configure-icloud-exclusions = ../../../scripts/hosts/MacBook/macos-configure-icloud-exclusions.sh;
+      configure-finder-sidebar = ../../../scripts/hosts/MacBook/macos-configure-finder-sidebar.sh;
+      relaunch-desktop-services = ../../../scripts/hosts/MacBook/macos-relaunch-desktop-services.sh;
+      reload-dock-preference-state = ../../../scripts/hosts/MacBook/macos-reload-dock-preference-state.sh;
+      configure-input-config = ../../../scripts/hosts/MacBook/macos-configure-input-config.sh;
       macos-deploy-app-bundles = ../../../scripts/hosts/MacBook/macos-deploy-app-bundles.sh;
       macos-deploy-automator-workflows = ../../../scripts/hosts/MacBook/macos-deploy-automator-workflows.sh;
-      reload-user-preference-state = ../../../scripts/activation/bin/reload-user-preference-state.sh;
+      reload-user-preference-state = ../../../scripts/hosts/MacBook/macos-reload-user-preference-state.sh;
 
       # NixOS system activation scripts
       launch-nvim = ../../../scripts/editors/launch-nvim.sh;
