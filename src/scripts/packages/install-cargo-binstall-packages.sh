@@ -1,5 +1,12 @@
 # Managed cargo-binstall package convergence (install + zap).
 # Consumes crate-description tokens at activation time.
+#
+# Cargo resolution: probes ~/.cargo/bin for the rustup cargo proxy
+# (provisioned by initRustup activation step).  No fallback to nixpkgs
+# cargo — activation-fallback is prohibited per policy.  If rustup's
+# cargo proxy is absent, the step gracefully skips.
+#
+# Install priority: nixpkgs > cargo binstall > cargo > bun > uv.
 set -euo pipefail
 
 _icp_jq_bin="$1"
@@ -24,7 +31,7 @@ fi
 # If cargo is absent after PATH probing, skip rather than failing the
 # whole activation; nothing is installed by this step on POSIX hosts.
 if ! command -v cargo >/dev/null 2>&1; then
-  echo "cargo-binstall: cargo not found in PATH; skipping package management"
+  echo "cargo-binstall: rustup cargo proxy not found at ~/.cargo/bin; skipping package management"
   rm -f "$_icp_desired"
 else
   # Get actually installed crates from `cargo install --list` (zap-style).

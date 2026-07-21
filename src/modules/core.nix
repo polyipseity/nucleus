@@ -12,6 +12,9 @@ let
     pkgs.bottom
     pkgs.bun
     pkgs.caddy
+    # cargo install fallback when cargo-binstall has no binary. NOT for activation
+    # scripts (see activation-fallback ban in agents.nix).
+    pkgs.cargo
     pkgs.camilladsp
     pkgs.camillagui-backend
     pkgs.cargo-binstall

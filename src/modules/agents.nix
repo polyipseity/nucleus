@@ -93,7 +93,7 @@ in
     # installs additions, and removes deletions.
     #
     # Only packages absent from nixpkgs and cargo-binstall are managed here
-    # (install preference: nixpkgs > cargo binstall > bun > uv).
+    # (install preference: nixpkgs > cargo binstall > cargo > bun > uv).
     #
     # Currently managed:
     #   clawhub — fetched skill install vehicle; absent from nixpkgs and
@@ -115,7 +115,7 @@ in
     # and installs any desired tools that are missing.
     #
     # Only tools absent from nixpkgs, cargo-binstall, and bun are managed here
-    # (install preference: nixpkgs > cargo binstall > bun > uv).
+    # (install preference: nixpkgs > cargo binstall > cargo > bun > uv).
     # -------------------------------------------------------------------------
     installUvTools = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
       "${activationBundle}/bin/install-uv-tools" \
@@ -163,6 +163,14 @@ in
     #
     # Mirrors homebrew cleanup = "zap": removes anything installed but absent
     # from the declared desired set, regardless of how it was installed.
+    #
+    # Cargo resolution: this step probes `~/.cargo/bin` for the rustup cargo
+    # proxy (provisioned by initRustup).  No fallback to nixpkgs cargo is
+    # used — `pkgs.cargo` activation-fallback is prohibited (ban policy in
+    # core-behavior.instructions.md).  If the rustup proxy is absent, the
+    # step gracefully skips.
+    #
+    # Install priority: nixpkgs > cargo binstall > cargo > bun > uv.
     #
     # Why after initRustup: cargo is provided by rustup's stable toolchain via
     # ~/.cargo/bin; initRustup ensures stable is installed before this step
