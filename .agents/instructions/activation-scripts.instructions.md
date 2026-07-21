@@ -60,6 +60,7 @@ home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGenerat
 ```
 
 Rules:
+
 - **Always use `activationBundle` from `pkgs.callPackage ./lib/activation-bundle.nix { }`** — never hardcode a store path.
 - **Use `"${activationBundle}/bin/<name>"`** — the leading `"` makes Nix expand the store path.
 - **Positional CLI args for all per-user values.** No `__TOKEN__` placeholders.
@@ -97,6 +98,7 @@ _arg2="$2"
 ```
 
 Rules:
+
 - **Always start with `set -euo pipefail`** (except scripts that intentionally allow failures).
 - **Always define `SCRIPT_DIR`** — never reference `$REPO_ROOT` at runtime.
 - **Source libs via SCRIPT_DIR-relative path.** Never use `${repoRoot}` or hardcoded paths.
