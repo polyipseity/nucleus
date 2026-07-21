@@ -734,10 +734,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     };
   };
 
-  # Safari and accessibility defaults require Full Disk Access (FDA), which is
-  # lost when running inside a sudo process tree during darwin-rebuild switch.
-  # Execute them in the user's terminal context via the terminal-activations
-  # manifest so macOS TCC grants are inherited.
+  # WHY terminal-activations (last resort): Safari and accessibility defaults
+  # require Full Disk Access (FDA), which is lost when running inside a sudo
+  # process tree during darwin-rebuild switch.  Execute them in the user's
+  # terminal context via the terminal-activations manifest so macOS TCC grants
+  # are inherited.
   nucleus.terminalActivations = {
     safari-defaults = {
       command = "${activationBundle}/bin/safari-defaults";

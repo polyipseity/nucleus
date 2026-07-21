@@ -236,6 +236,11 @@ run_terminal_activations() {
   #
   # This runs after the rebuild so the manifest exists, but before any
   # post-apply steps that may depend on the terminal-context changes.
+  #
+  # ── Policy ──────────────────────────────────────────────────────
+  # This stage is a LAST RESORT for macOS TCC-sensitive commands only.
+  # See src/modules/terminal-activations.nix for the full policy.
+  # ─────────────────────────────────────────────────────────────────
   _rta_manifest="$HOME/.config/nucleus/terminal-activations.list"
   if [ ! -f "$_rta_manifest" ]; then
     return
