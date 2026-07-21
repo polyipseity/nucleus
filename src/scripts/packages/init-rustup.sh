@@ -5,14 +5,28 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 
-_nix_system_bin_dirs="$1"
-_nix_profile_bin_dirs="$2"
-
+# All remaining arguments are probe directories (nix system bin dirs and
+# nix profile bin dirs), passed as individual arguments from the Nix template.
 # Locate pkgs.rustup in the newly linked home-manager profile.  The
 # activation shell PATH has not yet been updated to reflect the profile, so
 # probe known profile bin directories in priority order.
+# Each dir is a separate shell argument (properly split by the Nix template),
+# so "$@" expands to one directory per argument for _nucleus_prepend_first_executable_dir.
 # undoc-supp: rustup may not be in profile dir on first apply; fallback follows.
-_nucleus_prepend_first_executable_dir rustup "$_nix_system_bin_dirs" "$_nix_profile_bin_dirs" || true
+_nucleus_prepend_first_executable_dir rustup "$@" || true
+
+# Fallback: direct nix-store probe when profile PATH resolution fails
+# (e.g. on first apply before the home-manager profile symlink exists).
+# Mirrors the proven pattern from install-bun-packages.sh.
+if ! command -v rustup >/dev/null 2>&1; then
+  # undoc-supp: need fallback when nix-store path has not been built yet
+  _rustup_store_path="$(find /nix/store -name 'rustup' -type f -print -quit 2>/dev/null || true)"
+  if [ -n "$_rustup_store_path" ] && [ -x "$_rustup_store_path" ]; then
+    _rustup_store_dir="$(dirname "$_rustup_store_path")"
+    PATH="$_rustup_store_dir:$PATH"
+    export PATH
+  fi
+fi
 
 if ! command -v rustup >/dev/null 2>&1; then
   echo "rustup: rustup not found after profile link; skipping initialization" >&2

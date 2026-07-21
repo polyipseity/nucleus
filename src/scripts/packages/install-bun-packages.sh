@@ -9,9 +9,14 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 _jq_bin="$1"
 _managed_prepend="$2"
 _managed_append="$3"
-_nix_profile_bin_dirs="$4"
 
-# _ibp_setup_path PREPEND_GUARD APPEND_GUARD NIX_PROFILE_BIN_DIRS
+# Consume the 3 fixed-argument slots, then "$@" becomes the probe directories
+# (nix profile bin dirs), passed as individual arguments from the Nix template.
+# Each dir is a separate shell argument, so _ibp_setup_path receives properly
+# split directories via "$@" after its shift 2.
+shift 3
+
+# _ibp_setup_path PREPEND_GUARD APPEND_GUARD PROBE_DIRS...
 # Sets up PATH with managed bin directories and prepends nix profile dirs.
 _ibp_setup_path() {
   _ibp_prepend_guard="$1"
@@ -28,8 +33,9 @@ _ibp_setup_path() {
   _nucleus_prepend_first_executable_dir bun "$@" || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
 }
 
-# Call _ibp_setup_path with managed-path guard tokens.
-_ibp_setup_path "$_managed_prepend" "$_managed_append" "$_nix_profile_bin_dirs"
+# Call _ibp_setup_path with managed-path guard tokens and probe directories
+# as individual arguments.
+_ibp_setup_path "$_managed_prepend" "$_managed_append" "$@"
 
 # If bun is still not found after _ibp_setup_path was called, search the
 if ! command -v bun >/dev/null 2>&1; then

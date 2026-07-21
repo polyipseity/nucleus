@@ -149,6 +149,15 @@ let
     "$HOME/.local/home-manager/profile/bin" \
   '';
 
+  # List variant: each directory as a separate string for proper shell argument
+  # expansion. Used by activation scripts that pass probe dirs as individual args.
+  nixProfileBinDirsList = [
+    "$HOME/.local/state/nix/profiles/profile/bin"
+    "$HOME/.nix-profile/bin"
+    "$HOME/.local/state/home-manager/profile/bin"
+    "$HOME/.local/home-manager/profile/bin"
+  ];
+
   # ── Helper: NixOS system profile probe directories ────────────────
   # Shell-quoted list of NixOS system-wide profile bin directories.
   # Contains $USER reference — expanded at shell runtime, not by Nix.
@@ -156,6 +165,13 @@ let
     "/etc/profiles/per-user/$USER/bin" \
     "/run/current-system/sw/bin" \
   '';
+
+  # List variant: each directory as a separate string for proper shell argument
+  # expansion. Used by activation scripts that pass probe dirs as individual args.
+  nixSystemBinDirsList = [
+    "/etc/profiles/per-user/$USER/bin"
+    "/run/current-system/sw/bin"
+  ];
 in
 {
   inherit
@@ -170,6 +186,8 @@ in
     toPowerShellAppendSnippet
     toPowerShellPrependSnippet
     nixProfileBinDirs
+    nixProfileBinDirsList
     nixSystemBinDirs
+    nixSystemBinDirsList
     ;
 }

@@ -9,8 +9,12 @@ _icp_jq_bin="$1"
 _icp_gawk_bin="$2"
 _icp_desired_crates_json="$3"
 _icp_cargo_bin_dir="$HOME/$4"
-_icp_nix_system_bin_dirs="$5"
-_icp_nix_profile_bin_dirs="$6"
+
+# Consume the 4 fixed-argument slots, then "$@" becomes the probe directories
+# (nix system bin dirs and nix profile bin dirs), passed as individual
+# arguments from the Nix template.  Each dir is a separate shell argument,
+# so _nucleus_prepend_first_executable_dir receives properly split directories.
+shift 4
 
 # Desired crates as JSON array of crate names, e.g. ["crate1","crate2"].
 # Empty array = no cargo-binstall-managed crates on this host.
@@ -20,8 +24,24 @@ printf '%s\n' "$_icp_desired_crates_json" | "$_icp_jq_bin" -r '.[]' > "$_icp_des
 # Probe ~/.cargo/bin (rustup shim location) first, then nix-profile /
 # home-manager-profile bin directories as fallback.  initRustup runs
 # before this step to ensure the stable toolchain is installed.
+# Each dir is a separate shell argument (properly split by the Nix template),
+# so "$@" expands to one directory per argument for
+# _nucleus_prepend_first_executable_dir.
 # undoc-supp: cargo may not be in any profile dir on first apply; fallback follows.
-_nucleus_prepend_first_executable_dir cargo "$_icp_cargo_bin_dir" "$_icp_nix_system_bin_dirs" "$_icp_nix_profile_bin_dirs" || true
+_nucleus_prepend_first_executable_dir cargo "$_icp_cargo_bin_dir" "$@" || true
+
+# Fallback: direct nix-store probe when profile PATH resolution fails
+# (e.g. on first apply before the home-manager profile symlink exists).
+# Mirrors the proven pattern from install-bun-packages.sh.
+if ! command -v cargo >/dev/null 2>&1; then
+  # undoc-supp: need fallback when nix-store path has not been built yet
+  _cargo_store_path="$(find /nix/store -name 'cargo' -type f -print -quit 2>/dev/null || true)"
+  if [ -n "$_cargo_store_path" ] && [ -x "$_cargo_store_path" ]; then
+    _cargo_store_dir="$(dirname "$_cargo_store_path")"
+    PATH="$_cargo_store_dir:$PATH"
+    export PATH
+  fi
+fi
 
 # Guard: cargo is provided by rustup (stable toolchain) via ~/.cargo/bin;
 # initRustup ensures stable is installed before this step runs.

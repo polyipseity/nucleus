@@ -104,7 +104,7 @@ in
         "${pkgs.jq}/bin/jq" \
         "${managedPaths.toShellPrependGuard}" \
         "${managedPaths.toShellAppendGuard}" \
-        "${managedPaths.nixProfileBinDirs}"
+        ${lib.concatStringsSep " \\\n        " (map (d: ''"${d}"'') managedPaths.nixProfileBinDirsList)}
     '';
 
     # -------------------------------------------------------------------------
@@ -125,13 +125,15 @@ in
         "${pkgs.gawk}/bin/awk" \
         "${pkgs.gnugrep}/bin/grep" \
         "${pkgs.jq}/bin/jq" \
-        '${builtins.toJSON {
-          # PaddleOCR: cross-platform OCR with GPU auto-detection.  uv for
-          # cross-host version consistency (nixpkgs v3.5.0, PyPI v3.6.0).
-          # Pinned to Python 3.11 because its dependency opencv-contrib-python
-          # cannot build on Python >=3.12 (distutils removed).
-          paddleocr = "3.11";
-        }}'
+        '${
+          builtins.toJSON {
+            # PaddleOCR: cross-platform OCR with GPU auto-detection.  uv for
+            # cross-host version consistency (nixpkgs v3.5.0, PyPI v3.6.0).
+            # Pinned to Python 3.11 because its dependency opencv-contrib-python
+            # cannot build on Python >=3.12 (distutils removed).
+            paddleocr = "3.11";
+          }
+        }'
     '';
 
     # -------------------------------------------------------------------------
@@ -148,8 +150,8 @@ in
     # -------------------------------------------------------------------------
     initRustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/bin/init-rustup" \
-        "${managedPaths.nixSystemBinDirs}" \
-        "${managedPaths.nixProfileBinDirs}"
+        ${lib.concatStringsSep " \\\n        " (map (d: ''"${d}"'') managedPaths.nixSystemBinDirsList)} \
+        ${lib.concatStringsSep " \\\n        " (map (d: ''"${d}"'') managedPaths.nixProfileBinDirsList)}
     '';
 
     # -------------------------------------------------------------------------
@@ -176,8 +178,8 @@ in
         "${pkgs.gawk}/bin/awk" \
         '${builtins.toJSON [ ]}' \
         "${managedPaths.cargoBinDir}" \
-        "${managedPaths.nixSystemBinDirs}" \
-        "${managedPaths.nixProfileBinDirs}"
+        ${lib.concatStringsSep " \\\n        " (map (d: ''"${d}"'') managedPaths.nixSystemBinDirsList)} \
+        ${lib.concatStringsSep " \\\n        " (map (d: ''"${d}"'') managedPaths.nixProfileBinDirsList)}
     '';
 
     # -------------------------------------------------------------------------
