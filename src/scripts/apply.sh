@@ -228,6 +228,39 @@ run_replica_sync() {
   fi
 }
 
+run_terminal_activations() {
+  # Run activation commands that require the user's terminal TCC context
+  # (macOS Full Disk Access / Accessibility), serialised by the
+  # writeDarwinTerminalActivations HM activation step to
+  # ~/.config/nucleus/terminal-activations.list.
+  #
+  # This runs after the rebuild so the manifest exists, but before any
+  # post-apply steps that may depend on the terminal-context changes.
+  _rta_manifest="$HOME/.config/nucleus/terminal-activations.list"
+  if [ ! -f "$_rta_manifest" ]; then
+    return
+  fi
+
+  _rta_count=$(wc -l < "$_rta_manifest")
+  if [ "$_rta_count" -eq 0 ]; then
+    rm -f "$_rta_manifest"
+    return
+  fi
+
+  # undoc-supp: grep returns exit code 1 when no lines match; set -e would abort.
+  printf '%s\n' "terminal-activations: running $(grep -c '^[^#]' "$_rta_manifest" || true) terminal-context activation(s)..."
+  while IFS= read -r _rta_line; do
+    case "$_rta_line" in
+      '' | '#'*) continue ;;
+    esac
+    printf '%s\n' "terminal-activations: $_rta_line"
+    if ! eval "$_rta_line"; then
+      printf '%s\n' "terminal-activations: command exited with error (continuing)" >&2
+    fi
+  done < "$_rta_manifest"
+  rm -f "$_rta_manifest"
+}
+
 run_manual_display() {
   # Display the MANUAL.md for the given host after a successful apply.
   _rmd_host="$1"
@@ -254,6 +287,7 @@ case "$(uname -s)" in
     # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
     # while running as root (which otherwise produces ownership warnings).
     run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --impure --flake "$REPO_ROOT/src#macbook"
+    run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust sudo
       NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
@@ -275,6 +309,7 @@ case "$(uname -s)" in
       run_nix run "$REPO_ROOT/src#health-check"
       # Keep root invocations on root-owned HOME for consistent Nix behavior.
       run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
+      run_terminal_activations
       "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
       run_caddy_local_ca_trust sudo
       NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
@@ -291,6 +326,7 @@ case "$(uname -s)" in
       target_username="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
       run_nix run "$REPO_ROOT/src#health-check"
       run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
+      run_terminal_activations
       "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
       run_caddy_local_ca_trust user
       NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
