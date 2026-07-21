@@ -107,27 +107,7 @@ let
     containsRegex "order = lib\.mkOption" terminalActivationsModuleText
     && containsRegex "type = lib\.types\.int;" terminalActivationsModuleText
   ) "terminal-activations order sub-option must have int type";
-  # Test 17: Verify nixSystemBinDirsList is present in managed-paths.nix
-  test_nix_system_bin_dirs_list = assert' (
-    containsRegex "nixSystemBinDirsList" managedPathsText
-    && containsRegex "/etc/profiles/per-user/" managedPathsText
-    && containsRegex "/run/current-system/sw/bin" managedPathsText
-  ) "nixSystemBinDirsList must reference NixOS system bin directories";
 
-  # Test 18: Verify nixProfileBinDirsList is present in managed-paths.nix
-  test_nix_profile_bin_dirs_list = assert' (
-    containsRegex "nixProfileBinDirsList" managedPathsText
-    && containsRegex "nix/profiles/profile/bin" managedPathsText
-    && containsRegex "nix-profile/bin" managedPathsText
-    && containsRegex "home-manager/profile/bin" managedPathsText
-  ) "nixProfileBinDirsList must reference profile bin directories";
-
-  # Test 19: Verify nixSystemBinDirsList and nixProfileBinDirsList are exported
-  test_nix_bin_dirs_exported = assert' (
-    containsRegex "inherit" managedPathsText
-    && containsRegex "nixSystemBinDirsList" managedPathsText
-    && containsRegex "nixProfileBinDirsList" managedPathsText
-  ) "nixSystemBinDirsList and nixProfileBinDirsList must be exported from managed-paths.nix";
   allTests = [
     test_home_username_type
     test_home_directory_linux
@@ -145,9 +125,6 @@ let
     test_terminal_activations_options
     test_terminal_activations_command_option
     test_terminal_activations_order_option
-    test_nix_system_bin_dirs_list
-    test_nix_profile_bin_dirs_list
-    test_nix_bin_dirs_exported
   ];
 in
 let
@@ -175,8 +152,5 @@ in
     "terminal-activations module defines nucleus.terminalActivations option"
     "terminal-activations command sub-option has str type"
     "terminal-activations order sub-option has int type"
-    "nixSystemBinDirsList defined with system bin directories"
-    "nixProfileBinDirsList defined with profile bin directories"
-    "nixSystemBinDirsList and nixProfileBinDirsList exported"
   ];
 }

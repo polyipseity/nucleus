@@ -6,8 +6,6 @@
 #   _nucleus_protect_symlink       — set uchg / chattr +i on a symlink
 #   _nucleus_unprotect_symlink     — clear uchg / chattr -i from a symlink
 #   _nucleus_resolve_repo_root     — resolve $NUCLEUS_REPO_ROOT, fail if unset
-#   _nucleus_prepend_first_executable_dir — prepend dir containing executable to PATH
-
 # Set/clear immutable flags on symlinks so managed agent config symlinks are
 # not accidentally removed or replaced outside of an apply run.
 
@@ -74,21 +72,6 @@ _nucleus_resolve_repo_root() {
     echo "$_nrr_context: repo root not set; run via apply.sh or export NUCLEUS_REPO_ROOT." >&2
     return 1
   fi
-}
-
-# Append the first directory containing $1 to PATH (default to append to avoid
-# shadowing system executables).
-_nucleus_prepend_first_executable_dir() {
-  _nped_executable="$1"
-  shift
-  for _nped_dir in "$@"; do
-    if [ -x "$_nped_dir/$_nped_executable" ]; then
-      PATH="$PATH:$_nped_dir"
-      export PATH
-      return 0
-    fi
-  done
-  return 1
 }
 
 # ensure_file_symlink TARGET LINK
