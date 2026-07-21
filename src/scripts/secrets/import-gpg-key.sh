@@ -58,6 +58,6 @@ printf '%s\n' "$first_key_fingerprint" > "$managed_keys_manifest"
 # managed key; excess visibility could aid key targeting.
 chmod 600 "$managed_keys_manifest"
 
-if ! printf '%s:6:\n' "$first_key_fingerprint" | "$GPG_BIN" --import-ownertrust; then
+if ! printf '%s:6:\n' "$first_key_fingerprint" | '__GPG_BIN__' --import-ownertrust; then
   echo "secrets: warning — failed to enforce ultimate ownertrust for managed primary fingerprint $first_key_fingerprint; key is imported and tracked but trust state may require manual repair." >&2
 fi
