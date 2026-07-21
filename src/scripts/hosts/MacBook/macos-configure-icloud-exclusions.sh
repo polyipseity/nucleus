@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../../lib/macos-icloud-exclusions-lib.sh"
+. "$SCRIPT_DIR/../lib/macos-icloud-exclusions-lib.sh"
 
 _jq_bin="$1"
 _find_bin="$2"

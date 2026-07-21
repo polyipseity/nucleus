@@ -399,7 +399,7 @@ in
     # first-run race before provisionDevDirectory completes).
     # -----------------------------------------------------------------------
     vsCodeWorkspaceTrust = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      "${activationBundle}/bin/trust-vscode-workspace" "${pkgs.python3}" "${vsCodeWorkspaceTrustPy}"
+      "${activationBundle}/bin/trust-vscode-workspace" "${pkgs.python3}/bin/python3" "${vsCodeWorkspaceTrustPy}"
     '';
   };
 }

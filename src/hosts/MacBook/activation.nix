@@ -45,6 +45,8 @@ let
   # Baked at eval time from NUCLEUS_REPO_ROOT (set by apply.sh). Used to
   # resolve the repo checkout root in activation blocks that embed or invoke
   # repo-local scripts.
+  activationBundle = pkgs.callPackage ../../modules/lib/activation-bundle.nix { };
+
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   # Enhanced apple-sdk with real tool symlinks in usr/bin/ so xcrun shims
@@ -87,21 +89,11 @@ in
     # ---- ensureLogDirs -----------------------------------------------------------
     # Create system log dirs (all hosts) and macOS-specific user log dirs (console
     # user + chown). Shared with NixOS via ensure-log-dirs.sh.
-    ${builtins.replaceStrings
-      [
-        "__NUCLEUS_SYSTEM_LOG_DIR__"
-        "__NUCLEUS_LOG_SUBDIRS__"
-        "__NUCLEUS_USER_LOG_SUBDIRS__"
-        "__NUCLEUS_CHOWN_LOG_SUBDIRS__"
-      ]
-      [
-        "${config.nucleus.logging.systemLogDir}"
-        "${builtins.toString systemLogDirs}"
-        "${builtins.toString userLogDirs}"
-        "${builtins.toString chownLogDirs}"
-      ]
-      (builtins.readFile ../../scripts/services/log-dirs-init.sh)
-    }
+    "${activationBundle}/bin/log-dirs-init" \
+      "${config.nucleus.logging.systemLogDir}" \
+      "${builtins.toString systemLogDirs}" \
+      "${builtins.toString userLogDirs}" \
+      "${builtins.toString chownLogDirs}"
   '';
 
   # ---------------------------------------------------------------------------
@@ -205,26 +197,17 @@ in
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-disable-spotlight.sh}
 
     # ---- nvimLauncher -----------------------------------------------------------
-    ${builtins.readFile ../../scripts/editors/launch-nvim.sh}
+    # Pass empty arg to trigger runtime resolution from /dev/console (macOS).
+    "${activationBundle}/bin/launch-nvim" ""
 
     # ---- ensureLogDirs (repeated from extraActivation) --------------------------
     # Also ensure log directories exist during postActivation (belt-and-suspenders
     # in case systemLogDir was reconfigured at activation time).
-    ${builtins.replaceStrings
-      [
-        "__NUCLEUS_SYSTEM_LOG_DIR__"
-        "__NUCLEUS_LOG_SUBDIRS__"
-        "__NUCLEUS_USER_LOG_SUBDIRS__"
-        "__NUCLEUS_CHOWN_LOG_SUBDIRS__"
-      ]
-      [
-        "${config.nucleus.logging.systemLogDir}"
-        "${builtins.toString systemLogDirs}"
-        "${builtins.toString userLogDirs}"
-        "${builtins.toString chownLogDirs}"
-      ]
-      (builtins.readFile ../../scripts/services/log-dirs-init.sh)
-    }
+    "${activationBundle}/bin/log-dirs-init" \
+      "${config.nucleus.logging.systemLogDir}" \
+      "${builtins.toString systemLogDirs}" \
+      "${builtins.toString userLogDirs}" \
+      "${builtins.toString chownLogDirs}"
     # undoc-supp: /dev/console may not exist; guards below handle empty/root.
     _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     if [ -n "$_camilladsp_user" ] && [ "$_camilladsp_user" != "/Users/root" ]; then
