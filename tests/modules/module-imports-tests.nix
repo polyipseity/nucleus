@@ -28,6 +28,7 @@ let
     "starship"
     "wallpapers"
     "agents"
+    "terminal-activations"
   ];
 
   # Helper: verify a path exists by attempting to read it.
@@ -61,6 +62,7 @@ let
         "starship" = true;
         "wallpapers" = true;
         "agents" = true;
+        "terminal-activations" = true;
       };
     in
     if builtins.hasAttr moduleName knownModules then

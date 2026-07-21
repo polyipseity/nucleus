@@ -9,6 +9,7 @@ let
   secretsModuleText = builtins.readFile ../../src/modules/secrets.nix;
   flakeText = builtins.readFile ../../src/flake.nix;
   cloudDrivesModuleText = builtins.readFile ../../src/modules/cloud-drives.nix;
+  terminalActivationsModuleText = builtins.readFile ../../src/modules/terminal-activations.nix;
 
   # Test 1: Verify home.username option exists and is a string
   test_home_username_type = assert' (
@@ -86,6 +87,25 @@ let
         && containsRegex "type = lib\.types\.listOf replicaSubmodule;" cloudDrivesModuleText
       )
       "cloud-drives module must define nucleus.cloudDrives.mounts and nucleus.cloudDrives.replicas options as lists";
+  # Test 14: Verify terminal-activations module defines nucleus.terminalActivations option
+  test_terminal_activations_options =
+    assert'
+      (
+        containsRegex "options\.nucleus\.terminalActivations = lib\.mkOption" terminalActivationsModuleText
+        && containsRegex "type = lib\.types\.attrsOf" terminalActivationsModuleText
+        && containsRegex "home\.activation\.writeDarwinTerminalActivations" terminalActivationsModuleText
+      )
+      "terminal-activations module must define nucleus.terminalActivations option with attrsOf type and writeDarwinTerminalActivations activation entry";
+  # Test 15: Verify terminal-activations module defines command sub-option with str type
+  test_terminal_activations_command_option = assert' (
+    containsRegex "command = lib\.mkOption" terminalActivationsModuleText
+    && containsRegex "type = lib\.types\.str;" terminalActivationsModuleText
+  ) "terminal-activations command sub-option must have str type";
+  # Test 16: Verify terminal-activations module defines order sub-option with int type
+  test_terminal_activations_order_option = assert' (
+    containsRegex "order = lib\.mkOption" terminalActivationsModuleText
+    && containsRegex "type = lib\.types\.int;" terminalActivationsModuleText
+  ) "terminal-activations order sub-option must have int type";
   allTests = [
     test_home_username_type
     test_home_directory_linux
@@ -100,6 +120,9 @@ let
     test_option_defaults_meaningful
     test_conditional_options_structure
     test_cloud_drives_options
+    test_terminal_activations_options
+    test_terminal_activations_command_option
+    test_terminal_activations_order_option
   ];
 in
 {
@@ -120,5 +143,8 @@ in
     "option defaults are meaningful"
     "conditional options use mkIf"
     "cloud-drives module defines mounts and replicas options"
+    "terminal-activations module defines nucleus.terminalActivations option"
+    "terminal-activations command sub-option has str type"
+    "terminal-activations order sub-option has int type"
   ];
 }
