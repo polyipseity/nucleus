@@ -12,8 +12,9 @@ let
     pkgs.bottom
     pkgs.bun
     pkgs.caddy
-    # cargo install fallback when cargo-binstall has no binary. NOT for activation
-    # scripts (see activation-fallback ban in agents.nix).
+    # cargo install fallback when cargo-binstall has no binary.  Also used by
+    # installCargoBinstallPackages activation script for list/uninstall (via
+    # store-path arg; no ~/.cargo/bin probing).
     pkgs.cargo
     pkgs.camilladsp
     pkgs.camillagui-backend
