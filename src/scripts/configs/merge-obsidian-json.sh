@@ -25,4 +25,4 @@ case "$(uname -s)" in
 esac
 
 mkdir -p "$(dirname "$_obsidian_settings_path")"
-_obsidian_merge_json "__PYTHON3_BIN__" "__OBSIDIAN_MERGE_JSON_PY__" "$_obsidian_settings_path" "__OBSIDIAN_SETTINGS_JSON__"
+_obsidian_merge_json "__PYTHON3_BIN__" "__OBSIDIAN_MERGE_JSON_PY__" "$_obsidian_settings_path" __OBSIDIAN_SETTINGS_JSON__
