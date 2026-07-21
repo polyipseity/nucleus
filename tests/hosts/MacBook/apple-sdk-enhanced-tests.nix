@@ -25,7 +25,7 @@ assert lib.hasInfix "pkgs.gnumake" appleSdkToolsNix;
 # Null tools exist as placeholders (not missing)
 assert lib.hasInfix "swift" appleSdkToolsNix;
 assert lib.hasInfix "otool" appleSdkToolsNix;
-assert lib.hasInfix "as                   = null" appleSdkToolsNix;
+assert lib.hasInfix "as = null;" appleSdkToolsNix;
 
 # Header comment mentions regeneration command
 assert lib.hasInfix "otool -L" appleSdkToolsNix;

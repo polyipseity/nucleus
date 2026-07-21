@@ -92,7 +92,7 @@ let
     test_manual_md_paths
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} configuration composition tests passed";

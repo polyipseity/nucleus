@@ -177,7 +177,7 @@ let
     test_windows_library_module_wired
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} Jellyfin provisioning tests passed";

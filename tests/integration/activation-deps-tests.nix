@@ -386,7 +386,7 @@ let
     test_macos_workflows_has_open_nucleus_manual
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${builtins.toString (builtins.length allTests)} activation and service dependency tests passed";

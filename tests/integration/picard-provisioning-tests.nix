@@ -21,7 +21,7 @@ let
     test_windows_installs_picard
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} Picard package provisioning tests passed";

@@ -115,7 +115,7 @@ let
     test_manuals_document_curated_shortcuts_and_commands
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests) {
   success = true;
   testCount = builtins.length allTests;
   message = "Managed shell shortcut parity tests passed";

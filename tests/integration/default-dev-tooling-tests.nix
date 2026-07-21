@@ -252,7 +252,7 @@ let
     test_core_nickel_lsp_in_shared_packages
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} managed fallback tooling tests passed";

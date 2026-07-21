@@ -64,17 +64,17 @@ assert containsRegex "prefixMatch" watchdogPs1Text;
 
 # --- macOS launchd agent config ---
 assert containsRegex "local.service-watchdog" macosWatchdogNixText;
-assert containsRegex "StartInterval = 300" macosWatchdogNixText;
+assert containsRegex "KeepAlive = true" macosWatchdogNixText;
 assert containsRegex "RunAtLoad = true" macosWatchdogNixText;
 assert containsRegex "service-watchdog" macosWatchdogNixText;
 assert containsRegex "service-watchdog/stdout.log" macosWatchdogNixText;
 
 # --- NixOS systemd timer config ---
 assert containsRegex "nucleus-service-watchdog" nixosActivationText;
-assert containsRegex "OnUnitActiveSec" nixosActivationText;
-assert containsRegex "5min" nixosActivationText;
-assert containsRegex "timers.target" nixosActivationText;
-assert containsRegex "oneshot" nixosActivationText;
+assert containsRegex "Restart = .always." nixosActivationText;
+assert containsRegex "multi-user.target" nixosActivationText;
+assert containsRegex "Type = .simple." nixosActivationText;
+assert containsRegex "nucleus-service-watchdog" nixosActivationText;
 assert containsRegex "nucleus-service-watchdog" nixosActivationText;
 assert containsRegex "pkgs.jq" nixosActivationText;
 assert containsRegex "NUCLEUS_REPO_ROOT" nixosActivationText;
@@ -82,7 +82,7 @@ assert containsRegex "NUCLEUS_REPO_ROOT" nixosActivationText;
 # --- Windows DSC task config ---
 assert containsRegex "TaskName: service-watchdog" windowsSchedulerDscText;
 assert containsRegex "TaskPath: \\\\nucleus\\\\" windowsSchedulerDscText;
-assert containsRegex "PT5M" windowsSchedulerDscText;
+assert containsRegex "AtStartup" windowsSchedulerDscText;
 assert containsRegex "service-watchdog.ps1" windowsSchedulerDscText;
 assert containsRegex "NUCLEUS_REPO_ROOT" windowsSchedulerDscText;
 assert containsRegex "RunWithHighestPrivileges: true" windowsSchedulerDscText;

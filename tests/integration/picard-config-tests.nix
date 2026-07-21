@@ -100,7 +100,7 @@ let
     test_macos_icloud_exclusions_daily_schedule
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} Picard config merge tests passed";

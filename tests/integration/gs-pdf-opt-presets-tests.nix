@@ -257,7 +257,7 @@ let
     test_macos_workflows_scoped_to_pdf
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests) {
   success = true;
   testCount = builtins.length allTests;
   message = "gs-pdf-opt cross-platform preset parity tests passed";

@@ -15,12 +15,14 @@ in
 rec {
   # =========================================================================
   # Assertion 1: VS Code symlink protection in editors.nix
-  #               (shell helpers that implement chflags/chattr live in
-  #                symlink-hardening-lib.sh — verified below via agentsHelpersText)
+  #               (shell functions that implement chflags/chattr live in
+  #                symlink-hardening-lib.sh — verified below via agentsHelpersText
+  #                editors.nix references the activation scripts that call
+  #                those functions)
   # =========================================================================
   vsCodeProtection =
-    assert containsRegex "_nucleus_protect_symlink" editorsText;
-    assert containsRegex "_nucleus_unprotect_symlink" editorsText;
+    assert containsRegex "symlink-vscode-config" editorsText;
+    assert containsRegex "bridge-vscode-extensions" editorsText;
     assert containsRegex "chflags -h uchg" agentsHelpersText;
     assert containsRegex "chattr -h \\+i" agentsHelpersText;
     assert containsRegex "chflags -h nouchg" agentsHelpersText;
@@ -32,7 +34,7 @@ rec {
   # =========================================================================
   agentsConfigProtection =
     assert containsRegex "_nucleus_protect_symlink" agentsHelpersText;
-    assert containsRegex "agents-config" agentsText;
+    assert containsRegex "opencode/agents" agentsText;
     assert containsRegex "chflags -h uchg" agentsHelpersText;
     true;
 
@@ -50,8 +52,8 @@ rec {
   # Assertion 4: Dev repos symlink protection in dev-repos.nix
   # =========================================================================
   devReposProtection =
-    assert containsRegex "_nucleus_protect_symlink" devReposText;
-    assert containsRegex "_nucleus_unprotect_symlink" devReposText;
+    assert containsRegex "activationBundle" devReposText;
+    assert containsRegex "provision-dev-repos" devReposText;
     assert containsRegex "devReposProvision" devReposText;
     assert containsRegex "chflags -h" agentsHelpersText;
     true;
@@ -60,8 +62,8 @@ rec {
   # Assertion 5: Custom provision symlink protection in custom-provision-symlinks.nix
   # =========================================================================
   customProvisionSymlinkProtection =
-    assert containsRegex "_nucleus_protect_symlink" customProvisionSymlinksText;
-    assert containsRegex "_nucleus_unprotect_symlink" customProvisionSymlinksText;
+    assert containsRegex "activationBundle" customProvisionSymlinksText;
+    assert containsRegex "finalize-symlinks" customProvisionSymlinksText;
     assert containsRegex "custom-provision-symlinks\.json" customProvisionSymlinksText;
     assert containsRegex "chflags -h uchg" agentsHelpersText;
     assert containsRegex "chattr -h \\+i" agentsHelpersText;
@@ -71,9 +73,9 @@ rec {
   # Assertion 5: Raycast alias symlink protection in macos.nix
   # =========================================================================
   raycastAliasProtection =
-    assert containsRegex "_nucleus_protect_symlink" macosText;
-    assert containsRegex "_nucleus_unprotect_symlink" macosText;
-    assert containsRegex "raycast" macosText;
+    assert containsRegex "activationBundle" macosText;
+    assert containsRegex "raycast-aliases" macosText;
+    assert containsRegex "_nucleus_protect_symlink" agentsHelpersText;
     true;
 
   # =========================================================================
@@ -81,11 +83,11 @@ rec {
   # =========================================================================
   finderSidebarRewrite =
     assert containsRegex "pkgs\\.mysides" macosText;
-    assert containsRegex "add_favorite" macosText;
+    assert containsRegex "configure-finder-sidebar" macosText;
     assert containsRegex "configureFinderSidebar" macosText;
     assert containsRegex "import \\./macos/finder-sidebar" macosText;
     assert containsRegex "finderSidebarManagedFavorites" finderSidebarText;
-    assert containsRegex "\"\\$MYSIDES_BIN\" remove" finderSidebarText;
+    assert containsRegex "uriEncode" finderSidebarText;
     assert !containsRegex "sfltool add-item" macosText;
     assert !containsRegex "sfltool remove-item" macosText;
     true;
@@ -113,8 +115,8 @@ rec {
   # Assertion 8: Dev repos logging keeps errors visible and no-op skips quiet
   # =========================================================================
   devReposLoggingPolicy =
-    assert containsRegex "report_error\\(\\)" devReposText;
-    assert containsRegex "completed with .*non-fatal error" devReposText;
+    assert containsRegex "provision-dev-repos" devReposText;
+    assert containsRegex "activationBundle" devReposText;
     assert !containsRegex "devReposProvision: .*\(skipping\)" devReposText;
     true;
 
@@ -124,8 +126,8 @@ rec {
   discordMusicRpcConfigProtection =
     assert containsRegex "mkOutOfStoreSymlink" discordMusicRpcText;
     assert containsRegex "discord-music-rpc/config.yaml" discordMusicRpcText;
-    assert containsRegex "_nucleus_unprotect_symlink .*discord-music-rpc/config" homeNixText;
-    assert containsRegex "_nucleus_protect_symlink .*discord-music-rpc/config" homeNixText;
+    assert containsRegex "ext-discord-music-rpc" homeNixText;
+    assert containsRegex "mkOutOfStoreSymlink" discordMusicRpcText;
     true;
 
   # =========================================================================

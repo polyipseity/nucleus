@@ -146,7 +146,7 @@ let
     test_posix_pwsh_agent_env_vars_complete
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${builtins.toString (builtins.length allTests)} prek integration tests passed";

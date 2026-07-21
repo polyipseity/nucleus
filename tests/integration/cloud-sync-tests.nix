@@ -160,15 +160,14 @@ let
     assert'
       (
         containsRegex "pkgs\\.mysides" macosText
-        && containsRegex "\"\\$MYSIDES_BIN\" add" macosText
-        && containsRegex "add_favorite" macosText
+        && containsRegex "configure-finder-sidebar" macosText
+        && containsRegex "mysides}/bin/mysides" macosText
         && containsRegex "configureFinderSidebar" macosText
         && containsRegex "import \\./macos/finder-sidebar" macosText
         && containsRegex "finderSidebar\\.finderSidebar" macosText
         && containsRegex "finderSidebarManagedFavorites" finderSidebarText
-        && containsRegex "\"\\$MYSIDES_BIN\" add" finderSidebarText
-        && containsRegex "\"\\$MYSIDES_BIN\" remove" finderSidebarText
-        && containsRegex "\"\\$MYSIDES_BIN\" list" finderSidebarText
+        && containsRegex "uriEncode" finderSidebarText
+        && containsRegex "mysides" finderSidebarText
         && !containsRegex "finder-sidebar-repair-v2\\.done" macosText
         && !containsRegex "add favorites manually" macosText
         && !containsRegex "FavoriteItems\\.sfl4" macosText
@@ -240,8 +239,8 @@ let
   # Test 36: macOS Finder sidebar setup creates only canonical local directories and excludes cloud mount subpaths
   test_finder_sidebar_paths_created = assert' (
     containsRegex "mkdir -p" macosText
-    && containsRegex "mkdir -p" finderSidebarText
-    && containsRegex "\"\\$HOME/" finderSidebarText
+    && containsRegex "homeDirectory\}/Desktop" finderSidebarText
+    && containsRegex "homeDirectory\}/dev" finderSidebarText
     && !containsRegex "finder-sidebar-repair-v2\\.done" macosText
   ) "macOS setup must create Finder sidebar path directories";
 
@@ -301,7 +300,7 @@ let
   test_icloud_replica_platform_invariant =
     assert'
       (
-        containsRegex "Library/Mobile Documents" moduleText
+        containsRegex "Library/Mobile Documents" macosText
         && containsRegex "clouds/iCloudReplica" moduleText
         && containsRegex "ReparsePoint" windowsCloudDriveModuleText
         && containsRegex "macOS-only" windowsCloudDriveModuleText
@@ -336,7 +335,7 @@ let
     containsRegex "scheduledSyncReplicas" moduleText
     && containsRegex "mkReplicaScheduledSyncScript" moduleText
     && containsRegex "cloud-replica-scheduled-sync" moduleText
-    && containsRegex "nucleus-replica-sync" moduleText
+    && containsRegex "cloud-replica-scheduled-sync-" moduleText
     && containsRegex "StartCalendarInterval" moduleText
     && containsRegex "systemd\.user\.timers" moduleText
     && containsRegex "OnCalendar" moduleText

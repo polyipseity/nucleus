@@ -9,6 +9,7 @@ let
   # Validate that qtpass.json is valid JSON and parse it for semantic assertions
   qtpassJson = builtins.fromJSON (builtins.readFile ../../src/modules/configs/qtpass/qtpass.json);
   loadUserRegistryText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
+  neovimInitLuaText = builtins.readFile ../../src/scripts/editors/neovim-init.lua;
   syncQtPassText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-QtPassConfig.ps1;
   usersRegistryText = builtins.readFile ../../src/modules/users.json;
   windowsUsers = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
@@ -71,8 +72,8 @@ assert containsRegex "managedAppSettings \"neovim\" neovimDefaultSettings" edito
 assert containsRegex "shiftNumberTerminalPrograms = " editorsText;
 assert containsRegex "\"kitty\"" editorsText;
 assert containsRegex "\"1\" = \"!\"" editorsText;
-assert containsRegex "local shifted_key = " editorsText;
-assert containsRegex "KITTY_WINDOW_ID" editorsText;
+assert containsRegex "local shifted_key = " neovimInitLuaText;
+assert containsRegex "KITTY_WINDOW_ID" neovimInitLuaText;
 {
   success = true;
   message = "QtPass settings and editor config tests passed";
