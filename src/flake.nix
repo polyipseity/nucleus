@@ -295,9 +295,9 @@
       vsCodeMarketplaceMac = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
       vsCodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
-      # writeShellApplication plus full src/scripts/ bundling, so scripts that source
-      # libraries under src/scripts/lib/ work in both repo-direct and nix-store
-      # contexts regardless of how $0 resolves through symlinks.
+      # writeShellApplication plus lib.sh bundling, so scripts that source
+      # lib.sh work in both repo-direct and nix-store contexts regardless of
+      # how $0 resolves through symlinks.
       writeShellApplicationWithLib =
         pkgs: args:
         let
@@ -306,11 +306,13 @@
             "extraBin"
             "excludeShellChecks"
             "extraShellCheckFlags"
+            "sourcedFiles"
           ];
           baseDrv = pkgs.writeShellApplication (baseArgs // { checkPhase = "true"; });
           extraBin = args.extraBin or { };
           excludeShellChecks = args.excludeShellChecks or [ ];
           extraShellCheckFlags = args.extraShellCheckFlags or [ ];
+          sourcedFiles = args.sourcedFiles or { };
           shellcheckArgs =
             pkgs.lib.optionals (excludeShellChecks != [ ]) [
               "--exclude"
@@ -319,15 +321,23 @@
             ++ extraShellCheckFlags;
         in
         pkgs.runCommand "${name}-with-lib" { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
-          mkdir -p "$out/bin" "$out/src/scripts"
+          mkdir -p "$out/bin" "$out/src/scripts/lib"
           cp -r "${baseDrv}/bin/." "$out/bin/"
           chmod +w "$out/bin/${name}"
-          cp -r "${./scripts}/." "$out/src/scripts/"
+          cp "${./scripts/lib/lib.sh}" "$out/src/scripts/lib/lib.sh"
+          chmod +x "$out/src/scripts/lib/lib.sh"
+          ln -s ../src/scripts/lib/lib.sh "$out/bin/lib.sh"
           ${pkgs.lib.concatStringsSep "\n" (
             pkgs.lib.mapAttrsToList (target: src: ''
               mkdir -p "$(dirname "$out/bin/${target}")"
               cp "${src}" "$out/bin/${target}"
             '') extraBin
+          )}
+          ${pkgs.lib.concatStringsSep "\n" (
+            pkgs.lib.mapAttrsToList (target: src: ''
+              cp "${src}" "$out/src/scripts/${target}"
+              chmod +x "$out/src/scripts/${target}"
+            '') sourcedFiles
           )}
           shellcheck ${pkgs.lib.escapeShellArgs shellcheckArgs} -x --source-path="$out/bin" "$out/bin/${name}"
         '';
@@ -343,6 +353,7 @@
           script ? scripts + "/${name}.sh",
           excludeShellChecks ? [ ],
           extraShellCheckFlags ? [ ],
+          sourcedFiles ? { },
         }:
         assert pkgs.lib.assertMsg (builtins.baseNameOf script != "nucleus-${name}.sh") ''
           script filename '${builtins.baseNameOf script}' for package '${name}' must not start with 'nucleus-'.
@@ -353,7 +364,12 @@
           name = "nucleus-${name}";
           runtimeInputs = runtimeInputs;
           text = builtins.readFile script;
-          inherit extraBin excludeShellChecks extraShellCheckFlags;
+          inherit
+            extraBin
+            excludeShellChecks
+            extraShellCheckFlags
+            sourcedFiles
+            ;
         };
 
       # Helper for `nix run .#<name>` apps. Delegates to mkNucleusPackage.
@@ -677,6 +693,9 @@
         nucleus-cleanup-nix = mkNucleusPackage pkgs {
           name = "cleanup-nix";
           runtimeInputs = [ pkgs.bash ];
+          sourcedFiles = {
+            "cleanup-nix-build-artifacts.sh" = ./scripts/cleanup-nix-build-artifacts.sh;
+          };
         };
         nucleus-cloud-setup = mkNucleusPackage pkgs {
           name = "cloud-setup";
