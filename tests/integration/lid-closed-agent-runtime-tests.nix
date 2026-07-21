@@ -67,7 +67,7 @@ let
     test_ci_runs_this_suite
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} lid-closed agent runtime tests passed";

@@ -5,6 +5,7 @@ let
   nonEmpty = text: builtins.stringLength text > 0;
 
   nixText = builtins.readFile ../../src/hosts/MacBook/ntfs-3g.nix;
+  buildScriptText = builtins.readFile ../../src/scripts/hosts/MacBook/macos-build-ntfs3g.sh;
   cryptoPatchText = builtins.readFile ../../src/hosts/MacBook/patches/ntfs-3g-crypto.patch;
   rootbindirPatchText = builtins.readFile ../../src/hosts/MacBook/patches/ntfs-3g-rootbindir.patch;
   installHookPatchText = builtins.readFile ../../src/hosts/MacBook/patches/ntfs-3g-install-hook.patch;
@@ -87,10 +88,10 @@ let
 
   # Test 12: Module uses patch -p1 for all patches.
   test_uses_patch_command = assert' (
-    containsRegex "patch -p1.*cryptoPatchPath" nixText
-    && containsRegex "patch -p1.*rootbindirPatchPath" nixText
-    && containsRegex "patch -p1.*installHookPatchPath" nixText
-  ) "ntfs-3g.nix must apply all patches with patch -p1";
+    containsRegex "patch -p1.*CRYPTO_PATCH_PATH" buildScriptText
+    && containsRegex "patch -p1.*ROOTBINDIR_PATCH_PATH" buildScriptText
+    && containsRegex "patch -p1.*INSTALL_HOOK_PATCH_PATH" buildScriptText
+  ) "macos-build-ntfs3g.sh must apply all patches with patch -p1";
 
   # Test 12b: Module references installHookPatchPath.
   test_references_install_hook_patch = assert' (containsRegex "installHookPatchPath" nixText) "ntfs-3g.nix must define installHookPatchPath";
@@ -105,26 +106,26 @@ let
   # === Build script structure: log capture and error handling ===
 
   # Test 14: Module defines LOG_FILE path to the system log directory.
-  test_log_file_path_defined = assert' (containsRegex "LOG_FILE=\"/Users/Shared/nucleus/logs/ntfs-3g-build.log\"" nixText) "ntfs-3g.nix must define LOG_FILE pointing to system log dir";
+  test_log_file_path_defined = assert' (containsRegex "LOG_FILE=\"/Users/Shared/nucleus/logs/ntfs-3g-build.log\"" buildScriptText) "macos-build-ntfs3g.sh must define LOG_FILE pointing to system log dir";
 
   # Test 15: Module creates the log directory before writing.
-  test_log_dir_created = assert' (containsRegex "mkdir -p.*dirname.*LOG_FILE" nixText) "ntfs-3g.nix must mkdir -p the log file directory";
+  test_log_dir_created = assert' (containsRegex "mkdir -p.*dirname.*LOG_FILE" buildScriptText) "macos-build-ntfs3g.sh must mkdir -p the log file directory";
 
   # Test 16: Build output is redirected to the log file (stdout+stderr).
-  test_output_redirected_to_log = assert' (containsRegex ">>.*LOG_FILE.*2>&1" nixText) "ntfs-3g.nix must redirect build output to LOG_FILE with stderr";
+  test_output_redirected_to_log = assert' (containsRegex ">>.*LOG_FILE.*2>&1" buildScriptText) "macos-build-ntfs3g.sh must redirect build output to LOG_FILE with stderr";
 
   # Test 17: Module sets up trap cleanup for BUILD_DIR.
-  test_trap_cleanup = assert' (containsRegex "trap.*rm -rf.*BUILD_DIR.*EXIT" nixText) "ntfs-3g.nix must trap EXIT to clean up BUILD_DIR";
+  test_trap_cleanup = assert' (containsRegex "trap.*rm -rf.*BUILD_DIR.*EXIT" buildScriptText) "macos-build-ntfs3g.sh must trap EXIT to clean up BUILD_DIR";
 
   # Test 18: Module prints log path on successful build completion.
-  test_log_path_on_success = assert' (containsRegex "build complete.*log at" nixText) "ntfs-3g.nix must print log path on build success";
+  test_log_path_on_success = assert' (containsRegex "build complete.*log at" buildScriptText) "macos-build-ntfs3g.sh must print log path on build success";
 
   # Test 19: Module prints log path on build failure and exits with error.
   test_log_path_on_failure = assert' (
-    containsRegex "BUILD FAILED" nixText
-    && containsRegex "exit.*exit_code" nixText
-    && containsRegex "realpath.*LOG_FILE" nixText
-  ) "ntfs-3g.nix must print log path on build failure and exit with non-zero";
+    containsRegex "BUILD FAILED" buildScriptText
+    && containsRegex "exit.*exit_code" buildScriptText
+    && containsRegex "realpath.*LOG_FILE" buildScriptText
+  ) "macos-build-ntfs3g.sh must print log path on build failure and exit with non-zero";
 
   # WHY: Test asserts that ntfs-3g.nix no longer uses or-true for spurious failure masking.
   # The or-true references in the assertion strings below are part of the test's regex/error message, not the tested code.

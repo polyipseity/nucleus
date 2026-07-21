@@ -5,12 +5,13 @@ let
   macbookDefaultsText = builtins.readFile ../../../src/hosts/MacBook/defaults.nix;
   macbookManualText = builtins.readFile ../../../src/hosts/MacBook/MANUAL.md;
   raycastManualConfigText = builtins.readFile ../../../src/hosts/MacBook/raycast-manual-config.md;
+  raycastAliasesScriptText = builtins.readFile ../../../src/scripts/hosts/MacBook/macos-install-raycast-aliases.sh;
 in
-assert containsRegex "macos-install-raycast-aliases" macosText;
+assert containsRegex "raycast-aliases = lib.hm.dag.entryAfter" macosText;
 assert containsRegex "Nucleus App Aliases" macosText;
-assert containsRegex "Books \\(English\\)\\.app" macosText;
-assert containsRegex "Messages \\(English\\)\\.app" macosText;
-assert containsRegex "Weather \\(English\\)\\.app" macosText;
+assert containsRegex "Books \(English\)\.app" raycastAliasesScriptText;
+assert containsRegex "Messages \(English\)\.app" raycastAliasesScriptText;
+assert containsRegex "Weather \(English\)\.app" raycastAliasesScriptText;
 assert containsRegex ''"com\.raycast\.macos"'' macbookDefaultsText;
 assert !containsRegex "NSUserKeyEquivalents" macbookDefaultsText;
 assert containsRegex "Clipboard History hotkey" macbookManualText;

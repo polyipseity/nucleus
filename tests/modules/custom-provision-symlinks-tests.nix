@@ -57,7 +57,7 @@ let
     test_windows_apply_wires_custom_symlinks
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} custom provision symlink tests passed";

@@ -5,7 +5,6 @@ let
   zshCompDir = ../../src/modules/completions/zsh;
   zshCompFiles = builtins.readDir zshCompDir;
   shellText = builtins.readFile ../../src/modules/shell.nix;
-  posixPwshText = builtins.readFile ../../src/modules/pwsh.nix;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
 
   inherit (import ../lib.nix) assert';
@@ -59,23 +58,14 @@ let
 
   # --- Zsh completions are installed by activation hook ---
   test_zsh_completions_installed_by_shell_nix = assert' (
-    lib.hasInfix "_zsh_nucleus_comp_src=\"\${./completions/zsh}\"" shellText
-    && lib.hasInfix "for _zsh_nuc_f in \"$_zsh_nucleus_comp_src\"/_nucleus-" shellText
+    lib.hasInfix "install-zsh-completions" shellText && lib.hasInfix "./completions/zsh" shellText
   ) "shell.nix installZshCompletions must copy nucleus completion files";
-
-  # --- POSIX PowerShell completions ---
-  test_posix_pwsh_has_completers_for_all = assert' (lib.all (
-    cmd: lib.hasInfix "Register-ArgumentCompleter -CommandName ${cmd}" posixPwshText
-  ) nucleusCommands) "pwsh.nix must register argument completers for all nucleus commands";
 
   # --- Windows PowerShell completions ---
   test_windows_pwsh_has_completers_for_all = assert' (lib.all
     (cmd: lib.hasInfix "Register-ArgumentCompleter -CommandName ${cmd}" windowsShellProfileText)
     nucleusCommands
   ) "Sync-ShellProfile.ps1 must register argument completers for all nucleus commands";
-
-  # --- POSIX pwsh has Resolve-NucleusRepoRoot helper for dynamic completions ---
-  test_posix_pwsh_has_repo_root_helper = assert' (lib.hasInfix "function Resolve-NucleusRepoRoot" posixPwshText) "pwsh.nix must define Resolve-NucleusRepoRoot for dynamic completion resolution";
 
   # --- Windows pwsh reuses existing Resolve-NucleusRepoRoot ---
   test_windows_pwsh_reuses_repo_root_helper = assert' (lib.hasInfix "Resolve-NucleusRepoRoot" windowsShellProfileText) "Sync-ShellProfile.ps1 must reference Resolve-NucleusRepoRoot for dynamic completions";
@@ -84,9 +74,7 @@ let
     test_zsh_completions_exist_for_all
     test_zsh_completions_have_compdef
     test_zsh_completions_installed_by_shell_nix
-    test_posix_pwsh_has_completers_for_all
     test_windows_pwsh_has_completers_for_all
-    test_posix_pwsh_has_repo_root_helper
     test_windows_pwsh_reuses_repo_root_helper
   ];
 in
