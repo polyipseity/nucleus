@@ -56,7 +56,7 @@ while IFS= read -r _item; do
   _resolvedTarget="$(resolve_repo_path "$_target")"
 
   if [ "$_symlinkFromRepoRoot" = "true" ]; then
-    if _repoSymlinkTarget="$(resolve_repo_root_target)"; then
+    if _repoSymlinkTarget="$(resolve_repo_root_target "$repoRoot")"; then
       ensure_symlink "$_repoSymlinkTarget" "$_resolvedTarget" "$_name"
     else
       report_error "repo-root symlink target unavailable for $_name"

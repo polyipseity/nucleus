@@ -45,7 +45,7 @@ resolve_repo_path() {
 # to an empty string or a stale store path.
 # Takes the repo root as argument.
 resolve_repo_root_target() {
-  local repoRoot="$1"
+  repoRoot="$1"
   if [ -z "$repoRoot" ]; then
     report_error "repo root not set; run via apply.sh or export NUCLEUS_REPO_ROOT."
     return 1
