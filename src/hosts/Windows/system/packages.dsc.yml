@@ -400,7 +400,7 @@ properties:
           Ensure Bun is installed as the global JS runtime and package manager; provides
           `bun` CLI for running JS ecosystem tools and `bun install -g` for global package
           installs (for example pi-coding-agent).  Bun fills the last tier of the install
-          hierarchy (winget > scoop > cargo binstall > bun > uv) for JS-only tools absent from
+          hierarchy (winget > scoop > cargo binstall > cargo > bun > uv) for JS-only tools absent from
           all higher tiers.
       settings:
         id: Oven-sh.Bun

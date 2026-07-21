@@ -11,7 +11,7 @@ function Invoke-CargoBinstallSetup {
     versions pinned in the repository lockfile.
 
     Only packages absent from both WinGet and Scoop are managed here, following
-    the repository preference hierarchy (nixpkgs/winget > scoop > cargo binstall > bun > uv).
+    the repository preference hierarchy (nixpkgs/winget > scoop > cargo binstall > cargo > bun > uv).
 
     Currently managed:
       - cargo-cache    — reclaim disk space from ~/.cargo registry, git, and

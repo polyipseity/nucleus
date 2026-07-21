@@ -13,7 +13,7 @@ function Invoke-BunSetup {
 
     Only packages absent from WinGet, Scoop, and cargo-binstall are managed
     here, following the repository preference hierarchy
-    (nixpkgs/winget > scoop > cargo binstall > bun > uv).
+    (nixpkgs/winget > scoop > cargo binstall > cargo > bun > uv).
 
     Currently managed:
       - @google/gemini-cli         — Gemini terminal agent CLI.

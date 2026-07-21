@@ -19,7 +19,7 @@ fi
 # Declarative desired-state list.  One package per line.
 # Add a package name here to install it; remove it to trigger uninstall
 # on the next apply.  Only add packages absent from nixpkgs and
-# cargo-binstall (install preference: nixpkgs > cargo binstall > bun > uv).
+# cargo-binstall (install preference: nixpkgs > cargo binstall > cargo > bun > uv).
 _ibp_desired="$(mktemp)"
 printf '%s\n' \
   'clawhub' \
