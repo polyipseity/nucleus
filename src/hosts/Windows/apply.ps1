@@ -405,6 +405,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSSHServer.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-PowerPolicy.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-WifiMacRandomization.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-TerminalActivations.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-WindowsRDP.ps1")
 # setup/: one-time or infrequent toolchain provisioning (Scoop, Bun, Cargo, prek, PowerShell modules).
 . (Join-Path -Path $setupModuleDir -ChildPath "Initialize-DevDirectory.ps1")
@@ -847,6 +848,7 @@ Sync-WindowsRDP -Enabled:$EnableRdpParity
 Sync-PowerPolicy -Enabled:$EnablePowerParity
 Sync-UserPath -Enabled:$EnableShellParity
 Sync-WifiMacRandomization -Enabled:$EnableWiFiParity
+Sync-TerminalActivations
 Invoke-AgentHostShellSetup
 
 # Warn-only service verification: check all managed services are running.
