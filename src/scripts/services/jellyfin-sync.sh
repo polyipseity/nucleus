@@ -16,7 +16,6 @@ case "$REPO_ROOT" in __NUCLEUS_*)
     REPO_ROOT="$NUCLEUS_REPO_ROOT"
   else
     SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
-    # shellcheck disable=SC1091
     . "$SCRIPT_DIR/../lib/lib.sh"
     REPO_ROOT="$(derive_repo_root)"
   fi

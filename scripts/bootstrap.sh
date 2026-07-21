@@ -21,7 +21,6 @@ if [ -h "$_self" ]; then
   esac
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
-# shellcheck disable=SC1091
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 REPO_ROOT="$(derive_repo_root)"
 VERSIONS_FILE="$SCRIPT_DIR/bootstrap-versions.env"
@@ -117,7 +116,6 @@ load_bootstrap_versions() {
 
   set -a
   # shellcheck source=./bootstrap-versions.env
-  # shellcheck disable=SC1091
   . "$VERSIONS_FILE"
   set +a
 
@@ -170,10 +168,8 @@ bootstrap_nix_if_missing() {
   rm -f "$installer_path"
 
   if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
-    # shellcheck disable=SC1091
     . "$HOME/.nix-profile/etc/profile.d/nix.sh"
   elif [ -f "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" ]; then
-    # shellcheck disable=SC1091
     . "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
   fi
 

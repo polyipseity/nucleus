@@ -7,7 +7,6 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
 NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
-# shellcheck disable=SC1091
 . "$NUCLEUS_REPO_ROOT/src/scripts/lib.sh"
 
 # Create a scratch directory for all test artifacts.

@@ -324,8 +324,8 @@
           mkdir -p "$out/bin" "$out/src/scripts/lib"
           cp -r "${baseDrv}/bin/." "$out/bin/"
           chmod +w "$out/bin/${name}"
-          cp "${./scripts/lib/lib.sh}" "$out/src/scripts/lib/lib.sh"
-          chmod +x "$out/src/scripts/lib/lib.sh"
+          cp -r "${./scripts/lib}/." "$out/src/scripts/lib/"
+          chmod -R +x "$out/src/scripts/lib/"
           ln -s ../src/scripts/lib/lib.sh "$out/bin/lib.sh"
           ${pkgs.lib.concatStringsSep "\n" (
             pkgs.lib.mapAttrsToList (target: src: ''

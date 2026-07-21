@@ -9,7 +9,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
-# shellcheck disable=SC1091
 . "$(dirname "$SCRIPT_DIR")/lib.sh"
 
 _rak_repo_root=""

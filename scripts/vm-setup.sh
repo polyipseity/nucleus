@@ -13,7 +13,6 @@ if [ -h "$_self" ]; then
   esac
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
-# shellcheck disable=SC1091
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 REPO_ROOT="$(derive_repo_root)"
@@ -234,7 +233,6 @@ export NUCLEUS_VM_GUEST_PASSWORD="$vm_guest_password"
 
 # Source shared VM setup library (function definitions).
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
-# shellcheck disable=SC1091
 . "$SCRIPT_DIR/../src/scripts/lib/vm-setup-lib.sh"
 
 # ---------------------------------------------------------------------------
