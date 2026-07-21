@@ -168,6 +168,8 @@ bootstrap_nix_if_missing() {
   rm -f "$installer_path"
 
   if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
+    # Not available in Nix build sandbox — only at runtime after Nix install.
+    # shellcheck disable=SC1091
     . "$HOME/.nix-profile/etc/profile.d/nix.sh"
   elif [ -f "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" ]; then
     . "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
