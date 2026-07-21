@@ -179,6 +179,7 @@ in
     ./secrets.nix
     ./starship.nix
     ./shell.nix
+    ./terminal-activations.nix
     ./wallpapers.nix
   ];
 

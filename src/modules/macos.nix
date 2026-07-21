@@ -262,8 +262,8 @@ let
 
   gcWeekly = pkgs.writeShellScript "gc-weekly" (
     builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
-      (builtins.readFile ../scripts/lib/repo-root-lib.sh) +
-      (builtins.readFile ../scripts/services/gc-sweep.sh)
+      (builtins.readFile ../scripts/lib/repo-root-lib.sh)
+      + (builtins.readFile ../scripts/services/gc-sweep.sh)
     )
   );
 
@@ -351,11 +351,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # writes and domain-specific hooks.  This minimizes "ghost" values staying
     # in memory until logout/login after a rebuild.
     # -------------------------------------------------------------------------
-    reloadUserPreferenceState = lib.hm.dag.entryAfter [
-      "input-config"
-      "safari-defaults"
-      "universal-access-defaults"
-    ] ''
+    reloadUserPreferenceState = lib.hm.dag.entryAfter [ "input-config" ] ''
       "${activationBundle}/bin/reload-user-preference-state"
     '';
 
@@ -384,11 +380,22 @@ lib.mkIf pkgs.stdenv.isDarwin {
     #   VLC    — handles the complete set of audio/video UTIs defined above
     # -------------------------------------------------------------------------
     macos-launch-services = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      "${activationBundle}/bin/configure-launch-services" "${dutiBin}" '${builtins.toJSON [
-        { bundle_id = "com.google.chrome"; utis = chromeUTIs; }
-        { bundle_id = "com.aone.keka"; utis = kekaUTIs; }
-        { bundle_id = "org.videolan.vlc"; utis = vlcUTIs; }
-      ]}'
+      "${activationBundle}/bin/configure-launch-services" "${dutiBin}" '${
+        builtins.toJSON [
+          {
+            bundle_id = "com.google.chrome";
+            utis = chromeUTIs;
+          }
+          {
+            bundle_id = "com.aone.keka";
+            utis = kekaUTIs;
+          }
+          {
+            bundle_id = "org.videolan.vlc";
+            utis = vlcUTIs;
+          }
+        ]
+      }'
     '';
 
     # -------------------------------------------------------------------------
@@ -456,28 +463,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
       "${activationBundle}/bin/preflight-privacy" "${repoRoot}"
     '';
 
-    # -------------------------------------------------------------------------
-    # safari-defaults
-    # Safari is sandboxed and stores preferences in a containerized domain that
-    # `system.defaults.CustomUserPreferences` cannot always write during system
-    # activation. Apply these settings from user activation instead so Safari
-    # hardening remains declarative without breaking `darwin-rebuild switch`.
-    # -------------------------------------------------------------------------
-    safari-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
-      "${activationBundle}/bin/safari-defaults"
-    '';
-
-    # -------------------------------------------------------------------------
-    # universal-access-defaults
-    # Accessibility defaults are user/session scoped and may be protected from
-    # system-level defaults writes during `darwin-rebuild`. Apply them from the
-    # user activation phase to keep accessibility intent without system errors.
-    # -------------------------------------------------------------------------
-    universal-access-defaults = lib.hm.dag.entryAfter [ "preflightPrivacyPermissions" ] ''
-      "${activationBundle}/bin/universal-access-defaults"
-    '';
-
-    # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
     # provisionDevDirectory
     # Ensures ~/dev exists before any dev-tree maintenance runs.
@@ -746,6 +731,21 @@ lib.mkIf pkgs.stdenv.isDarwin {
         };
         NUCLEUS_REPO_ROOT = builtins.getEnv "NUCLEUS_REPO_ROOT";
       };
+    };
+  };
+
+  # Safari and accessibility defaults require Full Disk Access (FDA), which is
+  # lost when running inside a sudo process tree during darwin-rebuild switch.
+  # Execute them in the user's terminal context via the terminal-activations
+  # manifest so macOS TCC grants are inherited.
+  nucleus.terminalActivations = {
+    safari-defaults = {
+      command = "${activationBundle}/bin/safari-defaults";
+      order = 10;
+    };
+    universal-access-defaults = {
+      command = "${activationBundle}/bin/universal-access-defaults";
+      order = 20;
     };
   };
 
