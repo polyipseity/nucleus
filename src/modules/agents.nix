@@ -102,9 +102,7 @@ in
     installBunPackages = lib.hm.dag.entryAfter [ "install-agent-skills" ] ''
       "${activationBundle}/bin/install-bun-packages" \
         "${pkgs.jq}/bin/jq" \
-        "${managedPaths.toShellPrependGuard}" \
-        "${managedPaths.toShellAppendGuard}" \
-        ${lib.concatStringsSep " \\\n        " (map (d: ''"${d}"'') managedPaths.nixProfileBinDirsList)}
+        "${pkgs.bun}/bin/bun"
     '';
 
     # -------------------------------------------------------------------------
@@ -145,13 +143,12 @@ in
     # and installs the stable toolchain for cargo-binstall compilation fallback
     # and for cargo +stable list/uninstall operations in the next step.
     #
-    # Why after linkGeneration: pkgs.rustup (linked by linkGeneration) must be
-    # on PATH before this step invokes it to configure the toolchain state.
+    # Why after linkGeneration: must run before installCargoBinstallPackages
+    # (enforced by that step's entryAfter).
     # -------------------------------------------------------------------------
     initRustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/bin/init-rustup" \
-        ${lib.concatStringsSep " \\\n        " (map (d: ''"${d}"'') managedPaths.nixSystemBinDirsList)} \
-        ${lib.concatStringsSep " \\\n        " (map (d: ''"${d}"'') managedPaths.nixProfileBinDirsList)}
+        "${pkgs.rustup}/bin/rustup"
     '';
 
     # -------------------------------------------------------------------------
@@ -177,9 +174,7 @@ in
         "${pkgs.jq}/bin/jq" \
         "${pkgs.gawk}/bin/awk" \
         '${builtins.toJSON [ ]}' \
-        "${managedPaths.cargoBinDir}" \
-        ${lib.concatStringsSep " \\\n        " (map (d: ''"${d}"'') managedPaths.nixSystemBinDirsList)} \
-        ${lib.concatStringsSep " \\\n        " (map (d: ''"${d}"'') managedPaths.nixProfileBinDirsList)}
+        "${managedPaths.cargoBinDir}"
     '';
 
     # -------------------------------------------------------------------------

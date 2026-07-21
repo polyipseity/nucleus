@@ -1,58 +1,18 @@
 # shellcheck shell=sh
 # Idempotently converges the declarative bun global package set.
-# Requires: bun on PATH.
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
-
 _jq_bin="$1"
-_managed_prepend="$2"
-_managed_append="$3"
+_bun_bin="$2"
 
-# Consume the 3 fixed-argument slots, then "$@" becomes the probe directories
-# (nix profile bin dirs), passed as individual arguments from the Nix template.
-# Each dir is a separate shell argument, so _ibp_setup_path receives properly
-# split directories via "$@" after its shift 2.
-shift 3
+# Add bun's directory to PATH so bun is callable and child processes
+# can find it.
+_bun_bin_dir="$(dirname "$_bun_bin")"
+PATH="$_bun_bin_dir:$PATH"
+export PATH
 
-# _ibp_setup_path PREPEND_GUARD APPEND_GUARD PROBE_DIRS...
-# Sets up PATH with managed bin directories and prepends nix profile dirs.
-_ibp_setup_path() {
-  _ibp_prepend_guard="$1"
-  _ibp_append_guard="$2"
-  shift 2
-
-  PATH="${_ibp_prepend_guard}$PATH${_ibp_append_guard}"
-  export PATH
-
-  # Also prepend the nix profile bin directory, Home Manager profile bin
-  # directory, and directly probe the nix store for common package bins.
-  # After linkGeneration the profile symlinks exist, but the activation
-  # shell's PATH may not include them.
-  _nucleus_prepend_first_executable_dir bun "$@" || true  # undoc-supp: bun may not be in any profile dir; fallback follows.
-}
-
-# Call _ibp_setup_path with managed-path guard tokens and probe directories
-# as individual arguments.
-_ibp_setup_path "$_managed_prepend" "$_managed_append" "$@"
-
-# If bun is still not found after _ibp_setup_path was called, search the
-if ! command -v bun >/dev/null 2>&1; then
-  # undoc-supp: nix store may not have bun yet on first apply; best-effort store probe.
-  _bun_store_path="$(find /nix/store -name 'bun' -type f -print -quit 2>/dev/null || true)"
-  if [ -n "$_bun_store_path" ] && [ -x "$_bun_store_path" ]; then
-    _bun_store_dir="$(dirname "$_bun_store_path")"
-    PATH="$_bun_store_dir:$PATH"
-    export PATH
-  fi
-fi
-
-# bun is provided by pkgs.bun in core.nix (baseSharedPackages).  Verify bun is
-# now on PATH.  Fail fast if bun remains absent so the operator knows a full
-# apply is needed.
-if ! command -v bun >/dev/null 2>&1; then
-  echo "bun: bun not found in PATH; cannot install bun global packages" >&2
+if [ ! -x "$_bun_bin" ]; then
+  echo "bun: $_bun_bin not found in nix store; cannot install bun global packages" >&2
   exit 1
 fi
 
@@ -106,8 +66,8 @@ done < "$_ibp_desired"
 while IFS= read -r _ibp_pkg; do
   [ -z "$_ibp_pkg" ] && continue
   echo "bun: removing $_ibp_pkg"
-  if ! bun remove -g "$_ibp_pkg"; then
-    echo "bun: 'bun remove -g $_ibp_pkg' failed" >&2
+  if ! "$_bun_bin" remove -g "$_ibp_pkg"; then
+    echo "bun: '$_bun_bin remove -g $_ibp_pkg' failed" >&2
     rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
     exit 1
   fi
@@ -117,8 +77,8 @@ done < "$_ibp_to_remove"
 while IFS= read -r _ibp_pkg; do
   [ -z "$_ibp_pkg" ] && continue
   echo "bun: installing $_ibp_pkg"
-  if ! bun install -g --ignore-scripts "$_ibp_pkg"; then
-    echo "bun: 'bun install -g $_ibp_pkg' failed" >&2
+  if ! "$_bun_bin" install -g --ignore-scripts "$_ibp_pkg"; then
+    echo "bun: '$_bun_bin install -g $_ibp_pkg' failed" >&2
     rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
     exit 1
   fi
