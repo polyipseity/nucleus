@@ -1,8 +1,15 @@
 # shellcheck shell=sh
 # Idempotently converges the declarative bun global package set.
-# Variables below are substituted via Nix replaceStrings at build time.
 # Requires: bun on PATH.
 set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+
+_jq_bin="$1"
+_managed_prepend="$2"
+_managed_append="$3"
+_nix_profile_bin_dirs="$4"
 
 # _ibp_setup_path PREPEND_GUARD APPEND_GUARD NIX_PROFILE_BIN_DIRS
 # Sets up PATH with managed bin directories and prepends nix profile dirs.
@@ -22,7 +29,7 @@ _ibp_setup_path() {
 }
 
 # Call _ibp_setup_path with managed-path guard tokens.
-_ibp_setup_path "__MANAGED_PREPEND_GUARD__" "__MANAGED_APPEND_GUARD__" "__NIX_PROFILE_BIN_DIRS__"
+_ibp_setup_path "$_managed_prepend" "$_managed_append" "$_nix_profile_bin_dirs"
 
 # If bun is still not found after _ibp_setup_path was called, search the
 if ! command -v bun >/dev/null 2>&1; then
@@ -60,7 +67,7 @@ _ibp_global_json="$HOME/.bun/install/global/package.json"
 _ibp_installed="$(mktemp)"
 if [ -f "$_ibp_global_json" ]; then
   # undoc-supp: parse failure on a malformed or partially-written file treats the installed set as empty — safe because desired packages will simply be re-installed on the next run.
-  __JQ_BIN__ -r '.dependencies // {} | keys[]' "$_ibp_global_json" > "$_ibp_installed" || true
+  "$_jq_bin" -r '.dependencies // {} | keys[]' "$_ibp_global_json" > "$_ibp_installed" || true
 fi
 
 # Packages installed but not desired: zap-style removal.

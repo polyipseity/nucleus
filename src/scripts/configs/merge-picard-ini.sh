@@ -1,5 +1,12 @@
 # Picard INI merge orchestration.
-# Variables below are substituted via Nix replaceStrings at build time.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_mpi_awk_bin="$1"
+_mpi_picard_defaults_ini="$2"
+_mpi_picard_override_commands="$3"
 
 _upsert_ini_key() {
   _conf="$1"
@@ -17,7 +24,7 @@ _upsert_ini_key() {
     # literally in Picard's @Variant(…) serialized Qt values.
     # AWK -v treats the argument as a string constant and processes
     # backslash escapes; ENVIRON reads the raw bytes unchanged.
-    _UPSERT_VALUE="$_value" "__AWK_PATH__" -v section="$_section" -v key="$_key" '
+    _UPSERT_VALUE="$_value" "$_mpi_awk_bin" -v section="$_section" -v key="$_key" '
       function write_pair() {
         if (wrote == 0) {
           print key "=" value
@@ -76,7 +83,7 @@ _apply_picard_defaults_from_file() {
   _defaults="$1"
   _conf="$2"
 
-  "__AWK_PATH__" '
+  "$_mpi_awk_bin" '
     BEGIN { section = "" }
 
     /^[[:space:]]*([;#]|$)/ { next }
@@ -114,8 +121,8 @@ _apply_picard_defaults_from_file() {
 _picard_conf="${XDG_CONFIG_HOME:-$HOME/.config}/MusicBrainz/Picard.ini"
 _picard_defaults_file="$(mktemp "${TMPDIR:-/tmp}/picard-defaults.XXXXXX.ini")"
 trap 'rm -f "$_picard_defaults_file"' EXIT
-printf '%s' __PICARD_DEFAULTS_INI__ > "$_picard_defaults_file"
+printf '%s' "$_mpi_picard_defaults_ini" > "$_picard_defaults_file"
 
 _apply_picard_defaults_from_file "$_picard_defaults_file" "$_picard_conf"
 
-__PICARD_OVERRIDE_COMMANDS__
+eval "$_mpi_picard_override_commands"

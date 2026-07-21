@@ -1,5 +1,13 @@
 # QtPass INI merge shell helpers.
-# Variable below is substituted via Nix replaceStrings at build time.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_mqi_awk_bin="$1"
+_mqi_darwin_commands="$2"
+_mqi_linux_primary_commands="$3"
+_mqi_linux_secondary_commands="$4"
 
 _escape_qsettings_ini_string() {
   printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e ':join' -e 'N' -e '$!b join' -e 's/\n/\\n/g'
@@ -14,7 +22,7 @@ _update_qtpass_ini_value() {
 
   if [ -f "$_conf" ]; then
     _tmp="$(mktemp "$_conf.XXXXXX")"
-    "__AWK_PATH__" -v key="$_key" -v value="$_value" '
+    "$_mqi_awk_bin" -v key="$_key" -v value="$_value" '
       BEGIN { in_general = 0; wrote = 0 }
       {
         if ($0 ~ /^\[General\]$/) {
@@ -67,7 +75,7 @@ EOF
 
 case "$(uname -s)" in
   Darwin)
-__QTPASS_DARWIN_COMMANDS__
+    eval "$_mqi_darwin_commands"
     ;;
   Linux)
     # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
@@ -75,9 +83,9 @@ __QTPASS_DARWIN_COMMANDS__
     # Some builds may resolve via organization-domain pathing.
     _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
 
-__QTPASS_LINUX_PRIMARY_COMMANDS__
+    eval "$_mqi_linux_primary_commands"
     if [ -f "$_secondary_conf" ]; then
-__QTPASS_LINUX_SECONDARY_COMMANDS__
+      eval "$_mqi_linux_secondary_commands"
     fi
     ;;
 esac

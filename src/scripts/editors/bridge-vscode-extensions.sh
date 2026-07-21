@@ -2,12 +2,14 @@
 # VS Code extension bridge activation.
 # Called by home-manager activation vsCodeExtensionBridge.
 # Provides: _nucleus_protect_symlink, _nucleus_unprotect_symlink (from symlink-hardening-lib.sh)
-#
-# Variable below is substituted via Nix replaceStrings at build time.
 
 set -euo pipefail
 
-source_extensions='__EXTENSION_STORE__/share/vscode/extensions'
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+
+_extension_store="$1"
+source_extensions="$_extension_store/share/vscode/extensions"
 stable_extensions="$HOME/.vscode/extensions"
 insiders_extensions="$HOME/.vscode-insiders/extensions"
 

@@ -4,10 +4,17 @@
 # this but never retries, and subsequent activations skip unchanged agents.
 #
 # Uses $newGenPath (set by Home Manager activation).
-set -eu
+set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+# Provide local fallbacks for HM functions when running as a bundle subprocess.
+verboseEcho() { echo "verbose: $*" >&2; }
+warnEcho() { echo "warning: $*" >&2; }
+
+_new_gen_path="$1"
 _gui_domain="gui/$(id -u)"
-_gen_launchagents="$newGenPath/LaunchAgents"
+_gen_launchagents="$_new_gen_path/LaunchAgents"
 
 if [ ! -d "$_gen_launchagents" ]; then
   verboseEcho "No LaunchAgents directory in new generation -- nothing to verify"

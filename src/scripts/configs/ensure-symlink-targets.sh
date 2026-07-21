@@ -1,13 +1,18 @@
 # shellcheck shell=sh
 # Create target directories for custom-provision-symlinks entries.
-# Tokens substituted at build time.
 
-set -eu
+set -euo pipefail
 
-_nucleus_manifest_dir="$(dirname '__MANAGED_SYMLINK_MANIFEST_PATH__')"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+
+_nucleus_manifest_path="$1"
+_nucleus_target_dirs_json="$2"
+_nucleus_jq_bin="$3"
+_nucleus_manifest_dir="$(dirname "$_nucleus_manifest_path")"
 mkdir -p "$_nucleus_manifest_dir"
 
-echo '__SYMLINK_TARGET_DIRS_JSON__' | __JQ_BIN__ -r '.[]' | while IFS= read -r _nucleus_path; do
+printf '%s\n' "$_nucleus_target_dirs_json" | "$_nucleus_jq_bin" -r '.[]' | while IFS= read -r _nucleus_path; do
   [ -n "$_nucleus_path" ] || continue
   mkdir -p "$(dirname "$_nucleus_path")"
 done

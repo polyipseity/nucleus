@@ -1,25 +1,30 @@
 # ClawHub fetched skill convergence (install + stale cleanup).
-# Consumes tool paths and repo root token at activation time.
+# Consumes tool paths, PATH guards, repo root, and manifest path at
+# activation time.
 set -euo pipefail
 
-_scs_jq_bin='__JQ_BIN__'
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+
+_scs_jq_bin="$1"
+_scs_path_prepend="$2"
+_scs_path_append="$3"
+_scs_repo_root="$4"
+_scs_manifest_rel="$5"
 
 _scs_do_sync=true
 
 # Add managed bin directories (managed-paths.nix pathComponents) to PATH
 # so the ClawHub binary installed by installBunPackages is on PATH for
 # this activation step.
-PATH="__PATH_PREPEND_GUARD__$PATH__PATH_APPEND_GUARD__"
+PATH="${_scs_path_prepend}$PATH${_scs_path_append}"
 export PATH
-
-# Resolve the repo root (same mechanism as symlink and skills).
-_scs_repo_root="$(_nucleus_resolve_repo_root "clawhub" "__REPO_ROOT__")"
 
 # Path to the declarative fetched skill manifest.  Slugs listed here are
 # downloaded by ClawHub; slugs absent from the manifest are cleaned up
 # from ~/.agents/skills/ when their .clawhub/origin.json marker is
 # present.
-_scs_manifest="$_scs_repo_root/__CLAWHUB_MANIFEST_RELATIVE_PATH__"
+_scs_manifest="$_scs_repo_root/$_scs_manifest_rel"
 if [ ! -f "$_scs_manifest" ]; then
   echo "clawhub: manifest not found at $_scs_manifest; skipping fetched skill sync"
   _scs_do_sync=false

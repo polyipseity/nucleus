@@ -24,9 +24,9 @@ _cd_ensure_real_directory() {
   fi
 }
 
-_vsd_jq_bin='__JQ_BIN__'
-_vsd_mounts_json='__ENABLED_MOUNTS_JSON__'
-_vsd_replicas_json='__ENABLED_REPLICAS_JSON__'
+_vsd_jq_bin="$1"
+_vsd_mounts_json="$2"
+_vsd_replicas_json="$3"
 
 # Create the top-level clouds/ directory tree.
 mkdir -p "$HOME/clouds"

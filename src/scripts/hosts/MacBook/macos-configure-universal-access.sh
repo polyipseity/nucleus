@@ -3,7 +3,7 @@
 # accessibility intent without system errors.
 #
 # Requires print_fda_warning function (self-sourced below).
-set -eu
+set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../../lib/macos-fda-warning-lib.sh"

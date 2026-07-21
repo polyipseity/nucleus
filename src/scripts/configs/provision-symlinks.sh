@@ -1,11 +1,12 @@
 # Self-executing preparation of custom provision symlinks.
-# Inlines symlink-hardening-lib.sh at build time via builtins.readFile.
-# Unprotects managed symlinks before linkGeneration, using token placeholders
-# substituted at Nix eval time.
+# Unprotects managed symlinks before linkGeneration.
 set -euo pipefail
 
-_cps_manifest_path="__MANIFEST_PATH__"
-_cps_jq_bin="__JQ_BIN__"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+
+_cps_manifest_path="$1"
+_cps_jq_bin="$2"
 
 if [ -f "$_cps_manifest_path" ]; then
   while IFS= read -r _cps_link_path; do

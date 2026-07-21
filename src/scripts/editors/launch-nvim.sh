@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Create deterministic /etc/nucleus-bin/nvim symlink for vscode-neovim.
-# _nvim_path is substituted via Nix replaceStrings at build time per host.
-# When the token is unset (empty), resolve at runtime from /dev/console (macOS).
+# When the arg is empty, resolve at runtime from /dev/console (macOS).
 set -euo pipefail
 
-_nvim_path='__NUCLEUS_NVIM_PATH__'
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_nvim_path="$1"
 
 if [ -z "$_nvim_path" ]; then
   # Runtime resolution (macOS): get console user, resolve profile path.

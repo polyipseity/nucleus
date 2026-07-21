@@ -2,11 +2,17 @@
 # Consumes Nix profile bin directory lists at activation time.
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+
+_nix_system_bin_dirs="$1"
+_nix_profile_bin_dirs="$2"
+
 # Locate pkgs.rustup in the newly linked home-manager profile.  The
 # activation shell PATH has not yet been updated to reflect the profile, so
 # probe known profile bin directories in priority order.
 # undoc-supp: rustup may not be in profile dir on first apply; fallback follows.
-_nucleus_prepend_first_executable_dir rustup __MANAGED_NIX_SYSTEM_BIN_DIRS__ __MANAGED_NIX_PROFILE_BIN_DIRS__ || true
+_nucleus_prepend_first_executable_dir rustup "$_nix_system_bin_dirs" "$_nix_profile_bin_dirs" || true
 
 if ! command -v rustup >/dev/null 2>&1; then
   echo "rustup: rustup not found after profile link; skipping initialization" >&2

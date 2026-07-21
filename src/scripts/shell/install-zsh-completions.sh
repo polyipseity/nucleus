@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 # Idempotently generate zsh completion files for CLI tools whose Nix packages
 # do not auto-bundle them into fpath.
-#
-# Variables below are substituted via Nix replaceStrings at build time.
-#
-# Each token expands to a Nix store path (e.g. "${pkgs.bat}/bin/bat").
+# CLI args: bat_bin bun_bin fd_bin gh_bin opencode_bin ruff_bin rustup_bin typst_bin uv_bin zsh_completions_src
+set -euo pipefail
 
-set -eu
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_izc_bat_bin="$1"
+_izc_bun_bin="$2"
+_izc_fd_bin="$3"
+_izc_gh_bin="$4"
+_izc_opencode_bin="$5"
+_izc_ruff_bin="$6"
+_izc_rustup_bin="$7"
+_izc_typst_bin="$8"
+_izc_uv_bin="$9"
+_izc_zsh_completions_src="${10}"
 
 _zsh_comp_dir="$HOME/.local/share/zsh/completions"
 mkdir -p "$_zsh_comp_dir"
@@ -43,14 +52,14 @@ _generate_if_stale() {
 #     nix (bundled), fzf (source-based, not file-based).
 # -----------------------------------------------------------------------
 _generate_if_stale \
-  __BAT_BIN__ \
+  "$_izc_bat_bin" \
   "$_zsh_comp_dir/_bat" \
-  "'__BAT_BIN__' --completion zsh"
+  "'$_izc_bat_bin' --completion zsh"
 
 _generate_if_stale \
-  __BUN_BIN__ \
+  "$_izc_bun_bin" \
   "$_zsh_comp_dir/_bun" \
-  "'__BUN_BIN__' completions"
+  "'$_izc_bun_bin' completions"
 
 # cargo-binstall skipped: --completion flag not supported in current
 # version (confirmed 2026-07-01). No replacement available.
@@ -67,19 +76,19 @@ _generate_if_stale \
 #  "'${pkgs.eza}/bin/eza' --generate-completion zsh"
 
 _generate_if_stale \
-  __FD_BIN__ \
+  "$_izc_fd_bin" \
   "$_zsh_comp_dir/_fd" \
-  "'__FD_BIN__' --gen-completions zsh"
+  "'$_izc_fd_bin' --gen-completions zsh"
 
 _generate_if_stale \
-  __GH_BIN__ \
+  "$_izc_gh_bin" \
   "$_zsh_comp_dir/_gh" \
-  "'__GH_BIN__' completion -s zsh"
+  "'$_izc_gh_bin' completion -s zsh"
 
 _generate_if_stale \
-  __OPENCODE_BIN__ \
+  "$_izc_opencode_bin" \
   "$_zsh_comp_dir/_opencode" \
-  "'__OPENCODE_BIN__' completion zsh"
+  "'$_izc_opencode_bin' completion zsh"
 
 # prek skipped: no completion subcommand exists in current version
 # (confirmed 2026-07-01). "prek completion zsh" is interpreted as hook
@@ -90,32 +99,34 @@ _generate_if_stale \
 #  "'${pkgs.prek}/bin/prek' completion zsh"
 
 _generate_if_stale \
-  __RUFF_BIN__ \
+  "$_izc_ruff_bin" \
   "$_zsh_comp_dir/_ruff" \
-  "'__RUFF_BIN__' generate-shell-completion zsh"
+  "'$_izc_ruff_bin' generate-shell-completion zsh"
 
 _generate_if_stale \
-  __RUSTUP_BIN__ \
+  "$_izc_rustup_bin" \
   "$_zsh_comp_dir/_rustup" \
-  "'__RUSTUP_BIN__' completions zsh"
+  "'$_izc_rustup_bin' completions zsh"
 
 _generate_if_stale \
-  __TYPST_BIN__ \
+  "$_izc_typst_bin" \
   "$_zsh_comp_dir/_typst" \
-  "'__TYPST_BIN__' completions zsh"
+  "'$_izc_typst_bin' completions zsh"
 
 _generate_if_stale \
-  __UV_BIN__ \
+  "$_izc_uv_bin" \
   "$_zsh_comp_dir/_uv" \
-  "'__UV_BIN__' generate-shell-completion zsh"
+  "'$_izc_uv_bin' generate-shell-completion zsh"
 
 # -----------------------------------------------------------------------
 # Nucleus-command completions: static zsh completion files shipped with
 # the repository. Copied directly (no generation needed).
 # -----------------------------------------------------------------------
-for _zsh_nuc_f in "__ZSH_COMPLETIONS_SRC__"/_nucleus-* "__ZSH_COMPLETIONS_SRC__"/_nucleus; do
+for _zsh_nuc_f in "$_izc_zsh_completions_src"/_nucleus-* "$_izc_zsh_completions_src"/_nucleus; do
   [ -f "$_zsh_nuc_f" ] || continue
   cp -f "$_zsh_nuc_f" "$_zsh_comp_dir/"
 done
+
+echo "zsh-completions: done"
 
 echo "zsh-completions: done"

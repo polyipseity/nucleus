@@ -1,21 +1,28 @@
 # Secret decryption health verification (5 checks).
 # Consumes SOPS file manifest, secret paths, and tool paths at activation time.
-# Expects set -eu and the symlink hardening lib to be sourced before this
-# script runs.
-set -eu
+set -euo pipefail
 
-_vsd_jq_bin='__JQ_BIN__'
-_vsd_gnupg_bin='__GNUPG_BIN__'
-_vsd_ssh_to_age_bin='__SSH_TO_AGE_BIN__'
-_vsd_gpg_home='__GNUPG_HOME__'
-_vsd_all_sops_files_json='__ALL_SOPS_FILES_JSON__'
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_vsd_jq_bin="$1"
+_vsd_gnupg_bin="$2"
+_vsd_ssh_to_age_bin="$3"
+_vsd_gpg_home="$4"
+_vsd_all_sops_files_json="$5"
+_vsd_git_identity_secret_path="$6"
+_vsd_ssh_secret_path="$7"
+_vsd_ssh_public_secret_path="$8"
+_vsd_gpg_secret_path="$9"
+shift 9
+_vsd_gpg_manifest_path="$1"
+_vsd_ssh_pubkey_path="$2"
 
 # --- 1. Materialization sanity check ---
 for _vsd_path in \
-    '__GIT_IDENTITY_SECRET_PATH__' \
-    '__SSH_SECRET_PATH__' \
-    '__SSH_PUBLIC_SECRET_PATH__' \
-    '__GPG_SECRET_PATH__'; do
+    "$_vsd_git_identity_secret_path" \
+    "$_vsd_ssh_secret_path" \
+    "$_vsd_ssh_public_secret_path" \
+    "$_vsd_gpg_secret_path"; do
   if [ ! -s "$_vsd_path" ]; then
     echo "secrets: ERROR — decrypted secret missing or empty at '$_vsd_path'." >&2
     exit 1
@@ -23,7 +30,7 @@ for _vsd_path in \
 done
 
 # --- 2. GPG key presence in keyring ---
-_vsd_gpg_manifest='__GPG_MANIFEST_PATH__'
+_vsd_gpg_manifest="$_vsd_gpg_manifest_path"
 if [ ! -s "$_vsd_gpg_manifest" ]; then
   echo "secrets: ERROR — managed-gpg-keys manifest missing or empty; gpg-import may have failed." >&2
   exit 1
@@ -88,9 +95,9 @@ fi
 _vsd_ssh_age_pub=""
 _vsd_ssh_failures=""
 # undoc-supp: ssh-to-age may fail if the SSH public key hasn't been materialized yet (first bootstrap); empty result is handled below.
-_vsd_ssh_age_pub="$("$_vsd_ssh_to_age_bin" -i '__SSH_PUBKEY_PATH__')" || true
+_vsd_ssh_age_pub="$("$_vsd_ssh_to_age_bin" -i "$_vsd_ssh_pubkey_path")" || true
 if [ -z "$_vsd_ssh_age_pub" ]; then
-  echo "secrets: ERROR — personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure __SSH_PUBKEY_PATH__ is a valid Ed25519 public key." >&2
+  echo "secrets: ERROR — personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure $_vsd_ssh_pubkey_path is a valid Ed25519 public key." >&2
   exit 1
 fi
 while IFS= read -r _vsd_entry; do

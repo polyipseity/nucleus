@@ -1,7 +1,12 @@
 # Create system log directories for all nucleus systemd/launchd services before
 # they start, so journald/stderr redirect targets exist on disk.
-_sys_log_dir='__NUCLEUS_SYSTEM_LOG_DIR__'
-_log_subdirs='__NUCLEUS_LOG_SUBDIRS__'
+
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_sys_log_dir="$1"
+_log_subdirs="$2"
 if [ -n "$_sys_log_dir" ]; then
   for subdir in $_log_subdirs; do
     mkdir -p "$_sys_log_dir/$subdir"
@@ -10,8 +15,8 @@ fi
 
 # macOS-specific: create user-level log dirs in ~/Library/Logs/nucleus/ and
 # chown system log subdirs to the console user so launchd can write.
-_user_log_subdirs='__NUCLEUS_USER_LOG_SUBDIRS__'
-_chown_log_subdirs='__NUCLEUS_CHOWN_LOG_SUBDIRS__'
+_user_log_subdirs="$3"
+_chown_log_subdirs="$4"
 if [ "$(uname -s)" = "Darwin" ] && [ -n "$_user_log_subdirs" ]; then
   _console_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"  # undoc-supp: /dev/console may not exist in headless/SSH sessions
   if [ -n "$_console_user" ] && [ "$_console_user" != "/Users/root" ]; then

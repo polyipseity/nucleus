@@ -3,7 +3,9 @@
 #
 # Schedule: 18:00 -> 06:00, colour temperature 50 % (~4000 K).
 # Source: https://github.com/smudge/nightlight
-set -eu
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 if [ -x "/opt/homebrew/bin/nightlight" ]; then
   if ! /opt/homebrew/bin/nightlight schedule start; then

@@ -8,36 +8,28 @@
 # as JSON and consumed at activation time via jq
 # iteration. This keeps the Nix side pure data and moves all iteration
 # logic into a single maintainable shell script.
-#
-# Variables below are substituted via Nix replaceStrings at build time.
 
-set -eu
+set -euo pipefail
 
-export HOME="__CURRENT_USER_HOME__"
-export PATH="$PATH:__GIT_BIN__"
-export GIT_SSH_COMMAND="__SSH_CLIENT__"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+. "$SCRIPT_DIR/../lib/dev-repos-provision-lib.sh"
 
-# Resolve the repo checkout root at build time via replaceStrings.
-repoRoot="__REPO_ROOT__"
+export HOME="$1"
+export PATH="$PATH:$2"
+export GIT_SSH_COMMAND="$3"
+
+repoRoot="$4"
+_jqBin="$5"
+devReposJson="$6"
+
 if [ -z "$repoRoot" ] || [ ! -d "$repoRoot" ]; then
-  echo "devReposProvision: __REPO_ROOT__ is empty or invalid — check NUCLEUS_REPO_ROOT at build time" >&2
+  echo "devReposProvision: repo root is empty or invalid — check NUCLEUS_REPO_ROOT at build time" >&2
   exit 1
 fi
 
 devDir="$HOME/dev"
 mkdir -p "$devDir" || { echo "devReposProvision: failed to create $devDir" >&2; exit 1; }
-
-# Source shared symlink protection helpers from symlink-hardening-lib.sh
-# shellcheck disable=SC1091
-. "${repoRoot}/src/scripts/lib/symlink-hardening-lib.sh"
-
-# Source dev-repos helper functions from dev-repos-provision-lib.sh
-# shellcheck disable=SC1091
-. "${repoRoot}/src/scripts/lib/dev-repos-provision-lib.sh"
-
-_jqBin="__JQ_BIN__"
-
-devReposJson='__DEV_REPOS_JSON__'
 
 # Step 1: Provision configured repositories
 # Use temp file to avoid subshell isolation (while-read in pipelines

@@ -2,19 +2,26 @@
 # Consumes crate-description tokens at activation time.
 set -euo pipefail
 
-_icp_jq_bin='__JQ_BIN__'
-_icp_gawk_bin='__GAWK_BIN__'
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+
+_icp_jq_bin="$1"
+_icp_gawk_bin="$2"
+_icp_desired_crates_json="$3"
+_icp_cargo_bin_dir="$HOME/$4"
+_icp_nix_system_bin_dirs="$5"
+_icp_nix_profile_bin_dirs="$6"
 
 # Desired crates as JSON array of crate names, e.g. ["crate1","crate2"].
 # Empty array = no cargo-binstall-managed crates on this host.
 _icp_desired="$(mktemp)"
-printf '%s\n' '__DESIRED_CRATES_JSON__' | "$_icp_jq_bin" -r '.[]' > "$_icp_desired"
+printf '%s\n' "$_icp_desired_crates_json" | "$_icp_jq_bin" -r '.[]' > "$_icp_desired"
 
 # Probe ~/.cargo/bin (rustup shim location) first, then nix-profile /
 # home-manager-profile bin directories as fallback.  initRustup runs
 # before this step to ensure the stable toolchain is installed.
 # undoc-supp: cargo may not be in any profile dir on first apply; fallback follows.
-_nucleus_prepend_first_executable_dir cargo "$HOME/__CARGO_BIN_DIR__" __NIX_SYSTEM_BIN_DIRS__ __NIX_PROFILE_BIN_DIRS__ || true
+_nucleus_prepend_first_executable_dir cargo "$_icp_cargo_bin_dir" "$_icp_nix_system_bin_dirs" "$_icp_nix_profile_bin_dirs" || true
 
 # Guard: cargo is provided by rustup (stable toolchain) via ~/.cargo/bin;
 # initRustup ensures stable is installed before this step runs.

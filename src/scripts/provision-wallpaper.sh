@@ -1,16 +1,16 @@
 # Self-contained wallpaper provisioning script.
-# Tokens are substituted at build time by Nix.
+# CLI args: is_darwin pictures_dir desktoppr_bin coreutils_bin wallpapers_dir current_user sops_symlink_path wallpaper_items_json jq_bin
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
-_is_darwin='__IS_DARWIN__'
-_pictures_dir='__PICTURES_DIR__'
-_desktoppr_bin='__DESKTOPPR_BIN__'
-_coreutils_bin='__COREUTILS_BIN__'
-_wallpapers_dir='__WALLPAPERS_DIR__'
-_current_user='__CURRENT_USER__'
-_sops_symlink_path='__SOPS_SYMLINK_PATH__'
+_is_darwin="$1"
+_pictures_dir="$2"
+_desktoppr_bin="$3"
+_coreutils_bin="$4"
+_wallpapers_dir="$5"
+_current_user="$6"
+_sops_symlink_path="$7"
 
 lock_wallpaper_dir() {
   if [ "$_is_darwin" -ne 1 ]; then
@@ -229,5 +229,5 @@ wallpaper_post_copy_teardown() {
 
 # Entry point
 wallpaper_pre_copy_setup
-wallpaper_provision_copy_items '__WALLPAPER_ITEMS_JSON__' '__JQ_BIN__' "$_sops_symlink_path"
+wallpaper_provision_copy_items "$8" "$9" "$_sops_symlink_path"
 wallpaper_post_copy_teardown

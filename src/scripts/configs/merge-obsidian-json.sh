@@ -1,7 +1,15 @@
 # shellcheck shell=sh
 # Obsidian settings merge: merges managed advanced-setting keys into
 # obsidian.json while preserving app-owned vault metadata.
-# Variables below are substituted via Nix replaceStrings at build time.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_moj_python3_bin="$1"
+_moj_merge_script="$2"
+_moj_settings_json="$3"
+
 _obsidian_merge_json() {
   _python3_bin="$1"
   _python_script="$2"
@@ -9,8 +17,6 @@ _obsidian_merge_json() {
   _managed_json="$4"
   "$_python3_bin" "$_python_script" "$_settings_path" "$_managed_json"
 }
-
-set -eu
 
 case "$(uname -s)" in
   Darwin)
@@ -25,4 +31,4 @@ case "$(uname -s)" in
 esac
 
 mkdir -p "$(dirname "$_obsidian_settings_path")"
-_obsidian_merge_json "__PYTHON3_BIN__" "__OBSIDIAN_MERGE_JSON_PY__" "$_obsidian_settings_path" __OBSIDIAN_SETTINGS_JSON__
+_obsidian_merge_json "$_moj_python3_bin" "$_moj_merge_script" "$_obsidian_settings_path" "$_moj_settings_json"

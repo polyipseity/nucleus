@@ -1,5 +1,10 @@
 # VS Code workspace trust injector.
 # Inserts a workspace trust entry for ~/dev into VS Code's SQLite state DB.
-# Variables below are substituted via Nix replaceStrings at build time.
-set -eu
-__PYTHON3_BIN__/bin/python3 '__VSCODE_WORKSPACE_TRUST_PY__'
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_twt_python3_bin="$1"
+_twt_trust_py="$2"
+
+"$_twt_python3_bin" "$_twt_trust_py"

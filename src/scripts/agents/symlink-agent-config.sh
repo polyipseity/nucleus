@@ -3,7 +3,12 @@
 # src/modules/configs/agents/.
 set -euo pipefail
 
-_as_repo_root="__REPO_ROOT__"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+. "$SCRIPT_DIR/../lib/symlink-convergence-lib.sh"
+
+_as_repo_root="$1"
+_as_agents_relative="$2"
 _as_agents_source="$_as_repo_root/src/modules/configs/agents"
 if [ ! -d "$_as_agents_source" ]; then
   echo "agents-config: agents config dir not found: $_as_agents_source" >&2
@@ -36,7 +41,7 @@ _nucleus_converge_symlinks \
 # mkOutOfStoreSymlink) so the link still works after the repo root path
 # changes between rebuilds.
 mkdir -p "$HOME/.config/opencode"
-_as_opencode_source="$_as_repo_root/__AGENTS_CONFIG_RELATIVE_PATH__/opencode.user.jsonc"
+_as_opencode_source="$_as_repo_root/$_as_agents_relative/opencode.user.jsonc"
 _as_opencode_link="$HOME/.config/opencode/opencode.jsonc"
 if [ -L "$_as_opencode_link" ]; then
   if [ "$(readlink "$_as_opencode_link")" != "$_as_opencode_source" ]; then

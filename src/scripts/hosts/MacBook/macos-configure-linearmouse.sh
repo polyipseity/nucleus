@@ -1,9 +1,11 @@
 # Create out-of-store symlinks for LinearMouse runtime config files pointing
 # into the repository tree.  Resolves the repo root at activation time so the
 # link survives repo relocations and rebuilds without stale store paths.
-set -eu
+set -euo pipefail
 
-_ll_repo_root='__REPO_ROOT__'
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_ll_repo_root="$1"
 _ll_source="$_ll_repo_root/src/modules/configs/linearmouse/linearmouse.json"
 
 mkdir -p "$HOME/.config/linearmouse"

@@ -9,9 +9,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister"
 APP_DIR="$HOME/Applications"
 
-_vsd_jq_bin='__JQ_BIN__'
-_vsd_removed_bundles_json='__REMOVED_BUNDLES_JSON__'
-_vsd_current_bundles_json='__CURRENT_BUNDLES_JSON__'
+_vsd_jq_bin="$1"
+_vsd_removed_bundles_json="$2"
+_vsd_current_bundles_json="$3"
 
 # ── Phase 1a: Prune removed app bundles ───────────────────────────
 while IFS= read -r _vsd_entry; do

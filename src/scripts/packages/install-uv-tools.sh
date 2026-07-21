@@ -2,15 +2,19 @@
 # Consumes tool paths and desired tools JSON at activation time.
 set -euo pipefail
 
-_iut_uv_bin='__UV_BIN__'
-_iut_gawk_bin='__GAWK_BIN__'
-_iut_grep_bin='__GREP_BIN__'
-_iut_jq_bin='__JQ_BIN__'
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+
+_iut_uv_bin="$1"
+_iut_gawk_bin="$2"
+_iut_grep_bin="$3"
+_iut_jq_bin="$4"
+_iut_desired_json="$5"
 
 # Desired tools as JSON object: {"tool_name": "python_version_or_null", ...}
 # Read into a temp file in "tool python_version" format.
 _iut_desired="$(mktemp)"
-printf '%s\n' '__DESIRED_UV_TOOLS_JSON__' | "$_iut_jq_bin" -r 'to_entries[] | "\(.key) \(.value // "")"' > "$_iut_desired"
+printf '%s\n' "$_iut_desired_json" | "$_iut_jq_bin" -r 'to_entries[] | "\(.key) \(.value // "")"' > "$_iut_desired"
 
 # Build name-only list for comparison (strip version column).
 _iut_desired_names="$(mktemp)"

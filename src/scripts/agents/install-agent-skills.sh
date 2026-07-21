@@ -4,7 +4,11 @@
 # src/modules/configs/agents/skills/.
 set -euo pipefail
 
-_ask_repo_root="__REPO_ROOT__"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+. "$SCRIPT_DIR/../lib/symlink-convergence-lib.sh"
+
+_ask_repo_root="$1"
 _ask_skills_source="$_ask_repo_root/src/modules/configs/agents/skills"
 if [ ! -d "$_ask_skills_source" ]; then
   echo "skills: skills source dir not found: $_ask_skills_source" >&2

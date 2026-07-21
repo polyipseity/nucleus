@@ -1,11 +1,13 @@
 # Preflight macOS privacy permissions before defaults writes.
 # Full Disk Access privacy preflight. Runs FDA checks before defaults writes.
-# REPO_ROOT is substituted at build time via Nix replaceStrings.
-set -eu
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../../lib/macos-fda-warning-lib.sh"
+
+_pp_repo_root="$1"
 
 echo "macos: checking macOS privacy permissions before defaults writes..." >&2
-
-. "__REPO_ROOT__/src/scripts/lib/macos-fda-warning-lib.sh"
 
 fda_warning_emitted=0
 

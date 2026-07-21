@@ -1,22 +1,29 @@
 # Tracks the fingerprint of the managed personal SSH public key in
 # ~/.config/nucleus/managed-ssh-keys and flushes the in-memory SSH agent
 # when the fingerprint changes (i.e., the key was rotated in the SOPS secret).
-# Requires: SSH_PUB_PATH, SSH_KEYGEN_BIN, SSH_ADD_BIN env vars.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_ssh_pub_path="$1"
+_ssh_keygen_bin="$2"
+_ssh_add_bin="$3"
 
 nucleus_config_dir="$HOME/.config/nucleus"
 managed_ssh_manifest="$nucleus_config_dir/managed-ssh-keys"
 
-if [ ! -f '__SSH_PUB_PATH__' ]; then
+if [ ! -f "$_ssh_pub_path" ]; then
   # Not a hard error: sops-nix reports its own failure if materialization
   # did not complete.  Warn and skip so this activation does not mask the
   # upstream sops-nix error with a different message.
-  echo "secrets: managed SSH public key not found at '__SSH_PUB_PATH__'; skipping fingerprint adoption." >&2
+  echo "secrets: managed SSH public key not found at '$_ssh_pub_path'; skipping fingerprint adoption." >&2
 else
   # undoc-supp: SSH public key may not exist yet on first provision; ssh-keygen -lf exits 1 for missing/invalid keys.
-  new_fingerprint="$('__SSH_KEYGEN_BIN__' -lf '__SSH_PUB_PATH__' | /usr/bin/awk '{print $2}')" || true
+  new_fingerprint="$("$_ssh_keygen_bin" -lf "$_ssh_pub_path" | /usr/bin/awk '{print $2}')" || true
 
   if [ -z "$new_fingerprint" ]; then
-    echo "secrets: could not extract fingerprint from '__SSH_PUB_PATH__'; skipping adoption." >&2
+    echo "secrets: could not extract fingerprint from '$_ssh_pub_path'; skipping adoption." >&2
   else
     old_fingerprint=""
     if [ -f "$managed_ssh_manifest" ]; then
@@ -32,7 +39,7 @@ else
       # next outbound SSH connection.
       echo "secrets: managed SSH key fingerprint changed ($old_fingerprint -> $new_fingerprint); flushing SSH agent." >&2
       # undoc-supp: ssh-add -D fails when no agent is running; benign since nothing needs flushing.
-      '__SSH_ADD_BIN__' -D 2>/dev/null || true
+      "$_ssh_add_bin" -D 2>/dev/null || true
     fi
 
     mkdir -p "$nucleus_config_dir"

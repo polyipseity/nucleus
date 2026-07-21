@@ -2,9 +2,11 @@
 # Consumes jq binary and workflow JSON arrays at activation time.
 set -eu
 
-_vsd_jq_bin='__JQ_BIN__'
-_vsd_current_workflows_json='__CURRENT_WORKFLOWS_JSON__'
-_vsd_removed_workflows_json='__REMOVED_WORKFLOWS_JSON__'
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_vsd_jq_bin="$1"
+_vsd_current_workflows_json="$2"
+_vsd_removed_workflows_json="$3"
 _vsd_services_dir="$HOME/Library/Services"
 
 # ── Phase 1b: Prune removed Automator workflows ────────────────────

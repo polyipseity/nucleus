@@ -14,7 +14,9 @@
 #   4. If the single instance exists but is disconnected, rebuild it.
 #
 # No-op if BetterDisplay is not installed.
-set -eu
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 BD_BIN="/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay"
 BD_APP="/Applications/BetterDisplay.app"

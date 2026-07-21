@@ -13,7 +13,9 @@
 #      with the smallest height (closest match without overshooting).
 #
 # No-op if displayplacer is not installed.
-set -eu
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 DP_BIN="/opt/homebrew/bin/displayplacer"
 

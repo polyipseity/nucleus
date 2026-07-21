@@ -1,3 +1,13 @@
+# shellcheck shell=sh
+# Derive age secret identity from SSH host key and write to /etc/sops/age/machine.txt.
+# Invoked from system activation (runs as root).
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
+_dha_ssh_to_age_bin="$1"
+_dha_username="$2"
+
 age_dir="/etc/sops/age"
 age_key_file="$age_dir/machine.txt"
 host_ssh_key="/etc/ssh/ssh_host_ed25519_key"
@@ -14,12 +24,12 @@ else
   # an identity file.  System activation runs as root so it can read the
   # 0600 root-owned private key directly.
   derived_age_key_exit=0
-  derived_age_key="$(__SSH_TO_AGE_BIN__ -private-key -i "$host_ssh_key")" || derived_age_key_exit=$?
+  derived_age_key="$("$_dha_ssh_to_age_bin" -private-key -i "$host_ssh_key")" || derived_age_key_exit=$?
   if [ "$derived_age_key_exit" -ne 0 ] || [ -z "$derived_age_key" ]; then
     echo "sops: ssh-to-age failed (exit $derived_age_key_exit) reading $host_ssh_key; $age_key_file not written." >&2
   else
     printf '%s\n' "$derived_age_key" > "$age_key_file"
-    chown "__USERNAME__" "$age_key_file"
+    chown "$_dha_username" "$age_key_file"
     chmod 0600 "$age_key_file"
   fi
 fi

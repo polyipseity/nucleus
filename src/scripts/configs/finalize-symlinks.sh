@@ -1,17 +1,20 @@
 # shellcheck shell=sh
 # Finalize custom-provision-symlinks: protect each managed symlink and persist
-# the manifest.  symlink-hardening-lib.sh is inlined at build time via
-# builtins.readFile.
-#
-# Variables below are substituted via Nix replaceStrings at build time.
+# the manifest.
 
-set -eu
+set -euo pipefail
 
-_nucleus_manifest_path='__MANAGED_SYMLINK_MANIFEST_PATH__'
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+
+_nucleus_manifest_path="$1"
+_nucleus_jq_bin="$2"
+_nucleus_symlink_entries_json="$3"
+_nucleus_manifest_json="$4"
 _nucleus_manifest_dir="$(dirname "$_nucleus_manifest_path")"
 mkdir -p "$_nucleus_manifest_dir"
 
-echo '__SYMLINK_ENTRIES_JSON__' | __JQ_BIN__ -r '.[]' | while IFS= read -r _nucleus_link_path; do
+printf '%s\n' "$_nucleus_symlink_entries_json" | "$_nucleus_jq_bin" -r '.[]' | while IFS= read -r _nucleus_link_path; do
   [ -n "$_nucleus_link_path" ] || continue
   if [ -L "$_nucleus_link_path" ]; then
     _nucleus_protect_symlink "customProvisionSymlinks" "$_nucleus_link_path"
@@ -20,6 +23,4 @@ echo '__SYMLINK_ENTRIES_JSON__' | __JQ_BIN__ -r '.[]' | while IFS= read -r _nucl
   fi
 done
 
-cat > "$_nucleus_manifest_path" <<'EOF'
-__MANAGED_SYMLINK_MANIFEST_JSON__
-EOF
+printf '%s\n' "$_nucleus_manifest_json" > "$_nucleus_manifest_path"
