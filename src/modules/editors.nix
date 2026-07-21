@@ -199,10 +199,6 @@ let
   #
   # The script exits immediately when ~/dev does not yet exist (no-op for
   # edge cases such as a first-run race before provisionDevDirectory completes).
-  vsCodeWorkspaceTrustPy = pkgs.writeText "trust-vscode-workspace.py" (
-    builtins.readFile ../scripts/editors/trust-vscode-workspace.py
-  );
-
   # Resolve the active managed user record so Neovim settings can follow the
   # same per-user override model used by other application configs.
   effectiveUsername =
@@ -399,7 +395,7 @@ in
     # first-run race before provisionDevDirectory completes).
     # -----------------------------------------------------------------------
     vsCodeWorkspaceTrust = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      "${activationBundle}/editors/trust-vscode-workspace.sh" "${pkgs.python3}/bin/python3" "${vsCodeWorkspaceTrustPy}"
+      "${activationBundle}/editors/trust-vscode-workspace.sh" "${pkgs.python3}/bin/python3"
     '';
   };
 }

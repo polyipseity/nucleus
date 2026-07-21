@@ -88,10 +88,6 @@ let
   obsidianManagedSettings = managedAppSettings "obsidian" obsidianDefaultSettings;
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;
 
-  obsidianMergeJsonPy = pkgs.writeText "obsidian-merge-json.py" (
-    builtins.readFile ../scripts/configs/merge-obsidian-json.py
-  );
-
   # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh). Used for
   # runtime sourcing of lib scripts in activation blocks. Cannot use a
   # runtime env var because darwin-rebuild/nixos-rebuild use sudo, which
@@ -250,7 +246,6 @@ in
     home.activation."obsidian-merge-json" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/configs/merge-obsidian-json.sh" \
         "${pkgs.python3}/bin/python3" \
-        "${obsidianMergeJsonPy}" \
         ${lib.escapeShellArg obsidianManagedSettingsJson}
     '';
 

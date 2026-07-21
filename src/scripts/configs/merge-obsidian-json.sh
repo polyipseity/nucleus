@@ -7,15 +7,13 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _moj_python3_bin="$1"
-_moj_merge_script="$2"
-_moj_settings_json="$3"
+_moj_settings_json="$2"
 
 _obsidian_merge_json() {
   _python3_bin="$1"
-  _python_script="$2"
-  _settings_path="$3"
-  _managed_json="$4"
-  "$_python3_bin" "$_python_script" "$_settings_path" "$_managed_json"
+  _settings_path="$2"
+  _managed_json="$3"
+  "$_python3_bin" "$SCRIPT_DIR/merge-obsidian-json.py" "$_settings_path" "$_managed_json"
 }
 
 case "$(uname -s)" in
@@ -31,4 +29,4 @@ case "$(uname -s)" in
 esac
 
 mkdir -p "$(dirname "$_obsidian_settings_path")"
-_obsidian_merge_json "$_moj_python3_bin" "$_moj_merge_script" "$_obsidian_settings_path" "$_moj_settings_json"
+_obsidian_merge_json "$_moj_python3_bin" "$_obsidian_settings_path" "$_moj_settings_json"

@@ -5,6 +5,5 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _twt_python3_bin="$1"
-_twt_trust_py="$2"
 
-"$_twt_python3_bin" "$_twt_trust_py"
+"$_twt_python3_bin" "$SCRIPT_DIR/trust-vscode-workspace.py"
