@@ -561,6 +561,18 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          Ensure PowerSession is installed as the asciinema-compatible terminal
+          session recorder for Windows (ConPTY-based). Provides `PowerSession.exe`
+          for recording terminal sessions to .cast format and converting to plain
+          text for LLM ingestion. Cross-platform parity with pkgs.asciinema on
+          NixOS and macOS.
+      settings:
+        id: Watfaq.PowerSession
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure WinFsp (FUSE for Windows) is installed as a prerequisite for rclone mount on Windows; required for any cloud drive mount operation
       settings:
         id: WinFsp.WinFsp
