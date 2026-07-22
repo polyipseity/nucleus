@@ -22,19 +22,19 @@ Load this skill via `skill: "repo-structure"` when exploring the repository layo
 
 ## Key shared modules (`src/modules/`)
 
-| Category | Modules |
-|----------|---------|
-| Base system | `core.nix`, `posix-base.nix`, `posix-security.nix`, `posix-sops.nix`, `posix-user-shell.nix` |
-| OS-specific | `macos.nix`, `linux.nix` |
-| User environment | `home.nix`, `shell.nix`, `pwsh.nix`, `starship.nix`, `iterm2.nix` |
-| Developer tools | `dev-repos.nix`, `editors.nix`, `git.nix` |
-| Security & secrets | `gnupg.nix`, `secrets.nix` |
-| Services | `https-proxy.nix`, `camillagui-backend.nix`, `ext-discord-music-rpc.nix`, `logging.nix` |
-| Files & media | `cloud-drives.nix`, `fonts.nix`, `wallpapers.nix` |
-| AI agents | `agents.nix`, `agent-env-vars.nix`, `agent-host-shell.nix` |
-| Env var catalog | `lib/env-catalog.nix` (catalog + resolution), `lib/managed-paths.nix` (PATH components) |
-| Terminal & shell | `terminal-activations.nix` |
-| Other | `custom-provision-symlinks.nix` |
+| Category           | Modules                                                                                      |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| Base system        | `core.nix`, `posix-base.nix`, `posix-security.nix`, `posix-sops.nix`, `posix-user-shell.nix` |
+| OS-specific        | `macos.nix`, `linux.nix`                                                                     |
+| User environment   | `home.nix`, `shell.nix`, `pwsh.nix`, `starship.nix`, `iterm2.nix`                            |
+| Developer tools    | `dev-repos.nix`, `editors.nix`, `git.nix`                                                    |
+| Security & secrets | `gnupg.nix`, `secrets.nix`                                                                   |
+| Services           | `https-proxy.nix`, `camillagui-backend.nix`, `ext-discord-music-rpc.nix`, `logging.nix`      |
+| Files & media      | `cloud-drives.nix`, `fonts.nix`, `wallpapers.nix`                                            |
+| AI agents          | `agents.nix`, `agent-env-vars.nix`, `agent-host-shell.nix`                                   |
+| Env var catalog    | `lib/env-catalog.nix` (catalog + resolution), `lib/managed-paths.nix` (PATH components)      |
+| Terminal & shell   | `terminal-activations.nix`                                                                   |
+| Other              | `custom-provision-symlinks.nix`                                                              |
 
 Note: `services.json` in `src/modules/` is a data file (service registry), not a Nix module. Host-specific modules (`ntfs-3g.nix`, `camilladsp.nix`, `jellyfin.nix`) live under their host directory.
 
@@ -46,7 +46,7 @@ Additional module files live under these subdirectories:
 - `completions/` — Shell completion files
 - `configs/` — Per-application declarative configs (agents, autocorrect, bun, camilladsp, camillagui-backend, cargo, cloud, direnv, discord-music-rpc, git, iterm2, linearmouse, nextest, nix, obsidian, picard, plasma, pwsh, qtpass, ssh, starship, uv, vms, vscode)
 - `env/` — Env var catalog introspection module (`default.nix`)
-- `lib/` — Support functions (activation-bundle, activation-dag, config-utils, env-catalog, managed-paths, apple-sdk-*)
+- `lib/` — Support functions (activation-bundle, activation-dag, config-utils, env-catalog, managed-paths, apple-sdk-\*)
 - `macos/` — macOS-specific activation helpers (finder-sidebar, preference-gc)
 - `shell/` — Shell aliases (`aliases.nix`)
 - `users/` — User data helpers (`default.nix`)
@@ -84,16 +84,16 @@ Additional module files live under these subdirectories:
 ### Windows (`src/hosts/Windows/`)
 
 - `apply.ps1` — orchestration entry point. Dot-sources `modules/*.ps1`, applies WinGet DSC YAML.
-- `modules/` — reusable PowerShell logic: `setup/` (bootstrap installers), `system/` (daemon services, scheduled tasks), `user/` (Sync-* profile/config scripts), `editors/` (editor configs), `scripts/` (shared scripts), `secrets/` (secret provisioning), `wallpapers/` (wallpaper assets).
+- `modules/` — reusable PowerShell logic: `setup/` (bootstrap installers), `system/` (daemon services, scheduled tasks), `user/` (Sync-\* profile/config scripts), `editors/` (editor configs), `scripts/` (shared scripts), `secrets/` (secret provisioning), `wallpapers/` (wallpaper assets).
 - `system/*.dsc.yml` — DSC configs applied system-wide.
 - `user/*.dsc.yml` — Per-user DSC configs listed in `users.json`.
 - `source-builds.json` — Source build definitions for packages not available via WinGet.
 
 ## DSC architecture
 
-| Category | Scope | Directory |
-|----------|-------|-----------|
-| System | Always applied to all users | `system/*.dsc.yml` |
-| User | Per-user via `dscConfigFiles` in `users.json` | `user/*.dsc.yml` |
+| Category | Scope                                         | Directory          |
+| -------- | --------------------------------------------- | ------------------ |
+| System   | Always applied to all users                   | `system/*.dsc.yml` |
+| User     | Per-user via `dscConfigFiles` in `users.json` | `user/*.dsc.yml`   |
 
 List the respective directories for the current set of DSC files.

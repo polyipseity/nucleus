@@ -12,9 +12,9 @@ The `~/.agents/` directory is the runtime home for all agent configuration, prom
 
 | Path                                  | Owner                                            | Purpose                                                                                            |
 | ------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| `~/.agents/`                          | `symlink-agent-config` activation                      | Real directory; per-subdir symlinks for every `src/modules/configs/agents/` entry except `skills/` |
-| `~/.agents/skills/`                   | `install-agent-skills` activation                      | Real directory; per-skill symlinks for bundled skills + real dirs for fetched skills               |
-| `~/.agents/skills/<name>/` (symlink)  | `install-agent-skills`                                 | Bundled skill committed to `src/modules/configs/agents/skills/<name>/`                             |
+| `~/.agents/`                          | `symlink-agent-config` activation                | Real directory; per-subdir symlinks for every `src/modules/configs/agents/` entry except `skills/` |
+| `~/.agents/skills/`                   | `install-agent-skills` activation                | Real directory; per-skill symlinks for bundled skills + real dirs for fetched skills               |
+| `~/.agents/skills/<name>/` (symlink)  | `install-agent-skills`                           | Bundled skill committed to `src/modules/configs/agents/skills/<name>/`                             |
 | `~/.agents/skills/<name>/` (real dir) | `syncClawHubSkills` / `Sync-AgentsClawHubSkills` | Fetched skill downloaded by ClawHub; contains a `.clawhub/origin.json` marker                      |
 
 The per-subdir layout replaces an older whole-dir symlink scheme. The old scheme forced every clawhub download into the tracked repo tree; the real-dir layout lets the `skills/` subtree be writable without any writes entering Git.
