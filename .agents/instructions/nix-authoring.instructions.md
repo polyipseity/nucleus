@@ -17,6 +17,7 @@ applyTo: "src/**/*.nix"
 - `src/scripts/apply.sh` is the POSIX apply dispatcher behind `nix run .#apply` (kept in root).
 - `src/hosts/<Host>/` contains host entrypoints and host-only fragments. Current Nix hosts are `MacBook` and `NixOS`; `Windows/` is WinGet DSC-managed (no `.nix` files).
 - `src/modules/*.nix` contains shared modules reused across hosts and Home Manager. Keep host-specific hardware/runtime details in host files, not shared modules.
+- **Subagent path reminder**: when asking a subagent to extract or reference a file from a Nix module, the path must be relative to the Nix file's directory, not the repo root. For `src/modules/*.nix`, that means `../scripts/...`; for `src/hosts/MacBook/*.nix`, `../../scripts/...`.
 
 ## Flake conventions
 
@@ -141,6 +142,15 @@ All Nix modules must enforce explicit configuration and avoid implicit assumptio
 When using `builtins.replaceStrings` to substitute tokens in config/script source files, the placeholder token in the source file MUST use the format `__UPPERCASE_WITH_DOUBLE_UNDERSCORES__` (e.g., `__USERNAME__`, `__NIX_INDEX_BIN__`). Bare uppercase tokens like `USERNAME` are not permitted — they are indistinguishable from real code or misspelled variables.
 
 Exception: well-known mechanical transformations such as `"~"` → home directory, URL percent-encoding, and path separator conversion (`/` → `\`) are not template placeholders and do not need this convention.
+
+### Apple SDK enhancement pattern
+
+The Apple SDK is enhanced with symlinks for Xcode toolchain shims that nixpkgs does not bundle by default. The pattern spans three files:
+
+- `src/modules/lib/apple-sdk-tools.nix` maps xcrun shim names to nixpkgs derivations (or null). Returns `allTools` and `symlinkFarmTools` (filtered non-null). Attribute names containing `+` must be quoted: `"c++"`, `"clang++"`, `"flex++"`, `"c++filt"`.
+- `src/modules/lib/apple-sdk-enhanced.nix` uses `pkgs.symlinkJoin` to merge the original apple-sdk with a `runCommand` layer adding `usr/bin/` symlinks from the tool mapping.
+- Nix environment module (`env-catalog.nix`) sets `DEVELOPER_DIR` and `SDKROOT` to the enhanced derivation.
+- `src/hosts/MacBook/activation.nix` runs `xcode-select --switch` on the enhanced SDK.
 
 ## macOS defaults domain synchronization
 
