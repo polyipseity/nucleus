@@ -24,9 +24,7 @@ applyTo: "**"
 
 - **Suppressions in vendored third-party code** (`vendor/`) are exempt from this policy. The repo's shellcheck invocations skip vendor directories via `git ls-files` pathspecs.
 
-- **No whole-file suppressions.** Every `# shellcheck disable=` must be scoped to the smallest possible range: inline on the same line as the triggered code, or wrapped in a `disable`/`enable` pair around a multi-line expression. Whole-file suppression (placing a disable directive at the top of a file before any commands) is prohibited. The sole exception is when every statement in the file genuinely triggers the same code, which must be explicitly justified in the reason comment.
-
-- **Review whole-file suppressions especially hard.** A whole-file suppression is almost always wrong — the file contains many lines that do NOT trigger the warning. Scoping to the specific line proves the suppression is targeted and prevents future drift.
+- **File-level suppressions are prohibited.** Every `# shellcheck disable=` must be scoped to the smallest possible range: inline on the same line as the triggered code, or wrapped in a `disable`/`enable` pair around a multi-line expression. Placing a disable directive at the top of a file before any commands is forbidden — no exceptions.
 
 ### Priority guidance
 
