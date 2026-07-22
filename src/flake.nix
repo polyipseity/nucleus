@@ -339,7 +339,8 @@
               chmod +x "$out/src/scripts/${target}"
             '') sourcedFiles
           )}
-          shellcheck ${pkgs.lib.escapeShellArgs shellcheckArgs} -x --source-path="$out/bin" "$out/bin/${name}"
+          # --source-path first, -x second: consistent flag order with check-sh.sh
+          shellcheck ${pkgs.lib.escapeShellArgs shellcheckArgs} --source-path="$out/bin" -x "$out/bin/${name}"
         '';
 
       # Like mkApp but returns the derivation directly (no { type, program } wrapper).

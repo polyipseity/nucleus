@@ -20,6 +20,8 @@ usage() {
 
 # --source-path=SCRIPTDIR lets shellcheck resolve `# shellcheck source=` directives
 # relative to each script's own directory (e.g. bootstrap-versions.env alongside bootstrap.sh).
+# -x enables following external sources.
+# Flag order: long options first, -x second. Keep in sync with writeShellApplicationWithLib in flake.nix.
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help)
