@@ -42,6 +42,7 @@ assert containsRegex "# Method 4" agentsText;
 assert containsRegex "# Method 1" nixosServicesText;
 # Verify key config files are referenced in their consumer files
 assert containsRegex "system\\.gitignore" gitText;
+assert containsRegex "src/modules/configs/git/system\\.gitignore" gitText;
 assert containsRegex "wordlist\\.txt" defaultsText;
 assert containsRegex "camilladsp/configs" homeText;
 assert containsRegex "camillagui-backend/config" homeText;
@@ -55,6 +56,8 @@ assert containsRegex "bunfig\\.toml" shellText;
 assert containsRegex "config\\.toml" shellText;
 assert containsRegex "direnvrc" shellText;
 assert containsRegex "uv\\.toml" shellText;
+assert containsRegex "nextest/config\\.toml" shellText;
+assert containsRegex "mkOutOfStoreSymlink.*NUCLEUS_REPO_ROOT" shellText;
 assert containsRegex "agents/" agentsText;
 {
   success = true;
