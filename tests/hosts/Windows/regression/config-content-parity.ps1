@@ -116,3 +116,24 @@ Describe "SSH config content parity" {
         }
     }
 }
+
+Describe "Direnv config content parity" {
+    Context "direnvrc structure after lib/ split" {
+        It "Base direnvrc should NOT contain _nix() (moved to lib/)" {
+            $repoContent = Get-Content -Path (Join-Path $repoRoot 'src\modules\configs\direnv\direnvrc') -Raw
+            $repoContent | Should -Not -Match '_nix\(\)'
+        }
+
+        It "Lib override file should contain _nix()" {
+            $libContent = Get-Content -Path (Join-Path $repoRoot 'src\modules\configs\direnv\lib\apple-sdk-override.sh') -Raw
+            $libContent | Should -Match '_nix\(\)'
+        }
+
+        It "Lib override file should reference apple-sdk vars" {
+            $libContent = Get-Content -Path (Join-Path $repoRoot 'src\modules\configs\direnv\lib\apple-sdk-override.sh') -Raw
+            $libContent | Should -Match 'DEVELOPER_DIR'
+            $libContent | Should -Match 'SDKROOT'
+            $libContent | Should -Match 'NIX_APPLE_SDK_VERSION'
+        }
+    }
+}

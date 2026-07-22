@@ -50,6 +50,16 @@ Describe "Windows config method documentation" {
                 $prevLine -match '# Method' | Should -Be $true
             }
         }
+
+        It "Should have a # Method comment near Sync-DirenvConfig call" {
+            $applyContent = Get-Content -Path (Join-Path $PSScriptRoot '..\..\..\src\hosts\Windows\apply.ps1') -Raw
+            $direnvLines = $applyContent -split "`n" | Select-String -Pattern 'Sync-DirenvConfig'
+            $direnvLines | ForEach-Object {
+                $lineNum = $_.LineNumber
+                $prevLine = ($applyContent -split "`n")[$lineNum - 2]
+                $prevLine -match '# Method' | Should -Be $true
+            }
+        }
     }
 
     Context "module file path references have method labels" {
@@ -67,6 +77,16 @@ Describe "Windows config method documentation" {
             $moduleContent = Get-Content -Path (Join-Path $PSScriptRoot '..\..\..\src\hosts\Windows\modules\setup\Invoke-RustupSetup.ps1') -Raw
             $cargoLines = $moduleContent -split "`n" | Select-String -Pattern 'config\.toml'
             $cargoLines | ForEach-Object {
+                $lineNum = $_.LineNumber
+                $prevLine = ($moduleContent -split "`n")[$lineNum - 2]
+                $prevLine -match '# Method' | Should -Be $true
+            }
+        }
+
+        It "Sync-DirenvConfig should have # Method comment near source path" {
+            $moduleContent = Get-Content -Path (Join-Path $PSScriptRoot '..\..\..\src\hosts\Windows\modules\user\Sync-DirenvConfig.ps1') -Raw
+            $direnvLines = $moduleContent -split "`n" | Select-String -Pattern 'direnvrc'
+            $direnvLines | ForEach-Object {
                 $lineNum = $_.LineNumber
                 $prevLine = ($moduleContent -split "`n")[$lineNum - 2]
                 $prevLine -match '# Method' | Should -Be $true
