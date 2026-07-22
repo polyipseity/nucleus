@@ -7,7 +7,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
 NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
-. "$NUCLEUS_REPO_ROOT/src/scripts/lib.sh"
+. "$NUCLEUS_REPO_ROOT/src/scripts/lib/lib.sh"
 
 # Create a scratch directory for all test artifacts.
 TEST_DIR=$(mktemp -d)

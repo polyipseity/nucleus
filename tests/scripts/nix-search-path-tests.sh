@@ -12,12 +12,12 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
-# shellcheck source=../../src/scripts/lib.sh
-. "$REPO_ROOT/src/scripts/lib.sh"
+# shellcheck source=../../src/scripts/lib/lib.sh
+. "$REPO_ROOT/src/scripts/lib/lib.sh"
 
 # ---------------------------------------------------------------------------
 # Test 1: NIX_PATH env var overrides nix-path config option

@@ -23,7 +23,7 @@ mock_nucleus_script() {
 set -euo pipefail
 MOCKSCRIPT
     # Append the lib.sh sourcing + test code
-    echo ". '${REPO_ROOT}/src/scripts/lib.sh'" >> "$tmpdir/bin/nucleus-foo"
+    echo ". '${REPO_ROOT}/src/scripts/lib/lib.sh'" >> "$tmpdir/bin/nucleus-foo"
     echo "$code" >> "$tmpdir/bin/nucleus-foo"
     chmod +x "$tmpdir/bin/nucleus-foo"
     local result

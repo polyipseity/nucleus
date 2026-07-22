@@ -16,7 +16,7 @@ test_derive_repo_root_from_outside_cwd() {
         SCRIPT_DIR="$REPO_ROOT/scripts" \
         NUCLEUS_REPO_ROOT="" \
         bash -euo pipefail -c '
-            . "$SCRIPT_DIR/../src/scripts/lib.sh"
+            . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
             derive_repo_root
         '
     ) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
@@ -35,7 +35,7 @@ test_derive_repo_root_from_src_scripts() {
         SCRIPT_DIR="$REPO_ROOT/src/scripts" \
         NUCLEUS_REPO_ROOT="" \
         bash -euo pipefail -c '
-            . "$SCRIPT_DIR/lib.sh"
+            . "$SCRIPT_DIR/lib/lib.sh"
             derive_repo_root
         '
     ) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
@@ -54,7 +54,7 @@ test_env_var_priority() {
         SCRIPT_DIR="/nonexistent" \
         NUCLEUS_REPO_ROOT="$REPO_ROOT" \
         bash -euo pipefail -c '
-            . "'"$REPO_ROOT"'/src/scripts/lib.sh"
+            . "'"$REPO_ROOT"'/src/scripts/lib/lib.sh"
             derive_repo_root
         ' 2>/dev/null
     ) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
@@ -73,7 +73,7 @@ test_derive_repo_root_fails_cleanly() {
         NUCLEUS_REPO_ROOT="" \
         bash -euo pipefail -c '
             cd /tmp
-            . "'"$REPO_ROOT"'/src/scripts/lib.sh"
+            . "'"$REPO_ROOT"'/src/scripts/lib/lib.sh"
             derive_repo_root
         ' 2>&1
     ) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
@@ -98,7 +98,7 @@ test_env_var_symlink_resolution() {
         SCRIPT_DIR="$REPO_ROOT/src/scripts" \
         NUCLEUS_REPO_ROOT="$symlink_path" \
         bash -euo pipefail -c '
-            . "$SCRIPT_DIR/lib.sh"
+            . "$SCRIPT_DIR/lib/lib.sh"
             derive_repo_root
         '
     ) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
