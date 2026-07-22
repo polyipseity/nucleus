@@ -21,11 +21,13 @@ applyTo: "**"
 ## Shellcheck invocation
 
 All shell scripts are checked with `check-sh.sh`, which invokes:
+
 ```
 shellcheck --source-path=SCRIPTDIR -x <files>
 ```
 
 The Nix build system (`writeShellApplicationWithLib` in `flake.nix`) uses the equivalent:
+
 ```
 shellcheck --source-path="$out/bin" -x "$out/bin/$name"
 ```
