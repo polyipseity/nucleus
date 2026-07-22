@@ -52,10 +52,6 @@
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    scripts = {
-      url = "path:../scripts";
-      flake = false;
-    };
   };
 
   outputs =
@@ -70,7 +66,6 @@
       nixpkgs,
       nixos-generators,
       rust-overlay,
-      scripts,
       smudge-smudge,
       sops-nix,
       macos-fuse-t-cask,
@@ -295,105 +290,118 @@
       vsCodeMarketplaceMac = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
       vsCodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
-      # writeShellApplication plus lib.sh bundling, so scripts that source
-      # lib.sh work in both repo-direct and nix-store contexts regardless of
-      # how $0 resolves through symlinks.
-      writeShellApplicationWithLib =
-        pkgs: args:
-        let
-          name = args.name;
-          baseArgs = builtins.removeAttrs args [
-            "extraBin"
-            "excludeShellChecks"
-            "extraShellCheckFlags"
-            "sourcedFiles"
-          ];
-          baseDrv = pkgs.writeShellApplication (baseArgs // { checkPhase = "true"; });
-          extraBin = args.extraBin or { };
-          excludeShellChecks = args.excludeShellChecks or [ ];
-          extraShellCheckFlags = args.extraShellCheckFlags or [ ];
-          sourcedFiles = args.sourcedFiles or { };
-          shellcheckArgs =
-            pkgs.lib.optionals (excludeShellChecks != [ ]) [
-              "--exclude"
-              (pkgs.lib.concatStringsSep "," excludeShellChecks)
-            ]
-            ++ extraShellCheckFlags;
-        in
-        pkgs.runCommand "${name}-with-lib" { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
-          mkdir -p "$out/bin" "$out/src/scripts/lib"
-          cp -r "${baseDrv}/bin/." "$out/bin/"
-          chmod +w "$out/bin/${name}"
-          cp -r "${./scripts/lib}/." "$out/src/scripts/lib/"
-          chmod -R +x "$out/src/scripts/lib/"
-          ln -s ../src/scripts/lib/lib.sh "$out/bin/lib.sh"
-          ${pkgs.lib.concatStringsSep "\n" (
-            pkgs.lib.mapAttrsToList (target: src: ''
-              mkdir -p "$(dirname "$out/bin/${target}")"
-              cp "${src}" "$out/bin/${target}"
-            '') extraBin
-          )}
-          ${pkgs.lib.concatStringsSep "\n" (
-            pkgs.lib.mapAttrsToList (target: src: ''
-              cp "${src}" "$out/src/scripts/${target}"
-              chmod +x "$out/src/scripts/${target}"
-            '') sourcedFiles
-          )}
-          # --source-path first, -x second: consistent flag order with check-sh.sh
-          shellcheck ${pkgs.lib.escapeShellArgs shellcheckArgs} --source-path="$out/bin" -x "$out/bin/${name}"
-        '';
-
-      # Like mkApp but returns the derivation directly (no { type, program } wrapper).
-      # Use for home.packages installation without nix run overhead.
-      mkNucleusPackage =
+      # Unified shell app builder. Bundles all scripts/ and src/scripts/ into
+      # $out/scripts/ and $out/src/scripts/ with the exact repo directory
+      # structure. Creates a thin wrapper at $out/bin/nucleus-${name} that sets
+      # PATH from runtimeInputs and execs the real script from the mirror tree.
+      # This guarantees that $SCRIPT_DIR resolves identically in both source and
+      # build contexts.
+      runNucleusShellApp =
         pkgs:
         {
           name,
-          runtimeInputs,
+          script ? null,
+          runtimeInputs ? [ ],
           extraBin ? { },
-          script ? scripts + "/${name}.sh",
+          extraSourcedFiles ? { },
           excludeShellChecks ? [ ],
           extraShellCheckFlags ? [ ],
-          sourcedFiles ? { },
+          bundleDefault ? true,
         }:
-        assert pkgs.lib.assertMsg (builtins.baseNameOf script != "nucleus-${name}.sh") ''
-          script filename '${builtins.baseNameOf script}' for package '${name}' must not start with 'nucleus-'.
-          The nucleus- prefix is added automatically by the package derivation.
-          Name the script file '${name}.sh' instead.
-        '';
-        writeShellApplicationWithLib pkgs {
-          name = "nucleus-${name}";
-          runtimeInputs = runtimeInputs;
-          text = builtins.readFile script;
-          inherit
-            extraBin
-            excludeShellChecks
-            extraShellCheckFlags
-            sourcedFiles
-            ;
-        };
+        let
+          inherit (pkgs) lib;
 
-      # Helper for `nix run .#<name>` apps. Delegates to mkNucleusPackage.
-      # Defaults to ../scripts/${name}.sh.
+          # Auto-detect the main script file.
+          resolvedScript =
+            if script != null then
+              script
+            else if builtins.pathExists (../scripts + "/${name}.sh") then
+              ../scripts + "/${name}.sh"
+            else if builtins.pathExists (./scripts + "/${name}.sh") then
+              ./scripts + "/${name}.sh"
+            else
+              abort "runNucleusShellApp: cannot find script for '${name}'";
+
+          # Determine whether the resolved script lives in scripts/ or
+          # src/scripts/ by comparing store paths.
+          resolvedScriptStr = builtins.toString resolvedScript;
+          scriptsDirStr = builtins.toString ../scripts;
+          srcScriptsDirStr = builtins.toString ./scripts;
+          mirrorSubdir = if lib.hasPrefix scriptsDirStr resolvedScriptStr then "scripts" else "src/scripts";
+
+          shellcheckArgs =
+            lib.optionals (excludeShellChecks != [ ]) [
+              "--exclude"
+              (lib.concatStringsSep "," excludeShellChecks)
+            ]
+            ++ extraShellCheckFlags;
+        in
+        pkgs.runCommand "${name}-nucleus-app" { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
+          mkdir -p "$out/bin" "$out/scripts" "$out/src/scripts"
+
+          ${lib.optionalString bundleDefault ''
+            # Mirror all scripts with exact repo structure.
+            cp -r ${../scripts}/. "$out/scripts/"
+            chmod -R +w "$out/scripts/"
+            cp -r ${./scripts}/. "$out/src/scripts/"
+            chmod -R +w "$out/src/scripts/"
+          ''}
+
+          # Extra bin files.
+          ${lib.concatStringsSep "\n" (
+            lib.mapAttrsToList (target: src: ''
+              mkdir -p "$(dirname "$out/bin/${target}")"
+              cp "${src}" "$out/bin/${target}"
+              chmod +x "$out/bin/${target}"
+            '') extraBin
+          )}
+
+          # Extra sourced files.
+          ${lib.concatStringsSep "\n" (
+            lib.mapAttrsToList (target: src: ''
+              mkdir -p "$(dirname "$out/src/scripts/${target}")"
+              cp "${src}" "$out/src/scripts/${target}"
+              chmod +x "$out/src/scripts/${target}"
+            '') extraSourcedFiles
+          )}
+
+          # Create thin wrapper.
+          cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
+          #!${pkgs.runtimeShell}
+          set -euo pipefail
+          export PATH="${lib.makeBinPath runtimeInputs}:$PATH"
+          exec "$(unset CDPATH; cd -- "$(dirname -- "$0")/../${mirrorSubdir}" && pwd -P)/${name}.sh" "$@"
+          WRAPPER
+          chmod +x "$out/bin/nucleus-${name}"
+
+          # Shellcheck the wrapper and the real script.
+          real_script="$out/${mirrorSubdir}/${name}.sh"
+          shellcheck ${lib.escapeShellArgs shellcheckArgs} --source-path="$out" --source-path="$out/scripts" --source-path="$out/src/scripts" -x "$out/bin/nucleus-${name}"
+          if [ -f "$real_script" ]; then
+            shellcheck ${lib.escapeShellArgs shellcheckArgs} --source-path="$out" --source-path="$out/scripts" --source-path="$out/src/scripts" -x "$real_script"
+          fi
+        '';
+
+      # Helper for `nix run .#<name>` apps. Delegates to runNucleusShellApp.
       mkApp =
         pkgs: args:
         let
-          pkg = mkNucleusPackage pkgs args;
+          pkg = runNucleusShellApp pkgs args;
         in
         {
           type = "app";
           program = "${pkg}/bin/nucleus-${args.name}";
         };
 
-      # Derivation for nucleus-apply. Sibling scripts bundled via symlinkJoin so
-      # apply.sh resolves them through $_ash_script_dir. ai-sync and vm-setup
-      # are not bundled here — they are installed on PATH via home.packages
-      # (see mkNucleusApps) and thus available in post-apply after rebuild.
-      mkApplyPackage =
-        pkgs:
-        let
-          baseApply = writeShellApplicationWithLib pkgs {
-            name = "nucleus-apply";
+      # App wrapper for `nix run .#apply`. Sibling scripts (secrets/*,
+      # install-prek-hooks) are bundled automatically by runNucleusShellApp's
+      # default mirror, so apply.sh resolves them via $_ash_script_dir as
+      # before.
+      mkApplyApp = pkgs: {
+        type = "app";
+        program = "${
+          runNucleusShellApp pkgs {
+            name = "apply";
             runtimeInputs = [
               pkgs.curl
               pkgs.git
@@ -403,27 +411,8 @@
               pkgs.sops
               pkgs.ssh-to-age
             ];
-            text = builtins.readFile ./scripts/apply.sh;
-          };
-          siblingScripts = pkgs.runCommand "apply-siblings" { } ''
-            mkdir -p "$out/bin" "$out/bin/secrets"
-            install -m755 "${./scripts/secrets/generate-ssh-host-key.sh}" "$out/bin/secrets/generate-ssh-host-key.sh"
-            install -m755 "${./scripts/secrets/register-host-age-key.sh}" "$out/bin/secrets/register-host-age-key.sh"
-            install -m755 "${./scripts/install-prek-hooks.sh}" "$out/bin/install-prek-hooks.sh"
-          '';
-        in
-        pkgs.symlinkJoin {
-          name = "nucleus-apply";
-          paths = [
-            baseApply
-            siblingScripts
-          ];
-        };
-
-      # App wrapper for `nix run .#apply`.
-      mkApplyApp = pkgs: {
-        type = "app";
-        program = "${mkApplyPackage pkgs}/bin/nucleus-apply";
+          }
+        }/bin/nucleus-apply";
       };
 
       # PowerShell syntax validation (bundled deps so CI doesn't need system packages).
@@ -436,7 +425,7 @@
             pkgs.powershell
           ];
           text = ''
-            exec pwsh -NoLogo -NoProfile -NonInteractive -File "${scripts + "/check-pwsh.ps1"}" "$@"
+            exec pwsh -NoLogo -NoProfile -NonInteractive -File "${../scripts + "/check-pwsh.ps1"}" "$@"
           '';
         };
 
@@ -610,9 +599,6 @@
         mkApp pkgs {
           name = "bootstrap";
           runtimeInputs = [ ];
-          extraBin = {
-            "bootstrap-versions.env" = scripts + "/bootstrap-versions.env";
-          };
         };
 
       mkBumpLockfileApp =
@@ -641,23 +627,31 @@
       # Build the full set of nucleus app packages for a given package set.
       # Used by home-manager (home.packages) and flake packages output.
       mkNucleusApps = pkgs: {
-        nucleus-apply = mkApplyPackage pkgs;
-        nucleus-ai-sync = mkNucleusPackage pkgs {
+        nucleus-apply = runNucleusShellApp pkgs {
+          name = "apply";
+          runtimeInputs = [
+            pkgs.curl
+            pkgs.git
+            pkgs.jq
+            pkgs.openssh
+            pkgs.prek
+            pkgs.sops
+            pkgs.ssh-to-age
+          ];
+        };
+        nucleus-ai-sync = runNucleusShellApp pkgs {
           name = "ai-sync";
           runtimeInputs = [ pkgs.jq ];
         };
-        nucleus-bootstrap = mkNucleusPackage pkgs {
+        nucleus-bootstrap = runNucleusShellApp pkgs {
           name = "bootstrap";
           runtimeInputs = [ ];
-          extraBin = {
-            "bootstrap-versions.env" = scripts + "/bootstrap-versions.env";
-          };
         };
-        nucleus-bump-lockfile = mkNucleusPackage pkgs {
+        nucleus-bump-lockfile = runNucleusShellApp pkgs {
           name = "bump-lockfile";
           runtimeInputs = [ pkgs.jq ];
         };
-        nucleus-check = mkNucleusPackage pkgs {
+        nucleus-check = runNucleusShellApp pkgs {
           name = "check";
           runtimeInputs = [
             pkgs.bash
@@ -673,7 +667,7 @@
             pkgs.yq-go
           ];
         };
-        nucleus-check-packer = mkNucleusPackage pkgs {
+        nucleus-check-packer = runNucleusShellApp pkgs {
           name = "check-packer";
           runtimeInputs = [
             pkgs.bash
@@ -681,7 +675,7 @@
           ];
         };
         nucleus-check-pwsh = mkCheckPwshPackage pkgs;
-        nucleus-check-sh = mkNucleusPackage pkgs {
+        nucleus-check-sh = runNucleusShellApp pkgs {
           name = "check-sh";
           runtimeInputs = [
             pkgs.bash
@@ -689,14 +683,11 @@
             pkgs.shellcheck
           ];
         };
-        nucleus-cleanup-nix = mkNucleusPackage pkgs {
+        nucleus-cleanup-nix = runNucleusShellApp pkgs {
           name = "cleanup-nix";
           runtimeInputs = [ pkgs.bash ];
-          sourcedFiles = {
-            "cleanup-nix-build-artifacts.sh" = ./scripts/cleanup-nix-build-artifacts.sh;
-          };
         };
-        nucleus-cloud-setup = mkNucleusPackage pkgs {
+        nucleus-cloud-setup = runNucleusShellApp pkgs {
           name = "cloud-setup";
           runtimeInputs = [
             pkgs.git
@@ -704,15 +695,15 @@
             pkgs.rclone
           ];
         };
-        nucleus-config = mkNucleusPackage pkgs {
+        nucleus-config = runNucleusShellApp pkgs {
           name = "config";
           runtimeInputs = [ pkgs.jq ];
         };
-        nucleus-gs-pdf-opt = mkNucleusPackage pkgs {
+        nucleus-gs-pdf-opt = runNucleusShellApp pkgs {
           name = "gs-pdf-opt";
           runtimeInputs = [ pkgs.ghostscript ];
         };
-        nucleus-gc = mkNucleusPackage pkgs {
+        nucleus-gc = runNucleusShellApp pkgs {
           name = "gc";
           runtimeInputs = [
             pkgs.jq
@@ -720,7 +711,7 @@
             pkgs.home-manager
           ];
         };
-        nucleus-health-check = mkNucleusPackage pkgs {
+        nucleus-health-check = runNucleusShellApp pkgs {
           name = "health-check";
           runtimeInputs = [
             pkgs.curl
@@ -729,14 +720,14 @@
             pkgs.sops
           ];
         };
-        nucleus-replica-reset = mkNucleusPackage pkgs {
+        nucleus-replica-reset = runNucleusShellApp pkgs {
           name = "replica-reset";
           runtimeInputs = [
             pkgs.git
             pkgs.jq
           ];
         };
-        nucleus-replica-sync = mkNucleusPackage pkgs {
+        nucleus-replica-sync = runNucleusShellApp pkgs {
           name = "replica-sync";
           runtimeInputs = [
             pkgs.git
@@ -744,15 +735,15 @@
             pkgs.rclone
           ];
         };
-        nucleus-svc = mkNucleusPackage pkgs {
+        nucleus-svc = runNucleusShellApp pkgs {
           name = "svc";
           runtimeInputs = [ pkgs.jq ];
         };
-        nucleus-service-watchdog = mkNucleusPackage pkgs {
+        nucleus-service-watchdog = runNucleusShellApp pkgs {
           name = "service-watchdog";
           runtimeInputs = [ pkgs.jq ];
         };
-        nucleus-test = mkNucleusPackage pkgs {
+        nucleus-test = runNucleusShellApp pkgs {
           name = "test";
           runtimeInputs = [
             pkgs.bash
@@ -762,19 +753,16 @@
             pkgs.shellcheck
           ];
         };
-        nucleus-update = mkNucleusPackage pkgs {
+        nucleus-update = runNucleusShellApp pkgs {
           name = "update";
           runtimeInputs = [
             pkgs.gnupg
             pkgs.sops
           ];
         };
-        nucleus-vm-setup = mkNucleusPackage pkgs {
+        nucleus-vm-setup = runNucleusShellApp pkgs {
           name = "vm-setup";
           runtimeInputs = [ pkgs.jq ];
-          extraBin = {
-            "vm-setup-lib.sh" = ./scripts/lib/vm-setup-lib.sh;
-          };
         };
       };
 

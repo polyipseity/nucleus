@@ -224,7 +224,6 @@
         "nixos-generators": "nixos-generators",
         "nixpkgs": "nixpkgs",
         "rust-overlay": "rust-overlay",
-        "scripts": "scripts",
         "smudge-smudge": "smudge-smudge",
         "sops-nix": "sops-nix",
         "zackelia-formulae": "zackelia-formulae"
@@ -249,18 +248,6 @@
         "repo": "rust-overlay",
         "type": "github"
       }
-    },
-    "scripts": {
-      "flake": false,
-      "locked": {
-        "path": "../scripts",
-        "type": "path"
-      },
-      "original": {
-        "path": "../scripts",
-        "type": "path"
-      },
-      "parent": []
     },
     "smudge-smudge": {
       "flake": false,

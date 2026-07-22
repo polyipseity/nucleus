@@ -12,7 +12,8 @@ fi
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
-. "$SCRIPT_DIR/lib.sh"
+# shellcheck source=lib/lib.sh
+. "$SCRIPT_DIR/lib/lib.sh"
 
 # Usage
 usage() {

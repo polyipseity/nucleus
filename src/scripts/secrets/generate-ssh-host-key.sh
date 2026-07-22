@@ -8,7 +8,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
-. "$(dirname "$SCRIPT_DIR")/lib.sh"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
 
 usage() {
   usage_std "$(basename "$0")" "" "Generate SSH host keys if missing. No arguments accepted."

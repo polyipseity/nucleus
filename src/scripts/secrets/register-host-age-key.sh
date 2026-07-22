@@ -9,7 +9,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
-. "$(dirname "$SCRIPT_DIR")/lib.sh"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
 
 _rak_repo_root=""
 while [ "$#" -gt 0 ]; do
