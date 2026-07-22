@@ -171,20 +171,16 @@ function Sync-GitAndSshConfig {
         New-Item -ItemType Directory -Path $emptyTemplateDir -Force | Out-Null
       }
 
-      $globalIgnoreLines = @(
-        '# https://github.com/github/gitignore/blob/1046d8fba6b42d367da6314c934cddb6bfe5662e/Nix.gitignore {'
-        '# Ignore build outputs from performing a nix-build or `nix build` command'
-        'result'
-        'result-*'
-        ''
-        '# Ignore automatically generated direnv output'
-        '.direnv'
-        ''
-        '# Ignore NixOS interactive test driver history'
-        '**/.nixos-test-history'
-        '# }'
-      )
-      [System.IO.File]::WriteAllLines($globalIgnorePath, $globalIgnoreLines, [System.Text.UTF8Encoding]::new($false))
+      # Method 1 (writable symlink): global gitignore symlinked to repo file.
+      # Mirrors the POSIX git.nix deployment of system.gitignore.
+      $globalIgnoreSource = Join-Path $env:NUCLEUS_REPO_ROOT 'src\modules\configs\git\system.gitignore'
+      if (-not (Test-Path -Path $globalIgnoreSource -PathType Leaf)) {
+        throw "Sync-GitAndSshConfig: system.gitignore source not found at $globalIgnoreSource"
+      }
+      if (Test-Path -Path $globalIgnorePath) {
+        Remove-Item -Path $globalIgnorePath -Force
+      }
+      New-Item -Path $globalIgnorePath -ItemType SymbolicLink -Target $globalIgnoreSource -Force | Out-Null
 
       if (-not (Test-Path -Path $userIgnorePath)) {
         $userIgnoreTemplate = @(
