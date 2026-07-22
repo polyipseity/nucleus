@@ -28,7 +28,7 @@ def get_repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -> int:
+def run_check(files: list[str], repo_root: Path, format_enabled: bool = False, scoped: bool = False) -> int:
     """Run the check hook.
 
     On POSIX, delegates to ``scripts/check.sh`` directly (tools are available
@@ -43,6 +43,8 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -
             the check scripts.
         format_enabled: If True, pass ``--format`` to format Nix files
             in-place instead of just validating.
+        scoped: If True, pass ``--scoped`` to run in scoped mode
+            (skip whole-repo checks).
 
     Returns:
         Exit code from the underlying check process(es).  0 on success,
@@ -54,6 +56,8 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -
         cmd = [str(repo_root / "scripts" / "check.sh")]
         if format_enabled:
             cmd.append("--format")
+        if scoped:
+            cmd.append("--scoped")
         if files:
             cmd.extend(files)
         result = subprocess.run(cmd, cwd=repo_root, shell=False)
@@ -74,6 +78,8 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -
         "-File",
         str(repo_root / "scripts" / "check.ps1"),
     ]
+    if scoped:
+        cmd.append("--scoped")
     if files:
         cmd.extend(files)
     result = subprocess.run(cmd, shell=False)
@@ -89,11 +95,12 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False) -
 def run_test(files: list[str], repo_root: Path) -> int:
     """Run the test suite.
 
-    On POSIX, delegates to ``nix run ./src#test``.  On Windows, runs
-    ``scripts/test.ps1`` as a placeholder (future Windows test support).
+    On POSIX, delegates to ``nix run ./src#test`` (forwarding files after ``--``
+    for consistency).  On Windows, runs ``scripts/test.ps1`` as a placeholder
+    (future Windows test support).
 
     Args:
-        files: List of file paths (ignored — tests always run full suite).
+        files: List of file paths to forward to the test runner.
         repo_root: Absolute path to the repository root.
 
     Returns:
@@ -104,6 +111,9 @@ def run_test(files: list[str], repo_root: Path) -> int:
         env = os.environ.copy()
         env["NIX_CONFIG"] = "experimental-features = nix-command flakes"
         cmd = ["nix", "run", "./src#test"]
+        if files:
+            cmd.append("--")
+            cmd.extend(files)
         result = subprocess.run(cmd, env=env, cwd=repo_root, shell=False)
         if result.returncode != 0:
             print(
@@ -122,6 +132,8 @@ def run_test(files: list[str], repo_root: Path) -> int:
         "-File",
         str(repo_root / "scripts" / "test.ps1"),
     ]
+    if files:
+        cmd.extend(files)
     result = subprocess.run(cmd, shell=False)
     if result.returncode != 0:
         print(
@@ -152,6 +164,11 @@ def main() -> int:
         help="Format Nix files in-place (instead of just validating)",
     )
     parser.add_argument(
+        "--scoped",
+        action="store_true",
+        help="Run in scoped mode (skip whole-repo checks)",
+    )
+    parser.add_argument(
         "hook",
         choices=["check", "test"],
         help="Hook to run",
@@ -166,7 +183,7 @@ def main() -> int:
     repo_root = get_repo_root()
 
     if args.hook == "check":
-        return run_check(args.files, repo_root, format_enabled=args.format)
+        return run_check(args.files, repo_root, format_enabled=args.format, scoped=args.scoped)
     elif args.hook == "test":
         return run_test(args.files, repo_root)
     else:

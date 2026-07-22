@@ -58,8 +58,8 @@ hooks = [{ id = "check-dependabot" }, { id = "check-github-workflows" }]
 repo = "local"
 hooks = [
   # Consolidated check for shell, PowerShell, Packer, and Nix files.
-  { id = "repo-check", name = "repository checks", language = "python", files = "(\\.hcl|\\.nix|\\.pkr|\\.ps1|\\.sh)$", entry = "python scripts/prek-hooks.py check", args = [
-    "--format",
+  { id = "repo-check", name = "repository checks", language = "python", always_run = true, entry = "python scripts/prek-hooks.py check", args = [
+    "--format", "--scoped",
   ] },
   # Repository test suite — runs Nix test suite evaluation under tests/.
   # Always runs on pre-push regardless of changed files.
